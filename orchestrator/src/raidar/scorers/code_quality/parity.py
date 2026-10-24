@@ -1,6 +1,6 @@
 """Case-level coverage parity for G: leave out the cases whose outcome flipped, not the step.
 
-``code-quality@2`` (like ``@1`` and the SCB fork) reads a step's G as
+The SCB fork reads a step's G as
 ``ineligible`` (``coverage_parity_failed``) whenever the coverage run's outcomes
 differ from the grading run's in any case. One timing-sensitive grader case
 that passes in grading and fails under coverage therefore removes the step's
@@ -13,18 +13,25 @@ same run (environment, corpus, invocation, process ledger and the set of
 collected cases all equal, each run's outcome list equal to its ledger), the
 flipped cases, at most ``MAX_EXCLUDED_CASES``, are left out of both runs'
 outcomes, ledgers, coverage contexts and process events, and G is computed on
-the rest by the unchanged kernel. Anything else stays ``ineligible`` as in @2.
+the rest by the unchanged kernel. Anything else stays ``ineligible``.
 """
 
 from __future__ import annotations
 
+import json
 from collections import defaultdict
 from collections.abc import Iterable
+from pathlib import Path
 from typing import Any
 
 from pydantic import ValidationError
 
 from raidar.scorers.code_quality.lineage_models import RegressionRunEvidence
+from raidar.scorers.code_quality.transition import verifier_record_dir
+from raidar.scorers.sdk.context import StepInputs
+from raidar.verifier.coverage_store import read_offline_coverage
+from raidar.verifier.models import ParityVerdict
+from raidar.verifier.records import FORK_EVIDENCE_FILE
 
 # Parity reasons that a case-level exclusion can settle: only outcomes differ.
 CASE_LEVEL_REASONS = frozenset({"ledger_mismatch", "outcome_mismatch"})
@@ -33,6 +40,7 @@ MAX_EXCLUDED_CASES = 3
 CASE_EXCLUDED = "coverage_parity_cases_excluded"
 
 _Row = tuple[str, ...]
+ParitySource = tuple[ParityVerdict | None, dict[str, Any] | None]
 
 
 def _rows(run: RegressionRunEvidence) -> dict[str, set[_Row]]:
@@ -110,11 +118,40 @@ def reconcile(
     return _without(baseline, flipped), _without(produced, flipped), flipped
 
 
+def _in_trial_fork(step: StepInputs) -> dict[str, Any] | None:
+    directory = verifier_record_dir(step)
+    path = directory / FORK_EVIDENCE_FILE if directory is not None else None
+    if path is None or not path.is_file():
+        return None
+    try:
+        payload = json.loads(path.read_text())
+    except (OSError, ValueError):
+        return None
+    return payload if isinstance(payload, dict) else None
+
+
+def parity_source(step: StepInputs, store_root: Path | None) -> ParitySource | None:
+    """The parity verdict and G input behind a step, or None when there is none to read."""
+    record = step.record
+    if record is None:
+        return None
+    if record.coverage.enabled:
+        return record.coverage.parity, _in_trial_fork(step)
+    if store_root is None:
+        return None
+    stored = read_offline_coverage(
+        store_root, record.bundle.digest, record.step, record.snapshot.digest
+    )
+    return (stored.parity, stored.fork) if stored is not None else None
+
+
 __all__ = [
     "CASE_EXCLUDED",
     "CASE_LEVEL_REASONS",
     "MAX_EXCLUDED_CASES",
+    "ParitySource",
     "flipped_cases",
     "fork_runs",
+    "parity_source",
     "reconcile",
 ]

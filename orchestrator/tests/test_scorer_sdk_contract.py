@@ -51,8 +51,8 @@ from raidar.spec.metrics import MetricResolver
 from raidar.spec.references import RefKind, RegistryRef, RegistryReferenceError, ResolverSet
 from raidar.verifier.models import CaseStatus
 from tests.experiment_spec_support import (
-    PILOT_EXPERIMENT,
-    PILOT_ONESHOT,
+    MECHANICS_SMOKE,
+    SMOKE_EXPERIMENT,
     experiment_document,
     fixture_resolvers,
     write_experiment,
@@ -354,28 +354,28 @@ def test_builtin_manifests_declare_levels_the_policies_need() -> None:
     assert all(metric.tier.value == "deterministic" for metric in CORRECTNESS.metrics)
 
 
-def _pilot_scorer_refs() -> list[str]:
+def _committed_scorer_refs() -> list[str]:
     refs: list[str] = []
-    for path in (PILOT_EXPERIMENT, PILOT_ONESHOT):
+    for path in (MECHANICS_SMOKE, SMOKE_EXPERIMENT):
         refs += yaml.safe_load(path.read_text())["assessment"]["scorers"]
     return sorted(set(refs))
 
 
-def test_pilot_scorer_references_resolve_through_the_entry_point(tmp_path: Path) -> None:
+def test_committed_scorer_references_resolve_through_the_entry_point(tmp_path: Path) -> None:
     resolver = ResolverSet().resolver_for(RefKind.SCORER)
     assert resolver is not None
-    refs = _pilot_scorer_refs()
+    refs = _committed_scorer_refs()
     resolved = {
         ref: resolver.resolve(RegistryRef.parse(RefKind.SCORER, ref), base_dir=tmp_path)
         for ref in refs
     }
-    assert set(resolved) >= {"correctness@1", "code-quality@1", "resource-usage@1"}
-    quality = resolved["code-quality@1"]
+    assert set(resolved) >= {"correctness@1", "code-quality@3", "resource-usage@1"}
+    quality = resolved["code-quality@3"]
     assert quality.tool_versions["ruff"] == "0.8.6"
     assert quality.tool_versions["scb-check"] == "0.1.3"
     assert quality.metadata["manifest"] == CODE_QUALITY.definition()
     assert resolved["correctness@1"].tool_versions == {}
-    again = resolver.resolve(RegistryRef.parse(RefKind.SCORER, "code-quality@1"), base_dir=tmp_path)
+    again = resolver.resolve(RegistryRef.parse(RefKind.SCORER, "code-quality@3"), base_dir=tmp_path)
     assert again.digest == quality.digest
     with pytest.raises(RegistryReferenceError, match="unknown scorer 'nope@1'"):
         resolver.resolve(RegistryRef.parse(RefKind.SCORER, "nope@1"), base_dir=tmp_path)
@@ -388,7 +388,7 @@ def test_scorers_without_an_implementation_cannot_assess() -> None:
 
 
 def test_lock_records_scorer_manifests_and_tool_pins_byte_identically(tmp_path: Path) -> None:
-    scorers = _pilot_scorer_refs()
+    scorers = _committed_scorer_refs()
     path = write_experiment(tmp_path, experiment_document(assessment={"scorers": scorers}))
     problem, component, _ = fixture_resolvers()
     resolvers = ResolverSet(

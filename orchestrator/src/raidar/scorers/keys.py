@@ -22,7 +22,6 @@ def scorer_identity(registration: ScorerRegistration) -> ScorerIdentity:
             "ref": registration.manifest.ref,
             "manifest_digest": registration.manifest.digest(),
             "implementation_digest": registration.implementation_digest(),
-            "jev_policies": registration.jev_policy_bindings(),
         }
     )
 

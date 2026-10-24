@@ -9,7 +9,9 @@ lineage identities are V/E's unhashed eligible symbols (``diffs.rework_symbols``
 
 G reads the oracle's per-step fork-shaped run evidence
 (``raidar-oracle/steps/<step>/g-kernel-input.json``, WS-E E2): the graded run
-is the baseline and the separate coverage run is the produced run. A disabled
+is the baseline and the separate coverage run is the produced run. A step whose
+trial made the verifier's coverage pass reads it through ``in_trial_run_evidence``; one
+whose trial deferred it reads the store's offline run (``coverage_reader``). A disabled
 coverage run, a failed parity check or missing evidence makes the transition
 ``ineligible`` with typed reasons, never 0. That file's bytes are part of the
 step's oracle record digest (``trial_inputs._record_digest``), so a trial whose
@@ -19,6 +21,7 @@ G input differs or is missing never reuses another trial's Assessment key.
 from __future__ import annotations
 
 import json
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 
@@ -41,6 +44,7 @@ from raidar.verifier.records import FORK_EVIDENCE_FILE, step_record_dir
 
 PARITY_FAILED = "coverage_parity_failed"
 PROVENANCE_UNAVAILABLE = "canonical_provenance_unavailable"
+RunEvidences = tuple[RegressionRunEvidence, RegressionRunEvidence]
 
 
 @dataclass(frozen=True)
@@ -109,7 +113,8 @@ def verifier_record_dir(step: StepInputs) -> Path | None:
     return step_record_dir(step.snapshot.parents[depth - 1], step.step)
 
 
-def _run_evidence(step: StepInputs) -> tuple[RegressionRunEvidence, RegressionRunEvidence] | Gap:
+def in_trial_run_evidence(step: StepInputs) -> RunEvidences | Gap:
+    """G's run evidence from the trial's own coverage pass (record parity verdict, fork input)."""
     record = step.record
     if record is None:
         return Gap(AssessStatus.UNAVAILABLE, f"{step.step}: the oracle did not grade this step")
@@ -137,10 +142,11 @@ def _regression(
     pair: tuple[Measured, Measured] | Gap,
     steps: tuple[StepInputs, StepInputs],
     rework: TransitionReworkEvidence | Gap,
+    runs_for: Callable[[StepInputs], RunEvidences | Gap],
 ) -> RegressionAttribution | Gap:
     if isinstance(pair, Gap):
         return pair
-    runs = _run_evidence(steps[1])
+    runs = runs_for(steps[1])
     if isinstance(runs, Gap):
         return runs
     prior, current = pair
@@ -166,15 +172,20 @@ def _regression(
     return attribution
 
 
-def measure_transitions(measures: list[CheckpointMeasure]) -> list[TransitionMeasure]:
-    """R and G for every adjacent pair, with the R ledger reset after any gap."""
+def measure_transitions(
+    measures: list[CheckpointMeasure], runs_for: Callable[[StepInputs], RunEvidences | Gap]
+) -> list[TransitionMeasure]:
+    """R and G for every adjacent pair, G's run evidence from ``runs_for``.
+
+    R's ledger resets after any gap.
+    """
     ledger: Ledger = {}
     transitions = []
     for prior, current in zip(measures, measures[1:], strict=False):
         pair = _pair(prior, current)
         rework = _rework(pair, (prior.step.step, current.step.step), ledger)
         ledger = next_ledger(rework) if isinstance(rework, TransitionReworkEvidence) else {}
-        regression = _regression(pair, (prior.step, current.step), rework)
+        regression = _regression(pair, (prior.step, current.step), rework, runs_for)
         roots = None if isinstance(pair, Gap) else (pair[0].snapshot, pair[1].snapshot)
         transitions.append(TransitionMeasure(prior.step, current.step, rework, regression, roots))
     return transitions

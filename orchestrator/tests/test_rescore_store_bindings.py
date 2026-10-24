@@ -1,10 +1,9 @@
-"""`raidar assess --rescore` binds store-aware scorers, Jev policy modes, raw payloads and
+"""`raidar assess --rescore` binds store-aware scorers, raw payloads and
 problem-derived config (plan F2, G2, G5, H2)."""
 
 from __future__ import annotations
 
 import json
-import shutil
 from collections.abc import Mapping
 from pathlib import Path
 
@@ -14,10 +13,7 @@ from click.testing import CliRunner
 
 from raidar.cli import main
 from raidar.execution.assessment import ASSESSMENT_CONFIG_FILE
-from raidar.jev.policies import POLICY_DIR, PolicyMode
-from raidar.scorers import catalog
 from raidar.scorers.catalog import ScorerRegistration, ScorerRegistry, default_scorer_registry
-from raidar.scorers.keys import scorer_identity
 from raidar.scorers.rescore import RescoreOutcome, rescore_path
 from raidar.scorers.sdk.context import AssessContext, statused_result
 from raidar.scorers.sdk.result import AssessResult, AssessStatus
@@ -41,7 +37,6 @@ from tests.trace_trial_support import (
     write_traced_trial,
 )
 
-RUBRIC_POLICY = "code-quality.rubric-smells"
 DETERMINISTIC = "process-compliance@6"
 FAKE = "fake-quality@1"
 
@@ -112,37 +107,6 @@ def test_a_provisional_assessment_is_rerun_and_superseded_once_answered(
     with pytest.raises(AssessmentConflictError, match="different bytes"):
         rescore_path(trial, [FAKE], store, registry, replay=True)
     assert store.get(first.key) == complete
-
-
-def _with_mode(tmp_path: Path, mode: PolicyMode) -> Path:
-    policies = tmp_path / f"policies-{mode.value}"
-    shutil.copytree(POLICY_DIR, policies)
-    path = policies / f"{RUBRIC_POLICY}.yaml"
-    document = yaml.safe_load(path.read_text())
-    document["mode"] = mode.value
-    path.write_text(yaml.safe_dump(document))
-    return policies
-
-
-def test_the_jev_policy_mode_is_part_of_the_scorer_identity_and_key(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    registration = ScorerRegistration(fake_manifest("1"), jev_policies=(RUBRIC_POLICY,))
-    off = scorer_identity(registration)
-    assert off.jev_policies is not None
-    assert off.jev_policies[RUBRIC_POLICY].mode == "off", "the repo policy is parked"
-
-    monkeypatch.setattr(catalog, "JEV_POLICY_DIR", _with_mode(tmp_path, PolicyMode.SHADOW))
-    shadow = scorer_identity(registration)
-    assert shadow.jev_policies is not None
-    assert shadow.jev_policies[RUBRIC_POLICY].mode == "shadow"
-    assert off.payload() != shadow.payload()
-
-    # Scorers without Jev policies serialise exactly as before the field existed.
-    for ref in ("correctness@1", "code-quality@1", "resource-usage@1", DETERMINISTIC):
-        plain = scorer_identity(default_scorer_registry().get(ref))
-        assert plain.jev_policies is None
-        assert "jev_policies" not in plain.payload()
 
 
 class RawScorer(FakeScorer):
@@ -246,10 +210,9 @@ def test_builtin_registrations_declare_their_store_protocol_and_problem_bindings
     tmp_path: Path,
 ) -> None:
     registry = default_scorer_registry()
-    assert registry.get(DETERMINISTIC).jev_policies == ()
-    bound = registry.get(DETERMINISTIC).load_for_store(tmp_path / "store", replay_only=True)
+    bound = registry.get(DETERMINISTIC).load_for_store(tmp_path / "store")
     assert bound.manifest == registry.get(DETERMINISTIC).manifest
-    assert registry.get("code-quality@1").problem_config == ("entry_file",)
+    assert registry.get("code-quality@3").problem_config == ("entry_file",)
     assert registry.get("correctness@1").protocol_config == ("progression",)
     declared = {name for ref in registry.refs() for name in registry.get(ref).protocol_config}
     assert declared <= set(ProtocolSpec.model_fields), "protocol keys name ProtocolSpec fields"

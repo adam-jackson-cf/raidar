@@ -6,7 +6,7 @@ count:
 
 - V = 1 - |Ruff-flagged lines ∪ clone lines| / source LOC, with the pinned
   Ruff 0.8.6 SIM allowlist and the evaluator interpreter's token/AST clone
-  detector (``tool_env/snapshot_tool/evaluator.py``);
+  detector (``snapshot_tool/evaluator.py``);
 - E = 1 - high-complexity mass / total mass, where a function or method's
   mass is ``cc * sqrt(sloc)`` and high complexity is ``cc > 10``.
 

@@ -25,7 +25,6 @@ from click.testing import CliRunner
 from raidar.cli import main
 from raidar.scorers import catalog
 from raidar.scorers.catalog import default_scorer_registry
-from raidar.scorers.keys import scorer_identity
 from raidar.scorers.process_checks import (
     DeterministicProcessComplianceScorer,
     deterministic_process_compliance_scorer,
@@ -114,9 +113,6 @@ def test_the_manifest_has_only_deterministic_metrics_and_no_jev_binding() -> Non
     assert {metric.tier for metric in PROCESS_COMPLIANCE.metrics} == {Tier.DETERMINISTIC}
     registration = default_scorer_registry().get(REF)
     assert registration.store_implementation is None
-    assert registration.jev_policies == ()
-    assert registration.jev_policy_bindings() is None
-    assert scorer_identity(registration).jev_policies is None
     assert registration.load().manifest == PROCESS_COMPLIANCE
 
 
@@ -192,7 +188,7 @@ def test_an_invalid_config_is_an_error_on_every_metric(tmp_path: Path) -> None:
 def test_rescore_writes_no_jev_audit_and_nothing_is_provisional(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    # No key and no --jev-replay-only: nothing to answer, so nothing awaits.
+    # No key: nothing to answer, so nothing awaits.
     monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
     trial = write_traced_trial(
         tmp_path / "jobs" / "trial", [TracedStep("checkpoint_1", trace=_ambiguous())]
@@ -205,7 +201,6 @@ def test_rescore_writes_no_jev_audit_and_nothing_is_provisional(
     stored = AssessmentStore(store).get(entry["key"])
     assert stored is not None
     assert stored.provisional is False
-    assert stored.scorer.jev_policies is None
     assert not (store / "jev-audit").exists()
     item = _by_key(stored.result)["plan_written", "checkpoint_1"]
     assert (item.status, item.value) == (UNDETERMINED, None)

@@ -3,15 +3,14 @@
 ``raidar assess --rescore`` runs here. Each (trial, scorer) pair is keyed
 before anything runs. An existing key is reused unless ``replay`` is set, in
 which case the scorer runs again and the store verifies the bytes are
-identical. A provisional Assessment (some Jev decision had no answer yet) is
+identical. A provisional Assessment (an offline answer was not produced yet) is
 never reused: it runs again, and a complete result supersedes it. A new
 scorer version (or config, tool lock or input) gives a new key, so rescoring
 only ever adds Assessments (or completes a provisional one). Trial
 directories are read, never written.
 
-Scorers load through their store-aware factory when they have one (a scorer that
-decides under Jev gets a ``JevRuntime`` whose audit and cache live in the store;
-``jev_replay_only`` never calls the provider; no built-in scorer does today).
+Scorers load through their store-aware factory when they have one (the offline coverage
+runs and pre-fix grades they read live in the store).
 A scorer's problem-derived config keys (``entry_file``) default
 from ``AssessContext.problem_config``; explicit config wins. The key hashes the
 explicit config only: the defaults are a function of the problem reference and
@@ -22,7 +21,7 @@ Trial ids such as ``b01-p0-guided`` repeat across runs, so a trial inside a
 WS-D job (``<job>/trials/<trial>`` with ``<job>/run.json``) is recorded as
 its review id ``<experiment>.<job>.<trial>`` (``qualified_trial_id``; ``<job>/<trial>``
 when ``job.json`` names no experiment), in the
-store log and in every Jev decision the scorers audit. Calibration splits
+store log and in the Jev audit. Calibration splits
 over those ids are then disjoint across runs, and the Quality view attaches
 the decisions to exactly one trial. A trial outside a job keeps its directory
 name.
@@ -153,7 +152,6 @@ def assess(
     *,
     trial: str,
     replay: bool = False,
-    jev_replay_only: bool = False,
 ) -> AssessmentRecord:
     """Store (or reuse, or replay-verify) one scorer's Assessment of one trial."""
     parts = store_key(registration, ctx.config, context_inputs(ctx))
@@ -163,7 +161,7 @@ def assess(
         return AssessmentRecord(
             trial, identity.ref, key, RescoreOutcome.EXISTING, store.path_for(key)
         )
-    scorer = registration.load_for_store(store.root, replay_only=jev_replay_only, trial=trial)
+    scorer = registration.load_for_store(store.root)
     scored = replace(ctx, config=effective_config(registration, ctx))
     started = time.perf_counter()
     produced = _run(scorer, scored, store)
@@ -207,7 +205,6 @@ def rescore_path(
     inventory_policy: InventoryPolicy | None = None,
     bundle_override: Path | None = None,
     replay: bool = False,
-    jev_replay_only: bool = False,
 ) -> list[AssessmentRecord]:
     """Assess every trial under ``target`` (a trial or job dir) with each scorer."""
     registrations = _registrations(scorer_refs, registry, config or {})
@@ -231,16 +228,7 @@ def rescore_path(
         for registration in registrations:
             scorer_config = dict((config or {}).get(registration.manifest.ref, {}))
             ctx = replace(loaded, config=scorer_config)
-            records.append(
-                assess(
-                    store,
-                    registration,
-                    ctx,
-                    trial=trial_id,
-                    replay=replay,
-                    jev_replay_only=jev_replay_only,
-                )
-            )
+            records.append(assess(store, registration, ctx, trial=trial_id, replay=replay))
     return records
 
 

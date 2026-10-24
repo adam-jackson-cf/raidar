@@ -156,8 +156,13 @@ def _component(metric_id: str, name: str, level: MetricLevel) -> MetricSpec:
 
 CODE_QUALITY = ScorerManifest(
     id="code-quality",
-    version="1",
-    description="SCB-fork code-quality and inertia components over the per-step snapshots.",
+    version="3",
+    description=(
+        "SCB-fork code-quality and inertia components over the per-step snapshots; a step "
+        "graded without the in-trial coverage pass reads G's coverage run from the offline "
+        "run in the Assessment store, and G leaves out at most 3 cases whose outcome differs "
+        "between the grading and coverage runs instead of reading the step as ineligible."
+    ),
     runtimes=("python",),
     evidence_required=(
         EvidenceInput.SNAPSHOT_CURRENT,
@@ -194,6 +199,16 @@ CODE_QUALITY = ScorerManifest(
         _component("problem_architecture", "problem-level architecture mean (H)", _TRAJECTORY),
         _component("problem_rework", "problem-level rework mean (R)", _TRAJECTORY),
         _component("problem_regression", "problem-level regression-breadth mean (G)", _TRAJECTORY),
+        _metric(
+            "regression_parity_excluded_cases",
+            "Grader cases G left out at the transition because their outcome differed "
+            "between the grading run and the coverage run (0 when parity held).",
+            _TRANSITION,
+            MetricType.COUNT,
+            Direction.NEUTRAL,
+            Exactness.NATIVE,
+            unit="cases",
+        ),
     ),
 )
 

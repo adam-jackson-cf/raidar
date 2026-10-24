@@ -1,4 +1,4 @@
-"""code-quality@1 behaviour over stored trials (plan G2/G3 acceptance).
+"""code-quality@3 behaviour over stored trials (plan G2/G3 acceptance).
 
 A trial's per-step snapshots and verifier records go in; the Assessment holds
 V/E/H per checkpoint and R/G per transition with the fork's values, every
@@ -138,7 +138,6 @@ def test_problem_level_components_are_means_only_when_every_subject_has_a_value(
 @pytest.mark.parametrize(
     ("coverage", "parity", "reason"),
     [
-        (False, None, "coverage_parity_unavailable: coverage run disabled"),
         (
             True,
             ParityVerdict(eligible=False, reasons=("outcome_mismatch",)),

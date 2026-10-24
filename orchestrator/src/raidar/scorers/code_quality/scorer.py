@@ -1,10 +1,12 @@
-"""``code-quality@1``: the SCB fork's V/E/H per checkpoint and R/G per transition.
+"""``code-quality``: the SCB fork's V/E/H per checkpoint and R/G per transition.
 
-Implements the WS-F manifest ``builtin_manifests.CODE_QUALITY`` (plan G2/G3):
+Implements the manifest ``builtin_manifests.CODE_QUALITY`` (plan G2/G3):
 
 - ``verbosity``, ``erosion``, ``architecture``, ``lint_findings`` and
   ``production_loc`` for every planned checkpoint;
-- ``rework`` and ``regression`` for every adjacent transition;
+- ``rework`` and ``regression`` for every adjacent transition, and
+  ``regression_parity_excluded_cases``: how many grader cases G left out
+  (``coverage_reader``);
 - ``problem_*``: the plain mean of each component over every subject (the
   fork's problem-level component), available only when every subject has a
   value. The fork scores an unproduced checkpoint as a declared zero; here the
@@ -20,7 +22,10 @@ builds an empty graph (H = 1) when it is absent, for example after an agent
 renamed or deleted it; here H is ``ineligible`` (``entry_file_absent``).
 
 R and G follow the fork's live producers exactly (see ``diffs``), so every
-component keeps its ``scb-exact`` label.
+component keeps its ``scb-exact`` label. G's two run evidences come from the trial's own
+coverage pass, or, for a step whose trial deferred it, from the offline run in the
+Assessment store (``coverage_reader``); a step not yet produced there makes G
+``unavailable`` and the Assessment provisional (``awaiting_answers``).
 
 Config (``ctx.config``): ``entry_file``, the snapshot-relative entrypoint the
 call graph (H) starts from, as the fork's environment formats it (for example
@@ -32,14 +37,17 @@ from __future__ import annotations
 from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 from decimal import Decimal
+from pathlib import Path
 
 from raidar.scorers.builtin_manifests import CODE_QUALITY
 from raidar.scorers.code_quality.arithmetic import mean
 from raidar.scorers.code_quality.checkpoint import CheckpointMeasure, Gap, measure_checkpoint
+from raidar.scorers.code_quality.coverage_reader import CoverageReader
 from raidar.scorers.code_quality.measurement import ToolEnvironment, provisioned_environment
 from raidar.scorers.code_quality.observations import (
     ObservationSet,
     checkpoint_observations,
+    excluded_observation,
     transition_observations,
 )
 from raidar.scorers.code_quality.transition import measure_transitions
@@ -147,11 +155,17 @@ class CodeQualityScorer:
     """Observation-only scorer; the tool environment is provisioned on first use."""
 
     tools_factory: Callable[[], ToolEnvironment] = provisioned_environment
+    store_root: Path | None = None
     _tools: ToolEnvironment | None = field(default=None, init=False, repr=False)
+    _missing: list[str] = field(default_factory=list, init=False, repr=False)
 
     @property
     def manifest(self) -> ScorerManifest:
         return CODE_QUALITY
+
+    def awaiting_answers(self) -> bool:
+        """True when a deferred step's offline coverage run was not produced yet."""
+        return bool(self._missing)
 
     def _environment(self) -> ToolEnvironment:
         if self._tools is None:
@@ -159,6 +173,7 @@ class CodeQualityScorer:
         return self._tools
 
     def assess(self, ctx: AssessContext) -> AssessResult:
+        self._missing = []
         config = CodeQualityConfig.model_validate(dict(ctx.config))
         if not any(step.reached and step.snapshot is not None for step in ctx.steps):
             return statused_result(
@@ -174,18 +189,26 @@ class CodeQualityScorer:
                 f"measurement_environment_mismatch: tool environment unavailable: {error}",
             )
         measures = [measure_checkpoint(ctx, step, tools, config.entry_file) for step in ctx.steps]
+        reader = CoverageReader(self.store_root)
         observations = ObservationSet()
         for measure in measures:
             checkpoint_observations(observations, measure)
-        for transition in measure_transitions(measures):
+        for transition in measure_transitions(measures, reader.run_evidence):
             transition_observations(observations, transition)
+            observations.observations.append(excluded_observation(transition, reader.excluded))
         for metric, component in _PROBLEM_METRICS.items():
             observations.observations.append(
                 problem_mean(metric, observations.by_metric(component), observations.exact)
             )
+        self._missing = reader.missing
         return _result(observations, measures)
 
 
 def code_quality_scorer() -> CodeQualityScorer:
-    """Registry factory for ``code-quality@1``."""
+    """Registry factory for ``code-quality`` without a store (offline runs unavailable)."""
     return CodeQualityScorer()
+
+
+def code_quality_scorer_for_store(store_root: Path) -> CodeQualityScorer:
+    """Store-bound factory: reads deferred steps' offline coverage runs from the store."""
+    return CodeQualityScorer(store_root=store_root)

@@ -36,9 +36,11 @@ class _Provisioner(Protocol):
 
 QUALITY_TOOL = "scb-python-quality"
 DEFAULT_DEADLINE_S = 300.0
-_TOOL_ROOT = Path(__file__).resolve().parent / "tool_env"
+_TOOL_ROOT = Path(__file__).resolve().parent / "snapshot_tool"
 _BOOTSTRAP = (
-    "import sys; sys.path.insert(0, sys.argv.pop(1)); "
+    "import importlib.util as u, sys; "
+    "s = u.spec_from_file_location('snapshot_tool', sys.argv.pop(1) + '/__init__.py'); "
+    "m = u.module_from_spec(s); sys.modules['snapshot_tool'] = m; s.loader.exec_module(m); "
     "from snapshot_tool.cli import main; raise SystemExit(main(sys.argv[1:]))"
 )
 

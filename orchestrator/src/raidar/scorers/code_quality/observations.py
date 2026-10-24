@@ -7,6 +7,7 @@ float an Observation carries.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from decimal import Decimal
 
@@ -20,6 +21,7 @@ from raidar.scorers.code_quality.evidence import (
     rework_evidence,
     ruff_evidence,
 )
+from raidar.scorers.code_quality.parity import CASE_EXCLUDED
 from raidar.scorers.code_quality.transition import TransitionMeasure
 from raidar.scorers.inventory import FileRole
 from raidar.scorers.sdk.result import (
@@ -31,6 +33,8 @@ from raidar.scorers.sdk.result import (
 )
 
 _QUALITY_METRICS = ("verbosity", "erosion", "lint_findings", "production_loc")
+EXCLUDED_METRIC = "regression_parity_excluded_cases"
+NO_RUN_EVIDENCE = "no_g_run_evidence"
 
 
 @dataclass
@@ -124,3 +128,27 @@ def transition_observations(observations: ObservationSet, transition: Transition
         observations.evidence.extend(
             regression_evidence(observations.files, subject, roots[1], regression)
         )
+
+
+def excluded_observation(
+    transition: TransitionMeasure, excluded: Mapping[str, tuple[str, ...]]
+) -> Observation:
+    """Per transition: how many cases G left out (0 when parity held), or why none were read."""
+    subject = transition_subject(transition.prior.step, transition.current.step)
+    left_out = excluded.get(transition.current.step)
+    if left_out is None:
+        regression = transition.regression
+        detail = regression.reason if isinstance(regression, Gap) else "not read"
+        return Observation(
+            metric=EXCLUDED_METRIC,
+            subject=subject,
+            status=AssessStatus.NOT_APPLICABLE,
+            reason=f"{NO_RUN_EVIDENCE}: {detail}",
+        )
+    return Observation(
+        metric=EXCLUDED_METRIC,
+        subject=subject,
+        status=AssessStatus.OK,
+        value=float(len(left_out)),
+        reason=f"{CASE_EXCLUDED}: {', '.join(left_out)}" if left_out else None,
+    )

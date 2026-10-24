@@ -46,7 +46,7 @@ from raidar.scorers.code_quality.lineage_models import (
 from raidar.scorers.code_quality.models import CheckpointCorrectnessEvidence
 from raidar.scorers.code_quality.quality import ProductionQualityError, produce_production_quality
 from raidar.scorers.code_quality.regression import calculate_regression_breadth
-from raidar.scorers.code_quality.tool_env.snapshot_tool.cli import measure
+from raidar.scorers.code_quality.snapshot_tool.cli import measure
 from raidar.scorers.inventory import FileRole, build_inventory
 from tests.code_quality_support import (
     fork_goldens,

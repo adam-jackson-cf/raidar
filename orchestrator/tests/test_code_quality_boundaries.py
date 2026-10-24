@@ -1,4 +1,4 @@
-"""code-quality@1 rejection boundaries: evidence that cannot be trusted never becomes a value.
+"""code-quality@3 rejection boundaries: evidence that cannot be trusted never becomes a value.
 
 Mirrors the fork's own boundary contract: a wrong Ruff version, a foreign
 diagnostic, a parser failure, a missing or unsuccessful file row, malformed
@@ -31,8 +31,8 @@ from raidar.scorers.code_quality.measurement import (
     run_process,
 )
 from raidar.scorers.code_quality.quality import ProductionQualityError, produce_production_quality
-from raidar.scorers.code_quality.tool_env.snapshot_tool import cli
-from raidar.scorers.code_quality.tool_env.snapshot_tool.evaluator import (
+from raidar.scorers.code_quality.snapshot_tool import cli
+from raidar.scorers.code_quality.snapshot_tool.evaluator import (
     EvaluatorInputError,
     evaluate,
 )

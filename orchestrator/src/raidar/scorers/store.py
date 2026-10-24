@@ -17,19 +17,12 @@ Raw payloads (a scorer's unparsed tool output, kept for audit) live in a
 content-addressed ``raw/`` slot beside the objects; an Assessment names them
 by sha256 in ``raw_payloads``, so a replay proves their bytes too.
 
-A scorer that decides under Jev policies carries their effective mode and
-digest in its identity (``ScorerIdentity.jev_policies``), which is part of the
-key: a mode change (shadow -> enforce, or a run lowered to off) changes what
-the Assessment says and how it may be used, so it never reuses an Assessment
-made under another mode. Shadow observations stay out of verdicts either way
-(``raidar.jev.gating``).
-
-Whether Jev answered is not in the key, because analysis must find one
-Assessment per key. Instead an Assessment made while some decision had no
-answer yet (no API key, cache miss, provider failure) is stored as
-``provisional``, with one fixed reason for every such decision, so its bytes do
-not depend on ``--jev-replay-only`` or the environment. A provisional
-Assessment is the one exception to add-only:
+Whether an offline answer exists (a deferred step's coverage run, a pre-fix grade)
+is not in the key, because analysis must find one Assessment per key. Instead an
+Assessment made while some answer had not been produced yet is stored as
+``provisional``, with one fixed reason for every such gap, so its bytes do not
+depend on the environment. A provisional Assessment is the one exception to
+add-only:
 
 - a rescore runs it again rather than reusing it;
 - a different, complete Assessment for the same key supersedes it (the old
@@ -37,9 +30,8 @@ Assessment is the one exception to add-only:
 - a different provisional one is still a conflict, as is any change to a
   complete Assessment.
 
-Identities and Assessments without Jev policies, raw payloads or a provisional
-mark serialise exactly as before those fields existed, so their keys and bytes
-are unchanged.
+Assessments without raw payloads or a provisional mark serialise without those
+fields.
 """
 
 from __future__ import annotations
@@ -78,23 +70,10 @@ class PutOutcome(StrEnum):
     SUPERSEDED = "superseded"
 
 
-class JevPolicyBinding(SdkModel):
-    mode: str = Field(min_length=1)
-    digest: str = Field(pattern=_SHA256)
-
-
 class ScorerIdentity(SdkModel):
     ref: str = Field(min_length=1)
     manifest_digest: str = Field(min_length=1)
     implementation_digest: str | None
-    jev_policies: dict[str, JevPolicyBinding] | None = None
-
-    def payload(self) -> dict[str, Any]:
-        """JSON form; ``jev_policies`` only when the scorer decides under Jev."""
-        dumped = self.model_dump(mode="json")
-        if self.jev_policies is None:
-            dumped.pop("jev_policies")
-        return dumped
 
 
 class Assessment(SdkModel):
@@ -121,7 +100,6 @@ class Assessment(SdkModel):
 
     def render(self) -> bytes:
         dumped = self.model_dump(mode="json")
-        dumped["scorer"] = self.scorer.payload()
         if not self.raw_payloads:
             dumped.pop("raw_payloads")
         if not self.provisional:
@@ -138,7 +116,7 @@ def assessment_key(
 ) -> str:
     return digest_json(
         {
-            "scorer": scorer.payload(),
+            "scorer": scorer.model_dump(mode="json"),
             "config": dict(config),
             "tool_lock": dict(tool_lock),
             "inputs": dict(inputs),

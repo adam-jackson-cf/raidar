@@ -10,8 +10,7 @@ Assessment key. Each module is hashed as its normalised syntax tree
 the digest, and so every stored Assessment, unchanged. The lock resolves ``name@version``
 scorer references here through the ``raidar.spec.resolvers`` entry point
 ``scorer`` and records the manifest, the implementation's source digest, the
-pinned versions of the pack tools the scorer declares and, for a scorer that
-decides under Jev policies, those policies' effective mode and digest.
+pinned versions of the pack tools the scorer declares.
 
 A scorer whose implementation has not landed still resolves (its manifest is
 the contract), but it cannot assess: loading it raises
@@ -28,12 +27,12 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from raidar.jev.policies import POLICY_DIR, PolicyRegistry
 from raidar.packs.python.models import ToolLock, load_tool_lock
 from raidar.scorers.builtin_manifests import BUILTIN_MANIFESTS
+from raidar.scorers.gate_effort.manifest import GATE_EFFORT
+from raidar.scorers.process_checks.manifest import PROCESS_COMPLIANCE
 from raidar.scorers.sdk.context import Scorer
 from raidar.scorers.sdk.manifest import ANY_RUNTIME, ScorerManifest
-from raidar.scorers.versioned_manifests import VERSIONED_MANIFESTS
 from raidar.spec.canonical import digest_json
 from raidar.spec.references import (
     RefKind,
@@ -45,9 +44,6 @@ from raidar.spec.source_digest import SOURCE_DIGEST_SCHEME, python_source_digest
 
 LockedTools = dict[str, dict[str, dict[str, Any]]]
 RUNTIME_TOOL_LOCKS: dict[str, Callable[[], ToolLock]] = {"python": load_tool_lock}
-# The repo-versioned Jev policies a store-bound runtime decides under
-# (``raidar.jev.session.open_runtime`` reads the same directory).
-JEV_POLICY_DIR = POLICY_DIR
 
 
 class ScorerUnavailableError(RuntimeError):
@@ -143,7 +139,7 @@ def _source_digest(module: str) -> str:
 
 
 StoreFactory = Callable[..., Scorer]
-"""``factory(store_root, *, replay_only, trial) -> Scorer`` (a ``module:attribute`` target)."""
+"""``factory(store_root) -> Scorer`` (a ``module:attribute`` target)."""
 
 
 def _split_target(target: str, field: str) -> tuple[str, str]:
@@ -158,12 +154,9 @@ class ScorerRegistration:
     """A manifest, its implementation, and what it needs from the assessment run.
 
     - ``store_implementation``: a factory that binds the scorer to an assessment
-      store (for example a Jev runtime whose audit and cache live in it).
+      store (for the offline runs and grades it reads from it).
       ``raidar assess --rescore`` loads through it; without one it uses
       ``implementation``.
-    - ``jev_policies``: the Jev policy ids the store-bound scorer decides under.
-      Their effective definitions (mode included) join the scorer identity, so a
-      mode change never reuses an Assessment made under another mode.
     - ``problem_config``: config keys whose default comes from the problem
       (``AssessContext.problem_config``); explicit scorer config wins.
     - ``protocol_config``: config keys the experiment protocol sets (for
@@ -176,7 +169,6 @@ class ScorerRegistration:
     manifest: ScorerManifest
     implementation: str | None = None
     store_implementation: str | None = None
-    jev_policies: tuple[str, ...] = ()
     problem_config: tuple[str, ...] = ()
     protocol_config: tuple[str, ...] = ()
     errata_config: bool = False
@@ -215,29 +207,14 @@ class ScorerRegistration:
         factory = getattr(importlib.import_module(module_name), attribute)
         return self._checked(factory(), self.implementation)
 
-    def load_for_store(
-        self, store_root: Path, *, replay_only: bool = False, trial: str | None = None
-    ) -> Scorer:
+    def load_for_store(self, store_root: Path) -> Scorer:
         """The scorer bound to an assessment store; ``load()`` when it needs no store."""
         if self.store_implementation is None:
             return self.load()
         module_name, attribute = _split_target(self.store_implementation, "store_implementation")
         factory: StoreFactory = getattr(importlib.import_module(module_name), attribute)
-        scorer = factory(store_root, replay_only=replay_only, trial=trial)
+        scorer = factory(store_root)
         return self._checked(scorer, self.store_implementation)
-
-    def jev_policy_bindings(self) -> dict[str, dict[str, str]] | None:
-        """``{policy id: {mode, digest}}`` of the repo-versioned policies; None without Jev."""
-        if not self.jev_policies:
-            return None
-        registry = PolicyRegistry.from_dir(JEV_POLICY_DIR)
-        return {
-            policy_id: {
-                "mode": registry.get(policy_id).mode.value,
-                "digest": registry.get(policy_id).digest(),
-            }
-            for policy_id in sorted(self.jev_policies)
-        }
 
 
 def tool_lock_for(manifest: ScorerManifest) -> LockedTools:
@@ -293,59 +270,29 @@ class ScorerRegistry:
             ) from exc
 
 
-# ``code-quality@2``, ``process-compliance@2``-``@6`` and ``gate-effort@1``-``@9`` keep their
-# manifests beside their implementations so the released scorers' digests (which cover
-# ``builtin_manifests``) stay unchanged.
-REGISTERED_MANIFESTS = (*BUILTIN_MANIFESTS, *VERSIONED_MANIFESTS)
+REGISTERED_MANIFESTS = (*BUILTIN_MANIFESTS, PROCESS_COMPLIANCE, GATE_EFFORT)
 
 BUILTIN_IMPLEMENTATIONS: dict[str, str] = {
     "correctness@1": "raidar.scorers.correctness:correctness_scorer",
-    "code-quality@1": "raidar.scorers.code_quality:code_quality_scorer",
+    "code-quality@3": "raidar.scorers.code_quality:code_quality_scorer",
     "resource-usage@1": "raidar.scorers.resource_usage:resource_usage_scorer",
-    "process-compliance@2": (
+    "process-compliance@6": (
         "raidar.scorers.process_checks:deterministic_process_compliance_scorer"
     ),
-    "gate-effort@1": "raidar.scorers.gate_effort:gate_effort_scorer",
-    "gate-effort@2": "raidar.scorers.gate_effort_v2:gate_effort_v2_scorer",
-    "gate-effort@3": "raidar.scorers.gate_effort_v3:gate_effort_v3_scorer",
-    "gate-effort@4": "raidar.scorers.gate_effort_v4:gate_effort_v4_scorer",
-    "gate-effort@5": "raidar.scorers.gate_effort_v5:gate_effort_v5_scorer",
-    "process-compliance@3": "raidar.scorers.process_checks_v3:process_compliance_v3_scorer",
-    "gate-effort@6": "raidar.scorers.gate_effort_v6:gate_effort_v6_scorer",
-    "process-compliance@4": "raidar.scorers.process_checks_v4:process_compliance_v4_scorer",
-    "code-quality@2": "raidar.scorers.code_quality_v2:code_quality_v2_scorer",
-    "gate-effort@7": "raidar.scorers.gate_effort_v7:gate_effort_v7_scorer",
-    "process-compliance@5": "raidar.scorers.process_checks_v5:process_compliance_v5_scorer",
-    "gate-effort@8": "raidar.scorers.gate_effort_v8:gate_effort_v8_scorer",
-    "process-compliance@6": "raidar.scorers.process_checks_v6:process_compliance_v6_scorer",
-    "code-quality@3": "raidar.scorers.code_quality_v3:code_quality_v3_scorer",
-    "gate-effort@9": "raidar.scorers.gate_effort_v9:gate_effort_v9_scorer",
-    "gate-effort@10": "raidar.scorers.gate_effort_v10:gate_effort_v10_scorer",
+    "gate-effort@10": "raidar.scorers.gate_effort:gate_effort_scorer",
 }
-# Scorers bound to the assessment store at rescore time, with the Jev policies
-# that store-bound runtime decides under (none today: gate-effort@4 and later and
-# code-quality@2 and later decide under no Jev policy).
-BUILTIN_STORE_IMPLEMENTATIONS: dict[str, tuple[str, tuple[str, ...]]] = {
-    # gate-effort@4 reads the offline grades of guardrail-gate@3's pre-fix snapshots,
+# Scorers bound to the assessment store at rescore time.
+BUILTIN_STORE_IMPLEMENTATIONS: dict[str, str] = {
+    # gate-effort reads the offline grades of guardrail-gate's pre-fix snapshots,
     # which ``raidar assess --rescore`` writes to the store (raidar.verifier.prefix_grade).
-    "gate-effort@4": ("raidar.scorers.gate_effort_v4:gate_effort_v4_scorer_for_store", ()),
-    "gate-effort@5": ("raidar.scorers.gate_effort_v5:gate_effort_v5_scorer_for_store", ()),
-    "gate-effort@6": ("raidar.scorers.gate_effort_v6:gate_effort_v6_scorer_for_store", ()),
-    "gate-effort@7": ("raidar.scorers.gate_effort_v7:gate_effort_v7_scorer_for_store", ()),
-    "gate-effort@8": ("raidar.scorers.gate_effort_v8:gate_effort_v8_scorer_for_store", ()),
-    "gate-effort@9": ("raidar.scorers.gate_effort_v9:gate_effort_v9_scorer_for_store", ()),
-    "gate-effort@10": ("raidar.scorers.gate_effort_v10:gate_effort_v10_scorer_for_store", ()),
-    # code-quality@2 reads the offline coverage runs of steps whose trial deferred the
+    "gate-effort@10": "raidar.scorers.gate_effort:gate_effort_scorer_for_store",
+    # code-quality reads the offline coverage runs of steps whose trial deferred the
     # coverage pass, which ``raidar assess --rescore`` makes into the store
     # (raidar.verifier.coverage_offline).
-    "code-quality@2": ("raidar.scorers.code_quality_v2:code_quality_v2_scorer_for_store", ()),
-    # code-quality@3 reads the same offline runs (G leaves out a few flipped cases, not the step).
-    "code-quality@3": ("raidar.scorers.code_quality_v3:code_quality_v3_scorer_for_store", ()),
+    "code-quality@3": "raidar.scorers.code_quality:code_quality_scorer_for_store",
 }
 # Config keys a scorer takes from the problem unless the experiment sets them.
 BUILTIN_PROBLEM_CONFIG: dict[str, tuple[str, ...]] = {
-    "code-quality@1": ("entry_file",),
-    "code-quality@2": ("entry_file",),
     "code-quality@3": ("entry_file",),
 }
 # Config keys the experiment's protocol sets (``ProtocolSpec`` field names).
@@ -358,12 +305,10 @@ BUILTIN_ERRATA_CONFIG: frozenset[str] = frozenset({"correctness@1"})
 
 
 def _builtin(manifest: ScorerManifest) -> ScorerRegistration:
-    store_implementation, jev_policies = BUILTIN_STORE_IMPLEMENTATIONS.get(manifest.ref, (None, ()))
     return ScorerRegistration(
         manifest,
         BUILTIN_IMPLEMENTATIONS.get(manifest.ref),
-        store_implementation=store_implementation,
-        jev_policies=jev_policies,
+        store_implementation=BUILTIN_STORE_IMPLEMENTATIONS.get(manifest.ref),
         problem_config=BUILTIN_PROBLEM_CONFIG.get(manifest.ref, ()),
         protocol_config=BUILTIN_PROTOCOL_CONFIG.get(manifest.ref, ()),
         errata_config=manifest.ref in BUILTIN_ERRATA_CONFIG,
@@ -395,9 +340,6 @@ class ScorerResolver:
             "implementation_digest": registration.implementation_digest(),
             "tool_lock": tool_lock,
         }
-        jev_policies = registration.jev_policy_bindings()
-        if jev_policies is not None:
-            metadata["jev_policies"] = jev_policies
         return ResolvedReference(
             ref=ref,
             digest=digest_json(metadata),

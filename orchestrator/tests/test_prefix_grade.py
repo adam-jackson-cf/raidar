@@ -5,7 +5,7 @@ with its tree digest) gets that snapshot graded with the step's own bundle,
 sandbox and timeout into the Assessment store, never the job; a stored grade is
 not graded again; a changed snapshot is an error, never a grade; the regrade
 compares a fresh grade with the stored one. ``raidar assess --rescore`` grades
-first only when a scorer that reads the grades (gate-effort@4) runs.
+first only when a scorer that reads the grades (gate-effort@10) runs.
 """
 
 from __future__ import annotations
@@ -118,10 +118,9 @@ async def test_a_trial_without_pre_fix_snapshots_grades_nothing(tmp_path: Path) 
 @pytest.mark.parametrize(
     ("scorers", "replay", "grades"),
     [
-        (("gate-effort@4",), False, True),
-        (("gate-effort@7",), False, True),
-        (("gate-effort@4", "correctness@1"), True, False),
-        (("gate-effort@3", "correctness@1"), False, False),
+        (("gate-effort@10",), False, True),
+        (("gate-effort@10", "correctness@1"), True, False),
+        (("correctness@1", "code-quality@3"), False, False),
     ],
 )
 def test_rescore_grades_first_only_for_a_scorer_that_reads_the_grades(

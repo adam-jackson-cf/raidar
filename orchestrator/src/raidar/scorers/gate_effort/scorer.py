@@ -55,11 +55,8 @@ def gate_effort_scorer() -> GateEffortScorer:
     return GateEffortScorer()
 
 
-def gate_effort_scorer_for_store(
-    store_root: Path, *, replay_only: bool = False, trial: str | None = None
-) -> GateEffortScorer:
+def gate_effort_scorer_for_store(store_root: Path) -> GateEffortScorer:
     """Store-bound factory: reads pre-fix grades from the Assessment store."""
-    del replay_only, trial
     return GateEffortScorer(store_root)
 
 
