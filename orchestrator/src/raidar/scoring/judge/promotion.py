@@ -41,7 +41,7 @@ import math
 from collections.abc import Collection, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 import yaml
 
@@ -200,7 +200,7 @@ class _Derived:
     evaluation: SplitMetrics
     readiness: Readiness
     corpus: str
-    reviewers: dict[str, int]
+    reviewers: dict[Literal["human", "model"], int]
     reviewer_models: tuple[str, ...]
 
 
@@ -251,7 +251,7 @@ def build_promotion(
         runtimes=tuple(runtime for runtime in policy.runtimes if runtime != "*") or ("*",),
         split=split,
         regression_corpus=derived.corpus,
-        reviewers=derived.reviewers,  # type: ignore[arg-type]
+        reviewers=derived.reviewers,
         reviewer_models=derived.reviewer_models,
         calibration_metrics=derived.calibration,
         evaluation_metrics=derived.evaluation,

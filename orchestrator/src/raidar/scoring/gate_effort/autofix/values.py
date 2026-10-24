@@ -1,6 +1,6 @@
 """The autofix values of one step: passes, what they fixed, counts after it.
 
-Read from the step's ``autofix`` block (``autofix_records``) beside the step's
+Read from the step's ``autofix`` block (``autofix.records``) beside the step's
 cross-mode values. A step whose gate ran without autofix (guardrail-gate@1-@3,
 or @4 with it off) has every autofix value ``not_applicable`` and its raw counts
 are the step's own. Enforced (``apply``): the first gate run is the post-autofix
@@ -16,7 +16,7 @@ from collections.abc import Mapping
 from pathlib import Path
 
 from raidar.scoring.framework.result import AssessStatus
-from raidar.scoring.gate_effort.autofix_metrics import (
+from raidar.scoring.gate_effort.autofix.metrics import (
     AUTOFIX_ERRORS,
     AUTOFIX_FILES,
     AUTOFIX_LINES,
@@ -27,8 +27,8 @@ from raidar.scoring.gate_effort.autofix_metrics import (
     FIRST_RUN_RAW,
     STEP_END_POST,
 )
-from raidar.scoring.gate_effort.autofix_records import AutofixPass, StepAutofix
-from raidar.scoring.gate_effort.cross_mode_metrics import FIRST_RUN_NET, STEP_END_NET
+from raidar.scoring.gate_effort.autofix.records import AutofixPass, StepAutofix
+from raidar.scoring.gate_effort.cross_mode.metrics import FIRST_RUN_NET, STEP_END_NET
 from raidar.scoring.gate_effort.families import FAMILIES, family_of
 from raidar.scoring.gate_effort.findings import CODES_UNLISTED, UNTYPED_CALL_CODE, codes_once
 from raidar.scoring.gate_effort.folding import duplicates

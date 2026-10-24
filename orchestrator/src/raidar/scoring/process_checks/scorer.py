@@ -35,7 +35,7 @@ from pydantic import ValidationError
 from raidar.scoring.framework.context import AssessContext, statused_result
 from raidar.scoring.framework.manifest import MetricLevel, ScorerManifest
 from raidar.scoring.framework.result import AssessResult, AssessStatus, Provenance
-from raidar.scoring.process_checks.core import ProcessComplianceConfig, combine
+from raidar.scoring.process_checks.assess import ProcessComplianceConfig, combine
 from raidar.scoring.process_checks.manifest import PROCESS_COMPLIANCE
 from raidar.scoring.process_checks.outputs import not_run_total
 from raidar.scoring.process_checks.stall import STALL_METRICS, stall_observations

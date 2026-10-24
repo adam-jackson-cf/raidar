@@ -1,4 +1,4 @@
-"""The deterministic core of ``process-compliance``.
+"""Assessing one ``process-compliance`` step and combining steps, deterministically.
 
 One step's ATIF trajectory (every session, including review-loop and
 sub-agent sessions) is classified into process events (``trace_events``) and

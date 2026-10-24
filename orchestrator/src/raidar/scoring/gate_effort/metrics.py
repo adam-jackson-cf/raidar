@@ -2,7 +2,7 @@
 
 The ids and descriptions are part of the scorer's identity (``gate_effort.manifest``). This
 module holds the base effort metrics, the tests check and fix-round correctness, and the
-blocking counts that compare across gate modes; ``cross_mode_metrics`` and ``autofix_metrics``
+blocking counts that compare across gate modes; ``cross_mode.metrics`` and ``autofix.metrics``
 hold the rest.
 """
 

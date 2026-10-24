@@ -1,20 +1,20 @@
 """Manifest of ``gate-effort``: what a commit gate cost the agent, per step.
 
 It lives beside its implementation. The metrics are the ones of ``metrics``,
-``cross_mode_metrics`` and ``autofix_metrics``, in that order (ids are part of the
+``cross_mode.metrics`` and ``autofix.metrics``, in that order (ids are part of the
 scorer's identity).
 """
 
 from __future__ import annotations
 
 from raidar.scoring.framework.manifest import EvidenceInput, ScorerManifest
-from raidar.scoring.gate_effort.autofix_metrics import (
+from raidar.scoring.gate_effort.autofix.metrics import (
     AUTOFIX_STEP_METRICS,
     AUTOFIX_TRAJECTORY_METRICS,
     NEW_AUTOFIX_STEP_METRICS,
     NEW_AUTOFIX_TRAJECTORY_METRICS,
 )
-from raidar.scoring.gate_effort.cross_mode_metrics import (
+from raidar.scoring.gate_effort.cross_mode.metrics import (
     EX_CASCADE_STEP_METRICS,
     EX_CASCADE_TRAJECTORY_METRICS,
     NET_STEP_METRICS,

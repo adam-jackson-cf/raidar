@@ -11,13 +11,13 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 
 from raidar.scoring.framework.result import AssessStatus
-from raidar.scoring.gate_effort.autofix_metrics import (
+from raidar.scoring.gate_effort.autofix.metrics import (
     AUTOFIX_SUMMED,
     FIRST_PASS_POST,
     NEW_METRICS,
     STEP_END_POST,
 )
-from raidar.scoring.gate_effort.cross_mode_metrics import (
+from raidar.scoring.gate_effort.cross_mode.metrics import (
     FINAL_STEP_END_EX_CASCADE,
     FINAL_STEP_END_NET,
     FIRST_PASS_VARIANT_WHAT,

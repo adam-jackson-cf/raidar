@@ -57,10 +57,8 @@ _DEFINITIONS = (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)
 _SKIPPED_MODULE_NODES = (*_DEFINITIONS, ast.Import, ast.ImportFrom)
 
 
-def _start(node: ast.AST) -> int:
-    decorators = getattr(node, "decorator_list", [])
-    lines = [node.lineno, *(decorator.lineno for decorator in decorators)]  # type: ignore[attr-defined]
-    return min(lines)
+def _start(node: ast.FunctionDef | ast.AsyncFunctionDef | ast.ClassDef) -> int:
+    return min([node.lineno, *(decorator.lineno for decorator in node.decorator_list)])
 
 
 def _text(lines: list[str], start: int, end: int) -> str:

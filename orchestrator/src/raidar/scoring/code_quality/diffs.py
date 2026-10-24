@@ -23,7 +23,7 @@ from __future__ import annotations
 import difflib
 from collections.abc import Iterable, Mapping, Sequence
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 from raidar.scoring.code_quality.lineage_models import (
     LineageCandidate,
@@ -59,9 +59,11 @@ def changed_lines(
                 removed.update((path, line) for line in range(prior_start + 1, prior_end + 1))
                 added.update((path, line) for line in range(current_start + 1, current_end + 1))
 
-    def ordered(lines: set[tuple[str, int]], side: str) -> tuple[PhysicalLineEvidence, ...]:
+    def ordered(
+        lines: set[tuple[str, int]], side: Literal["added", "removed"]
+    ) -> tuple[PhysicalLineEvidence, ...]:
         return tuple(
-            PhysicalLineEvidence(path=path, line=line, side=side)  # type: ignore[arg-type]
+            PhysicalLineEvidence(path=path, line=line, side=side)
             for path, line in sorted(lines, key=lambda item: (_utf8(item[0]), item[1]))
         )
 

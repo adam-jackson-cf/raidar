@@ -12,7 +12,7 @@ from __future__ import annotations
 from collections.abc import Callable, Mapping
 
 from raidar.scoring.framework.result import AssessStatus
-from raidar.scoring.gate_effort.cross_mode_metrics import (
+from raidar.scoring.gate_effort.cross_mode.metrics import (
     AUTOFIX_CODES,
     EX_CASCADE_STEP_METRICS,
     FIRST_PASS_EXCEPT_AUTOFIX,

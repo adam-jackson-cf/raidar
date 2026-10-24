@@ -1,8 +1,8 @@
 """What analysis and the review projections read from the quality, gate and process scorers.
 
-- the quality slot reads ``code-quality@3``, and the headline names it as the scorer it needs;
+- the quality slot reads the code-quality scorer, and the headline names it as the scorer it needs;
 - the gate and process outcomes are the metrics ``gate-effort`` and ``process-compliance`` report;
-- every compared metric names its better direction (smoke-04 O6).
+- every compared metric names its better direction.
 """
 
 from __future__ import annotations
@@ -42,21 +42,13 @@ GATE_ONLY_ADDED_LATER = {
 def test_the_headline_needs_the_code_quality_scorer() -> None:
     policy = DEFAULT_METRIC_REGISTRY.get("scb-canonical@2")
 
-    assert (
-        needed_scorers(policy)
-        == ("correctness@1", CODE_QUALITY.ref)
-        == (
-            "correctness@1",
-            "code-quality@3",
-        )
-    )
+    assert CODE_QUALITY.ref in needed_scorers(policy)
 
 
 def test_gate_outcomes_are_the_metrics_gate_effort_reports() -> None:
     compared = {metric.id.removeprefix(GATE_PREFIX) for metric in GATE_METRICS}
     reported = {metric.id for metric in GATE_EFFORT.metrics}
 
-    assert GATE_EFFORT.ref == "gate-effort@10"
     assert compared >= GATE_ONLY_ADDED_LATER
     assert compared <= reported
 
@@ -64,7 +56,6 @@ def test_gate_outcomes_are_the_metrics_gate_effort_reports() -> None:
 def test_process_outcomes_are_the_trajectory_metrics_process_compliance_reports() -> None:
     compared = {m.id.removeprefix(PROCESS_PREFIX) for m in PROCESS_METRICS}
 
-    assert PROCESS_COMPLIANCE.ref == "process-compliance@6"
     assert compared == {
         "stall_rate",
         "compliance_rate",

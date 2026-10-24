@@ -6,18 +6,18 @@ from collections.abc import Sequence
 
 from raidar.scoring.framework.context import AssessContext, StepInputs
 from raidar.scoring.framework.result import AssessStatus, Observation
+from raidar.scoring.process_checks.assess import (
+    ProcessComplianceConfig,
+    StepAssessment,
+    measurable,
+    step_evidence,
+)
 from raidar.scoring.process_checks.checks import (
     PLAN_WRITTEN,
     TESTS_RUN_BEFORE_FINISH,
     CheckOutcome,
     Verdict,
     run_checks,
-)
-from raidar.scoring.process_checks.core import (
-    ProcessComplianceConfig,
-    StepAssessment,
-    measurable,
-    step_evidence,
 )
 from raidar.scoring.process_checks.outputs import NOT_RUN, call_outputs, split_unrun
 from raidar.scoring.process_checks.trace_events import classify

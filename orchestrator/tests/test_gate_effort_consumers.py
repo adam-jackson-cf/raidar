@@ -1,9 +1,8 @@
-"""Iteration 4 consumers: gate-effort in the analysis, review, manipulation check and grading.
+"""Consumers of gate-effort: the analysis, review, manipulation check and grading.
 
 - the analysis compares gate-effort's autofix outcomes (each with its better direction);
 - the markdown shows the autofix-by-family and fix-cost-by-refusal tables only when an arm
   reports them;
-- the manipulation check, the review gate view and the pre-fix grading read gate-effort;
 - forge's ordering case is a known, spec-determined timing sensitivity (not an erratum),
   shown beside the grading-vs-coverage disagreement count.
 """
@@ -21,7 +20,7 @@ from raidar.design.problem.sensitivities import (
     known_sensitivities,
     load_sensitivities,
 )
-from raidar.evaluation.analysis.assessed import GATE_EFFORT_REF, disagreements
+from raidar.evaluation.analysis.assessed import disagreements
 from raidar.evaluation.analysis.gate_effort import GateDescriptive
 from raidar.evaluation.analysis.markdown import (
     _autofix_family_table,
@@ -29,14 +28,11 @@ from raidar.evaluation.analysis.markdown import (
     _refusal_table,
     _verifier_arms,
 )
-from raidar.evaluation.analysis.report import ArmSummary
-from raidar.evaluation.review.quality.gate_view import GATE_EFFORT_REF as REVIEW_REF
-from raidar.grading.offline import PRE_FIX_GRADE_SCORERS
-from raidar.scoring.catalog.checks import GATE_EFFORT_REFS as MANIPULATION_REFS
 from raidar.scoring.catalog.outcomes import GATE_METRICS, GATE_PREFIX, VERIFIER_DISAGREEMENTS
 from raidar.scoring.framework.result import AssessResult, AssessStatus, Observation
-from raidar.scoring.gate_effort.autofix_metrics import REFUSAL_KINDS
+from raidar.scoring.gate_effort.autofix.metrics import REFUSAL_KINDS
 from raidar.scoring.gate_effort.families import FAMILIES
+from tests.analysis_support import arm_summary
 
 REPO = Path(__file__).resolve().parents[2]
 
@@ -67,34 +63,11 @@ def test_gate_effort_autofix_outcomes_are_compared_each_with_a_better_direction(
     assert _better("gate.total_fix_cost_usd_by_refusal.coverage_minimum") == "↓ lower"
 
 
-def test_every_consumer_reads_gate_effort() -> None:
-    assert MANIPULATION_REFS == (GATE_EFFORT_REF,)
-    assert REVIEW_REF == GATE_EFFORT_REF
-    assert GATE_EFFORT_REF in PRE_FIX_GRADE_SCORERS
-
-
-def _arm(name: str, values: dict[str, float]) -> ArmSummary:
-    return ArmSummary(
-        arm=name,
-        planned=1,
-        run=1,
-        valid=1,
-        infra_error=0,
-        not_run=0,
-        infra_reasons={},
-        cost_means={},
-        gate_effort={
-            metric: GateDescriptive(n=1, mean=value, sd=None, interval=None)
-            for metric, value in values.items()
-        },
-    )
-
-
 def test_the_autofix_and_refusal_tables_show_only_when_an_arm_reports_them() -> None:
-    plain = _arm("r2", {"gate.total_fix_cost_usd": 0.1})
+    plain = arm_summary("r2", {"gate.total_fix_cost_usd": 0.1})
     assert _autofix_family_table([plain], ["r2"]) == []
     assert _refusal_table([plain], ["r2"]) == []
-    reporting = _arm(
+    reporting = arm_summary(
         "r2",
         {
             "gate.total_autofix_removed_blocking": 3.0,
@@ -119,7 +92,7 @@ TIMING_CASE = "test_checkpoint_1.py::test_blueprint_list_orders_by_created_at_na
 
 
 def test_the_forge_ordering_case_is_a_spec_determined_timing_sensitivity_not_an_erratum() -> None:
-    found = known_sensitivities([FORGE, "toy@1"], start=REPO)
+    found = known_sensitivities([FORGE, "toy@1"], store=REPO / "lab" / "problems")
 
     note = next(note for note in found[FORGE] if note.case == TIMING_CASE)
     assert (note.case, note.kind, note.spec_determined) == (
@@ -169,7 +142,7 @@ def test_disagreements_sum_code_qualitys_excluded_cases() -> None:
 
 
 def test_the_verifier_section_shows_the_counts_and_the_known_notes() -> None:
-    arm = _arm("r2", {})
+    arm = arm_summary("r2", {})
     arm = arm.model_copy(
         update={
             "verifier_diagnostics": {
@@ -177,7 +150,7 @@ def test_the_verifier_section_shows_the_counts_and_the_known_notes() -> None:
             }
         }
     )
-    notes = known_sensitivities([FORGE], start=REPO)
+    notes = known_sensitivities([FORGE], store=REPO / "lab" / "problems")
     report = SimpleNamespace(
         arms=(arm,),
         verifier_sensitivities={
@@ -190,4 +163,4 @@ def test_the_verifier_section_shows_the_counts_and_the_known_notes() -> None:
     assert "## Verifier sensitivity (diagnostic; never an outcome)" in text
     assert VERIFIER_DISAGREEMENTS in text
     assert TIMING_CASE in text
-    assert _verifier_arms(SimpleNamespace(arms=(_arm("r1", {}),))) == []  # type: ignore[arg-type]
+    assert _verifier_arms(SimpleNamespace(arms=(arm_summary("r1", {}),))) == []  # type: ignore[arg-type]

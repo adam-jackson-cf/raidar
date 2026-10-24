@@ -2,7 +2,7 @@
 
 ``pre_fix_pass_rate`` is the case pass rate of the workspace the step's first fix session
 started from (guardrail-gate@3's pre-fix snapshot, graded offline into the Assessment store by
-``raidar.grading.prefix_grade``) and ``correctness_delta`` the step's final case pass rate (its
+``raidar.grading.prefix.grade``) and ``correctness_delta`` the step's final case pass rate (its
 verifier record) minus it. A step without a fix round, and every step of a shadow gate, is
 ``not_applicable``; an ungraded snapshot is ``unavailable`` (the Assessment is then provisional
 and a later rescore, after grading, supersedes it).

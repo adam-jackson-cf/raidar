@@ -15,7 +15,7 @@ whether the coverage minimum drives the fix cost.
 from __future__ import annotations
 
 from raidar.scoring.framework.result import AssessStatus
-from raidar.scoring.gate_effort.autofix_metrics import (
+from raidar.scoring.gate_effort.autofix.metrics import (
     COVERAGE_COST,
     COVERAGE_ONLY,
     COVERAGE_SESSIONS,

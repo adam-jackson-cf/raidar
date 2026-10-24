@@ -22,12 +22,12 @@ from raidar.scoring.framework.manifest import (
     Tier,
 )
 from raidar.scoring.framework.result import TRAJECTORY_SUBJECT, AssessStatus, Observation
+from raidar.scoring.process_checks.assess import UNDETERMINED, check_observation
 from raidar.scoring.process_checks.checks import (
     TESTS_RUN_BEFORE_FINISH,
     CheckOutcome,
     tests_run_before_finish,
 )
-from raidar.scoring.process_checks.core import UNDETERMINED, check_observation
 from raidar.scoring.process_checks.trace_events import TraceEvent
 
 WORK_TESTS = f"work_session_{TESTS_RUN_BEFORE_FINISH}"

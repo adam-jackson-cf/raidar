@@ -7,10 +7,10 @@ A shadow gate's fix-side totals are not applicable, the refusal split included; 
 from __future__ import annotations
 
 from raidar.scoring.framework.result import TRAJECTORY_SUBJECT, Observation
-from raidar.scoring.gate_effort.autofix_records import read_step_autofix
-from raidar.scoring.gate_effort.autofix_steps import with_autofix
+from raidar.scoring.gate_effort.autofix.records import read_step_autofix
+from raidar.scoring.gate_effort.autofix.step_added import with_new_autofix
+from raidar.scoring.gate_effort.autofix.steps import with_autofix
 from raidar.scoring.gate_effort.grades import Grades
-from raidar.scoring.gate_effort.new_autofix import with_new_autofix
 from raidar.scoring.gate_effort.outcomes import Step
 from raidar.scoring.gate_effort.per_step import per_step_values
 from raidar.scoring.gate_effort.refusals import SPLIT_METRICS

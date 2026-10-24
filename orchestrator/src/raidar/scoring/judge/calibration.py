@@ -32,6 +32,7 @@ from __future__ import annotations
 from collections import Counter
 from collections.abc import Collection, Iterable, Mapping
 from dataclasses import dataclass, field
+from typing import Literal
 
 from raidar.scoring.judge.audit import (
     AuditLog,
@@ -189,12 +190,16 @@ class Readiness:
     """Reference-classed labels per reviewer: ``human`` and ``model:<model id>``."""
 
     @property
-    def reviewer_kinds(self) -> dict[str, int]:
+    def reviewer_kinds(self) -> dict[Literal["human", "model"], int]:
         """Reference-classed labels per reviewer kind (``human`` | ``model``)."""
-        kinds: Counter[str] = Counter()
-        for reviewer, count in self.by_reviewer.items():
-            kinds[reviewer.split(":", 1)[0]] += count
-        return dict(sorted(kinds.items()))
+        humans = sum(c for ref, c in self.by_reviewer.items() if ref == ReviewerKind.HUMAN)
+        models = sum(c for ref, c in self.by_reviewer.items() if ref != ReviewerKind.HUMAN)
+        kinds: dict[Literal["human", "model"], int] = {}
+        if humans:
+            kinds["human"] = humans
+        if models:
+            kinds["model"] = models
+        return kinds
 
     def summary(self) -> dict[str, object]:
         return {

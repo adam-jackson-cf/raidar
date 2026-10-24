@@ -22,6 +22,7 @@ import hashlib
 from collections import defaultdict
 from collections.abc import Mapping, Sequence
 from decimal import Decimal
+from typing import Literal
 
 from raidar.scoring.code_quality.lineage_models import (
     LedgerTransitionEvidence,
@@ -77,7 +78,7 @@ def _candidate(
     current: SymbolIdentity,
     *,
     accepted: bool = False,
-    match: str = "none",
+    match: Literal["exact", "hash", "none"] = "none",
     ambiguous_set_id: str | None = None,
 ) -> LineageCandidate:
     return LineageCandidate(
@@ -87,7 +88,7 @@ def _candidate(
         structure_hash_equal=_equal(prior.structure_sha256, current.structure_sha256),
         signature_hash_equal=_equal(prior.signature_sha256, current.signature_sha256),
         accepted=accepted,
-        match=match,  # type: ignore[arg-type]
+        match=match,
         ambiguous_set_id=ambiguous_set_id,
     )
 

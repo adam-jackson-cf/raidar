@@ -20,7 +20,7 @@ from pathlib import Path
 import pytest
 
 from raidar.scoring.framework.result import TRAJECTORY_SUBJECT, AssessStatus
-from raidar.scoring.gate_effort.cross_mode_metrics import AUTOFIX_CODES
+from raidar.scoring.gate_effort.cross_mode.metrics import AUTOFIX_CODES
 from raidar.scoring.gate_effort.folding import FOLDED_CODES, SUPPRESS_CODE
 from tests.gate_effort_support import (
     CP1,

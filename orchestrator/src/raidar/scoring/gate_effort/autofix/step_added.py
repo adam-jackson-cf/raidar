@@ -20,17 +20,17 @@ from __future__ import annotations
 from collections.abc import Mapping
 
 from raidar.scoring.framework.result import AssessStatus
-from raidar.scoring.gate_effort.autofix_metrics import (
+from raidar.scoring.gate_effort.autofix.metrics import (
     AUTOFIX_LINES,
     NEW_LINES,
     NEW_METRICS,
     NEW_REMOVED,
 )
-from raidar.scoring.gate_effort.autofix_records import DRY_RUN, AutofixPass, StepAutofix
-from raidar.scoring.gate_effort.autofix_values import NO_AUTOFIX, removed
+from raidar.scoring.gate_effort.autofix.records import DRY_RUN, AutofixPass, StepAutofix
+from raidar.scoring.gate_effort.autofix.values import NO_AUTOFIX, removed
 from raidar.scoring.gate_effort.families import FAMILIES, family_of
 from raidar.scoring.gate_effort.measured import Measured
-from raidar.scoring.gate_effort.new_counts import PerStep
+from raidar.scoring.gate_effort.step_added_counts import PerStep
 
 _OK = AssessStatus.OK
 _NA = AssessStatus.NOT_APPLICABLE

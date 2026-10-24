@@ -1,12 +1,12 @@
 """Every step's values with the autofix step and the fix cost by refusal added.
 
-The autofix values (``autofix_values``) and the fix-session split (``refusals``) are added to
+The autofix values (``autofix.values``) and the fix-session split (``refusals``) are added to
 each step's values; then the ``new_*`` counts that need the previous gated step.
 """
 
 from __future__ import annotations
 
-from raidar.scoring.gate_effort.autofix_metrics import (
+from raidar.scoring.gate_effort.autofix.metrics import (
     FIRST_PASS_POST,
     FIRST_RUN_POST,
     FIRST_RUN_RAW,
@@ -14,15 +14,15 @@ from raidar.scoring.gate_effort.autofix_metrics import (
     NEW_RAW,
     STEP_END_POST,
 )
-from raidar.scoring.gate_effort.autofix_records import read_step_autofix
-from raidar.scoring.gate_effort.autofix_values import autofix_step_values
-from raidar.scoring.gate_effort.cross_mode_metrics import STEP_END_NET
+from raidar.scoring.gate_effort.autofix.records import read_step_autofix
+from raidar.scoring.gate_effort.autofix.values import autofix_step_values
+from raidar.scoring.gate_effort.cross_mode.metrics import STEP_END_NET
 from raidar.scoring.gate_effort.measured import Measured
-from raidar.scoring.gate_effort.new_counts import PerStep, with_new
 from raidar.scoring.gate_effort.outcomes import Step
 from raidar.scoring.gate_effort.refusals import SPLIT_METRICS, refusal_values
 from raidar.scoring.gate_effort.shadow import shadowed
 from raidar.scoring.gate_effort.sources import NO_SOURCE_CHANGE
+from raidar.scoring.gate_effort.step_added_counts import PerStep, with_new
 
 
 def _split_values(step: Step, values: dict[str, Measured]) -> dict[str, Measured]:

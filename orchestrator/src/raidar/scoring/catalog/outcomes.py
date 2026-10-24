@@ -21,7 +21,7 @@ from enum import StrEnum
 
 from raidar.scoring.framework.builtin_manifests import CODE_QUALITY, CORRECTNESS, RESOURCE_USAGE
 from raidar.scoring.framework.manifest import Direction, ScorerManifest
-from raidar.scoring.gate_effort.autofix_metrics import REFUSAL_KINDS
+from raidar.scoring.gate_effort.autofix.metrics import REFUSAL_KINDS
 from raidar.scoring.gate_effort.families import FAMILIES
 from raidar.scoring.gate_effort.manifest import GATE_EFFORT
 from raidar.scoring.process_checks.manifest import PROCESS_COMPLIANCE

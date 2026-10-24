@@ -15,7 +15,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from raidar.grading.prefix_store import read_pre_fix_grade
+from raidar.grading.prefix.store import read_pre_fix_grade
 from raidar.scoring.framework.context import AssessContext
 from raidar.scoring.framework.manifest import ScorerManifest
 from raidar.scoring.framework.result import AssessResult

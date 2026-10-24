@@ -6,14 +6,18 @@ source change is not applicable to first-pass clean and the first-run tests outc
 
 from __future__ import annotations
 
-from raidar.scoring.gate_effort.cross_mode import FIRST_PASS_VARIANTS, ex_cascade_values, net_values
-from raidar.scoring.gate_effort.cross_mode_metrics import (
+from raidar.scoring.gate_effort.cross_mode.metrics import (
     FIRST_RUN_EX_CASCADE,
     FIRST_RUN_NET,
     NEW_EX_CASCADE,
     NEW_NET,
     STEP_END_EX_CASCADE,
     STEP_END_NET,
+)
+from raidar.scoring.gate_effort.cross_mode.values import (
+    FIRST_PASS_VARIANTS,
+    ex_cascade_values,
+    net_values,
 )
 from raidar.scoring.gate_effort.grades import Grades
 from raidar.scoring.gate_effort.measured import Measured
@@ -25,11 +29,11 @@ from raidar.scoring.gate_effort.metrics import (
     NEW_FIRST_RUN_BLOCKING,
     STEP_END_BLOCKING,
 )
-from raidar.scoring.gate_effort.new_counts import PerStep, with_new
 from raidar.scoring.gate_effort.outcomes import Step
 from raidar.scoring.gate_effort.raw_step import raw_step_values
 from raidar.scoring.gate_effort.shadow import SHADOW_STEP_NA, shadowed
 from raidar.scoring.gate_effort.sources import NO_SOURCE_CHANGE
+from raidar.scoring.gate_effort.step_added_counts import PerStep, with_new
 
 FIRST_PASS_CLEAN = "first_pass_clean"
 SHADOW_CORRECTNESS_NA = ("pre_fix_pass_rate", "correctness_delta")
