@@ -73,13 +73,25 @@ def find_store_root(start: Path) -> Path:
     return _discover(start)[0]
 
 
+def store_at(root: Path) -> ProblemStore:
+    """The store for an explicit committed root (``--store``, a pinned resolver).
+
+    A repository's ``lab/problems`` keeps its generated content under that
+    repository's ``var/problems`` (as ``open_store``), never inside the tracked
+    ``lab/`` tree; any other directory is a self-contained store.
+    """
+    root = root.resolve()
+    if root.name == STORE_DIR.name and root.parent.name == STORE_DIR.parent.name:
+        return ProblemStore(root, data_root=var_root(root.parent.parent) / "problems")
+    return ProblemStore(root)
+
+
 def open_store(start: Path) -> ProblemStore:
     """The problems store for an experiment directory (see the module docstring)."""
     override = os.environ.get(ROOT_ENV)
     if override:
         return ProblemStore(Path(override).resolve())
-    root, repo = _discover(start)
-    return ProblemStore(root, data_root=var_root(repo) / "problems")
+    return store_at(_discover(start)[0])
 
 
 @dataclass(frozen=True)

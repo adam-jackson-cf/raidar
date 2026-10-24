@@ -29,6 +29,7 @@ from raidar.problems.store import (
     ProblemStoreError,
     find_store_root,
     open_store,
+    store_at,
 )
 from raidar.spec.canonical import digest_json
 from raidar.spec.loader import load_experiment
@@ -341,6 +342,9 @@ def test_resolver_entry_point_discovers_the_store_from_the_experiment_dir(
     monkeypatch.setenv(VAR_ENV, str(tmp_path / "relocated"))
     assert open_store(experiment_dir).data == (tmp_path / "relocated" / "problems").resolve()
     monkeypatch.delenv(VAR_ENV)
+    explicit = store_at(tmp_path / "lab" / "problems")
+    assert explicit.data == tmp_path.resolve() / "var" / "problems"
+    assert store_at(tmp_path / "elsewhere").data == (tmp_path / "elsewhere").resolve()
     monkeypatch.setenv(ROOT_ENV, str(tmp_path / "elsewhere"))
     assert find_store_root(experiment_dir) == (tmp_path / "elsewhere").resolve()
     monkeypatch.delenv(ROOT_ENV)
