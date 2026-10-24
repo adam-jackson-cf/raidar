@@ -11,11 +11,11 @@ Assessment already exists and fails unless the bytes are identical.
 Without it, the settings come from the experiment lock of the job that holds
 the target (found at the target or up to two levels above it:
 ``<job>/trials/<trial>``): ``--lock`` if given, else the experiment's current
-lock when its ``lock_sha256`` is the job's, else the job's ``job.lock.json``.
+lock; either must carry the job's ``lock_sha256``, otherwise the rescore is refused.
 A relock that changes only assessment settings keeps ``lock_sha256``, so a
 plain rescore stores Assessments under the keys analysis looks up for that
-lock. Only a job with no findable lock falls back to its execution-time
-``assessment-config.yaml``. The report names the config it used.
+lock. Only a target outside any job reads its ``assessment-config.yaml``.
+The report names the config it used.
 
 Pre-fix grades: when a scorer run reads them (``gate-effort``), ``--rescore``
 first grades every guardrail-gate@3 pre-fix snapshot of the target that is not
@@ -204,7 +204,7 @@ def run_lock(target: Path, explicit: Path | None) -> Path | None:
     job_dir, manifest = found
     path = explicit or default_lock(JobDir(path=job_dir, manifest=manifest, plan={}, records=()))
     if not path.is_file():
-        return None
+        raise ValueError(f"lock {path} does not exist")
     lock = read_lock(path)
     if lock["lock_sha256"] != manifest.get("lock_sha256"):
         raise ValueError(
@@ -329,7 +329,7 @@ def _rescore(request: _RescoreRequest, out: Path | None) -> None:
     "lock_path",
     type=click.Path(exists=True, dir_okay=False, path_type=Path),
     help="With --rescore, the experiment lock whose assessment settings apply "
-    "(default: the job's experiment lock, else its job.lock.json).",
+    "(default: the job's experiment lock; it must carry the job's lock_sha256).",
 )
 @click.option(
     "--replay",
