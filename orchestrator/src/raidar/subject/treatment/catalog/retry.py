@@ -39,9 +39,7 @@ from raidar.subject.treatment.definition.manifest import (
 )
 from raidar.subject.treatment.runtime.transient_retry import COMPONENT, RETRY_DIR, RETRY_RECORD
 
-TRANSIENT_RETRY_IMPORT_PATH = (
-    "raidar.subject.treatment.runtime.transient_retry:TransientRetryAgent"
-)
+TRANSIENT_RETRY_IMPORT_PATH = "raidar.subject.treatment.runtime.transient_retry:TransientRetryAgent"
 
 
 class TransientRetry:
@@ -60,10 +58,12 @@ class TransientRetry:
             *COMMON_FINGERPRINT,
             "orchestrator/src/raidar/subject/treatment/catalog/retry.py",
             "orchestrator/src/raidar/subject/treatment/runtime/transient_retry.py",
-            "orchestrator/src/raidar/subject/treatment/runtime/continue_on_stall.py",  # the per-attempt run record
+            # the per-attempt run record
+            "orchestrator/src/raidar/subject/treatment/runtime/continue_on_stall.py",
             "orchestrator/src/raidar/contract/snapshot.py",  # imported by continue_on_stall
             "orchestrator/src/raidar/subject/treatment/runtime/session_chain.py",
-            "orchestrator/src/raidar/subject/treatment/runtime/review_loop.py",  # usage sums, prompt budget
+            # usage sums, prompt budget
+            "orchestrator/src/raidar/subject/treatment/runtime/review_loop.py",
         ),
         discovery_probe=DiscoveryProbe(
             id="transient-retry-recorded",

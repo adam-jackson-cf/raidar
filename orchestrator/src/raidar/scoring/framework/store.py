@@ -48,7 +48,7 @@ from typing import Annotated, Any, Literal
 
 from pydantic import Field, field_validator
 
-from raidar.design.experiment.canonical import (
+from raidar.contract.canonical import (
     canonical_json_bytes,
     digest_json,
     pretty_canonical_json_bytes,

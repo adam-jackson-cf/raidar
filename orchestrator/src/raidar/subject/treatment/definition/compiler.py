@@ -13,7 +13,7 @@ from pathlib import Path
 from harbor.models.task.config import MCPServerConfig
 from pydantic import JsonValue
 
-from raidar.design.experiment.references import RegistryReferenceError
+from raidar.contract.references import RegistryReferenceError
 from raidar.design.experiment.schema import AgentEntry, ConditionSpec, ExperimentSpec
 from raidar.subject.treatment.definition.compiled import (
     HARBOR_AGENT_NAMES,

@@ -12,7 +12,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import Any
 
-from raidar.design.experiment.canonical import digest_json
+from raidar.contract.canonical import digest_json
 from raidar.design.experiment.lock import LOCK_VERSION, analysis_section, seal_lock
 from raidar.design.experiment.metrics import DEFAULT_METRIC_REGISTRY
 

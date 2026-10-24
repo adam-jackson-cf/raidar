@@ -138,8 +138,10 @@ class GuardrailGate:
             "orchestrator/src/raidar/subject/treatment/runtime/autofix_run.py",
             "orchestrator/src/raidar/subject/treatment/runtime/guardrail_gate.py",
             "orchestrator/src/raidar/subject/treatment/runtime/session_chain.py",
-            "orchestrator/src/raidar/subject/treatment/runtime/review_loop.py",  # usage sums, budget, step logs
-            "orchestrator/src/raidar/contract/snapshot.py",  # SNAPSHOT_EXCLUDES, the pre-fix tree digest
+            # usage sums, budget, step logs
+            "orchestrator/src/raidar/subject/treatment/runtime/review_loop.py",
+            # SNAPSHOT_EXCLUDES, the pre-fix tree digest
+            "orchestrator/src/raidar/contract/snapshot.py",
         ),
         discovery_probe=DiscoveryProbe(
             id="guardrail-gate-ran",

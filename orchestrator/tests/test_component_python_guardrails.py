@@ -24,7 +24,7 @@ from typing import Any, cast
 
 import pytest
 
-from raidar.design.experiment.references import RefKind, RegistryRef
+from raidar.contract.references import RefKind, RegistryRef
 from raidar.engine.trial import collect
 from raidar.engine.trial.models import ProbeSummary
 from raidar.subject.treatment import ComponentKind, ComponentRegistry, ComponentRejectedError
@@ -220,7 +220,9 @@ def test_python_guardrails_is_a_python_service_that_fingerprints_its_whole_paylo
         assert f"{PAYLOAD_REPO_DIR}/{relative}" in manifest.fingerprint
     assert "orchestrator/src/raidar/subject/treatment/catalog/guardrails.py" in manifest.fingerprint
     assert "orchestrator/src/raidar/subject/treatment/runtime/provision.py" in manifest.fingerprint
-    assert "orchestrator/src/raidar/subject/treatment/definition/integrity.py" in manifest.fingerprint
+    assert (
+        "orchestrator/src/raidar/subject/treatment/definition/integrity.py" in manifest.fingerprint
+    )
     assert len(manifest.fingerprint) == len(set(manifest.fingerprint))
     shipped = {
         path.relative_to(PAYLOAD_DIR).as_posix()

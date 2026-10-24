@@ -27,8 +27,8 @@ from typing import Any
 
 from pydantic import ValidationError
 
+from raidar.contract.canonical import digest_json
 from raidar.contract.job_layout import JOB_KIND, JOB_MANIFEST, PLAN_FILE, TRIAL_RECORDS_DIR
-from raidar.design.experiment.canonical import digest_json
 from raidar.design.experiment.lock import LOCK_SUFFIX, lock_integrity_issues
 from raidar.design.experiment.schema import ExperimentSpec
 from raidar.engine.job.assessment import lock_errata, rescore_config

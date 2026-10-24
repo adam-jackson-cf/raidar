@@ -14,8 +14,8 @@ from typing import Self
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from raidar.contract.canonical import digest_json
 from raidar.contract.runtimes import ANY_RUNTIME
-from raidar.design.experiment.canonical import digest_json
 from raidar.subject.environment.python.models import ToolExecution
 
 _ID_PATTERN = r"^[a-z0-9][a-z0-9-]*$"

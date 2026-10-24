@@ -69,8 +69,10 @@ class ContinueOnStall:
             "orchestrator/src/raidar/subject/treatment/catalog/stall.py",
             "orchestrator/src/raidar/subject/treatment/runtime/continue_on_stall.py",
             "orchestrator/src/raidar/subject/treatment/runtime/session_chain.py",
-            "orchestrator/src/raidar/subject/treatment/runtime/review_loop.py",  # final message, usage sums
-            "orchestrator/src/raidar/contract/snapshot.py",  # the workspace and its snapshot excludes
+            # final message, usage sums
+            "orchestrator/src/raidar/subject/treatment/runtime/review_loop.py",
+            # the workspace and its snapshot excludes
+            "orchestrator/src/raidar/contract/snapshot.py",
         ),
         discovery_probe=DiscoveryProbe(
             id="continue-on-stall-recorded",

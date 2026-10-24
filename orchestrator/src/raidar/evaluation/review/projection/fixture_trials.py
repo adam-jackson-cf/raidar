@@ -26,8 +26,8 @@ from harbor.models.trajectories import (
     Trajectory,
 )
 
+from raidar.contract.canonical import digest_json
 from raidar.contract.snapshot import tree_digest
-from raidar.design.experiment.canonical import digest_json
 from raidar.engine.trial.collect import NOT_STARTED
 from raidar.engine.trial.models import (
     CheckpointState,

@@ -6,9 +6,9 @@ module and every module it imports, transitively, from ``raidar`` or its own
 top-level package (shared kernels, the SDK, the oracle records), read
 statically without importing, so a code change to any helper changes the
 Assessment key. Each module is hashed as its normalised syntax tree
-(``raidar.design.experiment.source_digest``): docstring, comment and layout edits leave
+(``raidar.contract.source_digest``): docstring, comment and layout edits leave
 the digest, and so every stored Assessment, unchanged. The lock resolves ``name@version``
-scorer references here through the ``raidar.design.experiment.resolvers`` entry point
+scorer references here through the ``raidar.contract.resolvers`` entry point
 ``scorer`` and records the manifest, the implementation's source digest, the
 pinned versions of the pack tools the scorer declares.
 
@@ -27,15 +27,15 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from raidar.contract.runtimes import ANY_RUNTIME
-from raidar.design.experiment.canonical import digest_json
-from raidar.design.experiment.references import (
+from raidar.contract.canonical import digest_json
+from raidar.contract.references import (
     RefKind,
     RegistryRef,
     RegistryReferenceError,
     ResolvedReference,
 )
-from raidar.design.experiment.source_digest import SOURCE_DIGEST_SCHEME, python_source_digest
+from raidar.contract.runtimes import ANY_RUNTIME
+from raidar.contract.source_digest import SOURCE_DIGEST_SCHEME, python_source_digest
 from raidar.scoring.framework.builtin_manifests import BUILTIN_MANIFESTS
 from raidar.scoring.framework.context import Scorer
 from raidar.scoring.framework.manifest import ScorerManifest
@@ -351,5 +351,5 @@ class ScorerResolver:
 
 
 def scorer_resolver() -> ScorerResolver:
-    """Entry-point factory (group ``raidar.design.experiment.resolvers``, name ``scorer``)."""
+    """Entry-point factory (group ``raidar.contract.resolvers``, name ``scorer``)."""
     return ScorerResolver(default_scorer_registry())

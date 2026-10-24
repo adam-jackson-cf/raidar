@@ -31,7 +31,7 @@ from pydantic import (
     model_validator,
 )
 
-from raidar.design.experiment.references import REFERENCE_PATTERN
+from raidar.contract.references import REFERENCE_PATTERN
 from raidar.subject.agent.config import AgentName, Harness, agent_cli
 
 IDENTIFIER_PATTERN = r"^[a-z0-9][a-z0-9_-]*$"

@@ -133,9 +133,7 @@ def test_the_lock_pins_the_errata_in_the_execution_identity(
     fixture: ImportedFixture, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     # The trial config attaches host codex auth; this test is about errata, not the host.
-    monkeypatch.setattr(
-        "raidar.engine.trial.config.with_host_auth", lambda config, harness: config
-    )
+    monkeypatch.setattr("raidar.engine.trial.config.with_host_auth", lambda config, harness: config)
     _, plain, _ = locked_experiment(
         tmp_path / "plain", fixture.ref, environment={"compose_init": False}
     )

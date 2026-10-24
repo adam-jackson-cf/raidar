@@ -34,8 +34,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from raidar.contract.references import ResolvedReference
 from raidar.contract.runtimes import ANY_RUNTIME
-from raidar.design.experiment.references import ResolvedReference
 from raidar.design.experiment.schema import ComponentUse, ExperimentSpec
 from raidar.design.experiment.validation import FieldIssue
 

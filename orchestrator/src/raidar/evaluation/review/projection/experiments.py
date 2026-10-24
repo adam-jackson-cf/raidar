@@ -15,6 +15,8 @@ from dataclasses import dataclass
 from statistics import fmean, median, pstdev
 from typing import Any
 
+from raidar.contract.canonical import digest_json
+from raidar.contract.references import RegistryReferenceError
 from raidar.contract.review import (
     ArmChangeCategory,
     ArmComparableConfig,
@@ -24,9 +26,7 @@ from raidar.contract.review import (
     ReviewRunDetail,
     ReviewRunRecord,
 )
-from raidar.design.experiment.canonical import digest_json
 from raidar.design.experiment.metrics import DEFAULT_METRIC_REGISTRY
-from raidar.design.experiment.references import RegistryReferenceError
 from raidar.design.experiment.schema import ExperimentSpec
 from raidar.evaluation.analysis.outcomes import CODE_QUALITY_REF, CORRECTNESS_REF
 from raidar.evaluation.review.projection.headline import UNDECLARED_MARKER, policy_shares

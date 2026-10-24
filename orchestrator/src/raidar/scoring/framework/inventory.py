@@ -48,8 +48,8 @@ from pathlib import Path, PurePosixPath
 
 from pydantic import Field
 
+from raidar.contract.canonical import digest_json
 from raidar.contract.snapshot import SNAPSHOT_EXCLUDES
-from raidar.design.experiment.canonical import digest_json
 from raidar.scoring.framework.manifest import SdkModel
 
 RECOGNIZED_EXTENSIONS = frozenset(

@@ -25,7 +25,7 @@ from harbor.models.task.config import MCPServerConfig
 from harbor.models.trial.config import AgentConfig
 from pydantic import JsonValue
 
-from raidar.design.experiment.canonical import digest_json
+from raidar.contract.canonical import digest_json
 from raidar.subject.agent.config import Harness
 from raidar.subject.treatment.catalog._common import tree_files
 from raidar.subject.treatment.definition.contribution import AgentWrapper, SupportFile

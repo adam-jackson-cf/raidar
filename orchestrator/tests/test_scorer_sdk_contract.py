@@ -10,15 +10,15 @@ import pytest
 import yaml
 from pydantic import ValidationError
 
-from raidar.design.experiment.loader import load_experiment
-from raidar.design.experiment.lock import build_lock, render_lock
-from raidar.design.experiment.metrics import MetricResolver
-from raidar.design.experiment.references import (
+from raidar.contract.references import (
     RefKind,
     RegistryRef,
     RegistryReferenceError,
     ResolverSet,
 )
+from raidar.design.experiment.loader import load_experiment
+from raidar.design.experiment.lock import build_lock, render_lock
+from raidar.design.experiment.metrics import MetricResolver
 from raidar.grading.models import CaseStatus
 from raidar.scoring.framework import result as result_module
 from raidar.scoring.framework.builtin_manifests import BUILTIN_MANIFESTS, CODE_QUALITY, CORRECTNESS

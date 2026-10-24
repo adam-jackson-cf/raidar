@@ -4,7 +4,7 @@ Definitions are registered under the ``raidar.subject.treatment`` entry-point gr
 named by their full reference (``rules-file@1``). Entry points are imported
 lazily, only when that reference is looked up. An unknown reference raises; nothing is skipped.
 
-The resolver is exposed to ``raidar lock`` through the ``raidar.design.experiment.resolvers``
+The resolver is exposed to ``raidar lock`` through the ``raidar.contract.resolvers``
 entry point named ``component``.
 """
 
@@ -12,15 +12,17 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 from importlib.metadata import EntryPoint, entry_points
+from pathlib import Path
+
+from raidar.contract.canonical import digest_json, sha256_file
 from raidar.contract.paths import REPO_ROOT
-from raidar.contract.runtimes import ANY_RUNTIME
-from raidar.design.experiment.canonical import digest_json, sha256_file
-from raidar.design.experiment.references import (
+from raidar.contract.references import (
     RefKind,
     RegistryRef,
     RegistryReferenceError,
     ResolvedReference,
 )
+from raidar.contract.runtimes import ANY_RUNTIME
 from raidar.subject.agent.config import agent_name_for
 from raidar.subject.treatment.definition.manifest import ComponentDefinition
 
@@ -145,5 +147,5 @@ class ComponentResolver:
 
 
 def component_resolver() -> ComponentResolver:
-    """Entry-point factory for ``raidar.design.experiment.resolvers`` (kind ``component``)."""
+    """Entry-point factory for ``raidar.contract.resolvers`` (kind ``component``)."""
     return ComponentResolver()

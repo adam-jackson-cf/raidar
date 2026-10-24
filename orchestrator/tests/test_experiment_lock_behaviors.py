@@ -10,7 +10,13 @@ import pytest
 from click.testing import CliRunner
 
 from raidar.cli import main
-from raidar.design.experiment.canonical import digest_json
+from raidar.contract.canonical import digest_json
+from raidar.contract.references import (
+    RefKind,
+    RegistryRef,
+    RegistryReferenceError,
+    ResolverSet,
+)
 from raidar.design.experiment.loader import CliOverrides, load_experiment
 from raidar.design.experiment.lock import (
     SECTIONS,
@@ -23,12 +29,6 @@ from raidar.design.experiment.lock import (
     stale_sections,
 )
 from raidar.design.experiment.metrics import MetricResolver
-from raidar.design.experiment.references import (
-    RefKind,
-    RegistryRef,
-    RegistryReferenceError,
-    ResolverSet,
-)
 from tests.experiment_spec_support import (
     SHARED_FRAMING,
     InMemoryResolver,
@@ -428,7 +428,7 @@ def test_entry_point_resolvers_load_lazily_by_kind(monkeypatch: pytest.MonkeyPat
         return InMemoryResolver(RefKind.SCORER, {"correctness@1": {}})
 
     monkeypatch.setattr(
-        "raidar.design.experiment.references.entry_points",
+        "raidar.contract.references.entry_points",
         lambda group: [_EntryPoint("scorer", scorer_factory)],
     )
     resolvers = ResolverSet()
@@ -457,7 +457,7 @@ def test_entry_point_resolver_misconfiguration_is_rejected(
         return _EntryPoint(name, lambda: InMemoryResolver(RefKind.SCORER))
 
     monkeypatch.setattr(
-        "raidar.design.experiment.references.entry_points",
+        "raidar.contract.references.entry_points",
         lambda group: [make(name) for name in entries],
     )
 

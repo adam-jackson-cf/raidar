@@ -20,10 +20,10 @@ from pathlib import Path
 
 from pydantic import ValidationError
 
+from raidar.contract.references import RegistryReferenceError
 from raidar.design.experiment.agent_support import agent_support_issues
 from raidar.design.experiment.factor_guard import check_factors
 from raidar.design.experiment.metrics import DEFAULT_METRIC_REGISTRY, MetricRegistry
-from raidar.design.experiment.references import RegistryReferenceError
 from raidar.design.experiment.schema import (
     BENCHMARK_MIN_ATTEMPTS,
     EXPERIMENT_KINDS,

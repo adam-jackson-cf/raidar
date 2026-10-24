@@ -22,7 +22,7 @@ from typing import Any
 
 from harbor.models.trial.config import AgentConfig
 
-from raidar.design.experiment.canonical import digest_json
+from raidar.contract.canonical import digest_json
 from raidar.design.experiment.loader import LoadedExperiment
 from raidar.design.problem.models import ProblemId
 from raidar.design.problem.store import ProblemStore, ProblemStoreError

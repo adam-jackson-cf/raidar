@@ -21,7 +21,7 @@ import pytest
 from harbor.models.trial.config import AgentConfig
 from harbor.trial.hooks import TrialEvent
 
-from raidar.design.experiment.references import RefKind, RegistryRef
+from raidar.contract.references import RefKind, RegistryRef
 from raidar.subject.treatment import (
     ComponentKind,
     ComponentRegistry,

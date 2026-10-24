@@ -44,8 +44,8 @@ dev = [
 [project.scripts]
 raidar = "raidar.cli:main"
 
-# Registry resolvers loaded lazily by `raidar lock` (raidar.design.experiment.references).
-[project.entry-points."raidar.design.experiment.resolvers"]
+# Registry resolvers loaded lazily by `raidar lock` (raidar.contract.references).
+[project.entry-points."raidar.contract.resolvers"]
 problem = "raidar.design.problem.resolver:resolver_factory"
 scorer = "raidar.scoring.framework.catalog:scorer_resolver"
 component = "raidar.subject.treatment.definition.registry:component_resolver"

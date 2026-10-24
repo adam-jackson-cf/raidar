@@ -16,10 +16,10 @@ import pytest
 from click.testing import CliRunner
 
 from raidar.cli import main
+from raidar.contract.references import RefKind, RegistryRef, ResolverSet
 from raidar.design.experiment.loader import CliOverrides, load_experiment
 from raidar.design.experiment.lock import LOCK_VERSION, LockError, build_lock, seal_lock
 from raidar.design.experiment.metrics import MetricResolver
-from raidar.design.experiment.references import RefKind, RegistryRef, ResolverSet
 from raidar.design.problem.importer import _runtime_pack
 from raidar.design.problem.resolver import ProblemResolver
 from raidar.design.problem.store import ProblemStoreError

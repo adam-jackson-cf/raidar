@@ -58,7 +58,8 @@ class ReviewLoop:
             "orchestrator/src/raidar/subject/treatment/catalog/workflow.py",
             "orchestrator/src/raidar/subject/treatment/runtime/review_loop.py",
             "orchestrator/src/raidar/subject/treatment/runtime/session_chain.py",
-            "orchestrator/src/raidar/contract/snapshot.py",  # the reviewer diff leaves out SNAPSHOT_EXCLUDES
+            # the reviewer diff leaves out SNAPSHOT_EXCLUDES
+            "orchestrator/src/raidar/contract/snapshot.py",
         ),
         discovery_probe=DiscoveryProbe(
             id="review-loop-reviewed",

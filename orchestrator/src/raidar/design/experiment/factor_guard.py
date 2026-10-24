@@ -14,7 +14,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from itertools import combinations
 
-from raidar.design.experiment.canonical import canonical_json_bytes
+from raidar.contract.canonical import canonical_json_bytes
 from raidar.design.experiment.schema import ArmSpec, ExperimentSpec
 
 AGENT_NOUN_FIELDS = ("name", "provider", "model", "reasoning_effort", "version")

@@ -19,7 +19,7 @@ from __future__ import annotations
 import ast
 from pathlib import Path
 
-from raidar.design.experiment.canonical import digest_json
+from raidar.contract.canonical import digest_json
 
 SOURCE_DIGEST_SCHEME = "python-ast/1"
 """Recorded beside every source digest; bump it when the normalisation changes."""

@@ -30,6 +30,7 @@ from raidar.engine.target.health import TargetUnavailableError
 from raidar.engine.target.job import JobTarget
 from raidar.engine.trial import driver
 from raidar.engine.trial.agent_config import CODEX_AUTH_ENV, reported_harness_pin, with_host_auth
+from raidar.engine.trial.config import harbor_trial_config
 from raidar.engine.trial.driver import TrialRun, run_harbor_trial, run_in_order
 from raidar.engine.trial.environment import (
     RUN_SCOPED_DOCKER_IMPORT_PATH,
@@ -37,7 +38,6 @@ from raidar.engine.trial.environment import (
     run_scope,
 )
 from raidar.engine.trial.materialise import MaterialiseError, materialise_task
-from raidar.engine.trial.config import harbor_trial_config
 from raidar.grading.verifier import RaidarVerifier
 from raidar.subject.agent.codex_auth import ResolvedCodexAuth
 from raidar.subject.agent.config import Harness
@@ -193,9 +193,7 @@ def test_the_verifier_runs_the_coverage_pass_unless_the_protocol_defers_it(
     timeout: int,
 ) -> None:
     monkeypatch.setenv(ROOT_ENV, str(fixture_problem.store.root))
-    monkeypatch.setattr(
-        "raidar.engine.trial.config.with_host_auth", lambda config, harness: config
-    )
+    monkeypatch.setattr("raidar.engine.trial.config.with_host_auth", lambda config, harness: config)
     plan = _plan(tmp_path, fixture_problem, protocol=protocol)
 
     config = harbor_trial_config(
@@ -216,9 +214,7 @@ def test_a_run_materialises_each_trial_and_writes_step_results(
 ) -> None:
     monkeypatch.setenv(ROOT_ENV, str(fixture_problem.store.root))
     monkeypatch.setattr("raidar.engine.trial.materialise.image_present", lambda tag: True)
-    monkeypatch.setattr(
-        "raidar.engine.trial.config.with_host_auth", lambda config, harness: config
-    )
+    monkeypatch.setattr("raidar.engine.trial.config.with_host_auth", lambda config, harness: config)
     protocol = {"progression": "halt_on_failure", "min_reward": 1.0}
     plan = _plan(tmp_path, fixture_problem, protocol=protocol)
     seen: list[TrialConfig] = []
@@ -332,9 +328,7 @@ def test_a_lost_target_marks_the_trial_and_aborts_the_job_before_the_next_trial(
 ) -> None:
     monkeypatch.setenv(ROOT_ENV, str(fixture_problem.store.root))
     monkeypatch.setattr("raidar.engine.trial.materialise.image_present", lambda tag: True)
-    monkeypatch.setattr(
-        "raidar.engine.trial.config.with_host_auth", lambda config, harness: config
-    )
+    monkeypatch.setattr("raidar.engine.trial.config.with_host_auth", lambda config, harness: config)
     loaded, lock, _ = locked_experiment(
         tmp_path / "exp",
         fixture_problem.ref,
@@ -407,9 +401,7 @@ def test_a_trial_that_raises_is_recorded_as_infra_and_the_run_completes(
 ) -> None:
     monkeypatch.setenv(ROOT_ENV, str(fixture_problem.store.root))
     monkeypatch.setattr("raidar.engine.trial.materialise.image_present", lambda tag: True)
-    monkeypatch.setattr(
-        "raidar.engine.trial.config.with_host_auth", lambda config, harness: config
-    )
+    monkeypatch.setattr("raidar.engine.trial.config.with_host_auth", lambda config, harness: config)
     loaded, lock, _ = locked_experiment(
         tmp_path / "exp",
         fixture_problem.ref,

@@ -364,7 +364,10 @@ class McpServer:
         kind=ComponentKind.HARNESS,
         description="A stdio MCP server registered through Harbor mcp_servers",
         supports=BOTH_HARNESSES,
-        fingerprint=(*_FINGERPRINT, "orchestrator/src/raidar/subject/treatment/runtime/mcp_shim.py"),
+        fingerprint=(
+            *_FINGERPRINT,
+            "orchestrator/src/raidar/subject/treatment/runtime/mcp_shim.py",
+        ),
         discovery_probe=DiscoveryProbe(
             id="mcp-server-connected",
             description="The harness initialised the server and listed its tools",

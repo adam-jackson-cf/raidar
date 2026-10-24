@@ -13,13 +13,9 @@ import pytest
 import yaml
 from harbor.models.task.task import Task
 
+from raidar.contract.canonical import digest_json
 from raidar.contract.paths import VAR_ENV
-from raidar.contract.snapshot import APP_SOURCE
-from raidar.design.experiment.canonical import digest_json
-from raidar.design.experiment.loader import load_experiment
-from raidar.design.experiment.lock import build_lock
-from raidar.design.experiment.metrics import MetricResolver
-from raidar.design.experiment.references import (
+from raidar.contract.references import (
     RESOLVER_ENTRY_POINT_GROUP,
     RefKind,
     RegistryRef,
@@ -27,6 +23,10 @@ from raidar.design.experiment.references import (
     ResolvedReference,
     ResolverSet,
 )
+from raidar.contract.snapshot import APP_SOURCE
+from raidar.design.experiment.loader import load_experiment
+from raidar.design.experiment.lock import build_lock
+from raidar.design.experiment.metrics import MetricResolver
 from raidar.design.problem.content import content_digest, hidden_content_in_task
 from raidar.design.problem.importer import ProblemDriftError, import_problem
 from raidar.design.problem.models import ProblemId, ProblemManifest, ProblemMode

@@ -9,7 +9,7 @@ from pathlib import Path
 import click
 
 from raidar.cli.target_options import docker_selection, target_option
-from raidar.design.experiment.references import RegistryReferenceError
+from raidar.contract.references import RegistryReferenceError
 from raidar.design.problem.errata import Disposition, draft_errata, report_entries
 from raidar.design.problem.importer import import_problem
 from raidar.design.problem.models import ProblemId, ProblemManifest

@@ -430,9 +430,7 @@ async def test_validator_wires_the_harbor_engine_and_the_native_arm(
     monkeypatch.setattr(harbor_engine, "run_variant", fake_variant)
     monkeypatch.setattr(validator, "resolve_checkout", lambda *args: Checkout())
     monkeypatch.setattr(validator, "stage_catalog", lambda source, catalog: catalog / source.name)
-    monkeypatch.setattr(
-        "raidar.design.problem.native._docker_host", lambda context: "unix:///fake"
-    )
+    monkeypatch.setattr("raidar.design.problem.native._docker_host", lambda context: "unix:///fake")
     report = await validate_problem(
         store,
         ProblemId.parse(POSITIVE_REF),

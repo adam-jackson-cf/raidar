@@ -36,8 +36,8 @@ from typing import Literal, Self
 import yaml
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from raidar.contract.canonical import digest_json
 from raidar.contract.paths import judge_root
-from raidar.design.experiment.canonical import digest_json
 
 POLICY_DIR = judge_root() / "policies"
 LABELS = ("correct", "false_positive", "false_negative", "uncertain")

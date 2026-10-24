@@ -6,7 +6,7 @@ import hashlib
 from collections.abc import Collection
 from pathlib import Path
 
-from raidar.design.experiment.canonical import IGNORED_TREE_NAMES
+from raidar.contract.canonical import IGNORED_TREE_NAMES
 from raidar.subject.agent.config import Harness
 from raidar.subject.treatment.definition.manifest import ComponentConfigError, ComponentUseContext
 

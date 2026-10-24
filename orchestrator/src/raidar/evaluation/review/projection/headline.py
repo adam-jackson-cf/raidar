@@ -24,13 +24,13 @@ from collections.abc import Collection, Mapping
 from dataclasses import dataclass, field
 from decimal import Decimal
 
+from raidar.contract.references import RegistryReferenceError
 from raidar.design.experiment.metrics import (
     CORRECTNESS,
     DEFAULT_METRIC_REGISTRY,
     Metric,
     MetricScore,
 )
-from raidar.design.experiment.references import RegistryReferenceError
 from raidar.engine.trial.models import CheckpointState, TrialRecord
 from raidar.evaluation.analysis.assessed import (
     CODE_QUALITY_REF,

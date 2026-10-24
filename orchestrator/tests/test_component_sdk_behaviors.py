@@ -9,15 +9,15 @@ import pytest
 from click.testing import CliRunner
 
 from raidar.cli import main
-from raidar.design.experiment.loader import load_experiment
-from raidar.design.experiment.lock import build_lock
-from raidar.design.experiment.metrics import DEFAULT_METRIC_REGISTRY, MetricResolver
-from raidar.design.experiment.references import (
+from raidar.contract.references import (
     RefKind,
     RegistryRef,
     RegistryReferenceError,
     ResolverSet,
 )
+from raidar.design.experiment.loader import load_experiment
+from raidar.design.experiment.lock import build_lock
+from raidar.design.experiment.metrics import DEFAULT_METRIC_REGISTRY, MetricResolver
 from raidar.subject.agent.config import Harness
 from raidar.subject.treatment import (
     ComponentKind,
@@ -356,7 +356,7 @@ def test_component_trees_ship_exactly_the_files_the_lock_hashes(tmp_path: Path) 
 
 
 # Imported modules a fingerprint need not list: the lock's toolchain section
-# pins orchestrator/src/raidar/design/experiment (raidar_spec digest); the registry and the harness enum are
+# pins raidar.design.experiment (raidar_spec digest); the registry and the harness enum are
 # lookup machinery, not component behaviour.
 _UNFINGERPRINTED_OK = {
     "orchestrator/src/raidar/subject/agent/config.py",

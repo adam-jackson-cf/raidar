@@ -19,7 +19,7 @@ from typing import Literal
 
 from harbor.models.trial.config import AgentConfig
 
-from raidar.design.experiment.canonical import digest_json
+from raidar.contract.canonical import digest_json
 from raidar.design.experiment.schema import AgentEntry
 from raidar.subject.agent.codex_auth import resolve_codex_auth
 from raidar.subject.agent.config import Harness

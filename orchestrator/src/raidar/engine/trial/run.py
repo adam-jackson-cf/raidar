@@ -12,10 +12,10 @@ import traceback
 
 from raidar.engine.job.context import JobContext
 from raidar.engine.trial.agent_config import reported_harness_pin
-from raidar.engine.trial.materialise import MaterialisedTask, environment_cold, materialise_task
-from raidar.engine.trial.models import PlannedTrial, TrialRecord
 from raidar.engine.trial.config import harbor_trial_config
 from raidar.engine.trial.finish import finish_trial
+from raidar.engine.trial.materialise import MaterialisedTask, environment_cold, materialise_task
+from raidar.engine.trial.models import PlannedTrial, TrialRecord
 from raidar.engine.trial.record import (
     RunnerFailure,
     TrialEvidence,

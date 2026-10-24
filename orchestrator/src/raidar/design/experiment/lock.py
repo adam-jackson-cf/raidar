@@ -44,12 +44,20 @@ from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 from typing import Any
 
-from raidar.design.experiment.canonical import (
+from raidar.contract.canonical import (
     IGNORED_TREE_NAMES,
     digest_json,
     pretty_canonical_json_bytes,
     sha256_file,
 )
+from raidar.contract.references import (
+    RefKind,
+    RegistryRef,
+    RegistryReferenceError,
+    ResolvedReference,
+    ResolverSet,
+)
+from raidar.contract.source_digest import SOURCE_DIGEST_SCHEME, python_source_digest
 from raidar.design.experiment.compat import GateInputs, PackLoader, compatibility_issues
 from raidar.design.experiment.loader import LoadedExperiment
 from raidar.design.experiment.metrics import (
@@ -57,15 +65,7 @@ from raidar.design.experiment.metrics import (
     MetricRegistry,
     MetricResolver,
 )
-from raidar.design.experiment.references import (
-    RefKind,
-    RegistryRef,
-    RegistryReferenceError,
-    ResolvedReference,
-    ResolverSet,
-)
 from raidar.design.experiment.schema import ComponentUse, ExperimentSpec, ProblemEntry
-from raidar.design.experiment.source_digest import SOURCE_DIGEST_SCHEME, python_source_digest
 from raidar.design.experiment.validation import FieldIssue
 
 LOCK_VERSION = 3

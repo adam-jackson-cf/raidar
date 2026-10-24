@@ -83,7 +83,7 @@ import json
 import re
 import shlex
 from collections.abc import Iterator
-from pathlib import Path, PurePosixPath
+from pathlib import PurePosixPath
 from typing import Any
 
 from raidar.contract.paths import treatment_root

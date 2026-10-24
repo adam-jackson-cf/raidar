@@ -5,7 +5,7 @@ registry reference. The lock resolves each reference through a
 ``RegistryResolver`` registered for its kind. The spec package ships the
 ``metric`` resolver (the headline metric registry); other workstreams plug in their
 registries either by passing a resolver to ``ResolverSet`` directly or by
-exposing a zero-argument factory under the ``raidar.design.experiment.resolvers`` entry-point
+exposing a zero-argument factory under the ``raidar.contract.resolvers`` entry-point
 group. Entry points are loaded lazily, only when a reference of that kind must
 be resolved.
 """
@@ -20,7 +20,7 @@ from importlib.metadata import entry_points
 from pathlib import Path
 from typing import Protocol, runtime_checkable
 
-RESOLVER_ENTRY_POINT_GROUP = "raidar.design.experiment.resolvers"
+RESOLVER_ENTRY_POINT_GROUP = "raidar.contract.resolvers"
 
 _NAME_PATTERN = r"[a-z0-9][a-z0-9._/-]*"
 _VERSION_PATTERN = r"[A-Za-z0-9][A-Za-z0-9._+-]*"

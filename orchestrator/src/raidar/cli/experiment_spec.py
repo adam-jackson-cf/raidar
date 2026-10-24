@@ -8,6 +8,7 @@ from typing import Any
 
 import click
 
+from raidar.contract.references import RefKind
 from raidar.design.experiment.loader import LoadedExperiment, load_experiment, overrides_from_cli
 from raidar.design.experiment.lock import (
     LockError,
@@ -18,7 +19,6 @@ from raidar.design.experiment.lock import (
     default_resolvers,
     render_lock,
 )
-from raidar.design.experiment.references import RefKind
 from raidar.design.experiment.validation import SpecValidationError, spec_warnings
 from raidar.subject.treatment.definition.arm_check import check_arm_components
 

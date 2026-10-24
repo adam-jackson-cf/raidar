@@ -1,4 +1,4 @@
-"""``RegistryResolver`` for kind ``problem`` (entry point ``raidar.design.experiment.resolvers``).
+"""``RegistryResolver`` for kind ``problem`` (entry point ``raidar.contract.resolvers``).
 
 Resolution reads only committed records - the manifest and its validation
 report - so ``raidar lock`` works without materialised task content (and
@@ -31,7 +31,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
-from raidar.design.experiment.references import (
+from raidar.contract.references import (
     RefKind,
     RegistryRef,
     RegistryReferenceError,
@@ -88,5 +88,5 @@ class ProblemResolver:
 
 
 def resolver_factory() -> ProblemResolver:
-    """Zero-argument factory for the ``raidar.design.experiment.resolvers`` entry point."""
+    """Zero-argument factory for the ``raidar.contract.resolvers`` entry point."""
     return ProblemResolver()

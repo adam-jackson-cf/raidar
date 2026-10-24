@@ -23,8 +23,8 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from raidar.design.experiment.canonical import digest_json
-from raidar.design.experiment.references import RefKind, RegistryRef, RegistryReferenceError
+from raidar.contract.canonical import digest_json
+from raidar.contract.references import RefKind, RegistryRef, RegistryReferenceError
 
 VERSION_CHARS = 12
 _COMMIT = re.compile(r"^[0-9a-f]{40}$")

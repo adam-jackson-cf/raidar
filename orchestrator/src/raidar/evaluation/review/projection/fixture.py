@@ -38,8 +38,8 @@ from pathlib import Path
 
 import yaml
 
+from raidar.contract.canonical import digest_json
 from raidar.contract.paths import tmp_root
-from raidar.design.experiment.canonical import digest_json
 from raidar.design.experiment.schema import ExperimentSpec
 from raidar.engine.job.assessment import rescore_config
 from raidar.evaluation.review.projection.fixture_assessments import LintFinding, QualityPlan

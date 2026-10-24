@@ -45,7 +45,7 @@ from typing import Any
 
 import yaml
 
-from raidar.design.experiment.canonical import digest_json
+from raidar.contract.canonical import digest_json
 from raidar.scoring.judge.audit import AuditLog, DecisionRecord, LabelRecord, ReviewerKind
 from raidar.scoring.judge.calibration import (
     PROVISIONAL_THRESHOLD,
