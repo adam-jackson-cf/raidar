@@ -572,6 +572,9 @@ def test_run_command_runs_the_selection_into_the_runs_dir(
     tmp_path: Path, fixture_problem: ImportedFixture, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.setenv(ROOT_ENV, str(fixture_problem.store.root))
+    # API-key auth with a placeholder so the credential preflight never depends on the host.
+    monkeypatch.setenv("CODEX_AUTH_MODE", "api")
+    monkeypatch.setenv("OPENAI_API_KEY", "x" * 24)
     loaded, _, _ = locked_experiment(
         tmp_path / "exp", fixture_problem.ref, environment={"compose_init": False}
     )
