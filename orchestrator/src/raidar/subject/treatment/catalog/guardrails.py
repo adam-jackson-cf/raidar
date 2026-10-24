@@ -12,7 +12,7 @@ guardrail-gate runs ``guardrail-check`` as the workspace's pre-commit hook. No
 text tells the agent about the gate; like any repository it carries
 ``ruff.toml`` and ``mypy.ini``.
 
-The pack ships one payload (``payloads/python_guardrails``) and:
+The pack ships one payload (``lab/treatment/python_guardrails``) and:
 
 - **installs once per trial at environment start**
   (``raidar.subject.treatment.runtime.provision``): the payload is uploaded to a

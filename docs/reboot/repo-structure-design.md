@@ -220,3 +220,49 @@ Built on `structure-groupings` (from `origin/main` @ `37adf8b`) as pure moves: 3
 - **Import contracts**, one per stage, with the existing edges kept: `contracts` imports no stage; nothing imports `cli` (new); `scoring` never imports `engine`, `subjects.agents`, `subjects.treatments` or `cli` (the jev contract is folded in); `grading` never imports `engine`, `subjects` or `cli`; `scoring.process_checks` never imports `scoring.judge`. The edge `scoring` → `grading.sandbox` is not enforced: `scoring.framework.rescore` regrades coverage through `grading.regrade`, which uses the sandbox.
 - **Structure check.** `make structure-check` takes the 8 top-level packages and a second-level allowlist per group, and keeps the depth ≤3 rule with the exemptions above.
 - **Re-key.** Scorer implementation digests and the `raidar_spec` toolchain digest changed with the module paths, and the three open experiments were relocked. Entry-point groups follow the package names (`raidar.design.experiments.resolvers`, `raidar.subjects.treatments`).
+
+## 10. Round 3: tiers, singular names and data outside the package (2026-10-24)
+
+Built on `structure-groupings` after round 2, from the import graph measured on 2026-10-24. Three rules from the coding-guidance skill applied to the round-2 layout. Behaviour is unchanged; the one declared re-key is below.
+
+**Tiers.** The top-level groups are tiers, highest first, and a group imports only groups below it:
+
+```
+cli > evaluation > engine > design > scoring > grading > subject > contract
+```
+
+Inside a group the second level is a set of declared sub-tiers or of independent siblings:
+
+| Group | Sub-tiers, highest first | Independent |
+|---|---|---|
+| `engine` | `job` > `trial` > `health` > `perf` > `target` | none |
+| `scoring` | `catalog` > scorers (`code_quality`, `correctness`, `gate_effort`, `judge`, `process_checks`, `resource_usage`) > `framework` | the scorers, from each other |
+| `subject` | `treatment` > `agent` | `environment`, from `treatment` and `agent` |
+| `design` | none | `experiment`, `problem` |
+| `evaluation` | `review` > `analysis` | `ledger`, from `review` and `analysis` |
+
+`orchestrator/.importlinter` enforces the tiers with `layers` contracts (`tiers`, `engine-tiers`, `scoring-tiers`, `subject-tiers`, `evaluation-tiers`) and the independent siblings with `independence` contracts. The `forbidden` contracts that are stricter than the tiers stay: `scoring` never imports `subject.agent` or `subject.treatment`, `grading` never imports `subject`, `design.problem` never imports `subject.agent`, `scoring.process_checks` never imports `scoring.judge`, and `evaluation.ledger` imports no other raidar layer. The contracts that the tiers subsume (nothing imports `cli`, `contract` imports no group, `engine` and `evaluation` stay independent of `cli`) are removed.
+
+**Upward edges removed.** The measured violations were `design` → `evaluation` (2), `scoring` → `design` (11) and `subject` → `design` (9), plus these sibling cycles. Each was broken by moving the shared part down:
+
+- **`design.experiment` read hashing and references (scoring, subject).** `canonical` (canonical JSON hashing), `source_digest` and `references` (registry reference types, the resolver protocol) moved to `contract`. The resolver entry-point group is now `raidar.contract.resolvers`.
+- **`scoring` read headline metrics from design.** `design/experiment/metrics.py` moved to `scoring/framework/metrics.py`. The lock's `raidar_spec` digest still covers it (`SPEC_EXTERNAL_MODULES` in `design/experiment/lock.py` lists it with the three `contract` modules above).
+- **`design.experiment.validation` read `evaluation.analysis`.** It read the outcome metric ids and the manipulation-check names with their scorer refs. The metric catalogue (`MetricDef`, the metric ids, `primary_metric`, the checkpoint series) moved out of `analysis/outcomes.py` to `scoring/catalog/outcomes.py`, and the check table (`CHECK_SCORERS`) out of `analysis/manipulation.py` to `scoring/catalog/checks.py`. `analysis/outcomes.py` keeps the analysis models (`Value`, `TrialOutcome`, `PoolingReport`); analysis builds `treatment_check_report` on the table.
+- **`scoring.framework.catalog` imported the scorers.** The registry machinery (`ScorerRegistration`, `ScorerRegistry`, the implementation digest, `tool_lock_for`) is `scoring/framework/registry.py`; the built-in registrations and their config tables are `scoring/catalog/builtin.py`. `process_checks` read `resource_usage.atif`, so `atif.py` moved to `scoring/framework/`.
+- **`subject.treatment` compiled an `ExperimentSpec`.** `compile_condition`, `compile_arm` and the arm check moved to `design/experiment/arm.py` and `arm_check.py` (compiling an experiment's arm into components is design work that reads the treatment registry). `ArmBlueprint` left the job plan for `engine/trial/blueprint.py`.
+- **`engine`: `health` ↔ `trial`, `perf` → `trial`, `target` → `trial`.** Trial records (`models.py`, read by `evaluation` too) moved to `contract/trial.py` with `NOT_STARTED`; `timestamps.py` to `contract/timestamps.py`; Harbor's `result.json` reading (`RESULT_FILE`, `read_result`, `step_results`) to `contract/job_layout.py`. The agent reaper moved from `trial` to `health` (its reports are what health audits).
+- **`engine`: `health` → `job`, `trial` ↔ `job`.** `provenance.py` (what a job records about the code it ran under; read only by `job`) moved from `health` to `job`. The plan (`ExperimentPlan`) and `JobContext`, which every trial receives, moved from `job` to `trial/plan.py` and `trial/context.py`.
+
+**Singular names.** A folder is plural only when it is a catalogue of same-kind items. Renamed: `contracts` → `contract`, `subjects` → `subject` (`treatments`, `agents`, `environments` → `treatment`, `agent`, `environment`; `agent/adapters/` stays a catalogue), `engine/{jobs,trials,targets}` → `engine/{job,trial,target}`, `design/{experiments,problems}` → `design/{experiment,problem}`. `payloads/` and `adapters/` stay plural. A child no longer repeats its parent's name: `job/context.py` and `job/manifest.py`, `trial/{config,finish,record,run}.py`, `perf/report.py`, `environment/python/task.py`, `contract/review.py`, `grading/offline.py`. Entry-point groups follow the package names (`raidar.subject.treatment`).
+
+**Data outside the package.** Run-time data lives under `lab/`, each tree at one explicit path from `raidar/contract/paths.py` (`treatment_root()`, `environment_root()`, `judge_root()`), with no search order and no fallback:
+
+| Was | Now |
+|---|---|
+| `subject/treatment/payloads/python_guardrails/` | `lab/treatment/python_guardrails/` |
+| `subject/environment/python/{pack.yaml,tools.lock.yaml,image/}` | `lab/environment/python/` |
+| `scoring/judge/{policies,question_sets}/` | `lab/judge/{policies,question_sets}/` |
+
+Component fingerprints are repo-relative (`orchestrator/src/raidar/...`, `lab/treatment/...`), so a payload outside the package is hashed like code. Code shipped into containers (the grader plugin `grading/runtime/`, `mcp_shim.py`, `step_reset.sh`) is code and stays in the package. `make structure-check` drops the payload and image depth exemptions (nothing needs them), allows only `experiments, problems, ledger, treatment, environment, judge` below `lab/`, and keeps the `v<N>/` data-folder rule for `components/` and `lab/treatment/`.
+
+**Re-key.** Scorer implementation digests, the `raidar_spec` toolchain digest and component fingerprints changed with the module and payload paths. The three experiments were relocked; no jobs are carried over.
