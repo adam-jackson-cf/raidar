@@ -1,4 +1,4 @@
-"""Repository state helpers for quality-gate checks."""
+"""Git working-tree state the quality gate reads: unstaged changes and generated artifacts."""
 
 from __future__ import annotations
 
