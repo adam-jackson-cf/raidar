@@ -155,3 +155,54 @@ Built on `reboot-impl` in 54 commits after `archive/pre-structure-reset`: 726 fi
   - `make perf-gate TARGET=mbp` passes strictly against the accepted `mbp` set;
   - `make orchestrator-smoke` solves;
   - the forge smoke `v1-forge-01` (8 checkpoints) is valid with 0 health violations, and assess plus analyze complete on it.
+
+## 8. Round 2: descriptive groupings inside `raidar/` (proposal, 2026-10-24)
+
+**Problem.** `orchestrator/src/raidar/` has 15 top-level packages named on three different axes:
+- architectural layer: `cli`, `core`;
+- domain noun: `agents`, `components`, `packs`, `problems`, `targets`, `scorers`, `spec`, `ledger`, `jev`;
+- activity: `execution`, `review`, `analysis`, `verifier`.
+
+A reader cannot tell from the names where a stage of Raidar's process lives. factory-x-loops groups by role in its process (`capability/{define,verify,judge,accept}`, `engine/{lifecycle,supervision,workflow}`, `evaluation/{analysis,health,journal,replay}`) and has 6 top-level packages.
+
+**Rule.** The top level names the stages of an evaluation, in order, plus the interface and the shared contracts. The second level names the thing that stage handles. Every name says what the code does for an experiment, never its architectural layer.
+
+```
+raidar/
+  cli/            interface: click commands only (unchanged)
+  contracts/      shared records every stage reads/writes: job layout, step snapshot, review contract,
+                  repo/var paths, runtime ids                                  (was core/)
+  design/         declaring an experiment
+    experiments/  schema, validation, lock, compatibility gate, metrics       (was spec/)
+    problems/     registry, import, store, validation, errata                 (was problems/)
+  subjects/       what is evaluated
+    agents/       adapters, harness ids, codex auth                           (was agents/)
+    treatments/   component definition, catalog, in-trial runtime, payloads   (was components/)
+    environments/ runtime packs: image, provisioner, drift                    (was packs/)
+  engine/         running a locked experiment
+    targets/      Docker targets, transport, trust gate, job guard            (was targets/)
+    jobs/         plan, run, detach supervisor, job manifest, progression     (was execution/ job modules)
+    trials/       driver, environment, materialise, collect, cleanup, reaper  (was execution/ trial modules)
+    health/       run-health audit, liveness, admission, provenance           (was execution/health/)
+    perf/         phases, budgets, perf report                                (was execution/perf/)
+  grading/        the hidden-test verdict of each step                        (was verifier/; runtime/ plugin kept)
+  scoring/        measuring trials offline
+    framework/    sdk, catalog, store, rescore, keys, trial inputs            (was scorers/*.py, scorers/sdk/)
+    correctness/, code_quality/, process_checks/, gate_effort/, resource_usage/   one package per scorer
+    judge/        dormant model judgement                                     (was jev/)
+  evaluation/     turning scores into findings
+    analysis/     paired effects, verdicts, pooling gate                      (was analysis/)
+    review/       projection and quality views for the review surface         (was review/{projection,quality})
+    ledger/       fault categories and remedies                               (was ledger/)
+```
+
+There are 8 top-level packages instead of 15, and no package sits deeper than 3 below `raidar/`. `scoring/code_quality/snapshot_tool` is at depth 3, and `subjects/treatments/payloads/**` is data.
+
+**Consequences.**
+- **Pure moves, with one declared re-key.** Scorer implementation digests change because module paths change, and component fingerprints change because payload and fingerprint paths change. Relock the three experiments; no jobs are carried over (clean start).
+- **Config and checks to update:** import-linter contracts are rewritten per stage, keeping the same edges (`contracts` imports no stage, `scoring` never imports `engine`, `grading` never imports `subjects`). `make structure-check` gets the new package allowlist with second-level allowlists. Also update the entry points, `scoring/framework/catalog` dotted strings, Makefile `python -m` paths, and AGENTS/README.
+- **Proof:**
+  - `make quality`;
+  - a scorer-parity rescore of the round-1 forge smoke `v1-forge-01` (old store vs new code, identical results);
+  - `make perf-gate TARGET=mbp`;
+  - `make orchestrator-smoke`.

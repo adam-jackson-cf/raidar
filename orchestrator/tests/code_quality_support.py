@@ -54,15 +54,12 @@ def materialise(root: Path, files: Mapping[str, str]) -> Path:
 def without_executable(payload: dict[str, Any]) -> dict[str, Any]:
     """Raw V/E evidence minus the host's evaluator interpreter identity.
 
-    The interpreter binary digest and the parser/tokenizer schema id (which hashes
-    ``sys.version``) identify the machine that ran the evaluator, not the port's
-    values, so goldens recorded on one host must not pin them.
+    The interpreter's binary, version and stdlib-file digests and the parser/tokenizer
+    schema id (which hashes ``sys.version``) identify the machine that ran the
+    evaluator, not the port's values, so goldens recorded on one host must not pin
+    them; only the language level (``cache_tag``) is compared.
     """
-    interpreter = {
-        **payload["interpreter"],
-        "executable": "<python>",
-        "executable_sha256": "<host>",
-    }
+    interpreter = {"cache_tag": payload["interpreter"]["cache_tag"]}
     ruff = {**payload["ruff"], "invocation": ["<python>", *payload["ruff"]["invocation"][1:]]}
     return {
         **payload,
