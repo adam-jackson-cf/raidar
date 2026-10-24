@@ -28,23 +28,3 @@ export function fmtPercent(v: number | null | undefined): string {
   if (v == null) return '—';
   return `${Math.round(v * 100)}%`;
 }
-
-/** Parse a JSON-ish payload string; returns undefined when not parseable. */
-export function tryParseJson(s: string | null | undefined): unknown {
-  if (!s) return undefined;
-  try {
-    return JSON.parse(s);
-  } catch {
-    return undefined;
-  }
-}
-
-/** Pretty-print a payload for copy actions; falls back to the raw string. */
-export function tryJson(s: string | null | undefined): string | null {
-  if (!s) return null;
-  try {
-    return JSON.stringify(JSON.parse(s), null, 2);
-  } catch {
-    return s;
-  }
-}

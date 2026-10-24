@@ -2,9 +2,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ChevronRight, ChevronsDownUp, ChevronsUpDown, CircleAlert } from 'lucide-react';
 import { AnnotationChip } from '@/components/AnnotationChip';
-import { C, SPAN_TYPE_INFO } from '@/utils/colors';
-import { fmtDuration } from '@/utils/helpers';
-import type { Annotation, Span } from '@/utils/types';
+import { C, SPAN_TYPE_INFO } from '@/presentation/colors';
+import { fmtDuration } from '@/presentation/format';
+import type { Annotation, Span } from '@/api/types';
 
 interface FlatRow {
   span: Span;

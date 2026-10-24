@@ -3,9 +3,9 @@
 // condition contract before trusting score movement between arms.
 import { useMemo, useState } from 'react';
 import { ChevronDown, ChevronRight, MoveRight, TriangleAlert } from 'lucide-react';
-import { C } from '@/utils/colors';
-import { fmtTokens } from '@/utils/helpers';
-import type { ArmDiff, ExperimentRecord, FileDiff } from '@/utils/types';
+import { C } from '@/presentation/colors';
+import { fmtTokens } from '@/presentation/format';
+import type { ArmDiff, ExperimentRecord, FileDiff } from '@/api/types';
 
 /** Display names for the diff's wire keys (`condition` is the locked condition contract). */
 const TAB_LABEL = { prompt: 'prompt', condition: 'contract' } as const;

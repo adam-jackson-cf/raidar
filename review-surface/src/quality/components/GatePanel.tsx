@@ -7,7 +7,7 @@
 // labelled as such, its families are the first run's and its fix outcomes read n/a.
 import { Fragment, useState } from 'react';
 import { ChevronDown, ChevronRight } from 'lucide-react';
-import { C } from '@/utils/colors';
+import { C } from '@/presentation/colors';
 import { StatusBadge } from '@/quality/components/QualityStrip';
 import { GATE_FAMILIES, type Cell, type GateRound, type GateStep, type GateView } from '@/quality/types';
 

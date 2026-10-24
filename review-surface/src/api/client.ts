@@ -6,7 +6,7 @@ import type {
   RunOutline,
   RunRecord,
   SearchMatch,
-} from '@/utils/types';
+} from '@/api/types';
 
 async function getJson<T>(url: string): Promise<T> {
   const res = await fetch(url);

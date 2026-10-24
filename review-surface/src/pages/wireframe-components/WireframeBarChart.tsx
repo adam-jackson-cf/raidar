@@ -1,8 +1,8 @@
 import { useNavigate } from 'react-router-dom';
-import { C } from '@/utils/colors';
-import { fmtScore, fmtTokens } from '@/utils/helpers';
-import { runLabel, scoreTier } from '@/utils/verdict';
-import type { RunRecord } from '@/utils/types';
+import { C } from '@/presentation/colors';
+import { fmtScore, fmtTokens } from '@/presentation/format';
+import { runLabel, scoreTier } from '@/presentation/verdict';
+import type { RunRecord } from '@/api/types';
 
 const WIDTH = 560;
 const HEIGHT = 220;

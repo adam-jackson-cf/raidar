@@ -1,7 +1,7 @@
 import { ChevronRight } from 'lucide-react';
-import { C } from '@/utils/colors';
-import { runLabel, scoreTier } from '@/utils/verdict';
-import type { RunRecord } from '@/utils/types';
+import { C } from '@/presentation/colors';
+import { runLabel, scoreTier } from '@/presentation/verdict';
+import type { RunRecord } from '@/api/types';
 
 function OutcomeRing({ score }: { score: number | null }) {
   const normalized = score == null ? 0 : Math.max(0, Math.min(1, score));

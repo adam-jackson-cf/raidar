@@ -2,8 +2,8 @@ import { useState, type FormEvent } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Search } from 'lucide-react';
 import { api } from '@/api/client';
-import { C } from '@/utils/colors';
-import type { SearchMatch } from '@/utils/types';
+import { C } from '@/presentation/colors';
+import type { SearchMatch } from '@/api/types';
 
 const MATCH_OPEN = '<<MATCH>>';
 const MATCH_CLOSE = '<<END>>';

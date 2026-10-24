@@ -5,9 +5,9 @@ import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { GateChips } from '@/components/GateChips';
 import { SearchPanel } from '@/components/SearchPanel';
 import { SpanTree } from '@/components/SpanTree';
-import { C } from '@/utils/colors';
+import { C } from '@/presentation/colors';
 import { api } from '@/api/client';
-import type { Annotation, AnnotationKind, RunRecord, RunDetail as RunDetailData, Span } from '@/utils/types';
+import type { Annotation, AnnotationKind, RunRecord, RunDetail as RunDetailData, Span } from '@/api/types';
 import { WireframeAnnotationCards } from './wireframe-components/WireframeAnnotationCards';
 import { WireframeRunListItem } from './wireframe-components/WireframeRunListItem';
 import { WireframeRunHeader } from './wireframe-components/WireframeRunHeader';

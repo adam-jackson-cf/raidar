@@ -1,9 +1,9 @@
 // Adapted from Raindrop Workshop (MIT) — app/src/components/TraceAnnotations.tsx
 import { Crosshair, Trash2 } from 'lucide-react';
 import { AnnotationChip, KIND_STYLES, SOURCE_GLYPH, annotationSourceLabel } from '@/components/AnnotationChip';
-import { C } from '@/utils/colors';
-import { categoryHint, categoryLabel } from '@/utils/verdict';
-import type { Annotation, FindingEvidenceRef } from '@/utils/types';
+import { C } from '@/presentation/colors';
+import { categoryHint, categoryLabel } from '@/presentation/verdict';
+import type { Annotation, FindingEvidenceRef } from '@/api/types';
 
 export function canDeleteAnnotation(annotation: Annotation): boolean {
   return annotation.source === 'user' && annotation.id.startsWith('user-');

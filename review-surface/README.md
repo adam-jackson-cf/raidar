@@ -29,7 +29,7 @@ behind progressive disclosure, so each persona starts zoomed-out and drills in.
 ### Semantic verdict layer
 
 Raw scores, sample sizes, and finding categories are translated into one
-consistent good/bad vocabulary in `src/utils/verdict.ts`:
+consistent good/bad vocabulary in `src/presentation/verdict.ts`:
 
 - **Delivery** tiers from the composite score (Strong ≥ 0.9, Solid ≥ 0.75,
   Shaky ≥ 0.5, Failing below) — a presentation band; Raidar has no canonical

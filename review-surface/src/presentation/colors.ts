@@ -41,7 +41,7 @@ export const C = {
   traceErrorBg: 'var(--raidar-trace-error-bg)',
 } as const;
 
-import type { SpanType } from '@/utils/types';
+import type { SpanType } from '@/api/types';
 
 export const SPAN_TYPE_INFO: Record<SpanType, { color: string; label: string }> = {
   TRACE: { color: C.purple, label: 'TRACE' },

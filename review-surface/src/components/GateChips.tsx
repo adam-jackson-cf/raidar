@@ -1,7 +1,7 @@
 // Quick gate-status scan for the run header: one chip per verification gate,
 // clickable to select the gate's evidence span in the tree.
-import { C } from '@/utils/colors';
-import type { Span } from '@/utils/types';
+import { C } from '@/presentation/colors';
+import type { Span } from '@/api/types';
 
 export function GateChips({
   spans,

@@ -4,7 +4,7 @@
 // saved here is pending until `make jev-export-labels` exports it for
 // `raidar jev import-labels`; a label already in the audit is shown locked.
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { C } from '@/utils/colors';
+import { C } from '@/presentation/colors';
 import { qualityApi } from '@/quality/api';
 import { JEV_LABELS, type JevDecisionItem, type JevLabel } from '@/quality/types';
 

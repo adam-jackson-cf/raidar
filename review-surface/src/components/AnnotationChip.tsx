@@ -1,5 +1,5 @@
 // Adapted from Raindrop Workshop (MIT) — app/src/components/AnnotationChip.tsx
-import type { Annotation, AnnotationKind } from '@/utils/types';
+import type { Annotation, AnnotationKind } from '@/api/types';
 
 export const KIND_STYLES: Record<
   AnnotationKind,

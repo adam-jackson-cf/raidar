@@ -1,8 +1,8 @@
 import { useMemo, useState } from 'react';
 import { ChevronDown, ChevronRight, MoveRight, TriangleAlert, Trophy } from 'lucide-react';
-import { C } from '@/utils/colors';
-import { fmtTokens } from '@/utils/helpers';
-import type { ExperimentRecord, FileDiff, ArmDiff, StatBlock } from '@/utils/types';
+import { C } from '@/presentation/colors';
+import { fmtTokens } from '@/presentation/format';
+import type { ExperimentRecord, FileDiff, ArmDiff, StatBlock } from '@/api/types';
 import { compactSpec } from './wireframeLabels';
 
 type MovementMetric = 'outcome' | 'runtime' | 'spend';

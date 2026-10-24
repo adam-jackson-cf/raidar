@@ -1,8 +1,8 @@
 import { useMemo, useState, type MouseEvent } from 'react';
 import { Info, Pin, PinOff, X } from 'lucide-react';
-import { C } from '@/utils/colors';
-import { humanize } from '@/utils/verdict';
-import type { ExperimentRecord, RunRecord, StatBlock } from '@/utils/types';
+import { C } from '@/presentation/colors';
+import { humanize } from '@/presentation/verdict';
+import type { ExperimentRecord, RunRecord, StatBlock } from '@/api/types';
 import { compactSpec } from './wireframeLabels';
 
 type MetricOutcome = {

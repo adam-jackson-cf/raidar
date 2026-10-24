@@ -1,5 +1,5 @@
 import { KIND_STYLES } from '@/components/AnnotationChip';
-import type { AnnotationKind } from '@/utils/types';
+import type { AnnotationKind } from '@/api/types';
 
 const ORDER: AnnotationKind[] = ['issue', 'good', 'note'];
 

@@ -4,9 +4,9 @@
 import { useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { CircleAlert } from 'lucide-react';
-import { C } from '@/utils/colors';
-import { categoryHint, categoryLabel, runLabel } from '@/utils/verdict';
-import type { RunRecord } from '@/utils/types';
+import { C } from '@/presentation/colors';
+import { categoryHint, categoryLabel, runLabel } from '@/presentation/verdict';
+import type { RunRecord } from '@/api/types';
 
 interface Pattern {
   label: string;

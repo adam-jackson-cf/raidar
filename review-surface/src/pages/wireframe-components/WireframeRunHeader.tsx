@@ -1,10 +1,10 @@
 import { useState, type MouseEvent, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowUpRight, Check, ChevronDown, ChevronRight, Copy, MessageSquarePlus } from 'lucide-react';
-import { C } from '@/utils/colors';
-import { fmtDuration, fmtScore, fmtTokens } from '@/utils/helpers';
-import { runLabel, runSummary, scoreTier } from '@/utils/verdict';
-import type { RunRecord } from '@/utils/types';
+import { C } from '@/presentation/colors';
+import { fmtDuration, fmtScore, fmtTokens } from '@/presentation/format';
+import { runLabel, runSummary, scoreTier } from '@/presentation/verdict';
+import type { RunRecord } from '@/api/types';
 
 type HoverPayload = {
   x: number;

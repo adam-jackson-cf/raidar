@@ -2,9 +2,10 @@ import { useState } from 'react';
 import { Check, Copy, MessageSquarePlus, X } from 'lucide-react';
 import { AnnotationCards } from '@/components/AnnotationCards';
 import { JsonView } from '@/components/JsonView';
-import { C, SPAN_TYPE_INFO } from '@/utils/colors';
-import { fmtDuration, tryParseJson } from '@/utils/helpers';
-import type { Annotation, Span } from '@/utils/types';
+import { C, SPAN_TYPE_INFO } from '@/presentation/colors';
+import { fmtDuration } from '@/presentation/format';
+import { tryParseJson } from '@/presentation/payload';
+import type { Annotation, Span } from '@/api/types';
 
 function CopyPayloadButton({ payload }: { payload: string }) {
   const [copied, setCopied] = useState(false);

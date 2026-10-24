@@ -1,7 +1,7 @@
 // SCB-dashboard distributions per arm (lint density, CC-mass concentration,
 // function LOC): a box (Q1–Q3, median) with whiskers to min/max and every
 // checkpoint value as a dot. The source line names how each was measured.
-import { C } from '@/utils/colors';
+import { C } from '@/presentation/colors';
 import { armColor } from '@/quality/format';
 import type { SignalDistributions } from '@/quality/types';
 

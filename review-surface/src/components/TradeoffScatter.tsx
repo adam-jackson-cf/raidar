@@ -3,10 +3,10 @@
 // outliers separate visually. One point per run, colored by AgentSpec.
 import { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { C } from '@/utils/colors';
-import { fmtDuration, fmtScore } from '@/utils/helpers';
-import { runLabel } from '@/utils/verdict';
-import type { RunRecord } from '@/utils/types';
+import { C } from '@/presentation/colors';
+import { fmtDuration, fmtScore } from '@/presentation/format';
+import { runLabel } from '@/presentation/verdict';
+import type { RunRecord } from '@/api/types';
 
 const SPEC_COLORS = [C.accent, C.cyan, C.purple, C.orange, '#8BC34A', '#F5CE4E'];
 const WIDTH = 560;

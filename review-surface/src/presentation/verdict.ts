@@ -1,7 +1,7 @@
 // Semantic translation layer: raw scores, samples, and finding categories
 // rendered as plain-language verdicts with one consistent tier vocabulary.
-import { C } from '@/utils/colors';
-import type { ExperimentRecord, RunRecord, StatBlock } from '@/utils/types';
+import { C } from '@/presentation/colors';
+import type { ExperimentRecord, RunRecord, StatBlock } from '@/api/types';
 
 export interface Tier {
   label: string;

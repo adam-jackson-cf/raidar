@@ -7,7 +7,7 @@ import { WireframeExperimentsPage } from '@/pages/WireframeExperimentsPage';
 import { WireframeRunsPage } from '@/pages/WireframeRunsPage';
 import { QualityPage } from '@/quality/QualityPage';
 import { QualityRunPage } from '@/quality/QualityRunPage';
-import { C } from '@/utils/colors';
+import { C } from '@/presentation/colors';
 
 function Layout() {
   const location = useLocation();
