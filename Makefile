@@ -175,8 +175,7 @@ help:
 	@echo "  make pack-audit [RUNTIME=python]                      Assert the built agent image has pinned agents, no scorer tools or browsers"
 	@echo "  make pack-tool-provision TOOL=<tool> [RUNTIME=python] Provision one host-parse measurement tool into the lock-keyed cache"
 	@echo "  make component-probe-trials [PROBE_EVIDENCE_DIR=<dir>] Real codex/gpt-6-luna low trials proving every built-in component's discovery probe"
-	@echo "  make guardrails-verify                                python-guardrails rule tests for each pack (@1, which @2 installs: 76 rules; @3: 83, its tests check"
-	@echo "                                                        included; @4 and @5: 85, the scope canaries included; @6, @7 and @8: 86, the test-class canary included; @8 also its --autofix canaries): every rule (derived from the pack's config and codes) fires on its violating canary and"
+	@echo "  make guardrails-verify                                python-guardrails rule tests (86 rules, the test-class and --autofix canaries included): every rule (derived from the pack's config and codes) fires on its violating canary and"
 	@echo "                                                        passes its clean one against the pack installed in the pack image, plus a mutant-pack negative"
 	@echo "                                                        control (Docker target, PyPI; not in make quality)"
 	@echo ""
@@ -200,11 +199,11 @@ help:
 	@echo "                                                        ALLOW_UNSMOKED=1 overrides and records it in job.json (admission)"
 	@echo "  make experiment-status JOB=<job-dir> [LOG_LINES=20]   A job's state (running, finished, failed, died), trials recorded of selected, log tail"
 	@echo "  make health JOB=<job-dir>                             Recompute every trial's health.json (V/H/L/P/T checks) and append fault-candidates.jsonl; exit 1 on a violation"
-	@echo "  make experiment-assess JOB=<job-dir> STORE=<assessment-store> SCORERS=\"correctness@1 ...\" [LOCK=] [ASSESSMENT_CONFIG=] [REPLAY=1] [JEV_REPLAY_ONLY=1] [CONCURRENCY=N] [ASSESS_OUT=report.json]"
+	@echo "  make experiment-assess JOB=<job-dir> STORE=<assessment-store> SCORERS=\"correctness@1 ...\" [LOCK=] [ASSESSMENT_CONFIG=] [REPLAY=1] [CONCURRENCY=N] [ASSESS_OUT=report.json]"
 	@echo "                                                        Score a job's stored trials into an Assessment store (never re-runs agents; AS1-gated)"
-	@echo "                                                        (process-compliance@2-@6 are deterministic only; JEV_REPLAY_ONLY matters only for the dormant @1;"
-	@echo "                                                        with gate-effort@4-@9 it first grades guardrail-gate@3/@4 pre-fix snapshots into STORE, and with"
-	@echo "                                                        code-quality@2 or @3 it first makes deferred coverage runs (verifier_coverage: offline) into STORE: Docker target;"
+	@echo "                                                        (process-compliance@6 is deterministic only;"
+	@echo "                                                        with gate-effort@10 it first grades guardrail-gate@4 pre-fix snapshots into STORE, and with"
+	@echo "                                                        code-quality@3 it first makes deferred coverage runs (verifier_coverage: offline) into STORE: Docker target;"
 	@echo "                                                        CONCURRENCY=N works on N trials at once, each trial's steps in order; default 1)"
 	@echo "  make assess-regrade JOB=<trial-or-job-dir> [VERIFIER_BUNDLE=<dir>] [STORE=<assessment-store>] [COVERAGE_CHECK=1 [CONCURRENCY=N]] [REGRADE_OUT=report.json]"
 	@echo "                                                        Rerun the verifier over stored step snapshots (and, with STORE, the stored pre-fix grades); fails if results differ;"
@@ -549,7 +548,7 @@ experiment-assess:
 	@$(TARGET_ENV) $(RAIDAR_SECRETS) assess --rescore "$(if $(wildcard $(JOB)/trials),$(JOB)/trials,$(JOB))" --store "$(STORE)" \
 		$(foreach scorer,$(SCORERS),--scorer "$(scorer)") \
 		$(if $(ASSESSMENT_CONFIG),--config "$(ASSESSMENT_CONFIG)",) $(if $(LOCK),--lock "$(LOCK)",) $(if $(REPLAY),--replay,) \
-		$(if $(JEV_REPLAY_ONLY),--jev-replay-only,) $(if $(CONCURRENCY),--concurrency "$(CONCURRENCY)",) \
+		$(if $(CONCURRENCY),--concurrency "$(CONCURRENCY)",) \
 		$(if $(ASSESS_OUT),--out "$(ASSESS_OUT)",)
 
 assess-regrade:
