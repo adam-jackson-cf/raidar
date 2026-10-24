@@ -50,16 +50,14 @@ from pathlib import Path, PurePosixPath
 from typing import Any, ClassVar, cast
 
 from harbor.agents.base import BaseAgent
-from harbor.agents.factory import AgentFactory
 from harbor.agents.options import AgentOptions
 from harbor.environments.base import BaseEnvironment
 from harbor.models.agent.context import AgentContext
 from harbor.models.trajectories import Trajectory
-from harbor.models.trial.config import AgentConfig
-from harbor.utils.templating import render_prompt_template
 from pydantic import BaseModel, ConfigDict, Field
 
 from raidar.components.definition.evidence import read_jsonl
+from raidar.components.runtime.session_chain import InnerAgentSpec, create_inner, render_task
 from raidar.core.snapshot import SNAPSHOT_EXCLUDES
 
 COMPONENT = "review-loop@2"
@@ -370,27 +368,16 @@ class ReviewLoopAgent(BaseAgent):
         value = self.loop_options.inner_agent.kwargs.get(PROMPT_TEMPLATE_KWARG)
         return Path(str(value)) if value else None
 
+    def _inner_spec(self) -> InnerAgentSpec:
+        inner = self.loop_options.inner_agent
+        return InnerAgentSpec(name=inner.name, kwargs=inner.kwargs)
+
     def _implementer_task(self, instruction: str) -> str:
-        template = self.prompt_template
-        return render_prompt_template(template, instruction) if template else instruction
+        return render_task(self._inner_spec(), instruction)
 
     def _inner(self, logs_dir: Path) -> BaseAgent:
         """The wrapped agent without its prompt template: the loop applies that itself."""
-        inner = self.loop_options.inner_agent
-        kwargs = {key: v for key, v in inner.kwargs.items() if key != PROMPT_TEMPLATE_KWARG}
-        return AgentFactory.create_agent_from_config(
-            AgentConfig(
-                name=inner.name,
-                model_name=self.model_name,
-                kwargs=kwargs,
-                env=dict(self._extra_env),
-            ),
-            logs_dir=logs_dir,
-            logger=self.logger,
-            mcp_servers=self.mcp_servers,
-            skills_dir=self.skills_dir,
-            environment_logs_dir=self.environment_logs_dir,
-        )
+        return create_inner(self, self._inner_spec(), logs_dir, model_name=self.model_name)
 
     @property
     def work_dir(self) -> PurePosixPath:

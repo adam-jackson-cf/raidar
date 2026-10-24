@@ -40,12 +40,9 @@ import yaml
 
 from raidar.core.paths import tmp_root
 from raidar.execution.assessment import rescore_config
-from raidar.review.projection.fixture_assessments import (
-    LintFinding,
-    QualityPlan,
-    store_assessments,
-)
+from raidar.review.projection.fixture_assessments import LintFinding, QualityPlan
 from raidar.review.projection.fixture_lock import fixture_lock
+from raidar.review.projection.fixture_store import FixtureAssessments
 from raidar.review.projection.fixture_trials import (
     CheckpointScript,
     Outcome,
@@ -54,8 +51,6 @@ from raidar.review.projection.fixture_trials import (
     write_bundle,
     write_trial,
 )
-from raidar.scorers.catalog import default_scorer_registry
-from raidar.scorers.store import AssessmentStore
 from raidar.spec.canonical import digest_json
 from raidar.spec.schema import ExperimentSpec
 
@@ -377,7 +372,7 @@ def _write_json(path: Path, payload: object) -> None:
     path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n")
 
 
-def _run(design: Design, dest: Path, store: AssessmentStore, root: str = JOBS_DIR) -> Path:
+def _run(design: Design, dest: Path, store: FixtureAssessments, root: str = JOBS_DIR) -> Path:
     spec = _spec(design)
     lock = _lock(design, spec)
     job_dir = dest / root / design.experiment / design.experiment
@@ -392,7 +387,6 @@ def _run(design: Design, dest: Path, store: AssessmentStore, root: str = JOBS_DI
     (job_dir / "assessment-config.yaml").write_text(
         yaml.safe_dump(settings.model_dump(mode="json"), sort_keys=True)
     )
-    registry = default_scorer_registry()
     conditions = design.locked_conditions()
     for index, trial in enumerate(design.trials):
         condition, agent = design.arms[trial.arm]
@@ -412,9 +406,7 @@ def _run(design: Design, dest: Path, store: AssessmentStore, root: str = JOBS_DI
         )
         script = _script(design, trial, index)
         write_trial(plan, script)
-        store_assessments(
-            store,
-            registry,
+        store.store_trial(
             job_dir / "trials" / script.trial_id,
             settings,
             _quality(trial, len(trial.outcomes)),
@@ -441,7 +433,7 @@ def generate_review_fixture(dest: Path) -> list[Path]:
     Returns the job directories.
     """
     shutil.rmtree(dest, ignore_errors=True)
-    store = AssessmentStore(dest / "store")
+    store = FixtureAssessments(dest / "store")
     designs = (_bugfix(), _skill(), _policy_mix(), _policy_mix_k2())
     runs = [_run(design, dest, store) for design in designs]
     runs.append(_run(_review_only(), dest, store, REVIEW_ONLY_DIR))

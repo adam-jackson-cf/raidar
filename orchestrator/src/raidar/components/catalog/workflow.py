@@ -11,6 +11,8 @@ recorded in that record, not evidence about whether the component took effect.
 
 from __future__ import annotations
 
+from typing import Any
+
 from raidar.components.catalog._common import (
     BOTH_HARNESSES,
     COMMON_FINGERPRINT,
@@ -32,6 +34,15 @@ from raidar.components.runtime.review_loop import LOOP_RECORD
 REVIEW_LOOP_IMPORT_PATH = "raidar.components.runtime.review_loop:ReviewLoopAgent"
 
 
+def _early_end(record: dict[str, Any]) -> object | None:
+    """The error of a loop that ended on a stage failure or a timeout cancellation, else None."""
+    stages = record.get("stages") or [{}]
+    cancelled = str(stages[-1].get("error") or "").startswith("CancelledError")
+    if record.get("termination_reason") == "stage_failed" or cancelled:
+        return record.get("error") or stages[-1].get("error")
+    return None
+
+
 class ReviewLoop:
     manifest = ComponentManifest(
         name="review-loop",
@@ -46,6 +57,7 @@ class ReviewLoop:
             *COMMON_FINGERPRINT,
             "raidar/components/catalog/workflow.py",
             "raidar/components/runtime/review_loop.py",
+            "raidar/components/runtime/session_chain.py",
             "raidar/core/snapshot.py",  # the reviewer diff leaves out SNAPSHOT_EXCLUDES
         ),
         discovery_probe=DiscoveryProbe(
@@ -86,11 +98,9 @@ class ReviewLoop:
         if not records:
             return ProbeOutcome(False, "no review-loop record in this step's logs")
         record = records[0]
-        stages = record.get("stages") or [{}]
-        cancelled = str(stages[-1].get("error") or "").startswith("CancelledError")
-        if record.get("termination_reason") == "stage_failed" or cancelled:
-            error = record.get("error") or stages[-1].get("error")
-            return ProbeOutcome(True, f"stage ended early ({error}); classified by its exception")
+        early = _early_end(record)
+        if early is not None:
+            return ProbeOutcome(True, f"stage ended early ({early}); classified by its exception")
         reviews = [
             stage
             for stage in record.get("stages", [])
