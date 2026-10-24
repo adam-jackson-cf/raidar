@@ -255,15 +255,14 @@ def test_changing_any_pin_provisions_into_a_new_cache_key(tmp_path: Path) -> Non
     assert bumped.root != original.root
 
 
-def test_cache_root_precedence_is_explicit_then_xdg_then_home(
+def test_cache_root_is_explicit_else_under_the_var_root(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     monkeypatch.setenv("HOME", str(tmp_path / "home"))
-    monkeypatch.delenv("XDG_CACHE_HOME", raising=False)
-    monkeypatch.delenv(TOOL_CACHE_ENV, raising=False)
-    assert default_cache_root() == tmp_path / "home" / ".cache" / "raidar" / "tools"
     monkeypatch.setenv("XDG_CACHE_HOME", str(tmp_path / "xdg"))
-    assert default_cache_root() == tmp_path / "xdg" / "raidar" / "tools"
+    monkeypatch.delenv(TOOL_CACHE_ENV, raising=False)
+    monkeypatch.setenv("RAIDAR_VAR", str(tmp_path / "var"))
+    assert default_cache_root() == (tmp_path / "var").resolve() / "cache" / "tools"
     monkeypatch.setenv(TOOL_CACHE_ENV, str(tmp_path / "explicit"))
     assert default_cache_root() == tmp_path / "explicit"
 

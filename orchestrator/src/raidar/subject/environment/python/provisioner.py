@@ -34,6 +34,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 
+from raidar.contract.paths import var_root
 from raidar.subject.environment.python.pack_definition import (
     REASON_DRIFT,
     REASON_FIRST_USE,
@@ -75,9 +76,7 @@ def default_cache_root() -> Path:
     explicit = os.environ.get(TOOL_CACHE_ENV)
     if explicit:
         return Path(explicit)
-    xdg = os.environ.get("XDG_CACHE_HOME")
-    base = Path(xdg) if xdg else Path.home() / ".cache"
-    return base / "raidar" / "tools"
+    return var_root() / "cache" / "tools"
 
 
 class ToolProvisioningError(RuntimeError):

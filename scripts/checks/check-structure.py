@@ -5,7 +5,7 @@ Rules (docs/reboot/repo-structure-design.md §3.5):
 
 * no repository path carries a version token (``_v2``, ``-v2``, a ``v2`` segment); the
   version is data (``name@N`` in a manifest). ``v<N>/`` data folders under a
-  ``components/`` directory or under ``lab/treatment/`` are the one exception;
+  ``components/`` directory or under ``lab/treatments/`` are the one exception;
 * the repository root holds only the allowlisted directories and files;
 * ``lab/`` holds only the allowlisted data trees (experiments, problem pins, the ledger, component
   payloads, runtime-pack recipes and judge policies);
@@ -54,7 +54,7 @@ ROOT_FILES = frozenset(
 )
 # The data trees the code loads at run time, each at one explicit path (contract/paths.py).
 LAB_DIRECTORIES = frozenset(
-    {"experiments", "problems", "ledger", "treatment", "environment", "judge"}
+    {"experiments", "problems", "ledger", "treatments", "environments", "judge"}
 )
 RAIDAR_PACKAGE_DIR = "orchestrator/src/raidar"
 # Top-level packages (the stages of an evaluation, plus the CLI and the shared contracts), each with
@@ -85,7 +85,7 @@ MAX_PACKAGE_DEPTH = 3
 VERSION_TOKEN = re.compile(r"(?<![A-Za-z0-9])v\d+(?![A-Za-z0-9])")
 DATA_VERSION_SEGMENT = re.compile(r"v\d+")
 DATA_PARENT = "components"
-DATA_PREFIX = "lab/treatment/"
+DATA_PREFIX = "lab/treatments/"
 # Dated design records keep their historical file names (the docs tree is not product layout).
 VERSION_EXEMPT_PREFIXES = ("docs/",)
 

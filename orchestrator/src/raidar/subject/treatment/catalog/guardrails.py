@@ -12,7 +12,7 @@ guardrail-gate runs ``guardrail-check`` as the workspace's pre-commit hook. No
 text tells the agent about the gate; like any repository it carries
 ``ruff.toml`` and ``mypy.ini``.
 
-The pack ships one payload (``lab/treatment/python_guardrails``) and:
+The pack ships one payload (``lab/treatments/python_guardrails``) and:
 
 - **installs once per trial at environment start**
   (``raidar.subject.treatment.runtime.provision``): the payload is uploaded to a
@@ -86,7 +86,7 @@ from collections.abc import Iterator
 from pathlib import PurePosixPath
 from typing import Any
 
-from raidar.contract.paths import treatment_root
+from raidar.contract.paths import treatments_root
 from raidar.subject.treatment.catalog.builtin_definition import (
     BOTH_HARNESSES,
     BUILTIN_FINGERPRINT,
@@ -112,8 +112,8 @@ from raidar.subject.treatment.runtime.provision import (
     TrialProvision,
 )
 
-PAYLOAD_DIR = treatment_root() / "python_guardrails"
-PAYLOAD_REPO_DIR = "lab/treatment/python_guardrails"
+PAYLOAD_DIR = treatments_root() / "python_guardrails"
+PAYLOAD_REPO_DIR = "lab/treatments/python_guardrails"
 GATE_LIBRARY = (
     "__init__.py",
     "diagnostics.py",

@@ -1,4 +1,4 @@
-# Python pack measurement tool lock (reboot plan WS-I I2, design memo §4.1).
+# Python pack measurement tool lock (design memo §4.1).
 # host-parse tools are provisioned lazily into the host cache keyed by this
 # lock's hash. eval-sandbox tools build or execute candidate code, so they run
 # in the eval container and are never provisioned on the host.
@@ -33,7 +33,7 @@ tools:
     executables: [scb-check]
     modules: [scb_check]
   # The eval container installs these from raidar.oracle.grader_image
-  # GRADER_TOOLS (WS-E); this entry mirrors that set so the agent-image audit
+  # GRADER_TOOLS; this entry mirrors that set so the agent-image audit
   # forbids it and host provisioning refuses it. A test fails if they diverge.
   scb-oracle-pytest:
     execution: eval-sandbox

@@ -4,7 +4,7 @@
 fork's own code (``fixtures/code_quality/generate_fork_goldens.py``); it holds
 every input beside the fork's outputs. The quality tool environment is the
 real ``scb-python-quality`` tool, provisioned on first use into the host
-cache (``RAIDAR_TOOL_CACHE`` or the user cache), exactly as scoring uses it.
+cache (``RAIDAR_TOOL_CACHE`` or ``var/cache/tools``), exactly as scoring uses it.
 """
 
 from __future__ import annotations

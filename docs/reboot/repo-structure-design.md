@@ -55,7 +55,7 @@ lab/                        tracked research content
   ledger/                   faults/, remedies/, README.md (generated)
 docs/  scripts/  .agents/  .github/
 var/                        ALL generated data, git-ignored, relocatable with RAIDAR_VAR=<dir>
-  jobs/  stores/  analysis/  problems/{store,cache}/  tmp/   (tmp replaces .tmp/)
+  jobs/  stores/  analysis/  problems/{store,cache}/  tmp/  cache/tools/   (tmp replaces .tmp/)
 Makefile  README.md  AGENTS.md  CHANGELOG.md
 ```
 
@@ -255,14 +255,14 @@ Inside a group the second level is a set of declared sub-tiers or of independent
 
 **Singular names.** A folder is plural only when it is a catalogue of same-kind items. Renamed: `contracts` → `contract`, `subjects` → `subject` (`treatments`, `agents`, `environments` → `treatment`, `agent`, `environment`; `agent/adapters/` stays a catalogue), `engine/{jobs,trials,targets}` → `engine/{job,trial,target}`, `design/{experiments,problems}` → `design/{experiment,problem}`. `payloads/` and `adapters/` stay plural. A child no longer repeats its parent's name: `job/context.py` and `job/manifest.py`, `trial/{config,finish,record,run}.py`, `perf/report.py`, `environment/python/task.py`, `contract/review.py`, `grading/offline.py`. Entry-point groups follow the package names (`raidar.subject.treatment`).
 
-**Data outside the package.** Run-time data lives under `lab/`, each tree at one explicit path from `raidar/contract/paths.py` (`treatment_root()`, `environment_root()`, `judge_root()`), with no search order and no fallback:
+**Data outside the package.** Run-time data lives under `lab/`, each tree at one explicit path from `raidar/contract/paths.py` (`treatments_root()`, `environments_root()`, `judge_root()`), with no search order and no fallback:
 
 | Was | Now |
 |---|---|
-| `subject/treatment/payloads/python_guardrails/` | `lab/treatment/python_guardrails/` |
-| `subject/environment/python/{pack.yaml,tools.lock.yaml,image/}` | `lab/environment/python/` |
+| `subject/treatment/payloads/python_guardrails/` | `lab/treatments/python_guardrails/` |
+| `subject/environment/python/{pack.yaml,tools.lock.yaml,image/}` | `lab/environments/python/` |
 | `scoring/judge/{policies,question_sets}/` | `lab/judge/{policies,question_sets}/` |
 
-Component fingerprints are repo-relative (`orchestrator/src/raidar/...`, `lab/treatment/...`), so a payload outside the package is hashed like code. Code shipped into containers (the grader plugin `grading/runtime/`, `mcp_shim.py`, `step_reset.sh`) is code and stays in the package. `make structure-check` drops the payload and image depth exemptions (nothing needs them), allows only `experiments, problems, ledger, treatment, environment, judge` below `lab/`, and keeps the `v<N>/` data-folder rule for `components/` and `lab/treatment/`.
+Component fingerprints are repo-relative (`orchestrator/src/raidar/...`, `lab/treatments/...`), so a payload outside the package is hashed like code. Code shipped into containers (the grader plugin `grading/runtime/`, `mcp_shim.py`, `step_reset.sh`) is code and stays in the package. `make structure-check` drops the payload and image depth exemptions (nothing needs them), allows only `experiments, problems, ledger, treatments, environments, judge` below `lab/`, and keeps the `v<N>/` data-folder rule for `components/` and `lab/treatments/`.
 
 **Re-key.** Scorer implementation digests, the `raidar_spec` toolchain digest and component fingerprints changed with the module and payload paths. The three experiments were relocked; no jobs are carried over.

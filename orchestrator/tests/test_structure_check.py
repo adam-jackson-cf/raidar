@@ -48,7 +48,7 @@ def test_version_suffixes_and_segments_are_refused(path: str) -> None:
         "lab/experiments/smoke/python__forge__mechanics/experiment.yaml",
         "lab/experiments/ab-test/x/components/python-guardrails/v8/ruff.toml",
         "lab/components/rules/v2/AGENTS.md",
-        "lab/treatment/python_guardrails/v8/ruff.toml",
+        "lab/treatments/python_guardrails/v8/ruff.toml",
         "docs/reboot/mechanics-v1-design.md",
     ],
 )
@@ -156,8 +156,8 @@ def test_lab_holds_only_the_allowlisted_data_trees() -> None:
         "lab/experiments/smoke/x/experiment.yaml",
         "lab/problems/sources.yaml",
         "lab/ledger/faults/FCR-001.md",
-        "lab/treatment/python_guardrails/lib/guardrails/gate.py",
-        "lab/environment/python/pack.yaml",
+        "lab/treatments/python_guardrails/lib/guardrails/gate.py",
+        "lab/environments/python/pack.yaml",
         "lab/judge/policies/code-quality.rubric-smells.yaml",
     ]
     refused = ["lab/components/rules/AGENTS.md", "lab/notes.md"]
