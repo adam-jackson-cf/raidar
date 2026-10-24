@@ -1,7 +1,7 @@
-"""The autofix step of ``guardrail-gate@4``: its script, its result and its typed errors.
+"""The autofix step of ``guardrail-gate``: its script, its result and its typed errors.
 
-Pure and host-side, like ``raidar.components.runtime.gate_run_v2``: ``autofix_script``
-renders the bash the wrapper (``raidar.components.runtime.guardrail_gate_v4``) runs in
+Pure and host-side, like ``raidar.components.runtime.gate_run``: ``autofix_script``
+renders the bash the wrapper (``raidar.components.runtime.guardrail_gate``) runs in
 the trial container and ``read_autofix_run`` reads its result back.
 
 The command is the pack's safe-fix command (``with.autofix_command``, for
@@ -26,8 +26,8 @@ Two modes:
   in the copy and deletes it.
 
 An autofix that cannot complete is never silent: ``AutofixRun.error_type``
-types it (``ERROR_TYPES``) and the gate falls back to @3's behaviour for that
-gate run (apply), or records no post-autofix check (dry run).
+types it (``ERROR_TYPES``) and the gate runs without autofix for that gate run
+(apply), or records no post-autofix check (dry run).
 """
 
 from __future__ import annotations
