@@ -1,7 +1,9 @@
-"""``workflow`` built-in: review-loop (C4).
+"""``workflow`` built-in: review-loop@2.
 
 The component wraps the arm's Harbor agent in
-``raidar.components.runtime.review_loop:ReviewLoopAgent``. The probe requires the loop
+``raidar.components.runtime.review_loop:ReviewLoopAgent``. Verdict feedback is
+read before or after the ``VERDICT`` line, an unusable review is re-asked once,
+and every parse is recorded in the loop record. The probe requires the loop
 record the wrapper writes, with at least one completed review stage. What the
 reviewer said (approve, changes, or no usable verdict) is the loop's outcome,
 recorded in that record, not evidence about whether the component took effect.
@@ -33,9 +35,12 @@ REVIEW_LOOP_IMPORT_PATH = "raidar.components.runtime.review_loop:ReviewLoopAgent
 class ReviewLoop:
     manifest = ComponentManifest(
         name="review-loop",
-        version="1",
+        version="2",
         kind=ComponentKind.WORKFLOW,
-        description="Implement/review rounds in fresh sessions of the arm's agent",
+        description=(
+            "Implement/review rounds in fresh sessions of the arm's agent; verdict "
+            "feedback read before or after the VERDICT line, one re-ask when unusable"
+        ),
         supports=BOTH_HARNESSES,
         fingerprint=(
             *COMMON_FINGERPRINT,
@@ -68,11 +73,24 @@ class ReviewLoop:
     def probe(
         self, use: ComponentUseContext, evidence: StepEvidence, step_index: int
     ) -> ProbeOutcome:
+        """A stage failure is not a component failure.
+
+        The wrapper re-raises a failed stage's exception, so the step carries
+        the inner agent's own error and ``execution.collect`` classifies it as
+        for the unwrapped agent; failing the probe as well would turn a graded
+        agent failure (a context-window overflow) into infra in this arm only. A
+        stage cancelled by the agent timeout is the same case (AgentTimeoutError).
+        """
         del step_index
         records = evidence.json_reports(LOOP_RECORD)
         if not records:
             return ProbeOutcome(False, "no review-loop record in this step's logs")
         record = records[0]
+        stages = record.get("stages") or [{}]
+        cancelled = str(stages[-1].get("error") or "").startswith("CancelledError")
+        if record.get("termination_reason") == "stage_failed" or cancelled:
+            error = record.get("error") or stages[-1].get("error")
+            return ProbeOutcome(True, f"stage ended early ({error}); classified by its exception")
         reviews = [
             stage
             for stage in record.get("stages", [])

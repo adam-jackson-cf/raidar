@@ -1,14 +1,13 @@
-"""continue-on-stall@1 and the session chain it rides on, plus guardrail-gate@3's contract.
+"""continue-on-stall@2 and the session chain it rides on, plus the gate's pre-fix record.
 
-- detection: a session that changed nothing and ended asking (fixed patterns);
+- detection: a session that changed nothing and ended asking or refusing (fixed patterns);
 - the component: a workflow that contributes no workflow wrapper, so it composes
-  with guardrail-gate@3, and is nested by the execution layer around the native
+  with guardrail-gate@4, and is nested by the execution layer around the native
   agent (inside the gate when there is one; the arm's agent otherwise);
 - the agent pin and auth are read through every level of wrapping;
-- guardrail-gate@3: @2's options and probe, its own wrapper, a nestable inner
-  agent and the pre-fix snapshot record.
+- guardrail-gate@4: the pre-fix snapshot record and a failed snapshot.
 
-The real-container proof is ``test_guardrails_v3_trial.py``.
+The real-container proof is ``test_guardrails_v4_trial.py``.
 """
 
 from __future__ import annotations
@@ -24,7 +23,7 @@ from harbor.models.trial.config import AgentConfig
 
 from raidar.agents.config import Harness
 from raidar.components import ComponentKind, ComponentRegistry
-from raidar.components.catalog.gate_v3 import GUARDRAIL_GATE_V3_IMPORT_PATH
+from raidar.components.catalog.gate import GUARDRAIL_GATE_IMPORT_PATH
 from raidar.components.catalog.stall import CONTINUE_ON_STALL_IMPORT_PATH, stall_records
 from raidar.components.definition.evidence import StepEvidence
 from raidar.components.runtime.continue_on_stall import (
@@ -32,15 +31,15 @@ from raidar.components.runtime.continue_on_stall import (
     STALL_DIR,
     STALL_RECORD,
     continuation_prompt,
-    detect_request,
+    detect_stall_message,
     fingerprint_script,
 )
-from raidar.components.runtime.guardrail_gate_v3 import (
-    GuardrailGateOptionsV3,
-    GuardrailGateV3Agent,
+from raidar.components.runtime.gate_run import GuardrailGateOptions
+from raidar.components.runtime.guardrail_gate import (
+    GuardrailGateAgent,
     PreFixSnapshot,
-    _GateStateV3,
-    gate_record_v3,
+    _GateState,
+    gate_record,
 )
 from raidar.components.runtime.session_chain import (
     InnerAgentSpec,
@@ -76,7 +75,7 @@ GATE = {"command": "guardrail-check", "mode": "commit", "max_rounds": 3, "timeou
     ],
 )
 def test_a_request_is_a_question_or_a_call_for_clarification(message: str, expected: bool) -> None:
-    assert bool(detect_request(message)) is expected
+    assert bool(detect_stall_message(message)) is expected
 
 
 def test_the_fingerprint_prunes_the_snapshot_excludes_and_hashes_every_file() -> None:
@@ -101,13 +100,13 @@ def test_the_continuation_says_no_human_is_available_and_asks_for_assumptions() 
 
 
 def test_the_component_is_a_session_wrapper_that_composes_with_the_gate() -> None:
-    definition = ComponentRegistry().get("continue-on-stall@1")
-    compiled = compile_uses(use("continue-on-stall@1"), use("guardrail-gate@3", **GATE))
+    definition = ComponentRegistry().get("continue-on-stall@2")
+    compiled = compile_uses(use("continue-on-stall@2"), use("guardrail-gate@4", **GATE))
 
     assert definition.manifest.kind is ComponentKind.WORKFLOW
     assert "raidar/components/runtime/continue_on_stall.py" in definition.manifest.fingerprint
     assert compiled.agent_wrapper is not None
-    assert compiled.agent_wrapper.import_path == GUARDRAIL_GATE_V3_IMPORT_PATH
+    assert compiled.agent_wrapper.import_path == GUARDRAIL_GATE_IMPORT_PATH
     (wrapper,) = condition_session_wrappers(compiled)
     assert wrapper.import_path == CONTINUE_ON_STALL_IMPORT_PATH
     assert compiled.overlay == {}
@@ -119,7 +118,7 @@ def test_the_component_takes_no_with_keys(bad: dict[str, int]) -> None:
     from raidar.components import ComponentRejectedError
 
     with pytest.raises(ComponentRejectedError):
-        compile_uses(use("continue-on-stall@1", **bad))
+        compile_uses(use("continue-on-stall@2", **bad))
 
 
 def _record(path: Path, *, stalled: bool) -> None:
@@ -128,7 +127,7 @@ def _record(path: Path, *, stalled: bool) -> None:
 
 
 def test_the_probe_needs_a_record_and_counts_the_stalls(tmp_path: Path) -> None:
-    compiled = compile_uses(use("continue-on-stall@1"))
+    compiled = compile_uses(use("continue-on-stall@2"))
     agent_dir = tmp_path / "agent"
     agent_dir.mkdir()
     (agent_dir / "raidar-reset.json").write_text(json.dumps({"kind": "raidar-step-reset"}))
@@ -169,9 +168,9 @@ def _config(*uses: Any) -> AgentConfig:
 
 
 def test_inside_the_gate_the_stall_wrapper_wraps_the_native_agent() -> None:
-    config = _config(use("continue-on-stall@1"), use("guardrail-gate@3", **GATE))
+    config = _config(use("continue-on-stall@2"), use("guardrail-gate@4", **GATE))
 
-    assert config.import_path == GUARDRAIL_GATE_V3_IMPORT_PATH
+    assert config.import_path == GUARDRAIL_GATE_IMPORT_PATH
     inner = InnerAgentSpec.model_validate(config.kwargs["inner_agent"])
     assert inner.import_path == CONTINUE_ON_STALL_IMPORT_PATH
     native = inner.native()
@@ -182,7 +181,7 @@ def test_inside_the_gate_the_stall_wrapper_wraps_the_native_agent() -> None:
 
 
 def test_without_a_workflow_the_stall_wrapper_is_the_arms_agent() -> None:
-    config = _config(use("continue-on-stall@1"))
+    config = _config(use("continue-on-stall@2"))
 
     assert (config.name, config.import_path) == (None, CONTINUE_ON_STALL_IMPORT_PATH)
     assert config.kwargs["inner_agent"]["name"] == "codex"
@@ -197,7 +196,7 @@ def test_host_auth_reaches_a_doubly_wrapped_codex(
     auth.write_text("{}")
     resolved = SimpleNamespace(resolved_mode="chatgpt", auth_json_path=auth)
     monkeypatch.setattr("raidar.execution.agent_config.resolve_codex_auth", lambda: resolved)
-    config = _config(use("continue-on-stall@1"), use("guardrail-gate@3", **GATE))
+    config = _config(use("continue-on-stall@2"), use("guardrail-gate@4", **GATE))
 
     assert str(auth) in with_host_auth(config, Harness.CODEX_CLI).env.values()
 
@@ -234,34 +233,20 @@ def test_apply_nests_the_first_wrapper_outermost() -> None:
     assert apply_session_wrappers(base, []) is base
 
 
-# ---- guardrail-gate@3 ------------------------------------------------------------------
-
-
-def test_gate_v3_keeps_v2s_options_and_probe_with_its_own_wrapper() -> None:
-    v2 = ComponentRegistry().get("guardrail-gate@2")
-    v3 = ComponentRegistry().get("guardrail-gate@3")
-    compiled = compile_uses(use("guardrail-gate@3", **GATE))
-
-    assert v3.manifest.discovery_probe == v2.manifest.discovery_probe
-    assert "raidar/components/runtime/guardrail_gate_v3.py" in v3.manifest.fingerprint
-    assert compiled.agent_wrapper is not None
-    assert dict(compiled.agent_wrapper.kwargs) == {**GATE, "component": "guardrail-gate@3"}
-    shadow = compile_uses(use("guardrail-gate@3", **{**GATE, "mode": "shadow"}))
-    assert shadow.agent_wrapper is not None
-    assert shadow.agent_wrapper.kwargs["mode"] == "shadow"
+# ---- the gate's pre-fix snapshot record -------------------------------------------------
 
 
 def test_the_gate_record_carries_every_pre_fix_snapshot() -> None:
-    options = GuardrailGateOptionsV3(inner_agent=InnerAgentSpec(name="nop"), command="check")
-    state = _GateStateV3()
+    options = GuardrailGateOptions(inner_agent=InnerAgentSpec(name="nop"), command="check")
+    state = _GateState()
     state.pre_fix.append(PreFixSnapshot(1, "stage_2_fix", "guardrail-gate/pre_fix_1/app", "d", 2))
     state.pre_fix.append(
         PreFixSnapshot(2, "stage_3_fix", "guardrail-gate/pre_fix_2/app", None, None, "boom")
     )
 
-    record = gate_record_v3(options, state)
+    record = gate_record(options, state)
 
-    assert record["workflow"] == "guardrail-gate@3"
+    assert record["workflow"] == "guardrail-gate@4"
     assert [item["round"] for item in record["pre_fix_snapshots"]] == [1, 2]
     assert record["pre_fix_snapshots"][1] == {
         "round": 2,
@@ -274,7 +259,7 @@ def test_the_gate_record_carries_every_pre_fix_snapshot() -> None:
 
 
 def test_a_failed_pre_fix_snapshot_is_recorded_and_never_fails_the_step(tmp_path: Path) -> None:
-    agent = GuardrailGateV3Agent(
+    agent = GuardrailGateAgent(
         logs_dir=tmp_path,
         model_name="openai/gpt-6-luna",
         inner_agent={"name": "nop"},

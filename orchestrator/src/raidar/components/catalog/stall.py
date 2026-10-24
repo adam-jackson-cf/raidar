@@ -1,17 +1,23 @@
-"""``workflow`` built-in: continue-on-stall@1, one continuation when a session stalls on a question.
+"""``workflow`` built-in: continue-on-stall@2, one continuation per step (first session only).
 
-No human answers an agent during a trial. When a session of the arm's agent
+No human answers an agent during a trial. When the first session of a step
 ends having changed no workspace file and with a final message that asks a
-question or for clarification or confirmation, the wrapper
+question, asks for clarification or confirmation, or says it cannot proceed
+without something ("can't ... without", "not enough context", "... isn't
+defined"), the wrapper
 (``raidar.components.runtime.continue_on_stall:ContinueOnStallAgent``) starts one
 continuation session of the same agent: no human is available, proceed with
 the specification and reasonable assumptions, record them in
 ``ASSUMPTIONS.md``. Detection is deterministic and recorded per session.
+Only the step's first session can stall and be continued (at most one
+continuation per step), so an arm whose gate starts fix sessions has the same
+exposure as an arm with one session per step. Later sessions are recorded
+(``eligible: false``) and never continued.
 
 It is a *session* wrapper: it contributes no workflow wrapper (a condition has
 at most one), and the execution layer nests it around the native agent, inside
 the condition's workflow wrapper if there is one
-(``raidar.components.runtime.session_chain``). With ``guardrail-gate@3`` every session
+(``raidar.components.runtime.session_chain``). With ``guardrail-gate`` every session
 the gate starts runs through it, so a stalled work session is continued before
 the gate runs. Put it in ``shared_components`` to apply it identically to every
 arm. It takes no ``with`` keys and no files; nothing in it names a problem.
@@ -47,13 +53,13 @@ CONTINUE_ON_STALL_IMPORT_PATH = "raidar.components.runtime.continue_on_stall:Con
 class ContinueOnStall:
     manifest = ComponentManifest(
         name="continue-on-stall",
-        version="1",
+        version="2",
         kind=ComponentKind.WORKFLOW,
         description=(
-            "When a session of the arm's agent changes no workspace file and ends asking a "
-            "question or for clarification, start one continuation session: no human is "
-            "available, proceed with the specification and reasonable assumptions recorded "
-            "in ASSUMPTIONS.md"
+            "When the first session of a step changes no workspace file and ends asking a "
+            "question or saying it cannot proceed without more information, start one "
+            "continuation session: no human is available, proceed with the specification "
+            "and reasonable assumptions recorded in ASSUMPTIONS.md (at most one per step)"
         ),
         supports=BOTH_HARNESSES,
         fingerprint=(

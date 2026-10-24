@@ -6,7 +6,7 @@
 - transient-retry@1: a session the provider drops (Harbor's transient API
   errors) is run again, at most twice, after a wait; other errors pass through;
   every attempt's logs, usage and error are kept;
-- both compose with guardrail-gate@3 in condition order:
+- both compose with guardrail-gate@4 in condition order:
   gate -> continue-on-stall@2 -> transient-retry@1 -> native agent.
 
 The wrappers run here against a local bash environment; the real-container
@@ -29,14 +29,15 @@ from harbor.environments.base import BaseEnvironment, ExecResult
 from harbor.models.agent.context import AgentContext
 
 from raidar.components import ComponentKind, ComponentRegistry, ComponentRejectedError
-from raidar.components.catalog.gate_v3 import GUARDRAIL_GATE_V3_IMPORT_PATH
+from raidar.components.catalog.gate import GUARDRAIL_GATE_IMPORT_PATH
 from raidar.components.catalog.retry import TRANSIENT_RETRY_IMPORT_PATH, retry_records
-from raidar.components.catalog.stall_v2 import CONTINUE_ON_STALL_V2_IMPORT_PATH
+from raidar.components.catalog.stall import CONTINUE_ON_STALL_IMPORT_PATH
 from raidar.components.definition.evidence import StepEvidence
 from raidar.components.runtime import transient_retry
-from raidar.components.runtime.continue_on_stall import STALL_DIR, STALL_RECORD
-from raidar.components.runtime.continue_on_stall_v2 import (
-    ContinueOnStallV2Agent,
+from raidar.components.runtime.continue_on_stall import (
+    STALL_DIR,
+    STALL_RECORD,
+    ContinueOnStallAgent,
     continuation_prompt,
     detect_stall_message,
 )
@@ -118,7 +119,7 @@ def test_both_are_workflow_session_wrappers_without_with_keys() -> None:
         assert registry.get(ref).manifest.kind is ComponentKind.WORKFLOW
         with pytest.raises(ComponentRejectedError):
             compile_uses(use(ref, retries=3))
-    assert "raidar/components/runtime/continue_on_stall_v2.py" in (
+    assert "raidar/components/runtime/continue_on_stall.py" in (
         registry.get("continue-on-stall@2").manifest.fingerprint
     )
     assert "raidar/components/runtime/transient_retry.py" in (
@@ -131,13 +132,13 @@ def test_the_chain_is_gate_then_stall_then_retry_then_the_native_agent() -> None
         use("prompt-wrapper@1", ("components/probe/wrapper.md",)),
         use("continue-on-stall@2"),
         use("transient-retry@1"),
-        use("guardrail-gate@3", **GATE),
+        use("guardrail-gate@4", **GATE),
     )
     config = arm_agent_config(AGENT, compiled, load_pack_spec(), agent_timeout_sec=1800)
 
-    assert config.import_path == GUARDRAIL_GATE_V3_IMPORT_PATH
+    assert config.import_path == GUARDRAIL_GATE_IMPORT_PATH
     stall = InnerAgentSpec.model_validate(config.kwargs["inner_agent"])
-    assert stall.import_path == CONTINUE_ON_STALL_V2_IMPORT_PATH
+    assert stall.import_path == CONTINUE_ON_STALL_IMPORT_PATH
     retry = stall.nested()
     assert retry is not None
     assert retry.import_path == TRANSIENT_RETRY_IMPORT_PATH
@@ -222,7 +223,7 @@ class ScriptedNative(BaseAgent):
         context.n_cache_tokens, context.cost_usd = 0, 0.5
 
 
-NATIVE = {"import_path": "tests.test_session_wrappers_v2:ScriptedNative"}
+NATIVE = {"import_path": "tests.test_session_wrappers:ScriptedNative"}
 
 
 @pytest.fixture
@@ -310,8 +311,8 @@ def test_other_errors_and_the_last_retrys_error_pass_through_unchanged(
     assert not is_retryable(NonZeroAgentExitCodeError("x"))
 
 
-def _stall_agent(logs: Path, app: Path) -> ContinueOnStallV2Agent:
-    return ContinueOnStallV2Agent(
+def _stall_agent(logs: Path, app: Path) -> ContinueOnStallAgent:
+    return ContinueOnStallAgent(
         logs_dir=logs,
         model_name="openai/gpt-6-luna",
         environment_logs_dir=PurePosixPath(str(logs)),

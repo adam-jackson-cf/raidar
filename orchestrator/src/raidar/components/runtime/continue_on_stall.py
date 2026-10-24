@@ -1,23 +1,35 @@
-"""``continue-on-stall@1`` session wrapper: no human will answer, so a stalled session continues.
+"""``continue-on-stall@2`` session wrapper: no human will answer, so a stalled session continues.
 
-An agent sometimes ends a session by asking a question without changing
-anything. No human is there to answer, so the step would end with no work.
-This wrapper runs each session of the native agent and, when the session
+An agent sometimes ends a session by asking a question, or by saying it cannot
+proceed without something, without changing anything. No human is there to
+answer, so the step would end with no work. This wrapper runs each session of
+the native agent and, when the session
 
 - changed no file in the workspace (``/app``: the tree with the verifier's
   snapshot excludes, hashed before and after the session), **and**
-- ended with a final message that asks a question or asks for clarification
-  or confirmation (``detect_request``: fixed, problem-agnostic patterns),
+- ended with a final message that asks a question, asks for clarification or
+  confirmation, or says it cannot proceed without something
+  (``detect_stall_message``: fixed, problem-agnostic request and refusal
+  patterns; curly apostrophes count as apostrophes),
 
 starts **one** continuation session of the same agent: the task again, its own
 last message, and the statement that no human is available, that it must
 proceed with the specification and reasonable assumptions, and record each
-assumption in ``ASSUMPTIONS.md`` in the workspace. Detection is deterministic
-and recorded for every session, stalled or not:
+assumption in ``ASSUMPTIONS.md`` in the workspace.
+
+**At most one continuation per step, for the step's first session.** A session
+is eligible only when no earlier continue-on-stall record exists under the
+step's agent logs dir (the execution layer empties it between steps; a workflow
+wrapper files each session's logs, record included, under it). The step's first
+session is therefore the only one that can stall, in every arm. A later session
+is still observed and recorded (``eligible: false``, ``would_stall``), never
+continued, and its ``stalled`` is false.
+
+Detection is deterministic and recorded for every session, stalled or not:
 ``/logs/agent/continue-on-stall/continue-on-stall.json`` (the fingerprints,
 whether anything changed, the final message's opening, the matched patterns,
 ``stalled``, ``continued`` and the continuation's outcome). Inside a workflow
-wrapper (``guardrail-gate@3``) the record is filed with that session's logs,
+wrapper (``guardrail-gate``) the record is filed with that session's logs,
 so a step has one record per session.
 
 The stalled session's logs are moved to ``continue-on-stall/stalled_session``
@@ -59,8 +71,9 @@ from raidar.components.runtime.review_loop import (
 from raidar.components.runtime.session_chain import InnerAgentSpec, create_inner, render_task
 from raidar.core.snapshot import APP_SOURCE, SNAPSHOT_EXCLUDES
 
-COMPONENT = "continue-on-stall@1"
-VERSION = "1"
+COMPONENT = "continue-on-stall@2"
+VERSION = "2"
+_APOSTROPHE = "['’]"
 STALL_DIR = "continue-on-stall"
 STALL_RECORD = "continue-on-stall.json"
 STALLED_SESSION_DIR = "stalled_session"
@@ -70,13 +83,14 @@ MESSAGE_FILES = ("codex.txt", "claude-code.txt")
 MESSAGE_TAIL_BYTES = 4_000_000
 
 CONTINUE_PROMPT = """\
-You stopped without changing any file and asked for input. No human is available:
-nobody will answer questions or confirm choices, now or later, so do not ask again.
+You stopped without changing any file: you asked for input, or said you could not
+proceed without more information. No human is available: nobody will answer
+questions, confirm choices or supply anything more, now or later, so do not ask again.
 
 Proceed now with the task below, in the directory you are already in. Where the
-specification leaves something open, make a reasonable assumption, record each
-assumption (one per line, with the reason) in %%%ASSUMPTIONS%%% in that directory,
-and complete the work.
+specification leaves something open or missing, make a reasonable assumption,
+record each assumption (one per line, with the reason) in %%%ASSUMPTIONS%%% in that
+directory, and complete the work.
 
 %%%TASK%%%
 
@@ -123,11 +137,44 @@ REQUEST_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
 )
 _FENCE = re.compile(r"```.*?```", re.DOTALL)
 
+# A final message "refuses": it says the work cannot proceed without something, or
+# that something it needs is missing. Fixed patterns, the same for every problem.
+REFUSAL_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
+    (
+        "cannot-without",
+        re.compile(
+            rf"\b(?:i|we)\s+(?:can{_APOSTROPHE}?t|cannot|can not|(?:am|are) unable to|"
+            rf"(?:am|are) not able to|won{_APOSTROPHE}t be able to)\b[^.!?\n]{{0,160}}"
+            r"\bwithout\b",
+            re.IGNORECASE,
+        ),
+    ),
+    (
+        "missing-information",
+        re.compile(
+            r"\b(?:not enough|insufficient|missing|lacks?|lacking)\s+(?:the\s+|any\s+)?"
+            r"(?:context|information|details?|requirements|specification)\b",
+            re.IGNORECASE,
+        ),
+    ),
+    (
+        "not-defined",
+        re.compile(
+            rf"\b(?:is|are){_APOSTROPHE}?n{_APOSTROPHE}?t\s+(?:present|defined|specified|"
+            rf"provided|available)\b|\b(?:is|are)\s+not\s+(?:present|defined|specified|"
+            rf"provided|available)\b|\b(?:does|do){_APOSTROPHE}?n{_APOSTROPHE}?t\s+"
+            rf"(?:define|specify|say)\b|\b(?:does|do)\s+not\s+(?:define|specify|say)\b",
+            re.IGNORECASE,
+        ),
+    ),
+)
+PATTERNS = (*REQUEST_PATTERNS, *REFUSAL_PATTERNS)
 
-def detect_request(message: str) -> tuple[str, ...]:
-    """The request patterns ``message`` matches (code fences ignored), in pattern order."""
+
+def detect_stall_message(message: str) -> tuple[str, ...]:
+    """The request and refusal patterns ``message`` matches (code fences ignored), in order."""
     text = _FENCE.sub(" ", message)
-    return tuple(name for name, pattern in REQUEST_PATTERNS if pattern.search(text))
+    return tuple(name for name, pattern in PATTERNS if pattern.search(text))
 
 
 def fingerprint_script(workspace: str = APP_SOURCE) -> str:
@@ -201,11 +248,16 @@ class _State:
     first: _Observation | None = None
     continuation: _Observation | None = None
     record: dict[str, Any] = field(default_factory=dict)
+    eligible: bool = True
+
+    @property
+    def would_stall(self) -> bool:
+        first = self.first
+        return first is not None and first.changed is False and bool(first.matched)
 
     @property
     def stalled(self) -> bool:
-        first = self.first
-        return first is not None and first.changed is False and bool(first.matched)
+        return self.eligible and self.would_stall
 
 
 class ContinueOnStallAgent(BaseAgent):
@@ -236,6 +288,7 @@ class ContinueOnStallAgent(BaseAgent):
         self, instruction: str, environment: BaseEnvironment, context: AgentContext
     ) -> None:
         self._state = state = _State()
+        state.eligible = not await self._earlier_record(environment)
         task = render_task(self.stall_options.inner_agent, instruction)
         before = await self._names(environment)
         state.first = _Observation(before=await self._fingerprint(environment))
@@ -258,6 +311,14 @@ class ContinueOnStallAgent(BaseAgent):
             await self._write_record(environment, state.record)
             if all(not run.context.is_empty() for run in state.runs):
                 self._sum_into(context)
+
+    async def _earlier_record(self, environment: BaseEnvironment) -> bool:
+        """Whether this step's logs already hold a continue-on-stall record (a later session)."""
+        logs = shlex.quote(str(self.environment_logs_dir))
+        result = await environment.exec(
+            f"find {logs} -name {shlex.quote(STALL_RECORD)} -type f -print -quit 2>/dev/null"
+        )
+        return bool((result.stdout or "").strip())
 
     async def _run_native(
         self, environment: BaseEnvironment, state: _State, role: str, prompt: str
@@ -286,7 +347,7 @@ class ContinueOnStallAgent(BaseAgent):
     async def _observe(self, environment: BaseEnvironment, seen: _Observation) -> None:
         seen.after = await self._fingerprint(environment)
         seen.message_source, seen.message = await self._final_message(environment)
-        seen.matched = detect_request(seen.message)
+        seen.matched = detect_stall_message(seen.message)
 
     async def _final_message(self, environment: BaseEnvironment) -> tuple[str | None, str]:
         """The session's last assistant message, from the harness's stream in the logs dir."""
@@ -340,6 +401,8 @@ class ContinueOnStallAgent(BaseAgent):
             "continued": state.continuation is not None,
             "continuation": seen(state.continuation),
             "runs": [run.record() for run in state.runs],
+            "eligible": state.eligible,
+            "would_stall": state.would_stall,
         }
 
     async def _write_record(self, environment: BaseEnvironment, record: dict[str, Any]) -> None:

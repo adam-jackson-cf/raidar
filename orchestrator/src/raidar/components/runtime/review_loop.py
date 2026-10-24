@@ -1,25 +1,49 @@
-"""``review-loop@1`` workflow agent (plan WS-C C4).
+"""``review-loop@2`` workflow agent (plan WS-C C4).
 
-Ported from factory-x-loops ``harnesses/review_loop.py`` (``_drive``/``_run_stage``
-/``parse_verdict``) as a Harbor agent that wraps the arm's own agent. One step
+Ported from factory-x-loops ``harnesses/review_loop.py`` (``_drive``/``_run_stage``)
+as a Harbor agent that wraps the arm's own agent. One step
 runs implement -> review -> [retry -> review]* inside the step's container,
 each stage a fresh session of the wrapped agent (a new harness process):
 
 - the reviewer sees the step instruction, a ``git diff --no-index`` of the
   workspace against the step's starting state, and the implementer's account;
-- the loop stops on ``VERDICT: APPROVE``, on an unusable review (no verdict or
-  empty feedback, recorded as a failed loop) or when the rounds run out;
+- a verdict marker may carry markdown emphasis or backticks. A marker that
+  starts a line is the reviewer's ruling and the last such marker wins; a
+  marker quoted mid-sentence after it cannot overturn it. Only a reply with no
+  line-start marker falls back to the last marker anywhere;
+- for ``CHANGES`` the feedback is the reply's text before *and* after that
+  line, so any non-empty feedback makes the verdict actionable;
+- an unusable review (no marker, or ``CHANGES`` with nothing else) gets one
+  re-ask: a fresh reviewer session with the same task and diff plus the
+  unusable reply. If that is unusable too, the loop stops with the work as it
+  stands and records ``review_unusable_after_reask``; it also stops on
+  ``VERDICT: APPROVE`` or when the rounds run out;
+- every parse is recorded in ``review-loop.json`` under ``parses``: round,
+  attempt, stage, verdict, where the feedback sat, and the number of markers;
 - every stage's logs and ATIF trajectory are filed under
   ``/logs/agent/review-loop/stage_<n>_<role>/`` and embedded as
   ``subagent_trajectories`` in the step's root ``trajectory.json``;
 - tokens and cost of every stage (reviewer sessions included) are summed into
   the step's ``AgentContext``, so the arm pays for its extra sessions; a field
-  any stage did not report is left unavailable (None), never a partial sum.
+  any stage did not report is left unavailable (None), never a partial sum;
+- a stage whose inner agent raised ends the loop, and the loop then re-raises
+  that exception after writing its record, so Harbor and ``execution.collect``
+  classify it exactly as for the unwrapped agent (an API error is infra in both
+  arms; a context-window overflow is graded in both);
+- a stage cancelled by the agent timeout still files its logs and reports its
+  usage before the cancellation propagates.
+
+A ``prompt_template_path`` on the wrapped agent (``prompt-wrapper@1``) is
+applied by the loop to the step instruction for the implementer's stages only.
+Harbor would otherwise wrap every stage prompt, telling the reviewer to build
+the program. The reviewer judges against the bare step instruction.
 """
 
 from __future__ import annotations
 
+import asyncio
 import json
+import re
 import shlex
 from dataclasses import dataclass, field
 from pathlib import Path, PurePosixPath
@@ -32,16 +56,26 @@ from harbor.environments.base import BaseEnvironment
 from harbor.models.agent.context import AgentContext
 from harbor.models.trajectories import Trajectory
 from harbor.models.trial.config import AgentConfig
+from harbor.utils.templating import render_prompt_template
 from pydantic import BaseModel, ConfigDict, Field
 
 from raidar.components.definition.evidence import read_jsonl
 from raidar.core.snapshot import SNAPSHOT_EXCLUDES
 
-APPROVE_LINE = "VERDICT: APPROVE"
-CHANGES_LINE = "VERDICT: CHANGES"
+COMPONENT = "review-loop@2"
+VERSION = "2"
 APPROVE, CHANGES = "APPROVE", "CHANGES"
 NO_VERDICT, EMPTY_FEEDBACK = "NO_VERDICT", "EMPTY_FEEDBACK"
-UNUSABLE_VERDICTS = {NO_VERDICT: "review_no_verdict", EMPTY_FEEDBACK: "review_empty_feedback"}
+UNUSABLE = (NO_VERDICT, EMPTY_FEEDBACK)
+FALLBACK_REASON = "review_unusable_after_reask"
+PROMPT_TEMPLATE_KWARG = "prompt_template_path"
+# The unusable reply quoted back to the re-asked reviewer (gpt-6-luna's run to ~2 KB).
+MAX_PREVIOUS_REVIEW_CHARS = 20_000
+# A verdict marker, wherever it sits, with optional markdown emphasis or backticks
+# around it. ``**VERDICT: CHANGES**`` at the end of a paragraph counts (pilot b04
+# checkpoint_4).
+_DECORATION = "*_`"
+MARKER_RE = re.compile(r"[*_`]*VERDICT:[ \t*_`]*(?P<verdict>APPROVE|CHANGES)\b[*_`]*")
 LOOP_DIR_NAME = "review-loop"
 LOOP_RECORD = "review-loop.json"
 DEFAULT_WORK_DIR = "/tmp/raidar-review"
@@ -107,16 +141,88 @@ A review of your last round found problems:
 """,
 }
 
+REASK_PROMPT = """\
+Another agent worked the checkpoint specification below, and a diff of its
+changes follows. Its working tree is the directory you are already in. Its own
+account of the change should be at `%%%REASONING_PATH%%%`.
 
-def parse_verdict(text: str) -> tuple[str, str]:
-    """The reviewer's ruling: the *last* marker wins (factory-x-loops semantics)."""
-    approved, asked = text.rfind(APPROVE_LINE), text.rfind(CHANGES_LINE)
-    if max(approved, asked) < 0:
-        return NO_VERDICT, ""
-    if approved > asked:
-        return APPROVE, ""
-    feedback = text[asked + len(CHANGES_LINE) :].strip()
-    return (CHANGES, feedback) if feedback else (EMPTY_FEEDBACK, "")
+An earlier review of this same work ended without a usable verdict line. Its
+reply is quoted below. Use it, check anything you need in the working tree, and
+give the ruling.
+
+Judge only two things: does the change achieve the specification's stated aim,
+and is the result maintainable (complexity, structure, naming, clarity).
+
+Change nothing yourself.
+
+End your reply with exactly one line: `VERDICT: APPROVE` if acceptable, or
+`VERDICT: CHANGES` followed by the concrete, actionable feedback the implementer
+needs to fix it.
+
+%%%TASK%%%
+
+The earlier review's reply:
+
+%%%PREVIOUS_REVIEW%%%
+
+The diff so far:
+
+%%%DIFF%%%
+"""
+
+
+@dataclass(frozen=True)
+class ReviewParse:
+    """One reviewer reply, read: the verdict, its feedback and how it was found."""
+
+    verdict: str
+    feedback: str
+    feedback_position: str  # "before", "after", "both" or "none"
+    markers: int
+
+    def record(self) -> dict[str, Any]:
+        return {
+            "verdict": self.verdict,
+            "feedback_position": self.feedback_position,
+            "feedback_chars": len(self.feedback),
+            "markers": self.markers,
+        }
+
+
+def _starts_line(text: str, match: re.Match[str]) -> bool:
+    line_start = text.rfind("\n", 0, match.start()) + 1
+    return not text[line_start : match.start()].strip(f"{_DECORATION} \t>-")
+
+
+def _ruling(text: str, markers: list[re.Match[str]]) -> re.Match[str]:
+    """The last line-start marker, else (none starts a line) the last marker anywhere."""
+    rulings = [match for match in markers if _starts_line(text, match)]
+    return (rulings or markers)[-1]
+
+
+def parse_review(text: str) -> ReviewParse:
+    """The reviewer's ruling; feedback may sit before or after the ruling marker."""
+    markers = list(MARKER_RE.finditer(text))
+    if not markers:
+        return ReviewParse(NO_VERDICT, "", "none", 0)
+    last = _ruling(text, markers)
+    if last["verdict"] == APPROVE:
+        return ReviewParse(APPROVE, "", "none", len(markers))
+    before = text[: last.start()].strip()
+    after = text[last.end() :].lstrip(f"{_DECORATION}:—–- \t").strip()
+    parts = {"before": before, "after": after}
+    present = [name for name, part in parts.items() if part]
+    if not present:
+        return ReviewParse(EMPTY_FEEDBACK, "", "none", len(markers))
+    position = "both" if len(present) == 2 else present[0]
+    feedback = "\n\n".join(parts[name] for name in present)
+    return ReviewParse(CHANGES, feedback, position, len(markers))
+
+
+def _clip(text: str, limit: int) -> str:
+    if len(text) <= limit:
+        return text
+    return text[:limit] + f"\n... reply truncated at {limit} characters ...\n"
 
 
 def _quoted_size(text: str) -> int:
@@ -180,7 +286,7 @@ class InnerAgent(BaseModel):
 class ReviewLoopOptions(AgentOptions):
     inner_agent: InnerAgent
     max_review_rounds: int = Field(default=3, ge=1, le=5)
-    component: str = Field(default="review-loop@1")
+    component: str = Field(default=COMPONENT)
     # Loop scratch outside the workspace (baseline tree, diffs, implementer's account).
     work_dir: str = Field(default=DEFAULT_WORK_DIR, pattern=r"^/[A-Za-z0-9._/-]+$")
 
@@ -243,7 +349,8 @@ def usage_gaps(stages: list[_Stage]) -> dict[str, list[str]]:
 
 
 class ReviewLoopAgent(BaseAgent):
-    """Wraps a Harbor agent in fresh implement/review sessions (review-loop@1)."""
+    """Wraps a Harbor agent in fresh implement/review sessions: position-tolerant verdicts,
+    one re-ask of an unusable review, recorded parses."""
 
     options_model: ClassVar[type[AgentOptions] | None] = ReviewLoopOptions
 
@@ -252,19 +359,30 @@ class ReviewLoopAgent(BaseAgent):
         return "raidar-review-loop"
 
     def version(self) -> str | None:
-        return "1"
+        return VERSION
 
     @property
     def loop_options(self) -> ReviewLoopOptions:
         return cast(ReviewLoopOptions, self.options)
 
+    @property
+    def prompt_template(self) -> Path | None:
+        value = self.loop_options.inner_agent.kwargs.get(PROMPT_TEMPLATE_KWARG)
+        return Path(str(value)) if value else None
+
+    def _implementer_task(self, instruction: str) -> str:
+        template = self.prompt_template
+        return render_prompt_template(template, instruction) if template else instruction
+
     def _inner(self, logs_dir: Path) -> BaseAgent:
+        """The wrapped agent without its prompt template: the loop applies that itself."""
         inner = self.loop_options.inner_agent
+        kwargs = {key: v for key, v in inner.kwargs.items() if key != PROMPT_TEMPLATE_KWARG}
         return AgentFactory.create_agent_from_config(
             AgentConfig(
                 name=inner.name,
                 model_name=self.model_name,
-                kwargs=inner.kwargs,
+                kwargs=kwargs,
                 env=dict(self._extra_env),
             ),
             logs_dir=logs_dir,
@@ -284,6 +402,8 @@ class ReviewLoopAgent(BaseAgent):
     async def run(
         self, instruction: str, environment: BaseEnvironment, context: AgentContext
     ) -> None:
+        self._parses: list[dict[str, Any]] = []
+        self._failure: Exception | None = None
         state = _LoopState()
         loop_dir = self.environment_logs_dir / LOOP_DIR_NAME
         await _exec_checked(
@@ -298,34 +418,73 @@ class ReviewLoopAgent(BaseAgent):
             raise
         finally:
             self._finish(context, state)
+        if self._failure is not None:
+            # Classified by Harbor/collect exactly as the unwrapped agent's error.
+            raise self._failure
 
     async def _drive(
         self, instruction: str, environment: BaseEnvironment, state: _LoopState
     ) -> None:
         feedback = ""
+        reasoning = str(self.work_dir / "reasoning.md")
         for round_no in range(1, self.loop_options.max_review_rounds + 1):
             role = "implement" if round_no == 1 else "retry"
-            tokens = {"TASK": instruction, "REASONING_PATH": str(self.work_dir / "reasoning.md")}
-            tokens["FEEDBACK"] = feedback
-            work = await self._stage(environment, state, role, round_no, tokens)
+            work_tokens = {
+                "TASK": self._implementer_task(instruction),
+                "REASONING_PATH": reasoning,
+                "FEEDBACK": feedback,
+            }
+            work = await self._stage(
+                environment, state, role, round_no, render(STAGE_PROMPTS[role], work_tokens)
+            )
             if work.error is not None:
                 state.termination_reason, state.error = "stage_failed", work.error
                 return
             diff = await self._capture(environment, round_no) or "(no diff)"
-            tokens["DIFF"] = fit_diff(STAGE_PROMPTS["review"], tokens, diff)
-            review = await self._stage(environment, state, "review", round_no, tokens)
-            if review.error is not None:
-                state.termination_reason, state.error = "stage_failed", review.error
+            outcome = await self._review(environment, state, round_no, instruction, diff)
+            if outcome is None:
                 return
-            verdict, feedback = parse_verdict(final_message(review.directory))
-            state.rounds.append({"round": str(round_no), "verdict": verdict, "feedback": feedback})
-            if verdict == APPROVE:
+            state.rounds.append(
+                {"round": str(round_no), "verdict": outcome.verdict, "feedback": outcome.feedback}
+            )
+            if outcome.verdict == APPROVE:
                 state.status, state.termination_reason = "completed", "review_approved"
                 return
-            if verdict in UNUSABLE_VERDICTS:
-                state.termination_reason = UNUSABLE_VERDICTS[verdict]
+            if outcome.verdict in UNUSABLE:
+                state.status, state.termination_reason = "completed", FALLBACK_REASON
                 return
+            feedback = outcome.feedback
         state.status, state.termination_reason = "completed", "rounds_exhausted"
+
+    async def _review(
+        self,
+        environment: BaseEnvironment,
+        state: _LoopState,
+        round_no: int,
+        instruction: str,
+        diff: str,
+    ) -> ReviewParse | None:
+        """Review once, re-ask once if unusable; ``None`` when a stage failed."""
+        tokens = {"TASK": instruction, "REASONING_PATH": str(self.work_dir / "reasoning.md")}
+        template = STAGE_PROMPTS["review"]
+        previous = ""
+        for attempt in (1, 2):
+            if attempt == 2:
+                template = REASK_PROMPT
+                tokens["PREVIOUS_REVIEW"] = _clip(previous, MAX_PREVIOUS_REVIEW_CHARS) or "(empty)"
+            prompt = render(template, {**tokens, "DIFF": fit_diff(template, tokens, diff)})
+            review = await self._stage(environment, state, "review", round_no, prompt)
+            if review.error is not None:
+                state.termination_reason, state.error = "stage_failed", review.error
+                return None
+            previous = final_message(review.directory)
+            parsed = parse_review(previous)
+            self._parses.append(
+                {"round": round_no, "attempt": attempt, "stage": review.name, **parsed.record()}
+            )
+            if parsed.verdict not in UNUSABLE:
+                return parsed
+        return parsed
 
     async def _stage(
         self,
@@ -333,7 +492,7 @@ class ReviewLoopAgent(BaseAgent):
         state: _LoopState,
         role: str,
         round_no: int,
-        tokens: dict[str, str],
+        prompt: str,
     ) -> _Stage:
         index = len(state.stages) + 1
         stage = _Stage(index, role, round_no, AgentContext(), Path())
@@ -341,13 +500,25 @@ class ReviewLoopAgent(BaseAgent):
         state.stages.append(stage)
         inner = self._inner(stage.directory)
         try:
-            await inner.run(render(STAGE_PROMPTS[role], tokens), environment, stage.context)
+            await inner.run(prompt, environment, stage.context)
+        except asyncio.CancelledError:
+            stage.error = "CancelledError: the agent phase was cancelled (agent timeout)"
+            await asyncio.shield(self._settle_stage(environment, stage, inner))
+            raise
         except Exception as exc:
             stage.error = f"{type(exc).__name__}: {exc}"
+            if self._failure is None:
+                self._failure = exc
+        await self._settle_stage(environment, stage, inner)
+        return stage
+
+    async def _settle_stage(
+        self, environment: BaseEnvironment, stage: _Stage, inner: BaseAgent
+    ) -> None:
+        """File the stage's logs and read its usage (also after a cancellation)."""
         await self._file_stage_logs(environment, stage)
         if stage.context.is_empty():
             inner.populate_context_post_run(stage.context)
-        return stage
 
     async def _file_stage_logs(self, environment: BaseEnvironment, stage: _Stage) -> None:
         logs = shlex.quote(str(self.environment_logs_dir))
@@ -399,6 +570,7 @@ class ReviewLoopAgent(BaseAgent):
             "verdicts": state.rounds,
             "stages": [stage.record() for stage in state.stages],
             "usage_unavailable": usage_gaps(state.stages),
+            "parses": self._parses,
         }
         context.metadata = {**(context.metadata or {}), "review_loop": record}
         loop_dir = self.logs_dir / LOOP_DIR_NAME
@@ -437,7 +609,7 @@ class ReviewLoopAgent(BaseAgent):
         return Trajectory.model_validate(
             {
                 "session_id": self.session_id,
-                "agent": {"name": self.name(), "version": "1", "model_name": self.model_name},
+                "agent": {"name": self.name(), "version": VERSION, "model_name": self.model_name},
                 "steps": steps
                 or [{"step_id": 1, "source": "system", "message": "review-loop ran no stage"}],
                 "final_metrics": {
