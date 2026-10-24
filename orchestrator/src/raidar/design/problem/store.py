@@ -19,9 +19,10 @@ Generated layout (``var/problems/``, git-ignored; ``RAIDAR_VAR`` relocates ``var
     cache/                                     pinned dataset checkouts and
                                                infra-failed validation attempts
 
-``RAIDAR_PROBLEMS_ROOT`` names one directory holding both layouts (a self-contained
-store); otherwise the first ancestor of the start directory holding
-``lab/problems/sources.yaml`` wins and its ``var/problems/`` holds the generated part.
+The committed root is explicit, in this order: the ``--store`` argument,
+``RAIDAR_PROBLEMS_ROOT``, then the repository's ``lab/problems``. Nothing is searched for:
+a directory outside ``lab/problems`` is a self-contained store holding both layouts, and
+``lab/problems`` keeps its generated part under ``var/problems/``.
 """
 
 from __future__ import annotations
@@ -35,7 +36,7 @@ from typing import Any
 import yaml
 from pydantic import ValidationError
 
-from raidar.contract.paths import var_root
+from raidar.contract.paths import problems_root, var_root
 from raidar.design.problem.content import content_digest, hidden_content_in_task
 from raidar.design.problem.errata import ERRATA_SUFFIX, ErrataError, LoadedErrata, load_errata
 from raidar.design.problem.models import ProblemId, ProblemManifest, SourcePin
@@ -55,43 +56,25 @@ class ProblemStoreError(ValueError):
     """The store is missing, malformed, or its content does not match a manifest."""
 
 
-def _discover(start: Path) -> tuple[Path, Path]:
-    """The committed store root and the repository root above ``start``."""
-    for directory in (start.resolve(), *start.resolve().parents):
-        candidate = directory / STORE_DIR
-        if (candidate / SOURCES_FILE).is_file():
-            return candidate, directory
-    raise ProblemStoreError(
-        f"no {STORE_DIR / SOURCES_FILE} above {start}; set {ROOT_ENV} to the problems store"
-    )
-
-
-def find_store_root(start: Path) -> Path:
+def store_root(explicit: Path | None = None) -> Path:
+    """The committed store root: ``explicit``, else ``$RAIDAR_PROBLEMS_ROOT``, else the default."""
+    if explicit is not None:
+        return explicit.resolve()
     override = os.environ.get(ROOT_ENV)
-    if override:
-        return Path(override).resolve()
-    return _discover(start)[0]
+    return Path(override).resolve() if override else problems_root()
 
 
-def store_at(root: Path) -> ProblemStore:
-    """The store for an explicit committed root (``--store``, a pinned resolver).
+def open_store(explicit: Path | None = None) -> ProblemStore:
+    """The problems store at ``store_root(explicit)``.
 
     A repository's ``lab/problems`` keeps its generated content under that
-    repository's ``var/problems`` (as ``open_store``), never inside the tracked
-    ``lab/`` tree; any other directory is a self-contained store.
+    repository's ``var/problems``, never inside the tracked ``lab/`` tree; any
+    other directory is a self-contained store.
     """
-    root = root.resolve()
+    root = store_root(explicit)
     if root.name == STORE_DIR.name and root.parent.name == STORE_DIR.parent.name:
         return ProblemStore(root, data_root=var_root(root.parent.parent) / "problems")
     return ProblemStore(root)
-
-
-def open_store(start: Path) -> ProblemStore:
-    """The problems store for an experiment directory (see the module docstring)."""
-    override = os.environ.get(ROOT_ENV)
-    if override:
-        return ProblemStore(Path(override).resolve())
-    return store_at(_discover(start)[0])
 
 
 @dataclass(frozen=True)

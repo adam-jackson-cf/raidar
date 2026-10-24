@@ -11,7 +11,10 @@ FORGE = "scb/forge@38d627ecf668"
 
 
 def test_forges_uuid_tie_break_cases_are_spec_determined_randomness_sensitivities() -> None:
-    found = {note.case: note for note in known_sensitivities([FORGE], start=REPO)[FORGE]}
+    found = {
+        note.case: note
+        for note in known_sensitivities([FORGE], store=REPO / "lab" / "problems")[FORGE]
+    }
     errata = (REPO / "lab/problems/registry/scb/forge/38d627ecf668.errata.yaml").read_text()
 
     for case, spec in (

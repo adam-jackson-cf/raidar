@@ -25,7 +25,7 @@ import yaml
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from raidar.design.problem.models import ProblemId
-from raidar.design.problem.store import ProblemStoreError, find_store_root
+from raidar.design.problem.store import store_root
 
 SENSITIVITIES_SUFFIX = ".sensitivities.yaml"
 SCHEMA = "raidar.problem-sensitivities/1"
@@ -88,13 +88,13 @@ def load_sensitivities(path: Path, *, problem: str) -> tuple[VerifierSensitivity
 
 
 def known_sensitivities(
-    problems: Iterable[str], *, start: Path | None = None
+    problems: Iterable[str], *, store: Path | None = None
 ) -> dict[str, tuple[VerifierSensitivity, ...]]:
-    """``{problem ref: sensitivities}`` for the problems that have any (no store: none)."""
-    try:
-        root = find_store_root(start or Path.cwd())
-    except ProblemStoreError:  # outside a checkout the notes are simply absent
-        return {}
+    """``{problem ref: sensitivities}`` for the problems that have any (a missing file: none).
+
+    ``store`` is the committed store root, resolved as ``raidar.design.problem.store.store_root``.
+    """
+    root = store_root(store)
     found = {}
     for ref in sorted(set(problems)):
         try:

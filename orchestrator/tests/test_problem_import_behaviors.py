@@ -14,7 +14,7 @@ import yaml
 from harbor.models.task.task import Task
 
 from raidar.contract.canonical import digest_json
-from raidar.contract.paths import VAR_ENV
+from raidar.contract.paths import VAR_ENV, problems_root
 from raidar.contract.references import (
     RESOLVER_ENTRY_POINT_GROUP,
     RefKind,
@@ -36,13 +36,12 @@ from raidar.design.problem.store import (
     ROOT_ENV,
     ProblemStore,
     ProblemStoreError,
-    find_store_root,
     open_store,
-    store_at,
+    store_root,
 )
 from raidar.scoring.framework.metrics import MetricResolver
 from raidar.subject.environment.python.image import image_tag
-from raidar.subject.environment.python.models import load_pack_spec
+from raidar.subject.environment.python.pack_definition import load_pack_spec
 from tests.experiment_spec_support import (
     experiment_document,
     fixture_resolvers,
@@ -315,10 +314,9 @@ def test_problem_resolver_reports_checkpoints_and_manifest_digest(tmp_path: Path
         )
 
 
-def test_resolver_entry_point_discovers_the_store_from_the_experiment_dir(
+def test_the_store_root_is_explicit_and_never_searched_for(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    monkeypatch.delenv(ROOT_ENV, raising=False)
     monkeypatch.delenv(VAR_ENV, raising=False)
     store = build_fixture_store(
         tmp_path / "lab" / "problems", data_root=tmp_path / "var" / "problems"
@@ -326,6 +324,8 @@ def test_resolver_entry_point_discovers_the_store_from_the_experiment_dir(
     record_validation(store, POSITIVE_REF, tmp_path / "validate")
     experiment_dir = tmp_path / "examples" / "pilot"
     experiment_dir.mkdir(parents=True)
+    monkeypatch.chdir(experiment_dir)
+    monkeypatch.setenv(ROOT_ENV, str(tmp_path / "lab" / "problems"))
     resolver = ResolverSet(entry_point_group=RESOLVER_ENTRY_POINT_GROUP).resolver_for(
         RefKind.PROBLEM
     )
@@ -334,21 +334,19 @@ def test_resolver_entry_point_discovers_the_store_from_the_experiment_dir(
         RegistryRef.parse(RefKind.PROBLEM, POSITIVE_REF), base_dir=experiment_dir
     )
     assert resolved.metadata["checkpoints"] == 2
-    assert find_store_root(experiment_dir) == (tmp_path / "lab" / "problems").resolve()
-    assert open_store(experiment_dir) == ProblemStore(
+    assert open_store() == ProblemStore(
         (tmp_path / "lab" / "problems").resolve(), tmp_path.resolve() / "var" / "problems"
     )
     monkeypatch.setenv(VAR_ENV, str(tmp_path / "relocated"))
-    assert open_store(experiment_dir).data == (tmp_path / "relocated" / "problems").resolve()
+    assert open_store().data == (tmp_path / "relocated" / "problems").resolve()
     monkeypatch.delenv(VAR_ENV)
-    explicit = store_at(tmp_path / "lab" / "problems")
-    assert explicit.data == tmp_path.resolve() / "var" / "problems"
-    assert store_at(tmp_path / "elsewhere").data == (tmp_path / "elsewhere").resolve()
-    monkeypatch.setenv(ROOT_ENV, str(tmp_path / "elsewhere"))
-    assert find_store_root(experiment_dir) == (tmp_path / "elsewhere").resolve()
+    assert open_store(tmp_path / "elsewhere").data == (tmp_path / "elsewhere").resolve()
+    assert open_store(tmp_path / "elsewhere").root == (tmp_path / "elsewhere").resolve()
     monkeypatch.delenv(ROOT_ENV)
-    with pytest.raises(ProblemStoreError, match="sources.yaml"):
-        find_store_root(Path("/"))
+    assert store_root() == problems_root()
+    assert store_root(tmp_path / "x") == (tmp_path / "x").resolve()
+    with pytest.raises(RegistryReferenceError, match="not imported"):
+        resolver.resolve(RegistryRef.parse(RefKind.PROBLEM, POSITIVE_REF), base_dir=experiment_dir)
     assert isinstance(resolver_factory(), ProblemResolver)
 
 

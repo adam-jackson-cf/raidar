@@ -52,7 +52,7 @@ def build_cli_plan(options: dict[str, Any]) -> tuple[ExperimentPlan, ProblemStor
     lock = _current_lock(loaded, options["lock_path"] or default_lock_path(loaded.path))
     override: AgentOverride | None = options["agent_override"]
     try:
-        store = open_store(loaded.base_dir)
+        store = open_store()
         plan = build_plan(
             loaded,
             lock,

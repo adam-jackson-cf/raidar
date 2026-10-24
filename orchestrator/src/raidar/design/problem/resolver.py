@@ -38,15 +38,16 @@ from raidar.contract.references import (
     ResolvedReference,
 )
 from raidar.design.problem.models import ProblemId
-from raidar.design.problem.store import ProblemStore, ProblemStoreError, open_store
+from raidar.design.problem.store import ProblemStoreError, open_store
 
 
 @dataclass(frozen=True)
 class ProblemResolver:
     """Resolve ``<dataset>/<problem>[.<checkpoint>]@<version>`` against a problems store.
 
-    ``store_root`` pins the store; when unset the store is discovered from the
-    experiment's directory (see ``raidar.design.problem.store.open_store``).
+    ``store_root`` pins the store; when unset the store is the one
+    ``raidar.design.problem.store.open_store`` names (``RAIDAR_PROBLEMS_ROOT``, else
+    ``lab/problems``).
     """
 
     store_root: Path | None = None
@@ -58,7 +59,7 @@ class ProblemResolver:
     def resolve(self, ref: RegistryRef, *, base_dir: Path) -> ResolvedReference:
         problem = ProblemId.from_ref(ref)
         try:
-            store = ProblemStore(self.store_root) if self.store_root else open_store(base_dir)
+            store = open_store(self.store_root)
             manifest = store.load_manifest(problem)
             errata = store.load_errata(problem, manifest)
         except ProblemStoreError as exc:

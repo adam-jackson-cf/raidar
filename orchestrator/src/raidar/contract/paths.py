@@ -44,6 +44,11 @@ def treatment_root(repo_root: Path = REPO_ROOT) -> Path:
     return lab_root(repo_root) / "treatment"
 
 
+def problems_root(repo_root: Path = REPO_ROOT) -> Path:
+    """Committed problem pins and manifests: ``lab/problems/``."""
+    return lab_root(repo_root) / "problems"
+
+
 def environment_root(repo_root: Path = REPO_ROOT) -> Path:
     """Run-time data of the runtime packs: ``lab/environment/<runtime>/``."""
     return lab_root(repo_root) / "environment"
