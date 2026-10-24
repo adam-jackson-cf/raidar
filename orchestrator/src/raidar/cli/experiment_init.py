@@ -8,7 +8,7 @@ problems, conditions and analysis plan. Another variant of an existing
 experiment's treatment is a new condition and arm inside that experiment, not
 a new file, so ``init`` refuses a path that already exists. The id follows the
 ``<runtime>__<subject>__<intent>`` grammar (``NAME2``) and defaults to the
-directory name, so ``experiments/ab-test/<id>/experiment.yaml`` satisfies ``NAME1``.
+directory name, so ``lab/experiments/ab-test/<id>/experiment.yaml`` satisfies ``NAME1``.
 """
 
 from __future__ import annotations
@@ -63,7 +63,7 @@ arms:
     agent: codex-luna
 
 assessment:
-  scorers: [correctness@1, code-quality@1, resource-usage@1]
+  scorers: [correctness@1, code-quality@3, resource-usage@1]
 
 analysis:
   baseline_arm: baseline

@@ -31,25 +31,18 @@ from typing import Self
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from raidar.scorers.builtin_manifests import CODE_QUALITY, CORRECTNESS, RESOURCE_USAGE
+from raidar.scorers.gate_effort.autofix_metrics import REFUSAL_KINDS
 from raidar.scorers.gate_effort.families import FAMILIES
-from raidar.scorers.gate_effort_manifests import (
-    GATE_EFFORT,
-    GATE_EFFORT_V4,
-    GATE_EFFORT_V6,
-    GATE_EFFORT_V7,
-    GATE_EFFORT_V8,
-    GATE_EFFORT_V9,
-    GATE_EFFORT_V10,
-)
-from raidar.scorers.gate_effort_v9.manifest import REFUSAL_KINDS
-from raidar.scorers.process_manifests import (
-    PROCESS_COMPLIANCE_V3,
-    PROCESS_COMPLIANCE_V4,
-    PROCESS_COMPLIANCE_V5,
-    PROCESS_COMPLIANCE_V6,
-)
+from raidar.scorers.gate_effort.manifest import GATE_EFFORT
+from raidar.scorers.process_checks.manifest import PROCESS_COMPLIANCE
 from raidar.scorers.sdk.manifest import Direction, ScorerManifest
 
+CORRECTNESS_REF = CORRECTNESS.ref
+CODE_QUALITY_REF = CODE_QUALITY.ref
+RESOURCE_USAGE_REF = RESOURCE_USAGE.ref
+PROCESS_COMPLIANCE_REF = PROCESS_COMPLIANCE.ref
+GATE_EFFORT_REF = GATE_EFFORT.ref
+"""The scorer refs analysis reads; each is its manifest's ``name@version``."""
 OK = "ok"
 UNASSESSED = "unassessed"
 TRUNCATED = "truncated"
@@ -439,52 +432,12 @@ GATE_METRICS: tuple[MetricDef, ...] = tuple(
         f"{GATE_PREFIX}{metric}",
         f"Gate effort: {label}",
         View.GATE,
-        declared_direction(GATE_EFFORT_V10, metric),
+        declared_direction(GATE_EFFORT, metric),
         min_effect,
     )
     for metric, label, min_effect in _GATE_OUTCOMES
 )
 """Gate-effort outcomes: compared only when the lock declares a gate-effort scorer."""
-_GATE_V4_ONLY = frozenset(
-    f"{GATE_PREFIX}{metric.id}"
-    for metric in GATE_EFFORT_V4.metrics
-    if metric.id not in {m.id for m in GATE_EFFORT.metrics}
-)
-
-
-_GATE_V6_ONLY = frozenset(
-    f"{GATE_PREFIX}{metric.id}"
-    for metric in GATE_EFFORT_V6.metrics
-    if metric.id not in {m.id for m in GATE_EFFORT_V4.metrics}
-)
-
-
-_GATE_V7_ONLY = frozenset(
-    f"{GATE_PREFIX}{metric.id}"
-    for metric in GATE_EFFORT_V7.metrics
-    if metric.id not in {m.id for m in GATE_EFFORT_V6.metrics}
-)
-
-
-_GATE_V8_ONLY = frozenset(
-    f"{GATE_PREFIX}{metric.id}"
-    for metric in GATE_EFFORT_V8.metrics
-    if metric.id not in {m.id for m in GATE_EFFORT_V7.metrics}
-)
-
-
-_GATE_V9_ONLY = frozenset(
-    f"{GATE_PREFIX}{metric.id}"
-    for metric in GATE_EFFORT_V9.metrics
-    if metric.id not in {m.id for m in GATE_EFFORT_V8.metrics}
-)
-
-
-_GATE_V10_ONLY = frozenset(
-    f"{GATE_PREFIX}{metric.id}"
-    for metric in GATE_EFFORT_V10.metrics
-    if metric.id not in {m.id for m in GATE_EFFORT_V9.metrics}
-)
 CROSS_MODE_CUMULATIVE = frozenset(
     f"{GATE_PREFIX}{metric}"
     for metric in (
@@ -501,123 +454,55 @@ over each step's new work), so a shadow arm's value is not comparable with an en
 The analysis keeps them but marks them; the cross-mode forms are ``total_new_*``."""
 
 
-def gate_metrics_for(ref: str | None) -> tuple[MetricDef, ...]:
-    """The gate outcomes a gate-effort version reports.
-
-    ``@4`` and ``@5`` add the tests check; ``@6`` adds the mode-comparable blocking counts,
-    the typing cascade and the split first-run tests outcomes; ``@7`` the first-pass rates
-    that ignore auto-fixable codes or the tests check, and the cascade-free counts; ``@8``
-    the counts that also count a refused suppression comment once (``*_net``); ``@9`` the
-    autofix step, the counts after and before it, and the fix cost by refusal kind; ``@10``
-    the autofix counts each step's own work added (``total_new_autofix_*``).
-    """
-    if ref == "gate-effort@10":
-        return GATE_METRICS
-    if ref == "gate-effort@9":
-        left_out = _GATE_V10_ONLY
-    elif ref == "gate-effort@8":
-        left_out = _GATE_V9_ONLY | _GATE_V10_ONLY
-    elif ref == "gate-effort@7":
-        left_out = _GATE_V8_ONLY | _GATE_V9_ONLY | _GATE_V10_ONLY
-    elif ref == "gate-effort@6":
-        left_out = _GATE_V7_ONLY | _GATE_V8_ONLY | _GATE_V9_ONLY | _GATE_V10_ONLY
-    elif ref in {"gate-effort@4", "gate-effort@5"}:
-        left_out = _GATE_V6_ONLY | _GATE_V7_ONLY | _GATE_V8_ONLY | _GATE_V9_ONLY | _GATE_V10_ONLY
-    else:
-        left_out = (
-            _GATE_V4_ONLY
-            | _GATE_V6_ONLY
-            | _GATE_V7_ONLY
-            | _GATE_V8_ONLY
-            | _GATE_V9_ONLY
-            | _GATE_V10_ONLY
-        )
-    return tuple(metric for metric in GATE_METRICS if metric.id not in left_out)
-
-
 PROCESS_PREFIX = "process."
-"""Process outcomes are ``process.<process-compliance@3 to @6 trajectory metric>``."""
+"""Process outcomes are ``process.<process-compliance trajectory metric>``."""
 PROCESS_METRICS: tuple[MetricDef, ...] = (
     MetricDef(
         f"{PROCESS_PREFIX}stall_rate",
         "Process: stall rate (steps in which a session stopped to ask, changing nothing)",
         View.PROCESS,
-        declared_direction(PROCESS_COMPLIANCE_V3, "stall_rate"),
+        declared_direction(PROCESS_COMPLIANCE, "stall_rate"),
         0.1,
     ),
-)
-"""Process outcomes (``process-compliance@3``): compared only when the lock declares it."""
-PROCESS_V4_METRICS: tuple[MetricDef, ...] = (
-    *PROCESS_METRICS,
     MetricDef(
         f"{PROCESS_PREFIX}compliance_rate",
         "Process: compliance rate (decided checks passed; a test command counts only if it ran)",
         View.PROCESS,
-        declared_direction(PROCESS_COMPLIANCE_V4, "compliance_rate"),
+        declared_direction(PROCESS_COMPLIANCE, "compliance_rate"),
         0.1,
     ),
     MetricDef(
         f"{PROCESS_PREFIX}total_test_commands_not_run",
         "Process: test commands whose runner was not found, per trial",
         View.PROCESS,
-        declared_direction(PROCESS_COMPLIANCE_V4, "total_test_commands_not_run"),
+        declared_direction(PROCESS_COMPLIANCE, "total_test_commands_not_run"),
         1.0,
     ),
-)
-"""Process outcomes of ``process-compliance@4``: @3's plus the compliance rate and not-run tests."""
-PROCESS_V5_METRICS: tuple[MetricDef, ...] = (
-    *PROCESS_V4_METRICS,
     MetricDef(
         f"{PROCESS_PREFIX}work_session_tests_run_rate",
         "Process: work sessions that ran tests after their last edit (decided steps)",
         View.PROCESS,
-        declared_direction(PROCESS_COMPLIANCE_V5, "work_session_tests_run_rate"),
+        declared_direction(PROCESS_COMPLIANCE, "work_session_tests_run_rate"),
         0.1,
     ),
-)
-"""Process outcomes of ``process-compliance@5``: @4's plus the work session's own test runs
-(its ``compliance_rate`` counts the plan check only when the condition asks for a plan)."""
-PROCESS_V6_METRICS: tuple[MetricDef, ...] = (
-    *PROCESS_V5_METRICS,
     MetricDef(
         f"{PROCESS_PREFIX}work_session_tests_run_any_rate",
         "Process: work sessions that ran the tests at all (decided steps)",
         View.PROCESS,
-        declared_direction(PROCESS_COMPLIANCE_V6, "work_session_tests_run_any_rate"),
+        declared_direction(PROCESS_COMPLIANCE, "work_session_tests_run_any_rate"),
         0.1,
     ),
     MetricDef(
         f"{PROCESS_PREFIX}work_session_tests_after_last_code_edit_rate",
         "Process: work sessions that ran the tests after their last non-test edit (decided steps)",
         View.PROCESS,
-        declared_direction(PROCESS_COMPLIANCE_V6, "work_session_tests_after_last_code_edit_rate"),
+        declared_direction(PROCESS_COMPLIANCE, "work_session_tests_after_last_code_edit_rate"),
         0.1,
     ),
 )
-"""Process outcomes of ``process-compliance@6``: @5's plus whether the work session ran the
-tests at all, and after its last edit to a non-test file."""
-PROCESS_OUTCOME_SCORER = "process-compliance@3"
-PROCESS_OUTCOME_SCORERS = (
-    "process-compliance@6",
-    "process-compliance@5",
-    "process-compliance@4",
-    PROCESS_OUTCOME_SCORER,
-)
-"""The process-compliance versions with ``process.*`` outcomes, newest first."""
+"""Process outcomes: compared only when the lock declares ``process-compliance``."""
 
-
-def process_metrics_for(ref: str | None) -> tuple[MetricDef, ...]:
-    """The process outcomes a process-compliance version reports (none before ``@3``)."""
-    if ref == "process-compliance@6":
-        return PROCESS_V6_METRICS
-    if ref == "process-compliance@5":
-        return PROCESS_V5_METRICS
-    if ref == "process-compliance@4":
-        return PROCESS_V4_METRICS
-    return PROCESS_METRICS if ref == PROCESS_OUTCOME_SCORER else ()
-
-
-ALL_METRICS = (*OUTCOME_METRICS, *GATE_METRICS, *PROCESS_V6_METRICS)
+ALL_METRICS = (*OUTCOME_METRICS, *GATE_METRICS, *PROCESS_METRICS)
 
 VERIFIER_PREFIX = "verifier."
 """Verifier diagnostics: described per arm, never compared (no verdict, no effect)."""

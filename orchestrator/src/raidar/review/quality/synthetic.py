@@ -7,7 +7,7 @@ WS-D/WS-F/WS-H shapes:
   (baseline arm and headline metric, as a real lock carries them), and
   ``runs/synthetic-quality/<job>/`` job directories (``job.json`` naming the
   lock digest + ``trial-records/*.json`` TrialRecords);
-- ``store/``: ``code-quality@1`` and ``correctness@1`` Assessments whose
+- ``store/``: ``code-quality@3`` and ``correctness@1`` Assessments whose
   inputs carry each trial's snapshot digests (correctness in the real
   scorer's shape: per-checkpoint ``solved`` and ``strict_pass_rate``, and
   trial ``solved_checkpoints`` and ``reached``), plus a Jev audit of
@@ -18,7 +18,7 @@ The experiment id, job ids, problem and every snapshot digest carry a
 ``synthetic: true``. It is never benchmark evidence.
 
 - the gated arm's commit-gate records under each trial's step agent dirs
-  (``raidar.review.quality.synthetic_gate``) and every trial's ``gate-effort@1``
+  (``raidar.review.quality.synthetic_gate``) and every trial's ``gate-effort``
   Assessment, made by the real scorer (``not_applicable`` for ``baseline``).
 
 Built-in shape (deterministic, seeded): two arms (``baseline``, ``guided``)
@@ -205,6 +205,7 @@ def _transition(trial: _Trial, subject: str) -> dict[str, float]:
     regression = 1.0 if rng.random() < 0.6 else round(rng.uniform(0.7, 0.95), 4)
     trial.ok("rework", subject, rework)
     trial.ok("regression", subject, regression)
+    trial.ok("regression_parity_excluded_cases", subject, 0.0)
     if rework < 1:
         trial.item(
             "rework",
@@ -396,7 +397,7 @@ def generate_quality_fixture(dest: Path) -> Path:
     experiment_file.write_text(
         f"# synthetic fixture: not benchmark evidence\nid: {EXPERIMENT}\n"
         "analysis:\n  baseline_arm: baseline\n  attempts: 6\n  seed: 20260930\n"
-        "assessment:\n  scorers: [correctness@1, code-quality@1, gate-effort@1]\n",
+        "assessment:\n  scorers: [correctness@1, code-quality@3, gate-effort@10]\n",
         encoding="utf-8",
     )
     lock_sha256 = write_synthetic_lock(

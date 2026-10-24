@@ -15,6 +15,7 @@ from dataclasses import dataclass
 from statistics import fmean, median, pstdev
 from typing import Any
 
+from raidar.analysis.assessed import CODE_QUALITY_REF
 from raidar.core.review_contract import (
     ArmChangeCategory,
     ArmComparableConfig,
@@ -26,7 +27,6 @@ from raidar.core.review_contract import (
 )
 from raidar.review.projection.headline import (
     CORRECTNESS_SCORER,
-    QUALITY_SCORERS,
     UNDECLARED_MARKER,
     policy_shares,
 )
@@ -43,7 +43,7 @@ PREFERRED_SCORED_RUNS = 5
 REPEAT_VARIANCE_STDDEV = 0.1
 _POLICY_CATEGORIES = {
     CORRECTNESS_SCORER: "correctness",
-    **dict.fromkeys(QUALITY_SCORERS, "quality"),
+    CODE_QUALITY_REF: "quality",
 }
 
 
@@ -101,7 +101,7 @@ def _measured(values: Sequence[float | None]) -> list[float]:
 
 
 def _scorer_outcomes(areas: Mapping[str, Sequence[float]]) -> dict[str, dict[str, Any]]:
-    """Mean score area (C for correctness@1, I for code-quality@1) over scored runs."""
+    """Mean score area (C for correctness@1, I for code-quality@3) over scored runs."""
     return {
         ref: {"sample_size": len(values), "mean_score": round(fmean(values), 6)}
         for ref, values in areas.items()
@@ -127,7 +127,7 @@ def _aggregate(runs: Sequence[ReviewRunRecord], policy: str) -> dict[str, Any]:
         "uncached_input_tokens": stat_block([float(run.total_input_tokens) for run in runs]),
         "metric_outcomes": _checkpoint_outcomes(runs),
         "scorer_outcomes": _scorer_outcomes(
-            {"correctness@1": diagnostics, "code-quality@1": qualities}
+            {"correctness@1": diagnostics, "code-quality@3": qualities}
         ),
     }
 
@@ -260,7 +260,7 @@ def _shares(policy_ref: str) -> dict[str, float]:
         base, inertia = policy_shares(DEFAULT_METRIC_REGISTRY.get(policy_ref))
     except RegistryReferenceError:
         return {}
-    return {CORRECTNESS_SCORER: base, **dict.fromkeys(QUALITY_SCORERS, inertia)}
+    return {CORRECTNESS_SCORER: base, CODE_QUALITY_REF: inertia}
 
 
 def _scorer(ref: str, shares: Mapping[str, float]) -> ResolvedScorerReviewConfig:

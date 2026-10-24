@@ -45,7 +45,7 @@ from raidar.jev.ledger import current_labels
 from raidar.scorers.store import LOG_FILE, OBJECTS_DIR, Assessment
 from raidar.spec.lock import LOCK_SUFFIX, default_lock_path
 
-CODE_QUALITY_REF = "code-quality@1"
+CODE_QUALITY_REF = "code-quality@3"
 CORRECTNESS_REF = "correctness@1"
 JOB_KIND = "raidar-job"
 _UNSAFE_ID = re.compile(r"[^A-Za-z0-9._-]")

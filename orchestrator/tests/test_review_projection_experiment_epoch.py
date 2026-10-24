@@ -112,7 +112,7 @@ def test_composite_is_the_headline_policy_score_over_one_hundred(
         if run.unscored:
             continue
         detail = _detail(projection, run.id)
-        quality = _span(detail, "scorer:code-quality@1")
+        quality = _span(detail, "scorer:code-quality@3")
         scoring = _span(detail, "scoring")
         components = {
             "C": Decimal(str(run.diagnostic_score)),
@@ -581,10 +581,10 @@ def test_a_headline_scorer_the_experiment_never_declared_is_named_not_unassessed
     result = headline("scb-canonical-oneshot@1", one, missing, declared=["correctness@1"])
     assert result.composite is None
     (reason,) = result.reasons
-    assert "needs code-quality@1" in reason
+    assert "needs code-quality@3" in reason
     assert UNDECLARED_MARKER in reason
     declared = headline(
-        "scb-canonical-oneshot@1", one, missing, declared=["correctness@1", "code-quality@1"]
+        "scb-canonical-oneshot@1", one, missing, declared=["correctness@1", "code-quality@3"]
     )
     assert all("unassessed" in reason for reason in declared.reasons)
 

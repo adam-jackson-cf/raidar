@@ -13,7 +13,7 @@ and time) is a quality signal of its own. It is reported two ways:
   in at least one valid trial. A baseline without the gate therefore yields no
   paired gate effect, and the comparison says why (``gate_note``).
 
-The same two views serve the ``process.*`` outcomes (``process-compliance@3``:
+The same two views serve the ``process.*`` outcomes (``process-compliance``:
 the stall rate) when the lock declares that scorer: an arm without the stall
 wrapper has no value.
 

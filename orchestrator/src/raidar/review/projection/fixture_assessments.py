@@ -1,7 +1,7 @@
 """Assessments for the synthetic fixture, stored under the keys a real rescore uses.
 
 ``correctness@1`` and ``resource-usage@1`` run for real over the synthetic
-verifier records and ATIF traces. ``code-quality@1`` needs the provisioned
+verifier records and ATIF traces. ``code-quality@3`` needs the provisioned
 measurement tools and multi-checkpoint lineage a synthetic snapshot cannot give
 meaningful values for, so its result is composed from the fixture's declared
 component values, then validated against the scorer's manifest (every metric
@@ -18,6 +18,7 @@ from pathlib import Path
 
 from raidar.scorers.builtin_manifests import CODE_QUALITY
 from raidar.scorers.catalog import ScorerRegistry
+from raidar.scorers.code_quality.observations import EXCLUDED_METRIC
 from raidar.scorers.keys import store_key
 from raidar.scorers.rescore import assess
 from raidar.scorers.rescore_config import RescoreConfig
@@ -87,6 +88,9 @@ def _transitions(steps: Sequence[StepInputs], plan: QualityPlan) -> list[Observa
         observations.extend(
             _ok(metric, subject, plan.values[metric]) if measured else _gap(metric, subject)
             for metric in _TRANSITION_COMPONENTS
+        )
+        observations.append(
+            _ok(EXCLUDED_METRIC, subject, 0.0) if measured else _gap(EXCLUDED_METRIC, subject)
         )
     return observations
 

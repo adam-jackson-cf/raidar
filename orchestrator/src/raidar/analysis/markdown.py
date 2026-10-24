@@ -11,8 +11,10 @@ from raidar.analysis.manipulation import CheckSeparation, ManipulationReport
 from raidar.analysis.outcomes import (
     ALL_METRICS,
     CROSS_MODE_CUMULATIVE,
+    GATE_EFFORT_REF,
     GATE_METRICS,
     GATE_PREFIX,
+    PROCESS_COMPLIANCE_REF,
     REFUSAL_KINDS,
     VERIFIER_DISAGREEMENTS,
     VERIFIER_METRICS,
@@ -44,7 +46,7 @@ CUMULATIVE_LEGEND = (
     "† A shadow gate sums this over its never-fixed tree at every step (it re-counts the "
     "accumulated debt), an enforced gate over each step's new work only, so a shadow arm's "
     "value does not compare with an enforced arm's. Compare total_new_first_run_blocking* "
-    "and (gate-effort@10) total_new_autofix_* across gate modes."
+    "and total_new_autofix_* across gate modes."
 )
 
 
@@ -192,7 +194,7 @@ def _gate_mean(arm: ArmSummary, metric: str) -> float | None:
 
 
 UNTYPED_CALL_ROW = "typing: of which no-untyped-call (call-site cascade)"
-"""gate-effort@6 reports the mypy ``no-untyped-call`` cascade apart from the typing family."""
+"""gate-effort reports the mypy ``no-untyped-call`` cascade apart from the typing family."""
 
 
 def _cascade_row(arms: Sequence[ArmSummary]) -> list[list[str]]:
@@ -234,32 +236,31 @@ def _gate_arms(report: AnalysisReport) -> list[str]:
     rows = _descriptive_rows(columns, [metric.id for metric in GATE_HEADLINE])
     return [
         "",
-        f"## Gate effort ({report.gate_scorer or 'gate-effort@1'}, per arm)",
+        f"## Gate effort ({report.gate_scorer or GATE_EFFORT_REF}, per arm)",
         "",
         "Mean [CI] n over valid trials; an arm without the commit gate has no value "
-        "(not applicable), never 0; an arm with a shadow gate (gate-effort@2 and later) has its "
-        "first-run values only; under gate-effort@3 a step with no source change is not "
-        "applicable to first-pass clean; gate-effort@4 and @5 add the tests check and "
-        "fix_round_correctness_delta (final minus pre-fix case pass rate over steps with a fix "
-        "round; not applicable to a shadow gate); gate-effort@6 counts a failed tests check "
-        "once in every blocking count and adds blocking counts that compare across gate "
-        "modes (total_new_first_run_blocking: what each step's own work added before any "
-        "fix; final_step_end_blocking: the tree the last step handed on; a shadow gate's "
-        "total_first_run_blocking re-counts the accumulated tree at every step), the mypy "
-        "no-untyped-call cascade apart, and failing tests and missed coverage as separate "
-        "first-run outcomes; gate-effort@7 adds first-pass clean rates that ignore the "
+        "(not applicable), never 0; an arm with a shadow gate has its first-run values only; "
+        "a step with no source change is not applicable to first-pass clean. The tests check "
+        "and fix_round_correctness_delta (final minus pre-fix case pass rate over steps with a "
+        "fix round; not applicable to a shadow gate) are reported; a failed tests check counts "
+        "once in every blocking count. Blocking counts that compare across gate "
+        "modes: total_new_first_run_blocking (what each step's own work added before any "
+        "fix), final_step_end_blocking (the tree the last step handed on); a shadow gate's "
+        "total_first_run_blocking re-counts the accumulated tree at every step. The mypy "
+        "no-untyped-call cascade is reported apart, and failing tests and missed coverage as "
+        "separate first-run outcomes; first-pass clean rates ignore the "
         "auto-fixable layout codes (FORMAT, I001, W291-W293), the tests check (TEST.*), or "
-        "both, and the cross-mode counts without the no-untyped-call cascade "
-        "(*_ex_cascade); gate-effort@8 adds those counts with a refused suppression comment "
-        "counted once (mypy's unused-ignore at a SUPPRESS line folded into it; *_net); "
-        "gate-effort@9 adds guardrail-gate@4's autofix step (passes, errors, files and lines "
-        "changed, block-tier findings fixed), the counts after autofix and before it "
+        "both, and the cross-mode counts are also given without the no-untyped-call cascade "
+        "(*_ex_cascade) and with a refused suppression comment "
+        "counted once (mypy's unused-ignore at a SUPPRESS line folded into it; *_net). "
+        "guardrail-gate's autofix step is reported (passes, errors, files and lines "
+        "changed, block-tier findings fixed), with the counts after autofix and before it "
         "(*_post_autofix_net, *_raw_net: an enforced gate's runs see the fixed tree, a shadow "
         "gate's check the raw one, so the arms compare like for like) and the fix sessions' "
-        "cost and wall time by the kind of refusal that started them; gate-effort@10 adds "
-        "the autofix lines and block-tier findings each step's own work added "
+        "cost and wall time by the kind of refusal that started them; the autofix lines and "
+        "block-tier findings each step's own work added "
         "(total_new_autofix_*: the step's first pass minus what the previous step left for "
-        "autofix), which compare across gate modes where total_autofix_* do not.",
+        "autofix) compare across gate modes where total_autofix_* do not.",
         "",
         *_table(("Metric", "Better", *names), rows),
         *_legend(row[0] for row in rows),
@@ -279,7 +280,7 @@ def _family_cell(arm: ArmSummary, metrics: Sequence[str], family: str) -> str:
 
 
 def _autofix_family_table(arms: Sequence[ArmSummary], names: Sequence[str]) -> list[str]:
-    """gate-effort@9: block-tier findings the autofix passes fixed, per family (@10: and new)."""
+    """gate-effort: block-tier findings the autofix passes fixed, per family (and new)."""
     metric = f"{GATE_PREFIX}total_autofix_removed_blocking"
     if not any(metric in (arm.gate_effort or {}) for arm in arms):
         return []
@@ -297,7 +298,7 @@ def _autofix_family_table(arms: Sequence[ArmSummary], names: Sequence[str]) -> l
 
 
 def _refusal_table(arms: Sequence[ArmSummary], names: Sequence[str]) -> list[str]:
-    """gate-effort@9: fix-session cost and wall time by the kind of refusal that started it."""
+    """gate-effort: fix-session cost and wall time by the kind of refusal that started it."""
     cost, wall = (
         f"{GATE_PREFIX}total_fix_cost_usd_by_refusal",
         f"{GATE_PREFIX}total_fix_wall_s_by_refusal",
@@ -365,20 +366,20 @@ def _process_arms(report: AnalysisReport) -> list[str]:
     rows = _descriptive_rows(columns, sorted({metric for column in columns for metric in column}))
     return [
         "",
-        f"## Process outcomes ({report.process_scorer or 'process-compliance@3'}, per arm)",
+        f"## Process outcomes ({report.process_scorer or PROCESS_COMPLIANCE_REF}, per arm)",
         "",
         "Mean [CI] n over valid trials; stall_rate is the share of reached steps in which a "
-        "session changed nothing and ended asking a question (continue-on-stall@1; @2 also "
-        "counts a no-edit refusal, and only each step's first session); an arm "
+        "session changed nothing and ended asking a question or refused without an edit "
+        "(only each step's first session counts); an arm "
         "without the stall wrapper has no value (not applicable), never 0. "
-        "process-compliance@4 counts a test command as a test run only when its output does "
+        "A test command counts as a test run only when its output does "
         "not say its runner was not found (total_test_commands_not_run counts those). "
-        "process-compliance@5 adds work_session_tests_run_rate (the step's work session "
-        "itself ran tests after its last edit; a gate's fix sessions do not count) and counts "
-        "plan_written in compliance_rate only when the condition asks for a plan. "
-        "process-compliance@6 adds work_session_tests_run_any_rate (the work session ran the "
-        "tests at all) and work_session_tests_after_last_code_edit_rate (it ran them after its "
-        "last edit to a non-test file).",
+        "work_session_tests_run_rate is the share of steps whose work session "
+        "itself ran tests after its last edit (a gate's fix sessions do not count); "
+        "plan_written counts in compliance_rate only when the condition asks for a plan. "
+        "work_session_tests_run_any_rate is the share whose work session ran the "
+        "tests at all and work_session_tests_after_last_code_edit_rate the share that ran them "
+        "after its last edit to a non-test file.",
         "",
         *_table(("Metric", "Better", *[arm.arm for arm in arms]), rows),
     ]

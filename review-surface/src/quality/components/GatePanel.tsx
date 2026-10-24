@@ -1,9 +1,9 @@
-// Commit-gate effort of a gated trial (gate-effort@1 + the step's guardrail-gate record):
+// Commit-gate effort of a gated trial (gate-effort + the step's guardrail-gate record):
 // per checkpoint, how the gate ended, the rounds it took, first-pass clean, the blocking
 // findings by rule family (a single-hue magnitude table, numbers always printed) and the
 // fix sessions' cost and time. A step expands to its gate rounds. An ungated trial has no
 // gate view, so nothing renders: never a row of zeros. A shadow gate (guardrail-gate@2
-// mode shadow, gate-effort@2) was recorded at each step's end and never enforced: it is
+// mode shadow, gate-effort) was recorded at each step's end and never enforced: it is
 // labelled as such, its families are the first run's and its fix outcomes read n/a.
 import { Fragment, useState } from 'react';
 import { ChevronDown, ChevronRight } from 'lucide-react';
@@ -187,7 +187,7 @@ export function GatePanel({ gate }: { gate: GateView | null | undefined }) {
           Commit gate
         </span>
         <span style={{ color: C.fg0 }}>
-          {gate.scorer ?? 'gate-effort@1'} · rounds, first-pass clean and blocking findings by rule family
+          {gate.scorer ?? 'gate-effort@10'} · rounds, first-pass clean and blocking findings by rule family
         </span>
         {shadow && (
           <span data-testid="gate-shadow" style={{ color: C.orange }} title="Recorded at each step's end, never enforced: no refusal, no fix session; the families shown are the first run's">

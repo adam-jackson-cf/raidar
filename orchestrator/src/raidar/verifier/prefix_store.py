@@ -1,7 +1,7 @@
 """Where pre-fix snapshot grades live in the Assessment store, and how they are read.
 
 The contract shared by the offline grader (``raidar.verifier.prefix_grade``)
-and the scorer that reads the grades (``gate-effort@4``): one JSON file per
+and the scorer that reads the grades (``gate-effort@10``): one JSON file per
 graded snapshot, content-addressed by (bundle digest, step, snapshot digest),
 ``<store>/pre-fix-grades/<bundle>/<step>/<snapshot>.json``. Kept apart from
 the grader so the scorer's identity covers only this reading contract.

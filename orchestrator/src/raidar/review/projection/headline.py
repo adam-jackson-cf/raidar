@@ -6,7 +6,7 @@ meaning: S is correctness-gated. ``quality_score`` is the policy's inertia I and
 ``diagnostic_score`` is correctness C. C is the policy's definition (the SCB
 fork's ``C_p``, ``analysis.assessed.correctness_component``): the mean of
 ``correctness@1``'s per-checkpoint ``strict_pass_rate``, an unreached
-checkpoint counting 0. V/E/H/R/G come from ``code-quality@1``'s problem-level
+checkpoint counting 0. V/E/H/R/G come from ``code-quality@3``'s problem-level
 means. A component that is not ``ok`` makes the score ineligible with the
 scorer's own reason, and a scorer with no stored Assessment makes it
 unassessed; neither is ever read as zero. Under a policy with the
@@ -24,11 +24,15 @@ from collections.abc import Collection, Mapping
 from dataclasses import dataclass, field
 from decimal import Decimal
 
-from raidar.analysis.assessed import Observed, correctness_component, infra_reasons
+from raidar.analysis.assessed import (
+    CODE_QUALITY_REF,
+    Observed,
+    correctness_component,
+    infra_reasons,
+)
 from raidar.analysis.policy_inputs import ComponentInput, score_inputs
 from raidar.execution.models import CheckpointState, TrialRecord
 from raidar.review.projection.assessments import TrialAssessments
-from raidar.scorers.code_quality_refs import CODE_QUALITY_REFS, code_quality_ref
 from raidar.scorers.sdk.result import TRAJECTORY_SUBJECT, AssessStatus, Observation
 from raidar.spec.metrics import (
     CORRECTNESS,
@@ -39,14 +43,6 @@ from raidar.spec.metrics import (
 from raidar.spec.references import RegistryReferenceError
 
 CORRECTNESS_SCORER = "correctness@1"
-QUALITY_SCORERS = CODE_QUALITY_REFS
-"""The code-quality versions I can come from; a trial reads the one it was assessed with."""
-
-
-def quality_scorer(assessments: TrialAssessments) -> str:
-    """The code-quality version this trial's lookup covered (``@2`` first)."""
-    return code_quality_ref([*assessments.found, *assessments.missing])
-
 
 COMPONENT_METRICS = {
     "V": "problem_verbosity",
@@ -171,15 +167,14 @@ def _quality_inputs(
 ) -> tuple[dict[str, ComponentInput], dict[str, Observation]]:
     inputs: dict[str, ComponentInput] = {}
     used: dict[str, Observation] = {}
-    quality = quality_scorer(assessments)
     for component in policy.inertia_weights:
-        observation = trial_observation(assessments, quality, COMPONENT_METRICS[component])
+        observation = trial_observation(assessments, CODE_QUALITY_REF, COMPONENT_METRICS[component])
         if observation is not None:
             used[component] = observation
         if observation is not None and observation.status is AssessStatus.OK:
             inputs[component] = ComponentInput(value=float(observation.value or 0.0))
         else:
-            missing = assessments.missing.get(quality)
+            missing = assessments.missing.get(CODE_QUALITY_REF)
             inputs[component] = ComponentInput(gap=_unmeasured(observation, missing))
     return inputs, used
 
@@ -192,11 +187,11 @@ def _reason_text(policy: str, component: str | None, detail: str) -> str:
 UNDECLARED_MARKER = "which the experiment does not declare"
 
 
-def needed_scorers(policy: Metric, declared: Collection[str] = ()) -> tuple[str, ...]:
+def needed_scorers(policy: Metric) -> tuple[str, ...]:
     """The scorers whose Assessments the policy's components come from."""
     if not policy.inertia_weights:
         return (CORRECTNESS_SCORER,)
-    return (CORRECTNESS_SCORER, code_quality_ref(declared))
+    return (CORRECTNESS_SCORER, CODE_QUALITY_REF)
 
 
 def _undeclared_reasons(policy: Metric, declared: Collection[str] | None) -> tuple[str, ...]:
@@ -205,7 +200,7 @@ def _undeclared_reasons(policy: Metric, declared: Collection[str] | None) -> tup
     return tuple(
         f"{policy.ref} not computable: the headline metric needs {ref}, "
         f"{UNDECLARED_MARKER} (add it to assessment.scorers and relock)"
-        for ref in needed_scorers(policy, declared)
+        for ref in needed_scorers(policy)
         if ref not in declared
     )
 
@@ -223,9 +218,7 @@ def _policy_reasons(
     if undeclared:
         return undeclared
     unassessed = [
-        ref
-        for ref in (CORRECTNESS_SCORER, quality_scorer(assessments))
-        if ref in assessments.missing
+        ref for ref in (CORRECTNESS_SCORER, CODE_QUALITY_REF) if ref in assessments.missing
     ]
     if unassessed:
         return tuple(

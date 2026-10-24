@@ -72,8 +72,8 @@ def _resolvers(
             ),
             InMemoryResolver(
                 RefKind.SCORER,
-                {"correctness@1": {"exact": True}, "code-quality@1": {"exact": True}},
-                bindings={"code-quality@1": {"runtimes": ["python"]}, **(scorers or {})},
+                {"correctness@1": {"exact": True}, "code-quality@3": {"exact": True}},
+                bindings={"code-quality@3": {"runtimes": ["python"]}, **(scorers or {})},
             ),
             MetricResolver(),
         ],
@@ -238,12 +238,12 @@ def test_rt3_components_must_cover_the_runtime_and_support_the_arms_agent(
 def test_rt4_scorers_and_the_metric_must_cover_the_runtime(tmp_path: Path) -> None:
     document = experiment_document(id="node-ts__fixture__test", runtime="node-ts")
     document["problems"] = [{"ref": FORGE_NODE}]
-    document["assessment"] = {"scorers": ["correctness@1", "code-quality@1"]}
+    document["assessment"] = {"scorers": ["correctness@1", "code-quality@3"]}
     path = write_experiment(tmp_path, document)
 
     issues = _issues(path, pack_loader=_node_pack)
 
-    assert "[RT4] code-quality@1 supports runtimes [python]" in issues["assessment.scorers.1"]
+    assert "[RT4] code-quality@3 supports runtimes [python]" in issues["assessment.scorers.1"]
     assert (
         "[RT4] headline metric scb-canonical@1 measures quality components for runtimes "
         in (issues["assessment.metric"])
@@ -326,7 +326,7 @@ def test_the_importer_loads_the_pack_of_the_sources_runtime() -> None:
 
 def test_the_real_resolvers_report_binding_facts() -> None:
     repo = Path(__file__).resolve().parents[2]
-    problem = ProblemResolver(repo / "problems").resolve(
+    problem = ProblemResolver().resolve(
         RegistryRef.parse(RefKind.PROBLEM, "scb/forge@38d627ecf668"), base_dir=repo
     )
     lint = ComponentResolver().resolve(
@@ -336,7 +336,7 @@ def test_the_real_resolvers_report_binding_facts() -> None:
         RegistryRef.parse(RefKind.COMPONENT, "rules-file@1"), base_dir=repo
     )
     quality = scorer_resolver().resolve(
-        RegistryRef.parse(RefKind.SCORER, "code-quality@1"), base_dir=repo
+        RegistryRef.parse(RefKind.SCORER, "code-quality@3"), base_dir=repo
     )
 
     assert problem.binding == PYTHON_BINDING
@@ -386,7 +386,7 @@ def test_as1_rescore_scorers_must_cover_the_jobs_runtime(tmp_path: Path) -> None
     store = tmp_path / "store"
 
     refused = _assess(
-        "--rescore", str(job / "trials"), "--store", str(store), "--scorer", "code-quality@1"
+        "--rescore", str(job / "trials"), "--store", str(store), "--scorer", "code-quality@3"
     )
     allowed = _assess(
         "--rescore", str(job / "trials"), "--store", str(store), "--scorer", "correctness@1"
@@ -394,7 +394,7 @@ def test_as1_rescore_scorers_must_cover_the_jobs_runtime(tmp_path: Path) -> None
 
     assert refused.exit_code != 0
     assert (
-        "[AS1] scorer code-quality@1 supports runtimes [python]; the job's runtime is node-ts"
+        "[AS1] scorer code-quality@3 supports runtimes [python]; the job's runtime is node-ts"
         in (refused.output)
     )
     assert "[AS1]" not in allowed.output
@@ -407,7 +407,7 @@ def test_as1_a_trial_outside_any_job_accepts_only_runtime_agnostic_scorers(
     trial.mkdir(parents=True)
 
     refused = _assess(
-        "--rescore", str(trial), "--store", str(tmp_path / "s"), "--scorer", "code-quality@1"
+        "--rescore", str(trial), "--store", str(tmp_path / "s"), "--scorer", "code-quality@3"
     )
 
     assert refused.exit_code != 0

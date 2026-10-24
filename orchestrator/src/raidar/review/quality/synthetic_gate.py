@@ -3,7 +3,7 @@
 The gated arm's trials get, per checkpoint, the files ``guardrail-gate@1``
 leaves in a step's agent log dir: the gate record, each gate run's output in
 ``guardrail-check``'s printed format and its JSON report. The real
-``gate-effort@1`` scorer then assesses every trial of the fixture (an ungated
+``gate-effort`` scorer then assesses every trial of the fixture (an ungated
 trial is ``not_applicable``), so the Quality view reads them exactly as it
 reads a real run. Each trial draws from its own seeded generator, so the rest
 of the fixture's values are unchanged.
@@ -133,7 +133,7 @@ def _step(trial_dir: Path, checkpoint: str) -> StepInputs:
 def gate_result(
     trial_dir: Path, checkpoints: Sequence[str], *, gated: bool, seed: str, problem: str
 ) -> AssessResult:
-    """Write the trial's gate records (gated arm only) and assess them with gate-effort@1."""
+    """Write the trial's gate records (gated arm only) and assess them with gate-effort."""
     if gated:
         rng = random.Random(seed)
         for checkpoint in checkpoints:

@@ -19,7 +19,7 @@ as ``analysis.curves`` bands do) and paired Δ uses WS-J's ``decide`` with the
 directions of WS-J's outcome metrics.
 
 The head-to-head scatter is the SCB dashboard's two signals (docs/reboot/
-h2h-signals.md), re-sourced from ``code-quality@1``: Ruff findings under the
+h2h-signals.md), re-sourced from ``code-quality@3``: Ruff findings under the
 fork's contract rule set (Ruff 0.8.6 SIM allowlist, not the dashboard's
 ~85-selector set), and functions or methods with cc > 10 as measured by the
 fork's production-quality evaluator (not the dashboard's tree-sitter count).
@@ -267,19 +267,19 @@ _SIGNALS: tuple[tuple[str, str, str, str], ...] = (
         "lint_per_kloc",
         "Lint density",
         "findings / KLOC",
-        "code-quality@1 lint_findings / production_loc (Ruff 0.8.6 SIM allowlist)",
+        "code-quality@3 lint_findings / production_loc (Ruff 0.8.6 SIM allowlist)",
     ),
     (
         "high_cc_mass_share",
         "CC-mass concentration",
         "share of cc·√sloc mass",
-        "1 − E: mass share of functions with cc > 10 (code-quality@1)",
+        "1 − E: mass share of functions with cc > 10 (code-quality@3)",
     ),
     (
         "high_cc_function_lines",
         "Function LOC (cc > 10)",
         "lines",
-        "span lines of each cc > 10 function in the E evidence; code-quality@1 does not "
+        "span lines of each cc > 10 function in the E evidence; code-quality@3 does not "
         "persist the full symbol table, so lower-complexity functions are not included",
     ),
 )
@@ -327,13 +327,13 @@ _H2H: tuple[tuple[str, str, str, str], ...] = (
         "lint_findings",
         "Lint errors per checkpoint",
         "Lint findings",
-        "Ruff 0.8.6, SCB contract SIM allowlist (code-quality@1)",
+        "Ruff 0.8.6, SCB contract SIM allowlist (code-quality@3)",
     ),
     (
         "high_cc_count",
         "Complexity per checkpoint",
         "Functions with CC > 10",
-        "fork production-quality evaluator cc > 10 (code-quality@1)",
+        "fork production-quality evaluator cc > 10 (code-quality@3)",
     ),
 )
 

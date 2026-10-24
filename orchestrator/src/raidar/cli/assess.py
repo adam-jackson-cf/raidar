@@ -16,18 +16,15 @@ A relock that changes only assessment settings keeps ``lock_sha256``, so a
 plain rescore stores Assessments under the keys analysis looks up for that
 lock. Only a job with no findable lock falls back to its execution-time
 ``assessment-config.yaml``. The report names the config it used.
-No built-in scorer decides under Jev today (Jev is parked); a scorer that does
-gets a runtime whose audit and cache live in ``--store``, and
-``--jev-replay-only`` answers from that cache alone and never calls the provider.
 
-Pre-fix grades: when a scorer run reads them (``gate-effort@4`` to ``@6``), ``--rescore``
+Pre-fix grades: when a scorer run reads them (``gate-effort``), ``--rescore``
 first grades every guardrail-gate@3 pre-fix snapshot of the target that is not
 yet graded into ``--store`` (``raidar.verifier.prefix_grade``: the step's own
 bundle, sandbox and timeout, on ``--target``'s grader target), never into the job, and
 reports what it graded. ``--replay`` grades nothing. ``--regrade`` with
 ``--store`` also regrades the stored pre-fix grades beside the final snapshots.
 
-Offline coverage: when a scorer run reads it (``code-quality@2``), ``--rescore``
+Offline coverage: when a scorer run reads it (``code-quality@3``), ``--rescore``
 first makes, into ``--store``, the verifier's coverage run of every step whose
 trial deferred it (``protocol.verifier_coverage: offline``;
 ``raidar.verifier.coverage_offline``), never into the job, and reports what it
@@ -112,7 +109,6 @@ class _RescoreRequest:
     config: Path | None
     bundle: Path | None
     replay: bool
-    jev_replay_only: bool = False
     lock: Path | None = None
     target_name: str | None = None
     concurrency: int = 1
@@ -281,7 +277,6 @@ def _rescore(request: _RescoreRequest, out: Path | None) -> None:
             inventory_policy=settings.inventory_policy,
             bundle_override=request.bundle,
             replay=request.replay,
-            jev_replay_only=request.jev_replay_only,
         )
     except (ValueError, ScorerUnavailableError, AssessmentConflictError) as exc:
         # ValueError covers unknown references, invalid run inputs and rejected scorer output.
@@ -346,11 +341,6 @@ def _rescore(request: _RescoreRequest, out: Path | None) -> None:
     help="With --rescore, rerun existing Assessments and require byte-identical output.",
 )
 @click.option(
-    "--jev-replay-only",
-    is_flag=True,
-    help="With --rescore, answer Jev decisions from the store's cache only (never the provider).",
-)
-@click.option(
     "--bundle",
     "bundle_override",
     type=click.Path(exists=True, file_okay=False, path_type=Path),
@@ -393,7 +383,6 @@ def assess(
     config_path: Path | None,
     lock_path: Path | None,
     replay: bool,
-    jev_replay_only: bool,
     bundle_override: Path | None,
     coverage_check: bool,
     concurrency: int,
@@ -422,7 +411,6 @@ def assess(
             config_path,
             bundle_override,
             replay,
-            jev_replay_only,
             lock_path,
             target_name,
             concurrency,

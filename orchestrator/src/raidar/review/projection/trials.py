@@ -20,17 +20,18 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from raidar.analysis.assessed import CODE_QUALITY_REF
 from raidar.core.review_contract import ReviewRunDetail, ReviewRunRecord, ReviewStatus
 from raidar.execution.models import CheckpointState, TrialRecord
 from raidar.review.projection.assessments import TrialAssessments
 from raidar.review.projection.atif import project_trajectory
 from raidar.review.projection.gates import GateContext, failed_gates, project_gates
-from raidar.review.projection.headline import CORRECTNESS_SCORER, QUALITY_SCORERS, Headline
+from raidar.review.projection.headline import CORRECTNESS_SCORER, Headline
 from raidar.review.projection.notes import Finding, finding_counts, to_annotations
 from raidar.review.projection.scoring import ScoringContext, project_scoring
 from raidar.review.projection.spans import SpanBuilder, repo_path, to_ms
 
-_POLICY_SCORERS = frozenset({CORRECTNESS_SCORER, *QUALITY_SCORERS})
+_POLICY_SCORERS = frozenset({CORRECTNESS_SCORER, CODE_QUALITY_REF})
 
 
 @dataclass(frozen=True)

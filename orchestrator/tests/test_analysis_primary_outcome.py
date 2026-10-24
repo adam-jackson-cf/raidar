@@ -17,7 +17,7 @@ from typing import Any
 
 import pytest
 
-from raidar.analysis.assessed import GATE_EFFORT_REFS, gate_effort_ref
+from raidar.analysis.assessed import GATE_EFFORT_REF, gate_effort_ref
 from raidar.analysis.effects import Settings
 from raidar.analysis.markdown import render_markdown
 from raidar.analysis.outcomes import (
@@ -151,25 +151,7 @@ def test_an_errata_primary_without_errata_still_has_a_primary_effect() -> None:
     assert comparison.primary_raw.metric == SOLVE_RATE
 
 
-def test_the_lock_declared_gate_effort_version_is_read_newest_first() -> None:
-    assert GATE_EFFORT_REFS == (
-        "gate-effort@10",
-        "gate-effort@9",
-        "gate-effort@8",
-        "gate-effort@7",
-        "gate-effort@6",
-        "gate-effort@5",
-        "gate-effort@4",
-        "gate-effort@3",
-        "gate-effort@2",
-        "gate-effort@1",
-    )
-    assert gate_effort_ref(["gate-effort@4", "gate-effort@3"]) == "gate-effort@4"
-    assert gate_effort_ref(["correctness@1", "gate-effort@1"]) == "gate-effort@1"
-    assert gate_effort_ref(["gate-effort@2", "gate-effort@1"]) == "gate-effort@2"
-    assert gate_effort_ref(["gate-effort@3", "correctness@1"]) == "gate-effort@3"
-    assert gate_effort_ref(["gate-effort@7", "gate-effort@6"]) == "gate-effort@7"
-    assert gate_effort_ref(["gate-effort@8", "gate-effort@7"]) == "gate-effort@8"
-    assert gate_effort_ref(["gate-effort@9", "gate-effort@8"]) == "gate-effort@9"
-    assert gate_effort_ref(["gate-effort@10", "gate-effort@9"]) == "gate-effort@10"
+def test_the_lock_declared_gate_effort_scorer_is_read() -> None:
+    assert GATE_EFFORT_REF == "gate-effort@10"
+    assert gate_effort_ref(["correctness@1", "gate-effort@10"]) == "gate-effort@10"
     assert gate_effort_ref(["correctness@1"]) is None

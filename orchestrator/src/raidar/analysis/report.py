@@ -18,7 +18,7 @@ the review surface's score, not the primary outcome).
 The verdict thresholds come from the caller (``Settings``); the report says
 where they came from and which of them differ from the documented defaults.
 
-When the lock declares ``gate-effort@1``, every arm carries its gate-effort
+When the lock declares ``gate-effort``, every arm carries its gate-effort
 descriptives and every comparison the gate effects both arms measured
 (``raidar.analysis.gate_effort``). The manipulation check runs the lock's
 pre-registered ``analysis.manipulation_checks`` when it declares them.
@@ -64,8 +64,10 @@ from raidar.analysis.manipulation import (
 )
 from raidar.analysis.outcomes import (
     COST_METRICS,
+    GATE_EFFORT_REF,
+    GATE_METRICS,
     OUTCOME_METRICS,
-    PROCESS_OUTCOME_SCORERS,
+    PROCESS_METRICS,
     RAW_COUNTERPART,
     VERIFIER_DISAGREEMENTS,
     VERIFIER_METRICS,
@@ -73,11 +75,9 @@ from raidar.analysis.outcomes import (
     MetricDef,
     PoolingReport,
     TrialOutcome,
-    gate_metrics_for,
     outcome_metric,
     primary_metric,
     primary_source,
-    process_metrics_for,
 )
 from raidar.analysis.ranking import Ranking, ranking
 from raidar.analysis.stats import POWER_CONSTANT, pairs_for_power
@@ -122,9 +122,9 @@ class AnalysisInputs:
     gate_results: Mapping[str, AssessResult | None] | None = field(default=None)
     """gate-effort results per trial when the lock declares it (else None)."""
     gate_scorer: str | None = None
-    """The gate-effort version the lock declares (``gate-effort@1`` to ``@4``)."""
+    """The gate-effort ref the lock declares."""
     process_scorer: str | None = None
-    """The process-compliance version the lock declares; ``@3`` adds the process outcomes."""
+    """The process-compliance ref the lock declares; it adds the process outcomes."""
     manipulation_checks: tuple[CheckRequest, ...] | None = None
     """The lock's pre-registered manipulation checks (None: the process defaults)."""
     dev_job: DevRun | None = None
@@ -142,13 +142,13 @@ class AnalysisInputs:
 
     @property
     def gate_metrics(self) -> tuple[MetricDef, ...]:
-        """The gate outcomes the lock's gate-effort version reports."""
-        return gate_metrics_for(self.gate_scorer or "gate-effort@1")
+        """The gate outcomes ``gate-effort`` reports."""
+        return GATE_METRICS
 
     @property
     def process_outcomes(self) -> bool:
         """Whether the lock declares a scorer of the ``process.*`` outcomes."""
-        return self.process_scorer in PROCESS_OUTCOME_SCORERS
+        return self.process_scorer is not None
 
     @property
     def process_label(self) -> str | None:
@@ -157,15 +157,15 @@ class AnalysisInputs:
 
     @property
     def process_metrics(self) -> tuple[MetricDef, ...]:
-        """The process outcomes the lock's process-compliance version reports."""
-        return process_metrics_for(self.process_scorer)
+        """The process outcomes ``process-compliance`` reports (none when undeclared)."""
+        return PROCESS_METRICS if self.process_scorer is not None else ()
 
     @property
     def gate_label(self) -> str | None:
         """The gate-effort version the report names (None: the lock declares none)."""
         if self.gate_results is None:
             return None
-        return self.gate_scorer or "gate-effort@1"
+        return self.gate_scorer or GATE_EFFORT_REF
 
 
 class ArmSummary(AnalysisModel):
@@ -180,7 +180,7 @@ class ArmSummary(AnalysisModel):
     gate_effort: dict[str, GateDescriptive] | None = None
     """Per gate metric over the arm's valid trials; None when the lock declares no gate-effort."""
     process_outcomes: dict[str, GateDescriptive] | None = None
-    """Per process metric (stall rate); None when the lock declares no process-compliance@3."""
+    """Per process metric (stall rate); None when the lock declares no process-compliance."""
     verifier_diagnostics: dict[str, GateDescriptive] | None = None
     """Verifier diagnostics (grading-vs-coverage disagreements); None when none was measured."""
 

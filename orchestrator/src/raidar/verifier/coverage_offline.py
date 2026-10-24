@@ -10,7 +10,7 @@ whose lock sets ``protocol.verifier_coverage: offline`` grades without it
 (``record.json`` ``coverage.enabled`` false), and this module runs it later:
 
 - ``produce_coverage_path`` (run by ``raidar assess --rescore`` when a locked
-  scorer reads it, ``code-quality@2``): for every graded step of the target
+  scorer reads it, ``code-quality@3``): for every graded step of the target
   whose record says the coverage pass was not run, the stored snapshot is
   checked against its recorded digest (and the bundle against its digest) and
   the coverage run is made with the step's own bundle, sandbox and grader

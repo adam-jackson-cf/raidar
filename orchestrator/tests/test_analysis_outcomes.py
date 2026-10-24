@@ -7,8 +7,6 @@ read as zero.
 
 from __future__ import annotations
 
-from typing import Any
-
 import pytest
 
 from raidar.analysis.assessed import (
@@ -282,32 +280,6 @@ def test_a_reached_checkpoint_with_no_graded_case_makes_c_ineligible_not_zero() 
     assert outcome.metrics["correctness"].status == "ineligible"
     assert "no graded oracle cases" in (outcome.metrics["correctness"].reason or "")
     assert outcome.metrics["headline_score"].status == "ineligible"
-
-
-def test_the_quality_slot_reads_code_quality_v2_when_the_trial_was_assessed_with_it() -> None:
-    v1 = build_outcome(
-        _record(),
-        {CORRECTNESS_REF: _halted_correctness(), CODE_QUALITY_REF: _quality()},
-        policy=SCB_CANONICAL,
-    )
-    v2 = build_outcome(
-        _record(),
-        {CORRECTNESS_REF: _halted_correctness(), "code-quality@2": _quality()},
-        policy=SCB_CANONICAL,
-    )
-    missing = build_outcome(
-        _record(), {CORRECTNESS_REF: _halted_correctness()}, policy=SCB_CANONICAL
-    )
-
-    assert v2.metrics == v1.metrics
-
-    def values(outcome: Any) -> dict[str, list[tuple[str, float | None]]]:
-        return {k: [(v.status, v.value) for v in vs] for k, vs in outcome.series.items()}
-
-    assert values(v2) == values(v1)
-    assert "code-quality@2 reported no erosion" in (v2.series["erosion"][0].reason or "")
-    assert v2.metrics["verbosity"] == Value.ok(0.8)
-    assert missing.metrics["verbosity"].status != "ok"
 
 
 def test_c_uses_exact_case_counts_when_the_scorer_records_them() -> None:

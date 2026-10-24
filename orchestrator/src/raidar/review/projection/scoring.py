@@ -2,7 +2,7 @@
 
 The scorecard is the headline metric's view: ``S = 100·C·(base + inertia·I)``.
 ``scorer:correctness@1`` carries C (the base share) with one metric per
-checkpoint, and ``scorer:code-quality@1`` carries I (the inertia share) with one
+checkpoint, and ``scorer:code-quality@3`` carries I (the inertia share) with one
 metric per inertia component at its policy weight; both shares are read from the
 policy (``policy_shares``). A scorer area is shown only when its
 value is measured; unmeasured components stay visible as ``metric:*`` spans with
@@ -16,6 +16,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from decimal import Decimal
 
+from raidar.analysis.assessed import CODE_QUALITY_REF
 from raidar.execution.models import CheckpointState, StepResult, TrialRecord
 from raidar.review.projection.assessments import TrialAssessments
 from raidar.review.projection.headline import (
@@ -23,7 +24,6 @@ from raidar.review.projection.headline import (
     CORRECTNESS_SCORER,
     Headline,
     policy_shares,
-    quality_scorer,
 )
 from raidar.review.projection.notes import EvidenceRef, Finding
 from raidar.review.projection.spans import SpanBuilder
@@ -132,7 +132,7 @@ def _component_payload(component: str, observation: Observation | None, weight: 
 def _quality(ctx: ScoringContext, scoring: str) -> None:
     policy = DEFAULT_METRIC_REGISTRY.get(ctx.headline.policy)
     weights = policy.inertia_weights
-    quality = quality_scorer(ctx.assessments)
+    quality = CODE_QUALITY_REF
     area = None
     if ctx.headline.quality is not None:
         _, inertia = policy_shares(policy)
@@ -192,7 +192,7 @@ def _scoring_summary(ctx: ScoringContext) -> dict[str, object]:
 
 
 def _evidence_findings(ctx: ScoringContext) -> list[Finding]:
-    quality = quality_scorer(ctx.assessments)
+    quality = CODE_QUALITY_REF
     assessment = ctx.assessments.get(quality)
     if assessment is None:
         return []

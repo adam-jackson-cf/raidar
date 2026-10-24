@@ -3,7 +3,7 @@ import { test, expect, type Page } from '@playwright/test';
 // Deterministic ids from the synthetic Quality fixture (make review-surface-quality-data).
 const INELIGIBLE_RUN = 'synthetic-quality.synthetic-run-1.b02-p0-baseline';
 const LABELLED_RUN = 'synthetic-quality.synthetic-run-1.b00-p0-baseline';
-// The fixture's guided arm runs behind a commit gate (gate-effort@1); baseline does not.
+// The fixture's guided arm runs behind a commit gate (gate-effort@10); baseline does not.
 const GATED_RUN = 'synthetic-quality.synthetic-run-1.b00-p0-guided';
 
 // The suite's Quality data also covers the experiment fixture's runs (run detail's Quality
@@ -192,20 +192,20 @@ test.describe('quality run detail: commit gate', () => {
   });
 
   test('a shadow gate is labelled as never enforced and shows what it would have decided', async ({ page }) => {
-    // gate-effort@2 shadow records (guardrail-gate@2 mode shadow): the run detail is the
+    // gate-effort shadow records (guardrail-gate mode shadow): the run detail is the
     // fixture's gated run with its view marked shadow, as the projection writes it.
     await page.route(`**/api/quality/runs/${GATED_RUN}`, async (route) => {
       const response = await route.fetch();
       const detail = await response.json();
       detail.gate.shadow = true;
-      detail.gate.scorer = 'gate-effort@2';
+      detail.gate.scorer = 'gate-effort@10';
       for (const step of detail.gate.steps) step.termination = 'shadow_recorded';
       await route.fulfill({ response, json: detail });
     });
     await page.goto(`/quality/runs/${GATED_RUN}`);
     const panel = page.getByTestId('gate-panel');
     await expect(panel.getByTestId('gate-shadow')).toHaveText('shadow gate · never enforced');
-    await expect(panel).toContainText('gate-effort@2');
+    await expect(panel).toContainText('gate-effort@10');
     await expect(panel.getByTestId('gate-ending').first()).toHaveText(/^shadow: would (pass|refuse)$/);
   });
 

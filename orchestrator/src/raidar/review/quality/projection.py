@@ -11,16 +11,16 @@ from collections.abc import Sequence
 from pathlib import Path
 
 from raidar.review.quality.experiment_view import ReviewedTrial, build_experiments
-from raidar.review.quality.gate_view import GATE_EFFORT_REFS
+from raidar.review.quality.gate_view import GATE_EFFORT_REF
 from raidar.review.quality.models import QualityProjection
 from raidar.review.quality.run_view import build_run_detail
 from raidar.review.quality.sources import (
+    CODE_QUALITY_REF,
     CORRECTNESS_REF,
     JevAudit,
     StoreIndex,
     discover_trials,
 )
-from raidar.scorers.code_quality_refs import CODE_QUALITY_REFS
 from raidar.spec.canonical import pretty_canonical_json_bytes
 
 
@@ -43,14 +43,12 @@ def _reviewed(jobs_root: Path, store_root: Path, locks: Sequence[Path]) -> list[
         jev = attached[trial.review_id]
         detail = build_run_detail(
             trial,
-            next((found for ref in CODE_QUALITY_REFS if (found := store.find(ref, trial))), None),
+            store.find(CODE_QUALITY_REF, trial),
             store.find(CORRECTNESS_REF, trial),
             decisions=jev.decisions,
             labels=audit.labels,
             jev_note=jev.note,
-            gate=next(
-                (found for ref in GATE_EFFORT_REFS if (found := store.find(ref, trial))), None
-            ),
+            gate=store.find(GATE_EFFORT_REF, trial),
         )
         reviewed.append(ReviewedTrial(source=trial, detail=detail))
     return reviewed

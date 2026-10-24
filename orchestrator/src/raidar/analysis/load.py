@@ -14,8 +14,7 @@ from typing import Any
 
 from raidar.analysis.assessed import (
     ANALYSED_SCORERS,
-    PROCESS_COMPLIANCE_REFS,
-    QUALITY_SCORERS,
+    PROCESS_COMPLIANCE_REF,
     build_outcome,
     gate_effort_ref,
 )
@@ -70,15 +69,14 @@ class LoadRequest:
 
 
 def _process_ref(declared: tuple[str, ...]) -> str | None:
-    """The process-compliance version the lock declares (``@2`` first), if any."""
-    return next((ref for ref in PROCESS_COMPLIANCE_REFS if ref in declared), None)
+    """``process-compliance`` when the lock declares it, else None."""
+    return PROCESS_COMPLIANCE_REF if PROCESS_COMPLIANCE_REF in declared else None
 
 
 def _scorer_refs(declared: tuple[str, ...], process_ref: str | None) -> tuple[str, ...]:
     gate_ref = gate_effort_ref(declared)
     wanted = (
         *ANALYSED_SCORERS,
-        *QUALITY_SCORERS,
         *((process_ref,) if process_ref else ()),
         *((gate_ref,) if gate_ref else ()),
     )

@@ -136,7 +136,7 @@ class ProtocolSpec(SpecModel):
     # Where the verifier's per-test coverage pass (G's evidence) runs: ``trial`` after each
     # step's grading run, on the trial's critical path; ``offline`` from the stored step
     # snapshots when an assessment needs it (raidar.verifier.coverage_offline, read by
-    # code-quality@2). Left at ``trial`` it is omitted from every dump, so the locks, plans
+    # code-quality@3). Left at ``trial`` it is omitted from every dump, so the locks, plans
     # and hashes of experiments that do not set it keep their bytes.
     verifier_coverage: Literal["trial", "offline"] = "trial"
 
@@ -211,7 +211,7 @@ class ManipulationCheckSpec(SpecModel):
     """One pre-registered manipulation check (``raidar.analysis.manipulation``).
 
     ``check`` names an available check (for example ``gate_clean_at_step_end``
-    from ``gate-effort@1``); ``min_share`` is the share of the treatment arm's
+    from ``gate-effort``); ``min_share`` is the share of the treatment arm's
     decided checkpoints that must pass. ``raidar.spec.validation`` checks the
     name and that a scorer reporting it is declared.
     """

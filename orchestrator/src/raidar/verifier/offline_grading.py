@@ -36,19 +36,9 @@ from raidar.verifier.prefix_grade import grade_pre_fix_path, regrade_pre_fix_pat
 from raidar.verifier.regrade import RegradeError, RegradeOptions, regrade_path
 
 # Scorers that read the offline grades of guardrail-gate@3's pre-fix snapshots.
-PRE_FIX_GRADE_SCORERS = frozenset(
-    {
-        "gate-effort@4",
-        "gate-effort@5",
-        "gate-effort@6",
-        "gate-effort@7",
-        "gate-effort@8",
-        "gate-effort@9",
-        "gate-effort@10",
-    }
-)
+PRE_FIX_GRADE_SCORERS = frozenset({"gate-effort@10"})
 # Scorers that read the offline coverage runs of steps whose trial deferred the coverage pass.
-OFFLINE_COVERAGE_SCORERS = frozenset({"code-quality@2", "code-quality@3"})
+OFFLINE_COVERAGE_SCORERS = frozenset({"code-quality@3"})
 
 
 class OfflineGradingError(RuntimeError):

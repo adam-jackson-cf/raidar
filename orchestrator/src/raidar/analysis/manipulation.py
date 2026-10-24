@@ -1,7 +1,7 @@
 """Manipulation check: did the guided arm's process actually differ from baseline? (G5)
 
 A process-guidance condition only means something if agents under it behave
-differently. This check takes ``process-compliance`` results per arm (``@2`` to ``@6``)
+differently. This check takes ``process-compliance`` results per arm
 and reports, per check, whether
 the guided arm complied more than the baseline. The checks are deterministic
 trace checks: only ``ok`` observations count, so an undetermined check never
@@ -30,7 +30,7 @@ The overall verdict is ``separated`` only when every requested check is.
 
 Available checks and the scorer each reads (``CHECK_SCORERS``):
 ``tests_run_before_finish`` and ``plan_written`` (``process-compliance``), and
-``gate_clean_at_step_end`` (``gate-effort@1`` or ``@2``: the step's last
+``gate_clean_at_step_end`` (``gate-effort``: the step's last
 commit-gate run passed; a shadow gate never decides it, so a baseline arm with a
 shadow gate has no decided checkpoint for it). The checks are the experiment's pre-registered
 ``analysis.manipulation_checks`` when its lock declares them; otherwise the
@@ -59,6 +59,7 @@ from typing import Literal
 
 from pydantic import Field
 
+from raidar.analysis.outcomes import GATE_EFFORT_REF, PROCESS_COMPLIANCE_REF
 from raidar.scorers.process_checks.checks import PLAN_WRITTEN, TESTS_RUN_BEFORE_FINISH
 from raidar.scorers.sdk.manifest import SdkModel
 from raidar.scorers.sdk.result import AssessResult, AssessStatus
@@ -68,25 +69,8 @@ DEFAULT_CHECKS = (TESTS_RUN_BEFORE_FINISH, PLAN_WRITTEN)
 EXACT_LIMIT = 50_000
 SAMPLES = 20_000
 SEED = 0
-PROCESS_COMPLIANCE_REFS = (
-    "process-compliance@6",
-    "process-compliance@5",
-    "process-compliance@4",
-    "process-compliance@3",
-    "process-compliance@2",
-)
-GATE_EFFORT_REFS = (
-    "gate-effort@10",
-    "gate-effort@9",
-    "gate-effort@8",
-    "gate-effort@7",
-    "gate-effort@6",
-    "gate-effort@5",
-    "gate-effort@4",
-    "gate-effort@3",
-    "gate-effort@2",
-    "gate-effort@1",
-)
+PROCESS_COMPLIANCE_REFS = (PROCESS_COMPLIANCE_REF,)
+GATE_EFFORT_REFS = (GATE_EFFORT_REF,)
 GATE_CLEAN = "gate_clean_at_step_end"
 PROCESS_SOURCE = "process-compliance"
 GATE_SOURCE = "gate-effort"

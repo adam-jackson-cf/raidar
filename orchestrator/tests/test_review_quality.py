@@ -299,10 +299,10 @@ def test_assessments_are_matched_by_snapshot_content_not_trial_name(
 
     result = build_quality_projection(target / "jobs", target / "store")
     unmatched = result.run_details[f"{EXPERIMENT}.synthetic-run-2.b00-p0-baseline"]
-    assert unmatched.run.sources == {"code-quality@1": None, "correctness@1": None}
+    assert unmatched.run.sources == {"code-quality@3": None, "correctness@1": None}
     assert unmatched.rows[0].cells["V"].status == "unavailable"
     matched = result.run_details[f"{RUN_PREFIX}b00-p0-baseline"]
-    assert matched.run.sources["code-quality@1"] is not None
+    assert matched.run.sources["code-quality@3"] is not None
     problem = _problem(result)
     assert any("superseded" in item for item in problem.excluded)
 
@@ -595,7 +595,7 @@ def test_a_baseline_with_no_counted_trials_is_named_in_the_notes(
     assert any("baseline arm baseline has no counted trials" in note for note in problem.notes)
 
 
-# ---- gate effort (gate-effort@1 + the guardrail-gate records) ---------------------------
+# ---- gate effort (gate-effort + the guardrail-gate records) ---------------------------
 
 
 def test_a_gated_run_shows_its_gate_rounds_and_failure_families(
@@ -630,7 +630,7 @@ def test_gate_records_without_an_assessment_or_with_a_broken_record_say_so(
 ) -> None:
     target = _copy(fixture_dir, tmp_path)
     for path in sorted((target / "store" / OBJECTS_DIR).glob("*/*.json")):
-        if json.loads(path.read_text())["scorer"]["ref"] == "gate-effort@1":
+        if json.loads(path.read_text())["scorer"]["ref"] == "gate-effort@10":
             path.unlink()
     trace = target / "jobs" / EXPERIMENT / RUN_ID / "trials" / "b01-p0-guided" / "steps"
     (trace / "checkpoint_2" / "agent" / "guardrail-gate" / "guardrail-gate.json").write_text("[")
@@ -643,7 +643,7 @@ def test_gate_records_without_an_assessment_or_with_a_broken_record_say_so(
     assert gate.steps[0].cells["gate_runs"].status == "unassessed"
     assert gate.steps[1].rounds == ()
     assert any("checkpoint_2: gate record unreadable" in note for note in gate.notes)
-    assert any("rescore its job with gate-effort@1" in note for note in gate.notes)
+    assert any("rescore its job with gate-effort@10" in note for note in gate.notes)
     assert gate.steps[3].rounds[0].verdict == "refused"
 
 
@@ -672,9 +672,7 @@ def test_experiments_label_the_primary_outcome_as_the_analysis_report_does(
     assert _primary([member(None)])[0] == "solve_rate"  # type: ignore[list-item]
 
 
-def test_a_shadow_gate_is_labelled_and_a_v1_assessment_of_it_is_flagged(
-    fixture_dir: Path, tmp_path: Path
-) -> None:
+def test_a_shadow_gate_is_labelled(fixture_dir: Path, tmp_path: Path) -> None:
     target = _copy(fixture_dir, tmp_path)
     steps = target / "jobs" / EXPERIMENT / RUN_ID / "trials" / "b01-p0-guided" / "steps"
     for record_path in steps.glob("*/agent/guardrail-gate/guardrail-gate.json"):
@@ -686,8 +684,8 @@ def test_a_shadow_gate_is_labelled_and_a_v1_assessment_of_it_is_flagged(
 
     gate = rebuilt.run_details[f"{RUN_PREFIX}b01-p0-guided"].gate
     assert gate is not None
-    assert (gate.shadow, gate.scorer) == (True, "gate-effort@1")
-    assert any("rescore with gate-effort@2 or later" in note for note in gate.notes)
+    assert (gate.shadow, gate.scorer) == (True, "gate-effort@10")
+    assert not gate.notes
     enforced = rebuilt.run_details[f"{RUN_PREFIX}b00-p0-guided"].gate
     assert enforced is not None
-    assert (enforced.shadow, enforced.scorer) == (False, "gate-effort@1")
+    assert (enforced.shadow, enforced.scorer) == (False, "gate-effort@10")

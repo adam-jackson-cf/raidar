@@ -1,7 +1,7 @@
 """Where offline coverage runs live in the Assessment store, and how they are read.
 
 The contract shared by the offline producer (``raidar.verifier.coverage_offline``)
-and the scorer that reads it (``code-quality@2``): one JSON file per graded step
+and the scorer that reads it (``code-quality@3``): one JSON file per graded step
 snapshot whose trial ran with the coverage pass deferred
 (``protocol.verifier_coverage: offline``), content-addressed by (bundle digest,
 step, snapshot digest), ``<store>/offline-coverage/<bundle>/<step>/<snapshot>.json``.

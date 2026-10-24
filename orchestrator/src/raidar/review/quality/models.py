@@ -143,7 +143,7 @@ class GateRound(QualityModel):
 
 
 class GateStep(QualityModel):
-    """One checkpoint's gate effort: ``gate-effort@1`` cells and the gate's rounds."""
+    """One checkpoint's gate effort: ``gate-effort`` cells and the gate's rounds."""
 
     checkpoint: str
     termination: str | None = None
@@ -154,7 +154,7 @@ class GateStep(QualityModel):
 
 
 class GateView(QualityModel):
-    """A gated trial's commit-gate effort (gate-effort@1 or @2); absent for an ungated trial."""
+    """A gated trial's commit-gate effort (gate-effort); absent for an ungated trial."""
 
     source: str | None
     scorer: str | None = None

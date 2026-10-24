@@ -131,7 +131,7 @@ export interface GateStep {
   rounds: GateRound[];
 }
 
-/** A gated trial's commit-gate effort (gate-effort@1/@2); absent (null) for an ungated trial. */
+/** A gated trial's commit-gate effort (gate-effort); absent (null) for an ungated trial. */
 export interface GateView {
   source: string | null;
   /** The gate-effort version the cells come from (null: unassessed). */

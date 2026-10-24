@@ -1,10 +1,9 @@
-"""Iteration 4 consumers: gate-effort@9 in the analysis, review, manipulation check and grading.
+"""Iteration 4 consumers: gate-effort in the analysis, review, manipulation check and grading.
 
-- the analysis compares gate-effort@9's new outcomes only for @9 (each with its better
-  direction), and @8 reads none of them;
+- the analysis compares gate-effort's autofix outcomes (each with its better direction);
 - the markdown shows the autofix-by-family and fix-cost-by-refusal tables only when an arm
   reports them;
-- the manipulation check, the review gate view and the pre-fix grading read @9 (before @8);
+- the manipulation check, the review gate view and the pre-fix grading read gate-effort;
 - forge's ordering case is a known, spec-determined timing sensitivity (not an erratum),
   shown beside the grading-vs-coverage disagreement count.
 """
@@ -16,7 +15,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from raidar.analysis.assessed import disagreements
+from raidar.analysis.assessed import GATE_EFFORT_REF, disagreements
 from raidar.analysis.gate_effort import GateDescriptive
 from raidar.analysis.manipulation import GATE_EFFORT_REFS as MANIPULATION_REFS
 from raidar.analysis.markdown import (
@@ -25,7 +24,7 @@ from raidar.analysis.markdown import (
     _refusal_table,
     _verifier_arms,
 )
-from raidar.analysis.outcomes import GATE_PREFIX, VERIFIER_DISAGREEMENTS, gate_metrics_for
+from raidar.analysis.outcomes import GATE_METRICS, GATE_PREFIX, VERIFIER_DISAGREEMENTS
 from raidar.analysis.report import ArmSummary
 from raidar.problems.sensitivities import (
     SensitivityError,
@@ -33,15 +32,15 @@ from raidar.problems.sensitivities import (
     known_sensitivities,
     load_sensitivities,
 )
-from raidar.review.quality.gate_view import GATE_EFFORT_REFS as REVIEW_REFS
+from raidar.review.quality.gate_view import GATE_EFFORT_REF as REVIEW_REF
+from raidar.scorers.gate_effort.autofix_metrics import REFUSAL_KINDS
 from raidar.scorers.gate_effort.families import FAMILIES
-from raidar.scorers.gate_effort_v9.manifest import REFUSAL_KINDS
 from raidar.scorers.sdk.result import AssessResult, AssessStatus, Observation
 from raidar.verifier.offline_grading import PRE_FIX_GRADE_SCORERS
 
 REPO = Path(__file__).resolve().parents[2]
 
-HEADLINE_V9 = {
+HEADLINE_AUTOFIX = {
     "total_autofix_rounds",
     "total_autofix_errors",
     "total_autofix_files_changed",
@@ -57,24 +56,21 @@ HEADLINE_V9 = {
 }
 
 
-def test_gate_effort_v9_outcomes_are_compared_only_for_v9() -> None:
-    v9 = {metric.id.removeprefix(GATE_PREFIX) for metric in gate_metrics_for("gate-effort@9")}
-    v8 = {metric.id.removeprefix(GATE_PREFIX) for metric in gate_metrics_for("gate-effort@8")}
+def test_gate_effort_autofix_outcomes_are_compared_each_with_a_better_direction() -> None:
+    compared = {metric.id.removeprefix(GATE_PREFIX) for metric in GATE_METRICS}
 
-    added = v9 - v8
-    assert added >= HEADLINE_V9
-    assert {f"total_autofix_removed_blocking.{family}" for family in FAMILIES} <= added
-    assert {f"total_fix_cost_usd_by_refusal.{kind}" for kind in REFUSAL_KINDS} <= added
-    assert not added & v8
+    assert compared >= HEADLINE_AUTOFIX
+    assert {f"total_autofix_removed_blocking.{family}" for family in FAMILIES} <= compared
+    assert {f"total_fix_cost_usd_by_refusal.{kind}" for kind in REFUSAL_KINDS} <= compared
     assert _better("gate.first_pass_clean_post_autofix_rate") == "↑ higher"
     assert _better("gate.total_new_first_run_blocking_post_autofix_net") == "↓ lower"
     assert _better("gate.total_fix_cost_usd_by_refusal.coverage_minimum") == "↓ lower"
 
 
-def test_every_consumer_reads_v9_before_v8() -> None:
-    for refs in (MANIPULATION_REFS, REVIEW_REFS):
-        assert refs.index("gate-effort@9") < refs.index("gate-effort@8")
-    assert "gate-effort@9" in PRE_FIX_GRADE_SCORERS
+def test_every_consumer_reads_gate_effort() -> None:
+    assert MANIPULATION_REFS == (GATE_EFFORT_REF,)
+    assert REVIEW_REF == GATE_EFFORT_REF
+    assert GATE_EFFORT_REF in PRE_FIX_GRADE_SCORERS
 
 
 def _arm(name: str, values: dict[str, float]) -> ArmSummary:
@@ -94,11 +90,11 @@ def _arm(name: str, values: dict[str, float]) -> ArmSummary:
     )
 
 
-def test_the_autofix_and_refusal_tables_show_only_for_v9() -> None:
-    v8 = _arm("r2", {"gate.total_fix_cost_usd": 0.1})
-    assert _autofix_family_table([v8], ["r2"]) == []
-    assert _refusal_table([v8], ["r2"]) == []
-    v9 = _arm(
+def test_the_autofix_and_refusal_tables_show_only_when_an_arm_reports_them() -> None:
+    plain = _arm("r2", {"gate.total_fix_cost_usd": 0.1})
+    assert _autofix_family_table([plain], ["r2"]) == []
+    assert _refusal_table([plain], ["r2"]) == []
+    reporting = _arm(
         "r2",
         {
             "gate.total_autofix_removed_blocking": 3.0,
@@ -109,8 +105,8 @@ def test_the_autofix_and_refusal_tables_show_only_for_v9() -> None:
             "gate.total_fix_wall_s_by_refusal.coverage_minimum": 60.0,
         },
     )
-    families = "\n".join(_autofix_family_table([v9], ["r2"]))
-    refusals = "\n".join(_refusal_table([v9], ["r2"]))
+    families = "\n".join(_autofix_family_table([reporting], ["r2"]))
+    refusals = "\n".join(_refusal_table([reporting], ["r2"]))
     assert "| style | 3 |" in families.replace("3.000", "3").replace("3.0", "3")
     assert "coverage_minimum" in refusals
     assert "mixed" in refusals
@@ -132,7 +128,7 @@ def test_the_forge_ordering_case_is_a_spec_determined_timing_sensitivity_not_an_
         True,
     )
     assert "instruction.md:64" in note.spec
-    errata = (REPO / "problems/registry/scb/forge/38d627ecf668.errata.yaml").read_text()
+    errata = (REPO / "lab/problems/registry/scb/forge/38d627ecf668.errata.yaml").read_text()
     assert "test_blueprint_list_orders_by_created_at_name_uuid" not in errata
 
 
@@ -142,7 +138,7 @@ def test_an_invalid_or_mismatched_sensitivities_file_raises(tmp_path: Path) -> N
     path.write_text("schema: raidar.problem-sensitivities/1\nproblem: other@1\nsensitivities: []\n")
     with pytest.raises(SensitivityError):
         load_sensitivities(path, problem=FORGE)
-    good = (REPO / "problems/registry/scb/forge/38d627ecf668.sensitivities.yaml").read_text()
+    good = (REPO / "lab/problems/registry/scb/forge/38d627ecf668.sensitivities.yaml").read_text()
     path.write_text(good)
     with pytest.raises(SensitivityError, match="names problem"):
         load_sensitivities(path, problem="scb/other@1")
@@ -166,7 +162,7 @@ def _cq3(*counts: float | None) -> AssessResult:
     )
 
 
-def test_disagreements_sum_code_quality_v3s_excluded_cases() -> None:
+def test_disagreements_sum_code_qualitys_excluded_cases() -> None:
     assert disagreements(_cq3(0, 1, None, 1)).value == 2
     assert disagreements(_cq3(None)).status == "not_applicable"
     assert not disagreements(None).measured
