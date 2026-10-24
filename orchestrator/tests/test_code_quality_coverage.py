@@ -23,7 +23,7 @@ from typing import Any
 
 import pytest
 
-from raidar.grading.coverage_store import COVERAGE_KIND, coverage_path
+from raidar.grading.coverage.store import COVERAGE_KIND, coverage_path
 from raidar.grading.models import ParityVerdict
 from raidar.grading.records import (
     FORK_EVIDENCE_FILE,

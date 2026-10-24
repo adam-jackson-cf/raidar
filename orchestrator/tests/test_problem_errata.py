@@ -36,7 +36,7 @@ from raidar.scoring.framework.result import (
 )
 from raidar.scoring.framework.trial_inputs import load_trial_context
 from raidar.scoring.framework.validation import validate_result
-from raidar.subject.environment.python.models import load_pack_spec
+from raidar.subject.environment.python.pack_definition import load_pack_spec
 from tests.execution_support import ImportedFixture, locked_experiment, validated_fixture
 from tests.scorer_support import APP_V1, StepFixture, write_trial
 from tests.test_analysis_outcomes import _record

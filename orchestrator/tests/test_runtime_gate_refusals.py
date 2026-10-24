@@ -385,11 +385,26 @@ def test_as1_rescore_scorers_must_cover_the_jobs_runtime(tmp_path: Path) -> None
     job = _job(tmp_path, "node-ts", bundle.digest())
     store = tmp_path / "store"
 
+    lock = str(job / "job.lock.json")
     refused = _assess(
-        "--rescore", str(job / "trials"), "--store", str(store), "--scorer", "code-quality@3"
+        "--rescore",
+        str(job / "trials"),
+        "--lock",
+        lock,
+        "--store",
+        str(store),
+        "--scorer",
+        "code-quality@3",
     )
     allowed = _assess(
-        "--rescore", str(job / "trials"), "--store", str(store), "--scorer", "correctness@1"
+        "--rescore",
+        str(job / "trials"),
+        "--lock",
+        lock,
+        "--store",
+        str(store),
+        "--scorer",
+        "correctness@1",
     )
 
     assert refused.exit_code != 0
@@ -425,11 +440,12 @@ def test_as1_a_bundle_override_must_be_the_verifier_bundle_the_lock_binds(
     (other.root / "tests" / "extra.py").write_text("x = 1\n")
     job = _job(tmp_path, "python", bound.digest())
     target = job / "trials" if mode == "--rescore" else job
+    lock = ["--lock", str(job / "job.lock.json")]
     store = (
         ["--store", str(tmp_path / "s"), "--scorer", "correctness@1"] if mode == "--rescore" else []
     )
 
-    refused = _assess(mode, str(target), *store, "--bundle", str(other.root))
+    refused = _assess(mode, str(target), *lock, *store, "--bundle", str(other.root))
 
     assert refused.exit_code != 0
     assert "[AS1] --bundle" in refused.output

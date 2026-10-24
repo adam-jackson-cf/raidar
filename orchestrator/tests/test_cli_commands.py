@@ -16,7 +16,7 @@ from click.testing import CliRunner
 from raidar.cli import env_harbor, main
 from raidar.contract.paths import ORCHESTRATOR_ROOT, REPO_ROOT
 from raidar.subject.agent.config import agent_name_for
-from raidar.subject.environment.python.models import load_pack_spec
+from raidar.subject.environment.python.pack_definition import load_pack_spec
 
 quality_gates = main.commands["quality"].commands["gates"]
 

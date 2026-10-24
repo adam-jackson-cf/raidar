@@ -35,7 +35,7 @@ from raidar.scoring.framework.result import AssessResult, AssessStatus, Observat
 from raidar.scoring.framework.store import AssessmentStore
 from raidar.scoring.framework.trial_inputs import load_trial_context
 from raidar.scoring.framework.validation import validate_result
-from raidar.subject.environment.python.models import load_tool_lock
+from raidar.subject.environment.python.pack_definition import load_tool_lock
 from raidar.subject.environment.python.provisioner import ToolProvisioningError
 from tests.code_quality_support import case_trial, golden_case, quality_tools
 from tests.scorer_support import StepFixture, tree_state, write_files, write_trial

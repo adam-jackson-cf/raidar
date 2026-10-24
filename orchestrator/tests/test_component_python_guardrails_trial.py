@@ -36,7 +36,7 @@ from harbor.models.agent.context import AgentContext
 from harbor.models.trial.config import AgentConfig
 
 from raidar.subject.environment.python.image import image_tag
-from raidar.subject.environment.python.models import load_pack_spec
+from raidar.subject.environment.python.pack_definition import load_pack_spec
 from raidar.subject.treatment.catalog.guardrails import (
     PAYLOAD_DIR,
     PAYLOAD_FILES,

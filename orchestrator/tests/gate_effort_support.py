@@ -13,7 +13,7 @@ from pathlib import Path
 from typing import Any
 
 from raidar.grading.models import CaseGroup, CaseResult, CaseStatus, VerifierGrade
-from raidar.grading.prefix_store import GRADE_KIND, grade_path
+from raidar.grading.prefix.store import GRADE_KIND, grade_path
 from raidar.grading.records import (
     BundleRef,
     CoverageRef,
