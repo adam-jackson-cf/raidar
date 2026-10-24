@@ -1,6 +1,6 @@
 """Inputs of the Quality projection: job directories, the Assessment store, the Jev audit.
 
-- **Trials** come from WS-D job directories
+- **Trials** come from job directories
   (``<jobs_root>/<experiment>/<job>/trial-records/<trial>.json``).
 - **Assessments** come from one Assessment store. A trial's Assessment of a
   scorer is found by content, not by the store log's trial name (trial ids
@@ -16,7 +16,7 @@
   across runs, so an ambiguous bare id attaches nowhere and every trial that
   shares it says so: a reviewer never labels a decision against another run.
 - The **lock** the run was executed under supplies the baseline arm and the
-  headline metric, as WS-J's analysis reads them. Candidates, in order: locks
+  headline metric, as the analysis reads them. Candidates, in order: locks
   given with ``--lock``, the lock next to the ``job.json`` ``experiment_file``
   (``default_lock_path``), and the locks in the job directory (``job.lock.json``,
   written by ``raidar run``). A candidate is accepted only when it is a sealed

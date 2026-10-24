@@ -16,7 +16,7 @@ import re
 from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass, field
 from enum import StrEnum
-from importlib.metadata import entry_points
+from importlib.metadata import EntryPoint, entry_points
 from pathlib import Path
 from typing import Protocol, runtime_checkable
 
@@ -116,16 +116,16 @@ def _entry_point_factories(group: str) -> dict[RefKind, list[ResolverFactory]]:
                 f"its name must be a reference kind ({', '.join(k.value for k in RefKind)})"
             ) from exc
 
-        def load(entry_point: object = entry) -> RegistryResolver:
-            factory = entry_point.load()  # type: ignore[attr-defined]
-            return factory()  # type: ignore[no-any-return]
+        def load(entry_point: EntryPoint = entry) -> RegistryResolver:
+            resolver: RegistryResolver = entry_point.load()()
+            return resolver
 
         factories.setdefault(kind, []).append(load)
     return factories
 
 
 class ResolverSet:
-    """Resolvers keyed by kind; explicit resolvers win over entry points."""
+    """Resolvers keyed by kind; a kind has either one explicit resolver or one entry point."""
 
     def __init__(
         self,
@@ -141,6 +141,10 @@ class ResolverSet:
         self._factories = (
             _entry_point_factories(entry_point_group) if entry_point_group is not None else {}
         )
+        for kind in self._factories.keys() & self._resolvers.keys():
+            raise RegistryReferenceError(
+                f"kind {kind.value!r} has both an explicit resolver and an entry point"
+            )
 
     def available_kinds(self) -> frozenset[RefKind]:
         return frozenset(self._resolvers) | frozenset(self._factories)

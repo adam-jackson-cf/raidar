@@ -9,8 +9,9 @@ from pathlib import Path
 
 import click
 
-from raidar.cli.shared import ORCHESTRATOR_ROOT, run_or_raise
+from raidar.cli.process import run_or_raise
 from raidar.cli.target_options import docker_selection, target_option
+from raidar.contract.paths import ORCHESTRATOR_ROOT
 from raidar.engine.trial.cleanup import cleanup_trial_projects
 from raidar.subject.agent.adapters.base import harbor_executable
 
@@ -114,9 +115,11 @@ def env_setup(install_tools: bool, sync_arg: tuple[str, ...]) -> None:
         # the orchestrator venv, so no global `uv tool install harbor` is used.
         run_or_raise(["uv", "sync", "--frozen", *sync_arg], ORCHESTRATOR_ROOT)
 
-    result = subprocess.run(
-        [harbor_executable(), "--version"], capture_output=True, text=True, check=False
-    )
+    try:
+        harbor = harbor_executable()
+    except FileNotFoundError as error:
+        raise click.ClickException(f"{error}; run `make env-setup` to sync it.") from error
+    result = subprocess.run([harbor, "--version"], capture_output=True, text=True, check=False)
     if result.returncode != 0:
         raise click.ClickException(
             "Project-pinned Harbor CLI is unavailable; run `make env-setup` to sync it."

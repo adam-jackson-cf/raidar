@@ -1,7 +1,7 @@
 """Synthetic new-model fixture for the Quality element (review-surface development and tests).
 
 Writes, under one directory, clearly labelled synthetic data in the real
-WS-D/WS-F/WS-H shapes:
+job, Assessment and Jev shapes:
 
 - ``experiment.yaml``, a digest-checked ``experiment.lock.json`` beside it
   (baseline arm and headline metric, as a real lock carries them), and

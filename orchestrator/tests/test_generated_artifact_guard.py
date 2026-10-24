@@ -3,7 +3,7 @@ import subprocess
 import click
 import pytest
 
-from raidar.contract import repo_state
+from raidar.cli import repo_state
 
 
 def test_repo_paths_and_name_status_parse_git_output_and_errors(monkeypatch):

@@ -11,10 +11,10 @@ Checkpoint cells come straight from the stored observations:
 The checkpoint-level I and S are a review view, not a headline: they apply
 the headline metric's weights and formula to one checkpoint's components.
 
-The problem-level row is the headline, and it is WS-J's trial outcome
+The problem-level row is the headline, and it is the analysis' trial outcome
 (``raidar.evaluation.analysis.assessed.build_outcome``), so the Quality element, the
 analysis report and the review projection agree for one trial: C is
-``solved_checkpoints / K`` (ADR-001 §2.4), V..G are the ``problem_*`` means,
+the mean of the per-checkpoint case pass rates (ADR-001 §2.4), V..G are the ``problem_*`` means,
 and S is the headline metric applied to them. A trial truncated by
 ``max_checkpoints`` has no problem-level outcome (every cell is
 ``truncated``). Only I is derived here, from the same policy score. Nothing
@@ -287,7 +287,7 @@ def _problem_cells(
     quality: Assessment | None,
     correctness: Assessment | None,
 ) -> tuple[dict[str, Cell], tuple[str, ...]]:
-    """WS-J's trial outcome as cells, plus the inertia of the same policy score."""
+    """The analysis's trial outcome as cells, plus the inertia of the same policy score."""
     outcome = build_outcome(
         trial.record,
         {

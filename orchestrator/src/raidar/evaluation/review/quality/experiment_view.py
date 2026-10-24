@@ -1,7 +1,7 @@
 """Experiment-level Quality view, per problem: curves, paired Δ, distributions, H2H, sensitivity.
 
 Runs are pooled only under one lock: an experiment's runs are grouped by the
-``lock_sha256`` they were executed under, as WS-J's ``check_jobs`` requires,
+``lock_sha256`` they were executed under, as the analysis' ``check_jobs`` requires,
 and each group is its own ``QualityExperiment``.
 
 Which trials count (each exclusion is listed, never silent):
@@ -14,9 +14,9 @@ Which trials count (each exclusion is listed, never silent):
 - when one (arm, attempt) was run more than once, the latest run counts and the
   earlier ones are superseded.
 
-Curve points carry WS-J's 95% interval (``raidar.evaluation.analysis.stats.summarise``,
-as ``analysis.curves`` bands do) and paired Δ uses WS-J's ``decide`` with the
-directions of WS-J's outcome metrics.
+Curve points carry the analysis' 95% interval (``raidar.evaluation.analysis.stats.summarise``,
+as ``analysis.curves`` bands do) and paired Δ uses the analysis' ``decide`` with the
+directions of the analysis' outcome metrics.
 
 The head-to-head scatter is the SCB dashboard's two signals (docs/reboot/
 h2h-signals.md), re-sourced from ``code-quality@3``: Ruff findings under the
@@ -120,7 +120,7 @@ def _counted(
 def _curve_point(
     checkpoint: str, values: Sequence[float], label: str, settings: Settings
 ) -> CurvePoint:
-    """Mean across attempts with WS-J's 95% interval (paired t, bootstrap from 10 values)."""
+    """Mean across attempts with the analysis' 95% interval (paired t, bootstrap from 10 values)."""
     summary = summarise(
         values,
         seed=seed_for(settings.seed, f"quality-curve:{label}:{checkpoint}"),
@@ -167,7 +167,7 @@ def _curves(
 
 
 def _metric(component: str) -> MetricDef:
-    """WS-J's outcome metric for a component (its declared direction); I has none there."""
+    """The analysis's outcome metric for a component (its declared direction); I has none there."""
     metric = _METRICS.get(_COMPONENT_METRIC.get(component, ""))
     if metric is not None:
         return metric

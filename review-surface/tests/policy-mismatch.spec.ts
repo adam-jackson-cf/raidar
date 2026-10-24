@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 
-// K3: the synthetic fixture's synthetic/policy-mix@1 family compares an
+// The synthetic fixture's synthetic/policy-mix@1 family compares an
 // experiment scored under scb-canonical-oneshot@1 with one scored under
 // scb-canonical@1 (make review-fixture-synthetic), so every row in it carries
 // the headline-policy-mismatch finding.

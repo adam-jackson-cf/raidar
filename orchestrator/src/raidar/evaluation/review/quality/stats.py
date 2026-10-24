@@ -1,6 +1,6 @@
-"""Descriptive statistics the Quality view needs beyond WS-J's (distributions, correlation).
+"""Descriptive statistics the Quality view needs beyond the analysis' (distributions, correlation).
 
-Means, SDs, curve intervals, paired Δ intervals and verdicts are WS-J's
+Means, SDs, curve intervals, paired Δ intervals and verdicts are the analysis'
 (``raidar.evaluation.analysis.stats``/``effects``), not here.
 """
 

@@ -15,6 +15,7 @@ import os
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[4]
+ORCHESTRATOR_ROOT = REPO_ROOT / "orchestrator"
 VAR_ENV = "RAIDAR_VAR"
 LAB_DIR = "lab"
 VAR_DIR = "var"

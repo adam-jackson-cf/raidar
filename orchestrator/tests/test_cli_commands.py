@@ -14,12 +14,7 @@ import yaml
 from click.testing import CliRunner
 
 from raidar.cli import env_harbor, main
-from raidar.cli.shared import ORCHESTRATOR_ROOT
-from raidar.contract.paths import REPO_ROOT
-from raidar.contract.repo_state import (
-    assert_no_generated_artifact_changes,
-    generated_artifact_paths,
-)
+from raidar.contract.paths import ORCHESTRATOR_ROOT, REPO_ROOT
 from raidar.subject.agent.config import agent_name_for
 from raidar.subject.environment.python.models import load_pack_spec
 
@@ -157,23 +152,6 @@ def test_agent_setup_auth_fails_when_login_does_not_create_auth_json(
     assert "no file-backed auth.json was found" in result.output
 
 
-def test_generated_artifact_paths_filters_prefixes() -> None:
-    paths = [
-        "var/jobs/smoke/20260930T000000Z/job.json",
-        "var/stores/example/assessments/ab/abcd.json",
-        "lab/problems/registry/scb/forge/38d627ecf668.json",
-        "orchestrator/src/raidar/cli.py",
-        "lab/experiments/smoke/python__forge__mechanics/experiment.yaml",
-    ]
-
-    matches = generated_artifact_paths(paths)
-
-    assert matches == [
-        "var/jobs/smoke/20260930T000000Z/job.json",
-        "var/stores/example/assessments/ab/abcd.json",
-    ]
-
-
 def test_quality_gates_writes_coverage_to_pytest_cache(monkeypatch) -> None:
     calls: list[dict[str, object]] = []
 
@@ -229,42 +207,6 @@ def test_env_setup_uses_frozen_sync(monkeypatch) -> None:
     # Harbor comes from the exact-pinned project dependency, not a global uv tool.
     assert len(calls) == 2
     assert "harbor 0.0.0" in result.output
-
-
-def test_artifact_guard_allows_generated_artifact_deletions(tmp_path: Path, monkeypatch) -> None:
-    monkeypatch.setattr(
-        "raidar.contract.repo_state.changed_repo_entries",
-        lambda _: [
-            (
-                "D",
-                "var/jobs/hello-world-smoke/run-01/run.json",
-            ),
-        ],
-    )
-
-    assert_no_generated_artifact_changes(tmp_path)
-
-
-def test_artifact_guard_rejects_modified_generated_artifacts(tmp_path: Path, monkeypatch) -> None:
-    monkeypatch.setattr(
-        "raidar.contract.repo_state.changed_repo_entries",
-        lambda _: [
-            (
-                "M",
-                "var/jobs/hello-world-smoke/run-01/run.json",
-            ),
-            (
-                "A",
-                "var/analysis/hello-world-smoke/report.md",
-            ),
-        ],
-    )
-
-    with pytest.raises(
-        click.ClickException,
-        match="Generated Harbor artifacts must not be committed",
-    ):
-        assert_no_generated_artifact_changes(tmp_path)
 
 
 def test_env_setup_refuses_an_old_docker_compose(monkeypatch) -> None:

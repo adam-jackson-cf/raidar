@@ -2,10 +2,10 @@ import click
 import pytest
 from click.testing import CliRunner
 
-from raidar.cli import quality, shared
+from raidar.cli import process, quality
 
 
-def test_shared_command_helpers_raise_on_failure(monkeypatch, tmp_path) -> None:
+def test_commands_run_through_one_runner_that_raises_on_failure(monkeypatch, tmp_path) -> None:
     calls: list[tuple[list[str], object]] = []
 
     class Result:
@@ -13,22 +13,20 @@ def test_shared_command_helpers_raise_on_failure(monkeypatch, tmp_path) -> None:
             self.returncode = returncode
 
     monkeypatch.setattr(
-        shared.subprocess,
+        process.subprocess,
         "run",
         lambda cmd, cwd, env, check: calls.append((cmd, env)) or Result(0),
     )
-    shared.run_or_raise(["tool", "ok"], tmp_path, env={"A": "1"})
+    process.run_or_raise(["tool", "ok"], tmp_path, env={"A": "1"})
     assert calls == [(["tool", "ok"], {"A": "1"})]
 
     monkeypatch.setattr(
-        shared.subprocess,
+        process.subprocess,
         "run",
         lambda cmd, cwd, env, check: Result(7),
     )
     with pytest.raises(click.ClickException, match="Command failed \\(7\\): tool fail"):
-        shared.run_or_raise(["tool", "fail"], tmp_path)
-
-    assert shared.python_cmd()
+        process.run_or_raise(["tool", "fail"], tmp_path)
 
 
 def test_quality_gate_helpers_validate_requirements_and_commands(monkeypatch, tmp_path) -> None:
@@ -55,7 +53,7 @@ def test_quality_gate_helpers_validate_requirements_and_commands(monkeypatch, tm
         quality.assert_quality_gate_requirements()
 
     calls: list[list[str]] = []
-    monkeypatch.setattr(quality, "python_cmd", lambda: "python")
+    monkeypatch.setattr(quality, "PYTHON", "python")
     monkeypatch.setattr(quality, "run_or_raise", lambda cmd, *_args, **_kwargs: calls.append(cmd))
     quality.run_ruff_quality_gates(fix=True)
     quality.run_ruff_quality_gates(fix=False)

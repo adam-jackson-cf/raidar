@@ -1,4 +1,4 @@
-"""``raidar analyze`` over stored jobs and a real Assessment store (WS-J J1, J2).
+"""``raidar analyze`` over stored jobs and a real Assessment store.
 
 Trials are written with host-side verifier records, rescored with the real
 ``correctness@1`` and ``resource-usage@1`` scorers, and analysed through the

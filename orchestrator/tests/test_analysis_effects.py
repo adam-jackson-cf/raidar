@@ -1,4 +1,4 @@
-"""Analysis on synthetic trials with known effects (WS-J J1, J2).
+"""Analysis on synthetic trials with known effects.
 
 Each scenario plants an effect and checks the verdict the report gives it:
 improved, worse, inconclusive and insufficient, plus the exclusion counts,

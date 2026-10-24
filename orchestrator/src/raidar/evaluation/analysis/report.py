@@ -3,7 +3,7 @@
 ``analyse`` is pure: it takes the planned slots and the per-trial
 outcomes (``raidar.evaluation.analysis.load`` reads them from jobs and the Assessment
 store) and returns a deterministic ``AnalysisReport``, the machine-readable
-document the review surface projects (WS-K) and the gate packet includes.
+document the review surface projects and the gate packet includes.
 Jobs and Assessments are only read, never written.
 
 Each treatment arm is compared with the experiment's baseline arm. Effects are
