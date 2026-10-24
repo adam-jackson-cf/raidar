@@ -63,6 +63,7 @@ from raidar.cli.grading import (
     regrade,
 )
 from raidar.core.job_layout import JOB_MANIFEST
+from raidar.core.runtimes import ANY_RUNTIME
 from raidar.execution.assessment import ASSESSMENT_CONFIG_FILE, lock_rescore_config
 from raidar.scorers.catalog import ScorerUnavailableError, default_scorer_registry
 from raidar.scorers.rescore import report_payload, rescore_path
@@ -135,9 +136,6 @@ def _job_dir(target: Path) -> Path | None:
             return candidate
         candidate = candidate.parent
     return None
-
-
-ANY_RUNTIME = "*"
 
 
 def _scorer_issues(runtime: str | None, scorer_refs: tuple[str, ...]) -> list[str]:

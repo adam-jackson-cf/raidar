@@ -13,7 +13,7 @@ from raidar.problems.errata import Disposition, draft_errata, report_entries
 from raidar.problems.importer import import_problem
 from raidar.problems.models import ProblemId, ProblemManifest
 from raidar.problems.source import SourceError
-from raidar.problems.store import ProblemStore, ProblemStoreError, open_store
+from raidar.problems.store import ProblemStore, ProblemStoreError, open_store, store_at
 from raidar.problems.validation import (
     Check,
     CheckStatus,
@@ -62,7 +62,7 @@ def register(main: click.Group) -> None:
 
 def _store(store_root: Path | None) -> ProblemStore:
     try:
-        return ProblemStore(store_root.resolve()) if store_root else open_store(Path.cwd())
+        return store_at(store_root) if store_root else open_store(Path.cwd())
     except ProblemStoreError as exc:
         raise click.ClickException(str(exc)) from exc
 

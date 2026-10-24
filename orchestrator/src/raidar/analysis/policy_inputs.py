@@ -1,6 +1,6 @@
 """Headline S from statused components: the one place a Metric is applied (F6, F15).
 
-Analysis (``assessed.headline_score``), the frozen review projection
+Analysis (``assessed.headline_score``), the review projection
 (``review.projection.headline``) and the Quality projection
 (``review.quality.run_view``) all weigh components through ``score_inputs``: a
 measured component is weighed, an unmeasured one makes S ineligible with its

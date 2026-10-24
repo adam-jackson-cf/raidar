@@ -345,6 +345,13 @@ def _better(direction: Direction, delta: float) -> bool:
     return delta > 0 if direction is Direction.HIGHER_BETTER else delta < 0
 
 
+def _directed(direction: Direction, delta: float, reason: str) -> tuple[Verdict, str]:
+    """A significant ``delta`` read against the metric's direction; a neutral metric has none."""
+    if direction is Direction.NEUTRAL:
+        return Verdict.INCONCLUSIVE, f"{reason}, but the metric has no better direction"
+    return (Verdict.IMPROVED if _better(direction, delta) else Verdict.WORSE), reason
+
+
 def decide(
     metric: MetricDef,
     summary: Summary,
@@ -378,8 +385,7 @@ def decide(
             )
         delta = summary.mean
         reason = f"{level} CI [{interval.low:.4g}, {interval.high:.4g}] excludes 0"
-    verdict = Verdict.IMPROVED if _better(metric.direction, delta) else Verdict.WORSE
-    return verdict, reason
+    return _directed(metric.direction, delta, reason)
 
 
 def mean_or_none(values: Sequence[float]) -> float | None:

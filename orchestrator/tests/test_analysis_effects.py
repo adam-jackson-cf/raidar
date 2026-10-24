@@ -13,11 +13,12 @@ import json
 
 import pytest
 
-from raidar.analysis.effects import Settings, Verdict
+from raidar.analysis.effects import Exclusions, Settings, Verdict, decide
 from raidar.analysis.markdown import render_markdown
-from raidar.analysis.outcomes import OUTCOME_METRICS
+from raidar.analysis.outcomes import ALL_METRICS, OUTCOME_METRICS
 from raidar.analysis.report import AnalysisReport, analyse
-from raidar.analysis.stats import IntervalMethod
+from raidar.analysis.stats import IntervalMethod, summarise
+from raidar.scorers.sdk.manifest import Direction
 from raidar.scorers.sdk.result import AssessResult, AssessStatus, Observation
 from tests.analysis_support import (
     BASELINE,
@@ -248,6 +249,19 @@ def test_zero_spread_gives_no_projection() -> None:
     assert effect.sample_size is not None
     assert effect.sample_size.recommended_pairs is None
     assert "SD is 0" in (effect.sample_size.reason or "")
+
+
+def test_a_metric_with_no_better_direction_never_reads_improved_or_worse() -> None:
+    neutral = next(m for m in ALL_METRICS if m.direction is Direction.NEUTRAL)
+    summary = summarise([2.0, 2.5, 2.0, 1.5, 2.0], seed=1, bootstrap_samples=500)
+    assert summary.interval is not None
+    assert not summary.interval.contains_zero()
+    pairs = Exclusions(planned=5, paired=5)
+
+    verdict, reason = decide(neutral, summary, pairs, SETTINGS)
+
+    assert verdict is Verdict.INCONCLUSIVE
+    assert "excludes 0, but the metric has no better direction" in reason
 
 
 def test_report_is_json_and_markdown_ready() -> None:
