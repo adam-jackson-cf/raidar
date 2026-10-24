@@ -12,6 +12,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from raidar.design.problem.store import ProblemStore, open_store
 from raidar.engine.job.assessment import lock_errata
 from raidar.evaluation.analysis.assessed import (
     ANALYSED_SCORERS,
@@ -64,7 +65,7 @@ class LoadRequest:
     lock_path: Path | None = None
     assessment_config: Path | None = None
     allow_dev_jobs: bool = False
-    bundle_search: tuple[Path, ...] = ()
+    problems: ProblemStore | None = None
     pool_overrides: tuple[str, ...] = ()
 
 
@@ -112,7 +113,11 @@ def _read_trials(
     config = assessment_config(request.assessment_config, lock)
     for trial_id, (job, record) in sorted(chosen.items()):
         results = lookup.valid_results(
-            job.trial_dir(record), config, trial_id=record.trial.trial_id, valid=record.valid
+            job.trial_dir(record),
+            config,
+            trial_id=record.trial.trial_id,
+            valid=record.valid,
+            problem=record.trial.problem,
         )
         outcomes.append(build_outcome(record, results, policy=policy))
         process[trial_id] = results.get(process_ref)
@@ -136,7 +141,8 @@ def load_inputs(request: LoadRequest) -> tuple[AnalysisInputs, Mapping[str, Any]
         store=AssessmentStore(request.store_root),
         registry=request.registry,
         scorer_refs=_scorer_refs(declared, process_ref),
-        bundles=BundleCache(search=request.bundle_search),
+        bundles=BundleCache(),
+        problems=request.problems or open_store(),
     )
     chosen, replaced = select_records(jobs)
     gate_ref = gate_effort_ref(declared)

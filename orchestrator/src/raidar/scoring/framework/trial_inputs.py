@@ -1,8 +1,8 @@
 """Build an ``AssessContext`` from a stored Harbor trial directory (read-only).
 
 The planned checkpoints come from the trial's oracle bundle (located through
-its step records or the verifier's ``oracle_bundle`` argument, and checked
-against the digest the records carry). Executed steps come from Harbor's
+its step records or the verifier's ``oracle_bundle`` argument, or an explicit
+override, and checked against the digest the records carry). Executed steps come from Harbor's
 ``result.json`` ``step_results`` in order and must be a prefix of the plan; a
 one-step trial has no ``step_results`` and must have exactly one oracle
 record. Planned checkpoints the trial never reached are kept with
@@ -30,7 +30,7 @@ from typing import Any
 
 from raidar.contract.canonical import digest_json
 from raidar.contract.snapshot import tree_digest
-from raidar.grading.bundle import BUNDLE_MANIFEST, BundleError, VerifierBundle, load_bundle
+from raidar.grading.bundle import BundleError, VerifierBundle, load_bundle
 from raidar.grading.records import (
     FORK_EVIDENCE_FILE,
     RECORD_FILE,
@@ -52,28 +52,15 @@ class TrialInputError(ValueError):
     """The trial directory cannot be assessed as stored."""
 
 
+class BundleUnavailableError(TrialInputError):
+    """The bundle directory cannot be loaded (moved, missing or malformed)."""
+
+
 @dataclass
 class BundleCache:
-    """Loaded bundles and their digests, shared across the trials of one rescore.
-
-    ``search`` lists directories to look in, by digest, when a recorded bundle
-    root no longer holds the bundle (the worktree moved, another host): the
-    bundle is found again only if its content digest is the recorded one.
-    """
+    """Loaded bundles and their digests, shared across the trials of one rescore."""
 
     loaded: dict[Path, tuple[VerifierBundle, str]] = field(default_factory=dict)
-    search: tuple[Path, ...] = ()
-
-    def relocate(self, digests: set[str]) -> VerifierBundle | None:
-        for directory in self.search:
-            for marker in sorted(directory.rglob(BUNDLE_MANIFEST)):
-                try:
-                    bundle, digest = self.get(marker.parent)
-                except TrialInputError:
-                    continue
-                if digest in digests:
-                    return bundle
-        return None
 
     def get(self, root: Path) -> tuple[VerifierBundle, str]:
         key = root.resolve()
@@ -81,7 +68,7 @@ class BundleCache:
             try:
                 bundle = load_bundle(key)
             except BundleError as exc:
-                raise TrialInputError(f"oracle bundle unusable: {exc}") from exc
+                raise BundleUnavailableError(f"oracle bundle unusable: {exc}") from exc
             self.loaded[key] = (bundle, bundle.digest())
         return self.loaded[key]
 
@@ -223,28 +210,8 @@ def _bundle(
             f"{trial_dir}: cannot locate the oracle bundle for the planned checkpoints; "
             "pass --bundle"
         )
-    if override is None and digests:
-        return _recorded_bundle(trial_dir, root, digests, cache)
     bundle, digest = cache.get(root)
     if digests and digest not in digests:
-        raise TrialInputError(
-            f"bundle at {root} does not match the digest recorded for {trial_dir}"
-        )
-    return bundle
-
-
-def _recorded_bundle(
-    trial_dir: Path, root: Path, digests: set[str], cache: BundleCache
-) -> VerifierBundle:
-    """The bundle the records name: at its recorded root, else found by digest."""
-    try:
-        bundle, digest = cache.get(root)
-    except TrialInputError:
-        relocated = cache.relocate(digests)
-        if relocated is None:
-            raise
-        return relocated
-    if digest not in digests:
         raise TrialInputError(
             f"bundle at {root} does not match the digest recorded for {trial_dir}"
         )

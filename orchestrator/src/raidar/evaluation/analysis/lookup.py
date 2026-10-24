@@ -18,8 +18,11 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from raidar.design.problem.models import ProblemId
+from raidar.design.problem.store import ProblemStore
 from raidar.engine.job.assessment import lock_rescore_config
 from raidar.evaluation.analysis.sources import AnalysisInputError
+from raidar.scoring.framework.context import AssessContext
 from raidar.scoring.framework.keys import scorer_identity, store_key
 from raidar.scoring.framework.registry import ScorerRegistry
 from raidar.scoring.framework.rescore import RescoreError
@@ -28,6 +31,7 @@ from raidar.scoring.framework.result import AssessResult
 from raidar.scoring.framework.store import AssessmentStore, ScorerIdentity
 from raidar.scoring.framework.trial_inputs import (
     BundleCache,
+    BundleUnavailableError,
     TrialInputError,
     context_inputs,
     load_trial_context,
@@ -42,6 +46,7 @@ class AssessmentLookup:
     registry: ScorerRegistry
     scorer_refs: tuple[str, ...]
     bundles: BundleCache
+    problems: ProblemStore
 
     def __post_init__(self) -> None:
         self._identities: dict[str, ScorerIdentity] = {}
@@ -52,14 +57,40 @@ class AssessmentLookup:
             self._identities[ref] = scorer_identity(self.registry.get(ref))
         return self._identities[ref]
 
-    def results(self, trial_dir: Path, config: RescoreConfig) -> dict[str, AssessResult | None]:
+    def _stored_bundle(self, problem: str) -> Path:
+        """The problem store's verifier bundle for the trial's pinned problem reference."""
+        try:
+            return self.problems.content_dir(ProblemId.parse(problem)) / "oracle"
+        except ValueError as exc:
+            raise TrialInputError(f"problem {problem!r} is not a store reference: {exc}") from exc
+
+    def _load(self, trial_dir: Path, config: RescoreConfig, problem: str) -> AssessContext:
+        """The trial's context: its bundle where recorded, else the problem store's."""
+        try:
+            return load_trial_context(
+                trial_dir, inventory_policy=config.inventory_policy, bundle_cache=self.bundles
+            )
+        except BundleUnavailableError as moved:
+            try:
+                return load_trial_context(
+                    trial_dir,
+                    inventory_policy=config.inventory_policy,
+                    bundle_override=self._stored_bundle(problem),
+                    bundle_cache=self.bundles,
+                )
+            except TrialInputError as exc:
+                raise TrialInputError(
+                    f"{moved}; the problem store's bundle for {problem} was refused: {exc}"
+                ) from exc
+
+    def results(
+        self, trial_dir: Path, config: RescoreConfig, *, problem: str
+    ) -> dict[str, AssessResult | None]:
         found: dict[str, AssessResult | None] = dict.fromkeys(self.scorer_refs)
         if not (trial_dir / "result.json").is_file():
             return found
         try:
-            ctx = load_trial_context(
-                trial_dir, inventory_policy=config.inventory_policy, bundle_cache=self.bundles
-            )
+            ctx = self._load(trial_dir, config, problem)
         except TrialInputError as exc:
             self.input_errors[trial_dir] = str(exc)
             return found
@@ -76,15 +107,13 @@ class AssessmentLookup:
         return found
 
     def valid_results(
-        self, trial_dir: Path, config: RescoreConfig, *, trial_id: str, valid: bool
+        self, trial_dir: Path, config: RescoreConfig, *, trial_id: str, valid: bool, problem: str
     ) -> dict[str, AssessResult | None]:
         """``results``; a valid trial whose inputs cannot be loaded is refused."""
-        found = self.results(trial_dir, config)
+        found = self.results(trial_dir, config, problem=problem)
         if valid and trial_dir in self.input_errors:
             raise AnalysisInputError(
-                f"trial {trial_id} ({trial_dir}) cannot be assessed: "
-                f"{self.input_errors[trial_dir]}; if its verifier bundle moved, pass "
-                "--bundle-search DIR (bundles are found again by content digest)"
+                f"trial {trial_id} ({trial_dir}) cannot be assessed: {self.input_errors[trial_dir]}"
             )
         return found
 

@@ -9,6 +9,7 @@ CLI. The analysis must find each trial's Assessments by recomputing the keys
 from __future__ import annotations
 
 import json
+import shutil
 from pathlib import Path
 from typing import Any
 
@@ -25,6 +26,7 @@ from raidar.contract.trial import (
     ValidityCheck,
 )
 from raidar.design.experiment.lock import LOCK_VERSION, seal_lock
+from raidar.design.problem.store import ROOT_ENV
 from raidar.engine.job.assessment import lock_rescore_config
 from raidar.evaluation.analysis.sources import (
     AnalysisInputError,
@@ -36,7 +38,14 @@ from raidar.grading.models import CaseStatus
 from raidar.scoring.catalog.builtin import default_scorer_registry
 from raidar.scoring.framework.rescore import rescore_path
 from raidar.scoring.framework.store import AssessmentStore
-from tests.scorer_support import APP_V1, APP_V2, StepFixture, tree_state, write_trial
+from tests.scorer_support import (
+    APP_V1,
+    APP_V2,
+    StepFixture,
+    tree_state,
+    write_toy_bundle,
+    write_trial,
+)
 
 PASS, FAIL = CaseStatus.PASSED, CaseStatus.FAILED
 STEPS = ("checkpoint_1", "checkpoint_2")
@@ -102,7 +111,7 @@ def _record(
             order=0,
             sequence=attempt,
             arm=arm,
-            problem="toy@1",
+            problem="scb/toy@1",
             problem_index=0,
             steps=STEPS,
             hashes=HASHES,
@@ -488,24 +497,57 @@ def test_rescore_and_analysis_follow_the_lock_not_the_runs_execution_time_file(
     assert _effect(report, "solve_rate")["n_pairs"] == 5
 
 
-def test_a_moved_oracle_bundle_is_refused_or_found_by_digest_never_unassessed(
-    pilot: tuple[Path, Path, Path], tmp_path: Path
+def _move_bundles_into_problem_store(job_dir: Path, tmp_path: Path) -> Path:
+    """Take the trials' bundles from their recorded roots; one becomes the store's oracle."""
+    problems = tmp_path / "problems"
+    oracle = problems / "store" / "scb" / "toy" / "1" / "oracle"
+    oracle.parent.mkdir(parents=True)
+    bundles = sorted((job_dir / "trials").glob("*-bundle"))
+    bundles[0].rename(oracle)
+    for bundle in bundles[1:]:
+        shutil.rmtree(bundle)
+    return problems
+
+
+def test_a_moved_oracle_bundle_is_read_from_the_problem_store_by_the_trials_problem(
+    pilot: tuple[Path, Path, Path], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     job_dir, store, lock_path = pilot
-    moved = tmp_path / "moved-bundles"
-    moved.mkdir()
-    for bundle in sorted((job_dir / "trials").glob("*-bundle")):
-        bundle.rename(moved / bundle.name)
+    problems = _move_bundles_into_problem_store(job_dir, tmp_path)
 
-    refused = _analyze(job_dir, store, lock_path, tmp_path / "refused")
-    assert refused.exit_code != 0
-    assert "cannot be assessed" in refused.output
-    assert "--bundle-search" in refused.output
+    monkeypatch.setenv(ROOT_ENV, str(tmp_path / "empty-store"))
+    absent = _analyze(job_dir, store, lock_path, tmp_path / "absent")
+    assert absent.exit_code != 0
+    assert "cannot be assessed" in absent.output
+    assert "scb/toy@1" in absent.output
+    assert "--bundle-search" not in absent.output
 
-    found = _analyze(job_dir, store, lock_path, tmp_path / "found", "--bundle-search", str(moved))
+    monkeypatch.setenv(ROOT_ENV, str(problems))
+    found = _analyze(job_dir, store, lock_path, tmp_path / "found")
     assert found.exit_code == 0, found.output
     report = json.loads((tmp_path / "found" / "analysis.json").read_text())
     assert _effect(report, "solve_rate")["n_pairs"] == 5
+
+
+def test_a_problem_store_bundle_with_another_digest_is_refused(
+    pilot: tuple[Path, Path, Path], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    job_dir, store, lock_path = pilot
+    problems = _move_bundles_into_problem_store(job_dir, tmp_path)
+    oracle = problems / "store" / "scb" / "toy" / "1" / "oracle"
+    shutil.rmtree(oracle)
+    write_toy_bundle(oracle, [*STEPS, "checkpoint_3"])
+
+    monkeypatch.setenv(ROOT_ENV, str(problems))
+    refused = _analyze(job_dir, store, lock_path, tmp_path / "refused")
+    assert refused.exit_code != 0
+    assert "cannot be assessed" in refused.output
+    assert "does not match the digest recorded" in refused.output
+
+
+def test_analyze_has_no_bundle_search_option() -> None:
+    result = CliRunner().invoke(main, ["analyze", "--help"])
+    assert "--bundle-search" not in result.output
 
 
 @pytest.mark.parametrize("process", ["process-compliance@6", None])
