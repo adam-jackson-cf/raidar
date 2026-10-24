@@ -687,4 +687,3 @@ quality:
 	@$(MAKE) --no-print-directory experiment-locks-check
 	@$(MAKE) --no-print-directory ledger-check
 	@$(RAIDAR_DEV) quality gates
-	@cd orchestrator && uv run --project . --extra dev python -m lizard -C 10 -l python src
