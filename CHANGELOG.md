@@ -370,6 +370,13 @@ All notable changes to this project are documented in this file.
 - CI no longer installs Bun; only the removed scenario starters used it.
 - `AGENTS.md` is rewritten for the experiment, problem, component and scorer model (workflow rules, known experiment configs, smoke testing). `CODEOWNERS` drops the nonexistent `/.configs/` and `/benchmark-view/` and names the current top-level surfaces.
 - The README, `make help`, the review-surface README and the import contracts describe the experiment, problem, component and scorer model.
+## 0.14.0 - 2026-07-09
+
+### Refactoring
+
+- refactor: migrate verifier runtime architecture
+
+- wireframe: refine review surface theme
 
 ## 0.14.0 - 2026-07-03
 
