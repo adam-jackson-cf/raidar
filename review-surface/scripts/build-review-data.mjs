@@ -11,7 +11,7 @@ const repoRoot = path.resolve(surfaceRoot, '..');
 const dataRoot = path.join(surfaceRoot, 'data');
 const projectionPath = process.env.RAIDAR_REVIEW_PROJECTION
   ? path.resolve(process.env.RAIDAR_REVIEW_PROJECTION)
-  : path.join(repoRoot, '.tmp', 'review-projection.json');
+  : path.join(repoRoot, 'var', 'tmp', 'review-projection.json');
 const SCHEMA_VERSION = 2;
 
 function invariant(condition, message) {

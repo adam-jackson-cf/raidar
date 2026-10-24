@@ -142,7 +142,6 @@ export interface ExperimentRecord {
     run_count_scored?: number;
     unscored_count?: number;
     validity_rate?: number;
-    performance_pass_rate?: number;
     composite_score?: StatBlock;
     quality_score?: StatBlock;
     duration_sec?: StatBlock;

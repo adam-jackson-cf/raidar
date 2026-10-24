@@ -275,7 +275,7 @@ async function handleApi(req, res, url) {
 function serveStatic(res, url) {
   const requested = url.pathname === '/' ? '/index.html' : url.pathname;
   const resolved = path.normalize(path.join(distRoot, requested));
-  if (!resolved.startsWith(distRoot)) {
+  if (resolved !== distRoot && !resolved.startsWith(distRoot + path.sep)) {
     res.writeHead(403);
     return res.end('forbidden');
   }
