@@ -66,11 +66,11 @@ class ContinueOnStall:
         supports=BOTH_HARNESSES,
         fingerprint=(
             *COMMON_FINGERPRINT,
-            "raidar/subject/treatment/catalog/stall.py",
-            "raidar/subject/treatment/runtime/continue_on_stall.py",
-            "raidar/subject/treatment/runtime/session_chain.py",
-            "raidar/subject/treatment/runtime/review_loop.py",  # final message, usage sums
-            "raidar/contract/snapshot.py",  # the workspace and its snapshot excludes
+            "orchestrator/src/raidar/subject/treatment/catalog/stall.py",
+            "orchestrator/src/raidar/subject/treatment/runtime/continue_on_stall.py",
+            "orchestrator/src/raidar/subject/treatment/runtime/session_chain.py",
+            "orchestrator/src/raidar/subject/treatment/runtime/review_loop.py",  # final message, usage sums
+            "orchestrator/src/raidar/contract/snapshot.py",  # the workspace and its snapshot excludes
         ),
         discovery_probe=DiscoveryProbe(
             id="continue-on-stall-recorded",

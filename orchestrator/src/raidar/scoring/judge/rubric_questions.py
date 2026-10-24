@@ -20,10 +20,11 @@ from typing import Any
 import yaml
 from pydantic import BaseModel, ConfigDict, Field
 
+from raidar.contract.paths import judge_root
 from raidar.scoring.judge.protocol import NoulCriteria, NoulQuestion
 from raidar.scoring.judge.symbols import SymbolKind
 
-QUESTION_SET_DIR = Path(__file__).parent / "question_sets"
+QUESTION_SET_DIR = judge_root() / "question_sets"
 SCB_RUBRIC_FILE = QUESTION_SET_DIR / "scb-rubric.yaml"
 _DEFAULT_KINDS = (SymbolKind.FUNCTION, SymbolKind.METHOD, SymbolKind.MODULE)
 

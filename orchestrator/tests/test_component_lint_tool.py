@@ -102,7 +102,7 @@ def test_lint_tool_is_a_python_service_component_with_declared_egress() -> None:
     assert component_runtimes(definition) == ("python",)
     assert manifest.network.egress_hosts == ("files.pythonhosted.org", "pypi.org")
     assert manifest.discovery_probe.id == "lint-tool-invocable"
-    assert "raidar/subject/treatment/runtime/provision.py" in manifest.fingerprint
+    assert "orchestrator/src/raidar/subject/treatment/runtime/provision.py" in manifest.fingerprint
     ref = RegistryRef.parse(RefKind.COMPONENT, "lint-tool@2")
     resolved = ComponentResolver().resolve(ref, base_dir=Path("."))
     assert resolved.binding["runtimes"] == ["python"]

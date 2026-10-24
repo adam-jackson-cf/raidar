@@ -15,14 +15,14 @@ BOTH_HARNESSES = (Harness.CODEX_CLI, Harness.CLAUDE_CODE)
 # and compile rules, the generated setup.sh (reset + overlay evidence) and the
 # probe evidence readers. Changing any of them changes every component digest.
 COMMON_FINGERPRINT = (
-    "raidar/subject/treatment/definition/manifest.py",
-    "raidar/subject/treatment/definition/contribution.py",
-    "raidar/subject/treatment/definition/evidence.py",
-    "raidar/subject/treatment/definition/compiler.py",
-    "raidar/subject/treatment/definition/compiled.py",
-    "raidar/subject/treatment/runtime/setup_script.py",
-    "raidar/subject/treatment/runtime/step_reset.sh",
-    "raidar/subject/treatment/catalog/_common.py",
+    "orchestrator/src/raidar/subject/treatment/definition/manifest.py",
+    "orchestrator/src/raidar/subject/treatment/definition/contribution.py",
+    "orchestrator/src/raidar/subject/treatment/definition/evidence.py",
+    "orchestrator/src/raidar/subject/treatment/definition/compiler.py",
+    "orchestrator/src/raidar/subject/treatment/definition/compiled.py",
+    "orchestrator/src/raidar/subject/treatment/runtime/setup_script.py",
+    "orchestrator/src/raidar/subject/treatment/runtime/step_reset.sh",
+    "orchestrator/src/raidar/subject/treatment/catalog/_common.py",
 )
 
 

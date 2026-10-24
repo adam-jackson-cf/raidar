@@ -48,6 +48,7 @@ def test_version_suffixes_and_segments_are_refused(path: str) -> None:
         "lab/experiments/smoke/python__forge__mechanics/experiment.yaml",
         "lab/experiments/ab-test/x/components/python-guardrails/v8/ruff.toml",
         "lab/components/rules/v2/AGENTS.md",
+        "lab/treatment/python_guardrails/v8/ruff.toml",
         "docs/reboot/mechanics-v1-design.md",
     ],
 )
@@ -107,7 +108,7 @@ def test_every_group_allows_only_its_own_subpackages() -> None:
         f"{RAIDAR}/engine/trial/driver.py",
         f"{RAIDAR}/engine/job/run.py",
         f"{RAIDAR}/engine/health/audit.py",
-        f"{RAIDAR}/scoring/judge/policies/code-quality.yaml",
+        f"{RAIDAR}/scoring/judge/audit.py",
         f"{RAIDAR}/evaluation/review/projection/spans.py",
         f"{RAIDAR}/grading/runtime/plugin.py",
         f"{RAIDAR}/engine/__init__.py",
@@ -141,14 +142,31 @@ def test_package_depth_is_capped_at_three_below_raidar() -> None:
     ]
 
 
-def test_payload_data_pack_image_and_the_grader_runtime_are_exempt_from_the_depth_cap() -> None:
-    paths = [
-        f"{RAIDAR}/subject/treatment/payloads/python_guardrails/rules/ruff/extra/more/file.toml",
-        f"{RAIDAR}/subject/environment/python/image/Dockerfile",
-        f"{RAIDAR}/grading/runtime/a/b/c/d/plugin.py",
+def test_no_data_tree_is_exempt_from_the_depth_cap() -> None:
+    deep = f"{RAIDAR}/subject/treatment/payloads/python_guardrails/rules/ruff/file.toml"
+
+    assert structure.package_violations([deep]) == [
+        "package nests deeper than 3 below raidar/: "
+        f"{RAIDAR}/subject/treatment/payloads/python_guardrails/rules/ruff",
     ]
 
-    assert structure.package_violations(paths) == []
+
+def test_lab_holds_only_the_allowlisted_data_trees() -> None:
+    allowed = [
+        "lab/experiments/smoke/x/experiment.yaml",
+        "lab/problems/sources.yaml",
+        "lab/ledger/faults/FCR-001.md",
+        "lab/treatment/python_guardrails/lib/guardrails/gate.py",
+        "lab/environment/python/pack.yaml",
+        "lab/judge/policies/code-quality.rubric-smells.yaml",
+    ]
+    refused = ["lab/components/rules/AGENTS.md", "lab/notes.md"]
+
+    assert structure.lab_violations(allowed) == []
+    assert structure.lab_violations(refused) == [
+        "unexpected lab entry: lab/components",
+        "unexpected lab entry: lab/notes.md",
+    ]
 
 
 def test_repo_paths_list_tracked_and_unignored_files_but_not_ignored_ones(tmp_path: Path) -> None:
@@ -167,12 +185,12 @@ def test_repo_paths_list_tracked_and_unignored_files_but_not_ignored_ones(tmp_pa
 
 def test_main_exits_zero_on_a_clean_layout_and_one_on_a_violation(tmp_path: Path) -> None:
     subprocess.run(["git", "init"], cwd=tmp_path, check=True, capture_output=True)
-    (tmp_path / "lab").mkdir()
-    (tmp_path / "lab" / "a.yaml").write_text("", encoding="utf-8")
+    (tmp_path / "lab" / "judge").mkdir(parents=True)
+    (tmp_path / "lab" / "judge" / "a.yaml").write_text("", encoding="utf-8")
 
     assert structure.main(["--repo-root", str(tmp_path)]) == 0
 
-    (tmp_path / "lab" / "thing_v2.yaml").write_text("", encoding="utf-8")
+    (tmp_path / "lab" / "judge" / "thing_v2.yaml").write_text("", encoding="utf-8")
 
     assert structure.main(["--repo-root", str(tmp_path)]) == 1
 

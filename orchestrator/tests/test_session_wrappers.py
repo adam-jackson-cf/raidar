@@ -119,10 +119,10 @@ def test_both_are_workflow_session_wrappers_without_with_keys() -> None:
         assert registry.get(ref).manifest.kind is ComponentKind.WORKFLOW
         with pytest.raises(ComponentRejectedError):
             compile_uses(use(ref, retries=3))
-    assert "raidar/subject/treatment/runtime/continue_on_stall.py" in (
+    assert "orchestrator/src/raidar/subject/treatment/runtime/continue_on_stall.py" in (
         registry.get("continue-on-stall@2").manifest.fingerprint
     )
-    assert "raidar/subject/treatment/runtime/transient_retry.py" in (
+    assert "orchestrator/src/raidar/subject/treatment/runtime/transient_retry.py" in (
         registry.get("transient-retry@1").manifest.fingerprint
     )
 

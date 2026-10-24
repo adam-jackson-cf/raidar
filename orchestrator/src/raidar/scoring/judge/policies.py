@@ -1,6 +1,6 @@
 """Versioned Jev policies: one mode per question set (design memo §3.5, plan H2).
 
-Each policy is a YAML file in ``raidar/scoring/judge/policies/`` and is part of the repo,
+Each policy is a YAML file in ``lab/judge/policies/`` and is part of the repo,
 so a mode change is a reviewed diff. Modes:
 
 - ``off``: no Jev call; every decision is still audited as ``skipped``.
@@ -36,9 +36,10 @@ from typing import Literal, Self
 import yaml
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from raidar.contract.paths import judge_root
 from raidar.design.experiment.canonical import digest_json
 
-POLICY_DIR = Path(__file__).parent / "policies"
+POLICY_DIR = judge_root() / "policies"
 LABELS = ("correct", "false_positive", "false_negative", "uncertain")
 MIN_LABELLED = 30
 MIN_MINORITY = 5

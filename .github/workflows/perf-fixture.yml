@@ -14,6 +14,8 @@ on:
       - "orchestrator/src/raidar/contract/**"
       - "orchestrator/src/raidar/subject/treatment/**"
       - "orchestrator/src/raidar/subject/environment/**"
+      - "lab/treatment/**"
+      - "lab/environment/**"
       - "orchestrator/tests/test_execution_perf_fixture.py"
       - "orchestrator/tests/execution_support.py"
       - "orchestrator/uv.lock"

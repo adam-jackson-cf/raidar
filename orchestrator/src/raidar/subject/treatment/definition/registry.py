@@ -10,11 +10,9 @@ entry point named ``component``.
 
 from __future__ import annotations
 
-import sys
 from collections.abc import Iterable
 from importlib.metadata import EntryPoint, entry_points
-from pathlib import Path
-
+from raidar.contract.paths import REPO_ROOT
 from raidar.contract.runtimes import ANY_RUNTIME
 from raidar.design.experiment.canonical import digest_json, sha256_file
 from raidar.design.experiment.references import (
@@ -81,12 +79,6 @@ class ComponentRegistry:
         return definition
 
 
-def _source_root(definition: ComponentDefinition) -> Path:
-    """Directory that holds the definition's top-level package (fingerprint base)."""
-    top = type(definition).__module__.split(".", 1)[0]
-    return Path(sys.modules[top].__file__ or ".").resolve().parent.parent
-
-
 BUILTIN_COMPONENT_RUNTIMES: dict[str, tuple[str, ...]] = {
     # lint-config@1 delivers ruff/mypy-style Python config files.
     "lint-config@1": ("python",),
@@ -108,8 +100,8 @@ def component_runtimes(definition: ComponentDefinition) -> tuple[str, ...]:
 
 
 def fingerprint(definition: ComponentDefinition) -> str:
-    """sha256 over the manifest and the bytes of every fingerprint source file."""
-    root = _source_root(definition)
+    """sha256 over the manifest and the bytes of every fingerprint source file (repo-relative)."""
+    root = REPO_ROOT
     sources = {}
     for relative in definition.manifest.fingerprint:
         path = root / relative

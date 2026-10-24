@@ -1039,9 +1039,9 @@ def test_the_probe_fails_when_autofix_was_asked_for_but_not_recorded(tmp_path: P
 
 def test_the_fingerprint_covers_the_gate_and_autofix_modules() -> None:
     files = GUARDRAIL_GATE.manifest.fingerprint
-    assert "raidar/subject/treatment/runtime/autofix_run.py" in files
-    assert "raidar/subject/treatment/runtime/guardrail_gate.py" in files
-    assert "raidar/subject/treatment/runtime/gate_run.py" in files
+    assert "orchestrator/src/raidar/subject/treatment/runtime/autofix_run.py" in files
+    assert "orchestrator/src/raidar/subject/treatment/runtime/guardrail_gate.py" in files
+    assert "orchestrator/src/raidar/subject/treatment/runtime/gate_run.py" in files
     assert len(files) == len(set(files))
     assert fingerprint(ComponentRegistry().get(REF)) != ""
 

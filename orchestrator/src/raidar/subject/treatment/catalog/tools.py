@@ -173,8 +173,8 @@ class LintTool:
         network=NetworkNeeds(egress_hosts=("files.pythonhosted.org", "pypi.org")),
         fingerprint=(
             *COMMON_FINGERPRINT,
-            "raidar/subject/treatment/catalog/tools.py",
-            "raidar/subject/treatment/runtime/provision.py",
+            "orchestrator/src/raidar/subject/treatment/catalog/tools.py",
+            "orchestrator/src/raidar/subject/treatment/runtime/provision.py",
         ),
         discovery_probe=DiscoveryProbe(
             id="lint-tool-invocable",

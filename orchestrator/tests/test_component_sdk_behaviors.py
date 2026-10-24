@@ -44,10 +44,10 @@ from tests.component_support import (
 from tests.experiment_spec_support import experiment_document, fixture_resolvers, write_experiment
 
 SDK_RUNTIME_SOURCES = [
-    "raidar/subject/treatment/definition/compiler.py",
-    "raidar/subject/treatment/definition/compiled.py",
-    "raidar/subject/treatment/runtime/setup_script.py",
-    "raidar/subject/treatment/runtime/step_reset.sh",
+    "orchestrator/src/raidar/subject/treatment/definition/compiler.py",
+    "orchestrator/src/raidar/subject/treatment/definition/compiled.py",
+    "orchestrator/src/raidar/subject/treatment/runtime/setup_script.py",
+    "orchestrator/src/raidar/subject/treatment/runtime/step_reset.sh",
 ]
 BUILTIN_REFS = [
     "continue-on-stall@2",
@@ -267,7 +267,7 @@ def test_resolver_digest_tracks_manifest_and_implementation_sources(tmp_path: Pa
     missing.manifest = ComponentManifest(
         **{
             **RULES_FILE.manifest.model_dump(),
-            "fingerprint": ("raidar/subject/treatment/absent.py",),
+            "fingerprint": ("orchestrator/src/raidar/subject/treatment/absent.py",),
             "discovery_probe": DiscoveryProbe(id="x", description="x", evidence=("x",)),
         }
     )
@@ -356,11 +356,11 @@ def test_component_trees_ship_exactly_the_files_the_lock_hashes(tmp_path: Path) 
 
 
 # Imported modules a fingerprint need not list: the lock's toolchain section
-# pins raidar/design/experiment (raidar_spec digest); the registry and the harness enum are
+# pins orchestrator/src/raidar/design/experiment (raidar_spec digest); the registry and the harness enum are
 # lookup machinery, not component behaviour.
 _UNFINGERPRINTED_OK = {
-    "raidar/subject/agent/config.py",
-    "raidar/subject/treatment/definition/registry.py",
+    "orchestrator/src/raidar/subject/agent/config.py",
+    "orchestrator/src/raidar/subject/treatment/definition/registry.py",
 }
 
 
@@ -369,27 +369,27 @@ def test_every_raidar_module_a_builtin_imports_is_fingerprinted() -> None:
 
     from raidar.subject.treatment.definition.registry import ComponentRegistry
 
-    src = Path(__file__).resolve().parents[1] / "src"
+    repo = Path(__file__).resolve().parents[2]
     registry = ComponentRegistry()
     missing: dict[str, list[str]] = {}
     for ref in registry.refs():
         listed = set(registry.get(ref).manifest.fingerprint)
         for relative in sorted(item for item in listed if item.endswith(".py")):
-            for node in ast.walk(ast.parse((src / relative).read_text())):
+            for node in ast.walk(ast.parse((repo / relative).read_text())):
                 if not isinstance(node, ast.ImportFrom) or not node.module:
                     continue
                 if not node.module.startswith("raidar."):
                     continue
-                module = node.module.replace(".", "/")
+                module = "orchestrator/src/" + node.module.replace(".", "/")
                 path = next(
-                    (c for c in (f"{module}.py", f"{module}/__init__.py") if (src / c).is_file()),
+                    (c for c in (f"{module}.py", f"{module}/__init__.py") if (repo / c).is_file()),
                     None,
                 )
                 if (
                     path
                     and path not in listed
                     and path not in _UNFINGERPRINTED_OK
-                    and not path.startswith("raidar/design/experiment/")
+                    and not path.startswith("orchestrator/src/raidar/design/experiment/")
                 ):
                     missing.setdefault(ref, []).append(path)
     assert missing == {}

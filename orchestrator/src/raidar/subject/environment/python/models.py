@@ -14,7 +14,9 @@ from typing import Any
 import yaml
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-PACK_DIR = Path(__file__).resolve().parent
+from raidar.contract.paths import environment_root
+
+PACK_DIR = environment_root() / "python"
 PACK_SPEC_PATH = PACK_DIR / "pack.yaml"
 TOOL_LOCK_PATH = PACK_DIR / "tools.lock.yaml"
 

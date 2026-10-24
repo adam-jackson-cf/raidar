@@ -55,10 +55,10 @@ class ReviewLoop:
         supports=BOTH_HARNESSES,
         fingerprint=(
             *COMMON_FINGERPRINT,
-            "raidar/subject/treatment/catalog/workflow.py",
-            "raidar/subject/treatment/runtime/review_loop.py",
-            "raidar/subject/treatment/runtime/session_chain.py",
-            "raidar/contract/snapshot.py",  # the reviewer diff leaves out SNAPSHOT_EXCLUDES
+            "orchestrator/src/raidar/subject/treatment/catalog/workflow.py",
+            "orchestrator/src/raidar/subject/treatment/runtime/review_loop.py",
+            "orchestrator/src/raidar/subject/treatment/runtime/session_chain.py",
+            "orchestrator/src/raidar/contract/snapshot.py",  # the reviewer diff leaves out SNAPSHOT_EXCLUDES
         ),
         discovery_probe=DiscoveryProbe(
             id="review-loop-reviewed",

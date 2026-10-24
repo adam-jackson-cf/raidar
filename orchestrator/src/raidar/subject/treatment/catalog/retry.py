@@ -58,12 +58,12 @@ class TransientRetry:
         supports=BOTH_HARNESSES,
         fingerprint=(
             *COMMON_FINGERPRINT,
-            "raidar/subject/treatment/catalog/retry.py",
-            "raidar/subject/treatment/runtime/transient_retry.py",
-            "raidar/subject/treatment/runtime/continue_on_stall.py",  # the per-attempt run record
-            "raidar/contract/snapshot.py",  # imported by continue_on_stall
-            "raidar/subject/treatment/runtime/session_chain.py",
-            "raidar/subject/treatment/runtime/review_loop.py",  # usage sums, prompt budget
+            "orchestrator/src/raidar/subject/treatment/catalog/retry.py",
+            "orchestrator/src/raidar/subject/treatment/runtime/transient_retry.py",
+            "orchestrator/src/raidar/subject/treatment/runtime/continue_on_stall.py",  # the per-attempt run record
+            "orchestrator/src/raidar/contract/snapshot.py",  # imported by continue_on_stall
+            "orchestrator/src/raidar/subject/treatment/runtime/session_chain.py",
+            "orchestrator/src/raidar/subject/treatment/runtime/review_loop.py",  # usage sums, prompt budget
         ),
         discovery_probe=DiscoveryProbe(
             id="transient-retry-recorded",

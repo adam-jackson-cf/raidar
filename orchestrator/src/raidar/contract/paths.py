@@ -1,5 +1,9 @@
 """Repository layout: tracked ``lab/`` definitions and the generated ``var/`` root.
 
+``lab/`` holds the run-time data the code loads, each tree at one explicit path below: the
+experiments, the problem pins, the ledger, the component payloads (``lab/treatment/``), the
+runtime-pack recipes (``lab/environment/``) and the judge policies (``lab/judge/``).
+
 ``var/`` holds everything Raidar generates (jobs, Assessment stores, analysis output,
 imported problem content and the scratch directory); it is git-ignored. ``RAIDAR_VAR``
 relocates it; unset, it is ``<repo>/var``.
@@ -32,3 +36,18 @@ def tmp_root() -> Path:
 
 def lab_root(repo_root: Path = REPO_ROOT) -> Path:
     return repo_root / LAB_DIR
+
+
+def treatment_root(repo_root: Path = REPO_ROOT) -> Path:
+    """Run-time data of the treatment components: ``lab/treatment/<component>/``."""
+    return lab_root(repo_root) / "treatment"
+
+
+def environment_root(repo_root: Path = REPO_ROOT) -> Path:
+    """Run-time data of the runtime packs: ``lab/environment/<runtime>/``."""
+    return lab_root(repo_root) / "environment"
+
+
+def judge_root(repo_root: Path = REPO_ROOT) -> Path:
+    """Judge policies and question sets: ``lab/judge/``."""
+    return lab_root(repo_root) / "judge"

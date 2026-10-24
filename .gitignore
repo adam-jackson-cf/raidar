@@ -36,7 +36,8 @@ coverage/
 .mypy_cache/
 .cache/
 # Generated data root (RAIDAR_VAR relocates it): jobs, stores, analysis, problems content, scratch.
-# Tracked definitions live under lab/ (experiments, problems pins, ledger).
+# Tracked definitions live under lab/ (experiments, problem pins, ledger, treatment payloads,
+# runtime-pack recipes, judge policies).
 /var/
 # Pre-schema-v2 job root; kept ignored for checkouts that still hold one.
 /runs/

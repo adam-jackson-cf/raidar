@@ -42,7 +42,7 @@ class PromptWrapper:
         kind=ComponentKind.PROMPT,
         description="Wrap each step instruction in a template with one {{ instruction }} slot",
         supports=BOTH_HARNESSES,
-        fingerprint=(*COMMON_FINGERPRINT, "raidar/subject/treatment/catalog/prompt.py"),
+        fingerprint=(*COMMON_FINGERPRINT, "orchestrator/src/raidar/subject/treatment/catalog/prompt.py"),
         discovery_probe=DiscoveryProbe(
             id="prompt-wrapper-rendered",
             description="The template's static text is in the prompt the harness received",

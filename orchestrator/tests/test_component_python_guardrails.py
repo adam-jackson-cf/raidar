@@ -47,7 +47,7 @@ from raidar.subject.treatment.catalog.guardrails import (
     LINK_PATH,
     PAYLOAD_DIR,
     PAYLOAD_FILES,
-    PAYLOAD_PACKAGE_DIR,
+    PAYLOAD_REPO_DIR,
     PINNED_VERSION,
     PROTECTED_CONFIGS,
     PTH_NAME,
@@ -217,10 +217,10 @@ def test_python_guardrails_is_a_python_service_that_fingerprints_its_whole_paylo
     assert component_runtimes(definition) == ("python",)
     assert manifest.network.egress_hosts == ("files.pythonhosted.org", "pypi.org")
     for relative in PAYLOAD_FILES:
-        assert f"{PAYLOAD_PACKAGE_DIR}/{relative}" in manifest.fingerprint
-    assert "raidar/subject/treatment/catalog/guardrails.py" in manifest.fingerprint
-    assert "raidar/subject/treatment/runtime/provision.py" in manifest.fingerprint
-    assert "raidar/subject/treatment/definition/integrity.py" in manifest.fingerprint
+        assert f"{PAYLOAD_REPO_DIR}/{relative}" in manifest.fingerprint
+    assert "orchestrator/src/raidar/subject/treatment/catalog/guardrails.py" in manifest.fingerprint
+    assert "orchestrator/src/raidar/subject/treatment/runtime/provision.py" in manifest.fingerprint
+    assert "orchestrator/src/raidar/subject/treatment/definition/integrity.py" in manifest.fingerprint
     assert len(manifest.fingerprint) == len(set(manifest.fingerprint))
     shipped = {
         path.relative_to(PAYLOAD_DIR).as_posix()

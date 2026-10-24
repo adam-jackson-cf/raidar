@@ -40,8 +40,8 @@ from raidar.subject.treatment.definition.manifest import (
 
 _FINGERPRINT = (
     *COMMON_FINGERPRINT,
-    "raidar/subject/treatment/catalog/workspace.py",
-    "raidar/subject/agent/harness.py",  # rules_target: the harness's rules filename
+    "orchestrator/src/raidar/subject/treatment/catalog/workspace.py",
+    "orchestrator/src/raidar/subject/agent/harness.py",  # rules_target: the harness's rules filename
 )
 LINT_CONFIG_NAMES = frozenset(
     {

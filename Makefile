@@ -88,7 +88,7 @@ endif
 endif
 # agent-smoke: the smoke experiment with its one agent replaced. AGENT is a Harbor agent name
 # (codex, claude-code). Versions must equal the Python pack pins
-# (orchestrator/src/raidar/subject/environment/python/pack.yaml); the lock refuses others (RT5).
+# (lab/environment/python/pack.yaml); the lock refuses others (RT5).
 # Provider/model/effort default per agent: codex runs gpt-6-luna at low effort;
 # claude-code runs claude-haiku-4-5, which has no effort levels, so its effort is unset.
 # REASONING_EFFORT given (even empty: `REASONING_EFFORT=`) wins; empty means unset.

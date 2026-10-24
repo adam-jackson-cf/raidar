@@ -133,13 +133,13 @@ class GuardrailGate:
         supports=BOTH_HARNESSES,
         fingerprint=(
             *COMMON_FINGERPRINT,
-            "raidar/subject/treatment/catalog/gate.py",
-            "raidar/subject/treatment/runtime/gate_run.py",
-            "raidar/subject/treatment/runtime/autofix_run.py",
-            "raidar/subject/treatment/runtime/guardrail_gate.py",
-            "raidar/subject/treatment/runtime/session_chain.py",
-            "raidar/subject/treatment/runtime/review_loop.py",  # usage sums, budget, step logs
-            "raidar/contract/snapshot.py",  # SNAPSHOT_EXCLUDES, the pre-fix tree digest
+            "orchestrator/src/raidar/subject/treatment/catalog/gate.py",
+            "orchestrator/src/raidar/subject/treatment/runtime/gate_run.py",
+            "orchestrator/src/raidar/subject/treatment/runtime/autofix_run.py",
+            "orchestrator/src/raidar/subject/treatment/runtime/guardrail_gate.py",
+            "orchestrator/src/raidar/subject/treatment/runtime/session_chain.py",
+            "orchestrator/src/raidar/subject/treatment/runtime/review_loop.py",  # usage sums, budget, step logs
+            "orchestrator/src/raidar/contract/snapshot.py",  # SNAPSHOT_EXCLUDES, the pre-fix tree digest
         ),
         discovery_probe=DiscoveryProbe(
             id="guardrail-gate-ran",

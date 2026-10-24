@@ -86,6 +86,7 @@ from collections.abc import Iterator
 from pathlib import Path, PurePosixPath
 from typing import Any
 
+from raidar.contract.paths import treatment_root
 from raidar.subject.treatment.catalog._common import (
     BOTH_HARNESSES,
     COMMON_FINGERPRINT,
@@ -111,8 +112,8 @@ from raidar.subject.treatment.runtime.provision import (
     TrialProvision,
 )
 
-PAYLOAD_PACKAGE_DIR = "raidar/subject/treatment/payloads/python_guardrails"
-PAYLOAD_DIR = Path(__file__).resolve().parents[1] / "payloads" / "python_guardrails"
+PAYLOAD_DIR = treatment_root() / "python_guardrails"
+PAYLOAD_REPO_DIR = "lab/treatment/python_guardrails"
 GATE_LIBRARY = (
     "__init__.py",
     "diagnostics.py",
@@ -764,10 +765,11 @@ class PythonGuardrails:
         network=NetworkNeeds(egress_hosts=("files.pythonhosted.org", "pypi.org")),
         fingerprint=(
             *COMMON_FINGERPRINT,
-            "raidar/subject/treatment/catalog/guardrails.py",
-            "raidar/subject/treatment/definition/integrity.py",
-            "raidar/subject/treatment/runtime/provision.py",
-            *(f"{PAYLOAD_PACKAGE_DIR}/{relative}" for relative in PAYLOAD_FILES),
+            "orchestrator/src/raidar/contract/paths.py",
+            "orchestrator/src/raidar/subject/treatment/catalog/guardrails.py",
+            "orchestrator/src/raidar/subject/treatment/definition/integrity.py",
+            "orchestrator/src/raidar/subject/treatment/runtime/provision.py",
+            *(f"{PAYLOAD_REPO_DIR}/{relative}" for relative in PAYLOAD_FILES),
         ),
         discovery_probe=DiscoveryProbe(
             id="python-guardrails-gate-works",

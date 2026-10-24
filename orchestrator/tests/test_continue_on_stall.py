@@ -105,7 +105,7 @@ def test_the_component_is_a_session_wrapper_that_composes_with_the_gate() -> Non
 
     assert definition.manifest.kind is ComponentKind.WORKFLOW
     assert (
-        "raidar/subject/treatment/runtime/continue_on_stall.py" in definition.manifest.fingerprint
+        "orchestrator/src/raidar/subject/treatment/runtime/continue_on_stall.py" in definition.manifest.fingerprint
     )
     assert compiled.agent_wrapper is not None
     assert compiled.agent_wrapper.import_path == GUARDRAIL_GATE_IMPORT_PATH
