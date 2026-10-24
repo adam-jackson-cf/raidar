@@ -34,6 +34,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from raidar.core.runtimes import ANY_RUNTIME
 from raidar.spec.references import ResolvedReference
 from raidar.spec.schema import ComponentUse, ExperimentSpec
 from raidar.spec.validation import FieldIssue
@@ -41,7 +42,6 @@ from raidar.spec.validation import FieldIssue
 if TYPE_CHECKING:
     from raidar.packs.python.models import PackSpec
 
-ANY_RUNTIME = "*"
 TASK_RUNTIME_KEY = "raidar_runtime"
 PackLoader = Callable[[str], "PackSpec"]
 
