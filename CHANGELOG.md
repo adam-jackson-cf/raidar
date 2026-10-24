@@ -2,6 +2,125 @@
 
 All notable changes to this project are documented in this file.
 
+## 0.15.0 - 2026-10-24
+
+### Features
+
+- feat: generated data root var/ (RAIDAR_VAR), make release-archive and structure-check
+- feat(health): run-health audit, host liveness (observe), T1 tool-tree hashing, smoke-before-measure (mechanics-v1 step 5)
+- feat(ledger): tracked fault/remedy ledger, raidar ledger check/index, make ledger-check in quality
+- feat(analysis): job provenance, records manifests and a pooling gate in analyze
+- feat(skills): raidar-onboarding behaviour skill (repo setup and ready checks)
+- feat(reboot): guardrails iteration 4 (gate autofix) and main-04 results
+- feat(reboot): guardrails iteration 4
+- feat(reboot): guardrails iteration 3b-n and main-03 results
+- feat(reboot): guardrails iteration 3b.5 — code-quality@3 case-level coverage parity (pre-registration)
+- feat(reboot): guardrails iteration 3b.4
+- feat(reboot): guardrails iteration 3b.3
+- feat(reboot): guardrails iteration 3b.2
+- feat(reboot): guardrails iteration 3b design — scope fix, stall@2, transient retry, gate-effort@5 (pre-registration)
+- feat(reboot): guardrails explore iteration 3 — tests in gate, pre-fix snapshots, no-stall continuation, per-trial pack install
+- feat(reboot): guardrails main-02 results
+- feat(reboot): shadow gate, configurable primary outcome, git evidence, detached jobs; de-vendor guardrails skill
+- feat(reboot): guardrails ab-test results
+- feat(reboot): python-guardrails@1 pack, gate-effort metrics, guardrails ab-test (replaces ruff experiments)
+- feat(reboot): park Jev; harness-agnostic guardrail commit gate
+
+### Bug Fixes
+
+- fix(analysis): a metric with no better direction never reads improved/worse; cli: problem --store via store_at, shared ANY_RUNTIME
+- fix(problems): store_at keeps an explicit lab/problems root's generated content under var/
+- fix(jev): always remove the temporary cache file after publishing a decision
+- fix(packs): ignore OS and cache files in the pack image context digest
+- fix(problems): refuse a committed errata that still carries the drafted placeholder reason
+- fix(components): review-loop accepts a session-wrapper inner agent; share helpers, fix stale docs
+- fix(review-surface): static path prefix check, var/tmp projection default, drop dead StatBlock field
+- fix(analysis): refuse arms with no shared attempt instead of IndexError; job layout constants
+- fix(ledger): match ids with fullmatch; require an existing --root
+- fix(gate-effort): emit new_* gaps for a reached step without a gate record; drop dead scorer code
+- fix(targets): validate target names/hosts, no leaked tunnel on context failure, private state dir
+
+### Documentation
+
+- docs: structure design accepted, implementation record
+- docs: identity-bearing artifacts follow the edit-in-place release rule
+- docs: README component row lists the surviving component versions
+- docs: repository structure, var/ root, release-archive and lab/ paths
+- docs: update AGENTS.md and README for moved packages and removed legacy targets
+- docs: repository structure, primitives and versioning design (accepted)
+- docs: ADR-002 A.8 mechanics v1 declared; forge smoke known config
+- docs: run mechanics v1 (health, liveness, pooling, ledger, smoke admission); correct design-memo Harbor backend claim
+- docs(verifier): drop stale bind-mount wording (scorer digests unchanged)
+- docs(reboot): ADR-002 A.3 remote bind-mount guard and gate result
+- docs(reboot): execution targets in AGENTS/README, per-target budget policy (mbp proposed, report-only), ADR-002 A.3
+- docs(reboot): mechanics-v1 step 0 spike evidence (copy path parity, liveness prototype)
+- docs(reboot): ADR-002 mechanics v1, design r2, close guardrails series
+- docs(reboot): guardrails iteration 3 write-up
+
+### Refactoring
+
+- refactor: split fan-out and complexity offenders (assess job lookup into analysis.sources, sandbox _run, check_l2, PhaseMonitor host)
+- refactor(components): one provision lister, shared ANY_RUNTIME, drop unused missing_secrets
+- refactor(cli): public load_cli_experiment instead of a cross-module private
+- refactor(spec): import ANY_RUNTIME from core.runtimes
+- refactor(review): one definition of scorer refs and job layout names; tolerate unparseable Harbor result.json
+- refactor(core,problems): remove dead changed_repo_paths and report_sha256; fix docstring
+- refactor(agents): drop unused model-profile labels and ModelTarget.from_string; fix stale CLI names
+- refactor(spec): drop dead naming flag, lock version parameter and unused constants; fix stale docs
+- refactor(cli): drop mutable agent-choices global and duplicate suite reruns in quality gates; use job layout constants; verifier wording
+- refactor(scorers): describe current behaviour only in gate-effort and process-compliance descriptions
+- refactor: analysis, review, spec and verifier read the single code-quality, process-compliance and gate-effort refs
+- refactor: collapse code-quality into one unversioned scorer and drop per-version registry glue and the scorer Jev store binding
+- refactor: flatten lint-tool@2 and prune component entry points to the surviving versions
+- refactor: move experiments, problems pins and ledger under lab/
+- refactor: flatten guardrail-gate into one unversioned module set at version 4
+- refactor: collapse process-compliance into one unversioned scorer package
+- refactor: keep the click error conversion of offline grading in cli/grading.py
+- refactor: group raidar into core, cli, agents, components/{definition,runtime,catalog}, execution/{health,perf} and review/{projection,quality}
+- refactor: delete legacy schema-v1 loader, job migration, dormant process-compliance@1 and code-quality sensitivity
+- refactor(reboot): cut mechanics out of scorer keys (mechanics-v1 step -1)
+
+### Chores
+
+- chore(components): drop plan/version-era names from component tests and docs
+- chore: fix version-wiring CLI path, stale skill examples, changelog for restructure and mechanics v1
+- chore: Makefile help and assess recipe follow the scorer collapse
+- chore: remove finished ab-test experiments (kept at tag archive/pre-structure-reset)
+- chore: relock experiments after the package restructure
+- chore: CLAUDE.md -> AGENTS.md and .claude/skills -> .agents/skills symlinks
+
+### Other Changes
+
+- relock experiments after review fixes
+- Update tests to the lab/ and var/ layout
+- Split modules to meet fan-out and complexity limits
+- Delete versioned python-guardrails tests
+- Flatten python-guardrails and provision into unversioned modules and one payload tree
+- Collapse gate-effort@1..@10 into one unversioned gate_effort package
+- Flatten continue-on-stall@2 and review-loop@2 into unversioned modules
+- Liveness enforce by default (idle kill classified like an agent timeout); smoke admission requires agent work
+- Per-target N1 budgets: accept the mbp set, select by recorded execution_target
+- mechanics-v1: runner dirty flag ignores docs/; forge smoke gets pilot-v2 starter framing; ADR-002 A.6-A.7; skill health.json path
+- Make the copy-only data path the only data path (mechanics-v1 steps 2-3)
+- Refuse bind-mount work on remote targets until the copy path lands
+- Make the Docker execution target configurable per machine (mechanics-v1 step 1)
+
+- detach: read the supervisor command line at unlimited ps width (procps truncates at 80 columns)
+- execution: report failed compose down, harden detach supervisor, drop dead helpers
+- experiments: add forge mechanics-v1 declaration smoke
+- health: keep the idle kill verdict when the phase ends mid-kill; seal symlinked dirs; L2 needs a phase; harden admission and poll script
+- make: quality runs lizard once (raidar quality gates already does)
+- restructure: drop leftover versioned tests; relock remaining experiments
+- scorers: import ANY_RUNTIME from core.runtimes
+- scorers: drop dead code-quality branches and stale docs, hash scorer identity once per rescore, no temp-file leak in store writes
+- style: ruff import block
+- tests: run and errata tests no longer depend on host codex auth
+- tests: fork parity compares only the interpreter language level; docs: round 2 grouping proposal
+- tests: fork parity ignores the host interpreter identity (fails on any host but the recording one)
+- tests: build the problem-store fixture in tmp; drop the committed lab/problems/fixtures copy
+- tests: sort imports
+- verifier: reap grader processes, catch escaped leak copies, treat malformed ledgers as infra, write store files atomically, drop cross-module private names
+
 ## Unreleased - repository restructure and mechanics v1
 
 ### Changed
@@ -275,20 +394,21 @@ All notable changes to this project are documented in this file.
 
 - Harbor's vocabulary replaces Raidar's wherever Harbor has a term (requirements change log 2026-10-02). Old to new:
 
-  | Was | Now |
-  |---|---|
-  | run, `runs/`, `run.json`, `run.lock.json`, `RUN=`, `RUNS=`, `RUN_ID=`, `RUNS_DIR=`, `--run-id`, `--runs-dir`, `--allow-dev-runs` | job, `jobs/`, `job.json`, `job.lock.json`, `JOB=`, `JOBS=`, `JOB_ID=`, `JOBS_DIR=`, `--job-id`, `--jobs-dir`, `--allow-dev-jobs` |
-  | trajectory, `TrajectoryRecord`, `trajectories/<trial>.json` (`raidar-trajectory`) | trial, `TrialRecord`, `trial-records/<trial>.json` (`raidar-trial`, schema 2) |
-  | `CheckpointAttempt` (`raidar-checkpoint-attempt`), record field `attempts` | `StepResult` (`raidar-step-result`), record field `step_results` |
-  | blocks, `analysis.blocks`, `--blocks`/`--block`, `BLOCK=`, `SMOKE_BLOCKS=` | attempts, `analysis.attempts`, `--attempts`/`--attempt`, `ATTEMPT=`, `SMOKE_ATTEMPTS=` |
-  | oracle (hidden grader), `raidar.oracle`, `RaidarOracleVerifier`, `OracleBundle`, `ORACLE_BUNDLE=` | verifier, `raidar.verifier`, `RaidarVerifier`, `VerifierBundle`, `VERIFIER_BUNDLE=` |
+  | Was                                                                                                                                                           | Now                                                                                                                                                                             |
+  | ------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+  | run, `runs/`, `run.json`, `run.lock.json`, `RUN=`, `RUNS=`, `RUN_ID=`, `RUNS_DIR=`, `--run-id`, `--runs-dir`, `--allow-dev-runs`                              | job, `jobs/`, `job.json`, `job.lock.json`, `JOB=`, `JOBS=`, `JOB_ID=`, `JOBS_DIR=`, `--job-id`, `--jobs-dir`, `--allow-dev-jobs`                                                |
+  | trajectory, `TrajectoryRecord`, `trajectories/<trial>.json` (`raidar-trajectory`)                                                                             | trial, `TrialRecord`, `trial-records/<trial>.json` (`raidar-trial`, schema 2)                                                                                                   |
+  | `CheckpointAttempt` (`raidar-checkpoint-attempt`), record field `attempts`                                                                                    | `StepResult` (`raidar-step-result`), record field `step_results`                                                                                                                |
+  | blocks, `analysis.blocks`, `--blocks`/`--block`, `BLOCK=`, `SMOKE_BLOCKS=`                                                                                    | attempts, `analysis.attempts`, `--attempts`/`--attempt`, `ATTEMPT=`, `SMOKE_ATTEMPTS=`                                                                                          |
+  | oracle (hidden grader), `raidar.oracle`, `RaidarOracleVerifier`, `OracleBundle`, `ORACLE_BUNDLE=`                                                             | verifier, `raidar.verifier`, `RaidarVerifier`, `VerifierBundle`, `VERIFIER_BUNDLE=`                                                                                             |
   | harness (`codex-cli`), `agents[].harness`, factor `agent.harness`, `raidar harness ...`, `make harness-list/harness-validate`, `HARNESS=`, `HARNESS_VERSION=` | agent name (Harbor `AgentName`: `codex`, `claude-code`), `agents[].name`, factor `agent.name`, `raidar agent ...`, `make agent-list/agent-validate`, `AGENT=`, `AGENT_VERSION=` |
-  | `runtime: {language, environment, compose_init}` | `runtime: <pack id>` and `environment: {type, compose_init}` |
-  | headline policy, `assessment.headline_policy`, `ScorePolicy`, `raidar.spec.policies`, reference kind `policy` | headline metric, `assessment.metric`, `Metric`, `raidar.spec.metrics`, reference kind `metric` (ids `scb-canonical@1/@2` unchanged) |
-  | validity checks `oracle_verdicts`, `oracle_infra`, `no_oracle_leak`, `harness_version`; phases `oracle_leak_check`, `oracle_run` | `verifier_verdicts`, `verifier_infra`, `no_verifier_leak`, `agent_version`; `verifier_leak_check`, `verifier_run` |
-  | `REVIEW_RUNS_ROOT=`, `QUALITY_RUNS=`, `--runs-root` | `REVIEW_JOBS_ROOT=`, `QUALITY_JOBS=`, `--jobs-root` |
+  | `runtime: {language, environment, compose_init}`                                                                                                              | `runtime: <pack id>` and `environment: {type, compose_init}`                                                                                                                    |
+  | headline policy, `assessment.headline_policy`, `ScorePolicy`, `raidar.spec.policies`, reference kind `policy`                                                 | headline metric, `assessment.metric`, `Metric`, `raidar.spec.metrics`, reference kind `metric` (ids `scb-canonical@1/@2` unchanged)                                             |
+  | validity checks `oracle_verdicts`, `oracle_infra`, `no_oracle_leak`, `harness_version`; phases `oracle_leak_check`, `oracle_run`                              | `verifier_verdicts`, `verifier_infra`, `no_verifier_leak`, `agent_version`; `verifier_leak_check`, `verifier_run`                                                               |
+  | `REVIEW_RUNS_ROOT=`, `QUALITY_RUNS=`, `--runs-root`                                                                                                           | `REVIEW_JOBS_ROOT=`, `QUALITY_JOBS=`, `--jobs-root`                                                                                                                             |
 
-  A make variable under its old name fails with its new name. Kept: *problem*, *checkpoint*, *experiment*, *arm*, *condition*, *component*, *factor*, *lock*, *verdict*; Harbor's `oracle` agent (`AGENT_OVERRIDE=oracle`); and, byte for byte, the frozen artifacts (released components' fingerprint sources, the grader plugin, the Python pack image recipe and the verifier evidence names inside trial directories).
+  A make variable under its old name fails with its new name. Kept: _problem_, _checkpoint_, _experiment_, _arm_, _condition_, _component_, _factor_, _lock_, _verdict_; Harbor's `oracle` agent (`AGENT_OVERRIDE=oracle`); and, byte for byte, the frozen artifacts (released components' fingerprint sources, the grader plugin, the Python pack image recipe and the verifier evidence names inside trial directories).
+
 - `experiment.yaml` is `schema_version: 2`: a required `kind` (`ab-test`, `benchmark`, `smoke`; `research-loop` reserved), a required `runtime`, and the renamed fields above. Schema v1 files are read-only: `raidar validate` accepts them, `lock`/`plan`/`run` refuse them; `raidar upgrade-spec` (`make experiment-upgrade`) converts one.
 - Experiments live at `experiments/<kind>/<id>/experiment.yaml` with ids `<runtime>__<subject>__<intent>` (`NAME1`, `NAME2`). `examples/` is gone: `examples/pilot/experiment.yaml` is `experiments/ab-test/python__forge__guided-pilot/`, `examples/pilot/oneshot.experiment.yaml` is `experiments/ab-test/python__circuit_eval-cp1__guided-pilot/`, `examples/smoke/experiment.yaml` is `experiments/smoke/python__circuit_eval-cp1__agent-health/` and `examples/smoke/agents.experiment.yaml` is the benchmark `experiments/benchmark/python__circuit_eval-cp1__agents/`. `experiments/` is tracked; `experiments/research_loops/` and `experiments/operational_smoke/` stay ignored.
 - Lock version 3: the execution section records `kind`, `runtime`, `environment` and agent names (`versions.agents`); the assessment section records `metric`. Every experiment was relocked. `raidar migrate-run-lock` is replaced by `raidar migrate-job`.
@@ -311,18 +431,18 @@ All notable changes to this project are documented in this file.
 - Removed CLI commands: `raidar scenario ...`, `raidar info`, `raidar matrix ...`, `raidar experiment run`, `raidar experiments list|prune`, and the `raidar run --scenario` compatibility branch.
 - Removed make targets, with no refusing stubs left behind. Old to new:
 
-  | Removed target | Replacement |
-  |---|---|
-  | `scenario-list` | `make problem-list` |
-  | `scenario-info` | `make problem-info PROBLEM=<ref>`, and `make experiment-plan EXPERIMENT=<path>` for an experiment's resolved contract |
-  | `scenario-validate` | `make experiment-validate EXPERIMENT=<path>` and `make problem-validate PROBLEM=<ref>` |
-  | `scenario-init` | `make experiment-init EXPERIMENT=<dir>/experiment.yaml` |
-  | `scenario-clone-revision` | no target: add a condition and an arm inside the existing `experiment.yaml` |
-  | `experiment-run`, `matrix-run` | `make experiment-execute EXPERIMENT=<path>` |
-  | `runtime-stack-scenario-smoke` | `make pack-audit` and `make component-probe-trials` |
-  | `experiments-list`, `experiments-prune` | none: `runs/` is a plain directory; `make harbor-cleanup` removes leftover trial environments |
-  | `smoke-matrix SMOKE_MATRIX_SELECTOR=` | `make smoke-agents SMOKE_ARM=codex\|claude` (the Gemini selector is gone; the Python pack bakes in only codex-cli and claude-code) |
-  | `benchmark-fixture-synthetic` | none: the scenario-epoch review read path is removed (see below); `make review-fixture-synthetic` writes the experiment fixture |
+  | Removed target                          | Replacement                                                                                                                        |
+  | --------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+  | `scenario-list`                         | `make problem-list`                                                                                                                |
+  | `scenario-info`                         | `make problem-info PROBLEM=<ref>`, and `make experiment-plan EXPERIMENT=<path>` for an experiment's resolved contract              |
+  | `scenario-validate`                     | `make experiment-validate EXPERIMENT=<path>` and `make problem-validate PROBLEM=<ref>`                                             |
+  | `scenario-init`                         | `make experiment-init EXPERIMENT=<dir>/experiment.yaml`                                                                            |
+  | `scenario-clone-revision`               | no target: add a condition and an arm inside the existing `experiment.yaml`                                                        |
+  | `experiment-run`, `matrix-run`          | `make experiment-execute EXPERIMENT=<path>`                                                                                        |
+  | `runtime-stack-scenario-smoke`          | `make pack-audit` and `make component-probe-trials`                                                                                |
+  | `experiments-list`, `experiments-prune` | none: `runs/` is a plain directory; `make harbor-cleanup` removes leftover trial environments                                      |
+  | `smoke-matrix SMOKE_MATRIX_SELECTOR=`   | `make smoke-agents SMOKE_ARM=codex\|claude` (the Gemini selector is gone; the Python pack bakes in only codex-cli and claude-code) |
+  | `benchmark-fixture-synthetic`           | none: the scenario-epoch review read path is removed (see below); `make review-fixture-synthetic` writes the experiment fixture    |
 
 - Review surface variables and flags: `REVIEW_EXPERIMENTS_ROOT`, `python -m raidar.review_projection --experiments-root` and the fixture's scenario-epoch experiments are removed with the scenario-epoch read path (next entry). `make review-surface-test` always runs on the synthetic review fixture, and it takes one `REVIEW_STORE` for every `REVIEW_RUNS_ROOT` or one per root, failing on any other count instead of leaving given runs out of the Quality data.
 - The scenario-epoch review read path is removed: `raidar.review_projection.scenario_epoch` (with its frozen fixture), `REVIEW_LEGACY_ROOT`, `python -m raidar.review_projection --legacy-root`, `REVIEW_FIXTURE` (`legacy` mode) and the scenario taxonomy in `raidar.schemas.review` are gone. `make review-surface-data` now requires `REVIEW_RUNS_ROOT`.
@@ -370,6 +490,7 @@ All notable changes to this project are documented in this file.
 - CI no longer installs Bun; only the removed scenario starters used it.
 - `AGENTS.md` is rewritten for the experiment, problem, component and scorer model (workflow rules, known experiment configs, smoke testing). `CODEOWNERS` drops the nonexistent `/.configs/` and `/benchmark-view/` and names the current top-level surfaces.
 - The README, `make help`, the review-surface README and the import contracts describe the experiment, problem, component and scorer model.
+
 ## 0.14.0 - 2026-07-09
 
 ### Refactoring
