@@ -66,7 +66,7 @@ RAIDAR_PACKAGES: dict[str, frozenset[str]] = {
     "design": frozenset({"experiment", "problem"}),
     "subject": frozenset({"agent", "treatment", "environment"}),
     "engine": frozenset({"target", "job", "trial", "health", "perf"}),
-    "grading": frozenset({"runtime"}),
+    "grading": frozenset({"runtime", "prefix", "coverage"}),
     "scoring": frozenset(
         {
             "catalog",
