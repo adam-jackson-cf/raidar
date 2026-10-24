@@ -20,7 +20,7 @@ whose lock sets ``protocol.verifier_coverage: offline`` grades without it
   ``ineligible`` without a coverage run, as in the trial. The parity verdict,
   its differences and the fork-shaped G input (``records.fork_payload``, the
   same payload the trial writes as ``g-kernel-input.json``) go to the
-  Assessment store (``raidar.grading.coverage_store``), never the job. A run
+  Assessment store (``raidar.grading.coverage.store``), never the job. A run
   already stored is not made again;
 - ``check_coverage_path`` (``raidar assess --regrade --coverage-check``): makes
   the coverage run offline for every graded step and compares it, without
@@ -41,7 +41,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from raidar.grading.coverage_store import (
+from raidar.grading.coverage.store import (
     COVERAGE_KIND,
     SCHEMA_VERSION,
     coverage_path,

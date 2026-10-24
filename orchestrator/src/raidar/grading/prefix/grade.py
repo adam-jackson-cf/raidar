@@ -36,7 +36,7 @@ from raidar.contract.snapshot import tree_digest
 from raidar.grading.grader import grade_step
 from raidar.grading.models import VerifierGrade
 from raidar.grading.per_trial import per_trial
-from raidar.grading.prefix_store import (
+from raidar.grading.prefix.store import (
     GRADE_KIND,
     SCHEMA_VERSION,
     grade_path,

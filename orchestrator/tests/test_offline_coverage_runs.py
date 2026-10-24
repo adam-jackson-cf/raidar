@@ -21,8 +21,8 @@ from click.testing import CliRunner
 
 from raidar.cli import main
 from raidar.grading import offline
-from raidar.grading.coverage_offline import check_coverage_path, produce_coverage_path
-from raidar.grading.coverage_store import read_offline_coverage
+from raidar.grading.coverage.offline import check_coverage_path, produce_coverage_path
+from raidar.grading.coverage.store import read_offline_coverage
 from raidar.grading.records import FORK_EVIDENCE_FILE, load_step_record, step_record_dir
 from raidar.grading.regrade import RegradeOptions
 from raidar.grading.sandbox import GradingSandbox

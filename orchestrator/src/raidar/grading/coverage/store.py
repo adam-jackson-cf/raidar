@@ -1,6 +1,6 @@
 """Where offline coverage runs live in the Assessment store, and how they are read.
 
-The contract shared by the offline producer (``raidar.grading.coverage_offline``)
+The contract shared by the offline producer (``raidar.grading.coverage.offline``)
 and the scorer that reads it (``code-quality@3``): one JSON file per graded step
 snapshot whose trial ran with the coverage pass deferred
 (``protocol.verifier_coverage: offline``), content-addressed by (bundle digest,

@@ -152,24 +152,24 @@ class RaidarVerifier(BaseVerifier):
         return report
 
     def _artifact_snapshot(self) -> tuple[Path | None, str]:
-        """The collected /app artifact and, when unusable, why (the fallback reason).
+        """The collected /app artifact and, when unusable, why (the download reason).
 
         Harbor creates the target directory before downloading and leaves it
         behind when the download fails or stops partway, recording the failure
         only in ``manifest.json``. A directory whose manifest entry is not
         ``ok`` is therefore an empty or truncated tree, never the snapshot.
         """
-        candidates = [self.trial_paths.artifacts_dir / APP_ARTIFACT_DESTINATION]
-        if self.step_name is not None:
-            candidates.insert(
-                0, self.trial_paths.step_artifacts_dir(self.step_name) / APP_ARTIFACT_DESTINATION
-            )
-        for path in candidates:
-            status = _artifact_status(path)
-            if status is not None:
-                return (path, "") if status == "ok" else (None, f"artifact_{status}")
-            if path.is_dir():
-                return path, ""
+        artifacts = (
+            self.trial_paths.step_artifacts_dir(self.step_name)
+            if self.step_name is not None
+            else self.trial_paths.artifacts_dir
+        )
+        path = artifacts / APP_ARTIFACT_DESTINATION
+        status = _artifact_status(path)
+        if status is not None:
+            return (path, "") if status == "ok" else (None, f"artifact_{status}")
+        if path.is_dir():
+            return path, ""
         return None, "artifact_missing"
 
     async def _snapshot(self, work: Path, record_dir: Path) -> tuple[Path, SnapshotRef]:
@@ -195,7 +195,7 @@ class RaidarVerifier(BaseVerifier):
         ref = SnapshotRef(
             requested=self.snapshot_source,
             used="download",
-            fallback_reason=reason or None,
+            download_reason=reason or None,
             digest=tree_digest(downloaded),
             stored_path=kept.relative_to(self.trial_paths.trial_dir).as_posix(),
         )

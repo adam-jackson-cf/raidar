@@ -25,7 +25,7 @@ from raidar.contract.trial import (
 from raidar.engine.perf.contention import TrialWindow, peak_during, peak_overlap
 from raidar.engine.perf.phases import trial_phases
 from tests.execution_support import StepOutcome, write_trial
-from tests.test_execution_perf_fixture import STRICT_CHECK
+from tests.test_overhead_fixture_run import STRICT_CHECK
 
 TEARDOWN = "teardown_result_write"
 
@@ -226,7 +226,7 @@ def test_perf_gate_runs_the_strict_fixture_at_concurrency_1_and_3(tmp_path: Path
     gate = tmp_path / "gate"
     output = _dry_run("perf-gate", f"PERF_GATE_DIR={gate}")
     assert f'rm -rf "{gate}"' in output
-    assert output.count("tests/test_execution_perf_fixture.py") == 2
+    assert output.count("tests/test_overhead_fixture_run.py") == 2
     assert output.count("export RAIDAR_EXECUTION_DOCKER=1") == 2
     for concurrency in (1, 3):
         assert f'export RAIDAR_PERF_FIXTURE_CONCURRENCY="{concurrency}"' in output

@@ -1,7 +1,7 @@
 """Run one trial's offline grading work beside other trials' (``raidar assess --concurrency``).
 
-The offline coverage runs (``raidar.grading.coverage_offline``) and the pre-fix
-grades (``raidar.grading.prefix_grade``) of a job used to be made one trial
+The offline coverage runs (``raidar.grading.coverage.offline``) and the pre-fix
+grades (``raidar.grading.prefix.grade``) of a job used to be made one trial
 after another: a 2-trial explore smoke of the guardrails experiment spent about
 44 minutes there before any scorer ran. Each trial's work stays sequential (its
 steps in order, as before); up to ``concurrency`` trials run at once, each step

@@ -2,7 +2,7 @@
 
 - ``regrade``: the stored step snapshots graded again (``raidar.grading.regrade``)
   and, with an Assessment store, the stored pre-fix grades beside them
-  (``raidar.grading.prefix_grade``); the report's ``match`` covers both;
+  (``raidar.grading.prefix.grade``); the report's ``match`` covers both;
 - ``grade_pre_fix``: before a rescore whose scorers read the grades of
   guardrail-gate@3's pre-fix snapshots (``PRE_FIX_GRADE_SCORERS``), every
   not-yet-graded snapshot of the target is graded into the store. A replay
@@ -10,7 +10,7 @@
 - ``produce_coverage``: before a rescore whose scorers read offline coverage runs
   (``OFFLINE_COVERAGE_SCORERS``), the coverage run of every step whose trial
   deferred it (``protocol.verifier_coverage: offline``) is made into the store
-  (``raidar.grading.coverage_offline``). A replay makes nothing;
+  (``raidar.grading.coverage.offline``). A replay makes nothing;
 - ``check_coverage`` (``--regrade --coverage-check``): every step's coverage run
   made offline and compared with the trial's own coverage pass or the stored
   offline run; nothing is written.
@@ -31,8 +31,8 @@ from pathlib import Path
 from typing import Any
 
 from raidar.grading.bundle import BundleError
-from raidar.grading.coverage_offline import check_coverage_path, produce_coverage_path
-from raidar.grading.prefix_grade import grade_pre_fix_path, regrade_pre_fix_path
+from raidar.grading.coverage.offline import check_coverage_path, produce_coverage_path
+from raidar.grading.prefix.grade import grade_pre_fix_path, regrade_pre_fix_path
 from raidar.grading.regrade import RegradeError, RegradeOptions, regrade_path
 
 # Scorers that read the offline grades of guardrail-gate@3's pre-fix snapshots.

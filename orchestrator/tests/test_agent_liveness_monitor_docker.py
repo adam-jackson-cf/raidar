@@ -27,7 +27,7 @@ from raidar.engine.health.liveness import (
 from raidar.engine.health.tool_tree import hash_tool_tree
 from raidar.engine.trial.collect import _infra_reasons
 from raidar.subject.environment.python.image import image_tag
-from raidar.subject.environment.python.models import load_pack_spec
+from raidar.subject.environment.python.pack_definition import load_pack_spec
 from tests.component_trial_support import docker_context
 from tests.liveness_support import AFTER_PHASE_REPORT, DETACHED_MARKER, run_probe_trial
 

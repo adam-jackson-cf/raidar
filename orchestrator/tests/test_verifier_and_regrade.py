@@ -165,7 +165,7 @@ async def test_missing_artifact_falls_back_to_download_and_keeps_a_regradable_co
     assert env.calls == ["exec", "download:/app"]
     record = load_step_record(step_record_dir(tmp_path / "trial", "checkpoint_1"))
     assert record.snapshot.used == "download"
-    assert record.snapshot.fallback_reason == "artifact_missing"
+    assert record.snapshot.download_reason == "artifact_missing"
     assert (tmp_path / "trial" / record.snapshot.stored_path / "app.py").is_file()
     assert record.coverage.parity is None
 
@@ -200,7 +200,7 @@ async def test_an_artifact_harbor_marked_unusable_is_never_graded(
     assert result.rewards["solved"] == 1.0
     record = load_step_record(step_record_dir(tmp_path / "trial", "checkpoint_1"))
     assert record.snapshot.used == "download"
-    assert record.snapshot.fallback_reason == f"artifact_{status}"
+    assert record.snapshot.download_reason == f"artifact_{status}"
 
 
 async def test_an_artifact_harbor_marked_ok_is_graded(tmp_path: Path) -> None:

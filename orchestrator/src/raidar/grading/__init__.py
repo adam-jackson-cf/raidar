@@ -1,6 +1,6 @@
-"""Raidar verifier: host-side hidden-test verification (reboot plan WS-E).
+"""Raidar verifier: host-side hidden-test verification.
 
-Entry points for other workstreams:
+Entry points:
 
 - ``raidar.grading.verifier:RaidarVerifier`` - Harbor ``verifier.import_path``.
 - ``raidar.grading.guard.install_leak_guard`` - required pre-agent leak check (trial hook).

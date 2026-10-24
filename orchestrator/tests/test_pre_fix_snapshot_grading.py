@@ -18,12 +18,12 @@ import pytest
 
 from raidar.contract.snapshot import tree_digest
 from raidar.grading import offline
-from raidar.grading.prefix_grade import (
+from raidar.grading.prefix.grade import (
     grade_pre_fix_path,
     pre_fix_snapshots,
     regrade_pre_fix_path,
 )
-from raidar.grading.prefix_store import read_pre_fix_grade
+from raidar.grading.prefix.store import read_pre_fix_grade
 from raidar.grading.records import load_step_record, step_record_dir
 from raidar.grading.regrade import RegradeOptions
 from tests.scorer_support import tree_state
