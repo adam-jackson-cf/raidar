@@ -22,8 +22,8 @@ A job is one execution of a locked experiment:
 | Agent sessions | `.../agent/sessions/**/*.jsonl` (baseline) or `.../agent/review-loop/stage_<n>_<stage>/sessions/**/*.jsonl` | raw tool calls (`custom_tool_call`) and outputs, line-addressable |
 | Component evidence | `.../agent/raidar-components.json`, `.../agent/raidar-components/*` | what each component installed, fired or probed |
 | Review loop | `.../agent/review-loop/review-loop.json`, `diffs/round_<n>.patch` | parses, verdicts, feedback, termination reason, per-round diffs |
-| Assessment store | `var/stores/<id>/assessments/<xx>/<digest>.json` (pilot v2: `var/jobs/pilot-v2/assessment-store`) | scorer observations: correctness, code-quality (V, E, H, R, G), resource-usage, process-compliance (`tests_run_before_finish`, `plan_written`) |
-| Analysis | `var/analysis/<id>/analysis.json` and `analysis.md` (pilot v2: `var/jobs/pilot-v2/gate-evidence/schema-v2/analysis/forge/`) | effects and verdicts under the lock's thresholds, curves, manipulation check, replaced trials, cost |
+| Assessment store | `var/stores/<id>/assessments/<xx>/<digest>.json` | scorer observations: correctness, code-quality (V, E, H, R, G), resource-usage, process-compliance (`tests_run_before_finish`, `plan_written`) |
+| Analysis | `var/analysis/<id>/analysis.json` and `analysis.md` | effects and verdicts under the lock's thresholds, curves, manipulation check, replaced trials, cost |
 | Problem bundle | `var/problems/store/<source>/<problem>/<pin>/task/steps/<checkpoint>/instruction.md` and `.../oracle/tests/` | the specification the agent saw, and the hidden tests (analyst-only) |
 
 ## Cohort

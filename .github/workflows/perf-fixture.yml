@@ -13,6 +13,7 @@ on:
       - "orchestrator/src/raidar/execution/**"
       - "orchestrator/src/raidar/core/**"
       - "orchestrator/src/raidar/components/**"
+      - "orchestrator/src/raidar/targets/**"
       - "orchestrator/src/raidar/packs/**"
       - "orchestrator/tests/test_execution_perf_fixture.py"
       - "orchestrator/tests/execution_support.py"

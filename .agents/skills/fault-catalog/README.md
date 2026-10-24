@@ -22,9 +22,9 @@ verifier and its rewards, ATIF trajectories, the Assessment store and
 
 ## Example prompts
 
-- "Extract fault categories from var/jobs/pilot-v2/python__forge__guided-pilot/{forge-02,forge-03}."
-- "Why is the guided arm worse? Reconcile the evidence with the catalog."
-- "Propose the next guided revision as a locked experiment."
+- "Extract fault categories from var/jobs/<id>/<job>."
+- "Why is arm B worse than the baseline? Reconcile the evidence with the catalog."
+- "Propose the next revision of that condition as a locked experiment."
 
 ## References
 

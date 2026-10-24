@@ -2,6 +2,18 @@
 
 All notable changes to this project are documented in this file.
 
+## Unreleased - repository restructure and mechanics v1
+
+### Changed
+
+- Clean start (design `docs/reboot/repo-structure-design.md`): no version in any module, class, folder or file name; a scorer, component or headline metric is one module edited in place and its version is the manifest's `@N`. `make release-archive REF=<name>@<N>` tags `archive/<name>@<N>` before an in-place edit. Earlier versioned modules named below (`gate_effort_v10`, `guardrails_v8`, `gate_v4`, `code_quality_v3` and similar) are now `raidar.scorers.<name>/` and `raidar.components.{definition,runtime,catalog,payloads}`. Finished experiments, jobs and stores left the tree (tag `archive/pre-structure-reset`; local data in `var/archive/pre-v1/`).
+- Layout: tracked definitions under `lab/` (`lab/experiments/<kind>/<id>/`, `lab/problems/`, `lab/ledger/`), all generated data under the git-ignored `var/` (`RAIDAR_VAR` relocates it). `raidar` packages are grouped by stage (`agents, analysis, cli, components, core, execution, jev, ledger, packs, problems, review, scorers, spec, targets, verifier`). `make structure-check` (part of `make quality`) enforces the root and package allowlists, a depth limit and the no-version-in-names rule.
+- Vocabulary follows Harbor (job, trial, step result, attempts, verifier, reward; schema v2); see `AGENTS.md`.
+
+### Added
+
+- Mechanics v1 (ADR-002): Docker targets (`~/.config/raidar/targets.toml`, `make target-*`, trusted-target gate for hidden tests and credentials, lost-trial reaping); per-trial run-health `health.json` (`make health`); host-side liveness monitor (`RAIDAR_LIVENESS`); smoke-before-measure admission (`ALLOW_UNSMOKED=1` overrides, recorded); runner/recipe/limit/target provenance in `job.json` with pooling refusals in `make experiment-analyze` (`POOL_OVERRIDE=`); N1 overhead budgets per target (`make perf-fixture`, `make perf-gate`, `make perf-check`); detached jobs (`DETACH=1`); the tracked fault and remedy ledger (`make ledger-index`, `make ledger-check`).
+
 ## Unreleased - guardrails iteration 4 record: smoke-4, main-04 and gate-effort@10
 
 ### Added

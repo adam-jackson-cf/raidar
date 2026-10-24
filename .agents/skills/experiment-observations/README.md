@@ -20,7 +20,7 @@ rewards, ATIF trajectories, Assessment store and `analysis.json`.
 
 ## Example prompts
 
-- "Report what jobs forge-02 and forge-03 of python__forge__guided-pilot observed."
+- "Report what job <job> of <experiment> observed."
 - "Reconcile the observed faults and give me the concise view."
 
 ## References
