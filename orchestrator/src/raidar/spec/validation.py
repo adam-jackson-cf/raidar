@@ -420,13 +420,8 @@ def semantic_issues(
     protocol_config: ProtocolConfigKeys | None = None,
     *,
     path: Path | None = None,
-    naming: bool = True,
 ) -> list[FieldIssue]:
-    """Cross-reference, kind and naming rules plus the factor guard, each with a location.
-
-    ``naming=False`` skips ``NAME*`` (a schema v1 file read through its
-    translation keeps its v1 id until it is upgraded).
-    """
+    """Cross-reference, kind and naming rules plus the factor guard, each with a location."""
     structural = [
         *_duplicate_ids("agents", (agent.id for agent in spec.agents)),
         *_duplicate_ids("conditions", (condition.id for condition in spec.conditions)),
@@ -446,7 +441,7 @@ def semantic_issues(
         ),
         *_errata_config_issues(spec),
     ]
-    labels = [*kind_issues(spec), *(name_issues(spec, path) if naming else [])]
+    labels = [*kind_issues(spec), *name_issues(spec, path)]
     if structural:
         # The factor guard needs resolvable arm references and unique ids.
         return [*structural, *labels]

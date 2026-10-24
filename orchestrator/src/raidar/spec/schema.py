@@ -34,10 +34,7 @@ from pydantic import (
 from raidar.agents.config import AgentName, Harness, agent_cli
 from raidar.spec.references import REFERENCE_PATTERN
 
-SCHEMA_VERSION = 2
 IDENTIFIER_PATTERN = r"^[a-z0-9][a-z0-9_-]*$"
-RUNTIMES = ("python", "node-ts", "go", "rust", "java", "dotnet")
-"""Runtime pack ids (F8). A runtime is a language toolchain; only ``python`` has a pack yet."""
 EXPERIMENT_KINDS = ("ab-test", "benchmark", "smoke", "research-loop")
 RESERVED_KINDS = ("research-loop",)
 """Kinds the schema accepts but no controller implements yet (``KIND0``)."""
@@ -45,6 +42,7 @@ RESERVED_KINDS = ("research-loop",)
 Identifier = Annotated[str, Field(pattern=IDENTIFIER_PATTERN, max_length=64)]
 Reference = Annotated[str, Field(pattern=REFERENCE_PATTERN)]
 Runtime = Literal["python", "node-ts", "go", "rust", "java", "dotnet"]
+"""Runtime pack ids (F8). A runtime is a language toolchain; only ``python`` has a pack yet."""
 ExperimentKind = Literal["ab-test", "benchmark", "smoke", "research-loop"]
 # A pinned release (``0.156.1``, ``2.1.4-beta.2``): starts with a digit, so
 # floating tags (``latest``, ``stable``) and ranges (``^1.2``, ``>=1``) are refused.
@@ -328,8 +326,8 @@ class ExperimentSpec(SpecModel):
         }
 
     def to_json(self) -> dict[str, object]:
-        # Optional fields left unset are omitted, as schema v1 omitted them, so the
-        # execution section of a migrated v1 lock compares field for field.
+        # Optional fields left unset are omitted, so a spec that does not set them keeps
+        # its bytes (and so its lock digests) as they were before the field existed.
         exclude: dict[str, object] = {}
         if not self.shared_components:
             exclude["shared_components"] = True

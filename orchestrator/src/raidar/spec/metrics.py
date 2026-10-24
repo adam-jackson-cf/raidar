@@ -384,7 +384,7 @@ DEFAULT_METRIC_REGISTRY = MetricRegistry(
 
 @dataclass(frozen=True)
 class MetricResolver:
-    """``RegistryResolver`` for kind ``policy`` backed by a MetricRegistry."""
+    """``RegistryResolver`` for kind ``metric`` backed by a MetricRegistry."""
 
     registry: MetricRegistry = DEFAULT_METRIC_REGISTRY
 

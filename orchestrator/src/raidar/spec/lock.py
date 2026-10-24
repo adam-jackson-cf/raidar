@@ -497,19 +497,16 @@ def seal_lock(body: Mapping[str, Any]) -> dict[str, Any]:
     }
 
 
-def _shape_issues(lock: Mapping[str, Any], version: int) -> list[str]:
-    if lock.get("lock_version") != version:
-        return [f"lock_version is {lock.get('lock_version')!r}, expected {version}; relock"]
+def _shape_issues(lock: Mapping[str, Any]) -> list[str]:
+    if lock.get("lock_version") != LOCK_VERSION:
+        return [f"lock_version is {lock.get('lock_version')!r}, expected {LOCK_VERSION}; relock"]
     missing = [name for name in SECTIONS if name not in lock]
     return [f"missing section(s) {', '.join(missing)}"] if missing else []
 
 
-def lock_integrity_issues(lock: Mapping[str, Any], *, version: int = LOCK_VERSION) -> list[str]:
-    """Why ``lock`` is not a sealed lock of ``version`` (empty when it is).
-
-    Lock versions 2 and 3 share the sealing scheme.
-    """
-    shape = _shape_issues(lock, version)
+def lock_integrity_issues(lock: Mapping[str, Any]) -> list[str]:
+    """Why ``lock`` is not a sealed lock of the current ``LOCK_VERSION`` (empty when it is)."""
+    shape = _shape_issues(lock)
     if shape:
         return shape
     recorded = lock.get("sections") or {}
