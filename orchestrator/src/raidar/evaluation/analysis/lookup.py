@@ -18,8 +18,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from raidar.engine.job.assessment import ASSESSMENT_CONFIG_FILE, lock_rescore_config
-from raidar.evaluation.analysis.sources import AnalysisInputError, JobDir
+from raidar.engine.job.assessment import lock_rescore_config
+from raidar.evaluation.analysis.sources import AnalysisInputError
 from raidar.scoring.framework.keys import scorer_identity, store_key
 from raidar.scoring.framework.registry import ScorerRegistry
 from raidar.scoring.framework.rescore import RescoreError
@@ -89,19 +89,14 @@ class AssessmentLookup:
         return found
 
 
-def assessment_config(
-    run: JobDir, override: Path | None, lock: Mapping[str, Any] | None = None
-) -> RescoreConfig:
-    """``override`` if given, else the lock's declared settings, else the job's file."""
-    if override is None and lock is not None:
+def assessment_config(override: Path | None, lock: Mapping[str, Any]) -> RescoreConfig:
+    """``override`` if given, else the lock's declared settings."""
+    if override is None:
         try:
             return lock_rescore_config(lock)
         except ValueError as exc:
             raise AnalysisInputError(f"the lock's assessment settings are invalid: {exc}") from exc
-    path = override or run.path / ASSESSMENT_CONFIG_FILE
-    if not path.is_file():
-        return RescoreConfig()
     try:
-        return load_rescore_config(path)
+        return load_rescore_config(override)
     except RescoreError as exc:
         raise AnalysisInputError(str(exc)) from exc

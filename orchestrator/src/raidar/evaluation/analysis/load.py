@@ -109,8 +109,8 @@ def _read_trials(
     outcomes: list[Any] = []
     process: _TrialResults = {}
     gate: _TrialResults = {}
+    config = assessment_config(request.assessment_config, lock)
     for trial_id, (job, record) in sorted(chosen.items()):
-        config = assessment_config(job, request.assessment_config, lock)
         results = lookup.valid_results(
             job.trial_dir(record), config, trial_id=record.trial.trial_id, valid=record.valid
         )
