@@ -29,8 +29,6 @@ def test_shared_command_helpers_raise_on_failure(monkeypatch, tmp_path) -> None:
         shared.run_or_raise(["tool", "fail"], tmp_path)
 
     assert shared.python_cmd()
-    shared.set_agent_choices(["codex"])
-    assert shared.AGENT_CHOICES == ["codex"]
 
 
 def test_quality_gate_helpers_validate_requirements_and_commands(monkeypatch, tmp_path) -> None:

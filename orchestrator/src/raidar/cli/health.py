@@ -12,7 +12,7 @@ from pathlib import Path
 
 import click
 
-from raidar.core.job_layout import JOB_MANIFEST, TRIAL_RECORDS_DIR
+from raidar.core.job_layout import JOB_MANIFEST, TRIAL_RECORDS_DIR, TRIALS_DIR
 from raidar.execution.health.audit import audit_recorded_trial
 from raidar.execution.health.fault_candidates import append_fault_candidates
 from raidar.execution.health.model import HealthReport, write_health
@@ -43,7 +43,7 @@ def health_command(job_dir: Path) -> None:
     failed = 0
     for trial_id in _trial_ids(job_dir):
         report = audit_recorded_trial(job_dir, trial_id)
-        write_health(job_dir / "trials" / trial_id, report)
+        write_health(job_dir / TRIALS_DIR / trial_id, report)
         append_fault_candidates(job_dir, report)
         _echo(report)
         failed += bool(report.violations)

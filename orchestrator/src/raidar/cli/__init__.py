@@ -7,9 +7,8 @@ import os
 import click
 from dotenv import load_dotenv
 
-from raidar.agents.config import AgentName
 from raidar.cli.register import register_commands
-from raidar.cli.shared import ENV_PATH, SECRETS_SOURCE_ENV, set_agent_choices
+from raidar.cli.shared import ENV_PATH, SECRETS_SOURCE_ENV
 
 # orchestrator/.env is the fallback secret source. When the make targets inject secrets
 # from Infisical they set RAIDAR_SECRETS_SOURCE=infisical, and .env stays unread so a
@@ -24,7 +23,6 @@ def main() -> None:
     """Raidar: lock, run, assess and analyze coding-agent experiments."""
 
 
-set_agent_choices([name.value for name in AgentName])
 register_commands(main)
 
 

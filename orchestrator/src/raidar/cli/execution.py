@@ -13,8 +13,9 @@ from raidar.cli.plan_build import build_cli_plan
 from raidar.cli.target_options import job_target, run_guarded, target_option
 from raidar.core.paths import jobs_root
 from raidar.execution.agent_config import AGENT_OVERRIDES
+from raidar.execution.detach import default_job_id
 from raidar.execution.plan import ExperimentPlan
-from raidar.execution.run import default_job_id, run_job
+from raidar.execution.run import run_job
 from raidar.execution.run_checks import RunRefusedError, prepare_run
 
 

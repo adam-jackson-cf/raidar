@@ -19,7 +19,8 @@ from raidar.agents.codex_auth import (
 )
 from raidar.agents.config import AgentName, AgentSpec, Harness, ModelTarget, agent_cli
 from raidar.agents.harness import harness_definition
-from raidar.cli.shared import AGENT_CHOICES
+
+_AGENT_CHOICES = click.Choice([name.value for name in AgentName])
 
 
 def register(main: click.Group) -> None:
@@ -44,7 +45,7 @@ def agent_list() -> None:
 
 
 @agent.command("validate")
-@click.option("--agent", "-a", "agent_name", type=click.Choice(AGENT_CHOICES), required=True)
+@click.option("--agent", "-a", "agent_name", type=_AGENT_CHOICES, required=True)
 @click.option("--model", "-m", type=str, required=True)
 @click.option("--provider", "-p", type=str, required=True)
 @click.option(
@@ -82,7 +83,7 @@ def agent_validate(agent_name: str, **options) -> None:
 
 
 @agent.command("setup-auth")
-@click.option("--agent", "-a", "agent_name", type=click.Choice(AGENT_CHOICES), required=True)
+@click.option("--agent", "-a", "agent_name", type=_AGENT_CHOICES, required=True)
 @click.option("--device-auth", is_flag=True)
 def agent_setup_auth(agent_name: str, device_auth: bool) -> None:
     """Set up agent authentication for supported interactive providers."""

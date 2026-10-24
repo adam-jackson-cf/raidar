@@ -76,7 +76,7 @@ def _problem_id(ref: str) -> ProblemId:
 
 @click.group()
 def problem() -> None:
-    """Pinned problem registry: list, inspect, import and oracle-validate problems."""
+    """Pinned problem registry: list, inspect, import and verifier-validate problems."""
 
 
 def _validation_state(store: ProblemStore, problem_id: ProblemId, manifest: ProblemManifest) -> str:
@@ -233,7 +233,7 @@ def validate_command(
     audit_only: bool,
     report_path: Path | None,
 ) -> None:
-    """Validate REF's oracle: ref k passes 1..k, ref k-1 fails k, repeats agree, native parity.
+    """Validate REF's verifier: ref k passes 1..k, ref k-1 fails k, repeats agree, native parity.
 
     The spec-determinacy audit flags verifier cases that assert what the
     specification does not determine; it never changes the verdict.

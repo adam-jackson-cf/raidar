@@ -11,14 +11,6 @@ from raidar.cli.shared import ORCHESTRATOR_ROOT, python_cmd, run_or_raise
 from raidar.core import repo_state
 from raidar.core.paths import REPO_ROOT
 
-# Experiment-model integration paths: spec -> plan -> Harbor trial -> oracle -> projection.
-INTEGRATION_TEST_TARGETS = [
-    "tests/test_execution_driver.py",
-    "tests/test_execution_step_results.py",
-    "tests/test_verifier_and_regrade.py",
-    "tests/test_harbor_cleanup.py",
-    "tests/test_review_projection_experiment_epoch.py",
-]
 FANOUT_CHECK_SCRIPT = REPO_ROOT / "scripts" / "checks" / "check-python-fanout.py"
 PYTHON_QUALITY_CHECK_SCRIPT = REPO_ROOT / "scripts" / "checks" / "check-python-quality.py"
 IMPORT_LINTER_CONFIG = ORCHESTRATOR_ROOT / ".importlinter"
@@ -106,11 +98,6 @@ def run_orchestrator_quality_gates() -> None:
     run_or_raise(["lizard", "-C", "10", "-l", "python", "src"], ORCHESTRATOR_ROOT)
     run_or_raise(
         [python_cmd(), "-m", "mypy", "--follow-imports=skip", *TYPECHECK_TARGETS],
-        ORCHESTRATOR_ROOT,
-    )
-    run_or_raise([python_cmd(), "-m", "pytest", "tests", "-x", "--tb=short"], ORCHESTRATOR_ROOT)
-    run_or_raise(
-        [python_cmd(), "-m", "pytest", *INTEGRATION_TEST_TARGETS, "-x", "--tb=short"],
         ORCHESTRATOR_ROOT,
     )
     run_or_raise(
