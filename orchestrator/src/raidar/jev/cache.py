@@ -121,10 +121,10 @@ class DecisionCache:
         try:
             os.link(temporary, path)
         except FileExistsError:
-            temporary.unlink()
             stored = self.get(key)
             if stored is None:
                 raise
             return stored
-        temporary.unlink()
+        finally:
+            temporary.unlink(missing_ok=True)
         return entry
