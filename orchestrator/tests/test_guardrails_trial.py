@@ -32,10 +32,10 @@ from harbor.environments.base import BaseEnvironment
 from harbor.models.agent.context import AgentContext
 from harbor.models.trial.config import AgentConfig
 
-from raidar.subjects.treatments.catalog.guardrails import AUTOFIX_COMMAND, PINNED_VERSION
-from raidar.subjects.treatments.runtime.gate_run import GATE_RECORD
-from raidar.subjects.treatments.runtime.provision import trial_provisions
-from raidar.subjects.treatments.runtime.session_chain import (
+from raidar.subject.treatment.catalog.guardrails import AUTOFIX_COMMAND, PINNED_VERSION
+from raidar.subject.treatment.runtime.gate_run import GATE_RECORD
+from raidar.subject.treatment.runtime.provision import trial_provisions
+from raidar.subject.treatment.runtime.session_chain import (
     apply_session_wrappers,
     condition_session_wrappers,
 )

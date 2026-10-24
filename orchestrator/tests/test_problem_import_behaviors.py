@@ -13,13 +13,13 @@ import pytest
 import yaml
 from harbor.models.task.task import Task
 
-from raidar.contracts.paths import VAR_ENV
-from raidar.contracts.snapshot import APP_SOURCE
-from raidar.design.experiments.canonical import digest_json
-from raidar.design.experiments.loader import load_experiment
-from raidar.design.experiments.lock import build_lock
-from raidar.design.experiments.metrics import MetricResolver
-from raidar.design.experiments.references import (
+from raidar.contract.paths import VAR_ENV
+from raidar.contract.snapshot import APP_SOURCE
+from raidar.design.experiment.canonical import digest_json
+from raidar.design.experiment.loader import load_experiment
+from raidar.design.experiment.lock import build_lock
+from raidar.design.experiment.metrics import MetricResolver
+from raidar.design.experiment.references import (
     RESOLVER_ENTRY_POINT_GROUP,
     RefKind,
     RegistryRef,
@@ -27,13 +27,13 @@ from raidar.design.experiments.references import (
     ResolvedReference,
     ResolverSet,
 )
-from raidar.design.problems.content import content_digest, hidden_content_in_task
-from raidar.design.problems.importer import ProblemDriftError, import_problem
-from raidar.design.problems.models import ProblemId, ProblemManifest, ProblemMode
-from raidar.design.problems.resolver import ProblemResolver, resolver_factory
-from raidar.design.problems.rewrite import VERIFIER_IMPORT_PATH
-from raidar.design.problems.source import SourceError
-from raidar.design.problems.store import (
+from raidar.design.problem.content import content_digest, hidden_content_in_task
+from raidar.design.problem.importer import ProblemDriftError, import_problem
+from raidar.design.problem.models import ProblemId, ProblemManifest, ProblemMode
+from raidar.design.problem.resolver import ProblemResolver, resolver_factory
+from raidar.design.problem.rewrite import VERIFIER_IMPORT_PATH
+from raidar.design.problem.source import SourceError
+from raidar.design.problem.store import (
     ROOT_ENV,
     ProblemStore,
     ProblemStoreError,
@@ -41,8 +41,8 @@ from raidar.design.problems.store import (
     open_store,
     store_at,
 )
-from raidar.subjects.environments.python.image import image_tag
-from raidar.subjects.environments.python.models import load_pack_spec
+from raidar.subject.environment.python.image import image_tag
+from raidar.subject.environment.python.models import load_pack_spec
 from tests.experiment_spec_support import (
     experiment_document,
     fixture_resolvers,

@@ -22,7 +22,7 @@ from collections import defaultdict
 from pathlib import Path
 from typing import Any
 
-from raidar.contracts.snapshot import copy_snapshot, tree_digest
+from raidar.contract.snapshot import copy_snapshot, tree_digest
 from raidar.grading.bundle import VerifierBundle, VerifierStepSpec
 from raidar.grading.models import (
     CorpusEvidence,

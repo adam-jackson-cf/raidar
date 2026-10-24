@@ -35,22 +35,22 @@ from harbor.models.agent.context import AgentContext
 from harbor.models.trajectories import Trajectory
 from harbor.models.trial.config import AgentConfig
 
-from raidar.subjects.agents.config import Harness
-from raidar.subjects.treatments import ComponentRegistry, ComponentRejectedError, StepEvidence
-from raidar.subjects.treatments.catalog.gate import (
+from raidar.subject.agent.config import Harness
+from raidar.subject.treatment import ComponentRegistry, ComponentRejectedError, StepEvidence
+from raidar.subject.treatment.catalog.gate import (
     GUARDRAIL_GATE,
     GUARDRAIL_GATE_IMPORT_PATH,
     gate_signal,
 )
-from raidar.subjects.treatments.definition.registry import fingerprint
-from raidar.subjects.treatments.runtime.autofix_run import (
+from raidar.subject.treatment.definition.registry import fingerprint
+from raidar.subject.treatment.runtime.autofix_run import (
     ERROR_TYPES,
     REPORT_MARK,
     AutofixMode,
     AutofixRun,
     read_autofix_run,
 )
-from raidar.subjects.treatments.runtime.gate_run import (
+from raidar.subject.treatment.runtime.gate_run import (
     GATE_RECORD,
     GIT_LOG_MARK,
     GIT_STATUS_MARK,
@@ -61,8 +61,8 @@ from raidar.subjects.treatments.runtime.gate_run import (
     parse_checks,
     read_gate_run,
 )
-from raidar.subjects.treatments.runtime.guardrail_gate import GuardrailGateAgent
-from raidar.subjects.treatments.runtime.review_loop import PROMPT_ARG_BUDGET
+from raidar.subject.treatment.runtime.guardrail_gate import GuardrailGateAgent
+from raidar.subject.treatment.runtime.review_loop import PROMPT_ARG_BUDGET
 from tests.component_support import compile_uses, use
 from tests.component_trial_support import (
     build_task,
@@ -1039,9 +1039,9 @@ def test_the_probe_fails_when_autofix_was_asked_for_but_not_recorded(tmp_path: P
 
 def test_the_fingerprint_covers_the_gate_and_autofix_modules() -> None:
     files = GUARDRAIL_GATE.manifest.fingerprint
-    assert "raidar/subjects/treatments/runtime/autofix_run.py" in files
-    assert "raidar/subjects/treatments/runtime/guardrail_gate.py" in files
-    assert "raidar/subjects/treatments/runtime/gate_run.py" in files
+    assert "raidar/subject/treatment/runtime/autofix_run.py" in files
+    assert "raidar/subject/treatment/runtime/guardrail_gate.py" in files
+    assert "raidar/subject/treatment/runtime/gate_run.py" in files
     assert len(files) == len(set(files))
     assert fingerprint(ComponentRegistry().get(REF)) != ""
 

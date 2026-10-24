@@ -39,14 +39,14 @@ from collections.abc import Collection, Mapping
 from dataclasses import dataclass
 from decimal import Decimal
 
-from raidar.design.experiments.metrics import (
+from raidar.design.experiment.metrics import (
     CORRECTNESS,
     Metric,
     checkpoint_pass_rate,
     checkpoint_solve_rate,
     problem_correctness,
 )
-from raidar.engine.trials.models import CheckpointState, TrialRecord
+from raidar.engine.trial.models import CheckpointState, TrialRecord
 from raidar.evaluation.analysis.outcomes import (
     CODE_QUALITY_REF,
     CORRECTNESS_METRIC,

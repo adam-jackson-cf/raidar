@@ -11,12 +11,12 @@ import pytest
 from click.testing import CliRunner
 
 from raidar.cli import main
-from raidar.design.experiments.loader import load_experiment
-from raidar.design.experiments.lock import LockError
-from raidar.design.problems.store import ROOT_ENV
-from raidar.engine.jobs.plan import PlanError, PlanOptions, arm_order, build_plan
-from raidar.subjects.environments.python.harness import HarnessPinError
-from raidar.subjects.environments.python.models import load_pack_spec
+from raidar.design.experiment.loader import load_experiment
+from raidar.design.experiment.lock import LockError
+from raidar.design.problem.store import ROOT_ENV
+from raidar.engine.job.plan import PlanError, PlanOptions, arm_order, build_plan
+from raidar.subject.environment.python.harness import HarnessPinError
+from raidar.subject.environment.python.models import load_pack_spec
 from tests.execution_support import ImportedFixture, locked_experiment, validated_fixture
 
 
@@ -224,7 +224,7 @@ def test_run_command_is_the_experiment_runner_only(tmp_path: Path) -> None:
 def test_a_lock_from_another_python_patch_release_still_plans(
     locked: tuple[Any, dict[str, Any], Path],
 ) -> None:
-    from raidar.design.experiments.lock import render_lock, seal_lock
+    from raidar.design.experiment.lock import render_lock, seal_lock
 
     loaded, lock, lock_path = locked
     sealed = {"sections", "lock_sha256", "document_sha256"}

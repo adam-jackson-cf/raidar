@@ -15,13 +15,13 @@ from click.testing import CliRunner
 
 from raidar.cli import env_harbor, main
 from raidar.cli.shared import ORCHESTRATOR_ROOT
-from raidar.contracts.paths import REPO_ROOT
-from raidar.contracts.repo_state import (
+from raidar.contract.paths import REPO_ROOT
+from raidar.contract.repo_state import (
     assert_no_generated_artifact_changes,
     generated_artifact_paths,
 )
-from raidar.subjects.agents.config import agent_name_for
-from raidar.subjects.environments.python.models import load_pack_spec
+from raidar.subject.agent.config import agent_name_for
+from raidar.subject.environment.python.models import load_pack_spec
 
 quality_gates = main.commands["quality"].commands["gates"]
 
@@ -233,7 +233,7 @@ def test_env_setup_uses_frozen_sync(monkeypatch) -> None:
 
 def test_artifact_guard_allows_generated_artifact_deletions(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.setattr(
-        "raidar.contracts.repo_state.changed_repo_entries",
+        "raidar.contract.repo_state.changed_repo_entries",
         lambda _: [
             (
                 "D",
@@ -247,7 +247,7 @@ def test_artifact_guard_allows_generated_artifact_deletions(tmp_path: Path, monk
 
 def test_artifact_guard_rejects_modified_generated_artifacts(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.setattr(
-        "raidar.contracts.repo_state.changed_repo_entries",
+        "raidar.contract.repo_state.changed_repo_entries",
         lambda _: [
             (
                 "M",

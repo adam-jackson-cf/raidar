@@ -26,7 +26,7 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
-from raidar.design.experiments.canonical import digest_json, pretty_canonical_json_bytes
+from raidar.design.experiment.canonical import digest_json, pretty_canonical_json_bytes
 from raidar.scoring.judge.client import JevSuccess
 from raidar.scoring.judge.protocol import (
     JEV_PINNED_MODEL,

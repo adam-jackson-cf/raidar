@@ -19,7 +19,7 @@ from pathlib import Path
 from harbor.models.trajectories import Step, ToolCall, Trajectory
 from pydantic import ValidationError
 
-from raidar.contracts.review_contract import ReviewStatus
+from raidar.contract.review import ReviewStatus
 from raidar.evaluation.review.projection.spans import SpanBuilder, to_ms
 
 TRAJECTORY_FILE = "trajectory.json"

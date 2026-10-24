@@ -40,7 +40,7 @@ from typing import Any
 from harbor.trial.hooks import LogEntry, TrialEvent, TrialHookEvent
 from harbor.trial.trial import Trial
 
-from raidar.engine.trials.reaper import ReapReport, reap_agent_processes
+from raidar.engine.trial.reaper import ReapReport, reap_agent_processes
 
 LIVENESS_REPORT = "raidar-liveness.json"
 MODE_ENV = "RAIDAR_LIVENESS"

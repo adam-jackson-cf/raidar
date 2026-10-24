@@ -26,10 +26,10 @@ from harbor.models.trajectories import (
     Trajectory,
 )
 
-from raidar.contracts.snapshot import tree_digest
-from raidar.design.experiments.canonical import digest_json
-from raidar.engine.trials.collect import NOT_STARTED
-from raidar.engine.trials.models import (
+from raidar.contract.snapshot import tree_digest
+from raidar.design.experiment.canonical import digest_json
+from raidar.engine.trial.collect import NOT_STARTED
+from raidar.engine.trial.models import (
     CheckpointState,
     ExecutionValidity,
     PhaseSample,
@@ -42,7 +42,7 @@ from raidar.engine.trials.models import (
     Usage,
     ValidityCheck,
 )
-from raidar.engine.trials.progression import derive_reached, strict_rule
+from raidar.engine.trial.progression import derive_reached, strict_rule
 from raidar.grading.bundle import BundleManifest, GraderSpec, VerifierStepSpec, load_bundle
 from raidar.grading.models import CaseGroup, CaseResult, CaseStatus, VerifierGrade
 from raidar.grading.records import (

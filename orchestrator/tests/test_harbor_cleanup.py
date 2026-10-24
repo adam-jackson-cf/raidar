@@ -8,12 +8,12 @@ from pathlib import Path
 
 import pytest
 
-from raidar.engine.trials.cleanup import (
+from raidar.engine.trial.cleanup import (
     cleanup_trial_projects,
     reap_project,
     trial_projects,
 )
-from raidar.engine.trials.environment import run_scope
+from raidar.engine.trial.environment import run_scope
 
 CONTEXT = "remote-ctx"
 

@@ -18,7 +18,7 @@ REPO_RUNTIME_ENV := mkdir -p "$(REPO_TMP_DIR)" "$(REPO_UV_CACHE_DIR)" && env \
 RAIDAR := $(REPO_RUNTIME_ENV) uv run --project orchestrator raidar
 RAIDAR_DEV := $(REPO_RUNTIME_ENV) uv run --project orchestrator --extra dev raidar
 
-# Docker target (raidar.engine.targets): TARGET=<name> selects an entry of ~/.config/raidar/targets.toml
+# Docker target (raidar.engine.target): TARGET=<name> selects an entry of ~/.config/raidar/targets.toml
 # (else $RAIDAR_TARGET, the file's `default`, then the current Docker context).
 TARGET ?=
 TARGET_ENV := $(if $(TARGET),export RAIDAR_TARGET="$(TARGET)" &&,)
@@ -88,7 +88,7 @@ endif
 endif
 # agent-smoke: the smoke experiment with its one agent replaced. AGENT is a Harbor agent name
 # (codex, claude-code). Versions must equal the Python pack pins
-# (orchestrator/src/raidar/subjects/environments/python/pack.yaml); the lock refuses others (RT5).
+# (orchestrator/src/raidar/subject/environment/python/pack.yaml); the lock refuses others (RT5).
 # Provider/model/effort default per agent: codex runs gpt-6-luna at low effort;
 # claude-code runs claude-haiku-4-5, which has no effort levels, so its effort is unset.
 # REASONING_EFFORT given (even empty: `REASONING_EFFORT=`) wins; empty means unset.
@@ -456,14 +456,14 @@ experiment-plan:
 	$(call require_var,EXPERIMENT)
 	@$(RAIDAR) plan "$(EXPERIMENT)" $(EXECUTION_SELECT) $(if $(PLAN_JSON),--json,)
 
-# DETACH=1: the job runs under a supervisor in its own session (raidar.engine.jobs.detach), so it
+# DETACH=1: the job runs under a supervisor in its own session (raidar.engine.job.detach), so it
 # survives the launching shell or agent session; its launch record, pid and log are in
 # <job dir>/detach/. The supervisor reruns this target with DETACH=0 and the job id (the
 # caller's other variables travel in MAKEFLAGS). Poll with make experiment-status JOB=<job dir>.
 DETACH ?=
 LOG_LINES ?= 20
 EXECUTE_JOBS_DIR = $(if $(JOBS_DIR),$(abspath $(JOBS_DIR)),$(RAIDAR_VAR)/jobs)
-DETACH_TOOL := $(REPO_RUNTIME_ENV) uv run --project orchestrator python -m raidar.engine.jobs.detach
+DETACH_TOOL := $(REPO_RUNTIME_ENV) uv run --project orchestrator python -m raidar.engine.job.detach
 
 experiment-execute: pack-build
 	$(call require_var,EXPERIMENT)

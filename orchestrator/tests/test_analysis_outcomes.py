@@ -9,13 +9,13 @@ from __future__ import annotations
 
 import pytest
 
-from raidar.design.experiments.metrics import (
+from raidar.design.experiment.metrics import (
     SCB_CANONICAL,
     SCB_CANONICAL_ONESHOT,
     SCB_CANONICAL_ONESHOT_V2,
     SCB_CANONICAL_V2,
 )
-from raidar.engine.trials.models import (
+from raidar.engine.trial.models import (
     CheckpointState,
     ExecutionValidity,
     PlannedTrial,

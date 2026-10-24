@@ -12,12 +12,12 @@ from click.testing import CliRunner
 from harbor.models.task.task import Task
 
 from raidar.cli import main
-from raidar.design.problems import direct, harbor_engine, validator
-from raidar.design.problems.models import ProblemId
-from raidar.design.problems.native import grade_from_evaluation, stage_catalog
-from raidar.design.problems.rewrite import VERIFIER_IMPORT_PATH
-from raidar.design.problems.store import ProblemStore
-from raidar.design.problems.validation import (
+from raidar.design.problem import direct, harbor_engine, validator
+from raidar.design.problem.models import ProblemId
+from raidar.design.problem.native import grade_from_evaluation, stage_catalog
+from raidar.design.problem.rewrite import VERIFIER_IMPORT_PATH
+from raidar.design.problem.store import ProblemStore
+from raidar.design.problem.validation import (
     NEGATIVE,
     POSITIVE,
     Check,
@@ -33,7 +33,7 @@ from raidar.design.problems.validation import (
     run_checks,
     verdict,
 )
-from raidar.design.problems.validator import ValidateOptions, validate_problem, write_report
+from raidar.design.problem.validator import ValidateOptions, validate_problem, write_report
 from raidar.grading.sandbox import SandboxResult, SandboxRun
 from tests.component_trial_support import docker_context, docker_target_reachable
 from tests.problems_support import (
@@ -431,7 +431,7 @@ async def test_validator_wires_the_harbor_engine_and_the_native_arm(
     monkeypatch.setattr(validator, "resolve_checkout", lambda *args: Checkout())
     monkeypatch.setattr(validator, "stage_catalog", lambda source, catalog: catalog / source.name)
     monkeypatch.setattr(
-        "raidar.design.problems.native._docker_host", lambda context: "unix:///fake"
+        "raidar.design.problem.native._docker_host", lambda context: "unix:///fake"
     )
     report = await validate_problem(
         store,

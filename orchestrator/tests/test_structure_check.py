@@ -31,7 +31,7 @@ structure = _load_structure_module()
         "orchestrator/src/raidar/scoring/framework/gate_effort_v10/scorer.py",
         "orchestrator/tests/test_code_quality_v3.py",
         "lab/experiments/smoke/python__forge__mechanics-v1/experiment.yaml",
-        "orchestrator/src/raidar/subjects/treatments/runtime/review_loop_v2.py",
+        "orchestrator/src/raidar/subject/treatment/runtime/review_loop_v2.py",
         "scripts/v2/run.sh",
         "orchestrator/src/raidar/scoring/framework/v3/x.py",
     ],
@@ -101,11 +101,11 @@ def test_raidar_packages_must_be_on_the_allowlist() -> None:
 
 def test_every_group_allows_only_its_own_subpackages() -> None:
     allowed = [
-        f"{RAIDAR}/design/experiments/lock.py",
-        f"{RAIDAR}/design/problems/store.py",
-        f"{RAIDAR}/subjects/treatments/runtime/step_reset.sh",
-        f"{RAIDAR}/engine/trials/driver.py",
-        f"{RAIDAR}/engine/jobs/run.py",
+        f"{RAIDAR}/design/experiment/lock.py",
+        f"{RAIDAR}/design/problem/store.py",
+        f"{RAIDAR}/subject/treatment/runtime/step_reset.sh",
+        f"{RAIDAR}/engine/trial/driver.py",
+        f"{RAIDAR}/engine/job/run.py",
         f"{RAIDAR}/engine/health/audit.py",
         f"{RAIDAR}/scoring/judge/policies/code-quality.yaml",
         f"{RAIDAR}/evaluation/review/projection/spans.py",
@@ -115,7 +115,7 @@ def test_every_group_allows_only_its_own_subpackages() -> None:
     refused = [
         f"{RAIDAR}/engine/execution/run.py",
         f"{RAIDAR}/scoring/sdk/result.py",
-        f"{RAIDAR}/contracts/paths/more.py",
+        f"{RAIDAR}/contract/paths/more.py",
         f"{RAIDAR}/cli/sub/command.py",
         f"{RAIDAR}/evaluation/jobs/run.py",
     ]
@@ -123,7 +123,7 @@ def test_every_group_allows_only_its_own_subpackages() -> None:
     assert structure.package_violations(allowed) == []
     assert structure.package_violations(refused) == [
         "unexpected cli subpackage: cli/sub/",
-        "unexpected contracts subpackage: contracts/paths/",
+        "unexpected contract subpackage: contract/paths/",
         "unexpected engine subpackage: engine/execution/",
         "unexpected evaluation subpackage: evaluation/jobs/",
         "unexpected scoring subpackage: scoring/sdk/",
@@ -143,8 +143,8 @@ def test_package_depth_is_capped_at_three_below_raidar() -> None:
 
 def test_payload_data_pack_image_and_the_grader_runtime_are_exempt_from_the_depth_cap() -> None:
     paths = [
-        f"{RAIDAR}/subjects/treatments/payloads/python_guardrails/rules/ruff/extra/more/file.toml",
-        f"{RAIDAR}/subjects/environments/python/image/Dockerfile",
+        f"{RAIDAR}/subject/treatment/payloads/python_guardrails/rules/ruff/extra/more/file.toml",
+        f"{RAIDAR}/subject/environment/python/image/Dockerfile",
         f"{RAIDAR}/grading/runtime/a/b/c/d/plugin.py",
     ]
 

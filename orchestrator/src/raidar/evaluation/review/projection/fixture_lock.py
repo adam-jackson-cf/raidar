@@ -12,9 +12,9 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import Any
 
-from raidar.design.experiments.canonical import digest_json
-from raidar.design.experiments.lock import LOCK_VERSION, analysis_section, seal_lock
-from raidar.design.experiments.metrics import DEFAULT_METRIC_REGISTRY
+from raidar.design.experiment.canonical import digest_json
+from raidar.design.experiment.lock import LOCK_VERSION, analysis_section, seal_lock
+from raidar.design.experiment.metrics import DEFAULT_METRIC_REGISTRY
 
 
 def fixture_lock(

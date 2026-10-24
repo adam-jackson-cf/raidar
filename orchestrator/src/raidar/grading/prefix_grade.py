@@ -32,7 +32,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from raidar.contracts.snapshot import tree_digest
+from raidar.contract.snapshot import tree_digest
 from raidar.grading.grader import grade_step
 from raidar.grading.models import VerifierGrade
 from raidar.grading.per_trial import per_trial

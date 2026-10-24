@@ -1,6 +1,6 @@
 """One step's ``guardrail-gate@1`` record, read back from the step's agent logs.
 
-The wrapper (``raidar.subjects.treatments.runtime.guardrail_gate``) writes
+The wrapper (``raidar.subject.treatment.runtime.guardrail_gate``) writes
 ``guardrail-gate/guardrail-gate.json`` under the step's agent log dir (the
 scorer's ``trace_dir``): every session (role, round, usage, duration) and
 every gate run (verdict, error, output log, report dir, duration). This module

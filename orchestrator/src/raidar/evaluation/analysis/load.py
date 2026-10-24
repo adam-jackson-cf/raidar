@@ -12,8 +12,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from raidar.design.experiments.metrics import DEFAULT_METRIC_REGISTRY, Metric
-from raidar.engine.jobs.assessment import lock_errata
+from raidar.design.experiment.metrics import DEFAULT_METRIC_REGISTRY, Metric
+from raidar.engine.job.assessment import lock_errata
 from raidar.evaluation.analysis.assessed import (
     ANALYSED_SCORERS,
     PROCESS_COMPLIANCE_REF,

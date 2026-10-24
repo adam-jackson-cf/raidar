@@ -20,7 +20,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Protocol
 
-from raidar.subjects.environments.python.models import ProvisioningTiming, load_tool_lock
+from raidar.subject.environment.python.models import ProvisioningTiming, load_tool_lock
 
 
 class _ProvisionedTool(Protocol):
@@ -137,7 +137,7 @@ def provisioned_environment(provisioner: _Provisioner | None = None) -> ToolEnvi
     implementation digest.
     """
     if provisioner is None:
-        module = importlib.import_module("raidar.subjects.environments.python.provisioner")
+        module = importlib.import_module("raidar.subject.environment.python.provisioner")
         provisioner = module.ToolProvisioner(load_tool_lock())
     tool = provisioner.ensure(QUALITY_TOOL)
     return ToolEnvironment(python=tool.python, provisioning=tool.first_use)

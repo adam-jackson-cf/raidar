@@ -5,9 +5,9 @@ root_package = raidar
 name = Nothing imports the CLI layer
 type = forbidden
 source_modules =
-    raidar.contracts
+    raidar.contract
     raidar.design
-    raidar.subjects
+    raidar.subject
     raidar.engine
     raidar.grading
     raidar.scoring
@@ -19,11 +19,11 @@ forbidden_modules =
 name = Shared contracts stay independent of every stage
 type = forbidden
 source_modules =
-    raidar.contracts
+    raidar.contract
 forbidden_modules =
     raidar.cli
     raidar.design
-    raidar.subjects
+    raidar.subject
     raidar.engine
     raidar.grading
     raidar.scoring
@@ -33,7 +33,7 @@ forbidden_modules =
 name = Experiment design stays independent of the engine and the CLI layer
 type = forbidden
 source_modules =
-    raidar.design.experiments
+    raidar.design.experiment
 forbidden_modules =
     raidar.engine
     raidar.cli
@@ -42,27 +42,27 @@ forbidden_modules =
 name = Problems stay independent of the engine, agents, and the CLI layer
 type = forbidden
 source_modules =
-    raidar.design.problems
+    raidar.design.problem
 forbidden_modules =
     raidar.engine
-    raidar.subjects.agents
+    raidar.subject.agent
     raidar.cli
 
 [importlinter:contract:subjects-environments-boundary]
 name = Runtime environments (packs) stay independent of the engine, agents, and the CLI layer
 type = forbidden
 source_modules =
-    raidar.subjects.environments
+    raidar.subject.environment
 forbidden_modules =
     raidar.engine
-    raidar.subjects.agents
+    raidar.subject.agent
     raidar.cli
 
 [importlinter:contract:subjects-treatments-boundary]
 name = Treatments (components) stay independent of the engine and the CLI layer
 type = forbidden
 source_modules =
-    raidar.subjects.treatments
+    raidar.subject.treatment
 forbidden_modules =
     raidar.engine
     raidar.cli
@@ -82,7 +82,7 @@ source_modules =
     raidar.grading
 forbidden_modules =
     raidar.engine
-    raidar.subjects
+    raidar.subject
     raidar.cli
 
 [importlinter:contract:scoring-boundary]
@@ -92,8 +92,8 @@ source_modules =
     raidar.scoring
 forbidden_modules =
     raidar.engine
-    raidar.subjects.agents
-    raidar.subjects.treatments
+    raidar.subject.agent
+    raidar.subject.treatment
     raidar.cli
 
 [importlinter:contract:deterministic-process-checks]
@@ -120,7 +120,7 @@ source_modules =
 forbidden_modules =
     raidar.cli
     raidar.design
-    raidar.subjects
+    raidar.subject
     raidar.engine
     raidar.scoring
     raidar.evaluation.analysis

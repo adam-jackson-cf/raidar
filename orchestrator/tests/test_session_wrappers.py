@@ -28,24 +28,24 @@ from harbor.agents.installed.base import ApiOverloadedError, NonZeroAgentExitCod
 from harbor.environments.base import BaseEnvironment, ExecResult
 from harbor.models.agent.context import AgentContext
 
-from raidar.design.experiments.schema import AgentEntry
-from raidar.engine.trials.agent_config import arm_agent_config, reported_harness_pin
-from raidar.subjects.environments.python.models import load_pack_spec
-from raidar.subjects.treatments import ComponentKind, ComponentRegistry, ComponentRejectedError
-from raidar.subjects.treatments.catalog.gate import GUARDRAIL_GATE_IMPORT_PATH
-from raidar.subjects.treatments.catalog.retry import TRANSIENT_RETRY_IMPORT_PATH, retry_records
-from raidar.subjects.treatments.catalog.stall import CONTINUE_ON_STALL_IMPORT_PATH
-from raidar.subjects.treatments.definition.evidence import StepEvidence
-from raidar.subjects.treatments.runtime import transient_retry
-from raidar.subjects.treatments.runtime.continue_on_stall import (
+from raidar.design.experiment.schema import AgentEntry
+from raidar.engine.trial.agent_config import arm_agent_config, reported_harness_pin
+from raidar.subject.environment.python.models import load_pack_spec
+from raidar.subject.treatment import ComponentKind, ComponentRegistry, ComponentRejectedError
+from raidar.subject.treatment.catalog.gate import GUARDRAIL_GATE_IMPORT_PATH
+from raidar.subject.treatment.catalog.retry import TRANSIENT_RETRY_IMPORT_PATH, retry_records
+from raidar.subject.treatment.catalog.stall import CONTINUE_ON_STALL_IMPORT_PATH
+from raidar.subject.treatment.definition.evidence import StepEvidence
+from raidar.subject.treatment.runtime import transient_retry
+from raidar.subject.treatment.runtime.continue_on_stall import (
     STALL_DIR,
     STALL_RECORD,
     ContinueOnStallAgent,
     continuation_prompt,
     detect_stall_message,
 )
-from raidar.subjects.treatments.runtime.session_chain import InnerAgentSpec
-from raidar.subjects.treatments.runtime.transient_retry import (
+from raidar.subject.treatment.runtime.session_chain import InnerAgentSpec
+from raidar.subject.treatment.runtime.transient_retry import (
     RETRY_DIR,
     RETRY_RECORD,
     TransientRetryAgent,
@@ -119,10 +119,10 @@ def test_both_are_workflow_session_wrappers_without_with_keys() -> None:
         assert registry.get(ref).manifest.kind is ComponentKind.WORKFLOW
         with pytest.raises(ComponentRejectedError):
             compile_uses(use(ref, retries=3))
-    assert "raidar/subjects/treatments/runtime/continue_on_stall.py" in (
+    assert "raidar/subject/treatment/runtime/continue_on_stall.py" in (
         registry.get("continue-on-stall@2").manifest.fingerprint
     )
-    assert "raidar/subjects/treatments/runtime/transient_retry.py" in (
+    assert "raidar/subject/treatment/runtime/transient_retry.py" in (
         registry.get("transient-retry@1").manifest.fingerprint
     )
 

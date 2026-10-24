@@ -1,4 +1,4 @@
-"""CLI-side wrappers of the verifier's offline grading (``raidar.grading.offline_grading``).
+"""CLI-side wrappers of the verifier's offline grading (``raidar.grading.offline``).
 
 The verifier raises ``OfflineGradingError`` for a grading run that cannot proceed; here every
 failure becomes a command error. ``grading_options`` resolves the selected target's grader
@@ -14,15 +14,15 @@ from typing import Any
 import click
 
 from raidar.cli.target_options import docker_selection
-from raidar.grading import offline_grading
-from raidar.grading.offline_grading import OfflineGradingError, reads_docker_grades
+from raidar.grading import offline
+from raidar.grading.offline import OfflineGradingError, reads_docker_grades
 from raidar.grading.regrade import RegradeOptions
 
 
 def regrade(target: Path, options: RegradeOptions, store: Path | None) -> dict[str, Any]:
     """The regrade report; a regrade that cannot run is a click error."""
     try:
-        return offline_grading.regrade(target, options, store)
+        return offline.regrade(target, options, store)
     except OfflineGradingError as exc:
         raise click.ClickException(str(exc)) from exc
 
@@ -38,7 +38,7 @@ def grade_pre_fix(
 ) -> dict[str, Any] | None:
     """Grade the target's ungraded pre-fix snapshots into the store, when a scorer reads them."""
     try:
-        return offline_grading.grade_pre_fix(
+        return offline.grade_pre_fix(
             target, store, scorer_refs, options, replay=replay, concurrency=concurrency
         )
     except OfflineGradingError as exc:
@@ -56,7 +56,7 @@ def produce_coverage(
 ) -> dict[str, Any] | None:
     """Make the target's deferred coverage runs into the store, when a scorer reads them."""
     try:
-        return offline_grading.produce_coverage(
+        return offline.produce_coverage(
             target, store, scorer_refs, options, replay=replay, concurrency=concurrency
         )
     except OfflineGradingError as exc:
@@ -68,7 +68,7 @@ def check_coverage(
 ) -> dict[str, Any]:
     """The offline coverage check report; a check that cannot run is a click error."""
     try:
-        return offline_grading.check_coverage(target, options, store, concurrency)
+        return offline.check_coverage(target, options, store, concurrency)
     except OfflineGradingError as exc:
         raise click.ClickException(str(exc)) from exc
 

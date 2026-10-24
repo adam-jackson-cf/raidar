@@ -7,7 +7,7 @@
 
 from __future__ import annotations
 
-from raidar.design.experiments.metrics import DEFAULT_METRIC_REGISTRY
+from raidar.design.experiment.metrics import DEFAULT_METRIC_REGISTRY
 from raidar.evaluation.analysis.markdown import BETTER_LEGEND, _better
 from raidar.evaluation.analysis.outcomes import (
     GATE_METRICS,

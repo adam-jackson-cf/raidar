@@ -1,4 +1,4 @@
-# Pinned errata for scb/forge@38d627ecf668 (raidar.design.problems.errata). The lock pins the
+# Pinned errata for scb/forge@38d627ecf668 (raidar.design.problem.errata). The lock pins the
 # sha256 of this file; editing it changes lock_sha256 (relock, then migrate executed jobs).
 kind: raidar-problem-errata
 schema_version: 1

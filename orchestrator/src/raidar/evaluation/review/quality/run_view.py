@@ -29,7 +29,7 @@ from decimal import Decimal
 from pathlib import Path
 from typing import cast, get_args
 
-from raidar.design.experiments.metrics import (
+from raidar.design.experiment.metrics import (
     COMPONENT_PLACES,
     DEFAULT_METRIC_REGISTRY,
     IneligibilityReason,

@@ -6,7 +6,7 @@ from pathlib import Path
 
 import click
 
-from raidar.contracts.paths import lab_root
+from raidar.contract.paths import lab_root
 from raidar.evaluation.ledger import index
 from raidar.evaluation.ledger.check import check_ledger, load_ledger
 

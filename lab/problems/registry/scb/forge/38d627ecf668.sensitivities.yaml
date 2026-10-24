@@ -1,4 +1,4 @@
-# Known verifier sensitivities of scb/forge@38d627ecf668 (raidar.design.problems.sensitivities).
+# Known verifier sensitivities of scb/forge@38d627ecf668 (raidar.design.problem.sensitivities).
 # Not errata: the specification determines each behaviour below, so no outcome changes.
 # A typed note the analysis shows beside the grading-vs-coverage disagreement count
 # (code-quality@3 regression_parity_excluded_cases). Judged by the spec-determinacy audit

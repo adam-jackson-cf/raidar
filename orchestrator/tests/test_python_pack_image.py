@@ -21,14 +21,14 @@ from harbor.environments.definition import should_use_prebuilt_docker_image
 from pydantic import ValidationError
 
 from raidar.cli import main
-from raidar.subjects.environments.python import image as image_module
-from raidar.subjects.environments.python.harness import (
+from raidar.subject.environment.python import image as image_module
+from raidar.subject.environment.python.harness import (
     HarnessPinError,
     harbor_agent_kwargs,
     harbor_reported_version,
     harbor_version_command,
 )
-from raidar.subjects.environments.python.image import (
+from raidar.subject.environment.python.image import (
     LOCK_HASH_LABEL,
     ImageAuditError,
     ImageNotBuiltError,
@@ -38,13 +38,13 @@ from raidar.subjects.environments.python.image import (
     image_lock_hash,
     image_tag,
 )
-from raidar.subjects.environments.python.models import (
+from raidar.subject.environment.python.models import (
     PACK_SPEC_PATH,
     PackSpec,
     load_pack_spec,
     load_tool_lock,
 )
-from raidar.subjects.environments.python.task_environment import (
+from raidar.subject.environment.python.task import (
     bind_task_environment,
     compose_override,
 )

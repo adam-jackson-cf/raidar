@@ -16,14 +16,14 @@ from typing import Any
 from harbor.models.task.config import EnvironmentConfig as TaskEnvironmentConfig
 from harbor.models.trial.config import TrialConfig
 
-from raidar.design.experiments.lock import spec_source_digest
-from raidar.design.problems.store import ImportedProblem
-from raidar.engine.jobs.detach import git_state
-from raidar.engine.jobs.plan import ExperimentPlan
-from raidar.engine.trials.trial_config import verifier_timeout_s
+from raidar.design.experiment.lock import spec_source_digest
+from raidar.design.problem.store import ImportedProblem
+from raidar.engine.job.detach import git_state
+from raidar.engine.job.plan import ExperimentPlan
+from raidar.engine.trial.config import verifier_timeout_s
 from raidar.grading.grader_image import grader_image_tag
-from raidar.subjects.environments import load_runtime_pack
-from raidar.subjects.environments.python.image import image_lock_hash
+from raidar.subject.environment import load_runtime_pack
+from raidar.subject.environment.python.image import image_lock_hash
 
 # Changes here never reach a trial, so they do not make the runner dirty (the
 # user keeps untracked notes under docs/).

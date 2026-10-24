@@ -24,12 +24,12 @@ from typing import Any, cast
 
 import pytest
 
-from raidar.design.experiments.references import RefKind, RegistryRef
-from raidar.engine.trials import collect
-from raidar.engine.trials.models import ProbeSummary
-from raidar.subjects.treatments import ComponentKind, ComponentRegistry, ComponentRejectedError
-from raidar.subjects.treatments.catalog._common import sha256_bytes
-from raidar.subjects.treatments.catalog.guardrails import (
+from raidar.design.experiment.references import RefKind, RegistryRef
+from raidar.engine.trial import collect
+from raidar.engine.trial.models import ProbeSummary
+from raidar.subject.treatment import ComponentKind, ComponentRegistry, ComponentRejectedError
+from raidar.subject.treatment.catalog._common import sha256_bytes
+from raidar.subject.treatment.catalog.guardrails import (
     AGENT_SITE,
     AGENT_TOOL_VERSIONS,
     AGENT_TOOLS,
@@ -64,11 +64,11 @@ from raidar.subjects.treatments.catalog.guardrails import (
     payload_bytes,
     protection_flags,
 )
-from raidar.subjects.treatments.definition.evidence import StepEvidence
-from raidar.subjects.treatments.definition.integrity import condition_step_flags
-from raidar.subjects.treatments.definition.manifest import ComponentUseContext
-from raidar.subjects.treatments.definition.registry import ComponentResolver, component_runtimes
-from raidar.subjects.treatments.runtime.provision import (
+from raidar.subject.treatment.definition.evidence import StepEvidence
+from raidar.subject.treatment.definition.integrity import condition_step_flags
+from raidar.subject.treatment.definition.manifest import ComponentUseContext
+from raidar.subject.treatment.definition.registry import ComponentResolver, component_runtimes
+from raidar.subject.treatment.runtime.provision import (
     AGENT_USER_ENV,
     PAYLOAD_ENV,
     PROVISION_CHANNEL,
@@ -218,9 +218,9 @@ def test_python_guardrails_is_a_python_service_that_fingerprints_its_whole_paylo
     assert manifest.network.egress_hosts == ("files.pythonhosted.org", "pypi.org")
     for relative in PAYLOAD_FILES:
         assert f"{PAYLOAD_PACKAGE_DIR}/{relative}" in manifest.fingerprint
-    assert "raidar/subjects/treatments/catalog/guardrails.py" in manifest.fingerprint
-    assert "raidar/subjects/treatments/runtime/provision.py" in manifest.fingerprint
-    assert "raidar/subjects/treatments/definition/integrity.py" in manifest.fingerprint
+    assert "raidar/subject/treatment/catalog/guardrails.py" in manifest.fingerprint
+    assert "raidar/subject/treatment/runtime/provision.py" in manifest.fingerprint
+    assert "raidar/subject/treatment/definition/integrity.py" in manifest.fingerprint
     assert len(manifest.fingerprint) == len(set(manifest.fingerprint))
     shipped = {
         path.relative_to(PAYLOAD_DIR).as_posix()

@@ -11,7 +11,7 @@ import sys
 from collections.abc import Sequence
 from pathlib import Path
 
-from raidar.contracts.review_contract import (
+from raidar.contract.review import (
     ArmDiffArtifact,
     ReviewExperimentRecord,
     ReviewProjectionArtifact,

@@ -8,8 +8,8 @@ from pathlib import Path
 
 import pytest
 
-from raidar.design.problems import direct
-from raidar.design.problems.models import ProblemId
+from raidar.design.problem import direct
+from raidar.design.problem.models import ProblemId
 from raidar.grading.grader_image import ensure_grader_image
 from raidar.grading.sandbox import (
     CONTAINER_LAYOUT,

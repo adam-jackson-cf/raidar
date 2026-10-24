@@ -17,32 +17,32 @@ from click.testing import CliRunner
 from harbor.models.trial.config import AgentConfig, TrialConfig
 
 from raidar.cli import main
-from raidar.design.experiments.lock import lock_integrity_issues, spec_source_digest
-from raidar.design.problems.rewrite import VERIFIER_IMPORT_PATH
-from raidar.design.problems.store import ROOT_ENV
+from raidar.design.experiment.lock import lock_integrity_issues, spec_source_digest
+from raidar.design.problem.rewrite import VERIFIER_IMPORT_PATH
+from raidar.design.problem.store import ROOT_ENV
 from raidar.engine.health.records_manifest import RECORDS_MANIFEST, tamper_findings
-from raidar.engine.jobs.job_context import JobContext
-from raidar.engine.jobs.plan import PlanOptions, build_plan
-from raidar.engine.jobs.run import execute, load_problems
-from raidar.engine.targets.config import Selection, implicit_target
-from raidar.engine.targets.guard import REAP_FILE, TargetGuard, TargetLostError
-from raidar.engine.targets.health import TargetUnavailableError
-from raidar.engine.targets.job import JobTarget
-from raidar.engine.trials import driver
-from raidar.engine.trials.agent_config import CODEX_AUTH_ENV, reported_harness_pin, with_host_auth
-from raidar.engine.trials.driver import TrialRun, run_harbor_trial, run_in_order
-from raidar.engine.trials.environment import (
+from raidar.engine.job.context import JobContext
+from raidar.engine.job.plan import PlanOptions, build_plan
+from raidar.engine.job.run import execute, load_problems
+from raidar.engine.target.config import Selection, implicit_target
+from raidar.engine.target.guard import REAP_FILE, TargetGuard, TargetLostError
+from raidar.engine.target.health import TargetUnavailableError
+from raidar.engine.target.job import JobTarget
+from raidar.engine.trial import driver
+from raidar.engine.trial.agent_config import CODEX_AUTH_ENV, reported_harness_pin, with_host_auth
+from raidar.engine.trial.driver import TrialRun, run_harbor_trial, run_in_order
+from raidar.engine.trial.environment import (
     RUN_SCOPED_DOCKER_IMPORT_PATH,
     RunScopedDockerEnvironment,
     run_scope,
 )
-from raidar.engine.trials.materialise import MaterialiseError, materialise_task
-from raidar.engine.trials.trial_config import harbor_trial_config
+from raidar.engine.trial.materialise import MaterialiseError, materialise_task
+from raidar.engine.trial.config import harbor_trial_config
 from raidar.grading.verifier import RaidarVerifier
-from raidar.subjects.agents.codex_auth import ResolvedCodexAuth
-from raidar.subjects.agents.config import Harness
-from raidar.subjects.environments.python.models import load_pack_spec
-from raidar.subjects.treatments.runtime.provision import Provision
+from raidar.subject.agent.codex_auth import ResolvedCodexAuth
+from raidar.subject.agent.config import Harness
+from raidar.subject.environment.python.models import load_pack_spec
+from raidar.subject.treatment.runtime.provision import Provision
 from tests.execution_support import (
     ImportedFixture,
     StepOutcome,
@@ -194,7 +194,7 @@ def test_the_verifier_runs_the_coverage_pass_unless_the_protocol_defers_it(
 ) -> None:
     monkeypatch.setenv(ROOT_ENV, str(fixture_problem.store.root))
     monkeypatch.setattr(
-        "raidar.engine.trials.trial_config.with_host_auth", lambda config, harness: config
+        "raidar.engine.trial.config.with_host_auth", lambda config, harness: config
     )
     plan = _plan(tmp_path, fixture_problem, protocol=protocol)
 
@@ -215,9 +215,9 @@ def test_a_run_materialises_each_trial_and_writes_step_results(
     tmp_path: Path, fixture_problem: ImportedFixture, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.setenv(ROOT_ENV, str(fixture_problem.store.root))
-    monkeypatch.setattr("raidar.engine.trials.materialise.image_present", lambda tag: True)
+    monkeypatch.setattr("raidar.engine.trial.materialise.image_present", lambda tag: True)
     monkeypatch.setattr(
-        "raidar.engine.trials.trial_config.with_host_auth", lambda config, harness: config
+        "raidar.engine.trial.config.with_host_auth", lambda config, harness: config
     )
     protocol = {"progression": "halt_on_failure", "min_reward": 1.0}
     plan = _plan(tmp_path, fixture_problem, protocol=protocol)
@@ -331,9 +331,9 @@ def test_a_lost_target_marks_the_trial_and_aborts_the_job_before_the_next_trial(
     tmp_path: Path, fixture_problem: ImportedFixture, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.setenv(ROOT_ENV, str(fixture_problem.store.root))
-    monkeypatch.setattr("raidar.engine.trials.materialise.image_present", lambda tag: True)
+    monkeypatch.setattr("raidar.engine.trial.materialise.image_present", lambda tag: True)
     monkeypatch.setattr(
-        "raidar.engine.trials.trial_config.with_host_auth", lambda config, harness: config
+        "raidar.engine.trial.config.with_host_auth", lambda config, harness: config
     )
     loaded, lock, _ = locked_experiment(
         tmp_path / "exp",
@@ -406,9 +406,9 @@ def test_a_trial_that_raises_is_recorded_as_infra_and_the_run_completes(
     tmp_path: Path, fixture_problem: ImportedFixture, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.setenv(ROOT_ENV, str(fixture_problem.store.root))
-    monkeypatch.setattr("raidar.engine.trials.materialise.image_present", lambda tag: True)
+    monkeypatch.setattr("raidar.engine.trial.materialise.image_present", lambda tag: True)
     monkeypatch.setattr(
-        "raidar.engine.trials.trial_config.with_host_auth", lambda config, harness: config
+        "raidar.engine.trial.config.with_host_auth", lambda config, harness: config
     )
     loaded, lock, _ = locked_experiment(
         tmp_path / "exp",
@@ -468,7 +468,7 @@ def test_verifier_override_carries_reference_solutions_only_then(
     tmp_path: Path, fixture_problem: ImportedFixture, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.setenv(ROOT_ENV, str(fixture_problem.store.root))
-    monkeypatch.setattr("raidar.engine.trials.materialise.image_present", lambda tag: False)
+    monkeypatch.setattr("raidar.engine.trial.materialise.image_present", lambda tag: False)
     loaded, lock, _ = locked_experiment(
         tmp_path / "exp", fixture_problem.ref, environment={"compose_init": False}
     )
@@ -546,12 +546,12 @@ def test_codex_gets_the_host_session_file_path_only(
 ) -> None:
     auth = tmp_path / "auth.json"
     session = ResolvedCodexAuth("auto", "chatgpt", auth, "file")
-    monkeypatch.setattr("raidar.engine.trials.agent_config.resolve_codex_auth", lambda: session)
+    monkeypatch.setattr("raidar.engine.trial.agent_config.resolve_codex_auth", lambda: session)
     codex = AgentConfig(name="codex")
     assert with_host_auth(codex, Harness.CODEX_CLI).env == {CODEX_AUTH_ENV: str(auth)}
     assert with_host_auth(AgentConfig(name="oracle"), Harness.CODEX_CLI).env == {}
     wrapper = AgentConfig(
-        import_path="raidar.subjects.treatments.runtime.review_loop:ReviewLoopAgent",
+        import_path="raidar.subject.treatment.runtime.review_loop:ReviewLoopAgent",
         kwargs={"inner_agent": {"name": "codex", "kwargs": {"version": "0.156.1"}}},
     )
     # A workflow wrapper is held to its wrapped harness's pin; a no-LLM override has none.
@@ -564,7 +564,7 @@ def test_codex_gets_the_host_session_file_path_only(
     # the session file its inner codex called the API with an empty key (401, pilot).
     assert with_host_auth(wrapper, Harness.CODEX_CLI).env == {CODEX_AUTH_ENV: str(auth)}
     api = ResolvedCodexAuth("auto", "api", None, "OPENAI_API_KEY")
-    monkeypatch.setattr("raidar.engine.trials.agent_config.resolve_codex_auth", lambda: api)
+    monkeypatch.setattr("raidar.engine.trial.agent_config.resolve_codex_auth", lambda: api)
     assert with_host_auth(codex, Harness.CODEX_CLI).env == {}
 
 
@@ -590,7 +590,7 @@ def test_run_command_runs_the_selection_into_the_runs_dir(
         seen_names.append(name)
         return JobTarget(SELECTION, None, TargetGuard.for_target(SELECTION.trial, reap=_no_reap))
 
-    monkeypatch.setattr("raidar.engine.jobs.run.execute", fake_execute)
+    monkeypatch.setattr("raidar.engine.job.run.execute", fake_execute)
     monkeypatch.setattr("raidar.cli.execution.job_target", fake_job_target)
     runner = CliRunner()
     arguments = ["run", str(loaded.path), "--arm", "baseline", "--attempt", "1", "--target", "t"]

@@ -9,11 +9,11 @@ from typing import Any
 
 import pytest
 
-from raidar.engine.targets.config import implicit_target
-from raidar.engine.targets.guard import REAP_FILE, TargetGuard, TargetLostError
-from raidar.engine.targets.health import TargetUnavailableError
-from raidar.engine.trials.driver import run_in_order
-from raidar.engine.trials.models import (
+from raidar.engine.target.config import implicit_target
+from raidar.engine.target.guard import REAP_FILE, TargetGuard, TargetLostError
+from raidar.engine.target.health import TargetUnavailableError
+from raidar.engine.trial.driver import run_in_order
+from raidar.engine.trial.models import (
     ExecutionValidity,
     PlannedTrial,
     ProgressionRule,

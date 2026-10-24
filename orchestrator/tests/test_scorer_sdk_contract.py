@@ -10,10 +10,10 @@ import pytest
 import yaml
 from pydantic import ValidationError
 
-from raidar.design.experiments.loader import load_experiment
-from raidar.design.experiments.lock import build_lock, render_lock
-from raidar.design.experiments.metrics import MetricResolver
-from raidar.design.experiments.references import (
+from raidar.design.experiment.loader import load_experiment
+from raidar.design.experiment.lock import build_lock, render_lock
+from raidar.design.experiment.metrics import MetricResolver
+from raidar.design.experiment.references import (
     RefKind,
     RegistryRef,
     RegistryReferenceError,

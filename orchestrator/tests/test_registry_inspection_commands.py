@@ -9,9 +9,9 @@ import pytest
 from click.testing import CliRunner
 
 from raidar.cli import main
-from raidar.design.problems.models import ProblemId
-from raidar.design.problems.store import ProblemStore, ProblemStoreError
-from raidar.subjects.environments.python.models import load_pack_spec
+from raidar.design.problem.models import ProblemId
+from raidar.design.problem.store import ProblemStore, ProblemStoreError
+from raidar.subject.environment.python.models import load_pack_spec
 from tests.problems_support import (
     NEGATIVE_REF,
     ONESHOT_REF,

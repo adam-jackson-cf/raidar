@@ -12,7 +12,7 @@ from click.testing import CliRunner
 
 from raidar.cli import main
 from raidar.cli.target_options import job_target
-from raidar.engine.targets.config import (
+from raidar.engine.target.config import (
     TARGETS_TEMPLATE,
     TargetError,
     activate,
@@ -22,7 +22,7 @@ from raidar.engine.targets.config import (
     resolve_selection,
     resolve_target,
 )
-from raidar.engine.trials.environment import run_scope
+from raidar.engine.trial.environment import run_scope
 
 FILE = """
 default = "mbp"
@@ -143,7 +143,7 @@ def test_the_implicit_target_asks_docker_when_the_environment_is_silent(
         assert argv == ["docker", "context", "show"]
         return subprocess.CompletedProcess(argv, 0, stdout="shown\n", stderr="")
 
-    monkeypatch.setattr("raidar.engine.targets.config.subprocess.run", fake_run)
+    monkeypatch.setattr("raidar.engine.target.config.subprocess.run", fake_run)
 
     assert resolve_target().docker_context == "shown"
 

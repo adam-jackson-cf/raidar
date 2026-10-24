@@ -24,15 +24,15 @@ from typing import Literal
 
 import yaml
 
-from raidar.contracts.review_contract import (
+from raidar.contract.review import (
     ArmChangeCategory,
     ArmDiffArtifact,
     DiffLine,
     FileDiff,
     TextDiff,
 )
-from raidar.design.experiments.factor_guard import arm_nouns
-from raidar.design.experiments.schema import ArmSpec, ExperimentSpec
+from raidar.design.experiment.factor_guard import arm_nouns
+from raidar.design.experiment.schema import ArmSpec, ExperimentSpec
 
 MAX_DIFF_LINES = 160
 INSTRUCTION_FILE = "instruction.md"

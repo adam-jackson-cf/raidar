@@ -27,7 +27,7 @@ from typing import Literal
 
 from pydantic import Field, ValidationError, model_validator
 
-from raidar.contracts.snapshot import tree_digest
+from raidar.contract.snapshot import tree_digest
 from raidar.grading.models import VerifierModel
 
 BUNDLE_MANIFEST = "oracle-bundle.json"  # wire name in the problem store (v1 layout)

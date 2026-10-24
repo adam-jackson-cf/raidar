@@ -16,9 +16,9 @@ import pytest
 from harbor.models.trial.config import AgentConfig
 from pydantic import JsonValue
 
-from raidar.subjects.agents.config import Harness
-from raidar.subjects.treatments.definition.compiled import RESET_PROBE
-from raidar.subjects.treatments.runtime.mcp_shim import parse_args, run
+from raidar.subject.agent.config import Harness
+from raidar.subject.treatment.definition.compiled import RESET_PROBE
+from raidar.subject.treatment.runtime.mcp_shim import parse_args, run
 from tests.component_support import (
     CLAUDE_SETTINGS,
     CODEX_SETTINGS,
@@ -96,7 +96,7 @@ def test_workflow_wraps_the_agent_and_keeps_its_inputs() -> None:
     )
 
     assert config.name is None
-    assert config.import_path == "raidar.subjects.treatments.runtime.review_loop:ReviewLoopAgent"
+    assert config.import_path == "raidar.subject.treatment.runtime.review_loop:ReviewLoopAgent"
     assert config.model_name == "openai/gpt-6-luna"
     assert config.kwargs["max_review_rounds"] == 2
     inner = config.kwargs["inner_agent"]
@@ -295,14 +295,14 @@ def test_settings_probe_compares_every_declared_setting_with_the_harness_report(
 def test_settings_harbor_always_overrides_are_refused_at_compile_time(
     harness: Harness, settings: dict[str, JsonValue]
 ) -> None:
-    from raidar.subjects.treatments import ComponentRejectedError
+    from raidar.subject.treatment import ComponentRejectedError
 
     with pytest.raises(ComponentRejectedError, match="always overridden"):
         compile_uses(use("harness-settings@1", settings=settings), harness=harness)
 
 
 def test_invalid_prompt_templates_are_rejected(tmp_path: Path) -> None:
-    from raidar.subjects.treatments import ComponentRejectedError
+    from raidar.subject.treatment import ComponentRejectedError
 
     for text, message in (
         ("no slot", "exactly one"),
@@ -315,7 +315,7 @@ def test_invalid_prompt_templates_are_rejected(tmp_path: Path) -> None:
 
 
 def test_native_config_merge_appends_entry_lists_only_and_refuses_clashes() -> None:
-    from raidar.subjects.treatments.definition.contribution import (
+    from raidar.subject.treatment.definition.contribution import (
         ContributionConflictError,
         merge_native_config,
     )
@@ -337,7 +337,7 @@ def test_native_config_merge_appends_entry_lists_only_and_refuses_clashes() -> N
 def test_skill_name_falls_back_to_the_directory_and_probe_errors_fail_closed(
     tmp_path: Path,
 ) -> None:
-    from raidar.subjects.treatments.catalog.harness import skill_name
+    from raidar.subject.treatment.catalog.harness import skill_name
 
     assert skill_name("---\nname: from-front\n---\nbody", "dir") == "from-front"
     assert skill_name("# no front matter", "dir") == "dir"
@@ -355,7 +355,7 @@ def test_skill_name_falls_back_to_the_directory_and_probe_errors_fail_closed(
 
 
 def test_evidence_reader_tolerates_malformed_logs(tmp_path: Path) -> None:
-    from raidar.subjects.treatments.definition.evidence import StepEvidence
+    from raidar.subject.treatment.definition.evidence import StepEvidence
 
     (tmp_path / "raidar-components.json").write_text("not json")
     (tmp_path / "nested").mkdir()
@@ -373,7 +373,7 @@ def test_evidence_reader_tolerates_malformed_logs(tmp_path: Path) -> None:
 
 
 def test_mcp_recorder_marks_errors_and_ignores_non_objects() -> None:
-    from raidar.subjects.treatments.runtime.mcp_shim import Recorder
+    from raidar.subject.treatment.runtime.mcp_shim import Recorder
 
     log = io.StringIO()
     recorder = Recorder(log)
@@ -421,9 +421,9 @@ def test_stop_hook_body_can_come_from_a_component_file() -> None:
 def test_mcp_probe_fails_on_error_replies_or_an_empty_tool_list(
     tmp_path: Path, records: list[dict[str, object]], detail: str
 ) -> None:
-    from raidar.subjects.treatments.catalog.harness import MCP_SERVER
-    from raidar.subjects.treatments.definition.evidence import StepEvidence
-    from raidar.subjects.treatments.definition.manifest import ComponentUseContext
+    from raidar.subject.treatment.catalog.harness import MCP_SERVER
+    from raidar.subject.treatment.definition.evidence import StepEvidence
+    from raidar.subject.treatment.definition.manifest import ComponentUseContext
 
     write_jsonl(tmp_path / "raidar-components" / "06-mcp-server.mcp.jsonl", records)
     use = ComponentUseContext("06-mcp-server", Harness.CODEX_CLI, tmp_path)
@@ -438,9 +438,9 @@ def test_stop_hook_probe_reads_the_body_exit_status(
 ) -> None:
     import subprocess
 
-    from raidar.subjects.treatments.catalog.harness import STOP_HOOK, _hook_wrapper
-    from raidar.subjects.treatments.definition.evidence import StepEvidence
-    from raidar.subjects.treatments.definition.manifest import ComponentUseContext
+    from raidar.subject.treatment.catalog.harness import STOP_HOOK, _hook_wrapper
+    from raidar.subject.treatment.definition.evidence import StepEvidence
+    from raidar.subject.treatment.definition.manifest import ComponentUseContext
 
     logs, components = tmp_path / "logs", tmp_path / "components"
     script = (

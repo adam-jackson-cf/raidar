@@ -16,8 +16,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from decimal import Decimal
 
-from raidar.design.experiments.metrics import DEFAULT_METRIC_REGISTRY
-from raidar.engine.trials.models import CheckpointState, StepResult, TrialRecord
+from raidar.design.experiment.metrics import DEFAULT_METRIC_REGISTRY
+from raidar.engine.trial.models import CheckpointState, StepResult, TrialRecord
 from raidar.evaluation.analysis.assessed import CODE_QUALITY_REF
 from raidar.evaluation.analysis.outcomes import CORRECTNESS_REF
 from raidar.evaluation.review.projection.assessments import TrialAssessments

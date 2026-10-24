@@ -35,17 +35,17 @@ from harbor.environments.base import BaseEnvironment
 from harbor.models.agent.context import AgentContext
 from harbor.models.trial.config import AgentConfig
 
-from raidar.subjects.environments.python.image import image_tag
-from raidar.subjects.environments.python.models import load_pack_spec
-from raidar.subjects.treatments.catalog.guardrails import (
+from raidar.subject.environment.python.image import image_tag
+from raidar.subject.environment.python.models import load_pack_spec
+from raidar.subject.treatment.catalog.guardrails import (
     PAYLOAD_DIR,
     PAYLOAD_FILES,
     PINNED_VERSION,
     install_script,
 )
-from raidar.subjects.treatments.definition.integrity import condition_step_flags
-from raidar.subjects.treatments.runtime.gate_run import GATE_RECORD
-from raidar.subjects.treatments.runtime.provision import trial_provisions
+from raidar.subject.treatment.definition.integrity import condition_step_flags
+from raidar.subject.treatment.runtime.gate_run import GATE_RECORD
+from raidar.subject.treatment.runtime.provision import trial_provisions
 from tests.component_support import compile_uses, use
 from tests.component_trial_support import (
     build_task,

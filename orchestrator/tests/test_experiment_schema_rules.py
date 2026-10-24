@@ -9,8 +9,8 @@ import pytest
 from click.testing import CliRunner
 
 from raidar.cli import main
-from raidar.design.experiments.loader import load_experiment
-from raidar.design.experiments.validation import SpecValidationError, spec_warnings
+from raidar.design.experiment.loader import load_experiment
+from raidar.design.experiment.validation import SpecValidationError, spec_warnings
 from tests.experiment_spec_support import (
     AGENTS_BENCHMARK,
     EXPERIMENTS,

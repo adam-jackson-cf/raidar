@@ -19,7 +19,7 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from raidar.design.experiments.references import RegistryReferenceError
+from raidar.design.experiment.references import RegistryReferenceError
 from raidar.scoring.framework.catalog import ScorerRegistry
 from raidar.scoring.framework.keys import scorer_identity, store_key
 from raidar.scoring.framework.rescore_config import RescoreConfig

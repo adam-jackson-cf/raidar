@@ -9,7 +9,7 @@ from typing import Any
 import click
 
 from raidar.cli.target_options import target_option
-from raidar.engine.targets.config import (
+from raidar.engine.target.config import (
     TARGETS_TEMPLATE,
     Target,
     TargetError,
@@ -17,13 +17,13 @@ from raidar.engine.targets.config import (
     resolve_target,
     targets_file,
 )
-from raidar.engine.targets.health import (
+from raidar.engine.target.health import (
     TargetUnavailableError,
     data_check_failure,
     docker_facts,
     ensure_target,
 )
-from raidar.engine.targets.transport import (
+from raidar.engine.target.transport import (
     TransportPaths,
     docker_healthy,
     read_pid,
@@ -31,7 +31,7 @@ from raidar.engine.targets.transport import (
     transport_up,
     tunnel_running,
 )
-from raidar.engine.trials.cleanup import cleanup_trial_projects
+from raidar.engine.trial.cleanup import cleanup_trial_projects
 
 
 def register(main: click.Group) -> None:

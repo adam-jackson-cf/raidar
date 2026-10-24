@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from raidar.design.experiments.metrics import (
+from raidar.design.experiment.metrics import (
     DEFAULT_METRIC_REGISTRY,
     SCB_CANONICAL,
     SCB_CANONICAL_ONESHOT,
@@ -21,7 +21,7 @@ from raidar.design.experiments.metrics import (
     checkpoint_solve_rate,
     problem_correctness,
 )
-from raidar.design.experiments.references import RefKind, RegistryRef, RegistryReferenceError
+from raidar.design.experiment.references import RefKind, RegistryRef, RegistryReferenceError
 
 FULL = {"C": 1, "V": 1, "E": 1, "H": 1, "R": 1, "G": 1}
 

@@ -16,8 +16,8 @@ from typing import Any
 
 import pytest
 
-from raidar.contracts.snapshot import tree_digest
-from raidar.grading import offline_grading
+from raidar.contract.snapshot import tree_digest
+from raidar.grading import offline
 from raidar.grading.prefix_grade import (
     grade_pre_fix_path,
     pre_fix_snapshots,
@@ -138,10 +138,10 @@ def test_rescore_grades_first_only_for_a_scorer_that_reads_the_grades(
         called.append((path, store, options.docker_context, concurrency))
         return {"snapshots": [], "errors": 0}
 
-    monkeypatch.setattr(offline_grading, "grade_pre_fix_path", fake)
+    monkeypatch.setattr(offline, "grade_pre_fix_path", fake)
     options = RegradeOptions(docker_context="orbstack")
 
-    result = offline_grading.grade_pre_fix(
+    result = offline.grade_pre_fix(
         tmp_path / "job", tmp_path / "store", scorers, options, replay=replay, concurrency=3
     )
 

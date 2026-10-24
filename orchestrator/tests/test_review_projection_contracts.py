@@ -10,7 +10,7 @@ from pathlib import Path
 
 import pytest
 
-from raidar.contracts.review_contract import ReviewProjectionArtifact
+from raidar.contract.review import ReviewProjectionArtifact
 from raidar.evaluation.review.projection import main, merge_review_projections
 from raidar.evaluation.review.projection.fixture import (
     JOBS_DIR,

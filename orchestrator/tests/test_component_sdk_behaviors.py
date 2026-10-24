@@ -9,17 +9,17 @@ import pytest
 from click.testing import CliRunner
 
 from raidar.cli import main
-from raidar.design.experiments.loader import load_experiment
-from raidar.design.experiments.lock import build_lock
-from raidar.design.experiments.metrics import DEFAULT_METRIC_REGISTRY, MetricResolver
-from raidar.design.experiments.references import (
+from raidar.design.experiment.loader import load_experiment
+from raidar.design.experiment.lock import build_lock
+from raidar.design.experiment.metrics import DEFAULT_METRIC_REGISTRY, MetricResolver
+from raidar.design.experiment.references import (
     RefKind,
     RegistryRef,
     RegistryReferenceError,
     ResolverSet,
 )
-from raidar.subjects.agents.config import Harness
-from raidar.subjects.treatments import (
+from raidar.subject.agent.config import Harness
+from raidar.subject.treatment import (
     ComponentKind,
     ComponentRegistry,
     ComponentRejectedError,
@@ -30,8 +30,8 @@ from raidar.subjects.treatments import (
     component_resolver,
     fingerprint,
 )
-from raidar.subjects.treatments.catalog.workspace import RULES_FILE, RulesFile
-from raidar.subjects.treatments.definition.manifest import ComponentManifest, DiscoveryProbe
+from raidar.subject.treatment.catalog.workspace import RULES_FILE, RulesFile
+from raidar.subject.treatment.definition.manifest import ComponentManifest, DiscoveryProbe
 from tests.component_support import (
     PILOT_DIR,
     PROBE_DIR,
@@ -44,10 +44,10 @@ from tests.component_support import (
 from tests.experiment_spec_support import experiment_document, fixture_resolvers, write_experiment
 
 SDK_RUNTIME_SOURCES = [
-    "raidar/subjects/treatments/definition/compiler.py",
-    "raidar/subjects/treatments/definition/compiled.py",
-    "raidar/subjects/treatments/runtime/setup_script.py",
-    "raidar/subjects/treatments/runtime/step_reset.sh",
+    "raidar/subject/treatment/definition/compiler.py",
+    "raidar/subject/treatment/definition/compiled.py",
+    "raidar/subject/treatment/runtime/setup_script.py",
+    "raidar/subject/treatment/runtime/step_reset.sh",
 ]
 BUILTIN_REFS = [
     "continue-on-stall@2",
@@ -247,7 +247,7 @@ def test_registry_refuses_mismatched_or_duplicate_definitions(
     monkeypatch.undo()
     doubled = [*registry._entry_points.values(), entry]
     monkeypatch.setattr(
-        "raidar.subjects.treatments.definition.registry.entry_points", lambda group: doubled
+        "raidar.subject.treatment.definition.registry.entry_points", lambda group: doubled
     )
     with pytest.raises(RegistryReferenceError, match="more than one entry point"):
         ComponentRegistry()
@@ -267,7 +267,7 @@ def test_resolver_digest_tracks_manifest_and_implementation_sources(tmp_path: Pa
     missing.manifest = ComponentManifest(
         **{
             **RULES_FILE.manifest.model_dump(),
-            "fingerprint": ("raidar/subjects/treatments/absent.py",),
+            "fingerprint": ("raidar/subject/treatment/absent.py",),
             "discovery_probe": DiscoveryProbe(id="x", description="x", evidence=("x",)),
         }
     )
@@ -341,8 +341,8 @@ def test_pilot_arms_share_the_framing_and_guided_adds_the_review_loop_workflow()
 
 
 def test_component_trees_ship_exactly_the_files_the_lock_hashes(tmp_path: Path) -> None:
-    from raidar.design.experiments.lock import _hash_tree
-    from raidar.subjects.treatments.catalog._common import tree_files
+    from raidar.design.experiment.lock import _hash_tree
+    from raidar.subject.treatment.catalog._common import tree_files
 
     skill = tmp_path / "skills" / "discipline"
     (skill / ".git").mkdir(parents=True)
@@ -356,18 +356,18 @@ def test_component_trees_ship_exactly_the_files_the_lock_hashes(tmp_path: Path) 
 
 
 # Imported modules a fingerprint need not list: the lock's toolchain section
-# pins raidar/design/experiments (raidar_spec digest); the registry and the harness enum are
+# pins raidar/design/experiment (raidar_spec digest); the registry and the harness enum are
 # lookup machinery, not component behaviour.
 _UNFINGERPRINTED_OK = {
-    "raidar/subjects/agents/config.py",
-    "raidar/subjects/treatments/definition/registry.py",
+    "raidar/subject/agent/config.py",
+    "raidar/subject/treatment/definition/registry.py",
 }
 
 
 def test_every_raidar_module_a_builtin_imports_is_fingerprinted() -> None:
     import ast
 
-    from raidar.subjects.treatments.definition.registry import ComponentRegistry
+    from raidar.subject.treatment.definition.registry import ComponentRegistry
 
     src = Path(__file__).resolve().parents[1] / "src"
     registry = ComponentRegistry()
@@ -389,7 +389,7 @@ def test_every_raidar_module_a_builtin_imports_is_fingerprinted() -> None:
                     path
                     and path not in listed
                     and path not in _UNFINGERPRINTED_OK
-                    and not path.startswith("raidar/design/experiments/")
+                    and not path.startswith("raidar/design/experiment/")
                 ):
                     missing.setdefault(ref, []).append(path)
     assert missing == {}

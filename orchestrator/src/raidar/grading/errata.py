@@ -1,6 +1,6 @@
 """Errata-applied verdicts: the strict solve rule over the cases an errata keeps.
 
-A problem version can carry a pinned errata (``raidar.design.problems.errata``): verifier
+A problem version can carry a pinned errata (``raidar.design.problem.errata``): verifier
 cases whose assertions its specification does not determine, each with a
 disposition. Only ``exclude-from-solved`` cases change anything here: they
 leave the errata-applied **solved** verdict. Nothing else changes. The raw

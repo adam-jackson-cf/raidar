@@ -6,9 +6,9 @@ module and every module it imports, transitively, from ``raidar`` or its own
 top-level package (shared kernels, the SDK, the oracle records), read
 statically without importing, so a code change to any helper changes the
 Assessment key. Each module is hashed as its normalised syntax tree
-(``raidar.design.experiments.source_digest``): docstring, comment and layout edits leave
+(``raidar.design.experiment.source_digest``): docstring, comment and layout edits leave
 the digest, and so every stored Assessment, unchanged. The lock resolves ``name@version``
-scorer references here through the ``raidar.design.experiments.resolvers`` entry point
+scorer references here through the ``raidar.design.experiment.resolvers`` entry point
 ``scorer`` and records the manifest, the implementation's source digest, the
 pinned versions of the pack tools the scorer declares.
 
@@ -27,21 +27,21 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from raidar.contracts.runtimes import ANY_RUNTIME
-from raidar.design.experiments.canonical import digest_json
-from raidar.design.experiments.references import (
+from raidar.contract.runtimes import ANY_RUNTIME
+from raidar.design.experiment.canonical import digest_json
+from raidar.design.experiment.references import (
     RefKind,
     RegistryRef,
     RegistryReferenceError,
     ResolvedReference,
 )
-from raidar.design.experiments.source_digest import SOURCE_DIGEST_SCHEME, python_source_digest
+from raidar.design.experiment.source_digest import SOURCE_DIGEST_SCHEME, python_source_digest
 from raidar.scoring.framework.builtin_manifests import BUILTIN_MANIFESTS
 from raidar.scoring.framework.context import Scorer
 from raidar.scoring.framework.manifest import ScorerManifest
 from raidar.scoring.gate_effort.manifest import GATE_EFFORT
 from raidar.scoring.process_checks.manifest import PROCESS_COMPLIANCE
-from raidar.subjects.environments.python.models import ToolLock, load_tool_lock
+from raidar.subject.environment.python.models import ToolLock, load_tool_lock
 
 LockedTools = dict[str, dict[str, dict[str, Any]]]
 RUNTIME_TOOL_LOCKS: dict[str, Callable[[], ToolLock]] = {"python": load_tool_lock}
@@ -351,5 +351,5 @@ class ScorerResolver:
 
 
 def scorer_resolver() -> ScorerResolver:
-    """Entry-point factory (group ``raidar.design.experiments.resolvers``, name ``scorer``)."""
+    """Entry-point factory (group ``raidar.design.experiment.resolvers``, name ``scorer``)."""
     return ScorerResolver(default_scorer_registry())

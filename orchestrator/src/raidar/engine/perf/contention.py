@@ -18,8 +18,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from raidar.engine.trials.collect import RESULT_FILE, read_result
-from raidar.engine.trials.timestamps import parse_ts
+from raidar.engine.trial.collect import RESULT_FILE, read_result
+from raidar.engine.trial.timestamps import parse_ts
 
 JOB_MANIFEST = "job.json"
 UNDETECTED_DOCKER_ACTIVITY = (

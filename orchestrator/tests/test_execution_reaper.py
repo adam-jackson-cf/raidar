@@ -9,9 +9,9 @@ from typing import Any, cast
 
 from harbor.trial.hooks import TrialEvent
 
-from raidar.engine.trials.collect import _infra_reasons
-from raidar.engine.trials.models import ProbeSummary
-from raidar.engine.trials.reaper import (
+from raidar.engine.trial.collect import _infra_reasons
+from raidar.engine.trial.models import ProbeSummary
+from raidar.engine.trial.reaper import (
     REAP_REPORT,
     install_agent_reaper,
     load_reap_report,

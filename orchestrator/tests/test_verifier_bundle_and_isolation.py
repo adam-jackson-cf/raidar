@@ -13,7 +13,7 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
-from raidar.contracts.snapshot import (
+from raidar.contract.snapshot import (
     SNAPSHOT_EXCLUDES,
     app_artifact_config,
     copy_snapshot,

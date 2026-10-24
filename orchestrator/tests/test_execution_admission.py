@@ -19,7 +19,7 @@ from raidar.engine.health.admission import (
 )
 from raidar.engine.health.audit import audit_trial
 from raidar.engine.health.model import HealthCheck, HealthReport, write_health
-from raidar.engine.trials.models import ExecutionValidity, TrialRecord, ValidityCheck
+from raidar.engine.trial.models import ExecutionValidity, TrialRecord, ValidityCheck
 from tests.health_support import TRIAL_ID, HealthyTrial, healthy_trial
 
 RUNNER = {"commit": "abc", "dirty": False, "toolchain_sha256": "t" * 64}

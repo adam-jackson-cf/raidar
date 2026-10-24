@@ -38,9 +38,9 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from raidar.contracts.job_layout import JOB_KIND, JOB_MANIFEST, TRIAL_RECORDS_DIR
-from raidar.design.experiments.lock import LOCK_SUFFIX, default_lock_path
-from raidar.engine.trials.models import TrialRecord
+from raidar.contract.job_layout import JOB_KIND, JOB_MANIFEST, TRIAL_RECORDS_DIR
+from raidar.design.experiment.lock import LOCK_SUFFIX, default_lock_path
+from raidar.engine.trial.models import TrialRecord
 from raidar.evaluation.analysis.sources import AnalysisInputError, read_lock
 from raidar.scoring.framework.store import LOG_FILE, OBJECTS_DIR, Assessment
 from raidar.scoring.judge.audit import AUDIT_DIR, AuditLog, DecisionRecord, LabelRecord

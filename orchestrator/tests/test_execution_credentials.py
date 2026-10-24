@@ -7,16 +7,16 @@ from pathlib import Path
 
 import pytest
 
-from raidar.design.experiments.loader import CliOverrides, load_experiment
-from raidar.design.experiments.validation import SpecValidationError
-from raidar.engine.jobs.credentials import (
+from raidar.design.experiment.loader import CliOverrides, load_experiment
+from raidar.design.experiment.validation import SpecValidationError
+from raidar.engine.job.credentials import (
     CredentialPreflightError,
     credential_issues,
     harness_credential_issue,
     preflight_credentials,
 )
-from raidar.engine.jobs.plan import PlanOptions
-from raidar.subjects.agents.config import Harness
+from raidar.engine.job.plan import PlanOptions
+from raidar.subject.agent.config import Harness
 from tests.experiment_spec_support import AGENTS_BENCHMARK, SMOKE_EXPERIMENT
 
 SMOKE = SMOKE_EXPERIMENT

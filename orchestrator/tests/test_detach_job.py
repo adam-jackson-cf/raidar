@@ -20,8 +20,8 @@ from pathlib import Path
 
 import pytest
 
-from raidar.contracts.job_layout import DETACH_DIR, JOB_MANIFEST, TRIAL_RECORDS_DIR
-from raidar.engine.jobs.detach import (
+from raidar.contract.job_layout import DETACH_DIR, JOB_MANIFEST, TRIAL_RECORDS_DIR
+from raidar.engine.job.detach import (
     EXIT_FILE,
     LAUNCH_FILE,
     LOG_FILE,
@@ -33,7 +33,7 @@ from raidar.engine.jobs.detach import (
     main,
     status,
 )
-from raidar.engine.jobs.run import create_job_dir
+from raidar.engine.job.run import create_job_dir
 
 EXPERIMENT_ID = "python__toy__detach"
 # Stands in for `make experiment-execute DETACH=0 ...`: writes the job like raidar run does.
@@ -252,10 +252,10 @@ def test_the_launch_record_names_the_commit_and_whether_the_tree_was_dirty(
 def test_a_launch_without_git_records_why_instead_of_failing(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    monkeypatch.setattr("raidar.engine.jobs.detach.shutil.which", lambda _name: None)
+    monkeypatch.setattr("raidar.engine.job.detach.shutil.which", lambda _name: None)
     assert git_state(tmp_path) == {"commit": None, "dirty": None, "error": "git not found"}
     monkeypatch.undo()
-    monkeypatch.setattr("raidar.engine.jobs.detach.shutil.which", lambda _name: "/nonexistent/git")
+    monkeypatch.setattr("raidar.engine.job.detach.shutil.which", lambda _name: "/nonexistent/git")
     failed = git_state(tmp_path)
     assert (failed["commit"], failed["dirty"]) == (None, None)
     assert "FileNotFoundError" in failed["error"]

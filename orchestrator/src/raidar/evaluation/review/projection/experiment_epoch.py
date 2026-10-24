@@ -21,14 +21,14 @@ from collections import Counter, defaultdict
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 
-from raidar.contracts.review_contract import (
+from raidar.contract.review import (
     ArmChangeCategory,
     ArmDiffArtifact,
     ReviewExperimentRecord,
     ReviewRunDetail,
 )
-from raidar.design.experiments.schema import ExperimentSpec
-from raidar.engine.trials.models import TrialRecord
+from raidar.design.experiment.schema import ExperimentSpec
+from raidar.engine.trial.models import TrialRecord
 from raidar.evaluation.review.projection.assessments import AssessmentLookup
 from raidar.evaluation.review.projection.conditions import ArmSide, condition_diff
 from raidar.evaluation.review.projection.experiments import ArmGroup, experiment_record

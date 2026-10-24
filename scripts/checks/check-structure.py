@@ -9,7 +9,7 @@ Rules (docs/reboot/repo-structure-design.md §3.5):
 * the repository root holds only the allowlisted directories and files;
 * ``orchestrator/src/raidar`` holds only the allowlisted stage packages, and each holds only its
   allowlisted subpackages (§8);
-* packages nest at most three levels below ``raidar/`` (``subjects/treatments/payloads/**`` data,
+* packages nest at most three levels below ``raidar/`` (``subject/treatment/payloads/**`` data,
   the Python pack's ``image/`` build context and ``grading/runtime`` are exempt).
 
 Paths are the tracked files plus untracked files that are not git-ignored.
@@ -56,10 +56,10 @@ RAIDAR_PACKAGE_DIR = "orchestrator/src/raidar"
 # at either level; a group's subpackage outside its set is refused.
 RAIDAR_PACKAGES: dict[str, frozenset[str]] = {
     "cli": frozenset(),
-    "contracts": frozenset(),
-    "design": frozenset({"experiments", "problems"}),
-    "subjects": frozenset({"agents", "treatments", "environments"}),
-    "engine": frozenset({"targets", "jobs", "trials", "health", "perf"}),
+    "contract": frozenset(),
+    "design": frozenset({"experiment", "problem"}),
+    "subject": frozenset({"agent", "treatment", "environment"}),
+    "engine": frozenset({"target", "job", "trial", "health", "perf"}),
     "grading": frozenset({"runtime"}),
     "scoring": frozenset(
         {
@@ -77,8 +77,8 @@ RAIDAR_PACKAGES: dict[str, frozenset[str]] = {
 MAX_PACKAGE_DEPTH = 3
 # Data and runtime trees below raidar/ that are not importable package structure.
 DEPTH_EXEMPT_PREFIXES = (
-    "orchestrator/src/raidar/subjects/treatments/payloads/",
-    "orchestrator/src/raidar/subjects/environments/python/image/",
+    "orchestrator/src/raidar/subject/treatment/payloads/",
+    "orchestrator/src/raidar/subject/environment/python/image/",
     "orchestrator/src/raidar/grading/runtime/",
 )
 VERSION_TOKEN = re.compile(r"(?<![A-Za-z0-9])v\d+(?![A-Za-z0-9])")

@@ -18,7 +18,7 @@ from raidar.scoring.framework.manifest import (
     ScorerManifest,
     Tier,
 )
-from raidar.subjects.environments.python.models import ToolExecution
+from raidar.subject.environment.python.models import ToolExecution
 
 _CHECKPOINT = MetricLevel.CHECKPOINT
 _TRANSITION = MetricLevel.TRANSITION

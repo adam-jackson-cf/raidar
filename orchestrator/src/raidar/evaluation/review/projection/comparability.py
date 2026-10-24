@@ -13,7 +13,7 @@ from __future__ import annotations
 from collections import defaultdict
 from collections.abc import Sequence
 
-from raidar.contracts.review_contract import ArmDiffArtifact, ReviewExperimentRecord
+from raidar.contract.review import ArmDiffArtifact, ReviewExperimentRecord
 from raidar.evaluation.review.projection.notes import EvidenceRef, Finding
 
 UNKNOWN_POLICY = "unrecorded headline metric"

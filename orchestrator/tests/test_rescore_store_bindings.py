@@ -12,8 +12,8 @@ import yaml
 from click.testing import CliRunner
 
 from raidar.cli import main
-from raidar.design.experiments.schema import ProtocolSpec
-from raidar.engine.jobs.assessment import ASSESSMENT_CONFIG_FILE
+from raidar.design.experiment.schema import ProtocolSpec
+from raidar.engine.job.assessment import ASSESSMENT_CONFIG_FILE
 from raidar.grading.models import CaseStatus
 from raidar.scoring.framework.catalog import (
     ScorerRegistration,

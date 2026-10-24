@@ -21,7 +21,7 @@ from raidar.engine.perf.budgets import (
     load_job_samples,
 )
 from raidar.engine.perf.contention import UNDETECTED_DOCKER_ACTIVITY, Contention
-from raidar.engine.perf.perf_report import PerfReport, build_report
+from raidar.engine.perf.report import PerfReport, build_report
 
 
 def _label(check: PhaseCheck) -> str:

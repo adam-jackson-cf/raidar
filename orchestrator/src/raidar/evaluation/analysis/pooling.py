@@ -13,7 +13,7 @@ from __future__ import annotations
 from collections.abc import Callable, Mapping, Sequence
 from typing import TYPE_CHECKING, Any
 
-from raidar.contracts.job_layout import TRIAL_RECORDS_DIR, TRIALS_DIR
+from raidar.contract.job_layout import TRIAL_RECORDS_DIR, TRIALS_DIR
 from raidar.engine.health.records_manifest import tamper_findings
 from raidar.evaluation.analysis.outcomes import PoolFinding, PoolingReport
 

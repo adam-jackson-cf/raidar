@@ -9,20 +9,20 @@ from pathlib import Path
 import click
 
 from raidar.cli.target_options import docker_selection, target_option
-from raidar.design.experiments.references import RegistryReferenceError
-from raidar.design.problems.errata import Disposition, draft_errata, report_entries
-from raidar.design.problems.importer import import_problem
-from raidar.design.problems.models import ProblemId, ProblemManifest
-from raidar.design.problems.source import SourceError
-from raidar.design.problems.store import ProblemStore, ProblemStoreError, open_store, store_at
-from raidar.design.problems.validation import (
+from raidar.design.experiment.references import RegistryReferenceError
+from raidar.design.problem.errata import Disposition, draft_errata, report_entries
+from raidar.design.problem.importer import import_problem
+from raidar.design.problem.models import ProblemId, ProblemManifest
+from raidar.design.problem.source import SourceError
+from raidar.design.problem.store import ProblemStore, ProblemStoreError, open_store, store_at
+from raidar.design.problem.validation import (
     Check,
     CheckStatus,
     ValidationRecordError,
     Verdict,
     read_validation_record,
 )
-from raidar.design.problems.validator import (
+from raidar.design.problem.validator import (
     ENGINES,
     ValidateOptions,
     audit_problem,

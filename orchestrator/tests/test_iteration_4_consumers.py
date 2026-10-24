@@ -15,7 +15,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from raidar.design.problems.sensitivities import (
+from raidar.design.problem.sensitivities import (
     SensitivityError,
     SensitivityKind,
     known_sensitivities,
@@ -33,7 +33,7 @@ from raidar.evaluation.analysis.markdown import (
 from raidar.evaluation.analysis.outcomes import GATE_METRICS, GATE_PREFIX, VERIFIER_DISAGREEMENTS
 from raidar.evaluation.analysis.report import ArmSummary
 from raidar.evaluation.review.quality.gate_view import GATE_EFFORT_REF as REVIEW_REF
-from raidar.grading.offline_grading import PRE_FIX_GRADE_SCORERS
+from raidar.grading.offline import PRE_FIX_GRADE_SCORERS
 from raidar.scoring.framework.result import AssessResult, AssessStatus, Observation
 from raidar.scoring.gate_effort.autofix_metrics import REFUSAL_KINDS
 from raidar.scoring.gate_effort.families import FAMILIES

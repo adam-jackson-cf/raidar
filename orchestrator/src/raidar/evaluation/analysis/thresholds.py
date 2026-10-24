@@ -1,7 +1,7 @@
 """Verdict thresholds from the lock (memo §2.3: fixed before any data is seen).
 
 The lock's ``spec.analysis`` section pins ``min_pairs``, ``max_exclusion_fraction``,
-``alpha`` and ``min_effects`` (``raidar.design.experiments.schema.VERDICT_THRESHOLDS``). A lock
+``alpha`` and ``min_effects`` (``raidar.design.experiment.schema.VERDICT_THRESHOLDS``). A lock
 written before the schema carried them is *not pinned*: the documented
 defaults fill the missing values and the report says so. A caller-supplied override (the
 ``raidar analyze`` options) replaces a pinned value and is named in
@@ -13,7 +13,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import Any
 
-from raidar.design.experiments.schema import (
+from raidar.design.experiment.schema import (
     DEFAULT_ALPHA,
     DEFAULT_MAX_EXCLUSION_FRACTION,
     DEFAULT_MIN_PAIRS,

@@ -18,7 +18,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from raidar.engine.jobs.assessment import ASSESSMENT_CONFIG_FILE, lock_rescore_config
+from raidar.engine.job.assessment import ASSESSMENT_CONFIG_FILE, lock_rescore_config
 from raidar.evaluation.analysis.sources import AnalysisInputError, JobDir
 from raidar.scoring.framework.catalog import ScorerRegistry
 from raidar.scoring.framework.keys import scorer_identity, store_key

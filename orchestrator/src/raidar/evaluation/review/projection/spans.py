@@ -8,7 +8,7 @@ import re
 from datetime import datetime
 from pathlib import Path
 
-from raidar.contracts.review_contract import ReviewSpan, ReviewSpanType, ReviewStatus
+from raidar.contract.review import ReviewSpan, ReviewSpanType, ReviewStatus
 
 REPO_ROOT = Path(__file__).resolve().parents[6]
 PAYLOAD_CAP = 32_000

@@ -3,7 +3,7 @@
 A manifest declares everything a scorer may emit before it runs: each metric's
 level, type, direction, measurement tier and SCB exactness. Scorers observe
 only; nothing here carries a weight or a success rule (F6). Weights live in
-Metrics (``raidar.design.experiments.metrics``).
+Metrics (``raidar.design.experiment.metrics``).
 """
 
 from __future__ import annotations
@@ -14,9 +14,9 @@ from typing import Self
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from raidar.contracts.runtimes import ANY_RUNTIME
-from raidar.design.experiments.canonical import digest_json
-from raidar.subjects.environments.python.models import ToolExecution
+from raidar.contract.runtimes import ANY_RUNTIME
+from raidar.design.experiment.canonical import digest_json
+from raidar.subject.environment.python.models import ToolExecution
 
 _ID_PATTERN = r"^[a-z0-9][a-z0-9-]*$"
 _METRIC_PATTERN = r"^[a-z0-9][a-z0-9_]*(\.[a-z0-9][a-z0-9_]*)*$"

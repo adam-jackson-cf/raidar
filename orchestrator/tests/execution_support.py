@@ -21,18 +21,18 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
-from raidar.design.experiments.loader import LoadedExperiment, load_experiment
-from raidar.design.experiments.lock import (
+from raidar.design.experiment.loader import LoadedExperiment, load_experiment
+from raidar.design.experiment.lock import (
     build_lock,
     default_lock_path,
     default_resolvers,
     render_lock,
 )
-from raidar.design.problems.importer import import_problem
-from raidar.design.problems.models import ProblemId
-from raidar.design.problems.store import ProblemStore
-from raidar.design.problems.validator import ValidateOptions, validate_problem, write_report
-from raidar.engine.trials.reaper import ReapReport, write_reap_report
+from raidar.design.problem.importer import import_problem
+from raidar.design.problem.models import ProblemId
+from raidar.design.problem.store import ProblemStore
+from raidar.design.problem.validator import ValidateOptions, validate_problem, write_report
+from raidar.engine.trial.reaper import ReapReport, write_reap_report
 from raidar.grading.leak import LeakReport
 from raidar.grading.models import CaseGroup, CaseResult, CaseStatus, InfraFailure, VerifierGrade
 from raidar.grading.records import (

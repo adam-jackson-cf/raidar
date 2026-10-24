@@ -16,11 +16,11 @@ from typing import Any
 
 import pytest
 
-from raidar.design.experiments.loader import load_experiment
-from raidar.design.experiments.lock import build_lock, render_lock, stale_sections
-from raidar.design.experiments.metrics import MetricResolver
-from raidar.design.experiments.references import ResolverSet
-from raidar.design.experiments.validation import SpecValidationError
+from raidar.design.experiment.loader import load_experiment
+from raidar.design.experiment.lock import build_lock, render_lock, stale_sections
+from raidar.design.experiment.metrics import MetricResolver
+from raidar.design.experiment.references import ResolverSet
+from raidar.design.experiment.validation import SpecValidationError
 from raidar.evaluation.analysis.assessed import GATE_EFFORT_REF, gate_effort_ref
 from raidar.evaluation.analysis.effects import Settings
 from raidar.evaluation.analysis.markdown import render_markdown

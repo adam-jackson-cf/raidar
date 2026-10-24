@@ -10,11 +10,11 @@ from click.testing import CliRunner
 from pydantic import ValidationError
 
 from raidar.cli import main
-from raidar.design.experiments.lock import default_lock_path
-from raidar.design.experiments.schema import AssessmentSpec, ExperimentSpec, ProtocolSpec
-from raidar.design.experiments.validation import semantic_issues
-from raidar.design.problems.store import ROOT_ENV
-from raidar.engine.jobs.assessment import rescore_config
+from raidar.design.experiment.lock import default_lock_path
+from raidar.design.experiment.schema import AssessmentSpec, ExperimentSpec, ProtocolSpec
+from raidar.design.experiment.validation import semantic_issues
+from raidar.design.problem.store import ROOT_ENV
+from raidar.engine.job.assessment import rescore_config
 from tests.experiment_spec_support import MECHANICS_SMOKE, SMOKE_EXPERIMENT
 
 

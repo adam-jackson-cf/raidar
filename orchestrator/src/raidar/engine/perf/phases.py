@@ -18,7 +18,7 @@ Definitions follow the Phase 0 overhead baseline (docs/reboot/overhead-baseline.
 - ``setup_sh``: the reset script's own duration (record-only sub-phase).
 - ``artifact_collection``: agent end to verifier start: Harbor's agent-log sync
   (the mounted-log ``chown``, the agent's trial conversion) and the
-  ``/app`` transfer to the host (``raidar.engine.trials.environment`` runs both on
+  ``/app`` transfer to the host (``raidar.engine.trial.environment`` runs both on
   the engine fast path).
 - ``snapshot_transfer``, ``verifier_plumbing``, ``grader_image``,
   ``verifier_leak_check``: from the verifier step record's timings.
@@ -40,9 +40,9 @@ from collections.abc import Iterable, Mapping, Sequence
 from pathlib import Path
 from typing import Any
 
-from raidar.engine.trials.collect import read_result
-from raidar.engine.trials.models import PhaseSample
-from raidar.engine.trials.timestamps import diff_s, parse_ts, span_s
+from raidar.engine.trial.collect import read_result
+from raidar.engine.trial.models import PhaseSample
+from raidar.engine.trial.timestamps import diff_s, parse_ts, span_s
 from raidar.grading.records import (
     RECORD_FILE,
     load_pre_agent_leak,

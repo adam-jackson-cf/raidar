@@ -19,7 +19,7 @@ from raidar.engine.perf.budgets import (
     percentile,
 )
 from raidar.engine.perf.phases import trial_phases
-from raidar.engine.trials.models import (
+from raidar.engine.trial.models import (
     ExecutionValidity,
     PhaseSample,
     PlannedTrial,

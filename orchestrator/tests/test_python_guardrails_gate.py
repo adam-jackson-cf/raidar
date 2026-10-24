@@ -23,7 +23,7 @@ from typing import Any
 
 import pytest
 
-from raidar.subjects.treatments.catalog.guardrails import (
+from raidar.subject.treatment.catalog.guardrails import (
     AUTOFIX_FIXED,
     AUTOFIX_KEPT,
     PAYLOAD_DIR,

@@ -14,7 +14,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
-from raidar.engine.trials.models import (
+from raidar.engine.trial.models import (
     CheckpointState,
     StepResult,
     TrialRecord,

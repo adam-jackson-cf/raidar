@@ -20,8 +20,8 @@ import subprocess
 import textwrap
 from pathlib import Path
 
-from raidar.design.problems.content import content_digest
-from raidar.design.problems.models import (
+from raidar.design.problem.content import content_digest
+from raidar.design.problem.models import (
     PackBinding,
     ProblemId,
     ProblemManifest,
@@ -29,9 +29,9 @@ from raidar.design.problems.models import (
     ProblemSource,
     ProblemStep,
 )
-from raidar.design.problems.store import ProblemStore
-from raidar.design.problems.validation import ValidationReport
-from raidar.design.problems.validator import ValidateOptions, validate_problem, write_report
+from raidar.design.problem.store import ProblemStore
+from raidar.design.problem.validation import ValidationReport
+from raidar.design.problem.validator import ValidateOptions, validate_problem, write_report
 from raidar.grading.bundle import BundleManifest, GraderSpec, VerifierStepSpec, write_bundle
 from tests.verifier_support import LocalProcessSandbox, write_app, write_tests
 

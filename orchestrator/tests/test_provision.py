@@ -19,10 +19,10 @@ from typing import Any, cast
 import pytest
 from harbor.trial.hooks import TrialEvent
 
-from raidar.engine.trials import environment as env_module
-from raidar.engine.trials.environment import RunScopedDockerEnvironment
-from raidar.subjects.treatments.definition.contribution import SupportFile, evidence_log
-from raidar.subjects.treatments.runtime.provision import (
+from raidar.engine.trial import environment as env_module
+from raidar.engine.trial.environment import RunScopedDockerEnvironment
+from raidar.subject.treatment.definition.contribution import SupportFile, evidence_log
+from raidar.subject.treatment.runtime.provision import (
     AGENT_USER_ENV,
     INSTALL_PHASE,
     PAYLOAD_ENV,

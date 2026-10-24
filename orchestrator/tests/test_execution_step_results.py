@@ -13,13 +13,13 @@ from pathlib import Path
 import pytest
 from harbor.trial.multi_step import MultiStepTrial
 
-from raidar.design.experiments.schema import AgentEntry, ConditionSpec, ProtocolSpec
+from raidar.design.experiment.schema import AgentEntry, ConditionSpec, ProtocolSpec
 from raidar.engine.health.liveness import LIVENESS_REPORT, idle_killed_steps
-from raidar.engine.trials.collect import TrialContext, classify_trial, execution_validity
-from raidar.engine.trials.models import CheckpointState, PlannedTrial, ProgressionRule, TrialHashes
-from raidar.engine.trials.progression import derive_reached, progression_rule
-from raidar.engine.trials.trial_record import reached
-from raidar.subjects.treatments import CompiledCondition, compile_condition
+from raidar.engine.trial.collect import TrialContext, classify_trial, execution_validity
+from raidar.engine.trial.models import CheckpointState, PlannedTrial, ProgressionRule, TrialHashes
+from raidar.engine.trial.progression import derive_reached, progression_rule
+from raidar.engine.trial.record import reached
+from raidar.subject.treatment import CompiledCondition, compile_condition
 from tests.execution_support import StepOutcome, verifier_grade, write_trial
 
 STEPS = tuple(f"checkpoint_{k}" for k in range(1, 9))

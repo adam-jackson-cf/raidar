@@ -25,8 +25,8 @@ from collections.abc import Callable, Mapping, Sequence
 from pathlib import Path
 from typing import Any
 
-from raidar.contracts.job_layout import TRIAL_RECORDS_DIR
-from raidar.contracts.snapshot import tree_digest
+from raidar.contract.job_layout import TRIAL_RECORDS_DIR
+from raidar.contract.snapshot import tree_digest
 from raidar.engine.health.base import Audit, make_check
 from raidar.engine.health.model import PASS, UNMEASURED, VIOLATION, HealthCheck, HealthReport
 from raidar.engine.health.signals import (
@@ -39,8 +39,8 @@ from raidar.engine.health.signals import (
     check_t3,
 )
 from raidar.engine.perf.contention import read_manifest
-from raidar.engine.trials.models import CheckpointState, StepResult, TrialRecord
-from raidar.engine.trials.timestamps import span_s
+from raidar.engine.trial.models import CheckpointState, StepResult, TrialRecord
+from raidar.engine.trial.timestamps import span_s
 from raidar.grading.records import StepRecord
 
 DEADLINE_GRACE_S = 60.0

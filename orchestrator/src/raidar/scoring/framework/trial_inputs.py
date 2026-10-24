@@ -28,8 +28,8 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from raidar.contracts.snapshot import tree_digest
-from raidar.design.experiments.canonical import digest_json
+from raidar.contract.snapshot import tree_digest
+from raidar.design.experiment.canonical import digest_json
 from raidar.grading.bundle import BUNDLE_MANIFEST, BundleError, VerifierBundle, load_bundle
 from raidar.grading.records import (
     FORK_EVIDENCE_FILE,

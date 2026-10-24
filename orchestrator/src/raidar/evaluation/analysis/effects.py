@@ -38,11 +38,11 @@ from enum import StrEnum
 
 from pydantic import Field
 
-from raidar.design.experiments.schema import DEFAULT_ALPHA as DEFAULT_ALPHA
-from raidar.design.experiments.schema import (
+from raidar.design.experiment.schema import DEFAULT_ALPHA as DEFAULT_ALPHA
+from raidar.design.experiment.schema import (
     DEFAULT_MAX_EXCLUSION_FRACTION as DEFAULT_MAX_EXCLUSION_FRACTION,
 )
-from raidar.design.experiments.schema import DEFAULT_MIN_PAIRS as DEFAULT_MIN_PAIRS
+from raidar.design.experiment.schema import DEFAULT_MIN_PAIRS as DEFAULT_MIN_PAIRS
 from raidar.evaluation.analysis.outcomes import (
     TOTAL_COST,
     UNASSESSED,

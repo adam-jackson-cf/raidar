@@ -10,9 +10,9 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from raidar.design.experiments.lock import LOCK_VERSION, default_lock_path, seal_lock
-from raidar.design.experiments.metrics import DEFAULT_METRIC_REGISTRY
-from raidar.design.experiments.schema import (
+from raidar.design.experiment.lock import LOCK_VERSION, default_lock_path, seal_lock
+from raidar.design.experiment.metrics import DEFAULT_METRIC_REGISTRY
+from raidar.design.experiment.schema import (
     DEFAULT_ALPHA,
     DEFAULT_MAX_EXCLUSION_FRACTION,
     DEFAULT_MIN_PAIRS,

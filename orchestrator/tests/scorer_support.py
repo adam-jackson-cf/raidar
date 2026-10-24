@@ -8,7 +8,7 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
-from raidar.contracts.snapshot import tree_digest
+from raidar.contract.snapshot import tree_digest
 from raidar.grading.bundle import (
     BundleManifest,
     GraderSpec,

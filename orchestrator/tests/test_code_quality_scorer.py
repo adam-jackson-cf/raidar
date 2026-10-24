@@ -16,7 +16,7 @@ from typing import Any
 
 import pytest
 
-from raidar.contracts.snapshot import tree_digest
+from raidar.contract.snapshot import tree_digest
 from raidar.grading.models import CaseStatus, ParityVerdict
 from raidar.grading.records import (
     FORK_EVIDENCE_FILE,
@@ -35,8 +35,8 @@ from raidar.scoring.framework.result import AssessResult, AssessStatus, Observat
 from raidar.scoring.framework.store import AssessmentStore
 from raidar.scoring.framework.trial_inputs import load_trial_context
 from raidar.scoring.framework.validation import validate_result
-from raidar.subjects.environments.python.models import load_tool_lock
-from raidar.subjects.environments.python.provisioner import ToolProvisioningError
+from raidar.subject.environment.python.models import load_tool_lock
+from raidar.subject.environment.python.provisioner import ToolProvisioningError
 from tests.code_quality_support import case_trial, golden_case, quality_tools
 from tests.scorer_support import StepFixture, tree_state, write_files, write_trial
 

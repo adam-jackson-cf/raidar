@@ -19,9 +19,9 @@ from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
-from raidar.contracts.job_layout import JOB_LOCK_FILE, JOB_MANIFEST, TRIAL_RECORDS_DIR
+from raidar.contract.job_layout import JOB_LOCK_FILE, JOB_MANIFEST, TRIAL_RECORDS_DIR
 from raidar.engine.health.model import load_health
-from raidar.engine.trials.models import TrialRecord
+from raidar.engine.trial.models import TrialRecord
 
 SMOKE_KIND = "smoke"
 Identity = dict[str, Any]

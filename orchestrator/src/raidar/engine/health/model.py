@@ -3,7 +3,7 @@
 Each check is ``{id, family, status, detail, evidence}``. ``status`` is ``pass``,
 ``violation`` or ``unmeasured``: a check that lacks evidence is ``unmeasured`` with its
 reason, never ``pass``. The audit itself lives in ``raidar.engine.health.audit``;
-``raidar.engine.trials.collect`` maps violations onto the trial's validity checks, so this
+``raidar.engine.trial.collect`` maps violations onto the trial's validity checks, so this
 module holds only the record and its file.
 """
 
@@ -15,7 +15,7 @@ from typing import Any, Literal
 
 from pydantic import Field
 
-from raidar.engine.trials.models import ExecutionModel
+from raidar.engine.trial.models import ExecutionModel
 
 HEALTH_FILE = "health.json"
 HealthStatus = Literal["pass", "violation", "unmeasured"]

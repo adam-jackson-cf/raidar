@@ -19,10 +19,10 @@ from harbor.trial.trial import Trial
 
 from raidar.engine.health.signals import tool_status
 from raidar.engine.health.tool_tree import ToolTreeWatch, load_tool_hashes
-from raidar.engine.targets.config import activate
-from raidar.engine.trials.cleanup import cleanup_trial_projects
-from raidar.engine.trials.environment import RUN_SCOPED_DOCKER_IMPORT_PATH, SCOPE_KWARG, run_scope
-from raidar.subjects.treatments.runtime.provision import (
+from raidar.engine.target.config import activate
+from raidar.engine.trial.cleanup import cleanup_trial_projects
+from raidar.engine.trial.environment import RUN_SCOPED_DOCKER_IMPORT_PATH, SCOPE_KWARG, run_scope
+from raidar.subject.treatment.runtime.provision import (
     install_trial_provisioning,
     trial_provisions,
 )

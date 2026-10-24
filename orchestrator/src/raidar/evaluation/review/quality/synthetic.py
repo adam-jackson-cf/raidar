@@ -39,7 +39,7 @@ import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from raidar.engine.trials.models import (
+from raidar.engine.trial.models import (
     CheckpointState,
     ExecutionValidity,
     PlannedTrial,

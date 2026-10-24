@@ -2,9 +2,9 @@
 
 import pytest
 
-from raidar.subjects.agents.adapters.factory import resolve_adapter
-from raidar.subjects.agents.adapters.gemini_cli import GeminiCliAdapter
-from raidar.subjects.agents.config import AgentSpec, Harness, ModelTarget
+from raidar.subject.agent.adapters.factory import resolve_adapter
+from raidar.subject.agent.adapters.gemini_cli import GeminiCliAdapter
+from raidar.subject.agent.config import AgentSpec, Harness, ModelTarget
 
 
 def _config(

@@ -14,8 +14,8 @@ from pydantic import ValidationError
 
 from raidar.cli import main
 from raidar.grading.grader_image import GRADER_TOOLS
-from raidar.subjects.environments.python import provisioner as provisioner_module
-from raidar.subjects.environments.python.models import (
+from raidar.subject.environment.python import provisioner as provisioner_module
+from raidar.subject.environment.python.models import (
     PROVISIONING_PHASE,
     REASON_DRIFT,
     REASON_FIRST_USE,
@@ -24,7 +24,7 @@ from raidar.subjects.environments.python.models import (
     ToolLock,
     load_tool_lock,
 )
-from raidar.subjects.environments.python.provisioner import (
+from raidar.subject.environment.python.provisioner import (
     MARKER_NAME,
     TOOL_CACHE_ENV,
     EvalSandboxToolError,

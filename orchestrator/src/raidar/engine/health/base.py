@@ -7,9 +7,9 @@ from pathlib import Path
 from typing import Any, cast
 
 from raidar.engine.health.model import HealthCheck, HealthFamily, HealthStatus
-from raidar.engine.trials.collect import NOT_STARTED, RESULT_FILE, read_result, step_results
-from raidar.engine.trials.models import CheckpointState, StepResult, TrialRecord
-from raidar.engine.trials.reaper import REAP_REPORT
+from raidar.engine.trial.collect import NOT_STARTED, RESULT_FILE, read_result, step_results
+from raidar.engine.trial.models import CheckpointState, StepResult, TrialRecord
+from raidar.engine.trial.reaper import REAP_REPORT
 from raidar.grading.records import (
     PRE_AGENT_LEAK_FILE,
     RECORD_FILE,

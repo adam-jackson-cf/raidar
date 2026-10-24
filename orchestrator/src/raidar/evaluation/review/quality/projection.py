@@ -10,7 +10,7 @@ import argparse
 from collections.abc import Sequence
 from pathlib import Path
 
-from raidar.design.experiments.canonical import pretty_canonical_json_bytes
+from raidar.design.experiment.canonical import pretty_canonical_json_bytes
 from raidar.evaluation.analysis.outcomes import CODE_QUALITY_REF, CORRECTNESS_REF
 from raidar.evaluation.review.quality.experiment_view import ReviewedTrial, build_experiments
 from raidar.evaluation.review.quality.gate_view import GATE_EFFORT_REF

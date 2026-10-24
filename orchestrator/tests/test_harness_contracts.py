@@ -3,8 +3,8 @@ from pathlib import Path
 import pytest
 
 from raidar.scoring.judge.redaction import redact
-from raidar.subjects.agents.config import Harness
-from raidar.subjects.agents.harness import (
+from raidar.subject.agent.config import Harness
+from raidar.subject.agent.harness import (
     CredentialSourceType,
     CredentialTransport,
     HarnessDefinitionError,

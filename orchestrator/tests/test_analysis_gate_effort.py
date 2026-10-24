@@ -13,8 +13,8 @@ from pathlib import Path
 
 import pytest
 
-from raidar.design.experiments.loader import load_experiment
-from raidar.design.experiments.validation import SpecValidationError
+from raidar.design.experiment.loader import load_experiment
+from raidar.design.experiment.validation import SpecValidationError
 from raidar.evaluation.analysis.assessed import GATE_EFFORT_REF, gate_metrics
 from raidar.evaluation.analysis.effects import Settings
 from raidar.evaluation.analysis.load import manipulation_requests

@@ -16,9 +16,9 @@ from typing import Any
 import pytest
 from harbor.models.trajectories import ToolCall
 
-from raidar.contracts.review_contract import ReviewProjectionArtifact, ReviewRunDetail
-from raidar.design.experiments.metrics import DEFAULT_METRIC_REGISTRY
-from raidar.design.experiments.schema import ExperimentSpec
+from raidar.contract.review import ReviewProjectionArtifact, ReviewRunDetail
+from raidar.design.experiment.metrics import DEFAULT_METRIC_REGISTRY
+from raidar.design.experiment.schema import ExperimentSpec
 from raidar.evaluation.review.projection import main, merge_review_projections
 from raidar.evaluation.review.projection.assessments import TrialAssessments
 from raidar.evaluation.review.projection.atif import tool_label

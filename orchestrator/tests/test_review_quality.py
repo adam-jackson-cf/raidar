@@ -10,8 +10,8 @@ from types import SimpleNamespace
 
 import pytest
 
-from raidar.design.experiments.metrics import SCB_CANONICAL
-from raidar.engine.trials.models import TrialRecord
+from raidar.design.experiment.metrics import SCB_CANONICAL
+from raidar.engine.trial.models import TrialRecord
 from raidar.evaluation.analysis.assessed import build_outcome
 from raidar.evaluation.analysis.outcomes import CORRECTNESS_METRIC, HEADLINE_SCORE
 from raidar.evaluation.review.quality.experiment_view import _primary

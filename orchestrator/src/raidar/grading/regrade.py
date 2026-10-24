@@ -26,7 +26,7 @@ from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from raidar.contracts.snapshot import tree_digest
+from raidar.contract.snapshot import tree_digest
 from raidar.grading.bundle import VerifierBundle, load_bundle
 from raidar.grading.grader import grade_step
 from raidar.grading.grader_image import ensure_grader_image

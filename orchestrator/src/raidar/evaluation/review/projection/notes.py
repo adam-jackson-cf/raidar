@@ -13,7 +13,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass, field
 from typing import Literal
 
-from raidar.contracts.review_contract import ReviewAnnotation
+from raidar.contract.review import ReviewAnnotation
 from raidar.evaluation.review.projection.spans import SpanBuilder
 
 FindingKind = Literal["issue", "good", "note"]

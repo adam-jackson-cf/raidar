@@ -10,8 +10,8 @@ from typing import Any
 
 import yaml
 
-from raidar.design.experiments.canonical import digest_json
-from raidar.design.experiments.references import (
+from raidar.design.experiment.canonical import digest_json
+from raidar.design.experiment.references import (
     RefKind,
     RegistryRef,
     RegistryReferenceError,

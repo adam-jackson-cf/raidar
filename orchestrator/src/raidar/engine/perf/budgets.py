@@ -29,8 +29,8 @@ from pathlib import Path
 
 from pydantic import ValidationError
 
-from raidar.contracts.job_layout import TRIAL_RECORD_GLOB
-from raidar.engine.trials.models import PhaseSample, TrialRecord
+from raidar.contract.job_layout import TRIAL_RECORD_GLOB
+from raidar.engine.trial.models import PhaseSample, TrialRecord
 
 MIN_SAMPLES = 10
 

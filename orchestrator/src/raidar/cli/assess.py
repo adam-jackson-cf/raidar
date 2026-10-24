@@ -61,8 +61,8 @@ from raidar.cli.grading import (
     reads_docker_grades,
     regrade,
 )
-from raidar.contracts.runtimes import ANY_RUNTIME
-from raidar.engine.jobs.assessment import ASSESSMENT_CONFIG_FILE, lock_rescore_config
+from raidar.contract.runtimes import ANY_RUNTIME
+from raidar.engine.job.assessment import ASSESSMENT_CONFIG_FILE, lock_rescore_config
 from raidar.evaluation.analysis.sources import (
     AnalysisInputError,
     JobDir,

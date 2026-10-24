@@ -21,24 +21,24 @@ import pytest
 from harbor.models.trial.config import AgentConfig
 from harbor.trial.hooks import TrialEvent
 
-from raidar.design.experiments.references import RefKind, RegistryRef
-from raidar.subjects.treatments import (
+from raidar.design.experiment.references import RefKind, RegistryRef
+from raidar.subject.treatment import (
     ComponentKind,
     ComponentRegistry,
     ComponentRejectedError,
     ComponentResolver,
     StepEvidence,
 )
-from raidar.subjects.treatments.catalog.tools import (
+from raidar.subject.treatment.catalog.tools import (
     INVOCATIONS,
     LINT_TOOL,
     RUFF_WHEEL_SHA256,
     invocation_results,
     resolved_config,
 )
-from raidar.subjects.treatments.definition.contribution import evidence_log
-from raidar.subjects.treatments.definition.registry import component_runtimes
-from raidar.subjects.treatments.runtime.provision import (
+from raidar.subject.treatment.definition.contribution import evidence_log
+from raidar.subject.treatment.definition.registry import component_runtimes
+from raidar.subject.treatment.runtime.provision import (
     PROVISION_CHANNEL,
     Provision,
     install_provisioning,
@@ -102,7 +102,7 @@ def test_lint_tool_is_a_python_service_component_with_declared_egress() -> None:
     assert component_runtimes(definition) == ("python",)
     assert manifest.network.egress_hosts == ("files.pythonhosted.org", "pypi.org")
     assert manifest.discovery_probe.id == "lint-tool-invocable"
-    assert "raidar/subjects/treatments/runtime/provision.py" in manifest.fingerprint
+    assert "raidar/subject/treatment/runtime/provision.py" in manifest.fingerprint
     ref = RegistryRef.parse(RefKind.COMPONENT, "lint-tool@2")
     resolved = ComponentResolver().resolve(ref, base_dir=Path("."))
     assert resolved.binding["runtimes"] == ["python"]

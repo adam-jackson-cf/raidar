@@ -16,19 +16,19 @@ import pytest
 from click.testing import CliRunner
 
 from raidar.cli import main
-from raidar.design.experiments.loader import CliOverrides, load_experiment
-from raidar.design.experiments.lock import LOCK_VERSION, LockError, build_lock, seal_lock
-from raidar.design.experiments.metrics import MetricResolver
-from raidar.design.experiments.references import RefKind, RegistryRef, ResolverSet
-from raidar.design.problems.importer import _runtime_pack
-from raidar.design.problems.resolver import ProblemResolver
-from raidar.design.problems.store import ProblemStoreError
+from raidar.design.experiment.loader import CliOverrides, load_experiment
+from raidar.design.experiment.lock import LOCK_VERSION, LockError, build_lock, seal_lock
+from raidar.design.experiment.metrics import MetricResolver
+from raidar.design.experiment.references import RefKind, RegistryRef, ResolverSet
+from raidar.design.problem.importer import _runtime_pack
+from raidar.design.problem.resolver import ProblemResolver
+from raidar.design.problem.store import ProblemStoreError
 from raidar.scoring.framework.catalog import scorer_resolver
-from raidar.subjects.environments import UnknownPackError, load_runtime_pack
-from raidar.subjects.environments.drift import LockedPackError, lock_runtime_pack, pack_drift_issues
-from raidar.subjects.environments.python.image import image_tag
-from raidar.subjects.environments.python.models import PackSpec
-from raidar.subjects.treatments.definition.registry import ComponentResolver
+from raidar.subject.environment import UnknownPackError, load_runtime_pack
+from raidar.subject.environment.drift import LockedPackError, lock_runtime_pack, pack_drift_issues
+from raidar.subject.environment.python.image import image_tag
+from raidar.subject.environment.python.models import PackSpec
+from raidar.subject.treatment.definition.registry import ComponentResolver
 from tests.experiment_spec_support import (
     InMemoryResolver,
     experiment_document,

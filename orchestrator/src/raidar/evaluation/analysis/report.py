@@ -36,7 +36,7 @@ from dataclasses import dataclass, field
 
 from pydantic import Field
 
-from raidar.design.problems.sensitivities import known_sensitivities
+from raidar.design.problem.sensitivities import known_sensitivities
 from raidar.evaluation.analysis.curves import Curve, problem_curves
 from raidar.evaluation.analysis.effects import (
     Effect,
@@ -253,7 +253,7 @@ class AnalysisReport(AnalysisModel):
     """The pooling gate's outcome: unmeasured jobs, lifted refusals, timing/cost comparability."""
     verifier_sensitivities: dict[str, list[dict[str, object]]] | None = None
     """``{problem ref: [known sensitivity]}`` from the problems registry
-    (``raidar.design.problems.sensitivities``): spec-determined cases whose verdict can depend on
+    (``raidar.design.problem.sensitivities``): spec-determined cases whose verdict can depend on
     timing. A note beside the disagreement counts; it changes no value."""
     sample_size_basis: SampleSizeBasis = Field(
         default_factory=lambda: SampleSizeBasis(

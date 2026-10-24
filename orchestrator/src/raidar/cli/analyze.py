@@ -22,8 +22,8 @@ from pathlib import Path
 
 import click
 
-from raidar.design.experiments.canonical import pretty_canonical_json_bytes
-from raidar.design.experiments.references import RegistryReferenceError
+from raidar.design.experiment.canonical import pretty_canonical_json_bytes
+from raidar.design.experiment.references import RegistryReferenceError
 from raidar.evaluation.analysis.load import LoadRequest, load_inputs
 from raidar.evaluation.analysis.markdown import render_markdown
 from raidar.evaluation.analysis.outcomes import outcome_metric
