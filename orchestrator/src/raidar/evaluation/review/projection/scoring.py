@@ -16,14 +16,14 @@ from __future__ import annotations
 from dataclasses import dataclass
 from decimal import Decimal
 
-from raidar.design.experiment.metrics import DEFAULT_METRIC_REGISTRY
 from raidar.engine.trial.models import CheckpointState, StepResult, TrialRecord
 from raidar.evaluation.analysis.assessed import CODE_QUALITY_REF
-from raidar.evaluation.analysis.outcomes import CORRECTNESS_REF
 from raidar.evaluation.review.projection.assessments import TrialAssessments
 from raidar.evaluation.review.projection.headline import COMPONENT_METRICS, Headline, policy_shares
 from raidar.evaluation.review.projection.notes import EvidenceRef, Finding
 from raidar.evaluation.review.projection.spans import SpanBuilder
+from raidar.scoring.catalog.outcomes import CORRECTNESS_REF
+from raidar.scoring.framework.metrics import DEFAULT_METRIC_REGISTRY
 from raidar.scoring.framework.result import AssessStatus, Observation
 
 _EVIDENCE_LIMIT = 10

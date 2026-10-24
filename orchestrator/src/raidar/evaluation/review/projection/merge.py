@@ -27,7 +27,7 @@ from raidar.evaluation.review.projection.sources import (
     load_job,
 )
 from raidar.evaluation.review.projection.spans import repo_path
-from raidar.scoring.framework.catalog import default_scorer_registry
+from raidar.scoring.catalog.builtin import default_scorer_registry
 from raidar.scoring.framework.store import AssessmentStore
 
 

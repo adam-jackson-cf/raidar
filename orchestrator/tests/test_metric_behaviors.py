@@ -8,7 +8,7 @@ from pathlib import Path
 import pytest
 
 from raidar.contract.references import RefKind, RegistryRef, RegistryReferenceError
-from raidar.design.experiment.metrics import (
+from raidar.scoring.framework.metrics import (
     DEFAULT_METRIC_REGISTRY,
     SCB_CANONICAL,
     SCB_CANONICAL_ONESHOT,

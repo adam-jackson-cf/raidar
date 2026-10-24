@@ -10,7 +10,6 @@ import pytest
 import yaml
 
 from raidar.design.experiment.lock import LockError
-from raidar.design.experiment.metrics import SCB_CANONICAL
 from raidar.design.experiment.validation import semantic_issues
 from raidar.design.problem.errata import (
     Disposition,
@@ -28,6 +27,7 @@ from raidar.grading.errata import ErrataOutcome, ErrataRef, errata_outcome
 from raidar.grading.models import CaseStatus
 from raidar.grading.records import load_step_record, step_record_dir, write_step_record
 from raidar.scoring.correctness import correctness_scorer
+from raidar.scoring.framework.metrics import SCB_CANONICAL
 from raidar.scoring.framework.result import (
     TRAJECTORY_SUBJECT,
     AssessResult,

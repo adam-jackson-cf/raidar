@@ -13,9 +13,11 @@ inertia I and the score S, weighted by the run's headline metric.
 
 from __future__ import annotations
 
-from typing import Literal, Self
+from typing import Literal, Self, cast, get_args
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
+
+from raidar.evaluation.analysis.outcomes import Value
 
 SCHEMA_VERSION = 1
 PROJECTION_KIND = "raidar-quality-projection"
@@ -35,6 +37,12 @@ CellStatus = Literal[
 Verdict = Literal["improved", "worse", "inconclusive", "insufficient"]
 
 
+def cell_status(value: str) -> CellStatus:
+    if value not in get_args(CellStatus):
+        raise ValueError(f"unknown assessment status {value!r}")
+    return cast(CellStatus, value)
+
+
 class QualityModel(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid")
 
@@ -51,6 +59,13 @@ class Cell(QualityModel):
         if self.status != "ok" and (self.value is not None or not self.reason):
             raise ValueError(f"a {self.status} cell carries a reason and no value")
         return self
+
+    @classmethod
+    def of_value(cls, value: Value) -> Cell:
+        """The cell of an analysis ``Value``: its number, or its status and reason."""
+        if value.value is not None:
+            return cls(status="ok", value=value.value)
+        return cls(status=cell_status(value.status), reason=value.reason)
 
 
 class PolicyInfo(QualityModel):

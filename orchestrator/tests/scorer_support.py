@@ -27,7 +27,6 @@ from raidar.grading.records import (
     stored_snapshot_path,
     write_step_record,
 )
-from raidar.scoring.framework.catalog import ScorerRegistration, ScorerRegistry
 from raidar.scoring.framework.context import AssessContext
 from raidar.scoring.framework.inventory import FileRole
 from raidar.scoring.framework.manifest import (
@@ -40,6 +39,7 @@ from raidar.scoring.framework.manifest import (
     ScorerManifest,
     Tier,
 )
+from raidar.scoring.framework.registry import ScorerRegistration, ScorerRegistry
 from raidar.scoring.framework.result import (
     TRAJECTORY_SUBJECT,
     AssessResult,

@@ -13,8 +13,8 @@ from __future__ import annotations
 from collections.abc import Mapping
 from dataclasses import dataclass
 
-from raidar.design.experiment.metrics import ComponentValue, Metric, MetricScore
 from raidar.evaluation.analysis.outcomes import Value
+from raidar.scoring.framework.metrics import ComponentValue, Metric, MetricScore
 from raidar.scoring.framework.result import AssessStatus
 
 

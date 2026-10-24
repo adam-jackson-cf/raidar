@@ -25,12 +25,6 @@ from dataclasses import dataclass, field
 from decimal import Decimal
 
 from raidar.contract.references import RegistryReferenceError
-from raidar.design.experiment.metrics import (
-    CORRECTNESS,
-    DEFAULT_METRIC_REGISTRY,
-    Metric,
-    MetricScore,
-)
 from raidar.engine.trial.models import CheckpointState, TrialRecord
 from raidar.evaluation.analysis.assessed import (
     CODE_QUALITY_REF,
@@ -38,9 +32,15 @@ from raidar.evaluation.analysis.assessed import (
     correctness_component,
     infra_reasons,
 )
-from raidar.evaluation.analysis.outcomes import CORRECTNESS_REF
 from raidar.evaluation.analysis.policy_inputs import ComponentInput, score_inputs
 from raidar.evaluation.review.projection.assessments import TrialAssessments
+from raidar.scoring.catalog.outcomes import CORRECTNESS_REF
+from raidar.scoring.framework.metrics import (
+    CORRECTNESS,
+    DEFAULT_METRIC_REGISTRY,
+    Metric,
+    MetricScore,
+)
 from raidar.scoring.framework.result import TRAJECTORY_SUBJECT, AssessStatus, Observation
 
 COMPONENT_METRICS = {

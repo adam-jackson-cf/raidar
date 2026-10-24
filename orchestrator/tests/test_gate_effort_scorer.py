@@ -13,7 +13,7 @@ from pathlib import Path
 
 import pytest
 
-from raidar.scoring.framework.catalog import default_scorer_registry
+from raidar.scoring.catalog.builtin import default_scorer_registry
 from raidar.scoring.framework.context import AssessContext, StepInputs
 from raidar.scoring.framework.result import TRAJECTORY_SUBJECT, AssessStatus
 from raidar.scoring.gate_effort import GATE_EFFORT, gate_effort_scorer

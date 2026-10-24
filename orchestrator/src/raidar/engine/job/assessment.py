@@ -29,12 +29,9 @@ import yaml
 from raidar.design.experiment.schema import AssessmentSpec, ProtocolSpec
 from raidar.design.problem.errata import errata_ref_from_metadata
 from raidar.grading.errata import ErrataRef
-from raidar.scoring.framework.catalog import (
-    ERRATA_CONFIG_KEY,
-    ScorerRegistry,
-    default_scorer_registry,
-)
+from raidar.scoring.catalog.builtin import ERRATA_CONFIG_KEY, default_scorer_registry
 from raidar.scoring.framework.inventory import InventoryPolicy
+from raidar.scoring.framework.registry import ScorerRegistry
 from raidar.scoring.framework.rescore_config import RescoreConfig
 
 ASSESSMENT_CONFIG_FILE = "assessment-config.yaml"

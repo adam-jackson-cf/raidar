@@ -34,8 +34,6 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 
-from pydantic import Field
-
 from raidar.design.problem.sensitivities import known_sensitivities
 from raidar.evaluation.analysis.curves import Curve, problem_curves
 from raidar.evaluation.analysis.effects import (
@@ -55,15 +53,14 @@ from raidar.evaluation.analysis.gate_effort import (
     gate_means,
 )
 from raidar.evaluation.analysis.manipulation import (
-    CHECK_SCORERS,
-    DEFAULT_CHECKS,
-    GATE_SOURCE,
-    PROCESS_SOURCE,
     CheckRequest,
     ManipulationReport,
-    check_report,
+    treatment_check_report,
 )
-from raidar.evaluation.analysis.outcomes import (
+from raidar.evaluation.analysis.outcomes import AnalysisModel, PoolingReport, TrialOutcome
+from raidar.evaluation.analysis.ranking import Ranking, ranking
+from raidar.evaluation.analysis.stats import SampleSizeBasis
+from raidar.scoring.catalog.outcomes import (
     COST_METRICS,
     GATE_EFFORT_REF,
     GATE_METRICS,
@@ -72,20 +69,14 @@ from raidar.evaluation.analysis.outcomes import (
     RAW_COUNTERPART,
     VERIFIER_DISAGREEMENTS,
     VERIFIER_METRICS,
-    AnalysisModel,
     MetricDef,
-    PoolingReport,
-    TrialOutcome,
     outcome_metric,
     primary_metric,
     primary_source,
 )
-from raidar.evaluation.analysis.ranking import Ranking, ranking
-from raidar.evaluation.analysis.stats import POWER_CONSTANT, pairs_for_power
 from raidar.scoring.framework.result import AssessResult
 
 REPORT_KIND = "raidar-analysis-report"
-STANDARDIZED_EFFECTS = (1.0, 0.5, 0.25)
 
 
 @dataclass(frozen=True)
@@ -200,13 +191,6 @@ class Comparison(AnalysisModel):
     process_note: str | None = None
 
 
-class SampleSizeBasis(AnalysisModel):
-    formula: str = f"n = ceil({POWER_CONSTANT} * (SD / delta)^2)"
-    power: float = 0.8
-    alpha: float = 0.05
-    standardized: dict[str, int]
-
-
 class ReportSettings(AnalysisModel):
     source: str = "caller"
     pinned_by_lock: bool = False
@@ -255,11 +239,7 @@ class AnalysisReport(AnalysisModel):
     """``{problem ref: [known sensitivity]}`` from the problems registry
     (``raidar.design.problem.sensitivities``): spec-determined cases whose verdict can depend on
     timing. A note beside the disagreement counts; it changes no value."""
-    sample_size_basis: SampleSizeBasis = Field(
-        default_factory=lambda: SampleSizeBasis(
-            standardized={f"{d:g}": pairs_for_power(1.0, d) for d in STANDARDIZED_EFFECTS}
-        )
-    )
+    sample_size_basis: SampleSizeBasis = SampleSizeBasis.standard()
 
 
 def _slots(inputs: AnalysisInputs, treatment: str) -> dict[str, list[Slot]]:
@@ -299,40 +279,17 @@ def _effects(slots: Mapping[str, list[Slot]], settings: Settings, label: str) ->
     return effects
 
 
-def _arm_results(
-    inputs: AnalysisInputs, by_trial: Mapping[str, AssessResult | None] | None, treatment: str
-) -> dict[str, list[AssessResult]]:
-    """One scorer's results of the two arms' valid trials."""
-    results: dict[str, list[AssessResult]] = {inputs.baseline_arm: [], treatment: []}
-    for outcome in inputs.outcomes:
-        result = (by_trial or {}).get(outcome.trial_id)
-        if outcome.arm in results and not outcome.infra_error and result is not None:
-            results[outcome.arm].append(result)
-    return results
-
-
 def _manipulation(
     inputs: AnalysisInputs, treatment: str, settings: Settings
 ) -> ManipulationReport | None:
-    requests = inputs.manipulation_checks
-    if requests is None:
-        if inputs.process_results is None:
-            return None
-        requests = tuple(CheckRequest(check=check) for check in DEFAULT_CHECKS)
-    sources = {PROCESS_SOURCE: inputs.process_results, GATE_SOURCE: inputs.gate_results}
-    per_check = {
-        request.check: _arm_results(
-            inputs, sources.get(CHECK_SCORERS.get(request.check, ("",))[0]), treatment
-        )
-        for request in requests
-    }
-    return check_report(
-        per_check,
-        requests,
-        guided=treatment,
+    return treatment_check_report(
+        inputs.manipulation_checks,
+        inputs.outcomes,
+        process_results=inputs.process_results,
+        gate_results=inputs.gate_results,
         baseline=inputs.baseline_arm,
+        treatment=treatment,
         alpha=settings.alpha,
-        preregistered=inputs.manipulation_checks is not None,
     )
 
 

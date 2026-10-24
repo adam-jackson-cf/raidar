@@ -18,15 +18,10 @@ from raidar.contract.references import (
 )
 from raidar.design.experiment.loader import load_experiment
 from raidar.design.experiment.lock import build_lock, render_lock
-from raidar.design.experiment.metrics import MetricResolver
 from raidar.grading.models import CaseStatus
+from raidar.scoring.catalog.builtin import scorer_resolver
 from raidar.scoring.framework import result as result_module
 from raidar.scoring.framework.builtin_manifests import BUILTIN_MANIFESTS, CODE_QUALITY, CORRECTNESS
-from raidar.scoring.framework.catalog import (
-    ScorerRegistration,
-    ScorerUnavailableError,
-    scorer_resolver,
-)
 from raidar.scoring.framework.context import statused_result
 from raidar.scoring.framework.manifest import (
     EvidenceInput,
@@ -35,11 +30,13 @@ from raidar.scoring.framework.manifest import (
     MetricType,
     ScorerManifest,
 )
+from raidar.scoring.framework.metrics import MetricResolver
 from raidar.scoring.framework.ownership import (
     DuplicateMetricError,
     MetricOwnershipError,
     MissingMetricError,
 )
+from raidar.scoring.framework.registry import ScorerRegistration, ScorerUnavailableError
 from raidar.scoring.framework.result import (
     AssessResult,
     AssessStatus,

@@ -7,14 +7,13 @@ from pathlib import Path
 import pytest
 
 from raidar.evaluation.analysis.manipulation import (
-    DEFAULT_CHECKS,
-    PROCESS_COMPLIANCE_REFS,
     Separation,
     load_arm_results,
     manipulation_check,
     permutation_p,
 )
-from raidar.scoring.framework.catalog import default_scorer_registry
+from raidar.scoring.catalog.builtin import default_scorer_registry
+from raidar.scoring.catalog.checks import DEFAULT_CHECKS, PROCESS_COMPLIANCE_REFS
 from raidar.scoring.framework.manifest import Tier
 from raidar.scoring.framework.rescore import assess
 from raidar.scoring.framework.result import (

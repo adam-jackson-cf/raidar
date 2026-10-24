@@ -37,13 +37,9 @@ from raidar.evaluation.analysis.effects import (
     interval_out,
     problem_effect,
 )
-from raidar.evaluation.analysis.outcomes import (
-    GATE_METRICS,
-    AnalysisModel,
-    MetricDef,
-    TrialOutcome,
-)
+from raidar.evaluation.analysis.outcomes import AnalysisModel, TrialOutcome
 from raidar.evaluation.analysis.stats import seed_for, summarise
+from raidar.scoring.catalog.outcomes import GATE_METRICS, MetricDef
 
 NO_GATE_NOTE = (
     "no paired gate effect: the {arm} arm measured no gate-effort value (it ran without "

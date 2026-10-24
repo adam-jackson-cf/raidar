@@ -3,7 +3,7 @@
 A manifest declares everything a scorer may emit before it runs: each metric's
 level, type, direction, measurement tier and SCB exactness. Scorers observe
 only; nothing here carries a weight or a success rule (F6). Weights live in
-Metrics (``raidar.design.experiment.metrics``).
+Metrics (``raidar.scoring.framework.metrics``).
 """
 
 from __future__ import annotations
@@ -169,6 +169,9 @@ class ScorerManifest(SdkModel):
     @property
     def ref(self) -> str:
         return f"{self.id}@{self.version}"
+
+    def supports_runtime(self, runtime: str | None) -> bool:
+        return ANY_RUNTIME in self.runtimes or runtime in self.runtimes
 
     def metric_inputs(self, metric: MetricSpec) -> frozenset[EvidenceInput]:
         return frozenset(metric.inputs or self.evidence_required)

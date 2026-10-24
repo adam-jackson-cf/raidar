@@ -10,7 +10,7 @@ Ported from ``slop-code-bench`` ``src/slop_code/metrics/scoring/schema.py``
 
 Scorers observe and policies weigh (F6, F15): the inertia weights and the
 score formula are taken from the ``scb-canonical@1`` Metric
-(``raidar.design.experiment.metrics``), not restated here. ``calculate_problem_score``
+(``raidar.scoring.framework.metrics``), not restated here. ``calculate_problem_score``
 composes the component means with that policy into the fork's
 ``ProblemScore`` so golden tests and sensitivity analysis use one code path.
 """
@@ -20,7 +20,6 @@ from __future__ import annotations
 from collections.abc import Sequence
 from decimal import ROUND_HALF_EVEN, Decimal, localcontext
 
-from raidar.design.experiment.metrics import SCB_CANONICAL
 from raidar.scoring.code_quality.models import (
     ZERO,
     CheckpointCorrectnessEvidence,
@@ -28,6 +27,7 @@ from raidar.scoring.code_quality.models import (
     ProblemScore,
     canonical_decimal,
 )
+from raidar.scoring.framework.metrics import SCB_CANONICAL
 
 DECIMAL_CONTEXT_PRECISION = 50
 COMPONENT_NAMES = ("verbosity", "erosion", "architecture", "rework", "regression")

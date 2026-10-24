@@ -28,13 +28,9 @@ from collections.abc import Mapping, Sequence
 from math import comb
 
 from raidar.evaluation.analysis.effects import IntervalOut, Settings, interval_out
-from raidar.evaluation.analysis.outcomes import (
-    FINAL_SOLVED,
-    AnalysisModel,
-    TrialOutcome,
-    outcome_metric,
-)
+from raidar.evaluation.analysis.outcomes import AnalysisModel, TrialOutcome
 from raidar.evaluation.analysis.stats import seed_for, summarise
+from raidar.scoring.catalog.outcomes import FINAL_SOLVED, outcome_metric
 from raidar.scoring.framework.manifest import Direction
 
 PASS_DEFINITION = "final_solved: the trial solved its problem's final checkpoint"

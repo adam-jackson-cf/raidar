@@ -21,6 +21,8 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from enum import StrEnum
 
+from raidar.evaluation.analysis.outcomes import AnalysisModel
+
 CONFIDENCE = 0.95
 BOOTSTRAP_MIN_PAIRS = 10
 BOOTSTRAP_SAMPLES = 10_000
@@ -213,3 +215,18 @@ def pairs_for_power(sd: float, delta: float) -> int:
     if sd < 0:
         raise ValueError(f"SD must be non-negative, got {sd}")
     return max(1, math.ceil(round(POWER_CONSTANT * (sd / delta) ** 2, 9)))
+
+
+STANDARDIZED_EFFECTS = (1.0, 0.5, 0.25)
+
+
+class SampleSizeBasis(AnalysisModel):
+    formula: str = f"n = ceil({POWER_CONSTANT} * (SD / delta)^2)"
+    power: float = 0.8
+    alpha: float = 0.05
+    standardized: dict[str, int]
+
+    @classmethod
+    def standard(cls) -> SampleSizeBasis:
+        """The pairs needed at the standardized effect sizes (SD 1)."""
+        return cls(standardized={f"{d:g}": pairs_for_power(1.0, d) for d in STANDARDIZED_EFFECTS})

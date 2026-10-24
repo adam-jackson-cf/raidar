@@ -24,6 +24,7 @@ import hashlib
 from collections.abc import Sequence
 from dataclasses import dataclass
 
+from raidar.scoring.framework.atif import Trajectory, TrajectoryError, load_trajectory
 from raidar.scoring.framework.builtin_manifests import RESOURCE_USAGE
 from raidar.scoring.framework.context import AssessContext, StepInputs
 from raidar.scoring.framework.manifest import ScorerManifest
@@ -36,7 +37,6 @@ from raidar.scoring.framework.result import (
     Observation,
     Span,
 )
-from raidar.scoring.resource_usage.atif import Trajectory, TrajectoryError, load_trajectory
 
 _USAGE_FIELDS = {
     "input_tokens": "n_input_tokens",

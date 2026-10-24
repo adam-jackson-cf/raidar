@@ -26,7 +26,6 @@ from raidar.contract.references import (
 from raidar.contract.snapshot import APP_SOURCE
 from raidar.design.experiment.loader import load_experiment
 from raidar.design.experiment.lock import build_lock
-from raidar.design.experiment.metrics import MetricResolver
 from raidar.design.problem.content import content_digest, hidden_content_in_task
 from raidar.design.problem.importer import ProblemDriftError, import_problem
 from raidar.design.problem.models import ProblemId, ProblemManifest, ProblemMode
@@ -41,6 +40,7 @@ from raidar.design.problem.store import (
     open_store,
     store_at,
 )
+from raidar.scoring.framework.metrics import MetricResolver
 from raidar.subject.environment.python.image import image_tag
 from raidar.subject.environment.python.models import load_pack_spec
 from tests.experiment_spec_support import (

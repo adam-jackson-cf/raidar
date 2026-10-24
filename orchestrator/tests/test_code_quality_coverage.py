@@ -31,6 +31,7 @@ from raidar.grading.records import (
     load_step_record,
     write_step_record,
 )
+from raidar.scoring.catalog.builtin import default_scorer_registry
 from raidar.scoring.code_quality import CodeQualityScorer
 from raidar.scoring.code_quality.coverage_reader import OFFLINE_NOT_PRODUCED
 from raidar.scoring.code_quality.lineage_models import RegressionRunEvidence
@@ -42,7 +43,6 @@ from raidar.scoring.code_quality.parity import (
     reconcile,
 )
 from raidar.scoring.framework.builtin_manifests import CODE_QUALITY
-from raidar.scoring.framework.catalog import default_scorer_registry
 from raidar.scoring.framework.context import AssessContext
 from raidar.scoring.framework.rescore import assess
 from raidar.scoring.framework.result import AssessResult, AssessStatus, Observation

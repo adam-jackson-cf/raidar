@@ -23,13 +23,16 @@ from pydantic import ValidationError
 from raidar.contract.references import RegistryReferenceError
 from raidar.design.experiment.agent_support import agent_support_issues
 from raidar.design.experiment.factor_guard import check_factors
-from raidar.design.experiment.metrics import DEFAULT_METRIC_REGISTRY, MetricRegistry
 from raidar.design.experiment.schema import (
     BENCHMARK_MIN_ATTEMPTS,
     EXPERIMENT_KINDS,
     RESERVED_KINDS,
     ExperimentSpec,
 )
+from raidar.scoring.catalog.builtin import BUILTIN_PROTOCOL_CONFIG
+from raidar.scoring.catalog.checks import CHECK_SCORERS
+from raidar.scoring.catalog.outcomes import ALL_METRICS, OUTCOME_METRICS
+from raidar.scoring.framework.metrics import DEFAULT_METRIC_REGISTRY, MetricRegistry
 
 EXPERIMENTS_ROOT = "experiments"
 ID_SEPARATOR = "__"
@@ -312,9 +315,6 @@ def spec_warnings(spec: ExperimentSpec) -> list[FieldIssue]:
 
 
 def _min_effect_issues(spec: ExperimentSpec) -> list[FieldIssue]:
-    # Analysis owns the outcome metric ids; imported lazily like the scorer catalog.
-    from raidar.evaluation.analysis.outcomes import ALL_METRICS, OUTCOME_METRICS
-
     known = {metric.id for metric in ALL_METRICS}
     issues = [
         FieldIssue(
@@ -347,9 +347,6 @@ def _min_effect_issues(spec: ExperimentSpec) -> list[FieldIssue]:
 
 def _manipulation_check_issues(spec: ExperimentSpec) -> list[FieldIssue]:
     """A pre-registered check must exist and a declared scorer must report it."""
-    # Analysis owns the checks and the scorers they read; imported lazily.
-    from raidar.evaluation.analysis.manipulation import CHECK_SCORERS
-
     declared = set(spec.assessment.scorers)
     issues = []
     for index, item in enumerate(spec.analysis.manipulation_checks or ()):
@@ -376,8 +373,6 @@ ProtocolConfigKeys = Mapping[str, Iterable[str]]
 
 def _default_protocol_config() -> ProtocolConfigKeys:
     # The scorer registry owns which scorer reads which protocol field.
-    from raidar.scoring.framework.catalog import BUILTIN_PROTOCOL_CONFIG
-
     return BUILTIN_PROTOCOL_CONFIG
 
 

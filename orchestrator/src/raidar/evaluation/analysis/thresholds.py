@@ -20,8 +20,8 @@ from raidar.design.experiment.schema import (
     VERDICT_THRESHOLDS,
 )
 from raidar.evaluation.analysis.effects import Settings
-from raidar.evaluation.analysis.outcomes import outcome_metric
 from raidar.evaluation.analysis.stats import BOOTSTRAP_SAMPLES
+from raidar.scoring.catalog.outcomes import outcome_metric
 
 LOCK_SOURCE = "lock"
 DEFAULT_SOURCE = "defaults (lock does not pin thresholds)"

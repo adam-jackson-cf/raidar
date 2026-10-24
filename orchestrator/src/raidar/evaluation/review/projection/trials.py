@@ -22,7 +22,6 @@ from typing import Any
 
 from raidar.contract.review import ReviewRunDetail, ReviewRunRecord, ReviewStatus
 from raidar.engine.trial.models import CheckpointState, TrialRecord
-from raidar.evaluation.analysis.outcomes import CODE_QUALITY_REF, CORRECTNESS_REF
 from raidar.evaluation.review.projection.assessments import TrialAssessments
 from raidar.evaluation.review.projection.atif import project_trajectory
 from raidar.evaluation.review.projection.gates import GateContext, failed_gates, project_gates
@@ -30,6 +29,7 @@ from raidar.evaluation.review.projection.headline import Headline
 from raidar.evaluation.review.projection.notes import Finding, finding_counts, to_annotations
 from raidar.evaluation.review.projection.scoring import ScoringContext, project_scoring
 from raidar.evaluation.review.projection.spans import SpanBuilder, repo_path, to_ms
+from raidar.scoring.catalog.outcomes import CODE_QUALITY_REF, CORRECTNESS_REF
 
 _POLICY_SCORERS = frozenset({CORRECTNESS_REF, CODE_QUALITY_REF})
 

@@ -27,24 +27,8 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from decimal import Decimal
 from pathlib import Path
-from typing import cast, get_args
 
-from raidar.design.experiment.metrics import (
-    COMPONENT_PLACES,
-    DEFAULT_METRIC_REGISTRY,
-    IneligibilityReason,
-    Metric,
-    MetricScore,
-)
 from raidar.evaluation.analysis.assessed import build_outcome
-from raidar.evaluation.analysis.outcomes import (
-    CODE_QUALITY_REF,
-    CORRECTNESS_METRIC,
-    CORRECTNESS_REF,
-    HEADLINE_SCORE,
-    QUALITY_COMPONENTS,
-    Value,
-)
 from raidar.evaluation.analysis.policy_inputs import ComponentInput, score_inputs
 from raidar.evaluation.review.quality.gate_view import build_gate_view
 from raidar.evaluation.review.quality.models import (
@@ -59,8 +43,23 @@ from raidar.evaluation.review.quality.models import (
     PolicyInfo,
     QualityRunDetail,
     QualityRunSummary,
+    cell_status,
 )
 from raidar.evaluation.review.quality.sources import TrialSource
+from raidar.scoring.catalog.outcomes import (
+    CODE_QUALITY_REF,
+    CORRECTNESS_METRIC,
+    CORRECTNESS_REF,
+    HEADLINE_SCORE,
+    QUALITY_COMPONENTS,
+)
+from raidar.scoring.framework.metrics import (
+    COMPONENT_PLACES,
+    DEFAULT_METRIC_REGISTRY,
+    IneligibilityReason,
+    Metric,
+    MetricScore,
+)
 from raidar.scoring.framework.result import TRANSITION_SEPARATOR, Observation
 from raidar.scoring.framework.store import Assessment
 from raidar.scoring.judge.audit import DecisionRecord, LabelRecord
@@ -95,19 +94,13 @@ def resolve_policy(from_lock: str | None, checkpoints: int) -> tuple[Metric, Pol
     return policy, info
 
 
-def _status(value: str) -> CellStatus:
-    if value not in get_args(CellStatus):
-        raise ValueError(f"unknown assessment status {value!r}")
-    return cast(CellStatus, value)
-
-
 def _cell(observation: Observation | None, missing: str) -> Cell:
     if observation is None:
         return Cell(status="unavailable", reason=missing)
     if observation.status.value == "ok":
         return Cell(status="ok", value=observation.value)
     return Cell(
-        status=_status(observation.status.value), reason=observation.reason or "no reason given"
+        status=cell_status(observation.status.value), reason=observation.reason or "no reason given"
     )
 
 
@@ -271,12 +264,6 @@ def _evidence(trial: TrialSource, assessment: Assessment | None) -> tuple[Eviden
     return tuple(items)
 
 
-def _from_value(value: Value) -> Cell:
-    if value.value is not None:
-        return Cell(status="ok", value=value.value)
-    return Cell(status=_status(value.status), reason=value.reason)
-
-
 def _reason_text(reason: IneligibilityReason) -> str:
     component = f" {reason.component}" if reason.component else ""
     return f"{reason.code.value}{component}: {reason.detail}"
@@ -309,10 +296,10 @@ def _problem_cells(
         },
         policy=policy,
     )
-    cells = {"C": _from_value(outcome.metrics[CORRECTNESS_METRIC])}
+    cells = {"C": Cell.of_value(outcome.metrics[CORRECTNESS_METRIC])}
     for name, key in QUALITY_COMPONENTS.items():
-        cells[key] = _from_value(outcome.metrics[name])
-    cells["S"] = _from_value(outcome.metrics[HEADLINE_SCORE])
+        cells[key] = Cell.of_value(outcome.metrics[name])
+    cells["S"] = Cell.of_value(outcome.metrics[HEADLINE_SCORE])
     if trial.truncation is not None:
         cells["I"] = Cell(status=_TRUNCATED, reason=cells["S"].reason)
         return {key: cells[key] for key in COMPONENTS}, ()

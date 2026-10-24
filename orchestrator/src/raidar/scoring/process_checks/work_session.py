@@ -12,6 +12,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 
+from raidar.scoring.framework.atif import Trajectory
 from raidar.scoring.framework.manifest import (
     Direction,
     Exactness,
@@ -28,7 +29,6 @@ from raidar.scoring.process_checks.checks import (
 )
 from raidar.scoring.process_checks.core import UNDETERMINED, check_observation
 from raidar.scoring.process_checks.trace_events import TraceEvent
-from raidar.scoring.resource_usage.atif import Trajectory
 
 WORK_TESTS = f"work_session_{TESTS_RUN_BEFORE_FINISH}"
 WORK_TESTS_RATE = "work_session_tests_run_rate"

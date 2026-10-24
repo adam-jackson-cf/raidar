@@ -22,6 +22,7 @@ from __future__ import annotations
 from collections.abc import Sequence
 from pathlib import PurePosixPath
 
+from raidar.scoring.framework.atif import Trajectory
 from raidar.scoring.framework.manifest import (
     Direction,
     Exactness,
@@ -43,7 +44,6 @@ from raidar.scoring.process_checks.work_session import (
     work_rate,
     work_session,
 )
-from raidar.scoring.resource_usage.atif import Trajectory
 
 WORK_TESTS_ANY = "work_session_tests_run_any"
 WORK_TESTS_AFTER_CODE = "work_session_tests_after_last_code_edit"

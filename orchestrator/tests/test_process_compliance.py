@@ -23,8 +23,8 @@ import pytest
 from click.testing import CliRunner
 
 from raidar.cli import main
-from raidar.scoring.framework import catalog
-from raidar.scoring.framework.catalog import default_scorer_registry
+from raidar.scoring.catalog.builtin import default_scorer_registry
+from raidar.scoring.framework import registry
 from raidar.scoring.framework.context import AssessContext
 from raidar.scoring.framework.manifest import Tier
 from raidar.scoring.framework.result import (
@@ -118,14 +118,14 @@ def test_the_manifest_has_only_deterministic_metrics_and_no_jev_binding() -> Non
 
 def test_its_implementation_digest_covers_no_jev_code(monkeypatch: pytest.MonkeyPatch) -> None:
     modules: list[str] = []
-    original = catalog.digest_json
+    original = registry.digest_json
 
     def spy(value: Any) -> str:
         if isinstance(value, dict) and "modules" in value:
             modules.extend(value["modules"])
         return original(value)
 
-    monkeypatch.setattr(catalog, "digest_json", spy)
+    monkeypatch.setattr(registry, "digest_json", spy)
     default_scorer_registry().get(REF).implementation_digest()
     assert "raidar.scoring.process_checks.checks" in modules
     assert not [

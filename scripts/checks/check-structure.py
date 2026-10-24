@@ -69,6 +69,7 @@ RAIDAR_PACKAGES: dict[str, frozenset[str]] = {
     "grading": frozenset({"runtime"}),
     "scoring": frozenset(
         {
+            "catalog",
             "framework",
             "correctness",
             "code_quality",

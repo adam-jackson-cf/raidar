@@ -9,12 +9,6 @@ from __future__ import annotations
 
 import pytest
 
-from raidar.design.experiment.metrics import (
-    SCB_CANONICAL,
-    SCB_CANONICAL_ONESHOT,
-    SCB_CANONICAL_ONESHOT_V2,
-    SCB_CANONICAL_V2,
-)
 from raidar.engine.trial.models import (
     CheckpointState,
     ExecutionValidity,
@@ -32,7 +26,14 @@ from raidar.evaluation.analysis.assessed import (
     build_outcome,
     headline_score,
 )
-from raidar.evaluation.analysis.outcomes import OUTCOME_METRICS, TRUNCATED, UNASSESSED, Value
+from raidar.evaluation.analysis.outcomes import TRUNCATED, UNASSESSED, Value
+from raidar.scoring.catalog.outcomes import OUTCOME_METRICS
+from raidar.scoring.framework.metrics import (
+    SCB_CANONICAL,
+    SCB_CANONICAL_ONESHOT,
+    SCB_CANONICAL_ONESHOT_V2,
+    SCB_CANONICAL_V2,
+)
 from raidar.scoring.framework.result import (
     TRAJECTORY_SUBJECT,
     AssessResult,

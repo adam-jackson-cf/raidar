@@ -35,12 +35,12 @@ from decimal import Decimal
 from enum import StrEnum
 from pathlib import Path
 
-from raidar.design.experiment.metrics import (
+from raidar.grading.models import CaseGroup, CaseStatus, VerifierGrade
+from raidar.scoring.framework.metrics import (
     DEFAULT_METRIC_REGISTRY,
     checkpoint_pass_rate,
     problem_correctness,
 )
-from raidar.grading.models import CaseGroup, CaseStatus, VerifierGrade
 
 POSITIVE = "positive"
 NEGATIVE = "negative"

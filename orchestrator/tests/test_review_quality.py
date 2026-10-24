@@ -10,10 +10,8 @@ from types import SimpleNamespace
 
 import pytest
 
-from raidar.design.experiment.metrics import SCB_CANONICAL
 from raidar.engine.trial.models import TrialRecord
 from raidar.evaluation.analysis.assessed import build_outcome
-from raidar.evaluation.analysis.outcomes import CORRECTNESS_METRIC, HEADLINE_SCORE
 from raidar.evaluation.review.quality.experiment_view import _primary
 from raidar.evaluation.review.quality.models import COMPONENTS, QualityProjection
 from raidar.evaluation.review.quality.projection import build_quality_projection, main
@@ -26,6 +24,8 @@ from raidar.evaluation.review.quality.synthetic import (
     generate_quality_fixture,
 )
 from raidar.evaluation.review.quality.synthetic_lock import write_synthetic_lock
+from raidar.scoring.catalog.outcomes import CORRECTNESS_METRIC, HEADLINE_SCORE
+from raidar.scoring.framework.metrics import SCB_CANONICAL
 from raidar.scoring.framework.result import AssessResult, AssessStatus, Observation, RunStats
 from raidar.scoring.framework.store import OBJECTS_DIR, AssessmentStore
 

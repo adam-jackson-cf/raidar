@@ -15,12 +15,9 @@ from raidar.cli import main
 from raidar.design.experiment.schema import ProtocolSpec
 from raidar.engine.job.assessment import ASSESSMENT_CONFIG_FILE
 from raidar.grading.models import CaseStatus
-from raidar.scoring.framework.catalog import (
-    ScorerRegistration,
-    ScorerRegistry,
-    default_scorer_registry,
-)
+from raidar.scoring.catalog.builtin import default_scorer_registry
 from raidar.scoring.framework.context import AssessContext, statused_result
+from raidar.scoring.framework.registry import ScorerRegistration, ScorerRegistry
 from raidar.scoring.framework.rescore import RescoreOutcome, rescore_path
 from raidar.scoring.framework.result import AssessResult, AssessStatus
 from raidar.scoring.framework.store import AssessmentConflictError, AssessmentStore

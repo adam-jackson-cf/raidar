@@ -43,15 +43,7 @@ from raidar.design.experiment.schema import (
     DEFAULT_MAX_EXCLUSION_FRACTION as DEFAULT_MAX_EXCLUSION_FRACTION,
 )
 from raidar.design.experiment.schema import DEFAULT_MIN_PAIRS as DEFAULT_MIN_PAIRS
-from raidar.evaluation.analysis.outcomes import (
-    TOTAL_COST,
-    UNASSESSED,
-    AnalysisModel,
-    Kind,
-    MetricDef,
-    TrialOutcome,
-    Value,
-)
+from raidar.evaluation.analysis.outcomes import UNASSESSED, AnalysisModel, TrialOutcome, Value
 from raidar.evaluation.analysis.stats import (
     BOOTSTRAP_SAMPLES,
     CONFIDENCE,
@@ -66,6 +58,7 @@ from raidar.evaluation.analysis.stats import (
     summarise,
     t_interval,
 )
+from raidar.scoring.catalog.outcomes import TOTAL_COST, Kind, MetricDef
 from raidar.scoring.framework.manifest import Direction
 from raidar.scoring.framework.result import AssessStatus
 

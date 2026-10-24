@@ -61,7 +61,6 @@ from raidar.cli.grading import (
     reads_docker_grades,
     regrade,
 )
-from raidar.contract.runtimes import ANY_RUNTIME
 from raidar.engine.job.assessment import ASSESSMENT_CONFIG_FILE, lock_rescore_config
 from raidar.evaluation.analysis.sources import (
     AnalysisInputError,
@@ -71,7 +70,8 @@ from raidar.evaluation.analysis.sources import (
     read_lock,
 )
 from raidar.grading.bundle import BundleError, load_bundle
-from raidar.scoring.framework.catalog import ScorerUnavailableError, default_scorer_registry
+from raidar.scoring.catalog.builtin import default_scorer_registry
+from raidar.scoring.framework.registry import ScorerUnavailableError
 from raidar.scoring.framework.rescore import report_payload, rescore_path
 from raidar.scoring.framework.rescore_config import RescoreConfig, load_rescore_config
 from raidar.scoring.framework.store import AssessmentConflictError, AssessmentStore
@@ -144,11 +144,13 @@ def _scorer_issues(runtime: str | None, scorer_refs: tuple[str, ...]) -> list[st
     issues = []
     for ref in scorer_refs:
         try:
-            runtimes = registry.get(ref).manifest.runtimes
+            manifest = registry.get(ref).manifest
         except (KeyError, ValueError):
             continue  # unknown scorers are reported by the rescore itself
-        if ANY_RUNTIME not in runtimes and runtime not in runtimes:
-            issues.append(f"[AS1] scorer {ref} supports runtimes [{', '.join(runtimes)}]; {where}")
+        if not manifest.supports_runtime(runtime):
+            issues.append(
+                f"[AS1] scorer {ref} supports runtimes [{', '.join(manifest.runtimes)}]; {where}"
+            )
     return issues
 
 

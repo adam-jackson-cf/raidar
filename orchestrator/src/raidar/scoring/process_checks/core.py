@@ -17,6 +17,7 @@ from itertools import chain
 
 from pydantic import Field, field_validator
 
+from raidar.scoring.framework.atif import Trajectory, TrajectoryError, load_trajectory
 from raidar.scoring.framework.context import AssessContext, StepInputs
 from raidar.scoring.framework.manifest import SdkModel
 from raidar.scoring.framework.result import (
@@ -36,7 +37,6 @@ from raidar.scoring.process_checks.trace_events import (
     DEFAULT_WORKDIR,
     Classifier,
 )
-from raidar.scoring.resource_usage.atif import Trajectory, TrajectoryError, load_trajectory
 
 RATE_METRIC = "compliance_rate"
 UNDETERMINED = "undetermined"

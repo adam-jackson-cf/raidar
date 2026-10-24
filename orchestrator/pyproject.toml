@@ -47,7 +47,7 @@ raidar = "raidar.cli:main"
 # Registry resolvers loaded lazily by `raidar lock` (raidar.contract.references).
 [project.entry-points."raidar.contract.resolvers"]
 problem = "raidar.design.problem.resolver:resolver_factory"
-scorer = "raidar.scoring.framework.catalog:scorer_resolver"
+scorer = "raidar.scoring.catalog.builtin:scorer_resolver"
 component = "raidar.subject.treatment.definition.registry:component_resolver"
 
 # Component definitions (raidar.subject.treatment.definition.registry), named by reference and imported lazily.

@@ -11,12 +11,12 @@ import json
 from pathlib import Path
 
 from raidar.design.experiment.lock import LOCK_VERSION, default_lock_path, seal_lock
-from raidar.design.experiment.metrics import DEFAULT_METRIC_REGISTRY
 from raidar.design.experiment.schema import (
     DEFAULT_ALPHA,
     DEFAULT_MAX_EXCLUSION_FRACTION,
     DEFAULT_MIN_PAIRS,
 )
+from raidar.scoring.framework.metrics import DEFAULT_METRIC_REGISTRY
 
 PINNED_THRESHOLDS = {
     "min_pairs": DEFAULT_MIN_PAIRS,

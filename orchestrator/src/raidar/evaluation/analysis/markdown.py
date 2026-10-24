@@ -8,20 +8,19 @@ from raidar.evaluation.analysis.curves import Band, Curve
 from raidar.evaluation.analysis.effects import Effect, Exclusions, IntervalOut
 from raidar.evaluation.analysis.gate_effort import GateDescriptive
 from raidar.evaluation.analysis.manipulation import CheckSeparation, ManipulationReport
-from raidar.evaluation.analysis.outcomes import (
+from raidar.evaluation.analysis.ranking import Ranking, RankingRow
+from raidar.evaluation.analysis.report import AnalysisReport, ArmSummary, Comparison
+from raidar.evaluation.analysis.stats import confidence_label
+from raidar.scoring.catalog.outcomes import (
     ALL_METRICS,
     CROSS_MODE_CUMULATIVE,
     GATE_EFFORT_REF,
     GATE_METRICS,
     GATE_PREFIX,
     PROCESS_COMPLIANCE_REF,
-    REFUSAL_KINDS,
     VERIFIER_DISAGREEMENTS,
     VERIFIER_METRICS,
 )
-from raidar.evaluation.analysis.ranking import Ranking, RankingRow
-from raidar.evaluation.analysis.report import AnalysisReport, ArmSummary, Comparison
-from raidar.evaluation.analysis.stats import confidence_label
 from raidar.scoring.framework.manifest import Direction
 from raidar.scoring.gate_effort.families import FAMILIES
 
@@ -305,6 +304,8 @@ def _refusal_table(arms: Sequence[ArmSummary], names: Sequence[str]) -> list[str
     )
     if not any(f"{cost}.mixed" in (arm.gate_effort or {}) for arm in arms):
         return []
+    prefix = f"{cost}."
+    kinds = [metric.id[len(prefix) :] for metric in GATE_METRICS if metric.id.startswith(prefix)]
     rows = [
         [
             kind,
@@ -314,7 +315,7 @@ def _refusal_table(arms: Sequence[ArmSummary], names: Sequence[str]) -> list[str
                 for arm in arms
             ),
         ]
-        for kind in REFUSAL_KINDS
+        for kind in kinds
     ]
     return [
         "Fix sessions per trial by the refusal that started them (mean cost USD / wall s; "

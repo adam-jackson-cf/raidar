@@ -20,8 +20,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from raidar.contract.references import RegistryReferenceError
-from raidar.scoring.framework.catalog import ScorerRegistry
 from raidar.scoring.framework.keys import scorer_identity, store_key
+from raidar.scoring.framework.registry import ScorerRegistry
 from raidar.scoring.framework.rescore_config import RescoreConfig
 from raidar.scoring.framework.store import Assessment, AssessmentStore, ScorerIdentity
 from raidar.scoring.framework.trial_inputs import (

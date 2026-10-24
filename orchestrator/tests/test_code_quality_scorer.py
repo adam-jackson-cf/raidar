@@ -24,11 +24,11 @@ from raidar.grading.records import (
     step_record_dir,
     write_step_record,
 )
+from raidar.scoring.catalog.builtin import default_scorer_registry
 from raidar.scoring.code_quality import CodeQualityScorer
 from raidar.scoring.code_quality.contract import EXPECTED_RUFF_VERSION
 from raidar.scoring.code_quality.measurement import QUALITY_TOOL
 from raidar.scoring.framework.builtin_manifests import CODE_QUALITY
-from raidar.scoring.framework.catalog import default_scorer_registry
 from raidar.scoring.framework.context import AssessContext
 from raidar.scoring.framework.rescore import RescoreOutcome, assess
 from raidar.scoring.framework.result import AssessResult, AssessStatus, Observation

@@ -59,27 +59,21 @@ from typing import Literal
 
 from pydantic import Field
 
-from raidar.evaluation.analysis.outcomes import GATE_EFFORT_REF, PROCESS_COMPLIANCE_REF
+from raidar.evaluation.analysis.outcomes import TrialOutcome
+from raidar.scoring.catalog.checks import (
+    CHECK_SCORERS,
+    DEFAULT_CHECKS,
+    GATE_SOURCE,
+    PROCESS_COMPLIANCE_REFS,
+    PROCESS_SOURCE,
+)
 from raidar.scoring.framework.manifest import SdkModel
 from raidar.scoring.framework.result import AssessResult, AssessStatus
 from raidar.scoring.framework.store import AssessmentStore
-from raidar.scoring.process_checks.checks import PLAN_WRITTEN, TESTS_RUN_BEFORE_FINISH
 
-DEFAULT_CHECKS = (TESTS_RUN_BEFORE_FINISH, PLAN_WRITTEN)
 EXACT_LIMIT = 50_000
 SAMPLES = 20_000
 SEED = 0
-PROCESS_COMPLIANCE_REFS = (PROCESS_COMPLIANCE_REF,)
-GATE_EFFORT_REFS = (GATE_EFFORT_REF,)
-GATE_CLEAN = "gate_clean_at_step_end"
-PROCESS_SOURCE = "process-compliance"
-GATE_SOURCE = "gate-effort"
-CHECK_SCORERS: dict[str, tuple[str, tuple[str, ...]]] = {
-    TESTS_RUN_BEFORE_FINISH: (PROCESS_SOURCE, PROCESS_COMPLIANCE_REFS),
-    PLAN_WRITTEN: (PROCESS_SOURCE, PROCESS_COMPLIANCE_REFS),
-    GATE_CLEAN: (GATE_SOURCE, GATE_EFFORT_REFS),
-}
-"""``{check: (result source, scorer refs that report it)}``."""
 Basis = Literal["separation", "threshold", "threshold+separation"]
 
 
@@ -384,3 +378,59 @@ def load_arm_results(
                 )
             loaded[arm].append(assessment.result)
     return loaded
+
+
+def _arm_results(
+    outcomes: Sequence[TrialOutcome],
+    by_trial: Mapping[str, AssessResult | None] | None,
+    *,
+    baseline: str,
+    treatment: str,
+) -> dict[str, list[AssessResult]]:
+    """One scorer's results of the two arms' valid trials."""
+    results: dict[str, list[AssessResult]] = {baseline: [], treatment: []}
+    for outcome in outcomes:
+        result = (by_trial or {}).get(outcome.trial_id)
+        if outcome.arm in results and not outcome.infra_error and result is not None:
+            results[outcome.arm].append(result)
+    return results
+
+
+def treatment_check_report(
+    requests: Sequence[CheckRequest] | None,
+    outcomes: Sequence[TrialOutcome],
+    *,
+    process_results: Mapping[str, AssessResult | None] | None,
+    gate_results: Mapping[str, AssessResult | None] | None,
+    baseline: str,
+    treatment: str,
+    alpha: float,
+) -> ManipulationReport | None:
+    """The manipulation report of one treatment arm against the baseline.
+
+    ``requests`` are the lock's pre-registered checks; without them the process-compliance
+    defaults run when that scorer's results exist, else there is no report.
+    """
+    preregistered = requests is not None
+    if requests is None:
+        if process_results is None:
+            return None
+        requests = tuple(CheckRequest(check=check) for check in DEFAULT_CHECKS)
+    sources = {PROCESS_SOURCE: process_results, GATE_SOURCE: gate_results}
+    per_check = {
+        request.check: _arm_results(
+            outcomes,
+            sources.get(CHECK_SCORERS.get(request.check, ("",))[0]),
+            baseline=baseline,
+            treatment=treatment,
+        )
+        for request in requests
+    }
+    return check_report(
+        per_check,
+        requests,
+        guided=treatment,
+        baseline=baseline,
+        alpha=alpha,
+        preregistered=preregistered,
+    )

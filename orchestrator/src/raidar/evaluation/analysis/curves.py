@@ -18,13 +18,9 @@ from __future__ import annotations
 from collections.abc import Sequence
 
 from raidar.evaluation.analysis.effects import IntervalOut, Settings, Slot, interval_out
-from raidar.evaluation.analysis.outcomes import (
-    CHECKPOINT_SERIES,
-    AnalysisModel,
-    SeriesDef,
-    TrialOutcome,
-)
+from raidar.evaluation.analysis.outcomes import AnalysisModel, TrialOutcome
 from raidar.evaluation.analysis.stats import seed_for, summarise
+from raidar.scoring.catalog.outcomes import CHECKPOINT_SERIES, SeriesDef
 from raidar.scoring.framework.manifest import Direction
 
 

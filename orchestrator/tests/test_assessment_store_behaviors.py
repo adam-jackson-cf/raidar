@@ -12,7 +12,7 @@ from click.testing import CliRunner
 
 from raidar.cli import main
 from raidar.grading.models import CaseStatus
-from raidar.scoring.framework.catalog import BUILTIN_IMPLEMENTATIONS
+from raidar.scoring.catalog.builtin import BUILTIN_IMPLEMENTATIONS
 from raidar.scoring.framework.rescore import RescoreError, RescoreOutcome, rescore_path
 from raidar.scoring.framework.store import AssessmentConflictError, AssessmentStore
 from raidar.scoring.framework.trial_inputs import TrialInputError, load_trial_context

@@ -10,9 +10,10 @@ from raidar.evaluation.review.projection.fixture_assessments import (
     QualityPlan,
     quality_result,
 )
+from raidar.scoring.catalog.builtin import default_scorer_registry
 from raidar.scoring.framework.builtin_manifests import CODE_QUALITY
-from raidar.scoring.framework.catalog import ScorerRegistry, default_scorer_registry
 from raidar.scoring.framework.keys import store_key
+from raidar.scoring.framework.registry import ScorerRegistry
 from raidar.scoring.framework.rescore import assess
 from raidar.scoring.framework.rescore_config import RescoreConfig
 from raidar.scoring.framework.store import Assessment, AssessmentStore

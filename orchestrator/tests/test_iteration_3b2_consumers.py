@@ -7,16 +7,16 @@
 
 from __future__ import annotations
 
-from raidar.design.experiment.metrics import DEFAULT_METRIC_REGISTRY
 from raidar.evaluation.analysis.markdown import BETTER_LEGEND, _better
-from raidar.evaluation.analysis.outcomes import (
+from raidar.evaluation.review.projection.headline import needed_scorers
+from raidar.scoring.catalog.outcomes import (
     GATE_METRICS,
     GATE_PREFIX,
     PROCESS_METRICS,
     PROCESS_PREFIX,
 )
-from raidar.evaluation.review.projection.headline import needed_scorers
 from raidar.scoring.framework.builtin_manifests import CODE_QUALITY
+from raidar.scoring.framework.metrics import DEFAULT_METRIC_REGISTRY
 from raidar.scoring.gate_effort.manifest import GATE_EFFORT
 from raidar.scoring.process_checks.manifest import PROCESS_COMPLIANCE
 

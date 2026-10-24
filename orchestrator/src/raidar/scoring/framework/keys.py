@@ -12,7 +12,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any
 
-from raidar.scoring.framework.catalog import ScorerRegistration, tool_lock_for
+from raidar.scoring.framework.registry import ScorerRegistration, tool_lock_for
 from raidar.scoring.framework.store import ScorerIdentity, assessment_key
 
 

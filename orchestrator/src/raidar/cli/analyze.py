@@ -26,11 +26,11 @@ from raidar.contract.canonical import pretty_canonical_json_bytes
 from raidar.contract.references import RegistryReferenceError
 from raidar.evaluation.analysis.load import LoadRequest, load_inputs
 from raidar.evaluation.analysis.markdown import render_markdown
-from raidar.evaluation.analysis.outcomes import outcome_metric
 from raidar.evaluation.analysis.report import AnalysisReport, analyse
 from raidar.evaluation.analysis.sources import AnalysisInputError
 from raidar.evaluation.analysis.thresholds import settings_from_lock
-from raidar.scoring.framework.catalog import default_scorer_registry
+from raidar.scoring.catalog.builtin import default_scorer_registry
+from raidar.scoring.catalog.outcomes import outcome_metric
 
 REPORT_JSON = "analysis.json"
 REPORT_MARKDOWN = "analysis.md"

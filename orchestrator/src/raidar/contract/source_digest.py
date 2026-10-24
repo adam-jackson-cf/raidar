@@ -9,7 +9,7 @@ omitted, so the digest is the same on every supported Python version
 (``ast.dump`` itself changed its output in 3.13). Line and column positions
 are attributes, not fields, and are never read.
 
-Scorer implementation digests (``raidar.scoring.framework.catalog``) and the lock's
+Scorer implementation digests (``raidar.scoring.framework.registry``) and the lock's
 ``raidar_spec`` toolchain digest use this, so a docstring or comment edit
 never invalidates stored Assessments or a lock.
 """

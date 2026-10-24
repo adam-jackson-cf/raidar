@@ -19,20 +19,16 @@ from raidar.evaluation.analysis.assessed import GATE_EFFORT_REF, gate_metrics
 from raidar.evaluation.analysis.effects import Settings
 from raidar.evaluation.analysis.load import manipulation_requests
 from raidar.evaluation.analysis.manipulation import (
-    GATE_CLEAN,
     CheckRequest,
     Separation,
     check_report,
     step_share,
 )
 from raidar.evaluation.analysis.markdown import render_markdown
-from raidar.evaluation.analysis.outcomes import (
-    GATE_METRICS,
-    TrialOutcome,
-    Value,
-    outcome_metric,
-)
+from raidar.evaluation.analysis.outcomes import TrialOutcome, Value
 from raidar.evaluation.analysis.report import AnalysisReport, analyse
+from raidar.scoring.catalog.checks import GATE_CLEAN
+from raidar.scoring.catalog.outcomes import GATE_METRICS, outcome_metric
 from raidar.scoring.framework.result import (
     TRAJECTORY_SUBJECT,
     AssessResult,

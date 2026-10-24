@@ -60,13 +60,13 @@ from raidar.contract.references import (
 from raidar.contract.source_digest import SOURCE_DIGEST_SCHEME, python_source_digest
 from raidar.design.experiment.compat import GateInputs, PackLoader, compatibility_issues
 from raidar.design.experiment.loader import LoadedExperiment
-from raidar.design.experiment.metrics import (
+from raidar.design.experiment.schema import ComponentUse, ExperimentSpec, ProblemEntry
+from raidar.design.experiment.validation import FieldIssue
+from raidar.scoring.framework.metrics import (
     DEFAULT_METRIC_REGISTRY,
     MetricRegistry,
     MetricResolver,
 )
-from raidar.design.experiment.schema import ComponentUse, ExperimentSpec, ProblemEntry
-from raidar.design.experiment.validation import FieldIssue
 
 LOCK_VERSION = 3
 """3: schema v2 vocabulary (kind, runtime, environment, agent names, metric, attempts)."""
@@ -135,8 +135,18 @@ def default_resolvers(metrics: MetricRegistry = DEFAULT_METRIC_REGISTRY) -> Reso
     return ResolverSet([MetricResolver(metrics)])
 
 
+SPEC_EXTERNAL_MODULES = (
+    "contract/canonical.py",
+    "contract/references.py",
+    "contract/source_digest.py",
+    "scoring/framework/metrics.py",
+)
+"""Modules outside this package whose code the spec/metric/lock rules are (paths below ``raidar/``)."""
+
+
 def spec_source_digest() -> str:
-    """Digest of this package's code, so a change to the spec/metric/lock rules relocks.
+    """Digest of this package's code and ``SPEC_EXTERNAL_MODULES``, so a change to the
+    spec/metric/lock rules relocks.
 
     The installed ``raidar`` version is static between releases; this digest is
     what ties a lock to the exact validation, metric and lock rules used. Each
@@ -144,14 +154,15 @@ def spec_source_digest() -> str:
     edits do not relock.
     """
     package_dir = Path(__file__).resolve().parent
-    return digest_json(
+    raidar_dir = package_dir.parents[1]
+    modules = {path.name: python_source_digest(path) for path in sorted(package_dir.glob("*.py"))}
+    modules.update(
         {
-            "scheme": SOURCE_DIGEST_SCHEME,
-            "modules": {
-                path.name: python_source_digest(path) for path in sorted(package_dir.glob("*.py"))
-            },
+            relative: python_source_digest(raidar_dir / relative)
+            for relative in SPEC_EXTERNAL_MODULES
         }
     )
+    return digest_json({"scheme": SOURCE_DIGEST_SCHEME, "modules": modules})
 
 
 def _package_version(package: str) -> str:

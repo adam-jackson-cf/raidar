@@ -29,18 +29,12 @@ from typing import Any
 
 from raidar.contract.canonical import digest_json
 from raidar.contract.references import (
-    RefKind,
-    RegistryRef,
     RegistryReferenceError,
-    ResolvedReference,
 )
 from raidar.contract.runtimes import ANY_RUNTIME
 from raidar.contract.source_digest import SOURCE_DIGEST_SCHEME, python_source_digest
-from raidar.scoring.framework.builtin_manifests import BUILTIN_MANIFESTS
 from raidar.scoring.framework.context import Scorer
 from raidar.scoring.framework.manifest import ScorerManifest
-from raidar.scoring.gate_effort.manifest import GATE_EFFORT
-from raidar.scoring.process_checks.manifest import PROCESS_COMPLIANCE
 from raidar.subject.environment.python.models import ToolLock, load_tool_lock
 
 LockedTools = dict[str, dict[str, dict[str, Any]]]
@@ -238,7 +232,7 @@ def tool_lock_for(manifest: ScorerManifest) -> LockedTools:
     return locked
 
 
-def _tool_versions(tool_lock: LockedTools) -> dict[str, str]:
+def tool_versions(tool_lock: LockedTools) -> dict[str, str]:
     versions: dict[str, str] = {}
     for tools in tool_lock.values():
         for spec in tools.values():
@@ -269,87 +263,3 @@ class ScorerRegistry:
             raise RegistryReferenceError(
                 f"unknown scorer {ref!r}; known: {', '.join(self.refs())}"
             ) from exc
-
-
-REGISTERED_MANIFESTS = (*BUILTIN_MANIFESTS, PROCESS_COMPLIANCE, GATE_EFFORT)
-
-BUILTIN_IMPLEMENTATIONS: dict[str, str] = {
-    "correctness@1": "raidar.scoring.correctness:correctness_scorer",
-    "code-quality@3": "raidar.scoring.code_quality:code_quality_scorer",
-    "resource-usage@1": "raidar.scoring.resource_usage:resource_usage_scorer",
-    "process-compliance@6": (
-        "raidar.scoring.process_checks:deterministic_process_compliance_scorer"
-    ),
-    "gate-effort@10": "raidar.scoring.gate_effort:gate_effort_scorer",
-}
-# Scorers bound to the assessment store at rescore time.
-BUILTIN_STORE_IMPLEMENTATIONS: dict[str, str] = {
-    # gate-effort reads the offline grades of guardrail-gate's pre-fix snapshots,
-    # which ``raidar assess --rescore`` writes to the store (raidar.grading.prefix_grade).
-    "gate-effort@10": "raidar.scoring.gate_effort:gate_effort_scorer_for_store",
-    # code-quality reads the offline coverage runs of steps whose trial deferred the
-    # coverage pass, which ``raidar assess --rescore`` makes into the store
-    # (raidar.grading.coverage_offline).
-    "code-quality@3": "raidar.scoring.code_quality:code_quality_scorer_for_store",
-}
-# Config keys a scorer takes from the problem unless the experiment sets them.
-BUILTIN_PROBLEM_CONFIG: dict[str, tuple[str, ...]] = {
-    "code-quality@3": ("entry_file",),
-}
-# Config keys the experiment's protocol sets (``ProtocolSpec`` field names).
-BUILTIN_PROTOCOL_CONFIG: dict[str, tuple[str, ...]] = {
-    "correctness@1": ("progression",),
-}
-# Scorers that take the lock's pinned problem errata as config key ``errata``.
-ERRATA_CONFIG_KEY = "errata"
-BUILTIN_ERRATA_CONFIG: frozenset[str] = frozenset({"correctness@1"})
-
-
-def _builtin(manifest: ScorerManifest) -> ScorerRegistration:
-    return ScorerRegistration(
-        manifest,
-        BUILTIN_IMPLEMENTATIONS.get(manifest.ref),
-        store_implementation=BUILTIN_STORE_IMPLEMENTATIONS.get(manifest.ref),
-        problem_config=BUILTIN_PROBLEM_CONFIG.get(manifest.ref, ()),
-        protocol_config=BUILTIN_PROTOCOL_CONFIG.get(manifest.ref, ()),
-        errata_config=manifest.ref in BUILTIN_ERRATA_CONFIG,
-    )
-
-
-def default_scorer_registry() -> ScorerRegistry:
-    """Built-in scorers, with their store bindings and problem-derived config keys."""
-    return ScorerRegistry(_builtin(manifest) for manifest in REGISTERED_MANIFESTS)
-
-
-@dataclass(frozen=True)
-class ScorerResolver:
-    """``RegistryResolver`` for kind ``scorer``."""
-
-    registry: ScorerRegistry
-
-    @property
-    def kind(self) -> RefKind:
-        return RefKind.SCORER
-
-    def resolve(self, ref: RegistryRef, *, base_dir: Path) -> ResolvedReference:
-        del base_dir
-        registration = self.registry.get(str(ref))
-        tool_lock = tool_lock_for(registration.manifest)
-        metadata: dict[str, object] = {
-            "manifest": registration.manifest.definition(),
-            "implementation": registration.implementation,
-            "implementation_digest": registration.implementation_digest(),
-            "tool_lock": tool_lock,
-        }
-        return ResolvedReference(
-            ref=ref,
-            digest=digest_json(metadata),
-            metadata=metadata,
-            tool_versions=_tool_versions(tool_lock),
-            binding={"runtimes": list(registration.manifest.runtimes)},
-        )
-
-
-def scorer_resolver() -> ScorerResolver:
-    """Entry-point factory (group ``raidar.contract.resolvers``, name ``scorer``)."""
-    return ScorerResolver(default_scorer_registry())

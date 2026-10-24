@@ -36,17 +36,6 @@ from decimal import Decimal
 from itertools import combinations
 
 from raidar.evaluation.analysis.effects import Exclusions, Settings, decide
-from raidar.evaluation.analysis.outcomes import (
-    CORRECTNESS_METRIC,
-    HEADLINE_SCORE,
-    OUTCOME_METRICS,
-    QUALITY_COMPONENTS,
-    RAW_COUNTERPART,
-    MetricDef,
-    View,
-    primary_metric,
-    primary_source,
-)
 from raidar.evaluation.analysis.stats import seed_for, summarise
 from raidar.evaluation.analysis.thresholds import settings_from_lock
 from raidar.evaluation.review.quality import stats
@@ -66,6 +55,17 @@ from raidar.evaluation.review.quality.models import (
     SignalDistributions,
 )
 from raidar.evaluation.review.quality.sources import TrialSource
+from raidar.scoring.catalog.outcomes import (
+    CORRECTNESS_METRIC,
+    HEADLINE_SCORE,
+    OUTCOME_METRICS,
+    QUALITY_COMPONENTS,
+    RAW_COUNTERPART,
+    MetricDef,
+    View,
+    primary_metric,
+    primary_source,
+)
 from raidar.scoring.framework.manifest import Direction
 
 _SCORE_SCALE = Decimal(30)  # S loses 100 * 0.30 * C * w * x when a weight is zeroed.

@@ -15,9 +15,9 @@ import pytest
 
 from raidar.evaluation.analysis.effects import Exclusions, Settings, Verdict, decide
 from raidar.evaluation.analysis.markdown import render_markdown
-from raidar.evaluation.analysis.outcomes import ALL_METRICS, OUTCOME_METRICS
 from raidar.evaluation.analysis.report import AnalysisReport, analyse
 from raidar.evaluation.analysis.stats import IntervalMethod, summarise
+from raidar.scoring.catalog.outcomes import ALL_METRICS, OUTCOME_METRICS
 from raidar.scoring.framework.manifest import Direction
 from raidar.scoring.framework.result import AssessResult, AssessStatus, Observation
 from tests.analysis_support import (

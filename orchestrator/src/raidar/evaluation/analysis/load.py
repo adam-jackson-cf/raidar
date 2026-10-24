@@ -12,7 +12,6 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from raidar.design.experiment.metrics import DEFAULT_METRIC_REGISTRY, Metric
 from raidar.engine.job.assessment import lock_errata
 from raidar.evaluation.analysis.assessed import (
     ANALYSED_SCORERS,
@@ -34,7 +33,8 @@ from raidar.evaluation.analysis.sources import (
     read_lock,
     select_records,
 )
-from raidar.scoring.framework.catalog import ScorerRegistry
+from raidar.scoring.framework.metrics import DEFAULT_METRIC_REGISTRY, Metric
+from raidar.scoring.framework.registry import ScorerRegistry
 from raidar.scoring.framework.store import AssessmentStore
 from raidar.scoring.framework.trial_inputs import BundleCache
 

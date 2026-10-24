@@ -26,13 +26,13 @@ from raidar.contract.review import (
     ReviewRunDetail,
     ReviewRunRecord,
 )
-from raidar.design.experiment.metrics import DEFAULT_METRIC_REGISTRY
 from raidar.design.experiment.schema import ExperimentSpec
-from raidar.evaluation.analysis.outcomes import CODE_QUALITY_REF, CORRECTNESS_REF
 from raidar.evaluation.review.projection.headline import UNDECLARED_MARKER, policy_shares
 from raidar.evaluation.review.projection.notes import EvidenceRef, Finding
 from raidar.evaluation.review.projection.spans import repo_path
 from raidar.evaluation.review.projection.trials import TrialInput
+from raidar.scoring.catalog.outcomes import CODE_QUALITY_REF, CORRECTNESS_REF
+from raidar.scoring.framework.metrics import DEFAULT_METRIC_REGISTRY
 
 MINIMUM_SCORED_RUNS = 3
 PREFERRED_SCORED_RUNS = 5

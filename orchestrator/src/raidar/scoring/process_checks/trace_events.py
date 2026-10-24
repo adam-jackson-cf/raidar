@@ -48,7 +48,7 @@ from enum import StrEnum
 from pathlib import PurePosixPath
 from typing import Any
 
-from raidar.scoring.resource_usage.atif import AGENT_SOURCE, AtifStep, Trajectory
+from raidar.scoring.framework.atif import AGENT_SOURCE, AtifStep, Trajectory
 
 DEFAULT_WORKDIR = "/app"
 DEFAULT_TEST_PATTERNS = (

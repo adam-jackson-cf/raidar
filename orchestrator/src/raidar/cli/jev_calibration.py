@@ -11,7 +11,7 @@ from pathlib import Path
 
 import click
 
-from raidar.scoring.framework.catalog import default_scorer_registry
+from raidar.scoring.catalog.builtin import default_scorer_registry
 from raidar.scoring.judge.audit import ReviewerKind
 from raidar.scoring.judge.blind import derive_blind_labels, export_blind
 from raidar.scoring.judge.calibration import (

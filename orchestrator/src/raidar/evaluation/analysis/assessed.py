@@ -39,15 +39,10 @@ from collections.abc import Collection, Mapping
 from dataclasses import dataclass
 from decimal import Decimal
 
-from raidar.design.experiment.metrics import (
-    CORRECTNESS,
-    Metric,
-    checkpoint_pass_rate,
-    checkpoint_solve_rate,
-    problem_correctness,
-)
 from raidar.engine.trial.models import CheckpointState, TrialRecord
-from raidar.evaluation.analysis.outcomes import (
+from raidar.evaluation.analysis.outcomes import TRUNCATED, UNASSESSED, TrialOutcome, Value
+from raidar.evaluation.analysis.policy_inputs import ComponentInput, score_inputs
+from raidar.scoring.catalog.outcomes import (
     CODE_QUALITY_REF,
     CORRECTNESS_METRIC,
     CORRECTNESS_REF,
@@ -69,14 +64,16 @@ from raidar.evaluation.analysis.outcomes import (
     SOLVE_RATE_ERRATA,
     SOLVED,
     STRICT_SOLVED,
-    TRUNCATED,
-    UNASSESSED,
     VERIFIER_DISAGREEMENT_SOURCE,
     VERIFIER_DISAGREEMENTS,
-    TrialOutcome,
-    Value,
 )
-from raidar.evaluation.analysis.policy_inputs import ComponentInput, score_inputs
+from raidar.scoring.framework.metrics import (
+    CORRECTNESS,
+    Metric,
+    checkpoint_pass_rate,
+    checkpoint_solve_rate,
+    problem_correctness,
+)
 from raidar.scoring.framework.result import (
     TRAJECTORY_SUBJECT,
     AssessResult,

@@ -17,7 +17,6 @@ import pytest
 from harbor.models.trajectories import ToolCall
 
 from raidar.contract.review import ReviewProjectionArtifact, ReviewRunDetail
-from raidar.design.experiment.metrics import DEFAULT_METRIC_REGISTRY
 from raidar.design.experiment.schema import ExperimentSpec
 from raidar.evaluation.review.projection import main, merge_review_projections
 from raidar.evaluation.review.projection.assessments import TrialAssessments
@@ -32,6 +31,7 @@ from raidar.evaluation.review.projection.fixture import REVIEW_ONLY_DIR, generat
 from raidar.evaluation.review.projection.headline import COMPONENT_METRICS, headline, policy_shares
 from raidar.evaluation.review.projection.merge import project_experiment_epoch
 from raidar.evaluation.review.projection.sources import JobSourceError, LockIndex, load_job
+from raidar.scoring.framework.metrics import DEFAULT_METRIC_REGISTRY
 
 FAILING = "synthetic-bugfix-gpt-5.5-low-04"
 UNSCORED = "synthetic-bugfix-gpt-5.5-low-05"

@@ -21,7 +21,6 @@ import yaml
 from pydantic import ValidationError
 
 from raidar.contract.canonical import sha256_hex
-from raidar.design.experiment.metrics import DEFAULT_METRIC_REGISTRY, MetricRegistry
 from raidar.design.experiment.schema import ExperimentSpec
 from raidar.design.experiment.validation import (
     FieldIssue,
@@ -29,6 +28,7 @@ from raidar.design.experiment.validation import (
     issues_from_pydantic,
     semantic_issues,
 )
+from raidar.scoring.framework.metrics import DEFAULT_METRIC_REGISTRY, MetricRegistry
 
 FLAG_PATHS: Mapping[str, str] = {
     "attempts": "analysis.attempts",

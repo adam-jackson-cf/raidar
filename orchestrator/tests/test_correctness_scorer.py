@@ -14,8 +14,8 @@ from raidar.grading.models import (
     VerifierGrade,
 )
 from raidar.grading.records import load_step_record, step_record_dir, write_step_record
+from raidar.scoring.catalog.builtin import default_scorer_registry
 from raidar.scoring.correctness import correctness_scorer
-from raidar.scoring.framework.catalog import default_scorer_registry
 from raidar.scoring.framework.context import AssessContext
 from raidar.scoring.framework.result import AssessResult, AssessStatus, Observation
 from raidar.scoring.framework.trial_inputs import load_trial_context

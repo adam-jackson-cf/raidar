@@ -11,7 +11,6 @@ from collections.abc import Sequence
 from pathlib import Path
 
 from raidar.contract.canonical import pretty_canonical_json_bytes
-from raidar.evaluation.analysis.outcomes import CODE_QUALITY_REF, CORRECTNESS_REF
 from raidar.evaluation.review.quality.experiment_view import ReviewedTrial, build_experiments
 from raidar.evaluation.review.quality.gate_view import GATE_EFFORT_REF
 from raidar.evaluation.review.quality.models import QualityProjection
@@ -21,6 +20,7 @@ from raidar.evaluation.review.quality.sources import (
     StoreIndex,
     discover_trials,
 )
+from raidar.scoring.catalog.outcomes import CODE_QUALITY_REF, CORRECTNESS_REF
 
 
 def build_quality_projection(

@@ -20,8 +20,8 @@ from typing import Any
 
 from raidar.engine.job.assessment import ASSESSMENT_CONFIG_FILE, lock_rescore_config
 from raidar.evaluation.analysis.sources import AnalysisInputError, JobDir
-from raidar.scoring.framework.catalog import ScorerRegistry
 from raidar.scoring.framework.keys import scorer_identity, store_key
+from raidar.scoring.framework.registry import ScorerRegistry
 from raidar.scoring.framework.rescore import RescoreError
 from raidar.scoring.framework.rescore_config import RescoreConfig, load_rescore_config
 from raidar.scoring.framework.result import AssessResult

@@ -19,12 +19,12 @@ import pytest
 from raidar.contract.references import ResolverSet
 from raidar.design.experiment.loader import load_experiment
 from raidar.design.experiment.lock import build_lock, render_lock, stale_sections
-from raidar.design.experiment.metrics import MetricResolver
 from raidar.design.experiment.validation import SpecValidationError
 from raidar.evaluation.analysis.assessed import GATE_EFFORT_REF, gate_effort_ref
 from raidar.evaluation.analysis.effects import Settings
 from raidar.evaluation.analysis.markdown import render_markdown
-from raidar.evaluation.analysis.outcomes import (
+from raidar.evaluation.analysis.report import analyse
+from raidar.scoring.catalog.outcomes import (
     PRIMARY_FROM_LOCK,
     RAW_COUNTERPART,
     SOLVE_RATE,
@@ -32,7 +32,7 @@ from raidar.evaluation.analysis.outcomes import (
     primary_metric,
     primary_source,
 )
-from raidar.evaluation.analysis.report import analyse
+from raidar.scoring.framework.metrics import MetricResolver
 from tests.analysis_support import inputs, paired_arms
 from tests.experiment_spec_support import (
     experiment_document,

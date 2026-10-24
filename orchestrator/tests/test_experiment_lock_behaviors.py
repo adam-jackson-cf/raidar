@@ -28,7 +28,7 @@ from raidar.design.experiment.lock import (
     render_lock,
     stale_sections,
 )
-from raidar.design.experiment.metrics import MetricResolver
+from raidar.scoring.framework.metrics import MetricResolver
 from tests.experiment_spec_support import (
     SHARED_FRAMING,
     InMemoryResolver,

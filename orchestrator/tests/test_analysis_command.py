@@ -28,7 +28,7 @@ from raidar.engine.trial.models import (
 )
 from raidar.evaluation.analysis.sources import AnalysisInputError, JobDir, select_records
 from raidar.grading.models import CaseStatus
-from raidar.scoring.framework.catalog import default_scorer_registry
+from raidar.scoring.catalog.builtin import default_scorer_registry
 from raidar.scoring.framework.rescore import rescore_path
 from raidar.scoring.framework.store import AssessmentStore
 from tests.scorer_support import APP_V1, APP_V2, StepFixture, tree_state, write_trial

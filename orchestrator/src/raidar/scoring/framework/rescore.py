@@ -36,7 +36,6 @@ from pathlib import Path
 from typing import Any
 
 from raidar.grading.regrade import RegradeError, trial_dirs
-from raidar.scoring.framework.catalog import ScorerRegistration, ScorerRegistry
 from raidar.scoring.framework.context import (
     AssessContext,
     AwaitingAnswersScorer,
@@ -45,6 +44,7 @@ from raidar.scoring.framework.context import (
 )
 from raidar.scoring.framework.inventory import InventoryPolicy
 from raidar.scoring.framework.keys import scorer_identity, store_key
+from raidar.scoring.framework.registry import ScorerRegistration, ScorerRegistry
 from raidar.scoring.framework.result import AssessResult, RunStats
 from raidar.scoring.framework.store import Assessment, AssessmentStore, PutOutcome, ScorerIdentity
 from raidar.scoring.framework.trial_inputs import (
