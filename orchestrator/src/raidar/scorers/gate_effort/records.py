@@ -78,7 +78,6 @@ class GateRunView:
     error: str | None
     timed_out: bool
     log: str | None
-    checks_failed: tuple[str, ...] | None
     findings: RunFindings
     duration_s: float | None
 
@@ -101,7 +100,6 @@ class SessionView:
 class StepGate:
     termination_reason: str
     error: str | None
-    rounds_configured: int | None
     clean_at_end: bool | None
     runs: tuple[GateRunView, ...]
     sessions: tuple[SessionView, ...]
@@ -194,10 +192,6 @@ def run_findings(trace_dir: Path, run: dict[str, Any]) -> RunFindings:
     return RunFindings(SOURCE_UNRECOGNISED, None, None)
 
 
-def _strings(value: Any) -> tuple[str, ...] | None:
-    return tuple(str(item) for item in value) if isinstance(value, list) else None
-
-
 def _run_view(trace_dir: Path, run: Any) -> GateRunView:
     if not isinstance(run, dict):
         raise GateRecordError("a gate run is not a JSON object")
@@ -208,7 +202,6 @@ def _run_view(trace_dir: Path, run: Any) -> GateRunView:
         error=str(run["error"]) if run.get("error") else None,
         timed_out=run.get("timed_out") is True,
         log=run.get("log") if isinstance(run.get("log"), str) else None,
-        checks_failed=_strings(run.get("checks_failed")),
         findings=run_findings(trace_dir, run),
         duration_s=_number(run.get("duration_sec")),
     )
@@ -253,11 +246,9 @@ def read_step_gate(trace_dir: Path | None) -> StepGate | None:
         return None
     payload = _load(trace_dir / RECORD_PATH)
     signal = payload.get(SIGNAL)
-    rounds = payload.get("rounds_configured")
     return StepGate(
         termination_reason=str(payload["termination_reason"]),
         error=str(payload["error"]) if payload.get("error") else None,
-        rounds_configured=rounds if isinstance(rounds, int) else None,
         clean_at_end=signal if isinstance(signal, bool) else None,
         runs=tuple(_run_view(trace_dir, run) for run in payload["gate_runs"]),
         sessions=tuple(_session_view(stage) for stage in payload["stages"]),

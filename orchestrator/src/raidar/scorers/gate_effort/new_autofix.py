@@ -5,8 +5,8 @@ whole tree: its per-step ``autofix_lines_changed`` and
 ``autofix_removed_blocking`` repeat the accumulated debt and their sums count
 it again at every step, while an enforced gate's first pass sees only the
 step's new code (its previous step handed on a fixed tree). This is the
-cumulative-versus-incremental problem gate-effort@6 solved for the blocking
-counts, solved the same way: the step's first pass minus what the previous
+cumulative-versus-incremental problem the ``new_first_run_blocking_*`` counts solve, solved
+the same way: the step's first pass minus what the previous
 gated step left for autofix.
 
 - First pass: enforced, the pass before gate run 1; shadow, the dry run.
@@ -119,8 +119,7 @@ def with_new_autofix(
         if step.gate is None or step.error is not None:
             same = values[AUTOFIX_LINES]
             values.update(_gap(same.status, same.reason or "no gate record"))
-            if step.gated:
-                previous = _gap(_UNAVAILABLE, f"{step.inputs.step} has no readable gate record")
+            previous = _gap(_UNAVAILABLE, f"{step.inputs.step} has no readable gate record")
             continue
         block = autofix.get(step.inputs.step)
         if block is None or not block.enabled:

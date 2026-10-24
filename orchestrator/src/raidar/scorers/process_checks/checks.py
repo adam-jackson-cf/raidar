@@ -19,10 +19,6 @@ from raidar.scorers.process_checks.trace_events import EventKind, TraceEvent
 
 TESTS_RUN_BEFORE_FINISH = "tests_run_before_finish"
 PLAN_WRITTEN = "plan_written"
-CHECK_RULES = {
-    TESTS_RUN_BEFORE_FINISH: "run the project's tests after its last source edit in the step",
-    PLAN_WRITTEN: "write a plan before its first source edit in the step",
-}
 
 
 class Verdict(StrEnum):

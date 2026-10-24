@@ -25,7 +25,9 @@ def with_new(per_step: PerStep, first_name: str, end_name: str, new_name: str) -
             values[new_name] = Measured.gap(_NA, "checkpoint not reached")
             continue
         if not step.gated:
-            previous = Measured.gap(_UNAVAILABLE, f"{step.inputs.step} has no gate record")
+            reason = f"{step.inputs.step} has no gate record"
+            values[new_name] = Measured.gap(_UNAVAILABLE, reason)
+            previous = values[new_name]
             continue
         first = values[first_name]
         if first.status is not _OK:

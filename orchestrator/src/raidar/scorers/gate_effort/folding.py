@@ -1,4 +1,4 @@
-"""A refused suppression comment's second finding, located per gate run (``gate-effort@8``).
+"""A refused suppression comment's second finding, located per gate run.
 
 The gate refuses every lint or type suppression comment (``SUPPRESS``, a
 bespoke check). An unused ``# type: ignore`` is also reported by mypy, as
@@ -6,7 +6,7 @@ bespoke check). An unused ``# type: ignore`` is also reported by mypy, as
 findings (``smoke-3b-3`` r2 cp8: ``SUPPRESS`` and ``MYPY.unused-ignore`` at
 ``forge.py:359``). ``duplicates`` counts, for one gate run, the block-tier
 findings with a code in ``FOLDED_CODES`` at a ``(path, line)`` that also has a
-block-tier ``SUPPRESS``: the findings ``gate-effort@8`` folds into their
+block-tier ``SUPPRESS``: the findings the ``*_net`` counts fold into their
 ``SUPPRESS``.
 
 Locations come from the run's report (``python-guardrails.gate-report/1``,

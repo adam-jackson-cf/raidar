@@ -261,6 +261,22 @@ def test_a_missing_or_broken_record_in_a_gated_trial_is_unavailable(tmp_path: Pa
         read_step_gate(_trace(broken))
 
 
+def test_a_reached_step_without_a_gate_record_still_yields_a_complete_valid_result(
+    tmp_path: Path,
+) -> None:
+    first, missing, last = (_step(tmp_path, f"checkpoint_{n}") for n in (1, 2, 3))
+    for step in (first, last):
+        _write_gate(_trace(step), outputs=[PASSED], termination="gate_clean", signal=True)
+
+    values = _values(_assess(first, missing, last))
+
+    for metric in ("new_first_run_blocking_raw_net", "new_first_run_blocking_post_autofix_net"):
+        assert values[(metric, "checkpoint_2")].status is AssessStatus.UNAVAILABLE
+    last_new = values[("new_first_run_blocking_raw_net", "checkpoint_3")]
+    assert last_new.status is AssessStatus.UNAVAILABLE
+    assert "has no gate record" in (last_new.reason or "")
+
+
 def test_an_unrecognised_gate_format_leaves_counts_unavailable(tmp_path: Path) -> None:
     step = _step(tmp_path, "checkpoint_1")
     assert step.trace_dir is not None

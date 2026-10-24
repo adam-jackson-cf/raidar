@@ -81,7 +81,6 @@ class StepAssessment:
     passed: int = 0
     decided: int = 0
     unreadable: bool = False
-    resolved_model: str | None = None
 
 
 def statused(
@@ -175,7 +174,7 @@ def step_evidence(
     """Evidence at the deciding tool call (and a passing plan file) of each decided check."""
     data = trajectory.path.read_bytes()
     sha256 = hashlib.sha256(data).hexdigest()
-    lines = data.decode("utf-8", errors="replace").splitlines()
+    lines = data.decode("utf-8", errors="replace").split("\n")
     evidence: list[Evidence] = []
     for outcome in outcomes:
         if outcome.verdict not in (Verdict.PASS, Verdict.FAIL):

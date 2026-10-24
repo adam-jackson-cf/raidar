@@ -145,7 +145,8 @@ def _turns_evidence(inputs: StepInputs, trajectory: Trajectory | Measured) -> Ev
     if not isinstance(trajectory, Trajectory):
         return None
     data = trajectory.path.read_bytes()
-    lines = len(trajectory.lines)
+    # The validator counts newline-terminated lines; str.splitlines also splits on U+2028 etc.
+    lines = data.count(b"\n") + (1 if data and not data.endswith(b"\n") else 0)
     if lines == 0:
         return None
     return Evidence(

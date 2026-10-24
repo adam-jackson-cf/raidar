@@ -63,10 +63,6 @@ class Trajectory:
         """
         return sum(1 for step in self.steps if step.model_turn)
 
-    @property
-    def lines(self) -> tuple[str, ...]:
-        return tuple(self.path.read_text().splitlines())
-
 
 def _message(step: HarborStep) -> str:
     if isinstance(step.message, str):

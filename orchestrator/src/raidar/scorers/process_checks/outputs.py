@@ -25,7 +25,7 @@ from pathlib import Path
 from harbor.models.trajectories import Trajectory as HarborTrajectory
 from pydantic import ValidationError
 
-from raidar.scorers.process_checks.trace_events import _LAUNCHER, EventKind, TraceEvent
+from raidar.scorers.process_checks.trace_events import LAUNCHER, EventKind, TraceEvent
 from raidar.scorers.sdk.manifest import (
     Direction,
     Exactness,
@@ -103,7 +103,7 @@ def call_outputs(path: Path) -> dict[str, str]:
 
 def runner_of(command: str) -> tuple[str, str | None]:
     """(first word after launcher prefixes, the module of ``python -m``) of a test command."""
-    launcher = _LAUNCHER.match(command)
+    launcher = LAUNCHER.match(command)
     rest = command[launcher.end() :] if launcher else command
     module = _PYTHON_MODULE.match(rest)
     word = _FIRST_WORD.match(rest)

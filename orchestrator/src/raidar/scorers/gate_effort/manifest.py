@@ -1,7 +1,6 @@
 """Manifest of ``gate-effort``: what a commit gate cost the agent, per step.
 
-It lives beside its implementation so the released scorers' digests, which cover
-``builtin_manifests``, stay unchanged. The metrics are the ones of ``metrics``,
+It lives beside its implementation. The metrics are the ones of ``metrics``,
 ``cross_mode_metrics`` and ``autofix_metrics``, in that order (ids are part of the
 scorer's identity).
 """

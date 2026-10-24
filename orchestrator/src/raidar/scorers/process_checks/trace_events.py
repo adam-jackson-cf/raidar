@@ -100,7 +100,7 @@ _PLAN_CALL = re.compile(r"\bupdate_plan\s*\(")
 _SCRATCH_OUTPUT = re.compile(r"(?i)\.(?:log|out|err|tmp|txt)$")
 _KEPT_TEXT = re.compile(r"(?i)(?:^|/)(?:requirements|constraints)[^/]*\.txt$")
 _SEGMENT = re.compile(r"\n|;|&&|\|\||\|")
-_LAUNCHER = re.compile(
+LAUNCHER = re.compile(
     r"""(?:[\s('"{]+"""
     r"|\w+=\S*\s+"
     r"|(?:sudo|env|exec|time|command|nohup|npx)\s+"
@@ -154,7 +154,7 @@ class Classifier:
 
     def runs_tests(self, segment: str) -> str | None:
         """The segment, stripped of launcher prefixes, when it starts with a test runner."""
-        launcher = _LAUNCHER.match(segment)
+        launcher = LAUNCHER.match(segment)
         command = segment[launcher.end() :] if launcher else segment
         if any(re.match(pattern, command) for pattern in self.test_patterns):
             return segment.strip()

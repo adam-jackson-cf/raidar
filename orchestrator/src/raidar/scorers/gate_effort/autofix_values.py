@@ -98,7 +98,7 @@ def pass_values(autofix: StepAutofix) -> dict[str, Measured]:
 
 
 def run_net(trace_dir: Path, run: GateRunView, record: Mapping[str, object]) -> Measured:
-    """One run's blocking findings as @8's ``*_net`` counts them (cascade out, fold applied)."""
+    """One run's blocking findings as the ``*_net`` counts them (cascade out, fold applied)."""
     if not run.decided:
         return Measured.gap(_INSUFFICIENT, f"the check could not decide: {run.error}")
     codes = codes_once(run)
