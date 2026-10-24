@@ -1,4 +1,4 @@
-"""Reducing a trajectory's record and Assessments to analysis outcomes (WS-J J1).
+"""Reducing a trajectory's record and Assessments to analysis outcomes.
 
 Covers the strict and continue views of a halted trial, the headline
 Metric applied to scorer components, and the rule that a gap is never
@@ -238,7 +238,7 @@ def _rework_gap() -> AssessResult:
     return _quality(rework=rework)
 
 
-def test_v2_c_zero_scores_zero_and_keeps_the_trial_despite_quality_gaps() -> None:
+def test_floor_policy_c_zero_scores_zero_and_keeps_the_trial_despite_quality_gaps() -> None:
     # S2-SS-2: dropping C = 0 trials would bias paired S towards the arm that fails more.
     for quality in (_rework_gap(), None):
         results = {CORRECTNESS_REF: _failed_correctness(0.0)}
@@ -253,7 +253,7 @@ def test_v2_c_zero_scores_zero_and_keeps_the_trial_despite_quality_gaps() -> Non
         assert v1.metrics["headline_score"].status == ("ineligible" if quality else UNASSESSED)
 
 
-def test_v2_c_above_zero_with_a_quality_gap_is_ineligible() -> None:
+def test_floor_policy_c_above_zero_with_a_quality_gap_is_ineligible() -> None:
     results = {CORRECTNESS_REF: _failed_correctness(0.25), CODE_QUALITY_REF: _rework_gap()}
     outcome = build_outcome(_record(), results, policy=SCB_CANONICAL_V2)
     assert outcome.metrics["correctness"] == Value.ok(0.25)
@@ -265,7 +265,7 @@ def test_v2_c_above_zero_with_a_quality_gap_is_ineligible() -> None:
     assert missing.metrics["headline_score"].status == UNASSESSED
 
 
-def test_v2_all_checkpoints_failed_but_partially_passing_is_not_zero() -> None:
+def test_floor_policy_all_checkpoints_failed_but_partially_passing_is_not_zero() -> None:
     # solved/K is 0 here, but C (mean pass rate) is 0.9, so the zero rule does not fire.
     results = {CORRECTNESS_REF: _failed_correctness(0.9), CODE_QUALITY_REF: _quality()}
     outcome = build_outcome(_record(), results, policy=SCB_CANONICAL_V2)
@@ -313,7 +313,7 @@ def test_c_uses_exact_case_counts_when_the_scorer_records_them() -> None:
     )
 
 
-def test_oneshot_v2_c_zero_scores_zero_without_quality() -> None:
+def test_oneshot_floor_policy_c_zero_scores_zero_without_quality() -> None:
     components = {"C": Value.ok(0.0), "V": Value.missing("ineligible", "no files")}
     assert headline_score(SCB_CANONICAL_ONESHOT_V2, 1, components) == Value.ok(0.0)
     assert headline_score(SCB_CANONICAL_ONESHOT, 1, components).status == "ineligible"

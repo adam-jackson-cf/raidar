@@ -1,4 +1,4 @@
-"""Quality projection (plan K2): contract invariants, source matching and precedence."""
+"""Quality projection: contract invariants, source matching and precedence."""
 
 from __future__ import annotations
 

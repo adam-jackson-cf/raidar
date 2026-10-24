@@ -1,4 +1,4 @@
-"""Behaviour of the experiment-epoch review projection (plan K1, K3).
+"""Behaviour of the experiment-epoch review projection.
 
 The synthetic fixture is written with the production models and scored by the
 real correctness/resource-usage scorers, so these tests exercise the same path

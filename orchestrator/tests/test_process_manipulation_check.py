@@ -1,4 +1,4 @@
-"""Manipulation check: guided vs baseline process-compliance separation (G5)."""
+"""Manipulation check: guided vs baseline process-compliance separation."""
 
 from __future__ import annotations
 

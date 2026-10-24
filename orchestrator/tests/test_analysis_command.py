@@ -248,7 +248,7 @@ def test_analyze_reports_stored_assessments_without_touching_inputs(
     assert "not pinned by the lock" in markdown
 
 
-def test_v2_scores_c_zero_trials_zero_end_to_end_while_v1_leaves_them_unscored(
+def test_floor_policy_scores_c_zero_trials_zero_end_to_end_while_the_base_policy_leaves_them_unscored(
     tmp_path: Path,
 ) -> None:
     # S2-SS-2 through rescore and `raidar analyze`: code-quality@3 is never rescored, so every
