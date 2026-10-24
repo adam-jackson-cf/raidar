@@ -1,4 +1,4 @@
-"""``raidar lock``: content hashes, versions, determinism and gaps (WS-A: A2)."""
+"""``raidar lock``: content hashes, versions, determinism and gaps."""
 
 from __future__ import annotations
 
@@ -365,7 +365,7 @@ def test_lock_command_writes_then_checks_and_reports_pending_resolvers(tmp_path:
     missing = runner.invoke(main, ["lock", str(path)])
 
     assert missing.exit_code == 1
-    # The problem resolver is registered (WS-B); this fixture problem is not imported anywhere.
+    # The problem resolver is registered; this fixture problem is not imported anywhere.
     assert "problems.0.ref" in missing.output
     assert not (tmp_path / "experiment.lock.json").exists()
 

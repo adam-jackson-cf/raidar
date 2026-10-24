@@ -138,7 +138,7 @@ async def test_one_shot_problem_grades_one_step_under_the_one_shot_policy(
         "R": "not_applicable",
         "G": "not_applicable",
     }
-    assert policy["eligible"] is False  # V/E/H come from WS-G scorers, never zero-filled
+    assert policy["eligible"] is False  # V/E/H come from scorers, never zero-filled
     multi: Any = (await _validate(store, POSITIVE_REF, tmp_path, repeats=1)).to_json()
     assert multi["headline_policy"]["policy"] == "scb-canonical@1"
 

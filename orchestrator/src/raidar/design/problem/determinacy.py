@@ -101,10 +101,6 @@ class AssertionKind(StrEnum):
     ERROR_TEXT_PATTERN = "error_text_pattern"
     OUTPUT_BYTES = "output_bytes"
 
-    @property
-    def is_error_text(self) -> bool:
-        return self is not AssertionKind.OUTPUT_BYTES
-
 
 @dataclass(frozen=True)
 class AuditedAssertion:

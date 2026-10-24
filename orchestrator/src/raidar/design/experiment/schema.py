@@ -133,7 +133,7 @@ class ProtocolSpec(SpecModel):
     snapshot_source: Literal["artifact", "download"] = "artifact"
     # Where the verifier's per-test coverage pass (G's evidence) runs: ``trial`` after each
     # step's grading run, on the trial's critical path; ``offline`` from the stored step
-    # snapshots when an assessment needs it (raidar.grading.coverage_offline, read by
+    # snapshots when an assessment needs it (raidar.grading.coverage.offline, read by
     # code-quality@3). Left at ``trial`` it is omitted from every dump, so the locks, plans
     # and hashes of experiments that do not set it keep their bytes.
     verifier_coverage: Literal["trial", "offline"] = "trial"
@@ -328,7 +328,7 @@ class ExperimentSpec(SpecModel):
     def to_json(self) -> dict[str, object]:
         # Optional fields left unset are omitted, so a spec that does not set them keeps
         # its bytes (and so its lock digests) as they were before the field existed.
-        exclude: dict[str, object] = {}
+        exclude: dict[str, Any] = {}
         if not self.shared_components:
             exclude["shared_components"] = True
         unset = {

@@ -40,7 +40,7 @@ from raidar.design.experiment.schema import ComponentUse, ExperimentSpec
 from raidar.design.experiment.validation import FieldIssue
 
 if TYPE_CHECKING:
-    from raidar.subject.environment.python.models import PackSpec
+    from raidar.subject.environment.python.pack_definition import PackSpec
 
 TASK_RUNTIME_KEY = "raidar_runtime"
 PackLoader = Callable[[str], "PackSpec"]
@@ -231,14 +231,14 @@ def _agent_issues(spec: ExperimentSpec, pack: PackSpec) -> list[FieldIssue]:
     return issues
 
 
-def compatibility_issues(
-    inputs: GateInputs, *, pack_loader: PackLoader = _default_pack_loader
+def runtime_gate_issues(
+    inputs: GateInputs, *, pack_loader: PackLoader | None = None
 ) -> list[FieldIssue]:
     """Every ``RT*`` issue of the effective spec against its runtime's pack."""
     spec = inputs.spec
     issues: list[FieldIssue] = []
     try:
-        pack: PackSpec | None = pack_loader(spec.runtime)
+        pack: PackSpec | None = (pack_loader or _default_pack_loader)(spec.runtime)
     except LookupError as exc:
         pack = None
         issues.append(FieldIssue("runtime", f"[RT6] {exc}"))

@@ -1,4 +1,4 @@
-"""experiment.yaml schema, CLI override precedence and factor guard (WS-A: A1, A3)."""
+"""experiment.yaml schema, CLI override precedence and factor guard."""
 
 from __future__ import annotations
 

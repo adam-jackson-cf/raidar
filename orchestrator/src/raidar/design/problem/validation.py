@@ -290,7 +290,7 @@ def policy_preview(positive: StepGrades, checkpoints: int) -> dict[str, object]:
     """Headline metric selected by K, applied to the reference solution's C.
 
     Only correctness is known here; the other components come from scorers
-    (WS-G), so the preview shows which components the policy uses, which are
+    so the preview shows which components the policy uses, which are
     ``not_applicable`` and which are still missing - it is not a score.
     """
     policy = DEFAULT_METRIC_REGISTRY.default_for_checkpoints(checkpoints)

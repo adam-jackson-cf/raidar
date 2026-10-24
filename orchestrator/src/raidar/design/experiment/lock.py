@@ -21,7 +21,7 @@ each with its own digest under ``sections``:
 - ``toolchain``: Python, Raidar, LiteLLM and the spec/lock rules digest.
 
 Before anything is written, the runtime-compatibility gate
-(``raidar.design.experiment.compat``, ``RT0``-``RT6``) checks the effective spec against its
+(``raidar.design.experiment.runtime_gate``, ``RT0``-``RT6``) checks the effective spec against its
 runtime pack, so no lock exists for a design its runtime cannot run.
 
 ``document_sha256`` covers the whole document (sections, spec, overrides and
@@ -58,8 +58,8 @@ from raidar.contract.references import (
     ResolverSet,
 )
 from raidar.contract.source_digest import SOURCE_DIGEST_SCHEME, python_source_digest
-from raidar.design.experiment.compat import GateInputs, PackLoader, compatibility_issues
 from raidar.design.experiment.loader import LoadedExperiment
+from raidar.design.experiment.runtime_gate import GateInputs, PackLoader, runtime_gate_issues
 from raidar.design.experiment.schema import ComponentUse, ExperimentSpec, ProblemEntry
 from raidar.design.experiment.validation import FieldIssue
 from raidar.scoring.framework.metrics import (
@@ -418,11 +418,7 @@ def build_lock(
         builder.metric(resolved_problems) if len(resolved_problems) == len(problems) else None
     )
     gate = GateInputs(spec=spec, base_dir=loaded.base_dir, resolved=builder.resolved)
-    builder.issues.extend(
-        compatibility_issues(gate, pack_loader=pack_loader)
-        if pack_loader is not None
-        else compatibility_issues(gate)
-    )
+    builder.issues.extend(runtime_gate_issues(gate, pack_loader=pack_loader))
     if builder.issues:
         raise LockError(str(loaded.path), builder.issues)
     spec_json = spec.to_json()

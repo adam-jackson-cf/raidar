@@ -41,7 +41,7 @@ from raidar.design.problem.store import ProblemStore, ProblemStoreError
 from raidar.grading.bundle import VerifierBundle
 from raidar.subject.environment import UnknownPackError, load_runtime_pack
 from raidar.subject.environment.python.image import image_tag
-from raidar.subject.environment.python.models import PackSpec
+from raidar.subject.environment.python.pack_definition import PackSpec
 
 # The converter's README embeds the conversion date; it is not task content.
 _CONVERTER_README = "README.md"

@@ -36,7 +36,7 @@ from raidar.grading.bundle import (
     build_bundle_from_scb_harbor_task,
     write_bundle,
 )
-from raidar.subject.environment.python.models import PackSpec
+from raidar.subject.environment.python.pack_definition import PackSpec
 from raidar.subject.environment.python.task import bind_task_environment
 
 VERIFIER_IMPORT_PATH = "raidar.grading.verifier:RaidarVerifier"

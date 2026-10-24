@@ -27,7 +27,7 @@ from raidar.scoring.framework.metrics import MetricResolver
 from raidar.subject.environment import UnknownPackError, load_runtime_pack
 from raidar.subject.environment.drift import LockedPackError, lock_runtime_pack, pack_drift_issues
 from raidar.subject.environment.python.image import image_tag
-from raidar.subject.environment.python.models import PackSpec
+from raidar.subject.environment.python.pack_definition import PackSpec
 from raidar.subject.treatment.definition.registry import ComponentResolver
 from tests.experiment_spec_support import (
     InMemoryResolver,

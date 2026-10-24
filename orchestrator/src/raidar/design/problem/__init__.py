@@ -1,6 +1,6 @@
-"""Problems: pinned dataset import, verifier validation and one-shot support (plan WS-B).
+"""Problems: pinned dataset import, verifier validation and one-shot support.
 
-Entry points for other workstreams:
+Entry points:
 
 - ``raidar.design.problem.store.ProblemStore.load(ProblemId)`` - a digest-verified
   imported problem: agent-visible Harbor ``task_dir`` plus host-only oracle
