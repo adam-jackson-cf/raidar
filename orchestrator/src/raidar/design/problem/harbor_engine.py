@@ -76,7 +76,8 @@ def trial_config(
             kwargs={
                 "oracle_bundle": str(bundle_root),
                 "docker_context": docker_context,
-                "snapshot_source": "artifact",
+                # Validation tasks collect no /app artifact; the snapshot is downloaded.
+                "snapshot_source": "download",
                 "coverage": False,
             },
         ),

@@ -41,10 +41,13 @@ from raidar.subject.environment.python.task import bind_task_environment
 
 VERIFIER_IMPORT_PATH = "raidar.grading.verifier:RaidarVerifier"
 AGENT_USER = "agent"
+# Frozen task content: these bytes are inside every imported problem's pinned
+# ``task_sha256`` (registered 2026-09-30), so they keep that release's wording.
+# Changing them is a problem re-release: re-import and re-validate with native parity.
 STUB_TEST_SH = """#!/bin/bash
-# Raidar: hidden tests are graded host-side by raidar.grading.verifier.
+# Raidar: hidden tests are graded host-side by raidar.oracle.verifier.
 # Harbor requires a test script for shared-mode steps; this one is never run.
-echo "raidar: the verifier is host-side" >&2
+echo "raidar: the oracle is host-side" >&2
 exit 1
 """
 # Checkpoint test modules a bundle keeps only when one of its steps selects them.
