@@ -1,4 +1,4 @@
-"""``raidar target``: inspect, start, stop and prune execution targets (mechanics-v1 §3.1)."""
+"""``raidar target``: inspect, start, stop and prune execution targets."""
 
 from __future__ import annotations
 

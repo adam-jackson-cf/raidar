@@ -19,7 +19,7 @@ from raidar.subject.environment.python.image import (
     image_tag,
     inspect_image,
 )
-from raidar.subject.environment.python.models import ToolExecution, load_tool_lock
+from raidar.subject.environment.python.pack_definition import ToolExecution, load_tool_lock
 from raidar.subject.environment.python.provisioner import (
     EvalSandboxToolError,
     ToolProvisioner,

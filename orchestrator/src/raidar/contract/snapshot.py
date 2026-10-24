@@ -2,9 +2,8 @@
 
 The same exclude list is used for Harbor's per-step ``/app`` artifact (which
 the verifier grades by default, ``snapshot_source=artifact``) and for the
-download fallback, so both sources hash identically (overhead-baseline §4:
-"keep them in one place"). Patterns match any path component, like the
-``tar --exclude`` flags Harbor passes.
+downloaded copy (``snapshot_source=download``), so both sources hash identically.
+Patterns match any path component, like the ``tar --exclude`` flags Harbor passes.
 """
 
 from __future__ import annotations
@@ -88,13 +87,3 @@ def copy_snapshot(source: Path, dest: Path) -> None:
         return {name for name in names if name in SNAPSHOT_EXCLUDES}
 
     shutil.copytree(source, dest, symlinks=True, ignore=ignore, dirs_exist_ok=True)
-
-
-def make_world_writable(root: Path) -> None:
-    """Let the sandbox's non-root user write to a staged host copy."""
-    for dirpath, _dirnames, filenames in os.walk(root):
-        os.chmod(dirpath, 0o777)
-        for name in filenames:
-            path = Path(dirpath) / name
-            if not path.is_symlink():
-                os.chmod(path, 0o666 | (path.stat().st_mode & 0o111))

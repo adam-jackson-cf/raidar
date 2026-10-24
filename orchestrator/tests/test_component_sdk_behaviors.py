@@ -283,11 +283,18 @@ def test_resolver_digest_tracks_manifest_and_implementation_sources(tmp_path: Pa
 def test_lock_records_component_digest_through_the_entry_point_resolver(tmp_path: Path) -> None:
     path = write_experiment(tmp_path, experiment_document())
     others = [r for r in fixture_resolvers() if r.kind is not RefKind.COMPONENT]
-    resolvers = ResolverSet([MetricResolver(DEFAULT_METRIC_REGISTRY), *others])
+    entry_point_resolver = ResolverSet().resolver_for(RefKind.COMPONENT)
+    assert isinstance(entry_point_resolver, ComponentResolver)
+    resolvers = ResolverSet(
+        [MetricResolver(DEFAULT_METRIC_REGISTRY), *others, entry_point_resolver],
+        entry_point_group=None,
+    )
 
     lock = build_lock(load_experiment(path), lock_path=tmp_path / "lock.json", resolvers=resolvers)
 
     assert isinstance(ResolverSet().resolver_for(RefKind.COMPONENT), ComponentResolver)
+    with pytest.raises(RegistryReferenceError, match="both an explicit resolver and an entry"):
+        ResolverSet([entry_point_resolver])
     recorded = lock["execution"]["references"]["component"]["rules-file@1"]  # type: ignore[index]
     assert recorded["digest"] == fingerprint(RULES_FILE)
     assert recorded["metadata"]["supports"] == ["codex", "claude-code"]
@@ -340,7 +347,7 @@ def test_pilot_arms_share_the_framing_and_guided_adds_the_review_loop_workflow()
 
 def test_component_trees_ship_exactly_the_files_the_lock_hashes(tmp_path: Path) -> None:
     from raidar.design.experiment.lock import _hash_tree
-    from raidar.subject.treatment.catalog._common import tree_files
+    from raidar.subject.treatment.catalog.builtin_definition import tree_files
 
     skill = tmp_path / "skills" / "discipline"
     (skill / ".git").mkdir(parents=True)

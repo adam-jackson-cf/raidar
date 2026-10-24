@@ -1,4 +1,4 @@
-"""Job directory layout (schema v2 vocabulary: a *job* is one execution of a locked experiment).
+"""Job directory layout (a *job* is one execution of a locked experiment).
 
 A job directory (``<jobs root>/<experiment id>/<job id>/``) holds::
 
@@ -14,7 +14,7 @@ A job directory (``<jobs root>/<experiment id>/<job id>/``) holds::
                              launch record, the supervisor's pid, the job's log and
                              its exit record; written before the job starts
 
-Inside each Harbor trial directory the verifier keeps its v1 evidence names
+Inside each Harbor trial directory the verifier keeps its established evidence names
 (``raidar-oracle/steps/<step>/record.json``, reward key ``oracle_leak``,
 verifier kwarg ``oracle_bundle``): they are wire names that released scorers
 and ``assess --regrade`` read identically for every job.

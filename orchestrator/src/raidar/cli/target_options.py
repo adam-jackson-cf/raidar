@@ -29,8 +29,7 @@ def target_option(command: Callable[..., Any]) -> Callable[..., Any]:
         "--target",
         "target_name",
         default=None,
-        help="Execution target (default: $RAIDAR_TARGET, then targets.toml `default`, "
-        "then the current Docker context).",
+        help="Execution target (default: $RAIDAR_TARGET, then targets.toml `default`).",
     )(command)
 
 

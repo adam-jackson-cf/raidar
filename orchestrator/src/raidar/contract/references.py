@@ -2,12 +2,11 @@
 
 An ``experiment.yaml`` names problems, components, scorers and score policies by
 registry reference. The lock resolves each reference through a
-``RegistryResolver`` registered for its kind. The spec package ships the
-``metric`` resolver (the headline metric registry); other workstreams plug in their
-registries either by passing a resolver to ``ResolverSet`` directly or by
-exposing a zero-argument factory under the ``raidar.contract.resolvers`` entry-point
-group. Entry points are loaded lazily, only when a reference of that kind must
-be resolved.
+``RegistryResolver`` registered for its kind. The design package ships the
+``metric`` resolver (the headline metric registry); every other kind registers a
+zero-argument factory under the ``raidar.contract.resolvers`` entry-point group, or is
+passed to ``ResolverSet`` directly (one source per kind). Entry points are loaded lazily,
+only when a reference of that kind must be resolved.
 """
 
 from __future__ import annotations
@@ -73,8 +72,8 @@ class ResolvedReference:
     entry. ``tool_versions`` feeds the lock's recorded tool versions.
 
     ``binding`` holds the facts the runtime-compatibility gate reads
-    (``raidar.design.experiment.compat``) and is never recorded in the lock, so adding the
-    gate left every execution digest unchanged:
+    (``raidar.design.experiment.runtime_gate``) and is never recorded in the lock, so adding
+    the gate left every execution digest unchanged:
 
     - problem: ``runtime`` (the binding's pack id), ``pack_version``,
       ``validated`` and, when not validated, ``validation_issue``;

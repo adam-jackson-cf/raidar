@@ -9,7 +9,7 @@ from pathlib import Path
 _CHUNK_BYTES = 1 << 20
 
 # Names never hashed into a lock and never copied into an agent workspace: the
-# lock hashes exactly the bytes components ship (``components.catalog._common``).
+# lock hashes exactly the bytes components ship (``subject.treatment.catalog.builtin_definition``).
 IGNORED_TREE_NAMES = frozenset({".DS_Store", "__pycache__", ".git"})
 
 

@@ -19,7 +19,7 @@ lock. Only a job with no findable lock falls back to its execution-time
 
 Pre-fix grades: when a scorer run reads them (``gate-effort``), ``--rescore``
 first grades every guardrail-gate@3 pre-fix snapshot of the target that is not
-yet graded into ``--store`` (``raidar.grading.prefix_grade``: the step's own
+yet graded into ``--store`` (``raidar.grading.prefix.grade``: the step's own
 bundle, sandbox and timeout, on ``--target``'s grader target), never into the job, and
 reports what it graded. ``--replay`` grades nothing. ``--regrade`` with
 ``--store`` also regrades the stored pre-fix grades beside the final snapshots.
@@ -27,7 +27,7 @@ reports what it graded. ``--replay`` grades nothing. ``--regrade`` with
 Offline coverage: when a scorer run reads it (``code-quality@3``), ``--rescore``
 first makes, into ``--store``, the verifier's coverage run of every step whose
 trial deferred it (``protocol.verifier_coverage: offline``;
-``raidar.grading.coverage_offline``), never into the job, and reports what it
+``raidar.grading.coverage.offline``), never into the job, and reports what it
 made. ``--replay`` makes nothing. ``--regrade --coverage-check`` instead makes
 every step's coverage run offline and compares it with the trial's own coverage
 pass (parity verdict and G input) or, for a deferred step, the run stored in
@@ -365,8 +365,10 @@ def _rescore(request: _RescoreRequest, out: Path | None) -> None:
     "--target",
     "target_name",
     default=None,
-    help="Docker target for hidden-test grading (default: $RAIDAR_TARGET, targets.toml `default`, "
-    "then the current Docker context); its grader target must be trusted.",
+    help=(
+        "Docker target for hidden-test grading (default: $RAIDAR_TARGET, targets.toml "
+        "`default`); its grader target must be trusted."
+    ),
 )
 @click.option(
     "--out", type=click.Path(dir_okay=False, path_type=Path), help="Write the report here."
