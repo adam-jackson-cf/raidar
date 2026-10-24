@@ -112,6 +112,10 @@ def errata_ref_from_metadata(metadata: object) -> ErrataRef | None:
     )
 
 
+DRAFT_REASON_PREFIX = "TODO"
+"""Starts the placeholder reason of a drafted case; a committed errata may not carry it."""
+
+
 def load_errata(path: Path, *, problem: str, manifest_sha256: str) -> LoadedErrata | None:
     """The errata at ``path`` (None when there is none), refused unless it is for this manifest."""
     if not path.is_file():
@@ -127,6 +131,14 @@ def load_errata(path: Path, *, problem: str, manifest_sha256: str) -> LoadedErra
         raise ErrataError(
             f"{path} is for manifest {errata.manifest_sha256[:12]}, not {manifest_sha256[:12]}; "
             "re-audit the problem and re-register its errata"
+        )
+    drafted = sorted(
+        case.id for case in errata.cases if case.reason.startswith(DRAFT_REASON_PREFIX)
+    )
+    if drafted:
+        raise ErrataError(
+            f"{path} still has the drafted placeholder reason for {drafted}; "
+            "write the reason each case is not determined by the specification"
         )
     return LoadedErrata(path, errata, hashlib.sha256(raw).hexdigest())
 
@@ -152,7 +164,8 @@ def _draft_case(entry: dict[str, Any], disposition: Disposition) -> dict[str, ob
         "disposition": disposition.value,
         "rule": first.get("rule", "unknown"),
         "assertion": first.get("assertion", ""),
-        "reason": "TODO: state why the specification does not determine the asserted value",
+        "reason": f"{DRAFT_REASON_PREFIX}: state why the specification does not determine "
+        "the asserted value",
         "evidence": evidence or ["audit: see the validation report's spec_determinacy section"],
     }
 
@@ -163,8 +176,8 @@ def draft_errata(
     """A YAML errata draft from a validation report's audit: flagged cases excluded from solved.
 
     The draft is a starting point. Its ``reason`` fields must be written by a
-    person before the file is committed (a TODO reason is refused by nobody but
-    review, so the draft says so loudly).
+    person before the file is committed: ``load_errata`` refuses a file that still
+    carries the placeholder reason.
     """
     flagged = report_entries(audit.get("flagged"))
     document = {

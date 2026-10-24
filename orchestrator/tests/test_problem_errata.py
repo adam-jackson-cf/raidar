@@ -108,6 +108,17 @@ def test_errata_is_pinned_by_its_bytes_and_refused_for_another_manifest(
     write_errata(fixture, cases=[errata_document("x", "y")["cases"][0]] * 2)
     with pytest.raises(ErrataError, match="duplicate errata case ids"):
         load_errata(path, problem=fixture.ref, manifest_sha256=manifest.digest())
+    write_errata(
+        fixture,
+        cases=[
+            {
+                **errata_document("x", "y")["cases"][0],
+                "reason": "TODO: state why the specification does not determine the asserted value",
+            }
+        ],
+    )
+    with pytest.raises(ErrataError, match="placeholder reason"):
+        load_errata(path, problem=fixture.ref, manifest_sha256=manifest.digest())
     path.unlink()
     assert fixture.store.load_errata(problem, manifest) is None
     assert errata_ref_from_metadata({"checkpoints": 2}) is None
