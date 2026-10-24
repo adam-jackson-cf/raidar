@@ -40,7 +40,7 @@ from typing import Any
 from harbor.trial.hooks import LogEntry, TrialEvent, TrialHookEvent
 from harbor.trial.trial import Trial
 
-from raidar.execution.reaper import reap_agent_processes
+from raidar.execution.reaper import ReapReport, reap_agent_processes
 
 LIVENESS_REPORT = "raidar-liveness.json"
 MODE_ENV = "RAIDAR_LIVENESS"
@@ -56,7 +56,7 @@ _ERROR = "@@RAIDAR_ERROR"
 
 # Runs as root inside the trial container. Cumulative counters only.
 _SCRIPT = """
-uid=$(id -u -- {user} 2>/dev/null) || {{ echo "{error} unknown agent user {user}"; exit 0; }}
+uid=$(id -u -- {user} 2>/dev/null) || {{ echo "{error} unknown agent user"; exit 0; }}
 echo "@@CLK $(getconf CLK_TCK 2>/dev/null || echo 100)"
 echo "@@PROC"
 for d in /proc/[0-9]*; do
@@ -218,6 +218,7 @@ class PhaseMonitor:
         self.samples: deque[dict[str, Any]] = deque(maxlen=config.max_samples)
         self.sample_count = 0
         self.verdict = Verdict()
+        self.error: str | None = None  # why the sampling loop died, if it did
 
     @property
     def stopped(self) -> bool:
@@ -310,9 +311,23 @@ class PhaseMonitor:
         if self.config.mode != "enforce":
             verdict.decision = "idle_observed"
             return
-        report = await reap_agent_processes(self._environment, self._user)
+        report = await self._reap()
         verdict.kill = report.as_json()
         verdict.decision = "kill_failed" if report.error or report.residual else "idle_killed"
+
+    async def _reap(self) -> ReapReport:
+        """Kill the agent uid; a cancel (the phase ended, perhaps because of the kill) never
+        abandons the kill's report, so the decision is always recorded."""
+        reaping = asyncio.ensure_future(reap_agent_processes(self._environment, self._user))
+        try:
+            return await asyncio.shield(reaping)
+        except asyncio.CancelledError:
+            report = await reaping
+            self.verdict.kill = report.as_json()
+            self.verdict.decision = (
+                "kill_failed" if report.error or report.residual else "idle_killed"
+            )
+            raise
 
     def as_json(self) -> dict[str, Any]:
         return {
@@ -323,6 +338,7 @@ class PhaseMonitor:
             "duration_s": round(self._clock() - self._started, 3),
             "idle_for_s": self.verdict.idle_for_s,
             "kill": self.verdict.kill,
+            "error": self.error,
             "sample_count": self.sample_count,
             "samples_dropped": max(0, self.sample_count - len(self.samples)),
             "unmeasured_samples": sum(1 for s in self.samples if not s["measured"]),
@@ -330,13 +346,19 @@ class PhaseMonitor:
         }
 
     async def run(self, flush: Callable[[], None]) -> None:
-        while not self.stopped:
-            await self.sample()
-            if self.sample_count % FLUSH_EVERY_SAMPLES == 0 or self.verdict.decision != "active":
-                flush()
-            if self.stopped:
-                break
-            await asyncio.sleep(self.config.interval_s)
+        try:
+            while not self.stopped:
+                await self.sample()
+                if (
+                    self.sample_count % FLUSH_EVERY_SAMPLES == 0
+                    or self.verdict.decision != "active"
+                ):
+                    flush()
+                if self.stopped:
+                    break
+                await asyncio.sleep(self.config.interval_s)
+        except Exception as error:  # noqa: BLE001 - recorded, never raised over the agent outcome
+            self.error = f"{type(error).__name__}: {error}"
 
 
 class TrialLiveness:

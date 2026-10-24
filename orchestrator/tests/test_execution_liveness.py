@@ -208,6 +208,34 @@ def test_enforce_mode_reports_a_failed_kill() -> None:
     assert m.verdict.decision == "kill_failed"
 
 
+def test_a_cancel_during_the_kill_still_records_the_idle_kill() -> None:
+    """The kill ends the agent, so the phase-end hook cancels the monitor mid-kill."""
+    quiet = poll_output([stat_line(5, "sleep", 3)])
+    kill_output = f"{_KILLED}\n5 1000 S sleep\n{_RESIDUAL}\n"
+    release = asyncio.Event()
+
+    class SlowKill(ScriptedEnv):
+        async def exec(self, command: str, **kwargs: Any) -> Any:
+            if "kill -KILL" in command:
+                await release.wait()
+            return await super().exec(command, **kwargs)
+
+    clock = Clock()
+    m = monitor(SlowKill([quiet] * 4 + [kill_output]), clock, mode="enforce", idle_s=45)
+    run_samples(m, clock, 3)
+
+    async def go() -> None:
+        task = asyncio.ensure_future(m.sample())
+        await asyncio.sleep(0.01)  # the sample is inside the kill
+        task.cancel()
+        release.set()
+        await asyncio.gather(task, return_exceptions=True)
+
+    asyncio.run(go())
+    assert m.verdict.decision == "idle_killed"
+    assert m.verdict.kill is not None
+
+
 def test_sample_history_is_bounded() -> None:
     clock = Clock()
     config = LivenessConfig("observe", idle_s=10**9, max_samples=5)

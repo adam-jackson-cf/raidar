@@ -33,7 +33,9 @@ def _file_digest(path: Path) -> str:
 def current_files(trial_dir: Path, record_file: Path, job_dir: Path) -> dict[str, str]:
     """sha256 of the trial directory's files (not its manifest) and the trial record."""
     files: dict[str, str] = {}
-    for current, _, names in os.walk(trial_dir):
+    for current, dirs, names in os.walk(trial_dir):
+        # os.walk never descends a symlinked directory; the link itself is evidence
+        names = [*names, *(d for d in dirs if Path(current, d).is_symlink())]
         for name in names:
             path = Path(current, name)
             if name in (RECORDS_MANIFEST, HEALTH_FILE) and path.parent == trial_dir:

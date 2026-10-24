@@ -57,7 +57,9 @@ def check_l1(a: Audit) -> HealthCheck:
 
 
 def _blind(phase: dict[str, Any]) -> bool:
-    return phase.get("sample_count", 0) == phase.get("unmeasured_samples", 0)
+    return bool(phase.get("error")) or phase.get("sample_count", 0) == phase.get(
+        "unmeasured_samples", 0
+    )
 
 
 def _finding(phase: dict[str, Any]) -> dict[str, Any]:
@@ -99,6 +101,8 @@ def check_l2(a: Audit) -> HealthCheck:
         return make_check("L2", UNMEASURED, _NO_LIVENESS)
     if (failed := _l2_kill_failed(phases)) is not None:
         return failed
+    if not phases:
+        return make_check("L2", UNMEASURED, "the liveness record holds no agent phase")
     blind = [p.get("step") for p in phases if _blind(p)]
     observed = [_finding(p) for p in phases if p.get("decision") == "idle_observed"]
     killed = [_finding(p) for p in phases if p.get("decision") == "idle_killed"]

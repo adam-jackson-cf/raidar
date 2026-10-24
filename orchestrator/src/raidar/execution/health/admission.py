@@ -4,7 +4,7 @@
 clean smoke job of the same setup: the same Raidar toolchain digest, runtime pack recipe,
 every arm's agent name/model/effort and the same execution target (name and Docker facts).
 *Clean* means the job finished, every selected trial has a valid record, every trial's
-``health.json`` exists with no violation, and in every trial every executed step's agent changed
+``health.json`` exists with no violation, and in every trial every step's agent changed
 ``/app`` (the step's recorded snapshot digest differs from its parent's; the first step's parent
 is the empty tree), so a smoke where the agent only asked a question cannot clear a run.
 ``--allow-unsmoked`` (``ALLOW_UNSMOKED=1``) admits without one; ``job.json`` records the
@@ -93,7 +93,10 @@ def _trial_problem(job_dir: Path, trial_id: str) -> str | None:
     record_file = job_dir / TRIAL_RECORDS_DIR / f"{trial_id}.json"
     if not record_file.is_file():
         return f"trial {trial_id} has no record"
-    record = TrialRecord.model_validate_json(record_file.read_text())
+    try:
+        record = TrialRecord.model_validate_json(record_file.read_text())
+    except ValueError as error:
+        return f"trial {trial_id} has an unreadable record ({type(error).__name__})"
     if not record.valid:
         failed = [c.name for c in record.validity.checks if not c.passed]
         return f"trial {trial_id} is invalid ({failed})"

@@ -153,6 +153,7 @@ def test_l1_and_l2_record_liveness_per_agent_phase(tmp_path: Path) -> None:
     assert (status(t, "L1"), status(t, "L2")) == ("unmeasured", "unmeasured")
     t.write("raidar-liveness.json", {"phases": []})
     assert status(t, "L1") == "unmeasured"
+    assert status(t, "L2") == "unmeasured"
 
 
 def _phase(decision: str, **extra: Any) -> dict[str, Any]:
