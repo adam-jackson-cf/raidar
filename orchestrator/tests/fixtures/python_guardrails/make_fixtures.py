@@ -1,18 +1,15 @@
 #!/usr/bin/env python3
 """Write one passing and one violating fixture per applicable rule, plus specs.json.
 
-    make_fixtures.py OUT_DIR LOCK_FILE SPECS_FILE [--pack 3|4|6]
+    make_fixtures.py OUT_DIR LOCK_FILE SPECS_FILE
 
-``--pack 3`` writes python-guardrails@3's set (``specs-3.json``): every @1
-canary, the tests check's canaries (``TEST.*``), and a commit canary whose
-clean workspace has a test (the @3 gate refuses a change with none).
-``--pack 4`` writes python-guardrails@4's (``specs-4.json``): @3's plus the
-scope canaries (``SCOPE.*``: an extensionless python script, and the target of
-a ``.py`` symlink, are checked).
-``--pack 6`` writes python-guardrails@6's (``specs-6.json``): @4's plus the
-test-class canary (``RUFF.LINT.per-file-ignores.test-public-methods``: a
-21-method test class is quiet under each test-file glob, the same class size in
-production code is refused). python-guardrails@5 ships @4's rules byte for byte.
+The set is the pack's: the rule canaries, the tests check's canaries (``TEST.*``),
+a commit canary whose clean workspace has a test (the gate refuses a change with
+none), the scope canaries (``SCOPE.*``: an extensionless python script, and the
+target of a ``.py`` symlink, are checked) and the test-class canary
+(``RUFF.LINT.per-file-ignores.test-public-methods``: a 21-method test class is
+quiet under each test-file glob, the same class size in production code is
+refused).
 
 LOCK_FILE is a ``uv.lock`` for the canary's demo project (``name = "demo"``, no
 dependencies), produced by the uv that the gate will run, so the lockfile
@@ -366,16 +363,17 @@ def main(argv: list[str]) -> None:
         mode="propagation",
     )
     add_config_entries()
-    pack = argv[4] if len(argv) > 4 and argv[3] == "--pack" else "1"
-    commit_ok = ok if pack == "1" else with_test("mod.py", MODULE, UNIT_TEST)
-    add("RUNNER.local-ci-parity", "F401", commit_ok, "import os\n", mode="commit")
+    add(
+        "RUNNER.local-ci-parity",
+        "F401",
+        with_test("mod.py", MODULE, UNIT_TEST),
+        "import os\n",
+        mode="commit",
+    )
     add("TEST.tiers", "F401", ok, "import os\n")
-    if pack in ("3", "4", "6"):
-        add_tests_check()
-    if pack in ("4", "6"):
-        add_scope()
-    if pack == "6":
-        add_test_classes()
+    add_tests_check()
+    add_scope()
+    add_test_classes()
     Path(argv[2]).write_text(json.dumps(SPECS, indent=2, sort_keys=True) + "\n")
 
 

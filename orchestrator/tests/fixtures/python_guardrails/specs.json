@@ -167,6 +167,10 @@
     "codes": "F401",
     "mode": "rule"
   },
+  "RUFF.LINT.per-file-ignores.test-public-methods": {
+    "codes": "PLR0904",
+    "mode": "rule"
+  },
   "RUFF.PYDOCSTYLE.convention": {
     "codes": "D",
     "mode": "rule"
@@ -291,9 +295,45 @@
     "codes": "F401",
     "mode": "commit"
   },
+  "SCOPE.py-symlink": {
+    "codes": "F401",
+    "mode": "rule"
+  },
+  "SCOPE.shebang-script": {
+    "codes": "F401",
+    "mode": "rule"
+  },
+  "TEST.coverage-minimum": {
+    "codes": "TEST.coverage-minimum",
+    "mode": "rule"
+  },
+  "TEST.failed": {
+    "codes": "TEST.failed",
+    "mode": "rule"
+  },
   "TEST.failure-propagation": {
     "codes": "",
     "mode": "propagation"
+  },
+  "TEST.isolated-run": {
+    "codes": "TEST.failed",
+    "mode": "workspace-clean"
+  },
+  "TEST.missing": {
+    "codes": "TEST.missing",
+    "mode": "rule"
+  },
+  "TEST.no-change-exempt": {
+    "codes": "TEST.missing",
+    "mode": "since-commit"
+  },
+  "TEST.pytest-runner": {
+    "codes": "TEST.failed",
+    "mode": "rule"
+  },
+  "TEST.subprocess-coverage": {
+    "codes": "TEST.coverage-minimum",
+    "mode": "rule"
   },
   "TEST.subprocess-timeouts": {
     "codes": "TST001",

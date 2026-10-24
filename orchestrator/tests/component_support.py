@@ -13,9 +13,10 @@ from raidar.components import CompiledCondition, compile_condition
 from raidar.spec.schema import AgentEntry, ComponentUse, ConditionSpec
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-PILOT_DIR = REPO_ROOT / "experiments" / "ab-test" / "python__forge__guided-pilot"
 # Component proof fixtures: probe files every built-in compiles from, relative to FIXTURES_DIR.
 FIXTURES_DIR = Path(__file__).resolve().parent / "fixtures"
+# A copy of the guided-pilot experiment (its components and spec), so no test reads a tracked one.
+PILOT_DIR = FIXTURES_DIR / "guided_pilot"
 PROBE_DIR = "components/probe"
 CODEX_SETTINGS: dict[str, JsonValue] = {
     "developer_instructions": "RAIDAR-PROBE-SETTINGS: prefer the standard library.",
