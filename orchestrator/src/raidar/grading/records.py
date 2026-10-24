@@ -48,7 +48,6 @@ class BundleRef(VerifierModel):
 class SnapshotRef(VerifierModel):
     requested: Literal["artifact", "download"]
     used: Literal["artifact", "download"]
-    download_reason: str | None = None
     digest: str
     stored_path: str
 

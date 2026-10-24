@@ -28,7 +28,7 @@ from raidar.grading.records import (
 )
 from raidar.grading.regrade import RegradeError, RegradeOptions, regrade_path
 from raidar.grading.sandbox import GradingSandbox
-from raidar.grading.verifier import RaidarVerifier
+from raidar.grading.verifier import RaidarVerifier, SnapshotUnavailableError
 from tests.verifier_support import FakeAgentEnvironment, LocalProcessSandbox, make_bundle, write_app
 
 
@@ -152,11 +152,9 @@ async def test_verifier_outcomes_stay_out_of_the_env_mounted_verifier_dir(tmp_pa
     ).is_file()
 
 
-async def test_missing_artifact_falls_back_to_download_and_keeps_a_regradable_copy(
-    tmp_path: Path,
-) -> None:
+async def test_explicit_download_source_keeps_a_regradable_copy(tmp_path: Path) -> None:
     env = FakeAgentEnvironment(app_source=write_app(tmp_path / "live-app"))
-    verifier = await make_verifier(tmp_path, env, coverage=False)
+    verifier = await make_verifier(tmp_path, env, coverage=False, snapshot_source="download")
 
     result = await verifier.verify()
 
@@ -164,14 +162,24 @@ async def test_missing_artifact_falls_back_to_download_and_keeps_a_regradable_co
     assert result.rewards["solved"] == 1.0
     assert env.calls == ["exec", "download:/app"]
     record = load_step_record(step_record_dir(tmp_path / "trial", "checkpoint_1"))
-    assert record.snapshot.used == "download"
-    assert record.snapshot.download_reason == "artifact_missing"
+    assert (record.snapshot.requested, record.snapshot.used) == ("download", "download")
     assert (tmp_path / "trial" / record.snapshot.stored_path / "app.py").is_file()
     assert record.coverage.parity is None
 
 
+async def test_a_missing_artifact_is_an_infra_failure_not_a_download(tmp_path: Path) -> None:
+    env = FakeAgentEnvironment(app_source=write_app(tmp_path / "live-app"))
+    verifier = await make_verifier(tmp_path, env, coverage=False)
+
+    with pytest.raises(SnapshotUnavailableError, match="artifact_missing"):
+        await verifier.verify()
+
+    assert env.calls == ["exec"]  # no download
+    assert not (step_record_dir(tmp_path / "trial", "checkpoint_1") / RECORD_FILE).exists()
+
+
 @pytest.mark.parametrize("status", ["failed", "empty"])
-async def test_an_artifact_harbor_marked_unusable_is_never_graded(
+async def test_an_artifact_harbor_marked_unusable_is_never_graded_or_replaced(
     tmp_path: Path, status: str
 ) -> None:
     # Harbor leaves the target dir behind (here: a truncated, wrong tree) when
@@ -193,14 +201,11 @@ async def test_an_artifact_harbor_marked_unusable_is_never_graded(
     env = FakeAgentEnvironment(app_source=write_app(tmp_path / "live-app"))
     verifier = await make_verifier(tmp_path, env, coverage=False)
 
-    result = await verifier.verify()
+    with pytest.raises(SnapshotUnavailableError, match=f"artifact_{status}"):
+        await verifier.verify()
 
-    assert env.calls == ["exec", "download:/app"]
-    assert result.rewards is not None
-    assert result.rewards["solved"] == 1.0
-    record = load_step_record(step_record_dir(tmp_path / "trial", "checkpoint_1"))
-    assert record.snapshot.used == "download"
-    assert record.snapshot.download_reason == f"artifact_{status}"
+    assert env.calls == ["exec"]
+    assert not (step_record_dir(tmp_path / "trial", "checkpoint_1") / RECORD_FILE).exists()
 
 
 async def test_an_artifact_harbor_marked_ok_is_graded(tmp_path: Path) -> None:

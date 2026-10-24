@@ -10,8 +10,9 @@ Loaded per trial through ``TrialConfig.verifier``::
 Per step it (1) asserts no hidden test is present in the agent environment,
 both now and (via the report ``raidar.grading.guard.install_leak_guard``
 stored) before the agent started, (2) takes the step's ``/app`` snapshot
-(Harbor's host artifact by default, ``download`` as fallback; digest always
-recorded), (3) grades a copy in a fresh
+(from the one ``snapshot_source`` the protocol names: Harbor's host artifact, or an explicit
+``download``; a missing or unusable artifact is an infrastructure failure, never a download;
+digest always recorded), (3) grades a copy in a fresh
 no-network grader container and, optionally, (4) runs the separate coverage
 pass. It returns only the reward to Harbor and writes its records host-side.
 Tests are never uploaded to the agent environment.
@@ -59,6 +60,16 @@ from raidar.grading.records import (
 from raidar.grading.sandbox import DockerCopySandbox, GradingSandbox
 
 SnapshotSource = Literal["artifact", "download"]
+
+
+class SnapshotUnavailableError(RuntimeError):
+    """The protocol's snapshot source gave no usable ``/app``: an infra failure of the step.
+
+    Harbor records it as the step's verifier exception; the trial classifier reads the step
+    as ``no_verifier_record:SnapshotUnavailableError``, never as a graded verdict.
+    """
+
+
 LEAK_REWARD_KEY = "oracle_leak"
 
 
@@ -151,8 +162,8 @@ class RaidarVerifier(BaseVerifier):
             )
         return report
 
-    def _artifact_snapshot(self) -> tuple[Path | None, str]:
-        """The collected /app artifact and, when unusable, why (the download reason).
+    def _artifact_snapshot(self) -> Path:
+        """The collected /app artifact; raises ``SnapshotUnavailableError`` when unusable.
 
         Harbor creates the target directory before downloading and leaves it
         behind when the download fails or stops partway, recording the failure
@@ -166,19 +177,21 @@ class RaidarVerifier(BaseVerifier):
         )
         path = artifacts / APP_ARTIFACT_DESTINATION
         status = _artifact_status(path)
-        if status is not None:
-            return (path, "") if status == "ok" else (None, f"artifact_{status}")
-        if path.is_dir():
-            return path, ""
-        return None, "artifact_missing"
+        if status is None and path.is_dir():
+            return path
+        if status == "ok":
+            return path
+        reason = "artifact_missing" if status is None else f"artifact_{status}"
+        raise SnapshotUnavailableError(
+            f"step {self.step_name!r}: the /app artifact at {path} is unusable ({reason}); "
+            "snapshot_source=artifact never falls back to a download"
+        )
 
     async def _snapshot(self, work: Path, record_dir: Path) -> tuple[Path, SnapshotRef]:
-        artifact, reason = (
-            self._artifact_snapshot() if self.snapshot_source == "artifact" else (None, "")
-        )
-        if artifact is not None:
+        if self.snapshot_source == "artifact":
+            artifact = self._artifact_snapshot()
             ref = SnapshotRef(
-                requested=self.snapshot_source,
+                requested="artifact",
                 used="artifact",
                 digest=tree_digest(artifact),
                 stored_path=stored_snapshot_path(self.step_name),
@@ -193,9 +206,8 @@ class RaidarVerifier(BaseVerifier):
         shutil.rmtree(kept, ignore_errors=True)
         shutil.copytree(downloaded, kept, symlinks=True)
         ref = SnapshotRef(
-            requested=self.snapshot_source,
+            requested="download",
             used="download",
-            download_reason=reason or None,
             digest=tree_digest(downloaded),
             stored_path=kept.relative_to(self.trial_paths.trial_dir).as_posix(),
         )
