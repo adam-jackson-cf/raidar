@@ -7,10 +7,10 @@ from math import comb
 
 import pytest
 
-from raidar.analysis.effects import Settings
-from raidar.analysis.markdown import render_markdown
-from raidar.analysis.ranking import pass_at_k
-from raidar.analysis.report import PlannedTrial, analyse
+from raidar.evaluation.analysis.effects import Settings
+from raidar.evaluation.analysis.markdown import render_markdown
+from raidar.evaluation.analysis.ranking import pass_at_k
+from raidar.evaluation.analysis.report import PlannedTrial, analyse
 from tests.analysis_support import inputs, trial
 
 AGENTS = ("codex", "claude", "gemini")

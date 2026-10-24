@@ -22,15 +22,15 @@ from pathlib import Path
 
 import click
 
-from raidar.analysis.load import LoadRequest, load_inputs
-from raidar.analysis.markdown import render_markdown
-from raidar.analysis.outcomes import outcome_metric
-from raidar.analysis.report import AnalysisReport, analyse
-from raidar.analysis.sources import AnalysisInputError
-from raidar.analysis.thresholds import settings_from_lock
-from raidar.scorers.catalog import default_scorer_registry
-from raidar.spec.canonical import pretty_canonical_json_bytes
-from raidar.spec.references import RegistryReferenceError
+from raidar.contract.canonical import pretty_canonical_json_bytes
+from raidar.contract.references import RegistryReferenceError
+from raidar.evaluation.analysis.load import LoadRequest, load_inputs
+from raidar.evaluation.analysis.markdown import render_markdown
+from raidar.evaluation.analysis.report import AnalysisReport, analyse
+from raidar.evaluation.analysis.sources import AnalysisInputError
+from raidar.evaluation.analysis.thresholds import settings_from_lock
+from raidar.scoring.catalog.builtin import default_scorer_registry
+from raidar.scoring.catalog.outcomes import outcome_metric
 
 REPORT_JSON = "analysis.json"
 REPORT_MARKDOWN = "analysis.md"
@@ -102,12 +102,6 @@ def _echo_pooling(report: AnalysisReport) -> None:
     help="Rescore config used for the Assessments (default: the lock's assessment settings).",
 )
 @click.option(
-    "--bundle-search",
-    multiple=True,
-    type=click.Path(exists=True, file_okay=False, path_type=Path),
-    help="Directory to find moved verifier bundles in, by content digest (repeatable).",
-)
-@click.option(
     "--min-pairs",
     type=click.IntRange(min=2),
     help="Override the lock's minimum pairs (fewer gives 'insufficient'); labelled in "
@@ -160,7 +154,6 @@ def analyze(
     output: Path,
     lock_path: Path | None,
     assessment_config: Path | None,
-    bundle_search: tuple[Path, ...],
     min_pairs: int | None,
     max_exclusion_fraction: float | None,
     alpha: float | None,
@@ -179,7 +172,6 @@ def analyze(
         lock_path=lock_path,
         assessment_config=assessment_config,
         allow_dev_jobs=allow_dev_jobs,
-        bundle_search=bundle_search,
         pool_overrides=pool_overrides,
     )
     try:

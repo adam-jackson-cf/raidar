@@ -13,15 +13,10 @@ import pytest
 import yaml
 from click.testing import CliRunner
 
-from raidar.agents.config import agent_name_for
 from raidar.cli import env_harbor, main
-from raidar.cli.shared import ORCHESTRATOR_ROOT
-from raidar.core.paths import REPO_ROOT
-from raidar.core.repo_state import (
-    assert_no_generated_artifact_changes,
-    generated_artifact_paths,
-)
-from raidar.packs.python.models import load_pack_spec
+from raidar.contract.paths import ORCHESTRATOR_ROOT, REPO_ROOT
+from raidar.subject.agent.config import agent_name_for
+from raidar.subject.environment.python.pack_definition import load_pack_spec
 
 quality_gates = main.commands["quality"].commands["gates"]
 
@@ -157,23 +152,6 @@ def test_agent_setup_auth_fails_when_login_does_not_create_auth_json(
     assert "no file-backed auth.json was found" in result.output
 
 
-def test_generated_artifact_paths_filters_prefixes() -> None:
-    paths = [
-        "var/jobs/smoke/20260930T000000Z/job.json",
-        "var/stores/example/assessments/ab/abcd.json",
-        "lab/problems/registry/scb/forge/38d627ecf668.json",
-        "orchestrator/src/raidar/cli.py",
-        "lab/experiments/smoke/python__forge__mechanics/experiment.yaml",
-    ]
-
-    matches = generated_artifact_paths(paths)
-
-    assert matches == [
-        "var/jobs/smoke/20260930T000000Z/job.json",
-        "var/stores/example/assessments/ab/abcd.json",
-    ]
-
-
 def test_quality_gates_writes_coverage_to_pytest_cache(monkeypatch) -> None:
     calls: list[dict[str, object]] = []
 
@@ -229,42 +207,6 @@ def test_env_setup_uses_frozen_sync(monkeypatch) -> None:
     # Harbor comes from the exact-pinned project dependency, not a global uv tool.
     assert len(calls) == 2
     assert "harbor 0.0.0" in result.output
-
-
-def test_artifact_guard_allows_generated_artifact_deletions(tmp_path: Path, monkeypatch) -> None:
-    monkeypatch.setattr(
-        "raidar.core.repo_state.changed_repo_entries",
-        lambda _: [
-            (
-                "D",
-                "var/jobs/hello-world-smoke/run-01/run.json",
-            ),
-        ],
-    )
-
-    assert_no_generated_artifact_changes(tmp_path)
-
-
-def test_artifact_guard_rejects_modified_generated_artifacts(tmp_path: Path, monkeypatch) -> None:
-    monkeypatch.setattr(
-        "raidar.core.repo_state.changed_repo_entries",
-        lambda _: [
-            (
-                "M",
-                "var/jobs/hello-world-smoke/run-01/run.json",
-            ),
-            (
-                "A",
-                "var/analysis/hello-world-smoke/report.md",
-            ),
-        ],
-    )
-
-    with pytest.raises(
-        click.ClickException,
-        match="Generated Harbor artifacts must not be committed",
-    ):
-        assert_no_generated_artifact_changes(tmp_path)
 
 
 def test_env_setup_refuses_an_old_docker_compose(monkeypatch) -> None:
@@ -520,7 +462,7 @@ def test_review_fixture_is_written_under_the_fixture_dir() -> None:
     result = _make_dry_run("review-fixture-synthetic")
 
     assert result.returncode == 0, result.stderr
-    assert "raidar.review.projection.fixture" in result.stdout
+    assert "tests.review_fixtures.projection" in result.stdout
     assert "/var/tmp/review-fixture" in result.stdout
     assert "experiments/" not in result.stdout
 
@@ -530,8 +472,12 @@ def test_review_surface_test_projects_both_fixture_roots_but_quality_only_one() 
 
     assert result.returncode == 0, result.stderr
     joined = re.sub(r"\\\n\s*", " ", result.stdout)
-    review = next(line for line in joined.splitlines() if "raidar.review.projection " in line)
-    quality = next(line for line in joined.splitlines() if "raidar.review.quality " in line)
+    review = next(
+        line for line in joined.splitlines() if "raidar.evaluation.review.projection " in line
+    )
+    quality = next(
+        line for line in joined.splitlines() if "raidar.evaluation.review.quality " in line
+    )
     assert "--legacy-root" not in review
     assert "/var/tmp/review-fixture/review-only" in review
     assert "/var/tmp/review-fixture/jobs" in review
@@ -558,7 +504,9 @@ def test_review_surface_test_applies_one_store_to_every_given_runs_root() -> Non
 
     assert result.returncode == 0, result.stderr
     joined = re.sub(r"\\\n\s*", " ", result.stdout)
-    quality = next(line for line in joined.splitlines() if "raidar.review.quality " in line)
+    quality = next(
+        line for line in joined.splitlines() if "raidar.evaluation.review.quality " in line
+    )
     assert f'--jobs-root "{REPO_ROOT / "runs/a"}"' in quality
     assert f'--jobs-root "{REPO_ROOT / "runs/b"}"' in quality
     assert quality.count(f'--store "{REPO_ROOT / "store"}"') == 2

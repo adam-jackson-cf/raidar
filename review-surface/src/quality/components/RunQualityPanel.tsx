@@ -6,13 +6,13 @@ import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { ArrowUpRight, ChevronDown, ChevronRight } from 'lucide-react';
-import { C } from '@/utils/colors';
+import { C } from '@/presentation/colors';
 import { qualityApi } from '@/quality/api';
 import { GatePanel } from '@/quality/components/GatePanel';
 import { QualityStrip, Ring, StatusBadge } from '@/quality/components/QualityStrip';
 import { POLICY_SOURCE_TITLE, fmtComponent } from '@/quality/format';
 import { qualityExperimentHref, qualityRunHref, useQualityIndex } from '@/quality/links';
-import type { RunRecord } from '@/utils/types';
+import type { RunRecord } from '@/api/types';
 import '@/quality/quality.css';
 
 function Shell({ children }: { children: React.ReactNode }) {

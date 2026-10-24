@@ -9,8 +9,8 @@ from dataclasses import asdict
 import click
 
 from raidar.cli.target_options import docker_selection, target_option
-from raidar.packs import available_runtimes, load_runtime_pack
-from raidar.packs.python.image import (
+from raidar.subject.environment import available_runtimes, load_runtime_pack
+from raidar.subject.environment.python.image import (
     ImageAuditError,
     ImageNotBuiltError,
     audit_image,
@@ -19,8 +19,8 @@ from raidar.packs.python.image import (
     image_tag,
     inspect_image,
 )
-from raidar.packs.python.models import ToolExecution, load_tool_lock
-from raidar.packs.python.provisioner import (
+from raidar.subject.environment.python.pack_definition import ToolExecution, load_tool_lock
+from raidar.subject.environment.python.provisioner import (
     EvalSandboxToolError,
     ToolProvisioner,
     ToolProvisioningError,

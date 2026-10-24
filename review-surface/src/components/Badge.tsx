@@ -1,4 +1,4 @@
-import { C } from '@/utils/colors';
+import { C } from '@/presentation/colors';
 
 /** Small uppercase pill badge, e.g. SYNTHETIC. */
 export function Badge({ label, color = C.orange, title }: { label: string; color?: string; title?: string }) {

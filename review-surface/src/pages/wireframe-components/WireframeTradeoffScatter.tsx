@@ -2,10 +2,10 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Info, SlidersHorizontal } from 'lucide-react';
 import { WireframeBarChart } from './WireframeBarChart';
-import { C } from '@/utils/colors';
-import { fmtDuration, fmtScore } from '@/utils/helpers';
-import { runLabel } from '@/utils/verdict';
-import type { RunRecord } from '@/utils/types';
+import { C } from '@/presentation/colors';
+import { fmtDuration, fmtScore } from '@/presentation/format';
+import { runLabel } from '@/presentation/verdict';
+import type { RunRecord } from '@/api/types';
 
 const MODEL_COLORS = [C.accent, C.cyan, C.green, C.orange, C.purple, '#F5CE4E', '#E879F9', '#94A3B8'];
 const WIDTH = 560;

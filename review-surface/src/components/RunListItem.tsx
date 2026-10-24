@@ -2,10 +2,10 @@
 // the raw run id stays in the tooltip.
 import { Badge } from '@/components/Badge';
 import { FindingChips } from '@/components/FindingChips';
-import { C } from '@/utils/colors';
-import { fmtScore } from '@/utils/helpers';
-import { runLabel, scoreTier } from '@/utils/verdict';
-import type { RunRecord } from '@/utils/types';
+import { C } from '@/presentation/colors';
+import { fmtScore } from '@/presentation/format';
+import { runLabel, scoreTier } from '@/presentation/verdict';
+import type { RunRecord } from '@/api/types';
 
 export function RunListItem({
   run,

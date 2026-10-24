@@ -1,6 +1,6 @@
 // Adapted from Raindrop Workshop (MIT) — app/src/components/JsonView.tsx
 import React, { useCallback, useMemo, useState } from 'react';
-import { C } from '@/utils/colors';
+import { C } from '@/presentation/colors';
 
 const MONO = 'ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace';
 const SIZE = 11;

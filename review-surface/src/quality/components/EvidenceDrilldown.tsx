@@ -2,7 +2,7 @@
 // at one checkpoint or across all of them, plus files left out of measurement.
 import { useMemo } from 'react';
 import { X } from 'lucide-react';
-import { C } from '@/utils/colors';
+import { C } from '@/presentation/colors';
 import { COMPONENT_INFO } from '@/quality/format';
 import type { Selection } from '@/quality/components/QualityStrip';
 import type { EvidenceItem, ExclusionItem } from '@/quality/types';

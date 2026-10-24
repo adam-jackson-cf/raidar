@@ -8,9 +8,10 @@ from typing import Any
 
 import click
 
-from raidar.components.definition.arm_check import check_arm_components
-from raidar.spec.loader import LoadedExperiment, load_experiment, overrides_from_cli
-from raidar.spec.lock import (
+from raidar.contract.references import RefKind
+from raidar.design.experiment.arm_check import check_arm_components
+from raidar.design.experiment.loader import LoadedExperiment, load_experiment, overrides_from_cli
+from raidar.design.experiment.lock import (
     LockError,
     StaleLockError,
     build_lock,
@@ -19,8 +20,7 @@ from raidar.spec.lock import (
     default_resolvers,
     render_lock,
 )
-from raidar.spec.references import RefKind
-from raidar.spec.validation import SpecValidationError, spec_warnings
+from raidar.design.experiment.validation import SpecValidationError, spec_warnings
 
 
 def register(main: click.Group) -> None:

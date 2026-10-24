@@ -6,20 +6,20 @@ from pathlib import Path
 
 import pytest
 
-from raidar.scorers.catalog import default_scorer_registry
-from raidar.scorers.correctness import correctness_scorer
-from raidar.scorers.sdk.context import AssessContext
-from raidar.scorers.sdk.result import AssessResult, AssessStatus, Observation
-from raidar.scorers.sdk.validation import validate_result
-from raidar.scorers.trial_inputs import load_trial_context
-from raidar.verifier.models import (
+from raidar.grading.models import (
     CaseGroup,
     CaseResult,
     CaseStatus,
     InfraFailure,
     VerifierGrade,
 )
-from raidar.verifier.records import load_step_record, step_record_dir, write_step_record
+from raidar.grading.records import load_step_record, step_record_dir, write_step_record
+from raidar.scoring.catalog.builtin import default_scorer_registry
+from raidar.scoring.correctness import correctness_scorer
+from raidar.scoring.framework.context import AssessContext
+from raidar.scoring.framework.result import AssessResult, AssessStatus, Observation
+from raidar.scoring.framework.trial_inputs import load_trial_context
+from raidar.scoring.framework.validation import validate_result
 from tests.scorer_support import APP_V1, StepFixture, write_trial
 
 P, F, E, S = CaseStatus.PASSED, CaseStatus.FAILED, CaseStatus.ERROR, CaseStatus.SKIPPED

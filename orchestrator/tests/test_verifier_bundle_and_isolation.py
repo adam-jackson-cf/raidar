@@ -13,13 +13,13 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
-from raidar.core.snapshot import (
+from raidar.contract.snapshot import (
     SNAPSHOT_EXCLUDES,
     app_artifact_config,
     copy_snapshot,
     tree_digest,
 )
-from raidar.verifier.bundle import (
+from raidar.grading.bundle import (
     BUNDLE_MANIFEST,
     BundleError,
     BundleManifest,
@@ -28,9 +28,9 @@ from raidar.verifier.bundle import (
     build_bundle_from_scb_harbor_task,
     load_bundle,
 )
-from raidar.verifier.grader_image import GRADER_TOOLS, grader_dockerfile, grader_image_tag
-from raidar.verifier.leak import LeakScanError, leak_scan_command, parse_leak_output
-from raidar.verifier.sandbox import (
+from raidar.grading.grader_image import GRADER_TOOLS, grader_dockerfile, grader_image_tag
+from raidar.grading.leak import LeakScanError, leak_scan_command, parse_leak_output
+from raidar.grading.sandbox import (
     CONTAINER_LAYOUT,
     RUNTIME_DIR,
     DockerCopySandbox,

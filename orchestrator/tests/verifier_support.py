@@ -18,8 +18,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from raidar.verifier.bundle import BundleManifest, GraderSpec, VerifierStepSpec, write_bundle
-from raidar.verifier.sandbox import RUNTIME_DIR, SandboxLayout, SandboxResult, SandboxRun
+from raidar.grading.bundle import BundleManifest, GraderSpec, VerifierStepSpec, write_bundle
+from raidar.grading.sandbox import RUNTIME_DIR, SandboxLayout, SandboxResult, SandboxRun
 
 CONFTEST = """
 import shlex

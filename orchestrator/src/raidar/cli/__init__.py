@@ -8,10 +8,13 @@ import click
 from dotenv import load_dotenv
 
 from raidar.cli.register import register_commands
-from raidar.cli.shared import ENV_PATH, SECRETS_SOURCE_ENV
+from raidar.contract.paths import ORCHESTRATOR_ROOT
 
-# orchestrator/.env is the fallback secret source. When the make targets inject secrets
-# from Infisical they set RAIDAR_SECRETS_SOURCE=infisical, and .env stays unread so a
+ENV_PATH = ORCHESTRATOR_ROOT / ".env"
+SECRETS_SOURCE_ENV = "RAIDAR_SECRETS_SOURCE"
+
+# orchestrator/.env supplies secrets unless the make targets inject them from
+# Infisical (they set RAIDAR_SECRETS_SOURCE=infisical), in which case .env stays unread so a
 # stale local value can never stand in for a secret Infisical lacks.
 if ENV_PATH.exists() and os.environ.get(SECRETS_SOURCE_ENV) != "infisical":
     load_dotenv(ENV_PATH, override=False)

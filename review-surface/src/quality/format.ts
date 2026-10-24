@@ -1,5 +1,5 @@
-import { C } from '@/utils/colors';
-import { scoreTier } from '@/utils/verdict';
+import { C } from '@/presentation/colors';
+import { scoreTier } from '@/presentation/verdict';
 import type { Cell, CellStatus, Component, Verdict } from '@/quality/types';
 
 export const COMPONENT_INFO: Record<Component, { name: string; definition: string }> = {

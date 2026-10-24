@@ -23,25 +23,25 @@ import pytest
 from click.testing import CliRunner
 
 from raidar.cli import main
-from raidar.scorers import catalog
-from raidar.scorers.catalog import default_scorer_registry
-from raidar.scorers.process_checks import (
-    DeterministicProcessComplianceScorer,
-    deterministic_process_compliance_scorer,
-)
-from raidar.scorers.process_checks.manifest import PROCESS_COMPLIANCE
-from raidar.scorers.process_checks.work_tests import is_test_file
-from raidar.scorers.sdk.context import AssessContext
-from raidar.scorers.sdk.manifest import Tier
-from raidar.scorers.sdk.result import (
+from raidar.scoring.catalog.builtin import default_scorer_registry
+from raidar.scoring.framework import registry
+from raidar.scoring.framework.context import AssessContext
+from raidar.scoring.framework.manifest import Tier
+from raidar.scoring.framework.result import (
     TRAJECTORY_SUBJECT,
     AssessResult,
     AssessStatus,
     Observation,
     Provenance,
 )
-from raidar.scorers.sdk.validation import validate_result
-from raidar.scorers.store import AssessmentStore
+from raidar.scoring.framework.store import AssessmentStore
+from raidar.scoring.framework.validation import validate_result
+from raidar.scoring.process_checks import (
+    DeterministicProcessComplianceScorer,
+    deterministic_process_compliance_scorer,
+)
+from raidar.scoring.process_checks.manifest import PROCESS_COMPLIANCE
+from raidar.scoring.process_checks.work_tests import is_test_file
 from tests.test_process_compliance_work_session import GATE_PATTERN, PROMPT, _ran
 from tests.trace_trial_support import (
     AGENT,
@@ -118,18 +118,20 @@ def test_the_manifest_has_only_deterministic_metrics_and_no_jev_binding() -> Non
 
 def test_its_implementation_digest_covers_no_jev_code(monkeypatch: pytest.MonkeyPatch) -> None:
     modules: list[str] = []
-    original = catalog.digest_json
+    original = registry.digest_json
 
     def spy(value: Any) -> str:
         if isinstance(value, dict) and "modules" in value:
             modules.extend(value["modules"])
         return original(value)
 
-    monkeypatch.setattr(catalog, "digest_json", spy)
+    monkeypatch.setattr(registry, "digest_json", spy)
     default_scorer_registry().get(REF).implementation_digest()
-    assert "raidar.scorers.process_checks.checks" in modules
+    assert "raidar.scoring.process_checks.checks" in modules
     assert not [
-        m for m in modules if m.startswith(("raidar.jev", "raidar.scorers.process_compliance"))
+        m
+        for m in modules
+        if m.startswith(("raidar.scoring.judge", "raidar.scoring.framework.process_compliance"))
     ]
 
 

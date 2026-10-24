@@ -7,7 +7,8 @@ from pathlib import Path
 
 import pytest
 
-from raidar.spec.metrics import (
+from raidar.contract.references import RefKind, RegistryRef, RegistryReferenceError
+from raidar.scoring.framework.metrics import (
     DEFAULT_METRIC_REGISTRY,
     SCB_CANONICAL,
     SCB_CANONICAL_ONESHOT,
@@ -21,7 +22,6 @@ from raidar.spec.metrics import (
     checkpoint_solve_rate,
     problem_correctness,
 )
-from raidar.spec.references import RefKind, RegistryRef, RegistryReferenceError
 
 FULL = {"C": 1, "V": 1, "E": 1, "H": 1, "R": 1, "G": 1}
 
@@ -165,7 +165,7 @@ QUALITY_GAPS = [
 
 
 @pytest.mark.parametrize(("quality", "ineligible"), QUALITY_GAPS)
-def test_v1_is_fork_exact_c_zero_with_a_quality_gap_is_ineligible(
+def test_fork_exact_policy_c_zero_with_a_quality_gap_is_ineligible(
     quality: dict, ineligible: dict
 ) -> None:
     components = {**quality, "C": 0}
@@ -178,7 +178,9 @@ def test_v1_is_fork_exact_c_zero_with_a_quality_gap_is_ineligible(
 
 
 @pytest.mark.parametrize(("quality", "ineligible"), QUALITY_GAPS)
-def test_v2_c_zero_scores_zero_even_with_a_quality_gap(quality: dict, ineligible: dict) -> None:
+def test_floor_policy_c_zero_scores_zero_even_with_a_quality_gap(
+    quality: dict, ineligible: dict
+) -> None:
     components = {**quality, "C": 0}
 
     result = SCB_CANONICAL_V2.score(checkpoints=8, components=components, ineligible=ineligible)
@@ -195,7 +197,7 @@ def test_v2_c_zero_scores_zero_even_with_a_quality_gap(quality: dict, ineligible
 
 
 @pytest.mark.parametrize(("quality", "ineligible"), QUALITY_GAPS)
-def test_v2_c_above_zero_with_a_quality_gap_stays_ineligible(
+def test_floor_policy_c_above_zero_with_a_quality_gap_stays_ineligible(
     quality: dict, ineligible: dict
 ) -> None:
     components = {**quality, "C": Decimal("0.000000000001")}
@@ -210,7 +212,7 @@ def test_v2_c_above_zero_with_a_quality_gap_stays_ineligible(
     }
 
 
-def test_v2_unmeasured_c_is_still_ineligible() -> None:
+def test_floor_policy_unmeasured_c_is_still_ineligible() -> None:
     missing = SCB_CANONICAL_V2.score(checkpoints=8, components={"V": 1})
     flagged = SCB_CANONICAL_V2.score(
         checkpoints=8, components={**FULL, "C": 0}, ineligible={"C": ["verifier leak"]}
@@ -222,14 +224,14 @@ def test_v2_unmeasured_c_is_still_ineligible() -> None:
     assert flagged.components["C"] is ComponentStatus.INELIGIBLE
 
 
-def test_v2_c_zero_does_not_override_an_unsupported_k() -> None:
+def test_floor_policy_c_zero_does_not_override_an_unsupported_k() -> None:
     result = SCB_CANONICAL_V2.score(checkpoints=1, components={"C": 0})
 
     assert result.score is None
     assert result.reasons[0].code is IneligibilityCode.CHECKPOINT_COUNT_UNSUPPORTED
 
 
-def test_oneshot_v2_c_zero_scores_zero_without_quality() -> None:
+def test_oneshot_floor_policy_c_zero_scores_zero_without_quality() -> None:
     v1 = SCB_CANONICAL_ONESHOT.score(checkpoints=1, components={"C": 0, "V": 1})
     v2 = SCB_CANONICAL_ONESHOT_V2.score(checkpoints=1, components={"C": 0, "V": 1})
 
@@ -238,7 +240,7 @@ def test_oneshot_v2_c_zero_scores_zero_without_quality() -> None:
     assert v2.components["R"] is ComponentStatus.NOT_APPLICABLE
 
 
-def test_v2_matches_v1_whenever_every_component_is_measured() -> None:
+def test_floor_policy_matches_fork_exact_whenever_every_component_is_measured() -> None:
     for components in (FULL, {**FULL, "C": 0}, {**FULL, "C": 0.5, "V": 0.2, "G": 0}):
         v1 = SCB_CANONICAL.score(checkpoints=8, components=components)
         v2 = SCB_CANONICAL_V2.score(checkpoints=8, components=components)

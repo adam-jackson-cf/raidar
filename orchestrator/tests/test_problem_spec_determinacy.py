@@ -15,25 +15,25 @@ import yaml
 from click.testing import CliRunner
 
 from raidar.cli import main as cli
-from raidar.problems import variant_shim
-from raidar.problems.audit import (
+from raidar.design.problem import variant_shim
+from raidar.design.problem.audit import (
     DynamicEvidence,
     StepGradeSummary,
     audit_report,
     function_of,
     grade_audit_variants,
 )
-from raidar.problems.determinacy import (
+from raidar.design.problem.determinacy import (
     AssertionKind,
     HelperIndex,
     SpecText,
     classify,
     scan_test_file,
 )
-from raidar.problems.errata import ProblemErrata
-from raidar.problems.models import ProblemId
-from raidar.problems.validator import ValidateOptions, audit_problem, merge_audit
-from raidar.problems.variants import build_variant, original_name, shim_source
+from raidar.design.problem.errata import ProblemErrata
+from raidar.design.problem.models import ProblemId
+from raidar.design.problem.validator import ValidateOptions, audit_problem, merge_audit
+from raidar.design.problem.variants import build_variant, original_name, shim_source
 from tests.audit_support import KV_REF, build_kv_problem
 from tests.verifier_support import LocalProcessSandbox
 

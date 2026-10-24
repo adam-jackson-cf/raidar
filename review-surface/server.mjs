@@ -7,9 +7,10 @@ import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { createQualityApi } from './quality-api.mjs';
+import { DataFileError, readJson, readRunJson, readUserState } from './read-json.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
-const dataRoot = path.join(here, 'data');
+const dataRoot = process.env.REVIEW_SURFACE_DATA_ROOT || path.join(here, 'data');
 const distRoot = path.join(here, 'dist');
 const userAnnotationsPath = path.join(dataRoot, 'user-annotations.json');
 const port = Number(process.env.REVIEW_SURFACE_PORT || 5950);
@@ -26,25 +27,17 @@ const MIME = {
   '.ttf': 'font/ttf',
 };
 
-function readJson(filePath, fallback) {
-  try {
-    return JSON.parse(fs.readFileSync(filePath, 'utf8'));
-  } catch {
-    return fallback;
-  }
-}
-
 function loadRunIndex() {
-  return readJson(path.join(dataRoot, 'runs.json'), { runs: [] });
+  return readJson(path.join(dataRoot, 'runs.json'));
 }
 
 function loadRunDetail(runId) {
   if (!/^[A-Za-z0-9._-]+$/.test(runId)) return null;
-  return readJson(path.join(dataRoot, 'runs', `${runId}.json`), null);
+  return readRunJson(path.join(dataRoot, 'runs', `${runId}.json`));
 }
 
 function loadUserAnnotations() {
-  return readJson(userAnnotationsPath, []);
+  return readUserState(userAnnotationsPath);
 }
 
 function saveUserAnnotations(annotations) {
@@ -213,7 +206,7 @@ async function handleApi(req, res, url) {
     return sendJson(res, 200, loadRunIndex().runs);
   }
   if (req.method === 'GET' && url.pathname === '/api/experiments') {
-    return sendJson(res, 200, readJson(path.join(dataRoot, 'experiments.json'), { experiments: [] }));
+    return sendJson(res, 200, readJson(path.join(dataRoot, 'experiments.json')));
   }
   if (req.method === 'GET' && parts[1] === 'runs' && parts[2] === 'detail' && parts[3]) {
     const detail = loadRunDetail(parts[3]);
@@ -304,7 +297,8 @@ const server = http.createServer(async (req, res) => {
     }
     serveStatic(res, url);
   } catch (error) {
-    sendJson(res, 500, { error: String(error) });
+    const status = error instanceof DataFileError ? error.status : 500;
+    sendJson(res, status, { error: error instanceof Error ? error.message : String(error) });
   }
 });
 

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from raidar.execution.health.records_manifest import seal_trial, tamper_findings
+from raidar.engine.health.records_manifest import seal_trial, tamper_findings
 
 
 def _trial(tmp_path: Path) -> tuple[Path, Path, Path]:

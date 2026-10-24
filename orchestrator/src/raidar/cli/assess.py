@@ -11,15 +11,15 @@ Assessment already exists and fails unless the bytes are identical.
 Without it, the settings come from the experiment lock of the job that holds
 the target (found at the target or up to two levels above it:
 ``<job>/trials/<trial>``): ``--lock`` if given, else the experiment's current
-lock when its ``lock_sha256`` is the job's, else the job's ``job.lock.json``.
+lock; either must carry the job's ``lock_sha256``, otherwise the rescore is refused.
 A relock that changes only assessment settings keeps ``lock_sha256``, so a
 plain rescore stores Assessments under the keys analysis looks up for that
-lock. Only a job with no findable lock falls back to its execution-time
-``assessment-config.yaml``. The report names the config it used.
+lock. Only a target outside any job reads its ``assessment-config.yaml``.
+The report names the config it used.
 
 Pre-fix grades: when a scorer run reads them (``gate-effort``), ``--rescore``
 first grades every guardrail-gate@3 pre-fix snapshot of the target that is not
-yet graded into ``--store`` (``raidar.verifier.prefix_grade``: the step's own
+yet graded into ``--store`` (``raidar.grading.prefix.grade``: the step's own
 bundle, sandbox and timeout, on ``--target``'s grader target), never into the job, and
 reports what it graded. ``--replay`` grades nothing. ``--regrade`` with
 ``--store`` also regrades the stored pre-fix grades beside the final snapshots.
@@ -27,7 +27,7 @@ reports what it graded. ``--replay`` grades nothing. ``--regrade`` with
 Offline coverage: when a scorer run reads it (``code-quality@3``), ``--rescore``
 first makes, into ``--store``, the verifier's coverage run of every step whose
 trial deferred it (``protocol.verifier_coverage: offline``;
-``raidar.verifier.coverage_offline``), never into the job, and reports what it
+``raidar.grading.coverage.offline``), never into the job, and reports what it
 made. ``--replay`` makes nothing. ``--regrade --coverage-check`` instead makes
 every step's coverage run offline and compares it with the trial's own coverage
 pass (parity verdict and G input) or, for a deferred step, the run stored in
@@ -52,13 +52,6 @@ from typing import Any
 
 import click
 
-from raidar.analysis.sources import (
-    AnalysisInputError,
-    JobDir,
-    default_lock,
-    find_job_manifest,
-    read_lock,
-)
 from raidar.cli.grading import (
     RegradeOptions,
     check_coverage,
@@ -68,13 +61,20 @@ from raidar.cli.grading import (
     reads_docker_grades,
     regrade,
 )
-from raidar.core.runtimes import ANY_RUNTIME
-from raidar.execution.assessment import ASSESSMENT_CONFIG_FILE, lock_rescore_config
-from raidar.scorers.catalog import ScorerUnavailableError, default_scorer_registry
-from raidar.scorers.rescore import report_payload, rescore_path
-from raidar.scorers.rescore_config import RescoreConfig, load_rescore_config
-from raidar.scorers.store import AssessmentConflictError, AssessmentStore
-from raidar.verifier.bundle import BundleError, load_bundle
+from raidar.engine.job.assessment import ASSESSMENT_CONFIG_FILE, lock_rescore_config
+from raidar.evaluation.analysis.sources import (
+    AnalysisInputError,
+    JobDir,
+    default_lock,
+    find_job_manifest,
+    read_lock,
+)
+from raidar.grading.bundle import BundleError, load_bundle
+from raidar.scoring.catalog.builtin import default_scorer_registry
+from raidar.scoring.framework.registry import ScorerUnavailableError
+from raidar.scoring.framework.rescore import report_payload, rescore_path
+from raidar.scoring.framework.rescore_config import RescoreConfig, load_rescore_config
+from raidar.scoring.framework.store import AssessmentConflictError, AssessmentStore
 
 
 def register(main: click.Group) -> None:
@@ -144,11 +144,13 @@ def _scorer_issues(runtime: str | None, scorer_refs: tuple[str, ...]) -> list[st
     issues = []
     for ref in scorer_refs:
         try:
-            runtimes = registry.get(ref).manifest.runtimes
+            manifest = registry.get(ref).manifest
         except (KeyError, ValueError):
             continue  # unknown scorers are reported by the rescore itself
-        if ANY_RUNTIME not in runtimes and runtime not in runtimes:
-            issues.append(f"[AS1] scorer {ref} supports runtimes [{', '.join(runtimes)}]; {where}")
+        if not manifest.supports_runtime(runtime):
+            issues.append(
+                f"[AS1] scorer {ref} supports runtimes [{', '.join(manifest.runtimes)}]; {where}"
+            )
     return issues
 
 
@@ -202,7 +204,7 @@ def run_lock(target: Path, explicit: Path | None) -> Path | None:
     job_dir, manifest = found
     path = explicit or default_lock(JobDir(path=job_dir, manifest=manifest, plan={}, records=()))
     if not path.is_file():
-        return None
+        raise ValueError(f"lock {path} does not exist")
     lock = read_lock(path)
     if lock["lock_sha256"] != manifest.get("lock_sha256"):
         raise ValueError(
@@ -327,7 +329,7 @@ def _rescore(request: _RescoreRequest, out: Path | None) -> None:
     "lock_path",
     type=click.Path(exists=True, dir_okay=False, path_type=Path),
     help="With --rescore, the experiment lock whose assessment settings apply "
-    "(default: the job's experiment lock, else its job.lock.json).",
+    "(default: the job's experiment lock; it must carry the job's lock_sha256).",
 )
 @click.option(
     "--replay",
@@ -363,8 +365,10 @@ def _rescore(request: _RescoreRequest, out: Path | None) -> None:
     "--target",
     "target_name",
     default=None,
-    help="Docker target for hidden-test grading (default: $RAIDAR_TARGET, targets.toml `default`, "
-    "then the current Docker context); its grader target must be trusted.",
+    help=(
+        "Docker target for hidden-test grading (default: $RAIDAR_TARGET, targets.toml "
+        "`default`); its grader target must be trusted."
+    ),
 )
 @click.option(
     "--out", type=click.Path(dir_okay=False, path_type=Path), help="Write the report here."

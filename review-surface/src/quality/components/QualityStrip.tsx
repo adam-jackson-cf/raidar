@@ -1,7 +1,7 @@
 // Per-checkpoint C·V·E·H·R·G·I·S strip. Each cell is a progression ring for an
 // ok value, or a grey diamond plus a status badge carrying the scorer's reason
 // (never a zero). V/E/H/R/G cells open their file:line drill-down.
-import { C } from '@/utils/colors';
+import { C } from '@/presentation/colors';
 import {
   COMPONENT_INFO,
   STATUS_BADGE,

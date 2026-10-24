@@ -13,16 +13,16 @@ import sys
 import textwrap
 from pathlib import Path
 
-from raidar.problems.content import content_digest
-from raidar.problems.models import (
+from raidar.design.problem.content import content_digest
+from raidar.design.problem.models import (
     PackBinding,
     ProblemManifest,
     ProblemMode,
     ProblemSource,
     ProblemStep,
 )
-from raidar.problems.store import ImportedProblem, ProblemStore
-from raidar.verifier.bundle import BundleManifest, GraderSpec, VerifierStepSpec, write_bundle
+from raidar.design.problem.store import ImportedProblem, ProblemStore
+from raidar.grading.bundle import BundleManifest, GraderSpec, VerifierStepSpec, write_bundle
 
 KV_VERSION = "ab" * 6
 KV_REF = f"fixture/kv@{KV_VERSION}"
@@ -265,6 +265,6 @@ def build_kv_problem(root: Path) -> tuple[ProblemStore, ImportedProblem]:
             entry_file="kv.py",
         )
     )
-    from raidar.problems.models import ProblemId
+    from raidar.design.problem.models import ProblemId
 
     return store, store.load(ProblemId.parse(KV_REF))

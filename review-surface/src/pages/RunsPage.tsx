@@ -16,8 +16,8 @@ import { SearchPanel } from '@/components/SearchPanel';
 import { SpanDetail } from '@/components/SpanDetail';
 import { SpanTree } from '@/components/SpanTree';
 import { RunQualityPanel } from '@/quality/components/RunQualityPanel';
-import { C } from '@/utils/colors';
-import type { Annotation, AnnotationKind, RunDetail as RunDetailData } from '@/utils/types';
+import { C } from '@/presentation/colors';
+import type { Annotation, AnnotationKind, RunDetail as RunDetailData } from '@/api/types';
 
 const KIND_ORDER: Record<Annotation['kind'], number> = { issue: 0, note: 1, good: 2 };
 

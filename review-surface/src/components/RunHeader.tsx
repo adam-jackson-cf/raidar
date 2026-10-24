@@ -4,10 +4,10 @@ import { Link } from 'react-router-dom';
 import { ArrowUpRight, ChevronDown, ChevronRight, Copy, Check } from 'lucide-react';
 import { Badge } from '@/components/Badge';
 import { TierPill } from '@/components/Verdict';
-import { C } from '@/utils/colors';
-import { fmtDuration, fmtScore, fmtTokens } from '@/utils/helpers';
-import { runLabel, runSummary, scoreTier } from '@/utils/verdict';
-import type { RunRecord } from '@/utils/types';
+import { C } from '@/presentation/colors';
+import { fmtDuration, fmtScore, fmtTokens } from '@/presentation/format';
+import { runLabel, runSummary, scoreTier } from '@/presentation/verdict';
+import type { RunRecord } from '@/api/types';
 
 function Fact({ label, value, color = C.fg3, title }: { label: string; value: string; color?: string; title?: string }) {
   return (

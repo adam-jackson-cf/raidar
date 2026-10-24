@@ -1,5 +1,5 @@
 // Quality projection contract (raidar-quality-projection, schema_version 1),
-// emitted by orchestrator/src/raidar/review/quality/models.py.
+// emitted by orchestrator/src/raidar/evaluation/review/quality/models.py.
 
 export const COMPONENTS = ['C', 'V', 'E', 'H', 'R', 'G', 'I', 'S'] as const;
 export type Component = (typeof COMPONENTS)[number];
@@ -94,7 +94,7 @@ export interface QualityRunSummary {
   trial_record: string;
 }
 
-/** Rule families of the gate's blocking findings (raidar.scorers.gate_effort.families). */
+/** Rule families of the gate's blocking findings (raidar.scoring.gate_effort.families). */
 export const GATE_FAMILIES = [
   'complexity',
   'typing',

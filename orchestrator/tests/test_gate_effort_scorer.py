@@ -13,18 +13,18 @@ from pathlib import Path
 
 import pytest
 
-from raidar.scorers.catalog import default_scorer_registry
-from raidar.scorers.gate_effort import GATE_EFFORT, gate_effort_scorer
-from raidar.scorers.gate_effort.evidence import run_summary
-from raidar.scorers.gate_effort.families import FAMILIES, family_counts, family_of
-from raidar.scorers.gate_effort.records import (
+from raidar.scoring.catalog.builtin import default_scorer_registry
+from raidar.scoring.framework.context import AssessContext, StepInputs
+from raidar.scoring.framework.result import TRAJECTORY_SUBJECT, AssessStatus
+from raidar.scoring.gate_effort import GATE_EFFORT, gate_effort_scorer
+from raidar.scoring.gate_effort.evidence import run_summary
+from raidar.scoring.gate_effort.families import FAMILIES, family_counts, family_of
+from raidar.scoring.gate_effort.records import (
     RECORD_PATH,
     GateRecordError,
     parse_output,
     read_step_gate,
 )
-from raidar.scorers.sdk.context import AssessContext, StepInputs
-from raidar.scorers.sdk.result import TRAJECTORY_SUBJECT, AssessStatus
 from tests.gate_effort_support import (
     CAPPED,
     GUARDRAIL_STYLE_GATE,

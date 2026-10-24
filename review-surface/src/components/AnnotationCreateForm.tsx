@@ -1,8 +1,8 @@
 // Adapted from Raindrop Workshop (MIT) — app/src/components/TraceAnnotations.tsx (InlineCreateForm)
 import { useState, type RefObject } from 'react';
 import { KIND_STYLES } from '@/components/AnnotationChip';
-import { C } from '@/utils/colors';
-import type { AnnotationKind, Span } from '@/utils/types';
+import { C } from '@/presentation/colors';
+import type { AnnotationKind, Span } from '@/api/types';
 
 const KINDS: AnnotationKind[] = ['issue', 'good', 'note'];
 

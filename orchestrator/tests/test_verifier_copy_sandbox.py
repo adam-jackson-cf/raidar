@@ -8,10 +8,10 @@ from pathlib import Path
 
 import pytest
 
-from raidar.problems import direct
-from raidar.problems.models import ProblemId
-from raidar.verifier.grader_image import ensure_grader_image
-from raidar.verifier.sandbox import (
+from raidar.design.problem import direct
+from raidar.design.problem.models import ProblemId
+from raidar.grading.grader_image import ensure_grader_image
+from raidar.grading.sandbox import (
     CONTAINER_LAYOUT,
     GRADER_ROLE_LABEL,
     DockerCopySandbox,

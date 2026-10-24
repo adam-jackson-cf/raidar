@@ -1,4 +1,4 @@
-"""``raidar analyze`` over stored jobs and a real Assessment store (WS-J J1, J2).
+"""``raidar analyze`` over stored jobs and a real Assessment store.
 
 Trials are written with host-side verifier records, rescored with the real
 ``correctness@1`` and ``resource-usage@1`` scorers, and analysed through the
@@ -9,16 +9,15 @@ CLI. The analysis must find each trial's Assessments by recomputing the keys
 from __future__ import annotations
 
 import json
+import shutil
 from pathlib import Path
 from typing import Any
 
 import pytest
 from click.testing import CliRunner
 
-from raidar.analysis.sources import AnalysisInputError, JobDir, select_records
 from raidar.cli import main
-from raidar.execution.assessment import lock_rescore_config
-from raidar.execution.models import (
+from raidar.contract.trial import (
     ExecutionValidity,
     PlannedTrial,
     ProgressionRule,
@@ -26,12 +25,27 @@ from raidar.execution.models import (
     TrialRecord,
     ValidityCheck,
 )
-from raidar.scorers.catalog import default_scorer_registry
-from raidar.scorers.rescore import rescore_path
-from raidar.scorers.store import AssessmentStore
-from raidar.spec.lock import LOCK_VERSION, seal_lock
-from raidar.verifier.models import CaseStatus
-from tests.scorer_support import APP_V1, APP_V2, StepFixture, tree_state, write_trial
+from raidar.design.experiment.lock import LOCK_VERSION, seal_lock
+from raidar.design.problem.store import ROOT_ENV
+from raidar.engine.job.assessment import lock_rescore_config
+from raidar.evaluation.analysis.sources import (
+    AnalysisInputError,
+    JobDir,
+    default_lock,
+    select_records,
+)
+from raidar.grading.models import CaseStatus
+from raidar.scoring.catalog.builtin import default_scorer_registry
+from raidar.scoring.framework.rescore import rescore_path
+from raidar.scoring.framework.store import AssessmentStore
+from tests.scorer_support import (
+    APP_V1,
+    APP_V2,
+    StepFixture,
+    tree_state,
+    write_toy_bundle,
+    write_trial,
+)
 
 PASS, FAIL = CaseStatus.PASSED, CaseStatus.FAILED
 STEPS = ("checkpoint_1", "checkpoint_2")
@@ -97,7 +111,7 @@ def _record(
             order=0,
             sequence=attempt,
             arm=arm,
-            problem="toy@1",
+            problem="scb/toy@1",
             problem_index=0,
             steps=STEPS,
             hashes=HASHES,
@@ -243,7 +257,7 @@ def test_analyze_reports_stored_assessments_without_touching_inputs(
     assert "not pinned by the lock" in markdown
 
 
-def test_v2_scores_c_zero_trials_zero_end_to_end_while_v1_leaves_them_unscored(
+def test_floor_policy_scores_c_zero_trials_zero_end_to_end_while_the_base_policy_leaves_unscored(
     tmp_path: Path,
 ) -> None:
     # S2-SS-2 through rescore and `raidar analyze`: code-quality@3 is never rescored, so every
@@ -282,7 +296,7 @@ def test_v2_scores_c_zero_trials_zero_end_to_end_while_v1_leaves_them_unscored(
             assert headline_effect["mean_delta"] == 0.0  # both arms S = 0 on the C = 0 pairs
 
 
-PINNED = {
+PINNED: dict[str, Any] = {
     "min_pairs": 6,
     "max_exclusion_fraction": 0.2,
     "alpha": 0.05,
@@ -386,6 +400,32 @@ def test_a_valid_rerun_replaces_an_invalid_trial_but_two_valid_ones_conflict() -
         select_records([rerun, rerun])
 
 
+def test_a_job_resolves_only_the_lock_its_manifest_names_and_otherwise_asks_for_one(
+    tmp_path: Path,
+) -> None:
+    lock = _lock(["correctness@1"])
+    experiment_file = tmp_path / "pilot.yaml"
+    lock_path = tmp_path / "pilot.lock.json"
+    lock_path.write_text(json.dumps(lock))
+    manifest = {"job_id": "j", "lock_sha256": lock["lock_sha256"]}
+    job_dir = tmp_path / "job"
+    job_dir.mkdir()
+    (job_dir / "job.lock.json").write_text(json.dumps(lock))  # never a fallback
+
+    def job(**extra: object) -> JobDir:
+        return JobDir(job_dir, {**manifest, **extra}, {}, ())
+
+    assert default_lock(job(experiment_file=str(experiment_file))) == lock_path
+    with pytest.raises(AnalysisInputError, match="names no experiment_file; pass --lock"):
+        default_lock(job())
+    lock_path.write_text(json.dumps(_lock(["correctness@1"], experiment="another")))
+    with pytest.raises(AnalysisInputError, match="another experiment.*pass --lock"):
+        default_lock(job(experiment_file=str(experiment_file)))
+    lock_path.unlink()
+    with pytest.raises(AnalysisInputError, match="pass --lock"):
+        default_lock(job(experiment_file=str(experiment_file)))
+
+
 def test_truncated_runs_are_refused_unless_labelled_and_never_pooled(tmp_path: Path) -> None:
     lock = _lock(["correctness@1", "resource-usage@1"])
     lock_path = tmp_path / "pilot.lock.json"
@@ -457,24 +497,57 @@ def test_rescore_and_analysis_follow_the_lock_not_the_runs_execution_time_file(
     assert _effect(report, "solve_rate")["n_pairs"] == 5
 
 
-def test_a_moved_oracle_bundle_is_refused_or_found_by_digest_never_unassessed(
-    pilot: tuple[Path, Path, Path], tmp_path: Path
+def _move_bundles_into_problem_store(job_dir: Path, tmp_path: Path) -> Path:
+    """Take the trials' bundles from their recorded roots; one becomes the store's oracle."""
+    problems = tmp_path / "problems"
+    oracle = problems / "store" / "scb" / "toy" / "1" / "oracle"
+    oracle.parent.mkdir(parents=True)
+    bundles = sorted((job_dir / "trials").glob("*-bundle"))
+    bundles[0].rename(oracle)
+    for bundle in bundles[1:]:
+        shutil.rmtree(bundle)
+    return problems
+
+
+def test_a_moved_oracle_bundle_is_read_from_the_problem_store_by_the_trials_problem(
+    pilot: tuple[Path, Path, Path], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     job_dir, store, lock_path = pilot
-    moved = tmp_path / "moved-bundles"
-    moved.mkdir()
-    for bundle in sorted((job_dir / "trials").glob("*-bundle")):
-        bundle.rename(moved / bundle.name)
+    problems = _move_bundles_into_problem_store(job_dir, tmp_path)
 
-    refused = _analyze(job_dir, store, lock_path, tmp_path / "refused")
-    assert refused.exit_code != 0
-    assert "cannot be assessed" in refused.output
-    assert "--bundle-search" in refused.output
+    monkeypatch.setenv(ROOT_ENV, str(tmp_path / "empty-store"))
+    absent = _analyze(job_dir, store, lock_path, tmp_path / "absent")
+    assert absent.exit_code != 0
+    assert "cannot be assessed" in absent.output
+    assert "scb/toy@1" in absent.output
+    assert "--bundle-search" not in absent.output
 
-    found = _analyze(job_dir, store, lock_path, tmp_path / "found", "--bundle-search", str(moved))
+    monkeypatch.setenv(ROOT_ENV, str(problems))
+    found = _analyze(job_dir, store, lock_path, tmp_path / "found")
     assert found.exit_code == 0, found.output
     report = json.loads((tmp_path / "found" / "analysis.json").read_text())
     assert _effect(report, "solve_rate")["n_pairs"] == 5
+
+
+def test_a_problem_store_bundle_with_another_digest_is_refused(
+    pilot: tuple[Path, Path, Path], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    job_dir, store, lock_path = pilot
+    problems = _move_bundles_into_problem_store(job_dir, tmp_path)
+    oracle = problems / "store" / "scb" / "toy" / "1" / "oracle"
+    shutil.rmtree(oracle)
+    write_toy_bundle(oracle, [*STEPS, "checkpoint_3"])
+
+    monkeypatch.setenv(ROOT_ENV, str(problems))
+    refused = _analyze(job_dir, store, lock_path, tmp_path / "refused")
+    assert refused.exit_code != 0
+    assert "cannot be assessed" in refused.output
+    assert "does not match the digest recorded" in refused.output
+
+
+def test_analyze_has_no_bundle_search_option() -> None:
+    result = CliRunner().invoke(main, ["analyze", "--help"])
+    assert "--bundle-search" not in result.output
 
 
 @pytest.mark.parametrize("process", ["process-compliance@6", None])

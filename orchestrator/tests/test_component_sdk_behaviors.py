@@ -8,25 +8,28 @@ from pathlib import Path
 import pytest
 from click.testing import CliRunner
 
-from raidar.agents.config import Harness
 from raidar.cli import main
-from raidar.components import (
+from raidar.contract.references import (
+    RefKind,
+    RegistryRef,
+    RegistryReferenceError,
+    ResolverSet,
+)
+from raidar.design.experiment.arm import ComponentRejectedError, compile_arm, compile_condition
+from raidar.design.experiment.loader import load_experiment
+from raidar.design.experiment.lock import SPEC_EXTERNAL_MODULES, build_lock
+from raidar.scoring.framework.metrics import DEFAULT_METRIC_REGISTRY, MetricResolver
+from raidar.subject.agent.config import Harness
+from raidar.subject.treatment import (
     ComponentKind,
     ComponentRegistry,
-    ComponentRejectedError,
     ComponentResolver,
     UnknownComponentError,
-    compile_arm,
-    compile_condition,
     component_resolver,
     fingerprint,
 )
-from raidar.components.catalog.workspace import RULES_FILE, RulesFile
-from raidar.components.definition.manifest import ComponentManifest, DiscoveryProbe
-from raidar.spec.loader import load_experiment
-from raidar.spec.lock import build_lock
-from raidar.spec.metrics import DEFAULT_METRIC_REGISTRY, MetricResolver
-from raidar.spec.references import RefKind, RegistryRef, RegistryReferenceError, ResolverSet
+from raidar.subject.treatment.catalog.workspace import RULES_FILE, RulesFile
+from raidar.subject.treatment.definition.manifest import ComponentManifest, DiscoveryProbe
 from tests.component_support import (
     PILOT_DIR,
     PROBE_DIR,
@@ -39,10 +42,10 @@ from tests.component_support import (
 from tests.experiment_spec_support import experiment_document, fixture_resolvers, write_experiment
 
 SDK_RUNTIME_SOURCES = [
-    "raidar/components/definition/compiler.py",
-    "raidar/components/definition/compiled.py",
-    "raidar/components/runtime/setup_script.py",
-    "raidar/components/runtime/step_reset.sh",
+    "orchestrator/src/raidar/design/experiment/arm.py",
+    "orchestrator/src/raidar/subject/treatment/definition/compiled.py",
+    "orchestrator/src/raidar/subject/treatment/runtime/setup_script.py",
+    "orchestrator/src/raidar/subject/treatment/runtime/step_reset.sh",
 ]
 BUILTIN_REFS = [
     "continue-on-stall@2",
@@ -241,7 +244,9 @@ def test_registry_refuses_mismatched_or_duplicate_definitions(
         ComponentRegistry().get("lint-config@1")
     monkeypatch.undo()
     doubled = [*registry._entry_points.values(), entry]
-    monkeypatch.setattr("raidar.components.definition.registry.entry_points", lambda group: doubled)
+    monkeypatch.setattr(
+        "raidar.subject.treatment.definition.registry.entry_points", lambda group: doubled
+    )
     with pytest.raises(RegistryReferenceError, match="more than one entry point"):
         ComponentRegistry()
     with pytest.raises(RegistryReferenceError, match="duplicate"):
@@ -260,7 +265,7 @@ def test_resolver_digest_tracks_manifest_and_implementation_sources(tmp_path: Pa
     missing.manifest = ComponentManifest(
         **{
             **RULES_FILE.manifest.model_dump(),
-            "fingerprint": ("raidar/components/absent.py",),
+            "fingerprint": ("orchestrator/src/raidar/subject/treatment/absent.py",),
             "discovery_probe": DiscoveryProbe(id="x", description="x", evidence=("x",)),
         }
     )
@@ -278,11 +283,18 @@ def test_resolver_digest_tracks_manifest_and_implementation_sources(tmp_path: Pa
 def test_lock_records_component_digest_through_the_entry_point_resolver(tmp_path: Path) -> None:
     path = write_experiment(tmp_path, experiment_document())
     others = [r for r in fixture_resolvers() if r.kind is not RefKind.COMPONENT]
-    resolvers = ResolverSet([MetricResolver(DEFAULT_METRIC_REGISTRY), *others])
+    entry_point_resolver = ResolverSet().resolver_for(RefKind.COMPONENT)
+    assert isinstance(entry_point_resolver, ComponentResolver)
+    resolvers = ResolverSet(
+        [MetricResolver(DEFAULT_METRIC_REGISTRY), *others, entry_point_resolver],
+        entry_point_group=None,
+    )
 
     lock = build_lock(load_experiment(path), lock_path=tmp_path / "lock.json", resolvers=resolvers)
 
     assert isinstance(ResolverSet().resolver_for(RefKind.COMPONENT), ComponentResolver)
+    with pytest.raises(RegistryReferenceError, match="both an explicit resolver and an entry"):
+        ResolverSet([entry_point_resolver])
     recorded = lock["execution"]["references"]["component"]["rules-file@1"]  # type: ignore[index]
     assert recorded["digest"] == fingerprint(RULES_FILE)
     assert recorded["metadata"]["supports"] == ["codex", "claude-code"]
@@ -334,8 +346,8 @@ def test_pilot_arms_share_the_framing_and_guided_adds_the_review_loop_workflow()
 
 
 def test_component_trees_ship_exactly_the_files_the_lock_hashes(tmp_path: Path) -> None:
-    from raidar.components.catalog._common import tree_files
-    from raidar.spec.lock import _hash_tree
+    from raidar.design.experiment.lock import _hash_tree
+    from raidar.subject.treatment.catalog.builtin_definition import tree_files
 
     skill = tmp_path / "skills" / "discipline"
     (skill / ".git").mkdir(parents=True)
@@ -349,40 +361,41 @@ def test_component_trees_ship_exactly_the_files_the_lock_hashes(tmp_path: Path) 
 
 
 # Imported modules a fingerprint need not list: the lock's toolchain section
-# pins raidar/spec (raidar_spec digest); the registry and the harness enum are
-# lookup machinery, not component behaviour.
+# pins raidar.design.experiment and SPEC_EXTERNAL_MODULES (raidar_spec digest); the registry
+# and the harness enum are lookup machinery, not component behaviour.
 _UNFINGERPRINTED_OK = {
-    "raidar/agents/config.py",
-    "raidar/components/definition/registry.py",
+    "orchestrator/src/raidar/subject/agent/config.py",
+    "orchestrator/src/raidar/subject/treatment/definition/registry.py",
 }
 
 
 def test_every_raidar_module_a_builtin_imports_is_fingerprinted() -> None:
     import ast
 
-    from raidar.components.definition.registry import ComponentRegistry
+    from raidar.subject.treatment.definition.registry import ComponentRegistry
 
-    src = Path(__file__).resolve().parents[1] / "src"
+    repo = Path(__file__).resolve().parents[2]
     registry = ComponentRegistry()
     missing: dict[str, list[str]] = {}
     for ref in registry.refs():
         listed = set(registry.get(ref).manifest.fingerprint)
         for relative in sorted(item for item in listed if item.endswith(".py")):
-            for node in ast.walk(ast.parse((src / relative).read_text())):
+            for node in ast.walk(ast.parse((repo / relative).read_text())):
                 if not isinstance(node, ast.ImportFrom) or not node.module:
                     continue
                 if not node.module.startswith("raidar."):
                     continue
-                module = node.module.replace(".", "/")
+                module = "orchestrator/src/" + node.module.replace(".", "/")
                 path = next(
-                    (c for c in (f"{module}.py", f"{module}/__init__.py") if (src / c).is_file()),
+                    (c for c in (f"{module}.py", f"{module}/__init__.py") if (repo / c).is_file()),
                     None,
                 )
                 if (
                     path
                     and path not in listed
                     and path not in _UNFINGERPRINTED_OK
-                    and not path.startswith("raidar/spec/")
+                    and not path.startswith("orchestrator/src/raidar/design/experiment/")
+                    and path.removeprefix("orchestrator/src/raidar/") not in SPEC_EXTERNAL_MODULES
                 ):
                     missing.setdefault(ref, []).append(path)
     assert missing == {}

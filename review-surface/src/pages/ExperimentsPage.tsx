@@ -12,9 +12,9 @@ import { PolicyMismatchNotice, familyMismatch } from '@/components/PolicyMismatc
 import { ArmMovement } from '@/components/ArmMovement';
 import { TradeoffScatter } from '@/components/TradeoffScatter';
 import { ScoreBar, ScoreVerdict, TierPill } from '@/components/Verdict';
-import { C } from '@/utils/colors';
+import { C } from '@/presentation/colors';
 import { qualityExperimentHref, useQualityIndex, type QualityTarget } from '@/quality/links';
-import { fmtPercent, fmtScore, fmtTokens } from '@/utils/helpers';
+import { fmtPercent, fmtScore, fmtTokens } from '@/presentation/format';
 import {
   categoryLabel,
   humanize,
@@ -23,8 +23,8 @@ import {
   scoreTier,
   scorerName,
   spreadTier,
-} from '@/utils/verdict';
-import type { AnnotationKind, ArmDiff, ExperimentRecord, RunRecord, StatBlock } from '@/utils/types';
+} from '@/presentation/verdict';
+import type { AnnotationKind, ArmDiff, ExperimentRecord, RunRecord, StatBlock } from '@/api/types';
 
 function statDetail(stat: StatBlock | undefined): string {
   if (stat?.mean == null) return 'No scored trials';

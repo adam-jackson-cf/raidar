@@ -31,15 +31,15 @@ from harbor.models.trial.config import (
     VerifierConfig,
 )
 
-from raidar.components import CompiledCondition
-from raidar.components.runtime.provision import AnyProvision, install_trial_provisioning
-from raidar.execution.cleanup import cleanup_trial_projects
-from raidar.execution.environment import RUN_SCOPED_DOCKER_IMPORT_PATH, SCOPE_KWARG, run_scope
-from raidar.packs.python.image import image_tag
-from raidar.packs.python.models import load_pack_spec
-from raidar.packs.python.task_environment import bind_task_environment
-from raidar.targets.config import Target, TargetError, activate, resolve_target
-from raidar.targets.health import ensure_target
+from raidar.engine.target.config import Target, TargetError, activate, resolve_target
+from raidar.engine.target.health import ensure_target
+from raidar.engine.trial.cleanup import cleanup_trial_projects
+from raidar.engine.trial.environment import RUN_SCOPED_DOCKER_IMPORT_PATH, SCOPE_KWARG, run_scope
+from raidar.subject.environment.python.image import image_tag
+from raidar.subject.environment.python.pack_definition import load_pack_spec
+from raidar.subject.environment.python.task import bind_task_environment
+from raidar.subject.treatment import CompiledCondition
+from raidar.subject.treatment.runtime.provision import AnyProvision, install_trial_provisioning
 
 PLANT_MARKER = "raidar-planted-sentinel"
 AGENT_HOME = load_pack_spec().image.agent_home
@@ -58,7 +58,7 @@ STUB_TEST_SH = "#!/bin/bash\n# Verifier disabled in component trials.\nexit 1\n"
 
 
 def docker_target() -> Target:
-    """The target tests run on: ``RAIDAR_TARGET``, the targets file, else the current context."""
+    """The target tests run on: ``RAIDAR_TARGET`` or the targets file's ``default``."""
     return resolve_target()
 
 

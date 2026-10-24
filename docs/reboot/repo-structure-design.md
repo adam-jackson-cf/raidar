@@ -55,7 +55,7 @@ lab/                        tracked research content
   ledger/                   faults/, remedies/, README.md (generated)
 docs/  scripts/  .agents/  .github/
 var/                        ALL generated data, git-ignored, relocatable with RAIDAR_VAR=<dir>
-  jobs/  stores/  analysis/  problems/{store,cache}/  tmp/   (tmp replaces .tmp/)
+  jobs/  stores/  analysis/  problems/{store,cache}/  tmp/  cache/tools/   (tmp replaces .tmp/)
 Makefile  README.md  AGENTS.md  CHANGELOG.md
 ```
 
@@ -206,3 +206,76 @@ There are 8 top-level packages instead of 15, and no package sits deeper than 3 
   - a scorer-parity rescore of the round-1 forge smoke `v1-forge-01` (old store vs new code, identical results);
   - `make perf-gate TARGET=mbp`;
   - `make orchestrator-smoke`.
+
+## 9. Implementation record: round 2 (2026-10-24)
+
+Built on `structure-groupings` (from `origin/main` @ `37adf8b`) as pure moves: 364 files under `orchestrator/src/raidar` in 8 top-level packages, with import paths, dotted strings and docs rewritten by a codemod. No behaviour change.
+
+- **Layout as §8.** `core` → `contracts`; `spec` and `problems` → `design/{experiments,problems}`; `agents`, `components` and `packs` → `subjects/{agents,treatments,environments}`; `targets` → `engine/targets`; `verifier` → `grading`; `scorers/sdk` is folded into `scoring/framework` (flat, no name clashes), each scorer package moves to `scoring/<name>/`, `jev` → `scoring/judge`; `analysis`, `review/{projection,quality}` and `ledger` → `evaluation/`.
+- **Jobs and trials split by what a module operates on.**
+  - `engine/jobs/` (job level): `plan`, `run`, `detach`, `job_context`, `job_manifest`, `run_checks`, `assessment` (the lock's assessment settings) and `credentials` (the preflight over every selected arm before any trial).
+  - `engine/trials/` (one trial): `driver`, `trial_run`, `trial_finish`, `trial_config`, `trial_record`, `environment`, `materialise`, `collect`, `cleanup`, `reaper`, `timestamps`, `agent_config`, `models` (planned trials, step results and trial records) and `progression` (the continue/halt rule over one trial's steps).
+  - The two packages depend on each other at package level (`jobs.run` runs `trials.trial_run`; `trials.trial_run` receives a `jobs.job_context.JobContext` and `trials.trial_config` an `ExperimentPlan`). The module graph has no cycle, so no contract separates them.
+- **Depth.** Nothing needed flattening. `scoring/code_quality/snapshot_tool` and `evaluation/review/projection` sit at depth 3. The Python pack's `subjects/environments/python/image/` (a Docker build context holding one `Dockerfile`, hashed into the image digest) would be depth 4. It is data like `payloads/` and `grading/runtime`, so `make structure-check` exempts it instead of moving the recipe.
+- **Import contracts**, one per stage, with the existing edges kept: `contracts` imports no stage; nothing imports `cli` (new); `scoring` never imports `engine`, `subjects.agents`, `subjects.treatments` or `cli` (the jev contract is folded in); `grading` never imports `engine`, `subjects` or `cli`; `scoring.process_checks` never imports `scoring.judge`. The edge `scoring` → `grading.sandbox` is not enforced: `scoring.framework.rescore` regrades coverage through `grading.regrade`, which uses the sandbox.
+- **Structure check.** `make structure-check` takes the 8 top-level packages and a second-level allowlist per group, and keeps the depth ≤3 rule with the exemptions above.
+- **Re-key.** Scorer implementation digests and the `raidar_spec` toolchain digest changed with the module paths, and the three open experiments were relocked. Entry-point groups follow the package names (`raidar.design.experiments.resolvers`, `raidar.subjects.treatments`).
+
+## 10. Round 3: tiers, singular names and data outside the package (2026-10-24)
+
+Built on `structure-groupings` after round 2, from the import graph measured on 2026-10-24. Three rules from the coding-guidance skill applied to the round-2 layout. Behaviour is unchanged; the one declared re-key is below.
+
+**Tiers.** The top-level groups are tiers, highest first, and a group imports only groups below it:
+
+```
+cli > evaluation > engine > design > scoring > grading > subject > contract
+```
+
+Inside a group the second level is a set of declared sub-tiers or of independent siblings:
+
+| Group | Sub-tiers, highest first | Independent |
+|---|---|---|
+| `engine` | `job` > `trial` > `health` > `perf` > `target` | none |
+| `scoring` | `catalog` > scorers (`code_quality`, `correctness`, `gate_effort`, `judge`, `process_checks`, `resource_usage`) > `framework` | the scorers, from each other |
+| `subject` | `treatment` > `agent` | `environment`, from `treatment` and `agent` |
+| `design` | none | `experiment`, `problem` |
+| `evaluation` | `review` > `analysis` | `ledger`, from `review` and `analysis` |
+
+`orchestrator/.importlinter` enforces the tiers with `layers` contracts (`tiers`, `engine-tiers`, `scoring-tiers`, `subject-tiers`, `evaluation-tiers`) and the independent siblings with `independence` contracts. The `forbidden` contracts that are stricter than the tiers stay: `scoring` never imports `subject.agent` or `subject.treatment`, `grading` never imports `subject`, `design.problem` never imports `subject.agent`, `scoring.process_checks` never imports `scoring.judge`, and `evaluation.ledger` imports no other raidar layer. The contracts that the tiers subsume (nothing imports `cli`, `contract` imports no group, `engine` and `evaluation` stay independent of `cli`) are removed.
+
+**Upward edges removed.** The measured violations were `design` → `evaluation` (2), `scoring` → `design` (11) and `subject` → `design` (9), plus these sibling cycles. Each was broken by moving the shared part down:
+
+- **`design.experiment` read hashing and references (scoring, subject).** `canonical` (canonical JSON hashing), `source_digest` and `references` (registry reference types, the resolver protocol) moved to `contract`. The resolver entry-point group is now `raidar.contract.resolvers`.
+- **`scoring` read headline metrics from design.** `design/experiment/metrics.py` moved to `scoring/framework/metrics.py`. The lock's `raidar_spec` digest still covers it (`SPEC_EXTERNAL_MODULES` in `design/experiment/lock.py` lists it with the three `contract` modules above).
+- **`design.experiment.validation` read `evaluation.analysis`.** It read the outcome metric ids and the manipulation-check names with their scorer refs. The metric catalogue (`MetricDef`, the metric ids, `primary_metric`, the checkpoint series) moved out of `analysis/outcomes.py` to `scoring/catalog/outcomes.py`, and the check table (`CHECK_SCORERS`) out of `analysis/manipulation.py` to `scoring/catalog/checks.py`. `analysis/outcomes.py` keeps the analysis models (`Value`, `TrialOutcome`, `PoolingReport`); analysis builds `treatment_check_report` on the table.
+- **`scoring.framework.catalog` imported the scorers.** The registry machinery (`ScorerRegistration`, `ScorerRegistry`, the implementation digest, `tool_lock_for`) is `scoring/framework/registry.py`; the built-in registrations and their config tables are `scoring/catalog/builtin.py`. `process_checks` read `resource_usage.atif`, so `atif.py` moved to `scoring/framework/`.
+- **`subject.treatment` compiled an `ExperimentSpec`.** `compile_condition`, `compile_arm` and the arm check moved to `design/experiment/arm.py` and `arm_check.py` (compiling an experiment's arm into components is design work that reads the treatment registry). `ArmBlueprint` left the job plan for `engine/trial/blueprint.py`.
+- **`engine`: `health` ↔ `trial`, `perf` → `trial`, `target` → `trial`.** Trial records (`models.py`, read by `evaluation` too) moved to `contract/trial.py` with `NOT_STARTED`; Harbor's `result.json` reading (`RESULT_FILE`, `read_result`, `step_results`, from `trial/collect.py`) and the timing arithmetic of `trial/timestamps.py` together form `contract/harbor_result.py`. The agent reaper moved from `trial` to `health` (its reports are what health audits).
+- **`engine`: `health` → `job`, `trial` ↔ `job`.** `provenance.py` (what a job records about the code it ran under; read only by `job`) moved from `health` to `job`. The plan (`ExperimentPlan`) and `JobContext`, which every trial receives, moved from `job` to `trial/plan.py` and `trial/context.py`.
+
+**Singular names.** A folder is plural only when it is a catalogue of same-kind items. Renamed: `contracts` → `contract`, `subjects` → `subject` (`treatments`, `agents`, `environments` → `treatment`, `agent`, `environment`; `agent/adapters/` stays a catalogue), `engine/{jobs,trials,targets}` → `engine/{job,trial,target}`, `design/{experiments,problems}` → `design/{experiment,problem}`. `payloads/` and `adapters/` stay plural. A child no longer repeats its parent's name: `job/context.py` and `job/manifest.py`, `trial/{config,finish,record,run}.py`, `perf/report.py`, `environment/python/task.py`, `contract/review.py`, `grading/offline.py`. Entry-point groups follow the package names (`raidar.subject.treatment`).
+
+**Data outside the package.** Run-time data lives under `lab/`, each tree at one explicit path from `raidar/contract/paths.py` (`treatments_root()`, `environments_root()`, `judge_root()`), with no search order and no fallback:
+
+| Was | Now |
+|---|---|
+| `subject/treatment/payloads/python_guardrails/` | `lab/treatments/python_guardrails/` |
+| `subject/environment/python/{pack.yaml,tools.lock.yaml,image/}` | `lab/environments/python/` |
+| `scoring/judge/{policies,question_sets}/` | `lab/judge/{policies,question_sets}/` |
+
+Component fingerprints are repo-relative (`orchestrator/src/raidar/...`, `lab/treatments/...`), so a payload outside the package is hashed like code. Code shipped into containers (the grader plugin `grading/runtime/`, `mcp_shim.py`, `step_reset.sh`) is code and stays in the package. `make structure-check` drops the payload and image depth exemptions (nothing needs them), allows only `experiments, problems, ledger, treatments, environments, judge` below `lab/`, and keeps the `v<N>/` data-folder rule for `components/` and `lab/treatments/`.
+
+**Re-key.** Scorer implementation digests, the `raidar_spec` toolchain digest and component fingerprints changed with the module and payload paths. The three experiments were relocked; no jobs are carried over.
+
+## 11. Final pass: gate green after the guidance fixes (2026-10-24)
+
+Twelve parallel guidance passes landed without a full gate run; this pass made `make quality` exit 0 again and changed no rule.
+
+- **`grading` owner folders.** The offline grading modules moved into `grading/prefix/` (pre-fix snapshot grades) and `grading/coverage/` (per-step coverage runs), each with its store. Both are real owners, so `make structure-check` lists them with `runtime` as the second level of `grading`.
+- **Fan-out and complexity in analysis.** Resolving a verifier bundle from the problem store (the replacement for the bundle search) pushed `analysis/lookup.py` to 12 architectural imports and `load.py` to 11. `stored_bundle` now sits in `analysis/sources.py`, the lookup takes it as a callable and builds its own `BundleCache`, and `load.py` constructs the lookup in `_lookup` (which also keeps `load_inputs` within CCN 10).
+- **Test typing.** `PINNED` in `test_analysis_command.py` is typed `dict[str, Any]`, and `scorer_support` narrows the inventory instead of indexing an optional pair.
+- **Relock.** The three experiment locks were stale after the scorer, framework and trial changes and were relocked with `make experiment-lock`; no execution section changed, so `lock_sha256` values of jobs still match.
+- **Docs.** AGENTS and README now say that a job's own `job.lock.json` is never a substitute for the lock (explicit or current lock, else a refusal, for assessment, analysis and review), name `lab/treatments` and `lab/environments` in the structure allowlist, and describe `grading/{prefix,coverage}`. The names `lab/treatments`, `lab/environments`, `tests/review_fixtures`, explicit target selection and the removal of `--bundle-search` were already current.
+- **Pack recipe bytes kept.** Removing ticket tags from the header comments of `lab/environments/python/{image/Dockerfile,pack.yaml,tools.lock.yaml}` changed the pack image tag (`2b91a52663e099f2` → `9a2fea119406ded8`). Both problem pins bind that tag (RT6 drift). A default re-validation downgraded them from `validated` to `validated_partial`, because the recorded native-parity run was not repeated, and it invalidated forge's errata, which are keyed by manifest. The recipe is identity-bearing (AGENTS.md), so its bytes are restored: the old comments stay until a pack release rebuilds and re-validates both problems with native parity.
+- **Imported task stub bytes kept.** `design/problem/rewrite.py` `STUB_TEST_SH` is written into every imported task, so it is inside each pin's `task_sha256`. Its comment had been renamed with the modules (`raidar.oracle.verifier` → `raidar.verifier.verifier` on 2026-10-02 → `raidar.grading.verifier`). A fresh import therefore no longer reproduced either registered pin; earlier smokes passed only because older store content was still on disk. The stub now carries its registered bytes again, so fresh imports reproduce both manifests byte for byte, and `test_imported_task_stub_keeps_the_bytes_bound_by_registered_pins` pins its digest. A wording change is a problem re-release. A trial re-validation of circuit_eval with new stub bytes passed the four oracle checks, but its native-parity runs produced no native evaluation (`native_no_evaluation`, not investigated). The registered pins are unchanged, so their `validated` reports stand.
+- **Validation snapshot source is explicit.** Validation oracle trials collect no `/app` artifact. With the verifier's download fallback removed, they recorded `no_verifier_record` on every step, so `design/problem/harbor_engine.py` now asks for `snapshot_source: download`. Experiment trials keep `artifact`.

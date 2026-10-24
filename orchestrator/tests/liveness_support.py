@@ -32,10 +32,10 @@ from harbor.models.trial.config import (
     VerifierConfig,
 )
 
-from raidar.execution.cleanup import cleanup_trial_projects
-from raidar.execution.environment import RUN_SCOPED_DOCKER_IMPORT_PATH, SCOPE_KWARG, run_scope
-from raidar.execution.health.liveness import install_liveness_monitor
-from raidar.targets.config import activate
+from raidar.engine.health.liveness import install_liveness_monitor
+from raidar.engine.target.config import activate
+from raidar.engine.trial.cleanup import cleanup_trial_projects
+from raidar.engine.trial.environment import RUN_SCOPED_DOCKER_IMPORT_PATH, SCOPE_KWARG, run_scope
 from tests.component_trial_support import build_task, docker_target
 
 AFTER_PHASE_REPORT = "liveness-after-phase.json"

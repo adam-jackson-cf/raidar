@@ -6,7 +6,7 @@
 
 ## Arms
 
-All three arms run the no-LLM perf fixture (`tests/test_execution_perf_fixture.py`): 2 checkpoints × {baseline, guided} × 5 attempts with Harbor's `oracle` agent, graded by the Docker grader, then `raidar perf check --strict`. Each arm runs at concurrency 1 and again at 3.
+All three arms run the no-LLM perf fixture (`tests/test_overhead_fixture_run.py`): 2 checkpoints × {baseline, guided} × 5 attempts with Harbor's `oracle` agent, graded by the Docker grader, then `raidar perf check --strict`. Each arm runs at concurrency 1 and again at 3.
 
 | Arm | Where Raidar runs | Docker | Data path |
 |---|---|---|---|

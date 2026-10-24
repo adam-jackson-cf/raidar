@@ -21,16 +21,22 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
-from raidar.execution.reaper import ReapReport, write_reap_report
-from raidar.problems.importer import import_problem
-from raidar.problems.models import ProblemId
-from raidar.problems.store import ProblemStore
-from raidar.problems.validator import ValidateOptions, validate_problem, write_report
-from raidar.spec.loader import LoadedExperiment, load_experiment
-from raidar.spec.lock import build_lock, default_lock_path, default_resolvers, render_lock
-from raidar.verifier.leak import LeakReport
-from raidar.verifier.models import CaseGroup, CaseResult, CaseStatus, InfraFailure, VerifierGrade
-from raidar.verifier.records import (
+from raidar.design.experiment.loader import LoadedExperiment, load_experiment
+from raidar.design.experiment.lock import (
+    build_lock,
+    default_lock_path,
+    default_resolvers,
+    render_lock,
+)
+from raidar.design.problem.importer import import_problem
+from raidar.design.problem.models import ProblemId
+from raidar.design.problem.store import ProblemStore
+from raidar.design.problem.validator import ValidateOptions, validate_problem, write_report
+from raidar.engine.health.reaper import ReapReport, write_reap_report
+from raidar.engine.target.config import Target
+from raidar.grading.leak import LeakReport
+from raidar.grading.models import CaseGroup, CaseResult, CaseStatus, InfraFailure, VerifierGrade
+from raidar.grading.records import (
     BundleRef,
     CoverageRef,
     GraderRef,
@@ -40,7 +46,7 @@ from raidar.verifier.records import (
     write_pre_agent_leak,
     write_step_record,
 )
-from raidar.verifier.verifier import step_rewards
+from raidar.grading.verifier import step_rewards
 from tests.experiment_spec_support import experiment_document, write_experiment
 from tests.problems_support import (
     POSITIVE_REF,
@@ -51,6 +57,21 @@ from tests.problems_support import (
 )
 
 T0 = datetime(2026, 9, 30, 12, 0, 0, tzinfo=UTC)
+
+
+def fake_engine_target(docker_context: str) -> Target:
+    """A trusted target on an existing Docker context, for tests that fake the engine."""
+    return Target(
+        name="test",
+        kind="docker",
+        docker_context=docker_context,
+        trusted=True,
+        max_concurrency=None,
+        grader="test",
+        data_check=(),
+        data_check_expect=None,
+        transport=None,
+    )
 
 
 @dataclass(frozen=True)

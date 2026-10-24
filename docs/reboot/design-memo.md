@@ -240,7 +240,7 @@ A pack is `runtimes/<id>/pack.yaml` + lockfiles. It declares:
 4. **test adapter** (normalizes to `CaseResult` via JUnit XML/JSON).
 5. **quality tool lock** split into `host-parse` tools and `eval-sandbox` tools.
 
-**Rule:** a tool that only parses may run on the host from a content-addressed cache (`~/.cache/raidar/tools/<lockhash>/`, via `uv tool`/`npm ci`/pinned release binaries). Any tool that **builds or executes** candidate code (tests, `dotnet build` with Roslyn analyzers, `cargo clippy`, `golangci-lint` with type-check, anything running `build.rs` or MSBuild targets) runs in the eval sandbox.
+**Rule:** a tool that only parses may run on the host from a content-addressed cache (`$RAIDAR_TOOL_CACHE`, else `var/cache/tools/<lockhash>/` under the var root, via `uv tool`/`npm ci`/pinned release binaries). Any tool that **builds or executes** candidate code (tests, `dotnet build` with Roslyn analyzers, `cargo clippy`, `golangci-lint` with type-check, anything running `build.rs` or MSBuild targets) runs in the eval sandbox.
 
 **Laziness:**
 

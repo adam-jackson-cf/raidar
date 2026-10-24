@@ -7,7 +7,7 @@ import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { ArrowLeft } from 'lucide-react';
 import { FamilyPolicyMismatch } from '@/components/PolicyMismatchNotice';
-import { C } from '@/utils/colors';
+import { C } from '@/presentation/colors';
 import { qualityApi } from '@/quality/api';
 import { EvidenceDrilldown } from '@/quality/components/EvidenceDrilldown';
 import { GatePanel } from '@/quality/components/GatePanel';

@@ -18,10 +18,10 @@ import pytest
 from harbor.models.trial.config import AgentConfig
 from harbor.trial.trial import Trial
 
-from raidar.components import compile_condition
-from raidar.components.definition.contribution import SupportFile
-from raidar.components.runtime.setup_script import render_setup_script
-from raidar.execution.environment import RUN_SCOPED_DOCKER_IMPORT_PATH, run_scope
+from raidar.design.experiment.arm import compile_condition
+from raidar.engine.trial.environment import RUN_SCOPED_DOCKER_IMPORT_PATH, run_scope
+from raidar.subject.treatment.definition.contribution import SupportFile
+from raidar.subject.treatment.runtime.setup_script import render_setup_script
 from tests.component_support import PILOT_DIR, agent, all_builtin_uses, compile_uses, condition
 from tests.component_trial_support import (
     IsolationProbeAgent,
@@ -109,8 +109,8 @@ def test_setup_script_resets_state_materialises_support_and_records_workspace(
 
 @pytest.mark.skipif(BASH5 is None, reason="needs bash >= 4 (associative arrays)")
 def test_root_agent_user_is_refused_not_killed_and_fails_the_reset_probe(tmp_path: Path) -> None:
-    from raidar.components.definition.compiled import reset_probe
-    from raidar.components.definition.evidence import StepEvidence
+    from raidar.subject.treatment.definition.compiled import reset_probe
+    from raidar.subject.treatment.definition.evidence import StepEvidence
 
     logs, workspace = tmp_path / "logs", tmp_path / "app"
     workspace.mkdir()
@@ -184,9 +184,10 @@ def test_component_trials_get_a_per_run_compose_project_and_always_clean_it_up(
         "tests.component_trial_support.cleanup_trial_projects",
         lambda job_dir, **_: cleaned.append(job_dir),
     )
-    monkeypatch.setenv("RAIDAR_TARGETS_FILE", str(tmp_path / "no-targets.toml"))
+    targets = tmp_path / "targets.toml"
+    targets.write_text('default = "offline"\n[targets.offline]\ndocker_context = "test-ctx"\n')
+    monkeypatch.setenv("RAIDAR_TARGETS_FILE", str(targets))
     monkeypatch.delenv("RAIDAR_TARGET", raising=False)
-    monkeypatch.setenv("DOCKER_CONTEXT", "test-ctx")
     agent_config = AgentConfig(import_path="tests.component_trial_support:IsolationProbeAgent")
     with pytest.raises(RuntimeError, match="compose up failed"):
         run_trial_sync(tmp_path / "task", tmp_path / "trials", agent_config, "isolation")

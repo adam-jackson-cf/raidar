@@ -4,8 +4,9 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 
-from raidar.analysis.outcomes import TrialOutcome, Value
-from raidar.analysis.report import AnalysisInputs, PlannedTrial
+from raidar.evaluation.analysis.gate_effort import GateDescriptive
+from raidar.evaluation.analysis.outcomes import TrialOutcome, Value
+from raidar.evaluation.analysis.report import AnalysisInputs, ArmSummary, PlannedTrial
 
 BASELINE = "baseline"
 GUIDED = "guided"
@@ -95,4 +96,22 @@ def inputs(
         progression=progression,
         planned=planned(attempts, problems),
         outcomes=tuple(outcomes),
+    )
+
+
+def arm_summary(name: str, gate_effort: Mapping[str, float]) -> ArmSummary:
+    """One valid trial's arm summary carrying the given gate-effort means."""
+    return ArmSummary(
+        arm=name,
+        planned=1,
+        run=1,
+        valid=1,
+        infra_error=0,
+        not_run=0,
+        infra_reasons={},
+        cost_means={},
+        gate_effort={
+            metric: GateDescriptive(n=1, mean=value, sd=None, interval=None)
+            for metric, value in gate_effort.items()
+        },
     )

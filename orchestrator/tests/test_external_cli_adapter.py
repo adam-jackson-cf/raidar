@@ -2,10 +2,10 @@
 
 import pytest
 
-from raidar.agents.adapters.copilot_cli import CopilotCliAdapter
-from raidar.agents.adapters.cursor_cli import CursorCliAdapter
-from raidar.agents.adapters.pi_cli import PiCliAdapter
-from raidar.agents.config import AgentSpec, Harness, ModelTarget
+from raidar.subject.agent.adapters.copilot_cli import CopilotCliAdapter
+from raidar.subject.agent.adapters.cursor_cli import CursorCliAdapter
+from raidar.subject.agent.adapters.pi_cli import PiCliAdapter
+from raidar.subject.agent.config import AgentSpec, Harness, ModelTarget
 
 
 def _config(harness: Harness, provider: str, model: str = "model") -> AgentSpec:

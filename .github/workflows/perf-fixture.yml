@@ -10,12 +10,13 @@ on:
   pull_request:
     branches: [main, master]
     paths:
-      - "orchestrator/src/raidar/execution/**"
-      - "orchestrator/src/raidar/core/**"
-      - "orchestrator/src/raidar/components/**"
-      - "orchestrator/src/raidar/targets/**"
-      - "orchestrator/src/raidar/packs/**"
-      - "orchestrator/tests/test_execution_perf_fixture.py"
+      - "orchestrator/src/raidar/engine/**"
+      - "orchestrator/src/raidar/contract/**"
+      - "orchestrator/src/raidar/subject/treatment/**"
+      - "orchestrator/src/raidar/subject/environment/**"
+      - "lab/treatments/**"
+      - "lab/environments/**"
+      - "orchestrator/tests/test_overhead_fixture_run.py"
       - "orchestrator/tests/execution_support.py"
       - "orchestrator/uv.lock"
       - ".github/workflows/perf-fixture.yml"
@@ -25,7 +26,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 90
     env:
-      DOCKER_CONTEXT: default
+      RAIDAR_TARGET: ci
+      RAIDAR_TARGETS_FILE: ${{ github.workspace }}/ci-targets.toml
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -39,6 +41,10 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install "uv>=0.7"
+
+      - name: Name the runner's Docker daemon as the target
+        run: |
+          printf '[targets.ci]\ndocker_context = "default"\n' > "$RAIDAR_TARGETS_FILE"
 
       - name: Install orchestrator dev dependencies
         run: |

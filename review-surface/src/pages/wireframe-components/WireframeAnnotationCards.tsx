@@ -1,6 +1,6 @@
 import { Crosshair } from 'lucide-react';
-import { C } from '@/utils/colors';
-import type { Annotation, AnnotationKind } from '@/utils/types';
+import { C } from '@/presentation/colors';
+import type { Annotation, AnnotationKind } from '@/api/types';
 
 function findingHeadline(annotation: Annotation) {
   if (annotation.category === 'clean-verification') return 'No verification gates failed';

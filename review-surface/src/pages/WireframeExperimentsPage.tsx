@@ -9,10 +9,10 @@ import { WireframeTradeoffScatter } from './wireframe-components/WireframeTradeo
 import { ArmDiffCard } from './wireframe-components/WireframeArmMovement';
 import { compactSpec } from './wireframe-components/wireframeLabels';
 import { api } from '@/api/client';
-import { C } from '@/utils/colors';
-import { fmtPercent, fmtScore } from '@/utils/helpers';
-import { humanize, runLabel, scoreTier } from '@/utils/verdict';
-import type { ExperimentRecord, RunRecord, StatBlock } from '@/utils/types';
+import { C } from '@/presentation/colors';
+import { fmtPercent, fmtScore } from '@/presentation/format';
+import { humanize, runLabel, scoreTier } from '@/presentation/verdict';
+import type { ExperimentRecord, RunRecord, StatBlock } from '@/api/types';
 
 type CompositeStat = StatBlock | undefined;
 

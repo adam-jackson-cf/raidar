@@ -6,7 +6,7 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { Badge } from '@/components/Badge';
 import { FamilyPolicyMismatch } from '@/components/PolicyMismatchNotice';
-import { C } from '@/utils/colors';
+import { C } from '@/presentation/colors';
 import { qualityApi } from '@/quality/api';
 import { ArmLegend, ComponentCurves } from '@/quality/components/ComponentCurves';
 import { Distributions } from '@/quality/components/Distributions';

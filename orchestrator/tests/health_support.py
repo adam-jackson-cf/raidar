@@ -7,20 +7,20 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from raidar.components import compile_condition
-from raidar.core.snapshot import tree_digest
-from raidar.execution.collect import TrialContext, classify_trial
-from raidar.execution.health.records_manifest import seal_trial
-from raidar.execution.models import (
+from raidar.contract.snapshot import tree_digest
+from raidar.contract.trial import (
     ExecutionValidity,
     PlannedTrial,
     TrialHashes,
     TrialRecord,
     ValidityCheck,
 )
-from raidar.execution.progression import progression_rule
-from raidar.spec.schema import AgentEntry, ConditionSpec, ProtocolSpec
-from raidar.verifier.records import (
+from raidar.design.experiment.arm import compile_condition
+from raidar.design.experiment.schema import AgentEntry, ConditionSpec, ProtocolSpec
+from raidar.engine.health.records_manifest import seal_trial
+from raidar.engine.trial.collect import TrialContext, classify_trial
+from raidar.engine.trial.progression import progression_rule
+from raidar.grading.records import (
     SnapshotRef,
     load_step_record,
     step_record_dir,

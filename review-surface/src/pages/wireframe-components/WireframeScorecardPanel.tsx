@@ -1,9 +1,10 @@
 import { useMemo, useState } from 'react';
 import { ChevronDown, ChevronRight, Crosshair } from 'lucide-react';
-import { C } from '@/utils/colors';
-import { fmtPercent, fmtScore, tryParseJson } from '@/utils/helpers';
-import { humanize, scoreTier, scorerName } from '@/utils/verdict';
-import type { Span } from '@/utils/types';
+import { C } from '@/presentation/colors';
+import { fmtPercent, fmtScore } from '@/presentation/format';
+import { tryParseJson } from '@/presentation/payload';
+import { humanize, scoreTier, scorerName } from '@/presentation/verdict';
+import type { Span } from '@/api/types';
 
 interface MetricRow {
   metricId: string;

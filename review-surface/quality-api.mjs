@@ -1,9 +1,10 @@
-// Quality element API (plan K2/K4): serves the Python-emitted Quality
+// Quality element API: serves the Python-emitted Quality
 // projection and persists reviewer Jev calibration labels locally. Mounted by
 // server.mjs under /api/quality/*; zero runtime dependencies.
 import fs from 'node:fs';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
+import { readJson, readRunJson, readUserState } from './read-json.mjs';
 
 export const JEV_LABELS = ['correct', 'false_positive', 'false_negative', 'uncertain'];
 // Label provenance: a person on this surface is a `human` reviewer (source
@@ -11,21 +12,13 @@ export const JEV_LABELS = ['correct', 'false_positive', 'false_negative', 'uncer
 export const JEV_REVIEWERS = ['human', 'model'];
 const SAFE_ID = /^[A-Za-z0-9._-]+$/;
 
-function readJson(filePath, fallback) {
-  try {
-    return JSON.parse(fs.readFileSync(filePath, 'utf8'));
-  } catch {
-    return fallback;
-  }
-}
-
 export function createQualityApi({ dataRoot, sendJson, readBody }) {
   const qualityRoot = path.join(dataRoot, 'quality');
   const labelsPath = path.join(dataRoot, 'jev-labels.json');
 
   const loadDetail = (runId) =>
-    SAFE_ID.test(runId) ? readJson(path.join(qualityRoot, 'runs', `${runId}.json`), null) : null;
-  const loadLabels = () => readJson(labelsPath, []);
+    SAFE_ID.test(runId) ? readRunJson(path.join(qualityRoot, 'runs', `${runId}.json`)) : null;
+  const loadLabels = () => readUserState(labelsPath);
   const saveLabels = (labels) => {
     fs.mkdirSync(dataRoot, { recursive: true });
     fs.writeFileSync(labelsPath, JSON.stringify(labels, null, 2));
@@ -71,7 +64,7 @@ export function createQualityApi({ dataRoot, sendJson, readBody }) {
   return async function handleQualityApi(req, res, url) {
     const parts = url.pathname.split('/').filter(Boolean); // ['api', 'quality', ...]
     if (req.method === 'GET' && parts[2] === 'runs' && !parts[3]) {
-      return sendJson(res, 200, readJson(path.join(qualityRoot, 'runs.json'), { runs: [] }));
+      return sendJson(res, 200, readJson(path.join(qualityRoot, 'runs.json')));
     }
     if (req.method === 'GET' && parts[2] === 'runs' && parts[3]) {
       const detail = loadDetail(parts[3]);
@@ -79,7 +72,7 @@ export function createQualityApi({ dataRoot, sendJson, readBody }) {
       return sendJson(res, 200, detail);
     }
     if (req.method === 'GET' && parts[2] === 'experiments') {
-      return sendJson(res, 200, readJson(path.join(qualityRoot, 'experiments.json'), { experiments: [] }));
+      return sendJson(res, 200, readJson(path.join(qualityRoot, 'experiments.json')));
     }
     if (parts[2] === 'labels' && !parts[3]) {
       if (req.method === 'GET') {

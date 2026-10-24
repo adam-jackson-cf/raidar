@@ -21,11 +21,17 @@ from pathlib import Path
 
 import pytest
 
-from raidar.analysis.markdown import CUMULATIVE_LEGEND, _autofix_family_table, _better, _legend
-from raidar.scorers.gate_effort.autofix_metrics import REFUSAL_KINDS
-from raidar.scorers.gate_effort.families import FAMILIES
-from raidar.scorers.gate_effort.refusals import refusal_kind
-from raidar.scorers.sdk.result import TRAJECTORY_SUBJECT, AssessStatus
+from raidar.evaluation.analysis.markdown import (
+    CUMULATIVE_LEGEND,
+    _autofix_family_table,
+    _better,
+    _legend,
+)
+from raidar.scoring.framework.result import TRAJECTORY_SUBJECT, AssessStatus
+from raidar.scoring.gate_effort.autofix.metrics import REFUSAL_KINDS
+from raidar.scoring.gate_effort.families import FAMILIES
+from raidar.scoring.gate_effort.refusals import refusal_kind
+from tests.analysis_support import arm_summary
 from tests.gate_effort_support import (
     COVERAGE,
     CP1,
@@ -46,7 +52,6 @@ from tests.gate_effort_support import (
     _value,
     _values,
 )
-from tests.test_iteration_4_consumers import _arm
 
 T = TRAJECTORY_SUBJECT
 LINES, REMOVED = "new_autofix_lines_changed", "new_autofix_removed_blocking"
@@ -304,7 +309,7 @@ def test_the_cumulative_totals_are_marked_and_the_new_ones_are_not() -> None:
 
 
 def test_the_family_table_shows_the_new_counts_beside_the_sums() -> None:
-    arm = _arm(
+    arm = arm_summary(
         "r1",
         {
             "gate.total_autofix_removed_blocking": 40.0,

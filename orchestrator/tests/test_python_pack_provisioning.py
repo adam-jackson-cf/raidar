@@ -1,4 +1,4 @@
-"""Python pack measurement tools: lock pins and lazy host provisioning (WS-I I2)."""
+"""Python pack measurement tools: lock pins and lazy host provisioning."""
 
 from __future__ import annotations
 
@@ -13,8 +13,9 @@ from click.testing import CliRunner
 from pydantic import ValidationError
 
 from raidar.cli import main
-from raidar.packs.python import provisioner as provisioner_module
-from raidar.packs.python.models import (
+from raidar.grading.grader_image import GRADER_TOOLS
+from raidar.subject.environment.python import provisioner as provisioner_module
+from raidar.subject.environment.python.pack_definition import (
     PROVISIONING_PHASE,
     REASON_DRIFT,
     REASON_FIRST_USE,
@@ -23,7 +24,7 @@ from raidar.packs.python.models import (
     ToolLock,
     load_tool_lock,
 )
-from raidar.packs.python.provisioner import (
+from raidar.subject.environment.python.provisioner import (
     MARKER_NAME,
     TOOL_CACHE_ENV,
     EvalSandboxToolError,
@@ -31,7 +32,6 @@ from raidar.packs.python.provisioner import (
     ToolProvisioningError,
     default_cache_root,
 )
-from raidar.verifier.grader_image import GRADER_TOOLS
 
 UV = "/fake/bin/uv"
 
@@ -255,15 +255,14 @@ def test_changing_any_pin_provisions_into_a_new_cache_key(tmp_path: Path) -> Non
     assert bumped.root != original.root
 
 
-def test_cache_root_precedence_is_explicit_then_xdg_then_home(
+def test_cache_root_is_explicit_else_under_the_var_root(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     monkeypatch.setenv("HOME", str(tmp_path / "home"))
-    monkeypatch.delenv("XDG_CACHE_HOME", raising=False)
-    monkeypatch.delenv(TOOL_CACHE_ENV, raising=False)
-    assert default_cache_root() == tmp_path / "home" / ".cache" / "raidar" / "tools"
     monkeypatch.setenv("XDG_CACHE_HOME", str(tmp_path / "xdg"))
-    assert default_cache_root() == tmp_path / "xdg" / "raidar" / "tools"
+    monkeypatch.delenv(TOOL_CACHE_ENV, raising=False)
+    monkeypatch.setenv("RAIDAR_VAR", str(tmp_path / "var"))
+    assert default_cache_root() == (tmp_path / "var").resolve() / "cache" / "tools"
     monkeypatch.setenv(TOOL_CACHE_ENV, str(tmp_path / "explicit"))
     assert default_cache_root() == tmp_path / "explicit"
 

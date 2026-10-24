@@ -9,16 +9,16 @@ import pytest
 from click.testing import CliRunner
 
 from raidar.cli import main
-from raidar.jev.audit import AuditLog
-from raidar.jev.calibration import LabelImportError, import_labels, promotion_readiness
-from raidar.jev.label_export import (
+from raidar.scoring.judge.audit import AuditLog
+from raidar.scoring.judge.calibration import LabelImportError, import_labels, promotion_readiness
+from raidar.scoring.judge.label_export import (
     LabelExportError,
     ReviewLabel,
     export_labels,
     load_review_labels,
 )
-from raidar.jev.rubric import RUBRIC_POLICY
-from raidar.review.quality.synthetic import generate_quality_fixture
+from raidar.scoring.judge.rubric import RUBRIC_POLICY
+from tests.review_fixtures.quality.generate import generate_quality_fixture
 
 RUN = "synthetic-quality.synthetic-run-1.b00-p0-baseline"
 

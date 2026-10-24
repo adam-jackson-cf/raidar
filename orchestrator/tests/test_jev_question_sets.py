@@ -11,24 +11,33 @@ import pytest
 from click.testing import CliRunner
 
 from raidar.cli import main
-from raidar.jev.audit import DecisionStage, SufficiencyLevel
-from raidar.jev.carry_forward import is_span_unchanged, parse_diff_hunks, unified_diff_text
-from raidar.jev.codebase import CodebaseIndex
-from raidar.jev.report import rubric_shadow_report
-from raidar.jev.rubric import (
+from raidar.scoring.judge.audit import DecisionStage, SufficiencyLevel
+from raidar.scoring.judge.carry_forward import (
+    is_span_unchanged,
+    parse_diff_hunks,
+    unified_diff_text,
+)
+from raidar.scoring.judge.codebase import CodebaseIndex
+from raidar.scoring.judge.report import rubric_shadow_report
+from raidar.scoring.judge.rubric import (
     RUBRIC_POLICY,
     CheckpointSource,
     JudgementStatus,
     RubricRunner,
 )
-from raidar.jev.rubric_questions import (
+from raidar.scoring.judge.rubric_questions import (
     SCB_RUBRIC_FILE,
     QuestionSetError,
     Requirement,
     load_rubric_question_set,
 )
-from raidar.jev.session import open_runtime
-from raidar.jev.symbols import MODULE_QUALNAME, SymbolKind, SymbolParseError, extract_symbols
+from raidar.scoring.judge.session import open_runtime
+from raidar.scoring.judge.symbols import (
+    MODULE_QUALNAME,
+    SymbolKind,
+    SymbolParseError,
+    extract_symbols,
+)
 from tests.jev_support import (
     RecordedTransport,
     make_runtime,

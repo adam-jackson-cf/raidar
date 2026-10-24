@@ -26,9 +26,9 @@ from typing import Any
 
 import yaml
 
-from raidar.components.catalog import guardrails
-from raidar.components.runtime.gate_run import GateMode, GuardrailGateOptions, gate_script
-from raidar.components.runtime.session_chain import InnerAgentSpec
+from raidar.subject.treatment.catalog import guardrails
+from raidar.subject.treatment.runtime.gate_run import GateMode, GuardrailGateOptions, gate_script
+from raidar.subject.treatment.runtime.session_chain import InnerAgentSpec
 
 FIXTURES = Path(__file__).resolve().parent / "fixtures"
 VERIFY_DIR = FIXTURES / "python_guardrails"

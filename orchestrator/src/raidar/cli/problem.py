@@ -9,19 +9,20 @@ from pathlib import Path
 import click
 
 from raidar.cli.target_options import docker_selection, target_option
-from raidar.problems.errata import Disposition, draft_errata, report_entries
-from raidar.problems.importer import import_problem
-from raidar.problems.models import ProblemId, ProblemManifest
-from raidar.problems.source import SourceError
-from raidar.problems.store import ProblemStore, ProblemStoreError, open_store, store_at
-from raidar.problems.validation import (
+from raidar.contract.references import RegistryReferenceError
+from raidar.design.problem.errata import Disposition, draft_errata, report_entries
+from raidar.design.problem.importer import import_problem
+from raidar.design.problem.models import ProblemId, ProblemManifest
+from raidar.design.problem.source import SourceError
+from raidar.design.problem.store import ProblemStore, ProblemStoreError, open_store
+from raidar.design.problem.validation import (
     Check,
     CheckStatus,
     ValidationRecordError,
     Verdict,
     read_validation_record,
 )
-from raidar.problems.validator import (
+from raidar.design.problem.validator import (
     ENGINES,
     ValidateOptions,
     audit_problem,
@@ -30,7 +31,6 @@ from raidar.problems.validator import (
     validate_problem,
     write_report,
 )
-from raidar.spec.references import RegistryReferenceError
 
 EXIT_EXCLUDED = 1
 EXIT_INFRA = 2
@@ -62,7 +62,7 @@ def register(main: click.Group) -> None:
 
 def _store(store_root: Path | None) -> ProblemStore:
     try:
-        return store_at(store_root) if store_root else open_store(Path.cwd())
+        return open_store(store_root)
     except ProblemStoreError as exc:
         raise click.ClickException(str(exc)) from exc
 

@@ -1,7 +1,7 @@
 // Component curves per arm over checkpoints: one small multiple per component,
 // mean line with a 95% interval band across attempts (WS-J's paired t / bootstrap,
 // as the analysis curves use). Hover a point for n, mean, SD and the interval.
-import { C } from '@/utils/colors';
+import { C } from '@/presentation/colors';
 import { COMPONENT_INFO, armColor, fmtComponent } from '@/quality/format';
 import { COMPONENTS, type Component, type CurvePoint } from '@/quality/types';
 

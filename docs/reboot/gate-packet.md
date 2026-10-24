@@ -232,7 +232,7 @@ Also outside N1: Harbor reinstalls codex in every trial, which takes about 36 s 
 - The log `chown` runs as one exec.
 - The rootless probe and the `litellm` import run concurrently with `compose up`.
 
-Tested in `tests/test_execution_environment.py`. Full measurements, including p50s: overhead-baseline.md §8, "N1 misses: profile and fixes".
+Tested in `tests/test_run_scoped_docker_environment.py`. Full measurements, including p50s: overhead-baseline.md §8, "N1 misses: profile and fixes".
 
 **Re-measured** (`make perf-fixture`, OrbStack, no LLM, 10 trajectories each, all valid and solved; `make perf-check` on each run). Values are p95 in seconds:
 

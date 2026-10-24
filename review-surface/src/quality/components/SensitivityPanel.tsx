@@ -1,7 +1,7 @@
 // Sensitivity of the headline score: weight ablation (mean S lost if a
 // component's weight were zero) and component correlation (a pair near ±1
 // suggests one component is redundant).
-import { C } from '@/utils/colors';
+import { C } from '@/presentation/colors';
 import { COMPONENT_INFO } from '@/quality/format';
 import { COMPONENTS, type Component, type Sensitivity } from '@/quality/types';
 

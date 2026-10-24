@@ -9,29 +9,34 @@ from typing import Any
 import pytest
 import yaml
 
-from raidar.analysis.assessed import CORRECTNESS_REF, build_outcome
-from raidar.execution.assessment import lock_errata, lock_rescore_config
-from raidar.execution.plan import PlanError, PlanOptions, build_plan
-from raidar.execution.trial_config import harbor_trial_config
-from raidar.packs.python.models import load_pack_spec
-from raidar.problems.errata import (
+from raidar.design.experiment.lock import LockError
+from raidar.design.experiment.validation import semantic_issues
+from raidar.design.problem.errata import (
     Disposition,
     ErrataError,
     errata_ref_from_metadata,
     load_errata,
 )
-from raidar.problems.models import ProblemId
-from raidar.problems.store import ROOT_ENV
-from raidar.scorers.correctness import correctness_scorer
-from raidar.scorers.sdk.result import TRAJECTORY_SUBJECT, AssessResult, AssessStatus, Observation
-from raidar.scorers.sdk.validation import validate_result
-from raidar.scorers.trial_inputs import load_trial_context
-from raidar.spec.lock import LockError
-from raidar.spec.metrics import SCB_CANONICAL
-from raidar.spec.validation import semantic_issues
-from raidar.verifier.errata import ErrataOutcome, ErrataRef, errata_outcome
-from raidar.verifier.models import CaseStatus
-from raidar.verifier.records import load_step_record, step_record_dir, write_step_record
+from raidar.design.problem.models import ProblemId
+from raidar.design.problem.store import ROOT_ENV
+from raidar.engine.job.assessment import lock_errata, lock_rescore_config
+from raidar.engine.trial.config import harbor_trial_config
+from raidar.engine.trial.plan import PlanError, PlanOptions, build_plan
+from raidar.evaluation.analysis.assessed import CORRECTNESS_REF, build_outcome
+from raidar.grading.errata import ErrataOutcome, ErrataRef, errata_outcome
+from raidar.grading.models import CaseStatus
+from raidar.grading.records import load_step_record, step_record_dir, write_step_record
+from raidar.scoring.correctness import correctness_scorer
+from raidar.scoring.framework.metrics import SCB_CANONICAL
+from raidar.scoring.framework.result import (
+    TRAJECTORY_SUBJECT,
+    AssessResult,
+    AssessStatus,
+    Observation,
+)
+from raidar.scoring.framework.trial_inputs import load_trial_context
+from raidar.scoring.framework.validation import validate_result
+from raidar.subject.environment.python.pack_definition import load_pack_spec
 from tests.execution_support import ImportedFixture, locked_experiment, validated_fixture
 from tests.scorer_support import APP_V1, StepFixture, write_trial
 from tests.test_analysis_outcomes import _record
@@ -128,9 +133,7 @@ def test_the_lock_pins_the_errata_in_the_execution_identity(
     fixture: ImportedFixture, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     # The trial config attaches host codex auth; this test is about errata, not the host.
-    monkeypatch.setattr(
-        "raidar.execution.trial_config.with_host_auth", lambda config, harness: config
-    )
+    monkeypatch.setattr("raidar.engine.trial.config.with_host_auth", lambda config, harness: config)
     _, plain, _ = locked_experiment(
         tmp_path / "plain", fixture.ref, environment={"compose_init": False}
     )
@@ -227,7 +230,7 @@ async def test_the_verifier_records_raw_and_errata_applied_verdicts(tmp_path: Pa
 
 
 def test_errata_outcome_has_no_verdict_without_a_raw_one() -> None:
-    from raidar.verifier.models import InfraFailure, VerifierGrade
+    from raidar.grading.models import InfraFailure, VerifierGrade
 
     grade = VerifierGrade(
         step="s", checkpoint="s", cases=(), infra_failure=InfraFailure(code="sandbox_timeout")
@@ -343,8 +346,8 @@ def test_analysis_labels_errata_outcomes_beside_the_raw_ones() -> None:
 
 
 def test_the_analysis_report_names_the_errata_its_errata_outcomes_apply() -> None:
-    from raidar.analysis.markdown import _errata_lines
-    from raidar.analysis.report import AnalysisReport
+    from raidar.evaluation.analysis.markdown import _errata_lines
+    from raidar.evaluation.analysis.report import AnalysisReport
 
     pinned = {
         "scb/forge@x": {"sha256": "9a6dec369dea" + "0" * 52, "exclude_from_solved": ["a", "b"]}

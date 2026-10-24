@@ -4,12 +4,15 @@ from __future__ import annotations
 
 import os
 import shutil
+import sys
 
 import click
 
-from raidar.cli.shared import ORCHESTRATOR_ROOT, python_cmd, run_or_raise
-from raidar.core import repo_state
-from raidar.core.paths import REPO_ROOT
+from raidar.cli import repo_state
+from raidar.cli.process import run_or_raise
+from raidar.contract.paths import ORCHESTRATOR_ROOT, REPO_ROOT
+
+PYTHON = sys.executable
 
 FANOUT_CHECK_SCRIPT = REPO_ROOT / "scripts" / "checks" / "check-python-fanout.py"
 PYTHON_QUALITY_CHECK_SCRIPT = REPO_ROOT / "scripts" / "checks" / "check-python-quality.py"
@@ -51,19 +54,19 @@ def assert_quality_gate_requirements() -> None:
 
 def run_ruff_quality_gates(*, fix: bool) -> None:
     if fix:
-        run_or_raise([python_cmd(), "-m", "ruff", "format", "--force-exclude"], ORCHESTRATOR_ROOT)
+        run_or_raise([PYTHON, "-m", "ruff", "format", "--force-exclude"], ORCHESTRATOR_ROOT)
         run_or_raise(
-            [python_cmd(), "-m", "ruff", "check", ".", "--fix", "--force-exclude"],
+            [PYTHON, "-m", "ruff", "check", ".", "--fix", "--force-exclude"],
             ORCHESTRATOR_ROOT,
         )
         return
 
     run_or_raise(
-        [python_cmd(), "-m", "ruff", "format", "--check", "--force-exclude"],
+        [PYTHON, "-m", "ruff", "format", "--check", "--force-exclude"],
         ORCHESTRATOR_ROOT,
     )
     run_or_raise(
-        [python_cmd(), "-m", "ruff", "check", ".", "--no-fix", "--force-exclude"],
+        [PYTHON, "-m", "ruff", "check", ".", "--no-fix", "--force-exclude"],
         ORCHESTRATOR_ROOT,
     )
 
@@ -79,7 +82,7 @@ def coverage_env() -> dict[str, str]:
 def run_orchestrator_quality_gates() -> None:
     run_or_raise(
         [
-            python_cmd(),
+            PYTHON,
             str(FANOUT_CHECK_SCRIPT),
             "--repo-root",
             str(REPO_ROOT),
@@ -91,18 +94,18 @@ def run_orchestrator_quality_gates() -> None:
         REPO_ROOT,
     )
     run_or_raise(
-        [python_cmd(), str(PYTHON_QUALITY_CHECK_SCRIPT), "--repo-root", str(REPO_ROOT)],
+        [PYTHON, str(PYTHON_QUALITY_CHECK_SCRIPT), "--repo-root", str(REPO_ROOT)],
         REPO_ROOT,
     )
     run_or_raise(["lint-imports", "--config", str(IMPORT_LINTER_CONFIG)], ORCHESTRATOR_ROOT)
     run_or_raise(["lizard", "-C", "10", "-l", "python", "src"], ORCHESTRATOR_ROOT)
     run_or_raise(
-        [python_cmd(), "-m", "mypy", "--follow-imports=skip", *TYPECHECK_TARGETS],
+        [PYTHON, "-m", "mypy", "--follow-imports=skip", *TYPECHECK_TARGETS],
         ORCHESTRATOR_ROOT,
     )
     run_or_raise(
         [
-            python_cmd(),
+            PYTHON,
             "-m",
             "pytest",
             "tests",

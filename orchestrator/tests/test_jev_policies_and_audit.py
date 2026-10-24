@@ -10,14 +10,20 @@ import pytest
 from click.testing import CliRunner
 
 from raidar.cli import main
-from raidar.jev.audit import DecisionStage, InputSufficiency, SufficiencyLevel
-from raidar.jev.calibration import (
+from raidar.scoring.framework.builtin_manifests import PROCESS_COMPLIANCE
+from raidar.scoring.framework.result import AssessResult, AssessStatus, Observation, Provenance
+from raidar.scoring.judge.audit import DecisionStage, InputSufficiency, SufficiencyLevel
+from raidar.scoring.judge.calibration import (
     LabelImportError,
     import_labels,
     promotion_readiness,
 )
-from raidar.jev.gating import jev_policy_modes, uncalibrated_observations, verdict_observations
-from raidar.jev.policies import (
+from raidar.scoring.judge.gating import (
+    jev_policy_modes,
+    uncalibrated_observations,
+    verdict_observations,
+)
+from raidar.scoring.judge.policies import (
     LABELS,
     CalibrationSplit,
     PolicyError,
@@ -25,11 +31,9 @@ from raidar.jev.policies import (
     PolicyRegistry,
     load_policy,
 )
-from raidar.jev.promotion import build_promotion, verify_promotion
-from raidar.jev.protocol import NoulQuestion
-from raidar.jev.runtime import RULE_INPUT_MISSING
-from raidar.scorers.builtin_manifests import PROCESS_COMPLIANCE
-from raidar.scorers.sdk.result import AssessResult, AssessStatus, Observation, Provenance
+from raidar.scoring.judge.promotion import build_promotion, verify_promotion
+from raidar.scoring.judge.protocol import NoulQuestion
+from raidar.scoring.judge.runtime import RULE_INPUT_MISSING
 from tests.jev_support import SUFFICIENT, RecordedTransport, make_runtime, noul_answer, policy
 
 RUBRIC = "code-quality.rubric-smells"

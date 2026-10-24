@@ -22,10 +22,10 @@ from pathlib import Path
 import pytest
 from harbor.models.trial.config import AgentConfig
 
-from raidar.agents.codex_auth import resolve_codex_auth
-from raidar.agents.config import Harness
-from raidar.components import CompiledCondition
-from raidar.components.runtime.provision import trial_provisions
+from raidar.subject.agent.codex_auth import resolve_codex_auth
+from raidar.subject.agent.config import Harness
+from raidar.subject.treatment import CompiledCondition
+from raidar.subject.treatment.runtime.provision import trial_provisions
 from tests.component_support import PILOT_DIR, all_builtin_uses, compile_uses, use
 from tests.component_trial_support import (
     build_task,

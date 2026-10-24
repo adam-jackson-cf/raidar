@@ -2,7 +2,7 @@
 // trial's audited Jev decisions are shown read-only, collapsed, for history.
 // Nothing here labels, scores or counts; `JevLabelPanel` stays in the tree,
 // dormant, for the day a new user decision un-parks Jev.
-import { C } from '@/utils/colors';
+import { C } from '@/presentation/colors';
 import type { JevDecisionItem } from '@/quality/types';
 
 export function JevHistoryPanel({ decisions }: { decisions: JevDecisionItem[] }) {

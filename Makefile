@@ -18,8 +18,8 @@ REPO_RUNTIME_ENV := mkdir -p "$(REPO_TMP_DIR)" "$(REPO_UV_CACHE_DIR)" && env \
 RAIDAR := $(REPO_RUNTIME_ENV) uv run --project orchestrator raidar
 RAIDAR_DEV := $(REPO_RUNTIME_ENV) uv run --project orchestrator --extra dev raidar
 
-# Docker target (raidar.targets): TARGET=<name> selects an entry of ~/.config/raidar/targets.toml
-# (else $RAIDAR_TARGET, the file's `default`, then the current Docker context).
+# Docker target (raidar.engine.target): TARGET=<name> selects an entry of ~/.config/raidar/targets.toml
+# (else $RAIDAR_TARGET, then the file's `default`; none of these is an error).
 TARGET ?=
 TARGET_ENV := $(if $(TARGET),export RAIDAR_TARGET="$(TARGET)" &&,)
 
@@ -88,7 +88,7 @@ endif
 endif
 # agent-smoke: the smoke experiment with its one agent replaced. AGENT is a Harbor agent name
 # (codex, claude-code). Versions must equal the Python pack pins
-# (orchestrator/src/raidar/packs/python/pack.yaml); the lock refuses others (RT5).
+# (lab/environments/python/pack.yaml); the lock refuses others (RT5).
 # Provider/model/effort default per agent: codex runs gpt-6-luna at low effort;
 # claude-code runs claude-haiku-4-5, which has no effort levels, so its effort is unset.
 # REASONING_EFFORT given (even empty: `REASONING_EFFORT=`) wins; empty means unset.
@@ -152,7 +152,7 @@ help:
 	@echo "  Secrets: execute/smoke/assess/jev targets inject Infisical (project mac-os-cf, env dev) when the infisical"
 	@echo "  CLI is logged in, else read orchestrator/.env. [SECRETS=auto|infisical|dotenv] [INFISICAL_ENV=dev]"
 	@echo ""
-	@echo "Docker target (TARGET=<name> from ~/.config/raidar/targets.toml, else \$$RAIDAR_TARGET, its default, then the current Docker context):"
+	@echo "Docker target (TARGET=<name> from ~/.config/raidar/targets.toml, else \$$RAIDAR_TARGET, then its default; none of these is an error):"
 	@echo "  make target-init                                       Write a commented ~/.config/raidar/targets.toml template (never overwrites)"
 	@echo "  make target-list                                       List defined targets and the selected one"
 	@echo "  make target-status [TARGET=name]                       Print the target's Docker facts; non-zero when unreachable or its data check fails"
@@ -208,7 +208,7 @@ help:
 	@echo "  make assess-regrade JOB=<trial-or-job-dir> [VERIFIER_BUNDLE=<dir>] [STORE=<assessment-store>] [COVERAGE_CHECK=1 [CONCURRENCY=N]] [REGRADE_OUT=report.json]"
 	@echo "                                                        Rerun the verifier over stored step snapshots (and, with STORE, the stored pre-fix grades); fails if results differ;"
 	@echo "                                                        COVERAGE_CHECK=1 instead makes each step's coverage run offline and compares it with the trial's own (or STORE's)"
-	@echo "  make experiment-analyze JOBS=\"<job-dir> ...\" STORE=<assessment-store> ANALYSIS_OUT=<dir> [LOCK=] [ASSESSMENT_CONFIG=] [BUNDLE_SEARCH=<dir>...] [MIN_PAIRS=] [MAX_EXCLUSION_FRACTION=] [ALPHA=] [BOOTSTRAP_SAMPLES=10000] [MIN_EFFECTS=\"metric=delta ...\"] [ALLOW_DEV_JOBS=1] [POOL_OVERRIDE=<field>[,<field>]]"
+	@echo "  make experiment-analyze JOBS=\"<job-dir> ...\" STORE=<assessment-store> ANALYSIS_OUT=<dir> [LOCK=] [ASSESSMENT_CONFIG=] [MIN_PAIRS=] [MAX_EXCLUSION_FRACTION=] [ALPHA=] [BOOTSTRAP_SAMPLES=10000] [MIN_EFFECTS=\"metric=delta ...\"] [ALLOW_DEV_JOBS=1] [POOL_OVERRIDE=<field>[,<field>]]"
 	@echo "                                                        Paired deltas, CIs, curves, verdicts and sample size vs the baseline arm (thresholds from the lock;"
 	@echo "                                                        overrides are labelled); benchmarks add a ranking view, smoke reports are stamped not citable;"
 	@echo "                                                        2+ jobs pool only when provenance matches (POOL_OVERRIDE lifts named refusals, recorded; a records-manifest violation never lifts)"
@@ -304,7 +304,7 @@ REVIEW_LOCK ?=
 
 # $(1) job roots, $(2) Assessment stores.
 define review_projection
-	@$(REPO_RUNTIME_ENV) uv run --project orchestrator python -m raidar.review.projection \
+	@$(REPO_RUNTIME_ENV) uv run --project orchestrator python -m raidar.evaluation.review.projection \
 		$(foreach root,$(1),--jobs-root "$(abspath $(root))") \
 		$(foreach store,$(2),--store "$(abspath $(store))") \
 		$(foreach lock,$(REVIEW_LOCK),--lock "$(abspath $(lock))") \
@@ -314,7 +314,7 @@ define review_projection
 endef
 
 review-fixture-synthetic:
-	@cd orchestrator && uv run --project . python -m raidar.review.projection.fixture "$(abspath $(REVIEW_FIXTURE_DIR))"
+	@cd orchestrator && uv run --project . python -m tests.review_fixtures.projection "$(abspath $(REVIEW_FIXTURE_DIR))"
 
 review-surface-data:
 	$(call require_var,REVIEW_JOBS_ROOT)
@@ -334,7 +334,7 @@ QUALITY_LOCK ?=
 
 # $(1) job roots and $(2) Assessment stores, paired by position; $(3) --synthetic or empty.
 define quality_projection
-	@$(REPO_RUNTIME_ENV) uv run --project orchestrator python -m raidar.review.quality \
+	@$(REPO_RUNTIME_ENV) uv run --project orchestrator python -m raidar.evaluation.review.quality \
 		$(foreach root,$(1),--jobs-root "$(abspath $(root))") \
 		$(foreach store,$(2),--store "$(abspath $(store))") \
 		$(foreach lock,$(QUALITY_LOCK) $(REVIEW_LOCK),--lock "$(abspath $(lock))") \
@@ -344,7 +344,7 @@ define quality_projection
 endef
 
 quality-fixture-synthetic:
-	@$(REPO_RUNTIME_ENV) uv run --project orchestrator python -m raidar.review.quality.synthetic "$(QUALITY_FIXTURE_DIR)"
+	@$(REPO_RUNTIME_ENV) uv run --project orchestrator --directory orchestrator python -m tests.review_fixtures.quality "$(abspath $(QUALITY_FIXTURE_DIR))"
 
 review-surface-quality-data:
 	$(if $(QUALITY_JOBS),$(if $(filter $(words $(QUALITY_JOBS)),$(words $(QUALITY_STORE))),,$(error QUALITY_JOBS and QUALITY_STORE need one store per jobs root, in the same order)))
@@ -456,14 +456,14 @@ experiment-plan:
 	$(call require_var,EXPERIMENT)
 	@$(RAIDAR) plan "$(EXPERIMENT)" $(EXECUTION_SELECT) $(if $(PLAN_JSON),--json,)
 
-# DETACH=1: the job runs under a supervisor in its own session (raidar.execution.detach), so it
+# DETACH=1: the job runs under a supervisor in its own session (raidar.engine.job.detach), so it
 # survives the launching shell or agent session; its launch record, pid and log are in
 # <job dir>/detach/. The supervisor reruns this target with DETACH=0 and the job id (the
 # caller's other variables travel in MAKEFLAGS). Poll with make experiment-status JOB=<job dir>.
 DETACH ?=
 LOG_LINES ?= 20
 EXECUTE_JOBS_DIR = $(if $(JOBS_DIR),$(abspath $(JOBS_DIR)),$(RAIDAR_VAR)/jobs)
-DETACH_TOOL := $(REPO_RUNTIME_ENV) uv run --project orchestrator python -m raidar.execution.detach
+DETACH_TOOL := $(REPO_RUNTIME_ENV) uv run --project orchestrator python -m raidar.engine.job.detach
 
 experiment-execute: pack-build
 	$(call require_var,EXPERIMENT)
@@ -497,7 +497,7 @@ perf-fixture:
 		$(if $(PERF_FIXTURE_DIR),export RAIDAR_PERF_FIXTURE_DIR="$(abspath $(PERF_FIXTURE_DIR))" &&,) \
 		$(if $(PERF_FIXTURE_CONCURRENCY),export RAIDAR_PERF_FIXTURE_CONCURRENCY="$(PERF_FIXTURE_CONCURRENCY)" &&,) \
 		cd orchestrator && $(REPO_RUNTIME_ENV) uv run --project . --extra dev \
-		python -m pytest tests/test_execution_perf_fixture.py -v -s -rs
+		python -m pytest tests/test_overhead_fixture_run.py -v -s -rs
 
 # The enforced N1 overhead gate: the no-LLM fixture at fixed concurrency 1 and 3, each
 # checked strictly against the accepted budgets. Needs Docker, so it is a release/gate
@@ -559,7 +559,7 @@ experiment-analyze:
 	$(call require_var,JOBS)
 	$(call require_var,STORE)
 	$(call require_var,ANALYSIS_OUT)
-	@$(RAIDAR) analyze $(foreach job,$(JOBS),"$(job)") --store "$(STORE)" --output "$(ANALYSIS_OUT)" $(if $(LOCK),--lock "$(LOCK)",) $(if $(ASSESSMENT_CONFIG),--assessment-config "$(ASSESSMENT_CONFIG)",) $(foreach dir,$(BUNDLE_SEARCH),--bundle-search "$(dir)") $(if $(MIN_PAIRS),--min-pairs "$(MIN_PAIRS)",) $(if $(MAX_EXCLUSION_FRACTION),--max-exclusion-fraction "$(MAX_EXCLUSION_FRACTION)",) $(if $(ALPHA),--alpha "$(ALPHA)",) $(if $(BOOTSTRAP_SAMPLES),--bootstrap-samples "$(BOOTSTRAP_SAMPLES)",) $(foreach effect,$(MIN_EFFECTS),--min-effect "$(effect)") $(if $(ALLOW_DEV_JOBS),--allow-dev-jobs,) $(foreach field,$(subst $(comma), ,$(POOL_OVERRIDE)),--pool-override "$(field)")
+	@$(RAIDAR) analyze $(foreach job,$(JOBS),"$(job)") --store "$(STORE)" --output "$(ANALYSIS_OUT)" $(if $(LOCK),--lock "$(LOCK)",) $(if $(ASSESSMENT_CONFIG),--assessment-config "$(ASSESSMENT_CONFIG)",) $(if $(MIN_PAIRS),--min-pairs "$(MIN_PAIRS)",) $(if $(MAX_EXCLUSION_FRACTION),--max-exclusion-fraction "$(MAX_EXCLUSION_FRACTION)",) $(if $(ALPHA),--alpha "$(ALPHA)",) $(if $(BOOTSTRAP_SAMPLES),--bootstrap-samples "$(BOOTSTRAP_SAMPLES)",) $(foreach effect,$(MIN_EFFECTS),--min-effect "$(effect)") $(if $(ALLOW_DEV_JOBS),--allow-dev-jobs,) $(foreach field,$(subst $(comma), ,$(POOL_OVERRIDE)),--pool-override "$(field)")
 
 jev-export-labels:
 	$(call require_var,POLICY)

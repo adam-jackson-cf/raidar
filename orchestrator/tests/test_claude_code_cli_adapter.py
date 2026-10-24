@@ -2,9 +2,9 @@
 
 import pytest
 
-from raidar.agents.adapters.claude_code_cli import ClaudeCodeCliAdapter
-from raidar.agents.adapters.factory import resolve_adapter
-from raidar.agents.config import AgentSpec, Harness, ModelTarget
+from raidar.subject.agent.adapters.claude_code_cli import ClaudeCodeCliAdapter
+from raidar.subject.agent.adapters.factory import resolve_adapter
+from raidar.subject.agent.config import AgentSpec, Harness, ModelTarget
 
 
 def _config(

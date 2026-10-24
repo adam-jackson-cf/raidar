@@ -1,4 +1,4 @@
 # Imported content and dataset checkouts are generated under var/problems/ (see
-# raidar.problems.store); only a fixture store's own cache is ignored here, so committed
+# raidar.design.problem.store); only a fixture store's own cache is ignored here, so committed
 # fixture stores (fixtures/*/store) stay tracked.
 /fixtures/*/cache/

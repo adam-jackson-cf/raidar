@@ -20,8 +20,8 @@ import subprocess
 import textwrap
 from pathlib import Path
 
-from raidar.problems.content import content_digest
-from raidar.problems.models import (
+from raidar.design.problem.content import content_digest
+from raidar.design.problem.models import (
     PackBinding,
     ProblemId,
     ProblemManifest,
@@ -29,10 +29,10 @@ from raidar.problems.models import (
     ProblemSource,
     ProblemStep,
 )
-from raidar.problems.store import ProblemStore
-from raidar.problems.validation import ValidationReport
-from raidar.problems.validator import ValidateOptions, validate_problem, write_report
-from raidar.verifier.bundle import BundleManifest, GraderSpec, VerifierStepSpec, write_bundle
+from raidar.design.problem.store import ProblemStore
+from raidar.design.problem.validation import ValidationReport
+from raidar.design.problem.validator import ValidateOptions, validate_problem, write_report
+from raidar.grading.bundle import BundleManifest, GraderSpec, VerifierStepSpec, write_bundle
 from tests.verifier_support import LocalProcessSandbox, write_app, write_tests
 
 FIXTURE_COMMIT = "fe" * 20

@@ -1,132 +1,142 @@
 [importlinter]
-root_package = raidar
+root_packages =
+    raidar
+    tests
 
-[importlinter:contract:core-boundary]
-name = Core value types stay independent of every other raidar layer
+# Tiers of the top-level groups, highest first. A group imports only groups below it, directly
+# or through other modules (docs/reboot/repo-structure-design.md §8).
+[importlinter:contract:tiers]
+name = Each group imports only groups below it
+type = layers
+layers =
+    raidar.cli
+    raidar.evaluation
+    raidar.engine
+    raidar.design
+    raidar.scoring
+    raidar.grading
+    raidar.subject
+    raidar.contract
+
+# Sub-tiers inside a group: siblings either form declared tiers or are independent.
+[importlinter:contract:engine-tiers]
+name = Engine: job > trial > health > perf > target
+type = layers
+layers =
+    raidar.engine.job
+    raidar.engine.trial
+    raidar.engine.health
+    raidar.engine.perf
+    raidar.engine.target
+
+[importlinter:contract:scoring-tiers]
+name = Scoring: the catalog imports the scorers, the scorers import only the framework and never each other
+type = layers
+layers =
+    raidar.scoring.catalog
+    raidar.scoring.code_quality | raidar.scoring.correctness | raidar.scoring.gate_effort | raidar.scoring.judge | raidar.scoring.process_checks | raidar.scoring.resource_usage
+    raidar.scoring.framework
+
+[importlinter:contract:subject-tiers]
+name = Subject: treatment > agent
+type = layers
+layers =
+    raidar.subject.treatment
+    raidar.subject.agent
+
+[importlinter:contract:subject-environment-independent-of-treatment]
+name = Runtime packs (environment) and treatments are independent
+type = independence
+modules =
+    raidar.subject.environment
+    raidar.subject.treatment
+
+[importlinter:contract:subject-environment-independent-of-agent]
+name = Runtime packs (environment) and agents are independent
+type = independence
+modules =
+    raidar.subject.environment
+    raidar.subject.agent
+
+[importlinter:contract:design-independent]
+name = Experiment design and the problem registry are independent
+type = independence
+modules =
+    raidar.design.experiment
+    raidar.design.problem
+
+[importlinter:contract:evaluation-tiers]
+name = Evaluation: review > analysis
+type = layers
+layers =
+    raidar.evaluation.review
+    raidar.evaluation.analysis
+
+[importlinter:contract:ledger-independent-of-review]
+name = The ledger and the review views are independent
+type = independence
+modules =
+    raidar.evaluation.ledger
+    raidar.evaluation.review
+
+[importlinter:contract:ledger-independent-of-analysis]
+name = The ledger and analysis are independent
+type = independence
+modules =
+    raidar.evaluation.ledger
+    raidar.evaluation.analysis
+
+# Boundaries that are stricter than the tiers.
+[importlinter:contract:design-problem-boundary]
+name = Problems stay independent of agents
 type = forbidden
 source_modules =
-    raidar.core
+    raidar.design.problem
 forbidden_modules =
-    raidar.agents
-    raidar.analysis
-    raidar.cli
-    raidar.components
-    raidar.execution
-    raidar.jev
-    raidar.review
-    raidar.scorers
-    raidar.spec
+    raidar.subject.agent
 
-[importlinter:contract:scorers-boundary]
-name = Scorers stay independent of execution, agents, and the CLI layer
+[importlinter:contract:grading-boundary]
+name = Grading stays independent of subjects
 type = forbidden
 source_modules =
-    raidar.scorers
+    raidar.grading
 forbidden_modules =
-    raidar.execution
-    raidar.agents
-    raidar.cli
+    raidar.subject
 
-[importlinter:contract:spec-boundary]
-name = Experiment spec stays independent of execution and the CLI layer
+[importlinter:contract:scoring-boundary]
+name = Scoring stays independent of agents and treatments
 type = forbidden
 source_modules =
-    raidar.spec
+    raidar.scoring
 forbidden_modules =
-    raidar.execution
-    raidar.cli
-
-[importlinter:contract:packs-boundary]
-name = Runtime packs stay independent of execution, agents, and the CLI layer
-type = forbidden
-source_modules =
-    raidar.packs
-forbidden_modules =
-    raidar.execution
-    raidar.agents
-    raidar.cli
-
-[importlinter:contract:verifier-boundary]
-name = Verifier stays independent of execution, agents, and the CLI layer
-type = forbidden
-source_modules =
-    raidar.verifier
-forbidden_modules =
-    raidar.execution
-    raidar.agents
-    raidar.cli
-
-[importlinter:contract:problems-boundary]
-name = Problems stay independent of execution, agents, and the CLI layer
-type = forbidden
-source_modules =
-    raidar.problems
-forbidden_modules =
-    raidar.execution
-    raidar.agents
-    raidar.cli
-
-[importlinter:contract:components-boundary]
-name = Components stay independent of execution and the CLI layer
-type = forbidden
-source_modules =
-    raidar.components
-forbidden_modules =
-    raidar.execution
-    raidar.cli
-
-[importlinter:contract:jev-boundary]
-name = Jev stays independent of execution, agents, and the CLI layer
-type = forbidden
-source_modules =
-    raidar.jev
-forbidden_modules =
-    raidar.execution
-    raidar.agents
-    raidar.cli
-
-[importlinter:contract:execution-boundary]
-name = Execution stays independent of the CLI layer
-type = forbidden
-source_modules =
-    raidar.execution
-forbidden_modules =
-    raidar.cli
-
-[importlinter:contract:analysis-boundary]
-name = Analysis stays independent of the CLI layer
-type = forbidden
-source_modules =
-    raidar.analysis
-forbidden_modules =
-    raidar.cli
-
-[importlinter:contract:review-boundary]
-name = Review projection and quality stay independent of the CLI layer
-type = forbidden
-source_modules =
-    raidar.review
-forbidden_modules =
-    raidar.cli
-
-[importlinter:contract:ledger-boundary]
-name = Ledger stays independent of every other raidar layer
-type = forbidden
-source_modules =
-    raidar.ledger
-forbidden_modules =
-    raidar.agents
-    raidar.analysis
-    raidar.cli
-    raidar.components
-    raidar.execution
-    raidar.scorers
-    raidar.spec
+    raidar.subject.agent
+    raidar.subject.treatment
 
 [importlinter:contract:deterministic-process-checks]
 name = process-compliance decides only deterministically: no Jev import, direct or indirect
 type = forbidden
 source_modules =
-    raidar.scorers.process_checks
+    raidar.scoring.process_checks
 forbidden_modules =
-    raidar.jev
+    raidar.scoring.judge
+
+[importlinter:contract:ledger-boundary]
+name = Ledger stays independent of every other raidar layer
+type = forbidden
+source_modules =
+    raidar.evaluation.ledger
+forbidden_modules =
+    raidar.cli
+    raidar.design
+    raidar.subject
+    raidar.engine
+    raidar.scoring
+    raidar.evaluation.analysis
+
+[importlinter:contract:test-tooling-is-not-product]
+name = No product module imports the review fixture generators (test tooling)
+type = forbidden
+source_modules =
+    raidar
+forbidden_modules =
+    tests

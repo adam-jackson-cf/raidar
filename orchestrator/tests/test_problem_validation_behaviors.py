@@ -12,12 +12,12 @@ from click.testing import CliRunner
 from harbor.models.task.task import Task
 
 from raidar.cli import main
-from raidar.problems import direct, harbor_engine, validator
-from raidar.problems.models import ProblemId
-from raidar.problems.native import grade_from_evaluation, stage_catalog
-from raidar.problems.rewrite import VERIFIER_IMPORT_PATH
-from raidar.problems.store import ProblemStore
-from raidar.problems.validation import (
+from raidar.design.problem import direct, harbor_engine, validator
+from raidar.design.problem.models import ProblemId
+from raidar.design.problem.native import grade_from_evaluation, stage_catalog
+from raidar.design.problem.rewrite import VERIFIER_IMPORT_PATH
+from raidar.design.problem.store import ProblemStore
+from raidar.design.problem.validation import (
     NEGATIVE,
     POSITIVE,
     Check,
@@ -33,8 +33,8 @@ from raidar.problems.validation import (
     run_checks,
     verdict,
 )
-from raidar.problems.validator import ValidateOptions, validate_problem, write_report
-from raidar.verifier.sandbox import SandboxResult, SandboxRun
+from raidar.design.problem.validator import ValidateOptions, validate_problem, write_report
+from raidar.grading.sandbox import SandboxResult, SandboxRun
 from tests.component_trial_support import docker_context, docker_target_reachable
 from tests.problems_support import (
     NEGATIVE_REF,
@@ -138,7 +138,7 @@ async def test_one_shot_problem_grades_one_step_under_the_one_shot_policy(
         "R": "not_applicable",
         "G": "not_applicable",
     }
-    assert policy["eligible"] is False  # V/E/H come from WS-G scorers, never zero-filled
+    assert policy["eligible"] is False  # V/E/H come from scorers, never zero-filled
     multi: Any = (await _validate(store, POSITIVE_REF, tmp_path, repeats=1)).to_json()
     assert multi["headline_policy"]["policy"] == "scb-canonical@1"
 
@@ -291,7 +291,8 @@ def test_harbor_engine_variant_adds_solutions_to_a_copy_only(
     assert config.agent.name == "oracle"
     assert config.verifier.import_path == VERIFIER_IMPORT_PATH
     assert config.verifier.kwargs["oracle_bundle"] == str(problem.bundle.root)
-    assert config.verifier.kwargs["snapshot_source"] == "artifact"
+    # Validation tasks collect no /app artifact, so the verifier downloads the snapshot.
+    assert config.verifier.kwargs["snapshot_source"] == "download"
     grades = harbor_engine.read_grades(tmp_path / "trials" / "negative-0", ["checkpoint_1"])
     assert grades["checkpoint_1"].infra_failure == "no_verifier_record"
     # Harbor records (does not raise) trial exceptions; the type survives as the reason.
@@ -430,7 +431,7 @@ async def test_validator_wires_the_harbor_engine_and_the_native_arm(
     monkeypatch.setattr(harbor_engine, "run_variant", fake_variant)
     monkeypatch.setattr(validator, "resolve_checkout", lambda *args: Checkout())
     monkeypatch.setattr(validator, "stage_catalog", lambda source, catalog: catalog / source.name)
-    monkeypatch.setattr("raidar.problems.native._docker_host", lambda context: "unix:///fake")
+    monkeypatch.setattr("raidar.design.problem.native._docker_host", lambda context: "unix:///fake")
     report = await validate_problem(
         store,
         ProblemId.parse(POSITIVE_REF),

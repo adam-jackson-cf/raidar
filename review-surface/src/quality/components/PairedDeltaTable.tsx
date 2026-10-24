@@ -1,6 +1,6 @@
 // Paired Δ per component vs the baseline arm: within-attempt differences, mean
 // with a 95% paired-t interval, and a verdict only when the interval excludes 0.
-import { C } from '@/utils/colors';
+import { C } from '@/presentation/colors';
 import { COMPONENT_INFO, VERDICT_STYLE, fmtSigned } from '@/quality/format';
 import type { PairedDelta } from '@/quality/types';
 

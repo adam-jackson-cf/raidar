@@ -9,19 +9,19 @@ from typing import Any
 
 import click
 
-from raidar.execution.cleanup import reap_project
-from raidar.execution.environment import trial_project_name
-from raidar.targets.config import (
+from raidar.engine.target.config import (
     Selection,
     TargetError,
     activate,
     require_trusted,
     resolve_selection,
 )
-from raidar.targets.guard import TargetGuard, TargetLostError
-from raidar.targets.health import docker_facts, ensure_target
-from raidar.targets.job import JobTarget
-from raidar.verifier.sandbox import sweep_grader_orphans
+from raidar.engine.target.guard import TargetGuard, TargetLostError
+from raidar.engine.target.health import docker_facts, ensure_target
+from raidar.engine.target.job import JobTarget
+from raidar.engine.trial.cleanup import reap_project
+from raidar.engine.trial.environment import trial_project_name
+from raidar.grading.sandbox import sweep_grader_orphans
 
 
 def target_option(command: Callable[..., Any]) -> Callable[..., Any]:
@@ -29,8 +29,7 @@ def target_option(command: Callable[..., Any]) -> Callable[..., Any]:
         "--target",
         "target_name",
         default=None,
-        help="Execution target (default: $RAIDAR_TARGET, then targets.toml `default`, "
-        "then the current Docker context).",
+        help="Execution target (default: $RAIDAR_TARGET, then targets.toml `default`).",
     )(command)
 
 

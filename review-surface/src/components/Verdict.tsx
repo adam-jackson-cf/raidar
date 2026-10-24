@@ -1,8 +1,8 @@
 // Shared verdict renderings: tier pills and score bars. Every score the
 // surface shows should pass through one of these so the good/bad vocabulary
 // stays consistent.
-import { C } from '@/utils/colors';
-import { scoreTier, type Tier } from '@/utils/verdict';
+import { C } from '@/presentation/colors';
+import { scoreTier, type Tier } from '@/presentation/verdict';
 
 /** Named tier pill, e.g. ● Strong. */
 export function TierPill({ tier, detail, size = 'sm' }: { tier: Tier; detail?: string; size?: 'sm' | 'lg' }) {

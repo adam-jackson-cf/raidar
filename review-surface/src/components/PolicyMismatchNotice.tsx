@@ -7,8 +7,8 @@ import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { TriangleAlert } from 'lucide-react';
 import { api } from '@/api/client';
-import { C } from '@/utils/colors';
-import type { ExperimentRecord } from '@/utils/types';
+import { C } from '@/presentation/colors';
+import type { ExperimentRecord } from '@/api/types';
 import type { QualityExperiment } from '@/quality/types';
 
 export const MISMATCH_CATEGORY = 'headline-policy-mismatch';

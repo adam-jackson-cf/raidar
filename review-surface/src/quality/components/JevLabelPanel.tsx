@@ -1,10 +1,10 @@
 // DORMANT since 2026-10-04 (Jev parked): not rendered; QualityRunPage shows
 // JevHistoryPanel instead. Kept intact for a future decision to un-park Jev.
-// Reviewer calibration labels for this run's Jev decisions (plan K4). A label
+// Reviewer calibration labels for this run's Jev decisions. A label
 // saved here is pending until `make jev-export-labels` exports it for
 // `raidar jev import-labels`; a label already in the audit is shown locked.
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { C } from '@/utils/colors';
+import { C } from '@/presentation/colors';
 import { qualityApi } from '@/quality/api';
 import { JEV_LABELS, type JevDecisionItem, type JevLabel } from '@/quality/types';
 

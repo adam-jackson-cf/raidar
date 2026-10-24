@@ -13,9 +13,9 @@ from typing import Any
 import pytest
 import requests
 
-from raidar.jev.audit import DecisionStage
-from raidar.jev.cache import decision_key
-from raidar.jev.client import (
+from raidar.scoring.judge.audit import DecisionStage
+from raidar.scoring.judge.cache import decision_key
+from raidar.scoring.judge.client import (
     FailureReason,
     JevClient,
     JevFailure,
@@ -23,7 +23,7 @@ from raidar.jev.client import (
     RequestsTransport,
     api_key_from_env,
 )
-from raidar.jev.protocol import (
+from raidar.scoring.judge.protocol import (
     INVALID_MODEL_ID,
     JEV_ENDPOINT,
     JEV_MODEL,
@@ -33,7 +33,7 @@ from raidar.jev.protocol import (
     NoulQuestion,
     ScoreQuestion,
 )
-from raidar.jev.redaction import clip, redact
+from raidar.scoring.judge.redaction import clip, redact
 from tests.jev_support import (
     SUFFICIENT,
     TEST_KEY,

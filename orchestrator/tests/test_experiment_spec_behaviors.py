@@ -1,4 +1,4 @@
-"""experiment.yaml schema, CLI override precedence and factor guard (WS-A: A1, A3)."""
+"""experiment.yaml schema, CLI override precedence and factor guard."""
 
 from __future__ import annotations
 
@@ -8,9 +8,9 @@ import pytest
 from click.testing import CliRunner
 
 from raidar.cli import main
-from raidar.spec.factor_guard import check_factors
-from raidar.spec.loader import UNSET, CliOverrides, load_experiment, parse_assignment
-from raidar.spec.validation import SpecValidationError
+from raidar.design.experiment.factor_guard import check_factors
+from raidar.design.experiment.loader import UNSET, CliOverrides, load_experiment, parse_assignment
+from raidar.design.experiment.validation import SpecValidationError
 from tests.experiment_spec_support import (
     AGENTS_BENCHMARK,
     MECHANICS_SMOKE,
@@ -374,7 +374,7 @@ def test_verdict_thresholds_are_pinned_in_the_analysis_block(tmp_path: Path) -> 
 
 
 def test_set_overrides_change_only_the_addressed_yaml_alias(tmp_path: Path) -> None:
-    from raidar.spec.loader import _read_document, apply_assignment
+    from raidar.design.experiment.loader import _read_document, apply_assignment
 
     path = tmp_path / "aliased.yaml"
     path.write_text(

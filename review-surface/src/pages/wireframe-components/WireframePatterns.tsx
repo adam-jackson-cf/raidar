@@ -1,8 +1,8 @@
 import { useMemo, useState, type MouseEvent } from 'react';
 import { CircleAlert, CircleCheck, Info, Pin, PinOff, X } from 'lucide-react';
-import { C } from '@/utils/colors';
-import { humanize, categoryHint, categoryLabel, runLabel } from '@/utils/verdict';
-import type { ExperimentRecord, RunRecord } from '@/utils/types';
+import { C } from '@/presentation/colors';
+import { humanize, categoryHint, categoryLabel, runLabel } from '@/presentation/verdict';
+import type { ExperimentRecord, RunRecord } from '@/api/types';
 import { compactSpec } from './wireframeLabels';
 
 type PatternKind = 'friction' | 'strength';

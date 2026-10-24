@@ -1,0 +1,35 @@
+"""Reusable adapter for harness CLIs discovered via env or PATH."""
+
+from __future__ import annotations
+
+from .base import HarnessAdapter
+
+
+class ExternalCliAdapter(HarnessAdapter):
+    """Shared adapter for harnesses launched via a dedicated CLI binary."""
+
+    CLI_ENV_VAR: str = ""
+    DEFAULT_BINARY: str = ""
+    ALLOWED_PROVIDERS: tuple[str, ...] | None = None
+
+    @classmethod
+    def supported_model_summary(cls) -> str:
+        if not cls.ALLOWED_PROVIDERS:
+            return "(any provider/model)"
+        return ", ".join(f"{provider}/*" for provider in cls.ALLOWED_PROVIDERS)
+
+    def validate(self) -> None:
+        self._resolve_cli()
+        self._validate_credentials()
+        if self.ALLOWED_PROVIDERS and self.config.model.provider not in self.ALLOWED_PROVIDERS:
+            allowed = ", ".join(self.ALLOWED_PROVIDERS)
+            raise ValueError(
+                f"{self.config.harness.value} harness only supports providers: {allowed}. "
+                f"Received '{self.config.model.provider}'."
+            )
+
+    def runtime_env(self) -> dict[str, str]:
+        env = super().runtime_env()
+        if self.CLI_ENV_VAR:
+            env[self.CLI_ENV_VAR] = self._resolve_cli()
+        return env

@@ -23,32 +23,32 @@ from typing import Any
 
 import pytest
 
-from raidar.scorers.builtin_manifests import CODE_QUALITY
-from raidar.scorers.catalog import default_scorer_registry
-from raidar.scorers.code_quality import CodeQualityScorer
-from raidar.scorers.code_quality.coverage_reader import OFFLINE_NOT_PRODUCED
-from raidar.scorers.code_quality.lineage_models import RegressionRunEvidence
-from raidar.scorers.code_quality.observations import EXCLUDED_METRIC, NO_RUN_EVIDENCE
-from raidar.scorers.code_quality.parity import (
-    CASE_EXCLUDED,
-    MAX_EXCLUDED_CASES,
-    flipped_cases,
-    reconcile,
-)
-from raidar.scorers.rescore import assess
-from raidar.scorers.sdk.context import AssessContext
-from raidar.scorers.sdk.result import AssessResult, AssessStatus, Observation
-from raidar.scorers.sdk.validation import validate_result
-from raidar.scorers.store import AssessmentStore
-from raidar.scorers.trial_inputs import load_trial_context
-from raidar.verifier.coverage_store import COVERAGE_KIND, coverage_path
-from raidar.verifier.models import ParityVerdict
-from raidar.verifier.records import (
+from raidar.grading.coverage.store import COVERAGE_KIND, coverage_path
+from raidar.grading.models import ParityVerdict
+from raidar.grading.records import (
     FORK_EVIDENCE_FILE,
     CoverageRef,
     load_step_record,
     write_step_record,
 )
+from raidar.scoring.catalog.builtin import default_scorer_registry
+from raidar.scoring.code_quality import CodeQualityScorer
+from raidar.scoring.code_quality.coverage_reader import OFFLINE_NOT_PRODUCED
+from raidar.scoring.code_quality.lineage_models import RegressionRunEvidence
+from raidar.scoring.code_quality.observations import EXCLUDED_METRIC, NO_RUN_EVIDENCE
+from raidar.scoring.code_quality.parity import (
+    CASE_EXCLUDED,
+    MAX_EXCLUDED_CASES,
+    flipped_cases,
+    reconcile,
+)
+from raidar.scoring.framework.builtin_manifests import CODE_QUALITY
+from raidar.scoring.framework.context import AssessContext
+from raidar.scoring.framework.rescore import assess
+from raidar.scoring.framework.result import AssessResult, AssessStatus, Observation
+from raidar.scoring.framework.store import AssessmentStore
+from raidar.scoring.framework.trial_inputs import load_trial_context
+from raidar.scoring.framework.validation import validate_result
 from tests.code_quality_support import case_trial, golden_case, quality_tools
 
 SHOP_CONFIG = {"entry_file": "app.py"}

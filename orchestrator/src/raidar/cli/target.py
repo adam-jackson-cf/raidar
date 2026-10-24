@@ -1,4 +1,4 @@
-"""``raidar target``: inspect, start, stop and prune execution targets (mechanics-v1 §3.1)."""
+"""``raidar target``: inspect, start, stop and prune execution targets."""
 
 from __future__ import annotations
 
@@ -9,8 +9,7 @@ from typing import Any
 import click
 
 from raidar.cli.target_options import target_option
-from raidar.execution.cleanup import cleanup_trial_projects
-from raidar.targets.config import (
+from raidar.engine.target.config import (
     TARGETS_TEMPLATE,
     Target,
     TargetError,
@@ -18,13 +17,13 @@ from raidar.targets.config import (
     resolve_target,
     targets_file,
 )
-from raidar.targets.health import (
+from raidar.engine.target.health import (
     TargetUnavailableError,
     data_check_failure,
     docker_facts,
     ensure_target,
 )
-from raidar.targets.transport import (
+from raidar.engine.target.transport import (
     TransportPaths,
     docker_healthy,
     read_pid,
@@ -32,6 +31,7 @@ from raidar.targets.transport import (
     transport_up,
     tunnel_running,
 )
+from raidar.engine.trial.cleanup import cleanup_trial_projects
 
 
 def register(main: click.Group) -> None:

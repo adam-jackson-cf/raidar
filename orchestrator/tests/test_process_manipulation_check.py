@@ -1,4 +1,4 @@
-"""Manipulation check: guided vs baseline process-compliance separation (G5)."""
+"""Manipulation check: guided vs baseline process-compliance separation."""
 
 from __future__ import annotations
 
@@ -6,20 +6,24 @@ from pathlib import Path
 
 import pytest
 
-from raidar.analysis.manipulation import (
-    DEFAULT_CHECKS,
-    PROCESS_COMPLIANCE_REFS,
+from raidar.evaluation.analysis.manipulation import (
     Separation,
     load_arm_results,
     manipulation_check,
     permutation_p,
 )
-from raidar.scorers.catalog import default_scorer_registry
-from raidar.scorers.process_checks.manifest import PROCESS_COMPLIANCE
-from raidar.scorers.rescore import assess
-from raidar.scorers.sdk.manifest import Tier
-from raidar.scorers.sdk.result import TRAJECTORY_SUBJECT, AssessResult, AssessStatus, Observation
-from raidar.scorers.store import AssessmentStore
+from raidar.scoring.catalog.builtin import default_scorer_registry
+from raidar.scoring.catalog.checks import DEFAULT_CHECKS, PROCESS_COMPLIANCE_REFS
+from raidar.scoring.framework.manifest import Tier
+from raidar.scoring.framework.rescore import assess
+from raidar.scoring.framework.result import (
+    TRAJECTORY_SUBJECT,
+    AssessResult,
+    AssessStatus,
+    Observation,
+)
+from raidar.scoring.framework.store import AssessmentStore
+from raidar.scoring.process_checks.manifest import PROCESS_COMPLIANCE
 from tests.trace_trial_support import (
     TracedStep,
     agent_step,

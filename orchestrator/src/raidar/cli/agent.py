@@ -10,15 +10,15 @@ import subprocess
 
 import click
 
-from raidar.agents.adapters.base import resolve_cli_executable
-from raidar.agents.adapters.factory import adapter_class_for_harness, resolve_adapter
-from raidar.agents.codex_auth import (
+from raidar.subject.agent.adapters.base import resolve_cli_executable
+from raidar.subject.agent.adapters.factory import adapter_class_for_harness, resolve_adapter
+from raidar.subject.agent.codex_auth import (
     CODEX_AUTH_MODE_ENV,
     codex_auth_json_path,
     has_file_backed_codex_auth,
 )
-from raidar.agents.config import AgentName, AgentSpec, Harness, ModelTarget, agent_cli
-from raidar.agents.harness import harness_definition
+from raidar.subject.agent.config import AgentName, AgentSpec, Harness, ModelTarget, agent_cli
+from raidar.subject.agent.harness import harness_definition
 
 _AGENT_CHOICES = click.Choice([name.value for name in AgentName])
 

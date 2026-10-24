@@ -15,12 +15,12 @@ from pathlib import Path
 
 import pytest
 
-from raidar.scorers.gate_effort import GATE_EFFORT, gate_effort_scorer, gate_effort_scorer_for_store
-from raidar.scorers.gate_effort.grades import NO_FIX_ROUND
-from raidar.scorers.gate_effort.records import RECORD_PATH
-from raidar.scorers.sdk.context import AssessContext, StepInputs
-from raidar.scorers.sdk.result import TRAJECTORY_SUBJECT, AssessResult, AssessStatus
-from raidar.scorers.sdk.validation import validate_result
+from raidar.scoring.framework.context import AssessContext, StepInputs
+from raidar.scoring.framework.result import TRAJECTORY_SUBJECT, AssessResult, AssessStatus
+from raidar.scoring.framework.validation import validate_result
+from raidar.scoring.gate_effort import GATE_EFFORT, gate_effort_scorer, gate_effort_scorer_for_store
+from raidar.scoring.gate_effort.grades import NO_FIX_ROUND
+from raidar.scoring.gate_effort.records import RECORD_PATH
 from tests.gate_effort_support import (
     CP1,
     CP2,

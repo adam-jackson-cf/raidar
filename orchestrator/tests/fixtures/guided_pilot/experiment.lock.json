@@ -43,7 +43,7 @@
         "code-quality@1": {
           "digest": "177e2bf8912f1c63ce536097a8222c0e12c4317508439d94dc27246d953613cf",
           "metadata": {
-            "implementation": "raidar.scorers.code_quality:code_quality_scorer",
+            "implementation": "raidar.scoring.code_quality:code_quality_scorer",
             "implementation_digest": "736cd68366d63a638ec8d961cc7499a540f47d972f748a6fcadd09d159c75c01",
             "manifest": {
               "description": "SCB-fork code-quality and inertia components over the per-step snapshots.",
@@ -253,7 +253,7 @@
         "correctness@1": {
           "digest": "4be940aff5a1e111061505e02963b54c373825ea85cc2ef0cac0ba33099ee3c0",
           "metadata": {
-            "implementation": "raidar.scorers.correctness:correctness_scorer",
+            "implementation": "raidar.scoring.correctness:correctness_scorer",
             "implementation_digest": "30bad4c6f5461c6a39578e64f0c484ca9074dec1ed36981f9c383ce3b06dc733",
             "manifest": {
               "description": "Oracle verdicts per checkpoint and trajectory, from the oracle step records.",
@@ -420,7 +420,7 @@
         "process-compliance@2": {
           "digest": "0df8979b10a49acc20e00f840d0f470535b423e8563f99debb12cb80f744039d",
           "metadata": {
-            "implementation": "raidar.scorers.process_checks:deterministic_process_compliance_scorer",
+            "implementation": "raidar.scoring.process_checks:deterministic_process_compliance_scorer",
             "implementation_digest": "3632b8f5b963593a27adb85cab243f326eb9187c5e6683e8392f464841b8f5d4",
             "manifest": {
               "description": "Deterministic trace checks of agent process; a check the trace cannot decide is undetermined, never judged by a model.",
@@ -480,7 +480,7 @@
         "resource-usage@1": {
           "digest": "f3c72ab636efd5be83bff09e357d9f578450e3382bab9fd8485fd6645e354b6d",
           "metadata": {
-            "implementation": "raidar.scorers.resource_usage:resource_usage_scorer",
+            "implementation": "raidar.scoring.resource_usage:resource_usage_scorer",
             "implementation_digest": "a4e91a68b90ce43a9cc515ece436be4d7242dc72861459cfa0aae4c03218130b",
             "manifest": {
               "description": "Tokens, cost, turns and agent wall time from Harbor per-step usage and timing.",
