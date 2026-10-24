@@ -1,15 +1,10 @@
-"""Component SDK: manifests, registry, compiler, per-step reset, probes."""
+"""Component SDK: manifests, registry, compiled conditions, per-step reset, probes."""
 
 from raidar.subject.treatment.definition.compiled import (
     HARBOR_AGENT_NAMES,
     CompiledCondition,
     ProbeReport,
     ProbeResult,
-)
-from raidar.subject.treatment.definition.compiler import (
-    ComponentRejectedError,
-    compile_arm,
-    compile_condition,
 )
 from raidar.subject.treatment.definition.contribution import (
     AgentWrapper,
@@ -47,7 +42,6 @@ __all__ = [
     "ComponentKind",
     "ComponentManifest",
     "ComponentRegistry",
-    "ComponentRejectedError",
     "ComponentResolver",
     "ComponentUseContext",
     "Contribution",
@@ -60,8 +54,6 @@ __all__ = [
     "StepEvidence",
     "SupportFile",
     "UnknownComponentError",
-    "compile_arm",
-    "compile_condition",
     "trial_provisions",
     "component_resolver",
     "fingerprint",

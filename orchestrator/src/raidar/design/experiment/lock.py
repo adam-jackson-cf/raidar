@@ -141,7 +141,7 @@ SPEC_EXTERNAL_MODULES = (
     "contract/source_digest.py",
     "scoring/framework/metrics.py",
 )
-"""Modules outside this package whose code the spec/metric/lock rules are (paths below ``raidar/``)."""
+"""Modules outside this package that are part of the spec/metric/lock rules (below ``raidar/``)."""
 
 
 def spec_source_digest() -> str:

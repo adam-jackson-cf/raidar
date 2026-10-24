@@ -20,17 +20,15 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import Any
 
-from harbor.models.trial.config import AgentConfig
-
 from raidar.contract.canonical import digest_json
 from raidar.design.experiment.loader import LoadedExperiment
 from raidar.design.problem.models import ProblemId
 from raidar.design.problem.store import ProblemStore, ProblemStoreError
-from raidar.engine.trial.agent_config import AgentOverride, agent_digest, arm_agent_config
+from raidar.engine.trial.agent_config import AgentOverride, agent_digest
+from raidar.engine.trial.blueprint import ArmBlueprint, arm_blueprints
 from raidar.engine.trial.models import PlannedTrial, ProgressionRule, TrialHashes
 from raidar.engine.trial.progression import progression_rule
 from raidar.subject.environment.python.models import PackSpec
-from raidar.subject.treatment import CompiledCondition, compile_arm
 
 
 class PlanError(ValueError):
@@ -55,13 +53,6 @@ class PlanOptions:
     max_checkpoints: int | None = None
     agent_override: AgentOverride | None = None
     concurrency: int | None = None
-
-
-@dataclass(frozen=True)
-class ArmBlueprint:
-    arm_id: str
-    compiled: CompiledCondition
-    agent_config: AgentConfig
 
 
 @dataclass(frozen=True)
@@ -192,24 +183,6 @@ def _problems(
     return tuple(targets)
 
 
-def _blueprints(
-    loaded: LoadedExperiment, pack: PackSpec, options: PlanOptions
-) -> dict[str, ArmBlueprint]:
-    spec = loaded.spec
-    blueprints = {}
-    for arm in spec.arms:
-        compiled = compile_arm(spec, arm.id, base_dir=loaded.base_dir)
-        config = arm_agent_config(
-            spec.agent(arm.agent),
-            compiled,
-            pack,
-            agent_timeout_sec=spec.protocol.agent_timeout_sec,
-            override=options.agent_override,
-        )
-        blueprints[arm.id] = ArmBlueprint(arm.id, compiled, config)
-    return blueprints
-
-
 @dataclass(frozen=True)
 class _HashInputs:
     loaded: LoadedExperiment
@@ -280,7 +253,7 @@ def build_plan(
     )
     hashes = _HashInputs(loaded, lock, protocol, options.agent_override)
     problems = _problems(loaded, lock, store)
-    arms = _blueprints(loaded, pack, options)
+    arms = arm_blueprints(loaded, pack, agent_override=options.agent_override)
     trials: list[PlannedTrial] = []
     for attempt in range(spec.analysis.attempts):
         for problem in problems:

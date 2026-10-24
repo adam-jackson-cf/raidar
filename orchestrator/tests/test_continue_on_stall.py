@@ -118,7 +118,7 @@ def test_the_component_is_a_session_wrapper_that_composes_with_the_gate() -> Non
 
 @pytest.mark.parametrize("bad", [{"max": 2}])
 def test_the_component_takes_no_with_keys(bad: dict[str, int]) -> None:
-    from raidar.subject.treatment import ComponentRejectedError
+    from raidar.design.experiment.arm import ComponentRejectedError
 
     with pytest.raises(ComponentRejectedError):
         compile_uses(use("continue-on-stall@2", **bad))

@@ -28,10 +28,11 @@ from harbor.agents.installed.base import ApiOverloadedError, NonZeroAgentExitCod
 from harbor.environments.base import BaseEnvironment, ExecResult
 from harbor.models.agent.context import AgentContext
 
+from raidar.design.experiment.arm import ComponentRejectedError
 from raidar.design.experiment.schema import AgentEntry
 from raidar.engine.trial.agent_config import arm_agent_config, reported_harness_pin
 from raidar.subject.environment.python.models import load_pack_spec
-from raidar.subject.treatment import ComponentKind, ComponentRegistry, ComponentRejectedError
+from raidar.subject.treatment import ComponentKind, ComponentRegistry
 from raidar.subject.treatment.catalog.gate import GUARDRAIL_GATE_IMPORT_PATH
 from raidar.subject.treatment.catalog.retry import TRANSIENT_RETRY_IMPORT_PATH, retry_records
 from raidar.subject.treatment.catalog.stall import CONTINUE_ON_STALL_IMPORT_PATH

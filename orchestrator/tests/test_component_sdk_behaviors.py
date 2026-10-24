@@ -15,6 +15,7 @@ from raidar.contract.references import (
     RegistryReferenceError,
     ResolverSet,
 )
+from raidar.design.experiment.arm import ComponentRejectedError, compile_arm, compile_condition
 from raidar.design.experiment.loader import load_experiment
 from raidar.design.experiment.lock import SPEC_EXTERNAL_MODULES, build_lock
 from raidar.scoring.framework.metrics import DEFAULT_METRIC_REGISTRY, MetricResolver
@@ -22,11 +23,8 @@ from raidar.subject.agent.config import Harness
 from raidar.subject.treatment import (
     ComponentKind,
     ComponentRegistry,
-    ComponentRejectedError,
     ComponentResolver,
     UnknownComponentError,
-    compile_arm,
-    compile_condition,
     component_resolver,
     fingerprint,
 )
@@ -44,7 +42,7 @@ from tests.component_support import (
 from tests.experiment_spec_support import experiment_document, fixture_resolvers, write_experiment
 
 SDK_RUNTIME_SOURCES = [
-    "orchestrator/src/raidar/subject/treatment/definition/compiler.py",
+    "orchestrator/src/raidar/design/experiment/arm.py",
     "orchestrator/src/raidar/subject/treatment/definition/compiled.py",
     "orchestrator/src/raidar/subject/treatment/runtime/setup_script.py",
     "orchestrator/src/raidar/subject/treatment/runtime/step_reset.sh",
@@ -356,8 +354,8 @@ def test_component_trees_ship_exactly_the_files_the_lock_hashes(tmp_path: Path) 
 
 
 # Imported modules a fingerprint need not list: the lock's toolchain section
-# pins raidar.design.experiment and SPEC_EXTERNAL_MODULES (raidar_spec digest); the registry and the harness enum are
-# lookup machinery, not component behaviour.
+# pins raidar.design.experiment and SPEC_EXTERNAL_MODULES (raidar_spec digest); the registry
+# and the harness enum are lookup machinery, not component behaviour.
 _UNFINGERPRINTED_OK = {
     "orchestrator/src/raidar/subject/agent/config.py",
     "orchestrator/src/raidar/subject/treatment/definition/registry.py",

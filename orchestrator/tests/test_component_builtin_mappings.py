@@ -295,14 +295,14 @@ def test_settings_probe_compares_every_declared_setting_with_the_harness_report(
 def test_settings_harbor_always_overrides_are_refused_at_compile_time(
     harness: Harness, settings: dict[str, JsonValue]
 ) -> None:
-    from raidar.subject.treatment import ComponentRejectedError
+    from raidar.design.experiment.arm import ComponentRejectedError
 
     with pytest.raises(ComponentRejectedError, match="always overridden"):
         compile_uses(use("harness-settings@1", settings=settings), harness=harness)
 
 
 def test_invalid_prompt_templates_are_rejected(tmp_path: Path) -> None:
-    from raidar.subject.treatment import ComponentRejectedError
+    from raidar.design.experiment.arm import ComponentRejectedError
 
     for text, message in (
         ("no slot", "exactly one"),

@@ -8,9 +8,9 @@ rejection is visible through the public commands, not only at execution.
 
 from __future__ import annotations
 
+from raidar.design.experiment.arm import ComponentRejectedError, compile_condition
 from raidar.design.experiment.loader import LoadedExperiment
 from raidar.design.experiment.validation import FieldIssue, SpecValidationError
-from raidar.subject.treatment.definition.compiler import ComponentRejectedError, compile_condition
 from raidar.subject.treatment.definition.registry import ComponentRegistry
 
 

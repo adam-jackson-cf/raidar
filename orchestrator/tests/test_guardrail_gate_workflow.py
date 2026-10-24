@@ -35,8 +35,9 @@ from harbor.models.agent.context import AgentContext
 from harbor.models.trajectories import Trajectory
 from harbor.models.trial.config import AgentConfig
 
+from raidar.design.experiment.arm import ComponentRejectedError
 from raidar.subject.agent.config import Harness
-from raidar.subject.treatment import ComponentRegistry, ComponentRejectedError, StepEvidence
+from raidar.subject.treatment import ComponentRegistry, StepEvidence
 from raidar.subject.treatment.catalog.gate import (
     GUARDRAIL_GATE,
     GUARDRAIL_GATE_IMPORT_PATH,

@@ -22,10 +22,10 @@ from harbor.models.trial.config import AgentConfig
 from harbor.trial.hooks import TrialEvent
 
 from raidar.contract.references import RefKind, RegistryRef
+from raidar.design.experiment.arm import ComponentRejectedError
 from raidar.subject.treatment import (
     ComponentKind,
     ComponentRegistry,
-    ComponentRejectedError,
     ComponentResolver,
     StepEvidence,
 )

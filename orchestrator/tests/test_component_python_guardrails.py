@@ -25,9 +25,10 @@ from typing import Any, cast
 import pytest
 
 from raidar.contract.references import RefKind, RegistryRef
+from raidar.design.experiment.arm import ComponentRejectedError
 from raidar.engine.trial import collect
 from raidar.engine.trial.models import ProbeSummary
-from raidar.subject.treatment import ComponentKind, ComponentRegistry, ComponentRejectedError
+from raidar.subject.treatment import ComponentKind, ComponentRegistry
 from raidar.subject.treatment.catalog._common import sha256_bytes
 from raidar.subject.treatment.catalog.guardrails import (
     AGENT_SITE,

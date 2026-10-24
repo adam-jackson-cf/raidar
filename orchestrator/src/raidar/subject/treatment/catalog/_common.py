@@ -18,7 +18,7 @@ COMMON_FINGERPRINT = (
     "orchestrator/src/raidar/subject/treatment/definition/manifest.py",
     "orchestrator/src/raidar/subject/treatment/definition/contribution.py",
     "orchestrator/src/raidar/subject/treatment/definition/evidence.py",
-    "orchestrator/src/raidar/subject/treatment/definition/compiler.py",
+    "orchestrator/src/raidar/design/experiment/arm.py",
     "orchestrator/src/raidar/subject/treatment/definition/compiled.py",
     "orchestrator/src/raidar/subject/treatment/runtime/setup_script.py",
     "orchestrator/src/raidar/subject/treatment/runtime/step_reset.sh",

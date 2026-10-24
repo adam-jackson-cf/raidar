@@ -18,8 +18,8 @@ import pytest
 from harbor.models.trial.config import AgentConfig
 from harbor.trial.trial import Trial
 
+from raidar.design.experiment.arm import compile_condition
 from raidar.engine.trial.environment import RUN_SCOPED_DOCKER_IMPORT_PATH, run_scope
-from raidar.subject.treatment import compile_condition
 from raidar.subject.treatment.definition.contribution import SupportFile
 from raidar.subject.treatment.runtime.setup_script import render_setup_script
 from tests.component_support import PILOT_DIR, agent, all_builtin_uses, compile_uses, condition

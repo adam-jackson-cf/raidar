@@ -8,9 +8,10 @@ from typing import Any
 
 from pydantic import JsonValue
 
+from raidar.design.experiment.arm import compile_condition
 from raidar.design.experiment.schema import AgentEntry, ComponentUse, ConditionSpec
 from raidar.subject.agent.config import Harness, agent_name_for
-from raidar.subject.treatment import CompiledCondition, compile_condition
+from raidar.subject.treatment import CompiledCondition
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 # Component proof fixtures: probe files every built-in compiles from, relative to FIXTURES_DIR.

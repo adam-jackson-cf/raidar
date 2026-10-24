@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any
 
 from raidar.contract.snapshot import tree_digest
+from raidar.design.experiment.arm import compile_condition
 from raidar.design.experiment.schema import AgentEntry, ConditionSpec, ProtocolSpec
 from raidar.engine.health.records_manifest import seal_trial
 from raidar.engine.trial.collect import TrialContext, classify_trial
@@ -25,7 +26,6 @@ from raidar.grading.records import (
     step_record_dir,
     write_step_record,
 )
-from raidar.subject.treatment import compile_condition
 from tests.execution_support import StepOutcome, write_trial
 
 TRIAL_ID = "b00-p0-baseline"
