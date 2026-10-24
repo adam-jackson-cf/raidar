@@ -1,4 +1,4 @@
-"""Component compiler: one condition x one harness -> a ``CompiledCondition`` (C1).
+"""Component compiler: one condition x one harness -> a ``CompiledCondition``.
 
 ``compile_condition`` resolves every component use through the registry and
 rejects the arm when any use is unknown, unsupported on the arm's harness,

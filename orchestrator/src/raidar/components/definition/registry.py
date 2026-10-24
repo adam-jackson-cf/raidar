@@ -17,6 +17,7 @@ from pathlib import Path
 
 from raidar.agents.config import agent_name_for
 from raidar.components.definition.manifest import ComponentDefinition
+from raidar.core.runtimes import ANY_RUNTIME
 from raidar.spec.canonical import digest_json, sha256_file
 from raidar.spec.references import (
     RefKind,
@@ -86,7 +87,6 @@ def _source_root(definition: ComponentDefinition) -> Path:
     return Path(sys.modules[top].__file__ or ".").resolve().parent.parent
 
 
-ANY_RUNTIME = "*"
 BUILTIN_COMPONENT_RUNTIMES: dict[str, tuple[str, ...]] = {
     # lint-config@1 delivers ruff/mypy-style Python config files.
     "lint-config@1": ("python",),

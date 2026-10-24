@@ -1,4 +1,4 @@
-"""What one component use contributes to a trial's Harbor inputs (C2).
+"""What one component use contributes to a trial's Harbor inputs.
 
 Contributions are merged per condition by the compiler into:
 

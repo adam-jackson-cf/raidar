@@ -1,4 +1,4 @@
-# Raidar per-step context reset body (plan WS-C C3; requirements F3).
+# Raidar per-step context reset body (requirements F3).
 #
 # Harbor runs steps/<name>/workdir/setup.sh as the step's agent user after the
 # step's workdir upload and before the agent starts. raidar.components.runtime.setup_script

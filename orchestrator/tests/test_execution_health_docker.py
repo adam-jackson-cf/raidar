@@ -17,7 +17,7 @@ from harbor.models.trial.config import (
 from harbor.trial.hooks import TrialEvent, TrialHookEvent
 from harbor.trial.trial import Trial
 
-from raidar.components.runtime.provision import condition_provisions, install_trial_provisioning
+from raidar.components.runtime.provision import install_trial_provisioning, trial_provisions
 from raidar.execution.cleanup import cleanup_trial_projects
 from raidar.execution.environment import RUN_SCOPED_DOCKER_IMPORT_PATH, SCOPE_KWARG, run_scope
 from raidar.execution.health.signals import tool_status
@@ -58,7 +58,7 @@ async def _run(tmp_path: Path, tamper_on_step: int | None) -> Path:
     )
     try:
         trial = await Trial.create(config)
-        install_trial_provisioning(trial, condition_provisions(compiled))
+        install_trial_provisioning(trial, trial_provisions(compiled))
         watch = ToolTreeWatch(trial, SimpleNamespace(resolve_step=lambda name: name))  # type: ignore[arg-type]
         ends = 0
 

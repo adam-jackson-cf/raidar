@@ -1,4 +1,4 @@
-"""Component manifest and definition protocol (F5, plan WS-C C1).
+"""Component manifest and definition protocol (F5).
 
 A component is a pluggable starting condition of one of five kinds. Its
 manifest declares what it is and what it needs:

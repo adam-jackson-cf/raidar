@@ -31,7 +31,7 @@ from raidar.components.definition.registry import (
     component_resolver,
     fingerprint,
 )
-from raidar.components.runtime.provision import Provision, condition_provisions
+from raidar.components.runtime.provision import AnyProvision, trial_provisions
 
 __all__ = [
     "COMPONENT_ENTRY_POINT_GROUP",
@@ -52,13 +52,13 @@ __all__ = [
     "ProbeOutcome",
     "ProbeReport",
     "ProbeResult",
-    "Provision",
+    "AnyProvision",
     "StepEvidence",
     "SupportFile",
     "UnknownComponentError",
     "compile_arm",
     "compile_condition",
-    "condition_provisions",
+    "trial_provisions",
     "component_resolver",
     "fingerprint",
 ]

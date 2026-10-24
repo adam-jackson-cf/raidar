@@ -1,4 +1,4 @@
-"""``workspace`` built-ins: rules-file, workspace-files, lint-config (C2).
+"""``workspace`` built-ins: rules-file, workspace-files, lint-config.
 
 All three map to the task overlay: files are placed in the workspace through
 the first step's ``workdir/`` (Harbor uploads it before that step's

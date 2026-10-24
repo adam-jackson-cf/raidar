@@ -1,6 +1,6 @@
-"""A compiled condition: the Harbor inputs one arm applies (plan WS-C C1-C3).
+"""A compiled condition: the Harbor inputs one arm applies.
 
-``CompiledCondition`` is what execution (WS-D) uses:
+``CompiledCondition`` is what execution uses:
 
 - ``write_task_steps(task_dir, steps)``: writes each step's ``workdir/setup.sh``
   (context reset + component support files) and the workspace overlay into the
@@ -94,7 +94,7 @@ class ProbeReport:
 
 
 def reset_probe(evidence: StepEvidence) -> ProbeOutcome:
-    """C3: the step's reset ran, left no agent-user process and reset every state path."""
+    """The step's reset ran, left no agent-user process and reset every state path."""
     if not evidence.reset_reports:
         return ProbeOutcome(False, "no raidar-reset.json: setup.sh did not run")
     report = evidence.reset_reports[0]
@@ -213,10 +213,6 @@ class CompiledCondition:
                 "inner_agent": {"name": config.name, "kwargs": kwargs},
             }
         return config.model_copy(update=update)
-
-    def missing_secrets(self, environ: Mapping[str, str]) -> list[str]:
-        """Secret names the components need that are absent (presence check only)."""
-        return sorted(name for name in self.secrets if not environ.get(name))
 
     def probe_step(self, agent_dir: Path, step_index: int) -> ProbeReport:
         evidence = StepEvidence(agent_dir)

@@ -1,4 +1,4 @@
-"""``prompt`` built-in: prompt-wrapper (C2).
+"""``prompt`` built-in: prompt-wrapper.
 
 Maps onto Harbor's instruction rendering: the template file becomes the
 agent's ``prompt_template_path`` and Harbor renders ``{{ instruction }}`` into

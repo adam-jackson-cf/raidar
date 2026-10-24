@@ -1,4 +1,4 @@
-"""Generate the per-step ``setup.sh`` (plan WS-C C3; requirements F3, F5).
+"""Generate the per-step ``setup.sh`` (requirements F3, F5).
 
 Every arm gets one, with or without components. The script:
 

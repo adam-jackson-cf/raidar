@@ -1,1 +1,1 @@
-"""Built-in component definitions (C2, C4), registered as ``raidar.components`` entry points."""
+"""Built-in component definitions, registered as ``raidar.components`` entry points."""

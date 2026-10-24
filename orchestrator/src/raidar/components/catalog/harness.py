@@ -1,4 +1,4 @@
-"""``harness`` built-ins: skills, harness-settings, stop-hook, mcp-server (C2).
+"""``harness`` built-ins: skills, harness-settings, stop-hook, mcp-server.
 
 Mapping onto Harbor 0.23 inputs for its installed ``codex`` / ``claude-code``
 agents:

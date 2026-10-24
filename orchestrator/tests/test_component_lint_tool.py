@@ -40,9 +40,9 @@ from raidar.components.definition.registry import component_runtimes
 from raidar.components.runtime.provision import (
     PROVISION_CHANNEL,
     Provision,
-    condition_provisions,
     install_provisioning,
     parse_check_output,
+    trial_provisions,
 )
 from raidar.spec.references import RefKind, RegistryRef
 from tests.component_support import PROBE_DIR, compile_uses, use, write_jsonl
@@ -134,8 +134,8 @@ def test_lint_tool_changes_no_workspace_or_harness_input_only_the_provisions() -
     assert compiled.skills == ()
     assert compiled.network_egress == ("files.pythonhosted.org", "pypi.org")
     assert compiled.digest != baseline.digest
-    assert condition_provisions(baseline) == ()
-    (provision,) = condition_provisions(compiled)
+    assert trial_provisions(baseline) == ()
+    (provision,) = trial_provisions(compiled)
     assert (provision.slug, provision.component) == (SLUG, "lint-tool@2")
 
 
@@ -375,7 +375,7 @@ def test_every_invocation_runs_the_pin_in_a_real_two_step_harbor_trial(tmp_path:
         tmp_path / "trials",
         AgentConfig(name="nop"),
         task.name,
-        condition_provisions(compiled),
+        trial_provisions(compiled),
     )
 
     steps = trial / "steps"

@@ -22,7 +22,7 @@ from raidar.components import compile_condition
 from raidar.components.definition.contribution import SupportFile
 from raidar.components.runtime.setup_script import render_setup_script
 from raidar.execution.environment import RUN_SCOPED_DOCKER_IMPORT_PATH, run_scope
-from tests.component_support import PILOT_DIR, agent, all_builtin_uses, compile_uses, condition, use
+from tests.component_support import PILOT_DIR, agent, all_builtin_uses, compile_uses, condition
 from tests.component_trial_support import (
     IsolationProbeAgent,
     build_task,
@@ -167,7 +167,6 @@ def test_every_step_gets_the_reset_and_only_the_first_gets_the_overlay(tmp_path:
         compiled.write_task_steps(tmp_path, [])
     baseline = compile_condition(condition(), agent(), base_dir=PILOT_DIR)
     assert "kill -KILL" in baseline.setup_script()
-    assert compile_uses(use("stop-hook@1", command="true")).missing_secrets({}) == []
 
 
 def test_component_trials_get_a_per_run_compose_project_and_always_clean_it_up(

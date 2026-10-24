@@ -105,26 +105,16 @@ AnyProvision = Provision | TrialProvision
 
 @runtime_checkable
 class ProvisioningComponent(Protocol):
-    def provision(self, use: ComponentUseContext) -> Provision: ...
+    def provision(self, use: ComponentUseContext) -> AnyProvision: ...
 
 
-def condition_provisions(compiled: CompiledCondition) -> tuple[Provision, ...]:
+def trial_provisions(compiled: CompiledCondition) -> tuple[AnyProvision, ...]:
     """The provisions of every use in a compiled condition, in condition order."""
     return tuple(
         use.definition.provision(use.context)
         for use in compiled.uses
         if isinstance(use.definition, ProvisioningComponent)
     )
-
-
-def trial_provisions(compiled: CompiledCondition) -> tuple[AnyProvision, ...]:
-    """The provisions of every use in a compiled condition, in condition order."""
-    found: list[AnyProvision] = []
-    for use in compiled.uses:
-        if isinstance(use.definition, ProvisioningComponent):
-            provision: Any = use.definition.provision(use.context)
-            found.append(provision)
-    return tuple(found)
 
 
 def parse_check_output(stdout: str) -> dict[str, str]:
