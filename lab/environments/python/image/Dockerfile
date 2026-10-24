@@ -1,4 +1,4 @@
-# Raidar Python pack agent image.
+# Raidar Python pack agent image (reboot plan WS-I I1).
 # Toolchain + harness binaries only. No scorer tools and no browsers: those are
 # provisioned lazily on the host or run in the eval container (tools.lock.yaml).
 # Built by `raidar pack build python`, which passes every ARG from pack.yaml and
