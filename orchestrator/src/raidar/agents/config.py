@@ -71,20 +71,10 @@ class ModelTarget(BaseModel):
         """Return provider/model string expected by Harbor and adapters."""
         return f"{self.provider}/{self.name}"
 
-    @classmethod
-    def from_string(cls, model_string: str) -> "ModelTarget":
-        """Parse a model string like 'openai/gpt-5' into ModelTarget."""
-        if "/" not in model_string:
-            raise ValueError(f"Model string must be in format 'provider/model': {model_string}")
-        provider, model_name = model_string.split("/", 1)
-        return cls(provider=provider, name=model_name)
-
 
 class AgentSpec(BaseModel):
     """Configuration for an AgentSpec: one agent CLI plus one model."""
 
     harness: Harness = Field(description="Agent CLI install id (claude-code, codex-cli, etc)")
     model: ModelTarget = Field(description="Model configuration")
-    timeout_sec: int = Field(
-        default=1800, description="Agent timeout in seconds (harness validate)"
-    )
+    timeout_sec: int = Field(default=1800, description="Agent timeout in seconds (agent validate)")

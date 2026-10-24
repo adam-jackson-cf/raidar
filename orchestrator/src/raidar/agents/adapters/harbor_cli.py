@@ -11,9 +11,7 @@ from .base import HarnessAdapter
 class SupportedModelProfile:
     """Model support metadata for adapter validation and reporting."""
 
-    display_label: str
     reasoning_levels: tuple[str, ...] = ()
-    default_reasoning: str | None = None
 
 
 class HarborCliAdapter(HarnessAdapter):

@@ -2,7 +2,7 @@
 
 Adapters own each harness's model support table (which ``raidar validate``
 checks agent entries against) and its host-side credential and CLI checks
-(``raidar harness validate``). Trials themselves run Harbor's installed agents
+(``raidar agent validate``). Trials themselves run Harbor's installed agents
 (``raidar.execution.agent_config``).
 """
 

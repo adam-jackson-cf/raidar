@@ -19,38 +19,16 @@ class CodexCliAdapter(HarborCliAdapter):
     CLI_ENV_VAR = "CODEX_CLI_PATH"
     DEFAULT_BINARY = "codex"
     SUPPORTED_MODELS: dict[str, SupportedModelProfile] = {
-        "gpt-5.6-terra": SupportedModelProfile(
-            display_label="GPT-5.6 Terra",
-            reasoning_levels=("low",),
-        ),
-        "gpt-5.6-luna": SupportedModelProfile(
-            display_label="GPT-5.6 Luna",
-            reasoning_levels=("low",),
-        ),
-        "gpt-6-luna": SupportedModelProfile(
-            display_label="GPT-6 Luna",
-            reasoning_levels=("low",),
-        ),
-        "gpt-5.5": SupportedModelProfile(
-            display_label="GPT-5.5",
-            reasoning_levels=("low", "medium", "high", "xhigh"),
-        ),
-        "gpt-5.2": SupportedModelProfile(
-            display_label="GPT-5.2",
-            reasoning_levels=("low", "medium", "high"),
-        ),
+        "gpt-5.6-terra": SupportedModelProfile(reasoning_levels=("low",)),
+        "gpt-5.6-luna": SupportedModelProfile(reasoning_levels=("low",)),
+        "gpt-6-luna": SupportedModelProfile(reasoning_levels=("low",)),
+        "gpt-5.5": SupportedModelProfile(reasoning_levels=("low", "medium", "high", "xhigh")),
+        "gpt-5.2": SupportedModelProfile(reasoning_levels=("low", "medium", "high")),
         "gpt-5.3-codex-spark": SupportedModelProfile(
-            display_label="GPT-5.3 Codex Spark",
-            reasoning_levels=("low", "medium", "high", "xhigh"),
+            reasoning_levels=("low", "medium", "high", "xhigh")
         ),
-        "gpt-5.4": SupportedModelProfile(
-            display_label="GPT-5.4",
-            reasoning_levels=("low", "medium", "high", "xhigh"),
-        ),
-        "gpt-5.4-mini": SupportedModelProfile(
-            display_label="GPT-5.4 Mini",
-            reasoning_levels=("low",),
-        ),
+        "gpt-5.4": SupportedModelProfile(reasoning_levels=("low", "medium", "high", "xhigh")),
+        "gpt-5.4-mini": SupportedModelProfile(reasoning_levels=("low",)),
     }
 
     def __init__(self, config: AgentSpec) -> None:
