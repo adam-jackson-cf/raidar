@@ -45,7 +45,7 @@ def test_changed_paths_entries_generated_artifacts_and_unstaged_detection(monkey
     def fake_paths(args):
         path_calls.append(args)
         if "--cached" in args:
-            return ["a.py", "jobs/e/j/job.json"]
+            return ["a.py", "var/jobs/e/j/job.json"]
         if "--others" in args:
             return ["untracked.py"]
         return ["a.py", "b.py"]
@@ -55,8 +55,8 @@ def test_changed_paths_entries_generated_artifacts_and_unstaged_detection(monkey
     def fake_status(args):
         status_calls.append(args)
         if "--cached" in args:
-            return [("M", "a.py"), ("D", "jobs/e/j/deleted.json")]
-        return [("M", "a.py"), ("M", "jobs/e/j/job.json")]
+            return [("M", "a.py"), ("D", "var/jobs/e/j/deleted.json")]
+        return [("M", "a.py"), ("M", "var/jobs/e/j/job.json")]
 
     monkeypatch.setattr(repo_state, "repo_paths_from_git_cmd", fake_paths)
     monkeypatch.setattr(repo_state, "repo_name_status_from_git_cmd", fake_status)
@@ -64,23 +64,23 @@ def test_changed_paths_entries_generated_artifacts_and_unstaged_detection(monkey
     assert repo_state.changed_repo_paths(tmp_path) == [
         "a.py",
         "b.py",
-        "jobs/e/j/job.json",
         "untracked.py",
+        "var/jobs/e/j/job.json",
     ]
-    assert repo_state.generated_artifact_paths(["a.py", "jobs/e/j/job.json"]) == [
-        "jobs/e/j/job.json"
+    assert repo_state.generated_artifact_paths(["a.py", "var/jobs/e/j/job.json"]) == [
+        "var/jobs/e/j/job.json"
     ]
     assert repo_state.changed_repo_entries(tmp_path) == [
         ("M", "a.py"),
-        ("D", "jobs/e/j/deleted.json"),
-        ("M", "jobs/e/j/job.json"),
+        ("D", "var/jobs/e/j/deleted.json"),
+        ("M", "var/jobs/e/j/job.json"),
         ("??", "untracked.py"),
     ]
 
     with pytest.raises(click.ClickException, match="Generated Harbor artifacts"):
         repo_state.assert_no_generated_artifact_changes(tmp_path)
 
-    monkeypatch.setattr(repo_state, "changed_repo_entries", lambda _root: [("D", "jobs/x")])
+    monkeypatch.setattr(repo_state, "changed_repo_entries", lambda _root: [("D", "var/jobs/x")])
     repo_state.assert_no_generated_artifact_changes(tmp_path)
 
     monkeypatch.setattr(
@@ -98,5 +98,5 @@ def test_changed_paths_entries_generated_artifacts_and_unstaged_detection(monkey
 
 
 def test_assessment_stores_and_analysis_output_are_generated_artifacts() -> None:
-    paths = ["stores/rules-trial/log.jsonl", "analysis/rules-trial/analysis.md", "src/x.py"]
+    paths = ["var/stores/rules-trial/log.jsonl", "var/analysis/rules-trial/analysis.md", "src/x.py"]
     assert repo_state.generated_artifact_paths(paths) == sorted(paths[:2])

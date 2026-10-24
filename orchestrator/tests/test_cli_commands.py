@@ -15,7 +15,8 @@ from click.testing import CliRunner
 
 from raidar.agents.config import agent_name_for
 from raidar.cli import env_harbor, main
-from raidar.cli.shared import ORCHESTRATOR_ROOT, REPO_ROOT
+from raidar.cli.shared import ORCHESTRATOR_ROOT
+from raidar.core.paths import REPO_ROOT
 from raidar.core.repo_state import (
     assert_no_generated_artifact_changes,
     generated_artifact_paths,
@@ -236,7 +237,7 @@ def test_artifact_guard_allows_generated_artifact_deletions(tmp_path: Path, monk
         lambda _: [
             (
                 "D",
-                "experiments/operational_smoke/hello-world-smoke/runs/run-01/run.json",
+                "var/jobs/hello-world-smoke/run-01/run.json",
             ),
         ],
     )
@@ -250,11 +251,11 @@ def test_artifact_guard_rejects_modified_generated_artifacts(tmp_path: Path, mon
         lambda _: [
             (
                 "M",
-                "experiments/operational_smoke/hello-world-smoke/runs/run-01/run.json",
+                "var/jobs/hello-world-smoke/run-01/run.json",
             ),
             (
                 "A",
-                "experiments/operational_smoke/hello-world-smoke/report.md",
+                "var/analysis/hello-world-smoke/report.md",
             ),
         ],
     )
@@ -358,8 +359,8 @@ def test_run_refuses_the_removed_scenario_flag(tmp_path: Path) -> None:
     assert "No such option: --scenario" in result.output
 
 
-SMOKE_PATH = "experiments/smoke/python__circuit_eval-cp1__agent-health/experiment.yaml"
-AGENTS_PATH = "experiments/benchmark/python__circuit_eval-cp1__agents/experiment.yaml"
+SMOKE_PATH = "lab/experiments/smoke/python__circuit_eval-cp1__agent-health/experiment.yaml"
+AGENTS_PATH = "lab/experiments/benchmark/python__circuit_eval-cp1__agents/experiment.yaml"
 
 
 def _make_dry_run(*args: str) -> subprocess.CompletedProcess[str]:
@@ -520,7 +521,7 @@ def test_review_fixture_is_written_under_the_fixture_dir() -> None:
 
     assert result.returncode == 0, result.stderr
     assert "raidar.review.projection.fixture" in result.stdout
-    assert "/.tmp/review-fixture" in result.stdout
+    assert "/var/tmp/review-fixture" in result.stdout
     assert "experiments/" not in result.stdout
 
 
@@ -532,9 +533,9 @@ def test_review_surface_test_projects_both_fixture_roots_but_quality_only_one() 
     review = next(line for line in joined.splitlines() if "raidar.review.projection " in line)
     quality = next(line for line in joined.splitlines() if "raidar.review.quality " in line)
     assert "--legacy-root" not in review
-    assert "/.tmp/review-fixture/review-only" in review
-    assert "/.tmp/review-fixture/jobs" in review
-    assert "/.tmp/review-fixture/review-only" not in quality
+    assert "/var/tmp/review-fixture/review-only" in review
+    assert "/var/tmp/review-fixture/jobs" in review
+    assert "/var/tmp/review-fixture/review-only" not in quality
 
 
 def test_review_surface_data_requires_jobs() -> None:

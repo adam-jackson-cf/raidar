@@ -13,7 +13,7 @@ import pytest
 from click.testing import CliRunner
 
 from raidar.cli import main
-from raidar.cli.shared import REPO_ROOT
+from raidar.core.paths import REPO_ROOT
 from raidar.execution.models import (
     ExecutionValidity,
     PhaseSample,

@@ -83,7 +83,7 @@ def _step(name: str, files: list[str]) -> VerifierStepSpec:
 
 def _write_problem(store: ProblemStore, name: str, *, ref_one_has_mul: bool, oneshot: bool) -> None:
     ref = f"{name}@{FIXTURE_VERSION}"
-    content = store.root / "store" / name / FIXTURE_VERSION
+    content = store.content_dir(ProblemId.parse(ref))
     work = content.parent / "work"
     steps = ["checkpoint_1"] if oneshot else ["checkpoint_1", "checkpoint_2"]
     step_specs = {
