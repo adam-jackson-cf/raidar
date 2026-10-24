@@ -40,13 +40,13 @@
         }
       },
       "scorer": {
-        "code-quality@1": {
-          "digest": "177e2bf8912f1c63ce536097a8222c0e12c4317508439d94dc27246d953613cf",
+        "code-quality@3": {
+          "digest": "68958aa58415d7b495ff53974b91e297a36149fc7f0c57034232833d23a5e836",
           "metadata": {
             "implementation": "raidar.scorers.code_quality:code_quality_scorer",
-            "implementation_digest": "736cd68366d63a638ec8d961cc7499a540f47d972f748a6fcadd09d159c75c01",
+            "implementation_digest": "4b2a00a42050a931ec62ee8417d06accf29e377079fc9010ea1eb6799cbb9f6c",
             "manifest": {
-              "description": "SCB-fork code-quality and inertia components over the per-step snapshots.",
+              "description": "SCB-fork code-quality and inertia components over the per-step snapshots; a step graded without the in-trial coverage pass reads G's coverage run from the offline run in the Assessment store, and G leaves out at most 3 cases whose outcome differs between the grading and coverage runs instead of reading the step as ineligible.",
               "evidence_required": [
                 "snapshot.current",
                 "snapshot.prior",
@@ -198,6 +198,18 @@
                   "tier": "deterministic",
                   "type": "ratio",
                   "unit": null
+                },
+                {
+                  "description": "Grader cases G left out at the transition because their outcome differed between the grading run and the coverage run (0 when parity held).",
+                  "direction": "neutral",
+                  "exactness": "native",
+                  "id": "regression_parity_excluded_cases",
+                  "inputs": [],
+                  "level": "transition",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "count",
+                  "unit": "cases"
                 }
               ],
               "runtimes": [
@@ -207,7 +219,7 @@
                 "scb-python-quality",
                 "scb-check"
               ],
-              "version": "1"
+              "version": "3"
             },
             "tool_lock": {
               "python": {
@@ -251,10 +263,10 @@
           }
         },
         "correctness@1": {
-          "digest": "4be940aff5a1e111061505e02963b54c373825ea85cc2ef0cac0ba33099ee3c0",
+          "digest": "dd32158487f94c054799a93f92a06952a48c283914aabf36da8ef911dd17acf0",
           "metadata": {
             "implementation": "raidar.scorers.correctness:correctness_scorer",
-            "implementation_digest": "30bad4c6f5461c6a39578e64f0c484ca9074dec1ed36981f9c383ce3b06dc733",
+            "implementation_digest": "e5f8eca8b6ca1015270235a09314890d376ea89543c9a35c5ade3227251fcc57",
             "manifest": {
               "description": "Oracle verdicts per checkpoint and trajectory, from the oracle step records.",
               "evidence_required": [
@@ -417,13 +429,13 @@
             "tool_lock": {}
           }
         },
-        "process-compliance@2": {
-          "digest": "0df8979b10a49acc20e00f840d0f470535b423e8563f99debb12cb80f744039d",
+        "process-compliance@6": {
+          "digest": "82fd3cf36bc0c896dfcfeac9d4dde576040fecce96299da7337fcc6a70939b73",
           "metadata": {
             "implementation": "raidar.scorers.process_checks:deterministic_process_compliance_scorer",
-            "implementation_digest": "3632b8f5b963593a27adb85cab243f326eb9187c5e6683e8392f464841b8f5d4",
+            "implementation_digest": "b84709693e5b605603a2e5ecf731d700680e5275b956a01776185310d4a3c492",
             "manifest": {
-              "description": "Deterministic trace checks of agent process; a check the trace cannot decide is undetermined, never judged by a model.",
+              "description": "Deterministic trace checks of agent process (process-compliance@5: stall outcomes, a test command counts only when it ran, the step's work session's own test run after its last edit, a compliance rate without the plan check unless the condition asks for a plan); a check the trace cannot decide is undetermined, never judged by a model. Adds whether the work session ran the tests at all, and whether it ran them after its last edit to a non-test file.",
               "evidence_required": [
                 "trace",
                 "snapshot.current"
@@ -466,22 +478,166 @@
                   "tier": "deterministic",
                   "type": "ratio",
                   "unit": null
+                },
+                {
+                  "description": "A session of the step changed no workspace file and ended asking a question (continue-on-stall@1 detection).",
+                  "direction": "lower_better",
+                  "exactness": "native",
+                  "id": "stalled",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "boolean",
+                  "unit": null
+                },
+                {
+                  "description": "Every continuation a stall started changed the workspace.",
+                  "direction": "higher_better",
+                  "exactness": "native",
+                  "id": "stall_resolved",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "boolean",
+                  "unit": null
+                },
+                {
+                  "description": "Share of reached steps with a stall record in which a session stalled.",
+                  "direction": "lower_better",
+                  "exactness": "native",
+                  "id": "stall_rate",
+                  "inputs": [],
+                  "level": "trajectory",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "ratio",
+                  "unit": null
+                },
+                {
+                  "description": "Reached steps in which a session stalled.",
+                  "direction": "lower_better",
+                  "exactness": "native",
+                  "id": "stalled_steps",
+                  "inputs": [],
+                  "level": "trajectory",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "count",
+                  "unit": null
+                },
+                {
+                  "description": "Test commands in the step whose runner was not found (they never ran).",
+                  "direction": "lower_better",
+                  "exactness": "native",
+                  "id": "test_commands_not_run",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "count",
+                  "unit": null
+                },
+                {
+                  "description": "Test commands whose runner was not found, over the trajectory.",
+                  "direction": "lower_better",
+                  "exactness": "native",
+                  "id": "total_test_commands_not_run",
+                  "inputs": [],
+                  "level": "trajectory",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "count",
+                  "unit": null
+                },
+                {
+                  "description": "The step's work session (the one given the step's first prompt) ran the project's tests after its last source edit; a test command counts only if it ran.",
+                  "direction": "higher_better",
+                  "exactness": "native",
+                  "id": "work_session_tests_run_before_finish",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "boolean",
+                  "unit": null
+                },
+                {
+                  "description": "Share of decided steps whose work session ran tests after its last edit.",
+                  "direction": "higher_better",
+                  "exactness": "native",
+                  "id": "work_session_tests_run_rate",
+                  "inputs": [],
+                  "level": "trajectory",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "ratio",
+                  "unit": null
+                },
+                {
+                  "description": "The step's work session ran the project's tests at least once (a test command counts only if it ran); not applicable when it made no source edit.",
+                  "direction": "higher_better",
+                  "exactness": "native",
+                  "id": "work_session_tests_run_any",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "boolean",
+                  "unit": null
+                },
+                {
+                  "description": "The step's work session ran the project's tests after its last edit to a non-test file (edits to test files after the run do not fail it).",
+                  "direction": "higher_better",
+                  "exactness": "native",
+                  "id": "work_session_tests_after_last_code_edit",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "boolean",
+                  "unit": null
+                },
+                {
+                  "description": "Share of decided steps whose work session ran the tests at all.",
+                  "direction": "higher_better",
+                  "exactness": "native",
+                  "id": "work_session_tests_run_any_rate",
+                  "inputs": [],
+                  "level": "trajectory",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "ratio",
+                  "unit": null
+                },
+                {
+                  "description": "Share of decided steps whose work session ran the tests after its last code edit.",
+                  "direction": "higher_better",
+                  "exactness": "native",
+                  "id": "work_session_tests_after_last_code_edit_rate",
+                  "inputs": [],
+                  "level": "trajectory",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "ratio",
+                  "unit": null
                 }
               ],
               "runtimes": [
                 "*"
               ],
               "tools": [],
-              "version": "2"
+              "version": "6"
             },
             "tool_lock": {}
           }
         },
         "resource-usage@1": {
-          "digest": "f3c72ab636efd5be83bff09e357d9f578450e3382bab9fd8485fd6645e354b6d",
+          "digest": "9bc12416714af62f9bcfcd5c121b023322a6f3546da1a4521d4abbeac8dcedd3",
           "metadata": {
             "implementation": "raidar.scorers.resource_usage:resource_usage_scorer",
-            "implementation_digest": "a4e91a68b90ce43a9cc515ece436be4d7242dc72861459cfa0aae4c03218130b",
+            "implementation_digest": "582a154181f8fb7617d322dfdb51415f99cf8e71d95ab1fe12bb153a568a6d71",
             "manifest": {
               "description": "Tokens, cost, turns and agent wall time from Harbor per-step usage and timing.",
               "evidence_required": [
@@ -619,9 +775,9 @@
       "scorer_config": {},
       "scorers": [
         "correctness@1",
-        "code-quality@1",
+        "code-quality@3",
         "resource-usage@1",
-        "process-compliance@2"
+        "process-compliance@6"
       ]
     },
     "tools": {
@@ -633,7 +789,7 @@
       "tree-sitter-language-pack": "0.13.0"
     }
   },
-  "document_sha256": "e477c699814057f5efbb32a7dbabb17197b776ce87ed437372d40c6f04058f44",
+  "document_sha256": "57d5e2e35e8464e33b1ab7a7ff4f5b5cafab9f6cbc074b10b3ed179f3e8d9119",
   "execution": {
     "arms": {
       "baseline": {
@@ -684,7 +840,7 @@
         "type": "docker"
       },
       "factors": [],
-      "id": "python__forge__mechanics-v1",
+      "id": "python__forge__mechanics",
       "kind": "smoke",
       "problems": [
         {
@@ -819,12 +975,12 @@
     }
   },
   "experiment": {
-    "id": "python__forge__mechanics-v1",
+    "id": "python__forge__mechanics",
     "source": "experiment.yaml",
-    "source_sha256": "5be7db544db26b2313b8c34d35248d38511cc0fe82f384ae628cbbc3f78a09c8",
-    "spec_sha256": "9e649694681626dfdc73660dfcaca488bdae5e9c69c28576f30ab495af50d8aa"
+    "source_sha256": "73c016377dffd7a9facbf962ac4079fa5f7e77cdec22b93d67e73fd73e2e3a58",
+    "spec_sha256": "43f1c6560562b63320c50ba381c4a80a60d24536ad855fa0ba04306e446f5bc0"
   },
-  "lock_sha256": "ced429bb43ed3abd33ac11712d4d260f2e528757629f9c1ea91eb83f25534281",
+  "lock_sha256": "30c276f303512b7763fcaa044e213b008db3b77362a2ebe14180615c0ce63888",
   "lock_version": 3,
   "overrides": {
     "flags": {},
@@ -832,9 +988,9 @@
   },
   "sections": {
     "analysis": "144d50057229f81b6136f89cfe8df3c9cf5dbbbec9a279c66acba88e027528b3",
-    "assessment": "74e11fc5a38325dd957ec0580a392de55d54c776b6c7a336d3052632cfbfe486",
-    "execution": "ced429bb43ed3abd33ac11712d4d260f2e528757629f9c1ea91eb83f25534281",
-    "toolchain": "f4764cb89419a1078037ab9653100edad8097d38af85ab3024226f1879fb437d"
+    "assessment": "6474414287a305f140550a9a78969afe01da35fac0370b007a91eb218b319fbc",
+    "execution": "30c276f303512b7763fcaa044e213b008db3b77362a2ebe14180615c0ce63888",
+    "toolchain": "d7690085426651b528648be88074c92a237e26e17e212b4bf7aee4dd7bac2844"
   },
   "spec": {
     "agents": [
@@ -873,9 +1029,9 @@
       "scorer_config": {},
       "scorers": [
         "correctness@1",
-        "code-quality@1",
+        "code-quality@3",
         "resource-usage@1",
-        "process-compliance@2"
+        "process-compliance@6"
       ]
     },
     "conditions": [
@@ -884,13 +1040,13 @@
         "id": "baseline"
       }
     ],
-    "description": "Mechanics-v1 declaration smoke on forge (8 checkpoints); not citable.",
+    "description": "Mechanics declaration smoke on forge (8 checkpoints); not citable.",
     "environment": {
       "compose_init": true,
       "type": "docker"
     },
     "factors": [],
-    "id": "python__forge__mechanics-v1",
+    "id": "python__forge__mechanics",
     "kind": "smoke",
     "problems": [
       {
@@ -921,6 +1077,6 @@
     "litellm": "1.102.1",
     "python": "3.13.7",
     "raidar": "0.14.0",
-    "raidar_spec": "8517990a49c15a5d143c2572dd78f1d56b8859ffc580654715ecbc114045e5d9"
+    "raidar_spec": "cc5dc301258ba2fbedfd1340a05f1690401ba98d6bf1036716a85f8b9573f813"
   }
 }

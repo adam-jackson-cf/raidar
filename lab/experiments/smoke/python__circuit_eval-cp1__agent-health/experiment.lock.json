@@ -42,10 +42,10 @@
       },
       "scorer": {
         "correctness@1": {
-          "digest": "4be940aff5a1e111061505e02963b54c373825ea85cc2ef0cac0ba33099ee3c0",
+          "digest": "dd32158487f94c054799a93f92a06952a48c283914aabf36da8ef911dd17acf0",
           "metadata": {
             "implementation": "raidar.scorers.correctness:correctness_scorer",
-            "implementation_digest": "30bad4c6f5461c6a39578e64f0c484ca9074dec1ed36981f9c383ce3b06dc733",
+            "implementation_digest": "e5f8eca8b6ca1015270235a09314890d376ea89543c9a35c5ade3227251fcc57",
             "manifest": {
               "description": "Oracle verdicts per checkpoint and trajectory, from the oracle step records.",
               "evidence_required": [
@@ -223,7 +223,7 @@
     },
     "tools": {}
   },
-  "document_sha256": "b5def3561964719a3fcdb008d865936b71f9c5bf23d91e2703809378a3145755",
+  "document_sha256": "bb89d651a383746aeac194b25b2545ba3b986f51914d7d80ec17ec489e4d0ad7",
   "execution": {
     "arms": {
       "baseline": {
@@ -334,7 +334,7 @@
   "experiment": {
     "id": "python__circuit_eval-cp1__agent-health",
     "source": "experiment.yaml",
-    "source_sha256": "68286c566dde428e077a2d124b0de197ac4f90caf4a9610e7a82d68c5d622a65",
+    "source_sha256": "58885155d29becc70bc270e72a95989421beb8a05c42bcd49538d5e1dcab3153",
     "spec_sha256": "8ca775601293accb1d0af95ed52ffdbb122ffd8340e572ea4c60029b324f5953"
   },
   "lock_sha256": "e6e0988b09f9f3463aaf847d417ccc561223a9a2feb590393f472b6f298c5591",
@@ -345,9 +345,9 @@
   },
   "sections": {
     "analysis": "144d50057229f81b6136f89cfe8df3c9cf5dbbbec9a279c66acba88e027528b3",
-    "assessment": "18b4adfd6bd49cd2d21ecc2d1cd613ce5288baad0bb2ab274839597a30aff612",
+    "assessment": "6a281a341d3e95c3d269a27ba9f57e2bc4c41bd23b9b24cf397f02b183ce1078",
     "execution": "e6e0988b09f9f3463aaf847d417ccc561223a9a2feb590393f472b6f298c5591",
-    "toolchain": "f4764cb89419a1078037ab9653100edad8097d38af85ab3024226f1879fb437d"
+    "toolchain": "d7690085426651b528648be88074c92a237e26e17e212b4bf7aee4dd7bac2844"
   },
   "spec": {
     "agents": [
@@ -422,6 +422,6 @@
     "litellm": "1.102.1",
     "python": "3.13.7",
     "raidar": "0.14.0",
-    "raidar_spec": "8517990a49c15a5d143c2572dd78f1d56b8859ffc580654715ecbc114045e5d9"
+    "raidar_spec": "cc5dc301258ba2fbedfd1340a05f1690401ba98d6bf1036716a85f8b9573f813"
   }
 }
