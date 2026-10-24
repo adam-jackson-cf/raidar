@@ -79,7 +79,12 @@ def cleanup_trial_projects(
     dry_run: bool = False,
     runner: Runner = _run,
 ) -> list[str]:
-    """Remove stale trial projects (``docker compose down``) on ``docker_context``; their names."""
+    """Remove stale trial projects (``docker compose down``) on ``docker_context``; their names.
+
+    Every stale project is attempted; if any ``down`` fails, the others are still removed and a
+    ``RuntimeError`` then names the ones left behind (a project is never reported removed when
+    docker refused).
+    """
     listed = runner(
         _docker(
             docker_context,
@@ -95,10 +100,13 @@ def cleanup_trial_projects(
         raise RuntimeError(f"docker ps failed: {listed.stderr.strip()}")
     stale = select_stale(trial_projects(listed.stdout), job_dir)
     if not dry_run:
+        failed = []
         for project in stale:
-            runner(
-                _docker(docker_context, "compose", "-p", project.name, "down", "--remove-orphans")
-            )
+            done = reap_project(project.name, docker_context=docker_context, runner=runner)
+            if done["returncode"] != 0:
+                failed.append(f"{project.name}: {done['stderr']}")
+        if failed:
+            raise RuntimeError("docker compose down failed for " + "; ".join(failed))
     return [project.name for project in stale]
 
 

@@ -175,14 +175,24 @@ def supervise(detach: Path, command: Sequence[str]) -> int:
     signal.signal(signal.SIGHUP, signal.SIG_IGN)
     code: int | None = None
     error: str | None = None
+    children: list[subprocess.Popen[bytes]] = []
+    early: list[int] = []
+
+    def forward(signum: int, _frame: object) -> None:
+        if children:
+            children[0].send_signal(signum)
+        else:
+            early.append(signum)  # arrived before the job started: delivered right after
+
+    # Installed before the job starts: a TERM in that window must not kill the supervisor
+    # without its exit record.
+    signal.signal(signal.SIGTERM, forward)
+    signal.signal(signal.SIGINT, forward)
     try:
         process = subprocess.Popen(full, stdin=subprocess.DEVNULL)  # noqa: S603
-
-        def forward(signum: int, _frame: object) -> None:
+        children.append(process)
+        for signum in early:
             process.send_signal(signum)
-
-        signal.signal(signal.SIGTERM, forward)
-        signal.signal(signal.SIGINT, forward)
         code = process.wait()
     except OSError as exc:
         error = f"{type(exc).__name__}: {exc}"
@@ -212,13 +222,27 @@ def _read_json(path: Path) -> dict[str, Any] | None:
 
 
 def _alive(pid: int) -> bool:
+    """Whether ``pid`` is still this module's supervisor (a recycled pid is not).
+
+    After a reboot or a long wait the recorded pid may belong to an unrelated process, so
+    a live pid counts only when its command line is the supervisor's.
+    """
     try:
         os.kill(pid, 0)
     except ProcessLookupError:
         return False
     except PermissionError:
+        return False  # another user's process cannot be our supervisor
+    ps = shutil.which("ps")
+    if ps is None:
         return True
-    return True
+    try:
+        listed = subprocess.run(  # noqa: S603 - fixed ps arguments
+            [ps, "-p", str(pid), "-o", "command="], capture_output=True, text=True, check=False
+        )
+    except OSError:
+        return True
+    return "raidar.execution.detach" in listed.stdout
 
 
 def _pid(detach: Path) -> int | None:

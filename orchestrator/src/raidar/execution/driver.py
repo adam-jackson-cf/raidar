@@ -9,7 +9,7 @@ kills agent processes before artifacts are collected and graded, and the
 provisioning hooks of any component that installs a tool in the trial
 container (``raidar.components.runtime.provision``; trial provisions install at
 environment start), then the T1 tool-tree hash (``execution.health.tool_tree``) and the
-host-side liveness monitor (``execution.health.liveness``, observe by default).
+host-side liveness monitor (``execution.health.liveness``, enforce by default).
 
 Decision (deviates from plan section 1 "Harbor JobConfigs", N4 "Harbor owns
 concurrency"): Raidar builds one Harbor ``TrialConfig`` per planned trial and

@@ -11,7 +11,6 @@ import pytest
 from raidar.execution.cleanup import (
     cleanup_trial_projects,
     reap_project,
-    select_stale,
     trial_projects,
 )
 from raidar.execution.environment import run_scope
@@ -24,9 +23,10 @@ def _listing(*rows: tuple[str, str]) -> str:
 
 
 class FakeDocker:
-    def __init__(self, listing: str, returncode: int = 0) -> None:
+    def __init__(self, listing: str, returncode: int = 0, down: tuple[int, str] = (0, "")) -> None:
         self.listing = listing
         self.returncode = returncode
+        self.down = down
         self.calls: list[list[str]] = []
 
     def __call__(self, command: Sequence[str]) -> subprocess.CompletedProcess[str]:
@@ -37,7 +37,9 @@ class FakeDocker:
             return subprocess.CompletedProcess(
                 list(command), self.returncode, stdout=self.listing, stderr="no daemon"
             )
-        return subprocess.CompletedProcess(list(command), 0, stdout="", stderr="")
+        return subprocess.CompletedProcess(
+            list(command), self.down[0], stdout="", stderr=self.down[1]
+        )
 
     def downs(self) -> list[str]:
         return [call[3] for call in self.calls if call[:3] == ["docker", "compose", "-p"]]
@@ -106,11 +108,6 @@ def test_a_failed_listing_is_an_error() -> None:
         cleanup_trial_projects(docker_context=CONTEXT, runner=FakeDocker("", returncode=1))
 
 
-def test_select_stale_is_empty_without_trial_projects(tmp_path: Path) -> None:
-    assert select_stale([], None) == []
-    assert select_stale([], tmp_path) == []
-
-
 def test_reaping_one_project_runs_compose_down_on_the_given_context() -> None:
     docker = FakeDocker("")
 
@@ -118,3 +115,19 @@ def test_reaping_one_project_runs_compose_down_on_the_given_context() -> None:
 
     assert docker.downs() == ["t0__env-abcdefabcd"]
     assert outcome == {"returncode": 0, "stderr": ""}
+
+
+def test_a_project_docker_will_not_remove_is_an_error_not_a_removal() -> None:
+    docker = FakeDocker(
+        _listing(
+            ("b00-p0-baseline__env-0123456789", "exited"),
+            ("b01-p0-guided__env-abcdefabcd", "exited"),
+        ),
+        down=(1, "network in use"),
+    )
+
+    with pytest.raises(RuntimeError, match="b00-p0-baseline__env-0123456789: network in use"):
+        cleanup_trial_projects(docker_context=CONTEXT, runner=docker)
+
+    # every project is attempted before the failure is raised
+    assert docker.downs() == ["b00-p0-baseline__env-0123456789", "b01-p0-guided__env-abcdefabcd"]

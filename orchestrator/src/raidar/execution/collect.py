@@ -41,7 +41,7 @@ from typing import Any
 from raidar.components import CompiledCondition
 from raidar.components.definition.integrity import condition_step_flags
 from raidar.execution.health.liveness import idle_killed_steps
-from raidar.execution.health.model import VIOLATION, HealthReport, load_health
+from raidar.execution.health.model import VIOLATION, HealthReport
 from raidar.execution.models import (
     CheckpointState,
     ExecutionValidity,
@@ -390,12 +390,6 @@ def health_validity(report: HealthReport) -> tuple[ValidityCheck, ...]:
         detail = "; ".join(f"{c.id}: {c.detail}" for c in hits)
         checks.append(ValidityCheck(name=name, passed=not hits, detail=detail))
     return tuple(checks)
-
-
-def recorded_health_validity(trial_dir: Path) -> tuple[ValidityCheck, ...]:
-    """The validity checks of the trial's ``health.json``; none when it has not been written."""
-    report = load_health(trial_dir)
-    return health_validity(report) if report is not None else ()
 
 
 def trial_exception(trial_dir: Path) -> str | None:

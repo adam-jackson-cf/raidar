@@ -44,7 +44,7 @@ _ERROR = "@@RAIDAR_ERROR"
 # also stashes an agent-authored workspace setup.sh, which the next step's
 # workdir upload overwrites and the generated setup.sh then puts back.
 _SCRIPT = """
-uid=$(id -u -- {user} 2>/dev/null) || {{ echo "{error} unknown agent user {user}"; exit 0; }}
+uid=$(id -u -- {user} 2>/dev/null) || {{ echo "{error} unknown agent user"; exit 0; }}
 if [ "$uid" = 0 ]; then echo "{error} agent user is root"; exit 0; fi
 live() {{ ps -e -o pid=,uid=,stat=,args= 2>/dev/null | awk -v u="$uid" '$2==u && $3 !~ /^Z/'; }}
 echo "{killed}"

@@ -12,6 +12,7 @@ from __future__ import annotations
 import json
 import os
 import shutil
+import signal
 import subprocess
 import sys
 import time
@@ -122,6 +123,39 @@ def test_a_failing_command_reads_failed_with_its_exit_code(tmp_path: Path) -> No
 
     assert found.state == "failed"
     assert "exited 3" in found.detail
+
+
+def test_a_recycled_pid_is_not_a_running_supervisor(tmp_path: Path) -> None:
+    job_dir = tmp_path / "job"
+    detach = job_dir / DETACH_DIR
+    detach.mkdir(parents=True)
+    (detach / LAUNCH_FILE).write_text("{}")
+    (detach / PID_FILE).write_text(f"{os.getpid()}\n")  # alive, but this is pytest
+
+    assert status(job_dir).state == "died"
+
+
+def test_a_terminate_sent_to_the_supervisor_ends_the_job_and_leaves_an_exit_record(
+    tmp_path: Path,
+) -> None:
+    launched = launch(
+        _command(tmp_path, sleep=60),
+        experiment=_experiment(tmp_path),
+        jobs_dir=tmp_path / "jobs",
+        job_id="stopped",
+        cwd=tmp_path,
+    )
+    detach = launched.job_dir / DETACH_DIR
+    _wait_for(detach / PID_FILE)
+    _wait_for(detach / LOG_FILE)
+    while "fake job" not in (detach / LOG_FILE).read_text():
+        time.sleep(0.05)
+
+    os.kill(int((detach / PID_FILE).read_text()), signal.SIGTERM)
+    _wait_for(detach / EXIT_FILE)
+
+    assert json.loads((detach / EXIT_FILE).read_text())["exit_code"] != 0
+    assert status(launched.job_dir).state == "failed"
 
 
 def test_a_supervisor_that_vanished_without_an_exit_record_reads_died(tmp_path: Path) -> None:

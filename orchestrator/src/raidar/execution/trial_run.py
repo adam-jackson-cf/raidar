@@ -7,6 +7,7 @@ and writes each record.
 
 from __future__ import annotations
 
+import asyncio
 import traceback
 
 from raidar.execution.agent_config import reported_harness_pin
@@ -49,7 +50,7 @@ async def _run_and_classify(ctx: JobContext, trial: PlannedTrial) -> TrialRecord
     plan = ctx.plan
     problem = ctx.problems[trial.problem_index]
     task = _materialise(ctx, trial)
-    cold = environment_cold(task.path)
+    cold = await asyncio.to_thread(environment_cold, task.path)
     config = harbor_trial_config(
         plan,
         trial,

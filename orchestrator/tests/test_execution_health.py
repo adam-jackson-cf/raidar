@@ -12,7 +12,7 @@ import pytest
 from click.testing import CliRunner
 
 from raidar.cli import main
-from raidar.execution.collect import health_validity, recorded_health_validity
+from raidar.execution.collect import health_validity
 from raidar.execution.health.audit import audit_trial
 from raidar.execution.health.fault_candidates import FAULT_CANDIDATES, append_fault_candidates
 from raidar.execution.health.model import HealthCheck, HealthReport, load_health, write_health
@@ -316,18 +316,6 @@ def test_violations_map_to_validity_checks_and_nothing_else_invalidates() -> Non
     assert "V2: V2 violation" in failed["health_verdicts"].detail
     assert "H4" in failed["health_budgets"].detail
     assert "T3" in failed["health_tamper"].detail
-
-
-def test_collect_reads_the_trials_health_json(tmp_path: Path) -> None:
-    assert recorded_health_validity(tmp_path) == ()
-    write_health(tmp_path, _report(("T1", "violation")))
-    checks = {c.name: c.passed for c in recorded_health_validity(tmp_path)}
-    assert checks == {
-        "health_verdicts": True,
-        "health_budgets": True,
-        "health_tamper": False,
-    }
-    assert load_health(tmp_path) == _report(("T1", "violation"))
 
 
 def test_the_trial_run_writes_health_json_and_maps_its_violations(tmp_path: Path) -> None:

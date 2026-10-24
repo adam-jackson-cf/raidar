@@ -71,8 +71,3 @@ def derive_reached(
         reached.append(open_)
         open_ = open_ and gate_passes(rewards, rule)
     return tuple(reached)
-
-
-def executed_reached(attempted: Sequence[bool]) -> tuple[bool, ...]:
-    """``reached`` of a halt run: the checkpoints Harbor actually started."""
-    return tuple(attempted)

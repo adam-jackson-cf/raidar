@@ -17,7 +17,7 @@ from raidar.components import CompiledCondition, compile_condition
 from raidar.execution.collect import TrialContext, classify_trial, execution_validity
 from raidar.execution.health.liveness import LIVENESS_REPORT, idle_killed_steps
 from raidar.execution.models import CheckpointState, PlannedTrial, ProgressionRule, TrialHashes
-from raidar.execution.progression import derive_reached, executed_reached, progression_rule
+from raidar.execution.progression import derive_reached, progression_rule
 from raidar.execution.trial_record import reached
 from raidar.spec.schema import AgentEntry, ConditionSpec, ProtocolSpec
 from tests.execution_support import StepOutcome, verifier_grade, write_trial
@@ -239,9 +239,7 @@ def test_derived_strict_reached_equals_the_halt_run(
     assert derived == halt_reached
     if None not in passes:
         # A valid halt run executed exactly the strict-reached prefix.
-        executed = executed_reached(
-            [a.checkpoint_state is not CheckpointState.NOT_ATTEMPTED for a in halted]
-        )
+        executed = tuple(a.checkpoint_state is not CheckpointState.NOT_ATTEMPTED for a in halted)
         assert executed == derived
         assert execution_validity(halt_run, halted, "0.156.1", HALT).passed
     if passes[2] is False:

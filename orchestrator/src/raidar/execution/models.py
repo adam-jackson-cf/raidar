@@ -1,11 +1,11 @@
 """Execution records (plan WS-D): planned trials, step results, trial records.
 
 A ``PlannedTrial`` is one arm x attempt x problem trial (one Harbor
-multi-step trial). After it runs, the driver writes one ``TrialRecord``
+multi-step trial). After it runs, ``trial_finish`` writes one ``TrialRecord``
 holding a ``StepResult`` per planned checkpoint (Harbor's per-step result),
 the execution-validity gate and the N1 phase timings. Correctness facts come
 from the host-only verifier records (``raidar-oracle/steps/<step>/record.json``,
-a v1 wire path kept for every job), never from Harbor's aggregated trial reward.
+an identity-bearing evidence name), never from Harbor's aggregated trial reward.
 
 Schema v2 vocabulary (Harbor's): a *job* is one execution of a locked
 experiment, a *trial* is one arm x attempt x problem run through every

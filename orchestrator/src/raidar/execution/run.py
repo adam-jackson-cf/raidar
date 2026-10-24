@@ -52,10 +52,6 @@ def _summary(records: list[TrialRecord]) -> dict[str, object]:
     }
 
 
-def default_job_id() -> str:
-    return datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
-
-
 def create_job_dir(job_dir: Path) -> None:
     """Create the job directory; a job directory is never reused.
 
@@ -83,6 +79,7 @@ async def execute(ctx: JobContext) -> list[TrialRecord]:
 
     async def run_one(trial: PlannedTrial) -> TrialRecord:
         record = await run_trial(ctx, trial)
+        finished.append(record)
         trial_id = trial.trial_id
         sealed[trial_id] = await asyncio.to_thread(
             seal_trial,
@@ -90,7 +87,6 @@ async def execute(ctx: JobContext) -> list[TrialRecord]:
             ctx.job_dir / TRIAL_RECORDS_DIR / f"{trial_id}.json",
             ctx.job_dir,
         )
-        finished.append(record)
         return record
 
     try:
