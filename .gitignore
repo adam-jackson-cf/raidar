@@ -39,8 +39,6 @@ coverage/
 # Tracked definitions live under lab/ (experiments, problem pins, ledger, treatment payloads,
 # runtime-pack recipes, judge policies).
 /var/
-# Pre-schema-v2 job root; kept ignored for checkouts that still hold one.
-/runs/
 orchestrator/results*/
 orchestrator/workspace*/
 .enaible/
@@ -55,9 +53,7 @@ diff.png
 .playwright-cli/
 .visual-explainer/
 
-# Lock files (keep bun.lock for scaffold)
-.enaible/
-.plan/
+# Local tool state
 .codegraph/
 .codex/
 

@@ -17,8 +17,8 @@ report is written to ``<fixture dir>/perf-check.json``.
 
 Opted in, a missing prerequisite fails the test instead of skipping it, so a
 CI job or ``make perf-fixture`` can never pass without running the fixture.
-The Docker target is the one ``TARGET=`` / ``RAIDAR_TARGET`` / the targets file selects
-(else the current Docker context); its configured data check must pass.
+The Docker target is the one ``TARGET=`` / ``RAIDAR_TARGET`` / the targets file's
+``default`` selects; its configured data check must pass.
 """
 
 from __future__ import annotations
@@ -36,7 +36,7 @@ from raidar.design.problem.store import ROOT_ENV
 from raidar.engine.target.config import Target, TargetError
 from raidar.engine.target.health import ensure_target
 from raidar.subject.environment.python.image import image_tag
-from raidar.subject.environment.python.models import load_pack_spec
+from raidar.subject.environment.python.pack_definition import load_pack_spec
 from tests.component_trial_support import docker_target
 from tests.execution_support import imported_pack_fixture, locked_experiment
 
@@ -54,8 +54,8 @@ pytestmark = pytest.mark.skipif(
 def _require_target() -> Target:
     """Opted in: every prerequisite must hold, or the fixture fails (never skips).
 
-    The target is the one ``RAIDAR_TARGET`` / the targets file / the current Docker
-    context selects; its reachability and configured data check must pass.
+    The target is the one ``RAIDAR_TARGET`` / the targets file's ``default`` selects; its
+    reachability and configured data check must pass.
     """
     try:
         target = docker_target()

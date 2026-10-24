@@ -9,13 +9,15 @@ import pytest
 
 @pytest.fixture
 def docker_target_offline(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    """CLI commands that select a Docker target resolve the implicit one, without Docker.
+    """CLI commands that select a Docker target resolve the file's default, without Docker.
 
-    No targets file, nothing selected: the implicit target names the context in
-    ``DOCKER_CONTEXT``; reachability is not probed (the test fakes the engine).
+    The targets file defines one trusted target ``offline`` on context ``test-ctx`` as its
+    default; reachability is not probed (the test fakes the engine).
     """
-    monkeypatch.setenv("RAIDAR_TARGETS_FILE", str(tmp_path / "no-targets.toml"))
+    targets = tmp_path / "targets.toml"
+    targets.write_text('default = "offline"\n[targets.offline]\ndocker_context = "test-ctx"\n')
+    monkeypatch.setenv("RAIDAR_TARGETS_FILE", str(targets))
     monkeypatch.delenv("RAIDAR_TARGET", raising=False)
     monkeypatch.delenv("DOCKER_HOST", raising=False)
-    monkeypatch.setenv("DOCKER_CONTEXT", "test-ctx")
+    monkeypatch.delenv("DOCKER_CONTEXT", raising=False)
     monkeypatch.setattr("raidar.cli.target_options.ensure_target", lambda target: None)

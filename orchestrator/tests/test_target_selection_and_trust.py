@@ -121,38 +121,11 @@ def test_invalid_files_are_refused_with_the_field_named(
         parse_targets(text, tmp_path / "targets.toml")
 
 
-def test_no_file_gives_the_implicit_target_from_the_docker_context(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    monkeypatch.setenv("DOCKER_CONTEXT", "ctx-from-env")
-
-    selection = resolve_selection()
-    target = resolve_target()
-
-    assert selection.grader is selection.trial
-    assert (target.name, target.docker_context, target.trusted) == ("default", "ctx-from-env", True)
-    assert (target.data_check, target.transport, target.max_concurrency) == ((), None, None)
-
-
-def test_the_implicit_target_asks_docker_when_the_environment_is_silent(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    import subprocess
-
-    def fake_run(argv: list[str], **_: object) -> subprocess.CompletedProcess[str]:
-        assert argv == ["docker", "context", "show"]
-        return subprocess.CompletedProcess(argv, 0, stdout="shown\n", stderr="")
-
-    monkeypatch.setattr("raidar.engine.target.config.subprocess.run", fake_run)
-
-    assert resolve_target().docker_context == "shown"
-
-
-def test_selection_precedence_is_flag_then_env_then_default_then_implicit(
+def test_selection_precedence_is_flag_then_env_then_default(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     write_targets(tmp_path)
-    monkeypatch.setenv("DOCKER_CONTEXT", "implicit-ctx")
+    monkeypatch.setenv("DOCKER_CONTEXT", "ignored-ctx")
 
     assert resolve_target().name == "mbp"  # the file's default
     monkeypatch.setenv("RAIDAR_TARGET", "lab")
@@ -160,13 +133,18 @@ def test_selection_precedence_is_flag_then_env_then_default_then_implicit(
     assert resolve_target("local").name == "local"  # flag beats env
 
 
-def test_the_implicit_target_applies_when_a_file_has_no_default(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+@pytest.mark.parametrize("text", [None, '[targets.a]\ndocker_context = "x"\n'])
+def test_no_selection_is_refused_and_the_docker_context_is_never_consulted(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, text: str | None
 ) -> None:
-    write_targets(tmp_path, '[targets.a]\ndocker_context = "x"\n')
-    monkeypatch.setenv("DOCKER_CONTEXT", "implicit-ctx")
+    if text is not None:
+        write_targets(tmp_path, text)
+    monkeypatch.setenv("DOCKER_CONTEXT", "ambient-ctx")
 
-    assert resolve_target().docker_context == "implicit-ctx"
+    with pytest.raises(TargetError, match="no target selected"):
+        resolve_target()
+    with pytest.raises(TargetError, match="no target selected"):
+        resolve_selection()
 
 
 def test_an_unknown_target_lists_the_defined_names(tmp_path: Path) -> None:

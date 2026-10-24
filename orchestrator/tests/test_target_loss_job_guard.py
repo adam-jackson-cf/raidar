@@ -17,10 +17,10 @@ from raidar.contract.trial import (
     TrialRecord,
     ValidityCheck,
 )
-from raidar.engine.target.config import implicit_target
 from raidar.engine.target.guard import REAP_FILE, TargetGuard, TargetLostError
 from raidar.engine.target.health import TargetUnavailableError
 from raidar.engine.trial.driver import run_in_order
+from tests.execution_support import fake_engine_target
 
 HASHES = TrialHashes(
     lock="l", problem="p", arm="a", condition="c", agent="g", protocol="r", trial="t"
@@ -85,7 +85,7 @@ class FakeTarget:
 
     def guard(self, reconnect_s: float = 300.0) -> TargetGuard:
         return TargetGuard(
-            target=implicit_target("ctx"),
+            target=fake_engine_target("ctx"),
             healthy=self.healthy,
             ensure=self.ensure,
             reap=self.reap,

@@ -19,7 +19,7 @@ RAIDAR := $(REPO_RUNTIME_ENV) uv run --project orchestrator raidar
 RAIDAR_DEV := $(REPO_RUNTIME_ENV) uv run --project orchestrator --extra dev raidar
 
 # Docker target (raidar.engine.target): TARGET=<name> selects an entry of ~/.config/raidar/targets.toml
-# (else $RAIDAR_TARGET, the file's `default`, then the current Docker context).
+# (else $RAIDAR_TARGET, then the file's `default`; none of these is an error).
 TARGET ?=
 TARGET_ENV := $(if $(TARGET),export RAIDAR_TARGET="$(TARGET)" &&,)
 
@@ -152,7 +152,7 @@ help:
 	@echo "  Secrets: execute/smoke/assess/jev targets inject Infisical (project mac-os-cf, env dev) when the infisical"
 	@echo "  CLI is logged in, else read orchestrator/.env. [SECRETS=auto|infisical|dotenv] [INFISICAL_ENV=dev]"
 	@echo ""
-	@echo "Docker target (TARGET=<name> from ~/.config/raidar/targets.toml, else \$$RAIDAR_TARGET, its default, then the current Docker context):"
+	@echo "Docker target (TARGET=<name> from ~/.config/raidar/targets.toml, else \$$RAIDAR_TARGET, then its default; none of these is an error):"
 	@echo "  make target-init                                       Write a commented ~/.config/raidar/targets.toml template (never overwrites)"
 	@echo "  make target-list                                       List defined targets and the selected one"
 	@echo "  make target-status [TARGET=name]                       Print the target's Docker facts; non-zero when unreachable or its data check fails"
@@ -497,7 +497,7 @@ perf-fixture:
 		$(if $(PERF_FIXTURE_DIR),export RAIDAR_PERF_FIXTURE_DIR="$(abspath $(PERF_FIXTURE_DIR))" &&,) \
 		$(if $(PERF_FIXTURE_CONCURRENCY),export RAIDAR_PERF_FIXTURE_CONCURRENCY="$(PERF_FIXTURE_CONCURRENCY)" &&,) \
 		cd orchestrator && $(REPO_RUNTIME_ENV) uv run --project . --extra dev \
-		python -m pytest tests/test_execution_perf_fixture.py -v -s -rs
+		python -m pytest tests/test_overhead_fixture_run.py -v -s -rs
 
 # The enforced N1 overhead gate: the no-LLM fixture at fixed concurrency 1 and 3, each
 # checked strictly against the accepted budgets. Needs Docker, so it is a release/gate

@@ -33,6 +33,7 @@ from raidar.design.problem.models import ProblemId
 from raidar.design.problem.store import ProblemStore
 from raidar.design.problem.validator import ValidateOptions, validate_problem, write_report
 from raidar.engine.health.reaper import ReapReport, write_reap_report
+from raidar.engine.target.config import Target
 from raidar.grading.leak import LeakReport
 from raidar.grading.models import CaseGroup, CaseResult, CaseStatus, InfraFailure, VerifierGrade
 from raidar.grading.records import (
@@ -56,6 +57,21 @@ from tests.problems_support import (
 )
 
 T0 = datetime(2026, 9, 30, 12, 0, 0, tzinfo=UTC)
+
+
+def fake_engine_target(docker_context: str) -> Target:
+    """A trusted target on an existing Docker context, for tests that fake the engine."""
+    return Target(
+        name="test",
+        kind="docker",
+        docker_context=docker_context,
+        trusted=True,
+        max_concurrency=None,
+        grader="test",
+        data_check=(),
+        data_check_expect=None,
+        transport=None,
+    )
 
 
 @dataclass(frozen=True)

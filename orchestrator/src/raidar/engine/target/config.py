@@ -1,19 +1,18 @@
 """Execution targets: which Docker engine runs trials and graders (mechanics-v1 §3.1).
 
 A target is a named Docker engine, read from ``~/.config/raidar/targets.toml``
-(override: ``RAIDAR_TARGETS_FILE``). With no file and nothing selected, the
-*implicit* target is whatever ``DOCKER_CONTEXT`` or ``docker context show``
-names. Resolution is lazy: only commands that touch Docker call it.
+(override: ``RAIDAR_TARGETS_FILE``). Resolution is lazy: only commands that
+touch Docker call it.
 
 Selection precedence: ``--target NAME`` > ``RAIDAR_TARGET`` > the file's
-``default`` > the implicit target.
+``default``. Nothing selected is an error; the current Docker context is never
+consulted.
 """
 
 from __future__ import annotations
 
 import os
 import re
-import subprocess
 import tomllib
 from collections.abc import Mapping
 from dataclasses import dataclass
@@ -24,9 +23,7 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_valida
 
 ENV_TARGETS_FILE = "RAIDAR_TARGETS_FILE"
 ENV_TARGET = "RAIDAR_TARGET"
-IMPLICIT_TARGET_NAME = "default"
 _NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9_-]*$")
-_DOCKER_TIMEOUT_S = 20
 
 TARGETS_TEMPLATE = """\
 # Raidar execution targets. `raidar target status` shows the selected one.
@@ -150,21 +147,6 @@ def targets_file() -> Path:
     return Path(override).expanduser() if override else Path.home() / ".config/raidar/targets.toml"
 
 
-def implicit_target(docker_context: str) -> Target:
-    """A trusted, check-free, transport-free target for an existing Docker context."""
-    return Target(
-        name=IMPLICIT_TARGET_NAME,
-        kind="docker",
-        docker_context=docker_context,
-        trusted=True,
-        max_concurrency=None,
-        grader=IMPLICIT_TARGET_NAME,
-        data_check=(),
-        data_check_expect=None,
-        transport=None,
-    )
-
-
 def _field_errors(path: Path, error: ValidationError) -> TargetError:
     lines = [
         f"  {'.'.join(str(part) for part in item['loc']) or '<file>'}: {item['msg']}"
@@ -233,34 +215,16 @@ def load_targets(path: Path | None = None) -> TargetBook:
     return parse_targets(path.read_text(), path)
 
 
-def current_docker_context() -> str:
-    """``DOCKER_CONTEXT``, else what ``docker context show`` reports."""
-    from_env = os.environ.get("DOCKER_CONTEXT")
-    if from_env:
-        return from_env
-    try:
-        shown = subprocess.run(
-            ["docker", "context", "show"],  # noqa: S607 - docker resolves from PATH
-            capture_output=True,
-            text=True,
-            timeout=_DOCKER_TIMEOUT_S,
-            check=False,
-        )
-    except (OSError, subprocess.TimeoutExpired) as error:
-        raise TargetError(f"cannot read the current Docker context: {error}") from error
-    context = shown.stdout.strip()
-    if shown.returncode != 0 or not context:
-        raise TargetError(f"`docker context show` failed: {shown.stderr.strip() or 'no output'}")
-    return context
-
-
 def resolve_target(name: str | None = None, *, book: TargetBook | None = None) -> Target:
-    """Apply the selection precedence; the implicit target when nothing selects one."""
+    """Apply the selection precedence; no selection at all is an error."""
     book = book or load_targets()
     chosen = name or os.environ.get(ENV_TARGET) or book.default
-    if chosen:
-        return book.get(chosen)
-    return implicit_target(current_docker_context())
+    if not chosen:
+        raise TargetError(
+            f"no target selected: pass --target, set {ENV_TARGET}, or set `default` in "
+            f"{book.source or targets_file()} (`make target-init` creates it)"
+        )
+    return book.get(chosen)
 
 
 def resolve_selection(name: str | None = None, *, book: TargetBook | None = None) -> Selection:

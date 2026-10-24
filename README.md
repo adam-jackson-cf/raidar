@@ -24,7 +24,7 @@ The design lives in [`docs/reboot/requirements.md`](docs/reboot/requirements.md)
 Prerequisites:
 
 - `uv`
-- Docker with `docker compose` 2.40.1 or newer, local or on another host. Each machine names its Docker targets in `~/.config/raidar/targets.toml` (`make target-init` writes a commented template); select one with `TARGET=<name>` or the file's `default`. With no file, Raidar uses the current Docker context. A remote target is reached through a supervised SSH-forwarded socket (`make target-up TARGET=<name>`, `make target-status`), and hidden tests and agent credentials go only to targets marked `trusted = true`.
+- Docker with `docker compose` 2.40.1 or newer, local or on another host. Each machine names its Docker targets in `~/.config/raidar/targets.toml` (`make target-init` writes a commented template); select one with `TARGET=<name>` or the file's `default`. A remote target is reached through a supervised SSH-forwarded socket (`make target-up TARGET=<name>`, `make target-status`), and hidden tests and agent credentials go only to targets marked `trusted = true`.
 - Node 18 or newer, for the review surface
 - Agent credentials: file-backed Codex auth (`make codex-auth-setup`) or `OPENAI_API_KEY` for `codex`; `ANTHROPIC_API_KEY` or `CLAUDE_CODE_OAUTH_TOKEN` for `claude-code`
 - Optional but preferred: the [Infisical CLI](https://infisical.com/docs/cli/overview), logged in once with `infisical login` in a real terminal (it is interactive)

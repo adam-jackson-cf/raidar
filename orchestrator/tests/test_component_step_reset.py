@@ -184,9 +184,10 @@ def test_component_trials_get_a_per_run_compose_project_and_always_clean_it_up(
         "tests.component_trial_support.cleanup_trial_projects",
         lambda job_dir, **_: cleaned.append(job_dir),
     )
-    monkeypatch.setenv("RAIDAR_TARGETS_FILE", str(tmp_path / "no-targets.toml"))
+    targets = tmp_path / "targets.toml"
+    targets.write_text('default = "offline"\n[targets.offline]\ndocker_context = "test-ctx"\n')
+    monkeypatch.setenv("RAIDAR_TARGETS_FILE", str(targets))
     monkeypatch.delenv("RAIDAR_TARGET", raising=False)
-    monkeypatch.setenv("DOCKER_CONTEXT", "test-ctx")
     agent_config = AgentConfig(import_path="tests.component_trial_support:IsolationProbeAgent")
     with pytest.raises(RuntimeError, match="compose up failed"):
         run_trial_sync(tmp_path / "task", tmp_path / "trials", agent_config, "isolation")
