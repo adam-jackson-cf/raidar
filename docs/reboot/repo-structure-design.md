@@ -1,4 +1,4 @@
-# Repository structure, primitives and versioning (proposal)
+# Repository structure, primitives and versioning
 
 - **Status:** accepted 2026-10-24 with these user decisions: keep `orchestrator/` (no rename); `lab/` and `var/` adopted; `spikes/` deleted; package layout §4.2 approved as proposed; and **a clean start**. Once the restructure is signed off (no functional regression, verification and code reviews green), jobs and artefacts start afresh as v1. Old experiments, jobs and stores are not carried forward: finished and closed experiment definitions leave the tree (they are preserved at `archive/pre-structure-reset`), and old jobs, stores and analyses move to `var/archive/pre-v1/`. The schema-v1/legacy-job migration code and the dormant `process-compliance@1` are deleted. §3.4 ("closed, not relocked") is therefore not built.
 - **Date:** 2026-10-24
@@ -125,3 +125,33 @@ Each inheritance chain is flattened into its one module. Tests that cover only a
 3. Put generated data under a single `var/` (recommended), or keep `jobs/`, `stores/`, `analysis/` at the root.
 4. Close the finished pilot experiments, which avoids re-pinning (recommended), or re-pin them to the survivors.
 5. Delete `spikes/` (2.5G, untracked) and the schema-v1/legacy-job migration code (recommended).
+
+## 7. Implementation record (2026-10-24)
+
+Built on `reboot-impl` in 54 commits after `archive/pre-structure-reset`: 726 files changed, +12.8k/−53.6k lines. `orchestrator/src` now has 379 tracked files and `orchestrator/tests` 152.
+
+- **Wave 1:** package moves (§4.2) and deletions (schema-v1 loader, legacy job migration, dormant `process-compliance@1`, dead modules).
+- **Wave 2:**
+  - every version chain flattened into one module (§4.3);
+  - `lab/` and `var/` adopted (`RAIDAR_VAR`), with `make structure-check` in `make quality` and `make release-archive`;
+  - the finished experiments removed, and `smoke/python__forge__mechanics` renamed and re-pinned to `code-quality@3` and `process-compliance@6`.
+- **Review:** ten slice reviews (execution, run-health, targets/perf, verifier, two for scorers, components, spec/problems/packs/agents, analysis/review/UI/CLI, and docs/build) fixed what they found. The main fixes:
+  - leak-guard bypass via escaped `sha256sum` paths;
+  - malformed grader ledger crashing `verify()`;
+  - enforce-mode kill verdict lost on cancel;
+  - records-manifest blind to symlinked directories;
+  - root-shell injection via the agent user name in the reaper and liveness scripts;
+  - unchecked `compose down` failures;
+  - a recycled pid read as a running supervisor;
+  - neutral-direction metrics given verdicts;
+  - gate-effort failing on an ungated reached step;
+  - review-loop rejecting session-wrapper inner agents;
+  - placeholder errata accepted;
+  - a review-surface static path escape;
+  - SSH option injection through the target host.
+- **Regression proof:**
+  - the old `@3`/`@6`/`@10` scorers and the collapsed ones give identical results on the archived guardrails `main-04`: 32 payloads, about 9.8k observations;
+  - `make quality` exits 0 (1784 passed, 12 skipped, coverage 96.20%);
+  - `make perf-gate TARGET=mbp` passes strictly against the accepted `mbp` set;
+  - `make orchestrator-smoke` solves;
+  - the forge smoke `v1-forge-01` (8 checkpoints) is valid with 0 health violations, and assess plus analyze complete on it.
