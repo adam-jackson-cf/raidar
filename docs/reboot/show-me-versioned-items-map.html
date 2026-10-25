@@ -1,0 +1,484 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Raidar — versioned items across the experiment flow</title>
+<style>
+  [data-theme='dark'] {
+    --bg: #000000; --surface: #0a0a0a; --elevated: #111111;
+    --border: rgba(255,255,255,0.06); --border-light: rgba(255,255,255,0.1);
+    --fg0: #5a6a72; --fg1: #7d8a90; --fg2: #a0acb2; --fg5: #f2f5f7;
+    --hover: rgba(255,255,255,0.05);
+    --R: #4FCAE3; --F: #E3B54F; --H: #60E36D; --E: #B48CF2;
+  }
+  [data-theme='light'] {
+    --bg: #f7f8f9; --surface: #ffffff; --elevated: #eef1f3;
+    --border: rgba(0,0,0,0.10); --border-light: rgba(0,0,0,0.16);
+    --fg0: #8a969d; --fg1: #68757d; --fg2: #53616a; --fg5: #05080a;
+    --hover: rgba(0,0,0,0.045);
+    --R: #0b7fd3; --F: #a86b00; --H: #198a34; --E: #7a4fc4;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--fg2);
+    font-family: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace;
+    font-size: 13px; line-height: 1.5; font-variant-numeric: tabular-nums;
+  }
+  main { max-width: 1560px; margin: 0 auto; padding: 28px 20px 80px; }
+  h1 { color: var(--fg5); font-size: 20px; font-weight: 600; margin: 0 0 4px; }
+  h2 { color: var(--fg5); font-size: 15px; font-weight: 600; margin: 40px 0 12px; }
+  h3 { color: var(--fg5); font-size: 13px; font-weight: 600; margin: 22px 0 8px; }
+  .sub { color: var(--fg1); margin: 0 0 18px; }
+  code { color: var(--fg5); overflow-wrap: anywhere; }
+  .item, .kind-card, .s-head { min-width: 0; overflow-wrap: anywhere; }
+  .theme { float: right; background: var(--elevated); color: var(--fg2); border: 1px solid var(--border-light);
+           border-radius: 6px; padding: 4px 10px; font: inherit; cursor: pointer; }
+
+  /* kind legend */
+  .kinds { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+  .kind-card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 12px 14px;
+               border-top: 3px solid var(--k); }
+  .appx > summary { cursor: pointer; }
+  .appx > summary .t { display: inline; }
+  .kind-card .t { color: var(--fg5); font-weight: 600; }
+  .kind-card .t b { color: var(--k); margin-right: 6px; }
+  .kind-card .reset { margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border); color: var(--fg2); }
+  .kind-card .reset span { color: var(--k); }
+  .hint { color: var(--fg0); margin-top: 8px; }
+
+  /* appendix */
+  .appx { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; margin-top: 14px;
+          border-top: 3px solid var(--k); overflow: hidden; }
+  .appx > .hd { padding: 12px 16px; }
+  .appx > .hd .t { color: var(--fg5); font-weight: 600; font-size: 14px; }
+  .appx > .hd .t b { color: var(--k); margin-right: 8px; }
+  .appx > .hd .d { color: var(--fg1); margin-top: 4px; }
+  .grp { color: var(--k); padding: 10px 16px 4px; font-weight: 600; border-top: 1px solid var(--border); }
+  .tbl { width: 100%; border-collapse: collapse; }
+  .tbl th { text-align: left; color: var(--fg0); font-weight: 500; padding: 6px 16px; border-bottom: 1px solid var(--border); }
+  .tbl td { padding: 7px 16px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  .tbl tr:last-child td { border-bottom: 0; }
+  .tbl tr { cursor: pointer; }
+  .tbl tr:hover td, .tbl tr.hl td { background: var(--hover); }
+  .tbl .nm { color: var(--fg5); }
+  .tbl .val { color: var(--fg2); }
+  .tbl .def { color: var(--fg1); font-size: 12px; word-break: break-all; }
+  .tbl .eff { color: var(--fg2); }
+  .dots { white-space: nowrap; }
+  .dot { display: inline-block; min-width: 20px; text-align: center; margin: 0 2px 2px 0; padding: 0 4px; border-radius: 4px;
+         color: var(--k); border: 1px solid var(--k); font-size: 11px; }
+  .refs { color: var(--fg1); font-size: 12px; }
+  footer { color: var(--fg0); margin-top: 40px; border-top: 1px solid var(--border); padding-top: 12px; }
+  .muted { color: var(--fg0); font-weight: 400; }
+
+  /* legend + diagram */
+  .legend { display: flex; flex-wrap: wrap; gap: 8px; margin: 4px 0 14px; }
+  .legend button { font: inherit; color: var(--fg2); background: var(--surface); border: 1px solid var(--border-light);
+                   border-left: 4px solid var(--k); border-radius: 6px; padding: 6px 12px; cursor: pointer; }
+  .legend button b { color: var(--k); margin-right: 4px; }
+  .legend button span { color: var(--fg1); margin-left: 6px; }
+  .legend button.off { opacity: .35; }
+  .diagram { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 12px; overflow-x: auto; }
+  .diagram svg { display: block; width: 100%; min-width: 1100px; height: auto; font-family: inherit; }
+  svg text { font-family: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace; }
+  .phase text { fill: var(--fg0); font-size: 11px; letter-spacing: .08em; }
+  .phase line { stroke: var(--border-light); }
+  .spine rect { fill: var(--elevated); stroke: var(--fg0); stroke-width: 1.2; }
+  .spine .st { fill: var(--fg5); font-size: 13px; font-weight: 600; text-anchor: middle; }
+  .spine .sc { fill: var(--fg1); font-size: 10.5px; text-anchor: middle; }
+  .flow { stroke: var(--fg1); stroke-width: 1.5; fill: none; }
+  .wire { fill: none; stroke-width: 1.4; }
+  .wire.dash { stroke-dasharray: 4 4; }
+  .wl { font-size: 10.5px; }
+  .nt { font-size: 12px; font-weight: 600; }
+  .ns { font-size: 10.5px; }
+  .k-R .node rect { fill: var(--bg); stroke: var(--R); }
+  .k-R .nt { fill: var(--fg5); } .k-R .ns, .k-R .wl { fill: var(--R); }
+  .k-R .wire { stroke: var(--R); } .k-R .jn { fill: var(--R); }
+  .k-F .pill rect { fill: var(--bg); stroke: var(--F); }
+  .k-F .pill text { fill: var(--F); font-size: 10.5px; text-anchor: middle; }
+  .k-F .pill line { stroke: var(--F); stroke-dasharray: 2 3; }
+  .k-E .store rect { fill: var(--bg); stroke: var(--E); stroke-width: 1.4; }
+  .k-E .store text { fill: var(--fg5); font-size: 11.5px; text-anchor: middle; }
+  .k-E .store .ns { fill: var(--E); font-size: 10.5px; }
+  .k-E .wire { stroke: var(--E); } .k-E .wl { fill: var(--E); }
+  .k-H .idbox rect { fill: var(--bg); stroke: var(--H); }
+  .k-H .idbox.chk rect { stroke-width: 2; }
+  .k-H .idbox text { text-anchor: middle; } .k-H .nt { fill: var(--fg5); } .k-H .ns { fill: var(--H); }
+  .k-H .wire { stroke: var(--H); } .k-H .wl { fill: var(--H); }
+  .k-H .gate { fill: var(--H); }
+  svg g[class^="k-"] { transition: opacity .15s; }
+  svg.off-R .k-R, svg.off-F .k-F, svg.off-H .k-H, svg.off-E .k-E { opacity: .1; }
+  .node, .store, .idbox, .pill { cursor: help; }
+
+  @media (max-width: 860px) {
+    .kinds { grid-template-columns: 1fr 1fr; }
+    .tbl thead { display: none; }
+    .tbl tr { display: block; border-bottom: 1px solid var(--border); padding: 6px 0; }
+    .tbl td { display: block; border: 0; padding: 2px 16px; }
+  }
+  @media (max-width: 520px) { .kinds { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<main>
+  <button class="theme" id="theme">light / dark</button>
+  <h1>How versioned items feed the experiment flow</h1>
+  <p class="sub">State at commit <code>119b4f6</code>, 2026-10-25. The middle row is the process. Release labels feed in from above, formats are the files handed along it, identities are computed and checked below it, and evidence is what each stage leaves behind. Click a colour to isolate that kind.</p>
+
+  <div class="legend" id="legend">
+    <button data-k="R" style="--k: var(--R)"><b>R</b> Release labels <span>name@N, feed in from above</span></button>
+    <button data-k="F" style="--k: var(--F)"><b>F</b> Formats <span>files handed between stages</span></button>
+    <button data-k="H" style="--k: var(--H)"><b>H</b> Identities <span>● computed · ◆ checked</span></button>
+    <button data-k="E" style="--k: var(--E)"><b>E</b> Evidence <span>persisted below</span></button>
+  </div>
+
+  <div class="diagram">
+  <svg id="flowsvg" viewBox="0 0 1480 560" role="img" aria-label="Experiment flow with versioned item kinds">
+    <defs>
+      <marker id="a-fg" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="var(--fg1)"/></marker>
+      <marker id="a-R" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="var(--R)"/></marker>
+      <marker id="a-H" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="var(--H)"/></marker>
+      <marker id="a-E" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="var(--E)"/></marker>
+    </defs>
+
+    <!-- phases -->
+    <g class="phase">
+      <text x="20" y="22">PREPARE PROBLEMS</text><line x1="20" y1="30" x2="436" y2="30"/>
+      <text x="458" y="22">DESIGN</text><line x1="458" y1="30" x2="728" y2="30"/>
+      <text x="750" y="22">RUN</text><line x1="750" y1="30" x2="1020" y2="30"/>
+      <text x="1042" y="22">MEASURE</text><line x1="1042" y1="30" x2="1458" y2="30"/>
+    </g>
+
+    <!-- R: release labels -->
+    <g class="k-R">
+      <g class="node"><title>Release in place: make release-archive REF=name@N tags the replaced release, edit in place, bump @N, relock.</title>
+        <rect x="250" y="46" width="290" height="50" rx="8"/>
+        <text class="nt" x="262" y="66">↻ Release in place</text>
+        <text class="ns" x="262" y="84">tag old · bump @N · relock</text></g>
+      <path class="wire" d="M540,71 H666 V198" marker-end="url(#a-R)"/>
+      <g class="node"><title>14 components: rules-file@2, workspace-files@2, lint-config@2, lint-tool@2, skills@2, harness-settings@2, stop-hook@2, mcp-server@2, prompt-wrapper@1, review-loop@3, guardrail-gate@5, python-guardrails@8, continue-on-stall@3, transient-retry@2</title>
+        <rect x="888" y="46" width="140" height="50" rx="8"/>
+        <text class="nt" x="898" y="66">Components ×14</text>
+        <text class="ns" x="898" y="84">delivered to agent</text></g>
+      <g class="node"><title>5 scorers: correctness@2, code-quality@4, resource-usage@2, process-compliance@7, gate-effort@11. Judge policy code-quality.rubric-smells v3 + scb-rubric@2 (parked, mode off).</title>
+        <rect x="1034" y="46" width="140" height="50" rx="8"/>
+        <text class="nt" x="1044" y="66">Scorers ×5</text>
+        <text class="ns" x="1044" y="84">+ judge (parked)</text></g>
+      <g class="node"><title>Headline metrics: scb-canonical@1, @2; scb-canonical-oneshot@1, @2</title>
+        <rect x="1180" y="46" width="140" height="50" rx="8"/>
+        <text class="nt" x="1190" y="66">Metrics ×4</text>
+        <text class="ns" x="1190" y="84">headline score S</text></g>
+      <path class="wire" d="M958,96 V198" marker-end="url(#a-R)"/>
+      <path class="wire" d="M1104,96 V198" marker-end="url(#a-R)"/>
+      <path class="wire" d="M1250,96 V198" marker-end="url(#a-R)"/>
+      <path class="wire dash" d="M958,104 V112 M1104,104 V112 M1250,104 V112 M1250,112 H666"/>
+      <circle class="jn" cx="958" cy="112" r="2.5"/><circle class="jn" cx="1104" cy="112" r="2.5"/>
+      <text class="wl" x="760" y="108">every label is pinned in the lock</text>
+    </g>
+
+    <!-- F: formats handed along the spine -->
+    <g class="k-F">
+      <g class="pill"><rect x="95" y="124" width="120" height="48" rx="6"/><text x="155" y="143">pack.yaml v1</text><text x="155" y="158">tools.lock v1</text><line x1="155" y1="172" x2="155" y2="226"/></g>
+      <g class="pill"><rect x="241" y="124" width="120" height="48" rx="6"/><text x="301" y="143">problem manifest/1</text><text x="301" y="158">bundle/1</text><line x1="301" y1="172" x2="301" y2="226"/></g>
+      <g class="pill"><rect x="387" y="124" width="120" height="48" rx="6"/><text x="447" y="143">validation/1</text><text x="447" y="158">errata/1 · sens./1</text><line x1="447" y1="172" x2="447" y2="226"/></g>
+      <g class="pill"><rect x="533" y="124" width="120" height="48" rx="6"/><text x="593" y="143">experiment.yaml</text><text x="593" y="158">schema 2</text><line x1="593" y1="172" x2="593" y2="226"/></g>
+      <g class="pill"><rect x="679" y="124" width="120" height="48" rx="6"/><text x="739" y="143">lock</text><text x="739" y="158">lock_version 3</text><line x1="739" y1="172" x2="739" y2="224"/></g>
+      <g class="pill"><rect x="825" y="124" width="120" height="48" rx="6"/><text x="885" y="143">plan.json</text><text x="885" y="158">schema 2</text><line x1="885" y1="172" x2="885" y2="224"/></g>
+      <g class="pill"><rect x="971" y="118" width="120" height="58" rx="6"/><text x="1031" y="135">trial, step /2</text><text x="1031" y="150">verifier rec /1</text><text x="1031" y="165">health /1</text><line x1="1031" y1="176" x2="1031" y2="226"/></g>
+      <g class="pill"><rect x="1117" y="124" width="120" height="48" rx="6"/><text x="1177" y="143">Assessments</text><text x="1177" y="158">grading stores /2</text><line x1="1177" y1="172" x2="1177" y2="224"/></g>
+      <g class="pill"><rect x="1263" y="124" width="120" height="48" rx="6"/><text x="1323" y="143">analysis /3</text><text x="1323" y="158">manipulation /2</text><line x1="1323" y1="172" x2="1323" y2="226"/></g>
+    </g>
+
+    <!-- spine -->
+    <g class="spine">
+      <g><rect x="20"   y="200" width="124" height="62" rx="8"/><text class="st" x="82"   y="226">Pack build</text><text class="sc" x="82"   y="244">pack-build</text></g>
+      <g><rect x="166"  y="200" width="124" height="62" rx="8"/><text class="st" x="228"  y="226">Import problem</text><text class="sc" x="228"  y="244">problem-import</text></g>
+      <g><rect x="312"  y="200" width="124" height="62" rx="8"/><text class="st" x="374"  y="226">Validate</text><text class="sc" x="374"  y="244">problem-validate</text></g>
+      <g><rect x="458"  y="200" width="124" height="62" rx="8"/><text class="st" x="520"  y="226">Author</text><text class="sc" x="520"  y="244">experiment.yaml</text></g>
+      <g><rect x="604"  y="200" width="124" height="62" rx="8"/><text class="st" x="666"  y="226">Lock</text><text class="sc" x="666"  y="244">experiment-lock</text></g>
+      <g><rect x="750"  y="200" width="124" height="62" rx="8"/><text class="st" x="812"  y="226">Plan + admit</text><text class="sc" x="812"  y="244">experiment-plan</text></g>
+      <g><rect x="896"  y="200" width="124" height="62" rx="8"/><text class="st" x="958"  y="222">Run trials</text><text class="sc" x="958"  y="238">agent → verifier</text><text class="sc" x="958" y="252">→ health</text></g>
+      <g><rect x="1042" y="200" width="124" height="62" rx="8"/><text class="st" x="1104" y="226">Assess</text><text class="sc" x="1104" y="244">experiment-assess</text></g>
+      <g><rect x="1188" y="200" width="124" height="62" rx="8"/><text class="st" x="1250" y="226">Analyse</text><text class="sc" x="1250" y="244">experiment-analyze</text></g>
+      <g><rect x="1334" y="200" width="124" height="62" rx="8"/><text class="st" x="1396" y="226">Review</text><text class="sc" x="1396" y="244">review surface</text></g>
+      <path class="flow" d="M144,231 H164 M290,231 H310 M436,231 H456 M582,231 H602 M728,231 H748 M874,231 H894 M1020,231 H1040 M1166,231 H1186 M1312,231 H1332"/>
+      <path class="flow" d="M150,231 H164" marker-end="url(#a-fg)"/><path class="flow" d="M296,231 H310" marker-end="url(#a-fg)"/>
+      <path class="flow" d="M442,231 H456" marker-end="url(#a-fg)"/><path class="flow" d="M588,231 H602" marker-end="url(#a-fg)"/>
+      <path class="flow" d="M734,231 H748" marker-end="url(#a-fg)"/><path class="flow" d="M880,231 H894" marker-end="url(#a-fg)"/>
+      <path class="flow" d="M1026,231 H1040" marker-end="url(#a-fg)"/><path class="flow" d="M1172,231 H1186" marker-end="url(#a-fg)"/>
+      <path class="flow" d="M1318,231 H1332" marker-end="url(#a-fg)"/>
+    </g>
+
+    <!-- E: evidence persisted -->
+    <g class="k-E">
+      <path class="wire" d="M228,262 L272,290" marker-end="url(#a-E)"/><path class="wire" d="M374,262 L330,290" marker-end="url(#a-E)"/>
+      <path class="wire" d="M666,262 V290" marker-end="url(#a-E)"/><path class="wire" d="M958,262 V290" marker-end="url(#a-E)"/>
+      <path class="wire" d="M1104,262 V290" marker-end="url(#a-E)"/><path class="wire" d="M1250,262 V290" marker-end="url(#a-E)"/>
+      <path class="wire" d="M1396,262 V290" marker-end="url(#a-E)"/>
+      <g class="store"><title>2 manifests, 2 validation reports, forge errata (25 cases), forge sensitivities</title><rect x="246" y="292" width="110" height="44" rx="10"/><text x="301" y="310">lab/problems</text><text class="ns" x="301" y="326">reports · errata</text></g>
+      <g class="store"><title>4 committed locks; toolchain section records raidar 0.15.0 and the python-ast/1 digest scheme</title><rect x="611" y="292" width="110" height="44" rx="10"/><text x="666" y="310">lock files</text><text class="ns" x="666" y="326">4 committed</text></g>
+      <g class="store"><title>6 jobs (29 MB), all from before the remediation: forge v1-forge-01..03, agent-health ×3. job.json records mechanics_epoch mechanics-v1.</title><rect x="903" y="292" width="110" height="44" rx="10"/><text x="958" y="310">var/jobs</text><text class="ns" x="958" y="326">job.json · epoch</text></g>
+      <g class="store"><title>1 store, 4 Assessments from v1-forge-03 (old scorer releases)</title><rect x="1049" y="292" width="110" height="44" rx="10"/><text x="1104" y="310">var/stores</text><text class="ns" x="1104" y="326">Assessments</text></g>
+      <g class="store"><title>Empty today</title><rect x="1195" y="292" width="110" height="44" rx="10"/><text x="1250" y="310">var/analysis</text><text class="ns" x="1250" y="326">verdicts</text></g>
+      <g class="store"><title>Reviewer annotations; review projection schema 2, quality projection schema 1</title><rect x="1341" y="292" width="110" height="44" rx="10"/><text x="1396" y="310">annotations</text><text class="ns" x="1396" y="326">projections</text></g>
+      <g class="store"><title>FCR-001…004 open, M-001 proposed</title><rect x="465" y="292" width="110" height="44" rx="10"/><text x="520" y="310">lab/ledger</text><text class="ns" x="520" y="326">faults · remedies</text></g>
+      <path class="wire dash" d="M915,336 V352 H520 V340" marker-end="url(#a-E)"/>
+      <text class="wl" x="560" y="364">fault candidates</text>
+      <g class="store"><title>4 epoch tags in the repo; 19 per-release tags only in var/tmp/codereview-releases.bundle</title><rect x="40" y="46" width="160" height="50" rx="10"/><text x="120" y="66">archive tags</text><text class="ns" x="120" y="84">archive/name@N</text></g>
+      <path class="wire dash" d="M250,71 H204" marker-end="url(#a-E)"/>
+    </g>
+
+    <!-- H: identities computed (●) and checked (◆) -->
+    <g class="k-H">
+      <path class="wire" d="M82,262 V368"/>
+      <path class="wire" d="M301,336 V368"/><path class="wire" d="M666,336 V368"/>
+      <path class="wire" d="M958,336 V368"/><path class="wire" d="M1104,336 V368"/>
+      <g class="idbox"><title>raidar/pack-python:2b91a52663e099f2 — hash of parsed pack.yaml image fields + raw image/ bytes</title><rect x="17" y="368" width="130" height="46" rx="6"/><text class="nt" x="82" y="387">● pack image tag</text><text class="ns" x="82" y="403">recipe bytes</text></g>
+      <g class="idbox"><title>task_sha256, bundle_sha256, references_sha256, manifest_sha256; a fresh import must reproduce them</title><rect x="236" y="368" width="130" height="46" rx="6"/><text class="nt" x="301" y="387">● problem shas</text><text class="ns" x="301" y="403">re-import must match</text></g>
+      <g class="idbox"><title>lock_sha256 = hash of the execution section: component resolver digests, problem pins, pack tag. Assessment section holds scorer and metric digests.</title><rect x="601" y="368" width="130" height="46" rx="6"/><text class="nt" x="666" y="387">● lock_sha256</text><text class="ns" x="666" y="403">+ code digests</text></g>
+      <g class="idbox"><title>snapshot digest per step, execution_sha256 and toolchain_sha256 of the runner, records manifest digests</title><rect x="893" y="368" width="130" height="46" rx="6"/><text class="nt" x="958" y="387">● snapshots</text><text class="ns" x="958" y="403">execution_sha256</text></g>
+      <g class="idbox"><title>Assessment key = scorer ref + manifest digest + implementation digest + config + tool lock hash + input keys (snapshot, verifier inputs, errata)</title><rect x="1039" y="368" width="130" height="46" rx="6"/><text class="nt" x="1104" y="387">● Assessment key</text><text class="ns" x="1104" y="403">code + snapshot</text></g>
+
+      <path class="gate" d="M739,224 L746,231 L739,238 L732,231 z"/>
+      <path class="gate" d="M885,224 L892,231 L885,238 L878,231 z"/>
+      <path class="gate" d="M1177,224 L1184,231 L1177,238 L1170,231 z"/>
+      <path class="wire" d="M739,238 V440 M885,238 V440 M1177,238 V440"/>
+      <g class="idbox chk"><title>RT6: each problem's locked pack image must equal the pack the runtime builds now</title><rect x="674" y="440" width="130" height="46" rx="6"/><text class="nt" x="739" y="459">◆ pack drift</text><text class="ns" x="739" y="475">locked = built</text></g>
+      <g class="idbox chk"><title>Smoke-before-measure: a clean earlier smoke job with equal toolchain_sha256, execution_sha256, pack recipe, agents and target</title><rect x="820" y="440" width="130" height="46" rx="6"/><text class="nt" x="885" y="459">◆ smoke admission</text><text class="ns" x="885" y="475">same code + pack</text></g>
+      <g class="idbox chk"><title>Pooling gate: refuses to combine jobs that differ in epoch, toolchain, execution identity, dirty runner, pack/grader recipe, limits or target; tamper never overridable</title><rect x="1112" y="440" width="130" height="46" rx="6"/><text class="nt" x="1177" y="459">◆ pooling gate</text><text class="ns" x="1177" y="475">same epoch + code</text></g>
+
+      <path class="wire dash" d="M82,414 V504 H730 V490" marker-end="url(#a-H)"/>
+      <text class="wl" x="300" y="520">built tag compared with the locked one</text>
+      <path class="wire dash" d="M958,414 V504 H893 V490" marker-end="url(#a-H)"/>
+      <text class="wl" x="770" y="520">from the earlier smoke job</text>
+      <path class="wire dash" d="M1000,414 V540 H1150 V490" marker-end="url(#a-H)"/>
+      <path class="wire dash" d="M615,414 V540 H1000"/>
+      <text class="wl" x="1046" y="556">compared across jobs</text>
+    </g>
+  </svg>
+  </div>
+
+  <h2>What each kind means, and what “reset to 1” would do</h2>
+  <div class="kinds" id="kinds"></div>
+
+  <h2>Appendices by kind <span class="muted">(full item lists)</span></h2>
+  <div id="appx"></div>
+
+  <footer>Reference counts are textual mentions of the exact <code>name@N</code> string in <code>orchestrator/src</code> / <code>orchestrator/tests</code> / <code>lab</code> / docs (incl. AGENTS.md, README, skills, review-surface). Archived releases are the annotated tags in <code>var/tmp/codereview-releases.bundle</code>, not yet imported into the repository.</footer>
+</main>
+
+<script>
+const KINDS = {
+  R: { name: 'Release label', what: 'Hand-maintained name@N, bumped when behaviour changes; archive/<name>@N preserves the replaced release.',
+       reset: 'Rename only. Content hashes beside each label carry the identity, so nothing becomes ambiguous; locks and Assessment keys re-key. Archive tag names collide with the bundle\u2019s old @1 tags unless namespaced.' },
+  F: { name: 'Format version', what: 'kind + schema_version of a file Raidar writes or reads; readers refuse other values.',
+       reset: 'Possible but risky: a new \u201c1\u201d would collide with archived files of an older format 1. A new mechanics_epoch separates runs instead.' },
+  H: { name: 'Content identity', what: 'Hash or commit pin computed from bytes.',
+       reset: 'Cannot be reset. Changes only when content changes; a clean slate leaves all of these as they are.' },
+  E: { name: 'Logged evidence', what: 'Records produced by running the process.',
+       reset: 'Not a version: archive (runs, stores), keep (problem evidence), re-point (ledger), or mark as history (dated docs).' },
+};
+
+const STAGES = [
+  { n: 0, name: 'Pack build', cmd: 'make pack-build', what: 'Builds the agent image once per tag and audits that it carries no scorer tools.' },
+  { n: 1, name: 'Problem import', cmd: 'make problem-import PROBLEM=<ref>', what: 'Splits the pinned dataset problem into agent task, host-only verifier bundle and references; a fresh import must reproduce the registered digests.' },
+  { n: 2, name: 'Problem validation', cmd: 'make problem-validate PROBLEM=<ref> ENGINE=harbor NATIVE_RUNNER=<path>', what: 'Runs reference solutions through the verifier and the original runner; writes the verdict and the spec-determinacy audit.' },
+  { n: 3, name: 'Experiment authoring', cmd: 'make experiment-init / experiment-validate', what: 'experiment.yaml names problems, agents, conditions (components), arms, scorers and the headline metric.' },
+  { n: 4, name: 'Lock', cmd: 'make experiment-lock', what: 'Resolves every reference to digests. Sections: execution (→ lock_sha256, the job identity), assessment, analysis, toolchain.' },
+  { n: 5, name: 'Plan + admission', cmd: 'make experiment-plan; start of experiment-execute', what: 'Builds the trial list, checks pack drift, and for non-smoke kinds requires a clean matching smoke.' },
+  { n: 6, name: 'Trial execution', cmd: 'make experiment-execute JOB_ID=<id>', what: 'Runs each trial on the Docker target; records provenance and a snapshot of /app after every step.' },
+  { n: 7, name: 'Grading + run-health', cmd: 'inside each trial', what: 'The host-side verifier grades each step; health.json records validity checks and liveness.' },
+  { n: 8, name: 'Assessment', cmd: 'make experiment-assess JOB=… STORE=… SCORERS=…', what: 'Scorers run offline over the job and write Assessments to a store outside it.' },
+  { n: 9, name: 'Analysis', cmd: 'make experiment-analyze JOBS=… STORE=… ANALYSIS_OUT=…', what: 'Headline score, paired effects and verdicts, after the pooling gate admits the jobs.' },
+  { n: 10, name: 'Review surface', cmd: 'make review-surface-quality-data; review UI', what: 'Projections of jobs and Assessments for the human review UI.' },
+  { n: 11, name: 'Fault ledger', side: true, cmd: 'fault-catalog skill; make ledger-check', what: 'Fault candidates from jobs and analysis become tracked fault (FCR) and remedy (M) records.' },
+  { n: 12, name: 'Release in place', side: true, cmd: 'make release-archive REF=<name>@<N>; bump @N; relock', what: 'Any definition change: tag the replaced release, edit in place, bump the label, relock (feeds back into stage 4).' },
+];
+
+// kind, group, name, value, def, roles{stage: text}, effect, refs, archived
+const ITEMS = [
+  // ---------- R: scorers
+  ...[
+    ['correctness@2', '19 / 90 / 16 / 6', 'correctness@1', 'all 4 experiments'],
+    ['code-quality@4', '26 / 52 / 5 / 7', 'code-quality@3', 'forge smoke'],
+    ['resource-usage@2', '7 / 22 / 4 / 3', 'resource-usage@1', 'forge smoke'],
+    ['process-compliance@7', '3 / 7 / 4 / 2', 'process-compliance@6', 'forge smoke'],
+    ['gate-effort@11', '6 / 19 / 0 / 6', 'gate-effort@10', 'no current experiment'],
+  ].map(([n, refs, arch, use]) => ({
+    k: 'R', g: 'Scorers (5)', name: n, value: 'used by: ' + use,
+    def: 'orchestrator/src/raidar/scoring/catalog/builtin.py; manifests in scoring/framework/builtin_manifests.py (process-compliance, gate-effort: their own manifest.py)',
+    roles: { 3: 'Declared in assessment.scorers', 4: 'Ref + manifest digest + implementation digest pinned in the lock\u2019s assessment section', 8: 'Part of every Assessment key (scoring/framework/keys.py)' },
+    effect: 'Re-keys every Assessment and the lock\u2019s assessment section; jobs still match, so rescore.', refs, arch })),
+  // ---------- R: metrics
+  { k: 'R', g: 'Headline metrics (4 registered, 2 names)', name: 'scb-canonical@1', value: 'any missing component makes S ineligible; registered, not used by a current experiment',
+    def: 'orchestrator/src/raidar/scoring/framework/metrics.py', roles: { 3: 'assessment.metric', 4: 'Ref + definition digest in the assessment section', 9: 'Computes the headline score S' },
+    effect: 'A reset must keep one version per name.', refs: '61 total' },
+  { k: 'R', g: 'Headline metrics (4 registered, 2 names)', name: 'scb-canonical@2', value: '@1 + zero_correctness (C = 0 scores S = 0); forge smoke',
+    def: 'orchestrator/src/raidar/scoring/framework/metrics.py', roles: { 3: 'assessment.metric (forge smoke)', 4: 'Ref + definition digest in the assessment section', 9: 'Computes the headline score S' },
+    effect: 'Changes the assessment section; re-analyse.', refs: '1 / 11 / 6 / 10' },
+  { k: 'R', g: 'Headline metrics (4 registered, 2 names)', name: 'scb-canonical-oneshot@1', value: 'one-checkpoint form of @1; the 3 circuit_eval experiments',
+    def: 'orchestrator/src/raidar/scoring/framework/metrics.py', roles: { 3: 'assessment.metric (circuit_eval)', 4: 'Ref + definition digest in the assessment section', 9: 'Computes the headline score S' },
+    effect: 'Changes the assessment section; re-analyse.', refs: '2 / 19 / 22 / 15' },
+  { k: 'R', g: 'Headline metrics (4 registered, 2 names)', name: 'scb-canonical-oneshot@2', value: 'one-checkpoint form of @2; registered, unused',
+    def: 'orchestrator/src/raidar/scoring/framework/metrics.py', roles: { 4: 'Selectable by a lock', 9: 'Would compute S' },
+    effect: 'A reset must choose this or @1 as the new @1.', refs: '8 total' },
+  // ---------- R: components
+  ...[
+    ['prompt-wrapper@1', '2 / 26 / 6 / 11', 'prompt-wrapper@1 (unchanged)', 'forge smoke (pilot-v2 starter framing)'],
+    ['rules-file@2', '2 / 39 / 0 / 2', 'rules-file@1', 'tests and fixtures only'],
+    ['workspace-files@2', '0 / 8 / 0 / 1', 'workspace-files@1', 'tests and fixtures only'],
+    ['lint-config@2', '3 / 16 / 0 / 1', 'lint-config@1', 'tests and fixtures only'],
+    ['lint-tool@2', '1 / 11 / 0 / 7', 'lint-tool@2 (unchanged)', 'tests and fixtures only'],
+    ['skills@2', '0 / 14 / 0 / 1', 'skills@1', 'tests and fixtures only'],
+    ['harness-settings@2', '0 / 13 / 0 / 1', 'harness-settings@1', 'tests and fixtures only'],
+    ['stop-hook@2', '0 / 10 / 0 / 1', 'stop-hook@1', 'tests and fixtures only'],
+    ['mcp-server@2', '0 / 8 / 0 / 1', 'mcp-server@1', 'tests and fixtures only'],
+    ['review-loop@3', '3 / 18 / 0 / 1', 'review-loop@2', 'tests and fixtures only'],
+    ['guardrail-gate@5', '2 / 15 / 0 / 1', 'guardrail-gate@4', 'tests and fixtures only'],
+    ['python-guardrails@8', '3 / 10 / 11 / 5', 'python-guardrails@8 (unchanged)', 'tests and fixtures only; payload lab/treatments/python_guardrails/'],
+    ['continue-on-stall@3', '3 / 18 / 0 / 1', 'continue-on-stall@2', 'tests and fixtures only'],
+    ['transient-retry@2', '3 / 8 / 0 / 1', 'transient-retry@1', 'tests and fixtures only'],
+  ].map(([n, refs, arch, use]) => ({
+    k: 'R', g: 'Treatment components (14)', name: n, value: 'used by: ' + use,
+    def: 'orchestrator/pyproject.toml [project.entry-points."raidar.subject.treatment"] → subject/treatment/catalog/*.py',
+    roles: { 3: 'Chosen per condition', 4: 'Ref + resolver digest + payload file hashes in the execution section \u2192 lock_sha256', 6: 'Compiled into what the agent receives' },
+    effect: 'Changes lock_sha256: jobs before and after are different series.', refs, arch })),
+  // ---------- R: judge
+  { k: 'R', g: 'Judge (parked)', name: 'code-quality.rubric-smells v3', value: 'mode off since 2026-10-04',
+    def: 'lab/judge/policies/code-quality.rubric-smells.yaml', roles: { 8: 'Consulted by code-quality; mode off, so no model calls' },
+    effect: 'Policy lookup and audit only; not in Assessment cache keys. Un-parking is a new version.', refs: 'policy file + docs' },
+  { k: 'R', g: 'Judge (parked)', name: 'scb-rubric@2', value: 'question set named by the policy',
+    def: 'lab/judge/question_sets/scb-rubric.yaml', roles: { 8: 'Questions the parked judge would ask' },
+    effect: 'Renames the question set reference in the policy.', refs: '0 / 1 / 2 / 17' },
+
+  // ---------- F
+  ...[
+    ['Pack version', 'version: 1', 'lab/environments/python/pack.yaml', { 0: 'Pack contract the loader accepts', 1: 'Bound into problem manifests via the pack' }, 'Pack loading and problem binding'],
+    ['Tool lock version', 'version: 1', 'lab/environments/python/tools.lock.yaml', { 0: 'Measurement-tool lock format; its hash keys var/cache/tools', 8: 'Scorer tools provisioned from it' }, 'Tool provisioning and Assessment keys (via the lock hash)'],
+    ['Problem manifest', 'raidar-problem, schema 1', 'design/problem/models.py', { 1: 'Committed under lab/problems/registry/', 4: 'Read when the problem is locked' }, 'Re-import and relock'],
+    ['Verifier bundle manifest', 'schema 1', 'grading/bundle.py', { 1: 'Written with the host-only hidden tests', 7: 'Loaded by the verifier' }, 'Bundle loading; bundle_sha256 if serialisation changes'],
+    ['Validation report', 'raidar-problem-validation, schema 1', 'design/problem/validation.py', { 2: 'Verdict and audit', 4: 'Verdict consulted at lock time' }, 'Report parsing'],
+    ['Errata', 'raidar-problem-errata, schema 1', 'design/problem/errata.py', { 2: 'Drafted from the audit', 4: 'sha256 pinned in the lock', 9: 'Applied to *_errata outcomes' }, 'Errata loading; lock re-key if bytes change'],
+    ['Sensitivities', 'raidar.problem-sensitivities/1', 'design/problem/sensitivities.py', { 2: 'Recorded beside validation', 9: 'Reported as notes; not lock-pinned' }, 'Sidecar format only'],
+    ['Experiment spec', 'schema_version: 2', 'design/experiment/schema.py', { 3: 'experiment.yaml contract' }, 'Every experiment.yaml and lock'],
+    ['Lock', 'lock_version: 3', 'design/experiment/lock.py', { 4: 'A lock with another value is refused (relock)' }, 'All locks'],
+    ['Source digest scheme', 'python-ast/1', 'contract/source_digest.py', { 4: 'Algorithm behind implementation and spec digests', 6: 'Behind execution_sha256', 8: 'Behind scorer implementation digests' }, 'Every source-derived digest changes'],
+    ['Plan', 'raidar-plan, schema 2', 'engine/trial/plan.py', { 5: 'plan.json, the trial list a job runs' }, 'Plan readers'],
+    ['Job manifest', 'raidar-job (kind only)', 'contract/job_layout.py', { 6: 'job.json', 9: 'Read by pooling' }, 'Job recognition'],
+    ['Mechanics epoch', 'mechanics-v1', 'engine/target/job.py', { 6: 'Recorded per job', 9: 'Pooling refuses across epochs' }, 'Separates run populations; the clean-slate lever'],
+    ['Verifier step record', 'raidar-oracle-step, schema 1', 'grading/records.py', { 7: 'Per-step grade', 8: 'Read by scorers' }, 'Grade parsing'],
+    ['Trial / step records', 'raidar-trial, raidar-step-result, schema 2', 'contract/trial.py', { 7: 'Written per trial and step', 8: 'Scorer input', 10: 'Projected for review' }, 'Assessment and review readers'],
+    ['Health record', 'raidar-health, schema 1', 'engine/health/model.py', { 7: 'health.json per trial', 5: 'Admission requires clean health' }, 'Validity and admission'],
+    ['Pre-fix grade store', 'raidar-pre-fix-grade, schema 2', 'grading/prefix/store.py', { 8: 'gate-effort inputs' }, 'Store readers; regenerate'],
+    ['Offline coverage store', 'raidar-offline-coverage, schema 2', 'grading/coverage/store.py', { 8: 'code-quality inputs' }, 'Store readers; regenerate'],
+    ['Analysis report', 'schema 3', 'evaluation/analysis/report.py', { 9: 'analysis.json' }, 'Report readers'],
+    ['Manipulation check', 'schema 2', 'evaluation/analysis/manipulation.py', { 9: 'Pre-registered checks in the report' }, 'Report readers'],
+    ['Review projection', 'schema 2', 'contract/review.py; review-surface/scripts/build-review-data.mjs', { 10: 'Python producer and JS consumer must agree' }, 'Producer, UI and fixtures together'],
+    ['Quality projection', 'raidar-quality-projection, schema 1', 'evaluation/review/quality/models.py; review-surface/src/quality/types.ts', { 10: 'Reads Assessments by exact locked key' }, 'Producer, UI and fixtures together'],
+    ['Package version', '0.15.0', 'orchestrator/pyproject.toml; CHANGELOG.md; scripts/release/bump-version.py', { 4: 'Recorded in the lock toolchain section', 12: 'Bumped by the version workflow' }, 'Release history; toolchain relock note'],
+  ].map(([name, value, def, roles, effect]) => ({ k: 'F', g: 'Formats', name, value, def, roles, effect })),
+
+  // ---------- H
+  ...[
+    ['Dataset source pin', 'scb @ 38d627ecf668a88f88f8d260f8df8df6116e9b03', 'lab/problems/sources.yaml', { 1: 'Exact commit; dirty or different checkouts refused' }, 'Changes every problem identity'],
+    ['Problem refs', 'scb/forge@38d627ecf668, scb/circuit_eval.checkpoint_1@38d627ecf668', 'lab/problems/registry/scb/', { 1: 'Problem identity', 4: 'Pinned in the execution section', 9: 'Outcomes are per problem' }, 'New problem identity, new series'],
+    ['Problem content digests', 'task_sha256, bundle_sha256, references_sha256, manifest_sha256', 'lab/problems/registry/scb/*/38d627ecf668.json', { 1: 'Fresh import must reproduce them (the stub test.sh is inside task_sha256)', 2: 'Validation binds manifest_sha256', 4: 'Pinned in the execution section' }, 'Drift is refused; re-import + re-validate'],
+    ['Errata sha', 'sha256 of the errata file', 'design/problem/errata.py', { 4: 'Pinned in the lock', 9: 'Selects the exclusions applied' }, 'Lock re-key'],
+    ['Pack image tag', 'raidar/pack-python:2b91a52663e099f2', 'subject/environment/python/image.py (parsed pack.yaml image fields + raw image/ bytes)', { 0: 'Built once per tag', 1: 'Bound into problem manifests', 4: 'Locked via the problem', 5: 'RT6 pack drift check', 6: 'job.json recipes.pack' }, 'A pack release: re-validate both problems with native parity'],
+    ['Tool lock hash', 'hash of parsed tools.lock.yaml', 'subject/environment/python/pack_definition.py', { 0: 'Keys var/cache/tools', 8: 'In every Assessment key' }, 'Re-keys Assessments'],
+    ['Grader image tag', 'raidar-oracle-grader:<hash>', 'grading/grader_image.py', { 2: 'Recorded in validation', 6: 'job.json recipes.graders', 7: 'Environment of each grade' }, 'New grading environment; pooling refuses'],
+    ['Component resolver digest', 'manifest + source bytes (+ payload hashes)', 'subject/treatment/definition/registry.py', { 4: 'In the execution section', 6: 'Carried by compiled uses' }, 'lock_sha256 changes'],
+    ['Scorer manifest / implementation digest', 'per scorer', 'scoring/framework/registry.py; keys.py', { 4: 'Assessment section', 8: 'Assessment key' }, 'New Assessments'],
+    ['Metric definition digest', 'per metric', 'scoring/framework/metrics.py', { 4: 'Assessment section', 9: 'Headline policy identity' }, 'Re-analyse'],
+    ['Toolchain / spec digest', 'raidar_spec, toolchain_sha256', 'design/experiment/lock.py; engine/job/provenance.py', { 4: 'Toolchain section', 5: 'Smoke admission must match', 6: 'job.json runner', 9: 'Pooling compares' }, 'Relock note; admission and pooling refuse'],
+    ['Execution identity', 'execution_sha256', 'engine/job/provenance.py', { 5: 'Smoke admission must match', 6: 'job.json runner', 9: 'Pooling compares' }, 'A new smoke is needed before measuring'],
+    ['lock_sha256', 'hash of the lock\u2019s execution section', 'design/experiment/lock.py', { 4: 'Computed', 5: 'Plan must match its lock', 6: 'The job identity', 9: 'Jobs of one series share it' }, 'New series'],
+    ['Snapshot digest', 'framed raidar-snapshot hash per step', 'contract/snapshot.py', { 6: 'Recorded after every step', 7: 'Grade is bound to it', 8: 'Assessment input key' }, 'Old grades and coverage are not found under new keys'],
+    ['Records manifest digests', 'per trial', 'engine/trial/record.py', { 7: 'Health T2 tamper check', 9: 'Pooling: never overridable' }, 'Tamper evidence'],
+    ['Native runner commit', 'slop-code-bench@25069ba', 'design/problem/native.py', { 2: 'Recorded for native parity' }, 'Validation provenance'],
+  ].map(([name, value, def, roles, effect]) => ({ k: 'H', g: 'Content identities', name, value, def, roles, effect })),
+
+  // ---------- E
+  ...[
+    ['Problem registry evidence', '2 manifests, 2 validation reports, forge errata (25 cases), forge sensitivities', 'lab/problems/registry/scb/', { 1: 'Manifests', 2: 'Reports, errata, sensitivities' }, 'Keep: describes the upstream problems at the pin, not Raidar versions'],
+    ['Experiment locks', '4: forge mechanics smoke, circuit_eval agent-health smoke, circuit_eval pack-agent-health smoke, circuit_eval agents benchmark', 'lab/experiments/*/*/experiment.lock.json', { 4: 'make experiment-locks-check (in make quality) refuses stale locks' }, 'Relock after any reset'],
+    ['Admission record', 'job.json admission', 'engine/health/admission.py', { 5: 'Which smoke cleared the job, or ALLOW_UNSMOKED' }, 'Per job'],
+    ['Jobs', '6 (29 MB): forge v1-forge-01..03; agent-health 20261024T015535Z, T100317Z, T125113Z', 'var/jobs/', { 6: 'Written', 7: 'Trial records, health, snapshots' }, 'Archive: all predate the remediation\u2019s scorer releases and snapshot scheme'],
+    ['Fault candidates', 'fault-candidates.jsonl per job', 'var/jobs/<exp>/<job>/', { 7: 'Health violations and liveness findings', 11: 'Raw input to the ledger' }, 'Travels with the job'],
+    ['Assessment stores', '1 store, 4 Assessments (v1-forge-03, old scorer releases)', 'var/stores/', { 8: 'Written' }, 'Archive'],
+    ['Analysis outputs', 'empty', 'var/analysis/', { 9: 'analysis.json, analysis.md' }, 'Nothing to archive'],
+    ['Reviewer annotations', 'review server storage', 'review-surface/', { 10: 'Written by reviewers' }, 'Keep or archive with their jobs'],
+    ['Fault ledger', 'FCR-001\u2026004 open, M-001 proposed', 'lab/ledger/', { 11: 'Tracked faults and remedies; make ledger-check' }, 'Keep IDs; re-point evidence paths (some already point at removed locations)'],
+    ['Archive tags (repository)', 'pre-structure-reset, pre-mechanics-v1, scenario-epoch, spike-copy-path', 'git tag -l archive/*', { 12: 'Epoch snapshots' }, 'Add one archive/pre-clean-slate'],
+    ['Archive tags (bundle only)', '19 per-release tags at 124d5af', 'var/tmp/codereview-releases.bundle', { 12: 'Preserve the releases the remediation replaced' }, 'Import only under a namespace, or they collide with new @1 tags'],
+    ['Archived run data', 'jobs, stores, analysis, tmp (4.5 GB)', 'var/archive/pre-v1/', { 12: 'From the previous clean start' }, 'Keep as is'],
+    ['Dated design records', 'gate packet, ADRs, requirements change log, repo-structure-design \u00a711, overhead-baseline budgets, codereview.md', 'docs/reboot/; codereview.md', { 12: 'Decisions and evidence by date' }, 'Become history; cite old labels and jobs'],
+    ['Deferred-work tests', 'pack planning-tag release test; imported stub digest test', 'orchestrator/tests/test_python_pack_image.py; test_problem_import_behaviors.py', { 0: 'Fails at the next pack release until the cleanup is done', 1: 'Fails if the imported stub bytes change' }, 'Unaffected by a label reset'],
+  ].map(([name, value, def, roles, effect]) => ({ k: 'E', g: 'Evidence', name, value, def, roles, effect })),
+];
+ITEMS.forEach((it, i) => { it.id = i; it.stages = Object.keys(it.roles).map(Number).sort((a, b) => a - b); });
+
+const enabled = new Set(['R', 'F', 'H', 'E']);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const kvar = k => `--k: var(--${k})`;
+
+function renderKinds() {
+  document.getElementById('kinds').innerHTML = Object.entries(KINDS).map(([k, v]) => {
+    const n = ITEMS.filter(i => i.k === k).length;
+    return `<div class="kind-card" data-k="${k}" style="${kvar(k)}">
+      <div class="t"><b>${k}</b>${esc(v.name)} <span style="color:var(--fg0)">\u00b7 ${n} items</span></div>
+      <div>${esc(v.what)}</div>
+      <div class="reset"><span>Reset to 1:</span> ${esc(v.reset)}</div></div>`;
+  }).join('');
+}
+
+function renderAppendix() {
+  const out = [];
+  Object.entries(KINDS).forEach(([k, v], ai) => {
+    const items = ITEMS.filter(i => i.k === k);
+    const groups = [...new Set(items.map(i => i.g))];
+    const isR = k === 'R';
+    out.push(`<details class="appx" data-k="${k}" style="${kvar(k)}"><summary class="hd">
+      <div class="t"><b>Appendix ${'ABCD'[ai]} \u00b7 ${k}</b>${esc(v.name)} (${items.length})</div></summary>`);
+    groups.forEach(g => {
+      if (groups.length > 1) out.push(`<div class="grp">${esc(g)}</div>`);
+      out.push(`<table class="tbl"><thead><tr><th>Item</th><th>Current value</th><th>Defined in</th><th>Stages</th><th>${isR ? 'Refs src / tests / lab / docs \u00b7 archived' : 'If it changes'}</th></tr></thead><tbody>`);
+      items.filter(i => i.g === g).forEach(i => {
+        out.push(`<tr><td class="nm">${esc(i.name)}</td><td class="val">${esc(i.value)}</td>
+          <td class="def">${esc(i.def)}</td>
+          <td class="dots">${i.stages.map(n => `<span class="dot" title="${esc(STAGES[n].name)}">${esc(STAGES[n].name)}</span>`).join('')}</td>
+          <td class="eff">${isR ? `<div class="refs">${esc(i.refs || '')}${i.arch ? ' \u00b7 ' + esc(i.arch) : ''}</div><div>${esc(i.effect)}</div>` : esc(i.effect)}</td></tr>`);
+      });
+      out.push('</tbody></table>');
+    });
+    out.push('</details>');
+  });
+  document.getElementById('appx').innerHTML = out.join('');
+}
+
+function applyState() {
+  const svg = document.getElementById('flowsvg');
+  ['R', 'F', 'H', 'E'].forEach(k => svg.classList.toggle('off-' + k, !enabled.has(k)));
+  document.querySelectorAll('#legend button').forEach(el => el.classList.toggle('off', !enabled.has(el.dataset.k)));
+}
+
+document.getElementById('legend').addEventListener('click', e => {
+  const btn = e.target.closest('button');
+  if (!btn) return;
+  const k = btn.dataset.k;
+  if (enabled.size === 4) { enabled.clear(); enabled.add(k); }
+  else if (enabled.has(k)) { enabled.delete(k); if (!enabled.size) ['R', 'F', 'H', 'E'].forEach(x => enabled.add(x)); }
+  else enabled.add(k);
+  applyState();
+});
+document.getElementById('theme').addEventListener('click', () => {
+  const r = document.documentElement;
+  r.dataset.theme = r.dataset.theme === 'dark' ? 'light' : 'dark';
+});
+
+renderKinds(); renderAppendix(); applyState();
+</script>
+</body>
+</html>
