@@ -107,7 +107,7 @@ def test_shared_components_are_hashed_into_every_condition_manifest(tmp_path: Pa
     execution = lock["execution"]
     conditions = execution["conditions"]
     assert [entry["use"] for entry in conditions["baseline"]] == ["prompt-wrapper@1"]
-    assert [entry["use"] for entry in conditions["guided"]] == ["prompt-wrapper@1", "rules-file@1"]
+    assert [entry["use"] for entry in conditions["guided"]] == ["prompt-wrapper@1", "rules-file@2"]
     assert conditions["baseline"][0] == conditions["guided"][0]
     assert conditions["baseline"][0]["files"]["components/framing.md"]
     assert execution["design"]["shared_components"] == [{**SHARED_FRAMING, "with": {}}]
@@ -125,7 +125,7 @@ def _scorer_resolvers(implementation: str) -> ResolverSet:
     problem, component, _ = fixture_resolvers()
     scorer = InMemoryResolver(
         RefKind.SCORER,
-        {"correctness@1": {"implementation_digest": implementation}},
+        {"correctness@2": {"implementation_digest": implementation}},
         tool_versions={"pytest": "8.4.1"},
     )
     return ResolverSet([problem, component, scorer, MetricResolver()], entry_point_group=None)
@@ -312,12 +312,12 @@ def test_mixed_k_without_declared_policy_is_rejected(tmp_path: Path) -> None:
 def test_every_gap_is_reported_and_nothing_is_skipped(tmp_path: Path) -> None:
     document = experiment_document()
     document["conditions"][1]["components"][0]["files"] = ["components/missing.md"]
-    document["assessment"]["scorers"] = ["correctness@1", "jev@2"]
+    document["assessment"]["scorers"] = ["correctness@2", "jev@2"]
     path = write_experiment(tmp_path, document)
     resolvers = ResolverSet(
         [
             InMemoryResolver(RefKind.PROBLEM, {"scb/forge@abc123": {"checkpoints": 0}}),
-            InMemoryResolver(RefKind.SCORER, {"correctness@1": {}}),
+            InMemoryResolver(RefKind.SCORER, {"correctness@2": {}}),
         ],
         entry_point_group=None,
     )
@@ -337,7 +337,7 @@ def test_conflicting_tool_pins_are_rejected(tmp_path: Path) -> None:
     path = write_experiment(tmp_path, experiment_document())
     problem, _, scorer = fixture_resolvers()
     component = InMemoryResolver(
-        RefKind.COMPONENT, {"rules-file@1": {}}, tool_versions={"pytest": "7.0.0"}
+        RefKind.COMPONENT, {"rules-file@2": {}}, tool_versions={"pytest": "7.0.0"}
     )
     resolvers = ResolverSet([problem, component, scorer, MetricResolver()], entry_point_group=None)
 
@@ -425,7 +425,7 @@ def test_entry_point_resolvers_load_lazily_by_kind(monkeypatch: pytest.MonkeyPat
 
     def scorer_factory() -> InMemoryResolver:
         loaded.append("scorer")
-        return InMemoryResolver(RefKind.SCORER, {"correctness@1": {}})
+        return InMemoryResolver(RefKind.SCORER, {"correctness@2": {}})
 
     monkeypatch.setattr(
         "raidar.contract.references.entry_points",

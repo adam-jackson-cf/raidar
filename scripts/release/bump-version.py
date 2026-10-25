@@ -21,6 +21,7 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 PYPROJECT_PATH = REPO_ROOT / "orchestrator" / "pyproject.toml"
+LOCKFILE_PATH = PYPROJECT_PATH.with_name("uv.lock")
 CHANGELOG_PATH = REPO_ROOT / "CHANGELOG.md"
 
 VERSION_PATTERN = re.compile(r'(?m)^version = "([^"]+)"$')
@@ -190,6 +191,22 @@ def update_pyproject(new_version: str) -> None:
     print(f"Updated pyproject.toml: {new_version}")
 
 
+def render_lock_update(pyproject: str) -> str:
+    """Resolve and verify the prospective release before changing repository files."""
+    with tempfile.TemporaryDirectory(prefix="raidar-release-") as directory:
+        staging = Path(directory)
+        (staging / "pyproject.toml").write_text(pyproject, encoding="utf-8")
+        staged_lock = staging / "uv.lock"
+        staged_lock.write_bytes(LOCKFILE_PATH.read_bytes())
+        for options in ([], ["--check"]):
+            subprocess.run(
+                ["uv", "lock", "--project", str(staging), *options],
+                cwd=REPO_ROOT,
+                check=True,
+            )
+        return staged_lock.read_text(encoding="utf-8")
+
+
 def generate_changelog_entry(
     version: str,
     commits: list[dict[str, str]],
@@ -286,11 +303,13 @@ def main() -> int:
 
     updates = {CHANGELOG_PATH: render_changelog_update(entry)}
     if bump_type != "none":
-        updates[PYPROJECT_PATH] = render_pyproject_update(new_version)
+        pyproject = render_pyproject_update(new_version)
+        updates[PYPROJECT_PATH] = pyproject
+        updates[LOCKFILE_PATH] = render_lock_update(pyproject)
 
     _atomic_write_many(updates)
     if bump_type != "none":
-        print(f"Updated pyproject.toml: {new_version}")
+        print(f"Updated pyproject.toml and uv.lock: {new_version}")
     print("Updated CHANGELOG.md")
 
     return 0

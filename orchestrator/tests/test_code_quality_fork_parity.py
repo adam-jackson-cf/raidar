@@ -168,8 +168,18 @@ def _assert_quality_parity(
         return
     assert expected["eligibility"] == {"eligible": True, "reasons": []}
     quality = produce_production_quality(*arguments)
+    expected_quality = expected["production_quality"]
+    expected_ruff = expected_quality["ruff"]
+    expected_invocation = expected_ruff["invocation"]
+    isolated_expected = {
+        **expected_quality,
+        "ruff": {
+            **expected_ruff,
+            "invocation": [expected_invocation[0], "-I", "-B", *expected_invocation[1:]],
+        },
+    }
     assert without_executable(quality.evidence.model_dump(mode="json")) == without_executable(
-        expected["production_quality"]
+        isolated_expected
     )
 
 

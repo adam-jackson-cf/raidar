@@ -1,4 +1,4 @@
-"""``review-loop@2`` workflow agent.
+"""``review-loop@3`` workflow agent.
 
 A Harbor agent that wraps the arm's own agent. One step
 runs implement -> review -> [retry -> review]* inside the step's container,
@@ -66,7 +66,7 @@ from raidar.subject.treatment.runtime.session_chain import (
     render_task,
 )
 
-COMPONENT = "review-loop@2"
+COMPONENT = "review-loop@3"
 VERSION = "2"
 APPROVE, CHANGES = "APPROVE", "CHANGES"
 NO_VERDICT, EMPTY_FEEDBACK = "NO_VERDICT", "EMPTY_FEEDBACK"

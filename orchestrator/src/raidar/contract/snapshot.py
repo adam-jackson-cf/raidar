@@ -46,7 +46,7 @@ def is_excluded(relative: PurePosixPath) -> bool:
 def snapshot_files(root: Path) -> list[Path]:
     """Files and symlinks under ``root`` that belong to the snapshot, sorted."""
     found: list[Path] = []
-    for dirpath, dirnames, filenames in os.walk(root, followlinks=False):
+    for dirpath, dirnames, filenames in os.walk(root, followlinks=False, onerror=_raise_walk_error):
         base = Path(dirpath)
         dirnames[:] = sorted(
             d for d in dirnames if not is_excluded(PurePosixPath((base / d).relative_to(root)))
@@ -59,6 +59,21 @@ def snapshot_files(root: Path) -> list[Path]:
     return sorted(found, key=lambda p: p.relative_to(root).as_posix().encode())
 
 
+def _raise_walk_error(error: OSError) -> None:
+    raise error
+
+
+def _regular_file_digest(path: Path) -> bytes:
+    """Hash only regular files, without following a replacement symlink or blocking on a FIFO."""
+    if not stat.S_ISREG(path.lstat().st_mode):
+        raise OSError(f"snapshot entry is not a regular file: {path}")
+    descriptor = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+    with os.fdopen(descriptor, "rb") as stream:
+        if not stat.S_ISREG(os.fstat(stream.fileno()).st_mode):
+            raise OSError(f"snapshot entry is not a regular file: {path}")
+        return hashlib.file_digest(stream, "sha256").digest()
+
+
 def tree_digest(root: Path) -> str:
     """Order-stable content digest (relative path, kind, exec bit, bytes or link target).
 
@@ -67,16 +82,20 @@ def tree_digest(root: Path) -> str:
     or is not executable). Read/write bits are not: they differ between the
     artifact and download sources and never change what the grader runs.
     """
-    digest = hashlib.sha256()
+    digest = hashlib.sha256(b"raidar-snapshot\0")
     for path in snapshot_files(root):
-        digest.update(path.relative_to(root).as_posix().encode())
-        digest.update(b"\0")
-        if path.is_symlink():
-            digest.update(b"L" + os.readlink(path).encode())
+        relative = os.fsencode(path.relative_to(root).as_posix())
+        digest.update(len(relative).to_bytes(8, "big"))
+        digest.update(relative)
+        mode = path.lstat().st_mode
+        if stat.S_ISLNK(mode):
+            kind, content = b"L", os.fsencode(os.readlink(path))
         else:
-            executable = path.stat().st_mode & stat.S_IXUSR
-            digest.update((b"X" if executable else b"F") + path.read_bytes())
-        digest.update(b"\0")
+            kind = b"X" if mode & stat.S_IXUSR else b"F"
+            content = _regular_file_digest(path)
+        digest.update(kind)
+        digest.update(len(content).to_bytes(8, "big"))
+        digest.update(content)
     return digest.hexdigest()
 
 

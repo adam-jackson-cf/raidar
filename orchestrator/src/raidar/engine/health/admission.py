@@ -1,7 +1,7 @@
 """Smoke-before-measure admission (mechanics-v1 design r2 §3.2; fxl ``cohort_smoke``).
 
-``raidar run`` of any experiment kind except ``smoke`` is refused unless the jobs root holds a
-clean smoke job of the same setup: the same Raidar toolchain digest, runtime pack recipe,
+``raidar run`` of any experiment kind except ``smoke`` is refused unless the jobs root holds
+clean smoke jobs covering the setup: matching Raidar execution/toolchain digests, pack recipe,
 every arm's agent name/model/effort and the same execution target (name and Docker facts).
 *Clean* means the job finished, every selected trial has a valid record, every trial's
 ``health.json`` exists with no violation, and in every trial every step's agent changed
@@ -36,11 +36,16 @@ def experiment_kind(lock: Mapping[str, Any]) -> str | None:
     return str(kind) if kind else None
 
 
-def _agents(lock: Mapping[str, Any]) -> list[list[str | None]] | None:
-    design = (lock.get("execution") or {}).get("design") or {}
+def _agents(
+    lock: Mapping[str, Any], arm_ids: set[str] | None = None
+) -> list[list[str | None]] | None:
+    design = _execution_design(lock)
     by_id = {entry.get("id"): entry for entry in design.get("agents") or []}
+    arms = _selected_arms(design, arm_ids)
+    if arms is None:
+        return None
     triples = set()
-    for arm in design.get("arms") or []:
+    for arm in arms:
         agent = by_id.get(arm.get("agent"))
         if agent is None:
             return None
@@ -48,20 +53,38 @@ def _agents(lock: Mapping[str, Any]) -> list[list[str | None]] | None:
     return [list(t) for t in sorted(triples, key=repr)] or None
 
 
+def _execution_design(lock: Mapping[str, Any]) -> Mapping[str, Any]:
+    return (lock.get("execution") or {}).get("design") or {}
+
+
+def _selected_arms(
+    design: Mapping[str, Any], arm_ids: set[str] | None
+) -> list[dict[str, Any]] | None:
+    arms = design.get("arms") or []
+    if arm_ids is None:
+        return list(arms)
+    selected = [arm for arm in arms if arm.get("id") in arm_ids]
+    return selected if {arm.get("id") for arm in selected} == arm_ids else None
+
+
 def identity(
     lock: Mapping[str, Any],
     runner: Mapping[str, Any] | None,
     recipes: Mapping[str, Any] | None,
     target: Mapping[str, Any] | None,
+    *,
+    arm_ids: set[str] | None = None,
 ) -> Identity | None:
     """What a smoke must share with the job it clears; ``None`` when any part is unrecorded."""
-    agents = _agents(lock)
+    agents = _agents(lock, arm_ids)
     parts = (runner or {}).get("toolchain_sha256"), (recipes or {}).get("pack"), agents, target
-    if not all(parts):
+    execution = (runner or {}).get("execution_sha256")
+    if not all(parts) or not execution:
         return None
     assert target is not None  # ``parts`` is all-truthy
     return {
         "toolchain_sha256": parts[0],
+        "execution_sha256": execution,
         "pack": parts[1],
         "agents": agents,
         "target": {"name": target.get("name"), "docker": target.get("docker")},
@@ -71,7 +94,7 @@ def identity(
 def mismatches(wanted: Identity, smoke: Identity) -> list[str]:
     found = [
         f"{key} differs"
-        for key in ("toolchain_sha256", "pack", "target")
+        for key in ("toolchain_sha256", "execution_sha256", "pack", "target")
         if wanted[key] != smoke[key]
     ]
     uncovered = [a for a in wanted["agents"] if a not in smoke["agents"]]
@@ -113,6 +136,10 @@ EMPTY_TREE_DIGEST = hashlib.sha256().hexdigest()
 
 def _no_work_problem(record: TrialRecord) -> str | None:
     """The first executed step whose agent left ``/app`` as it found it, or ``None``."""
+    if record.agent_override:
+        return f"trial {record.trial.trial_id} ran agent override {record.agent_override!r}"
+    if not record.step_results:
+        return f"trial {record.trial.trial_id} executed no step"
     for result in record.step_results:
         digest = result.snapshot.digest if result.snapshot else None
         if digest is None:
@@ -149,30 +176,55 @@ def _smoke_jobs(jobs_root: Path) -> list[tuple[Path, dict[str, Any], dict[str, A
     return found
 
 
-def _candidate_reason(
+def _candidate_identity(
     job_dir: Path, manifest: dict[str, Any], lock: dict[str, Any], wanted: Identity
-) -> str | None:
+) -> tuple[Identity | None, str | None]:
+    if problem := smoke_problem(job_dir, manifest):
+        return None, problem
+    arms = {
+        TrialRecord.model_validate_json(
+            (job_dir / TRIAL_RECORDS_DIR / f"{trial_id}.json").read_text()
+        ).trial.arm
+        for trial_id in manifest["selected"]
+    }
     smoke = identity(
-        lock, manifest.get("runner"), manifest.get("recipes"), manifest.get("execution_target")
+        lock,
+        manifest.get("runner"),
+        manifest.get("recipes"),
+        manifest.get("execution_target"),
+        arm_ids=arms,
     )
     if smoke is None:
-        return "predates run provenance"
-    differs = mismatches(wanted, smoke)
-    return "; ".join(differs) if differs else smoke_problem(job_dir, manifest)
+        return None, "run provenance or executed-arm identity is incomplete"
+    differs = mismatches({**wanted, "agents": []}, smoke)
+    return (None, "; ".join(differs)) if differs else (smoke, None)
 
 
-def _search(wanted: Identity | None, jobs_root: Path) -> tuple[str | None, dict[str, str]]:
-    """(the clean matching smoke job, else why each smoke job did not clear the run)."""
+def _search(wanted: Identity | None, jobs_root: Path) -> tuple[list[str], dict[str, str]]:
+    """Clean compatible smoke jobs collectively covering the requested agents."""
     if wanted is None:
-        return None, {"": "run provenance is incomplete"}
+        return [], {"": "run provenance is incomplete"}
     reasons: dict[str, str] = {}
+    remaining = list(wanted["agents"])
+    selected: list[str] = []
     for job_dir, manifest, lock in _smoke_jobs(jobs_root):
         name = str(job_dir.relative_to(jobs_root))
-        reason = _candidate_reason(job_dir, manifest, lock, wanted)
-        if reason is None:
-            return name, reasons
-        reasons[name] = reason
-    return None, reasons or {"": "no smoke job found"}
+        smoke, reason = _candidate_identity(job_dir, manifest, lock, wanted)
+        if smoke is None:
+            reasons[name] = reason or "no compatible smoke identity"
+            continue
+        uncovered = _remaining_agents(remaining, smoke)
+        if uncovered != remaining:
+            selected.append(name)
+            remaining = uncovered
+        if not remaining:
+            return selected, reasons
+        reasons[name] = f"agent(s) {remaining} not smoked"
+    return [], reasons or {"": "no smoke job found"}
+
+
+def _remaining_agents(agents: list[list[str | None]], smoke: Identity) -> list[list[str | None]]:
+    return [agent for agent in agents if agent not in smoke["agents"]]
 
 
 def admit(
@@ -185,9 +237,15 @@ def admit(
     """The ``job.json`` ``admission`` record, or ``AdmissionError`` when the job is refused."""
     if kind == SMOKE_KIND:
         return {"required": False, "kind": kind}
-    smoke_job, unmet = _search(wanted, jobs_root)
-    if smoke_job is not None:
-        return {"required": True, "kind": kind, "smoke_job": smoke_job, "overridden": False}
+    smoke_jobs, unmet = _search(wanted, jobs_root)
+    if smoke_jobs:
+        return {
+            "required": True,
+            "kind": kind,
+            "smoke_job": smoke_jobs[0],
+            "smoke_jobs": smoke_jobs,
+            "overridden": False,
+        }
     if allow_unsmoked:
         return {
             "required": True,

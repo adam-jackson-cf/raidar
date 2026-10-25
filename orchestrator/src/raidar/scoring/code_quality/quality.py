@@ -240,11 +240,11 @@ def _normalized_diagnostic(
 def _ruff(
     tools: ToolEnvironment, root: Path, paths: Sequence[str]
 ) -> tuple[str, tuple[dict[str, Any], ...], tuple[str, ...]]:
-    version_result = _run(tools, ["-m", "ruff", "--version"])
+    version_result = _run(tools, ["-I", "-B", "-m", "ruff", "--version"])
     version = version_result.stdout.strip()
     if version_result.returncode != 0 or version != f"ruff {EXPECTED_RUFF_VERSION}":
         raise ProductionQualityError("measurement_environment_mismatch: Ruff version mismatch")
-    invocation = (str(tools.python), *RUFF_ARGUMENTS, *paths)
+    invocation = (str(tools.python), "-I", "-B", *RUFF_ARGUMENTS, *paths)
     done = _run(tools, list(invocation[1:]), cwd=root)
     if done.returncode not in (0, 1):
         raise ProductionQualityError(

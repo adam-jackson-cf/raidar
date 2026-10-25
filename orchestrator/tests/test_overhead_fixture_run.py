@@ -96,7 +96,7 @@ def test_fixture_experiment_runs_and_holds_the_n1_budgets(
             {"id": "baseline", "components": []},
             {
                 "id": "guided",
-                "components": [{"use": "lint-config@1", "files": ["components/ruff.toml"]}],
+                "components": [{"use": "lint-config@2", "files": ["components/ruff.toml"]}],
             },
         ],
         analysis={

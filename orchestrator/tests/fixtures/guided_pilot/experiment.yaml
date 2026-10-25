@@ -53,22 +53,22 @@ conditions:
   # lint config, a turn-end self-check and an implement -> review -> fix loop.
   - id: guided
     components:
-      - use: rules-file@1
+      - use: rules-file@2
         files: [components/guided/AGENTS.md]
-      - use: skills@1
+      - use: skills@2
         files: [components/guided/skills/checkpoint-discipline]
-      - use: lint-config@1
+      - use: lint-config@2
         files: [components/guided/ruff.toml]
-      # Codex maps stop-hook@1 to `notify`: it runs at each turn end, but its output
+      # Codex maps stop-hook@2 to `notify`: it runs at each turn end, but its output
       # is not shown to the agent (a Claude Stop hook's would be). ruff/mypy are
       # scorer tools and are not in the agent image, so the check is a byte-compile.
-      - use: stop-hook@1
+      - use: stop-hook@2
         with:
           command: python3 -m compileall -q . >/dev/null 2>&1 || true
       # Reviewer sessions use the arm's own agent and are billed to the arm.
-      # review-loop@2 reads feedback before or after the VERDICT line and re-asks
+      # review-loop@3 reads feedback before or after the VERDICT line and re-asks
       # once on an unusable review (F3: @1 read 18/40 forge reviews as EMPTY_FEEDBACK).
-      - use: review-loop@2
+      - use: review-loop@3
         with:
           max_review_rounds: 2
 

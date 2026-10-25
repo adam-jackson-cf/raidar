@@ -2,7 +2,7 @@
 
 The starter is the README walkthrough's shape: an ``ab-test`` with one pinned
 problem, one agent on the pack's pinned version, a ``baseline`` condition and a ``rules``
-condition (``rules-file@1`` with a stub ``components/AGENTS.md``), and the
+condition (``rules-file@2`` with a stub ``components/AGENTS.md``), and the
 paired analysis plan. It validates as written; the author then edits the
 problems, conditions and analysis plan. Another variant of an existing
 experiment's treatment is a new condition and arm inside that experiment, not
@@ -51,7 +51,7 @@ conditions:
     components: []
   - id: rules
     components:
-      - use: rules-file@1
+      - use: rules-file@2
         files: [{rules_file}]
 
 arms:
@@ -63,7 +63,7 @@ arms:
     agent: codex-luna
 
 assessment:
-  scorers: [correctness@1, code-quality@3, resource-usage@1]
+  scorers: [correctness@2, code-quality@4, resource-usage@2]
 
 analysis:
   baseline_arm: baseline

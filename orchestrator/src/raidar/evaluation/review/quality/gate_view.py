@@ -28,6 +28,7 @@ from raidar.evaluation.review.quality.models import (
     GateView,
 )
 from raidar.evaluation.review.quality.sources import TrialSource
+from raidar.scoring.catalog.outcomes import GATE_EFFORT_REF
 from raidar.scoring.framework.result import TRAJECTORY_SUBJECT, AssessStatus, Observation
 from raidar.scoring.framework.store import Assessment
 from raidar.scoring.gate_effort.evidence import run_summary
@@ -40,7 +41,6 @@ from raidar.scoring.gate_effort.records import (
 )
 from raidar.scoring.gate_effort.shadow import SHADOW_MODE, step_mode
 
-GATE_EFFORT_REF = "gate-effort@10"
 STEP_CELLS = (
     "gate_runs",
     "fix_rounds",

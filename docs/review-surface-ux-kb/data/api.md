@@ -9,6 +9,12 @@ timestamp: 2026-06-15T00:00:00Z
 
 # API endpoints
 
+> **Historical API audit.** This page records June 2026 behavior, not the current
+> API contract. In particular, the current experiments payload uses `arm_diffs`,
+> not the `revision_diffs` documented below. Consult `review-surface/server.mjs`,
+> `review-surface/quality-api.mjs` and their tests for current endpoints, and the
+> [root README](../../../README.md) for setup. See the [bundle status](../index.md).
+
 `server.mjs` is a zero-dependency `node:http` server (binds `127.0.0.1`, port
 `REVIEW_SURFACE_PORT` or `5950`). It serves the projection files as read-only
 JSON and the SPA static assets, plus annotation CRUD.

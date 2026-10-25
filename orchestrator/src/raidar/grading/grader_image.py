@@ -29,7 +29,7 @@ import time
 from dataclasses import dataclass
 
 from raidar.grading.bundle import GraderSpec
-from raidar.grading.sandbox import CONTAINER_LAYOUT
+from raidar.grading.sandbox import CONTAINER_LAYOUT, SUBMISSION_PYTHON
 from raidar.grading.submission_deps import dockerfile_layer, provisioned_pins
 
 GRADER_TOOLS: tuple[str, ...] = (
@@ -39,7 +39,6 @@ GRADER_TOOLS: tuple[str, ...] = (
 )
 GRADER_VENV = CONTAINER_LAYOUT.python.removesuffix("/bin/python")
 GRADER_REPOSITORY = "raidar-oracle-grader"
-SUBMISSION_PYTHON = "/usr/local/bin/python3"
 BUILD_TIMEOUT_S = 900.0
 
 

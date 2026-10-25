@@ -18,7 +18,12 @@ def _manifest(**changes: Any) -> dict[str, Any]:
     base = {
         "job_id": "job",
         "mechanics_epoch": "mechanics-v1",
-        "runner": {"commit": "abc", "dirty": False, "toolchain_sha256": "tc1"},
+        "runner": {
+            "commit": "abc",
+            "dirty": False,
+            "toolchain_sha256": "tc1",
+            "execution_sha256": "execution1",
+        },
         "recipes": {"pack": "pack1", "graders": {"scb/forge@x": "g1"}},
         "effective_limits": {"agent_s": {"a": 1800.0}, "verifier_s": 1500.0},
         "execution_target": {
@@ -67,11 +72,42 @@ def test_matching_jobs_pool_and_a_single_job_is_checked_for_integrity(tmp_path: 
 @pytest.mark.parametrize(
     ("field", "changes"),
     [
-        ("toolchain", {"runner": {"commit": "abc", "dirty": False, "toolchain_sha256": "tc2"}}),
+        (
+            "toolchain",
+            {
+                "runner": {
+                    "commit": "abc",
+                    "dirty": False,
+                    "toolchain_sha256": "tc2",
+                    "execution_sha256": "execution1",
+                }
+            },
+        ),
+        (
+            "execution_code",
+            {
+                "runner": {
+                    "commit": "def",
+                    "dirty": False,
+                    "toolchain_sha256": "tc1",
+                    "execution_sha256": "execution2",
+                }
+            },
+        ),
         ("pack_recipe", {"recipes": {"pack": "pack2", "graders": {"scb/forge@x": "g1"}}}),
         ("grader_recipe", {"recipes": {"pack": "pack1", "graders": {"scb/forge@x": "g2"}}}),
         ("effective_limits", {"effective_limits": {"agent_s": {"a": 60.0}, "verifier_s": 1500.0}}),
-        ("dirty_runner", {"runner": {"commit": "abc", "dirty": True, "toolchain_sha256": "tc1"}}),
+        (
+            "dirty_runner",
+            {
+                "runner": {
+                    "commit": "abc",
+                    "dirty": True,
+                    "toolchain_sha256": "tc1",
+                    "execution_sha256": "execution1",
+                }
+            },
+        ),
     ],
 )
 def test_pooling_refuses_each_provenance_difference_naming_jobs_and_values(
@@ -117,6 +153,18 @@ def test_pre_epoch_jobs_are_unmeasured_not_refused(tmp_path: Path) -> None:
     jobs = [_job(tmp_path, "old-1", {}), _job(tmp_path, "old-2", {})]
     assert check_pooling(jobs).unmeasured == ("old-1", "old-2")
     assert check_pooling(jobs[:1]).unmeasured == ("old-1",)
+
+
+def test_epoch_jobs_without_execution_identity_need_an_explicit_pool_override(
+    tmp_path: Path,
+) -> None:
+    manifest = _manifest()
+    del manifest["runner"]["execution_sha256"]
+    jobs = [_job(tmp_path, "one", manifest), _job(tmp_path, "two", manifest)]
+    with pytest.raises(PoolingError, match="execution code identity is unrecorded.*one, two"):
+        check_pooling(jobs)
+    assert check_pooling(jobs, ["execution_code"]).overrides_used == ("execution_code",)
+    assert check_pooling(jobs[:1]).findings == ()
 
 
 @pytest.mark.parametrize("damage", ["edit", "add", "remove-manifest", "edit-record"])

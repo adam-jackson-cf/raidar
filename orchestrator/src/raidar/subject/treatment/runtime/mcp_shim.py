@@ -33,7 +33,7 @@ class Recorder:
     def __init__(self, log: IO[str]) -> None:
         self._log = log
         self._lock = threading.Lock()
-        self._pending: dict[str, str] = {}
+        self._pending: dict[tuple[str, str], str] = {}
 
     def _write(self, record: dict[str, Any]) -> None:
         with self._lock:
@@ -48,21 +48,27 @@ class Recorder:
             return
         if not isinstance(message, dict):
             return
-        if direction == "client" and isinstance(message.get("method"), str):
-            self._observe_request(message)
+        if isinstance(message.get("method"), str):
+            self._observe_request(direction, message)
         else:
             self._observe_response(direction, message)
 
-    def _observe_request(self, message: dict[str, Any]) -> None:
+    def _observe_request(self, direction: str, message: dict[str, Any]) -> None:
         method = str(message["method"])
         if "id" in message:
             with self._lock:
-                self._pending[json.dumps(message["id"])] = method
-        self._write({"dir": "client", "method": method})
+                self._pending[(direction, json.dumps(message["id"]))] = method
+        self._write({"dir": direction, "method": method})
+
+    def _answered_method(self, direction: str, message: dict[str, Any]) -> str | None:
+        if "id" not in message or not ("result" in message or "error" in message):
+            return None
+        requester = "client" if direction == "server" else "server"
+        with self._lock:
+            return self._pending.pop((requester, json.dumps(message["id"])), None)
 
     def _observe_response(self, direction: str, message: dict[str, Any]) -> None:
-        with self._lock:
-            answered = self._pending.pop(json.dumps(message.get("id")), None)
+        answered = self._answered_method(direction, message)
         record: dict[str, Any] = {"dir": direction, "result_of": answered}
         result = message.get("result")
         if answered == "tools/list" and isinstance(result, dict):

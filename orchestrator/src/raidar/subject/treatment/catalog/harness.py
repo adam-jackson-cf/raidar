@@ -83,7 +83,7 @@ def _claude_listed_skills(evidence: StepEvidence) -> set[str]:
 class Skills:
     manifest = ComponentManifest(
         name="skills",
-        version="1",
+        version="2",
         kind=ComponentKind.HARNESS,
         description="Inject skill directories (each with SKILL.md) through Harbor --skill",
         supports=BOTH_HARNESSES,
@@ -197,7 +197,7 @@ def _flatten(settings: Mapping[str, JsonValue], prefix: str = "") -> dict[str, J
 class HarnessSettings:
     manifest = ComponentManifest(
         name="harness-settings",
-        version="1",
+        version="2",
         kind=ComponentKind.HARNESS,
         description="Harness-native settings passed as the agent's config (--ak config)",
         supports=BOTH_HARNESSES,
@@ -286,7 +286,7 @@ def _hook_wrapper(slug: str, harness: Harness) -> bytes:
 class StopHook:
     manifest = ComponentManifest(
         name="stop-hook",
-        version="1",
+        version="2",
         kind=ComponentKind.HARNESS,
         description=(
             "Run a command when the agent finishes a turn (Codex notify, Claude Stop hook)"
@@ -363,7 +363,7 @@ def mcp_shim_source() -> bytes:
 class McpServer:
     manifest = ComponentManifest(
         name="mcp-server",
-        version="1",
+        version="2",
         kind=ComponentKind.HARNESS,
         description="A stdio MCP server registered through Harbor mcp_servers",
         supports=BOTH_HARNESSES,

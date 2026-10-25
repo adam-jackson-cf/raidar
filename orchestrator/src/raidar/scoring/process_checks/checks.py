@@ -68,6 +68,14 @@ def tests_run_before_finish(events: Sequence[TraceEvent]) -> CheckOutcome:
         return CheckOutcome(
             check, Verdict.PASS, "tests ran after the last edit", timeline.pick([last_test])
         )
+    possible_tests = [p for p in timeline.at(EventKind.AMBIGUOUS_TEST) if p > last_edit]
+    if possible_tests:
+        return CheckOutcome(
+            check,
+            Verdict.AMBIGUOUS,
+            "shell control flow may have skipped the test run",
+            timeline.pick(possible_tests),
+        )
     if last_test < last_edit:
         edit = events[last_edit].detail
         return CheckOutcome(

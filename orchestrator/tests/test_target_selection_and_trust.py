@@ -29,6 +29,7 @@ default = "mbp"
 
 [targets.local]
 docker_context = "orbstack"
+trusted = true
 data_check = ["orbstack-data-status"]
 data_check_expect = "external_available=True"
 max_concurrency = 3
@@ -169,6 +170,24 @@ def test_an_untrusted_target_is_refused_naming_the_setting(tmp_path: Path) -> No
     require_trusted(resolve_target("local"), "grading")
     with pytest.raises(TargetError, match=r"targets\.mbp\.trusted"):
         require_trusted(resolve_target("mbp"), "agent credentials")
+
+
+@pytest.mark.parametrize("context", ["orbstack", "ssh-daemon", "tcp-daemon"])
+@pytest.mark.parametrize("trusted", [None, False, True])
+def test_existing_contexts_require_explicit_trust(
+    tmp_path: Path, context: str, trusted: bool | None
+) -> None:
+    text = f'[targets.endpoint]\ndocker_context = "{context}"\n'
+    if trusted is not None:
+        text += f"trusted = {str(trusted).lower()}\n"
+    target = parse_targets(text, tmp_path / "targets.toml").get("endpoint")
+
+    assert target.trusted is (trusted is True)
+    if trusted:
+        require_trusted(target, "agent credentials and hidden tests")
+    else:
+        with pytest.raises(TargetError, match=r"targets\.endpoint\.trusted"):
+            require_trusted(target, "agent credentials and hidden tests")
 
 
 def test_activate_points_docker_at_the_target_and_drops_docker_host(

@@ -116,7 +116,7 @@ def test_composite_is_the_headline_policy_score_over_one_hundred(
         if run.unscored:
             continue
         detail = _detail(projection, run.id)
-        quality = _span(detail, "scorer:code-quality@3")
+        quality = _span(detail, "scorer:code-quality@4")
         scoring = _span(detail, "scoring")
         components = {
             "C": Decimal(str(run.diagnostic_score)),
@@ -214,7 +214,7 @@ def test_condition_diff_pairs_baseline_with_the_same_agent(
 ) -> None:
     [diff] = projection.arm_diffs
     assert diff.key == "synthetic/skill-coding@1:baseline->skills"
-    assert diff.summary == ["arm baseline-gpt -> skills-gpt", "+ component skills@1"]
+    assert diff.summary == ["arm baseline-gpt -> skills-gpt", "+ component skills@2"]
     assert diff.comparable_warnings == []
     assert diff.change_categories == ["rules"]
     assert "workdir/skills/tdd/SKILL.md" in diff.sections
@@ -254,7 +254,7 @@ def _spec(factors: list[str]) -> ExperimentSpec:
                 {"id": "base", "condition": "base", "agent": "a"},
                 {"id": "rules", "condition": "rules", "agent": "b"},
             ],
-            "assessment": {"scorers": ["correctness@1"]},
+            "assessment": {"scorers": ["correctness@2"]},
             "analysis": {"baseline_arm": "base", "attempts": 1, "seed": 0},
         }
     )
@@ -561,7 +561,7 @@ def test_following_the_unassessed_hint_stores_the_assessment_the_review_finds(
     config = job_dir / "assessment-config.yaml"
     config.write_text(
         config.read_text().replace(
-            "scorers: {}", "scorers:\n  correctness@1:\n    progression: continue"
+            "scorers: {}", "scorers:\n  correctness@2:\n    progression: continue"
         )
     )
     runs, store = tmp_path / "jobs", tmp_path / "store"
@@ -569,30 +569,30 @@ def test_following_the_unassessed_hint_stores_the_assessment_the_review_finds(
     [hint] = [
         reason
         for reason in _detail(before, PASSING).run.unscored_reasons
-        if "correctness@1" in reason and "raidar assess" in reason
+        if "correctness@2" in reason and "raidar assess" in reason
     ]
     command = hint.split("`")[1].replace("<store>", str(store)).split()
     result = CliRunner().invoke(assess, command[2:])
     assert result.exit_code == 0, result.output
     after = merge_review_projections(job_roots=[runs], stores=[store])
     scoring = _span(_detail(after, PASSING), "scoring")
-    assert "correctness@1" in scoring["assessments"]
-    assert "correctness@1" not in scoring["not_assessed"]
+    assert "correctness@2" in scoring["assessments"]
+    assert "correctness@2" not in scoring["not_assessed"]
 
 
 def test_a_headline_scorer_the_experiment_never_declared_is_named_not_unassessed() -> None:
     from raidar.evaluation.review.projection.assessments import TrialAssessments
     from raidar.evaluation.review.projection.headline import UNDECLARED_MARKER, headline
 
-    missing = TrialAssessments(missing={"correctness@1": "no stored Assessment"})
+    missing = TrialAssessments(missing={"correctness@2": "no stored Assessment"})
     one = ("checkpoint_1",)
-    result = headline("scb-canonical-oneshot@1", one, missing, declared=["correctness@1"])
+    result = headline("scb-canonical-oneshot@1", one, missing, declared=["correctness@2"])
     assert result.composite is None
     (reason,) = result.reasons
-    assert "needs code-quality@3" in reason
+    assert "needs code-quality@4" in reason
     assert UNDECLARED_MARKER in reason
     declared = headline(
-        "scb-canonical-oneshot@1", one, missing, declared=["correctness@1", "code-quality@3"]
+        "scb-canonical-oneshot@1", one, missing, declared=["correctness@2", "code-quality@4"]
     )
     assert all("unassessed" in reason for reason in declared.reasons)
 

@@ -1,4 +1,4 @@
-"""review-loop@2 workflow agent (gate packet F3).
+"""review-loop@3 workflow agent (gate packet F3).
 
 A scripted inner Harbor agent stands in for the harness and a local-shell
 environment stands in for the container (mounted logs), so the loop's real
@@ -219,7 +219,7 @@ def test_a_session_wrapper_inner_agent_runs_every_stage(tmp_path: Path) -> None:
         inner_agent=nest_session_wrapper(
             {"name": "tests.test_review_loop_workflow:ScriptedInnerAgent", "kwargs": {}},
             "raidar.subject.treatment.runtime.continue_on_stall:ContinueOnStallAgent",
-            {"component": "continue-on-stall@2"},
+            {"component": "continue-on-stall@3"},
         ),
         work_dir=str(tmp_path / "review"),
     )
@@ -461,7 +461,7 @@ def test_feedback_before_the_verdict_drives_the_fix_round(tmp_path: Path) -> Non
         "retry",
         "review",
     ]
-    assert (loop["workflow"], loop["termination_reason"]) == ("review-loop@2", "review_approved")
+    assert (loop["workflow"], loop["termination_reason"]) == ("review-loop@3", "review_approved")
     assert "Handle the empty input." in ScriptedInnerAgent.prompts[2]
     assert [
         (p["round"], p["attempt"], p["verdict"], p["feedback_position"]) for p in loop["parses"]
@@ -512,7 +512,7 @@ def test_falls_back_to_the_work_as_it_stands_after_a_second_unusable_review(
 
 
 def test_frames_the_implementer_task_but_not_the_reviewer(tmp_path: Path) -> None:
-    """prompt-wrapper@1 under review-loop@2: the reviewer must not be told to build."""
+    """prompt-wrapper@1 under review-loop@3: the reviewer must not be told to build."""
     framing = "You are working non-interactively in /app.\n\n{{ instruction }}\n"
     agent, environment = _agent(tmp_path, rounds=2, template=framing)
     ScriptedInnerAgent.replies[:] = ["Gap.\nVERDICT: CHANGES", "VERDICT: APPROVE"]
@@ -533,7 +533,7 @@ def test_component_wraps_the_arm_agent_in_the_review_loop_agent() -> None:
     )
     contribution = REVIEW_LOOP.contribute(use)
 
-    assert REVIEW_LOOP.manifest.ref == "review-loop@2"
+    assert REVIEW_LOOP.manifest.ref == "review-loop@3"
     assert contribution.agent_wrapper is not None
     assert (
         contribution.agent_wrapper.import_path
@@ -541,7 +541,7 @@ def test_component_wraps_the_arm_agent_in_the_review_loop_agent() -> None:
     )
     assert dict(contribution.agent_wrapper.kwargs) == {
         "max_review_rounds": 2,
-        "component": "review-loop@2",
+        "component": "review-loop@3",
     }
 
 

@@ -1,4 +1,4 @@
-"""``workflow`` built-in: continue-on-stall@2, one continuation per step (first session only).
+"""``workflow`` built-in: continue-on-stall@3, one continuation per step (first session only).
 
 No human answers an agent during a trial. When the first session of a step
 ends having changed no workspace file and with a final message that asks a
@@ -55,7 +55,7 @@ CONTINUE_ON_STALL_IMPORT_PATH = (
 class ContinueOnStall:
     manifest = ComponentManifest(
         name="continue-on-stall",
-        version="2",
+        version="3",
         kind=ComponentKind.WORKFLOW,
         description=(
             "When the first session of a step changes no workspace file and ends asking a "

@@ -90,7 +90,7 @@ class RulesFile:
 
     manifest = ComponentManifest(
         name="rules-file",
-        version="1",
+        version="2",
         kind=ComponentKind.WORKSPACE,
         description="Place one rules file at the workspace root under the harness's rules name",
         supports=BOTH_HARNESSES,
@@ -154,7 +154,7 @@ class WorkspaceFiles:
 
     manifest = ComponentManifest(
         name="workspace-files",
-        version="1",
+        version="2",
         kind=ComponentKind.WORKSPACE,
         description="Copy files or directories into the workspace at the first step",
         supports=BOTH_HARNESSES,
@@ -196,7 +196,7 @@ class LintConfig:
 
     manifest = ComponentManifest(
         name="lint-config",
-        version="1",
+        version="2",
         kind=ComponentKind.WORKSPACE,
         description="Place lint and type-check config files at the workspace root",
         supports=BOTH_HARNESSES,

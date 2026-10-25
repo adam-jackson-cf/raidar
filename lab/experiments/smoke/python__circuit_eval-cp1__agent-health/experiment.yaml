@@ -38,7 +38,7 @@ arms:
     agent: agent
 
 assessment:
-  scorers: [correctness@1]
+  scorers: [correctness@2]
   metric: scb-canonical-oneshot@1
 
 analysis:

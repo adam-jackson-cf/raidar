@@ -10,8 +10,8 @@ A problem resolves only after verifier validation (F13; plan task 0.5: "any
 failing problem is excluded"): its report must be for the current manifest and
 carry a usable verdict. Excluded, infra-failed, stale or missing validation is
 reported to the compatibility gate (``binding.validated``), which refuses the
-lock with ``RT0``; a validated problem's lock records the verdict and report
-digest.
+lock with ``RT0``; a validated problem's lock records the verdict and skipped
+checks alongside the manifest digest. The report's run-specific bytes are not pinned.
 
 A problem with a committed errata (``<version>.errata.yaml``) also records it
 under ``metadata.errata``: the sha256 of the file and its case ids by

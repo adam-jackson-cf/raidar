@@ -1,4 +1,4 @@
-"""``correctness@1`` scorer (plan G1)."""
+"""``correctness@2`` scorer (plan G1)."""
 
 from raidar.scoring.correctness.scorer import CorrectnessScorer, correctness_scorer
 

@@ -1,8 +1,8 @@
 """Experiment-level Quality view, per problem: curves, paired Δ, distributions, H2H, sensitivity.
 
-Runs are pooled only under one lock: an experiment's runs are grouped by the
-``lock_sha256`` they were executed under, as the analysis' ``check_jobs`` requires,
-and each group is its own ``QualityExperiment``.
+Runs are pooled only under one lock, after the projection applies analysis'
+provenance and record-integrity gate. An experiment's runs are grouped by the
+``lock_sha256`` they were executed under; each group is its own ``QualityExperiment``.
 
 Which trials count (each exclusion is listed, never silent):
 
@@ -19,7 +19,7 @@ as ``analysis.curves`` bands do) and paired Δ uses the analysis' ``decide`` wit
 directions of the analysis' outcome metrics.
 
 The head-to-head scatter is the SCB dashboard's two signals (docs/reboot/
-h2h-signals.md), re-sourced from ``code-quality@3``: Ruff findings under the
+h2h-signals.md), re-sourced from ``code-quality@4``: Ruff findings under the
 fork's contract rule set (Ruff 0.8.6 SIM allowlist, not the dashboard's
 ~85-selector set), and functions or methods with cc > 10 as measured by the
 fork's production-quality evaluator (not the dashboard's tree-sitter count).
@@ -267,19 +267,19 @@ _SIGNALS: tuple[tuple[str, str, str, str], ...] = (
         "lint_per_kloc",
         "Lint density",
         "findings / KLOC",
-        "code-quality@3 lint_findings / production_loc (Ruff 0.8.6 SIM allowlist)",
+        "code-quality@4 lint_findings / production_loc (Ruff 0.8.6 SIM allowlist)",
     ),
     (
         "high_cc_mass_share",
         "CC-mass concentration",
         "share of cc·√sloc mass",
-        "1 − E: mass share of functions with cc > 10 (code-quality@3)",
+        "1 − E: mass share of functions with cc > 10 (code-quality@4)",
     ),
     (
         "high_cc_function_lines",
         "Function LOC (cc > 10)",
         "lines",
-        "span lines of each cc > 10 function in the E evidence; code-quality@3 does not "
+        "span lines of each cc > 10 function in the E evidence; code-quality@4 does not "
         "persist the full symbol table, so lower-complexity functions are not included",
     ),
 )
@@ -327,13 +327,13 @@ _H2H: tuple[tuple[str, str, str, str], ...] = (
         "lint_findings",
         "Lint errors per checkpoint",
         "Lint findings",
-        "Ruff 0.8.6, SCB contract SIM allowlist (code-quality@3)",
+        "Ruff 0.8.6, SCB contract SIM allowlist (code-quality@4)",
     ),
     (
         "high_cc_count",
         "Complexity per checkpoint",
         "Functions with CC > 10",
-        "fork production-quality evaluator cc > 10 (code-quality@3)",
+        "fork production-quality evaluator cc > 10 (code-quality@4)",
     ),
 )
 
@@ -406,6 +406,7 @@ def _head_to_head(
 
 def _eligible_components(
     trials: Sequence[ReviewedTrial],
+    required: Sequence[str],
 ) -> tuple[list[dict[str, float]], list[str]]:
     """Problem-level component values of trials whose headline score is eligible."""
     eligible, excluded = [], []
@@ -413,6 +414,12 @@ def _eligible_components(
         problem = trial.detail.problem
         if problem["S"].value is None:
             excluded.append(f"{trial.detail.run.id}: headline score {problem['S'].status}")
+            continue
+        missing = [key for key in required if problem[key].value is None]
+        if missing:
+            excluded.append(
+                f"{trial.detail.run.id}: sensitivity components unavailable: {', '.join(missing)}"
+            )
             continue
         eligible.append(
             {key: cell.value for key, cell in problem.items() if cell.value is not None}
@@ -437,7 +444,7 @@ def _sensitivity(trials: Sequence[ReviewedTrial], weights: dict[str, float]) -> 
     stored observations do not carry; the sum is the same one, over the
     eligible trials' problem-level components, in Decimal.
     """
-    eligible, excluded = _eligible_components(trials)
+    eligible, excluded = _eligible_components(trials, ("C", *weights))
     ablation = {
         key: float(
             sum(

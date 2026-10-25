@@ -88,7 +88,7 @@ def test_builtins_map_onto_harbor_agent_inputs(
 
 def test_workflow_wraps_the_agent_and_keeps_its_inputs() -> None:
     compiled = compile_uses(
-        use("review-loop@2", max_review_rounds=2),
+        use("review-loop@3", max_review_rounds=2),
         use("prompt-wrapper@1", (f"{PROBE_DIR}/wrapper.md",)),
     )
     config = compiled.apply_to_agent_config(
@@ -106,7 +106,7 @@ def test_workflow_wraps_the_agent_and_keeps_its_inputs() -> None:
 
 
 def test_agent_config_refuses_a_non_builtin_agent_or_an_owned_kwarg() -> None:
-    compiled = compile_uses(use("harness-settings@1", settings=CODEX_SETTINGS))
+    compiled = compile_uses(use("harness-settings@2", settings=CODEX_SETTINGS))
 
     with pytest.raises(ValueError, match="apply to Harbor's 'codex' agent"):
         compiled.apply_to_agent_config(AgentConfig(import_path="x.y:Agent"))
@@ -199,24 +199,24 @@ def test_probes_fail_when_a_component_did_not_take_effect(tmp_path: Path) -> Non
     assert not report.passed
     assert set(failed) == {
         RESET_PROBE,
-        "rules-file@1",
-        "workspace-files@1",
-        "lint-config@1",
-        "skills@1",
-        "harness-settings@1",
-        "stop-hook@1",
-        "mcp-server@1",
+        "rules-file@2",
+        "workspace-files@2",
+        "lint-config@2",
+        "skills@2",
+        "harness-settings@2",
+        "stop-hook@2",
+        "mcp-server@2",
         "prompt-wrapper@1",
     }
     assert "residual processes" in failed[RESET_PROBE]
-    assert "absent" in failed["lint-config@1"]
-    assert "content differs" in failed["workspace-files@1"]
-    assert "never listed" in failed["mcp-server@1"]
+    assert "absent" in failed["lint-config@2"]
+    assert "content differs" in failed["workspace-files@2"]
+    assert "never listed" in failed["mcp-server@2"]
     assert compiled.probe_step(tmp_path / "empty", 0).failures()[0].detail.startswith("no raidar")
 
 
 def test_rules_file_changed_by_the_agent_is_not_held_against_later_steps(tmp_path: Path) -> None:
-    compiled = compile_uses(use("rules-file@1", (f"{PROBE_DIR}/AGENTS.md",)))
+    compiled = compile_uses(use("rules-file@2", (f"{PROBE_DIR}/AGENTS.md",)))
     step = tmp_path / "agent"
     write_step_reports(step, {"AGENTS.md": "f" * 64})
 
@@ -257,8 +257,8 @@ def test_settings_probe_compares_every_declared_setting_with_the_harness_report(
     tmp_path: Path,
 ) -> None:
     codex = compile_uses(
-        use("harness-settings@1", settings={"model_reasoning_summary": "detailed"}),
-        use("harness-settings@1", settings={"developer_instructions": "Prefer the stdlib."}),
+        use("harness-settings@2", settings={"model_reasoning_summary": "detailed"}),
+        use("harness-settings@2", settings={"developer_instructions": "Prefer the stdlib."}),
     )
     step = tmp_path / "agent"
     write_step_reports(step, {})
@@ -270,7 +270,7 @@ def test_settings_probe_compares_every_declared_setting_with_the_harness_report(
         ],
     )
     claude = compile_uses(
-        use("harness-settings@1", settings={"outputStyle": "Explanatory"}),
+        use("harness-settings@2", settings={"outputStyle": "Explanatory"}),
         harness=Harness.CLAUDE_CODE,
     )
     write_jsonl(step / "claude-code.txt", [{"type": "system", "subtype": "init"}])
@@ -279,7 +279,7 @@ def test_settings_probe_compares_every_declared_setting_with_the_harness_report(
 
     assert [result.passed for result in report.results[1:]] == [True, False]
     assert "expected 'Prefer the stdlib.'" in report.results[2].detail
-    assert report.to_json()["results"][2]["component"] == "harness-settings@1"
+    assert report.to_json()["results"][2]["component"] == "harness-settings@2"
     assert not claude.probe_step(step, 0).passed
 
 
@@ -298,7 +298,7 @@ def test_settings_harbor_always_overrides_are_refused_at_compile_time(
     from raidar.design.experiment.arm import ComponentRejectedError
 
     with pytest.raises(ComponentRejectedError, match="always overridden"):
-        compile_uses(use("harness-settings@1", settings=settings), harness=harness)
+        compile_uses(use("harness-settings@2", settings=settings), harness=harness)
 
 
 def test_invalid_prompt_templates_are_rejected(tmp_path: Path) -> None:
@@ -343,7 +343,7 @@ def test_skill_name_falls_back_to_the_directory_and_probe_errors_fail_closed(
     assert skill_name("# no front matter", "dir") == "dir"
     rules = tmp_path / "rules.md"
     rules.write_text("# rules\n")
-    compiled = compile_uses(use("rules-file@1", ("rules.md",)), base_dir=tmp_path)
+    compiled = compile_uses(use("rules-file@2", ("rules.md",)), base_dir=tmp_path)
     rules.unlink()
     step = tmp_path / "agent"
     write_step_reports(step, {"AGENTS.md": None})
@@ -388,9 +388,34 @@ def test_mcp_recorder_marks_errors_and_ignores_non_objects() -> None:
     ]
 
 
+def test_mcp_recorder_keeps_bidirectional_requests_and_notifications_separate() -> None:
+    from raidar.subject.treatment.runtime.mcp_shim import Recorder
+
+    log = io.StringIO()
+    recorder = Recorder(log)
+    messages = [
+        ("client", {"id": 1, "method": "tools/list"}),
+        ("server", {"id": 1, "method": "ping"}),
+        ("server", {"method": "notifications/tools/list_changed"}),
+        ("client", {"id": 1, "result": {}}),
+        ("server", {"id": 1, "result": {"tools": [{"name": "raidar_echo"}]}}),
+    ]
+    for direction, message in messages:
+        recorder.observe(direction, json.dumps(message).encode())
+
+    records = [json.loads(line) for line in log.getvalue().splitlines()]
+    assert records == [
+        {"dir": "client", "method": "tools/list"},
+        {"dir": "server", "method": "ping"},
+        {"dir": "server", "method": "notifications/tools/list_changed"},
+        {"dir": "client", "result_of": "ping"},
+        {"dir": "server", "result_of": "tools/list", "tools": ["raidar_echo"]},
+    ]
+
+
 def test_stop_hook_body_can_come_from_a_component_file() -> None:
     hook_file = f"{PROBE_DIR}/ruff.toml"
-    compiled = compile_uses(use("stop-hook@1", (hook_file,)))
+    compiled = compile_uses(use("stop-hook@2", (hook_file,)))
 
     body = compiled.support_files["00-stop-hook/hook-body.sh"]
     assert body.content == (FIXTURES_DIR / hook_file).read_bytes()

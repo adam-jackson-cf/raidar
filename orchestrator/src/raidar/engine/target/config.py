@@ -33,6 +33,7 @@ default = "local"
 [targets.local]
 kind = "docker"
 docker_context = "orbstack"               # a `docker context ls` name
+trusted = true                          # explicitly approve credentials and hidden tests
 # data_check = ["orbstack-data-status"]   # argv run on this host; must exit 0
 # data_check_expect = "external_available=True"   # and print this, when set
 # max_concurrency = 3                     # caps the plan's concurrency
@@ -178,7 +179,7 @@ def _build(name: str, spec: TargetSpec) -> Target:
         name=name,
         kind=spec.kind,
         docker_context=context,
-        trusted=spec.trusted if spec.trusted is not None else transport is None,
+        trusted=spec.trusted is True,
         max_concurrency=spec.max_concurrency,
         grader=spec.grader or name,
         data_check=spec.data_check,

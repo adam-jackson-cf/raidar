@@ -1,4 +1,4 @@
-"""``continue-on-stall@2`` session wrapper: no human will answer, so a stalled session continues.
+"""``continue-on-stall@3`` session wrapper: no human will answer, so a stalled session continues.
 
 An agent sometimes ends a session by asking a question, or by saying it cannot
 proceed without something, without changing anything. No human is there to
@@ -75,7 +75,7 @@ from raidar.subject.treatment.runtime.session_chain import (
     render_task,
 )
 
-COMPONENT = "continue-on-stall@2"
+COMPONENT = "continue-on-stall@3"
 VERSION = "2"
 _APOSTROPHE = "['’]"
 STALL_DIR = "continue-on-stall"

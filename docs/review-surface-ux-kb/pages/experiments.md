@@ -11,6 +11,12 @@ persona: benchmark-reviewer
 
 # Experiments page
 
+> **Historical page audit.** Scenario families, revision comparisons and the
+> `benchmark-fixture-synthetic` recovery command below belong to the retired
+> surface. Current comparisons use experiments, conditions and arms; the current
+> fixture target is `make review-fixture-synthetic`. See the
+> [root README](../../../README.md) and [bundle status](../index.md).
+
 The landing page (`/`). Experiments are grouped into **scenario families →
 revisions**, each revision rendered as one comparison group. A family-anchor nav
 appears when more than one family is present.

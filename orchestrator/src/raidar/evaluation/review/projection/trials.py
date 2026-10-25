@@ -61,6 +61,7 @@ class TrialInput:
     assessments: TrialAssessments
     headline: Headline
     synthetic: bool
+    integrity_note: str | None = None
 
     @property
     def trial_dir(self) -> Path:
@@ -238,7 +239,19 @@ def _metric_scores(record: TrialRecord) -> list[dict[str, object]]:
 def run_detail(trial: TrialInput) -> ReviewRunDetail:
     builder = SpanBuilder(trial.review_id)
     start, duration = _timing(trial)
-    notes = to_annotations(_spans(builder, trial, start, duration), builder, start)
+    findings = _spans(builder, trial, start, duration)
+    if trial.integrity_note:
+        findings.append(
+            Finding(
+                id="provenance-unmeasured",
+                kind="note",
+                category="provenance-unmeasured",
+                title="Provenance is unmeasured",
+                detail=trial.integrity_note,
+                span=None,
+            )
+        )
+    notes = to_annotations(findings, builder, start)
     counts, issues = finding_counts(notes)
     labels, headline = trial.labels, trial.headline
     uncached, output = _tokens(trial.record)

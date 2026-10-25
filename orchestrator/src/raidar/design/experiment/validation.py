@@ -117,7 +117,29 @@ def _path_owner(path: str, owner: str) -> bool:
     return path == owner or path.startswith(f"{owner}/") or owner.startswith(f"{path}/")
 
 
-def _component_overlay_issues(spec: ExperimentSpec) -> list[FieldIssue]:
+def _resolved_task_owner(base_dir: Path, relative: str, task_dirs: list[str]) -> str | None:
+    root = base_dir / relative
+    owners = [(task, (base_dir / task).resolve()) for task in task_dirs]
+    candidates = (root, *root.rglob("*")) if root.is_dir() else (root,)
+    for candidate in candidates:
+        resolved = candidate.resolve()
+        for task, owner in owners:
+            if resolved.is_relative_to(owner) or owner.is_relative_to(resolved):
+                return task
+    return None
+
+
+def _task_owner(base_dir: Path | None, relative: str, task_dirs: list[str]) -> str | None:
+    """Identify task overlap by declaration and, when available, filesystem identity."""
+    owner = next((task for task in task_dirs if _path_owner(relative, task)), None)
+    if owner is not None or base_dir is None or not task_dirs:
+        return owner
+    return _resolved_task_owner(base_dir, relative, task_dirs)
+
+
+def _component_overlay_issues(
+    spec: ExperimentSpec, *, base_dir: Path | None = None
+) -> list[FieldIssue]:
     """Component files may not overlap a local problem's task directory (F4).
 
     Overlaying task files (including hidden ``tests/``) into the agent's
@@ -127,7 +149,7 @@ def _component_overlay_issues(spec: ExperimentSpec) -> list[FieldIssue]:
     issues: list[FieldIssue] = []
     for loc, component in spec.component_uses():
         for f_index, relative in enumerate(component.files):
-            owner = next((task for task in task_dirs if _path_owner(relative, task)), None)
+            owner = _task_owner(base_dir, relative, task_dirs)
             if owner is not None:
                 issues.append(
                     FieldIssue(
@@ -426,7 +448,7 @@ def semantic_issues(
         *_duplicate_values("factors", spec.factors),
         *_reference_issues(spec),
         *_agent_issues(spec),
-        *_component_overlay_issues(spec),
+        *_component_overlay_issues(spec, base_dir=path.parent if path is not None else None),
         *_shared_component_issues(spec),
         *_metric_issues(spec, metrics),
         *_min_effect_issues(spec),

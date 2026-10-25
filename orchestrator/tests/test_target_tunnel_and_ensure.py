@@ -102,6 +102,9 @@ class FakeTunnel:
     def poll(self) -> int | None:
         return 255 if self.dies else None
 
+    def kill(self) -> None:
+        self.dies = True
+
 
 def test_the_ssh_forward_argv_is_detached_batch_mode_with_the_unix_socket_forward(
     tmp_path: Path,
@@ -217,6 +220,11 @@ def test_up_gives_up_when_the_daemon_never_answers(tmp_path: Path) -> None:
             self.spawned.append(list(argv))
             return self
 
+    now = [0.0]
+
+    def sleep(seconds: float) -> None:
+        now[0] += seconds
+
     with pytest.raises(RuntimeError, match="did not answer"):
         transport_up(
             mbp,
@@ -224,8 +232,49 @@ def test_up_gives_up_when_the_daemon_never_answers(tmp_path: Path) -> None:
             spawner=Silent(docker),
             base=tmp_path,
             timeout_s=1.0,
-            sleep=lambda _: None,
+            sleep=sleep,
+            clock=lambda: now[0],
         )
+
+
+@pytest.mark.parametrize("probe_seconds", [0.1, 6.0, 30.0])
+def test_startup_bounds_slow_probes_and_cleans_up_the_failed_tunnel(
+    tmp_path: Path, probe_seconds: float
+) -> None:
+    mbp = targets(tmp_path)["mbp"]
+    docker = FakeDocker()
+    now = [0.0]
+    timeouts: list[float] = []
+
+    def runner(argv: Sequence[str], timeout: float | None) -> subprocess.CompletedProcess[str]:
+        assert timeout is not None
+        if "version" in argv:
+            timeouts.append(timeout)
+            now[0] += min(probe_seconds, timeout)
+        return docker(argv, timeout)
+
+    class Silent(FakeTunnel):
+        def __call__(self, argv: Sequence[str], log: Path) -> FakeTunnel:
+            self.spawned.append(list(argv))
+            return self
+
+    tunnel = Silent(docker)
+    with pytest.raises((RuntimeError, TimeoutError)):
+        transport_up(
+            mbp,
+            runner=runner,
+            spawner=tunnel,
+            base=tmp_path,
+            timeout_s=4.0,
+            sleep=lambda seconds: now.__setitem__(0, now[0] + seconds),
+            clock=lambda: now[0],
+        )
+
+    assert now[0] == pytest.approx(4.0)
+    assert timeouts
+    assert max(timeouts) <= 4.0
+    assert tunnel.dies
+    assert not TransportPaths.of(mbp, tmp_path).pidfile.exists()
 
 
 def test_ensure_is_a_no_op_for_a_healthy_transport_target(tmp_path: Path) -> None:
@@ -246,6 +295,40 @@ def test_ensure_restarts_an_unhealthy_transport_target(tmp_path: Path) -> None:
     ensure_target(mbp, runner=docker, spawner=tunnel, base=tmp_path, sleep=lambda _: None)
 
     assert len(tunnel.spawned) == 1
+
+
+@pytest.mark.parametrize("phase", ["version", "inspect", "create", "check-data"])
+def test_ensure_bounds_all_subprocess_phases_by_the_shared_reconnect_budget(
+    tmp_path: Path, phase: str
+) -> None:
+    items = targets(tmp_path)
+    chosen = items["plain"] if phase == "check-data" else items["mbp"]
+    docker = FakeDocker(healthy=phase == "check-data")
+    now = [0.0]
+    budgets: list[float] = []
+
+    def runner(argv: Sequence[str], timeout: float | None) -> subprocess.CompletedProcess[str]:
+        assert timeout is not None
+        budgets.append(timeout)
+        if phase in argv:
+            now[0] += timeout
+            return subprocess.CompletedProcess(list(argv), 127, stdout="", stderr="timeout")
+        return docker(argv, timeout)
+
+    with pytest.raises(TargetUnavailableError):
+        ensure_target(
+            chosen,
+            runner=runner,
+            spawner=FakeTunnel(docker),
+            base=tmp_path,
+            timeout_s=0.2,
+            sleep=lambda seconds: now.__setitem__(0, now[0] + seconds),
+            clock=lambda: now[0],
+        )
+
+    assert now[0] <= 0.2
+    assert budgets
+    assert max(budgets) <= 0.2
 
 
 def test_ensure_wraps_a_failed_transport_and_an_unreachable_plain_target(tmp_path: Path) -> None:

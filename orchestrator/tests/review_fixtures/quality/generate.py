@@ -7,7 +7,7 @@ job, Assessment and Jev shapes:
   (baseline arm and headline metric, as a real lock carries them), and
   ``jobs/<experiment>/<job>/`` job directories (``job.json`` naming the
   lock digest + ``trial-records/*.json`` TrialRecords);
-- ``store/``: ``code-quality@3`` and ``correctness@1`` Assessments whose
+- ``store/``: ``code-quality@4`` and ``correctness@2`` Assessments whose
   inputs carry each trial's snapshot digests (correctness in the real
   scorer's shape: per-checkpoint ``solved`` and ``strict_pass_rate``, and
   trial ``solved_checkpoints`` and ``reached``), plus a Jev audit of
@@ -49,8 +49,9 @@ from raidar.contract.trial import (
     TrialRecord,
     ValidityCheck,
 )
+from raidar.engine.job.assessment import lock_rescore_config
+from raidar.evaluation.analysis.sources import read_lock
 from raidar.scoring.framework.builtin_manifests import CODE_QUALITY, CORRECTNESS
-from raidar.scoring.framework.manifest import ScorerManifest
 from raidar.scoring.framework.result import (
     AssessResult,
     AssessStatus,
@@ -59,12 +60,7 @@ from raidar.scoring.framework.result import (
     Span,
     transition_subject,
 )
-from raidar.scoring.framework.store import (
-    Assessment,
-    AssessmentStore,
-    ScorerIdentity,
-    assessment_key,
-)
+from raidar.scoring.framework.store import AssessmentStore
 from raidar.scoring.judge.audit import (
     AuditLog,
     DecisionRecord,
@@ -74,8 +70,11 @@ from raidar.scoring.judge.audit import (
 )
 from raidar.scoring.judge.policies import PolicyMode
 from raidar.scoring.judge.rubric import RUBRIC_POLICY
+from tests.review_fixtures.projection.trials import write_bundle
 from tests.review_fixtures.quality.gate import GATE_EFFORT, gate_result
+from tests.review_fixtures.quality.inputs import write_inputs
 from tests.review_fixtures.quality.lock import default_metric, write_synthetic_lock
+from tests.review_fixtures.quality.store import FixtureAssessments
 
 EXPERIMENT = "synthetic-quality"
 PROBLEM = "synthetic/ledger@0"
@@ -269,41 +268,6 @@ def _measure(trial: _Trial) -> None:
     )
 
 
-def _inputs(trial: _Trial) -> dict[str, object]:
-    return {
-        "inventory_policy": {"generated_globs": [], "test_globs": []},
-        "problem": PROBLEM,
-        "starter": None,
-        "steps": [
-            {
-                "checkpoint": checkpoint,
-                "oracle_record": _digest("record", trial.trial_id, checkpoint),
-                "reached": True,
-                "snapshot": trial.snapshot(checkpoint),
-                "step": checkpoint,
-                "trace": _digest("trace", trial.trial_id, checkpoint),
-            }
-            for checkpoint in CHECKPOINTS
-        ],
-    }
-
-
-def _assessment(manifest: ScorerManifest, trial: _Trial, result: AssessResult) -> Assessment:
-    identity = ScorerIdentity(
-        ref=manifest.ref, manifest_digest=manifest.digest(), implementation_digest=None
-    )
-    inputs = _inputs(trial)
-    key = assessment_key(identity, config={}, tool_lock={"synthetic": True}, inputs=inputs)
-    return Assessment(
-        key=key,
-        scorer=identity,
-        config={},
-        tool_lock={"synthetic": True},
-        inputs=inputs,
-        result=result,
-    )
-
-
 def _record(trial: _Trial) -> TrialRecord:
     valid = (trial.arm, trial.attempt) != INVALID
     step_results = tuple(
@@ -401,7 +365,7 @@ def generate_quality_fixture(dest: Path) -> Path:
     experiment_file.write_text(
         f"# synthetic fixture: not benchmark evidence\nid: {EXPERIMENT}\n"
         "analysis:\n  baseline_arm: baseline\n  attempts: 6\n  seed: 20260930\n"
-        "assessment:\n  scorers: [correctness@1, code-quality@3, gate-effort@10]\n",
+        "assessment:\n  scorers: [correctness@2, code-quality@4, gate-effort@11]\n",
         encoding="utf-8",
     )
     lock_sha256 = write_synthetic_lock(
@@ -426,16 +390,28 @@ def generate_quality_fixture(dest: Path) -> Path:
         encoding="utf-8",
     )
     store = AssessmentStore(dest / "store")
+    settings = lock_rescore_config(read_lock(dest / "experiment.lock.json"))
+    assessments = FixtureAssessments(settings)
+    bundle = write_bundle(dest / "bundle", PROBLEM, CHECKPOINTS)
     audit = AuditLog.for_store(dest / "store")
     rng = random.Random(_SEED)
     for attempt in range(BLOCKS):
         for arm in ARMS:
             trial = _Trial(arm=arm, attempt=attempt, rng=random.Random(rng.random()))
             _measure(trial)
+            record = write_inputs(job_dir, _record(trial), bundle)
+            trial_dir = job_dir / record.trial_dir
+            gate = gate_result(
+                trial_dir,
+                CHECKPOINTS,
+                gated=arm == GATED_ARM,
+                seed=_digest("gate", trial.trial_id),
+                problem=PROBLEM,
+            )
             store.put(
-                _assessment(
-                    CODE_QUALITY,
-                    trial,
+                assessments.assessment(
+                    CODE_QUALITY.ref,
+                    trial_dir,
                     AssessResult(
                         status=AssessStatus.OK,
                         observations=tuple(trial.observations),
@@ -444,21 +420,13 @@ def generate_quality_fixture(dest: Path) -> Path:
                 )
             )
             store.put(
-                _assessment(
-                    CORRECTNESS,
-                    trial,
+                assessments.assessment(
+                    CORRECTNESS.ref,
+                    trial_dir,
                     AssessResult(status=AssessStatus.OK, observations=tuple(trial.correctness)),
                 )
             )
-            gate = gate_result(
-                job_dir / "trials" / trial.trial_id,
-                CHECKPOINTS,
-                gated=arm == GATED_ARM,
-                seed=_digest("gate", trial.trial_id),
-                problem=PROBLEM,
-            )
-            store.put(_assessment(GATE_EFFORT, trial, gate))
-            record = _record(trial)
+            store.put(assessments.assessment(GATE_EFFORT.ref, trial_dir, gate))
             (job_dir / "trial-records" / f"{trial.trial_id}.json").write_text(
                 record.model_dump_json(indent=2), encoding="utf-8"
             )

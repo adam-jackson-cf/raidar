@@ -10,7 +10,7 @@ whose lock sets ``protocol.verifier_coverage: offline`` grades without it
 (``record.json`` ``coverage.enabled`` false), and this module runs it later:
 
 - ``produce_coverage_path`` (run by ``raidar assess --rescore`` when a locked
-  scorer reads it, ``code-quality@3``): for every graded step of the target
+  scorer reads it, ``code-quality@4``): for every graded step of the target
   whose record says the coverage pass was not run, the stored snapshot is
   checked against its recorded digest (and the bundle against its digest) and
   the coverage run is made with the step's own bundle, sandbox and grader
@@ -33,6 +33,7 @@ Nothing in the job directory is written.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import tempfile
 import time
@@ -41,6 +42,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+from raidar.grading.bundle import VerifierBundle
 from raidar.grading.coverage.store import (
     COVERAGE_KIND,
     SCHEMA_VERSION,
@@ -63,7 +65,9 @@ from raidar.grading.records import (
     RECORD_FILE,
     VERIFIER_RECORD_DIR,
     StepRecord,
+    coverage_identity,
     fork_payload,
+    grading_identity,
     load_step_record,
 )
 from raidar.grading.regrade import (
@@ -75,6 +79,7 @@ from raidar.grading.regrade import (
     trial_dirs,
     write_store_json,
 )
+from raidar.grading.sandbox import GradingSandbox
 
 PRODUCTION_KIND = "raidar-offline-coverage-production"
 CHECK_KIND = "raidar-offline-coverage-check"
@@ -106,6 +111,18 @@ class CoverageRun:
     infra_failure: InfraFailure | None
 
 
+def _outcome(payload: dict[str, Any], timing_sensitive: tuple[str, ...] = ()) -> RunOutcome:
+    infra, evidence = payload.get("infra_failure"), payload.get("evidence")
+    return RunOutcome(
+        role=str(payload.get("role", "coverage")),
+        cases=tuple(CaseResult.model_validate(case) for case in payload.get("cases") or ()),
+        infra_failure=InfraFailure.model_validate(infra) if infra else None,
+        evidence=RunEvidence.model_validate(evidence) if evidence else None,
+        timing_sensitive=timing_sensitive,
+        seconds=0.0,
+    )
+
+
 def coverage_targets(trial_dir: Path) -> list[CoverageTarget]:
     """Every graded step of the trial, in step order."""
     steps_root = trial_dir / VERIFIER_RECORD_DIR / "steps"
@@ -126,19 +143,12 @@ def _grading_run(target: CoverageTarget) -> RunOutcome:
         raise RegradeError(f"the step's grading evidence is unreadable: {path}: {exc}") from exc
     if not isinstance(payload, dict):
         raise RegradeError(f"the step's grading evidence is missing: {path}")
-    infra = payload.get("infra_failure")
-    evidence = payload.get("evidence")
-    return RunOutcome(
-        role="grading",
-        cases=tuple(CaseResult.model_validate(case) for case in payload.get("cases") or ()),
-        infra_failure=InfraFailure.model_validate(infra) if infra else None,
-        evidence=RunEvidence.model_validate(evidence) if evidence else None,
-        timing_sensitive=target.record.timing_sensitive_cases,
-        seconds=0.0,
-    )
+    return _outcome(payload, target.record.timing_sensitive_cases)
 
 
-async def run_offline_coverage(target: CoverageTarget, options: RegradeOptions) -> CoverageRun:
+async def run_offline_coverage(
+    target: CoverageTarget, options: RegradeOptions, store_root: Path | None = None
+) -> CoverageRun:
     """The step's coverage run from its stored snapshot, parity-checked against the trial."""
     record = target.record
     snapshot = stored_snapshot(target.trial_dir, record)
@@ -147,21 +157,16 @@ async def run_offline_coverage(target: CoverageTarget, options: RegradeOptions) 
     factory = options.sandbox_factory or docker_sandbox_factory(options.docker_context)
     sandbox = await factory(bundle)
     environment = await sandbox.environment_id()
+    if environment != record.grader.environment_id:
+        raise RegradeError("offline coverage grader environment differs from the trial")
     if grading.infra_failure is not None:
         # As in the trial: a failed grading run gets no coverage run.
         verdict = ineligible(f"grading_infra_failure:{grading.infra_failure.code}")
         return CoverageRun(verdict, (), None, environment, 0.0, None)
     started = time.perf_counter()
-    with tempfile.TemporaryDirectory(prefix="raidar-coverage-", dir=options.work_root) as work:
-        measured = await run_oracle(
-            bundle,
-            bundle.step(record.step),
-            snapshot,
-            sandbox,
-            Path(work) / "coverage",
-            coverage=True,
-            timeout_s=record.grader.timeout_s,
-        )
+    measured = await _coverage_measurement(
+        target, options, store_root, bundle, snapshot, sandbox, grading
+    )
     verdict, differences = parity_verdict(grading, measured)
     fork = fork_payload(StepGrade(record.grade, grading, measured, verdict, differences))
     # As the trial writes it (json.dumps, sort_keys) and reads it back: plain JSON values.
@@ -174,6 +179,72 @@ async def run_offline_coverage(target: CoverageTarget, options: RegradeOptions) 
         time.perf_counter() - started,
         measured.infra_failure,
     )
+
+
+def _measurement_identity(record: StepRecord, grading: RunOutcome) -> str:
+    """Reusable coverage binds execution facts, independently of a trial's outcomes."""
+    evidence = grading.evidence
+    return hashlib.sha256(
+        json.dumps(
+            {
+                "execution": grading_identity(record.grader),
+                "environment": evidence.environment.model_dump() if evidence else None,
+                "corpus": evidence.corpus.model_dump() if evidence else None,
+                "invocation": evidence.invocation.model_dump() if evidence else None,
+            },
+            sort_keys=True,
+        ).encode()
+    ).hexdigest()
+
+
+async def _coverage_measurement(
+    target: CoverageTarget,
+    options: RegradeOptions,
+    store_root: Path | None,
+    bundle: VerifierBundle,
+    snapshot: Path,
+    sandbox: GradingSandbox,
+    grading: RunOutcome,
+) -> RunOutcome:
+    record = target.record
+    identity = _measurement_identity(record, grading)
+    cached = None
+    if store_root is not None:
+        cached = coverage_path(
+            store_root / "coverage-runs",
+            record.bundle.digest,
+            record.step,
+            record.snapshot.digest,
+            identity=identity,
+        )
+        if cached.is_file():
+            payload = json.loads(cached.read_text())
+            if payload.get("identity") == identity:
+                return _outcome(payload)
+    with tempfile.TemporaryDirectory(prefix="raidar-coverage-", dir=options.work_root) as work:
+        measured = await run_oracle(
+            bundle,
+            bundle.step(record.step),
+            snapshot,
+            sandbox,
+            Path(work) / "coverage",
+            coverage=True,
+            timeout_s=record.grader.timeout_s,
+        )
+    if cached is not None and measured.infra_failure is None:
+        write_store_json(
+            cached,
+            {
+                "identity": identity,
+                "role": measured.role,
+                "cases": [case.model_dump(mode="json") for case in measured.cases],
+                "infra_failure": None,
+                "evidence": measured.evidence.model_dump(mode="json")
+                if measured.evidence
+                else None,
+            },
+        )
+    return measured
 
 
 def _entry(target: CoverageTarget, status: str, **extra: Any) -> dict[str, Any]:
@@ -191,6 +262,7 @@ def _payload(target: CoverageTarget, run: CoverageRun) -> dict[str, Any]:
     return {
         "kind": COVERAGE_KIND,
         "schema_version": SCHEMA_VERSION,
+        "identity": coverage_identity(record, target.record_dir),
         "step": record.step,
         "checkpoint": record.checkpoint,
         "snapshot_digest": record.snapshot.digest,
@@ -214,13 +286,31 @@ async def produce_offline_coverage(
 ) -> dict[str, Any]:
     """Make one deferred step's coverage run into the store (``stored`` when it already is)."""
     record = target.record
-    path = coverage_path(store_root, record.bundle.digest, record.step, record.snapshot.digest)
-    if path.is_file():
-        return _entry(target, "stored", path=str(path))
+    identity = coverage_identity(record, target.record_dir)
+    path = coverage_path(
+        store_root, record.bundle.digest, record.step, record.snapshot.digest, identity=identity
+    )
     try:
-        run = await run_offline_coverage(target, options)
+        stored_snapshot(target.trial_dir, record)
+        recorded_bundle(record, options)
+        if (
+            read_offline_coverage(
+                store_root,
+                record.bundle.digest,
+                record.step,
+                record.snapshot.digest,
+                identity=identity,
+            )
+            is not None
+        ):
+            return _entry(target, "stored", path=str(path))
+        run = await run_offline_coverage(target, options, store_root)
     except RegradeError as exc:
         return _entry(target, "error", error=str(exc))
+    if run.infra_failure is not None:
+        return _entry(
+            target, "error", error=f"coverage infrastructure failure: {run.infra_failure.code}"
+        )
     payload = _payload(target, run)
     write_store_json(path, payload)
     return _entry(
@@ -308,7 +398,11 @@ async def check_offline_coverage(
     if target.deferred:
         stored = (
             read_offline_coverage(
-                store_root, record.bundle.digest, record.step, record.snapshot.digest
+                store_root,
+                record.bundle.digest,
+                record.step,
+                record.snapshot.digest,
+                identity=coverage_identity(record, target.record_dir),
             )
             if store_root is not None
             else None

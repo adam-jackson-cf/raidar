@@ -41,7 +41,12 @@ def write_synthetic_lock(
             "lock_version": LOCK_VERSION,
             "synthetic": True,
             "experiment": {"id": experiment},
-            "spec": {"id": experiment, "analysis": analysis},
+            "spec": {
+                "id": experiment,
+                "analysis": analysis,
+                "assessment": {"scorers": ["correctness@2", "code-quality@4", "gate-effort@11"]},
+                "protocol": {"progression": "continue"},
+            },
             "execution": {"design": {"id": experiment}},
             "assessment": {"metric": {"ref": metric}},
             "analysis": analysis,

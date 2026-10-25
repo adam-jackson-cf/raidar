@@ -14,7 +14,8 @@ from pathlib import Path
 
 from raidar.contract.job_layout import JOB_KIND, JOB_LOCK_FILE, JOB_MANIFEST, PLAN_FILE
 from raidar.engine.job.assessment import lock_errata, write_assessment_config
-from raidar.engine.job.provenance import effective_limits, recipe_digests, runner_provenance
+from raidar.engine.job.provenance import effective_limits, runner_provenance
+from raidar.engine.job.recipe import recipe_digests
 from raidar.engine.trial.context import JobContext
 
 

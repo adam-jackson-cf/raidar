@@ -1,0 +1,50 @@
+# Operational smoke: one trial per pack agent, not citable. The agent benchmark
+# remains a separate experiment under lab/experiments/benchmark/.
+schema_version: 2
+kind: smoke
+id: python__circuit_eval-cp1__pack-agent-health
+description: Operational health of every pack agent; not citable.
+
+problems:
+  - ref: scb/circuit_eval.checkpoint_1@38d627ecf668
+
+runtime: python
+
+agents:
+  - id: codex
+    name: codex
+    provider: openai
+    model: gpt-6-luna
+    reasoning_effort: low
+    version: 0.156.1
+  - id: claude
+    name: claude-code
+    provider: anthropic
+    model: claude-haiku-4-5
+    version: 2.1.285
+
+protocol:
+  agent_timeout_sec: 1800
+
+factors: [agent]
+
+conditions:
+  - id: baseline
+    components: []
+
+arms:
+  - id: codex
+    condition: baseline
+    agent: codex
+  - id: claude
+    condition: baseline
+    agent: claude
+
+assessment:
+  scorers: [correctness@2]
+  metric: scb-canonical-oneshot@1
+
+analysis:
+  baseline_arm: codex
+  attempts: 1
+  seed: 20260930

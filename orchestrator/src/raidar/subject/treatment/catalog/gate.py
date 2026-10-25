@@ -1,4 +1,4 @@
-"""``workflow`` built-in: guardrail-gate@4, the commit gate a real repository enforces.
+"""``workflow`` built-in: guardrail-gate@5, the commit gate a real repository enforces.
 
 The component wraps the arm's Harbor agent in
 ``raidar.subject.treatment.runtime.guardrail_gate:GuardrailGateAgent`` (harness-agnostic: the
@@ -119,7 +119,7 @@ def autofix_options(use: ComponentUseContext, mode: str) -> dict[str, JsonValue]
 class GuardrailGate:
     manifest = ComponentManifest(
         name="guardrail-gate",
-        version="4",
+        version="5",
         kind=ComponentKind.WORKFLOW,
         description=(
             "Run the workspace's commit gate after every session of the arm's agent; a "

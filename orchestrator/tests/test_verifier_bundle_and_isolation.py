@@ -17,6 +17,7 @@ from raidar.contract.snapshot import (
     SNAPSHOT_EXCLUDES,
     app_artifact_config,
     copy_snapshot,
+    snapshot_files,
     tree_digest,
 )
 from raidar.grading.bundle import (
@@ -223,6 +224,74 @@ def test_app_artifact_uses_the_same_exclude_list_as_the_digest() -> None:
     assert config["source"] == "/app"
     assert config["destination"] == "app"
     assert tuple(config["exclude"]) == SNAPSHOT_EXCLUDES  # type: ignore[arg-type]
+
+
+@pytest.mark.parametrize("suffix", ["", ".py", "\nodd"])
+def test_snapshot_digest_distinguishes_record_boundaries(tmp_path: Path, suffix: str) -> None:
+    app = tmp_path / "app"
+    app.mkdir()
+    first, second = app / f"a{suffix}", app / f"b{suffix}"
+    first.write_bytes(b"x=1\n\0" + second.name.encode() + b"\0Fy=2\n")
+    embedded = tree_digest(app)
+    first.write_bytes(b"x=1\n")
+    second.write_bytes(b"y=2\n")
+    assert tree_digest(app) != embedded
+
+
+def test_snapshot_digest_tracks_path_link_target_and_entry_kind(tmp_path: Path) -> None:
+    app = tmp_path / "app"
+    app.mkdir()
+    entry = app / "entry"
+    entry.write_bytes(b"target")
+    regular = tree_digest(app)
+    entry.rename(app / "renamed")
+    renamed = tree_digest(app)
+    assert renamed != regular
+    (app / "renamed").unlink()
+    entry.symlink_to("target")
+    link = tree_digest(app)
+    assert link != regular
+    entry.unlink()
+    entry.symlink_to("other")
+    assert tree_digest(app) != link
+
+
+def test_snapshot_walk_refuses_missing_and_unreadable_evidence(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    with pytest.raises(FileNotFoundError):
+        snapshot_files(tmp_path / "missing")
+    app = tmp_path / "app"
+    app.mkdir()
+    private = app / "private"
+    private.mkdir()
+    (private / "app.py").write_text("x = 1\n")
+    walk = os.walk
+
+    def unreadable_walk(*args: object, **kwargs: object) -> object:
+        onerror = kwargs["onerror"]
+        assert callable(onerror)
+        onerror(PermissionError("snapshot directory is unreadable"))
+        return walk(*args, **kwargs)
+
+    monkeypatch.setattr(os, "walk", unreadable_walk)
+    with pytest.raises(PermissionError, match="unreadable"):
+        tree_digest(app)
+
+
+def test_snapshot_digest_refuses_special_files_before_open(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    app = tmp_path / "app"
+    app.mkdir()
+    os.mkfifo(app / "generated.py")
+
+    def unexpected_open(*args: object, **kwargs: object) -> int:
+        raise AssertionError("special snapshot entry must never be opened")
+
+    monkeypatch.setattr(os, "open", unexpected_open)
+    with pytest.raises(OSError, match="not a regular file"):
+        tree_digest(app)
 
 
 # ------------------------------------------------------------------ sandbox

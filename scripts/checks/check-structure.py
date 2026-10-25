@@ -47,6 +47,7 @@ ROOT_FILES = frozenset(
         "CHANGELOG.md",
         "CLAUDE.md",
         "CODEOWNERS",
+        "codereview.md",
         "Makefile",
         "README.md",
         "skills-lock.json",

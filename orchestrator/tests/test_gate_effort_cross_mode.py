@@ -30,11 +30,15 @@ from tests.gate_effort_support import (
     REFUSED,
     _assess,
     _at,
+    _autofix,
     _enforced,
     _finding,
     _graded,
+    _pass,
     _report,
+    _run_record,
     _shadow,
+    _stage,
     _step,
     _tests_block,
     _trace,
@@ -368,3 +372,54 @@ def test_an_unlocatable_pair_leaves_the_net_count_unavailable(tmp_path: Path) ->
 
 def test_the_folded_codes_are_mypys_unused_ignore_only() -> None:
     assert frozenset({UNUSED_IGNORE}) == FOLDED_CODES
+
+
+@pytest.mark.parametrize("termination", ["stage_failed", "cancelled", "gate_error"])
+def test_final_tree_counts_and_following_baselines_require_a_check_after_the_last_session(
+    tmp_path: Path, termination: str
+) -> None:
+    first, following = _step(tmp_path, CP1), _step(tmp_path, CP2)
+    fix = _stage(2, "fix", 1)
+    fix["error"] = "TimeoutError: fix session stopped after editing"
+    runs = [_run_record(1, "stage_1_work", passed=False)]
+    outputs = [REFUSED]
+    if termination == "gate_error":
+        runs.append(_run_record(2, "stage_2_fix", passed=False, error="check failed"))
+        outputs.append("gate error")
+        fix["error"] = None
+    _write_gate(
+        _trace(first),
+        outputs=outputs,
+        termination=termination,
+        signal=None,
+        stages=[_stage(1, "work", 0), fix],
+        runs=runs,
+    )
+    _report(_trace(first), 1, [_finding("C901")], _tests_block(ran=4, coverage=80.0))
+    _autofix(_trace(first), [_pass(1, before=1)])
+    _write_gate(_trace(following), outputs=[PASSED], termination="gate_clean", signal=True)
+    first_only = _values(_assess(first))
+    for metric in (
+        "step_end_blocking",
+        "step_end_untyped_call",
+        "step_end_blocking_ex_cascade",
+        "step_end_blocking_net",
+        "step_end_blocking_post_autofix_net",
+        "tests_passed_at_step_end",
+        "tests_run_at_step_end",
+        "coverage_at_step_end",
+    ):
+        item = first_only[(metric, CP1)]
+        assert (item.status, item.value) == (AssessStatus.UNAVAILABLE, None), metric
+    for metric in ("final_step_end_blocking", "final_step_end_blocking_net"):
+        item = first_only[(metric, TRAJECTORY_SUBJECT)]
+        assert (item.status, item.value) == (AssessStatus.UNAVAILABLE, None)
+    # First-run and aggregate records remain useful historical evidence.
+    assert first_only[("first_run_blocking", CP1)].value == 1
+    assert first_only[("blocking_findings", CP1)].value == 1
+    observed = _values(_assess(first, following))
+    for metric in ("new_first_run_blocking", "new_first_run_blocking_net"):
+        item = observed[(metric, CP2)]
+        assert (item.status, item.value) == (AssessStatus.UNAVAILABLE, None)
+    assert observed[("step_end_blocking", CP2)].value == 0
+    assert observed[("final_step_end_blocking", TRAJECTORY_SUBJECT)].value == 0

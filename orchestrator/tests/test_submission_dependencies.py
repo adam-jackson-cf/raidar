@@ -6,6 +6,7 @@ import sys
 from pathlib import Path
 
 import pytest
+from packaging.markers import default_environment
 
 from raidar.grading import submission_deps
 from raidar.grading.bundle import (
@@ -17,6 +18,7 @@ from raidar.grading.bundle import (
 )
 from raidar.grading.grader import grade_step
 from raidar.grading.grader_image import grader_dockerfile
+from raidar.grading.sandbox import DockerCopySandbox
 from raidar.grading.submission_deps import (
     SubmissionDependencies,
     declared_requirements,
@@ -27,6 +29,61 @@ from raidar.grading.submission_deps import (
 from tests.verifier_support import LocalProcessSandbox
 
 PINS = {"pyyaml": "PyYAML==6.0.3"}
+
+
+def test_dependency_markers_use_the_submission_runtime_not_the_host(tmp_path: Path) -> None:
+    snapshot = _snapshot(
+        tmp_path / "app",
+        {
+            "requirements.txt": (
+                'PyYAML==6.0.3; sys_platform == "linux" and python_version == "3.12"\n'
+            ),
+        },
+    )
+    linux = {**default_environment(), "sys_platform": "linux", "python_version": "3.12"}
+    other = {**linux, "sys_platform": "win32"}
+    assert resolve_dependencies(snapshot, PINS, marker_environment=linux).provided == (
+        "PyYAML==6.0.3",
+    )
+    skipped = resolve_dependencies(snapshot, PINS, marker_environment=other)
+    assert skipped.provided == skipped.unprovided == ()
+    with pytest.raises(ValueError, match="submission interpreter environment"):
+        resolve_dependencies(snapshot, PINS)
+    with pytest.raises(ValueError, match="submission interpreter environment"):
+        resolve_dependencies(snapshot, PINS, marker_environment={"sys_platform": "linux"})
+
+
+async def test_marker_environment_is_probed_from_the_targets_submission_interpreter(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import json
+
+    target = {**default_environment(), "sys_platform": "different-target"}
+    calls = []
+
+    async def execute(self: DockerCopySandbox, argv: list[str], **kwargs):
+        calls.append(argv)
+        return 0, json.dumps(target).encode()
+
+    monkeypatch.setattr(DockerCopySandbox, "_exec", execute)
+    sandbox = DockerCopySandbox(image="grader-image", docker_context="remote-target")
+    assert await sandbox.marker_environment() == target
+    assert calls[0][:4] == ["docker", "--context", "remote-target", "run"]
+    assert calls[0][-4:-1] == ["/usr/local/bin/python3", "-P", "-c"]
+
+
+@pytest.mark.parametrize(("code", "output"), [(1, b"probe failed"), (0, b"not-json")])
+async def test_a_failed_marker_probe_never_uses_host_environment(
+    monkeypatch: pytest.MonkeyPatch, code: int, output: bytes
+) -> None:
+    async def execute(self: DockerCopySandbox, argv: list[str], **kwargs):
+        return code, output
+
+    monkeypatch.setattr(DockerCopySandbox, "_exec", execute)
+    sandbox = DockerCopySandbox(image="grader-image", docker_context="remote-target")
+    with pytest.raises((RuntimeError, ValueError)):
+        await sandbox.marker_environment()
+
 
 TEST = """
 import subprocess
@@ -132,7 +189,12 @@ def _bundle(root: Path) -> VerifierBundle:
 
 @pytest.mark.parametrize(
     ("declared", "solved"),
-    [('dependencies = ["raidar-fake-yaml>=1"]', True), ("dependencies = []", False)],
+    [
+        ('dependencies = ["raidar-fake-yaml>=1"]', True),
+        ("dependencies = []", False),
+        ("dependencies = ['raidar-fake-yaml>=1; python_version < \"2.0\"']", False),
+        ("dependencies = ['raidar-fake-yaml>=1; python_version >= \"3.0\"']", True),
+    ],
 )
 async def test_a_declared_package_is_importable_by_the_graded_program_offline(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, declared: str, solved: bool

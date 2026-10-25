@@ -136,7 +136,7 @@ def test_autofix_runs_before_the_commit_check_or_on_a_copy_in_shadow(
 ) -> None:
     compiled = compile_uses(
         use("python-guardrails@8", workspace_configs=arm == "r2"),
-        use("guardrail-gate@4", **GATES[arm], **AUTOFIX),
+        use("guardrail-gate@5", **GATES[arm], **AUTOFIX),
     )
     task = tmp_path / f"guardrails-{arm}"
     build_task(task, compiled, STEPS)

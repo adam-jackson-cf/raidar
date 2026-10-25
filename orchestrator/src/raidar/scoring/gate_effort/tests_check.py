@@ -3,7 +3,8 @@
 A gate run's report (``tests`` block, python-guardrails@3; a run without one is
 ``not_applicable``) gives, per step: ``first_run_tests_passed`` and ``first_run_tests_missing``
 (the first run's tests check passed / reported ``TEST.missing``), ``tests_passed_at_step_end``,
-``tests_run_at_step_end`` and ``coverage_at_step_end`` (the step's last decided run), and
+``tests_run_at_step_end`` and ``coverage_at_step_end`` (the checked final workspace;
+unavailable after an unchecked session), and
 ``first_run_coverage`` (owned line coverage, percent, when tests ran). Failing tests and
 missed coverage are separate first-run outcomes: ``first_run_tests_failed`` (the first run's
 tests failed or the run timed out; ``not_applicable`` when no test ran), ``first_run_coverage_met``

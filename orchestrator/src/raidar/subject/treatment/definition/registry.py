@@ -82,13 +82,13 @@ class ComponentRegistry:
 
 
 BUILTIN_COMPONENT_RUNTIMES: dict[str, tuple[str, ...]] = {
-    # lint-config@1 delivers ruff/mypy-style Python config files.
-    "lint-config@1": ("python",),
+    # lint-config@2 delivers ruff/mypy-style Python config files.
+    "lint-config@2": ("python",),
 }
 """Runtimes of built-ins whose manifest has no ``runtimes`` attribute.
 
 Changing a component's manifest or fingerprint sources changes its digest, so
-``lint-config@1`` keeps its runtime here rather than on its class; a built-in
+``lint-config@2`` keeps its runtime here rather than on its class; a built-in
 not listed works on any runtime. A definition may set ``runtimes`` itself.
 """
 

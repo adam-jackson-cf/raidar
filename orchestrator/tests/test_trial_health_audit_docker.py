@@ -40,7 +40,7 @@ pytestmark = pytest.mark.skipif(
 
 async def _run(tmp_path: Path, tamper_on_step: int | None) -> Path:
     compiled = compile_uses(
-        use("lint-config@1", (f"{PROBE_DIR}/ruff.toml",)), use("lint-tool@2", config="ruff.toml")
+        use("lint-config@2", (f"{PROBE_DIR}/ruff.toml",)), use("lint-tool@2", config="ruff.toml")
     )
     task = tmp_path / "task"
     build_task(task, compiled, {step: step for step in STEPS})

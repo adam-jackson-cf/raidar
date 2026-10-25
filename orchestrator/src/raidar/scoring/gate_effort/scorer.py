@@ -15,7 +15,9 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from raidar.grading.models import VerifierGrade
 from raidar.grading.prefix.store import read_pre_fix_grade
+from raidar.grading.records import grading_identity
 from raidar.scoring.framework.context import AssessContext
 from raidar.scoring.framework.manifest import ScorerManifest
 from raidar.scoring.framework.result import AssessResult
@@ -39,14 +41,24 @@ class GateEffortScorer:
         """True when a pre-fix snapshot was not graded yet (a later rescore completes it)."""
         return bool(self._missing)
 
-    def _reader(self) -> GradeReader | None:
+    def _reader(self, ctx: AssessContext) -> GradeReader | None:
         root = self._store_root
         if root is None:
             return None
-        return lambda bundle, step, digest: read_pre_fix_grade(root, bundle, step, digest)
+        records = {step.step: step.record for step in ctx.steps}
+
+        def read(bundle: str, step: str, digest: str) -> VerifierGrade | None:
+            record = records.get(step)
+            if record is None:
+                return None
+            return read_pre_fix_grade(
+                root, bundle, step, digest, identity=grading_identity(record.grader)
+            )
+
+        return read
 
     def assess(self, ctx: AssessContext) -> AssessResult:
-        result, self._missing = assess_trajectory(ctx, self._reader())
+        result, self._missing = assess_trajectory(ctx, self._reader(ctx))
         return result
 
 

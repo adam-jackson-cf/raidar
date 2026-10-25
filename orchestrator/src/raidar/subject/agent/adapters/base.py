@@ -40,14 +40,14 @@ def resolve_cli_executable(
     harness_label: str,
 ) -> str:
     """Resolve a harness CLI executable from env override or PATH."""
-    candidate = os.environ.get(cli_env_var)
-    if not candidate and default_binary:
-        candidate = shutil.which(default_binary)
-    if not candidate:
+    candidate = os.environ.get(cli_env_var) or default_binary
+    executable = shutil.which(candidate) if candidate else None
+    if executable is None:
         raise FileNotFoundError(
-            f"{harness_label} CLI not found. Set {cli_env_var} or add '{default_binary}' to PATH."
+            f"{harness_label} CLI not found or not executable. "
+            f"Set {cli_env_var} to an executable or add '{default_binary}' to PATH."
         )
-    return candidate
+    return executable
 
 
 @dataclass(frozen=True, slots=True)

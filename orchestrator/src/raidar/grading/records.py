@@ -9,13 +9,19 @@ must never see verifier results (F4). Harbor receives only the reward.
 
 from __future__ import annotations
 
+import hashlib
 import json
+import platform
 from collections.abc import Mapping
+from functools import lru_cache
+from importlib.metadata import version
 from pathlib import Path
 from typing import Any, Literal
 
 from pydantic import Field
 
+from raidar.contract.canonical import digest_json
+from raidar.contract.source_digest import SOURCE_DIGEST_SCHEME, python_source_digest
 from raidar.grading.errata import ErrataOutcome, ErrataRef, errata_outcome
 from raidar.grading.leak import LeakReport
 from raidar.grading.models import CaseResult, ParityVerdict, VerifierGrade, VerifierModel
@@ -85,6 +91,65 @@ class StepRecord(VerifierModel):
     """The errata-applied verdict when the trial ran under a pinned errata; ``grade``
     and ``rewards`` stay the raw SCB verdict either way."""
     submission_dependencies: SubmissionDependencies | None = None
+
+
+@lru_cache(maxsize=256)
+def _grading_source_digest(path: Path, _stat_key: tuple[int, int, int]) -> str:
+    """Parse a source once until its size, modification time or change time changes."""
+    return python_source_digest(path)
+
+
+def grading_execution_digest() -> str:
+    """Bounded host grading implementation plus the files shipped into its sandbox."""
+    root = Path(__file__).parent.parent
+    sources = sorted((root / "grading").rglob("*.py"))
+    sources.extend(sorted((root / "contract").rglob("*.py")))
+    digests = {}
+    for path in sources:
+        facts = path.stat()
+        key = (facts.st_mtime_ns, facts.st_ctime_ns, facts.st_size)
+        digests[path.relative_to(root).as_posix()] = _grading_source_digest(path, key)
+    runtime = root / "grading" / "runtime"
+    payloads = {
+        name: hashlib.sha256((runtime / name).read_bytes()).hexdigest()
+        for name in ("raidar_oracle_plugin.py", "coverage.rc", "pytest.ini")
+    }
+    return digest_json(
+        {
+            "scheme": SOURCE_DIGEST_SCHEME,
+            "sources": digests,
+            "runtime": payloads,
+            "host_runtime": _grading_host_runtime(),
+        }
+    )
+
+
+@lru_cache(maxsize=1)
+def _grading_host_runtime() -> tuple[str, str, str]:
+    return platform.python_version(), version("packaging"), version("pydantic")
+
+
+def grading_identity(grader: GraderRef) -> str:
+    """Identity of execution settings and implementation that may change an offline grade."""
+    payload = (
+        grader.environment_id,
+        grader.timeout_s,
+        grading_execution_digest(),
+    )
+    return hashlib.sha256(json.dumps(payload).encode()).hexdigest()
+
+
+def coverage_identity(record: StepRecord, record_dir: Path | None) -> str:
+    """Bind a parity decision to this trial's retained grading evidence."""
+    evidence = record_dir / EVIDENCE_FILE if record_dir is not None else None
+    payload = {
+        "execution": grading_identity(record.grader),
+        "grade": record.grade.model_dump(mode="json"),
+        "evidence": hashlib.sha256(evidence.read_bytes()).hexdigest()
+        if evidence is not None and evidence.is_file()
+        else None,
+    }
+    return hashlib.sha256(json.dumps(payload, sort_keys=True).encode()).hexdigest()
 
 
 def _run_payload(run: RunOutcome | None) -> dict[str, object] | None:

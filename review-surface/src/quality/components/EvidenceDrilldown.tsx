@@ -5,7 +5,7 @@ import { X } from 'lucide-react';
 import { C } from '@/presentation/colors';
 import { COMPONENT_INFO } from '@/quality/format';
 import type { Selection } from '@/quality/components/QualityStrip';
-import type { EvidenceItem, ExclusionItem } from '@/quality/types';
+import type { CheckpointRow, EvidenceItem, ExclusionItem } from '@/quality/types';
 
 const EMPTY_HINT: Record<string, string> = {
   V: 'No Ruff diagnostics or clone groups in the measured production files.',
@@ -24,11 +24,13 @@ export function EvidenceDrilldown({
   selection,
   evidence,
   exclusions,
+  rows,
   onClose,
 }: {
   selection: Selection;
   evidence: EvidenceItem[];
   exclusions: ExclusionItem[];
+  rows: CheckpointRow[];
   onClose: () => void;
 }) {
   const items = useMemo(
@@ -45,6 +47,14 @@ export function EvidenceDrilldown({
   );
   const info = COMPONENT_INFO[selection.component];
   const scope = selection.checkpoint ?? 'all checkpoints';
+  const measurements = rows.filter(
+    (row) => selection.checkpoint == null || row.checkpoint === selection.checkpoint,
+  );
+  const unmeasured = measurements.filter(
+    (row) => row.cells[selection.component].status !== 'ok' || row.cells[selection.component].value == null,
+  );
+  const complete = measurements.length > 0 && unmeasured.length === 0;
+  const clean = complete && measurements.every((row) => row.cells[selection.component].value === 1);
   return (
     <section
       data-testid="evidence-drilldown"
@@ -69,9 +79,28 @@ export function EvidenceDrilldown({
           <X className="size-3.5" />
         </button>
       </header>
+      {!complete && (
+        <div className="px-3 py-2 text-[11px]" style={{ color: C.orange }} data-testid="evidence-measurement-status">
+          <p>Measurement is incomplete for this selection.</p>
+          {measurements.length === 0 ? (
+            <p>No checkpoint measurement is available.</p>
+          ) : (
+            <ul>
+              {unmeasured.map((row) => {
+                const cell = row.cells[selection.component];
+                return (
+                  <li key={row.checkpoint}>
+                    {row.checkpoint}: {cell.status.replace(/_/g, ' ')} · {cell.reason ?? 'No measured value is available.'}
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </div>
+      )}
       {items.length === 0 ? (
         <p className="px-3 py-3 text-[11px]" style={{ color: C.fg1 }}>
-          {EMPTY_HINT[selection.component]}
+          {clean ? EMPTY_HINT[selection.component] : 'No located findings were retained in the available evidence.'}
         </p>
       ) : (
         <ul className="max-h-80 overflow-y-auto">
