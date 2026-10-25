@@ -1,6 +1,6 @@
 ---
 name: "fault-catalog"
-description: "Use when extracting, recording, reconciling or targeting conceptual fault categories from Raidar jobs (trials, step results, verifier records, ATIF trajectories, Assessments, analysis.json), or when proposing the next revision of a condition from them."
+description: "Use when reconciling Raidar job faults with the fault/remedy ledger or proposing condition revisions from fault evidence."
 ---
 
 # Task
