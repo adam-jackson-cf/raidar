@@ -56,6 +56,7 @@ models:
 
 - Agent pins replace the harness pins in `lab/environments/python/pack.yaml` (one source of truth; RT5 moves to read agents).
 - Adapters: keep `codex_cli`, `claude_code_cli` and their base `harbor_cli`; delete `gemini_cli`, `cursor_cli`, `copilot_cli`, `pi_cli`, `external_cli` (and their tests, registry entries and `TYPECHECK_TARGETS` in `cli/quality.py`).
+- **Scope (user decision 2026-10-25):** phases 1–9 are built and proved on the codex adapter only. `claude_code_cli` stays as it is and gets its agent definition, resume proof and smokes once the codex end-to-end path works.
 
 ## 5. Workflows and stages
 
@@ -200,7 +201,7 @@ Each phase lands as one cutover, keeps `env -u AGENT make quality` green (covera
 | # | Phase | Main work | Exit |
 |---|---|---|---|
 | 0 | Review | Two independent reviews; D1–D5 settled (done) | Agreed revision |
-| 1 | Session spike | Codex and claude-code each run a build turn plus a resumed turn under Harbor through a throwaway runner; per-turn token deltas; next checkpoint fresh | Same session id across turns; deltas reconcile with session totals |
+| 1 | Session spike | Codex runs a build turn plus a resumed turn under Harbor through a throwaway runner, on two forge checkpoints; per-turn token deltas; next checkpoint fresh | Done 2026-10-25: same session id across turns; the resumed turn answers from the earlier turn; deltas reconcile with session totals ([evidence/session-resume-spike.md](evidence/session-resume-spike.md)) |
 | 2 | One-shot cutover | Move lab infrastructure out of `subject/treatment/` (`provision`, `setup_script`, `session_chain`/`create_inner`, `HARBOR_AGENT_NAMES`, `integrity` consumers); add `lab/agents/`, `lab/workflows/`, schemas, loader, `lab/releases.yaml` + check; runner with build stage; `one-shot@1`; workspace seeding (D2); lock identity (5.4); admission identity; snapshot excludes. Then delete the catalogue, component definitions, `lab/treatments/`, component entry points (`orchestrator/pyproject.toml`), experiment `conditions`/`components`/`shared_components`/`manipulation_checks`, factor guard, `component_hosts`, the `component_probes` validity check, review projection of conditions, 5 adapters; rewrite every experiment as `one-shot` arms and relock | Forge smoke on `one-shot@1` passes admission (`/app` changed); no component code or reference remains |
 | 3 | Task text | Importer reads `checkpoint_N.md` with entrypoint substitution; spec hash per checkpoint; re-import and re-validate forge and circuit_eval; re-pin errata | Spec bytes equal SCB's plus the two substitutions |
 | 4 | Health | Full outcome table (section 6) written first; health sole validity producer; L registry; provider-failure classification without retry; per-arm exclusion report; readings incl. former process metrics; delete `process-compliance` and its analysis and review consumers | A forced provider failure is excluded, not retried; table rows each covered by a test |
