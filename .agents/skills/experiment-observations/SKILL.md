@@ -1,6 +1,6 @@
 ---
 name: "experiment-observations"
-description: "Use when reporting what a completed Raidar experiment observed: per-arm outcomes from jobs, verifier records, the Assessment store and analysis.json, with fault evidence reconciled through fault-catalog."
+description: "Use when reporting a completed Raidar experiment's observed outcomes from persisted job, Assessment and analysis evidence."
 ---
 
 # Workflow
