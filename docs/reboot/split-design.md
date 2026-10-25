@@ -1,115 +1,223 @@
-# Raidar as the evaluation lab: boundary, arms and measurement
+# Raidar as the evaluation lab: design and implementation plan
 
-Status: decisions agreed with the user on 2026-10-25 (section 1–4), open decisions (section 5) and a proposed migration order (section 6). Nothing here is implemented yet. Background: [split-exploration.md](split-exploration.md) (2026-10-23 findings; factory-x-loops facts there predate this record and are re-checked before use) and [versioned-items map](show-me-versioned-items-map.html).
+Status: design agreed with the user on 2026-10-25, revised after two independent reviews (Claude Opus 5.5 high, GPT-6.1 Sol xhigh; section 11); the review's decisions D1–D5 were settled the same day as recommended. Nothing here is implemented yet. It supersedes the earlier version of this file (open decisions O1–O9 and "arm = agent + workflow owned by its provider"). Background: [split-exploration.md](split-exploration.md) and the [versioned-items map](show-me-versioned-items-map.html). factory-x-loops (FXL) facts cite `/Users/adamjackson/Projects/inflight/factory-x-loops/factory-x-loops`, branch `feat/plan-gate` (read at `2408471`; the branch has since moved to `ac5db0f`, so each port re-reads its source at a pinned commit).
 
-## 1. The boundary (agreed)
+## 1. The boundary
 
-Raidar is the evaluation lab. It owns everything that sets up a trial, runs it, decides whether the run counts, and measures how good it was. Everything that changes what the agent does belongs to the thing under test, the **arm**.
+Raidar is the evaluation lab. It owns the problem, the task text, workspace setup, the sandbox, running the trial, deciding whether the run counts (health), grading in its own grader sandbox, scoring, analysis and the ledger. The **arm** is what an experiment compares: an **agent** plus a **workflow**.
 
 ```mermaid
 flowchart LR
-  subgraph LAB["Raidar — evaluation lab"]
-    direction TB
-    PR["Problem (pinned)<br/>task prompt per checkpoint"] --> TB["Task brief<br/>task prompt + run conditions"]
-    TB --> RUN["Run: one call per checkpoint<br/>workspace kept between steps"]
-    WS["Workspace setup<br/>sandbox image · /app"] --> RUN
-    VAL["Run validity<br/>timeouts · idle · infra failures · tamper"] -. guards .- RUN
-    RUN --> VER["Verifier<br/>hidden tests on the host, never shown to the agent<br/>own + earlier checkpoints' tests"]
-    VER --> SC["Scorers<br/>correctness → solved per checkpoint<br/>code-quality · resource-usage · process-compliance"]
-    SC --> AN["Analysis<br/>solve rate · paired effects · verdicts"]
+  P["Problem (pinned SCB)<br/>checkpoint_N.md"] --> SET["Lab setup<br/>workspace project seeded + synced"]
+  SET --> RUN["Trial: one workflow run per checkpoint<br/>workspace kept between checkpoints"]
+  subgraph ARM["Arm"]
+    AG["Agent<br/>harness via adapter + pin<br/>model + model config"]
+    WF["Workflow name@N<br/>stages: define · build · verify<br/>each stage's settings and skills"]
   end
-  subgraph ARM["Arm — what an experiment compares"]
-    direction TB
-    AG["Agent<br/>harness (CLI or engine) @pin<br/>model + reasoning"]
-    WF["Workflow @vN (optional)<br/>stages · capabilities · components"]
-  end
-  RUN == "task brief + workspace" ==> ARM
-  ARM == "changed workspace + trace + end claim" ==> VER
+  ARM --> RUN
+  H["Health<br/>run validity + observability"] -. audits .- RUN
+  RUN --> G["Grader sandbox<br/>hidden tests: own + earlier checkpoints"]
+  G --> S["Scorers"] --> A["Analysis"]
 ```
 
-| Raidar owns | The arm owns |
-|---|---|
-| Problems: pinned import, errata, sensitivities, validation | Agent: harness (Codex CLI, Claude Code CLI, the factory-x-loops engine) at a pinned version, its settings, model and reasoning effort |
-| Task brief: the problem's task prompt for the checkpoint plus the lab's run conditions | Workflow (optional): stages and stage prompts, capabilities (define, accept, verify, judge), components (skills, instructions, tool configs), the workflow's own internal limits |
-| Workspace setup: the sandbox image, `/app`, carrying the workspace between checkpoints | |
-| Run: one arm call per checkpoint | |
-| Run validity: timeouts, idle/liveness, infrastructure-failure handling, reaper, tamper and health checks — the outer envelope, the same for every arm | |
-| Measurement: the host-side verifier, scorers, metrics, analysis, review | |
+## 2. Terms
 
-## 2. Terms (agreed)
+- **Agent**: a harness (an agent CLI Raidar has an adapter for) at a pinned version, a model and the model's configuration (reasoning level). Raidar defines agents.
+- **Workflow**: a versioned, user-authored definition (`lab/workflows/<name>/`) of the stages a checkpoint runs through. Raidar ships the schema and three workflows; anyone may write more.
+- **Stage**: a universal stage *type* (define, build, verify) with one implementation in Raidar code, a schema and a fixed delivery rule. A **stage in a workflow** is that workflow's own settings for the type. Stage settings are never shared by reference between workflows; a workflow that wants the same setup copies it.
+- **Component**: a file the agent reads, owned by one stage of one workflow. The only kinds are **skill** and **instructions**. Prompts, checks, rules and the judge are stage settings, not components.
+- **Arm**: an agent plus a workflow, as used in one experiment. An arm that names no workflow runs the default, `one-shot`.
 
-- **Agent**: a harness plus a model configuration. The common definition, and Harbor's (`AgentConfig`: harness, `model_name`, settings).
-- **Workflow**: an optional sibling of the agent: stages, capabilities and components. Owned and versioned by its provider (for example factory-x-loops `one-shot-verify@5`).
-- **Arm**: an agent plus an optional workflow, as used in one experiment, with its role (baseline or not). An arm with no workflow runs one session per checkpoint with the task brief passed through unchanged.
-- Agents are defined once in an experiment and referenced by arms. An arm id is local to its experiment; anything compared across experiments (smoke admission, pooling) compares the arm's resolved agent and workflow identity, never the id.
-- Experiment kinds: a `benchmark` compares arms that differ in agent; an `ab-test` compares arms that differ in workflow on the same agent. The factor guard enforces which part may differ.
+## 3. The task text and workspace setup (R1)
+
+- **Task text** follows FXL (`evaluation/benchmark/scb.py:169-186,421-445`, `evaluation/sequential.py:132-179`): for each checkpoint, read the pinned SCB `<problem>/checkpoint_N.md`, replace only `%%%ENTRYPOINT:entry_command%%%` and `%%%ENTRYPOINT:entry_file%%%`, keep everything else verbatim (the canary comment included). Checkpoint N is its own spec alone; earlier work carries through the workspace. The spec's hash per checkpoint is part of the problem pin. The entry-command value is the one Raidar's grader runs (`uv run --project /app <entry>`), recorded in the pin.
+- **No Raidar framing.** `prompt-wrapper` goes. Framing belongs to a workflow's build prompt.
+- **One-shot prompt (D1, decided).** `one-shot@1`'s build prompt copies FXL's measured baseline `one-shot/v1`: `Work the issue below per the repository's own rules.` + `%%%TASK%%%`. This is the workflow's wording, not lab framing. Raidar's own pilot recorded bare-task codex asking a question and writing nothing (pilot F1, `lab/experiments/smoke/python__forge__mechanics/experiment.yaml:5-7`).
+- **Workspace seeding (D2, decided).** Before checkpoint 1 the lab writes the workspace's own `pyproject.toml` with the problem's declared dependencies and runs `uv sync`, outside every measured duration, as FXL does (`scb.py:385-423`), so an agent's code is graded in the environment it worked in (Raidar's FCR-004 is that fault).
+
+## 4. Agents (R3)
+
+Fields taken from FXL's harness definition (`config/harness/<cli>/vN.toml`, `docs/references/harnesses.md`); the values are Raidar's own pins and are proved, not copied:
 
 ```yaml
-agents:
-  codex-luna:
-    harness: codex@1
-    model: { provider: openai, id: gpt-6-luna, reasoning: low }
-  fxl-codex-luna:
-    harness: factory-x-loops@<commit> (driving codex@2)
-    model: { provider: openai, id: gpt-6-luna, reasoning: low }
-
-arms:
-  - id: vanilla
-    agent: codex-luna
-  - id: verify
-    agent: fxl-codex-luna
-    workflow: one-shot-verify@5
-
-analysis: { baseline_arm: vanilla }
+# lab/agents/codex.yaml   -> released as codex@1
+adapter: codex
+tool: { package: "@openai/codex", binary: codex, version: 0.156.1 }
+settings:
+  isolated_home: true
+  ignore_user_config: true
+  features_off: [...]            # FXL codex/v2 lists five; Raidar proves the set for its pin
+  bundled_skills: [...]          # per-version list the P-family isolation check reads
+placement: { skills: ".agents/skills", instructions: "{home}/AGENTS.md" }
+resume: true                     # verifying workflows need session resume
+models:
+  gpt-6-luna: { canonical: gpt-6-luna, reasoning: [low] }   # what the adapter allows today
 ```
 
-## 3. What leaves Raidar (agreed direction)
+- Agent pins replace the harness pins in `lab/environments/python/pack.yaml` (one source of truth; RT5 moves to read agents).
+- Adapters: keep `codex_cli`, `claude_code_cli` and their base `harbor_cli`; delete `gemini_cli`, `cursor_cli`, `copilot_cli`, `pi_cli`, `external_cli` (and their tests, registry entries and `TYPECHECK_TARGETS` in `cli/quality.py`).
 
-- **Components.** Raidar stops delivering components. The 14 built-ins (`rules-file`, `workspace-files`, `lint-config`, `lint-tool`, `skills`, `harness-settings`, `stop-hook`, `mcp-server`, `prompt-wrapper`, `review-loop`, `guardrail-gate`, `python-guardrails`, `continue-on-stall`, `transient-retry`), the component definition/registry/compiler and the treatment runtime (`subject/treatment/`) leave with them. The experiment schema loses `conditions`, `components` and `shared_components`.
-- **`prompt-wrapper` is not a component.** Its text splits in two: the run conditions ("working non-interactively in /app, which may start empty; nobody will answer questions") become the lab's task brief; `{{ instruction }}` is the problem's own task prompt. Any further framing is a workflow's stage prompt (factory-x-loops already wraps `%%%TASK%%%` this way).
-- **`transient-retry` becomes run validity.** The lab classifies provider and infrastructure failures (the trial or step does not count against the arm); it never retries inside the arm's session.
-- Lab mechanics currently filed under `subject/` stay in Raidar under lab owners: the sandbox image, per-step reset, provisioning, setup script, evidence capture and integrity flags.
+## 5. Workflows and stages
 
-## 4. Measurement: solve rate (agreed)
+### 5.1 Stage types
 
-Raidar keeps its definition of solved and adds two of factory-x-loops' figures.
+| Stage | Session | What its code does | Delivery of its contents |
+|---|---|---|---|
+| define | fresh session | numbers the spec into units (`U<n>`, `C<n>`), runs the agent with the `define` tool, checks the draft (unit rules), writes the feature definition; questions auto-accepted and recorded (FXL `run-suite`) | its skills and instructions into the define session only, removed before build |
+| build | one session per checkpoint, resumed for every fix and rework turn; the next checkpoint starts fresh | runs the agent on the build prompt; structured replies where the workflow asks for them (define-build-verify: `account`, `ac_tests`, `adrs`, one repair turn) | its skills and instructions into the build session |
+| verify | none of its own | gate as the workspace pre-commit hook; seals each build turn with the runner's own commit through the gate; refusal → fix turn in the build session (≤ `max_fix_rounds`); optional judge pass; repeats up to `max_passes` | `prompt` replaces `%%%VERIFY%%%` in the build prompt; its skills and instructions into the build session |
 
-| | Agreed rule |
+- `build` is always on; `define` and `verify` are off unless enabled. A disabled stage's prompt, skills and instructions never reach the sandbox.
+- **Instructions**: each enabled stage's instructions are joined in stage order into one file at the agent's `placement.instructions`; never written over the task's own `AGENTS.md`. Stage-boundary cleanup removes define's copies from the workspace and the harness home (Harbor also copies skills into harness homes, `harbor/agents/installed/codex.py:1196-1205`).
+- **Workflow-owned paths** (skills dir, rules file, decisions file, feature definition, gate state) are excluded from the graded snapshot, every diff, the gate's commit and code-quality scoring (`contract/snapshot.py` `SNAPSHOT_EXCLUDES` grows), and their digests are recorded.
+- **Graded tree on interruption**: when a deadline, cancellation or gate error cuts a verifying run, the workspace is restored to the last tree the gate decided on (FXL `engine/workflow/verified.py:630-642`), and the record says which gate it was. Exhausted fixes grade the last sealed tree.
+
+### 5.2 Verify stage settings
+
+Everything FXL spreads across `[verification]`, the verify template, the gate policy and the Python pack (`docs/references/verify-gate.md:84-300`) is one block:
+
+| FXL | Verify stage field |
 |---|---|
-| Solved checkpoint | Every graded hidden test passed: the checkpoint's own tests and every earlier checkpoint's (forge checkpoint 3 runs `test_checkpoint_1..3`); skipped tests leave the count, as in SCB's native runner (`grading/models.py`). This matches factory-x-loops' "solved+retained", not its headline. |
-| Unreached checkpoint | Unsolved: the solve rate is solved checkpoints ÷ planned checkpoints per trial (`checkpoint_solve_rate`). |
-| Grader timeout, agent error | Unavailable: an infrastructure failure of the trial (run validity), never a zero. |
-| Variants | `*_errata` (pinned exclusions, existing); **add** a solvable-set rate (only tests the reference solution passes in the lab's environment), from factory-x-loops `evaluation/analysis/solving.py` and `benchmark/solvable/`. |
-| Intervals | Paired effects between arms as today; **add** Wilson 95% intervals for single-arm solve rates (factory-x-loops `analysis.wilson_interval`). |
+| `template = N` → `workflow/templates/verify/vN.md` | `prompt` (the text; tokens filled from the stage's own fields) |
+| `gate_policy = N` (including the per-test limit `rule.test`) | `rules`: rule families by name, plus `test_timeout` |
+| pack tool pins, `requirements-tools.lock` | `checks`: name, category (lint, format, types, tests, coverage, other), tool pin, command, blocking; every tool pinned, the resolved lock hashed |
+| `max_gate_fixes`, `max_passes`, `test_workers` | `max_fix_rounds`, `max_passes`, `test_workers` |
+| hook + engine seal | `gate: { on_commit, after_turn }` |
+| rules seeded into `AGENTS.md`; `.factory-x/decisions.md` | `rules_file`, `decisions_file` |
+| `[judge]` | `judge` |
+| `[probes]` | `probes` (phase 9; enabling it is a new workflow release) |
+| idle limits `gate`, `tool`, `install` | lab-owned limits in the L registry |
 
-Earlier agreements this record also carries:
+`language: python` selects the stage code's rule implementation (most families are Python code built on pytest and the syntax tree). Raidar ships Python only.
 
-- Format versions (Appendix B of the versioned-items map) may restart at 1.
-- Scorers and headline metrics restart at `@1` from their current latest version, under naming and versioning rules still to be agreed (section 5).
-- Generated data under `var/` may be cleared, except what section 5 keeps.
+**Authority of records**: the runner's root-run seal and its gate records, copied and hashed on the host after each turn, are authoritative. The hook's own records (written as the agent user on the agent's `git commit`) are evidence that must agree with them (FXL G1–G3).
 
-## 5. Open decisions
+### 5.3 Shipped workflows
 
-| # | Decision | Recommendation |
-|---|---|---|
-| O1 | Run conditions: one lab-wide versioned task-brief template, or part of each problem | Lab-wide template |
-| O2 | Infrastructure failures: classify and exclude only, or also a recorded rerun policy | Classify and exclude first |
-| O3 | Vanilla harness definitions (`codex`, `claude-code`): Raidar-owned now, or one shared provider owns all harness definitions | Raidar now, shared provider later |
-| O4 | An engine harness (factory-x-loops) and the CLI it drives: one harness entry, or the inner CLI as its own field | One harness entry |
-| O5 | "Vanilla CLI + an AGENTS.md": only through a workflow (for example `single-session@1` with an instructions component), or components directly on an agent-only arm | Only through a workflow |
-| O6 | Sandbox image: language toolchain only, harness CLI installed by the harness definition (a pack release with re-validation of both problems) | Yes |
-| O7 | Scorers that read method records (`gate-effort@11`, the stall metrics of `process-compliance@7`): a neutral evidence format any arm may emit, or retire them | Neutral evidence format |
-| O8 | Naming rules N1–N5 and versioning rules V1–V4 for scorers and metrics (lowercase hyphenated names; one integer version per name in the tree; a committed release register checked by `make quality`; epoch-namespaced archive tags) | Adopt all |
-| O9 | `var/archive/pre-v1` (4.5 GB, the only raw evidence behind ledger faults FCR-001…004) | Copy the cited files into the ledger, then clear |
+```text
+lab/workflows/
+  one-shot/workflow.yaml                 build only (default)
+  one-shot-verify/workflow.yaml          build + verify (gate, 2 fix rounds, 1 pass)
+  define-build-verify/workflow.yaml      define + build + verify (gate + judge, 20 passes)
+    skills/feature-definition/SKILL.md   define
+    skills/aspect-writing/SKILL.md       define
+    skills/test-per-aspect/SKILL.md      verify
+    skills/pytest-templates/SKILL.md     verify
+```
 
-## 6. Proposed migration order
+`define-build-verify@1` is **derived from** FXL `define-build-verify/v2` (v1 plus unit rules 2; adopted after FXL experiment B, `docs/experiments/ledger.md:357-407`), without probes. It is not a faithful port: skills are delivered per stage (FXL gives all four to the whole run, `engine/lifecycle/workspace.py:215-226`) and limits are lab-owned, so FXL's measured results do not transfer. Phase 8 writes its full field and token map before coding: the tokens `%%%UNITS%%%`, `%%%MODE%%%`, `%%%PRIOR%%%`, `%%%DEFINITION%%%`, `%%%PUSHBACK%%%`, `%%%GATE%%%`; the intake, build, rework and summary prompts; `max_refinement_rounds`, `aspects`, `anchored`, `audited`, `stated_literals`; judge `closed_at`, `open_at`, `settle_after`, `fit_rework`, `regression_needs_baseline`, `retries`, `context_tokens`, `timeout_seconds`.
 
-Each step lands on its own, passes `make quality`, and is smoke-proved where it changes a run.
+Judge: Jev through OpenRouter. Raidar's Jev client is parked and offline-first (`scoring/judge/session.py`); phase 8 adds a live mode that records raw responses and pins one model id (Raidar today requests `~typesafe/jev-latest` and checks `typesafe/jev-1.13-20260917`; FXL requests `typesafe/jev-1.13`). The key stays host-side and is proved absent from every sandbox environment and persisted output.
 
-1. **Task brief and run validity.** Move the run conditions into a lab task-brief template; move infrastructure-failure handling into run validity. Remove `prompt-wrapper` and `transient-retry` from experiments. Exit: the forge smoke solves checkpoint 1 with no components.
-2. **Arm schema.** `agents` + `arms { agent, workflow? }`; remove `conditions`/`components`; lock records the resolved agent and workflow identity; factor guard by kind. Exit: all experiments relocked; smoke admission and pooling compare arm identity.
-3. **Strip the treatment layer.** Remove `subject/treatment/` and the 14 components; settle O7 for `gate-effort` and `process-compliance`. Exit: no component code or references remain.
-4. **Measurement additions.** Solvable-set rate and Wilson intervals. Exit: both appear in analysis for the forge smoke.
-5. **Clean slate.** Scorers and metrics to `@1` under O8, format versions to 1, release register written, archive tags namespaced, `var/` cleared per O9. Exit: fresh smokes on every experiment.
-6. **First workflow arm.** factory-x-loops as an engine harness on codex (O4), `one-shot-verify` against vanilla codex on forge, after the factory-x-loops blockers recorded in the exploration (decoupled run entrypoint, git workspace, auth in a Linux container) are re-checked and resolved.
-7. **Sandbox image split (O6),** as its own pack release with native-parity re-validation.
+```yaml
+# lab/workflows/one-shot-verify/workflow.yaml   -> one-shot-verify@1
+schema: 1
+name: one-shot-verify
+stages:
+  build:
+    prompt: |
+      Work the issue below per the repository's own rules.
+
+      %%%VERIFY%%%
+
+      %%%TASK%%%
+  verify:
+    enabled: true
+    language: python
+    prompt: |
+      ## Verification
+      ...   (FXL workflow/templates/verify/v1.md, tokens renamed)
+    gate: { on_commit: true, after_turn: true }
+    max_fix_rounds: 2
+    max_passes: 1
+    test_workers: 2
+    test_timeout: 60
+    rules_file: AGENTS.md
+    decisions_file: .raidar/decisions.md
+    checks:
+      - { name: lint,   category: lint,     tool: ruff==0.8.6,       run: "ruff check",          blocking: true }
+      - { name: format, category: format,   tool: ruff==0.8.6,       run: "ruff format --check", blocking: true }
+      - { name: types,  category: types,    tool: mypy==2.3.1,       run: "mypy --strict",       blocking: true }
+      - { name: tests,  category: tests,    tool: pytest==<pin>,                                 blocking: true }
+      - { name: cover,  category: coverage, tool: pytest-cov==<pin>,                             blocking: false }
+    rules: [quality, project, against-base, tests-that-cannot-fail, coverage-exclusions]
+```
+
+### 5.4 Identity
+
+The lock records, per arm: the agent release and pin; the workflow release; the workflow's resolved content hash (definition with every default filled; every skill and instruction file's path and content; the resolved check-tool lock); and the **stage code digest** of each enabled stage type. The stage code digest covers the stage's modules, the verify rule implementation, the `define` tool and unit rules, the Jev client and the adapter. Pooling and smoke admission compare the full arm identity (agent + workflow + stage code digests); a stage code difference cannot be overridden. Admission today compares only agent name, model and effort (`engine/health/admission.py:3-5`) and grows to this identity.
+
+### 5.5 How a workflow runs inside a trial
+
+- **Runner**: a Harbor `BaseAgent` that drives the native adapter for one checkpoint, host-side, through `environment.exec`. It keeps one agent phase per checkpoint for the reaper and health hooks. It reuses lab infrastructure that today lives under `subject/treatment/` (`provision`, `setup_script`, `session_chain.create_inner`, `HARBOR_AGENT_NAMES`), moved, not rebuilt.
+- **Session resume**: the active session store is kept apart from the immutable per-turn logs (today's `GuardrailGateAgent` moves session logs per session and starts fresh sessions, `guardrail_gate.py:356-413`; Harbor codex resume needs the root `sessions` dir, `harbor/agents/installed/codex.py:1415-1475`). Fix and rework resume the build session, never define's.
+- **Accounting**: per-turn token deltas, not sums of cumulative contexts (Harbor codex contexts carry cumulative totals; FXL de-duplicates by session, `harness/codex.py:101-159`); session totals kept to reconcile.
+- **Liveness**: stage-aware. Agent turns keep the idle rule; host-side judge passes and root-run gate work are marked windows with their own registered limits (`idle.gate`, `idle.tool`, `idle.install`, `request.judge`), never counted as agent idleness.
+- **Time budget (D4, decided)**: one equal per-checkpoint budget for every arm of an experiment, set by the experiment (Raidar caps each checkpoint's agent phase, `agent_timeout_sec`, 1800 s on forge; FXL's measured runs were unbounded, so its results do not transfer). The runner reads the deadline and starts a fix or rework turn only when the last turn of its kind plus the last gate (and judge) fit (FXL `fit_rework`); a cut ends with a recorded `deadline` ending.
+- **Tools in the sandbox**: the verify gate's pinned tools and the `define` tool are a stage-tool layer of the image, keyed by stage code digest, installed root-owned outside the workspace; agent turns run as the agent user. `define` runs on the layer's own interpreter, not the agent's or the project's.
+
+## 6. Health (R2)
+
+FXL's model (`docs/references/run-health.md`): an audit after the run over recorded evidence; each check is `pass`, `violation` or `unmeasured` (missing evidence is never `pass`). Live controls only act and record; readings never invalidate. One health report per trial is the **only** producer of validity: today's execution checks (`engine/trial/collect.py:336-381`, `finish.py:50-59`) move into it. Phase 4 writes the full per-check table (`pass` / `violation` / `unmeasured` → `invalid` / `warning` / none) before coding, distinguishing instrument failures (a broken `define` tool, a gate error) from agent outcomes (an unusable definition).
+
+| Family | Checks |
+|---|---|
+| H run record | today's H checks; records integrity (was T2); residual processes after the reaper (was T3) |
+| L limits | every lab limit registered once; every kill names a registered limit; today's L1/L2 (liveness record) keep their meaning under L |
+| V verifier | today's V checks; V3 grows: the graded snapshot equals the last gate-decided tree for verifying workflows |
+| P provenance | today's P2/P3 (concurrency, comparison warnings) keep their numbers; new: no key or proxy variable names in sandbox records (FXL P6); the agent saw only its workflow's skills and instructions, read against the agent's `bundled_skills` list (FXL P8) |
+| G gate (verify on) | gate tools unchanged across the trial (tool-tree hash, was T1, over the stage-tool layer); no bypass (`--no-verify`, hook settings changed); hook records agree with the runner's (FXL G1–G6); gate and define state paths not written by the agent (the protected-path part of FXL T4) |
+| E workflow (verify or define on) | fix turns, endings, structured-reply repairs, definition present (FXL E1–E6) |
+| J judge (judge on) | judge calls recorded, closure consistent with answers (FXL J1–J3) |
+| readings | per-stage timings, provider calls and failures, idle time, stalls, tokens and cost; former `process-compliance` metrics (test commands never run, tests before finishing, tests after the last edit) |
+
+- **Agent provider failures**: every attempt recorded; the step classified as an infrastructure failure; the trial excluded within the existing 20% cap; no retry. Exclusions are reported per arm, and analysis refuses when exclusion rates differ materially between arms (heavier workflows make more calls).
+- **Judge failures (D3, decided)**: as FXL, a Jev request is retried up to 3 times and an unanswered aspect is recorded as undecided, which counts as open (`capability/judge/jev.py:250-344`). The judge is part of the workflow's method, not the agent's provider, so the no-retry rule above does not apply; recorded under J.
+- **Tamper (D5, decided)**: the earlier "drop T4" assumed nothing of the lab's sat in the agent's container. With verify and define, gate and define state do; the G family restores the protected-path part of T4 for those paths only.
+
+## 7. Measurement
+
+- Solved checkpoint, unreached checkpoint and grader failures as agreed (unchanged).
+- **Solvable-set rate**: needs reference-passing test sets per problem revision, regression sets included (FXL `evaluation/analysis/solving.py:34-46,163-178`, `benchmark/solvable/`). Raidar generates them in its grader sandbox from the reference solution, pins them beside the errata, and reports "unavailable" when a set is missing. Errata exclusions apply first.
+- **Wilson 95% intervals** for single-arm solve rates (FXL `evaluation/analysis/stats.py:35`).
+- `process-compliance` stops being a scorer (its metrics are health readings).
+- `gate-effort` becomes `verification-effort@1`: reads the runner's gate records; `not_applicable` when verify is off.
+- Naming and versioning (R8): lowercase hyphenated names of at most three words; package directory equals the scorer name; metric names `<benchmark>-<policy>[-<shape>]`; no versions in Python names; integer versions from 1; one version of each name in the tree; release register `lab/releases.yaml` (name@N → hash) checked by `make quality`; epoch-namespaced archive tags. Applies to scorers, metrics, agents and workflows; the register lands with the first agents and workflows (phase 2).
+
+## 8. Ledger (R9)
+
+Adopt FXL's journal model (`docs/references/journal.md`, `src/factory_x_loops/evaluation/journal/`): append-only JSONL records in git; run records (availability `local`, `fetchable`, `gone`, plus digests); occurrence records carrying a short redacted excerpt; fault events from which status is folded; generated views; a check that reads no run data. Migration, in order:
+
+1. Inventory every cited run and source in FCR-001…004 and M-001 (pilot jobs, guardrails main and smoke jobs, removed experiment prose).
+2. Register each run with its digests; capture each citation as an occurrence excerpt; re-point removed prose to `archive/pre-structure-reset:<path>`; cite hidden tests by upstream location (`scb-problems@<commit>:<path>`).
+3. The ledger check verifies the migration is complete (every citation resolves to an excerpt, an archive ref or an upstream ref).
+4. Only then clear `var/`; runs whose data is deleted are marked `gone`.
+
+## 9. Implementation plan
+
+Each phase lands as one cutover, keeps `env -u AGENT make quality` green (coverage ≥ 95%, import-linter contracts, structure allowlist `scripts/checks/check-structure.py`, experiment locks), re-pins errata and sensitivities and relocks every experiment in the same commit whenever an identity changes, and is smoke-proved where it changes a run (real runs: codex `gpt-6-luna` at `low`, `DETACH=1`).
+
+| # | Phase | Main work | Exit |
+|---|---|---|---|
+| 0 | Review | Two independent reviews; D1–D5 settled (done) | Agreed revision |
+| 1 | Session spike | Codex and claude-code each run a build turn plus a resumed turn under Harbor through a throwaway runner; per-turn token deltas; next checkpoint fresh | Same session id across turns; deltas reconcile with session totals |
+| 2 | One-shot cutover | Move lab infrastructure out of `subject/treatment/` (`provision`, `setup_script`, `session_chain`/`create_inner`, `HARBOR_AGENT_NAMES`, `integrity` consumers); add `lab/agents/`, `lab/workflows/`, schemas, loader, `lab/releases.yaml` + check; runner with build stage; `one-shot@1`; workspace seeding (D2); lock identity (5.4); admission identity; snapshot excludes. Then delete the catalogue, component definitions, `lab/treatments/`, component entry points (`orchestrator/pyproject.toml`), experiment `conditions`/`components`/`shared_components`/`manipulation_checks`, factor guard, `component_hosts`, the `component_probes` validity check, review projection of conditions, 5 adapters; rewrite every experiment as `one-shot` arms and relock | Forge smoke on `one-shot@1` passes admission (`/app` changed); no component code or reference remains |
+| 3 | Task text | Importer reads `checkpoint_N.md` with entrypoint substitution; spec hash per checkpoint; re-import and re-validate forge and circuit_eval; re-pin errata | Spec bytes equal SCB's plus the two substitutions |
+| 4 | Health | Full outcome table (section 6) written first; health sole validity producer; L registry; provider-failure classification without retry; per-arm exclusion report; readings incl. former process metrics; delete `process-compliance` and its analysis and review consumers | A forced provider failure is excluded, not retried; table rows each covered by a test |
+| 5 | Image split | Toolchain image; per-agent CLI layer keyed by agent hash; stage-tool layer keyed by stage code digest; problem pins bind the toolchain image only | `make perf-gate` within budget; cold and warm real-agent runs prove both CLIs' versions and auth; problem identity unchanged |
+| 6 | Clean slate | Scorers and metrics to `@1`; formats to 1; archive tags; solvable sets generated and pinned; Wilson intervals; ledger migration (section 8); clear `var/` | Fresh smokes on every experiment; ledger check passes with no run data |
+| 7 | `one-shot-verify@1` | Verify stage type ported from FXL `capability/verify` and `packs/python` at a pinned commit; gate hook, root seal, fix rounds in the build session, restore-to-last-gated-tree; G and E families; stage-aware liveness; time-budget fit rule (D4); `verification-effort@1` and its analysis and review consumers (replacing `gate-effort`, `evaluation/review/quality/gate_view.py`, `grading/prefix`) | Fake-agent integration tests: clean pass, seeded refusal → fix turn → pass, gate error ≠ refusal, deadline mid-fix restores the gated tree, bypass and tool tampering detected; one real forge smoke |
+| 8 | `define-build-verify@1` | Field and token map (5.3) first; define stage type (units, `define` tool, unit rules 2, auto-accepted questions); structured build replies; judge (Jev live mode, D3); rework passes; four skills copied; J family | Replays against FXL fixtures (unit numbering, unit rules 2, `define` checks, judge-input identity, as FXL `tests/test_define_compact_replay.py`); Jev key absent from every sandbox env and output; judge undecided vs closed exercised; one real forge smoke |
+| 9 | Probes | `verify.probes` `derive: [golden]` in a new `one-shot-verify` release, then `[golden, example]` with deterministic closure in a new `define-build-verify` release | Probe records per accepted gate; a failing probe produces a rework turn; probe-no-fix-left ending exercised |
+
+## 10. Risks
+
+- Porting FXL's verify pack and define stage brings host-side assumptions (worktrees, the engine's interpreter for `define`); phase 5's stage-tool layer and phase 7/8 integration tests are the guard.
+- FXL keeps moving; each port pins its source commit and records it.
+- Golden probes run the spec's worked examples, which SCB's hidden tests largely exercise; probe arms are their own releases and arms.
+- Stage code changes move behaviour without moving a workflow's hash; the stage code digest in the lock, with non-overridable pooling refusal, is the guard.
+- An equal capped budget favours light workflows; experiments comparing verifying workflows set a budget large enough that budget endings stay rare, and report them per arm.
+
+## 11. Independent review record
+
+Reviews of the first version of this document, read-only, run as separate sessions: [evidence/split-design-review-opus.md](evidence/split-design-review-opus.md) (Claude Opus 5.5, high) and [evidence/split-design-review-sol.md](evidence/split-design-review-sol.md) (GPT-6.1 Sol, xhigh). Both: "sound with changes". Their shared blockers (phase 1 deleting live infrastructure; deleting the `harbor_cli` base class) and major findings (resume, accounting, liveness, budget, graded tree on interruption, health table, identity, records authority, snapshot excludes, ledger inventory, define-build-verify fidelity, solvable sets, per-phase quality) are folded into sections 3–9. The decisions they raised, D1–D5, were settled as recommended.
