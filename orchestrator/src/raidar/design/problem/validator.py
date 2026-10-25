@@ -85,6 +85,7 @@ async def _harbor_runs(
             snapshots[variant],
             work,
             repeats=options.repeats,
+            concurrency=options.concurrency,
             docker_context=options.docker_context,
         )
     return runs
@@ -96,6 +97,7 @@ def _native_runs(
     assert options.native_runner is not None
     manifest = problem.manifest
     checkout = resolve_checkout(store, manifest.problem_id, options.source_checkout)
+    checkout.verify_clean(manifest.source.problem)
     catalog = work / "native-catalog"
     stage_catalog(checkout.root / manifest.source.problem, catalog)
     runner = NativeRunner(options.native_runner, docker_context=options.docker_context)
@@ -231,8 +233,9 @@ def merge_audit(store: ProblemStore, problem_id: ProblemId, audit: dict[str, obj
 def default_report_path(store: ProblemStore, report: ValidationReport) -> Path:
     """The committed report path, except when the new report would weaken it.
 
+    A real failure replaces earlier evidence even when other checks were skipped.
     An infra failure never replaces the committed report, and neither does a
-    report for the same manifest that skipped a check the committed one ran
+    passing report for the same manifest that skipped a check the committed one ran
     (e.g. ``--repeats 1`` over a full three-repeat validation): both go to the
     uncommitted attempt path.
     """
@@ -240,6 +243,8 @@ def default_report_path(store: ProblemStore, report: ValidationReport) -> Path:
     if report.verdict is Verdict.INFRA_FAILURE:
         return store.validation_attempt_path(problem_id)
     committed = store.validation_path(problem_id)
+    if report.verdict is Verdict.EXCLUDED:
+        return committed
     try:
         existing = read_validation_record(committed)
     except ValidationRecordError:

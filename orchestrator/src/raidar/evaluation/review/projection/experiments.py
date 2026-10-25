@@ -97,7 +97,7 @@ def _measured(values: Sequence[float | None]) -> list[float]:
 
 
 def _scorer_outcomes(areas: Mapping[str, Sequence[float]]) -> dict[str, dict[str, Any]]:
-    """Mean score area (C for correctness@1, I for code-quality@3) over scored runs."""
+    """Mean score area (C for correctness@2, I for code-quality@4) over scored runs."""
     return {
         ref: {"sample_size": len(values), "mean_score": round(fmean(values), 6)}
         for ref, values in areas.items()
@@ -123,7 +123,7 @@ def _aggregate(runs: Sequence[ReviewRunRecord], policy: str) -> dict[str, Any]:
         "uncached_input_tokens": stat_block([float(run.total_input_tokens) for run in runs]),
         "metric_outcomes": _checkpoint_outcomes(runs),
         "scorer_outcomes": _scorer_outcomes(
-            {"correctness@1": diagnostics, "code-quality@3": qualities}
+            {CORRECTNESS_REF: diagnostics, CODE_QUALITY_REF: qualities}
         ),
     }
 

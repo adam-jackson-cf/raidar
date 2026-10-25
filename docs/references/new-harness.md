@@ -1,5 +1,11 @@
 # Adding a New Harness
 
+> **Historical reference — retired integration workflow.** The paths and commands
+> below belong to the archived scenario epoch. They are not instructions for the
+> current repository. Start with the [root README](../../README.md); current agent
+> adapters live under `orchestrator/src/raidar/subject/agent/`, and runtime-pack pins
+> live under `lab/environments/`. Discover public commands with `make help`.
+
 Use this flow to add a new harness cleanly and keep run outputs comparable. `AgentSpec` means `harness + model`; this guide covers the harness half of that pairing.
 
 ## 1. Extend the Harness Registry

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import time
 from collections.abc import Callable
 from dataclasses import asdict, dataclass
 from pathlib import Path
@@ -12,6 +13,7 @@ from raidar.engine.target.config import Target, TargetError
 from raidar.engine.target.transport import (
     Runner,
     Spawner,
+    bounded_runner,
     docker_healthy,
     run_command,
     spawn_detached,
@@ -81,8 +83,37 @@ def ensure_target(
     spawner: Spawner = spawn_detached,
     base: Path | None = None,
     sleep: Callable[[float], None] | None = None,
+    timeout_s: float | None = None,
+    clock: Callable[[], float] = time.monotonic,
 ) -> None:
     """Healthy: no-op. Unhealthy transport target: restart the tunnel. Then the data check."""
+    deadline = None if timeout_s is None else clock() + timeout_s
+    if deadline is not None:
+        runner = bounded_runner(runner, deadline, clock)
+    try:
+        _ensure_target(
+            target,
+            runner=runner,
+            spawner=spawner,
+            base=base,
+            sleep=sleep,
+            clock=clock,
+            deadline=deadline,
+        )
+    except TimeoutError as error:
+        raise TargetUnavailableError(f"target {target.name!r}: {error}") from error
+
+
+def _ensure_target(
+    target: Target,
+    *,
+    runner: Runner,
+    spawner: Spawner,
+    base: Path | None,
+    sleep: Callable[[float], None] | None,
+    clock: Callable[[], float],
+    deadline: float | None,
+) -> None:
     if not docker_healthy(target.docker_context, runner):
         if target.transport is None:
             raise TargetUnavailableError(
@@ -90,7 +121,15 @@ def ensure_target(
             )
         extra: dict[str, Any] = {} if sleep is None else {"sleep": sleep}
         try:
-            transport_up(target, runner=runner, spawner=spawner, base=base, **extra)
+            transport_up(
+                target,
+                runner=runner,
+                spawner=spawner,
+                base=base,
+                clock=clock,
+                deadline=deadline,
+                **extra,
+            )
         except (RuntimeError, OSError) as error:
             raise TargetUnavailableError(
                 f"target {target.name!r}: transport to {target.transport.host} failed: {error}"

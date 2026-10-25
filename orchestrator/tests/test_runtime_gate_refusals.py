@@ -64,16 +64,16 @@ def _resolvers(
             ),
             InMemoryResolver(
                 RefKind.COMPONENT,
-                {"rules-file@1": {"kind": "workspace"}, "lint-config@1": {"kind": "workspace"}},
+                {"rules-file@2": {"kind": "workspace"}, "lint-config@2": {"kind": "workspace"}},
                 bindings={
-                    "lint-config@1": {"runtimes": ["python"], "supports": ["codex-cli"]},
+                    "lint-config@2": {"runtimes": ["python"], "supports": ["codex-cli"]},
                     **(components or {}),
                 },
             ),
             InMemoryResolver(
                 RefKind.SCORER,
-                {"correctness@1": {"exact": True}, "code-quality@3": {"exact": True}},
-                bindings={"code-quality@3": {"runtimes": ["python"]}, **(scorers or {})},
+                {"correctness@2": {"exact": True}, "code-quality@4": {"exact": True}},
+                bindings={"code-quality@4": {"runtimes": ["python"]}, **(scorers or {})},
             ),
             MetricResolver(),
         ],
@@ -213,24 +213,24 @@ def test_rt3_components_must_cover_the_runtime_and_support_the_arms_agent(
 ) -> None:
     document = experiment_document(id="node-ts__fixture__test", runtime="node-ts")
     document["problems"] = [{"ref": FORGE_NODE}]
-    document["conditions"][1]["components"].append({"use": "lint-config@1", "files": []})
-    document["shared_components"] = [{"use": "rules-file@1", "files": ["components/AGENTS.md"]}]
+    document["conditions"][1]["components"].append({"use": "lint-config@2", "files": []})
+    document["shared_components"] = [{"use": "rules-file@2", "files": ["components/AGENTS.md"]}]
     document["conditions"][1]["components"] = document["conditions"][1]["components"][1:]
     path = write_experiment(tmp_path, document)
     claude_only = {"runtimes": ["*"], "supports": ["claude-code"]}
 
     issues = _issues(
         path,
-        resolvers=_resolvers(components={"rules-file@1": claude_only}),
+        resolvers=_resolvers(components={"rules-file@2": claude_only}),
         pack_loader=_node_pack,
     )
 
     assert (
-        "[RT3] lint-config@1 supports runtimes [python]; experiment runtime is node-ts"
+        "[RT3] lint-config@2 supports runtimes [python]; experiment runtime is node-ts"
         in (issues["conditions.1.components.0.use"])
     )
     assert (
-        "[RT3] rules-file@1 does not support agent codex (arm baseline runs it)"
+        "[RT3] rules-file@2 does not support agent codex (arm baseline runs it)"
         in (issues["shared_components.0.use"])
     )
 
@@ -238,12 +238,12 @@ def test_rt3_components_must_cover_the_runtime_and_support_the_arms_agent(
 def test_rt4_scorers_and_the_metric_must_cover_the_runtime(tmp_path: Path) -> None:
     document = experiment_document(id="node-ts__fixture__test", runtime="node-ts")
     document["problems"] = [{"ref": FORGE_NODE}]
-    document["assessment"] = {"scorers": ["correctness@1", "code-quality@3"]}
+    document["assessment"] = {"scorers": ["correctness@2", "code-quality@4"]}
     path = write_experiment(tmp_path, document)
 
     issues = _issues(path, pack_loader=_node_pack)
 
-    assert "[RT4] code-quality@3 supports runtimes [python]" in issues["assessment.scorers.1"]
+    assert "[RT4] code-quality@4 supports runtimes [python]" in issues["assessment.scorers.1"]
     assert (
         "[RT4] headline metric scb-canonical@1 measures quality components for runtimes "
         in (issues["assessment.metric"])
@@ -330,13 +330,13 @@ def test_the_real_resolvers_report_binding_facts() -> None:
         RegistryRef.parse(RefKind.PROBLEM, "scb/forge@38d627ecf668"), base_dir=repo
     )
     lint = ComponentResolver().resolve(
-        RegistryRef.parse(RefKind.COMPONENT, "lint-config@1"), base_dir=repo
+        RegistryRef.parse(RefKind.COMPONENT, "lint-config@2"), base_dir=repo
     )
     rules = ComponentResolver().resolve(
-        RegistryRef.parse(RefKind.COMPONENT, "rules-file@1"), base_dir=repo
+        RegistryRef.parse(RefKind.COMPONENT, "rules-file@2"), base_dir=repo
     )
     quality = scorer_resolver().resolve(
-        RegistryRef.parse(RefKind.SCORER, "code-quality@3"), base_dir=repo
+        RegistryRef.parse(RefKind.SCORER, "code-quality@4"), base_dir=repo
     )
 
     assert problem.binding == PYTHON_BINDING
@@ -357,7 +357,7 @@ def _job(root: Path, runtime: str, bundle_digest: str) -> Path:
         {
             "lock_version": LOCK_VERSION,
             "experiment": {"id": "e"},
-            "spec": {"runtime": runtime, "assessment": {"scorers": ["correctness@1"]}},
+            "spec": {"runtime": runtime, "assessment": {"scorers": ["correctness@2"]}},
             "execution": {
                 "references": {
                     "problem": {
@@ -394,7 +394,7 @@ def test_as1_rescore_scorers_must_cover_the_jobs_runtime(tmp_path: Path) -> None
         "--store",
         str(store),
         "--scorer",
-        "code-quality@3",
+        "code-quality@4",
     )
     allowed = _assess(
         "--rescore",
@@ -404,12 +404,12 @@ def test_as1_rescore_scorers_must_cover_the_jobs_runtime(tmp_path: Path) -> None
         "--store",
         str(store),
         "--scorer",
-        "correctness@1",
+        "correctness@2",
     )
 
     assert refused.exit_code != 0
     assert (
-        "[AS1] scorer code-quality@3 supports runtimes [python]; the job's runtime is node-ts"
+        "[AS1] scorer code-quality@4 supports runtimes [python]; the job's runtime is node-ts"
         in (refused.output)
     )
     assert "[AS1]" not in allowed.output
@@ -422,7 +422,7 @@ def test_as1_a_trial_outside_any_job_accepts_only_runtime_agnostic_scorers(
     trial.mkdir(parents=True)
 
     refused = _assess(
-        "--rescore", str(trial), "--store", str(tmp_path / "s"), "--scorer", "code-quality@3"
+        "--rescore", str(trial), "--store", str(tmp_path / "s"), "--scorer", "code-quality@4"
     )
 
     assert refused.exit_code != 0
@@ -442,7 +442,7 @@ def test_as1_a_bundle_override_must_be_the_verifier_bundle_the_lock_binds(
     target = job / "trials" if mode == "--rescore" else job
     lock = ["--lock", str(job / "job.lock.json")]
     store = (
-        ["--store", str(tmp_path / "s"), "--scorer", "correctness@1"] if mode == "--rescore" else []
+        ["--store", str(tmp_path / "s"), "--scorer", "correctness@2"] if mode == "--rescore" else []
     )
 
     refused = _assess(mode, str(target), *lock, *store, "--bundle", str(other.root))

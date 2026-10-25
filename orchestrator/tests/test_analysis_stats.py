@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import math
+
 import pytest
 
 from raidar.evaluation.analysis.stats import (
@@ -59,6 +61,16 @@ def test_exact_mcnemar_counts_only_discordant_pairs() -> None:
     assert mcnemar_exact(0, 6) == pytest.approx(0.03125)
     assert mcnemar_exact(1, 9) == mcnemar_exact(9, 1) == pytest.approx(0.021484375)
     assert mcnemar_exact(3, 3) == 1.0
+    # Exact integer tails remain valid beyond the floating-point exponent range,
+    # for balanced, imbalanced and all-one-direction tables alike.
+    for left, right in ((512, 512), (500, 524), (1, 1023), (0, 1024), (2048, 2048)):
+        probability = mcnemar_exact(left, right)
+        assert math.isfinite(probability)
+        assert 0.0 <= probability <= 1.0
+        assert probability == mcnemar_exact(right, left)
+    assert mcnemar_exact(512, 512) == mcnemar_exact(2048, 2048) == 1.0
+    assert mcnemar_exact(0, 1024) == math.ldexp(1.0, -1023)
+    assert mcnemar_exact(1, 1023) == math.ldexp(1025.0, -1023)
 
 
 @pytest.mark.parametrize(

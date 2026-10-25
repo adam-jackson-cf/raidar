@@ -1,5 +1,11 @@
 # Creating A New Scenario
 
+> **Historical reference — retired scenario workflow.** The instructions below
+> describe the archived scenario epoch and must not be used to author current
+> experiments. Start with the [root README](../../README.md), which defines the
+> experiment workflow and current repository layout. Use `make help` for the
+> supported command catalogue. Do not recreate scenario, revision or matrix trees.
+
 Use this guide to create a versioned scenario that runs in the orchestrator for any supported `AgentSpec` (`harness + model`).
 
 ## 1. Create Versioned Scenario Structure

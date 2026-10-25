@@ -71,7 +71,7 @@ from tests.component_trial_support import (
     run_trial_sync,
 )
 
-REF = "guardrail-gate@4"
+REF = "guardrail-gate@5"
 INNER = "tests.test_guardrail_gate_workflow:ScriptedInnerAgent"
 LAYOUT_INNER = "tests.test_guardrail_gate_workflow:LayoutInnerAgent"
 # Fails until the agent has written fixed.txt; prints a recognised check line.
@@ -867,6 +867,84 @@ def test_the_shadow_copy_leaves_out_the_excludes_and_links_the_venv(
     assert git == "", "the copy has no .git"
 
 
+@pytest.mark.parametrize("absolute", [False, True])
+@pytest.mark.parametrize("directory_link", [False, True])
+def test_shadow_autofix_isolates_internal_file_and_directory_symlinks(
+    tmp_path: Path, shims: Path, absolute: bool, directory_link: bool
+) -> None:
+    command = (
+        "python3 -I -c "
+        + shlex.quote(
+            "from pathlib import Path; p = Path('linked/value.py'); "
+            "p.write_text(p.read_text().replace('x  =', 'x ='))"
+            if directory_link
+            else "from pathlib import Path; p = Path('linked.py'); "
+            "p.write_text(p.read_text().replace('x  =', 'x ='))"
+        )
+        + "; "
+        + TOY_AUTOFIX
+    )
+    agent, environment = _autofix_agent(
+        tmp_path,
+        shims,
+        mode="shadow",
+        autofix_before_check=True,
+        autofix_command=command,
+    )
+    workspace = (tmp_path / "app").resolve()
+    package = workspace / "package"
+    package.mkdir()
+    original = package / "value.py"
+    original.write_text("x  = 7\n")
+    target = package if directory_link else original
+    link = workspace / ("linked" if directory_link else "linked.py")
+    link.symlink_to(target if absolute else target.relative_to(workspace), directory_link)
+
+    gate = _run(agent, environment)
+
+    assert original.read_text() == "x  = 7\n"
+    assert link.is_symlink()
+    expected_target = original.parent if directory_link else original
+    assert link.resolve() == expected_target
+    (fix,) = gate["autofix"]["runs"]
+    assert fix["error_type"] is None
+    assert fix["post_check"]["passed"] is True
+
+
+@pytest.mark.parametrize("target_kind", ["absolute", "relative", "excluded", "broken"])
+def test_shadow_autofix_refuses_links_that_cannot_be_isolated(
+    tmp_path: Path, shims: Path, target_kind: str
+) -> None:
+    marker = tmp_path / "autofix-started"
+    command = f"touch {shlex.quote(str(marker))}; {TOY_AUTOFIX}"
+    agent, environment = _autofix_agent(
+        tmp_path,
+        shims,
+        mode="shadow",
+        autofix_before_check=True,
+        autofix_command=command,
+    )
+    workspace = (tmp_path / "app").resolve()
+    outside = tmp_path / "outside.py"
+    outside.write_text("x  = 7\n")
+    targets = {
+        "absolute": outside.resolve(),
+        "relative": Path("../outside.py"),
+        "excluded": Path(".venv/big.bin"),
+        "broken": Path("missing.py"),
+    }
+    (workspace / "linked.py").symlink_to(targets[target_kind])
+
+    gate = _run(agent, environment)
+
+    assert outside.read_text() == "x  = 7\n"
+    assert not marker.exists(), "the autofix must not run against an unsafe copy"
+    (fix,) = gate["autofix"]["runs"]
+    assert fix["error_type"] == "copy_failed"
+    assert fix["post_check"] is None
+    assert gate["termination_reason"] == "shadow_recorded"
+
+
 def test_a_failed_shadow_autofix_is_typed_with_no_post_check(tmp_path: Path, shims: Path) -> None:
     agent, environment = _autofix_agent(
         tmp_path, shims, mode="shadow", autofix_before_check=True, autofix_command="exit 4"
@@ -1021,7 +1099,7 @@ def test_the_gate_and_another_workflow_cannot_both_wrap_the_agent() -> None:
     with pytest.raises(ComponentRejectedError, match="more than one workflow wraps the agent"):
         compile_uses(
             use(REF, command="make check"),
-            use("review-loop@2", max_review_rounds=2),
+            use("review-loop@3", max_review_rounds=2),
         )
 
 
@@ -1063,7 +1141,7 @@ def test_planted_failure_refuses_the_commit_in_a_real_two_step_harbor_trial(
     tmp_path: Path,
 ) -> None:
     compiled = compile_uses(
-        use("workspace-files@1", ("components/gate/toy-gate.sh",)),
+        use("workspace-files@2", ("components/gate/toy-gate.sh",)),
         use(REF, command="bash toy-gate.sh", max_rounds=2, timeout_sec=60),
     )
     task = tmp_path / "guardrail-gate"

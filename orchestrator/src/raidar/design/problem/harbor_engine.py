@@ -120,8 +120,11 @@ async def run_variant(
     *,
     repeats: int,
     docker_context: str,
+    concurrency: int,
 ) -> list[StepGrades]:
-    """Run ``repeats`` concurrent trials of one variant; grades per repeat."""
+    """Run one variant's repeats within the selected target's concurrency limit."""
+    if concurrency < 1:
+        raise ValueError("concurrency must be >= 1")
     task = variant_task(problem, payloads, work / "tasks" / variant)
     bundle_root = problem.bundle.root
     configs = [
@@ -130,6 +133,12 @@ async def run_variant(
         )
         for index in range(repeats)
     ]
-    outcomes = await asyncio.gather(*(_run_trial(config, bundle_root) for config in configs))
+    gate = asyncio.Semaphore(concurrency)
+
+    async def run_trial(config: TrialConfig) -> tuple[Path, str | None]:
+        async with gate:
+            return await _run_trial(config, bundle_root)
+
+    outcomes = await asyncio.gather(*(run_trial(config) for config in configs))
     steps = list(payloads)
     return [read_grades(trial_dir, steps, error) for trial_dir, error in outcomes]

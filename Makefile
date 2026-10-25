@@ -68,17 +68,17 @@ EXPERIMENT_SET ?=
 LOCK_CHECK ?=
 TIMEOUT_SEC ?=
 
-# Experiment-path smoke workflow: the smoke experiment (kind smoke) and the agent benchmark
-# (kind benchmark) are locked under var/tmp/smoke with the target's overrides and run through
+# Experiment-path smoke workflow: operational smoke experiments (kind smoke)
+# are locked under var/tmp/smoke with the target's overrides and run through
 # Harbor (Docker; the TARGET target).
 SMOKE_EXPERIMENT ?= lab/experiments/smoke/python__circuit_eval-cp1__agent-health/experiment.yaml
-SMOKE_AGENTS_EXPERIMENT ?= lab/experiments/benchmark/python__circuit_eval-cp1__agents/experiment.yaml
+SMOKE_AGENTS_EXPERIMENT ?= lab/experiments/smoke/python__circuit_eval-cp1__pack-agent-health/experiment.yaml
 SMOKE_JOBS_DIR ?= $(RAIDAR_VAR)/jobs
 SMOKE_LOCK_DIR ?= $(REPO_TMP_DIR)/smoke
 SMOKE_ATTEMPTS ?= 1
 SMOKE_CONCURRENCY ?= 1
 # smoke-agents arms: one per agent the Python pack bakes in (the arm ids of the
-# agent benchmark experiment). SMOKE_ARM selects one of them.
+# multi-agent smoke experiment). SMOKE_ARM selects one of them.
 SMOKE_ARM ?=
 SMOKE_ARMS := codex claude
 ifneq ($(strip $(SMOKE_ARM)),)
@@ -199,11 +199,11 @@ help:
 	@echo "                                                        ALLOW_UNSMOKED=1 overrides and records it in job.json (admission)"
 	@echo "  make experiment-status JOB=<job-dir> [LOG_LINES=20]   A job's state (running, finished, failed, died), trials recorded of selected, log tail"
 	@echo "  make health JOB=<job-dir>                             Recompute every trial's health.json (V/H/L/P/T checks) and append fault-candidates.jsonl; exit 1 on a violation"
-	@echo "  make experiment-assess JOB=<job-dir> STORE=<assessment-store> SCORERS=\"correctness@1 ...\" [LOCK=] [ASSESSMENT_CONFIG=] [REPLAY=1] [CONCURRENCY=N] [ASSESS_OUT=report.json]"
+	@echo "  make experiment-assess JOB=<job-dir> STORE=<assessment-store> SCORERS=\"correctness@2 ...\" [LOCK=] [ASSESSMENT_CONFIG=] [REPLAY=1] [CONCURRENCY=N] [ASSESS_OUT=report.json]"
 	@echo "                                                        Score a job's stored trials into an Assessment store (never re-runs agents; AS1-gated)"
-	@echo "                                                        (process-compliance@6 is deterministic only;"
-	@echo "                                                        with gate-effort@10 it first grades guardrail-gate@4 pre-fix snapshots into STORE, and with"
-	@echo "                                                        code-quality@3 it first makes deferred coverage runs (verifier_coverage: offline) into STORE: Docker target;"
+	@echo "                                                        (process-compliance@7 is deterministic only;"
+	@echo "                                                        with gate-effort@11 it first grades guardrail-gate@5 pre-fix snapshots into STORE, and with"
+	@echo "                                                        code-quality@4 it first makes deferred coverage runs (verifier_coverage: offline) into STORE: Docker target;"
 	@echo "                                                        CONCURRENCY=N works on N trials at once, each trial's steps in order; default 1)"
 	@echo "  make assess-regrade JOB=<trial-or-job-dir> [VERIFIER_BUNDLE=<dir>] [STORE=<assessment-store>] [COVERAGE_CHECK=1 [CONCURRENCY=N]] [REGRADE_OUT=report.json]"
 	@echo "                                                        Rerun the verifier over stored step snapshots (and, with STORE, the stored pre-fix grades); fails if results differ;"

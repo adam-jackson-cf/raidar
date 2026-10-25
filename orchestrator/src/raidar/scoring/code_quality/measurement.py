@@ -48,6 +48,11 @@ _BOOTSTRAP = (
 # Measurement must never write into a stored snapshot: Ruff runs with the snapshot as its
 # working directory and would otherwise create ``.ruff_cache`` there.
 _READ_ONLY_ENV = {"RUFF_NO_CACHE": "true", "PYTHONDONTWRITEBYTECODE": "1"}
+# Parsing needs process/platform settings, not the assessor's credentials or Python
+# import overrides. Python -I also excludes candidate modules from every tool invocation.
+_PROCESS_ENV_NAMES = frozenset(
+    {"PATH", "SYSTEMROOT", "WINDIR", "TMPDIR", "TMP", "TEMP", "LANG", "LC_ALL", "LC_CTYPE", "TZ"}
+)
 
 
 class MeasurementError(ValueError):
@@ -78,7 +83,10 @@ def run_process(
             encoding="utf-8",
             timeout=deadline_s,
             check=False,
-            env={**os.environ, **_READ_ONLY_ENV},
+            env={
+                **{name: value for name, value in os.environ.items() if name in _PROCESS_ENV_NAMES},
+                **_READ_ONLY_ENV,
+            },
         )
     except subprocess.TimeoutExpired as error:
         raise MeasurementError("measurement_environment_mismatch: measurement timed out") from error

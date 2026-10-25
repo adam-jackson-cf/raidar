@@ -3,8 +3,8 @@
 Inputs are the job's ``TrialRecord`` (validity and identity) and the
 stored ``AssessResult`` of each scorer (``None`` when the store has no
 Assessment for this trial). Nothing is recomputed from raw run files:
-correctness comes from ``correctness@1``, quality from ``code-quality@3``,
-cost from ``resource-usage@1``, and the headline score from the experiment's
+correctness comes from ``correctness@2``, quality from ``code-quality@4``,
+cost from ``resource-usage@2``, and the headline score from the experiment's
 Metric applied to those components.
 
 The score component C (``correctness``) is the policy's definition
@@ -18,7 +18,7 @@ Two derivations are analysis-owned:
   before the last checkpoint (``not_attempted`` counts as unsolved, memo §10.1);
 - ``strict_solved[k]`` is 1 exactly when ``k`` lies in the reached prefix;
 - the ``*_errata`` outcomes repeat ``solve_rate``, ``reached`` and
-  ``final_solved`` over ``correctness@1``'s errata-applied metrics (the problem's
+  ``final_solved`` over ``correctness@2``'s errata-applied metrics (the problem's
   pinned errata); they are labelled as such and never replace the raw ones;
 - the ``gate.*`` outcomes (a gate-effort scorer, only when the lock declares
   one) are the scorer's trajectory metrics as stored: an arm without the commit
@@ -317,7 +317,7 @@ EXCLUDED_CASES = "regression_parity_excluded_cases"
 def disagreements(result: AssessResult | None) -> Value:
     """Grader cases whose outcome differed between grading and coverage, over a trial.
 
-    The sum of code-quality@3's per-transition ``regression_parity_excluded_cases``
+    The sum of code-quality@4's per-transition ``regression_parity_excluded_cases``
     over the transitions that measured it (a transition whose G read no run is not
     applicable and adds nothing). A diagnostic of the verifier, described, never compared.
     """

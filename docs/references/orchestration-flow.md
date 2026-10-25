@@ -1,5 +1,11 @@
 # Raidar Orchestration Flow
 
+> **Historical reference — retired scenario execution.** The flow below describes
+> the archived scenario epoch, including removed commands and paths. It is not the
+> current execution contract. The [root README](../../README.md) is the human
+> entrypoint for experiment → lock → job → assessment → analysis → review;
+> `make help` lists the supported public commands.
+
 End-to-end flow for scenario execution, runtime stack validation, Harbor runtime orchestration, scoring, and experiment artifacts.
 
 ## 1. Scenario Resolution

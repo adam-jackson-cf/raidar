@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 from collections.abc import Mapping
 from pathlib import Path
@@ -13,9 +14,10 @@ from harbor.models.task.task import Task
 
 from raidar.cli import main
 from raidar.design.problem import direct, harbor_engine, validator
-from raidar.design.problem.models import ProblemId
+from raidar.design.problem.models import ProblemId, SourcePin
 from raidar.design.problem.native import grade_from_evaluation, stage_catalog
 from raidar.design.problem.rewrite import VERIFIER_IMPORT_PATH
+from raidar.design.problem.source import PinnedCheckout, SourceError
 from raidar.design.problem.store import ProblemStore
 from raidar.design.problem.validation import (
     NEGATIVE,
@@ -40,6 +42,7 @@ from tests.problems_support import (
     NEGATIVE_REF,
     ONESHOT_REF,
     POSITIVE_REF,
+    build_fake_scb_repo,
     build_fixture_store,
 )
 from tests.verifier_support import LocalProcessSandbox
@@ -416,7 +419,14 @@ async def test_validator_wires_the_harbor_engine_and_the_native_arm(
     harbor_calls: list[tuple[str, int]] = []
 
     async def fake_variant(
-        imported: Any, variant: str, payloads: Any, work: Path, *, repeats: int, docker_context: str
+        imported: Any,
+        variant: str,
+        payloads: Any,
+        work: Path,
+        *,
+        repeats: int,
+        docker_context: str,
+        concurrency: int,
     ) -> list[Mapping[str, Grade]]:
         harbor_calls.append((variant, repeats))
         grades = await direct.grade_references(
@@ -426,6 +436,9 @@ async def test_validator_wires_the_harbor_engine_and_the_native_arm(
 
     class Checkout:
         root = tmp_path / "checkout"
+
+        def verify_clean(self, *paths: str) -> None:
+            assert paths == ("adder",)
 
     (Checkout.root / "adder").mkdir(parents=True)
     monkeypatch.setattr(harbor_engine, "run_variant", fake_variant)
@@ -517,3 +530,77 @@ async def test_a_weaker_validation_never_replaces_the_committed_report(
     assert weaker != committed
     assert weaker == store.validation_attempt_path(ProblemId.parse(ONESHOT_REF))
     assert validator.default_report_path(store, full) == committed
+
+
+async def test_failed_revalidation_revokes_admission_even_with_skipped_checks(
+    store: ProblemStore, tmp_path: Path
+) -> None:
+    report = await _validate(store, ONESHOT_REF, tmp_path, repeats=2)
+    report.checks = [Check(check.name, CheckStatus.PASS) for check in report.checks]
+    problem_id = ProblemId.parse(ONESHOT_REF)
+    committed = store.validation_path(problem_id)
+    write_report(report, committed)
+    assert store.require_validated(problem_id, store.load_manifest(problem_id)).usable
+
+    report.checks = [
+        Check("reference_k_passes_1..k", CheckStatus.FAIL),
+        Check("native_parity_positive", CheckStatus.NOT_RUN),
+    ]
+    path = validator.default_report_path(store, report)
+    assert path == committed
+    write_report(report, path)
+    with pytest.raises(ValueError, match="not usable.*excluded"):
+        store.require_validated(problem_id, store.load_manifest(problem_id))
+
+
+@pytest.mark.parametrize("limit", [1, 2])
+async def test_harbor_validation_respects_concurrency_across_all_repeats(
+    store: ProblemStore, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, limit: int
+) -> None:
+    problem = store.load(ProblemId.parse(ONESHOT_REF))
+    active = 0
+    peak = 0
+    completed: list[str] = []
+
+    async def run_trial(config: Any, bundle_root: Path) -> tuple[Path, None]:
+        nonlocal active, peak
+        active += 1
+        peak = max(peak, active)
+        await asyncio.sleep(0)
+        completed.append(config.trial_name)
+        active -= 1
+        return tmp_path / config.trial_name, None
+
+    monkeypatch.setattr(harbor_engine, "_run_trial", run_trial)
+    monkeypatch.setattr(harbor_engine, "read_grades", lambda *args: {})
+    runs = await validator._harbor_runs(
+        problem,
+        ValidateOptions("test-ctx", engine="harbor", repeats=5, concurrency=limit),
+        tmp_path / "harbor",
+    )
+    assert peak == limit
+    assert len(completed) == len(set(completed)) == 10
+    assert {variant: len(repeats) for variant, repeats in runs.items()} == {
+        POSITIVE: 5,
+        NEGATIVE: 5,
+    }
+
+
+@pytest.mark.parametrize("dirty_file", ["config.yaml", "untracked.py"])
+def test_native_parity_refuses_modified_problem_sources_before_staging(
+    store: ProblemStore, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, dirty_file: str
+) -> None:
+    checkout_root, commit = build_fake_scb_repo(tmp_path / "source")
+    checkout = PinnedCheckout(checkout_root, SourcePin(url="fixture://adder", commit=commit))
+    (checkout_root / "adder" / dirty_file).write_text("modified source\n")
+    monkeypatch.setattr(validator, "resolve_checkout", lambda *args: checkout)
+    staged: list[Path] = []
+    monkeypatch.setattr(validator, "stage_catalog", lambda source, catalog: staged.append(source))
+    with pytest.raises(SourceError, match="local changes"):
+        validator._native_runs(
+            store,
+            store.load(ProblemId.parse(POSITIVE_REF)),
+            ValidateOptions("test-ctx", native_runner=tmp_path / "runner"),
+            tmp_path / "native",
+        )
+    assert not staged

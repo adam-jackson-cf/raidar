@@ -145,7 +145,7 @@ def test_gate_refuses_with_the_pinned_pack_and_tampering_is_flagged_in_a_real_tr
 ) -> None:
     TamperingInnerAgent.sessions.clear()
     gate = {**_gate_use(), "max_rounds": 1, "timeout_sec": 120}
-    compiled = compile_uses(use("python-guardrails@8"), use("guardrail-gate@4", **gate))
+    compiled = compile_uses(use("python-guardrails@8"), use("guardrail-gate@5", **gate))
     task = tmp_path / "python-guardrails"
     build_task(task, compiled, {"checkpoint_1": "step one", "checkpoint_2": "step two"})
     assert compiled.agent_wrapper is not None
@@ -220,7 +220,7 @@ def test_the_shadow_baseline_records_the_gate_unseen_in_a_real_trial(tmp_path: P
     ObservingInnerAgent.sessions.clear()
     gate = {**_gate_use("shadow"), "timeout_sec": 120}
     compiled = compile_uses(
-        use("python-guardrails@8", workspace_configs=False), use("guardrail-gate@4", **gate)
+        use("python-guardrails@8", workspace_configs=False), use("guardrail-gate@5", **gate)
     )
     task = tmp_path / "python-guardrails-shadow"
     build_task(task, compiled, {"checkpoint_1": "step one", "checkpoint_2": "step two"})

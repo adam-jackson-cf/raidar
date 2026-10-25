@@ -97,6 +97,7 @@ export function QualityRunPage() {
             selection={selection}
             evidence={data.evidence}
             exclusions={data.exclusions}
+            rows={data.rows}
             onClose={() => setSelection(null)}
           />
         ) : (

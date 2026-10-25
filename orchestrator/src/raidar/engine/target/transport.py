@@ -29,6 +29,18 @@ _STOP_WAIT_S = 5.0
 Runner = Callable[[Sequence[str], float | None], subprocess.CompletedProcess[str]]
 
 
+def bounded_runner(runner: Runner, deadline: float, clock: Callable[[], float]) -> Runner:
+    """Share a wall-clock deadline across subprocesses, including their execution time."""
+
+    def run(argv: Sequence[str], timeout: float | None) -> subprocess.CompletedProcess[str]:
+        remaining = deadline - clock()
+        if remaining <= 0:
+            raise TimeoutError("target operation deadline exceeded")
+        return runner(argv, remaining if timeout is None else min(timeout, remaining))
+
+    return run
+
+
 def run_command(
     argv: Sequence[str], timeout: float | None = None
 ) -> subprocess.CompletedProcess[str]:
@@ -45,6 +57,8 @@ class SpawnedProcess(Protocol):
     pid: int
 
     def poll(self) -> int | None: ...
+
+    def kill(self) -> None: ...
 
 
 Spawner = Callable[[Sequence[str], Path], SpawnedProcess]
@@ -163,47 +177,65 @@ def transport_up(
     base: Path | None = None,
     timeout_s: float = UP_TIMEOUT_S,
     sleep: Callable[[float], None] = time.sleep,
+    clock: Callable[[], float] = time.monotonic,
+    deadline: float | None = None,
 ) -> int:
     """Start (or restart) the tunnel and wait until the daemon answers; the tunnel's pid."""
     transport = target.transport
     if transport is None:
         raise ValueError(f"target {target.name!r} has no transport")
+    deadline = min(clock() + timeout_s, deadline) if deadline is not None else clock() + timeout_s
+    runner = bounded_runner(runner, deadline, clock)
     paths = TransportPaths.of(target, base)
-    transport_down(target, base=base, sleep=sleep)
+    transport_down(target, base=base, sleep=sleep, runner=runner, deadline=deadline, clock=clock)
     paths.socket.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
     ensure_context(target, paths, runner)
     process = spawner(ssh_argv(transport, paths.socket), paths.log)
     paths.pidfile.write_text(f"{process.pid}\n")
-    waited = 0.0
-    while waited <= timeout_s:
-        if process.poll() is not None:
-            raise RuntimeError(
-                f"ssh tunnel to {transport.host} exited ({process.poll()}); see {paths.log}"
-            )
-        if docker_healthy(target.docker_context, runner):
-            return process.pid
-        sleep(_POLL_S)
-        waited += _POLL_S
-    transport_down(target, base=base, sleep=sleep)
-    raise RuntimeError(
-        f"docker did not answer on {target.docker_context} within {timeout_s:.0f}s; see {paths.log}"
-    )
+    try:
+        while clock() < deadline:
+            if process.poll() is not None:
+                raise RuntimeError(
+                    f"ssh tunnel to {transport.host} exited ({process.poll()}); see {paths.log}"
+                )
+            if docker_healthy(target.docker_context, runner):
+                return process.pid
+            sleep(min(_POLL_S, max(0.0, deadline - clock())))
+        raise RuntimeError(
+            f"docker did not answer on {target.docker_context} within {timeout_s:.0f}s; "
+            f"see {paths.log}"
+        )
+    except BaseException:
+        # This child is ours: cleanup needs no further subprocess or timeout budget.
+        if process.poll() is None:
+            with contextlib.suppress(ProcessLookupError):
+                process.kill()
+        paths.pidfile.unlink(missing_ok=True)
+        paths.socket.unlink(missing_ok=True)
+        raise
 
 
 def transport_down(
-    target: Target, *, base: Path | None = None, sleep: Callable[[float], None] = time.sleep
+    target: Target,
+    *,
+    base: Path | None = None,
+    sleep: Callable[[float], None] = time.sleep,
+    runner: Runner = run_command,
+    deadline: float | None = None,
+    clock: Callable[[], float] = time.monotonic,
 ) -> bool:
     """Stop the tunnel; whether one was running."""
     paths = TransportPaths.of(target, base)
     pid = read_pid(paths)
-    was_running = tunnel_running(paths)
+    was_running = tunnel_running(paths, runner)
     if pid is not None and was_running:
         with contextlib.suppress(ProcessLookupError):
             os.kill(pid, signal.SIGTERM)
-            waited = 0.0
-            while pid_alive(pid) and waited < _STOP_WAIT_S:
-                sleep(0.1)
-                waited += 0.1
+            stop_deadline = clock() + _STOP_WAIT_S
+            if deadline is not None:
+                stop_deadline = min(stop_deadline, deadline)
+            while pid_alive(pid) and clock() < stop_deadline:
+                sleep(min(0.1, max(0.0, stop_deadline - clock())))
             if pid_alive(pid):
                 os.kill(pid, signal.SIGKILL)
     paths.pidfile.unlink(missing_ok=True)

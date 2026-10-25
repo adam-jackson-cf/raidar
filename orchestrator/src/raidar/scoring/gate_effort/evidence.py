@@ -14,7 +14,7 @@ from raidar.scoring.framework.result import Evidence, EvidenceSource, Span
 from raidar.scoring.gate_effort.families import family_counts
 from raidar.scoring.gate_effort.metrics import BLOCKING_FINDINGS
 from raidar.scoring.gate_effort.outcomes import Step
-from raidar.scoring.gate_effort.records import GateRunView, RunFindings
+from raidar.scoring.gate_effort.records import GateRunView, RunFindings, _inside
 
 
 def families_text(findings: RunFindings) -> str:
@@ -40,7 +40,7 @@ def run_summary(run: GateRunView) -> str:
 
 
 def _run_evidence(step: str, trace_dir: Path, run: GateRunView) -> Evidence | None:
-    path = trace_dir / run.log if run.log else None
+    path = _inside(trace_dir, run.log)
     if path is None or not path.is_file():
         return None
     data = path.read_bytes()

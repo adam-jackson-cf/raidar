@@ -1,5 +1,7 @@
 """Tests for Gemini adapter behavior."""
 
+import sys
+
 import pytest
 
 from raidar.subject.agent.adapters.factory import resolve_adapter
@@ -35,14 +37,14 @@ def test_validate_rejects_non_google_provider():
 
 
 def test_validate_rejects_unsupported_model(monkeypatch: pytest.MonkeyPatch):
-    monkeypatch.setenv("GEMINI_CLI_PATH", "/usr/local/bin/gemini")
+    monkeypatch.setenv("GEMINI_CLI_PATH", sys.executable)
     adapter = GeminiCliAdapter(_config("gemini-2.0-flash"))
     with pytest.raises(ValueError, match="only supports models"):
         adapter.validate()
 
 
 def test_validate_requires_api_key(monkeypatch: pytest.MonkeyPatch):
-    monkeypatch.setenv("GEMINI_CLI_PATH", "/usr/local/bin/gemini")
+    monkeypatch.setenv("GEMINI_CLI_PATH", sys.executable)
     monkeypatch.delenv("GEMINI_API_KEY", raising=False)
     adapter = GeminiCliAdapter(_config("gemini-3-pro-preview"))
     with pytest.raises(OSError, match="require credentials; set: GEMINI_API_KEY"):
@@ -50,7 +52,7 @@ def test_validate_requires_api_key(monkeypatch: pytest.MonkeyPatch):
 
 
 def test_validate_rejects_reasoning_effort(monkeypatch: pytest.MonkeyPatch):
-    monkeypatch.setenv("GEMINI_CLI_PATH", "/usr/local/bin/gemini")
+    monkeypatch.setenv("GEMINI_CLI_PATH", sys.executable)
     monkeypatch.setenv("GEMINI_API_KEY", "test-key")
     adapter = GeminiCliAdapter(_config("gemini-3-pro-preview", reasoning_effort="high"))
 
@@ -67,16 +69,16 @@ def test_validate_rejects_reasoning_effort(monkeypatch: pytest.MonkeyPatch):
     ],
 )
 def test_validate_accepts_supported_models(monkeypatch: pytest.MonkeyPatch, model_name: str):
-    monkeypatch.setenv("GEMINI_CLI_PATH", "/usr/local/bin/gemini")
+    monkeypatch.setenv("GEMINI_CLI_PATH", sys.executable)
     monkeypatch.setenv("GEMINI_API_KEY", "test-key")
     adapter = GeminiCliAdapter(_config(model_name))
     adapter.validate()
 
 
 def test_runtime_env_forwards_cli_only(monkeypatch: pytest.MonkeyPatch):
-    monkeypatch.setenv("GEMINI_CLI_PATH", "/usr/local/bin/gemini")
+    monkeypatch.setenv("GEMINI_CLI_PATH", sys.executable)
     monkeypatch.setenv("GEMINI_API_KEY", "test-key")
     adapter = GeminiCliAdapter(_config("gemini-3-pro-preview"))
     env = adapter.runtime_env()
-    assert env["GEMINI_CLI_PATH"] == "/usr/local/bin/gemini"
+    assert env["GEMINI_CLI_PATH"] == sys.executable
     assert "GEMINI_API_KEY" not in env

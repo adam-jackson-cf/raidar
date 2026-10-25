@@ -7,7 +7,7 @@ conditions:
       - use: python-guardrails@8
         with:
           workspace_configs: false
-      - use: guardrail-gate@4
+      - use: guardrail-gate@5
         with:
           command: guardrail-check
           mode: shadow
@@ -20,7 +20,7 @@ conditions:
       - use: python-guardrails@8
         with:
           workspace_configs: true
-      - use: guardrail-gate@4
+      - use: guardrail-gate@5
         with:
           command: guardrail-check
           mode: commit

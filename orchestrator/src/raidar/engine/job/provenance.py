@@ -1,57 +1,57 @@
 """What a job records about the code and limits it ran under (pooling gate inputs).
 
 ``job.json`` carries ``runner`` (the Raidar checkout's commit and dirty flag, and the
-spec/lock toolchain digest a lock records as ``toolchain.raidar_spec``), ``recipes``
-(the pack image recipe hash and each problem's grader recipe digest, never image ids,
-which differ per daemon) and ``effective_limits`` (the per-phase timeouts the trials
-were configured with).
+spec/lock toolchain digest a lock records as ``toolchain.raidar_spec``, plus a separate
+semantic execution-code digest), and ``effective_limits`` (the per-phase timeouts
+the trials were configured with). Recipe identities live in ``job.recipe``.
 """
 
 from __future__ import annotations
 
-from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
 from harbor.models.task.config import EnvironmentConfig as TaskEnvironmentConfig
 from harbor.models.trial.config import TrialConfig
 
+from raidar.contract.canonical import digest_json
+from raidar.contract.source_digest import SOURCE_DIGEST_SCHEME, python_source_digest
 from raidar.design.experiment.lock import spec_source_digest
-from raidar.design.problem.store import ImportedProblem
 from raidar.engine.job.detach import git_state
 from raidar.engine.trial.config import verifier_timeout_s
 from raidar.engine.trial.plan import ExperimentPlan
-from raidar.grading.grader_image import grader_image_tag
-from raidar.subject.environment import load_runtime_pack
-from raidar.subject.environment.python.image import image_lock_hash
 
 # Changes here never reach a trial, so they do not make the runner dirty (the
 # user keeps untracked notes under docs/).
 RUNNER_DIRTY_EXCLUDES = ("docs",)
 
 
+def execution_source_digest(source_root: Path | None = None) -> str:
+    """Semantic identity of the installed Raidar code used to execute a job.
+
+    Cover the whole package conservatively: execution imports owners outside
+    ``engine``, and the experiment-spec digest intentionally covers only lock
+    rules. Relative paths make the identity independent of installation location;
+    normalized syntax trees exclude comments and docstrings.
+    """
+    root = source_root or Path(__file__).resolve().parents[2]
+    modules = {
+        path.relative_to(root).as_posix(): python_source_digest(path)
+        for path in sorted(root.rglob("*.py"))
+    }
+    if not modules:
+        raise ValueError(f"no Raidar Python source found under {root}")
+    return digest_json({"scheme": SOURCE_DIGEST_SCHEME, "modules": modules})
+
+
 def runner_provenance() -> dict[str, Any]:
-    """The running Raidar code: git commit, dirty flag and the lock's toolchain digest."""
+    """Record git state, lock-spec identity and semantic execution-code identity."""
     state = git_state(Path(__file__).resolve().parents[2], exclude=RUNNER_DIRTY_EXCLUDES)
     return {
         "commit": state["commit"],
         "dirty": state["dirty"],
         "toolchain_sha256": spec_source_digest(),
-    }
-
-
-def recipe_digests(plan: ExperimentPlan, problems: Mapping[int, ImportedProblem]) -> dict[str, Any]:
-    """The pack image recipe hash and the grader recipe digest of every planned problem."""
-    graders = {
-        str(target.ref): grader_image_tag(problems[target.index].bundle.manifest.grader).rsplit(
-            ":", 1
-        )[1]
-        for target in plan.problems
-        if target.index in problems
-    }
-    return {
-        "pack": image_lock_hash(load_runtime_pack(plan.loaded.spec.runtime)),
-        "graders": graders,
+        "execution_sha256": execution_source_digest(),
     }
 
 

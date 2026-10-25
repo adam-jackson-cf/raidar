@@ -5,6 +5,7 @@ from __future__ import annotations
 import os
 import re
 import subprocess
+import sys
 import tomllib
 from pathlib import Path
 
@@ -62,7 +63,7 @@ def test_agent_validate_reports_codex_auth_mode(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     runner = CliRunner()
-    monkeypatch.setenv("CODEX_CLI_PATH", "/usr/local/bin/codex")
+    monkeypatch.setenv("CODEX_CLI_PATH", sys.executable)
     monkeypatch.setenv("OPENAI_API_KEY", "test-key")
     monkeypatch.setenv("CODEX_HOME", str(tmp_path / ".codex"))
 
@@ -110,7 +111,7 @@ def test_agent_setup_auth_runs_codex_login_with_device_auth(
     auth_dir.mkdir()
     auth_path = auth_dir / "auth.json"
     monkeypatch.setenv("CODEX_HOME", str(auth_dir))
-    monkeypatch.setenv("CODEX_CLI_PATH", "/usr/local/bin/codex")
+    monkeypatch.setenv("CODEX_CLI_PATH", sys.executable)
     commands: list[list[str]] = []
 
     def fake_run(command, check=False):
@@ -127,7 +128,7 @@ def test_agent_setup_auth_runs_codex_login_with_device_auth(
     )
 
     assert result.exit_code == 0, result.output
-    assert commands == [["/usr/local/bin/codex", "login", "--device-auth"]]
+    assert commands == [[sys.executable, "login", "--device-auth"]]
     assert "Codex auth setup complete." in result.output
 
 
@@ -138,7 +139,7 @@ def test_agent_setup_auth_fails_when_login_does_not_create_auth_json(
     auth_dir = tmp_path / ".codex"
     auth_dir.mkdir()
     monkeypatch.setenv("CODEX_HOME", str(auth_dir))
-    monkeypatch.setenv("CODEX_CLI_PATH", "/usr/local/bin/codex")
+    monkeypatch.setenv("CODEX_CLI_PATH", sys.executable)
 
     def fake_run(command, check=False):
         del check
@@ -150,6 +151,24 @@ def test_agent_setup_auth_fails_when_login_does_not_create_auth_json(
 
     assert result.exit_code != 0
     assert "no file-backed auth.json was found" in result.output
+
+
+@pytest.mark.parametrize("action", ["validate", "setup-auth"])
+def test_agent_commands_explain_an_unusable_cli_override(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, action: str
+) -> None:
+    monkeypatch.setenv("CODEX_CLI_PATH", str(tmp_path / "missing-codex"))
+    monkeypatch.setenv("CODEX_HOME", str(tmp_path / ".codex"))
+    arguments = ["agent", action, "--agent", "codex"]
+    if action == "validate":
+        arguments.extend(["--provider", "openai", "--model", "gpt-6-luna"])
+
+    result = CliRunner().invoke(main, arguments)
+
+    assert result.exit_code == 1
+    assert "Error: codex-cli CLI not found or not executable" in result.output
+    assert "CODEX_CLI_PATH" in result.output
+    assert "passed" not in result.output
 
 
 def test_quality_gates_writes_coverage_to_pytest_cache(monkeypatch) -> None:
@@ -302,7 +321,7 @@ def test_run_refuses_the_removed_scenario_flag(tmp_path: Path) -> None:
 
 
 SMOKE_PATH = "lab/experiments/smoke/python__circuit_eval-cp1__agent-health/experiment.yaml"
-AGENTS_PATH = "lab/experiments/benchmark/python__circuit_eval-cp1__agents/experiment.yaml"
+AGENTS_PATH = "lab/experiments/smoke/python__circuit_eval-cp1__pack-agent-health/experiment.yaml"
 
 
 def _make_dry_run(*args: str) -> subprocess.CompletedProcess[str]:
@@ -387,6 +406,7 @@ def test_smoke_agents_arm_runs_one_arm_of_the_agents_smoke(arm: str) -> None:
 def test_smoke_agents_arms_match_the_agents_smoke_experiment() -> None:
     agents_smoke = REPO_ROOT / AGENTS_PATH
     spec = yaml.safe_load(agents_smoke.read_text(encoding="utf-8"))
+    assert spec["kind"] == "smoke"
     makefile = (REPO_ROOT / "Makefile").read_text(encoding="utf-8")
     arms = " ".join(arm["id"] for arm in spec["arms"])
 
@@ -591,12 +611,12 @@ def test_experiment_assess_rescores_the_run_trials_with_the_named_scorers(tmp_pa
         "experiment-assess",
         f"JOB={tmp_path}",
         "STORE=.tmp/store",
-        "SCORERS=correctness@1 code-quality@3",
+        "SCORERS=correctness@2 code-quality@4",
         "REPLAY=1",
     )
 
     assert result.returncode == 0, result.stderr
     (assess_args,) = _raidar_lines(result.stdout, "assess")
     assert assess_args.startswith(f'--rescore "{tmp_path}/trials" --store ".tmp/store"')
-    assert '--scorer "correctness@1" --scorer "code-quality@3"' in assess_args
+    assert '--scorer "correctness@2" --scorer "code-quality@4"' in assess_args
     assert "--replay" in assess_args

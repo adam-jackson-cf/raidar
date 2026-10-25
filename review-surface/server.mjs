@@ -15,6 +15,23 @@ const distRoot = path.join(here, 'dist');
 const userAnnotationsPath = path.join(dataRoot, 'user-annotations.json');
 const port = Number(process.env.REVIEW_SURFACE_PORT || 5950);
 const handleQualityApi = createQualityApi({ dataRoot, sendJson, readBody });
+const allowedHosts = new Set([`localhost:${port}`, `127.0.0.1:${port}`]);
+const mutationMethods = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
+
+function requestError(req) {
+  const host = req.headers.host?.toLowerCase();
+  if (!allowedHosts.has(host)) return { status: 403, error: 'untrusted host' };
+  if (!mutationMethods.has(req.method)) return null;
+  if ((req.headers.origin !== undefined && req.headers.origin !== `http://${host}`)
+      || req.headers['sec-fetch-site'] === 'cross-site') {
+    return { status: 403, error: 'cross-origin mutations are forbidden' };
+  }
+  if (['POST', 'PUT', 'PATCH'].includes(req.method)
+      && req.headers['content-type']?.split(';', 1)[0].trim().toLowerCase() !== 'application/json') {
+    return { status: 415, error: 'application/json required' };
+  }
+  return null;
+}
 
 const MIME = {
   '.html': 'text/html; charset=utf-8',
@@ -289,8 +306,15 @@ function serveStatic(res, url) {
 }
 
 const server = http.createServer(async (req, res) => {
-  const url = new URL(req.url ?? '/', `http://localhost:${port}`);
   try {
+    let url;
+    try {
+      url = new URL(req.url ?? '/', `http://localhost:${port}`);
+    } catch {
+      return sendJson(res, 400, { error: 'invalid request URL' });
+    }
+    const error = requestError(req);
+    if (error) return sendJson(res, error.status, { error: error.error });
     if (url.pathname.startsWith('/api/')) {
       await handleApi(req, res, url);
       return;

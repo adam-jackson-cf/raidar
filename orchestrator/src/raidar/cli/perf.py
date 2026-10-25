@@ -52,6 +52,10 @@ def _contention_lines(contention: Contention) -> list[str]:
         f"  peak concurrent trials incl. overlapping runs: {contention.peak_including_other_jobs}",
     ]
     lines += [f"  overlapping run: {run}" for run in contention.overlapping_jobs]
+    lines += [
+        f"  overlapping run with unknown shared target (not counted): {run}"
+        for run in contention.unknown_target_jobs
+    ]
     if contention.untimed_trials:
         lines.append(f"  trials without start/finish timestamps: {contention.untimed_trials}")
     lines.append(f"  note: {UNDETECTED_DOCKER_ACTIVITY}")

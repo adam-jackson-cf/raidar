@@ -304,7 +304,7 @@ def test_config_is_refused_and_the_scorer_is_registered(tmp_path: Path) -> None:
     step = _step(tmp_path, "checkpoint_1")
     ctx = AssessContext(problem="p", steps=(step,), config={"x": 1})
     assert gate_effort_scorer().assess(ctx).status is AssessStatus.ERROR
-    registration = default_scorer_registry().get("gate-effort@10")
+    registration = default_scorer_registry().get("gate-effort@11")
     assert registration.load().manifest == GATE_EFFORT
 
 
@@ -340,3 +340,31 @@ def test_the_wrapper_logs_score_end_to_end(tmp_path: Path, shims: Path) -> None:
     wall = _values(result)[("fix_wall_s", "checkpoint_1")]
     assert wall.status is AssessStatus.OK
     assert (wall.value or 0) >= 0
+
+
+@pytest.mark.parametrize("escape", ["parent", "absolute", "symlink"])
+def test_gate_evidence_rejects_escaping_logs_before_reading_any_bytes(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, escape: str
+) -> None:
+    step = _step(tmp_path, "checkpoint_1")
+    trace = _trace(step)
+    _write_gate(trace, outputs=[PASSED], termination="gate_clean", signal=True)
+    outside = tmp_path / "outside.log"
+    outside.write_text("synthetic evidence outside the retained trace\n")
+    link = trace / "outside-link.log"
+    link.symlink_to(outside)
+    paths = {"parent": "../../outside.log", "absolute": str(outside), "symlink": link.name}
+    record_path = trace / RECORD_PATH
+    record = json.loads(record_path.read_text())
+    record["gate_runs"][0]["log"] = paths[escape]
+    record_path.write_text(json.dumps(record))
+    original_read = Path.read_bytes
+
+    def guarded_read(path: Path) -> bytes:
+        assert path.resolve() != outside.resolve(), "escaping log must never be read"
+        return original_read(path)
+
+    monkeypatch.setattr(Path, "read_bytes", guarded_read)
+    result = _assess(step)
+    assert not result.evidence
+    assert _value(result, "first_pass_clean", "checkpoint_1") == 1

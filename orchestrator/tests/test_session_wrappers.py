@@ -1,13 +1,13 @@
-"""continue-on-stall@2 and transient-retry@1: the session wrappers.
+"""continue-on-stall@3 and transient-retry@2: the session wrappers.
 
-- continue-on-stall@2: a no-edit refusal stalls like a question (the
+- continue-on-stall@3: a no-edit refusal stalls like a question (the
   ``smoke-03`` r2 messages @1 missed); only a step's first session is eligible,
   so a gate's fix sessions are recorded and never continued;
-- transient-retry@1: a session the provider drops (Harbor's transient API
+- transient-retry@2: a session the provider drops (Harbor's transient API
   errors) is run again, at most twice, after a wait; other errors pass through;
   every attempt's logs, usage and error are kept;
-- both compose with guardrail-gate@4 in condition order:
-  gate -> continue-on-stall@2 -> transient-retry@1 -> native agent.
+- both compose with guardrail-gate@5 in condition order:
+  gate -> continue-on-stall@3 -> transient-retry@2 -> native agent.
 
 The wrappers run here against a local bash environment; the real-container
 proof is ``test_guardrails_trial.py``.
@@ -70,7 +70,7 @@ SMOKE_03_CP2 = (
 )
 
 
-# ---- continue-on-stall@2 detection ----------------------------------------------------
+# ---- continue-on-stall@3 detection ----------------------------------------------------
 
 
 @pytest.mark.parametrize(
@@ -116,24 +116,24 @@ AGENT = AgentEntry.model_validate(
 
 def test_both_are_workflow_session_wrappers_without_with_keys() -> None:
     registry = ComponentRegistry()
-    for ref in ("continue-on-stall@2", "transient-retry@1"):
+    for ref in ("continue-on-stall@3", "transient-retry@2"):
         assert registry.get(ref).manifest.kind is ComponentKind.WORKFLOW
         with pytest.raises(ComponentRejectedError):
             compile_uses(use(ref, retries=3))
     assert "orchestrator/src/raidar/subject/treatment/runtime/continue_on_stall.py" in (
-        registry.get("continue-on-stall@2").manifest.fingerprint
+        registry.get("continue-on-stall@3").manifest.fingerprint
     )
     assert "orchestrator/src/raidar/subject/treatment/runtime/transient_retry.py" in (
-        registry.get("transient-retry@1").manifest.fingerprint
+        registry.get("transient-retry@2").manifest.fingerprint
     )
 
 
 def test_the_chain_is_gate_then_stall_then_retry_then_the_native_agent() -> None:
     compiled = compile_uses(
         use("prompt-wrapper@1", ("components/probe/wrapper.md",)),
-        use("continue-on-stall@2"),
-        use("transient-retry@1"),
-        use("guardrail-gate@4", **GATE),
+        use("continue-on-stall@3"),
+        use("transient-retry@2"),
+        use("guardrail-gate@5", **GATE),
     )
     config = arm_agent_config(AGENT, compiled, load_pack_spec(), agent_timeout_sec=1800)
 
@@ -148,7 +148,7 @@ def test_the_chain_is_gate_then_stall_then_retry_then_the_native_agent() -> None
 
 
 def test_the_retry_probe_needs_a_record_and_counts_retries(tmp_path: Path) -> None:
-    compiled = compile_uses(use("transient-retry@1"))
+    compiled = compile_uses(use("transient-retry@2"))
     definition, context = compiled.uses[0].definition, compiled.uses[0].context
     agent_dir = tmp_path / "agent"
     agent_dir.mkdir()
@@ -336,7 +336,7 @@ def test_the_steps_first_session_that_refuses_is_continued(
     assert (record["eligible"], record["stalled"], record["continued"]) == (True, True, True)
     assert record["session"]["matched"] == ["cannot-without", "not-defined"]
     assert record["continuation"]["changed"] is True
-    assert record["component"] == "continue-on-stall@2"
+    assert record["component"] == "continue-on-stall@3"
     assert "could not\nproceed" in ScriptedNative.prompts[-1]
 
 

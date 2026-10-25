@@ -1,4 +1,4 @@
-"""``transient-retry@1`` session wrapper: rerun a session the provider dropped, at most twice.
+"""``transient-retry@2`` session wrapper: rerun a session the provider dropped, at most twice.
 
 A session that fails because the provider was briefly unavailable (Harbor's
 ``ApiOverloadedError``, ``ApiConnectionClosedError``, ``ApiResponseStalledError``,
@@ -60,7 +60,7 @@ from raidar.subject.treatment.runtime.session_chain import (
     render_task,
 )
 
-COMPONENT = "transient-retry@1"
+COMPONENT = "transient-retry@2"
 VERSION = "1"
 RETRY_DIR = "transient-retry"
 RETRY_RECORD = "transient-retry.json"

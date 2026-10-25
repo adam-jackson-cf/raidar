@@ -41,11 +41,11 @@
         }
       },
       "scorer": {
-        "correctness@1": {
-          "digest": "78e8f99d2b715e049a7cbc60368720d6bc38f0a05bb34aba7075f114c27aef33",
+        "correctness@2": {
+          "digest": "8a251d29959d7898e84e9f99fae451782811ca0162c6fdf80a2f0f8d6de5145e",
           "metadata": {
             "implementation": "raidar.scoring.correctness:correctness_scorer",
-            "implementation_digest": "da199703e1610267d514ac6956f12c14dd76694a435aee2ffce814faf64daf29",
+            "implementation_digest": "89ead5fa5b3a6a04bea23919aeec0794583d2b2060b4b4f4e46a382b238fd00e",
             "manifest": {
               "description": "Oracle verdicts per checkpoint and trajectory, from the oracle step records.",
               "evidence_required": [
@@ -203,7 +203,7 @@
                 "*"
               ],
               "tools": [],
-              "version": "1"
+              "version": "2"
             },
             "tool_lock": {}
           }
@@ -218,12 +218,12 @@
       "metric": "scb-canonical-oneshot@1",
       "scorer_config": {},
       "scorers": [
-        "correctness@1"
+        "correctness@2"
       ]
     },
     "tools": {}
   },
-  "document_sha256": "74be52193680903da6195e3c018ba5a9a54df721bda6cfdaddfe68b13d920aef",
+  "document_sha256": "f42ceac101bd550345b9603b867687ea42e35626c0425216479a761e53aca6eb",
   "execution": {
     "arms": {
       "claude": {
@@ -358,8 +358,8 @@
   "experiment": {
     "id": "python__circuit_eval-cp1__agents",
     "source": "experiment.yaml",
-    "source_sha256": "9e115bdd8ab6badb6e5d3f21eff371db2cceef3bbf172c75c1a510e0f698cce9",
-    "spec_sha256": "9759160b2f46411893de4bb10e013b93631f56b6c4a16015b61e08660da34147"
+    "source_sha256": "1489eb657544dd4720961ad7535ddf7951fcc51e954191d58bc0354e686068ac",
+    "spec_sha256": "82c37327106a30b3a0e4a956bcda6a131a9bd18752795d12a20aca5892d6ce6b"
   },
   "lock_sha256": "1fef5da2c46a18f32154b93ee5abf47f1831cf55a73aeff181342b9e04028583",
   "lock_version": 3,
@@ -369,9 +369,9 @@
   },
   "sections": {
     "analysis": "0a0fb32297e0c3abaad1f91cb80990bf42b3a3f0854246915ae017492003d1bc",
-    "assessment": "20c5834d888f5ae5135460a9f2ffceae7e282f82d59f38f0681e5bb5796ba60d",
+    "assessment": "4f77c71780fadb0b9b8c3ccaa43d9d9dce8156c578ceba254d40bafd730b8476",
     "execution": "1fef5da2c46a18f32154b93ee5abf47f1831cf55a73aeff181342b9e04028583",
-    "toolchain": "caf69c8bee7081c97084bd13d2d37a95e909495e09efd5424501ce0ad4e87489"
+    "toolchain": "7963edf30de293f2236db8488cdc06ba5d43c4449ab31a18359e00676e5e94d6"
   },
   "spec": {
     "agents": [
@@ -422,7 +422,7 @@
       "metric": "scb-canonical-oneshot@1",
       "scorer_config": {},
       "scorers": [
-        "correctness@1"
+        "correctness@2"
       ]
     },
     "conditions": [
@@ -461,6 +461,6 @@
     "litellm": "1.102.1",
     "python": "3.13.7",
     "raidar": "0.15.0",
-    "raidar_spec": "2d5fd95351dbd6a42ec1a1dd94602c87b0e7e0f4ceb301ad5f9e1a004e258357"
+    "raidar_spec": "ce2f0b13ac1faa348f4f09650d8488db7cfba6d509f6a9bcafb85600f856ce48"
   }
 }

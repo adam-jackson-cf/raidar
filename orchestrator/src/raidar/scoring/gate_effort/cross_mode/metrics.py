@@ -51,7 +51,7 @@ EX_CASCADE_STEP_METRICS = (
     ),
     metric(
         STEP_END_EX_CASCADE,
-        "Blocking findings of the step's last decided gate run without the "
+        "Blocking findings of the checked final workspace without the "
         "MYPY.no-untyped-call cascade.",
         _CHECKPOINT,
         MetricType.COUNT,
@@ -112,7 +112,7 @@ NET_STEP_METRICS = (
     ),
     metric(
         STEP_END_NET,
-        f"Blocking findings of the step's last decided gate run {_NET}.",
+        f"Blocking findings of the checked final workspace {_NET}.",
         _CHECKPOINT,
         MetricType.COUNT,
         _LOWER,

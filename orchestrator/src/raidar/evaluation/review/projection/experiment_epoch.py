@@ -136,7 +136,10 @@ def _labels(trial: _Trial, arm_label: str) -> ArmLabels:
 
 
 def _trial_input(
-    trial: _Trial, review_id: str, arm_label: str, lookup: AssessmentLookup
+    trial: _Trial,
+    review_id: str,
+    arm_label: str,
+    lookup: AssessmentLookup,
 ) -> TrialInput:
     source, record = trial.source, trial.record
     trial_dir = source.job_dir / record.trial_dir
@@ -159,6 +162,7 @@ def _trial_input(
             declared=scorers,
         ),
         synthetic=source.synthetic,
+        integrity_note=source.integrity_note,
     )
 
 
@@ -243,6 +247,7 @@ def _group(
 
 
 def project_sources(sources: Sequence[JobSource], lookup: AssessmentLookup) -> EpochProjection:
+    """Project the jobs admitted by the source loader's integrity/provenance gate."""
     trials = [_Trial(source, record) for source in sources for record in source.records]
     labels = _condition_labels(trials)
     ids = _review_ids(trials)

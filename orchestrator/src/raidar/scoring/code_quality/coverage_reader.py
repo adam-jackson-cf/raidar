@@ -5,7 +5,8 @@ verdict and ``g-kernel-input.json`` (``transition.in_trial_run_evidence``); a st
 trial deferred it (``protocol.verifier_coverage: offline``) reads the offline coverage run
 that ``raidar assess --rescore`` makes into the Assessment store
 (``raidar.grading.coverage.offline``; read through ``raidar.grading.coverage.store``),
-keyed by the step's bundle digest, step and snapshot digest. A run not produced yet makes G
+keyed by the step's bundle, snapshot and grading identity plus this trial's grading evidence.
+A run not produced yet makes G
 ``unavailable`` and the Assessment provisional (``awaiting_answers``), so a later rescore
 completes it instead of reusing it.
 
@@ -23,7 +24,7 @@ from pathlib import Path
 from pydantic import ValidationError
 
 from raidar.grading.coverage.store import read_offline_coverage
-from raidar.grading.records import StepRecord
+from raidar.grading.records import StepRecord, coverage_identity
 from raidar.scoring.code_quality.checkpoint import Gap
 from raidar.scoring.code_quality.lineage_models import RegressionRunEvidence
 from raidar.scoring.code_quality.parity import fork_runs, parity_source, reconcile
@@ -32,6 +33,7 @@ from raidar.scoring.code_quality.transition import (
     PARITY_FAILED,
     RunEvidences,
     in_trial_run_evidence,
+    verifier_record_dir,
 )
 from raidar.scoring.framework.context import StepInputs
 from raidar.scoring.framework.result import AssessStatus
@@ -50,7 +52,11 @@ class CoverageReader:
     def _stored_evidence(self, step: StepInputs, record: StepRecord) -> RunEvidences | Gap:
         stored = (
             read_offline_coverage(
-                self.store_root, record.bundle.digest, record.step, record.snapshot.digest
+                self.store_root,
+                record.bundle.digest,
+                record.step,
+                record.snapshot.digest,
+                identity=coverage_identity(record, verifier_record_dir(step)),
             )
             if self.store_root is not None
             else None

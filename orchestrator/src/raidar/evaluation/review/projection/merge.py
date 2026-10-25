@@ -7,7 +7,6 @@ their artifacts on every build; nothing is persisted per experiment.
 from __future__ import annotations
 
 import argparse
-import sys
 from collections.abc import Sequence
 from pathlib import Path
 
@@ -17,11 +16,10 @@ from raidar.contract.review import (
     ReviewProjectionArtifact,
     ReviewRunDetail,
 )
-from raidar.evaluation.analysis.sources import AnalysisInputError
 from raidar.evaluation.review.projection.assessments import AssessmentLookup
 from raidar.evaluation.review.projection.comparability import mark_policy_mismatches
 from raidar.evaluation.review.projection.experiment_epoch import EpochProjection, project_sources
-from raidar.evaluation.review.projection.sources import LockIndex, discover_job_dirs, load_job
+from raidar.evaluation.review.projection.sources import load_sources
 from raidar.evaluation.review.projection.spans import repo_path
 from raidar.scoring.catalog.builtin import default_scorer_registry
 from raidar.scoring.framework.store import AssessmentStore
@@ -30,19 +28,7 @@ from raidar.scoring.framework.store import AssessmentStore
 def project_experiment_epoch(
     job_roots: Sequence[Path], stores: Sequence[Path] = (), locks: Sequence[Path] = ()
 ) -> EpochProjection:
-    index = LockIndex(locks)
-    sources = []
-    for job_dir in discover_job_dirs(job_roots):
-        try:
-            source = load_job(job_dir, index)
-        except AnalysisInputError as exc:
-            # One unprojectable run (e.g. its lock was overwritten) never aborts the build.
-            print(f"Skipping run, lock unavailable: {repo_path(job_dir)}: {exc}", file=sys.stderr)
-            continue
-        if source.records:
-            sources.append(source)
-        else:
-            print(f"Skipping run without trial records: {repo_path(job_dir)}", file=sys.stderr)
+    sources = load_sources(job_roots, locks)
     lookup = AssessmentLookup([AssessmentStore(path) for path in stores], default_scorer_registry())
     return project_sources(sources, lookup)
 

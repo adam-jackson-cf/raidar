@@ -91,7 +91,12 @@ def _run(
             path = job_dir / "trial-records" / f"t{index}.json"
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_text(_record(job_dir, index, teardown(index)).model_dump_json())
-    manifest = {"kind": "raidar-job", "job_id": job_dir.name, "concurrency": concurrency}
+    manifest = {
+        "kind": "raidar-job",
+        "job_id": job_dir.name,
+        "concurrency": concurrency,
+        "execution_target": {"name": "test-host", "docker_context": "test-docker"},
+    }
     (job_dir / "job.json").write_text(json.dumps(manifest))
     return job_dir
 
@@ -173,6 +178,24 @@ def test_overlapping_sibling_runs_are_recorded_as_contention(tmp_path: Path) -> 
     assert contention["overlapping_jobs"] == [str((root / "e" / "busy").resolve())]
     assert contention["peak_concurrent_trials"] == 1
     assert contention["peak_including_other_jobs"] == 3
+
+
+def test_contention_excludes_other_targets_and_labels_unknown_targets(tmp_path: Path) -> None:
+    root = tmp_path / "jobs"
+    run = _run(root / "e" / "measured", [0.0] * 10)
+    foreign = _run(root / "e" / "foreign", [0.0] * 4)
+    unknown = _run(root / "e" / "unknown", [0.0] * 4)
+    for job, target in [(foreign, {"name": "remote-host"}), (unknown, None)]:
+        path = job / "job.json"
+        manifest = json.loads(path.read_text())
+        manifest["execution_target"] = target
+        path.write_text(json.dumps(manifest))
+    code, payload = _check(str(run))
+    assert code == 0, payload
+    contention = payload["contention"]
+    assert contention["peak_including_other_jobs"] == 10
+    assert contention["overlapping_jobs"] == []
+    assert contention["unknown_target_jobs"] == [str(unknown.resolve())]
 
 
 def test_untimed_trials_and_unrecorded_concurrency_are_reported(tmp_path: Path) -> None:

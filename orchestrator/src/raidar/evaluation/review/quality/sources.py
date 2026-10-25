@@ -1,20 +1,10 @@
-"""Inputs of the Quality projection: job directories, the Assessment store, the Jev audit.
+"""Quality trial sources, locked assessment settings and exact Assessment lookup.
 
 - **Trials** come from job directories
   (``<jobs_root>/<experiment>/<job>/trial-records/<trial>.json``).
-- **Assessments** come from one Assessment store. A trial's Assessment of a
-  scorer is found by content, not by the store log's trial name (trial ids
-  such as ``b00-p0-baseline`` repeat across runs): the Assessment's recorded
-  inputs must name the trial's problem and exactly its stored snapshot
-  digests, step by step. When several Assessments of one scorer match (a new
-  config or scorer build), the one logged most recently wins.
-- **Jev decisions** come from the store's audit (``<store>/jev-audit``). A
-  decision names its trial by a free string (``raidar jev shadow-rubric
-  --trial``). It attaches to a trial when that string is the trial's review id
-  (``<experiment>.<job>.<trial>``) or ``<job>/<trial>``; a bare trial id
-  attaches only when exactly one projected trial has it. Trial ids repeat
-  across runs, so an ambiguous bare id attaches nowhere and every trial that
-  shares it says so: a reviewer never labels a decision against another run.
+- **Assessments** come from one Assessment store, under the exact key derived
+  from the selected lock's settings, current scorer identity, tool lock and
+  stored trial inputs, just as analysis and the main review projection do.
 - The **lock** the run was executed under supplies the baseline arm and the
   headline metric, as the analysis reads them. Candidates, in order: locks
   given with ``--lock`` and the lock next to the ``job.json`` ``experiment_file``
@@ -31,19 +21,25 @@ from __future__ import annotations
 import json
 import os
 import re
-from collections import defaultdict
 from collections.abc import Iterator, Mapping, Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from raidar.contract.job_layout import JOB_KIND, JOB_MANIFEST, TRIAL_RECORDS_DIR
+from raidar.contract.job_layout import JOB_KIND, JOB_MANIFEST, PLAN_FILE, TRIAL_RECORDS_DIR
 from raidar.contract.trial import TrialRecord
 from raidar.design.experiment.lock import default_lock_path
-from raidar.evaluation.analysis.sources import AnalysisInputError, read_lock, read_trial_records
-from raidar.scoring.framework.store import LOG_FILE, OBJECTS_DIR, Assessment
-from raidar.scoring.judge.audit import AUDIT_DIR, AuditLog, DecisionRecord, LabelRecord
-from raidar.scoring.judge.ledger import current_labels
+from raidar.engine.job.assessment import lock_rescore_config
+from raidar.evaluation.analysis.sources import (
+    AnalysisInputError,
+    JobDir,
+    read_lock,
+    read_trial_records,
+)
+from raidar.evaluation.review.projection.assessments import AssessmentLookup, TrialAssessments
+from raidar.scoring.catalog.builtin import default_scorer_registry
+from raidar.scoring.framework.rescore_config import RescoreConfig
+from raidar.scoring.framework.store import Assessment, AssessmentStore
 
 _UNSAFE_ID = re.compile(r"[^A-Za-z0-9._-]")
 
@@ -58,6 +54,9 @@ class ExperimentInfo:
     note: str | None = None
     analysis: Mapping[str, Any] | None = None
     """The lock's ``spec.analysis`` section (verdict thresholds), when the lock was read."""
+    assessment: RescoreConfig | None = None
+    scorers: tuple[str, ...] = ()
+    lock_path: Path | None = None
 
 
 @dataclass(frozen=True)
@@ -68,6 +67,7 @@ class TrialSource:
     finished_at: str
     record: TrialRecord
     experiment: ExperimentInfo
+    job: JobDir | None = None
 
     @property
     def trial_dir(self) -> Path:
@@ -110,7 +110,7 @@ class TrialSource:
         }
 
 
-def _lock_facts(lock: dict[str, Any], executed: str) -> ExperimentInfo:
+def _lock_facts(lock: dict[str, Any], executed: str, path: Path) -> ExperimentInfo:
     spec = lock.get("spec") or {}
     headline = (lock.get("assessment") or {}).get("metric") or {}
     analysis = spec.get("analysis") or {}
@@ -119,6 +119,9 @@ def _lock_facts(lock: dict[str, Any], executed: str) -> ExperimentInfo:
         baseline_arm=analysis.get("baseline_arm"),
         metric=headline.get("ref") if isinstance(headline, dict) else None,
         analysis=analysis,
+        assessment=lock_rescore_config(lock),
+        scorers=tuple((spec.get("assessment") or {}).get("scorers", ())),
+        lock_path=path,
     )
 
 
@@ -145,7 +148,7 @@ def _experiment_info(run: dict[str, Any], locks: Sequence[Path] = ()) -> Experim
             reasons.append(str(exc).replace(str(path), path.name))
             continue
         if lock.get("lock_sha256") == executed:
-            return _lock_facts(lock, executed)
+            return _lock_facts(lock, executed, path)
         found = str(lock.get("lock_sha256"))[:12]
         reasons.append(
             f"{path.name} is now {found}, but the run was executed under {executed[:12]}"
@@ -170,6 +173,13 @@ def discover_trials(jobs_root: Path, locks: Sequence[Path] = ()) -> list[TrialSo
     for job_dir in _job_dirs(jobs_root):
         run = json.loads((job_dir / JOB_MANIFEST).read_text(encoding="utf-8"))
         experiment = _experiment_info(run, locks)
+        plan_path = job_dir / PLAN_FILE
+        job = JobDir(
+            path=job_dir,
+            manifest=run,
+            plan=json.loads(plan_path.read_text(encoding="utf-8")) if plan_path.is_file() else {},
+            records=read_trial_records(job_dir),
+        )
         trials.extend(
             TrialSource(
                 jobs_root=jobs_root,
@@ -178,8 +188,9 @@ def discover_trials(jobs_root: Path, locks: Sequence[Path] = ()) -> list[TrialSo
                 finished_at=str(run.get("finished_at") or ""),
                 record=record,
                 experiment=experiment,
+                job=job,
             )
-            for record in read_trial_records(job_dir)
+            for record in job.records
         )
     return trials
 
@@ -189,39 +200,32 @@ def _assessment_steps(assessment: Assessment) -> dict[str, str | None]:
     return {str(step["step"]): step.get("snapshot") for step in steps}
 
 
-@dataclass
 class StoreIndex:
-    """Assessments of one store, looked up by scorer and trial content."""
+    """Assessments of one store, found under the selected lock's exact keys."""
 
-    root: Path
-    _by_scorer: dict[str, list[tuple[int, Assessment]]] = field(default_factory=dict)
+    def __init__(self, root: Path) -> None:
+        self._lookup = AssessmentLookup([AssessmentStore(root)], default_scorer_registry())
+        self._trials: dict[str, TrialAssessments] = {}
 
     @classmethod
     def open(cls, root: Path) -> StoreIndex:
-        recency: dict[str, int] = {}
-        log = root / LOG_FILE
-        if log.is_file():
-            for position, line in enumerate(log.read_text(encoding="utf-8").splitlines()):
-                if line.strip():
-                    recency[json.loads(line)["key"]] = position
-        by_scorer: dict[str, list[tuple[int, Assessment]]] = defaultdict(list)
-        for path in sorted((root / OBJECTS_DIR).glob("*/*.json")):
-            assessment = Assessment.model_validate_json(path.read_bytes())
-            by_scorer[assessment.scorer.ref].append((recency.get(assessment.key, -1), assessment))
-        return cls(root=root, _by_scorer=dict(by_scorer))
+        return cls(root)
 
     def find(self, scorer_ref: str, trial: TrialSource) -> Assessment | None:
-        digests = trial.snapshot_digests()
-        problem = trial.record.trial.problem
-        matches = [
-            (recency, assessment.key, assessment)
-            for recency, assessment in self._by_scorer.get(scorer_ref, [])
-            if assessment.inputs.get("problem") == problem
-            and _matches(_assessment_steps(assessment), digests)
-        ]
-        if not matches:
+        experiment = trial.experiment
+        if experiment.assessment is None or scorer_ref not in experiment.scorers:
             return None
-        return max(matches, key=lambda item: (item[0], item[1]))[2]
+        if trial.review_id not in self._trials:
+            self._trials[trial.review_id] = self._lookup.for_trial(
+                trial.trial_dir,
+                experiment.scorers,
+                experiment.assessment,
+                config_path=experiment.lock_path,
+            )
+        found = self._trials[trial.review_id].get(scorer_ref)
+        if found is None or not _matches(_assessment_steps(found), trial.snapshot_digests()):
+            return None
+        return found
 
 
 def _matches(stored: dict[str, str | None], digests: dict[str, str | None]) -> bool:
@@ -232,56 +236,3 @@ def _matches(stored: dict[str, str | None], digests: dict[str, str | None]) -> b
     return all(
         snapshot is None or digests.get(step) == snapshot for step, snapshot in stored.items()
     )
-
-
-@dataclass(frozen=True)
-class JevAttachment:
-    """The decisions attached to one trial, and why others naming it were not."""
-
-    decisions: tuple[DecisionRecord, ...] = ()
-    note: str | None = None
-
-
-@dataclass(frozen=True)
-class JevAudit:
-    decisions: dict[str, list[DecisionRecord]]
-    labels: dict[str, LabelRecord]
-
-    @classmethod
-    def open(cls, store_root: Path) -> JevAudit:
-        audit = AuditLog.for_store(store_root)
-        root = store_root / AUDIT_DIR
-        by_trial: dict[str, list[DecisionRecord]] = defaultdict(list)
-        labels: dict[str, LabelRecord] = {}
-        policies = (
-            sorted(path.name for path in root.iterdir() if path.is_dir()) if root.is_dir() else []
-        )
-        for policy in policies:
-            for record in audit.decisions(policy):
-                if record.trial is not None:
-                    by_trial[record.trial].append(record)
-            labels.update(current_labels(audit, policy))
-        return cls(decisions=dict(by_trial), labels=labels)
-
-    def attach(self, trials: list[TrialSource]) -> dict[str, JevAttachment]:
-        """Decisions per trial review id, under the unambiguous-name rule above."""
-        by_bare: dict[str, list[TrialSource]] = defaultdict(list)
-        for trial in trials:
-            by_bare[trial.record.trial.trial_id].append(trial)
-        attached: dict[str, JevAttachment] = {}
-        for trial in trials:
-            bare = trial.record.trial.trial_id
-            names = (trial.review_id, f"{trial.job_id}/{bare}")
-            decisions = [record for name in names for record in self.decisions.get(name, [])]
-            unresolved = self.decisions.get(bare, [])
-            note = None
-            if len(by_bare[bare]) == 1:
-                decisions.extend(unresolved)
-            elif unresolved:
-                note = (
-                    f"{len(unresolved)} Jev decision(s) name trial {bare!r}, which "
-                    f"{len(by_bare[bare])} runs share; not attached. Record them with "
-                    f"--trial {trial.review_id} to review them here"
-                )
-            attached[trial.review_id] = JevAttachment(decisions=tuple(decisions), note=note)
-        return attached

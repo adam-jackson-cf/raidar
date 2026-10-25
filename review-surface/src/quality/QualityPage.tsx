@@ -177,8 +177,10 @@ export function QualityPage() {
   const [params, setParams] = useSearchParams();
   const list = useMemo(() => experiments.data?.experiments ?? [], [experiments.data]);
   const focusProblem = params.get('problem');
-  const current =
-    list.find((item) => matchesTarget(item, params.get('experiment'), params.get('lock'))) ?? list[0];
+  const explicitTarget = params.has('experiment') || params.has('lock');
+  const current = explicitTarget
+    ? list.find((item) => matchesTarget(item, params.get('experiment'), params.get('lock')))
+    : list[0];
   const select = (key: string) => {
     const item = list.find((entry) => experimentKey(entry) === key);
     if (!item) return;
@@ -196,10 +198,16 @@ export function QualityPage() {
         Quality data could not be loaded. Run make review-surface-quality-data, then reload.
       </p>
     );
+  } else if (!current && explicitTarget) {
+    body = (
+      <p className="text-xs" style={{ color: C.orange }} data-testid="quality-target-not-found">
+        The requested experiment or lock is not available in this projection. Choose an available experiment.
+      </p>
+    );
   } else if (!current) {
     body = (
       <p className="text-xs" style={{ color: C.fg1 }}>
-        No assessed trials yet. Rescore a job with code-quality@3 and correctness@1, then run make review-surface-quality-data.
+        No assessed trials yet. Rescore a job with code-quality@4 and correctness@2, then run make review-surface-quality-data.
       </p>
     );
   } else {
@@ -234,6 +242,7 @@ export function QualityPage() {
             value={current ? experimentKey(current) : ''}
             onChange={(event) => select(event.target.value)}
           >
+            {!current && <option value="" disabled>Choose an experiment</option>}
             {list.map((item) => (
               <option key={experimentKey(item)} value={experimentKey(item)}>
                 {experimentLabel(item)}

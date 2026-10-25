@@ -1,4 +1,4 @@
-"""code-quality@3 rejection boundaries: evidence that cannot be trusted never becomes a value.
+"""code-quality@4 rejection boundaries: evidence that cannot be trusted never becomes a value.
 
 Mirrors the fork's own boundary contract: a wrong Ruff version, a foreign
 diagnostic, a parser failure, a missing or unsuccessful file row, malformed
@@ -24,13 +24,18 @@ from raidar.scoring.code_quality.architecture import (
     strongly_connected_components,
 )
 from raidar.scoring.code_quality.checkpoint import Gap, eligibility_code, measure_checkpoint
+from raidar.scoring.code_quality.contract import EXPECTED_RUFF_VERSION
 from raidar.scoring.code_quality.measurement import (
     MeasurementError,
     ProcessResult,
     ToolEnvironment,
     run_process,
 )
-from raidar.scoring.code_quality.quality import ProductionQualityError, produce_production_quality
+from raidar.scoring.code_quality.quality import (
+    ProductionQualityError,
+    _ruff,
+    produce_production_quality,
+)
 from raidar.scoring.code_quality.snapshot_tool import cli
 from raidar.scoring.code_quality.snapshot_tool.evaluator import (
     EvaluatorInputError,
@@ -436,3 +441,52 @@ def test_checkpoint_gaps_carry_the_fork_code_as_their_reason(tmp_path: Path) -> 
     failing = ToolEnvironment(python=Path("python"), runner=Scripted([(lambda argv: True, error)]))
     assert _gap(_step(py), failing).reason == "measurement_environment_mismatch: x"
     assert eligibility_code(ValueError("something odd")) == "score_evidence_invalid"
+
+
+@pytest.mark.parametrize("candidate_module", ["ruff.py", "ruff/__main__.py"])
+def test_candidate_ruff_modules_cannot_execute_during_version_or_lint_checks(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, candidate_module: str
+) -> None:
+    snapshot = (tmp_path / "snapshot").resolve()
+    snapshot.mkdir()
+    marker = snapshot / "candidate-executed"
+    canary = (
+        f"from pathlib import Path\nPath({str(marker)!r}).write_text('executed')\nprint('[]')\n"
+    )
+    candidate = snapshot / candidate_module
+    candidate.parent.mkdir(parents=True, exist_ok=True)
+    candidate.write_text(canary)
+    if candidate_module.endswith("__main__.py"):
+        (candidate.parent / "__init__.py").write_text(canary)
+    (snapshot / "sitecustomize.py").write_text(canary)
+    (snapshot / "main.py").write_text("if a:\n    if b:\n        x = 1\n")
+    monkeypatch.chdir(snapshot)
+    monkeypatch.setenv("PYTHONPATH", str(snapshot))
+    version, diagnostics, invocation = _ruff(quality_tools(), snapshot, ["main.py"])
+    assert version == f"ruff {EXPECTED_RUFF_VERSION}"
+    assert [diagnostic["code"] for diagnostic in diagnostics] == ["SIM102"]
+    assert invocation[1:3] == ("-I", "-B")
+    assert not marker.exists()
+    assert not (snapshot / "__pycache__").exists()
+
+
+def test_measurement_processes_receive_only_platform_environment(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("RAIDAR_TEST_SECRET", "synthetic-canary")
+    monkeypatch.setenv("LANG", "C")
+    result = run_process(
+        [
+            str(quality_tools().python),
+            "-I",
+            "-c",
+            "import json, os; print(json.dumps({"
+            "'canary_present': 'RAIDAR_TEST_SECRET' in os.environ, "
+            "'language_preserved': os.environ.get('LANG') == 'C'}))",
+        ],
+        None,
+        None,
+        5,
+    )
+    assert result.returncode == 0
+    assert json.loads(result.stdout) == {"canary_present": False, "language_preserved": True}

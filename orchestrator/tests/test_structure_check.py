@@ -70,6 +70,7 @@ def test_root_allowlist_names_unexpected_directories_and_files() -> None:
     paths = [
         "Makefile",
         "README.md",
+        "codereview.md",
         "lab/experiments/a.yaml",
         "orchestrator/pyproject.toml",
         "experiments/a.yaml",

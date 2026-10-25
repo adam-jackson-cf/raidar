@@ -78,16 +78,44 @@ def copy_gate_dir(work_dir: str) -> PurePosixPath:
     return PurePosixPath(work_dir) / COPY_DIR / "gate"
 
 
+# Run inside the trial container before the dry-run command can write anything.
+# Resolve links against the original tree, then point them into the copied tree.
+_ISOLATE_LINKS = """\
+import os
+import sys
+from pathlib import Path
+
+source, copy = (Path(value).resolve() for value in sys.argv[1:3])
+excluded = set(sys.argv[3:])
+for directory, dirs, files in os.walk(copy, followlinks=False):
+    for name in dirs + files:
+        link = Path(directory) / name
+        if not link.is_symlink():
+            continue
+        try:
+            target = (source / link.relative_to(copy)).resolve(strict=True)
+            relative = target.relative_to(source)
+            if any(part in excluded for part in relative.parts):
+                raise ValueError("target is excluded from the shadow copy")
+        except (OSError, RuntimeError, ValueError) as error:
+            raise SystemExit(f"cannot isolate shadow-copy symlink {link.name}: {error}")
+        link.unlink()
+        link.symlink_to(copy / relative, target_is_directory=target.is_dir())
+"""
+
+
 def _copy_lines(work_dir: str) -> list[str]:
     base = shlex.quote(str(PurePosixPath(work_dir) / COPY_DIR))
     copy = shlex.quote(str(copy_root(work_dir)))
     excludes = " ".join(f"--exclude={shlex.quote(name)}" for name in SNAPSHOT_EXCLUDES)
     links = " ".join(shlex.quote(name) for name in LINKED_DIRS)
+    excluded = " ".join(shlex.quote(name) for name in SNAPSHOT_EXCLUDES)
+    isolate = f'python3 -I -c {shlex.quote(_ISOLATE_LINKS)} "$(pwd -P)" "$copy" {excluded}'
     return [
         "set -o pipefail",
         f"copy={copy}",
         f'if rm -rf {base} && mkdir -p "$copy" && '
-        f'tar -cf - {excludes} . | tar -xf - -C "$copy"; then',
+        f'{{ tar -cf - {excludes} . | tar -xf - -C "$copy"; }} && {isolate}; then',
         f'  for name in {links}; do [ -d "$name" ] && ln -s "$(pwd -P)/$name" "$copy/$name"; done',
         '  echo "copy_rc=0"; cd "$copy" || exit 0',
         "else",

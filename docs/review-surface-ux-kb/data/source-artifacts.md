@@ -9,6 +9,12 @@ timestamp: 2026-06-15T00:00:00Z
 
 # Source artifacts
 
+> **Historical contract.** The scenario/benchmark sources below were retired.
+> Current review producers read locked experiment jobs and Assessment stores
+> under the configured generated root, then emit schema-v2 projections. See the
+> [root README](../../../README.md) for the current workflow and the
+> [bundle's historical status](../index.md).
+
 `scripts/build-review-data.mjs` reads from `experiments/benchmarks/**` and
 `scenarios/**`. These are **authoritative**; the surface never mutates them.
 

@@ -5,8 +5,8 @@ its one-shot variant), so the review surface's delivery tiers keep their
 meaning: S is correctness-gated. ``quality_score`` is the policy's inertia I and
 ``diagnostic_score`` is correctness C. C is the policy's definition (the SCB
 fork's ``C_p``, ``analysis.assessed.correctness_component``): the mean of
-``correctness@1``'s per-checkpoint ``strict_pass_rate``, an unreached
-checkpoint counting 0. V/E/H/R/G come from ``code-quality@3``'s problem-level
+``correctness@2``'s per-checkpoint ``strict_pass_rate``, an unreached
+checkpoint counting 0. V/E/H/R/G come from ``code-quality@4``'s problem-level
 means. A component that is not ``ok`` makes the score ineligible with the
 scorer's own reason, and a scorer with no stored Assessment makes it
 unassessed; neither is ever read as zero. Under a policy with the

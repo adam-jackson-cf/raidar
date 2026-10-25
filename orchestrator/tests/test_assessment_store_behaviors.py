@@ -12,6 +12,7 @@ from click.testing import CliRunner
 
 from raidar.cli import main
 from raidar.grading.models import CaseStatus
+from raidar.grading.records import EVIDENCE_FILE, RECORD_FILE, step_record_dir
 from raidar.scoring.catalog.builtin import BUILTIN_IMPLEMENTATIONS
 from raidar.scoring.framework.rescore import RescoreError, RescoreOutcome, rescore_path
 from raidar.scoring.framework.store import AssessmentConflictError, AssessmentStore
@@ -26,6 +27,7 @@ from tests.scorer_support import (
     write_toy_bundle,
     write_trial,
 )
+from tests.verifier_support import copy_grading_sources
 
 V1 = "fake-quality@1"
 V2 = "fake-quality@2"
@@ -120,6 +122,48 @@ def test_assessment_keys_follow_config_and_inputs(tmp_path: Path) -> None:
     # Identical content in two trials is one Assessment: the key is content, not location.
     assert same_inputs[0].key == plain[0].key
     assert same_inputs[0].outcome is RescoreOutcome.EXISTING
+
+
+@pytest.mark.parametrize("change", ["evidence_changed", "evidence_removed", "image", "timeout"])
+def test_completed_assessments_are_rekeyed_when_grading_evidence_or_runtime_changes(
+    tmp_path: Path, change: str
+) -> None:
+    store = AssessmentStore(tmp_path / "store")
+    trial = two_step_trial(tmp_path / "trial")
+    record_dir = step_record_dir(trial, "checkpoint_1")
+    evidence = record_dir / EVIDENCE_FILE
+    evidence.write_text('{"grading": "original"}')
+    (original,) = rescore_path(trial, [V1], store, fake_registry())
+    original_bytes = original.path.read_bytes()
+    if change == "evidence_changed":
+        evidence.write_text('{"grading": "different"}')
+    elif change == "evidence_removed":
+        evidence.unlink()
+    else:
+        path = record_dir / RECORD_FILE
+        record = json.loads(path.read_text())
+        field = "environment_id" if change == "image" else "timeout_s"
+        record["grader"][field] = "sha256:different-image" if change == "image" else 123.0
+        path.write_text(json.dumps(record))
+    (updated,) = rescore_path(trial, [V1], store, fake_registry())
+    assert updated.key != original.key
+    assert updated.outcome is RescoreOutcome.ADDED
+    assert original.path.read_bytes() == original_bytes
+
+
+def test_completed_assessments_are_rekeyed_when_offline_grading_plugin_bytes_change(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    copied = copy_grading_sources(tmp_path / "implementation")
+    plugin = copied.parent / "runtime" / "raidar_oracle_plugin.py"
+    monkeypatch.setattr("raidar.grading.records.__file__", str(copied))
+    store = AssessmentStore(tmp_path / "store")
+    trial = two_step_trial(tmp_path / "trial")
+    (original,) = rescore_path(trial, [V1], store, fake_registry())
+    plugin.write_bytes(plugin.read_bytes() + b"\n# Changed sandbox plugin payload.\n")
+    (updated,) = rescore_path(trial, [V1], store, fake_registry())
+    assert updated.key != original.key
+    assert updated.outcome is RescoreOutcome.ADDED
 
 
 def test_scores_come_from_oracle_records_and_unavailable_steps_carry_no_value(
@@ -269,12 +313,12 @@ def test_assess_rescore_cli_config_sets_the_inventory_policy_and_scorer_config(
 def test_assess_rescore_cli_refuses_scorers_that_cannot_run(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    monkeypatch.delitem(BUILTIN_IMPLEMENTATIONS, "correctness@1")
+    monkeypatch.delitem(BUILTIN_IMPLEMENTATIONS, "correctness@2")
     trial = two_step_trial(tmp_path / "trial")
     runner = CliRunner()
     store = str(tmp_path / "store")
     unimplemented = runner.invoke(
-        main, ["assess", "--rescore", str(trial), "--scorer", "correctness@1", "--store", store]
+        main, ["assess", "--rescore", str(trial), "--scorer", "correctness@2", "--store", store]
     )
     assert unimplemented.exit_code == 1
     assert "no implementation" in unimplemented.output

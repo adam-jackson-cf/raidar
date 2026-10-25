@@ -201,7 +201,9 @@ def mcnemar_exact(baseline_only: int, treatment_only: int) -> float:
     if discordant == 0:
         return 1.0
     tail = sum(math.comb(discordant, k) for k in range(min(baseline_only, treatment_only) + 1))
-    return min(1.0, 2.0 * tail / 2.0**discordant)
+    # Divide integers before converting their ratio to float. Neither the
+    # binomial tail nor 2**discordant needs to fit in a floating-point value.
+    return min(1.0, (2 * tail) / (1 << discordant))
 
 
 def pairs_for_power(sd: float, delta: float) -> int:

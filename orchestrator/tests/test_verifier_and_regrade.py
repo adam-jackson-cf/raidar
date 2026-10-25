@@ -241,7 +241,8 @@ async def test_hidden_tests_seen_before_the_agent_started_leak_the_step(tmp_path
     # pre-agent scan can see a /tests copy baked into the agent image.
     bundle = make_bundle(tmp_path / "fixture").root
     baked = FakeAgentEnvironment(leak_stdout="TESTS\t/tests/conftest.py\nRAIDAR_LEAK_SCAN_DONE\n")
-    await start_agent_behind_guard(tmp_path, baked, bundle, "checkpoint_1")
+    with pytest.raises(LeakScanError, match="hidden verifier tests detected"):
+        await start_agent_behind_guard(tmp_path, baked, bundle, "checkpoint_1")
     place_step_artifact(tmp_path, "checkpoint_1")
     verifier = await make_verifier(
         tmp_path, FakeAgentEnvironment(), bundle_root=bundle, guarded=False, coverage=False

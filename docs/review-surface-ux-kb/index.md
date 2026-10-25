@@ -10,6 +10,14 @@ okf_version: "0.1"
 
 # Raidar Review Surface — UX Knowledgebase
 
+> **Historical UX audit, 2026-06-15.** This entire bundle records the retired
+> scenario-era surface. Its source paths, projection fields, API descriptions and
+> recovery commands are historical observations, not current integration contracts.
+> The [root README](../../README.md) is the current human entrypoint. Current
+> producers live under `orchestrator/src/raidar/evaluation/review/`; the UI consumes
+> schema-v2 projections and retains legacy route/wire names only as internal
+> contracts. Use `make help` to discover the supported workflow.
+
 This bundle is an [Open Knowledge Format](https://cloud.google.com/blog/products/data-analytics/how-the-open-knowledge-format-can-improve-data-sharing/)
 projection of the **Raidar Review Surface**: a Workshop-inspired web app for
 reviewing Raidar benchmark evidence. Each concept below is one markdown file
@@ -54,7 +62,8 @@ reflects the surface as it actually behaves, not just as designed.
 
 ## Regenerating the visualiser
 
-The bundle is the source of truth; the HTML is a generated consumer. After
+This historical bundle is the source for its historical HTML visualiser; neither
+is the source of truth for the current application. After
 editing any `.md` file, rebuild the visualiser with a zero-dependency script:
 
 ```bash

@@ -47,14 +47,14 @@ def all_builtin_uses(harness: Harness) -> list[ComponentUse]:
     """One use of every harness/workspace/prompt built-in (the batched probe condition)."""
     settings = CODEX_SETTINGS if harness is Harness.CODEX_CLI else CLAUDE_SETTINGS
     return [
-        use("rules-file@1", (f"{PROBE_DIR}/AGENTS.md",)),
-        use("workspace-files@1", (f"{PROBE_DIR}/starter",), dest="docs"),
-        use("lint-config@1", (f"{PROBE_DIR}/ruff.toml",)),
-        use("skills@1", (f"{PROBE_DIR}/skills/raidar-probe-skill",)),
-        use("harness-settings@1", settings=settings),
-        use("stop-hook@1", command="true"),
+        use("rules-file@2", (f"{PROBE_DIR}/AGENTS.md",)),
+        use("workspace-files@2", (f"{PROBE_DIR}/starter",), dest="docs"),
+        use("lint-config@2", (f"{PROBE_DIR}/ruff.toml",)),
+        use("skills@2", (f"{PROBE_DIR}/skills/raidar-probe-skill",)),
+        use("harness-settings@2", settings=settings),
+        use("stop-hook@2", command="true"),
         use(
-            "mcp-server@1",
+            "mcp-server@2",
             (f"{PROBE_DIR}/mcp_echo_server.py",),
             name="raidar-echo",
             command="python3",

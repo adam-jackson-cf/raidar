@@ -15,7 +15,9 @@ def docker_target_offline(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> No
     default; reachability is not probed (the test fakes the engine).
     """
     targets = tmp_path / "targets.toml"
-    targets.write_text('default = "offline"\n[targets.offline]\ndocker_context = "test-ctx"\n')
+    targets.write_text(
+        'default = "offline"\n[targets.offline]\ndocker_context = "test-ctx"\ntrusted = true\n'
+    )
     monkeypatch.setenv("RAIDAR_TARGETS_FILE", str(targets))
     monkeypatch.delenv("RAIDAR_TARGET", raising=False)
     monkeypatch.delenv("DOCKER_HOST", raising=False)

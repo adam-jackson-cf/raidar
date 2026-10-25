@@ -107,7 +107,7 @@ def test_a_baseline_without_the_gate_is_described_not_paired() -> None:
     assert comparison.gate_note is not None
     assert "baseline arm measured no gate-effort value" in comparison.gate_note
     markdown = render_markdown(report)
-    assert "## Gate effort (gate-effort@10, per arm)" in markdown
+    assert "## Gate effort (gate-effort@11, per arm)" in markdown
     assert "— (not_applicable 5)" in markdown
     assert "### Gate effort (paired)" in markdown
 
@@ -165,7 +165,7 @@ def test_gate_metrics_read_the_trajectory_observations() -> None:
     assert metrics[FIRST_PASS] == Value.ok(0.5)
     assert metrics[UNRESOLVED].status == "unavailable"
     assert gate_metrics(None)[FIRST_PASS].status == "unassessed"
-    assert GATE_EFFORT_REF == "gate-effort@10"
+    assert GATE_EFFORT_REF == "gate-effort@11"
 
 
 # ---- the pre-registered manipulation check ------------------------------------------------
@@ -259,7 +259,7 @@ def test_lock_manipulation_checks_are_read_and_validated(tmp_path: Path) -> None
         load_experiment(write_experiment(tmp_path / "unknown", document))
     assert "unknown check 'vibes'" in caught.value.issues[0].message
 
-    document["assessment"]["scorers"] = ["correctness@1", "gate-effort@10"]
+    document["assessment"]["scorers"] = ["correctness@2", "gate-effort@11"]
     document["analysis"]["manipulation_checks"] = [{"check": GATE_CLEAN, "min_share": 0.8}]
     document["analysis"]["min_effects"] = {FIRST_PASS: 0.2}
     spec = load_experiment(write_experiment(tmp_path / "ok", document)).spec
@@ -303,7 +303,7 @@ def test_a_lock_reports_the_fix_round_delta_and_the_process_stall_rate() -> None
         )
     ]
 
-    report = _analyse(outcomes, gate_scorer="gate-effort@10", process_scorer="process-compliance@6")
+    report = _analyse(outcomes, gate_scorer="gate-effort@11", process_scorer="process-compliance@7")
 
     baseline, guided = report.arms
     assert baseline.gate_effort is not None
@@ -318,7 +318,7 @@ def test_a_lock_reports_the_fix_round_delta_and_the_process_stall_rate() -> None
     assert baseline.process_outcomes is not None
     assert baseline.process_outcomes[STALL].mean == pytest.approx(0.25)
     markdown = render_markdown(report)
-    assert "## Process outcomes (process-compliance@6, per arm)" in markdown
+    assert "## Process outcomes (process-compliance@7, per arm)" in markdown
     assert "### Process outcomes (paired)" in markdown
     assert f"| {DELTA} |" in markdown
 

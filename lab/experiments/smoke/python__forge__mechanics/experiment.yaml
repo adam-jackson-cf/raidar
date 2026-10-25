@@ -44,7 +44,7 @@ arms:
     agent: agent
 
 assessment:
-  scorers: [correctness@1, code-quality@3, resource-usage@1, process-compliance@6]
+  scorers: [correctness@2, code-quality@4, resource-usage@2, process-compliance@7]
   metric: scb-canonical@2
 
 analysis:

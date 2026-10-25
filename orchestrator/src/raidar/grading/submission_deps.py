@@ -34,6 +34,21 @@ from raidar.grading.models import VerifierModel
 SUBMISSION_DEPENDENCY_PINS: Mapping[str, str] = {"pyyaml": "PyYAML==6.0.3"}
 SUBMISSION_DEPS_ROOT = "/opt/raidar-submission-deps"
 _DECLARATION_FILES = ("pyproject.toml", "requirements.txt")
+MARKER_ENVIRONMENT_KEYS = frozenset(
+    {
+        "implementation_name",
+        "implementation_version",
+        "os_name",
+        "platform_machine",
+        "platform_release",
+        "platform_system",
+        "platform_version",
+        "python_full_version",
+        "platform_python_implementation",
+        "python_version",
+        "sys_platform",
+    }
+)
 
 
 class SubmissionDependencies(VerifierModel):
@@ -108,7 +123,9 @@ def _pin_version(pin: str) -> str:
     return pin.split("==", 1)[1]
 
 
-def resolve_dependencies(snapshot: Path, pins: Mapping[str, str]) -> SubmissionDependencies:
+def resolve_dependencies(
+    snapshot: Path, pins: Mapping[str, str], *, marker_environment: Mapping[str, str] | None = None
+) -> SubmissionDependencies:
     """Which declared requirements a pinned package satisfies (``provided``) and which not."""
     provided: dict[str, str] = {}
     unprovided: list[str] = []
@@ -119,6 +136,15 @@ def resolve_dependencies(snapshot: Path, pins: Mapping[str, str]) -> SubmissionD
         except InvalidRequirement:
             unprovided.append(f"{text} (unparseable requirement)")
             continue
+        if requirement.marker is not None:
+            if marker_environment is None or not MARKER_ENVIRONMENT_KEYS.issubset(
+                marker_environment
+            ):
+                raise ValueError(
+                    "dependency markers require the submission interpreter environment"
+                )
+            if not requirement.marker.evaluate(environment=dict(marker_environment)):
+                continue
         name = canonicalize_name(requirement.name)
         pin = pins.get(name)
         if pin is None:

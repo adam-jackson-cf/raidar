@@ -65,7 +65,7 @@ class FakeTarget:
     def healthy(self) -> bool:
         return self.up
 
-    def ensure(self) -> None:
+    def ensure(self, timeout_s: float) -> None:
         self.ensures += 1
         if self.recover_after is not None and not self.up:
             self.recover_after -= 1
@@ -181,6 +181,28 @@ async def test_a_persistent_loss_raises_target_lost_and_stays_lost(tmp_path: Pat
 
     assert target.ensures == ensures  # a lost target is not retried per trial
     assert sum(target.slept) <= 10.0
+
+
+@pytest.mark.parametrize("probe_seconds", [0.2, 2.0, 30.0])
+async def test_reconnect_shares_its_remaining_budget_with_slow_ensure_calls(
+    probe_seconds: float,
+) -> None:
+    target = FakeTarget()
+    guard = target.guard(reconnect_s=5.0)
+    budgets: list[float] = []
+
+    def slow_ensure(timeout_s: float) -> None:
+        budgets.append(timeout_s)
+        target.now += min(probe_seconds, timeout_s)
+        raise TargetUnavailableError("probe timed out")
+
+    guard.ensure = slow_ensure
+    with pytest.raises(TargetLostError):
+        await guard.admit("t0")
+
+    assert budgets[0] == 5.0
+    assert all(0 <= seconds <= 5.0 for seconds in budgets)
+    assert target.now <= 5.0
 
 
 async def test_review_records_the_loss_when_the_target_never_returns(tmp_path: Path) -> None:

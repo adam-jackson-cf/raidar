@@ -5,7 +5,7 @@ with its tree digest) gets that snapshot graded with the step's own bundle,
 sandbox and timeout into the Assessment store, never the job; a stored grade is
 not graded again; a changed snapshot is an error, never a grade; the regrade
 compares a fresh grade with the stored one. ``raidar assess --rescore`` grades
-first only when a scorer that reads the grades (gate-effort@10) runs.
+first only when a scorer that reads the grades (gate-effort@11) runs.
 """
 
 from __future__ import annotations
@@ -17,14 +17,14 @@ from typing import Any
 import pytest
 
 from raidar.contract.snapshot import tree_digest
-from raidar.grading import offline
+from raidar.grading import offline, records
 from raidar.grading.prefix.grade import (
     grade_pre_fix_path,
     pre_fix_snapshots,
     regrade_pre_fix_path,
 )
 from raidar.grading.prefix.store import read_pre_fix_grade
-from raidar.grading.records import load_step_record, step_record_dir
+from raidar.grading.records import grading_identity, load_step_record, step_record_dir
 from raidar.grading.regrade import RegradeOptions
 from tests.scorer_support import tree_state
 from tests.test_verifier_and_regrade import (
@@ -33,7 +33,7 @@ from tests.test_verifier_and_regrade import (
     make_verifier,
     place_step_artifact,
 )
-from tests.verifier_support import make_bundle, write_app
+from tests.verifier_support import copy_grading_sources, make_bundle, write_app
 
 STEP = "checkpoint_2"
 
@@ -79,7 +79,9 @@ async def test_a_pre_fix_snapshot_is_graded_into_the_store_never_the_job(tmp_pat
     assert (entry["status"], entry["step"], report["errors"]) == ("graded", STEP, 0)
     (snapshot,) = pre_fix_snapshots(trial)
     final = load_step_record(step_record_dir(trial, STEP))
-    grade = read_pre_fix_grade(store, final.bundle.digest, STEP, snapshot.digest)
+    grade = read_pre_fix_grade(
+        store, final.bundle.digest, STEP, snapshot.digest, identity=grading_identity(final.grader)
+    )
     assert grade is not None
     final_rate, pre_fix_rate = final.grade.pass_rate(), grade.pass_rate()
     assert final_rate is not None
@@ -90,6 +92,41 @@ async def test_a_pre_fix_snapshot_is_graded_into_the_store_never_the_job(tmp_pat
     assert again["snapshots"][0]["status"] == "stored"
     regrade = await regrade_pre_fix_path(trial, store, _options(tmp_path))
     assert regrade["match"] is True
+
+
+async def test_pre_fix_cache_separates_timeouts_and_refuses_a_different_image(
+    tmp_path: Path,
+) -> None:
+    trial = await _graded_trial(tmp_path)
+    store = tmp_path / "store"
+    first = await grade_pre_fix_path(trial, store, _options(tmp_path))
+    record_path = step_record_dir(trial, STEP) / "record.json"
+    record = json.loads(record_path.read_text())
+    record["grader"]["timeout_s"] += 1
+    record_path.write_text(json.dumps(record))
+    second = await grade_pre_fix_path(trial, store, _options(tmp_path))
+    assert second["snapshots"][0]["status"] == "graded"
+    assert first["snapshots"][0]["path"] != second["snapshots"][0]["path"]
+    record["grader"]["environment_id"] = "different-image"
+    record_path.write_text(json.dumps(record))
+    third = await grade_pre_fix_path(trial, store, _options(tmp_path))
+    assert third["errors"] == 1
+    assert "environment differs" in third["snapshots"][0]["error"]
+
+
+async def test_host_execution_changes_invalidate_pre_fix_grades(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    trial = await _graded_trial(tmp_path)
+    copied = copy_grading_sources(tmp_path / "implementation")
+    monkeypatch.setattr(records, "__file__", str(copied))
+    store = tmp_path / "store"
+    first = await grade_pre_fix_path(trial, store, _options(tmp_path))
+    source = copied.parent / "submission_deps.py"
+    source.write_text(source.read_text() + "\nHOST_EXECUTION_REVISION = 2\n")
+    changed = await grade_pre_fix_path(trial, store, _options(tmp_path))
+    assert changed["snapshots"][0]["status"] == "graded"
+    assert changed["snapshots"][0]["path"] != first["snapshots"][0]["path"]
 
 
 async def test_a_changed_snapshot_is_an_error_never_a_grade(tmp_path: Path) -> None:
@@ -118,9 +155,9 @@ async def test_a_trial_without_pre_fix_snapshots_grades_nothing(tmp_path: Path) 
 @pytest.mark.parametrize(
     ("scorers", "replay", "grades"),
     [
-        (("gate-effort@10",), False, True),
-        (("gate-effort@10", "correctness@1"), True, False),
-        (("correctness@1", "code-quality@3"), False, False),
+        (("gate-effort@11",), False, True),
+        (("gate-effort@11", "correctness@2"), True, False),
+        (("correctness@2", "code-quality@4"), False, False),
     ],
 )
 def test_rescore_grades_first_only_for_a_scorer_that_reads_the_grades(

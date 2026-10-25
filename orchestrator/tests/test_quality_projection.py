@@ -11,15 +11,20 @@ from types import SimpleNamespace
 import pytest
 
 from raidar.contract.trial import TrialRecord
+from raidar.design.experiment.lock import seal_lock
+from raidar.engine.job.assessment import lock_rescore_config
 from raidar.evaluation.analysis.assessed import build_outcome
 from raidar.evaluation.review.quality.experiment_view import _primary
 from raidar.evaluation.review.quality.models import COMPONENTS, QualityProjection
 from raidar.evaluation.review.quality.projection import build_quality_projection, main
 from raidar.evaluation.review.quality.stats import pearson, quantiles
+from raidar.scoring.catalog.builtin import default_scorer_registry
 from raidar.scoring.catalog.outcomes import CORRECTNESS_METRIC, HEADLINE_SCORE
 from raidar.scoring.framework.metrics import SCB_CANONICAL
+from raidar.scoring.framework.rescore import assess
 from raidar.scoring.framework.result import AssessResult, AssessStatus, Observation, RunStats
-from raidar.scoring.framework.store import OBJECTS_DIR, AssessmentStore
+from raidar.scoring.framework.store import OBJECTS_DIR, AssessmentStore, assessment_key
+from raidar.scoring.framework.trial_inputs import load_trial_context
 from tests.review_fixtures.quality.generate import (
     EXPERIMENT,
     INELIGIBLE_H,
@@ -28,6 +33,7 @@ from tests.review_fixtures.quality.generate import (
     generate_quality_fixture,
 )
 from tests.review_fixtures.quality.lock import write_synthetic_lock
+from tests.review_fixtures.quality.store import FixtureAssessments
 
 RUN_PREFIX = f"{EXPERIMENT}.{RUN_ID}."
 
@@ -128,7 +134,7 @@ def test_problem_row_is_the_analysis_outcome_of_the_same_assessments(
         outcome = build_outcome(record, results, policy=SCB_CANONICAL)
         rates = {
             item.subject: item.value or 0.0
-            for item in results["correctness@1"].observations
+            for item in results["correctness@2"].observations
             if item.metric == "strict_pass_rate" and item.status is AssessStatus.OK
         }
         steps = record.trial.steps
@@ -299,27 +305,44 @@ def test_assessments_are_matched_by_snapshot_content_not_trial_name(
 
     result = build_quality_projection(target / "jobs", target / "store")
     unmatched = result.run_details[f"{EXPERIMENT}.synthetic-run-2.b00-p0-baseline"]
-    assert unmatched.run.sources == {"code-quality@3": None, "correctness@1": None}
+    assert unmatched.run.sources == {"code-quality@4": None, "correctness@2": None}
     assert unmatched.rows[0].cells["V"].status == "unavailable"
     matched = result.run_details[f"{RUN_PREFIX}b00-p0-baseline"]
-    assert matched.run.sources["code-quality@3"] is not None
+    assert matched.run.sources["code-quality@4"] is not None
     problem = _problem(result)
     assert any("superseded" in item for item in problem.excluded)
 
 
-def test_the_most_recently_logged_assessment_of_a_scorer_wins(
-    fixture_dir: Path, tmp_path: Path
+@pytest.mark.parametrize("changed", ["config", "implementation", "tools", "verifier", "trace"])
+def test_only_the_locked_exact_assessment_is_used_even_when_a_newer_one_has_the_same_snapshots(
+    fixture_dir: Path, tmp_path: Path, changed: str
 ) -> None:
     target = _copy(fixture_dir, tmp_path)
     store = AssessmentStore(target / "store")
     job_id = f"{RUN_PREFIX}b00-p0-baseline"
     before = build_quality_projection(target / "jobs", target / "store").run_details[job_id]
-    original = store.get(before.run.sources["correctness@1"] or "")
+    original = store.get(before.run.sources["correctness@2"] or "")
     assert original is not None
-    replacement = original.model_copy(
+    updates: dict[str, object] = {}
+    if changed == "config":
+        updates["config"] = {**original.config, "new_setting": True}
+    elif changed == "implementation":
+        updates["scorer"] = original.scorer.model_copy(update={"implementation_digest": "e" * 64})
+    elif changed == "tools":
+        updates["tool_lock"] = {"another": "tool"}
+    else:
+        inputs = json.loads(json.dumps(original.inputs))
+        inputs["steps"][0]["oracle_record" if changed == "verifier" else "trace"] = "e" * 64
+        updates["inputs"] = inputs
+    replacement = original.model_copy(update=updates)
+    replacement = replacement.model_copy(
         update={
-            "config": {"progression": "continue"},
-            "key": "e" * 64,
+            "key": assessment_key(
+                replacement.scorer,
+                config=replacement.config,
+                tool_lock=replacement.tool_lock,
+                inputs=replacement.inputs,
+            ),
             "result": AssessResult(
                 status=AssessStatus.OK,
                 observations=(
@@ -346,15 +369,17 @@ def test_the_most_recently_logged_assessment_of_a_scorer_wins(
     store.log(
         trial="b00-p0-baseline",
         key=replacement.key,
-        scorer="correctness@1",
+        scorer="correctness@2",
         outcome="added",
         stats=RunStats(duration_s=0),
     )
     after = build_quality_projection(target / "jobs", target / "store").run_details[job_id]
-    assert after.run.sources["correctness@1"] == "e" * 64
-    assert after.rows[0].cells["C"].value == 0.5
-    # C is the mean case pass rate (0.5 everywhere), not solved_checkpoints / K.
-    assert after.problem["C"].value == 0.5
+    assert after.run.sources["correctness@2"] == original.key
+    assert after.problem["C"] == before.problem["C"]
+    store.path_for(original.key).unlink()
+    missing = build_quality_projection(target / "jobs", target / "store").run_details[job_id]
+    assert missing.run.sources["correctness@2"] is None
+    assert missing.problem["C"].value is None
 
 
 def _lock(target: Path, headline_policy: str, experiment: str = EXPERIMENT) -> str:
@@ -386,6 +411,33 @@ def test_the_locks_headline_policy_takes_precedence_over_the_default(
     assert any("checkpoint_count_unsupported" in reason for reason in detail.policy_reasons)
 
 
+def test_relocking_assessment_settings_requires_the_new_exact_assessment(
+    fixture_dir: Path, tmp_path: Path
+) -> None:
+    target = _copy(fixture_dir, tmp_path)
+    run_id = f"{RUN_PREFIX}b00-p0-baseline"
+    before = build_quality_projection(target / "jobs", target / "store").run_details[run_id]
+    store = AssessmentStore(target / "store")
+    original = store.get(before.run.sources["correctness@2"] or "")
+    assert original is not None
+    lock_path = target / "experiment.lock.json"
+    lock = json.loads(lock_path.read_text())
+    lock["spec"]["assessment"]["inventory_policy"] = {"generated_globs": ["generated/**"]}
+    for derived in ("sections", "lock_sha256", "document_sha256"):
+        lock.pop(derived)
+    lock = seal_lock(lock)
+    lock_path.write_text(json.dumps(lock))
+    unassessed = build_quality_projection(target / "jobs", target / "store").run_details[run_id]
+    assert unassessed.run.sources["correctness@2"] is None
+    trial = target / "jobs" / EXPERIMENT / RUN_ID / "trials" / "b00-p0-baseline"
+    exact = FixtureAssessments(lock_rescore_config(lock)).assessment(
+        "correctness@2", trial, original.result
+    )
+    store.put(exact)
+    assessed = build_quality_projection(target / "jobs", target / "store").run_details[run_id]
+    assert assessed.run.sources["correctness@2"] == exact.key
+
+
 @pytest.mark.parametrize("change", ["missing", "relocked"])
 def test_without_the_runs_own_lock_there_is_no_baseline_and_no_paired_delta(
     fixture_dir: Path, tmp_path: Path, change: str
@@ -404,6 +456,7 @@ def test_without_the_runs_own_lock_there_is_no_baseline_and_no_paired_delta(
     assert any("no baseline arm" in note for note in problem.notes)
     detail = result.run_details[f"{RUN_PREFIX}b00-p0-baseline"]
     assert any("lock unavailable" in note for note in detail.notes)
+    assert all(key is None for key in detail.run.sources.values())
     assert (detail.policy.ref, detail.policy.source) == ("scb-canonical@1", "default_by_k")
 
 
@@ -455,8 +508,8 @@ def test_truncated_trials_have_no_problem_outcome_and_stay_out_of_arm_statistics
     assert [row.checkpoint for row in detail.rows] == ["checkpoint_1"]
     problem = _problem(result)
     assert any("b00-p0-guided: development job" in item for item in problem.excluded)
-    # Six guided attempts less the invalid one and the truncated one.
-    assert problem.curves["guided"]["E"][0].n == 4
+    # Without a matching lock there is no authorized assessment configuration.
+    assert problem.curves["guided"]["E"][0].n == 0
 
 
 def test_agent_override_trials_render_but_stay_out_of_arm_statistics(
@@ -622,7 +675,7 @@ def test_gate_records_without_an_assessment_or_with_a_broken_record_say_so(
 ) -> None:
     target = _copy(fixture_dir, tmp_path)
     for path in sorted((target / "store" / OBJECTS_DIR).glob("*/*.json")):
-        if json.loads(path.read_text())["scorer"]["ref"] == "gate-effort@10":
+        if json.loads(path.read_text())["scorer"]["ref"] == "gate-effort@11":
             path.unlink()
     trace = target / "jobs" / EXPERIMENT / RUN_ID / "trials" / "b01-p0-guided" / "steps"
     (trace / "checkpoint_2" / "agent" / "guardrail-gate" / "guardrail-gate.json").write_text("[")
@@ -635,7 +688,7 @@ def test_gate_records_without_an_assessment_or_with_a_broken_record_say_so(
     assert gate.steps[0].cells["gate_runs"].status == "unassessed"
     assert gate.steps[1].rounds == ()
     assert any("checkpoint_2: gate record unreadable" in note for note in gate.notes)
-    assert any("rescore its job with gate-effort@10" in note for note in gate.notes)
+    assert any("rescore its job with gate-effort@11" in note for note in gate.notes)
     assert gate.steps[3].rounds[0].verdict == "refused"
 
 
@@ -672,12 +725,50 @@ def test_a_shadow_gate_is_labelled(fixture_dir: Path, tmp_path: Path) -> None:
         record["mode"] = "shadow"
         record_path.write_text(json.dumps(record))
 
+    # A changed trace has a new assessment key; rescore the gate under that key.
+    assess(
+        AssessmentStore(target / "store"),
+        default_scorer_registry().get("gate-effort@11"),
+        load_trial_context(steps.parent),
+        trial="b01-p0-guided",
+    )
+
     rebuilt = build_quality_projection(target / "jobs", target / "store", synthetic=True)
 
     gate = rebuilt.run_details[f"{RUN_PREFIX}b01-p0-guided"].gate
     assert gate is not None
-    assert (gate.shadow, gate.scorer) == (True, "gate-effort@10")
+    assert (gate.shadow, gate.scorer) == (True, "gate-effort@11")
     assert not gate.notes
     enforced = rebuilt.run_details[f"{RUN_PREFIX}b00-p0-guided"].gate
     assert enforced is not None
-    assert (enforced.shadow, enforced.scorer) == (False, "gate-effort@10")
+    assert (enforced.shadow, enforced.scorer) == (False, "gate-effort@11")
+
+
+@pytest.mark.parametrize("quality_gap", ["missing", "ineligible"])
+def test_zero_correctness_remains_scored_when_sensitivity_components_are_unmeasured(
+    fixture_dir: Path, tmp_path: Path, quality_gap: str
+) -> None:
+    target = _copy(fixture_dir, tmp_path)
+    _lock(target, "scb-canonical@2")
+    for path in (target / "store" / OBJECTS_DIR).glob("*/*.json"):
+        payload = json.loads(path.read_text())
+        ref = payload["scorer"]["ref"]
+        if ref == "code-quality@4" and quality_gap == "missing":
+            path.unlink()
+            continue
+        for observation in payload["result"]["observations"]:
+            if ref == "correctness@2" and observation["metric"] == "strict_pass_rate":
+                observation["value"] = 0
+            elif ref == "code-quality@4" and observation["metric"] == "problem_architecture":
+                observation.update(
+                    status="ineligible", value=None, reason="unmeasured architecture"
+                )
+        path.write_text(json.dumps(payload))
+    projection = build_quality_projection(target / "jobs", target / "store")
+    detail = projection.run_details[f"{RUN_PREFIX}b00-p0-baseline"]
+    assert (detail.problem["S"].status, detail.problem["S"].value) == ("ok", 0)
+    sensitivity = _problem(projection).sensitivity
+    assert sensitivity.n == 0
+    assert sensitivity.ablation == {}
+    assert all(item.r is None for item in sensitivity.correlations)
+    assert any("sensitivity components unavailable" in item for item in sensitivity.excluded)

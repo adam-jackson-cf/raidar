@@ -8,6 +8,10 @@ timestamp: 2026-06-15T00:00:00Z
 
 # Data lineage
 
+> **Historical contract.** This page belongs to the archived June 2026 UX audit.
+> The artifacts and commands below do not describe current integration. See the
+> [bundle's status](../index.md) and the [root README](../../../README.md).
+
 Everything the surface shows is a **regenerable projection** of authoritative
 Raidar artifacts. The only data the surface owns is reviewer annotations.
 

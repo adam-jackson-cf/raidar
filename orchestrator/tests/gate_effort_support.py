@@ -13,13 +13,14 @@ from pathlib import Path
 from typing import Any
 
 from raidar.grading.models import CaseGroup, CaseResult, CaseStatus, VerifierGrade
-from raidar.grading.prefix.store import GRADE_KIND, grade_path
+from raidar.grading.prefix.store import GRADE_KIND, SCHEMA_VERSION, grade_path
 from raidar.grading.records import (
     BundleRef,
     CoverageRef,
     GraderRef,
     SnapshotRef,
     StepRecord,
+    grading_identity,
 )
 from raidar.scoring.framework.context import AssessContext, StepInputs
 from raidar.scoring.framework.result import AssessResult, AssessStatus, Observation
@@ -258,11 +259,16 @@ def _pre_fix(trace: Path, digest: str | None = PRE_FIX) -> None:
 
 
 def _store_grade(store: Path, step: str, passed: int, failed: int) -> None:
-    path = grade_path(store, BUNDLE, step, PRE_FIX)
+    identity = grading_identity(
+        GraderRef(image="g", environment_id="sha256:e", image_built=False, timeout_s=60)
+    )
+    path = grade_path(store, BUNDLE, step, PRE_FIX, identity=identity)
     path.parent.mkdir(parents=True, exist_ok=True)
     grade = _grade(step, passed, failed)
     payload = {
         "kind": GRADE_KIND,
+        "identity": identity,
+        "schema_version": SCHEMA_VERSION,
         "step": step,
         "snapshot_digest": PRE_FIX,
         "grade": grade.model_dump(mode="json"),

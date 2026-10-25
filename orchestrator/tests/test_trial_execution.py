@@ -21,6 +21,7 @@ from raidar.design.experiment.lock import lock_integrity_issues, spec_source_dig
 from raidar.design.problem.rewrite import VERIFIER_IMPORT_PATH
 from raidar.design.problem.store import ROOT_ENV
 from raidar.engine.health.records_manifest import RECORDS_MANIFEST, tamper_findings
+from raidar.engine.job.provenance import execution_source_digest
 from raidar.engine.job.run import execute, load_problems
 from raidar.engine.target.config import Selection
 from raidar.engine.target.guard import REAP_FILE, TargetGuard, TargetLostError
@@ -167,7 +168,7 @@ def _plan(tmp_path: Path, fixture: ImportedFixture, **changes: Any) -> Any:
         fixture.ref,
         environment={"compose_init": False},
         assessment={
-            "scorers": ["correctness@1"],
+            "scorers": ["correctness@2"],
             "inventory_policy": {"generated_globs": ["gen/**"]},
         },
         **changes,
@@ -264,7 +265,7 @@ def test_a_run_materialises_each_trial_and_writes_step_results(
     # discovery probe fails: that step is infra_error and the trial is invalid.
     guided_record = next(r for r in records if r.trial.arm == "guided")
     assert guided_record.step_results[0].checkpoint_state.value == "infra_error"
-    assert guided_record.step_results[0].infra_reasons[0].startswith("component_probe:rules-file@1")
+    assert guided_record.step_results[0].infra_reasons[0].startswith("component_probe:rules-file@2")
     assert not guided_record.valid
     assert record.reached == (True, False)
     assert record.reached_source == "executed"
@@ -286,8 +287,9 @@ def test_a_run_materialises_each_trial_and_writes_step_results(
 
 def _assert_job_provenance(manifest: dict[str, Any], job_dir: Path) -> None:
     runner = manifest["runner"]
-    assert set(runner) == {"commit", "dirty", "toolchain_sha256"}
+    assert set(runner) == {"commit", "dirty", "toolchain_sha256", "execution_sha256"}
     assert runner["toolchain_sha256"] == spec_source_digest()
+    assert runner["execution_sha256"] == execution_source_digest()
     assert set(manifest["recipes"]) == {"pack", "graders"}
     assert all(len(digest) == 16 for digest in manifest["recipes"]["graders"].values())
     limits = manifest["effective_limits"]
@@ -347,7 +349,7 @@ def test_a_lost_target_marks_the_trial_and_aborts_the_job_before_the_next_trial(
     up = [True]
     started: list[str] = []
 
-    def ensure() -> None:
+    def ensure(timeout_s: float) -> None:
         if not up[0]:
             raise TargetUnavailableError("daemon down")
 
@@ -534,6 +536,30 @@ def test_materialising_refuses_drift_reuse_and_a_compose_mismatch(
         )
 
 
+def test_materialised_tasks_enforce_network_without_rewriting_the_pinned_source(
+    tmp_path: Path, fixture_problem: ImportedFixture, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv(ROOT_ENV, str(fixture_problem.store.root))
+    plan = _plan(tmp_path, fixture_problem)
+    trial = plan.selected_trials()[0]
+    source = fixture_problem.store.load(plan.problems[0].ref).task_dir
+    original = (source / "task.toml").read_bytes()
+
+    materialised = materialise_task(
+        source,
+        tmp_path / "task",
+        steps=trial.steps,
+        rule=plan.rule,
+        condition=(plan.loaded, trial.arm, trial.hashes.condition),
+    )
+
+    task = tomllib.loads((materialised.path / "task.toml").read_text())
+    assert task["environment"]["network_mode"] == "allowlist"
+    assert "api.openai.com" in task["environment"]["allowed_hosts"]
+    assert all(step["agent"]["network_mode"] == "allowlist" for step in task["steps"])
+    assert (source / "task.toml").read_bytes() == original
+
+
 def test_codex_gets_the_host_session_file_path_only(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -623,3 +649,26 @@ def test_run_scoped_environment_suffixes_the_compose_session(
         RunScopedDockerEnvironment(session_id="b00-p0-baseline__env", run_scope=run_scope(trials))
     assert seen == [f"b00-p0-baseline__env-{run_scope(t)}" for t in (first, second)]
     assert len(set(seen)) == 2
+
+
+@pytest.mark.parametrize("owner", ["engine/health", "grading", "subject/agent", "contract"])
+def test_execution_provenance_tracks_behavior_and_source_paths_but_not_documentation(
+    tmp_path: Path, owner: str
+) -> None:
+    root = tmp_path / "raidar"
+    source = root / owner / "operation.py"
+    source.parent.mkdir(parents=True)
+    source.write_text('"""Operation."""\nLIMIT = 1\n')
+    initial = execution_source_digest(root)
+    source.write_text('"""Reworded operation."""\n# Clarification.\nLIMIT = 1\n')
+    assert execution_source_digest(root) == initial
+    source.write_text("LIMIT = 2\n")
+    changed = execution_source_digest(root)
+    assert changed != initial
+    source.rename(source.with_name("renamed.py"))
+    assert execution_source_digest(root) != changed
+
+
+def test_execution_provenance_refuses_an_empty_source_tree(tmp_path: Path) -> None:
+    with pytest.raises(ValueError, match="no Raidar Python source"):
+        execution_source_digest(tmp_path)

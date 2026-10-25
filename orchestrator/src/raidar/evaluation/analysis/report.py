@@ -463,7 +463,7 @@ def analyse(inputs: AnalysisInputs, settings: Settings) -> AnalysisReport:
     return AnalysisReport(
         experiment=inputs.experiment,
         experiment_kind=inputs.kind,
-        citable=inputs.kind not in NOT_CITABLE_KINDS,
+        citable=inputs.kind not in NOT_CITABLE_KINDS and inputs.dev_job is None,
         lock_sha256=inputs.lock_sha256,
         jobs=inputs.jobs,
         metric=dict(inputs.metric),

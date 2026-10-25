@@ -198,6 +198,23 @@ def test_several_problems_get_an_equal_weight_aggregate() -> None:
     assert size.per_pair_cost_usd == pytest.approx(2 * 2.5)
     assert size.basis.startswith("equal-weight aggregate of 2 problems")
 
+    # Binary aggregates estimate that same equally weighted effect, even when
+    # exclusions make pooled discordant counts point in the opposite direction.
+    # Exercise both signs so verdict, estimate and CI must agree symmetrically.
+    for reverse in (False, True):
+        low, high = (1.0, 0.0) if reverse else (0.0, 1.0)
+        left = paired_arms("final_solved", [low] * 450, [high] * 450, problem="a@1")
+        right = paired_arms("final_solved", [high] * 550, [low] * 530 + [high] * 20, problem="b@1")
+        binary = left + right
+        binary_report = _run(binary, 550, Settings(bootstrap_samples=100), problems=("a@1", "b@1"))
+        combined = _effect(binary_report, "final_solved", "*")
+        assert combined.mcnemar is None
+        assert combined.ci is not None
+        assert combined.mean_delta == pytest.approx(-0.018181818 if reverse else 0.018181818)
+        assert combined.verdict is (Verdict.WORSE if reverse else Verdict.IMPROVED)
+        assert (combined.ci.high < 0) if reverse else (combined.ci.low > 0)
+        assert all(_effect(binary_report, "final_solved", p).mcnemar for p in ("a@1", "b@1"))
+
 
 def test_curves_band_each_checkpoint_across_attempts_and_skip_invalid_trials() -> None:
     outcomes = [trial(BASELINE, b, {}, solved=[1.0, 0.0, 0.0, None]) for b in range(5)] + [

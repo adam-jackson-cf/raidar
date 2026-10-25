@@ -351,7 +351,7 @@ def _verifier_arms(report: AnalysisReport) -> list[str]:
         "## Verifier sensitivity (diagnostic; never an outcome)",
         "",
         "Grader cases whose outcome differed between the grading run and the coverage run, "
-        "per trial (code-quality@3 regression_parity_excluded_cases, summed). Correctness "
+        "per trial (code-quality@4 regression_parity_excluded_cases, summed). Correctness "
         "and the solve rates read the grading run's verdict; G leaves such cases out.",
         "",
         *_table(("Metric", "Better", *(arm.arm for arm in arms)), rows),
@@ -626,7 +626,13 @@ def _pooling_lines(report: AnalysisReport) -> list[str]:
 def render_markdown(report: AnalysisReport) -> str:
     metric = report.metric
     lines = [f"# Analysis: {report.experiment}", ""]
-    if not report.citable:
+    if not report.citable and report.dev_job is not None:
+        lines += [
+            "> **Not citable:** development execution options change the declared "
+            "experiment; these results are not evidence about its treatment or agent.",
+            "",
+        ]
+    elif not report.citable:
         lines += [
             f"> **Not citable:** a {report.experiment_kind} experiment checks operational "
             "health; its verdicts are not evidence about any treatment or agent.",

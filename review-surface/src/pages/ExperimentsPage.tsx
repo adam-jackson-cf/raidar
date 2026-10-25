@@ -582,7 +582,7 @@ export function ExperimentsPage() {
           className="num rounded px-2.5 py-1.5 text-[11px]"
           style={{ color: C.fg3, background: 'rgba(255,255,255,0.04)', border: `1px solid ${C.border}` }}
         >
-          make review-surface-data REVIEW_RUNS_ROOT=&lt;runs-root&gt; REVIEW_STORE=&lt;store&gt;
+          make review-surface-data REVIEW_JOBS_ROOT=&lt;jobs-root&gt; REVIEW_STORE=&lt;store&gt;
         </code>
       </div>
     );

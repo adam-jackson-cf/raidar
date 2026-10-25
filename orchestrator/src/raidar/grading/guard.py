@@ -24,7 +24,7 @@ from harbor.trial.hooks import TrialEvent, TrialHookEvent
 from harbor.trial.trial import Trial
 
 from raidar.grading.bundle import VerifierBundle, load_bundle
-from raidar.grading.leak import scan_agent_environment
+from raidar.grading.leak import LeakScanError, scan_agent_environment
 from raidar.grading.records import step_record_dir, write_pre_agent_leak
 
 
@@ -41,5 +41,7 @@ def install_leak_guard(trial: Trial, oracle_bundle: str | Path) -> None:
         step = current_step(event, bundle)
         report = await scan_agent_environment(trial.agent_environment, bundle)
         write_pre_agent_leak(step_record_dir(trial.paths.trial_dir, step), report)
+        if not report.clean:
+            raise LeakScanError(f"hidden verifier tests detected before agent step {step!r}")
 
     trial.add_hook(TrialEvent.AGENT_START, before_agent)

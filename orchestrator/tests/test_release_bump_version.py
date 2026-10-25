@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import importlib.util
 import subprocess
+import sys
+import tomllib
 from pathlib import Path
 
 import pytest
@@ -96,3 +98,73 @@ def test_update_pyproject_only_rewrites_project_version(
     assert pyproject.read_text(encoding="utf-8") == (
         '[project]\nname = "sample"\nversion = "2.0.0"\n\n[tool.sample]\nversion = "9.9.9"\n'
     )
+
+
+def test_release_updates_and_verifies_the_lock_before_publishing_files(
+    bump_version_module,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    pyproject = tmp_path / "pyproject.toml"
+    lockfile = tmp_path / "uv.lock"
+    changelog = tmp_path / "CHANGELOG.md"
+    pyproject.write_text('[project]\nname = "sample"\nversion = "1.2.3"\n', encoding="utf-8")
+    changelog.write_text("# Changelog\n", encoding="utf-8")
+    monkeypatch.setenv("UV_OFFLINE", "true")
+    monkeypatch.setenv("UV_CACHE_DIR", str(tmp_path / "cache"))
+    monkeypatch.setenv("UV_PYTHON", sys.executable)
+    subprocess.run(["uv", "lock", "--project", str(tmp_path)], check=True)
+    monkeypatch.setattr(bump_version_module, "PYPROJECT_PATH", pyproject)
+    monkeypatch.setattr(bump_version_module, "LOCKFILE_PATH", lockfile)
+    monkeypatch.setattr(bump_version_module, "CHANGELOG_PATH", changelog)
+    monkeypatch.setattr(bump_version_module, "get_commits_since_last_bump", lambda: ["fix: repair"])
+    monkeypatch.setattr(sys, "argv", [str(SCRIPT_PATH)])
+
+    assert bump_version_module.main() == 0
+
+    assert tomllib.loads(pyproject.read_text())["project"]["version"] == "1.2.4"
+    packages = tomllib.loads(lockfile.read_text())["package"]
+    assert (
+        next(package for package in packages if package["name"] == "sample")["version"] == "1.2.4"
+    )
+    assert "## 1.2.4" in changelog.read_text()
+    subprocess.run(["uv", "lock", "--project", str(tmp_path), "--check"], check=True)
+
+
+def test_failed_lock_verification_leaves_all_release_files_unchanged(
+    bump_version_module,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    pyproject = tmp_path / "pyproject.toml"
+    lockfile = tmp_path / "uv.lock"
+    changelog = tmp_path / "CHANGELOG.md"
+    originals = {
+        pyproject: '[project]\nname = "sample"\nversion = "1.2.3"\n',
+        lockfile: "old lock\n",
+        changelog: "# Changelog\n",
+    }
+    for path, contents in originals.items():
+        path.write_text(contents, encoding="utf-8")
+    monkeypatch.setattr(bump_version_module, "PYPROJECT_PATH", pyproject)
+    monkeypatch.setattr(bump_version_module, "LOCKFILE_PATH", lockfile)
+    monkeypatch.setattr(bump_version_module, "CHANGELOG_PATH", changelog)
+    monkeypatch.setattr(bump_version_module, "get_commits_since_last_bump", lambda: ["feat: add"])
+    monkeypatch.setattr(sys, "argv", [str(SCRIPT_PATH)])
+    commands = []
+
+    def resolve_then_fail_verification(command, **_kwargs):
+        commands.append(command)
+        staging = Path(command[command.index("--project") + 1])
+        if "--check" in command:
+            raise subprocess.CalledProcessError(1, command)
+        (staging / "uv.lock").write_text("resolved lock\n", encoding="utf-8")
+        return subprocess.CompletedProcess(command, 0)
+
+    monkeypatch.setattr(bump_version_module.subprocess, "run", resolve_then_fail_verification)
+
+    with pytest.raises(subprocess.CalledProcessError):
+        bump_version_module.main()
+
+    assert len(commands) == 2
+    assert all(path.read_text(encoding="utf-8") == contents for path, contents in originals.items())

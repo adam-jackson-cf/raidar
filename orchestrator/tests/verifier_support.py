@@ -18,8 +18,24 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from packaging.markers import default_environment
+
+from raidar.grading import records
 from raidar.grading.bundle import BundleManifest, GraderSpec, VerifierStepSpec, write_bundle
 from raidar.grading.sandbox import RUNTIME_DIR, SandboxLayout, SandboxResult, SandboxRun
+
+
+def copy_grading_sources(root: Path) -> Path:
+    """Isolate grading identity inputs so tests never modify the real implementation."""
+    source = Path(records.__file__).parent.parent
+    shutil.copytree(
+        source / "grading", root / "grading", ignore=shutil.ignore_patterns("__pycache__")
+    )
+    shutil.copytree(
+        source / "contract", root / "contract", ignore=shutil.ignore_patterns("__pycache__")
+    )
+    return root / "grading" / "records.py"
+
 
 CONFTEST = """
 import shlex
@@ -192,6 +208,9 @@ class LocalProcessSandbox:
 
     async def environment_id(self) -> str:
         return f"local:{sys.executable}"
+
+    async def marker_environment(self) -> dict[str, str]:
+        return default_environment()
 
     def _stage(self, run: SandboxRun) -> None:
         layout = self.layout

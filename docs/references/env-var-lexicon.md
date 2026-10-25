@@ -1,143 +1,48 @@
-# Environment Variable Lexicon
+# Environment settings
 
-This is the reference list for repo-visible environment variables that affect Raidar orchestrator behavior.
+Start with the [root README](../../README.md#install) for setup and `make help`
+for supported public options. This reference identifies selected settings and
+their consuming owners; it is not an exhaustive command catalogue. The former
+scenario-era `EVAL_*` tuning families are retired and do not configure current
+experiment deadlines, gates or scoring.
 
-Use [`orchestrator/.env.example`](../../orchestrator/.env.example) for the common local setup path. This document is the fuller lexicon, including advanced and internally generated variables.
+## Credentials
 
-## User-Set Variables
+Credential preflight is implemented in
+`orchestrator/src/raidar/engine/job/credentials.py`; host-to-agent wiring is owned
+by `engine/trial/agent_config.py` and the agent adapters.
 
-### Provider credentials
+- Codex accepts file-backed ChatGPT authentication or `OPENAI_API_KEY`, selected
+  by `CODEX_AUTH_MODE=auto|chatgpt|api`. `auto` prefers file-backed login.
+  `subject/agent/codex_auth.py` resolves it. `CODEX_HOME` selects an alternate
+  Codex credential directory when supplied.
+- Claude Code preflight accepts `ANTHROPIC_API_KEY`, `ANTHROPIC_AUTH_TOKEN` or
+  `CLAUDE_CODE_OAUTH_TOKEN`. `CLAUDE_FORCE_OAUTH=1` requires the OAuth token.
+  `CLAUDE_CODE_API_KEY` is not a supported execution credential alias.
+- Other agents use their registered credential requirements. A credential alone
+  does not establish runtime-pack compatibility or validate a model pairing.
 
-- `OPENAI_API_KEY`
-  Purpose: required for Codex harness runs and the OpenAI-backed fast Codex Harbor harness.
+Secret values must never be printed. Check presence only. Use
+[`orchestrator/.env.example`](../../orchestrator/.env.example) for key names;
+README explains Infisical and dotenv selection. Do not place credentials in
+experiment files or locks.
 
-- `ANTHROPIC_API_KEY`
-  Purpose: primary credential for Claude Code harness runs.
+## Runtime settings and owners
 
-- `CLAUDE_CODE_API_KEY`
-  Purpose: alternate Claude Code credential accepted in place of `ANTHROPIC_API_KEY`.
+| Setting | Effect | Consuming owner |
+|---|---|---|
+| `RAIDAR_TARGET` | Target selection when the public `TARGET` option is absent; otherwise the targets file default applies | `engine/target/config.py` |
+| `RAIDAR_VAR` | Relocates generated jobs, stores, caches and scratch defaults | `contract/paths.py`, root `Makefile` |
+| `RAIDAR_TOOL_CACHE` | Overrides the host measurement-tool cache | `subject/environment/python/provisioner.py` |
+| `RAIDAR_LIVENESS` | `enforce` (default), `observe`, or `off` | `engine/health/liveness.py` |
+| `RAIDAR_LIVENESS_IDLE_S` | Idle window, default 600 seconds | `engine/health/liveness.py` |
+| `RAIDAR_LIVENESS_INTERVAL_S` | Sample interval, default 15 seconds | `engine/health/liveness.py` |
 
-- `CLAUDE_CODE_OAUTH_TOKEN`
-  Purpose: optional OAuth token forwarded to the fast Claude harness when that auth mode is used.
+Owner paths in the table are relative to `orchestrator/src/raidar/`.
 
-- `GEMINI_API_KEY`
-  Purpose: required for Gemini harness runs.
-
-- `GOOGLE_API_KEY`
-  Purpose: optional alternate Google credential surfaced to the fast Gemini Harbor harness.
-
-- `COPILOT_API_KEY`
-  Purpose: required for Copilot CLI harness runs.
-
-- `CURSOR_API_KEY`
-  Purpose: required for Cursor CLI harness runs.
-
-- `PI_API_TOKEN`
-  Purpose: required for Pi CLI harness runs.
-
-### CLI path overrides
-
-- `CODEX_CLI_PATH`
-  Purpose: overrides CLI discovery for the Codex binary. If unset, Raidar falls back to `codex` on `PATH`.
-
-- `CLAUDE_CODE_CLI_PATH`
-  Purpose: overrides CLI discovery for the Claude binary. If unset, Raidar falls back to `claude` on `PATH`.
-
-- `GEMINI_CLI_PATH`
-  Purpose: overrides CLI discovery for the Gemini binary. If unset, Raidar falls back to `gemini` on `PATH`.
-
-- `COPILOT_CLI_PATH`
-  Purpose: overrides CLI discovery for the Copilot binary. If unset, Raidar falls back to `copilot` on `PATH`.
-
-- `CURSOR_CLI_PATH`
-  Purpose: overrides CLI discovery for the Cursor binary. If unset, Raidar falls back to `cursor` on `PATH`.
-
-- `PI_CLI_PATH`
-  Purpose: overrides CLI discovery for the Pi binary. If unset, Raidar falls back to `pi` on `PATH`.
-
-### Smoke-mode controls
-
-- `CODEX_AUTH_MODE`
-  Purpose: selects Codex authentication mode. Valid values are `auto`, `chatgpt`, and `api`.
-  Typical source: set by `make agent-smoke` for Codex smoke runs.
-
-- `RAIDAR_TASK_IMAGE_REUSE`
-  Purpose: enables or disables reusable task images for Harbor-backed runs.
-
-- `RAIDAR_TASK_IMAGE_PREFIX`
-  Purpose: overrides the Docker image repository prefix used for reusable task images.
-
-### Google / Vertex AI passthrough
-
-- `GOOGLE_APPLICATION_CREDENTIALS`
-  Purpose: forwarded into the fast Gemini Harbor harness for Google auth flows that rely on a credentials file.
-
-- `GOOGLE_CLOUD_PROJECT`
-  Purpose: forwarded into the fast Gemini Harbor harness for Vertex AI configuration.
-
-- `GOOGLE_CLOUD_LOCATION`
-  Purpose: forwarded into the fast Gemini Harbor harness for Vertex AI region selection.
-
-- `GOOGLE_GENAI_USE_VERTEXAI`
-  Purpose: forwarded into the fast Gemini Harbor harness to force Vertex-backed Gemini execution.
-
-### Evaluation tuning overrides
-
-These are optional runtime tuning variables consumed by [`orchestrator/src/raidar/config.py`](../../orchestrator/src/raidar/config.py). They are not required for normal setup, but they do alter scoring and timeout behavior.
-
-- `EVAL_TIMEOUTS__BUILD`
-- `EVAL_TIMEOUTS__TYPECHECK`
-- `EVAL_TIMEOUTS__TEST`
-- `EVAL_TIMEOUTS__GATE`
-- `EVAL_TIMEOUTS__SCREENSHOT`
-- `EVAL_TIMEOUTS__IMAGE_COMPARE`
-- `EVAL_TIMEOUTS__COMMAND_DEFAULT`
-  Purpose: override command and verifier timeouts.
-
-- `EVAL_LLM_AS_JUDGE__MODEL`
-- `EVAL_LLM_AS_JUDGE__REASONING_EFFORT`
-- `EVAL_LLM_AS_JUDGE__CODEX_AUTH_MODE`
-- `EVAL_LLM_AS_JUDGE__MAX_TOKENS`
-- `EVAL_LLM_AS_JUDGE__MAX_SOURCE_CHARS`
-- `EVAL_LLM_AS_JUDGE__MAX_RETRIES`
-  Purpose: tune the `llm-as-judge` metric behavior.
-
-- `EVAL_VERIFICATION_STABILITY__MAX_GATE_FAILURES`
-- `EVAL_VERIFICATION_STABILITY__REPEAT_PENALTY`
-  Purpose: tune verification stability scoring.
-
-- `EVAL_GATE__MAX_FAILURES`
-- `EVAL_GATE__MAX_OUTPUT_LENGTH`
-  Purpose: tune gate watcher termination thresholds.
-
-- `EVAL_VISUAL__ODIFF_THRESHOLD`
-- `EVAL_VISUAL__SIMILARITY_THRESHOLD`
-  Purpose: tune visual comparison strictness.
-
-- `EVAL_RESOURCE_EFFICIENCY__MAX_UNCACHED_TOKENS`
-- `EVAL_RESOURCE_EFFICIENCY__MAX_COMMANDS`
-- `EVAL_RESOURCE_EFFICIENCY__MAX_FAILED_COMMANDS`
-- `EVAL_RESOURCE_EFFICIENCY__MAX_EXTRA_VERIFICATION_ROUNDS`
-- `EVAL_RESOURCE_EFFICIENCY__MAX_REPEAT_FAILURES`
-- `EVAL_RESOURCE_EFFICIENCY__TOKEN_WEIGHT`
-- `EVAL_RESOURCE_EFFICIENCY__COMMAND_WEIGHT`
-- `EVAL_RESOURCE_EFFICIENCY__FAILURE_WEIGHT`
-- `EVAL_RESOURCE_EFFICIENCY__VERIFICATION_ROUND_WEIGHT`
-- `EVAL_RESOURCE_EFFICIENCY__REPEAT_FAILURE_WEIGHT`
-  Purpose: tune the resource-efficiency score calculation.
-
-## Internal / Generated Variables
-
-- `AGENTIC_EVAL_SECRET_FILE_<NAME>`
-  Purpose: internal variable family generated by the runner so Harbor fast agents can read secrets from mounted files instead of plain env values.
-  Examples: `AGENTIC_EVAL_SECRET_FILE_OPENAI_API_KEY`, `AGENTIC_EVAL_SECRET_FILE_GEMINI_API_KEY`
-  Notes: these are not intended for manual `.env` authoring.
-
-## Coverage
-
-- smoke-mode flags
-- Copilot, Cursor, and Pi credentials / CLI-path overrides
-- `CLAUDE_CODE_OAUTH_TOKEN`
-- `GOOGLE_API_KEY`
-- Google / Vertex AI passthrough variables
-- `EVAL_*` tuning surface variables
+Experiment agent/verifier deadlines belong to the authored `protocol` fields;
+gate settings belong to component configuration; scorer settings belong to the
+locked `assessment` configuration. Use explicit experiment overrides through the
+public make interface where needed. Setting a retired `EVAL_TIMEOUTS__*`,
+`EVAL_GATE__*` or `EVAL_RESOURCE_EFFICIENCY__*` variable has no effect on these
+current contracts.

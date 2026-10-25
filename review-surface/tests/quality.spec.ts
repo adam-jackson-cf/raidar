@@ -3,7 +3,7 @@ import { test, expect, type Page } from '@playwright/test';
 // Deterministic ids from the synthetic Quality fixture (make review-surface-quality-data).
 const INELIGIBLE_RUN = 'synthetic-quality.synthetic-run-1.b02-p0-baseline';
 const LABELLED_RUN = 'synthetic-quality.synthetic-run-1.b00-p0-baseline';
-// The fixture's guided arm runs behind a commit gate (gate-effort@10); baseline does not.
+// The fixture's guided arm runs behind a commit gate (gate-effort@11); baseline does not.
 const GATED_RUN = 'synthetic-quality.synthetic-run-1.b00-p0-guided';
 
 // The suite's Quality data also covers the experiment fixture's runs (run detail's Quality
@@ -64,6 +64,21 @@ test.describe('quality navigation', () => {
     await page.getByTestId('quality-run-page').getByRole('link', { name: 'Quality', exact: true }).click();
     await expect(page).toHaveURL(/\/quality\?experiment=synthetic-quality&lock=[0-9a-f]{12}&problem=synthetic%2Fledger%400$/);
     await expect(page.getByRole('heading', { name: 'synthetic/ledger@0' })).toBeVisible();
+  });
+
+  test('missing experiment and lock links require an explicit choice of available data', async ({ page }) => {
+    for (const target of ['experiment=no-such-experiment', 'experiment=synthetic-quality&lock=no-such-lock']) {
+      await page.goto(`/quality?${target}`);
+      await expect(page.getByTestId('quality-target-not-found')).toBeVisible();
+      await expect(page.getByTestId('quality-problem')).toHaveCount(0);
+      await expect(page.getByTestId('primary-outcome')).toHaveCount(0);
+      const selector = page.getByRole('combobox', { name: 'Experiment' });
+      await expect(selector).toHaveValue('');
+      const option = selector.locator('option', { hasText: 'synthetic-quality · lock' });
+      await selector.selectOption((await option.getAttribute('value'))!);
+      await expect(page.getByTestId('quality-target-not-found')).toHaveCount(0);
+      await expect(page.getByRole('heading', { name: 'synthetic/ledger@0' })).toBeVisible();
+    }
   });
 });
 
@@ -133,6 +148,43 @@ test.describe('quality run detail', () => {
     await expect(drilldown.getByTestId('evidence-item').first()).toContainText('->');
   });
 
+  test('empty evidence preserves measurement status and only claims clean for completely measured clean values', async ({ page }) => {
+    const statuses = ['unavailable', 'insufficient_evidence', 'not_applicable', 'ok', 'ok'];
+    await page.route(`**/api/quality/runs/${INELIGIBLE_RUN}`, async (route) => {
+      const response = await route.fetch();
+      const body = await response.json();
+      body.evidence = body.evidence.filter((item: { component: string }) => item.component !== 'G');
+      for (const [index, row] of body.rows.entries()) {
+        const status = statuses[index];
+        row.cells.G = { status, value: status === 'ok' ? (index === 3 ? 1 : 0.5) : null, reason: `measurement ${index + 1}` };
+      }
+      await route.fulfill({ response, json: body });
+    });
+    const cleanClaim = 'No changed symbol was executed by a failing regression test.';
+    for (let index = 0; index < statuses.length; index += 1) {
+      await page.goto(`/quality/runs/${INELIGIBLE_RUN}?component=G&checkpoint=checkpoint_${index + 1}`);
+      const drilldown = page.getByTestId('evidence-drilldown');
+      await expect(drilldown).toBeVisible();
+      if (index < 3) {
+        await expect(drilldown.getByTestId('evidence-measurement-status')).toContainText(`measurement ${index + 1}`);
+        await expect(drilldown.getByTestId('evidence-measurement-status')).toContainText(statuses[index].replace(/_/g, ' '));
+        await expect(drilldown).not.toContainText(cleanClaim);
+      } else if (index === 3) {
+        await expect(drilldown).toContainText(cleanClaim);
+        await expect(drilldown.getByTestId('evidence-measurement-status')).toHaveCount(0);
+      } else {
+        await expect(drilldown).not.toContainText(cleanClaim);
+        await expect(drilldown).toContainText('No located findings were retained');
+      }
+    }
+    await page.getByRole('button', { name: 'Regression evidence, all checkpoints' }).click();
+    const mixed = page.getByTestId('evidence-drilldown');
+    await expect(mixed).not.toContainText(cleanClaim);
+    for (let index = 0; index < 3; index += 1) {
+      await expect(mixed.getByTestId('evidence-measurement-status')).toContainText(`measurement ${index + 1}`);
+    }
+  });
+
   test('an unknown run says so and offers the way back', async ({ page }) => {
     await page.goto('/quality/runs/no-such-run');
     await expect(page.getByText('No quality data for no-such-run.')).toBeVisible();
@@ -198,14 +250,14 @@ test.describe('quality run detail: commit gate', () => {
       const response = await route.fetch();
       const detail = await response.json();
       detail.gate.shadow = true;
-      detail.gate.scorer = 'gate-effort@10';
+      detail.gate.scorer = 'gate-effort@11';
       for (const step of detail.gate.steps) step.termination = 'shadow_recorded';
       await route.fulfill({ response, json: detail });
     });
     await page.goto(`/quality/runs/${GATED_RUN}`);
     const panel = page.getByTestId('gate-panel');
     await expect(panel.getByTestId('gate-shadow')).toHaveText('shadow gate · never enforced');
-    await expect(panel).toContainText('gate-effort@10');
+    await expect(panel).toContainText('gate-effort@11');
     await expect(panel.getByTestId('gate-ending').first()).toHaveText(/^shadow: would (pass|refuse)$/);
   });
 

@@ -44,6 +44,15 @@ def _construct_unique_mapping(loader: _UniqueKeyLoader, node: yaml.MappingNode) 
     keys: set[object] = set()
     for key_node, _ in node.value:
         key = loader.construct_object(key_node)
+        try:
+            hash(key)
+        except TypeError as exc:
+            raise yaml.constructor.ConstructorError(
+                "while constructing a mapping",
+                node.start_mark,
+                "found an unhashable mapping key",
+                key_node.start_mark,
+            ) from exc
         if key in keys:
             raise yaml.constructor.ConstructorError(
                 "while constructing a mapping",
@@ -155,16 +164,19 @@ def apply_assignment(document: dict[str, Any], path: str, value: object) -> None
         raise ValueError(f"override path {path!r} does not address a mapping key or list index")
 
 
-def _unshared(node: Any) -> Any:
+def _unshared(node: Any, ancestors: frozenset[int] = frozenset()) -> Any:
     """Copy containers without sharing (``copy.deepcopy`` keeps aliases shared).
 
     YAML anchors/aliases load as one Python object; a ``--set`` override must
     change only the node it addresses, so every container is made distinct.
     """
-    if isinstance(node, dict):
-        return {key: _unshared(value) for key, value in node.items()}
-    if isinstance(node, list):
-        return [_unshared(value) for value in node]
+    if isinstance(node, (dict, list)):
+        if id(node) in ancestors:
+            raise ValueError("cyclic YAML aliases are not supported")
+        ancestors = ancestors | {id(node)}
+        if isinstance(node, dict):
+            return {key: _unshared(value, ancestors) for key, value in node.items()}
+        return [_unshared(value, ancestors) for value in node]
     return node
 
 
@@ -172,13 +184,14 @@ def _read_document(path: Path) -> tuple[dict[str, Any], str]:
     raw = path.read_bytes()
     try:
         document = yaml.load(raw.decode("utf-8"), Loader=_UniqueKeyLoader)
-    except (yaml.YAMLError, UnicodeDecodeError) as exc:
+        document = _unshared(document)
+    except (yaml.YAMLError, UnicodeDecodeError, ValueError) as exc:
         raise SpecValidationError(str(path), [FieldIssue("", f"unreadable YAML: {exc}")]) from exc
     if not isinstance(document, dict):
         raise SpecValidationError(
             str(path), [FieldIssue("", "experiment file must be a YAML mapping")]
         )
-    return _unshared(document), sha256_hex(raw)
+    return document, sha256_hex(raw)
 
 
 def _apply_overrides(document: dict[str, Any], overrides: CliOverrides) -> list[FieldIssue]:

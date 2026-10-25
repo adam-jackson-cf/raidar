@@ -23,7 +23,12 @@ def _listing(*rows: tuple[str, str]) -> str:
 
 
 class FakeDocker:
-    def __init__(self, listing: str, returncode: int = 0, down: tuple[int, str] = (0, "")) -> None:
+    def __init__(
+        self,
+        listing: str,
+        returncode: int = 0,
+        down: tuple[int, str] | Exception = (0, ""),
+    ) -> None:
         self.listing = listing
         self.returncode = returncode
         self.down = down
@@ -37,6 +42,8 @@ class FakeDocker:
             return subprocess.CompletedProcess(
                 list(command), self.returncode, stdout=self.listing, stderr="no daemon"
             )
+        if isinstance(self.down, Exception):
+            raise self.down
         return subprocess.CompletedProcess(
             list(command), self.down[0], stdout="", stderr=self.down[1]
         )
@@ -57,7 +64,7 @@ def test_only_run_scoped_trial_projects_are_recognised() -> None:
         )
     )
 
-    assert [(p.name, p.scope, p.running) for p in projects] == [
+    assert [(p.name, p.scope, p.active) for p in projects] == [
         ("b00-p0-baseline__env-0123456789", "0123456789", True),
         ("b01-p0-guided__env-abcdefabcd", "abcdefabcd", False),
     ]
@@ -76,6 +83,42 @@ def test_without_a_run_only_projects_with_nothing_running_are_removed() -> None:
 
     assert removed == ["b01-p0-guided__env-abcdefabcd"]
     assert docker.downs() == ["b01-p0-guided__env-abcdefabcd"]
+
+
+@pytest.mark.parametrize(
+    ("state", "removed"),
+    [
+        ("running", False),
+        ("paused", False),
+        ("restarting", False),
+        ("created", False),
+        ("removing", False),
+        ("unknown", False),
+        ("", False),
+        ("exited", True),
+        ("dead", True),
+    ],
+)
+def test_pruning_requires_confirmed_terminal_containers(state: str, removed: bool) -> None:
+    project = "b00-p0-baseline__env-0123456789"
+    docker = FakeDocker(_listing((project, state), (project, "exited")))
+    expected = [project] if removed else []
+    assert cleanup_trial_projects(docker_context=CONTEXT, runner=docker) == expected
+    assert docker.downs() == expected
+
+
+def test_pruning_rechecks_liveness_before_deletion() -> None:
+    project = "b00-p0-baseline__env-0123456789"
+
+    class RestartedDocker(FakeDocker):
+        def __call__(self, command: Sequence[str]) -> subprocess.CompletedProcess[str]:
+            result = super().__call__(command)
+            self.listing = _listing((project, "restarting"))
+            return result
+
+    docker = RestartedDocker(_listing((project, "exited")))
+    assert cleanup_trial_projects(docker_context=CONTEXT, runner=docker) == []
+    assert docker.downs() == []
 
 
 def test_a_named_run_removes_its_projects_even_when_running(tmp_path: Path) -> None:
@@ -117,17 +160,24 @@ def test_reaping_one_project_runs_compose_down_on_the_given_context() -> None:
     assert outcome == {"returncode": 0, "stderr": ""}
 
 
-def test_a_project_docker_will_not_remove_is_an_error_not_a_removal() -> None:
+@pytest.mark.parametrize(
+    "failure",
+    [(1, "network in use"), subprocess.TimeoutExpired(["docker"], 60), OSError("transport lost")],
+)
+def test_cleanup_attempts_every_project_before_reporting_failures(
+    failure: tuple[int, str] | Exception,
+) -> None:
     docker = FakeDocker(
         _listing(
             ("b00-p0-baseline__env-0123456789", "exited"),
             ("b01-p0-guided__env-abcdefabcd", "exited"),
         ),
-        down=(1, "network in use"),
+        down=failure,
     )
 
-    with pytest.raises(RuntimeError, match="b00-p0-baseline__env-0123456789: network in use"):
+    with pytest.raises(RuntimeError, match="b00-p0-baseline__env-0123456789") as captured:
         cleanup_trial_projects(docker_context=CONTEXT, runner=docker)
 
     # every project is attempted before the failure is raised
     assert docker.downs() == ["b00-p0-baseline__env-0123456789", "b01-p0-guided__env-abcdefabcd"]
+    assert "b01-p0-guided__env-abcdefabcd" in str(captured.value)
