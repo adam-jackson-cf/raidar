@@ -1,10 +1,8 @@
 ---
 name: "wireframe-conventions"
-description: "Use When you need to do any wireframe work."
+description: "Use when prototyping or migrating Raidar review-surface layouts through the dedicated wireframe page."
 ---
-# Guidance
-
-Use this before and during wireframe iteration to keep exploration isolated, reproducible, and intentionally portable.
+# Task
 
 ## Rules
 
@@ -34,11 +32,23 @@ For any migration from existing non wireframe implementation to a new component:
 - Confirm `/wireframe` renders content, is not blank, and has no console `Error:` output.
 - Stop and fix any console exception before reporting completion.
 
-## Commit hygiene
+## Presentation
 
-- Make one atomic commit after each completed wireframe change set.
-- Keep commit content limited to wireframe files unless an explicit migration was approved.
-- Use a specific, concise message, e.g.:
-  - `wireframe: tune problem and condition dropdown interaction`
-  - `wireframe: add overlay navigation for issues container`
-- Record what changed, what was validated, and whether rebuild+load check passed.
+- Start with a compact comparison overview; put exact values, definitions and evidence in overlays.
+- Keep labels, metadata and filters concise; defaults name the scope (for example, "all problems").
+- Use tables for row comparison, predictable metric widths and text widths suited to content.
+  Mark the strongest row only with a deterministic rule based on displayed metrics.
+- Use progression circles for numeric metrics, without embedded numbers in the overview.
+  Colours: green healthy, amber partial/volatile, red weak/problematic, grey unavailable/zero.
+- Use smaller distinct symbols for categorical findings, with enough spacing to avoid overlap.
+  Put multiplicity in overlays rather than large count badges.
+- Hover opens an ephemeral overlay; clicking pins it. Allow multiple pinned overlays.
+  Provide compact icon controls for pin/close and previous/next only for multiple items.
+  Show position as "1 of 4"; avoid repeating titles or interaction instructions.
+- Header overlays explain the column's meaning, source and use.
+- Preserve agreed canonical labels; avoid overlapping names for distinct metrics.
+
+## Output
+
+- Commit each completed wireframe change set atomically, limited to wireframe files unless migration was approved.
+- Report changes, validation and whether the rebuilt page loaded correctly.
