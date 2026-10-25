@@ -49,6 +49,7 @@ from pathlib import PurePosixPath
 from typing import Any
 
 from raidar.scoring.framework.atif import AGENT_SOURCE, AtifStep, Trajectory
+from raidar.scoring.process_checks.shell import shell_commands
 
 DEFAULT_WORKDIR = "/app"
 DEFAULT_TEST_PATTERNS = (
@@ -99,9 +100,8 @@ _SCRIPT_WRITE = re.compile(r"\bopen\([^)]*['\"][wa]\+?['\"]|\.write_text\(|\.wri
 _PLAN_CALL = re.compile(r"\bupdate_plan\s*\(")
 _SCRATCH_OUTPUT = re.compile(r"(?i)\.(?:log|out|err|tmp|txt)$")
 _KEPT_TEXT = re.compile(r"(?i)(?:^|/)(?:requirements|constraints)[^/]*\.txt$")
-_SEGMENT = re.compile(r"\n|;|&&|\|\||\|")
 LAUNCHER = re.compile(
-    r"""(?:[\s('"{]+"""
+    r"(?:\s+"
     r"|\w+=\S*\s+"
     r"|(?:sudo|env|exec|time|command|nohup|npx)\s+"
     r"|timeout\s+(?:-\S+\s+)*\S+\s+"
@@ -116,6 +116,7 @@ class EventKind(StrEnum):
     EDIT = "edit"
     AMBIGUOUS_EDIT = "ambiguous_edit"
     TEST = "test"
+    AMBIGUOUS_TEST = "ambiguous_test"
     PLAN = "plan"
     AMBIGUOUS_PLAN = "ambiguous_plan"
 
@@ -270,14 +271,6 @@ def _views(command: str) -> _Views:
     return _Views(_blank(command, masked), tuple(scripts))
 
 
-def _segments(text: str) -> Iterator[tuple[int, str]]:
-    position = 0
-    for separator in _SEGMENT.finditer(text):
-        yield position, text[position : separator.start()]
-        position = separator.end()
-    yield position, text[position:]
-
-
 _Found = tuple[int, EventKind, str, str | None]
 _UNPARSED = "in-place or scripted write; target not parsed"
 
@@ -303,10 +296,11 @@ def _command_events(offset: int, command: str, classifier: Classifier) -> list[_
     for start, script in views.scripts:
         ambiguous += [start + match.start() for match in _SCRIPT_WRITE.finditer(script)]
     found += [(offset + start, EventKind.AMBIGUOUS_EDIT, _UNPARSED, None) for start in ambiguous]
-    for start, segment in _segments(views.shell):
-        run = classifier.runs_tests(segment)
+    for shell_command in shell_commands(views.shell):
+        run = classifier.runs_tests(shell_command.text)
         if run is not None:
-            found.append((offset + start, EventKind.TEST, run[:200], None))
+            kind = EventKind.AMBIGUOUS_TEST if shell_command.conditional else EventKind.TEST
+            found.append((offset + shell_command.offset, kind, run[:200], None))
     return found
 
 

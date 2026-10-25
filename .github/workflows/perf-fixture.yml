@@ -44,7 +44,7 @@ jobs:
 
       - name: Name the runner's Docker daemon as the target
         run: |
-          printf '[targets.ci]\ndocker_context = "default"\n' > "$RAIDAR_TARGETS_FILE"
+          printf '[targets.ci]\ndocker_context = "default"\ntrusted = true\n' > "$RAIDAR_TARGETS_FILE"
 
       - name: Install orchestrator dev dependencies
         run: |
@@ -58,5 +58,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: perf-fixture-run
-          path: perf-fixture-out/runs
-          if-no-files-found: ignore
+          path: perf-fixture-out/jobs
+          if-no-files-found: warn

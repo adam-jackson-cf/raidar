@@ -36,7 +36,7 @@ from raidar.subject.treatment.runtime.review_loop import (
 )
 from raidar.subject.treatment.runtime.session_chain import InnerAgentSpec
 
-COMPONENT = "guardrail-gate@4"
+COMPONENT = "guardrail-gate@5"
 VERSION = "4"
 GATE_DIR_NAME = "guardrail-gate"
 GATE_RECORD = "guardrail-gate.json"

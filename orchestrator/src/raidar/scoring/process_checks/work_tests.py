@@ -117,6 +117,14 @@ def tests_run_any(events: Sequence[TraceEvent]) -> CheckOutcome:
     runs = tuple(event for event in events if event.kind is EventKind.TEST)
     if runs:
         return CheckOutcome(WORK_TESTS_ANY, Verdict.PASS, "the work session ran tests", runs[:1])
+    possible = tuple(event for event in events if event.kind is EventKind.AMBIGUOUS_TEST)
+    if possible:
+        return CheckOutcome(
+            WORK_TESTS_ANY,
+            Verdict.AMBIGUOUS,
+            "shell control flow may have skipped the test run",
+            possible,
+        )
     return CheckOutcome(WORK_TESTS_ANY, Verdict.FAIL, "the work session ran no test")
 
 

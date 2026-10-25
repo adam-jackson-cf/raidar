@@ -36,6 +36,7 @@ from raidar.grading.records import (
     RECORD_FILE,
     VERIFIER_RECORD_DIR,
     StepRecord,
+    coverage_identity,
     load_step_record,
     step_record_dir,
     stored_snapshot_path,
@@ -235,17 +236,23 @@ def _snapshot(
 def _record_digest(record_dir: Path, record: StepRecord) -> str:
     """Content digest of an oracle record; the bundle's host location is not content.
 
-    The step's fork-shaped G run evidence (``g-kernel-input.json``), when the
-    oracle wrote it, is part of the record's content: a trial whose G input
-    differs or went missing must not share an Assessment key.
+    Retained grading evidence and the current offline grading execution identity
+    participate even before an offline answer exists. Otherwise a finalized
+    Assessment could hide a coverage-cache invalidation caused by changed raw
+    evidence, grader image, timeout or plugin bytes. The optional fork-shaped G
+    input participates too; missing or changed input must change the key.
     """
     payload = record.model_dump(mode="json")
     payload["bundle"].pop("root")
     fork = record_dir / FORK_EVIDENCE_FILE
-    if not fork.is_file():
-        return digest_json(payload)
     return digest_json(
-        {"record": payload, FORK_EVIDENCE_FILE: hashlib.sha256(fork.read_bytes()).hexdigest()}
+        {
+            "record": payload,
+            "grading_evidence": coverage_identity(record, record_dir),
+            FORK_EVIDENCE_FILE: hashlib.sha256(fork.read_bytes()).hexdigest()
+            if fork.is_file()
+            else None,
+        }
     )
 
 

@@ -65,8 +65,11 @@ def agent_validate(agent_name: str, **options) -> None:
         timeout_sec=options["timeout"],
     )
     adapter = resolve_adapter(config)
-    adapter.validate()
-    runtime_keys = sorted(adapter.runtime_env().keys())
+    try:
+        adapter.validate()
+        runtime_keys = sorted(adapter.runtime_env().keys())
+    except OSError as error:
+        raise click.ClickException(str(error)) from error
 
     click.echo("Agent validation passed.")
     click.echo(f"  agent: {agent_name}")
@@ -99,14 +102,15 @@ def agent_setup_auth(agent_name: str, device_auth: bool) -> None:
         click.echo(f"  auth_json_path: {auth_path}")
         return
 
-    command = [
-        resolve_cli_executable(
+    try:
+        executable = resolve_cli_executable(
             cli_env_var="CODEX_CLI_PATH",
             default_binary="codex",
             harness_label=Harness.CODEX_CLI.value,
-        ),
-        "login",
-    ]
+        )
+    except OSError as error:
+        raise click.ClickException(str(error)) from error
+    command = [executable, "login"]
     if device_auth:
         command.append("--device-auth")
 

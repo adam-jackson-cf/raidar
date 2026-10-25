@@ -10,7 +10,7 @@ import pytest
 from raidar.evaluation.analysis.effects import Settings
 from raidar.evaluation.analysis.markdown import render_markdown
 from raidar.evaluation.analysis.ranking import pass_at_k
-from raidar.evaluation.analysis.report import PlannedTrial, analyse
+from raidar.evaluation.analysis.report import DevRun, PlannedTrial, analyse
 from tests.analysis_support import inputs, trial
 
 AGENTS = ("codex", "claude", "gemini")
@@ -127,5 +127,17 @@ def test_ab_tests_have_no_ranking_and_smoke_reports_are_not_citable() -> None:
     assert smoke.comparisons == ()
     assert not smoke.citable
     assert "> **Not citable:** a smoke experiment" in render_markdown(smoke)
+    for kind in ("ab-test", "benchmark"):
+        for options in (
+            DevRun(max_checkpoints=1, agent_override=None, note="truncated"),
+            DevRun(max_checkpoints=None, agent_override="oracle", note="oracle override"),
+        ):
+            development = analyse(replace(base, kind=kind, dev_job=options), Settings(seed=3))
+            assert not development.citable
+            assert development.model_dump(mode="json")["citable"] is False
+            text = render_markdown(development)
+            assert "> **Not citable:** development execution options" in text
+            assert "Development job, not arm evidence" in text
+            assert "checks operational health" not in text
     with pytest.raises(ValueError, match="no treatment arm"):
         analyse(replace(smoke_inputs, kind="ab-test"), Settings(seed=3))

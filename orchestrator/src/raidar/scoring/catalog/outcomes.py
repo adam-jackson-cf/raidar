@@ -75,7 +75,7 @@ CORRECTNESS_METRIC = "correctness"
 SOLVE_RATE = "solve_rate"
 REACHED = "reached"
 FINAL_SOLVED = "final_solved"
-# Errata-applied solve outcomes (``correctness@1`` ``*_errata`` metrics): the same rules
+# Errata-applied solve outcomes (``correctness@2`` ``*_errata`` metrics): the same rules
 # over the cases the problem's pinned errata keeps. Primary only when the experiment
 # pre-registers one (``analysis.primary_outcome``), and then always reported beside its
 # raw counterpart (``RAW_COUNTERPART``); ``not_applicable`` for a problem without an errata.
@@ -319,7 +319,7 @@ _GATE_OUTCOMES: tuple[tuple[str, str, float], ...] = (
         "wall time of the fix sessions whose refusal included the coverage minimum",
         60.0,
     ),
-    # gate-effort@10: the autofix counts each step's own work added (they compare across gate
+    # gate-effort@11: the autofix counts each step's own work added (they compare across gate
     # modes; a shadow gate's total_autofix_* re-count its never-fixed tree at every step).
     (
         "total_new_autofix_lines_changed",
@@ -420,12 +420,12 @@ ALL_METRICS = (*OUTCOME_METRICS, *GATE_METRICS, *PROCESS_METRICS)
 VERIFIER_PREFIX = "verifier."
 """Verifier diagnostics: described per arm, never compared (no verdict, no effect)."""
 VERIFIER_DISAGREEMENTS = f"{VERIFIER_PREFIX}grading_coverage_disagreements"
-VERIFIER_DISAGREEMENT_SOURCE = "code-quality@3"
+VERIFIER_DISAGREEMENT_SOURCE = "code-quality@4"
 VERIFIER_METRICS: tuple[MetricDef, ...] = (
     MetricDef(
         VERIFIER_DISAGREEMENTS,
         "Verifier: grader cases whose outcome differed between the grading run and the "
-        "coverage run, summed over a trial's transitions (code-quality@3 "
+        "coverage run, summed over a trial's transitions (code-quality@4 "
         "regression_parity_excluded_cases; diagnostic, never an outcome)",
         View.QUALITY,
         Direction.NEUTRAL,

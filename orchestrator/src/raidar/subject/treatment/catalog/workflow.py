@@ -1,4 +1,4 @@
-"""``workflow`` built-in: review-loop@2.
+"""``workflow`` built-in: review-loop@3.
 
 The component wraps the arm's Harbor agent in
 ``raidar.subject.treatment.runtime.review_loop:ReviewLoopAgent``. Verdict feedback is
@@ -46,7 +46,7 @@ def _early_end(record: dict[str, Any]) -> object | None:
 class ReviewLoop:
     manifest = ComponentManifest(
         name="review-loop",
-        version="2",
+        version="3",
         kind=ComponentKind.WORKFLOW,
         description=(
             "Implement/review rounds in fresh sessions of the arm's agent; verdict "

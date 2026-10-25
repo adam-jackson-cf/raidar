@@ -296,21 +296,21 @@ TESTS_STEP_METRICS = (
     ),
     metric(
         "tests_passed_at_step_end",
-        "The step's last decided gate run's tests check passed.",
+        "The checked final workspace's tests check passed.",
         _CHECKPOINT,
         MetricType.BOOLEAN,
         _HIGHER,
     ),
     metric(
         "tests_run_at_step_end",
-        "Tests the step's last decided gate run ran.",
+        "Tests run by the check of the final workspace.",
         _CHECKPOINT,
         MetricType.COUNT,
         _NEUTRAL,
     ),
     metric(
         "coverage_at_step_end",
-        "Owned line coverage of the step's last decided gate run.",
+        "Owned line coverage of the checked final workspace.",
         _CHECKPOINT,
         MetricType.REAL,
         _HIGHER,
@@ -390,7 +390,8 @@ FIRST_RUN_FAILED_TESTS = "first_run_failed_tests"
 BLOCKING_STEP_METRICS = (
     metric(
         STEP_END_BLOCKING,
-        "Blocking findings of the step's last decided gate run (a failed tests check once).",
+        "Blocking findings of the final workspace (a failed tests check once); unavailable "
+        "after an unchecked session or an undecided final gate run.",
         _CHECKPOINT,
         MetricType.COUNT,
         _LOWER,
@@ -411,7 +412,7 @@ BLOCKING_STEP_METRICS = (
     ),
     metric(
         STEP_END_UNTYPED_CALL,
-        "MYPY.no-untyped-call findings of the step's last decided gate run.",
+        "MYPY.no-untyped-call findings of the checked final workspace.",
         _CHECKPOINT,
         MetricType.COUNT,
         _LOWER,

@@ -53,7 +53,7 @@ from tests.component_trial_support import (
 )
 
 WITH_CONFIG = (
-    use("lint-config@1", (f"{PROBE_DIR}/ruff.toml",)),
+    use("lint-config@2", (f"{PROBE_DIR}/ruff.toml",)),
     use("lint-tool@2", config="ruff.toml"),
 )
 SLUG = "01-lint-tool"

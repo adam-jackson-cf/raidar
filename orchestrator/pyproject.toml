@@ -52,20 +52,20 @@ component = "raidar.subject.treatment.definition.registry:component_resolver"
 
 # Component definitions (raidar.subject.treatment.definition.registry), named by reference and imported lazily.
 [project.entry-points."raidar.subject.treatment"]
-"rules-file@1" = "raidar.subject.treatment.catalog.workspace:RULES_FILE"
-"workspace-files@1" = "raidar.subject.treatment.catalog.workspace:WORKSPACE_FILES"
-"lint-config@1" = "raidar.subject.treatment.catalog.workspace:LINT_CONFIG"
+"rules-file@2" = "raidar.subject.treatment.catalog.workspace:RULES_FILE"
+"workspace-files@2" = "raidar.subject.treatment.catalog.workspace:WORKSPACE_FILES"
+"lint-config@2" = "raidar.subject.treatment.catalog.workspace:LINT_CONFIG"
 "lint-tool@2" = "raidar.subject.treatment.catalog.tools:LINT_TOOL"
-"skills@1" = "raidar.subject.treatment.catalog.harness:SKILLS"
-"harness-settings@1" = "raidar.subject.treatment.catalog.harness:HARNESS_SETTINGS"
-"stop-hook@1" = "raidar.subject.treatment.catalog.harness:STOP_HOOK"
-"mcp-server@1" = "raidar.subject.treatment.catalog.harness:MCP_SERVER"
+"skills@2" = "raidar.subject.treatment.catalog.harness:SKILLS"
+"harness-settings@2" = "raidar.subject.treatment.catalog.harness:HARNESS_SETTINGS"
+"stop-hook@2" = "raidar.subject.treatment.catalog.harness:STOP_HOOK"
+"mcp-server@2" = "raidar.subject.treatment.catalog.harness:MCP_SERVER"
 "prompt-wrapper@1" = "raidar.subject.treatment.catalog.prompt:PROMPT_WRAPPER"
-"review-loop@2" = "raidar.subject.treatment.catalog.workflow:REVIEW_LOOP"
-"guardrail-gate@4" = "raidar.subject.treatment.catalog.gate:GUARDRAIL_GATE"
+"review-loop@3" = "raidar.subject.treatment.catalog.workflow:REVIEW_LOOP"
+"guardrail-gate@5" = "raidar.subject.treatment.catalog.gate:GUARDRAIL_GATE"
 "python-guardrails@8" = "raidar.subject.treatment.catalog.guardrails:PYTHON_GUARDRAILS"
-"continue-on-stall@2" = "raidar.subject.treatment.catalog.stall:CONTINUE_ON_STALL"
-"transient-retry@1" = "raidar.subject.treatment.catalog.retry:TRANSIENT_RETRY"
+"continue-on-stall@3" = "raidar.subject.treatment.catalog.stall:CONTINUE_ON_STALL"
+"transient-retry@2" = "raidar.subject.treatment.catalog.retry:TRANSIENT_RETRY"
 
 [build-system]
 requires = ["hatchling"]

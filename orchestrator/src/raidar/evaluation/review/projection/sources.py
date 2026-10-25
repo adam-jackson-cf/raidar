@@ -17,12 +17,11 @@ The assessment settings Assessments are looked up under are the lock's
 from __future__ import annotations
 
 import json
+import sys
 from collections.abc import Iterable, Mapping, Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Any
-
-from pydantic import ValidationError
 
 from raidar.contract.canonical import digest_json
 from raidar.contract.job_layout import JOB_KIND, JOB_MANIFEST, PLAN_FILE
@@ -32,10 +31,12 @@ from raidar.design.experiment.schema import ExperimentSpec
 from raidar.engine.job.assessment import lock_errata, rescore_config
 from raidar.evaluation.analysis.sources import (
     AnalysisInputError,
+    JobDir,
     read_json_object,
     read_lock,
     read_trial_records,
 )
+from raidar.evaluation.review.integrity import check_review_jobs
 from raidar.grading.errata import ErrataRef
 from raidar.scoring.framework.rescore_config import RescoreConfig
 
@@ -70,6 +71,7 @@ class JobSource:
     records: tuple[TrialRecord, ...]
     assessment_path: Path | None = None
     """The lock whose assessment settings ``assessment`` is (for the rescore hint)."""
+    integrity_note: str | None = None
 
     @property
     def experiment(self) -> str:
@@ -125,7 +127,7 @@ def experiment_lock(path: Path) -> ExperimentLock:
             path=path,
             errata=lock_errata(document),
         )
-    except (KeyError, TypeError, ValidationError) as exc:
+    except (KeyError, TypeError, ValueError) as exc:
         raise AnalysisInputError(f"{path} is not an experiment lock: {exc}") from exc
 
 
@@ -171,3 +173,29 @@ def load_job(job_dir: Path, locks: LockIndex) -> JobSource:
         records=read_trial_records(job_dir),
         assessment_path=lock.path,
     )
+
+
+def load_sources(job_roots: Sequence[Path], locks: Sequence[Path]) -> list[JobSource]:
+    """Collect projectable jobs and admit their evidence under analysis' integrity gate.
+
+    Missing locks and empty jobs are diagnosed individually; incompatible
+    provenance or changed sealed evidence refuses the collection explicitly.
+    """
+    index = LockIndex(locks)
+    sources = []
+    for job_dir in discover_job_dirs(job_roots):
+        try:
+            source = load_job(job_dir, index)
+        except AnalysisInputError as exc:
+            print(f"Skipping run, lock unavailable: {job_dir}: {exc}", file=sys.stderr)
+            continue
+        if source.records:
+            sources.append(source)
+        else:
+            print(f"Skipping run without trial records: {job_dir}", file=sys.stderr)
+    notes = check_review_jobs(
+        [JobDir(source.job_dir, source.manifest, source.plan, source.records) for source in sources]
+    )
+    return [
+        replace(source, integrity_note=notes.get(source.job_dir.resolve())) for source in sources
+    ]

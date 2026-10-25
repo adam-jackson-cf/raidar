@@ -23,11 +23,12 @@ from typing import Any
 
 import pytest
 
-from raidar.grading.coverage.store import COVERAGE_KIND, coverage_path
+from raidar.grading.coverage.store import COVERAGE_KIND, SCHEMA_VERSION, coverage_path
 from raidar.grading.models import ParityVerdict
 from raidar.grading.records import (
     FORK_EVIDENCE_FILE,
     CoverageRef,
+    coverage_identity,
     load_step_record,
     write_step_record,
 )
@@ -101,10 +102,15 @@ def _defer(trial: Path, store: Path | None, parity: dict[str, ParityVerdict] | N
         fork = json.loads(fork_file.read_text()) if fork_file.is_file() else None
         if store is not None:
             verdict = (parity or {}).get(record.step, ParityVerdict(eligible=True))
-            path = coverage_path(store, record.bundle.digest, record.step, record.snapshot.digest)
+            identity = coverage_identity(record, record_dir)
+            path = coverage_path(
+                store, record.bundle.digest, record.step, record.snapshot.digest, identity=identity
+            )
             path.parent.mkdir(parents=True, exist_ok=True)
             payload: dict[str, Any] = {
                 "kind": COVERAGE_KIND,
+                "identity": identity,
+                "schema_version": SCHEMA_VERSION,
                 "step": record.step,
                 "snapshot_digest": record.snapshot.digest,
                 "parity": verdict.model_dump(mode="json"),
@@ -202,7 +208,7 @@ def test_rescore_keeps_an_awaiting_assessment_provisional_then_completes_it(
     store = AssessmentStore(tmp_path / "store")
     _defer(produced, None)
     _defer(trial, None)
-    registration = default_scorer_registry().get("code-quality@3")
+    registration = default_scorer_registry().get("code-quality@4")
 
     first = assess(store, registration, _context(trial), trial="trial")
     stored = store.get(first.key)
@@ -213,13 +219,18 @@ def test_rescore_keeps_an_awaiting_assessment_provisional_then_completes_it(
     for record_dir in sorted((trial / "raidar-oracle" / "steps").iterdir()):
         record = load_step_record(record_dir)
         runs = case["runs"].get(record.step)
-        path = coverage_path(store.root, record.bundle.digest, record.step, record.snapshot.digest)
+        identity = coverage_identity(record, record_dir)
+        path = coverage_path(
+            store.root, record.bundle.digest, record.step, record.snapshot.digest, identity=identity
+        )
         path.parent.mkdir(parents=True, exist_ok=True)
         fork = {"transition_step": record.step, **runs} if runs is not None else None
         path.write_text(
             json.dumps(
                 {
                     "kind": COVERAGE_KIND,
+                    "identity": identity,
+                    "schema_version": SCHEMA_VERSION,
                     "step": record.step,
                     "snapshot_digest": record.snapshot.digest,
                     "parity": {"eligible": True, "reasons": []},
@@ -390,7 +401,7 @@ def test_reconcile_refuses_more_flips_than_the_cap() -> None:
 
 
 def test_code_quality_is_registered_store_bound_with_the_exclusion_count() -> None:
-    registration = default_scorer_registry().get("code-quality@3")
+    registration = default_scorer_registry().get("code-quality@4")
 
     assert registration.store_implementation is not None
     assert registration.problem_config == ("entry_file",)

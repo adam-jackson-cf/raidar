@@ -56,7 +56,7 @@ def reconnect_budget_s() -> float:
 class TargetGuard:
     target: Target
     healthy: Callable[[], bool]
-    ensure: Callable[[], None]
+    ensure: Callable[[float], None]
     reap: Callable[[str, Path], dict[str, Any]]
     reconnect_s: float = DEFAULT_RECONNECT_S
     sleep: Callable[[float], Awaitable[None]] = asyncio.sleep
@@ -76,7 +76,7 @@ class TargetGuard:
         return cls(
             target=target,
             healthy=lambda: docker_healthy(target.docker_context),
-            ensure=lambda: ensure_target(target),
+            ensure=lambda timeout_s: ensure_target(target, timeout_s=timeout_s),
             reap=reap,
             reconnect_s=reconnect_budget_s() if reconnect_s is None else reconnect_s,
         )
@@ -90,7 +90,7 @@ class TargetGuard:
             failed = False
             while True:
                 try:
-                    await asyncio.to_thread(self.ensure)
+                    await asyncio.to_thread(self.ensure, max(0.0, deadline - self.clock()))
                     return
                 except TargetUnavailableError as error:
                     if not failed:

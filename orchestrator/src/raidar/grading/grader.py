@@ -56,6 +56,7 @@ from raidar.grading.sandbox import (
     sandbox_env,
 )
 from raidar.grading.submission_deps import (
+    declared_requirements,
     provisioned_pins,
     python_path_entries,
     resolve_dependencies,
@@ -154,8 +155,15 @@ async def run_oracle(
     role = "coverage" if coverage else "grading"
     started = time.perf_counter()
     app, out = _stage(snapshot, run_dir)
+    marker_environment = (
+        await sandbox.marker_environment()
+        if any(";" in requirement for requirement in declared_requirements(app))
+        else None
+    )
     dependencies = resolve_dependencies(
-        app, provisioned_pins(bundle.manifest.grader.test_dependencies)
+        app,
+        provisioned_pins(bundle.manifest.grader.test_dependencies),
+        marker_environment=marker_environment,
     )
     argv, prefix = sandbox_argv(step, sandbox.layout, coverage=coverage)
     result = await sandbox.run(

@@ -105,6 +105,16 @@ class StepGate:
     sessions: tuple[SessionView, ...]
 
     @property
+    def final_run(self) -> GateRunView | None:
+        """The decided check of the final tree, never a check preceding a later session."""
+        if not self.runs or not self.runs[-1].decided:
+            return None
+        last = self.runs[-1]
+        if self.sessions and last.after != self.sessions[-1].name:
+            return None
+        return last
+
+    @property
     def fix_sessions(self) -> tuple[SessionView, ...]:
         return tuple(session for session in self.sessions if session.role == FIX_ROLE)
 

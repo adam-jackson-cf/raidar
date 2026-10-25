@@ -96,17 +96,30 @@ _CODEX_AUTH_JSON = CredentialSpec(
 
 _CLAUDE_API_KEY = CredentialSpec(
     id="claude-api-key",
-    accepted_names=("ANTHROPIC_API_KEY", "CLAUDE_CODE_API_KEY"),
+    accepted_names=("ANTHROPIC_API_KEY",),
     source_type=CredentialSourceType.ENVIRONMENT,
     required=True,
     requirement_group="authentication",
     transport=CredentialTransport.SECRET_FILE,
     transport_name="ANTHROPIC_API_KEY",
     mount_path="/tmp/agentic-eval-secrets/anthropic_api_key",
-    export_names=("ANTHROPIC_API_KEY", "CLAUDE_CODE_API_KEY"),
+    export_names=("ANTHROPIC_API_KEY",),
     redaction=CredentialRedaction(
-        assignment_names=("ANTHROPIC_API_KEY", "CLAUDE_CODE_API_KEY"),
+        assignment_names=("ANTHROPIC_API_KEY",),
     ),
+)
+
+_CLAUDE_AUTH_TOKEN = CredentialSpec(
+    id="claude-auth-token",
+    accepted_names=("ANTHROPIC_AUTH_TOKEN",),
+    source_type=CredentialSourceType.ENVIRONMENT,
+    required=True,
+    requirement_group="authentication",
+    transport=CredentialTransport.SECRET_FILE,
+    transport_name="ANTHROPIC_AUTH_TOKEN",
+    mount_path="/tmp/agentic-eval-secrets/anthropic_auth_token",
+    export_names=("ANTHROPIC_AUTH_TOKEN",),
+    redaction=CredentialRedaction(assignment_names=("ANTHROPIC_AUTH_TOKEN",)),
 )
 
 _CLAUDE_OAUTH_TOKEN = CredentialSpec(
@@ -145,7 +158,7 @@ _DEFINITIONS: dict[str, HarnessDefinition] = {
     "claude-code": HarnessDefinition(
         id="claude-code",
         rule_filename="CLAUDE.md",
-        credentials=(_CLAUDE_API_KEY, _CLAUDE_OAUTH_TOKEN),
+        credentials=(_CLAUDE_API_KEY, _CLAUDE_AUTH_TOKEN, _CLAUDE_OAUTH_TOKEN),
     ),
     "gemini": HarnessDefinition(
         id="gemini",

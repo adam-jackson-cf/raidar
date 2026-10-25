@@ -57,7 +57,7 @@ from tests.trace_trial_support import (
     write_traced_trial,
 )
 
-REF = "process-compliance@6"
+REF = "process-compliance@7"
 CHECKS = ("tests_run_before_finish", "plan_written")
 PLAN = tool_call("p0", "update_plan", {"plan": [{"step": "write"}]})
 EDIT = codex_patch("e0", "/app/app/main.py")
@@ -331,3 +331,70 @@ def test_the_observations_cover_every_check_at_every_step(tmp_path: Path) -> Non
             assert (metric, checkpoint) in values
     for metric in ("total_test_commands_not_run", f"{ANY}_rate", f"{AFTER}_rate", "stall_rate"):
         assert (metric, TRAJECTORY_SUBJECT) in values
+
+
+@pytest.mark.parametrize(
+    ("command", "expected_status", "expected_value"),
+    [
+        ("echo 'diagnostic; pytest -q'", AssessStatus.OK, 0.0),
+        ('printf "instructions && pytest -q"', AssessStatus.OK, 0.0),
+        (r"echo diagnostic\; pytest -q", AssessStatus.OK, 0.0),
+        ("echo 'first\npytest -q'", AssessStatus.OK, 0.0),
+        ("# pytest -q\necho done", AssessStatus.OK, 0.0),
+        ("run_tests() { pytest -q; }; echo done", AssessStatus.OK, 0.0),
+        ("echo 'diagnostic; pytest' ; pytest -q", AssessStatus.OK, 1.0),
+        ("pytest -q; echo 'finished; pytest'", AssessStatus.OK, 1.0),
+        ("uv run --project app pytest -q", AssessStatus.OK, 1.0),
+        ('pytest "$FLAGS"', AssessStatus.OK, 1.0),
+        ("bash --norc script.py pytest", AssessStatus.OK, 0.0),
+        ("'pytest -q'", AssessStatus.OK, 0.0),
+        ("env 'pytest; echo skipped'", AssessStatus.OK, 0.0),
+        ("bash -lc 'echo starting; pytest -q'", AssessStatus.OK, 1.0),
+        ("(pytest -q)", AssessStatus.OK, 1.0),
+        ("false && pytest -q", UNDETERMINED, None),
+        ("true || pytest -q", UNDETERMINED, None),
+        ("if false; then pytest -q; fi", UNDETERMINED, None),
+        ("for item in; do pytest -q; done", UNDETERMINED, None),
+        ("exit 0; pytest -q", UNDETERMINED, None),
+        ("set -e; false; pytest -q", UNDETERMINED, None),
+        ("set -o errexit; false; pytest -q", UNDETERMINED, None),
+        ('bash -c "$SCRIPT; pytest -q"', UNDETERMINED, None),
+    ],
+)
+def test_test_checks_distinguish_shell_execution_from_data_and_conditional_commands(
+    tmp_path: Path, command: str, expected_status: AssessStatus, expected_value: float | None
+) -> None:
+    shell_call = tool_call(
+        "t1", "exec", {"input": f"await tools.exec_command({{cmd: {json.dumps(command)}}});"}
+    )
+    trace = trajectory(agent_step(1, CODE), agent_step(2, shell_call))
+    values = _values(_ctx(tmp_path, trace))
+    for metric in ("tests_run_before_finish", WORK, ANY, AFTER):
+        item = values[(metric, CP1)]
+        assert (item.status, item.value) == (expected_status, expected_value), metric
+        if expected_status is UNDETERMINED:
+            assert (item.reason or "").startswith("undetermined: ")
+    rate = values[("compliance_rate", TRAJECTORY_SUBJECT)]
+    if expected_status is UNDETERMINED:
+        assert (rate.status, rate.value) == (AssessStatus.NOT_APPLICABLE, None)
+    else:
+        assert rate.value == expected_value
+
+
+@pytest.mark.parametrize("prefix", ["progress", "界" * 80])
+@pytest.mark.parametrize("test_last", [False, True])
+@pytest.mark.parametrize("nested_shell", [False, True])
+def test_shell_event_order_uses_character_positions_for_ascii_and_unicode_commands(
+    tmp_path: Path, prefix: str, test_last: bool, nested_shell: bool
+) -> None:
+    edit, run = "echo changed > forge.py", "pytest -q"
+    actions = (edit, run) if test_last else (run, edit)
+    command = f"printf '{prefix}'; " + "; ".join(actions)
+    if nested_shell:
+        command = f'bash -lc "{command}"'
+    shell_call = tool_call("t1", "exec_command", {"cmd": command})
+    trace = trajectory(agent_step(1, shell_call))
+    values = _values(_ctx(tmp_path, trace))
+    for metric in ("tests_run_before_finish", WORK, AFTER):
+        assert values[(metric, CP1)].value == float(test_last)
+    assert values[(ANY, CP1)].value == 1.0

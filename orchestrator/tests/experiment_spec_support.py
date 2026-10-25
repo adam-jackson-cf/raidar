@@ -49,14 +49,14 @@ BASE_EXPERIMENT: dict[str, Any] = {
         {"id": "baseline", "components": []},
         {
             "id": "guided",
-            "components": [{"use": "rules-file@1", "files": ["components/AGENTS.md"]}],
+            "components": [{"use": "rules-file@2", "files": ["components/AGENTS.md"]}],
         },
     ],
     "arms": [
         {"id": "baseline", "condition": "baseline", "agent": "luna"},
         {"id": "guided", "condition": "guided", "agent": "luna"},
     ],
-    "assessment": {"scorers": ["correctness@1"]},
+    "assessment": {"scorers": ["correctness@2"]},
     "analysis": {"baseline_arm": "baseline", "attempts": 5, "seed": 7},
 }
 
@@ -128,9 +128,9 @@ def fixture_resolvers(*, checkpoints: int = 8) -> list[InMemoryResolver]:
         InMemoryResolver(RefKind.PROBLEM, {"scb/forge@abc123": {"checkpoints": checkpoints}}),
         InMemoryResolver(
             RefKind.COMPONENT,
-            {"rules-file@1": {"kind": "workspace"}, "prompt-wrapper@1": {"kind": "prompt"}},
+            {"rules-file@2": {"kind": "workspace"}, "prompt-wrapper@1": {"kind": "prompt"}},
         ),
         InMemoryResolver(
-            RefKind.SCORER, {"correctness@1": {"exact": True}}, tool_versions={"pytest": "8.4.1"}
+            RefKind.SCORER, {"correctness@2": {"exact": True}}, tool_versions={"pytest": "8.4.1"}
         ),
     ]

@@ -18,7 +18,8 @@ Verdicts (memo §2.3), in precedence order:
    by the lock's ``analysis`` section; ``Settings.origin`` says whether a value
    came from the lock, a command-line override or the default);
 2. ``inconclusive``: the ``1 - alpha`` CI (95% at the default alpha) spans 0
-   (binary outcomes: exact McNemar p > alpha);
+   (per-problem binary outcomes: exact McNemar p > alpha; equal-weight
+   cross-problem aggregates use their equal-weight CI);
 3. ``improved`` / ``worse``: the CI excludes 0, read through the metric's
    direction.
 
@@ -180,7 +181,7 @@ class McNemar(AnalysisModel):
 
 
 class CostBeside(AnalysisModel):
-    """Resource usage on the effect's own pairs (descriptive; ``resource-usage@1``)."""
+    """Resource usage on the effect's own pairs (descriptive; ``resource-usage@2``)."""
 
     metric: str = TOTAL_COST
     n: int
@@ -577,21 +578,6 @@ def _aggregate_sample_size(
     )
 
 
-def _pooled_mcnemar(effects: Sequence[Effect]) -> McNemar | None:
-    tables = [effect.mcnemar for effect in effects if effect.mcnemar is not None]
-    if not tables:
-        return None
-    baseline_only = sum(t.baseline_only for t in tables)
-    treatment_only = sum(t.treatment_only for t in tables)
-    return McNemar(
-        both_solved=sum(t.both_solved for t in tables),
-        baseline_only=baseline_only,
-        treatment_only=treatment_only,
-        neither=sum(t.neither for t in tables),
-        p_value=mcnemar_exact(baseline_only, treatment_only),
-    )
-
-
 def _aggregate_cost(costs: Sequence[CostBeside]) -> CostBeside:
     return CostBeside(
         n=sum(cost.n for cost in costs),
@@ -608,11 +594,13 @@ def aggregate_effect(metric: MetricDef, effects: Sequence[Effect], settings: Set
 
     ``n_pairs`` is the smallest problem's pair count, so ``insufficient``
     applies when any problem is short; exclusions are summed.
+    Binary outcomes use this same equal-weight interval for their aggregate
+    verdict. McNemar tables belong to individual problems: pooling their counts
+    would weight problems by retained sample size and test a different effect.
     """
     summary = _equal_weight_summary(effects, 1.0 - settings.alpha)
     exclusions = _summed_exclusions(effects)
-    mcnemar = _pooled_mcnemar(effects) if metric.kind is Kind.BINARY else None
-    verdict, reason = decide(metric, summary, exclusions, settings, mcnemar)
+    verdict, reason = decide(metric, summary, exclusions, settings)
     return Effect(
         metric=metric.id,
         label=metric.label,
@@ -629,7 +617,6 @@ def aggregate_effect(metric: MetricDef, effects: Sequence[Effect], settings: Set
         verdict=verdict,
         verdict_reason=reason,
         exclusions=exclusions,
-        mcnemar=mcnemar,
         cost=_aggregate_cost([effect.cost for effect in effects]),
         sample_size=_aggregate_sample_size(metric, effects, settings),
     )

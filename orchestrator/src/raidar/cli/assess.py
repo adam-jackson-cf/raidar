@@ -24,7 +24,7 @@ bundle, sandbox and timeout, on ``--target``'s grader target), never into the jo
 reports what it graded. ``--replay`` grades nothing. ``--regrade`` with
 ``--store`` also regrades the stored pre-fix grades beside the final snapshots.
 
-Offline coverage: when a scorer run reads it (``code-quality@3``), ``--rescore``
+Offline coverage: when a scorer run reads it (``code-quality@4``), ``--rescore``
 first makes, into ``--store``, the verifier's coverage run of every step whose
 trial deferred it (``protocol.verifier_coverage: offline``;
 ``raidar.grading.coverage.offline``), never into the job, and reports what it

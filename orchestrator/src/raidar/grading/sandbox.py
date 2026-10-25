@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import json
 import socket
 import stat
 import subprocess
@@ -56,6 +57,7 @@ HOST_LABEL = "raidar.host"
 SCOPE_LABEL = "raidar.run_scope"
 COPY_TIMINGS_PREFIX = "[raidar-copy]"
 SAFE_PATH_FLAG = "-P"
+SUBMISSION_PYTHON = "/usr/local/bin/python3"
 
 
 @dataclass(frozen=True)
@@ -102,6 +104,8 @@ class GradingSandbox(Protocol):
     def layout(self) -> SandboxLayout: ...
 
     async def environment_id(self) -> str: ...
+
+    async def marker_environment(self) -> dict[str, str]: ...
 
     async def run(self, run: SandboxRun) -> SandboxResult: ...
 
@@ -251,6 +255,43 @@ class DockerCopySandbox:
         if code != 0 or not text:
             raise RuntimeError(f"grader image {self.image} is not available: {text}")
         return text
+
+    async def marker_environment(self) -> dict[str, str]:
+        """PEP 508 facts from the actual submission interpreter on the Docker target."""
+        probe = (
+            "import json,os,platform,sys; v=sys.implementation.version; "
+            "iv='.'.join(map(str,v[:3])); "
+            "iv+=v.releaselevel[0]+str(v.serial) if v.releaselevel!='final' else ''; "
+            "print(json.dumps(dict(implementation_name=sys.implementation.name,implementation_version=iv,"
+            "os_name=os.name,platform_machine=platform.machine(),platform_release=platform.release(),"
+            "platform_system=platform.system(),platform_version=platform.version(),"
+            "python_full_version=platform.python_version(),platform_python_implementation=platform.python_implementation(),"
+            "python_version='.'.join(platform.python_version_tuple()[:2]),sys_platform=sys.platform)))"
+        )
+        code, output = await self._exec(
+            self._docker(
+                "run",
+                "--rm",
+                "--network",
+                "none",
+                "--user",
+                SANDBOX_USER,
+                "--cap-drop",
+                "ALL",
+                "--security-opt",
+                "no-new-privileges",
+                "--label",
+                GRADER_ROLE_LABEL,
+                self.image,
+                SUBMISSION_PYTHON,
+                SAFE_PATH_FLAG,
+                "-c",
+                probe,
+            )
+        )
+        if code != 0:
+            raise RuntimeError("could not probe the submission interpreter's marker environment")
+        return json.loads(output)
 
     async def _exec(
         self, argv: list[str], *, stdin: IO[bytes] | None = None, stdout: IO[bytes] | None = None

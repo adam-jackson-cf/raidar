@@ -13,7 +13,8 @@ from typing import Any
 from raidar.design.problem.store import ImportedProblem, ProblemStore, ProblemStoreError
 from raidar.engine.health.admission import AdmissionError, admit, experiment_kind, identity
 from raidar.engine.job.credentials import CredentialPreflightError, preflight_credentials
-from raidar.engine.job.provenance import recipe_digests, runner_provenance
+from raidar.engine.job.provenance import runner_provenance
+from raidar.engine.job.recipe import recipe_digests
 from raidar.engine.job.run import load_problems
 from raidar.engine.target.job import JobTarget
 from raidar.engine.trial.plan import ExperimentPlan

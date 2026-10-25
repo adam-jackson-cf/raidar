@@ -60,7 +60,7 @@ JOBS_DIR = "jobs"
 REVIEW_ONLY_DIR = "review-only"
 POLICY_MIX_PROBLEM = "synthetic/policy-mix@1"
 _STARTED = datetime(2026, 1, 1, tzinfo=UTC)
-_SCORERS = ["correctness@1", "code-quality@3", "resource-usage@1"]
+_SCORERS = ["correctness@2", "code-quality@4", "resource-usage@2"]
 _LEDGER = (
     "import os\n\n\n"
     "def balance(entries):\n"
@@ -113,13 +113,13 @@ class Design:
     trials: tuple[FixtureTrial, ...]
 
     def locked_conditions(self) -> dict[str, list[dict[str, object]]]:
-        """The lock's hashed conditions: ``skills@1`` with the hash of each skill file."""
+        """The lock's hashed conditions: ``skills@2`` with the hash of each skill file."""
         return {
             condition: (
                 [
                     {
-                        "use": "skills@1",
-                        "use_digest": digest_json("skills@1"),
+                        "use": "skills@2",
+                        "use_digest": digest_json("skills@2"),
                         "with": {},
                         "files": {path: digest_json(text) for path, text in files.items()},
                     }
@@ -283,7 +283,7 @@ def _spec(design: Design) -> ExperimentSpec:
             "conditions": [
                 {
                     "id": condition,
-                    "components": [{"use": "skills@1", "files": paths}] if paths else [],
+                    "components": [{"use": "skills@2", "files": paths}] if paths else [],
                 }
                 for condition, paths in design.component_paths.items()
             ],

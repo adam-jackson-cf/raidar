@@ -1,11 +1,11 @@
-"""continue-on-stall@2 and the session chain it rides on, plus the gate's pre-fix record.
+"""continue-on-stall@3 and the session chain it rides on, plus the gate's pre-fix record.
 
 - detection: a session that changed nothing and ended asking or refusing (fixed patterns);
 - the component: a workflow that contributes no workflow wrapper, so it composes
-  with guardrail-gate@4, and is nested by the execution layer around the native
+  with guardrail-gate@5, and is nested by the execution layer around the native
   agent (inside the gate when there is one; the arm's agent otherwise);
 - the agent pin and auth are read through every level of wrapping;
-- guardrail-gate@4: the pre-fix snapshot record and a failed snapshot.
+- guardrail-gate@5: the pre-fix snapshot record and a failed snapshot.
 
 The real-container proof is ``test_guardrails_trial.py``.
 """
@@ -100,8 +100,8 @@ def test_the_continuation_says_no_human_is_available_and_asks_for_assumptions() 
 
 
 def test_the_component_is_a_session_wrapper_that_composes_with_the_gate() -> None:
-    definition = ComponentRegistry().get("continue-on-stall@2")
-    compiled = compile_uses(use("continue-on-stall@2"), use("guardrail-gate@4", **GATE))
+    definition = ComponentRegistry().get("continue-on-stall@3")
+    compiled = compile_uses(use("continue-on-stall@3"), use("guardrail-gate@5", **GATE))
 
     assert definition.manifest.kind is ComponentKind.WORKFLOW
     assert (
@@ -121,7 +121,7 @@ def test_the_component_takes_no_with_keys(bad: dict[str, int]) -> None:
     from raidar.design.experiment.arm import ComponentRejectedError
 
     with pytest.raises(ComponentRejectedError):
-        compile_uses(use("continue-on-stall@2", **bad))
+        compile_uses(use("continue-on-stall@3", **bad))
 
 
 def _record(path: Path, *, stalled: bool) -> None:
@@ -130,7 +130,7 @@ def _record(path: Path, *, stalled: bool) -> None:
 
 
 def test_the_probe_needs_a_record_and_counts_the_stalls(tmp_path: Path) -> None:
-    compiled = compile_uses(use("continue-on-stall@2"))
+    compiled = compile_uses(use("continue-on-stall@3"))
     agent_dir = tmp_path / "agent"
     agent_dir.mkdir()
     (agent_dir / "raidar-reset.json").write_text(json.dumps({"kind": "raidar-step-reset"}))
@@ -171,7 +171,7 @@ def _config(*uses: Any) -> AgentConfig:
 
 
 def test_inside_the_gate_the_stall_wrapper_wraps_the_native_agent() -> None:
-    config = _config(use("continue-on-stall@2"), use("guardrail-gate@4", **GATE))
+    config = _config(use("continue-on-stall@3"), use("guardrail-gate@5", **GATE))
 
     assert config.import_path == GUARDRAIL_GATE_IMPORT_PATH
     inner = InnerAgentSpec.model_validate(config.kwargs["inner_agent"])
@@ -184,7 +184,7 @@ def test_inside_the_gate_the_stall_wrapper_wraps_the_native_agent() -> None:
 
 
 def test_without_a_workflow_the_stall_wrapper_is_the_arms_agent() -> None:
-    config = _config(use("continue-on-stall@2"))
+    config = _config(use("continue-on-stall@3"))
 
     assert (config.name, config.import_path) == (None, CONTINUE_ON_STALL_IMPORT_PATH)
     assert config.kwargs["inner_agent"]["name"] == "codex"
@@ -199,7 +199,7 @@ def test_host_auth_reaches_a_doubly_wrapped_codex(
     auth.write_text("{}")
     resolved = SimpleNamespace(resolved_mode="chatgpt", auth_json_path=auth)
     monkeypatch.setattr("raidar.engine.trial.agent_config.resolve_codex_auth", lambda: resolved)
-    config = _config(use("continue-on-stall@2"), use("guardrail-gate@4", **GATE))
+    config = _config(use("continue-on-stall@3"), use("guardrail-gate@5", **GATE))
 
     assert str(auth) in with_host_auth(config, Harness.CODEX_CLI).env.values()
 
@@ -249,7 +249,7 @@ def test_the_gate_record_carries_every_pre_fix_snapshot() -> None:
 
     record = gate_record(options, state)
 
-    assert record["workflow"] == "guardrail-gate@4"
+    assert record["workflow"] == "guardrail-gate@5"
     assert [item["round"] for item in record["pre_fix_snapshots"]] == [1, 2]
     assert record["pre_fix_snapshots"][1] == {
         "round": 2,

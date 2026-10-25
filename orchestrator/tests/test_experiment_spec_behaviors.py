@@ -110,7 +110,7 @@ def test_component_files_may_not_overlap_a_local_task_directory(tmp_path: Path) 
         "tasks/forge-notes.md",
     ]
     document["conditions"].append(
-        {"id": "wide", "components": [{"use": "rules-file@1", "files": ["./tasks"]}]}
+        {"id": "wide", "components": [{"use": "rules-file@2", "files": ["./tasks"]}]}
     )
 
     issues = _issues(write_experiment(tmp_path, document))
@@ -120,6 +120,45 @@ def test_component_files_may_not_overlap_a_local_task_directory(tmp_path: Path) 
     assert "conditions.1.components.0.files.1" not in issues
     assert "conditions.1.components.0.files.2" not in issues
     assert "conditions.2.components.0.files.0" in issues
+
+
+@pytest.mark.parametrize("alias", ["file", "parent", "descendant", "ancestor", "task"])
+def test_component_inputs_cannot_alias_local_tasks(tmp_path: Path, alias: str) -> None:
+    task = tmp_path / "tasks/forge"
+    (task / "tests").mkdir(parents=True)
+    hidden = task / "tests/hidden.py"
+    hidden.write_text("hidden verifier content\n")
+    components = tmp_path / "components"
+    components.mkdir()
+    task_path = "tasks/forge"
+    if alias == "file":
+        (components / "alias").symlink_to(hidden)
+        component_path = "components/alias"
+    elif alias == "parent":
+        (components / "alias").symlink_to(task / "tests", target_is_directory=True)
+        component_path = "components/alias/hidden.py"
+    elif alias == "descendant":
+        (components / "alias").symlink_to(hidden)
+        component_path = "components"
+    elif alias == "ancestor":
+        (components / "alias").symlink_to(task.parent, target_is_directory=True)
+        component_path = "components/alias"
+    else:
+        (tmp_path / "task-alias").symlink_to(task, target_is_directory=True)
+        task_path = "task-alias"
+        component_path = "tasks/forge/tests/hidden.py"
+    document = experiment_document(problems=[{"path": task_path}])
+    document["conditions"][1]["components"][0]["files"] = [component_path]
+
+    issues = _issues(write_experiment(tmp_path, document))
+
+    assert "hidden test" in issues["conditions.1.components.0.files.0"]
+    # A sibling with an ordinary alias remains a permitted component input.
+    clean = tmp_path / "safe-rules.md"
+    clean.write_text("ordinary rules\n")
+    (components / "safe").symlink_to(clean)
+    document["conditions"][1]["components"][0]["files"] = ["components/safe"]
+    assert load_experiment(write_experiment(tmp_path, document)).spec
 
 
 def test_cross_reference_errors_are_located_on_the_referring_field(tmp_path: Path) -> None:
@@ -147,6 +186,29 @@ def test_duplicate_yaml_keys_are_rejected(tmp_path: Path) -> None:
     issues = _issues(path)
 
     assert "duplicate key 'id'" in issues[""]
+
+
+@pytest.mark.parametrize(
+    ("yaml_text", "message"),
+    [
+        ("loop: &loop [*loop]\n", "cyclic YAML aliases"),
+        ("loop: &loop {child: *loop}\n", "recursive node"),
+        ("loop: &loop [{child: *loop}]\n", "cyclic YAML aliases"),
+        ("? [a, b]\n: value\n", "unhashable mapping key"),
+        ("? {a: b}\n: value\n", "unhashable mapping key"),
+    ],
+)
+def test_invalid_yaml_graphs_have_readable_validation_errors(
+    tmp_path: Path, yaml_text: str, message: str
+) -> None:
+    path = tmp_path / "experiment.yaml"
+    path.write_text(yaml_text)
+
+    assert message in _issues(path)[""]
+    result = CliRunner().invoke(main, ["validate", str(path)])
+    assert result.exit_code != 0
+    assert message in result.output
+    assert not isinstance(result.exception, (RecursionError, TypeError))
 
 
 def test_cli_overrides_follow_scb_precedence(tmp_path: Path) -> None:
@@ -277,7 +339,7 @@ def test_shared_components_lead_every_condition_and_never_split_the_arms(
     spec = load_experiment(write_experiment(tmp_path / "guided", guided)).spec
     assert [use.use for use in spec.condition("guided").components] == [
         "prompt-wrapper@1",
-        "rules-file@1",
+        "rules-file@2",
     ]
     document = experiment_document(
         kind="smoke", factors=["agent.model"], shared_components=[SHARED_FRAMING]
@@ -322,7 +384,7 @@ def test_validate_command_exits_nonzero_with_field_errors(tmp_path: Path) -> Non
         ({"problems": [{"ref": "scb/forge@abc123", "path": "tasks/forge"}]}, "problems.0"),
         ({"problems": [{"ref": "scb/forge@abc123"}] * 2}, "problems.1"),
         ({"protocol": {"min_reward": 0.5}}, "protocol"),
-        ({"assessment": {"scorers": ["correctness@1", "correctness@1"]}}, "assessment.scorers.1"),
+        ({"assessment": {"scorers": ["correctness@2", "correctness@2"]}}, "assessment.scorers.1"),
     ],
     ids=["problem-two-sources", "duplicate-problem", "min-reward-in-continue", "dup-scorer"],
 )
@@ -343,10 +405,10 @@ def test_set_override_can_replace_a_list_item(tmp_path: Path) -> None:
     path = write_experiment(tmp_path, experiment_document())
 
     spec = load_experiment(
-        path, CliOverrides(assignments=("assessment.scorers.0=code-quality@3",))
+        path, CliOverrides(assignments=("assessment.scorers.0=code-quality@4",))
     ).spec
 
-    assert spec.assessment.scorers == ("code-quality@3",)
+    assert spec.assessment.scorers == ("code-quality@4",)
 
 
 def test_verdict_thresholds_are_pinned_in_the_analysis_block(tmp_path: Path) -> None:
@@ -379,8 +441,8 @@ def test_set_overrides_change_only_the_addressed_yaml_alias(tmp_path: Path) -> N
     path = tmp_path / "aliased.yaml"
     path.write_text(
         "conditions:\n"
-        "  - {id: a, components: [{use: review-loop@2, with: &w {max_review_rounds: 2}}]}\n"
-        "  - {id: b, components: [{use: review-loop@2, with: *w}]}\n"
+        "  - {id: a, components: [{use: review-loop@3, with: &w {max_review_rounds: 2}}]}\n"
+        "  - {id: b, components: [{use: review-loop@3, with: *w}]}\n"
     )
     document, _ = _read_document(path)
 

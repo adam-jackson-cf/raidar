@@ -23,18 +23,17 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import yaml
-from harbor.models.task.config import TaskConfig
 
 from raidar.contract.trial import ProgressionRule
 from raidar.design.experiment.arm import compile_arm
 from raidar.design.experiment.loader import LoadedExperiment
 from raidar.design.problem.content import content_digest
 from raidar.design.problem.harbor_engine import SOLVE_SH
+from raidar.engine.trial.task_config import configure_trial_task
 from raidar.subject.environment.python.image import image_present
 from raidar.subject.treatment import CompiledCondition
 from raidar.subject.treatment.runtime.provision import AnyProvision, trial_provisions
 
-TASK_FILE = "task.toml"
 COMPOSE_FILE = "environment/docker-compose.yaml"
 
 
@@ -62,20 +61,6 @@ def compose_init(task_dir: Path) -> bool:
     services = document.get("services") if isinstance(document, dict) else None
     main = services.get("main") if isinstance(services, dict) else None
     return isinstance(main, dict) and main.get("init") is True
-
-
-def _rewrite_task_toml(task_dir: Path, steps: tuple[str, ...], rule: ProgressionRule) -> None:
-    path = task_dir / TASK_FILE
-    config = TaskConfig.model_validate_toml(path.read_text())
-    by_name = {step.name: step for step in config.steps or []}
-    missing = [name for name in steps if name not in by_name]
-    if missing:
-        raise MaterialiseError(f"task {task_dir} has no steps {missing}")
-    min_reward = rule.harbor_min_reward()
-    kept = [by_name[name].model_copy(update={"min_reward": min_reward}) for name in steps]
-    for name in set(by_name) - set(steps):
-        shutil.rmtree(task_dir / "steps" / name, ignore_errors=True)
-    path.write_text(config.model_copy(update={"steps": kept}).model_dump_toml())
 
 
 def _write_solutions(task_dir: Path, references: Mapping[str, Path]) -> None:
@@ -112,13 +97,24 @@ def materialise_task(
             f"environment.compose_init={loaded.spec.environment.compose_init}"
         )
     shutil.copytree(source, dest, symlinks=True)
-    _rewrite_task_toml(dest, steps, rule)
     started = time.perf_counter()
     compiled: CompiledCondition = compile_arm(loaded.spec, arm_id, base_dir=loaded.base_dir)
     if compiled.digest != planned_digest:
         raise MaterialiseError(
             f"arm {arm_id!r} compiles to {compiled.digest[:12]}, planned {planned_digest[:12]}"
         )
+    arm = next(arm for arm in loaded.spec.arms if arm.id == arm_id)
+    try:
+        configure_trial_task(
+            dest,
+            steps,
+            rule,
+            runtime=loaded.spec.runtime,
+            provider=loaded.spec.agent(arm.agent).provider,
+            component_hosts=compiled.network_egress,
+        )
+    except ValueError as exc:
+        raise MaterialiseError(str(exc)) from exc
     compiled.write_task_steps(dest, list(steps))
     component_apply_s = time.perf_counter() - started
     if references is not None:

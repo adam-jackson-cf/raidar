@@ -7,13 +7,14 @@ verifier's own artifact mechanism and excludes, under the step's agent logs
 offline, beside the step's final snapshot:
 
 - ``grade_pre_fix_path`` (run by ``raidar assess --rescore`` when a locked
-  scorer reads pre-fix grades, ``gate-effort@10``): every pre-fix snapshot of
+  scorer reads pre-fix grades, ``gate-effort@11``): every pre-fix snapshot of
   every graded step is checked against its recorded digest and graded with the
   step's own verifier bundle (its recorded digest is checked too), sandbox and
   grader timeout, exactly as ``raidar.grading.regrade`` regrades the final
   snapshot (no coverage pass). The grade is written to the Assessment store
   (never the job), content-addressed by (bundle digest, step, snapshot digest):
-  ``<store>/pre-fix-grades/<bundle>/<step>/<snapshot>.json``. A grade that is
+  ``<store>/pre-fix-grades/<bundle>/<step>/<identity>/<snapshot>.json``.
+  The identity binds the recorded image ID, timeout and host grading implementation. A grade that is
   already stored is not graded again;
 - ``regrade_pre_fix_path`` (``raidar assess --regrade --store``): grades them
   again and reports, per snapshot, whether the cases match the stored grade.
@@ -42,7 +43,13 @@ from raidar.grading.prefix.store import (
     grade_path,
     read_pre_fix_grade,
 )
-from raidar.grading.records import RECORD_FILE, VERIFIER_RECORD_DIR, StepRecord, load_step_record
+from raidar.grading.records import (
+    RECORD_FILE,
+    VERIFIER_RECORD_DIR,
+    StepRecord,
+    grading_identity,
+    load_step_record,
+)
 from raidar.grading.regrade import (
     RegradeError,
     RegradeOptions,
@@ -111,6 +118,9 @@ async def _grade(snapshot: PreFixSnapshot, options: RegradeOptions) -> tuple[Ver
     bundle = recorded_bundle(snapshot.record, options)
     factory = options.sandbox_factory or docker_sandbox_factory(options.docker_context)
     sandbox = await factory(bundle)
+    environment = await sandbox.environment_id()
+    if environment != snapshot.record.grader.environment_id:
+        raise RegradeError("pre-fix grader environment differs from the trial")
     with tempfile.TemporaryDirectory(prefix="raidar-pre-fix-", dir=options.work_root) as work:
         result = await grade_step(
             bundle,
@@ -121,13 +131,14 @@ async def _grade(snapshot: PreFixSnapshot, options: RegradeOptions) -> tuple[Ver
             coverage=False,
             timeout_s=snapshot.record.grader.timeout_s,
         )
-    return result.grade, await sandbox.environment_id()
+    return result.grade, environment
 
 
 def _payload(snapshot: PreFixSnapshot, grade: VerifierGrade, environment: str) -> dict[str, Any]:
     return {
         "kind": GRADE_KIND,
         "schema_version": SCHEMA_VERSION,
+        "identity": grading_identity(snapshot.record.grader),
         "step": snapshot.step,
         "round": snapshot.round,
         "snapshot_digest": snapshot.digest,
@@ -155,13 +166,32 @@ async def grade_pre_fix_snapshot(
     snapshot: PreFixSnapshot, store_root: Path, options: RegradeOptions
 ) -> dict[str, Any]:
     """Grade one pre-fix snapshot into the store (``stored`` when it already is)."""
-    target = grade_path(store_root, snapshot.record.bundle.digest, snapshot.step, snapshot.digest)
-    if target.is_file():
-        return _entry(snapshot, "stored", path=str(target))
+    identity = grading_identity(snapshot.record.grader)
+    target = grade_path(
+        store_root, snapshot.record.bundle.digest, snapshot.step, snapshot.digest, identity=identity
+    )
     try:
+        if not snapshot.path.is_dir() or tree_digest(snapshot.path) != snapshot.digest:
+            raise RegradeError(f"pre-fix snapshot changed since it was recorded: {snapshot.path}")
+        recorded_bundle(snapshot.record, options)
+        if (
+            read_pre_fix_grade(
+                store_root,
+                snapshot.record.bundle.digest,
+                snapshot.step,
+                snapshot.digest,
+                identity=identity,
+            )
+            is not None
+        ):
+            return _entry(snapshot, "stored", path=str(target))
         grade, environment = await _grade(snapshot, options)
     except RegradeError as exc:
         return _entry(snapshot, "error", error=str(exc))
+    if grade.infra_failure is not None:
+        return _entry(
+            snapshot, "error", error=f"pre-fix infrastructure failure: {grade.infra_failure.code}"
+        )
     payload = _payload(snapshot, grade, environment)
     write_store_json(target, payload)
     return _entry(snapshot, "graded", path=str(target), summary=payload["summary"])
@@ -204,7 +234,13 @@ async def regrade_pre_fix_path(
     for trial in _trials(path):
         for snapshot in pre_fix_snapshots(trial):
             bundle_digest = snapshot.record.bundle.digest
-            stored = read_pre_fix_grade(store_root, bundle_digest, snapshot.step, snapshot.digest)
+            stored = read_pre_fix_grade(
+                store_root,
+                bundle_digest,
+                snapshot.step,
+                snapshot.digest,
+                identity=grading_identity(snapshot.record.grader),
+            )
             if stored is None:
                 entries.append(_entry(snapshot, "not_graded"))
                 continue

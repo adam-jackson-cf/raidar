@@ -36,6 +36,7 @@ fields.
 
 from __future__ import annotations
 
+import fcntl
 import hashlib
 import json
 import os
@@ -169,6 +170,19 @@ class AssessmentStore:
         return self.root / SUPERSEDED_DIR / key[:2] / f"{key}.{digest}.json"
 
     def put(self, assessment: Assessment) -> PutOutcome:
+        """Serialize each key's comparison and promotion across store writers."""
+        path = self.path_for(assessment.key)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        # Keep the lock inode stable: unlinking it would let waiting and new writers
+        # acquire different locks for the same Assessment.
+        with path.with_suffix(".lock").open("ab") as lock:
+            fcntl.flock(lock.fileno(), fcntl.LOCK_EX)
+            try:
+                return self._put_locked(assessment)
+            finally:
+                fcntl.flock(lock.fileno(), fcntl.LOCK_UN)
+
+    def _put_locked(self, assessment: Assessment) -> PutOutcome:
         data = assessment.render()
         path = self.path_for(assessment.key)
         if path.is_file():
@@ -183,7 +197,7 @@ class AssessmentStore:
                 f"bytes; stored copy kept at {path}"
             )
         if not self._write_new(path, data):
-            return self.put(assessment)
+            return self._put_locked(assessment)
         return PutOutcome.ADDED
 
     def _supersede(self, path: Path, stored: bytes, data: bytes, key: str) -> None:

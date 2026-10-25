@@ -1,4 +1,4 @@
-"""code-quality@3 behaviour over stored trials (plan G2/G3 acceptance).
+"""code-quality@4 behaviour over stored trials (plan G2/G3 acceptance).
 
 A trial's per-step snapshots and verifier records go in; the Assessment holds
 V/E/H per checkpoint and R/G per transition with the fork's values, every

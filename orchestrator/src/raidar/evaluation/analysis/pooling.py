@@ -31,6 +31,7 @@ TAMPER = "tamper"
 OVERRIDABLE = (
     "mechanics_epoch",
     "toolchain",
+    "execution_code",
     "dirty_runner",
     "pack_recipe",
     "grader_recipe",
@@ -94,6 +95,20 @@ def _difference(jobs: Sequence[JobDir], value: Callable[[JobDir], Any], name: st
     return f"{name} differs between jobs: {shown}"
 
 
+def _execution_difference(jobs: Sequence[JobDir]) -> PoolFinding | None:
+    difference = _difference(
+        jobs, lambda job: _get(job.manifest, "runner", "execution_sha256"), "execution_code"
+    )
+    missing = [
+        job.job_id
+        for job in jobs
+        if _get(job.manifest, "runner", "execution_sha256") in (UNRECORDED, None, "")
+    ]
+    if difference is None and missing:
+        difference = "execution code identity is unrecorded for: " + ", ".join(missing)
+    return PoolFinding(field="execution_code", message=difference) if difference else None
+
+
 def _refusals(jobs: Sequence[JobDir]) -> list[PoolFinding]:
     measured = [job for job in jobs if _epoch(job) != PRE_EPOCH]
     checks: list[tuple[str, Sequence[JobDir], Callable[[JobDir], Any]]] = [
@@ -110,6 +125,9 @@ def _refusals(jobs: Sequence[JobDir]) -> list[PoolFinding]:
         message = _difference(scope, value, name)
         if message is not None:
             found.append(PoolFinding(field=name, message=message))
+    execution_difference = _execution_difference(measured)
+    if execution_difference is not None:
+        found.append(execution_difference)
     dirty = [job.job_id for job in measured if _get(job.manifest, "runner", "dirty") is not False]
     if dirty:
         found.append(

@@ -30,6 +30,20 @@ def raw_step_values(step: Step, grades: Grades) -> dict[str, Measured]:
         | tests_values(step.inputs.trace_dir, record)
         | correctness_values(step.inputs, record, grades)
     )
+    if step.gate.final_run is None:
+        # Historical runs remain measured, but an unchecked fix session or a failed
+        # final check cannot establish the final tree or the next step's baseline.
+        gap = Measured.gap(_UNAVAILABLE, "the final workspace has no decided gate check")
+        values |= dict.fromkeys(
+            (
+                "step_end_blocking",
+                "step_end_untyped_call",
+                "tests_passed_at_step_end",
+                "tests_run_at_step_end",
+                "coverage_at_step_end",
+            ),
+            gap,
+        )
     # Filled in over the trajectory (it needs the previous gated step's end).
     values[NEW_FIRST_RUN_BLOCKING] = Measured.gap(_UNAVAILABLE, "not computed")
     return values

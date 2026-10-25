@@ -1,4 +1,4 @@
-"""``workflow`` built-in: transient-retry@1, a bounded retry of a session the provider dropped.
+"""``workflow`` built-in: transient-retry@2, a bounded retry of a session the provider dropped.
 
 When a session of the arm's agent fails with a transient provider error
 (Harbor's ``ApiOverloadedError``, ``ApiConnectionClosedError``,
@@ -45,7 +45,7 @@ TRANSIENT_RETRY_IMPORT_PATH = "raidar.subject.treatment.runtime.transient_retry:
 class TransientRetry:
     manifest = ComponentManifest(
         name="transient-retry",
-        version="1",
+        version="2",
         kind=ComponentKind.WORKFLOW,
         description=(
             "When a session of the arm's agent fails with a transient model-provider error "

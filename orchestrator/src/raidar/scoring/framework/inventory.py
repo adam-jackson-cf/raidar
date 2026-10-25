@@ -208,7 +208,8 @@ def _display_path(path: Path, root: Path) -> tuple[str, bool]:
 
 def _walk(root: Path) -> Iterator[_Entry | InventoryExclusion | InventoryIssue]:
     """Files and symlinks in byte order; assessor-excluded directories are reported."""
-    for dirpath, dirnames, filenames in os.walk(root, followlinks=False):
+    errors: list[OSError] = []
+    for dirpath, dirnames, filenames in os.walk(root, followlinks=False, onerror=errors.append):
         base = Path(dirpath)
         kept: list[str] = []
         for name in sorted(dirnames):
@@ -229,6 +230,12 @@ def _walk(root: Path) -> Iterator[_Entry | InventoryExclusion | InventoryIssue]:
                 yield _Entry(relative, path, path.is_symlink())
             else:
                 yield InventoryIssue(path=relative, detail="path is not UTF-8")
+    for error in errors:
+        path = Path(error.filename) if error.filename is not None else root
+        relative, _ = _display_path(path, root)
+        yield InventoryIssue(
+            path=relative, detail=f"directory unreadable: {error.strerror or type(error).__name__}"
+        )
 
 
 def _basename_test_rules(basename: str, extension: str) -> list[str]:
@@ -259,9 +266,19 @@ class _Target:
     invalid: str | None = None
 
 
+def _regular_target(path: Path) -> _Target:
+    try:
+        mode = path.lstat().st_mode
+    except OSError as exc:
+        return _Target(None, invalid=f"unreadable: {exc.strerror or type(exc).__name__}")
+    if not stat.S_ISREG(mode):
+        return _Target(None, invalid="snapshot entry is not a regular file")
+    return _Target(path)
+
+
 def _target(entry: _Entry, root: Path) -> _Target:
     if not entry.is_symlink:
-        return _Target(entry.absolute)
+        return _regular_target(entry.absolute)
     try:
         resolved = entry.absolute.resolve(strict=True)
     except (OSError, RuntimeError):
@@ -339,7 +356,8 @@ def _classify(
         reason = "unrecognized_extension" if extension else "extensionless"
         return _ignored(entry, target, reason), issue
     if target.path is None:
-        return _ignored(entry, target, "symlink_invalid", extension=extension), issue
+        reason = "symlink_invalid" if entry.is_symlink else "invalid_file"
+        return _ignored(entry, target, reason, extension=extension), issue
     try:
         data = target.path.read_bytes()
     except OSError as exc:

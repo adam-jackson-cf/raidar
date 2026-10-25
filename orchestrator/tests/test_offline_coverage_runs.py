@@ -6,13 +6,14 @@ Assessment store, never the job, with the same parity verdict and the same G
 input the in-trial pass writes for the same snapshot; ``check_coverage_path``
 makes it again and compares it with the trial's own pass or the stored run,
 writing nothing. ``raidar assess --rescore`` makes it first only when a scorer
-that reads it (``code-quality@3``) runs; the trial config defers it only when
+that reads it (``code-quality@4``) runs; the trial config defers it only when
 the protocol says so.
 """
 
 from __future__ import annotations
 
 import json
+import shutil
 from pathlib import Path
 from typing import Any
 
@@ -20,10 +21,16 @@ import pytest
 from click.testing import CliRunner
 
 from raidar.cli import main
-from raidar.grading import offline
+from raidar.grading import offline, records
+from raidar.grading.coverage import offline as coverage_module
 from raidar.grading.coverage.offline import check_coverage_path, produce_coverage_path
 from raidar.grading.coverage.store import read_offline_coverage
-from raidar.grading.records import FORK_EVIDENCE_FILE, load_step_record, step_record_dir
+from raidar.grading.records import (
+    FORK_EVIDENCE_FILE,
+    coverage_identity,
+    load_step_record,
+    step_record_dir,
+)
 from raidar.grading.regrade import RegradeOptions
 from raidar.grading.sandbox import GradingSandbox
 from tests.scorer_support import tree_state
@@ -32,7 +39,7 @@ from tests.test_verifier_and_regrade import (
     make_verifier,
     place_step_artifact,
 )
-from tests.verifier_support import LocalProcessSandbox, make_bundle
+from tests.verifier_support import LocalProcessSandbox, copy_grading_sources, make_bundle
 
 STEP = "checkpoint_2"
 
@@ -76,7 +83,13 @@ async def test_a_deferred_coverage_pass_is_made_into_the_store_never_the_job(
     assert tree_state(trial) == before, "the job is never written"
     (entry,) = report["steps"]
     assert (entry["status"], entry["eligible"], report["errors"]) == ("produced", True, 0)
-    stored = read_offline_coverage(store, record.bundle.digest, STEP, record.snapshot.digest)
+    stored = read_offline_coverage(
+        store,
+        record.bundle.digest,
+        STEP,
+        record.snapshot.digest,
+        identity=coverage_identity(record, step_record_dir(trial, STEP)),
+    )
     assert stored is not None
     assert stored.parity.eligible
     assert stored.fork is not None
@@ -85,6 +98,93 @@ async def test_a_deferred_coverage_pass_is_made_into_the_store_never_the_job(
     assert again["steps"][0]["status"] == "stored"
     check = await check_coverage_path(trial, store, _options(tmp_path))
     assert (check["match"], check["steps"][0]["against"]) == (True, "store")
+
+
+async def test_shared_coverage_is_rechecked_against_each_trials_grading_evidence(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    trial = await _graded(tmp_path, coverage=False)
+    other = tmp_path / "other-trial"
+    shutil.copytree(trial, other)
+    evidence_path = step_record_dir(other, STEP) / "evidence.json"
+    evidence = json.loads(evidence_path.read_text())
+    evidence["grading"]["cases"][0]["status"] = "failed"
+    failed_case = evidence["grading"]["cases"][0]["id"]
+    for entry in evidence["grading"]["evidence"]["ledger"]:
+        if entry["node_id"] == failed_case and entry["phase"] == "call":
+            entry["outcome"] = "failed"
+    evidence_path.write_text(json.dumps(evidence))
+    record_path = step_record_dir(other, STEP) / "record.json"
+    record = json.loads(record_path.read_text())
+    record["grade"]["cases"][0]["status"] = "failed"
+    record_path.write_text(json.dumps(record))
+    calls = 0
+    original = coverage_module.run_oracle
+
+    async def measured(*args: Any, **kwargs: Any) -> Any:
+        nonlocal calls
+        calls += 1
+        return await original(*args, **kwargs)
+
+    monkeypatch.setattr(coverage_module, "run_oracle", measured)
+    store = tmp_path / "store"
+    first = await produce_coverage_path(trial, store, _options(tmp_path))
+    second = await produce_coverage_path(other, store, _options(tmp_path))
+    assert first["steps"][0]["eligible"] is True
+    assert second["steps"][0]["eligible"] is False
+    assert first["steps"][0]["path"] != second["steps"][0]["path"]
+    assert calls == 1, "the reusable coverage run is shared, never the parity decision"
+
+
+@pytest.mark.parametrize("module", ["submission_deps.py", "sandbox.py", "grader.py"])
+async def test_host_execution_changes_invalidate_reusable_coverage(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, module: str
+) -> None:
+    trial = await _graded(tmp_path, coverage=False)
+    copied = copy_grading_sources(tmp_path / "implementation")
+    monkeypatch.setattr(records, "__file__", str(copied))
+    calls = 0
+    original = coverage_module.run_oracle
+
+    async def measured(*args: Any, **kwargs: Any) -> Any:
+        nonlocal calls
+        calls += 1
+        return await original(*args, **kwargs)
+
+    monkeypatch.setattr(coverage_module, "run_oracle", measured)
+    store = tmp_path / "store"
+    first = await produce_coverage_path(trial, store, _options(tmp_path))
+    source = copied.parent / module
+    source.write_text(source.read_text() + "\n# A comment leaves execution semantics alone.\n")
+    unchanged = await produce_coverage_path(trial, store, _options(tmp_path))
+    assert unchanged["steps"][0]["status"] == "stored"
+    assert calls == 1
+    source.write_text(source.read_text() + "\nHOST_EXECUTION_REVISION = 2\n")
+    changed = await produce_coverage_path(trial, store, _options(tmp_path))
+    assert changed["steps"][0]["status"] == "produced"
+    assert changed["steps"][0]["path"] != first["steps"][0]["path"]
+    assert calls == 2, "changed host execution must rerun coverage, not just recompute parity"
+
+
+async def test_coverage_cache_separates_grader_timeouts_and_refuses_a_different_image(
+    tmp_path: Path,
+) -> None:
+    trial = await _graded(tmp_path, coverage=False)
+    store = tmp_path / "store"
+    first = await produce_coverage_path(trial, store, _options(tmp_path))
+    record_path = step_record_dir(trial, STEP) / "record.json"
+    record = json.loads(record_path.read_text())
+    record["grader"]["timeout_s"] += 1
+    record_path.write_text(json.dumps(record))
+    second = await produce_coverage_path(trial, store, _options(tmp_path))
+    assert second["steps"][0]["status"] == "produced"
+    assert first["steps"][0]["path"] != second["steps"][0]["path"]
+    record["grader"]["environment_id"] = "different-image"
+    record_path.write_text(json.dumps(record))
+    third = await produce_coverage_path(trial, store, _options(tmp_path))
+    assert third["errors"] == 1
+    assert "environment differs" in third["steps"][0]["error"]
 
 
 async def test_the_offline_run_reproduces_the_trials_own_coverage_pass(tmp_path: Path) -> None:
@@ -139,9 +239,9 @@ async def test_a_changed_snapshot_is_an_error_never_a_run(tmp_path: Path) -> Non
 @pytest.mark.parametrize(
     ("scorers", "replay", "makes"),
     [
-        (("code-quality@3",), False, True),
-        (("code-quality@3", "correctness@1"), True, False),
-        (("correctness@1", "resource-usage@1"), False, False),
+        (("code-quality@4",), False, True),
+        (("code-quality@4", "correctness@2"), True, False),
+        (("correctness@2", "resource-usage@2"), False, False),
     ],
 )
 def test_rescore_makes_coverage_first_only_for_a_scorer_that_reads_it(

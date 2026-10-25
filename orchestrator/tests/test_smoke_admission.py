@@ -22,7 +22,12 @@ from raidar.engine.health.audit import audit_trial
 from raidar.engine.health.model import HealthCheck, HealthReport, write_health
 from tests.health_support import TRIAL_ID, HealthyTrial, healthy_trial
 
-RUNNER = {"commit": "abc", "dirty": False, "toolchain_sha256": "t" * 64}
+RUNNER = {
+    "commit": "abc",
+    "dirty": False,
+    "toolchain_sha256": "t" * 64,
+    "execution_sha256": "e" * 64,
+}
 RECIPES = {"pack": "p" * 64, "graders": {}}
 TARGET = {"name": "mbp", "docker": {"ncpu": 4, "server_version": "29"}}
 AGENT = {
@@ -50,6 +55,10 @@ def smoke_job(root: Path, name: str = "smoke-01", **changes: Any) -> HealthyTria
     """A finished smoke job under ``root/<exp>/<name>``, clean unless ``changes`` say otherwise."""
     job_dir = root / "exp" / name
     t = healthy_trial(root / ".work" / name, job_dir=job_dir)
+    smoke_lock = changes.get("lock", lock("smoke"))
+    arm = changes.get("executed_arm", smoke_lock["execution"]["design"]["arms"][0]["id"])
+    t.record = t.record.model_copy(update={"trial": t.record.trial.model_copy(update={"arm": arm})})
+    (job_dir / "trial-records" / f"{TRIAL_ID}.json").write_text(t.record.model_dump_json())
     manifest = {
         "runner": changes.get("runner", RUNNER),
         "recipes": changes.get("recipes", RECIPES),
@@ -59,7 +68,7 @@ def smoke_job(root: Path, name: str = "smoke-01", **changes: Any) -> HealthyTria
         **changes.get("manifest", {}),
     }
     t.job_file.write_text(json.dumps(manifest))
-    (job_dir / "job.lock.json").write_text(json.dumps(changes.get("lock", lock("smoke"))))
+    (job_dir / "job.lock.json").write_text(json.dumps(smoke_lock))
     if changes.get("health", True):
         write_health(t.trial_dir, audit_trial(t.job_dir, t.trial_dir, t.record, t.job()))
     return t
@@ -95,6 +104,7 @@ def test_a_clean_matching_smoke_admits_and_is_recorded(tmp_path: Path) -> None:
         "required": True,
         "kind": "ab-test",
         "smoke_job": "exp/smoke-01",
+        "smoke_jobs": ["exp/smoke-01"],
         "overridden": False,
     }
 
@@ -105,10 +115,63 @@ def test_a_smoke_covering_more_agents_still_clears_a_narrower_run(tmp_path: Path
     assert decide(tmp_path)["smoke_job"] == "exp/smoke-01"
 
 
+def test_only_executed_arms_clear_agents_and_per_agent_smokes_combine(tmp_path: Path) -> None:
+    other = {**AGENT, "id": "haiku", "name": "claude-code", "model": "claude-haiku-4-5"}
+    both = lock("smoke", AGENT, other)
+    smoke_job(tmp_path, "codex", lock=both, executed_arm="arm-luna")
+    wanted_both = wanted(lock=lock("benchmark", AGENT, other))
+    with pytest.raises(AdmissionError, match="not smoked"):
+        admit("benchmark", wanted_both, tmp_path, allow_unsmoked=False)
+    smoke_job(tmp_path, "claude-bad", lock=both, executed_arm="arm-haiku", health=False)
+    with pytest.raises(AdmissionError, match="not smoked"):
+        admit("benchmark", wanted_both, tmp_path, allow_unsmoked=False)
+    smoke_job(tmp_path, "claude", lock=both, executed_arm="arm-haiku")
+    decision = admit("benchmark", wanted_both, tmp_path, allow_unsmoked=False)
+    assert decision["smoke_jobs"] == ["exp/claude", "exp/codex"]
+    assert decision["overridden"] is False
+
+
+def test_incompatible_per_agent_smokes_cannot_complete_coverage(tmp_path: Path) -> None:
+    other = {**AGENT, "id": "haiku", "name": "claude-code", "model": "claude-haiku-4-5"}
+    smoke_job(tmp_path, "codex")
+    smoke_job(
+        tmp_path,
+        "claude",
+        lock=lock("smoke", other),
+        runner={**RUNNER, "execution_sha256": "x" * 64},
+    )
+    with pytest.raises(AdmissionError, match="execution_sha256 differs"):
+        admit(
+            "benchmark",
+            wanted(lock=lock("benchmark", AGENT, other)),
+            tmp_path,
+            allow_unsmoked=False,
+        )
+
+
+@pytest.mark.parametrize(
+    ("changes", "reason"),
+    [
+        ({"agent_override": "oracle"}, "agent override"),
+        ({"step_results": ()}, "executed no step"),
+    ],
+)
+def test_a_smoke_requires_actual_work_by_the_declared_agent(
+    tmp_path: Path, changes: dict[str, Any], reason: str
+) -> None:
+    trial = smoke_job(tmp_path)
+    record = trial.record.model_copy(update=changes)
+    (trial.job_dir / "trial-records" / f"{TRIAL_ID}.json").write_text(record.model_dump_json())
+    with pytest.raises(AdmissionError, match=reason):
+        decide(tmp_path)
+
+
 @pytest.mark.parametrize(
     ("changes", "wanted_changes", "why"),
     [
         ({"runner": {**RUNNER, "toolchain_sha256": "x" * 64}}, {}, "toolchain_sha256 differs"),
+        ({"runner": {**RUNNER, "execution_sha256": "x" * 64}}, {}, "execution_sha256 differs"),
+        ({"runner": {"toolchain_sha256": "t" * 64}}, {}, "provenance.*incomplete"),
         ({"recipes": {**RECIPES, "pack": "q" * 64}}, {}, "pack differs"),
         ({"target": {**TARGET, "name": "other"}}, {}, "target differs"),
         ({"target": {**TARGET, "docker": {"ncpu": 8}}}, {}, "target differs"),
@@ -215,5 +278,5 @@ def test_no_smoke_refuses_with_the_way_forward_and_the_override_is_recorded(
 def test_a_smoke_without_run_provenance_predates_the_gate(tmp_path: Path) -> None:
     t = smoke_job(tmp_path, "old")
     t.job_file.write_text(json.dumps({"selected": [TRIAL_ID], "finished_at": "x"}))
-    with pytest.raises(AdmissionError, match="predates run provenance"):
+    with pytest.raises(AdmissionError, match="provenance.*incomplete"):
         decide(tmp_path)

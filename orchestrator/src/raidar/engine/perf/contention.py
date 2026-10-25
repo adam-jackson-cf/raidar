@@ -45,6 +45,7 @@ class Contention:
     overlapping_jobs: tuple[str, ...]
     untimed_trials: int
     trial_peaks: dict[tuple[str, str], int] = field(default_factory=dict)
+    unknown_target_jobs: tuple[str, ...] = ()
 
     def to_json(self) -> dict[str, object]:
         return {
@@ -53,6 +54,7 @@ class Contention:
             "peak_including_other_jobs": self.peak_including_other_jobs,
             "overlapping_jobs": list(self.overlapping_jobs),
             "untimed_trials": self.untimed_trials,
+            "unknown_target_jobs": list(self.unknown_target_jobs),
             "other_docker_activity": UNDETECTED_DOCKER_ACTIVITY,
         }
 
@@ -121,19 +123,48 @@ def _sibling_jobs(job_dirs: Sequence[Path]) -> list[Path]:
 
 def other_job_windows(
     job_dirs: Sequence[Path], checked: Sequence[TrialWindow]
-) -> tuple[list[TrialWindow], tuple[str, ...]]:
+) -> tuple[list[TrialWindow], tuple[str, ...], tuple[str, ...]]:
     """Trial windows of sibling runs that overlap the checked trials' span."""
     if not checked:
-        return [], ()
+        return [], (), ()
+    targets = {_target_identity(job) for job in job_dirs} - {None}
     start, end = min(w.start for w in checked), max(w.end for w in checked)
     windows: list[TrialWindow] = []
     runs: list[str] = []
+    unknown: list[str] = []
     for sibling in _sibling_jobs(job_dirs):
-        overlapping = [w for w in _job_windows(sibling) if w.start < end and w.end > start]
-        if overlapping:
+        shared = _shares_target(sibling, targets)
+        if shared is False:
+            continue
+        overlapping = _overlapping_windows(sibling, start, end)
+        if not overlapping:
+            continue
+        if shared is None:
+            unknown.append(str(sibling))
+        else:
             windows.extend(overlapping)
             runs.append(str(sibling))
-    return windows, tuple(runs)
+    return windows, tuple(runs), tuple(unknown)
+
+
+def _shares_target(job_dir: Path, targets: set[str | None]) -> bool | None:
+    target = _target_identity(job_dir)
+    if target is None or not targets:
+        return None
+    return target in targets
+
+
+def _overlapping_windows(job_dir: Path, start: datetime, end: datetime) -> list[TrialWindow]:
+    return [window for window in _job_windows(job_dir) if window.start < end and window.end > start]
+
+
+def _target_identity(job_dir: Path) -> str | None:
+    """Recorded target and daemon facts; absent identity cannot prove shared contention."""
+    target = read_manifest(job_dir).get("execution_target")
+    if not isinstance(target, dict) or not target.get("name"):
+        return None
+    fields = ("name", "docker_context", "transport", "docker")
+    return json.dumps({key: target.get(key) for key in fields}, sort_keys=True)
 
 
 def measure_contention(
@@ -144,7 +175,7 @@ def measure_contention(
         str(job_dir): _concurrency(read_manifest(job_dir).get("concurrency"))
         for job_dir in job_dirs
     }
-    others, overlapping = other_job_windows(job_dirs, checked)
+    others, overlapping, unknown = other_job_windows(job_dirs, checked)
     everything = [*checked, *others]
     return Contention(
         configured_concurrency=configured,
@@ -153,6 +184,7 @@ def measure_contention(
         overlapping_jobs=overlapping,
         untimed_trials=untimed,
         trial_peaks={(w.run, w.trial): peak_during(w, everything) for w in checked},
+        unknown_target_jobs=unknown,
     )
 
 

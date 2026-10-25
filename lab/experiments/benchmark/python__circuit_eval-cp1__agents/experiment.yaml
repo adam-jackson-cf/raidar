@@ -1,4 +1,4 @@
-# Agent benchmark smoke (make smoke-agents [SMOKE_ARM=codex|claude]): the smoke problem
+# Agent benchmark: the one-shot problem
 # once per agent the Python pack bakes in. kind benchmark: the agent is the factor under
 # one condition, so each arm is one agent and codex is the reference agent; analysis
 # gives paired verdicts against it plus a ranking view. Versions equal the pack.yaml
@@ -48,7 +48,7 @@ arms:
     agent: claude
 
 assessment:
-  scorers: [correctness@1]
+  scorers: [correctness@2]
   metric: scb-canonical-oneshot@1
 
 analysis:

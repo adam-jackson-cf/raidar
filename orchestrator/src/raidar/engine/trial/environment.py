@@ -72,6 +72,7 @@ RUN_SCOPED_DOCKER_IMPORT_PATH = "raidar.engine.trial.environment:RunScopedDocker
 SCOPE_KWARG = "run_scope"
 # Harbor's own bound for packing a transfer archive (base._TRANSFER_PACK_TIMEOUT_SEC).
 TRANSFER_TIMEOUT_S = 600
+CONTAINER_LOOKUP_TIMEOUT_S = 10
 _EXEC_VALUE_FLAGS = frozenset({"-w", "-e", "-u"})
 _MAIN_PREFIX = f"{MAIN_SERVICE_NAME}:"
 # Imported lazily by Harbor's installed agents (codex, claude-code) to price a
@@ -202,7 +203,13 @@ class RunScopedDockerEnvironment(DockerEnvironment):
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.DEVNULL,
         )
-        stdout, _ = await process.communicate()
+        try:
+            stdout, _ = await asyncio.wait_for(
+                process.communicate(), timeout=CONTAINER_LOOKUP_TIMEOUT_S
+            )
+        except (TimeoutError, asyncio.CancelledError):
+            await self._terminate_process(process)
+            raise
         ids = stdout.decode(errors="replace").split()
         if process.returncode != 0 or len(ids) != 1:
             return None
@@ -235,27 +242,37 @@ class RunScopedDockerEnvironment(DockerEnvironment):
         self,
         command: list[str],
         check: bool = True,
-        timeout_sec: int | None = None,
+        timeout_sec: float | None = None,
         stdin_data: bytes | None = None,
         on_output: Any = None,
     ) -> ExecResult:
+        started = asyncio.get_running_loop().time()
         translated = None
         if command and command[0] in ("exec", "cp"):
-            container = await self._resolve_main_container()
+            try:
+                async with asyncio.timeout(timeout_sec):
+                    container = await self._resolve_main_container()
+            except TimeoutError:
+                raise RuntimeError("Container discovery timed out") from None
             if container is not None:
                 translated = engine_command(command, container, stdin=stdin_data is not None)
+        remaining = timeout_sec
+        if timeout_sec is not None:
+            remaining = timeout_sec - (asyncio.get_running_loop().time() - started)
+            if remaining <= 0:
+                raise RuntimeError(f"Command timed out after {timeout_sec} seconds")
         if translated is None:
             return await super()._run_docker_compose_command(
                 command,
                 check=check,
-                timeout_sec=timeout_sec,
+                timeout_sec=remaining,
                 stdin_data=stdin_data,
                 on_output=on_output,
             )
         return await self._run_engine_command(
             translated,
             check=check,
-            timeout_sec=timeout_sec,
+            timeout_sec=remaining,
             stdin_data=stdin_data,
             on_output=on_output,
         )
@@ -265,7 +282,7 @@ class RunScopedDockerEnvironment(DockerEnvironment):
         argv: list[str],
         *,
         check: bool,
-        timeout_sec: int | None,
+        timeout_sec: float | None,
         stdin_data: bytes | None,
         on_output: Any,
     ) -> ExecResult:

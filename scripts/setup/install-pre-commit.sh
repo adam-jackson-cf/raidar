@@ -14,6 +14,6 @@ require_cmd uv
 
 uv tool install pre-commit
 cd "$ROOT_DIR"
-pre-commit install
+pre-commit install --hook-type pre-commit --hook-type pre-push
 
-echo "Pre-commit hook installed."
+echo "Pre-commit and pre-push hooks installed."

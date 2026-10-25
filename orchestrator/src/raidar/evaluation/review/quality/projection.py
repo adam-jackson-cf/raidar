@@ -8,15 +8,17 @@ from __future__ import annotations
 
 import argparse
 from collections.abc import Sequence
+from dataclasses import replace
 from pathlib import Path
 
 from raidar.contract.canonical import pretty_canonical_json_bytes
+from raidar.evaluation.review.integrity import check_review_jobs
 from raidar.evaluation.review.quality.experiment_view import ReviewedTrial, build_experiments
 from raidar.evaluation.review.quality.gate_view import GATE_EFFORT_REF
+from raidar.evaluation.review.quality.labels import JevAudit
 from raidar.evaluation.review.quality.models import QualityProjection
 from raidar.evaluation.review.quality.run_view import build_run_detail
 from raidar.evaluation.review.quality.sources import (
-    JevAudit,
     StoreIndex,
     discover_trials,
 )
@@ -65,6 +67,18 @@ def build_quality_projection_from(
         raise ValueError("at least one jobs root and store are required")
     reviewed = [item for jobs_root, store in sources for item in _reviewed(jobs_root, store, locks)]
     _require_unique_ids(reviewed)
+    integrity = check_review_jobs([item.source.job for item in reviewed if item.source.job])
+    reviewed = [
+        replace(
+            item,
+            detail=item.detail.model_copy(
+                update={"notes": (*item.detail.notes, integrity[item.source.job_dir.resolve()])}
+            ),
+        )
+        if item.source.job_dir.resolve() in integrity
+        else item
+        for item in reviewed
+    ]
     return QualityProjection(
         generated_from=_generated_from(sources),
         synthetic=synthetic,

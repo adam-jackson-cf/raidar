@@ -28,7 +28,7 @@ from pydantic import ValidationError
 
 from raidar.grading.coverage.store import read_offline_coverage
 from raidar.grading.models import ParityVerdict
-from raidar.grading.records import FORK_EVIDENCE_FILE
+from raidar.grading.records import FORK_EVIDENCE_FILE, coverage_identity
 from raidar.scoring.code_quality.lineage_models import RegressionRunEvidence
 from raidar.scoring.code_quality.transition import verifier_record_dir
 from raidar.scoring.framework.context import StepInputs
@@ -140,7 +140,11 @@ def parity_source(step: StepInputs, store_root: Path | None) -> ParitySource | N
     if store_root is None:
         return None
     stored = read_offline_coverage(
-        store_root, record.bundle.digest, record.step, record.snapshot.digest
+        store_root,
+        record.bundle.digest,
+        record.step,
+        record.snapshot.digest,
+        identity=coverage_identity(record, verifier_record_dir(step)),
     )
     return (stored.parity, stored.fork) if stored is not None else None
 
