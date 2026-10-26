@@ -2,10 +2,10 @@
 
 Jev (TypeSafe System One) answers typed questions about a JSON ``state``:
 ``noul`` (a probability that a statement holds), ``choice`` (one of 2-255
-options) and ``score`` (an ordinal level of 2-10). Requests always name the
-floating ``~typesafe/jev-latest`` selector, because OpenRouter rejects
-versioned selectors; the model the provider *resolved* is checked against
-``JEV_PINNED_MODEL`` instead, and any other model is rejected.
+options) and ``score`` (an ordinal level of 2-10). Parked policy consumers
+retain the floating ``~typesafe/jev-latest`` selector; live workflows and coverage
+scorers request ``JEV_PINNED_MODEL`` directly. Both paths validate the resolved
+model against that immutable pin and reject any other build.
 
 Malformed question blocks are programmer errors and raise before any network
 call. Everything the provider returns is validated here, never trusted.

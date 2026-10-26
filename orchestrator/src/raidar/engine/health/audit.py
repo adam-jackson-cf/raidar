@@ -38,8 +38,6 @@ from raidar.contract.harbor_result import span_s
 from raidar.contract.snapshot import tree_digest
 from raidar.contract.trial import CheckpointState, StepResult, TrialRecord
 from raidar.engine.health.base import Audit, make_check
-from raidar.engine.health.definition import check_definition
-from raidar.engine.health.gate import check_gate
 from raidar.engine.health.isolation import check_p8
 from raidar.engine.health.model import PASS, UNMEASURED, VIOLATION, HealthCheck, HealthReport
 from raidar.engine.health.signals import (
@@ -51,6 +49,7 @@ from raidar.engine.health.signals import (
     check_t2,
     check_t3,
 )
+from raidar.engine.health.workflow import check_workflow
 from raidar.grading.records import StepRecord
 
 DEADLINE_GRACE_S = 60.0
@@ -287,7 +286,6 @@ def audit_trial(
         trial_id=record.trial.trial_id,
         checks=(
             *(check(audit) for check in CHECKS),
-            *check_gate(audit),
-            *check_definition(audit),
+            *check_workflow(audit),
         ),
     )

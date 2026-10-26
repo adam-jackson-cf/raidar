@@ -148,6 +148,16 @@ def test_a_gate_pass_without_a_ready_definition_is_a_violation_of_e1(tmp_path: P
     assert _status(agent)["E1"] == "violation"
 
 
+def test_an_accepted_seal_is_audited_even_when_judging_does_not_verify(tmp_path: Path) -> None:
+    agent = _sealed_step(tmp_path, verify="pass_limit")
+    path = agent / "workflow" / "workflow.json"
+    workflow = json.loads(path.read_text())
+    workflow["verify"]["gates"] = [{"verdict": "passed"}]
+    path.write_text(json.dumps(workflow))
+    _rewrite(agent, ending="definition_unusable", definition=None, definition_sha256=None)
+    assert _status(agent)["E1"] == "violation"
+
+
 def test_missing_define_evidence_is_unmeasured_never_pass(tmp_path: Path) -> None:
     agent = _sealed_step(tmp_path)
     (agent / "workflow" / "define" / "define-events.jsonl").unlink()

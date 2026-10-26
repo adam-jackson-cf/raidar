@@ -50,6 +50,7 @@ import asyncio
 import contextlib
 import hashlib
 import importlib
+import json
 import shutil
 import socket
 import sys
@@ -68,6 +69,8 @@ from harbor.environments.docker.docker import (
     _sanitize_docker_compose_project_name,
 )
 from harbor.models.trial.paths import EnvironmentPaths
+
+from raidar.judge.secrets import absence_evidence, exec_env, require_key_absent
 
 RUN_SCOPED_DOCKER_IMPORT_PATH = "raidar.engine.trial.environment:RunScopedDockerEnvironment"
 SCOPE_KWARG = "run_scope"
@@ -167,6 +170,7 @@ class RunScopedDockerEnvironment(DockerEnvironment):
         self._synced: dict[Path, tuple[int, int]] = {}
         self._main_container: str | None = None
         self._post_start: list[PostStartHook] = []
+        self._sandbox_env_names: dict[str, list[str]] = {}
 
     @property
     def capabilities(self) -> EnvironmentCapabilities:
@@ -224,7 +228,20 @@ class RunScopedDockerEnvironment(DockerEnvironment):
         gap; it is done here, concurrently with ``compose up``.
         """
         self._main_container = None
+        require_key_absent(self._persistent_env, "the trial environment")
+        require_key_absent(self._compose_task_env, "the task environment")
+        self._record_sandbox_env("persistent", self._persistent_env)
+        self._record_sandbox_env("task", self._compose_task_env)
         await asyncio.gather(super().start(force_build), warm_agent_imports())
+        observed = await self.exec(
+            "python3 -c 'import json,os; print(json.dumps(sorted(os.environ)))'",
+            user="root",
+        )
+        if observed.return_code != 0:
+            raise RuntimeError("could not record sandbox environment names")
+        inherited = dict.fromkeys(json.loads(observed.stdout), "")
+        require_key_absent(inherited, "the running container")
+        self._record_sandbox_env("container", inherited)
         for hook in self._post_start:
             await hook()
 
@@ -239,6 +256,17 @@ class RunScopedDockerEnvironment(DockerEnvironment):
             self._main_container = None
         await super().stop_service(service)
 
+    def _record_sandbox_env(self, source: str, env: dict[str, str]) -> None:
+        names = sorted(env)
+        if self._sandbox_env_names.get(source) == names:
+            return
+        self._sandbox_env_names[source] = names
+        path = self.trial_paths.trial_dir / "raidar-secret-isolation.json"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(
+            json.dumps(absence_evidence(self._sandbox_env_names), indent=2, sort_keys=True) + "\n"
+        )
+
     async def _run_docker_compose_command(
         self,
         command: list[str],
@@ -247,6 +275,11 @@ class RunScopedDockerEnvironment(DockerEnvironment):
         stdin_data: bytes | None = None,
         on_output: Any = None,
     ) -> ExecResult:
+        if command and command[0] == "exec":
+            require_key_absent(exec_env(command), "a sandbox command")
+            names = sorted(exec_env(command))
+            source = "exec:" + ",".join(names)
+            self._record_sandbox_env(source, dict.fromkeys(names, ""))
         started = asyncio.get_running_loop().time()
         translated = None
         if command and command[0] in ("exec", "cp"):

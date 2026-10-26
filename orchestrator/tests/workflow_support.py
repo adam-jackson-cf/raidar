@@ -24,7 +24,8 @@ CODE = "def add(a: int, b: int) -> int:\n    return a + b\n"
 PASSING = "from calc import add\n\n\ndef test_add() -> None:\n    assert add(2, 3) == 5\n"
 FAILING = "from calc import add\n\n\ndef test_add() -> None:\n    assert add(2, 3) == 6\n"
 
-AgentTurn = Callable[[Path, str], None]
+AgentTurn = Callable[[Path, str], str | None]
+"""A scripted turn: edits and commits in the workspace; a returned string is the turn's reply."""
 
 
 class LocalEnvironment:
@@ -75,11 +76,18 @@ class ScriptedAgent(BaseAgent):
     def _turn(self, instruction: str, resumed: bool, context: AgentContext) -> None:
         cls = type(self)
         cls.prompts.append((resumed, instruction))
-        (self.logs_dir / "trajectory.json").write_text(json.dumps({"session_id": "session-1"}))
         turns = len(cls.prompts)  # the session's cumulative totals, as codex reports them
         context.n_input_tokens, context.n_cache_tokens = 1000 * turns, 600 * turns
         context.n_output_tokens, context.cost_usd = 50 * turns, None
-        cls.turns.pop(0)(cls.workspace, instruction)
+        (self.logs_dir / "trajectory.json").write_text(json.dumps({"session_id": "session-1"}))
+        reply = cls.turns.pop(0)(cls.workspace, instruction)
+        steps = (
+            []
+            if reply is None
+            else [{"step_id": turns, "timestamp": f"t{turns}", "source": "agent", "message": reply}]
+        )
+        trajectory = {"session_id": "session-1", "steps": steps}
+        (self.logs_dir / "trajectory.json").write_text(json.dumps(trajectory))
 
 
 @pytest.fixture

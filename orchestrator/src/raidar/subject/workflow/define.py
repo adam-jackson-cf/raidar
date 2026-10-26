@@ -10,8 +10,9 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from raidar.subject.workflow.acceptance import Acceptance
 from raidar.subject.workflow.definition import DEFINE_TOKEN, DefineSettings
-from raidar.subject.workflow.stage import Checkpoint, Stage
+from raidar.subject.workflow.stage import DEFINE_ROUND, Checkpoint, Resume, Stage
 
 SOURCE_COMMIT = "ac5db0f28364911ef2298e428748120be8b0d56c"
 PYTHON_PIN = "3.12.14"
@@ -76,9 +77,9 @@ class Define(Stage):
     name = "define"
     token = DEFINE_TOKEN
 
-    def __init__(self, settings: DefineSettings) -> None:
+    def __init__(self, settings: DefineSettings, acceptance: Acceptance | None = None) -> None:
         self.settings = settings
-        self.paths = PATHS
+        self.acceptance = acceptance or Acceptance()
         self.instructions = []
         self.context: dict[str, Any] = {}
         self.units = ""
@@ -89,6 +90,11 @@ class Define(Stage):
         self.definition_sha256: str | None = None
         self.install_seconds: float | None = None
         self.errors: list[str] = []
+
+    @property
+    def paths(self) -> DefinePaths:
+        """The fixed host-installed define tool layout."""
+        return PATHS
 
     async def prepare(self, checkpoint: Checkpoint) -> None:
         records = checkpoint.logs_dir / RECORD_DIR
@@ -166,8 +172,8 @@ class Define(Stage):
     def fragment(self) -> str:
         return self.settings.prompt.replace("%%%UNITS%%%", self.units)
 
-    async def check(self, checkpoint: Checkpoint, after: str) -> str | None:
-        if self.ending == "definition_unusable":
+    async def check(self, checkpoint: Checkpoint, after: str) -> Resume | None:
+        if self.ending in ("definition_unusable", "definition_ready"):
             return None
         result = await checkpoint.environment.exec(shlex.join(self.paths.inspector), user="root")
         try:
@@ -196,19 +202,20 @@ class Define(Stage):
             path.write_text(text, encoding="utf-8")
             self.definition_sha256 = hashlib.sha256(text.encode()).hexdigest()
             self.ending = "definition_ready"
+            self.acceptance.load(text)
             return None
         if state == "asking":
             return await self._accept(checkpoint, after, inspected["reply"]["questions"])
         if not self.repairs:
             self.repairs.append({"after": after, "findings": findings})
-            return REPAIR.format(error="; ".join(findings))
+            return Resume(REPAIR.format(error="; ".join(findings)), DEFINE_ROUND)
         self.ending = "definition_unusable"
         self.definition_sha256 = None
         return None
 
     async def _accept(
         self, checkpoint: Checkpoint, after: str, asked: list[dict[str, Any]]
-    ) -> str | None:
+    ) -> Resume | None:
         number = len(self.questions) + 1
         questions = [{"id": f"Q{number}.{i}", **q} for i, q in enumerate(asked, 1)]
         accepted = number <= self.settings.max_refinement_rounds
@@ -242,10 +249,11 @@ class Define(Stage):
         )
         await self._exec(checkpoint, shlex.join(self.paths.invocation("tool", script)))
         await self._inputs(checkpoint)
-        return (
+        return Resume(
             "Every proposal is accepted (benchmark policy). Build a fresh definition with these "
             "answers; seal it with `define done ready`, then finish building against the "
-            "definition.\n\n" + self.units
+            "definition.\n\n" + self.units,
+            DEFINE_ROUND,
         )
 
     async def _keep(self, checkpoint: Checkpoint) -> None:

@@ -36,6 +36,8 @@ from enum import StrEnum
 from pathlib import Path
 from typing import Any
 
+from raidar.judge.client import state_text
+from raidar.judge.protocol import JEV_STATE_CHAR_LIMIT, JevAnswers, NoulAnswer
 from raidar.scoring.framework.inventory import FileRole, InventoryPolicy, build_inventory
 from raidar.scoring.judge.audit import DecisionStage, InputSufficiency, SufficiencyLevel
 from raidar.scoring.judge.carry_forward import (
@@ -44,9 +46,7 @@ from raidar.scoring.judge.carry_forward import (
     parse_diff_hunks,
     unified_diff_text,
 )
-from raidar.scoring.judge.client import state_text
 from raidar.scoring.judge.codebase import CodebaseIndex
-from raidar.scoring.judge.protocol import JEV_STATE_CHAR_LIMIT, JevAnswers, NoulAnswer
 from raidar.scoring.judge.redaction import Clipped, clip
 from raidar.scoring.judge.rubric_questions import Criterion, Requirement, RubricQuestionSet
 from raidar.scoring.judge.runtime import RULE_INPUT_MISSING, DecisionOutcome, JevRuntime

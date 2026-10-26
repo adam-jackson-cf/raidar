@@ -42,6 +42,19 @@ never holds it, and the tool directory is hashed again. Records under the step's
 category, duration, output, the repository evidence), ``workflow/<turn>/verify-hook-runs.jsonl``
 after every turn and ``workflow/verify/hook-runs.jsonl`` at the end, ``workflow/verify/rules.md``
 (the block the agent was shown), and the stage record in ``workflow.json`` with every digest.
+
+**Judge** (``verify.judge``, design D3-D4): after every accepted seal, and after a refusal that
+used its fix rounds, the engine judges each criterion of the feature definition on the sealed
+tree (``raidar.subject.workflow.judging``): Jev is asked, host-side and never from the sandbox
+(``raidar.subject.workflow.asking``), one question per ``Aspect:`` over the mapped tests' source
+(read from the tree and kept under ``workflow/sources``). The tests that pass on the base, run
+once before the agent starts, close ``Kind: regression`` criteria. Criteria still open come back
+to the builder as a ``rework`` turn (the pushback and the gate's result), then the work is sealed
+and judged again, up to ``max_passes``. Endings: ``verified``, ``pass_limit``, ``no_progress``,
+``budget_exhausted`` (``fit_rework``: a turn starts only when the last turn of its kind, the last
+gate and the last judge pass fit the time left; the tree is then gated and judged), ``deadline``
+(the phase was cut, or no time was left to judge), ``gate_refused`` (the fix rounds ran out; that
+tree is judged, not reworked) and ``gate_error``. ``gate_ending`` is the last seal's own verdict.
 """
 
 from __future__ import annotations
@@ -55,14 +68,27 @@ from pathlib import Path
 from typing import Any
 
 from raidar.contract.snapshot import SNAPSHOT_EXCLUDES
-from raidar.subject.workflow import verify_gate
+from raidar.subject.workflow import judgeloop, judging, verify_gate
+from raidar.subject.workflow.acceptance import Acceptance
 from raidar.subject.workflow.definition import VERIFY_TOKEN, VerifySettings
-from raidar.subject.workflow.stage import DEADLINE, TURN_ERROR, Checkpoint, Stage
+from raidar.subject.workflow.judgeloop import JudgeLoop
+from raidar.subject.workflow.stage import (
+    DEADLINE,
+    GATE_FIX,
+    REWORK,
+    TURN_ERROR,
+    Checkpoint,
+    Resume,
+    Stage,
+)
 
 GATE_PASSED = "gate_passed"
 GATE_REFUSED = "gate_refused"
 GATE_ERROR = "gate_error"
 RESTORED_ON = (DEADLINE, TURN_ERROR, GATE_ERROR)
+BUDGET_EXHAUSTED = "budget_exhausted"
+BASELINE_RECORD = "base-tests.json"
+CLIP = 20_000
 RECORD_DIR = "workflow/verify"
 HOOK_LOG = "verify-hook-runs.jsonl"
 RULES_RECORD = "rules.md"
@@ -216,6 +242,11 @@ def fix_prompt(exit_code: int, output: str) -> str:
     return FIX_PROMPT.format(exit=exit_code, output=text)
 
 
+def _clip(text: str, limit: int = CLIP) -> str:
+    """``text`` cut to ``limit`` characters, saying so."""
+    return text if len(text) <= limit else text[: max(limit - len(TRUNCATED), 0)] + TRUNCATED
+
+
 def _sha256(text: str) -> str:
     return hashlib.sha256(text.encode()).hexdigest()
 
@@ -235,6 +266,18 @@ def _last_json(stdout: str) -> dict[str, Any] | None:
     return None
 
 
+@dataclass
+class Standing:
+    """How the checkpoint stands: fix rounds, the last seal's verdict and the ending."""
+
+    ending: str | None = None
+    gate_ending: str | None = None
+    fix_rounds: int = 0
+    """The fix turns this pass has used."""
+    fixes: int = 0
+    """Every fix turn of the checkpoint."""
+
+
 class Verify(Stage):
     """The verify stage with one workflow's settings, for one checkpoint (module docstring)."""
 
@@ -242,7 +285,11 @@ class Verify(Stage):
     token = VERIFY_TOKEN
 
     def __init__(
-        self, settings: VerifySettings, *, prerequisites: list[dict[str, Any]] | None = None
+        self,
+        settings: VerifySettings,
+        *,
+        prerequisites: list[dict[str, Any]] | None = None,
+        acceptance: Acceptance | None = None,
     ) -> None:
         self.settings = settings
         self.paths = PATHS
@@ -252,10 +299,20 @@ class Verify(Stage):
         self.facts: dict[str, Any] = {"prerequisites": prerequisites or []}
         self.tools: dict[str, Any] = {"pins": settings.pins}
         self.gates: list[dict[str, Any]] = []
-        self.fix_rounds = 0
-        self.ending: str | None = None
+        self.standing = Standing()
         self.restored: dict[str, Any] | None = None
         self.errors: list[str] = []
+        self.loop = (
+            None
+            if settings.judge is None or settings.rework is None
+            else JudgeLoop(
+                settings.judge,
+                settings.max_passes,
+                settings.rework,
+                acceptance or Acceptance(),
+                self.paths.workspace,
+            )
+        )
 
     # before the agent starts ----------------------------------------------------------------
 
@@ -279,6 +336,36 @@ class Verify(Stage):
             rules_owned=values.get("rules_owned") == "1",
         )
         self.tools["sha256_before"] = await self._tools_digest(checkpoint)
+        if self.loop is not None:
+            await self._baseline(checkpoint, records, self.loop)
+            self.loop.start(checkpoint)
+
+    async def _baseline(self, checkpoint: Checkpoint, records: Path, loop: JudgeLoop) -> None:
+        """Run the tests check over the base: the tests that pass before the agent starts.
+
+        A ``Kind: regression`` criterion closes only when a test mapped to it is among them
+        (``judge.regression_needs_baseline``); a base the check could not run leaves none.
+        """
+        paths = self.paths
+        command = shlex.join([*paths.gate_command, "baseline", "--config", paths.config])
+        result = await checkpoint.environment.exec(command, user="root")
+        found = _last_json(result.stdout or "") or {
+            "status": "error",
+            "output": f"exit {result.return_code}: {(result.stderr or '').strip()[-500:]}",
+        }
+        (records / BASELINE_RECORD).write_text(
+            json.dumps(found, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+        )
+        tests = found.get("tests") if found.get("status") != verify_gate.ERROR else None
+        loop.baseline_passed = sorted(judging.passed_tests(tests))
+        loop.baseline = {
+            "record": f"{RECORD_DIR}/{BASELINE_RECORD}",
+            "status": found.get("status"),
+            "exit": found.get("exit"),
+            "seconds": found.get("seconds"),
+            "collected": len((tests or {}).get("collected", [])),
+        }
+        await self._exec(checkpoint, f"chown -R {q(f'{self.owner}:')} {q(paths.workspace)}")
 
     async def _install_gate(self, checkpoint: Checkpoint, records: Path) -> None:
         paths = self.paths
@@ -367,21 +454,54 @@ class Verify(Stage):
 
     # checks when the agent stops -------------------------------------------------------------
 
-    async def check(self, checkpoint: Checkpoint, after: str) -> str | None:
+    async def check(self, checkpoint: Checkpoint, after: str) -> Resume | None:
         await self._copy_hook_log(checkpoint, f"{after}/{HOOK_LOG}")
         gate = await self._seal(checkpoint, after)
+        loop, standing = self.loop, self.standing
         if gate["verdict"] == verify_gate.PASSED:
-            self.ending = GATE_PASSED
+            standing.gate_ending = GATE_PASSED
+        elif gate["verdict"] != verify_gate.REFUSED:
+            standing.gate_ending = standing.ending = GATE_ERROR
             return None
-        if gate["verdict"] != verify_gate.REFUSED:
-            self.ending = GATE_ERROR
+        elif standing.fix_rounds >= self.settings.max_fix_rounds:
+            standing.gate_ending = GATE_REFUSED
+        elif loop is not None and not loop.fits(checkpoint, GATE_FIX, self.gates):
+            standing.gate_ending, standing.ending = GATE_REFUSED, BUDGET_EXHAUSTED
+            await loop.judge_if_fits(checkpoint, self.gates, gate)
             return None
-        if self.fix_rounds >= self.settings.max_fix_rounds:
-            self.ending = GATE_REFUSED
+        else:
+            standing.fix_rounds += 1
+            standing.fixes += 1
+            seal = judgeloop.decided(self.gates, gate)
+            fix = fix_prompt(int(gate["exit"]), str(seal.get("output") or ""))
+            return Resume(fix, GATE_FIX)
+        if loop is None:
+            standing.ending = standing.gate_ending
             return None
-        self.fix_rounds += 1
-        decided = self._gate(gate.get("reused_from")) or gate
-        return fix_prompt(int(gate["exit"]), str(decided.get("output") or ""))
+        return await self._judged(checkpoint, gate, loop)
+
+    async def _judged(
+        self, checkpoint: Checkpoint, gate: dict[str, Any], loop: JudgeLoop
+    ) -> Resume | None:
+        """Judge the sealed tree; end the loop or send the open criteria back (``rework``)."""
+        standing = self.standing
+        left = checkpoint.remaining()
+        if left is not None and left <= 0:
+            standing.ending = DEADLINE
+            return None
+        result, changed = await loop.judge_pass(checkpoint, self.gates, gate)
+        if standing.gate_ending == GATE_REFUSED:
+            standing.ending = GATE_REFUSED
+            return None
+        ended = loop.stop(changed)
+        if ended is None and not loop.fits(checkpoint, REWORK, self.gates):
+            ended = BUDGET_EXHAUSTED
+        if ended is not None:
+            standing.ending = ended
+            return None
+        standing.fix_rounds = 0  # ``max_fix_rounds`` bounds each pass's fix turns
+        seal = judgeloop.decided(self.gates, gate)
+        return loop.rework(result, _clip(str(seal.get("output") or "(no output)")))
 
     def _gate(self, run: object) -> dict[str, Any] | None:
         return next((gate for gate in self.gates if gate["run"] == run), None)
@@ -416,6 +536,7 @@ class Verify(Stage):
             f"{(result.stderr or '').strip()[-500:]}",
         }  # fmt: skip
         gate["record"] = f"{RECORD_DIR}/gate-{run}.json"
+        gate["turn_kind"] = checkpoint.turns[-1].kind if checkpoint.turns else None
         path = checkpoint.logs_dir / gate["record"]
         path.write_text(json.dumps(gate, indent=2, sort_keys=True) + "\n", encoding="utf-8")
         self.gates.append(gate)
@@ -425,13 +546,13 @@ class Verify(Stage):
 
     async def close(self, checkpoint: Checkpoint, cut: str | None) -> None:
         if self.base is None:
-            self.ending = GATE_ERROR
+            self.standing.ending = GATE_ERROR
             self.errors.append("the gate was not set up before the agent started")
             return
-        if cut is not None and self.ending is None:
-            self.ending = cut
+        if cut is not None and self.standing.ending is None:
+            self.standing.ending = cut
         try:
-            if self.ending in RESTORED_ON:
+            if self.standing.ending in RESTORED_ON:
                 await self._restore(checkpoint)
             await self._copy_hook_log(checkpoint, f"{RECORD_DIR}/{verify_gate.HOOK_RUNS}")
             rules = q(f"{self.paths.workspace}/{self.settings.rules_file}")
@@ -447,7 +568,7 @@ class Verify(Stage):
 
     async def _restore(self, checkpoint: Checkpoint) -> None:
         decided = self._last_decided()
-        self.restored = {"reason": self.ending, "gate": None, "tree": None}
+        self.restored = {"reason": self.standing.ending, "gate": None, "tree": None}
         if decided is None:
             self.restored["detail"] = (
                 "no seal decided a tree: the workspace is as the agent left it"
@@ -487,9 +608,11 @@ class Verify(Stage):
         return result.stdout or ""
 
     def record(self) -> dict[str, Any]:
+        loop = self.loop
         return {
-            "ending": self.ending,
-            "fix_rounds": self.fix_rounds,
+            "ending": self.standing.ending,
+            "gate_ending": self.standing.gate_ending,
+            "fix_rounds": self.standing.fixes,
             "max_fix_rounds": self.settings.max_fix_rounds,
             "base": self.base,
             "owner": self.owner,
@@ -498,9 +621,19 @@ class Verify(Stage):
             "rules_record": f"{RECORD_DIR}/{RULES_RECORD}",
             **self.facts,
             "tools": self.tools,
-            "gates": [{k: v for k, v in gate.items() if k != "output"} for gate in self.gates],
+            "gates": [
+                {
+                    **{k: v for k, v in gate.items() if k != "output"},
+                    "checks": [
+                        {k: v for k, v in check.items() if k != "tests"}
+                        for check in gate.get("checks", [])
+                    ],
+                }
+                for gate in self.gates
+            ],
             "restored": self.restored,
             "errors": self.errors,
+            **({} if loop is None else loop.record()),
         }
 
 

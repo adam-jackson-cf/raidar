@@ -16,6 +16,7 @@ layers =
     raidar.scoring
     raidar.grading
     raidar.subject
+    raidar.judge
     raidar.contract
 
 # Sub-tiers inside a group: siblings either form declared tiers or are independent.
@@ -30,11 +31,12 @@ layers =
     raidar.engine.target
 
 [importlinter:contract:scoring-tiers]
-name = Scoring: the catalog imports the scorers, the scorers import only the framework and never each other
+name = Scoring: the catalog imports independent scorers over shared evidence and framework
 type = layers
 layers =
     raidar.scoring.catalog
-    raidar.scoring.code_quality | raidar.scoring.correctness | raidar.scoring.gate_effort | raidar.scoring.judge | raidar.scoring.process_checks | raidar.scoring.resource_usage
+    raidar.scoring.code_quality | raidar.scoring.correctness | raidar.scoring.definition_coverage | raidar.scoring.gate_effort | raidar.scoring.process_checks | raidar.scoring.resource_usage | raidar.scoring.test_coverage
+    raidar.scoring.coverage_inputs | raidar.scoring.judge
     raidar.scoring.framework
 
 [importlinter:contract:subject-tiers]
@@ -119,6 +121,7 @@ source_modules =
     raidar.scoring.process_checks
 forbidden_modules =
     raidar.scoring.judge
+    raidar.judge
 
 [importlinter:contract:ledger-boundary]
 name = Ledger stays independent of every other raidar layer

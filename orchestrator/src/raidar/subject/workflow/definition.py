@@ -24,6 +24,13 @@ starts, ``test_timeout`` stops a single test, and ``rules_file`` is where the ga
 written for the agent. Its ``prompt`` may use the tokens ``%%%MAX_FIX_ROUNDS%%%``,
 ``%%%RULES_FILE%%%`` and ``%%%TEST_TIMEOUT_SECONDS%%%`` and no other.
 
+With ``verify.judge`` (and ``verify.rework``, the pushback prompt with ``%%%PUSHBACK%%%`` and
+``%%%GATE%%%`` once each) the engine judges each accepted seal's criteria host-side and sends the
+open ones back to the builder, up to ``verify.max_passes`` passes; it needs the define stage (the
+criteria) and ``build.structured`` (each build turn ends with a JSON reply
+``{account, ac_tests, adrs}``, the shape appended by the runner). Without a judge the one pass is
+the gate's.
+
 A workflow directory holds ``workflow.yaml`` and the skills its stages place
 (``skills/<name>/...``, listed in a stage's ``skills``). Every file under ``skills/`` is part of
 the definition as ``components`` (path -> text) and so of its content hash; a file no stage's
@@ -56,6 +63,7 @@ DEFINE_TOKEN = "%%%DEFINE%%%"
 UNITS_TOKEN = "%%%UNITS%%%"
 VERIFY_TOKEN = "%%%VERIFY%%%"
 VERIFY_PROMPT_TOKENS = frozenset({"MAX_FIX_ROUNDS", "RULES_FILE", "TEST_TIMEOUT_SECONDS"})
+REWORK_TOKENS = frozenset({"PUSHBACK", "GATE"})
 NAME_PATTERN = r"^[a-z0-9][a-z0-9-]*$"
 PIN_PATTERN = r"^(?P<name>[A-Za-z0-9][A-Za-z0-9._-]*)==[0-9][A-Za-z0-9.+!-]*$"
 COMPONENT_PATH = re.compile(r"^skills/[a-z0-9][a-z0-9-]*(/[A-Za-z0-9][A-Za-z0-9._-]*)+$")
@@ -106,6 +114,8 @@ class DefineSettings(_Model):
 class BuildSettings(_Model):
     prompt: str = Field(min_length=1)
     skills: SkillNames = ()
+    structured: bool = False
+    """Each turn ends with a JSON reply ``{account, ac_tests, adrs}`` (shape appended)."""
 
     @model_validator(mode="after")
     def _one_task_token(self) -> Self:
@@ -155,23 +165,47 @@ class GateTriggers(_Model):
     after_turn: Literal[True]
 
 
+class JudgeSettings(_Model):
+    """The engine's judge of the acceptance criteria (factory-x-loops ``[judge]``), host-side."""
+
+    model: str = Field(min_length=1)
+    question_set: Literal["dbv5-aspect/1"]
+    closed_at: float = Field(gt=0, le=1)
+    open_at: float = Field(ge=0, lt=1)
+    regression_needs_baseline: bool
+    retries: int = Field(ge=0)
+    timeout_s: float = Field(gt=0)
+    context_tokens: int = Field(gt=0)
+    stall_repeats: int = Field(gt=0)
+    fit_rework: bool
+
+    @model_validator(mode="after")
+    def _thresholds_ordered(self) -> Self:
+        if self.open_at >= self.closed_at:
+            raise ValueError("judge.open_at must be below judge.closed_at")
+        return self
+
+
 class VerifySettings(_Model):
     enabled: bool
     language: Literal["python"]
     prompt: str = Field(min_length=1)
     gate: GateTriggers
     max_fix_rounds: int = Field(ge=0)
-    max_passes: Literal[1]
+    max_passes: int = Field(ge=1)
     test_timeout: int = Field(gt=0)
     rules_file: str = Field(pattern=r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
     checks: tuple[GateCheck, ...] = Field(min_length=1)
     skills: SkillNames = ()
+    judge: JudgeSettings | None = None
+    rework: str | None = None
 
     @model_validator(mode="after")
     def _consistent(self) -> Self:
         unknown = sorted(set(TOKEN.findall(self.prompt)) - VERIFY_PROMPT_TOKENS)
         if unknown:
             raise ValueError(f"verify.prompt uses unknown token(s) {unknown}")
+        self._rework_consistent()
         names = [check.name for check in self.checks]
         if len(set(names)) != len(names):
             raise ValueError(f"verify.checks repeats a name: {names}")
@@ -179,6 +213,19 @@ class VerifySettings(_Model):
         if len(tests) != 1 or not tests[0].blocking:
             raise ValueError("verify.checks needs exactly one blocking tests check")
         return self
+
+    def _rework_consistent(self) -> None:
+        """``judge`` and ``rework`` come together; a rework needs a prompt with its two tokens."""
+        if (self.judge is None) != (self.rework is None):
+            raise ValueError("verify.judge and verify.rework are set together or not at all")
+        if self.judge is None and self.max_passes != 1:
+            raise ValueError("verify.max_passes above 1 needs verify.judge: passes are judged")
+        if self.rework is not None:
+            found = sorted(TOKEN.findall(self.rework))
+            if found != sorted(REWORK_TOKENS):
+                raise ValueError(
+                    f"verify.rework must contain {sorted(REWORK_TOKENS)} once each (found {found})"
+                )
 
     def render(self) -> str:
         """The verify prompt with its tokens filled from these settings."""
@@ -221,6 +268,20 @@ class Stages(_Model):
                     f"build.prompt must contain {token} {expected} time(s) "
                     f"(found {count}): exactly once when its stage is enabled, never otherwise"
                 )
+        return self
+
+    @model_validator(mode="after")
+    def _judge_has_its_inputs(self) -> Self:
+        """The judge reads criteria from the define stage and ``ac_tests`` from replies."""
+        verify = self.verify
+        if verify is None or not verify.enabled or verify.judge is None:
+            return self
+        if self.define is None or not self.define.enabled:
+            raise ValueError("verify.judge needs the define stage: its criteria are judged")
+        if not self.build.structured:
+            raise ValueError(
+                "verify.judge needs build.structured: criteria map to tests in replies"
+            )
         return self
 
     @property
@@ -278,12 +339,15 @@ class WorkflowDefinition(_Model):
         return tuple(self.stages.enabled)
 
     def to_json(self) -> dict[str, object]:
-        """The resolved definition; empty ``skills`` and ``components`` are left out."""
+        """The resolved definition; empty ``skills``, a build that is not ``structured`` and empty
+        ``components`` are left out (a workflow that does not use them keeps its hash)."""
         document = self.model_dump(mode="json", by_alias=True, exclude_none=True)
         stages: dict[str, dict[str, object]] = document["stages"]
         for settings in stages.values():
             if not settings.get("skills"):
                 settings.pop("skills", None)
+        if not stages["build"].get("structured"):
+            stages["build"].pop("structured", None)
         if not document["components"]:
             del document["components"]
         return document

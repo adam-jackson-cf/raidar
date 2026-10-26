@@ -15,7 +15,7 @@ from __future__ import annotations
 
 from typing import Literal
 
-from harbor.models.trial.config import AgentConfig
+from harbor.models.trial.config import AgentConfig, TrialConfig
 
 from raidar.contract.canonical import digest_json
 from raidar.design.experiment.arm import ResolvedArm
@@ -32,6 +32,20 @@ AGENT_OVERRIDES: tuple[AgentOverride, ...] = ("oracle", "nop")
 CODEX_AUTH_ENV = "CODEX_AUTH_JSON_PATH"
 ISOLATED_AGENTS = {AgentName.CODEX: IsolatedCodex}
 """The Raidar class that runs each adapter's native agent with its definition's isolation."""
+
+
+def effective_agent_timeout_s(agent_timeout_sec: int) -> float:
+    """The agent phase's real budget: the configured timeout scaled as Harbor scales it.
+
+    Harbor multiplies an agent's ``override_timeout_sec`` by the trial's ``timeout_multiplier`` and
+    ``agent_timeout_multiplier`` (their defaults here: Raidar sets neither), the same product the
+    ``H4`` health check holds the phase to.
+    """
+    fields = TrialConfig.model_fields
+    scale = float(fields["timeout_multiplier"].default or 1.0)
+    return (
+        float(agent_timeout_sec) * scale * float(fields["agent_timeout_multiplier"].default or 1.0)
+    )
 
 
 def arm_agent_config(
@@ -67,6 +81,7 @@ def arm_agent_config(
             "workflow": arm.workflow.ref,
             "definition": arm.definition.to_json(),
             "skills_placement": agent.released.definition.placement.skills,
+            "phase_timeout_s": effective_agent_timeout_s(agent_timeout_sec),
         },
         override_timeout_sec=float(agent_timeout_sec),
     )
