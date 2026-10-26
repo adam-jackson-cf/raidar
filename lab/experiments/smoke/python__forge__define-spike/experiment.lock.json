@@ -789,7 +789,7 @@
       "tree-sitter-language-pack": "0.13.0"
     }
   },
-  "document_sha256": "410f922fefedba6ba343a1c3147f6d83847999ec97f0bc8da377e770ee3932d0",
+  "document_sha256": "933d88842f84d6a346729de32c3a810bf474d51448670f6eb5782399815040e8",
   "execution": {
     "arms": {
       "define": {
@@ -807,13 +807,13 @@
           "version_pin": "0.156.1",
           "workflow_skills": "placement.skills .agents/skills in the workspace /app"
         },
-        "digest": "e02de8fa2f7f960dd5cb7fddbd98cc7be24587574a1ad2af2ddb87f17ee4ea0b",
+        "digest": "cdd7a77bb0cd9d95b765946c1117426e75bbd107c4605e49f173e2db49dd07b0",
         "model": "gpt-6-luna",
         "provider": "openai",
         "reasoning": "low",
         "stage_code": {
           "build": "920077d2fc46ddf74d0ffb33ffe87cf0982e7eb6027a50f6723780a953111437",
-          "define": "deb942869e000b8249e14468a66d84f7411b7a39e6ea9a45ab9cebc7cee8aa01",
+          "define": "70c40eaf0994d0c18e77f3a69f141ccb10f282c44872ca579376c13820de6da9",
           "verify": "736c14db59960d084732317cb39431f2aa5b679b2f05e2d8d8b1a11515b7408a"
         },
         "tool": {
@@ -987,7 +987,7 @@
     "source_sha256": "624b8915dfb55dd26efdb8c8c307fc5dd5b8a810f9995228d3bd9ce9751c2010",
     "spec_sha256": "4a33f79bec95858812391959fb13a40d2347f191e9969d8d9f869859dd8ed2e9"
   },
-  "lock_sha256": "0e15de1bed7235817766f50599dde63c6ac39e64dda72d82a0dae5f44fd71efa",
+  "lock_sha256": "5e30b76a6960639f07c878771903b76eea4036312c2e80f3ae36a3b1197aeb32",
   "lock_version": 4,
   "overrides": {
     "flags": {},
@@ -996,7 +996,7 @@
   "sections": {
     "analysis": "5857cbd73862a8373632833c2dac16ea584aa2f92fc94b12b7181fb3804de9e7",
     "assessment": "46b5cf8e2be9b494d132ee2858cc1da81f12a9b254452ae0546901a171227ff8",
-    "execution": "0e15de1bed7235817766f50599dde63c6ac39e64dda72d82a0dae5f44fd71efa",
+    "execution": "5e30b76a6960639f07c878771903b76eea4036312c2e80f3ae36a3b1197aeb32",
     "toolchain": "037de8092c78cc029ff5b0266ac406e508a22714e4f2501420e1e2d18e9c2a20"
   },
   "spec": {

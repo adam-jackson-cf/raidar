@@ -14,7 +14,7 @@ from raidar.subject.workflow.definition import DEFINE_TOKEN, DefineSettings
 from raidar.subject.workflow.stage import Checkpoint, Stage
 
 SOURCE_COMMIT = "ac5db0f28364911ef2298e428748120be8b0d56c"
-PYTHON_PIN = "3.12.12"
+PYTHON_PIN = "3.12.14"
 RECORD_DIR = "workflow/define"
 PAYLOAD = Path(__file__).with_name("define_tool")
 REPAIR = (
@@ -59,15 +59,15 @@ PATHS = DefinePaths()
 
 
 def tools_install_command(paths: DefinePaths) -> str:
-    """An independent exact-pinned interpreter, never the project's interpreter."""
+    """Copy the pack's exact-pinned interpreter; never use the project or the network."""
     home = shlex.quote(paths.home)
+    version_check = f"import sys; assert sys.version.split()[0] == {PYTHON_PIN!r}, sys.version"
     return "\n".join(
         [
             "set -eu",
+            f"/usr/local/bin/python3 -I -c {shlex.quote(version_check)}",
             f"[ -x {shlex.quote(paths.python)} ] && exit 0",
-            f"export UV_PYTHON_INSTALL_DIR={home}/python",
-            f"uv python install {PYTHON_PIN}",
-            f"uv venv -q --python {PYTHON_PIN} {home}/tools",
+            f"/usr/local/bin/python3 -I -m venv --copies --without-pip {home}/tools",
         ]
     )
 
