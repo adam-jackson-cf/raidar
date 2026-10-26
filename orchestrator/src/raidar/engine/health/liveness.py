@@ -40,6 +40,7 @@ from typing import Any
 from harbor.trial.hooks import LogEntry, TrialEvent, TrialHookEvent
 from harbor.trial.trial import Trial
 
+from raidar.contract.activity import HostActivity, observe_host_activity
 from raidar.engine.health.reaper import ReapReport, reap_agent_processes
 
 LIVENESS_REPORT = "raidar-liveness.json"
@@ -200,6 +201,7 @@ class AgentHost:
 
     environment: Any
     user: str | None
+    activity: HostActivity
 
 
 class PhaseMonitor:
@@ -216,7 +218,7 @@ class PhaseMonitor:
     ) -> None:
         self.config = config
         self.step = step
-        self._host = AgentHost(environment, user)
+        self._host = AgentHost(environment, user, observe_host_activity(environment, clock))
         self._clock = clock
         self._started = clock()
         self._output = OutputTally(self._started)
@@ -249,10 +251,20 @@ class PhaseMonitor:
         return (reading, None) if reading else (None, f"poll output unusable: {output[-200:]!r}")
 
     async def sample(self) -> dict[str, Any]:
+        reading, error = await self._poll()
         now = self._clock()
         t = round(now - self._started, 3)
-        reading, error = await self._poll()
+        activity = self._host.activity
+        host_work = bool(activity.active)
+        changed = activity.observed_generation != activity.generation
+        if host_work or changed:
+            self._baseline = None
+            self._quiet_since = None
+            self._output.last = now
+            activity.observed_generation = activity.generation
         record: dict[str, Any] = {"t": t, "measured": reading is not None}
+        if host_work or changed:
+            record["host_windows"] = [w["limit"] for w in activity.active]
         self.sample_count += 1
         if reading is None:
             record["unmeasured"] = error
@@ -263,7 +275,7 @@ class PhaseMonitor:
             record.update(self._evaluate(now, reading))
         record["output_age_s"] = round(now - self._output.last, 3)
         self.samples.append(record)
-        if reading is not None:
+        if reading is not None and not host_work:
             await self._maybe_decide(now, record)
         return record
 
@@ -352,6 +364,17 @@ class PhaseMonitor:
             "samples_dropped": max(0, self.sample_count - len(self.samples)),
             "unmeasured_samples": sum(1 for s in self.samples if not s["measured"]),
             "samples": list(self.samples),
+            "host_limits": sorted({w["limit"] for w in self._host.activity.windows}),
+            "host_windows": [
+                {
+                    **{k: v for k, v in w.items() if k not in {"started", "finished"}},
+                    "started_at_s": round(w["started"] - self._started, 3),
+                    "finished_at_s": (
+                        round(w["finished"] - self._started, 3) if "finished" in w else None
+                    ),
+                }
+                for w in self._host.activity.windows
+            ],
         }
 
     async def run(self, flush: Callable[[], None]) -> None:

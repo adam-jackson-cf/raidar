@@ -7,8 +7,13 @@
 # proposal, at most max_refinement_rounds times. The define prompt is FXL's
 # workflow/define-build-verify/v2.toml intake prompt adapted to the single session (no mode, no
 # earlier-rounds block: the units carry the accepted answers as A<n>); the verify prompt and gate
-# are one-shot-verify@1's. One pass: no judge, ac_tests or rework (a later release). The skills are
-# FXL's components, copied unchanged into skills/ and placed per the agent's placement.skills.
+# are one-shot-verify@1's. Every build turn ends with a JSON reply {account, ac_tests, adrs} (the
+# runner appends its shape). After each accepted seal the engine judges every criterion's aspects
+# with Jev host-side (verify.judge: factory-x-loops v2 [judge] thresholds, closure by thresholds,
+# the dated Jev model id) and sends open criteria back as a rework turn, at most max_passes
+# passes (3: the smoke's 1800 s holds a first build, a judge pass and two reworks, each rework
+# started only when the time left fits it). The skills are FXL's components, copied unchanged into
+# skills/ and placed per the agent's placement.skills.
 schema: 1
 name: define-build-verify
 stages:
@@ -150,6 +155,7 @@ stages:
       every one before `define done`; it refuses all but the last, which it lists.
   build:
     skills: []
+    structured: true
     prompt: |-
       Build the issue below in the repository you are in, per the repository's own
       rules, and write the tests that prove it.
@@ -162,14 +168,34 @@ stages:
       - `Source:` lines are the issue's statements it derives from: they are the
         requirement where the criterion's wording differs;
       - each `Aspect:` is a situation a test sets up and the outcome it asserts;
-      - an `Example:` value must appear literally in a test you write for the criterion;
-      - a `Kind: regression` criterion has no aspects: keep the repository's
-        earlier tests that cover it passing.
+      - an `Example:` value must appear literally in a test mapped to the criterion;
+      - a `Kind: regression` criterion has no aspects: map to it the repository's
+        earlier tests that cover it, which passed before your change;
+      - `Verification:` is the engine's line, the same for every criterion: a
+        criterion is done only when tests mapped to it in `ac_tests` prove it.
 
       Keep behaviour earlier requirements accepted, and its tests, passing. Leave
       `/app/.raidar/` as it is.
 
       %%%VERIFY%%%
+
+      Once the gate accepts your work, the engine checks each aspect of each
+      criterion against its mapped tests, and every criterion still open comes back
+      to you with what is missing. This session is yours for the whole run.
+
+      Your reply says what you changed and why (`account`), maps every acceptance
+      criterion to the tests that prove it (`ac_tests`) and reports your architecture
+      decisions (`adrs`):
+      - a test is named as the test runner names it (`path::test_name` or
+        `path::Class::test_name`); the engine checks each test's file is in the
+        working tree, and a test the gate does not collect counts as missing. On a
+        later turn, list only the criteria whose tests you added, changed, moved or
+        renamed, or none;
+      - an ADR is an architecture decision the feature definition does not already
+        record (a new component or module boundary, a data format, a dependency, a
+        structural choice): `id` is `ADR1`, … numbered on across your turns and
+        `status` is `accepted` or `superseded`; report each once, and again only when
+        its status changes; none: `[]`.
 
       The issue:
 
@@ -209,8 +235,39 @@ stages:
       `.gitignore` exclude it.
     gate: { on_commit: true, after_turn: true }
     max_fix_rounds: 2
-    max_passes: 1
+    max_passes: 3
     test_timeout: 60
+    judge:
+      model: typesafe/jev-1.13-20260917
+      question_set: dbv5-aspect/1
+      closed_at: 0.8
+      open_at: 0.3
+      regression_needs_baseline: true
+      retries: 3
+      timeout_s: 60
+      context_tokens: 32000
+      stall_repeats: 2
+      fit_rework: true
+    rework: |-
+      The engine's verification left the acceptance criteria below open, each with
+      the issue statements it derives from, what is missing (an aspect no mapped test
+      sets up and asserts, an `Example:` value no mapped test states, a mapped test
+      that did not pass) and its mapped tests with their gate result. Fix every one
+      in this turn, keep every criterion's tests mapped and passing, and do not break
+      what already works. When you stop, the engine commits through the gate and
+      checks every criterion again.
+
+      Reply as before: `account` says criterion by criterion (by id) what you changed;
+      `ac_tests` lists only the criteria whose tests you added, changed, moved or
+      renamed; `adrs` any new or changed decisions.
+
+      The open acceptance criteria, by feature:
+
+      %%%PUSHBACK%%%
+
+      The gate's result on the work the engine checked:
+
+      %%%GATE%%%
     rules_file: AGENTS.md
     checks:
       - { name: lint, category: lint, tool: ruff==0.8.6, run: "ruff check", blocking: true }

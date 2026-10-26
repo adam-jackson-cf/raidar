@@ -49,6 +49,7 @@ class StepDefine:
     agent: Path
     record: dict[str, Any]
     verify_ending: str | None
+    verify_accepted: bool
 
 
 def _json(path: Path) -> Any:
@@ -133,6 +134,18 @@ def _schema(record: dict[str, Any]) -> list[str]:
     )
 
 
+def _verify_outcome(verify: Any) -> tuple[str | None, bool]:
+    if not isinstance(verify, dict):
+        return None, False
+    ending = verify.get("ending")
+    gates = verify.get("gates")
+    gates = gates if isinstance(gates, list) else []
+    accepted = ending in (GATE_PASSED, "verified") or any(
+        gate.get("verdict") == "passed" for gate in gates if isinstance(gate, dict)
+    )
+    return ending if isinstance(ending, str) else None, accepted
+
+
 def step_defines(steps: Sequence[tuple[str, Path]]) -> tuple[list[StepDefine], list[str]] | None:
     """(defining steps' records, steps whose records cannot be read); ``None`` when the
     records show no define stage at all (the E family does not apply)."""
@@ -151,9 +164,8 @@ def step_defines(steps: Sequence[tuple[str, Path]]) -> tuple[list[StepDefine], l
         if not isinstance(record, dict):
             unread.append(step)
             continue
-        verify = workflow.get("verify")
-        ending = verify.get("ending") if isinstance(verify, dict) else None
-        found.append(StepDefine(step, agent, record, ending if isinstance(ending, str) else None))
+        ending, accepted = _verify_outcome(workflow.get("verify"))
+        found.append(StepDefine(step, agent, record, ending, accepted))
     if not found and not named:
         return None
     return found, unread
@@ -184,7 +196,7 @@ def _context(define: StepDefine) -> tuple[tool.Context | None, str | None]:
 
 
 def _e1_step(define: StepDefine) -> tuple[list[str], str | None]:
-    if define.verify_ending != GATE_PASSED:
+    if not define.verify_accepted:
         return [], None
     step = define.step
     ending = define.record.get("ending")
@@ -334,7 +346,7 @@ def _e3_step(define: StepDefine) -> tuple[list[str], str | None]:
         return found, why
     if draft.sealed == "ready" and not last.get("blocking"):
         found.append(f"{step}: unusable, but its draft is sealed ready and its last check passed")
-    if define.verify_ending == GATE_PASSED:
+    if define.verify_accepted:
         found.append(f"{step}: the gate passed on an unusable definition")
     return found, None
 
@@ -381,7 +393,7 @@ def definition_family(steps: Sequence[tuple[str, Path]]) -> tuple[HealthCheck, .
             defines,
             unread,
             _e1_step,
-            lambda ds: f"{sum(d.verify_ending == GATE_PASSED for d in ds)} gate-passed "
+            lambda ds: f"{sum(d.verify_accepted for d in ds)} gate-passed "
             "checkpoint(s) hold a sealed, passing definition",
         ),
         _family(

@@ -13,9 +13,9 @@ from __future__ import annotations
 from collections.abc import Mapping
 from pathlib import Path
 
+from raidar.judge.client import JevClient, Transport, api_key_from_env
 from raidar.scoring.judge.audit import AuditLog
 from raidar.scoring.judge.cache import DecisionCache
-from raidar.scoring.judge.client import JevClient, Transport, api_key_from_env
 from raidar.scoring.judge.policies import POLICY_DIR, PolicyRegistry
 from raidar.scoring.judge.runtime import JevRuntime
 

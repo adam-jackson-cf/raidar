@@ -11,6 +11,7 @@ from typing import Any, cast
 import pytest
 from harbor.trial.hooks import TrialEvent
 
+from raidar.contract.activity import host_window
 from raidar.engine.health.liveness import (
     LIVENESS_REPORT,
     LivenessConfig,
@@ -298,3 +299,42 @@ def test_hooks_arm_the_phase_and_write_the_host_side_report(tmp_path: Path) -> N
     assert recorded["decision"] == "idle_observed"
     assert report["config"]["mode"] == "observe"
     assert recorded["samples"][0]["baseline"]
+
+
+def test_host_judge_time_is_not_agent_idle_and_is_recorded() -> None:
+    clock, env = Clock(), ScriptedEnv([poll_output([])])
+    m = monitor(env, clock, idle_s=30)
+    run_samples(m, clock, 2, step_s=10)
+    with host_window(env, "request.judge", 60):
+        run_samples(m, clock, 5, step_s=10)
+    run_samples(m, clock, 2, step_s=10)
+    assert m.verdict.decision == "active"
+    assert m.as_json()["host_windows"] == [
+        {
+            "limit": "request.judge",
+            "limit_s": 60,
+            "seconds": 50.0,
+            "started_at_s": 20.0,
+            "finished_at_s": 70.0,
+        }
+    ]
+    run_samples(m, clock, 3, step_s=10)
+    assert m.verdict.decision == "idle_observed"
+    assert m.verdict.first_idle_at_s == 100
+
+
+def test_a_host_window_between_samples_resets_the_idle_baseline() -> None:
+    clock, env = Clock(), ScriptedEnv([poll_output([])])
+    m = monitor(env, clock, idle_s=30)
+    run_samples(m, clock, 2, step_s=10)
+    with host_window(env, "idle.gate", 180):
+        clock.now += 25
+    run_samples(m, clock, 2, step_s=10)
+    assert m.verdict.decision == "active"
+    assert m.samples[-2]["baseline"] is True
+
+
+@pytest.mark.parametrize(("name", "limit"), [("unknown", 60), ("request.judge", 0)])
+def test_unregistered_or_unbounded_host_work_cannot_suspend_idle(name: str, limit: float) -> None:
+    with pytest.raises(ValueError, match="host limit"), host_window(object(), name, limit):
+        pytest.fail("invalid host window entered")

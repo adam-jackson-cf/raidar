@@ -93,6 +93,10 @@ def run(
     for stage in definition["stages"].values():
         stage.pop("skills", None)
     definition["stages"]["define"]["max_refinement_rounds"] = max_refinement_rounds
+    definition["stages"]["build"]["structured"] = False  # the judged loop has its own tests
+    for judged in ("judge", "rework"):
+        definition["stages"]["verify"].pop(judged)
+    definition["stages"]["verify"]["max_passes"] = 1
     if not verify:
         definition["stages"].pop("verify")
         definition["stages"]["build"]["prompt"] = definition["stages"]["build"]["prompt"].replace(

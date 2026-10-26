@@ -65,6 +65,7 @@ RAIDAR_PACKAGE_DIR = "orchestrator/src/raidar"
 RAIDAR_PACKAGES: dict[str, frozenset[str]] = {
     "cli": frozenset(),
     "contract": frozenset(),
+    "judge": frozenset(),
     "design": frozenset({"experiment", "problem"}),
     "subject": frozenset({"agent", "workflow", "environment"}),
     "engine": frozenset({"target", "job", "trial", "health", "perf"}),
@@ -79,6 +80,9 @@ RAIDAR_PACKAGES: dict[str, frozenset[str]] = {
             "gate_effort",
             "resource_usage",
             "judge",
+            "coverage_inputs",
+            "definition_coverage",
+            "test_coverage",
         }
     ),
     "evaluation": frozenset({"analysis", "review", "ledger"}),

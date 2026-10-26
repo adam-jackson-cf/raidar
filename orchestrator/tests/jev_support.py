@@ -8,14 +8,15 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from raidar.scoring.judge.audit import AuditLog, InputSufficiency, SufficiencyLevel
-from raidar.scoring.judge.cache import DecisionCache
-from raidar.scoring.judge.client import (
+from raidar.judge.client import (
     JevClient,
     TransportError,
     TransportResponse,
     TransportTimeoutError,
 )
+from raidar.judge.protocol import JEV_PINNED_MODEL
+from raidar.scoring.judge.audit import AuditLog, InputSufficiency, SufficiencyLevel
+from raidar.scoring.judge.cache import DecisionCache
 from raidar.scoring.judge.policies import (
     POLICY_DIR,
     CalibrationSplit,
@@ -24,7 +25,6 @@ from raidar.scoring.judge.policies import (
     PolicyRegistry,
     Promotion,
 )
-from raidar.scoring.judge.protocol import JEV_PINNED_MODEL
 from raidar.scoring.judge.runtime import JevRuntime
 
 TEST_KEY = "sk-or-v1-testkey-0123456789abcdef"

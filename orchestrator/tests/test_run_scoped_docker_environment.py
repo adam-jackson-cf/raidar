@@ -12,6 +12,7 @@ from typing import Any
 
 import pytest
 from harbor.environments.base import ExecResult
+from harbor.models.trial.paths import TrialPaths
 
 from raidar.engine.trial import environment as env_module
 from raidar.engine.trial.environment import RunScopedDockerEnvironment, engine_command
@@ -58,12 +59,16 @@ def test_anything_else_stays_on_the_compose_path(compose_args: list[str]) -> Non
     assert engine_command(compose_args, "cid", stdin=False) is None
 
 
-def _bare_env(container: str | None) -> RunScopedDockerEnvironment:
+def _bare_env(container: str | None, trial_dir: Path) -> RunScopedDockerEnvironment:
     env = object.__new__(RunScopedDockerEnvironment)
     env._main_container = container  # noqa: SLF001
     env._is_windows_container = False  # noqa: SLF001
     env._post_start = []  # noqa: SLF001  (as the constructor leaves it)
     env._synced = {}  # noqa: SLF001
+    env._sandbox_env_names = {}  # noqa: SLF001
+    env._persistent_env = {}  # noqa: SLF001
+    env._compose_task_env = {}  # noqa: SLF001
+    env.trial_paths = TrialPaths(trial_dir)
 
     async def resolve() -> str | None:
         return container
@@ -74,6 +79,7 @@ def _bare_env(container: str | None) -> RunScopedDockerEnvironment:
 
 async def test_translated_commands_run_on_the_engine_and_the_rest_on_compose(
     monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
 ) -> None:
     calls: list[tuple[str, list[str]]] = []
 
@@ -89,10 +95,10 @@ async def test_translated_commands_run_on_the_engine_and_the_rest_on_compose(
         "harbor.environments.docker.docker.DockerEnvironment._run_docker_compose_command", compose
     )
     monkeypatch.setattr(RunScopedDockerEnvironment, "_run_engine_command", engine)
-    env = _bare_env("cid")
+    env = _bare_env("cid", tmp_path)
     await env._run_docker_compose_command(["exec", "-u", "root", "main", "true"])  # noqa: SLF001
     await env._run_docker_compose_command(["down"])  # noqa: SLF001
-    unresolved = _bare_env(None)
+    unresolved = _bare_env(None, tmp_path)
     await unresolved._run_docker_compose_command(["exec", "main", "true"])  # noqa: SLF001
     assert calls == [
         ("engine", ["exec", "-u", "root", "cid", "true"]),
@@ -132,7 +138,7 @@ async def test_excluded_download_is_one_streamed_tar_with_harbors_excludes(
         return FakeProcess(stdout)
 
     monkeypatch.setattr(env_module.asyncio, "create_subprocess_exec", fake_exec)
-    env = _bare_env("cid")
+    env = _bare_env("cid", tmp_path)
     monkeypatch.setattr(env, "_compose_env_vars", lambda include_os_env=True: {}, raising=False)
     await env.download_dir_with_exclusions(
         source_dir="/app", target_dir=tmp_path / "app", exclude=[".venv", "*.pyc"]
@@ -171,7 +177,7 @@ async def test_a_failed_stream_raises_like_harbors_transfer(
         return FailedProcess()
 
     monkeypatch.setattr(env_module.asyncio, "create_subprocess_exec", fake_exec)
-    env = _bare_env("cid")
+    env = _bare_env("cid", tmp_path)
     monkeypatch.setattr(env, "_compose_env_vars", lambda include_os_env=True: {}, raising=False)
     with pytest.raises(RuntimeError, match="code 2: tar: /app: Cannot open"):
         await env.download_dir_with_exclusions(
@@ -179,8 +185,8 @@ async def test_a_failed_stream_raises_like_harbors_transfer(
         )
 
 
-def test_the_environment_is_not_mounted_and_declares_no_volumes() -> None:
-    env = _bare_env("cid")
+def test_the_environment_is_not_mounted_and_declares_no_volumes(tmp_path: Path) -> None:
+    env = _bare_env("cid", tmp_path)
     env._enable_egress_control = False  # noqa: SLF001
     env._mounts = [  # noqa: SLF001
         {"type": "bind", "source": "/host/agent", "target": "/logs/agent"}  # type: ignore[list-item]
@@ -194,8 +200,10 @@ def test_the_environment_is_not_mounted_and_declares_no_volumes() -> None:
         env._cleanup_mounts_compose_file()  # noqa: SLF001
 
 
-async def test_preparing_logs_for_the_host_runs_nothing(monkeypatch: pytest.MonkeyPatch) -> None:
-    env = _bare_env("cid")
+async def test_preparing_logs_for_the_host_runs_nothing(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    env = _bare_env("cid", tmp_path)
 
     async def forbidden(*_: Any, **__: Any) -> ExecResult:
         raise AssertionError("no exec: nothing is mounted")
@@ -206,6 +214,7 @@ async def test_preparing_logs_for_the_host_runs_nothing(monkeypatch: pytest.Monk
 
 async def test_start_warms_agent_imports_alongside(
     monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
 ) -> None:
     calls: list[str] = []
 
@@ -215,9 +224,13 @@ async def test_start_warms_agent_imports_alongside(
     async def warm() -> None:
         calls.append("warm")
 
+    async def observe_environment(*_: Any, **__: Any) -> ExecResult:
+        return ExecResult(return_code=0, stdout='["PATH"]')
+
     monkeypatch.setattr("harbor.environments.docker.docker.DockerEnvironment.start", compose_start)
     monkeypatch.setattr(env_module, "warm_agent_imports", warm)
-    env = _bare_env("stale")
+    env = _bare_env("stale", tmp_path)
+    monkeypatch.setattr(env, "exec", observe_environment)
     await env.start(False)
     assert sorted(calls) == ["start:False", "warm"]
     assert env._main_container is None  # noqa: SLF001  (a new container is resolved again)
@@ -242,7 +255,7 @@ class _FakeProcess:
 
 
 def _resolvable_env(
-    monkeypatch: pytest.MonkeyPatch, stdout: bytes, returncode: int = 0
+    monkeypatch: pytest.MonkeyPatch, trial_dir: Path, stdout: bytes, returncode: int = 0
 ) -> tuple[RunScopedDockerEnvironment, list[tuple[str, ...]]]:
     spawned: list[tuple[str, ...]] = []
 
@@ -254,6 +267,8 @@ def _resolvable_env(
     env = object.__new__(RunScopedDockerEnvironment)
     env._main_container = None  # noqa: SLF001
     env._is_windows_container = False  # noqa: SLF001
+    env._sandbox_env_names = {}  # noqa: SLF001
+    env.trial_paths = TrialPaths(trial_dir)
     env.session_id = "b00-p0-baseline__env-abc"
     env.environment_name = "fixture"
     monkeypatch.setattr(env, "_compose_env_vars", lambda include_os_env=True: {}, raising=False)
@@ -262,8 +277,9 @@ def _resolvable_env(
 
 async def test_the_main_container_is_resolved_once_by_compose_labels(
     monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
 ) -> None:
-    env, spawned = _resolvable_env(monkeypatch, b"4c6d0baac68c\n")
+    env, spawned = _resolvable_env(monkeypatch, tmp_path, b"4c6d0baac68c\n")
     assert await env._resolve_main_container() == "4c6d0baac68c"  # noqa: SLF001
     assert await env._resolve_main_container() == "4c6d0baac68c"  # noqa: SLF001
     assert len(spawned) == 1
@@ -274,6 +290,7 @@ async def test_the_main_container_is_resolved_once_by_compose_labels(
 async def test_blocked_discovery_is_bounded_and_reaps_its_process(
     monkeypatch: pytest.MonkeyPatch,
     stop: str,
+    tmp_path: Path,
 ) -> None:
     started = asyncio.Event()
     terminated = False
@@ -300,7 +317,7 @@ async def test_blocked_discovery_is_bounded_and_reaps_its_process(
     async def spawn(*_: Any, **__: Any) -> BlockedProcess:
         return BlockedProcess()
 
-    env, _ = _resolvable_env(monkeypatch, b"")
+    env, _ = _resolvable_env(monkeypatch, tmp_path, b"")
     monkeypatch.setattr(env_module.asyncio, "create_subprocess_exec", spawn)
     monkeypatch.setattr(
         env_module, "CONTAINER_LOOKUP_TIMEOUT_S", 0.01 if stop == "lookup_bound" else 10
@@ -325,8 +342,9 @@ async def test_blocked_discovery_is_bounded_and_reaps_its_process(
 
 async def test_container_lookup_consumes_the_execution_deadline(
     monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
 ) -> None:
-    env = _bare_env("cid")
+    env = _bare_env("cid", tmp_path)
     observed: list[float] = []
 
     async def resolve() -> str:
@@ -346,16 +364,17 @@ async def test_container_lookup_consumes_the_execution_deadline(
 
 @pytest.mark.parametrize(("stdout", "returncode"), [(b"", 0), (b"a\nb\n", 0), (b"a\n", 1)])
 async def test_an_ambiguous_or_missing_container_falls_back_to_compose(
-    monkeypatch: pytest.MonkeyPatch, stdout: bytes, returncode: int
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, stdout: bytes, returncode: int
 ) -> None:
-    env, _ = _resolvable_env(monkeypatch, stdout, returncode)
+    env, _ = _resolvable_env(monkeypatch, tmp_path, stdout, returncode)
     assert await env._resolve_main_container() is None  # noqa: SLF001
 
 
 async def test_engine_commands_keep_harbors_output_and_failure_contract(
     monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
 ) -> None:
-    env, spawned = _resolvable_env(monkeypatch, b"/app\n", 0)
+    env, spawned = _resolvable_env(monkeypatch, tmp_path, b"/app\n", 0)
     run = env._run_engine_command  # noqa: SLF001
     result = await run(
         ["exec", "cid", "pwd"], check=True, timeout_sec=None, stdin_data=None, on_output=None
@@ -365,7 +384,7 @@ async def test_engine_commands_keep_harbors_output_and_failure_contract(
         0,
         ("docker", "exec", "cid", "pwd"),
     )
-    failing, _ = _resolvable_env(monkeypatch, b"boom", 3)
+    failing, _ = _resolvable_env(monkeypatch, tmp_path, b"boom", 3)
     run = failing._run_engine_command  # noqa: SLF001
     unchecked = await run(
         ["exec", "cid", "false"], check=False, timeout_sec=None, stdin_data=None, on_output=None
@@ -379,13 +398,14 @@ async def test_engine_commands_keep_harbors_output_and_failure_contract(
 
 async def test_stopping_the_environment_or_main_service_forgets_the_container(
     monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
 ) -> None:
     async def noop(self: Any, *_: Any) -> None:
         return None
 
     monkeypatch.setattr("harbor.environments.docker.docker.DockerEnvironment.stop", noop)
     monkeypatch.setattr("harbor.environments.docker.docker.DockerEnvironment.stop_service", noop)
-    env = _bare_env("cid")
+    env = _bare_env("cid", tmp_path)
     await env.stop_service("sidecar")
     assert env._main_container == "cid"  # noqa: SLF001
     await env.stop_service("main")
@@ -412,7 +432,7 @@ async def test_the_final_agent_log_download_keeps_files_the_host_rewrote(
     monkeypatch.setattr(
         "harbor.environments.docker.docker.DockerEnvironment.download_dir", harbor_download
     )
-    env = _bare_env("cid")
+    env = _bare_env("cid", tmp_path)
     host = tmp_path / "agent"
     await env.download_dir("/logs/agent/stage", host / "stage")  # a component's mid-run sync
     (host / "stage" / "trajectory.json").write_text("host root trajectory, longer")

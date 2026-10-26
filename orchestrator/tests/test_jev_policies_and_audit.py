@@ -10,6 +10,7 @@ import pytest
 from click.testing import CliRunner
 
 from raidar.cli import main
+from raidar.judge.protocol import NoulQuestion
 from raidar.scoring.framework.builtin_manifests import PROCESS_COMPLIANCE
 from raidar.scoring.framework.result import AssessResult, AssessStatus, Observation, Provenance
 from raidar.scoring.judge.audit import DecisionStage, InputSufficiency, SufficiencyLevel
@@ -32,7 +33,6 @@ from raidar.scoring.judge.policies import (
     load_policy,
 )
 from raidar.scoring.judge.promotion import build_promotion, verify_promotion
-from raidar.scoring.judge.protocol import NoulQuestion
 from raidar.scoring.judge.runtime import RULE_INPUT_MISSING
 from tests.jev_support import SUFFICIENT, RecordedTransport, make_runtime, noul_answer, policy
 

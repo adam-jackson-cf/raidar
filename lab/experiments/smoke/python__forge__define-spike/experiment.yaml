@@ -1,12 +1,12 @@
-# Define-stage spike (split design S3): forge x one codex arm running define-build-verify@1 (the
-# deterministic define tool in the primary session, then build against the sealed definition, with
-# the verify gate) x one attempt, to show a stage with its own bespoke tool and what it costs.
+# Define-build-verify spike (S4): forge x one codex arm, structured build replies,
+# host-side aspect judge and bounded primary-session rework. Assessment retains
+# uncalibrated definition-coverage and test-coverage readings.
 # Kind smoke, not citable.
 # Run detached: make experiment-execute EXPERIMENT=lab/experiments/smoke/python__forge__define-spike/experiment.yaml MAX_CHECKPOINTS=2 JOB_ID=<id> DETACH=1
 schema_version: 3
 kind: smoke
 id: python__forge__define-spike
-description: Define-stage spike on forge (define-build-verify@1); not citable.
+description: End-to-end define-build-verify@2 spike on forge; not citable.
 
 problems:
   - ref: scb/forge@38d627ecf668
@@ -28,10 +28,10 @@ protocol:
 arms:
   - id: define
     agent: agent
-    workflow: define-build-verify@1
+    workflow: define-build-verify@2
 
 assessment:
-  scorers: [correctness@2, code-quality@4, resource-usage@2, process-compliance@7]
+  scorers: [correctness@2, code-quality@4, resource-usage@2, process-compliance@7, definition-coverage@1, test-coverage@1]
   metric: scb-canonical@2
 
 analysis:

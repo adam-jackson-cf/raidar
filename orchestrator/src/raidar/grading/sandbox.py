@@ -33,7 +33,7 @@ import uuid
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
-from typing import IO, Protocol
+from typing import IO, Any, Protocol
 
 from raidar.grading.bundle import (
     APP_PLACEHOLDER,
@@ -41,6 +41,7 @@ from raidar.grading.bundle import (
     VerifierBundle,
     VerifierStepSpec,
 )
+from raidar.judge.secrets import absence_evidence, require_key_absent
 
 RUNTIME_DIR = Path(__file__).resolve().parent / "runtime"
 PLUGIN_MODULE = "raidar_oracle_plugin"
@@ -218,6 +219,7 @@ class DockerCopySandbox:
         return [self.docker_bin, "--context", self.docker_context, *args]
 
     def create_argv(self, run: SandboxRun, name: str) -> list[str]:
+        require_key_absent(run.env, "the grader sandbox")
         labels = [GRADER_ROLE_LABEL, f"{HOST_LABEL}={socket.gethostname()}"]
         if self.run_scope:
             labels.append(f"{SCOPE_LABEL}={self.run_scope}")
@@ -313,6 +315,7 @@ class DockerCopySandbox:
 
     async def run(self, run: SandboxRun) -> SandboxResult:
         name = f"raidar-oracle-{uuid.uuid4().hex[:12]}"
+        require_key_absent(run.env, "the grader sandbox")
         try:
             return await self._run(run, name)
         finally:
@@ -327,6 +330,7 @@ class DockerCopySandbox:
             code, output = await self._exec(self.create_argv(run, name))
             if code != 0:
                 return SandboxResult(code, False, output.decode(errors="replace"))
+            isolation = await self._secret_isolation(run, name)
             mark = time.perf_counter()
             await asyncio.to_thread(build_copy_in_tar, run, layout, archive)
             with archive.open("rb") as source:
@@ -337,11 +341,24 @@ class DockerCopySandbox:
 
             proc, stdout, timed_out = await self._start_and_wait(run, name, timings)
             failure = await self._copy_out(name, back, run.out_dir, timings)
+            run.out_dir.mkdir(parents=True, exist_ok=True)
+            (run.out_dir / "secret-isolation.json").write_text(
+                json.dumps(isolation, indent=2) + "\n"
+            )
         text = stdout.decode(errors="replace")
         if failure:
             text += f"\n{COPY_TIMINGS_PREFIX} copy-out failed: {failure}"
         text += f"\n{COPY_TIMINGS_PREFIX} " + " ".join(f"{k}={v:.3f}" for k, v in timings.items())
         return SandboxResult(None if timed_out else proc.returncode, timed_out, text)
+
+    async def _secret_isolation(self, run: SandboxRun, name: str) -> dict[str, Any]:
+        template = '{{range .Config.Env}}{{println (index (split . "=") 0)}}{{end}}'
+        code, output = await self._exec(self._docker("inspect", "--format", template, name))
+        if code != 0:
+            raise RuntimeError("could not record grader sandbox environment names")
+        inherited = dict.fromkeys(output.decode().splitlines(), "")
+        require_key_absent(inherited, "the created grader container")
+        return absence_evidence({"container": inherited, "grader": run.env})
 
     async def _start_and_wait(
         self, run: SandboxRun, name: str, timings: dict[str, float]
