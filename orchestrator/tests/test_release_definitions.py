@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import copy
+import shutil
 from pathlib import Path
 from typing import Any
 
@@ -9,9 +11,12 @@ import pytest
 
 from raidar.contract.paths import agents_root, workflows_root
 from raidar.subject.agent.definition import AgentDefinitionError, load_agent
+from raidar.subject.workflow.components import PlacementError, skill_files
 from raidar.subject.workflow.definition import (
     TASK_TOKEN,
+    UNITS_TOKEN,
     VERIFY_TOKEN,
+    WorkflowDefinition,
     WorkflowDefinitionError,
     load_workflow,
 )
@@ -36,6 +41,8 @@ def test_the_real_definitions_load(tree: Path) -> None:
     assert load_workflow(workflows_root(tree), "one-shot").enabled_stages == ("build",)
     verifying = load_workflow(REAL_LAB / "workflows", "one-shot-verify")
     assert verifying.enabled_stages == ("build", "verify")
+    defining = load_workflow(REAL_LAB / "workflows", "define-build-verify")
+    assert defining.enabled_stages == ("define", "build", "verify")
 
 
 # ---- workflows -----------------------------------------------------------------------
@@ -48,11 +55,15 @@ def test_a_workflow_with_an_unknown_stage_is_refused(tree: Path) -> None:
         load_workflow(workflows_root(tree), "one-shot")
 
 
-def test_the_define_stage_is_refused_until_it_is_implemented(tree: Path) -> None:
-    write_workflow(tree, _workflow({**_build(f"do {TASK_TOKEN}"), "define": {"prompt": "x"}}))
+def test_the_define_prompt_needs_the_units_token_once() -> None:
+    real = load_workflow(REAL_LAB / "workflows", "define-build-verify")
+    stages: Any = copy.deepcopy(real.to_json()["stages"])
+    stages["define"]["prompt"] = "no units"
 
-    with pytest.raises(WorkflowDefinitionError, match="not implemented"):
-        load_workflow(workflows_root(tree), "one-shot")
+    with pytest.raises(ValueError, match=UNITS_TOKEN):
+        WorkflowDefinition.model_validate(
+            {"schema": 1, "name": "x", "stages": stages, "components": real.components}
+        )
 
 
 @pytest.mark.parametrize("enabled", [True, False])
@@ -87,12 +98,48 @@ def test_a_workflow_without_a_build_stage_is_refused(tree: Path) -> None:
         load_workflow(workflows_root(tree), "one-shot")
 
 
-def test_a_workflow_directory_may_hold_only_its_definition(tree: Path) -> None:
+def test_a_workflow_file_outside_its_skills_is_refused(tree: Path) -> None:
     write_workflow(tree, _workflow(_build(f"do {TASK_TOKEN}")))
     (workflows_root(tree) / "one-shot" / "notes.md").write_text("extra\n", encoding="utf-8")
 
     with pytest.raises(WorkflowDefinitionError, match=r"notes\.md"):
         load_workflow(workflows_root(tree), "one-shot")
+
+
+def test_a_skill_no_stage_lists_is_refused(tree: Path) -> None:
+    write_workflow(tree, _workflow(_build(f"do {TASK_TOKEN}")))
+    skill = workflows_root(tree) / "one-shot" / "skills" / "orphan"
+    skill.mkdir(parents=True)
+    (skill / "SKILL.md").write_text("x\n", encoding="utf-8")
+
+    with pytest.raises(WorkflowDefinitionError, match="orphan"):
+        load_workflow(workflows_root(tree), "one-shot")
+
+
+def test_the_skill_bytes_are_part_of_the_workflow_hash(tmp_path: Path) -> None:
+    root = tmp_path / "workflows"
+    shutil.copytree(REAL_LAB / "workflows", root)
+    before = load_workflow(root, "define-build-verify")
+    skill = root / "define-build-verify" / "skills" / "aspect-writing" / "SKILL.md"
+    skill.write_text(skill.read_text(encoding="utf-8") + "\n", encoding="utf-8")
+
+    assert load_workflow(root, "define-build-verify").digest != before.digest
+
+
+def test_skills_are_placed_for_the_enabled_stages_only(tmp_path: Path) -> None:
+    definition = load_workflow(REAL_LAB / "workflows", "define-build-verify")
+
+    placed = skill_files(definition, ".agents/skills")
+
+    assert sorted(path.split("/")[2] for path in placed) == [
+        "aspect-writing",
+        "feature-definition",
+        "pytest-templates",
+        "test-per-aspect",
+    ]
+    assert all(path.endswith("SKILL.md") for path in placed)
+    with pytest.raises(PlacementError):
+        skill_files(definition, "{home}/skills")
 
 
 def test_a_workflow_must_be_named_for_its_directory(tree: Path) -> None:

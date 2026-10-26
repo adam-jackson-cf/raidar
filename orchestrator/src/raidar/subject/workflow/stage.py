@@ -41,6 +41,7 @@ class Checkpoint:
 
     environment: BaseEnvironment
     logs_dir: Path
+    task: str
 
 
 class Stage(ABC):
@@ -89,9 +90,9 @@ def compose(stages: Sequence[Stage], task: str) -> str:
 
     The task text goes in last, so a token inside the task is never filled.
     """
-    frame, *others = stages
+    frame = next(stage for stage in stages if stage.name == "build")
     prompt = frame.fragment()
-    for stage in others:
-        assert stage.token is not None  # only build frames
-        prompt = prompt.replace(stage.token, stage.fragment())
+    for stage in stages:
+        if stage.token is not None:
+            prompt = prompt.replace(stage.token, stage.fragment())
     return prompt.replace(TASK_TOKEN, task)

@@ -2,6 +2,17 @@
 
 All notable changes to this project are documented in this file.
 
+## Unreleased
+
+### Features
+
+- Define stage in the primary session: FXL `ac5db0f` command grammar, unit rules 2,
+  deterministic checks and renderer on a root-owned CPython 3.12.12 tool environment.
+- `define-build-verify@1`: four workflow-owned skills, proposal acceptance, one definition
+  repair and `define.unsealed` commit refusals; one verification pass, no judge.
+- Health E1–E3 audit definition validity, call/state consistency and unusable endings;
+  workflow component bytes and digests are retained for P8 instruction isolation.
+
 ## 0.15.0 - 2026-10-24
 
 ### Documentation

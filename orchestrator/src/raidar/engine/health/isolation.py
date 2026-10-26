@@ -15,7 +15,11 @@ Files a workflow places for the agent (``placement.skills: .agents/skills``, ins
 into the workspace, so the workspace rule covers them; nothing else is allowed. A stage's own
 text in the workspace's instruction files (the verify gate's rules block) is taken out of the
 graded snapshot, so its lines are read from the step's records instead: every file listed in
-the workflow record's ``instructions``.
+the workflow record's ``instructions``. Skills and instruction files a workflow places are the
+workflow record's ``components`` (``path`` in the workspace, ``sha256`` of its text, ``record``:
+the host copy of the text, relative to the step's agent logs): each copy must hold the digest
+and a path inside the workspace, and a placed ``AGENTS.md`` or ``AGENTS.override.md`` allows the
+lines of its record, never the lines of anything unrecorded.
 
 A step without ``workflow/workflow.json``, a turn without a rollout, an ``AGENTS.md`` message
 without a stored snapshot, or an oracle/nop agent override (no codex ran) is ``unmeasured``.
@@ -23,6 +27,7 @@ without a stored snapshot, or an oracle/nop agent override (no codex ran) is ``u
 
 from __future__ import annotations
 
+import hashlib
 import json
 import re
 from collections.abc import Iterator
@@ -95,7 +100,53 @@ def _workspace_lines(a: Audit, step: str) -> set[str] | None:
     placed = workflow.get("instructions") if isinstance(workflow, dict) else None
     records = [agent / path for path in placed or [] if isinstance(path, str)]
     files = [root / name for root in roots for name in AGENTS_FILES] + records
-    return {line for path in files for line in _file_lines(path)}
+    return {line for path in files for line in _file_lines(path)} | _component_lines(agent)
+
+
+def _broken_components(agent: Path) -> list[tuple[PurePosixPath, str]]:
+    """The recorded components whose record is missing or does not hold its digest, or whose
+    path leaves the workspace."""
+    workflow = _json(agent / WORKFLOW_FILE)
+    entries = workflow.get("components") if isinstance(workflow, dict) else None
+    broken: list[tuple[PurePosixPath, str]] = []
+    for entry in entries if isinstance(entries, list) else []:
+        if not isinstance(entry, dict) or not isinstance(entry.get("path"), str):
+            continue
+        path = PurePosixPath(entry["path"])
+        reason = _component_fault(agent, entry, path)
+        if reason is not None:
+            broken.append((path, reason))
+    return broken
+
+
+def _component_fault(agent: Path, entry: dict[str, object], path: PurePosixPath) -> str | None:
+    """Why one recorded component is broken, or None."""
+    record = entry.get("record")
+    try:
+        text = (agent / record).read_bytes() if isinstance(record, str) else None
+    except OSError:
+        text = None
+    if text is None:
+        return "its record is missing"
+    if hashlib.sha256(text).hexdigest() != entry.get("sha256"):
+        return "its record is not the recorded digest"
+    if path.is_absolute() or ".." in path.parts:
+        return "it is placed outside the workspace"
+    return None
+
+
+def _component_lines(agent: Path) -> set[str]:
+    """Lines of the recorded instruction files (``AGENTS.md`` components)."""
+    workflow = _json(agent / WORKFLOW_FILE)
+    entries = workflow.get("components") if isinstance(workflow, dict) else None
+    lines: set[str] = set()
+    for entry in entries if isinstance(entries, list) else []:
+        is_file = isinstance(entry, dict) and isinstance(entry.get("path"), str)
+        if is_file and PurePosixPath(entry["path"]).name in AGENTS_FILES:
+            record = entry.get("record")
+            if isinstance(record, str):
+                lines |= _file_lines(agent / record)
+    return lines
 
 
 def _instructions(text: str, allowed: set[str] | None) -> tuple[list[str], list[str]]:
@@ -158,6 +209,9 @@ def _step_findings(a: Audit, step: str, violations: dict[str, str], unmeasured: 
         unmeasured.append(f"{step}: no readable {WORKFLOW_FILE}")
         return 0
     allowed = _workspace_lines(a, step)
+    broken = _broken_components(a.trial_dir / "steps" / step / "agent")
+    for path, why in broken:
+        violations.setdefault(f"component {path}: {why}", f"component {path}: {why} ({step})")
     checked = 0
     for label, rollouts in turns:
         if not rollouts:
