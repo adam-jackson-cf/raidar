@@ -2,19 +2,31 @@
 
 A workflow names the stages a checkpoint runs through. There are three stage types
 (``define``, ``build``, ``verify``), each with one implementation in Raidar; a workflow holds
-its own settings for each stage it uses. This Raidar implements ``build`` only: a definition
-that names any other stage is refused, never accepted as inert.
+its own settings for each stage it uses. This Raidar implements ``build`` and ``verify``: a
+definition that names ``define`` is refused, never accepted as inert.
 
-``build.prompt`` is the text of the checkpoint's build turn; ``%%%TASK%%%`` (exactly once)
-is replaced by the checkpoint's task text. A workflow directory holds only ``workflow.yaml``
-while no implemented stage delivers files (skills, instructions).
+``build.prompt`` frames the checkpoint's one prompt: ``%%%TASK%%%`` (exactly once) is replaced
+by the checkpoint's task text and, when ``verify`` is enabled, ``%%%VERIFY%%%`` (exactly once)
+by the verify stage's prompt; a workflow without verify may not carry ``%%%VERIFY%%%``.
 
-The content hash covers the resolved definition (every default filled), so editing the file
-needs a new release in ``lab/releases.yaml``.
+``verify`` (design section 5.2, spike-sized) gates the work through a pre-commit hook and the
+runner's own commit after every turn: ``checks`` are the gate's checks (one ``tests`` check,
+which is pytest with at least one test and none failing; the others run their pinned tool's
+command over the workspace's Python files), ``max_fix_rounds`` bounds the fix turns a refusal
+starts, ``test_timeout`` stops a single test, and ``rules_file`` is where the gate's rules are
+written for the agent. Its ``prompt`` may use the tokens ``%%%MAX_FIX_ROUNDS%%%``,
+``%%%RULES_FILE%%%`` and ``%%%TEST_TIMEOUT_SECONDS%%%`` and no other.
+
+A workflow directory holds only ``workflow.yaml`` while no implemented stage delivers files
+(skills, instructions). The content hash covers the resolved definition (every default
+filled; a stage the workflow does not name is absent), so editing the file needs a new release
+in ``lab/releases.yaml``.
 """
 
 from __future__ import annotations
 
+import re
+import shlex
 from pathlib import Path
 from typing import Any, Literal, Self
 
@@ -26,9 +38,14 @@ from raidar.contract.canonical import IGNORED_TREE_NAMES, digest_json
 WORKFLOW_FILE = "workflow.yaml"
 StageType = Literal["define", "build", "verify"]
 STAGE_TYPES: tuple[StageType, ...] = ("define", "build", "verify")
-IMPLEMENTED_STAGES: tuple[StageType, ...] = ("build",)
+IMPLEMENTED_STAGES: tuple[StageType, ...] = ("build", "verify")
 TASK_TOKEN = "%%%TASK%%%"
+VERIFY_TOKEN = "%%%VERIFY%%%"
+VERIFY_PROMPT_TOKENS = frozenset({"MAX_FIX_ROUNDS", "RULES_FILE", "TEST_TIMEOUT_SECONDS"})
 NAME_PATTERN = r"^[a-z0-9][a-z0-9-]*$"
+PIN_PATTERN = r"^(?P<name>[A-Za-z0-9][A-Za-z0-9._-]*)==[0-9][A-Za-z0-9.+!-]*$"
+TOKEN = re.compile(r"%%%([A-Z_]+)%%%")
+CheckCategory = Literal["lint", "format", "types", "tests"]
 
 
 class WorkflowDefinitionError(ValueError):
@@ -39,7 +56,7 @@ class _Model(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
 
-class BuildStage(_Model):
+class BuildSettings(_Model):
     prompt: str = Field(min_length=1)
 
     @model_validator(mode="after")
@@ -49,13 +66,89 @@ class BuildStage(_Model):
             raise ValueError(f"build.prompt must contain {TASK_TOKEN} exactly once (found {count})")
         return self
 
-    def render(self, task: str) -> str:
-        """The build turn's prompt for one checkpoint's task text."""
-        return self.prompt.replace(TASK_TOKEN, task)
+
+class GateCheck(_Model):
+    """One gate check: a pinned tool and, unless it is the tests check, the command it runs."""
+
+    name: str = Field(pattern=NAME_PATTERN)
+    category: CheckCategory
+    tool: str = Field(pattern=PIN_PATTERN)
+    run: str | None = None
+    blocking: bool
+
+    @model_validator(mode="after")
+    def _command_runs_the_pinned_tool(self) -> Self:
+        if self.category == "tests":
+            if self.run is not None:
+                raise ValueError(f"check {self.name!r}: the tests check is pytest and takes no run")
+            if self.package != "pytest":
+                raise ValueError(f"check {self.name!r}: the tests check's tool is pytest")
+            return self
+        argv = shlex.split(self.run or "")
+        if not argv or argv[0] != self.package:
+            raise ValueError(f"check {self.name!r}: run must start with its tool {self.package!r}")
+        return self
+
+    @property
+    def package(self) -> str:
+        found = re.match(PIN_PATTERN, self.tool)
+        assert found is not None  # the field's pattern
+        return found["name"]
+
+    @property
+    def argv(self) -> list[str]:
+        return shlex.split(self.run or "")
+
+
+class GateTriggers(_Model):
+    """When the gate runs: on the agent's own commits (the hook) and after every turn (the seal)."""
+
+    on_commit: Literal[True]
+    after_turn: Literal[True]
+
+
+class VerifySettings(_Model):
+    enabled: bool
+    language: Literal["python"]
+    prompt: str = Field(min_length=1)
+    gate: GateTriggers
+    max_fix_rounds: int = Field(ge=0)
+    max_passes: Literal[1]
+    test_timeout: int = Field(gt=0)
+    rules_file: str = Field(pattern=r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
+    checks: tuple[GateCheck, ...] = Field(min_length=1)
+
+    @model_validator(mode="after")
+    def _consistent(self) -> Self:
+        unknown = sorted(set(TOKEN.findall(self.prompt)) - VERIFY_PROMPT_TOKENS)
+        if unknown:
+            raise ValueError(f"verify.prompt uses unknown token(s) {unknown}")
+        names = [check.name for check in self.checks]
+        if len(set(names)) != len(names):
+            raise ValueError(f"verify.checks repeats a name: {names}")
+        tests = [check for check in self.checks if check.category == "tests"]
+        if len(tests) != 1 or not tests[0].blocking:
+            raise ValueError("verify.checks needs exactly one blocking tests check")
+        return self
+
+    def render(self) -> str:
+        """The verify prompt with its tokens filled from these settings."""
+        values = {
+            "MAX_FIX_ROUNDS": str(self.max_fix_rounds),
+            "RULES_FILE": self.rules_file,
+            "TEST_TIMEOUT_SECONDS": str(self.test_timeout),
+        }
+        return TOKEN.sub(lambda found: values[found[1]], self.prompt)
+
+    @property
+    def pins(self) -> list[str]:
+        """Every tool pin the gate installs, once each, sorted."""
+        return sorted({check.tool for check in self.checks})
 
 
 class Stages(_Model):
-    build: BuildStage
+    build: BuildSettings
+    verify: VerifySettings | None = None
 
     @model_validator(mode="before")
     @classmethod
@@ -73,6 +166,17 @@ class Stages(_Model):
                     )
         return data
 
+    @model_validator(mode="after")
+    def _verify_token_iff_verify(self) -> Self:
+        count = self.build.prompt.count(VERIFY_TOKEN)
+        expected = 1 if self.verify is not None and self.verify.enabled else 0
+        if count != expected:
+            raise ValueError(
+                f"build.prompt must contain {VERIFY_TOKEN} {expected} time(s) "
+                f"(found {count}): exactly once when verify is enabled, never otherwise"
+            )
+        return self
+
 
 class WorkflowDefinition(_Model):
     schema_: Literal[1] = Field(alias="schema")
@@ -82,10 +186,11 @@ class WorkflowDefinition(_Model):
     @property
     def enabled_stages(self) -> tuple[StageType, ...]:
         """The stage types this workflow runs, in stage order."""
-        return IMPLEMENTED_STAGES
+        verify = self.stages.verify
+        return ("build", "verify") if verify is not None and verify.enabled else ("build",)
 
     def to_json(self) -> dict[str, object]:
-        return self.model_dump(mode="json", by_alias=True)
+        return self.model_dump(mode="json", by_alias=True, exclude_none=True)
 
     @property
     def digest(self) -> str:

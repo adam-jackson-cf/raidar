@@ -4,6 +4,8 @@ The same exclude list is used for Harbor's per-step ``/app`` artifact (which
 the verifier grades by default, ``snapshot_source=artifact``) and for the
 downloaded copy (``snapshot_source=download``), so both sources hash identically.
 Patterns match any path component, like the ``tar --exclude`` flags Harbor passes.
+``.raidar`` is a workflow's own state in the workspace (design section 5.1: a workflow's
+own files are never graded, diffed or scored).
 """
 
 from __future__ import annotations
@@ -27,6 +29,7 @@ SNAPSHOT_EXCLUDES: tuple[str, ...] = (
     "target",
     "dist",
     "build",
+    ".raidar",
 )
 
 

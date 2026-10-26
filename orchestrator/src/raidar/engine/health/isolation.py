@@ -12,7 +12,10 @@ check requires that:
   stored ``/app`` snapshot and the one before it (the state the session started from).
 
 Files a workflow places for the agent (``placement.skills: .agents/skills``, instructions) go
-into the workspace, so the workspace rule covers them; nothing else is allowed.
+into the workspace, so the workspace rule covers them; nothing else is allowed. A stage's own
+text in the workspace's instruction files (the verify gate's rules block) is taken out of the
+graded snapshot, so its lines are read from the step's records instead: every file listed in
+the workflow record's ``instructions``.
 
 A step without ``workflow/workflow.json``, a turn without a rollout, an ``AGENTS.md`` message
 without a stored snapshot, or an oracle/nop agent override (no codex ran) is ``unmeasured``.
@@ -82,11 +85,17 @@ def _file_lines(path: Path) -> set[str]:
 
 
 def _workspace_lines(a: Audit, step: str) -> set[str] | None:
-    """Lines of the workspace's AGENTS files in the step's snapshot and its predecessor's."""
+    """Lines of the workspace's AGENTS files in the step's snapshot and its predecessor's, and
+    of the text the step's workflow placed in them (its records)."""
     roots = _snapshot_roots(a, step)
     if not roots:
         return None
-    return {line for root in roots for name in AGENTS_FILES for line in _file_lines(root / name)}
+    agent = a.trial_dir / "steps" / step / "agent"
+    workflow = _json(agent / WORKFLOW_FILE)
+    placed = workflow.get("instructions") if isinstance(workflow, dict) else None
+    records = [agent / path for path in placed or [] if isinstance(path, str)]
+    files = [root / name for root in roots for name in AGENTS_FILES] + records
+    return {line for path in files for line in _file_lines(path)}
 
 
 def _instructions(text: str, allowed: set[str] | None) -> tuple[list[str], list[str]]:

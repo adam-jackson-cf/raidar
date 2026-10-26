@@ -13,9 +13,11 @@ from pathlib import Path
 import click
 
 from raidar.contract.job_layout import JOB_MANIFEST, TRIAL_RECORDS_DIR, TRIALS_DIR
-from raidar.engine.health.audit import audit_recorded_trial
+from raidar.contract.trial import TrialRecord
+from raidar.engine.health.audit import audit_trial
 from raidar.engine.health.fault_candidates import append_fault_candidates
 from raidar.engine.health.model import HealthReport, write_health
+from raidar.engine.perf.contention import read_manifest
 
 
 def register(main: click.Group) -> None:
@@ -27,6 +29,13 @@ def _trial_ids(job_dir: Path) -> list[str]:
     if not (job_dir / JOB_MANIFEST).is_file() or not records:
         raise click.ClickException(f"{job_dir} is not a job directory with trial records")
     return [path.stem for path in records]
+
+
+def _audit(job_dir: Path, trial_id: str) -> HealthReport:
+    """Audit a finished trial from its files."""
+    record_file = job_dir / TRIAL_RECORDS_DIR / f"{trial_id}.json"
+    record = TrialRecord.model_validate_json(record_file.read_text())
+    return audit_trial(job_dir, job_dir / record.trial_dir, record, read_manifest(job_dir))
 
 
 def _echo(report: HealthReport) -> None:
@@ -42,7 +51,7 @@ def health_command(job_dir: Path) -> None:
     """Recompute each trial's health.json and record fault candidates."""
     failed = 0
     for trial_id in _trial_ids(job_dir):
-        report = audit_recorded_trial(job_dir, trial_id)
+        report = _audit(job_dir, trial_id)
         write_health(job_dir / TRIALS_DIR / trial_id, report)
         append_fault_candidates(job_dir, report)
         _echo(report)

@@ -41,10 +41,10 @@
       },
       "scorer": {
         "code-quality@4": {
-          "digest": "d94173182344e7547ccffa2ac44bbb27b428dcb4c26c627e6a593f952cbb2f6d",
+          "digest": "b38674a8b49cec8fb8416fa1aa7833bf88e710d6268f964000efbe58e7cf8837",
           "metadata": {
             "implementation": "raidar.scoring.code_quality:code_quality_scorer",
-            "implementation_digest": "80cf801e62e91fb0f4f44380c766d47d2fd0c5f718b605452e0d1cb2825d5c65",
+            "implementation_digest": "07389108d549ca5eb43ed869088f6745ca54915bff898d6eb212f97cc553753f",
             "manifest": {
               "description": "SCB-fork code-quality and inertia components over the per-step snapshots; a step graded without the in-trial coverage pass reads G's coverage run from the offline run in the Assessment store, and G leaves out at most 3 cases whose outcome differs between the grading and coverage runs instead of reading the step as ineligible.",
               "evidence_required": [
@@ -263,10 +263,10 @@
           }
         },
         "correctness@2": {
-          "digest": "f558c7137297fa8212fe60b3457923ba04e2ffd8eafde57dfc662d5f8e3e4580",
+          "digest": "636dc278b05c754a6fba915430a80a0af694100b027e277bb11f46bc3c38b0ba",
           "metadata": {
             "implementation": "raidar.scoring.correctness:correctness_scorer",
-            "implementation_digest": "faa3ef469503e3bb71f0f348410aec8aa9f54974755d8665d352778164427f0d",
+            "implementation_digest": "f3829aae8221fd79ee747c608ba8aca30de8e3081b05d13d70c3887830cf8711",
             "manifest": {
               "description": "Oracle verdicts per checkpoint and trajectory, from the oracle step records.",
               "evidence_required": [
@@ -430,10 +430,10 @@
           }
         },
         "process-compliance@7": {
-          "digest": "bae7817a6245366ea48174cc6f52731ff9ab7b3565fb68af9892db56cffb97ce",
+          "digest": "aaf074d1addbbd1fb43d2bbe32a5790797bc74e981664bf51215624b9ad4f659",
           "metadata": {
             "implementation": "raidar.scoring.process_checks:deterministic_process_compliance_scorer",
-            "implementation_digest": "ccdce85830fba51386435fc4bfa00f6ee33c620a32d7f5f3ec6e7bc7df5daed7",
+            "implementation_digest": "5949f4f31bb9118dad144f09740b37d04c5e5ddc418e7a3cb80f54b133c19bd9",
             "manifest": {
               "description": "Deterministic trace checks of agent process (stall outcomes, a test command counts only when it ran, the step's work session's own test run after its last edit, a compliance rate without the plan check unless the condition asks for a plan); a check the trace cannot decide is undetermined, never judged by a model. Adds whether the work session ran the tests at all, and whether it ran them after its last edit to a non-test file.",
               "evidence_required": [
@@ -634,10 +634,10 @@
           }
         },
         "resource-usage@2": {
-          "digest": "07758d7c0e5d59191576a93d2c4c07c6108bbe258a291ce53b27522048b20ad8",
+          "digest": "8304b05e7815cbc40daaef793d1870414865bf9fddcd131493c713bb1994a7d2",
           "metadata": {
             "implementation": "raidar.scoring.resource_usage:resource_usage_scorer",
-            "implementation_digest": "38f40bf540d82902bbdd3a6936576a9fb722224c1eed285d4321b7c2281b9fda",
+            "implementation_digest": "3d02218d04de2a1762ccd0424318f6589a0340b65b40a7304f23db10d79a7c6b",
             "manifest": {
               "description": "Tokens, cost, turns and agent wall time from Harbor per-step usage and timing.",
               "evidence_required": [
@@ -789,7 +789,7 @@
       "tree-sitter-language-pack": "0.13.0"
     }
   },
-  "document_sha256": "d4159230bae944b15f75c8df0855e8da466eb8bb53cc3ff9084e541f6a3b0bd1",
+  "document_sha256": "b8b3d31e493990eae5266f6c8111a644463b0af1634f871b1d39a0b8cf4a1125",
   "execution": {
     "arms": {
       "baseline": {
@@ -807,12 +807,12 @@
           "version_pin": "0.156.1",
           "workflow_skills": "placement.skills .agents/skills in the workspace /app"
         },
-        "digest": "46f590399742ec39c63570ad21473684bab767e09a5fd6127c3cae76206563f7",
+        "digest": "2c7318e228b7a113290920e3396aea61071907dadce44d6ce0d10b0712ab4be5",
         "model": "gpt-6-luna",
         "provider": "openai",
         "reasoning": "low",
         "stage_code": {
-          "build": "134f6ac314e68a8f1c0c283ac2cd446a416c234ca2452cc92c75ffc4485cb757"
+          "build": "0194365664e16447574af024142d60fe3db3e76dd9339999f0a1e2ef257ee67d"
         },
         "tool": {
           "binary": "codex",
@@ -983,7 +983,7 @@
     "source_sha256": "7886c14b311bcfc0388a31e9860273e6a0e8aa6fc2f3f2dcff8941629161d794",
     "spec_sha256": "2b236aa4e97ed4d82b3f42fbb10415249074acf24b6b672d495bb45ce4dbc985"
   },
-  "lock_sha256": "e5a7335416b797664d421bdff26bc56336b0f926ecd38235443d2cf067f7f267",
+  "lock_sha256": "506366e7b39a4d325b52406f081b942072fa0f44b9d0d2aa853918e47f97a34b",
   "lock_version": 4,
   "overrides": {
     "flags": {},
@@ -991,8 +991,8 @@
   },
   "sections": {
     "analysis": "144d50057229f81b6136f89cfe8df3c9cf5dbbbec9a279c66acba88e027528b3",
-    "assessment": "9054e3c6939db2987b382542fc1cbf12440cc29d1a49f7443d19664527b86bb3",
-    "execution": "e5a7335416b797664d421bdff26bc56336b0f926ecd38235443d2cf067f7f267",
+    "assessment": "04940b66bca80a407fc8616d6ce327f29496675911d290a136748cd0eb98a9f4",
+    "execution": "506366e7b39a4d325b52406f081b942072fa0f44b9d0d2aa853918e47f97a34b",
     "toolchain": "037de8092c78cc029ff5b0266ac406e508a22714e4f2501420e1e2d18e9c2a20"
   },
   "spec": {

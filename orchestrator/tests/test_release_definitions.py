@@ -1,4 +1,4 @@
-"""Agent and workflow definitions: what the loaders refuse and how a build prompt renders."""
+"""Agent and workflow definitions: what the loaders refuse."""
 
 from __future__ import annotations
 
@@ -11,11 +11,11 @@ from raidar.contract.paths import agents_root, workflows_root
 from raidar.subject.agent.definition import AgentDefinitionError, load_agent
 from raidar.subject.workflow.definition import (
     TASK_TOKEN,
-    BuildStage,
+    VERIFY_TOKEN,
     WorkflowDefinitionError,
     load_workflow,
 )
-from tests.release_support import edit_agent, release_tree, write_workflow
+from tests.release_support import REAL_LAB, edit_agent, release_tree, write_workflow
 
 
 @pytest.fixture
@@ -34,6 +34,8 @@ def _build(prompt: str) -> dict[str, Any]:
 def test_the_real_definitions_load(tree: Path) -> None:
     assert load_agent(agents_root(tree), "codex").name == "codex"
     assert load_workflow(workflows_root(tree), "one-shot").enabled_stages == ("build",)
+    verifying = load_workflow(REAL_LAB / "workflows", "one-shot-verify")
+    assert verifying.enabled_stages == ("build", "verify")
 
 
 # ---- workflows -----------------------------------------------------------------------
@@ -46,11 +48,25 @@ def test_a_workflow_with_an_unknown_stage_is_refused(tree: Path) -> None:
         load_workflow(workflows_root(tree), "one-shot")
 
 
-@pytest.mark.parametrize("stage", ["define", "verify"])
-def test_declared_but_unimplemented_stages_are_refused(tree: Path, stage: str) -> None:
-    write_workflow(tree, _workflow({**_build(f"do {TASK_TOKEN}"), stage: {"prompt": "x"}}))
+def test_the_define_stage_is_refused_until_it_is_implemented(tree: Path) -> None:
+    write_workflow(tree, _workflow({**_build(f"do {TASK_TOKEN}"), "define": {"prompt": "x"}}))
 
     with pytest.raises(WorkflowDefinitionError, match="not implemented"):
+        load_workflow(workflows_root(tree), "one-shot")
+
+
+@pytest.mark.parametrize("enabled", [True, False])
+def test_the_verify_token_is_in_the_build_prompt_exactly_when_verify_runs(
+    tree: Path, enabled: bool
+) -> None:
+    real = load_workflow(REAL_LAB / "workflows", "one-shot-verify").to_json()
+    stages: Any = real["stages"]
+    stages["verify"]["enabled"] = enabled
+    without = f"do {TASK_TOKEN}"
+    stages["build"]["prompt"] = without if enabled else f"{VERIFY_TOKEN}\n{without}"
+    write_workflow(tree, _workflow(stages))
+
+    with pytest.raises(WorkflowDefinitionError, match=VERIFY_TOKEN):
         load_workflow(workflows_root(tree), "one-shot")
 
 
@@ -84,12 +100,6 @@ def test_a_workflow_must_be_named_for_its_directory(tree: Path) -> None:
 
     with pytest.raises(WorkflowDefinitionError, match="must equal its directory"):
         load_workflow(workflows_root(tree), "one-shot")
-
-
-def test_the_build_stage_substitutes_the_task() -> None:
-    stage = BuildStage(prompt=f"Work the issue.\n\n{TASK_TOKEN}\n\nThanks")
-
-    assert stage.render("fix the parser") == "Work the issue.\n\nfix the parser\n\nThanks"
 
 
 # ---- agents --------------------------------------------------------------------------
