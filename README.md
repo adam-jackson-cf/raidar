@@ -96,7 +96,7 @@ runtime: python              # one runtime pack per experiment
 
 agents:
   - id: codex
-    release: codex@1         # lab/agents/codex.yaml, registered in lab/releases.yaml
+    release: codex@2         # lab/agents/codex.yaml, registered in lab/releases.yaml
     model: gpt-6-luna
     reasoning: low
 
@@ -176,11 +176,11 @@ make review-surface-serve REVIEW_JOBS_ROOT=var/jobs/python__circuit_eval-cp1__re
 
 ## Smoke checks
 
-The smoke targets run real agent trials through the same experiment path: `lab/experiments/smoke/python__circuit_eval-cp1__agent-health/` for a single agent and `lab/experiments/smoke/python__circuit_eval-cp1__pack-agent-health/` for one arm per released agent (today `codex@1` only). Both have kind `smoke`. The separate `lab/experiments/benchmark/python__circuit_eval-cp1__agents/` compares agents; it is not an operational smoke. Each smoke target locks its experiment under `var/tmp/smoke/` with its own overrides and writes jobs under `var/jobs/`.
+The smoke targets run real agent trials through the same experiment path: `lab/experiments/smoke/python__circuit_eval-cp1__agent-health/` for a single agent and `lab/experiments/smoke/python__circuit_eval-cp1__pack-agent-health/` for one arm per released agent (today `codex@2` only). Both have kind `smoke`. The separate `lab/experiments/benchmark/python__circuit_eval-cp1__agents/` compares agents; it is not an operational smoke. Each smoke target locks its experiment under `var/tmp/smoke/` with its own overrides and writes jobs under `var/jobs/`.
 
 ```bash
 make orchestrator-smoke                                   # codex + gpt-6-luna (low), one trial
-make agent-smoke RELEASE=codex@1 MODEL=gpt-6-luna         # the same smoke with its agent release replaced
+make agent-smoke RELEASE=codex@2 MODEL=gpt-6-luna         # the same smoke with its agent release replaced
 make smoke-agents                                         # one trial per released agent (arm codex)
 make smoke-agents SMOKE_ARM=codex                         # one arm only
 ```
@@ -195,13 +195,13 @@ The forge mechanics smoke uses `scb/forge@38d627ecf668` through all 8 checkpoint
 
 ## Run health, pooling and the fault ledger
 
-Every trial writes `health.json`: verdict, record, limit, liveness, contention and tamper checks, each `pass`, `violation` or `unmeasured`. A verdict, record/limit or tamper violation invalidates the trial; `make health JOB=<job dir>` recomputes it, and violations land as provisional lines in `<job>/fault-candidates.jsonl`. A host-side liveness monitor (`RAIDAR_LIVENESS=enforce` by default; `observe` and `off` opt out) watches each agent phase for output, CPU or network: an agent quiet for 600 s is killed and the step is verified and graded on what exists, like an agent timeout, so the trial stays valid and the kill is a provisional fault candidate (calibration: ADR-002 A.9).
+Every trial writes `health.json`: verdict, record, limit, liveness, contention, isolation and tamper checks, each `pass`, `violation` or `unmeasured`. A verdict, record/limit, isolation or tamper violation invalidates the trial; `make health JOB=<job dir>` recomputes it, and violations land as provisional lines in `<job>/fault-candidates.jsonl`. A host-side liveness monitor (`RAIDAR_LIVENESS=enforce` by default; `observe` and `off` opt out) watches each agent phase for output, CPU or network: an agent quiet for 600 s is killed and the step is verified and graded on what exists, like an agent timeout, so the trial stays valid and the kill is a provisional fault candidate (calibration: ADR-002 A.9).
 
-Health identifiers group verifier checks (`V1`–`V3`), records/limits (`H1`, `H3`–`H6`), liveness (`L1`–`L2`), contention (`P2`–`P3`), and integrity (`T1` tool tree, `T2` records manifest, `T3` reaper residuals). `T2` is unmeasured in-run and verified by `make health`; `unmeasured` is neither a pass nor an invalidation. Liveness samples every 15 s by default (`RAIDAR_LIVENESS_INTERVAL_S`); `RAIDAR_LIVENESS_IDLE_S` sets the idle window. Findings distinguish `idle_killed` from observe-only `idle_observed`. Harness and workflow time limits take precedence; Raidar does not retry trials automatically.
+Health identifiers group verifier checks (`V1`–`V3`), records/limits (`H1`, `H3`–`H6`), liveness (`L1`–`L2`), contention (`P2`–`P3`), isolation (`P8`: every skill root and instruction file each codex session loaded lies in the workspace; codex-home, bundled, plugin or host content is a violation, a missing rollout `unmeasured`), and integrity (`T1` tool tree, `T2` records manifest, `T3` reaper residuals). `T2` is unmeasured in-run and verified by `make health`; `unmeasured` is neither a pass nor an invalidation. Liveness samples every 15 s by default (`RAIDAR_LIVENESS_INTERVAL_S`); `RAIDAR_LIVENESS_IDLE_S` sets the idle window. Findings distinguish `idle_killed` from observe-only `idle_observed`. Harness and workflow time limits take precedence; Raidar does not retry trials automatically.
 
 `job.json` records the runner commit and toolchain hash, pack and grader recipe digests, effective limits and the execution target. `make experiment-analyze` pools several jobs only when these match (`POOL_OVERRIDE=<field>[,<field>]` lifts a named refusal, recorded in the analysis; a records-manifest mismatch or a stage-code difference never lifts).
 
-Pooling also checks the mechanics epoch, dirty-runner state and subject; timing and cost cannot pool across target hardware. Jobs predating the mechanics epoch are labelled `unmeasured`.
+Pooling also checks the mechanics epoch, dirty-runner state and subject; timing and cost cannot pool across target hardware. Jobs predating the mechanics epoch are labelled `unmeasured`. Whatever the number of jobs, every arm must carry the same agent capability declaration (`capabilities` in `lab/agents/<name>.yaml`, recorded in the lock and `plan.json`) and every valid trial of a problem the same parity record (`parity` in its trial record: image id, seeded workspace digest, limits, agent network policy, the agent process's user, `PATH` and `TMPDIR`); neither lifts, and the analysis records both comparisons. Each trial record also keeps `harness_isolation`, the flags the agent harness applied to its turns.
 
 `lab/ledger/` tracks fault categories (`faults/FCR-NNN.md`) and remedies (`remedies/M-NNN.md`); `make ledger-index` regenerates `lab/ledger/README.md` and `make ledger-check` (part of `make quality`) validates the records.
 

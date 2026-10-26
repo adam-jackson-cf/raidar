@@ -10,7 +10,7 @@ Vocabulary (Harbor's): an experiment has a ``kind`` (``ab-test``, ``benchmark``,
 ``smoke``; ``research-loop`` is reserved), one ``runtime`` (a runtime pack id), a Harbor
 ``environment`` (``type: docker``), a headline ``metric`` and ``analysis.attempts``: the
 paired, counterbalanced replicates of every arm. An **arm** is an agent plus a workflow:
-``agents`` name an agent release (``codex@1``, ``lab/agents/``) with one of its models and
+``agents`` name an agent release (``codex@2``, ``lab/agents/``) with one of its models and
 that model's reasoning level; ``arms`` name an agent id and a workflow release
 (``lab/workflows/``), ``one-shot@1`` when omitted.
 """

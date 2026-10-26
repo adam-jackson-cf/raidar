@@ -19,7 +19,7 @@ runtime: python
 agents:
   # Real-LLM smokes default to codex + gpt-6-luna at low effort (ADR-001 §2.7).
   - id: agent
-    release: codex@1
+    release: codex@2
     model: gpt-6-luna
     reasoning: low
 

@@ -31,14 +31,16 @@ RUNNER = {
 RECIPES = {"pack": "p" * 64, "graders": {}}
 TARGET = {"name": "mbp", "docker": {"ncpu": 4, "server_version": "29"}}
 STAGE_CODE = {"build": "b" * 64}
+CAPABILITIES = {"permissions": "bypass", "isolation_proof": "full", "version_pin": "0.156.1"}
 AGENT = {
     "agent": "luna",
-    "agent_release": "codex@1",
+    "agent_release": "codex@2",
     "adapter": "codex",
     "provider": "openai",
     "model": "gpt-6-luna",
     "reasoning": "low",
     "tool": {"package": "@openai/codex", "binary": "codex", "version": "0.156.1"},
+    "capabilities": CAPABILITIES,
     "workflow": "one-shot@1",
     "workflow_sha256": "w" * 64,
     "stage_code": STAGE_CODE,
@@ -154,6 +156,29 @@ def test_incompatible_per_arm_smokes_cannot_complete_coverage(tmp_path: Path) ->
             tmp_path,
             allow_unsmoked=False,
         )
+
+
+@pytest.mark.parametrize(
+    ("other", "reason"),
+    [({**OTHER, "capabilities": {**CAPABILITIES, "isolation_proof": "partial"}}, "different"),
+     ({k: v for k, v in OTHER.items() if k != "capabilities"}, "declares no capabilities")],
+    ids=["different", "undeclared"],
+)  # fmt: skip
+def test_arms_with_different_or_no_capability_declarations_are_refused_outright(
+    tmp_path: Path, other: dict[str, Any], reason: str
+) -> None:
+    smoke_job(tmp_path, lock=lock("smoke", AGENT, other))
+    arms = wanted(lock=lock("benchmark", AGENT, other))
+
+    with pytest.raises(AdmissionError, match=reason):
+        admit("benchmark", arms, tmp_path, allow_unsmoked=True)
+
+
+def test_a_smoke_whose_arm_declared_other_capabilities_does_not_clear(tmp_path: Path) -> None:
+    smoke_job(tmp_path, lock=lock("smoke", {**AGENT, "capabilities": {"permissions": "x"}}))
+
+    with pytest.raises(AdmissionError, match="not smoked"):
+        decide(tmp_path)
 
 
 @pytest.mark.parametrize(

@@ -12,7 +12,9 @@ result can be trusted, and returns one ``HealthReport`` (``health.json``). Famil
 - **L** liveness: ``L1`` a liveness record exists per agent phase; ``L2`` the idle decision
   (``idle_observed`` and an enforce ``idle_killed`` are a pass with a finding: the kill is
   classified like an agent timeout; ``kill_failed`` is a violation).
-- **P** comparability: ``P2`` batch concurrency is recorded; ``P3`` job-level comparison warnings.
+- **P** comparability: ``P2`` batch concurrency is recorded; ``P3`` job-level comparison warnings;
+  ``P8`` the agent saw only its workflow's skills and instructions (workspace-only skill roots, no
+  plugin recommendations, ``AGENTS.md`` text only from the workspace).
 - **T** tamper: ``T1`` the tool tree is unchanged since the first hash; ``T2`` the records
   manifest verifies; ``T3`` the reaper left no residual process.
 
@@ -30,6 +32,7 @@ from raidar.contract.job_layout import TRIAL_RECORDS_DIR
 from raidar.contract.snapshot import tree_digest
 from raidar.contract.trial import CheckpointState, StepResult, TrialRecord
 from raidar.engine.health.base import Audit, make_check
+from raidar.engine.health.isolation import check_p8
 from raidar.engine.health.model import PASS, UNMEASURED, VIOLATION, HealthCheck, HealthReport
 from raidar.engine.health.signals import (
     check_l1,
@@ -264,7 +267,7 @@ CHECKS: tuple[Callable[[Audit], HealthCheck], ...] = (
     check_v1, check_v2, check_v3,
     check_h1, check_h3, check_h4, check_h5, check_h6, check_h_target,
     check_l1, check_l2,
-    check_p2, check_p3,
+    check_p2, check_p3, check_p8,
     check_t1, check_t2, check_t3,
 )  # fmt: skip
 

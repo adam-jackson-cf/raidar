@@ -302,7 +302,7 @@ def test_the_real_resolvers_report_binding_facts() -> None:
     problem = ProblemResolver().resolve(
         RegistryRef.parse(RefKind.PROBLEM, "scb/forge@38d627ecf668"), base_dir=repo
     )
-    agent = AgentResolver().resolve(RegistryRef.parse(RefKind.AGENT, "codex@1"), base_dir=repo)
+    agent = AgentResolver().resolve(RegistryRef.parse(RefKind.AGENT, "codex@2"), base_dir=repo)
     quality = scorer_resolver().resolve(
         RegistryRef.parse(RefKind.SCORER, "code-quality@4"), base_dir=repo
     )

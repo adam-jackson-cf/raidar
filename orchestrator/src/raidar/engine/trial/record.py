@@ -3,10 +3,10 @@
 from __future__ import annotations
 
 import time
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Literal
+from typing import Any, Literal
 
 from raidar.contract.trial import (
     ExecutionValidity,
@@ -25,7 +25,9 @@ from raidar.engine.trial.collect import (
     trial_exception,
 )
 from raidar.engine.trial.materialise import MaterialisedTask, compose_init
+from raidar.engine.trial.parity import harness_isolation, parity_record
 from raidar.engine.trial.progression import derive_reached, strict_rule
+from raidar.engine.trial.workspace import seed_duration
 
 
 @dataclass(frozen=True)
@@ -40,6 +42,8 @@ class TrialEvidence:
     pinned_harness_version: str | None
     environment_cold: bool
     runner_exception: str | None
+    image_id: str | None
+    timeouts: Mapping[str, Any]
 
 
 def reached(
@@ -90,6 +94,7 @@ def build_record(
         arm_apply_s=evidence.task.arm_apply_s,
         environment_cold=evidence.environment_cold,
         compose_init=compose_init(evidence.task.path),
+        workspace_seed_s=seed_duration(evidence.trial_dir, evidence.trial.steps),
     )
     return TrialRecord(
         experiment=experiment,
@@ -111,6 +116,14 @@ def build_record(
         ),
         phases=tuple(phases),
         trial_exception=trial_exception(evidence.trial_dir) or evidence.runner_exception,
+        harness_isolation=harness_isolation(evidence.trial_dir, evidence.trial.steps),
+        parity=parity_record(
+            evidence.trial_dir,
+            evidence.trial.steps,
+            task_dir=evidence.task.path,
+            image_id=evidence.image_id,
+            timeouts=evidence.timeouts,
+        ),
     )
 
 

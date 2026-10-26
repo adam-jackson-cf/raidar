@@ -16,7 +16,12 @@ from raidar.engine.trial.agent_config import reported_harness_pin
 from raidar.engine.trial.config import harbor_trial_config
 from raidar.engine.trial.context import JobContext
 from raidar.engine.trial.finish import finish_trial
-from raidar.engine.trial.materialise import MaterialisedTask, environment_cold, materialise_task
+from raidar.engine.trial.materialise import (
+    MaterialisedTask,
+    environment_cold,
+    environment_image_id,
+    materialise_task,
+)
 from raidar.engine.trial.provision import TrialProvision
 from raidar.engine.trial.record import (
     RunnerFailure,
@@ -73,6 +78,11 @@ async def _run_and_classify(ctx: JobContext, trial: PlannedTrial) -> TrialRecord
     )
     provisions = _provisions(ctx, trial)
     outcome = await ctx.runner(config, problem.bundle.root, provisions)
+    timeouts = {
+        "agent_timeout_s": config.agent.override_timeout_sec,
+        "verifier_timeout_s": config.verifier.override_timeout_sec,
+        "grader_timeout_s": config.verifier.kwargs.get("grader_timeout_s"),
+    }
     evidence = TrialEvidence(
         trial=trial,
         trial_dir=outcome.trial_dir,
@@ -82,6 +92,8 @@ async def _run_and_classify(ctx: JobContext, trial: PlannedTrial) -> TrialRecord
         pinned_harness_version=reported_harness_pin(plan.arms[trial.arm].agent_config),
         environment_cold=cold,
         runner_exception=outcome.exception_type,
+        image_id=await asyncio.to_thread(environment_image_id, task.path),
+        timeouts=timeouts,
     )
     return build_record(
         evidence,

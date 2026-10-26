@@ -52,7 +52,7 @@ def test_a_healthy_sealed_trial_passes_every_check(tmp_path: Path) -> None:
         k: (c.status, c.detail) for k, c in checks.items() if c.status != "pass"
     }
     assert [c.id for c in checks.values()] == [
-        "V1", "V2", "V3", "H1", "H3", "H4", "H5", "H6", "H-target", "L1", "L2", "P2", "P3",
+        "V1", "V2", "V3", "H1", "H3", "H4", "H5", "H6", "H-target", "L1", "L2", "P2", "P3", "P8",
         "T1", "T2", "T3",
     ]  # fmt: skip
     assert {c.family for c in checks.values()} == {"V", "H", "L", "P", "T"}
@@ -301,14 +301,18 @@ def test_violations_map_to_validity_checks_and_nothing_else_invalidates() -> Non
         _report(("L2", "pass"), ("P3", "pass"), ("T1", "unmeasured"), ("H-target", "violation"))
     )
     assert [c.name for c in clean] == [
-        "health_verdicts", "health_budgets", "health_tamper",
+        "health_verdicts", "health_budgets", "health_tamper", "health_isolation",
     ]  # fmt: skip
     assert all(c.passed for c in clean)  # H-target is the guard's own target_reachable
     failed = {
         c.name: c
         for c in health_validity(
             _report(
-                ("V2", "violation"), ("H4", "violation"), ("T3", "violation"), ("L2", "violation")
+                ("V2", "violation"),
+                ("H4", "violation"),
+                ("T3", "violation"),
+                ("L2", "violation"),
+                ("P8", "violation"),
             )
         )
     }

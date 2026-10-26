@@ -4,5 +4,6 @@
 # name's latest version resolves; earlier versions stay as history.
 agents:
   codex@1: a2770e3282bcc6e3d1b16dd6d3a4f81e8fccc9a0dd0447a4dd288ce23a00fd43
+  codex@2: 36bf2bd7d6e482206c62eb4eed7bc06a5e03ce808a8022fae02ef8afc193989b
 workflows:
   one-shot@1: 7041679bb89e24a756cbcdd84ebf8260f960baf44c77ec48bdb26d43a86a1113

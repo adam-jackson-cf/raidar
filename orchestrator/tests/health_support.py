@@ -119,6 +119,29 @@ def _store_snapshot(trial_dir: Path, step: str) -> None:
     write_step_record(record_dir, ledger.model_copy(update={"snapshot": snapshot}))
 
 
+def write_agent_session(trial_dir: Path, step: str, rows: list[str] | None = None) -> Path:
+    """A one-turn workflow record and its codex rollout (``rows``: message texts) for a step."""
+    agent = trial_dir / "steps" / step / "agent"
+    sessions = agent / "workflow" / "build-1" / "sessions" / "2026" / "10" / "26"
+    sessions.mkdir(parents=True, exist_ok=True)
+    turns = [{"stage": "build", "turn": 1, "log_dir": "workflow/build-1"}]
+    (agent / "workflow" / "workflow.json").write_text(
+        json.dumps({"kind": "raidar-workflow", "turns": turns})
+    )
+    lines = [
+        json.dumps(
+            {
+                "type": "response_item",
+                "payload": {"type": "message", "role": "user", "content": [{"text": text}]},
+            }
+        )
+        for text in (rows or ["solve the task"])
+    ]
+    rollout = sessions / "rollout-2026-10-26T00-00-00-abc.jsonl"
+    rollout.write_text("\n".join(lines) + "\n")
+    return rollout
+
+
 def _write_evidence(trial_dir: Path) -> None:
     point = {"present": True, "sha256": "a" * 64, "entries": 3, "measured": True, "step": STEP}
     hashes = {"points": [{**point, "point": "baseline"}, {**point, "point": "after_agent"}]}
@@ -144,6 +167,7 @@ def healthy_trial(
     for outcome in outcomes:
         if outcome.passed is not None:
             _store_snapshot(trial_dir, outcome.name)
+        write_agent_session(trial_dir, outcome.name)
     steps = tuple(outcome.name for outcome in outcomes)
     step_results = classify_trial(trial_dir, _context(steps))
     record = TrialRecord(

@@ -136,3 +136,45 @@ def test_an_agent_tool_version_must_be_pinned(tree: Path) -> None:
 
     with pytest.raises(AgentDefinitionError, match="version"):
         load_agent(agents_root(tree), "codex")
+
+
+@pytest.mark.parametrize("name", ["permissions", "host_isolation", "isolation_proof"])
+def test_an_agent_must_declare_every_capability(tree: Path, name: str) -> None:
+    edit_agent(tree, lambda doc: doc["capabilities"].pop(name))
+
+    with pytest.raises(AgentDefinitionError, match=name):
+        load_agent(agents_root(tree), "codex")
+
+
+def test_an_agent_declares_no_capability_outside_the_fixed_names(tree: Path) -> None:
+    edit_agent(tree, lambda doc: doc["capabilities"].update(telepathy="yes"))
+
+    with pytest.raises(AgentDefinitionError, match="telepathy"):
+        load_agent(agents_root(tree), "codex")
+
+
+def test_the_declared_version_pin_is_the_tool_pin(tree: Path) -> None:
+    edit_agent(tree, lambda doc: doc["capabilities"].update(version_pin="0.1.0"))
+
+    with pytest.raises(AgentDefinitionError, match="version_pin"):
+        load_agent(agents_root(tree), "codex")
+
+
+def test_an_isolation_proof_is_full_or_partial(tree: Path) -> None:
+    edit_agent(tree, lambda doc: doc["capabilities"].update(isolation_proof="some"))
+
+    with pytest.raises(AgentDefinitionError, match="isolation_proof"):
+        load_agent(agents_root(tree), "codex")
+
+
+@pytest.mark.parametrize(
+    ("setting", "value"),
+    [("features_off", ["plugins", "plugins"]), ("features_off", ["Plugins"]),
+     ("bundled_skills", ["../escape"])],
+    ids=["repeated", "not-a-feature-name", "not-a-folder-name"],
+)  # fmt: skip
+def test_isolation_name_lists_are_checked(tree: Path, setting: str, value: list[str]) -> None:
+    edit_agent(tree, lambda doc: doc["settings"].update({setting: value}))
+
+    with pytest.raises(AgentDefinitionError, match=setting):
+        load_agent(agents_root(tree), "codex")

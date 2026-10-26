@@ -12,7 +12,7 @@ are catalogued in ``raidar.scoring.catalog.outcomes``.
 
 from __future__ import annotations
 
-from typing import Self
+from typing import Any, Self
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -30,6 +30,13 @@ class PoolFinding(AnalysisModel):
     message: str
 
 
+class ParityComparison(AnalysisModel):
+    """The parity record ``trials`` valid trials of one problem share (pooling)."""
+
+    trials: int
+    record: dict[str, Any]
+
+
 class PoolingReport(AnalysisModel):
     unmeasured: tuple[str, ...] = ()
     """Jobs without ``mechanics_epoch``: no records manifest, integrity not measured."""
@@ -39,6 +46,10 @@ class PoolingReport(AnalysisModel):
     timing_cost_comparable: bool = True
     """False when the jobs ran on different execution-target hardware: timing and cost
     metrics are then not comparable across them (correctness and quality still pool)."""
+    capabilities: dict[str, str] | None = None
+    """The capability declaration every arm shares (``None``: only pre-epoch jobs)."""
+    parity: dict[str, ParityComparison] = Field(default_factory=dict)
+    """Per problem, the parity record every valid trial of every arm shares."""
 
 
 class Value(AnalysisModel):

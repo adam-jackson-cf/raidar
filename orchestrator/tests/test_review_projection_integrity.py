@@ -28,7 +28,24 @@ def _copy_job(root: Path, target: Path) -> Path:
     return target
 
 
+PARITY = {
+    "image_id": "sha256:image",
+    "seed_digest": "seed",
+    "limits": {"agent_timeout_s": 1800.0},
+    "network": [{"network_mode": "allowlist", "allowed_hosts": ["api.openai.com"]}],
+}
+
+
 def _modern(job: Path, **changes: object) -> None:
+    """Give a historical fixture job what a job of the current epoch records, then seal it."""
+    plan_path = job / "plan.json"
+    plan = json.loads(plan_path.read_text())
+    for path in (job / "trial-records").glob("*.json"):
+        record = json.loads(path.read_text())
+        arm = plan.setdefault("arms", {}).setdefault(record["trial"]["arm"], {})
+        arm["capabilities"] = {"isolation_proof": "full"}
+        path.write_text(json.dumps({**record, "parity": PARITY}))
+    plan_path.write_text(json.dumps(plan))
     manifest_path = job / "job.json"
     manifest = json.loads(manifest_path.read_text())
     manifest.update(

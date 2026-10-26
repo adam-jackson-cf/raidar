@@ -36,7 +36,7 @@ BASE_EXPERIMENT: dict[str, Any] = {
     "id": "python__fixture__test",
     "problems": [{"ref": "scb/forge@abc123"}],
     "runtime": "python",
-    "agents": [{"id": "luna", "release": "codex@1", "model": "gpt-6-luna", "reasoning": "low"}],
+    "agents": [{"id": "luna", "release": "codex@2", "model": "gpt-6-luna", "reasoning": "low"}],
     "arms": [
         {"id": "baseline", "agent": "luna", "workflow": "one-shot@1"},
         {"id": "guided", "agent": "luna", "workflow": "one-shot@1"},

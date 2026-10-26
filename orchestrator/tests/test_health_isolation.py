@@ -1,0 +1,122 @@
+"""P8: the agent saw only the workspace's skills and instructions."""
+
+from __future__ import annotations
+
+import json
+import shutil
+from pathlib import Path
+
+from raidar.engine.health.audit import audit_trial
+from raidar.engine.health.model import HealthCheck
+from raidar.engine.trial.collect import health_validity
+from tests.health_support import STEP, HealthyTrial, healthy_trial, write_agent_session
+
+SKILLS = "<skills_instructions>\n### Skill roots\n{roots}\n</skills_instructions>"
+AGENTS = "# AGENTS.md instructions for /app\n\n<INSTRUCTIONS>\n{body}\n</INSTRUCTIONS>"
+
+
+def roots(*paths: str) -> str:
+    return SKILLS.format(roots="\n".join(f"- `r{i}` = `{p}`" for i, p in enumerate(paths)))
+
+
+def p8(t: HealthyTrial) -> HealthCheck:
+    report = audit_trial(t.job_dir, t.trial_dir, t.record, t.job())
+    return next(c for c in report.checks if c.id == "P8")
+
+
+def session(tmp_path: Path, *rows: str) -> HealthyTrial:
+    t = healthy_trial(tmp_path)
+    write_agent_session(t.trial_dir, STEP, list(rows))
+    return t
+
+
+def test_workspace_skills_and_a_plain_prompt_pass(tmp_path: Path) -> None:
+    check = p8(session(tmp_path, roots("/app/.agents/skills"), "solve the task"))
+    assert check.status == "pass", check.detail
+    assert "1 rollout" in check.detail
+
+
+def test_a_bundled_skill_root_is_a_violation_naming_root_and_turn(tmp_path: Path) -> None:
+    check = p8(session(tmp_path, roots("/app/.agents/skills", "/tmp/codex-home/skills/.system")))
+    assert check.status == "violation"
+    assert "/tmp/codex-home/skills/.system" in check.detail
+    assert f"{STEP}/build/1" in check.detail
+
+
+def test_recommended_plugins_are_a_violation_and_invalidate_the_trial(tmp_path: Path) -> None:
+    t = session(tmp_path, "<recommended_plugins>\n- github\n</recommended_plugins>")
+    check = p8(t)
+    assert check.status == "violation"
+    report = audit_trial(t.job_dir, t.trial_dir, t.record, t.job())
+    isolation = next(c for c in health_validity(report) if c.name == "health_isolation")
+    assert not isolation.passed
+    assert "P8" in isolation.detail
+
+
+def test_agents_lines_must_be_the_workspaces_own(tmp_path: Path) -> None:
+    prompt = AGENTS.format(body="be terse\n--- project-doc ---\n\nuse uv\nhost secret rule")
+    t = session(tmp_path, prompt)
+    app = t.trial_dir / "steps" / STEP / "artifacts" / "app"
+    (app / "AGENTS.md").write_text("be terse\nuse uv\n")
+    found = p8(t)
+    assert found.status == "violation"
+    assert "host secret rule" in found.detail
+    (app / "AGENTS.override.md").write_text("host secret rule\n")
+    assert p8(t).status == "pass"
+
+
+def test_agents_text_without_a_stored_snapshot_is_unmeasured(tmp_path: Path) -> None:
+    t = session(tmp_path, AGENTS.format(body="be terse"))
+    shutil.rmtree(t.trial_dir / "steps" / STEP / "artifacts")
+    check = p8(t)
+    assert check.status == "unmeasured"
+    assert "snapshot" in check.detail
+
+
+def test_an_instructions_message_without_a_block_is_unmeasured(tmp_path: Path) -> None:
+    check = p8(session(tmp_path, "# AGENTS.md instructions for /app\n\nno block"))
+    assert check.status == "unmeasured"
+
+
+def test_a_turn_without_a_rollout_or_a_workflow_record_is_unmeasured(tmp_path: Path) -> None:
+    t = session(tmp_path, "solve the task")
+    agent = t.trial_dir / "steps" / STEP / "agent"
+    shutil.rmtree(agent / "workflow" / "build-1")
+    missing = p8(t)
+    assert missing.status == "unmeasured"
+    assert "no rollout" in missing.detail
+    (agent / "workflow" / "workflow.json").write_text(json.dumps({"turns": []}))
+    assert "workflow.json" in p8(t).detail
+    assert p8(t).status == "unmeasured"
+
+
+def test_a_violation_outranks_missing_evidence_and_findings_are_deduplicated(
+    tmp_path: Path,
+) -> None:
+    bad = roots("/etc/codex/skills")
+    t = session(tmp_path, bad, bad)
+    agent = t.trial_dir / "steps" / STEP / "agent"
+    turns = [
+        {"stage": "build", "turn": 1, "log_dir": "workflow/build-1"},
+        {"stage": "build", "turn": 2, "log_dir": "workflow/build-2"},
+    ]
+    (agent / "workflow" / "workflow.json").write_text(json.dumps({"turns": turns}))
+    check = p8(t)
+    assert check.status == "violation"
+    assert len(check.evidence["findings"]) == 1
+    assert check.evidence["unmeasured"]
+
+
+def test_many_findings_are_summarised(tmp_path: Path) -> None:
+    check = p8(session(tmp_path, roots(*(f"/x/{i}" for i in range(5)))))
+    assert check.detail.endswith("and 2 more")
+    assert len(check.evidence["findings"]) == 5
+
+
+def test_an_agent_override_runs_no_codex_and_is_unmeasured(tmp_path: Path) -> None:
+    t = healthy_trial(tmp_path)
+    record = t.record.model_copy(update={"agent_override": "oracle"})
+    report = audit_trial(t.job_dir, t.trial_dir, record, t.job())
+    check = next(c for c in report.checks if c.id == "P8")
+    assert check.status == "unmeasured"
+    assert "oracle" in check.detail
