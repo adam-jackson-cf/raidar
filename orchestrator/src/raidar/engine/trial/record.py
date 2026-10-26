@@ -35,6 +35,7 @@ class TrialEvidence:
     trial: PlannedTrial
     trial_dir: Path
     task: MaterialisedTask
+    provisions: tuple[str, ...]
     planned_steps: tuple[tuple[str, str], ...]
     pinned_harness_version: str | None
     environment_cold: bool
@@ -78,7 +79,7 @@ def build_record(
         trial=evidence.trial,
         planned_steps=evidence.planned_steps,
         task_dir=evidence.task.path,
-        compiled=evidence.task.compiled,
+        provisions=evidence.provisions,
         pinned_harness_version=evidence.pinned_harness_version,
         rule=rule,
     )
@@ -86,7 +87,7 @@ def build_record(
     reached_vector, source = reached(rule, step_results, max_checkpoints)
     phases = trial_phases(
         evidence.trial_dir,
-        component_apply_s=evidence.task.component_apply_s,
+        arm_apply_s=evidence.task.arm_apply_s,
         environment_cold=evidence.environment_cold,
         compose_init=compose_init(evidence.task.path),
     )

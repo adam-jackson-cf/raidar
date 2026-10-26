@@ -430,7 +430,7 @@ def test_harbor_agent_on_the_pack_pin_skips_install(
         harbor_agent_kwargs(spec, harness, configured="0.0.1")
     assert harbor_agent_kwargs(spec, harness, configured=pinned) == kwargs
     with pytest.raises(HarnessPinError, match="pins no harness"):
-        harbor_agent_kwargs(spec, "gemini-cli")
+        harbor_agent_kwargs(spec, "unpinned-cli")
 
 
 def test_compose_override_sets_init_and_keeps_task_services() -> None:

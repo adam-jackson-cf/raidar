@@ -9,7 +9,6 @@ from typing import Any
 import click
 
 from raidar.contract.references import RefKind
-from raidar.design.experiment.arm_check import check_arm_components
 from raidar.design.experiment.loader import LoadedExperiment, load_experiment, overrides_from_cli
 from raidar.design.experiment.lock import (
     LockError,
@@ -55,8 +54,6 @@ def load_cli_experiment(
     overrides = overrides_from_cli(attempts=attempts, seed=seed, assignments=assignments)
     try:
         loaded = load_experiment(experiment, overrides)
-        # Every arm must compile for its agent (C1): rejected here, never at run time.
-        check_arm_components(loaded)
     except SpecValidationError as exc:
         raise click.ClickException(str(exc)) from exc
     for warning in spec_warnings(loaded.spec):
@@ -72,15 +69,15 @@ def validate_command(
     seed: int | None,
     assignments: tuple[str, ...],
 ) -> None:
-    """Validate an experiment.yaml (schema, kind and naming rules, factor guard, components)."""
+    """Validate an experiment.yaml (schema, releases, kind and naming rules)."""
     loaded = load_cli_experiment(experiment, attempts, seed, assignments)
     spec = loaded.spec
     available = default_resolvers().available_kinds()
     click.echo("Experiment validation passed.")
     click.echo(f"  id: {spec.id}  kind: {spec.kind}  runtime: {spec.runtime}")
     click.echo(f"  problems: {len(spec.problems)}")
-    click.echo(f"  arms: {', '.join(arm.id for arm in spec.arms)}")
-    click.echo(f"  factors: {', '.join(spec.factors) or 'none'}")
+    arms = (f"{arm.id} ({spec.agent(arm.agent).release}, {arm.workflow})" for arm in spec.arms)
+    click.echo(f"  arms: {', '.join(arms)}")
     click.echo(f"  baseline_arm: {spec.analysis.baseline_arm}")
     click.echo(f"  attempts: {spec.analysis.attempts}  concurrency: {spec.analysis.concurrency}")
     click.echo(f"  metric: {spec.assessment.metric or 'default by K (at lock)'}")

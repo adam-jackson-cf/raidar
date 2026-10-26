@@ -1,4 +1,4 @@
-"""experiment.yaml schema, CLI override precedence and factor guard."""
+"""experiment.yaml schema, CLI override precedence and release/kind validation."""
 
 from __future__ import annotations
 
@@ -8,13 +8,12 @@ import pytest
 from click.testing import CliRunner
 
 from raidar.cli import main
-from raidar.design.experiment.factor_guard import check_factors
 from raidar.design.experiment.loader import UNSET, CliOverrides, load_experiment, parse_assignment
-from raidar.design.experiment.validation import SpecValidationError
+from raidar.design.experiment.schema import ExperimentSpec
+from raidar.design.experiment.validation import SpecValidationError, kind_issues
 from tests.experiment_spec_support import (
     AGENTS_BENCHMARK,
     MECHANICS_SMOKE,
-    SHARED_FRAMING,
     SMOKE_EXPERIMENT,
     experiment_document,
     write_experiment,
@@ -40,11 +39,9 @@ def test_validate_command_accepts_committed_experiments(committed: Path) -> None
 def test_invalid_file_reports_every_error_at_its_field(tmp_path: Path) -> None:
     document = experiment_document(unknown_key=1)
     document["agents"][0]["harness"] = "not-a-harness"
-    document["agents"][0]["version"] = "latest"
+    document["agents"][0]["release"] = "codex"
     document["analysis"]["attempts"] = 0
     document["problems"] = [{"ref": "forge"}, {"path": "."}]
-    document["conditions"][1]["components"][0]["files"] = ["/etc/passwd", "../../etc/hosts"]
-    document["conditions"][1]["components"][0]["with"] = {"depth": {"limit": float("nan")}}
     document["protocol"] = {"progression": "halt_on_failure"}
 
     issues = _issues(write_experiment(tmp_path, document))
@@ -52,119 +49,19 @@ def test_invalid_file_reports_every_error_at_its_field(tmp_path: Path) -> None:
     assert set(issues) >= {
         "unknown_key",
         "agents.0.harness",
-        "agents.0.version",
+        "agents.0.release",
         "analysis.attempts",
         "problems.0.ref",
         "problems.1.path",
-        "conditions.1.components.0.files.0",
-        "conditions.1.components.0.files.1",
-        "conditions.1.components.0.with",
         "protocol",
     }
     assert "halt_on_failure" in issues["protocol"]
-    assert "depth.limit" in issues["conditions.1.components.0.with"]
-
-
-@pytest.mark.parametrize(
-    ("change", "loc"),
-    [
-        ({"provider": "anthropic"}, "agents.0.provider"),
-        ({"model": "claude-opus-4-7"}, "agents.0.model"),
-        ({"reasoning_effort": "xhigh"}, "agents.0.reasoning_effort"),
-        (
-            {"name": "gemini-cli", "provider": "google", "model": "gemini-3-pro-preview"},
-            "agents.0",
-        ),
-        ({"name": "cursor-cli", "provider": "acme", "model": "any"}, "agents.0.provider"),
-        ({"name": "cursor-cli", "provider": "openai", "model": "any"}, None),
-    ],
-    ids=[
-        "provider",
-        "model",
-        "effort-outside-profile",
-        "gemini-effort",
-        "external-provider",
-        "external-accepted",
-    ],
-)
-def test_agents_are_checked_against_their_harness_model_support(
-    tmp_path: Path, change: dict, loc: str | None
-) -> None:
-    document = experiment_document()
-    document["agents"][0].update(change)
-    path = write_experiment(tmp_path, document)
-
-    if loc is None:
-        load_experiment(path)
-        return
-    issues = _issues(path)
-    assert len(issues) == 1
-    assert next(iter(issues)).startswith(loc)
-
-
-def test_component_files_may_not_overlap_a_local_task_directory(tmp_path: Path) -> None:
-    document = experiment_document(problems=[{"path": "tasks/forge"}])
-    document["conditions"][1]["components"][0]["files"] = [
-        "tasks/forge/tests/test_hidden.py",
-        "components/AGENTS.md",
-        "tasks/forge-notes.md",
-    ]
-    document["conditions"].append(
-        {"id": "wide", "components": [{"use": "rules-file@2", "files": ["./tasks"]}]}
-    )
-
-    issues = _issues(write_experiment(tmp_path, document))
-
-    assert "conditions.1.components.0.files.0" in issues
-    assert "hidden test" in issues["conditions.1.components.0.files.0"]
-    assert "conditions.1.components.0.files.1" not in issues
-    assert "conditions.1.components.0.files.2" not in issues
-    assert "conditions.2.components.0.files.0" in issues
-
-
-@pytest.mark.parametrize("alias", ["file", "parent", "descendant", "ancestor", "task"])
-def test_component_inputs_cannot_alias_local_tasks(tmp_path: Path, alias: str) -> None:
-    task = tmp_path / "tasks/forge"
-    (task / "tests").mkdir(parents=True)
-    hidden = task / "tests/hidden.py"
-    hidden.write_text("hidden verifier content\n")
-    components = tmp_path / "components"
-    components.mkdir()
-    task_path = "tasks/forge"
-    if alias == "file":
-        (components / "alias").symlink_to(hidden)
-        component_path = "components/alias"
-    elif alias == "parent":
-        (components / "alias").symlink_to(task / "tests", target_is_directory=True)
-        component_path = "components/alias/hidden.py"
-    elif alias == "descendant":
-        (components / "alias").symlink_to(hidden)
-        component_path = "components"
-    elif alias == "ancestor":
-        (components / "alias").symlink_to(task.parent, target_is_directory=True)
-        component_path = "components/alias"
-    else:
-        (tmp_path / "task-alias").symlink_to(task, target_is_directory=True)
-        task_path = "task-alias"
-        component_path = "tasks/forge/tests/hidden.py"
-    document = experiment_document(problems=[{"path": task_path}])
-    document["conditions"][1]["components"][0]["files"] = [component_path]
-
-    issues = _issues(write_experiment(tmp_path, document))
-
-    assert "hidden test" in issues["conditions.1.components.0.files.0"]
-    # A sibling with an ordinary alias remains a permitted component input.
-    clean = tmp_path / "safe-rules.md"
-    clean.write_text("ordinary rules\n")
-    (components / "safe").symlink_to(clean)
-    document["conditions"][1]["components"][0]["files"] = ["components/safe"]
-    assert load_experiment(write_experiment(tmp_path, document)).spec
 
 
 def test_cross_reference_errors_are_located_on_the_referring_field(tmp_path: Path) -> None:
     document = experiment_document()
     document["arms"][1]["agent"] = "ghost"
-    document["arms"].append({"id": "guided", "condition": "nowhere", "agent": "luna"})
+    document["arms"].append({"id": "guided", "agent": "luna"})
     document["analysis"]["baseline_arm"] = "control"
     document["assessment"]["metric"] = "scb-canonical@9"
 
@@ -173,7 +70,6 @@ def test_cross_reference_errors_are_located_on_the_referring_field(tmp_path: Pat
     assert set(issues) == {
         "arms.1.agent",
         "arms.2.id",
-        "arms.2.condition",
         "analysis.baseline_arm",
         "assessment.metric",
     }
@@ -268,106 +164,6 @@ def test_override_values_are_typed_like_scb() -> None:
     assert parse_assignment("a='1.10'") == ("a", "1.10")
 
 
-def test_a_bad_override_value_reports_only_its_own_field(tmp_path: Path) -> None:
-    path = write_experiment(tmp_path, experiment_document())
-
-    issues = _issues(path, CliOverrides(assignments=("agents.0.version=1.10",)))
-    quoted = load_experiment(path, CliOverrides(assignments=("agents.0.version='1.10'",)))
-
-    assert set(issues) == {"agents.0.version"}
-    assert quoted.spec.agents[0].version == "1.10"
-
-
-def test_factor_guard_rejects_arms_differing_in_an_undeclared_noun(tmp_path: Path) -> None:
-    document = experiment_document()
-    document["agents"].append({**document["agents"][0], "id": "mini", "model": "gpt-5.4-mini"})
-    document["arms"][1]["agent"] = "mini"
-
-    issues = _issues(write_experiment(tmp_path, document))
-
-    assert issues == {
-        "arms.1": "arms 'baseline' and 'guided' differ in undeclared noun 'agent.model' "
-        "(declared factors: condition)"
-    }
-
-
-def test_factor_guard_accepts_declared_parent_noun_and_ignores_ids(tmp_path: Path) -> None:
-    document = experiment_document(factors=["condition", "agent"])
-    document["agents"].append({**document["agents"][0], "id": "mini", "model": "gpt-5.4-mini"})
-    document["agents"].append({**document["agents"][0], "id": "luna-copy"})
-    document["conditions"].append({"id": "baseline-copy", "components": []})
-    document["arms"] = [
-        {"id": "baseline", "condition": "baseline", "agent": "luna"},
-        {"id": "renamed", "condition": "baseline-copy", "agent": "luna-copy"},
-        {"id": "mini", "condition": "guided", "agent": "mini"},
-    ]
-
-    spec = load_experiment(write_experiment(tmp_path, document)).spec
-
-    assert check_factors(spec) == []
-
-
-def test_factor_guard_flags_component_differences_when_condition_is_undeclared(
-    tmp_path: Path,
-) -> None:
-    document = experiment_document(kind="smoke", factors=["agent.model"])
-
-    issues = _issues(write_experiment(tmp_path, document))
-
-    assert list(issues) == ["arms.1"]
-    assert "undeclared noun 'condition'" in issues["arms.1"]
-
-
-def test_shared_components_lead_every_condition_and_never_split_the_arms(
-    tmp_path: Path,
-) -> None:
-    """Pilot v2: framing both arms get is not a factor, so the guard ignores it."""
-    document = experiment_document(
-        kind="smoke", factors=["agent.model"], shared_components=[SHARED_FRAMING]
-    )
-    document["conditions"][1]["components"] = []
-
-    spec = load_experiment(write_experiment(tmp_path, document)).spec
-
-    assert check_factors(spec) == []
-    for condition in ("baseline", "guided"):
-        assert [use.use for use in spec.condition(condition).components] == ["prompt-wrapper@1"]
-    assert spec.references()["component"] == ("prompt-wrapper@1",)
-    assert spec.to_json()["shared_components"] == [{**SHARED_FRAMING, "with": {}}]
-
-    guided = experiment_document(shared_components=[SHARED_FRAMING])
-    spec = load_experiment(write_experiment(tmp_path / "guided", guided)).spec
-    assert [use.use for use in spec.condition("guided").components] == [
-        "prompt-wrapper@1",
-        "rules-file@2",
-    ]
-    document = experiment_document(
-        kind="smoke", factors=["agent.model"], shared_components=[SHARED_FRAMING]
-    )
-    issues = _issues(write_experiment(tmp_path / "split", document))
-    assert list(issues) == ["arms.1"]
-    assert "undeclared noun 'condition'" in issues["arms.1"]
-
-
-def test_a_condition_may_not_repeat_a_shared_component(tmp_path: Path) -> None:
-    document = experiment_document(shared_components=[SHARED_FRAMING])
-    document["conditions"][1]["components"].append(SHARED_FRAMING)
-
-    issues = _issues(write_experiment(tmp_path, document))
-
-    assert issues == {
-        "conditions.1.components.1.use": "prompt-wrapper@1 is already in shared_components, "
-        "which every condition gets"
-    }
-
-
-def test_specs_without_shared_components_serialise_as_before(tmp_path: Path) -> None:
-    spec = load_experiment(write_experiment(tmp_path, experiment_document())).spec
-
-    assert "shared_components" not in spec.to_json()
-    assert spec.condition("guided") is spec.conditions[1]
-
-
 def test_validate_command_exits_nonzero_with_field_errors(tmp_path: Path) -> None:
     document = experiment_document()
     document["analysis"]["concurrency"] = -1
@@ -439,17 +235,54 @@ def test_set_overrides_change_only_the_addressed_yaml_alias(tmp_path: Path) -> N
     from raidar.design.experiment.loader import _read_document, apply_assignment
 
     path = tmp_path / "aliased.yaml"
-    path.write_text(
-        "conditions:\n"
-        "  - {id: a, components: [{use: review-loop@3, with: &w {max_review_rounds: 2}}]}\n"
-        "  - {id: b, components: [{use: review-loop@3, with: *w}]}\n"
-    )
+    path.write_text("arms:\n  - {id: a, with: &w {rounds: 2}}\n  - {id: b, with: *w}\n")
     document, _ = _read_document(path)
 
-    apply_assignment(document, "conditions.1.components.0.with.max_review_rounds", 3)
+    apply_assignment(document, "arms.1.with.rounds", 3)
 
-    rounds = [c["components"][0]["with"]["max_review_rounds"] for c in document["conditions"]]
-    assert rounds == [2, 3]
+    assert [arm["with"]["rounds"] for arm in document["arms"]] == [2, 3]
+
+
+@pytest.mark.parametrize(
+    ("agent_change", "field"),
+    [
+        ({"model": "claude-opus-4-7"}, "agents.0.model"),
+        ({"reasoning": "xhigh"}, "agents.0.reasoning"),
+        ({"reasoning": None}, "agents.0.reasoning"),
+        ({"release": "codex@2"}, "agents.0.release"),
+        ({"release": "ghost@1"}, "agents.0.release"),
+    ],
+    ids=["model", "reasoning", "reasoning-required", "unregistered-version", "unknown-agent"],
+)
+def test_agent_entries_are_checked_against_their_release(
+    tmp_path: Path, agent_change: dict, field: str
+) -> None:
+    document = experiment_document()
+    document["agents"][0].update(agent_change)
+
+    assert set(_issues(write_experiment(tmp_path, document))) == {field}
+
+
+def test_an_arm_workflow_must_be_a_released_workflow(tmp_path: Path) -> None:
+    document = experiment_document()
+    document["arms"][1]["workflow"] = "ghost@1"
+
+    assert set(_issues(write_experiment(tmp_path, document))) == {"arms.1.workflow"}
+
+
+def test_a_single_arm_smoke_is_accepted(tmp_path: Path) -> None:
+    document = experiment_document(kind="smoke", arms=[experiment_document()["arms"][0]])
+
+    assert load_experiment(write_experiment(tmp_path, document)).spec.kind == "smoke"
+
+
+def test_a_benchmark_may_not_compare_workflows() -> None:
+    document = experiment_document(kind="benchmark")
+    document["arms"][1]["workflow"] = "other@1"
+
+    assert [issue.loc for issue in kind_issues(ExperimentSpec.model_validate(document))] == ["arms"]
+    document["arms"][1]["workflow"] = "one-shot@1"
+    assert kind_issues(ExperimentSpec.model_validate(document)) == []
 
 
 def test_concurrency_is_not_a_lock_or_validate_override(tmp_path: Path) -> None:

@@ -28,16 +28,17 @@ mounts compose file declares no volumes, and Harbor copies ``/logs/agent`` and
 ``/logs/verifier`` out of the container after each phase. A Docker daemon on
 another host therefore sees the same flow as a local one.
 
-**Host edits survive the log download.** A component may download a stage's logs
-mid-run and then rewrite them on the host (a root ``trajectory.json``, a usage
-update). Harbor's final download of ``/logs/agent`` would overwrite those files
-with the container's older copies, which a bind mount never did (host and
+**Host edits survive the log download.** The workflow runner downloads a turn's logs
+mid-run and then writes on the host (the turn's trajectory, the step's root
+``trajectory.json``, the workflow record). Harbor's final download of ``/logs/agent``
+would overwrite those files with the container's older copies, which a bind mount never
+did (host and
 container were one file). The final download therefore keeps every host file
 that is not byte-for-byte what an earlier download left there (``_synced``).
 
 **Per-trial installs at start.** ``add_post_start_hook`` registers work that
-must run once per trial in the started container before any step (a
-component's tool install, ``raidar.subject.treatment.runtime.provision``). It runs inside
+must run once per trial in the started container before any step (a lab provision
+such as workspace seeding, ``raidar.engine.trial.provision``). It runs inside
 ``start``, so its time is the trial's ``environment_start`` (a per-trial
 cost), never a step's ``per_step_reset``. A hook records its own failure; it
 must not raise.

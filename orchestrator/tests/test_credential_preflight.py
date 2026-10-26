@@ -4,10 +4,13 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
+from raidar.design.experiment.arm import resolve_arm
 from raidar.design.experiment.loader import load_experiment
+from raidar.design.experiment.schema import ExperimentSpec
 from raidar.engine.job.credentials import (
     CredentialPreflightError,
     credential_issues,
@@ -16,7 +19,7 @@ from raidar.engine.job.credentials import (
 )
 from raidar.engine.trial.plan import PlanOptions
 from raidar.subject.agent.config import Harness
-from tests.experiment_spec_support import AGENTS_BENCHMARK
+from tests.experiment_spec_support import experiment_document, write_experiment
 
 FAKE = "x" * 24  # placeholder credential value; never a real secret
 
@@ -56,42 +59,59 @@ def test_claude_code_without_credentials_or_with_forced_oauth_and_no_token_fails
     assert "CLAUDE_FORCE_OAUTH" in str(harness_credential_issue(Harness.CLAUDE_CODE, forced))
 
 
-def test_issues_name_the_agent_field_of_each_selected_arm_only(tmp_path: Path) -> None:
-    spec = load_experiment(AGENTS_BENCHMARK).spec
-    env = _codex_home(tmp_path, with_auth=False)
-    issues = credential_issues(spec, ["codex", "claude"], env)
-    fields = [issue.field for issue in issues]
-    assert fields == [
-        "agents.0.name ('codex', codex, arm 'codex')",
-        "agents.1.name ('claude', claude-code, arm 'claude')",
+def _spec(tmp_path: Path) -> ExperimentSpec:
+    """Two codex agents (ids ``luna`` and ``second``), one arm each."""
+    document = experiment_document(kind="benchmark")
+    document["agents"].append({**document["agents"][0], "id": "second"})
+    document["arms"] = [
+        {"id": "first", "agent": "luna", "workflow": "one-shot@1"},
+        {"id": "second", "agent": "second", "workflow": "one-shot@1"},
     ]
-    only_claude = credential_issues(spec, ["claude"], {**env, "ANTHROPIC_API_KEY": FAKE})
-    assert only_claude == []
-    rendered = issues[1].render()
-    assert rendered.startswith("agents.1.name")
-    assert FAKE not in rendered
+    document["analysis"]["baseline_arm"] = "first"
+    return load_experiment(write_experiment(tmp_path, document)).spec
 
 
 class _Plan:
-    """The slice of ExperimentPlan the preflight reads."""
+    """The slice of ExperimentPlan the preflight reads, over really resolved arms."""
 
-    def __init__(self, arms: list[str], override: str | None = None) -> None:
-        self.loaded = load_experiment(AGENTS_BENCHMARK)
+    def __init__(self, tmp_path: Path, arms: list[str], override: str | None = None) -> None:
+        spec = _spec(tmp_path)
+        self.loaded = SimpleNamespace(spec=spec)
+        self.arms = {arm.id: SimpleNamespace(arm=resolve_arm(spec, arm.id)) for arm in spec.arms}
         self.options = PlanOptions(agent_override=override)  # type: ignore[arg-type]
         self._arms = arms
 
     def selected_trials(self) -> list[object]:
-        return [type("T", (), {"arm": arm})() for arm in self._arms]
+        return [SimpleNamespace(arm=arm) for arm in self._arms]
+
+
+def test_issues_name_the_agent_field_of_each_selected_arm_only(tmp_path: Path) -> None:
+    plan = _Plan(tmp_path, ["first", "second"])
+    env = _codex_home(tmp_path, with_auth=False)
+    issues = credential_issues(plan, ["first", "second"], env)  # type: ignore[arg-type]
+    assert [issue.field for issue in issues] == [
+        "agents.0.release ('luna', codex@1, arm 'first')",
+        "agents.1.release ('second', codex@1, arm 'second')",
+    ]
+    only_second = credential_issues(plan, ["second"], env)  # type: ignore[arg-type]
+    assert [issue.field.split(" ")[0] for issue in only_second] == ["agents.1.release"]
+    with_key = {**env, "OPENAI_API_KEY": FAKE}
+    assert credential_issues(plan, ["first", "second"], with_key) == []  # type: ignore[arg-type]
+    rendered = issues[1].render()
+    assert rendered.startswith("agents.1.release")
+    assert FAKE not in rendered
 
 
 def test_preflight_fails_before_any_trial_without_echoing_values(tmp_path: Path) -> None:
-    env = {**_codex_home(tmp_path, with_auth=False), "OPENAI_API_KEY": FAKE}
+    empty = _codex_home(tmp_path, with_auth=False)
+    plan = _Plan(tmp_path, ["first", "second"])
     with pytest.raises(CredentialPreflightError) as caught:
-        preflight_credentials(_Plan(["codex", "claude"]), env)  # type: ignore[arg-type]
+        preflight_credentials(plan, {**empty, "CODEX_AUTH_MODE": "api"})  # type: ignore[arg-type]
     message = str(caught.value)
     assert "no trial was started" in message
-    assert "agents.1.name" in message
-    assert "agents.0" not in message
-    assert FAKE not in message
-    preflight_credentials(_Plan(["codex"]), env)  # type: ignore[arg-type]
-    preflight_credentials(_Plan(["claude"], override="nop"), {})  # type: ignore[arg-type]
+    assert "agents.0.release" in message
+    assert "agents.1.release" in message
+    keyed = {**empty, "OPENAI_API_KEY": FAKE}
+    preflight_credentials(plan, keyed)  # type: ignore[arg-type]
+    override = _Plan(tmp_path, ["first"], override="nop")
+    preflight_credentials(override, {})  # type: ignore[arg-type]

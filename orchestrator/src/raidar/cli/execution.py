@@ -85,9 +85,10 @@ def _echo_plan(plan: ExperimentPlan) -> None:
             f"  truncated_to: {options.max_checkpoints}  agent_override: {options.agent_override}"
         )
     for arm_id, blueprint in plan.arms.items():
+        identity = blueprint.arm.identity()
         click.echo(
-            f"  arm {arm_id}: condition {blueprint.compiled.condition_id} "
-            f"digest {blueprint.compiled.digest[:12]} agent "
+            f"  arm {arm_id}: agent {identity['agent_release']} workflow {identity['workflow']} "
+            f"identity {str(identity['digest'])[:12]} harbor "
             f"{blueprint.agent_config.name or blueprint.agent_config.import_path}"
         )
     for trial in plan.trials:
@@ -96,8 +97,9 @@ def _echo_plan(plan: ExperimentPlan) -> None:
         click.echo(
             f" {mark} {trial.sequence:03d} {trial.trial_id} "
             f"attempt={trial.attempt} order={trial.order} "
-            f"steps={len(trial.steps)} trial={hashes.trial[:12]} condition={hashes.condition[:12]} "
-            f"arm={hashes.arm[:12]} problem={hashes.problem[:12]} agent={hashes.agent[:12]} "
+            f"steps={len(trial.steps)} trial={hashes.trial[:12]} arm={hashes.arm[:12]} "
+            f"workflow={hashes.workflow[:12]} stage_code={hashes.stage_code[:12]} "
+            f"problem={hashes.problem[:12]} agent={hashes.agent[:12]} "
             f"protocol={hashes.protocol[:12]}"
         )
     click.echo(f"  {len(plan.selected)}/{len(plan.trials)} trials selected (*)")

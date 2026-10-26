@@ -31,17 +31,10 @@ def test_native_startup_and_phase_policies_only_allow_declared_hosts(
     path = tmp_path / "task.toml"
     path.write_text(task.model_dump_toml())
 
-    restrict_trial_network(
-        tmp_path, runtime="python", provider=provider, component_hosts=("service.example.org",)
-    )
+    restrict_trial_network(tmp_path, runtime="python", provider=provider)
 
     rendered = TaskConfig.model_validate_toml(path.read_text())
-    expected = inference_hosts | {
-        "pypi.org",
-        "files.pythonhosted.org",
-        "registry.npmjs.org",
-        "service.example.org",
-    }
+    expected = inference_hosts | {"pypi.org", "files.pythonhosted.org", "registry.npmjs.org"}
     for step in [None, *(rendered.steps or ())]:
         plan = resolve_trial_network_plan(
             rendered,
@@ -73,7 +66,7 @@ def test_explicit_public_overrides_cannot_widen_stricter_parent_policies(
     path = tmp_path / "task.toml"
     path.write_text(task.model_dump_toml())
 
-    restrict_trial_network(tmp_path, runtime="python", provider="openai", component_hosts=())
+    restrict_trial_network(tmp_path, runtime="python", provider="openai")
 
     rendered = TaskConfig.model_validate_toml(path.read_text())
     plan = resolve_trial_network_plan(
@@ -95,29 +88,14 @@ def test_existing_allowlists_intersect_the_contract_and_preserve_narrower_phase_
 ) -> None:
     task = TaskConfig(steps=[StepConfig(name="first")])
     task.environment.network_mode = NetworkMode.ALLOWLIST
-    task.environment.allowed_hosts = [
-        "*.openai.com",
-        "*.example.org",
-        "192.0.2.0/24",
-        "2001:db8:1::/48",
-    ]
+    task.environment.allowed_hosts = ["*.openai.com", "pypi.org", "unapproved.example.org"]
     task.agent.network_mode = NetworkMode.ALLOWLIST
-    task.agent.allowed_hosts = [
-        "api.openai.com",
-        "192.0.2.12",
-        "*.api.example.org",
-        "2001:db8:1::1",
-    ]
+    task.agent.allowed_hosts = ["api.openai.com", "unapproved.example.org"]
     task.steps[0].agent.network_mode = NetworkMode.PUBLIC
     path = tmp_path / "task.toml"
     path.write_text(task.model_dump_toml())
 
-    restrict_trial_network(
-        tmp_path,
-        runtime="python",
-        provider="openai",
-        component_hosts=("192.0.2.0/25", "*.example.org", "2001:db8::/32", "198.51.100.0/24"),
-    )
+    restrict_trial_network(tmp_path, runtime="python", provider="openai")
 
     rendered = TaskConfig.model_validate_toml(path.read_text())
     plan = resolve_trial_network_plan(
@@ -130,16 +108,9 @@ def test_existing_allowlists_intersect_the_contract_and_preserve_narrower_phase_
     assert set(plan.agent_env_baseline.allowed_hosts) == {
         "api.openai.com",
         "auth.openai.com",
-        "*.example.org",
-        "192.0.2.0/25",
-        "2001:db8:1::/48",
+        "pypi.org",
     }
-    assert set(plan.agent_phase.allowed_hosts) == {
-        "api.openai.com",
-        "192.0.2.12",
-        "*.api.example.org",
-        "2001:db8:1::1",
-    }
+    assert set(plan.agent_phase.allowed_hosts) == {"api.openai.com"}
 
 
 def test_unknown_runtime_or_provider_contracts_are_refused_before_task_rewrite(
@@ -150,5 +121,5 @@ def test_unknown_runtime_or_provider_contracts_are_refused_before_task_rewrite(
     path.write_text(original)
     for runtime, provider in (("unknown", "openai"), ("python", "unknown")):
         with pytest.raises(ValueError, match="no trial network host contract"):
-            restrict_trial_network(tmp_path, runtime=runtime, provider=provider, component_hosts=())
+            restrict_trial_network(tmp_path, runtime=runtime, provider=provider)
         assert path.read_text() == original

@@ -43,7 +43,14 @@ from raidar.scoring.framework.result import (
 
 STEPS = ("checkpoint_1", "checkpoint_2", "checkpoint_3")
 HASHES = TrialHashes(
-    lock="l", problem="p", arm="a", condition="c", agent="g", protocol="r", trial="t"
+    lock="l",
+    problem="p",
+    arm="a",
+    workflow="w",
+    stage_code="s",
+    agent="g",
+    protocol="r",
+    trial="t",
 )
 
 

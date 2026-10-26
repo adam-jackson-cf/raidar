@@ -14,7 +14,7 @@ from pathlib import Path
 import pytest
 
 from raidar.scoring.catalog.builtin import default_scorer_registry
-from raidar.scoring.framework.context import AssessContext, StepInputs
+from raidar.scoring.framework.context import AssessContext
 from raidar.scoring.framework.result import TRAJECTORY_SUBJECT, AssessStatus
 from raidar.scoring.gate_effort import GATE_EFFORT, gate_effort_scorer
 from raidar.scoring.gate_effort.evidence import run_summary
@@ -27,7 +27,6 @@ from raidar.scoring.gate_effort.records import (
 )
 from tests.gate_effort_support import (
     CAPPED,
-    GUARDRAIL_STYLE_GATE,
     PASSED,
     REFUSED,
     _assess,
@@ -40,9 +39,6 @@ from tests.gate_effort_support import (
     _values,
     _write_gate,
 )
-from tests.test_guardrail_gate_workflow import ScriptedInnerAgent, _agent, _run
-from tests.test_guardrail_gate_workflow import _reset_script as _reset_script  # noqa: F401
-from tests.test_guardrail_gate_workflow import shims as shims  # noqa: F401 (fixture)
 
 # ---- families and parsing ----------------------------------------------------------------
 
@@ -306,40 +302,6 @@ def test_config_is_refused_and_the_scorer_is_registered(tmp_path: Path) -> None:
     assert gate_effort_scorer().assess(ctx).status is AssessStatus.ERROR
     registration = default_scorer_registry().get("gate-effort@11")
     assert registration.load().manifest == GATE_EFFORT
-
-
-def test_the_wrapper_logs_score_end_to_end(tmp_path: Path, shims: Path) -> None:  # noqa: F811
-    agent, environment = _agent(tmp_path, shims, command=GUARDRAIL_STYLE_GATE)
-    _run(agent, environment)
-    assert len(ScriptedInnerAgent.prompts) == 2
-    logs = tmp_path / "logs"
-    record = json.loads((logs / RECORD_PATH).read_text())
-    first = record["gate_runs"][0]
-    assert first["report_dir"] == "guardrail-gate/gate_run_1"
-    assert (logs / first["report_dir"] / "gate-1.json").is_file()
-    assert all(stage["duration_sec"] is not None for stage in record["stages"])
-    step = StepInputs(
-        step="checkpoint_1",
-        reached=True,
-        checkpoint="checkpoint_1",
-        snapshot=None,
-        snapshot_digest=None,
-        record=None,
-        record_digest=None,
-        trace_dir=logs,
-        trace_digest="t",
-        agent_result=None,
-    )
-
-    result = _assess(step)
-
-    assert _value(result, "rounds_to_clean", "checkpoint_1") == 1
-    assert _value(result, "first_run_blocking.complexity", "checkpoint_1") == 1
-    assert _value(result, "first_run_blocking.typing", "checkpoint_1") == 1
-    assert _value(result, "fix_cost_usd", "checkpoint_1") == pytest.approx(0.01)
-    wall = _values(result)[("fix_wall_s", "checkpoint_1")]
-    assert wall.status is AssessStatus.OK
-    assert (wall.value or 0) >= 0
 
 
 @pytest.mark.parametrize("escape", ["parent", "absolute", "symlink"])

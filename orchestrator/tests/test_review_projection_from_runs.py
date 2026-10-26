@@ -17,7 +17,6 @@ import pytest
 from harbor.models.trajectories import ToolCall
 
 from raidar.contract.review import ReviewProjectionArtifact, ReviewRunDetail
-from raidar.design.experiment.schema import ExperimentSpec
 from raidar.evaluation.analysis.sources import AnalysisInputError
 from raidar.evaluation.review.projection import main, merge_review_projections
 from raidar.evaluation.review.projection.assessments import TrialAssessments
@@ -27,7 +26,6 @@ from raidar.evaluation.review.projection.comparability import (
     UNKNOWN_POLICY,
     mark_policy_mismatches,
 )
-from raidar.evaluation.review.projection.conditions import ArmSide, condition_diff
 from raidar.evaluation.review.projection.headline import COMPONENT_METRICS, headline, policy_shares
 from raidar.evaluation.review.projection.merge import project_experiment_epoch
 from raidar.evaluation.review.projection.sources import LockIndex, load_job
@@ -65,16 +63,16 @@ def _span(detail: ReviewRunDetail, name: str) -> dict[str, Any]:
     return json.loads(span.output_payload or "{}")
 
 
-def test_frozen_concepts_map_to_problem_condition_and_agent(
+def test_frozen_concepts_map_to_problem_arm_and_agent(
     projection: ReviewProjectionArtifact,
 ) -> None:
     run = _detail(projection, PASSING).run
     assert run.problem == "synthetic/ledger-balance@1"
-    assert run.arm == "baseline"
-    assert run.agent_spec == "codex · openai/gpt-5.5 [medium]"
+    assert run.arm == "gpt55-medium"
+    assert run.agent_spec == "codex · openai/gpt-5.5 [medium] · one-shot@1"
     assert run.synthetic
     families = {(record.problem, record.arm) for record in projection.experiments}
-    assert ("synthetic/skill-coding@1", "skills") in families
+    assert ("synthetic/skill-coding@1", "sonnet") in families
     assert {
         (record.problem, record.aggregate["headline_policy"]) for record in projection.experiments
     } == {
@@ -85,25 +83,21 @@ def test_frozen_concepts_map_to_problem_condition_and_agent(
     }
 
 
-def test_arms_of_one_condition_on_different_harnesses_share_an_arm_label(
-    fixture_root: Path, projection: ReviewProjectionArtifact
+def test_arms_on_different_harnesses_carry_their_agent_labels(
+    projection: ReviewProjectionArtifact,
 ) -> None:
-    trials = fixture_root / "jobs/synthetic-skill/synthetic-skill/trial-records"
-    digests = {
-        json.loads(path.read_text())["trial"]["hashes"]["condition"]
-        for path in trials.glob("baseline-*-01.json")
-    }
-    assert len(digests) == 2  # codex and claude-code compile the condition differently
     labels = {
-        (record.harness, record.arm)
+        (record.arm, record.harness, record.agent_spec)
         for record in projection.experiments
         if record.problem == "synthetic/skill-coding@1"
     }
     assert labels == {
-        ("codex", "baseline"),
-        ("claude-code", "baseline"),
-        ("codex", "skills"),
-        ("claude-code", "skills"),
+        ("gpt55-low", "codex", "codex · openai/gpt-5.5 [low] · one-shot@1"),
+        (
+            "sonnet",
+            "claude-code",
+            "claude-code · anthropic/claude-sonnet-4.6 · one-shot@1",
+        ),
     }
 
 
@@ -201,85 +195,15 @@ def test_atif_steps_become_prompt_turn_and_tool_spans(projection: ReviewProjecti
 def test_unreadable_trial_is_one_error_span(fixture_root: Path, tmp_path: Path) -> None:
     runs = tmp_path / "jobs"
     shutil.copytree(fixture_root / "jobs" / "synthetic-skill", runs / "synthetic-skill")
-    trace = runs / "synthetic-skill/synthetic-skill/trials/skills-gpt-01/steps/checkpoint_1/agent"
+    trace = runs / "synthetic-skill/synthetic-skill/trials/gpt-5.5-low-01/steps/checkpoint_1/agent"
     (trace / "trajectory.json").write_text("{not atif")
-    detail = _detail(merge_review_projections(job_roots=[runs]), "synthetic-skill-skills-gpt-01")
+    detail = _detail(merge_review_projections(job_roots=[runs]), "synthetic-skill-gpt-5.5-low-01")
     broken = [span for span in detail.spans if span.name == "trajectory unreadable"]
     assert len(broken) == 1
     assert broken[0].status == "ERROR"
 
 
-def test_condition_diff_pairs_baseline_with_the_same_agent(
-    projection: ReviewProjectionArtifact,
-) -> None:
-    [diff] = projection.arm_diffs
-    assert diff.key == "synthetic/skill-coding@1:baseline->skills"
-    assert diff.summary == ["arm baseline-gpt -> skills-gpt", "+ component skills@2"]
-    assert diff.comparable_warnings == []
-    assert diff.change_categories == ["rules"]
-    assert "workdir/skills/tdd/SKILL.md" in diff.sections
-    assert set(diff.files) == {"condition", "prompt"}
-
-
-def _spec(factors: list[str]) -> ExperimentSpec:
-    return ExperimentSpec.model_validate(
-        {
-            "schema_version": 2,
-            "kind": "ab-test",
-            "id": "guarded",
-            "problems": [{"ref": "synthetic/p@1"}],
-            "runtime": "python",
-            "agents": [
-                {
-                    "id": "a",
-                    "name": "codex",
-                    "provider": "openai",
-                    "model": "m1",
-                    "version": "1.0",
-                },
-                {
-                    "id": "b",
-                    "name": "codex",
-                    "provider": "openai",
-                    "model": "m2",
-                    "version": "1.0",
-                },
-            ],
-            "factors": factors,
-            "conditions": [
-                {"id": "base"},
-                {"id": "rules", "components": [{"use": "rules-file@1"}]},
-            ],
-            "arms": [
-                {"id": "base", "condition": "base", "agent": "a"},
-                {"id": "rules", "condition": "rules", "agent": "b"},
-            ],
-            "assessment": {"scorers": ["correctness@2"]},
-            "analysis": {"baseline_arm": "base", "attempts": 1, "seed": 0},
-        }
-    )
-
-
-@pytest.mark.parametrize(
-    ("factors", "undeclared"),
-    [(["condition", "agent"], []), (["condition"], ["agent.model"])],
-)
-def test_condition_diff_warns_on_nouns_outside_the_declared_factors(
-    factors: list[str], undeclared: list[str]
-) -> None:
-    spec = _spec(factors)
-    base, rules = spec.arms
-    diff = condition_diff(
-        spec,
-        "synthetic/p@1",
-        ArmSide(base, "base", [], None),
-        ArmSide(rules, "rules", [{"use": "rules-file@1", "files": {}}], None),
-    )
-    assert [warning.split(" ")[0] for warning in diff.comparable_warnings] == undeclared
-    assert diff.change_categories == ["metadata", "rules"]
-
-
-def test_policy_mismatch_marks_every_compared_record_and_diff(
+def test_policy_mismatch_marks_every_compared_record(
     projection: ReviewProjectionArtifact,
 ) -> None:
     records = list(projection.experiments)
@@ -292,17 +216,16 @@ def test_policy_mismatch_marks_every_compared_record_and_diff(
     skill = [r for r in records if r.problem == "synthetic/skill-coding@1"][0]
     unrecorded = skill.model_copy(update={"experiment_id": "unrecorded", "aggregate": {}})
     single = [r for r in records if r.problem != "synthetic/policy-mix@1"]
-    marked, diffs = mark_policy_mismatches([*single, other, unrecorded], projection.arm_diffs)
+    marked = mark_policy_mismatches([*single, other, unrecorded])
     flagged = {
         record.problem
         for record in marked
         if any(finding["category"] == MISMATCH_CATEGORY for finding in record.findings)
     }
     assert flagged == {"synthetic/ledger-balance@1", "synthetic/skill-coding@1"}
-    assert UNKNOWN_POLICY in diffs[0].comparable_warnings[-1]
-    unchanged, same = mark_policy_mismatches(single, projection.arm_diffs)
-    assert unchanged == single
-    assert same == projection.arm_diffs
+    finding = next(r for r in marked if r.experiment_id == "unrecorded").findings[-1]
+    assert UNKNOWN_POLICY in json.dumps(finding)
+    assert mark_policy_mismatches(single) == single
 
 
 def test_run_without_its_lock_is_skipped_not_fatal(
@@ -336,10 +259,10 @@ def test_colliding_review_ids_are_qualified_by_experiment(
     data = json.loads(manifest.read_text())
     manifest.write_text(json.dumps({**data, "experiment": "copy"}))
     ids = set(merge_review_projections(job_roots=[tmp_path / "jobs"]).run_details)
-    assert "synthetic-skill-skills-gpt-01" not in ids
+    assert "synthetic-skill-gpt-5.5-low-01" not in ids
     assert {
-        "copy-synthetic-skill-skills-gpt-01",
-        "synthetic-skill-synthetic-skill-skills-gpt-01",
+        "copy-synthetic-skill-gpt-5.5-low-01",
+        "synthetic-skill-synthetic-skill-gpt-5.5-low-01",
     } <= ids
 
 
@@ -372,8 +295,8 @@ def test_merge_combines_run_roots_and_fails_closed_without_sources(
         ]
     )
     artifact = ReviewProjectionArtifact.model_validate_json(output.read_text())
-    assert len(artifact.runs) == 33
-    assert len(artifact.experiments) == 9
+    assert len(artifact.runs) == 27
+    assert len(artifact.experiments) == 7
     captured = capsys.readouterr()
     assert "Skipping run without trial records" in captured.err
     with pytest.raises(SystemExit):
@@ -493,23 +416,23 @@ def test_invalid_execution_withholds_the_headline_even_when_measured(
 
     def fail_probe(record: dict[str, Any]) -> None:
         for check in record["validity"]["checks"]:
-            if check["name"] == "component_probes":
-                check.update(passed=False, detail="AGENTS.md lines not in the harness context")
+            if check["name"] == "lab_checks":
+                check.update(passed=False, detail="the per-step context reset left stale files")
 
-    _edit_records(job_dir, fail_probe, "skills-gpt-01.json")
+    _edit_records(job_dir, fail_probe, "gpt-5.5-low-01.json")
     artifact = merge_review_projections(
         job_roots=[tmp_path / "jobs"], stores=[fixture_root / "store"]
     )
-    run = _detail(artifact, "synthetic-skill-skills-gpt-01").run
+    run = _detail(artifact, "synthetic-skill-gpt-5.5-low-01").run
     assert not run.valid
     assert run.unscored
     assert (run.composite_score, run.quality_score, run.diagnostic_score) == (None, None, None)
     assert run.unscored_reasons[0] == (
-        "Execution invalid: component_probes: AGENTS.md lines not in the harness context"
+        "Execution invalid: lab_checks: the per-step context reset left stale files"
     )
-    record = next(r for r in artifact.experiments if r.arm == "skills" and r.harness == "codex")
+    record = next(r for r in artifact.experiments if r.arm == "gpt55-low" and r.harness == "codex")
     assert record.aggregate["run_count_scored"] == 2
-    detail = _detail(artifact, "synthetic-skill-skills-gpt-01")
+    detail = _detail(artifact, "synthetic-skill-gpt-5.5-low-01")
     assert _span(detail, "metric:problem_verbosity")["status"] == "ok"
 
 

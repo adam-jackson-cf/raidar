@@ -36,7 +36,7 @@ from raidar.engine.health.liveness import install_liveness_monitor
 from raidar.engine.target.config import activate
 from raidar.engine.trial.cleanup import cleanup_trial_projects
 from raidar.engine.trial.environment import RUN_SCOPED_DOCKER_IMPORT_PATH, SCOPE_KWARG, run_scope
-from tests.component_trial_support import build_task, docker_target
+from tests.docker_trial_support import build_task, docker_target
 
 AFTER_PHASE_REPORT = "liveness-after-phase.json"
 DETACHED_MARKER = "raidar-liveness-detached"
@@ -119,7 +119,7 @@ async def run_probe_trial(
     if trials_dir.exists():
         shutil.rmtree(trials_dir)
     names = {f"checkpoint_{n}": f"checkpoint_{n}" for n in range(1, steps + 1)}
-    build_task(task_dir, None, names, agent_timeout_sec=hold_s + 300)
+    build_task(task_dir, names, reset=False, agent_timeout_sec=hold_s + 300)
     if verify:
         (task_dir / "tests" / "test.sh").write_text(PASSING_TEST_SH)
     activate(docker_target())

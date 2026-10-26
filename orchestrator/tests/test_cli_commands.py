@@ -16,8 +16,6 @@ from click.testing import CliRunner
 
 from raidar.cli import env_harbor, main
 from raidar.contract.paths import ORCHESTRATOR_ROOT, REPO_ROOT
-from raidar.subject.agent.config import agent_name_for
-from raidar.subject.environment.python.pack_definition import load_pack_spec
 
 quality_gates = main.commands["quality"].commands["gates"]
 
@@ -50,13 +48,6 @@ def test_agent_list_names_harbor_agents_with_model_variations() -> None:
         "models: openai/gpt-5.2, openai/gpt-5.3-codex-spark, openai/gpt-5.4, "
         "openai/gpt-5.4-mini, openai/gpt-5.5"
     ) in result.output
-    assert (
-        "models: google/gemini-3-flash-preview, google/gemini-3-pro-preview, "
-        "google/gemini-3.1-pro-preview"
-    ) in result.output
-    assert "models: cursor/*, openai/*, anthropic/*, google/*, deepseek/*" in result.output
-    assert "models: github/*" in result.output
-    assert "models: inflection/*" in result.output
 
 
 def test_agent_validate_reports_codex_auth_mode(
@@ -298,6 +289,7 @@ def test_cli_exposes_only_the_experiment_model_commands() -> None:
         "init",
         "jev",
         "ledger",
+        "releases",
         "lock",
         "pack",
         "perf",
@@ -357,50 +349,43 @@ def test_orchestrator_smoke_locks_and_runs_the_smoke_experiment_with_the_same_ov
     assert "orchestrator-smoke.lock.json" in run_args[0]
 
 
-def test_agent_smoke_replaces_the_agent_and_pins_the_pack_version() -> None:
-    # AGENT=claude-code alone defaults to claude-haiku-4-5 with the effort unset
-    # (an empty --set value unsets the field; haiku has no effort levels).
-    result = _make_dry_run("agent-smoke", "AGENT=claude-code", "TIMEOUT_SEC=300")
+def test_agent_smoke_replaces_the_agent_release_model_and_reasoning() -> None:
+    result = _make_dry_run("agent-smoke", "RELEASE=codex@1", "MODEL=gpt-6-luna", "TIMEOUT_SEC=300")
 
     assert result.returncode == 0, result.stderr
+    (lock_args,) = _raidar_lines(result.stdout, "lock")
     (run_args,) = _raidar_lines(result.stdout, "run")
     for assignment in (
-        "agents.0.name=claude-code",
-        "agents.0.provider=anthropic",
-        "agents.0.model=claude-haiku-4-5",
-        "agents.0.reasoning_effort=",
-        "agents.0.version='2.1.285'",
+        "agents.0.release=codex@1",
+        "agents.0.model=gpt-6-luna",
+        "agents.0.reasoning=low",
         "protocol.agent_timeout_sec=300",
     ):
+        assert f'--set "{assignment}"' in lock_args
         assert f'--set "{assignment}"' in run_args
 
 
 @pytest.mark.parametrize(
     ("args", "effort"),
-    [
-        ((), "low"),
-        (("REASONING_EFFORT=",), ""),
-        (("AGENT=claude-code", "REASONING_EFFORT=low"), "low"),
-    ],
+    [((), "low"), (("REASONING_EFFORT=",), ""), (("REASONING_EFFORT=medium",), "medium")],
 )
-def test_agent_smoke_effort_defaults_per_agent_and_empty_means_unset(
+def test_agent_smoke_reasoning_defaults_to_low_and_empty_means_unset(
     args: tuple[str, ...], effort: str
 ) -> None:
     result = _make_dry_run("agent-smoke", *args)
 
     assert result.returncode == 0, result.stderr
     (run_args,) = _raidar_lines(result.stdout, "run")
-    assert f'--set "agents.0.reasoning_effort={effort}"' in run_args
+    assert f'--set "agents.0.reasoning={effort}"' in run_args
 
 
-@pytest.mark.parametrize("arm", ["codex", "claude"])
-def test_smoke_agents_arm_runs_one_arm_of_the_agents_smoke(arm: str) -> None:
-    result = _make_dry_run("smoke-agents", f"SMOKE_ARM={arm}")
+def test_smoke_agents_arm_runs_one_arm_of_the_agents_smoke() -> None:
+    result = _make_dry_run("smoke-agents", "SMOKE_ARM=codex")
 
     assert result.returncode == 0, result.stderr
     (run_args,) = _raidar_lines(result.stdout, "run")
     assert run_args.startswith(f'"{AGENTS_PATH}"')
-    assert f'--arm "{arm}"' in run_args
+    assert '--arm "codex"' in run_args
 
 
 def test_smoke_agents_arms_match_the_agents_smoke_experiment() -> None:
@@ -413,12 +398,12 @@ def test_smoke_agents_arms_match_the_agents_smoke_experiment() -> None:
     assert f"SMOKE_ARMS := {arms}\n" in makefile
 
 
-@pytest.mark.parametrize("arm", ["gemini", "invalid"])
-def test_smoke_agents_rejects_an_arm_the_pack_cannot_run(arm: str) -> None:
+@pytest.mark.parametrize("arm", ["unknown-agent", "claude"])
+def test_smoke_agents_rejects_an_arm_the_experiment_does_not_have(arm: str) -> None:
     result = _make_dry_run("smoke-agents", f"SMOKE_ARM={arm}")
 
     assert result.returncode != 0
-    assert f"Unknown SMOKE_ARM '{arm}'; expected one of: codex claude" in result.stderr
+    assert f"Unknown SMOKE_ARM '{arm}'; expected one of: codex" in result.stderr
 
 
 def test_smoke_dry_run_check_prints_every_public_smoke_shape() -> None:
@@ -432,8 +417,8 @@ def test_smoke_dry_run_check_prints_every_public_smoke_shape() -> None:
 
     assert result.returncode == 0, result.stderr
     run_lines = _raidar_lines(result.stdout, "run")
-    assert len(run_lines) == 5
-    assert sum('--arm "' in line for line in run_lines) == 2
+    assert len(run_lines) == 4
+    assert sum('--arm "' in line for line in run_lines) == 1
 
 
 @pytest.mark.parametrize(
@@ -539,20 +524,6 @@ def test_review_surface_test_rejects_mismatched_runs_and_stores() -> None:
 
     assert result.returncode != 0
     assert "one store for all roots or one store per root" in result.stderr
-
-
-def test_smoke_experiments_pin_the_pack_agent_versions() -> None:
-    pins = {
-        agent_name_for(cli).value: pin.version
-        for cli, pin in load_pack_spec().image.harnesses.items()
-    }
-    makefile = (REPO_ROOT / "Makefile").read_text(encoding="utf-8")
-    for name, version in pins.items():
-        assert f"AGENT_SMOKE_VERSION_{name} := {version}" in makefile
-    for path in (SMOKE_PATH, AGENTS_PATH):
-        spec = yaml.safe_load((REPO_ROOT / path).read_text())
-        for agent in spec["agents"]:
-            assert agent["version"] == pins[agent["name"]]
 
 
 @pytest.mark.parametrize(

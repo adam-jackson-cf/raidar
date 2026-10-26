@@ -42,7 +42,6 @@ Refined in the port:
 - Quality components use Raidar's names (C, V, E, H, R, G, I, S) and the
   headline metric's own definition, read from the lock, instead of SCB's fixed
   table of weights.
-- Manipulation-check results are part of the report.
 
 Still needs refining:
 

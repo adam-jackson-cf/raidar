@@ -1,14 +1,14 @@
 """One step's ``guardrail-gate@4`` autofix passes, read back from its gate record.
 
-The wrapper (``raidar.subject.treatment.runtime.guardrail_gate``) records every autofix
+The workflow's guardrail gate records every autofix
 pass under ``autofix.runs`` of ``guardrail-gate/guardrail-gate.json``: its
 mode (``apply`` before an enforced commit check, ``dry_run`` on a shadow
 gate's throwaway copy), its typed error if it could not complete, what the
 pack's command reported (files and lines changed, codes fixed, all and
 block-tier) and, for a dry run, the shadow check of the fixed copy
 (``post_check``, a gate-run record). Nothing is written. The contract's key
-names are repeated here, not imported from the component, so this scorer's
-identity does not move with the wrapper's runtime code.
+names are repeated here, not imported from the workflow, so this scorer's
+identity does not move with the workflow's runtime code.
 """
 
 from __future__ import annotations

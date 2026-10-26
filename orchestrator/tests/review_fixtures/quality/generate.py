@@ -298,7 +298,16 @@ def _record(trial: _Trial) -> TrialRecord:
     )
     hashes = {
         name: _digest(name, trial.trial_id)
-        for name in ("lock", "problem", "arm", "condition", "agent", "protocol", "trial")
+        for name in (
+            "lock",
+            "problem",
+            "arm",
+            "workflow",
+            "stage_code",
+            "agent",
+            "protocol",
+            "trial",
+        )
     }
     return TrialRecord(
         experiment=EXPERIMENT,

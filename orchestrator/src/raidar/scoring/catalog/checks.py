@@ -1,10 +1,8 @@
 """The manipulation checks and the scorer refs that report each (G5).
 
-A pre-registered check (``analysis.manipulation_checks``) names a trace check of one scorer:
-``tests_run_before_finish`` and ``plan_written`` come from ``process-compliance``,
-``gate_clean_at_step_end`` from ``gate-effort``. Experiment validation reads this table to refuse
-an unknown check or a check whose scorer the experiment does not declare; analysis reads it to
-find each check's results (``raidar.evaluation.analysis.manipulation``).
+A check is a trace check of one scorer: ``tests_run_before_finish`` and ``plan_written`` come
+from ``process-compliance``, ``gate_clean_at_step_end`` from ``gate-effort``. Analysis reads
+this table to find each check's results (``raidar.evaluation.analysis.manipulation``).
 """
 
 from __future__ import annotations

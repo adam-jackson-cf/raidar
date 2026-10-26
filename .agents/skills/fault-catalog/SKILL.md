@@ -1,6 +1,6 @@
 ---
 name: "fault-catalog"
-description: "Use when reconciling Raidar job faults with the fault/remedy ledger or proposing condition revisions from fault evidence."
+description: "Use when reconciling Raidar job faults with the fault/remedy ledger or proposing arm revisions from fault evidence."
 ---
 
 # Task
@@ -27,8 +27,8 @@ description: "Use when reconciling Raidar job faults with the fault/remedy ledge
   update records and apply strict status transitions.
 - [Select an experiment target](references/select-experiment-target-runbook.md)
   from unresolved records.
-- [Propose the next revision](references/propose-next-revision-runbook.md) of a
-  condition as component changes, written as a locked, unexecuted experiment.
+- [Propose the next revision](references/propose-next-revision-runbook.md) of an
+  arm as agent or workflow release changes, written as a locked, unexecuted experiment.
 
 ## Catalog integrity
 
@@ -36,11 +36,11 @@ description: "Use when reconciling Raidar job faults with the fault/remedy ledge
   `make ledger-index && make ledger-check` and fix what it reports.
 - One record per reusable failure mode, never one per failed verifier case.
 - Every occurrence names its job, trial, checkpoint, agent and version, model,
-  reasoning effort, arm and condition digest.
+  reasoning effort, arm and arm digest.
 - Measurement faults (the verifier, the problem or the harness measures the
-  wrong thing) are recorded, but are never targeted by component changes.
+  wrong thing) are recorded, but are never targeted by agent or workflow changes.
 - Hidden-test firewall: you may read verifier tests to classify a failure, but a
-  proposed component must not carry knowledge that only the hidden tests give.
+  proposed agent or workflow release must not carry knowledge that only the hidden tests give.
 
 ## Validation
 

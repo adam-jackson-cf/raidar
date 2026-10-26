@@ -2,7 +2,7 @@
 
 A job directory (``raidar run``) holds ``job.json``, ``plan.json``,
 ``assessment-config.yaml``, ``trials/`` and ``trial-records/``. The experiment
-spec (agents, conditions, factors, headline metric) lives in the lock the run was
+spec (agents, workflows, arms, headline metric) lives in the lock the run was
 planned from; ``job.json`` names it by ``lock_sha256``. The lock is one given
 explicitly or the one beside the run's experiment file (the current lock, whose
 assessment settings apply after a relock that kept ``lock_sha256``); it must be a
@@ -23,7 +23,6 @@ from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Any
 
-from raidar.contract.canonical import digest_json
 from raidar.contract.job_layout import JOB_KIND, JOB_MANIFEST, PLAN_FILE
 from raidar.contract.trial import TrialRecord
 from raidar.design.experiment.lock import default_lock_path
@@ -50,15 +49,12 @@ class ExperimentLock:
     sha256: str
     spec: ExperimentSpec
     metric: str | None
-    conditions: Mapping[str, Any]
+    arms: Mapping[str, Mapping[str, Any]]
+    """``execution.arms``: each arm's locked agent release, model and workflow release."""
     problems: tuple[Mapping[str, Any], ...]
     path: Path | None = None
     errata: Mapping[str, ErrataRef] = field(default_factory=dict)
     """The problem errata the lock pins; correctness Assessments are keyed with them."""
-
-    def condition_digest(self, condition: str) -> str:
-        """The condition's locked contents, independent of the harness an arm compiles it for."""
-        return digest_json(self.conditions.get(condition, []))
 
 
 @dataclass(frozen=True)
@@ -122,7 +118,7 @@ def experiment_lock(path: Path) -> ExperimentLock:
             sha256=str(document["lock_sha256"]),
             spec=spec,
             metric=str(headline["ref"]) if isinstance(headline, Mapping) else None,
-            conditions=dict(execution.get("conditions") or {}),
+            arms=dict(execution["arms"]),
             problems=tuple(execution.get("problems") or ()),
             path=path,
             errata=lock_errata(document),

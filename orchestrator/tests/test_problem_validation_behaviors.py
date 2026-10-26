@@ -37,7 +37,7 @@ from raidar.design.problem.validation import (
 )
 from raidar.design.problem.validator import ValidateOptions, validate_problem, write_report
 from raidar.grading.sandbox import SandboxResult, SandboxRun
-from tests.component_trial_support import docker_context, docker_target_reachable
+from tests.docker_trial_support import docker_context, docker_target_reachable
 from tests.problems_support import (
     NEGATIVE_REF,
     ONESHOT_REF,

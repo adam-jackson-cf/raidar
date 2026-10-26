@@ -15,7 +15,7 @@ a resolved record, or make no catalog change.
   or a status change on its own.
 - Establish the configuration from the lock: experiment id, `lock_sha256`, job
   id, problem pin, agent name and version, model, reasoning effort, arm and
-  condition digest, progression mode, scorers and headline metric.
+  arm digest, progression mode, scorers and headline metric.
 - Compare like with like: the same progression view, the same checkpoint scope,
   the same lock thresholds. Never compare a strict-view measure with a
   continue-view one, or case pass rate with solved share.
@@ -28,7 +28,7 @@ a resolved record, or make no catalog change.
 
 Update a record when the new evidence has the same failure mode, the same (or an
 equivalent) detection signal, the same affected invariant, and the same
-remediation target. A different model, arm, condition, checkpoint, severity or
+remediation target. A different model, arm, workflow, checkpoint, severity or
 failed case is a new occurrence of the same category unless the invariant and
 the remediation target differ materially.
 
@@ -51,7 +51,7 @@ Create a record only when every gate passes:
 5. **Evidence:** at least one exact configuration and measured example.
 6. **Impact:** a concrete correctness, regression, integration, recovery,
    structural, process or measurement-validity consequence.
-7. **Owner:** the remediation target names who can change it: a component, the
+7. **Owner:** the remediation target names who can change it: an agent release, a workflow release, the
    verifier, the problem, the harness (Raidar) or the analysis.
 
 ## Status rules
@@ -77,10 +77,10 @@ Status describes the evidence about the category, not whether one case passes.
   mode with an equivalent signal and contradicts the resolution claim. A missing
   artifact, an infra exclusion or an incomparable configuration does not reopen.
 - **`not-reproducible`** (from `open`) when a controlled follow-up recreates the
-  lock (problem pin, agent, model, effort, condition, progression, seed) and the
+  lock (problem pin, agent, model, effort, arm, progression, seed) and the
   fault does not recur.
 - **`routed`** (from `open`) for a `Measurement` record whose owner is outside
-  the component space, once the routing (issue, decision item) is recorded. It
+  the agent and workflow release space, once the routing (issue, decision item) is recorded. It
   is not a resolution.
 
 ## Record the outcome

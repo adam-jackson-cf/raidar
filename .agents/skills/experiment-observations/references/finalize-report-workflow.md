@@ -6,9 +6,9 @@
    user names a path.
 2. Make the report evidence-first. Include: the question and the cohort (jobs,
    lock, arms, attempts, exclusions); provenance (lock digest, problem pin,
-   agent, model, effort, condition digests); per-arm outcomes; the analysis
-   verdicts as stated in `analysis.json`; quality components; process and
-   manipulation-check evidence; per-checkpoint evidence; reconciled fault
+   agent release, model, reasoning, workflow release digests); per-arm outcomes; the analysis
+   verdicts as stated in `analysis.json`; quality components; process
+   evidence; per-checkpoint evidence; reconciled fault
    entries; limitations; and a measured interpretation that separates
    observation from inference.
 3. Keep `Reached` (execution coverage) distinct from `Solved` (every graded case
@@ -28,16 +28,11 @@
    | --- | --- | --- | --- | --- | --- | --- | --- | --- |
    | `<arm>` | `<n/planned>` | `<mean>` | `<value>` | `<k/n>` | `<value>` | `<value or Unavailable>` | `<USD>` | `<s>` |
 
-   `Effects (treatment vs <baseline arm>)`
+   `Effects (arm vs <baseline arm>)`
 
    | Metric | View | n | Δ [95% CI] | Verdict |
    | --- | --- | --- | --- | --- |
    | `<metric>` | `<view>` | `<pairs>` | `<delta [lo, hi]>` | `<verdict from analysis.json>` |
-
-   `Manipulation check`
-
-   | Check | Baseline share | Treatment share | p | Verdict |
-   | --- | --- | --- | --- | --- |
 
    `Observed fault types`
 

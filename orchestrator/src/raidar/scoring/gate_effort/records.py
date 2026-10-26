@@ -1,6 +1,6 @@
 """One step's ``guardrail-gate@1`` record, read back from the step's agent logs.
 
-The wrapper (``raidar.subject.treatment.runtime.guardrail_gate``) writes
+The workflow's guardrail gate writes
 ``guardrail-gate/guardrail-gate.json`` under the step's agent log dir (the
 scorer's ``trace_dir``): every session (role, round, usage, duration) and
 every gate run (verdict, error, output log, report dir, duration). This module
@@ -17,7 +17,7 @@ reads that record and, per gate run, the blocking findings the gate reported:
    run in an unrecognised format has an unknown count.
 
 Nothing is written. The contract constants are repeated here, not imported
-from the component, so the scorer's identity does not move with the wrapper's
+from the workflow, so the scorer's identity does not move with the workflow's
 runtime code.
 """
 

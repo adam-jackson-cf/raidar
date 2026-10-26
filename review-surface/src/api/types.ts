@@ -7,7 +7,7 @@ export interface RunRecord {
   name: string;
   /** Problem id. */
   problem: string;
-  /** Label of the arm's condition; arms of one condition on different harnesses share it. */
+  /** The experiment's arm id. */
   arm: string;
   harness: string;
   model: string;
@@ -126,6 +126,7 @@ export interface ExperimentRecord {
   arm: string | null;
   harness: string | null;
   model: string | null;
+  reasoning_effort: string | null;
   agent_spec: string;
   synthetic: boolean;
   repeats: number | null;
@@ -165,29 +166,6 @@ export interface ExperimentRecord {
   created_at_utc: string | null;
   run_ids: string[];
 }
-
-export interface DiffLine {
-  type: 'context' | 'added' | 'removed';
-  text: string;
-}
-
-export interface FileDiff {
-  path: string;
-  diff: { added: number; removed: number; truncated: boolean; lines: DiffLine[] };
-}
-
-export interface ArmDiff {
-  key: string;
-  problem: string;
-  from_arm: string;
-  to_arm: string;
-  summary: string[];
-  comparable_warnings: string[];
-  sections?: Record<string, FileDiff>;
-  files: { condition: FileDiff; prompt: FileDiff };
-}
-
 export interface ExperimentsResponse {
   experiments: ExperimentRecord[];
-  arm_diffs: ArmDiff[];
 }

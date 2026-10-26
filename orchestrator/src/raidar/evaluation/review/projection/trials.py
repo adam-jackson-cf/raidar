@@ -6,7 +6,7 @@ The span tree is::
       <harness> · <model>                       AGENT_ROOT
         <checkpoint>                            one per attempted checkpoint
           system/user prompt, assistant message, tool calls   (ATIF)
-      verification gates                        gate:<checkpoint>, gate:infra, gate:component-probes
+      verification gates                        gate:<checkpoint>, gate:infra, gate:lab-checks
       scoring                                   scorer:* / metric:* (headline metric)
       execution validity                        validity checks, reached, progression
       process metrics                           N1 phases, usage, unweighted scorer observations
@@ -38,8 +38,7 @@ _POLICY_SCORERS = frozenset({CORRECTNESS_REF, CODE_QUALITY_REF})
 class ArmLabels:
     """How a trial's arm reads on the surface.
 
-    ``arm`` is the label of the arm's condition (``experiment_epoch._condition_labels``),
-    so arms of one condition on different harnesses share it.
+    ``arm`` is the experiment's arm id.
     """
 
     experiment_id: str

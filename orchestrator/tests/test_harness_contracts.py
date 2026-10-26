@@ -47,12 +47,6 @@ def test_file_credentials_declare_file_sources_and_mounts() -> None:
 
 
 def test_rule_filenames_cover_every_harness_and_unknown_harnesses_are_refused() -> None:
-    assert set(harness_rule_filenames()) == {
-        "AGENTS.md",
-        "CLAUDE.md",
-        "GEMINI.md",
-        "copilot-instructions.md",
-        "user-rules-setting.md",
-    }
+    assert set(harness_rule_filenames()) == {"AGENTS.md", "CLAUDE.md"}
     with pytest.raises(HarnessDefinitionError, match="Unknown harness 'nope'"):
         harness_definition("nope")

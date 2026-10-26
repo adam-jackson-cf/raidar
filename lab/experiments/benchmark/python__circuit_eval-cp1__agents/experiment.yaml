@@ -1,14 +1,13 @@
-# Agent benchmark: the one-shot problem
-# once per agent the Python pack bakes in. kind benchmark: the agent is the factor under
-# one condition, so each arm is one agent and codex is the reference agent; analysis
-# gives paired verdicts against it plus a ranking view. Versions equal the pack.yaml
-# pins (the lock refuses any other, RT5). One attempt is a smoke-sized benchmark:
-# validate warns below 5 attempts. Formerly examples/smoke/agents.experiment.yaml
-# (id smoke-agents).
-schema_version: 2
+# Agent benchmark: the one-shot problem once per released agent, every arm on one workflow
+# (one-shot@1): the agent is what varies, and codex is the reference agent; analysis gives
+# paired verdicts against it plus a ranking view. Today the only agent release is codex@1
+# (lab/releases.yaml), so the benchmark has one arm; add an agent and an arm when another
+# agent is released. One attempt is a smoke-sized benchmark: validate warns below 5 attempts.
+# Formerly examples/smoke/agents.experiment.yaml (id smoke-agents).
+schema_version: 3
 kind: benchmark
 id: python__circuit_eval-cp1__agents
-description: Every pack agent on the smoke problem; a smoke-sized benchmark.
+description: Every released agent on the smoke problem; a smoke-sized benchmark.
 
 problems:
   - ref: scb/circuit_eval.checkpoint_1@38d627ecf668
@@ -17,35 +16,17 @@ runtime: python
 
 agents:
   - id: codex
-    name: codex
-    provider: openai
+    release: codex@1
     model: gpt-6-luna
-    reasoning_effort: low
-    version: 0.156.1
-  - id: claude
-    name: claude-code
-    provider: anthropic
-    # Claude Code smokes run the cheapest model, claude-haiku-4-5, which has no
-    # effort levels, so reasoning_effort stays unset.
-    model: claude-haiku-4-5
-    version: 2.1.285
+    reasoning: low
 
 protocol:
   agent_timeout_sec: 1800
 
-factors: [agent]
-
-conditions:
-  - id: baseline
-    components: []
-
 arms:
   - id: codex
-    condition: baseline
     agent: codex
-  - id: claude
-    condition: baseline
-    agent: claude
+    workflow: one-shot@1
 
 assessment:
   scorers: [correctness@2]

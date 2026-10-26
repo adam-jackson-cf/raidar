@@ -392,9 +392,9 @@ def test_scorers_without_an_implementation_cannot_assess() -> None:
 def test_lock_records_scorer_manifests_and_tool_pins_byte_identically(tmp_path: Path) -> None:
     scorers = _committed_scorer_refs()
     path = write_experiment(tmp_path, experiment_document(assessment={"scorers": scorers}))
-    problem, component, _ = fixture_resolvers()
+    problem, agent, workflow, _ = fixture_resolvers()
     resolvers = ResolverSet(
-        [problem, component, MetricResolver(), scorer_resolver()], entry_point_group=None
+        [problem, agent, workflow, MetricResolver(), scorer_resolver()], entry_point_group=None
     )
     lock_path = path.with_name("experiment.lock.json")
     first = render_lock(build_lock(load_experiment(path), lock_path=lock_path, resolvers=resolvers))

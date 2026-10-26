@@ -22,15 +22,21 @@ from raidar.engine.health.tool_tree import ToolTreeWatch, load_tool_hashes
 from raidar.engine.target.config import activate
 from raidar.engine.trial.cleanup import cleanup_trial_projects
 from raidar.engine.trial.environment import RUN_SCOPED_DOCKER_IMPORT_PATH, SCOPE_KWARG, run_scope
-from raidar.subject.treatment.runtime.provision import (
-    install_trial_provisioning,
-    trial_provisions,
-)
-from tests.component_support import PROBE_DIR, compile_uses, use
-from tests.component_trial_support import build_task, docker_target, docker_target_ready
+from raidar.engine.trial.provision import PayloadFile, TrialProvision, install_trial_provisioning
+from tests.docker_trial_support import build_task, docker_target, docker_target_ready
 
-TOOL = "/opt/raidar-tools/01-lint-tool/ruff-0.8.6/bin/ruff"
+TOOL = "/opt/raidar-tools/probe-tool/bin/probe"
 STEPS = ("checkpoint_1", "checkpoint_2")
+# A root-owned tool in the provisioned tree, the shape every lab provision installs.
+PROBE_PROVISION = TrialProvision(
+    slug="probe-tool",
+    payload={"probe": PayloadFile(b"#!/bin/sh\necho probe\n", executable=True)},
+    install=(
+        'mkdir -p /opt/raidar-tools/probe-tool/bin && cp "$RAIDAR_PAYLOAD_DIR/probe" '
+        f"{TOOL} && chmod 755 {TOOL}"
+    ),
+    check=f"test -x {TOOL}",
+)
 
 pytestmark = pytest.mark.skipif(
     not docker_target_ready(),
@@ -39,11 +45,8 @@ pytestmark = pytest.mark.skipif(
 
 
 async def _run(tmp_path: Path, tamper_on_step: int | None) -> Path:
-    compiled = compile_uses(
-        use("lint-config@2", (f"{PROBE_DIR}/ruff.toml",)), use("lint-tool@2", config="ruff.toml")
-    )
     task = tmp_path / "task"
-    build_task(task, compiled, {step: step for step in STEPS})
+    build_task(task, {step: step for step in STEPS}, reset=False)
     activate(docker_target())
     trials_dir = tmp_path / "trials"
     config = TrialConfig(
@@ -61,7 +64,7 @@ async def _run(tmp_path: Path, tamper_on_step: int | None) -> Path:
     )
     try:
         trial = await Trial.create(config)
-        install_trial_provisioning(trial, trial_provisions(compiled))
+        install_trial_provisioning(trial, [PROBE_PROVISION])
         watch = ToolTreeWatch(trial, SimpleNamespace(resolve_step=lambda name: name))  # type: ignore[arg-type]
         ends = 0
 

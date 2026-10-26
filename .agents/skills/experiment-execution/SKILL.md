@@ -15,7 +15,7 @@ description: "Use when launching, monitoring or cleaning up a Raidar experiment 
 - Require a clean smoke matching toolchain, pack, every arm's agent/model/effort and target.
   Every executed smoke step must change /app; a question-only step does not qualify.
 - Never use ALLOW_UNSMOKED=1 for confirm. Record any explicitly requested explore override.
-- Relock changed experiments, components or problem pins before execution.
+- Relock changed experiments, agent or workflow releases or problem pins before execution.
   Give each job a new JOB_ID; never reuse a job directory.
 
 ## Launch and monitor

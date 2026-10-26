@@ -20,14 +20,6 @@ from tests.experiment_spec_support import (
     write_experiment,
 )
 
-CLAUDE = {
-    "id": "claude",
-    "name": "claude-code",
-    "provider": "anthropic",
-    "model": "claude-haiku-4-5",
-    "version": "2.1.285",
-}
-
 
 def _issues(path: Path) -> dict[str, str]:
     with pytest.raises(SpecValidationError) as caught:
@@ -36,14 +28,14 @@ def _issues(path: Path) -> dict[str, str]:
 
 
 def _benchmark(**changes: Any) -> dict[str, Any]:
-    document = experiment_document(**{"kind": "benchmark", "factors": ["agent"], **changes})
-    document["agents"].append(dict(CLAUDE))
-    document["conditions"] = [{"id": "baseline", "components": []}]
+    """Two agents (same release, two names) on one workflow."""
+    document = experiment_document(kind="benchmark", **changes)
+    document["agents"].append({**document["agents"][0], "id": "second"})
     document["arms"] = [
-        {"id": "codex", "condition": "baseline", "agent": "luna"},
-        {"id": "claude", "condition": "baseline", "agent": "claude"},
+        {"id": "first", "agent": "luna", "workflow": "one-shot@1"},
+        {"id": "second", "agent": "second", "workflow": "one-shot@1"},
     ]
-    document["analysis"]["baseline_arm"] = "codex"
+    document["analysis"]["baseline_arm"] = "first"
     return document
 
 
@@ -68,44 +60,23 @@ def test_research_loop_is_reserved(tmp_path: Path) -> None:
     assert "[KIND0]" in issues["kind"]
 
 
-@pytest.mark.parametrize(
-    ("changes", "loc"),
-    [
-        ({"factors": ["agent.model"]}, "factors"),
-        ({"factors": []}, "factors"),
-        ({"conditions": [{"id": "baseline", "components": []}]}, "conditions"),
-    ],
-)
-def test_an_ab_test_compares_conditions(tmp_path: Path, changes: dict[str, Any], loc: str) -> None:
-    document = experiment_document(**changes)
-    if "conditions" in changes:
-        document["arms"] = [{"id": "baseline", "condition": "baseline", "agent": "luna"}]
-    issues = _issues(write_experiment(tmp_path, document))
+def test_an_ab_test_compares_at_least_two_arms(tmp_path: Path) -> None:
+    document = experiment_document(arms=[experiment_document()["arms"][0]])
 
-    assert "[KIND1]" in issues[loc]
+    assert "[KIND1]" in _issues(write_experiment(tmp_path, document))["arms"]
 
 
-def test_an_ab_test_may_add_agent_factors(tmp_path: Path) -> None:
-    document = experiment_document(factors=["condition", "agent"])
-    document["agents"].append(dict(CLAUDE))
-    document["arms"].append({"id": "claude-guided", "condition": "guided", "agent": "claude"})
-
-    assert load_experiment(write_experiment(tmp_path, document)).spec.kind == "ab-test"
-
-
-def test_a_benchmark_compares_agents_under_one_condition(tmp_path: Path) -> None:
+def test_a_benchmark_compares_agents_under_one_workflow(tmp_path: Path) -> None:
     spec = load_experiment(write_experiment(tmp_path / "ok", _benchmark())).spec
     assert spec.kind == "benchmark"
     assert [w.loc for w in spec_warnings(spec)] == []
 
-    with_condition = _benchmark(factors=["condition", "agent"])
-    two_conditions = _benchmark()
-    two_conditions["conditions"].append({"id": "guided", "components": []})
-    no_factors = _benchmark(factors=[])
+    # The tree holds one workflow, so a second one is refused as unreleased (KIND2 itself is
+    # pinned on the parsed spec in test_experiment_spec_behaviors).
+    two_workflows = _benchmark()
+    two_workflows["arms"][1]["workflow"] = "other@1"
 
-    assert "[KIND2]" in _issues(write_experiment(tmp_path / "c", with_condition))["factors"]
-    assert "[KIND2]" in _issues(write_experiment(tmp_path / "2", two_conditions))["conditions"]
-    assert "[KIND2]" in _issues(write_experiment(tmp_path / "0", no_factors))["factors"]
+    assert "arms.1.workflow" in _issues(write_experiment(tmp_path / "2", two_workflows))
 
 
 def test_rank_by_is_a_benchmark_setting_naming_an_outcome_metric(tmp_path: Path) -> None:
@@ -128,8 +99,7 @@ def test_rank_by_is_a_benchmark_setting_naming_an_outcome_metric(tmp_path: Path)
 def test_small_benchmarks_and_smoke_runs_validate_with_warnings(tmp_path: Path) -> None:
     small = _benchmark()
     small["analysis"]["attempts"] = 2
-    smoke = experiment_document(kind="smoke", factors=[])
-    smoke["conditions"] = smoke["conditions"][:1]
+    smoke = experiment_document(kind="smoke")
     smoke["arms"] = smoke["arms"][:1]
     runner = CliRunner()
 
@@ -208,10 +178,9 @@ def test_name2_the_id_is_runtime_subject_intent(tmp_path: Path, experiment_id: s
 
 
 def test_naming_and_kind_issues_are_reported_with_the_others_at_once(tmp_path: Path) -> None:
-    document = experiment_document(id="fixture", factors=["agent.model"])
-    document["agents"][0]["name"] = "codex"
+    document = experiment_document(id="fixture", arms=[experiment_document()["arms"][0]])
     document["analysis"]["baseline_arm"] = "missing"
 
     issues = _issues(write_experiment(tmp_path, document))
 
-    assert {"id", "factors", "analysis.baseline_arm"} <= set(issues)
+    assert {"id", "arms", "analysis.baseline_arm"} <= set(issues)

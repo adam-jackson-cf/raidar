@@ -1,15 +1,16 @@
 """Field-level validation errors and cross-reference rules for experiments.
 
-Besides the cross-reference rules and the factor guard, schema v2 adds:
+Besides the cross-reference rules, schema v3 checks:
 
-- kind rules (``KIND0``-``KIND3``): ``research-loop`` is reserved; an
-  ``ab-test`` compares conditions; a ``benchmark`` compares agents under one
-  condition; ``analysis.rank_by`` is a benchmark setting;
+- release rules: every agent names a release the tree holds (``lab/releases.yaml``) and one
+  of that agent's models with one of its reasoning levels; every arm's workflow release is
+  the one the tree holds;
+- kind rules (``KIND0``-``KIND3``): ``research-loop`` is reserved; an ``ab-test`` compares
+  at least two arms; a ``benchmark`` compares agents, so every arm runs one workflow;
+  ``analysis.rank_by`` is a benchmark setting;
 - naming rules (``NAME1``, ``NAME2``): an experiment under
   ``experiments/<kind>/<id>/`` sits in the directory of its kind and id, and
   its id is ``<runtime>__<subject>__<intent>`` with the experiment's runtime.
-
-They forbid contradictions only; designs the factor guard allows stay allowed.
 """
 
 from __future__ import annotations
@@ -21,8 +22,8 @@ from pathlib import Path
 from pydantic import ValidationError
 
 from raidar.contract.references import RegistryReferenceError
-from raidar.design.experiment.agent_support import agent_support_issues
-from raidar.design.experiment.factor_guard import check_factors
+from raidar.contract.releases import ReleaseError
+from raidar.design.experiment.arm import entry_issues
 from raidar.design.experiment.schema import (
     BENCHMARK_MIN_ATTEMPTS,
     EXPERIMENT_KINDS,
@@ -30,9 +31,9 @@ from raidar.design.experiment.schema import (
     ExperimentSpec,
 )
 from raidar.scoring.catalog.builtin import BUILTIN_PROTOCOL_CONFIG
-from raidar.scoring.catalog.checks import CHECK_SCORERS
 from raidar.scoring.catalog.outcomes import ALL_METRICS, OUTCOME_METRICS
 from raidar.scoring.framework.metrics import DEFAULT_METRIC_REGISTRY, MetricRegistry
+from raidar.subject.releases import released_agent, released_workflow
 
 EXPERIMENTS_ROOT = "experiments"
 ID_SEPARATOR = "__"
@@ -88,16 +89,12 @@ def _duplicate_values(section: str, values: Iterable[str]) -> list[FieldIssue]:
 
 def _reference_issues(spec: ExperimentSpec) -> list[FieldIssue]:
     agent_ids = {agent.id for agent in spec.agents}
-    condition_ids = {condition.id for condition in spec.conditions}
     arm_ids = {arm.id for arm in spec.arms}
-    issues: list[FieldIssue] = []
-    for index, arm in enumerate(spec.arms):
-        if arm.agent not in agent_ids:
-            issues.append(FieldIssue(f"arms.{index}.agent", f"unknown agent {arm.agent!r}"))
-        if arm.condition not in condition_ids:
-            issues.append(
-                FieldIssue(f"arms.{index}.condition", f"unknown condition {arm.condition!r}")
-            )
+    issues = [
+        FieldIssue(f"arms.{index}.agent", f"unknown agent {arm.agent!r}")
+        for index, arm in enumerate(spec.arms)
+        if arm.agent not in agent_ids
+    ]
     if spec.analysis.baseline_arm not in arm_ids:
         issues.append(
             FieldIssue("analysis.baseline_arm", f"unknown arm {spec.analysis.baseline_arm!r}")
@@ -105,74 +102,29 @@ def _reference_issues(spec: ExperimentSpec) -> list[FieldIssue]:
     return issues
 
 
-def _agent_issues(spec: ExperimentSpec) -> list[FieldIssue]:
-    return [
-        FieldIssue(loc, message)
-        for index, agent in enumerate(spec.agents)
-        for loc, message in agent_support_issues(index, agent)
-    ]
-
-
-def _path_owner(path: str, owner: str) -> bool:
-    return path == owner or path.startswith(f"{owner}/") or owner.startswith(f"{path}/")
-
-
-def _resolved_task_owner(base_dir: Path, relative: str, task_dirs: list[str]) -> str | None:
-    root = base_dir / relative
-    owners = [(task, (base_dir / task).resolve()) for task in task_dirs]
-    candidates = (root, *root.rglob("*")) if root.is_dir() else (root,)
-    for candidate in candidates:
-        resolved = candidate.resolve()
-        for task, owner in owners:
-            if resolved.is_relative_to(owner) or owner.is_relative_to(resolved):
-                return task
-    return None
-
-
-def _task_owner(base_dir: Path | None, relative: str, task_dirs: list[str]) -> str | None:
-    """Identify task overlap by declaration and, when available, filesystem identity."""
-    owner = next((task for task in task_dirs if _path_owner(relative, task)), None)
-    if owner is not None or base_dir is None or not task_dirs:
-        return owner
-    return _resolved_task_owner(base_dir, relative, task_dirs)
-
-
-def _component_overlay_issues(
-    spec: ExperimentSpec, *, base_dir: Path | None = None
-) -> list[FieldIssue]:
-    """Component files may not overlap a local problem's task directory (F4).
-
-    Overlaying task files (including hidden ``tests/``) into the agent's
-    workspace would leak the verifier, so the overlap is refused at the spec.
-    """
-    task_dirs = [problem.path for problem in spec.problems if problem.path is not None]
+def _release_issues(spec: ExperimentSpec) -> list[FieldIssue]:
+    """Agent and workflow releases the tree holds, and models and reasoning they offer."""
     issues: list[FieldIssue] = []
-    for loc, component in spec.component_uses():
-        for f_index, relative in enumerate(component.files):
-            owner = _task_owner(base_dir, relative, task_dirs)
-            if owner is not None:
-                issues.append(
-                    FieldIssue(
-                        f"{loc}.files.{f_index}",
-                        f"overlaps local problem task directory {owner!r}; component "
-                        "files may not include task or hidden test files",
-                    )
-                )
+    for index, agent in enumerate(spec.agents):
+        try:
+            released = released_agent(agent.release)
+        except ReleaseError as exc:
+            issues.append(FieldIssue(f"agents.{index}.release", str(exc)))
+            continue
+        issues += [
+            FieldIssue(f"agents.{index}.{name}", message)
+            for name, message in entry_issues(agent, released)
+        ]
+    checked: set[str] = set()
+    for index, arm in enumerate(spec.arms):
+        if arm.workflow in checked:
+            continue
+        checked.add(arm.workflow)
+        try:
+            released_workflow(arm.workflow)
+        except ReleaseError as exc:
+            issues.append(FieldIssue(f"arms.{index}.workflow", str(exc)))
     return issues
-
-
-def _shared_component_issues(spec: ExperimentSpec) -> list[FieldIssue]:
-    """A condition may not repeat a shared component: the arms would not share it alone."""
-    shared = {use.use for use in spec.shared_components}
-    return [
-        FieldIssue(
-            f"conditions.{c_index}.components.{u_index}.use",
-            f"{use.use} is already in shared_components, which every condition gets",
-        )
-        for c_index, condition in enumerate(spec.conditions)
-        for u_index, use in enumerate(condition.components)
-        if use.use in shared
-    ]
 
 
 def _metric_issues(spec: ExperimentSpec, metrics: MetricRegistry) -> list[FieldIssue]:
@@ -186,44 +138,17 @@ def _metric_issues(spec: ExperimentSpec, metrics: MetricRegistry) -> list[FieldI
     return []
 
 
-def _agent_factor(factor: str) -> bool:
-    return factor == "agent" or factor.startswith("agent.")
-
-
-def _ab_test_issues(spec: ExperimentSpec) -> list[FieldIssue]:
-    issues = []
-    if "condition" not in spec.factors:
-        issues.append(
-            FieldIssue(
-                "factors",
-                "[KIND1] an ab-test compares conditions: factors must include 'condition' "
-                "(agent.* factors may be added)",
-            )
-        )
-    if len(spec.conditions) < 2:
-        issues.append(FieldIssue("conditions", "[KIND1] an ab-test needs at least two conditions"))
-    return issues
-
-
 def _benchmark_issues(spec: ExperimentSpec) -> list[FieldIssue]:
-    issues = []
-    if not spec.factors or not all(_agent_factor(factor) for factor in spec.factors):
-        issues.append(
+    workflows = sorted({arm.workflow for arm in spec.arms})
+    if len(workflows) > 1:
+        return [
             FieldIssue(
-                "factors",
-                "[KIND2] a benchmark compares agents: factors must be a non-empty set of "
-                "agent factors (agent, agent.name, agent.model, ...), never 'condition'",
+                "arms",
+                f"[KIND2] a benchmark compares agents: every arm runs one workflow, "
+                f"not {workflows}",
             )
-        )
-    if len(spec.conditions) != 1:
-        issues.append(
-            FieldIssue(
-                "conditions",
-                "[KIND2] a benchmark runs every agent under exactly one condition "
-                "(put shared framing in shared_components)",
-            )
-        )
-    return issues
+        ]
+    return []
 
 
 def kind_issues(spec: ExperimentSpec) -> list[FieldIssue]:
@@ -237,8 +162,8 @@ def kind_issues(spec: ExperimentSpec) -> list[FieldIssue]:
             )
         ]
     issues = []
-    if spec.kind == "ab-test":
-        issues.extend(_ab_test_issues(spec))
+    if spec.kind == "ab-test" and len(spec.arms) < 2:
+        issues.append(FieldIssue("arms", "[KIND1] an ab-test compares at least two arms"))
     elif spec.kind == "benchmark":
         issues.extend(_benchmark_issues(spec))
     if spec.analysis.rank_by is not None and spec.kind != "benchmark":
@@ -367,28 +292,6 @@ def _min_effect_issues(spec: ExperimentSpec) -> list[FieldIssue]:
     return issues
 
 
-def _manipulation_check_issues(spec: ExperimentSpec) -> list[FieldIssue]:
-    """A pre-registered check must exist and a declared scorer must report it."""
-    declared = set(spec.assessment.scorers)
-    issues = []
-    for index, item in enumerate(spec.analysis.manipulation_checks or ()):
-        where = f"analysis.manipulation_checks.{index}.check"
-        if item.check not in CHECK_SCORERS:
-            known = ", ".join(sorted(CHECK_SCORERS))
-            issues.append(FieldIssue(where, f"unknown check {item.check!r}; known: {known}"))
-            continue
-        refs = CHECK_SCORERS[item.check][1]
-        if not declared & set(refs):
-            issues.append(
-                FieldIssue(
-                    where,
-                    f"{item.check} is reported by {' or '.join(refs)}; declare it in "
-                    "assessment.scorers",
-                )
-            )
-    return issues
-
-
 ProtocolConfigKeys = Mapping[str, Iterable[str]]
 """``{scorer ref: ProtocolSpec field names it takes from the protocol}``."""
 
@@ -438,28 +341,20 @@ def semantic_issues(
     *,
     path: Path | None = None,
 ) -> list[FieldIssue]:
-    """Cross-reference, kind and naming rules plus the factor guard, each with a location."""
-    structural = [
+    """Cross-reference, release, kind and naming rules, each with a location."""
+    return [
         *_duplicate_ids("agents", (agent.id for agent in spec.agents)),
-        *_duplicate_ids("conditions", (condition.id for condition in spec.conditions)),
         *_duplicate_ids("arms", (arm.id for arm in spec.arms)),
         *_duplicate_values("problems", (problem.label for problem in spec.problems)),
         *_duplicate_values("assessment.scorers", spec.assessment.scorers),
-        *_duplicate_values("factors", spec.factors),
         *_reference_issues(spec),
-        *_agent_issues(spec),
-        *_component_overlay_issues(spec, base_dir=path.parent if path is not None else None),
-        *_shared_component_issues(spec),
+        *_release_issues(spec),
         *_metric_issues(spec, metrics),
         *_min_effect_issues(spec),
-        *_manipulation_check_issues(spec),
         *_protocol_config_issues(
             spec, _default_protocol_config() if protocol_config is None else protocol_config
         ),
         *_errata_config_issues(spec),
+        *kind_issues(spec),
+        *name_issues(spec, path),
     ]
-    labels = [*kind_issues(spec), *name_issues(spec, path)]
-    if structural:
-        # The factor guard needs resolvable arm references and unique ids.
-        return [*structural, *labels]
-    return [*labels, *(FieldIssue(item.loc, item.message) for item in check_factors(spec))]

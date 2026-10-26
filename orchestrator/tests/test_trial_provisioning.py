@@ -4,8 +4,7 @@ The install of a ``TrialProvision`` runs once, as root, right after the
 container starts (inside ``RunScopedDockerEnvironment.start``, so its time is
 ``environment_start``), from a payload uploaded to a root-only staging dir; the
 per-step check runs as the agent user before every step's agent and each step
-records the outcome. A frozen ``Provision`` keeps its released path.
-"""
+records the outcome."""
 
 from __future__ import annotations
 
@@ -21,23 +20,21 @@ from harbor.trial.hooks import TrialEvent
 
 from raidar.engine.trial import environment as env_module
 from raidar.engine.trial.environment import RunScopedDockerEnvironment
-from raidar.subject.treatment.definition.contribution import SupportFile, evidence_log
-from raidar.subject.treatment.runtime.provision import (
+from raidar.engine.trial.provision import (
     AGENT_USER_ENV,
     INSTALL_PHASE,
     PAYLOAD_ENV,
-    PROVISION_CHANNEL,
     STAGING_ROOT,
-    Provision,
+    PayloadFile,
     TrialProvision,
     install_trial_provisioning,
+    provision_log,
 )
 
-SLUG = "02-tool"
+SLUG = "tool"
 PROVISION = TrialProvision(
     SLUG,
-    "tool@3",
-    {"bin/tool": SupportFile(b"#!/bin/sh\n", executable=True), "config/a.toml": SupportFile(b"x")},
+    {"bin/tool": PayloadFile(b"#!/bin/sh\n", executable=True), "config/a.toml": PayloadFile(b"x")},
     "INSTALL",
     "CHECK",
 )
@@ -120,7 +117,7 @@ def test_the_install_runs_once_at_start_and_every_step_only_checks() -> None:
     ((files, target),) = env.uploads
     assert (set(files), target) == ({"bin/tool", "config/a.toml"}, staging)
     first, second = (record for _, record in env.records)
-    assert {target for target, _ in env.records} == {str(evidence_log(SLUG, PROVISION_CHANNEL))}
+    assert {target for target, _ in env.records} == {str(provision_log(SLUG))}
     assert (first["step"], second["step"]) == ("checkpoint_1", "checkpoint_2")
     assert first["install"]["phase"] == INSTALL_PHASE
     assert first["install"]["ok"] is True
@@ -151,13 +148,7 @@ def test_an_environment_that_cannot_run_work_at_start_records_a_failed_install()
     assert "cannot run an install at environment start" in record["install"]["output"]
 
 
-def test_a_first_step_provision_runs_beside_a_trial_provision() -> None:
-    env = _Env()
-    first_step = Provision("01-lint-tool", "lint-tool@2", "INSTALL", "CHECK")
-    hooks = _trial(env, [first_step, PROVISION])
-
-    assert len(hooks[TrialEvent.AGENT_START]) == 2
-    assert len(env.hooks) == 1, "only the trial provision installs at environment start"
+def test_no_provisions_install_nothing() -> None:
     assert _trial(_Env(), []) == {}
 
 

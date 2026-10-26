@@ -4,9 +4,8 @@ The imported, agent-visible task is copied per trial and then:
 
 - truncated to the trial's steps (``max_checkpoints``), dropping later step dirs;
 - given ``[[steps]].min_reward`` when the protocol halts on failure (D3);
-- given the arm's compiled condition: each step's ``workdir/setup.sh`` (the
-  per-step context reset plus component support files) and the first step's
-  workspace overlay (WS-C);
+- given each step's ``workdir/setup.sh`` (the per-step context reset,
+  ``raidar.engine.health.setup_script``) and the network boundary of the arm's provider;
 - for a no-LLM ``oracle`` agent override only, given per-step solutions that
   install the problem's host-only reference payloads (the validation engine's
   ``solve.sh``). Real arms never carry solutions.
@@ -25,14 +24,13 @@ from pathlib import Path
 import yaml
 
 from raidar.contract.trial import ProgressionRule
-from raidar.design.experiment.arm import compile_arm
+from raidar.design.experiment.arm import resolve_arm
 from raidar.design.experiment.loader import LoadedExperiment
 from raidar.design.problem.content import content_digest
 from raidar.design.problem.harbor_engine import SOLVE_SH
+from raidar.engine.health.setup_script import write_setup_scripts
 from raidar.engine.trial.task_config import configure_trial_task
 from raidar.subject.environment.python.image import image_present
-from raidar.subject.treatment import CompiledCondition
-from raidar.subject.treatment.runtime.provision import AnyProvision, trial_provisions
 
 COMPOSE_FILE = "environment/docker-compose.yaml"
 
@@ -45,13 +43,7 @@ class MaterialiseError(ValueError):
 class MaterialisedTask:
     path: Path
     digest: str
-    compiled: CompiledCondition
-    component_apply_s: float
-
-    @property
-    def provisions(self) -> tuple[AnyProvision, ...]:
-        """Per-trial tool installs the arm's components need (``runtime.provision``)."""
-        return trial_provisions(self.compiled)
+    arm_apply_s: float
 
 
 def compose_init(task_dir: Path) -> bool:
@@ -78,19 +70,19 @@ def materialise_task(
     *,
     steps: tuple[str, ...],
     rule: ProgressionRule,
-    condition: tuple[LoadedExperiment, str, str],
+    arm: tuple[LoadedExperiment, str, str],
     references: Mapping[str, Path] | None = None,
 ) -> MaterialisedTask:
     """Build the trial task at ``dest``.
 
-    ``condition`` is ``(loaded, arm_id, planned_digest)``: the arm is compiled
-    again here (timed as the N1 *component apply* phase) and must still match
-    the digest the plan recorded, so a component input that changed after
-    planning is refused rather than run under the old hash.
+    ``arm`` is ``(loaded, arm_id, planned_digest)``: the arm is resolved again here (timed
+    as the N1 *arm apply* phase) and must still have the identity the plan recorded, so a
+    release or stage code that changed after planning is refused rather than run under the
+    old hash.
     """
     if dest.exists():
         raise MaterialiseError(f"{dest} already exists; trial tasks are never reused")
-    loaded, arm_id, planned_digest = condition
+    loaded, arm_id, planned_digest = arm
     if compose_init(source) != loaded.spec.environment.compose_init:
         raise MaterialiseError(
             f"{source}: compose init is {compose_init(source)}, the experiment requires "
@@ -98,28 +90,23 @@ def materialise_task(
         )
     shutil.copytree(source, dest, symlinks=True)
     started = time.perf_counter()
-    compiled: CompiledCondition = compile_arm(loaded.spec, arm_id, base_dir=loaded.base_dir)
-    if compiled.digest != planned_digest:
+    resolved = resolve_arm(loaded.spec, arm_id)
+    digest = str(resolved.identity()["digest"])
+    if digest != planned_digest:
         raise MaterialiseError(
-            f"arm {arm_id!r} compiles to {compiled.digest[:12]}, planned {planned_digest[:12]}"
+            f"arm {arm_id!r} resolves to {digest[:12]}, planned {planned_digest[:12]}"
         )
-    arm = next(arm for arm in loaded.spec.arms if arm.id == arm_id)
     try:
         configure_trial_task(
-            dest,
-            steps,
-            rule,
-            runtime=loaded.spec.runtime,
-            provider=loaded.spec.agent(arm.agent).provider,
-            component_hosts=compiled.network_egress,
+            dest, steps, rule, runtime=loaded.spec.runtime, provider=resolved.agent.provider
         )
     except ValueError as exc:
         raise MaterialiseError(str(exc)) from exc
-    compiled.write_task_steps(dest, list(steps))
-    component_apply_s = time.perf_counter() - started
+    write_setup_scripts(dest, list(steps))
+    arm_apply_s = time.perf_counter() - started
     if references is not None:
         _write_solutions(dest, {step: references[step] for step in steps})
-    return MaterialisedTask(dest, content_digest(dest), compiled, component_apply_s)
+    return MaterialisedTask(dest, content_digest(dest), arm_apply_s)
 
 
 def environment_cold(task_dir: Path) -> bool:

@@ -2,10 +2,10 @@
 # problem x one arm x one attempt, graded by the host-only verifier, correctness only.
 # It proves the experiment path end to end (lock -> Harbor trial -> verifier -> job.json);
 # kind smoke: same engine, but its analysis is stamped not citable. The smoke targets
-# relock it under var/tmp/ with their overrides (agent, attempts, timeout), so this file
+# relock it under var/tmp/ with their overrides (agent release, model, reasoning, attempts, timeout), so this file
 # stays the default. Formerly examples/smoke/experiment.yaml (id smoke).
 # Validate: make experiment-validate EXPERIMENT=lab/experiments/smoke/python__circuit_eval-cp1__agent-health/experiment.yaml
-schema_version: 2
+schema_version: 3
 kind: smoke
 id: python__circuit_eval-cp1__agent-health
 description: Operational smoke of the experiment path; not citable.
@@ -19,23 +19,17 @@ runtime: python
 agents:
   # Real-LLM smokes default to codex + gpt-6-luna at low effort (ADR-001 §2.7).
   - id: agent
-    name: codex
-    provider: openai
+    release: codex@1
     model: gpt-6-luna
-    reasoning_effort: low
-    version: 0.156.1
+    reasoning: low
 
 protocol:
   agent_timeout_sec: 1800
 
-conditions:
-  - id: baseline
-    components: []
-
 arms:
   - id: baseline
-    condition: baseline
     agent: agent
+    workflow: one-shot@1
 
 assessment:
   scorers: [correctness@2]

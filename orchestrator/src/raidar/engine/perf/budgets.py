@@ -52,9 +52,9 @@ N1_REFERENCE_BUDGETS: tuple[Budget, ...] = (
     Budget("grader_image", 1.0, "warm", note="presence check"),
     Budget("grader_image", 180.0, "cold", tripwire=True, note="cold build; tripwire"),
     Budget(
-        "component_apply",
+        "arm_apply",
         2.5,
-        note="provisional; host-side compile+write only (in-container share is per_step_reset)",
+        note="provisional; host-side resolve+write only (in-container share is per_step_reset)",
     ),
     Budget("per_step_reset", 2.0),
     Budget("artifact_collection", 3.5, note="small /app; size term pending"),
@@ -76,7 +76,7 @@ N1_REFERENCE_BUDGETS: tuple[Budget, ...] = (
 _MBP_OVERRIDES: dict[tuple[str, str | None], float] = {
     ("environment_start", "warm"): 5.0,
     ("grader_image", "warm"): 1.0,
-    ("component_apply", None): 0.5,
+    ("arm_apply", None): 0.5,
     ("per_step_reset", None): 2.5,
     ("artifact_collection", None): 2.5,
     ("snapshot_transfer", "artifact"): 0.5,

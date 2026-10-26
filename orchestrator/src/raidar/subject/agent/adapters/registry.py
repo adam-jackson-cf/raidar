@@ -8,10 +8,6 @@ from ..config import Harness
 from .base import HarnessAdapter
 from .claude_code_cli import ClaudeCodeCliAdapter
 from .codex_cli import CodexCliAdapter
-from .copilot_cli import CopilotCliAdapter
-from .cursor_cli import CursorCliAdapter
-from .gemini_cli import GeminiCliAdapter
-from .pi_cli import PiCliAdapter
 
 if TYPE_CHECKING:
     from ..config import AgentSpec
@@ -43,11 +39,5 @@ class AdapterRegistry:
 registry = AdapterRegistry()
 
 
-# Default registrations for existing Harbor-native harnesses
 registry.register(Harness.CLAUDE_CODE, ClaudeCodeCliAdapter)
 registry.register(Harness.CODEX_CLI, CodexCliAdapter)
-registry.register(Harness.GEMINI, GeminiCliAdapter)
-# External CLI harnesses
-registry.register(Harness.CURSOR, CursorCliAdapter)
-registry.register(Harness.COPILOT, CopilotCliAdapter)
-registry.register(Harness.PI, PiCliAdapter)

@@ -19,7 +19,7 @@ from raidar.grading.sandbox import (
     build_copy_in_tar,
     extract_out_tar,
 )
-from tests.component_trial_support import docker_context, docker_target_reachable
+from tests.docker_trial_support import docker_context, docker_target_reachable
 from tests.problems_support import POSITIVE_REF, build_fixture_store
 from tests.verifier_support import LocalProcessSandbox
 

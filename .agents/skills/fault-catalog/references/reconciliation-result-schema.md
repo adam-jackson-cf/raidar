@@ -17,7 +17,7 @@ new record, including a `no change` decision:
 | `canonical_id` | The record ID, such as `FCR-003`. |
 | `exact_fault_type` | The record's exact canonical wording. |
 | `category` | The record's category. |
-| `owner` | The record's owner (component, verifier, problem, harness, analysis). |
+| `owner` | The record's owner (agent release, workflow release, verifier, problem, harness, analysis). |
 | `status` | The record's status after reconciliation. |
 | `affected` | A list of `{experiment, job, arm, model, reasoning_effort, checkpoints}`. |
 | `concise_measured_evidence` | A short measured statement with its per-arm denominators. |
@@ -36,7 +36,7 @@ reconciled_faults:
   - canonical_id: FCR-003
     exact_fault_type: "Exact canonical wording from the record"
     category: Process
-    owner: component
+    owner: workflow
     status: targeted
     affected:
       - experiment: python__forge__guided-pilot

@@ -6,10 +6,10 @@ Maintains a catalog of conceptual fault categories (SlopCodeBench style) observe
 in Raidar jobs. It extracts evidence-backed failure modes from verifier records,
 ATIF trajectories and Assessments, reconciles them against existing Fault
 Category Records, selects controlled targets, and proposes the next revision of
-a condition as component changes only.
+an arm as agent or workflow release changes only.
 
 Ported from `slop-code-bench/.agents/skills/fault-catalog` (SCB) and adapted to
-Raidar's model: jobs, trials, step results, attempts, arms and conditions, the
+Raidar's model: jobs, trials, step results, attempts, arms (agent release plus workflow release), the
 verifier and its rewards, ATIF trajectories, the Assessment store and
 `analysis.json`.
 
@@ -18,13 +18,13 @@ verifier and its rewards, ATIF trajectories, the Assessment store and
 - Analyse a completed job (or an A/B pair of arms) for fault categories.
 - Reconcile a new occurrence or status against existing records.
 - Select the next unresolved fault for a controlled experiment.
-- Propose a candidate condition for the next research-loop iteration.
+- Propose a candidate arm for the next research-loop iteration.
 
 ## Example prompts
 
 - "Extract fault categories from var/jobs/<id>/<job>."
 - "Why is arm B worse than the baseline? Reconcile the evidence with the catalog."
-- "Propose the next revision of that condition as a locked experiment."
+- "Propose the next revision of that arm as a locked experiment."
 
 ## References
 
@@ -48,9 +48,9 @@ Refined in the port:
   attempts, because a Raidar question is usually "why does arm B differ".
 - A `Measurement` category for faults in what is measured (spec-underdetermined
   verifier literals, harness fidelity gaps); such records name an owner outside
-  the component space and are never component targets.
+  the agent and workflow release space and are never release targets.
 - The hidden-test firewall, and a new runbook that turns targeted records into a
-  candidate condition written as a locked, unexecuted ab-test.
+  candidate arm written as a locked, unexecuted ab-test.
 - Failure-mechanism classes for verifier cases (`detail_exact`,
   `detail_contains`, `cli_surface_missing`, ...) in the evidence map.
 
@@ -66,8 +66,8 @@ Still needs refining:
   `make` target that emits a per-case failure matrix (case, origin checkpoint,
   mechanism, arm, attempt) would make the analysis repeatable.
 - **Hidden-test firewall checks** are a judgement call recorded in prose; there
-  is no mechanical check that a component file is free of verifier literals.
-- **Manipulation-check vocabulary.** `process-compliance@1` checks are fixed in
+  is no mechanical check that an agent or workflow file is free of verifier literals.
+- **Process-check vocabulary.** `process-compliance@1` checks are fixed in
   code (`tests_run_before_finish`, `plan_written`); the runbooks cannot yet
   declare which checks a candidate is expected to move.
 - **Status lifecycle across experiments**: a record targeted by an experiment

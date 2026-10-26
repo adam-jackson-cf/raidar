@@ -4,7 +4,7 @@ Harbor ends a timed-out agent by cancelling the host-side ``docker exec``
 client, which leaves the in-container process tree running. Without a reap, a
 timed-out ``codex exec`` keeps editing ``/app`` while artifacts are collected
 and graded, and on into the next step's workdir upload. The per-step
-``setup.sh`` reset (``subject/treatment/runtime/step_reset.sh``) runs too late for that: it
+``setup.sh`` reset (``raidar.engine.health.step_reset.sh``) runs too late for that: it
 runs after the next step's upload and never after the last step.
 
 ``install_agent_reaper`` adds an ``AGENT_END`` hook (Harbor emits it in a
@@ -28,10 +28,10 @@ from harbor.trial.hooks import TrialEvent, TrialHookEvent
 from harbor.trial.trial import Trial
 
 from raidar.contract.snapshot import APP_SOURCE
+from raidar.engine.health.setup_script import AGENT_SETUP_STASH, SETUP_SCRIPT_NAME
 from raidar.grading.bundle import VerifierBundle, load_bundle
 from raidar.grading.guard import current_step
 from raidar.grading.records import step_record_dir
-from raidar.subject.treatment.runtime.setup_script import AGENT_SETUP_STASH, SETUP_SCRIPT_NAME
 
 REAP_REPORT = "agent-reap.json"
 REAP_TIMEOUT_S = 60

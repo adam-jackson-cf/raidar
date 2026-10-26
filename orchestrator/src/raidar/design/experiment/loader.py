@@ -109,8 +109,8 @@ def _typed_value(raw: str) -> object:
     """SCB ``parse_override`` typing: true/false, then int, then float, else str.
 
     Two additions: a value wrapped in matching quotes stays a string, so a
-    numeric-looking string (``agents.0.version='1.10'``) can be set verbatim; and
-    an empty value (``agents.0.reasoning_effort=``) is ``UNSET``, which removes the
+    numeric-looking string (``description='1.10'``) can be set verbatim; and
+    an empty value (``agents.0.reasoning=``) is ``UNSET``, which removes the
     key so the field falls back to its schema default (``''`` sets an empty string).
     """
     if raw == "":

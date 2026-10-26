@@ -1,49 +1,39 @@
 """Agent names, CLI install ids and AgentSpec configuration for Harbor execution.
 
-Schema v2 names an agent by its Harbor ``AgentName`` (``codex``,
-``claude-code``): an agent's identity is that name plus model, kwargs
-(``reasoning_effort``) and the pinned version. ``Harness`` keeps the CLI
-install ids (``codex-cli``) that released component manifests and the Python
-pack image recipe were built with; those artifacts are frozen byte for byte,
+Schema v3 names an agent by its Harbor ``AgentName`` (``codex``,
+``claude-code``): an agent's identity is that name plus model, reasoning and the
+pinned version. ``Harness`` keeps the CLI install ids (``codex-cli``) that the
+Python pack image recipe was built with; that artifact is frozen byte for byte,
 so the ids stay internal and ``agent_cli`` / ``agent_name_for`` map between them.
 """
 
+from collections.abc import Mapping
 from enum import StrEnum
 
 from pydantic import BaseModel, Field
 
 
 class AgentName(StrEnum):
-    """Harbor ``AgentName`` ids an experiment's ``agents[].name`` may use."""
+    """Harbor ``AgentName`` ids an experiment's agent entry may use."""
 
     CODEX = "codex"
     CLAUDE_CODE = "claude-code"
-    GEMINI_CLI = "gemini-cli"
-    CURSOR_CLI = "cursor-cli"
-    COPILOT_CLI = "copilot-cli"
-    PI = "pi"
 
 
 class Harness(StrEnum):
-    """CLI install ids (internal; frozen in released component manifests and pack keys)."""
+    """CLI install ids (internal; frozen in pack keys)."""
 
     CLAUDE_CODE = "claude-code"
     CODEX_CLI = "codex-cli"
-    GEMINI = "gemini"
-    CURSOR = "cursor"
-    COPILOT = "copilot"
-    PI = "pi"
 
 
 _AGENT_CLI: dict[AgentName, Harness] = {
     AgentName.CODEX: Harness.CODEX_CLI,
     AgentName.CLAUDE_CODE: Harness.CLAUDE_CODE,
-    AgentName.GEMINI_CLI: Harness.GEMINI,
-    AgentName.CURSOR_CLI: Harness.CURSOR,
-    AgentName.COPILOT_CLI: Harness.COPILOT,
-    AgentName.PI: Harness.PI,
 }
 _CLI_AGENT: dict[Harness, AgentName] = {cli: name for name, cli in _AGENT_CLI.items()}
+HARBOR_AGENT_NAMES: Mapping[Harness, str] = {cli: name.value for cli, name in _CLI_AGENT.items()}
+"""Harbor 0.23 installed agents Raidar drives, by CLI install id (``codex-cli`` -> ``codex``)."""
 
 
 def agent_cli(name: AgentName | str) -> Harness:

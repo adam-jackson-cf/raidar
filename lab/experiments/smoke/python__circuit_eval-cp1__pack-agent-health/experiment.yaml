@@ -1,9 +1,10 @@
-# Operational smoke: one trial per pack agent, not citable. The agent benchmark
-# remains a separate experiment under lab/experiments/benchmark/.
-schema_version: 2
+# Operational smoke: one trial per released agent, not citable. Today the only agent release
+# is codex@1 (lab/releases.yaml); add an agent and an arm here when another agent is released.
+# The agent benchmark remains a separate experiment under lab/experiments/benchmark/.
+schema_version: 3
 kind: smoke
 id: python__circuit_eval-cp1__pack-agent-health
-description: Operational health of every pack agent; not citable.
+description: Operational health of every released agent; not citable.
 
 problems:
   - ref: scb/circuit_eval.checkpoint_1@38d627ecf668
@@ -12,33 +13,17 @@ runtime: python
 
 agents:
   - id: codex
-    name: codex
-    provider: openai
+    release: codex@1
     model: gpt-6-luna
-    reasoning_effort: low
-    version: 0.156.1
-  - id: claude
-    name: claude-code
-    provider: anthropic
-    model: claude-haiku-4-5
-    version: 2.1.285
+    reasoning: low
 
 protocol:
   agent_timeout_sec: 1800
 
-factors: [agent]
-
-conditions:
-  - id: baseline
-    components: []
-
 arms:
   - id: codex
-    condition: baseline
     agent: codex
-  - id: claude
-    condition: baseline
-    agent: claude
+    workflow: one-shot@1
 
 assessment:
   scorers: [correctness@2]
