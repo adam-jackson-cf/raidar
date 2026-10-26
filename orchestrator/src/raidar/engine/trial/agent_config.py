@@ -66,6 +66,7 @@ def arm_agent_config(
             INNER_KWARG: native.model_dump(mode="json"),
             "workflow": arm.workflow.ref,
             "definition": arm.definition.to_json(),
+            "skills_placement": agent.released.definition.placement.skills,
         },
         override_timeout_sec=float(agent_timeout_sec),
     )

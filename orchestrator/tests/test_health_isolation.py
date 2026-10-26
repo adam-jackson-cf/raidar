@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import shutil
 from pathlib import Path
@@ -63,6 +64,35 @@ def test_agents_lines_must_be_the_workspaces_own(tmp_path: Path) -> None:
     assert "host secret rule" in found.detail
     (app / "AGENTS.override.md").write_text("host secret rule\n")
     assert p8(t).status == "pass"
+
+
+def place_component(t: HealthyTrial, path: str, text: str, sha256: str | None = None) -> None:
+    agent = t.trial_dir / "steps" / STEP / "agent"
+    record = agent / "workflow" / "components" / "rules.md"
+    record.parent.mkdir(parents=True, exist_ok=True)
+    record.write_text(text)
+    flow = json.loads((agent / "workflow" / "workflow.json").read_text())
+    digest = sha256 or hashlib.sha256(text.encode()).hexdigest()
+    flow["components"] = [
+        {"path": path, "sha256": digest, "record": "workflow/components/rules.md"}
+    ]
+    (agent / "workflow" / "workflow.json").write_text(json.dumps(flow))
+
+
+def test_a_recorded_agents_component_allows_exactly_its_own_lines(tmp_path: Path) -> None:
+    t = session(tmp_path, AGENTS.format(body="be terse\nplaced rule"))
+    (t.trial_dir / "steps" / STEP / "artifacts" / "app" / "AGENTS.md").write_text("be terse\n")
+    assert p8(t).status == "violation"
+    place_component(t, "AGENTS.md", "placed rule\n")
+    assert p8(t).status == "pass"
+
+
+def test_a_component_whose_record_is_not_its_digest_is_a_violation(tmp_path: Path) -> None:
+    t = session(tmp_path, roots("/app/.agents/skills"))
+    place_component(t, ".agents/skills/x/SKILL.md", "a skill\n", sha256="0" * 64)
+    found = p8(t)
+    assert found.status == "violation"
+    assert "not the recorded digest" in found.detail
 
 
 def test_agents_text_without_a_stored_snapshot_is_unmeasured(tmp_path: Path) -> None:

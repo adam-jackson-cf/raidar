@@ -20,6 +20,10 @@ result can be trusted, and returns one ``HealthReport`` (``health.json``). Famil
 - **G** the verify gate, only when the workflow records show a verify stage
   (``raidar.engine.health.gate``): ``G1`` the hook's records agree with the seals'; ``G2`` no
   bypass; ``G3`` the gate's tools unchanged.
+- **E** the define stage, only when the workflow records show one
+  (``raidar.engine.health.definition``): ``E1`` every gate-passed checkpoint holds a sealed,
+  passing definition; ``E2`` the recorded ``define`` calls agree with the final draft; ``E3`` an
+  unusable definition is recorded and never passed.
 
 A check without evidence is ``unmeasured`` with its reason, never ``pass``.
 """
@@ -34,6 +38,7 @@ from raidar.contract.harbor_result import span_s
 from raidar.contract.snapshot import tree_digest
 from raidar.contract.trial import CheckpointState, StepResult, TrialRecord
 from raidar.engine.health.base import Audit, make_check
+from raidar.engine.health.definition import check_definition
 from raidar.engine.health.gate import check_gate
 from raidar.engine.health.isolation import check_p8
 from raidar.engine.health.model import PASS, UNMEASURED, VIOLATION, HealthCheck, HealthReport
@@ -280,5 +285,9 @@ def audit_trial(
     audit = Audit(job_dir, trial_dir, record, job)
     return HealthReport(
         trial_id=record.trial.trial_id,
-        checks=(*(check(audit) for check in CHECKS), *check_gate(audit)),
+        checks=(
+            *(check(audit) for check in CHECKS),
+            *check_gate(audit),
+            *check_definition(audit),
+        ),
     )

@@ -298,10 +298,17 @@ def _report(*checks: tuple[str, str]) -> HealthReport:
 
 def test_violations_map_to_validity_checks_and_nothing_else_invalidates() -> None:
     clean = health_validity(
-        _report(("L2", "pass"), ("P3", "pass"), ("T1", "unmeasured"), ("H-target", "violation"))
+        _report(
+            ("L2", "pass"),
+            ("P3", "pass"),
+            ("T1", "unmeasured"),
+            ("E2", "unmeasured"),
+            ("H-target", "violation"),
+        )
     )
     assert [c.name for c in clean] == [
         "health_verdicts", "health_budgets", "health_tamper", "health_isolation", "health_gate",
+        "health_define",
     ]  # fmt: skip
     assert all(c.passed for c in clean)  # H-target is the guard's own target_reachable
     failed = {
@@ -314,6 +321,7 @@ def test_violations_map_to_validity_checks_and_nothing_else_invalidates() -> Non
                 ("L2", "violation"),
                 ("P8", "violation"),
                 ("G2", "violation"),
+                ("E1", "violation"),
             )
         )
     }
@@ -322,6 +330,7 @@ def test_violations_map_to_validity_checks_and_nothing_else_invalidates() -> Non
     assert "H4" in failed["health_budgets"].detail
     assert "T3" in failed["health_tamper"].detail
     assert "G2" in failed["health_gate"].detail
+    assert "E1" in failed["health_define"].detail
 
 
 def test_the_trial_run_writes_health_json_and_maps_its_violations(tmp_path: Path) -> None:

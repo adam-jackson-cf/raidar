@@ -42,10 +42,10 @@
       },
       "scorer": {
         "correctness@2": {
-          "digest": "636dc278b05c754a6fba915430a80a0af694100b027e277bb11f46bc3c38b0ba",
+          "digest": "855fedcc5218a00d889819a067b1e87fe6d431464ab98d48ad2141aa450c1fb1",
           "metadata": {
             "implementation": "raidar.scoring.correctness:correctness_scorer",
-            "implementation_digest": "f3829aae8221fd79ee747c608ba8aca30de8e3081b05d13d70c3887830cf8711",
+            "implementation_digest": "c691fe4ef4a9373ed4ac2eb71a18048789d12ccecf37b67da5bc5519dd60d512",
             "manifest": {
               "description": "Oracle verdicts per checkpoint and trajectory, from the oracle step records.",
               "evidence_required": [
@@ -223,7 +223,7 @@
     },
     "tools": {}
   },
-  "document_sha256": "ca37c0c12ab77d9501444df6862655fa500b25a45c0828fb6040655bc3516160",
+  "document_sha256": "068bae5b48f182a58602aeedaba1fc242d498b654950a8fe654359721e15a19a",
   "execution": {
     "arms": {
       "codex": {
@@ -241,12 +241,12 @@
           "version_pin": "0.156.1",
           "workflow_skills": "placement.skills .agents/skills in the workspace /app"
         },
-        "digest": "acc0c6511c9cf72ea3e710da94e9f6a670ed04ce94fbc95df0d9eba5d792c7be",
+        "digest": "1ec3c3d1adace5255671b34a9121585b4787c69bb48bb0a1bb3bbeb74808d385",
         "model": "gpt-6-luna",
         "provider": "openai",
         "reasoning": "low",
         "stage_code": {
-          "build": "0194365664e16447574af024142d60fe3db3e76dd9339999f0a1e2ef257ee67d"
+          "build": "920077d2fc46ddf74d0ffb33ffe87cf0982e7eb6027a50f6723780a953111437"
         },
         "tool": {
           "binary": "codex",
@@ -379,7 +379,7 @@
     "source_sha256": "3714abd990251d225444e43821a6415a1a556dfb0939042688c560606877476a",
     "spec_sha256": "a2db5cd935a9f5ee4c821522d172698427f69f7a8f29fce989214fad9bbd8d7e"
   },
-  "lock_sha256": "7e203bfb6bac9d4b6529551e839f2d5af99bb0ce9ceb8b9eaeda60d688e06179",
+  "lock_sha256": "0cd63c8e4ec433b12c94aa168e8997372cbde5d2c94da09f2ef0f0eed51ec0ce",
   "lock_version": 4,
   "overrides": {
     "flags": {},
@@ -387,8 +387,8 @@
   },
   "sections": {
     "analysis": "0a0fb32297e0c3abaad1f91cb80990bf42b3a3f0854246915ae017492003d1bc",
-    "assessment": "beed0636db4c26990da7cc102462bab3eb148a498067683917b9292a34407db4",
-    "execution": "7e203bfb6bac9d4b6529551e839f2d5af99bb0ce9ceb8b9eaeda60d688e06179",
+    "assessment": "e550e62b4fa6a5d562f1a14861add406f9cf58a0949a594f8f55ec5f487c90ee",
+    "execution": "0cd63c8e4ec433b12c94aa168e8997372cbde5d2c94da09f2ef0f0eed51ec0ce",
     "toolchain": "037de8092c78cc029ff5b0266ac406e508a22714e4f2501420e1e2d18e9c2a20"
   },
   "spec": {

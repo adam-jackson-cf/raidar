@@ -23,22 +23,39 @@ from raidar.subject.workflow.definition import StageType
 
 RAIDAR_DIR = Path(__file__).resolve().parents[2]
 
+PAYLOAD_DIR = "subject/workflow/define_tool"
+
 STAGE_MODULES: Mapping[StageType, tuple[str, ...]] = {
+    "define": (
+        "subject/workflow/runner.py",
+        "subject/workflow/factory.py",
+        "subject/workflow/definition.py",
+        "subject/workflow/stage.py",
+        "subject/workflow/components.py",
+        "subject/workflow/define.py",
+    ),
     "build": (
         "subject/workflow/runner.py",
+        "subject/workflow/factory.py",
         "subject/workflow/inner.py",
         "subject/workflow/definition.py",
         "subject/workflow/stage.py",
+        "subject/workflow/components.py",
     ),
     "verify": (
         "subject/workflow/runner.py",
+        "subject/workflow/factory.py",
         "subject/workflow/definition.py",
         "subject/workflow/stage.py",
+        "subject/workflow/components.py",
         "subject/workflow/verify.py",
         "subject/workflow/verify_gate.py",
     ),
 }
 """Modules (below ``raidar/``) that carry out each implemented stage type."""
+
+STAGE_PAYLOADS: Mapping[StageType, str] = {"define": PAYLOAD_DIR}
+"""Directories (below ``raidar/``) of a stage's tool payload: every module in them, recursively."""
 
 ADAPTER_MODULES: Mapping[AgentName, tuple[str, ...]] = {
     AgentName.CODEX: (
@@ -56,9 +73,17 @@ ADAPTER_MODULES: Mapping[AgentName, tuple[str, ...]] = {
 """Adapter modules (below ``raidar/``) of each agent a stage drives."""
 
 
+def stage_modules(stage: StageType, adapter: AgentName) -> tuple[str, ...]:
+    """Every module (below ``raidar/``) that decides one stage type's code identity."""
+    payload = STAGE_PAYLOADS.get(stage)
+    found = (RAIDAR_DIR / payload).rglob("*.py") if payload else ()
+    payload_modules = sorted(path.relative_to(RAIDAR_DIR).as_posix() for path in found)
+    return (*STAGE_MODULES[stage], *payload_modules, *ADAPTER_MODULES[adapter])
+
+
 def stage_code_digest(stage: StageType, adapter: AgentName) -> str:
     """One stage type's code identity for an agent adapter."""
-    modules = (*STAGE_MODULES[stage], *ADAPTER_MODULES[adapter])
+    modules = stage_modules(stage, adapter)
     return digest_json(
         {
             "scheme": SOURCE_DIGEST_SCHEME,

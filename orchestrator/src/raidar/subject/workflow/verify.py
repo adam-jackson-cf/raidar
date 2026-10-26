@@ -241,13 +241,15 @@ class Verify(Stage):
     name = "verify"
     token = VERIFY_TOKEN
 
-    def __init__(self, settings: VerifySettings) -> None:
+    def __init__(
+        self, settings: VerifySettings, *, prerequisites: list[dict[str, Any]] | None = None
+    ) -> None:
         self.settings = settings
         self.paths = PATHS
         self.instructions = [f"{RECORD_DIR}/{RULES_RECORD}"]
         self.owner: str | None = None
         self.base: str | None = None
-        self.facts: dict[str, Any] = {}
+        self.facts: dict[str, Any] = {"prerequisites": prerequisites or []}
         self.tools: dict[str, Any] = {"pins": settings.pins}
         self.gates: list[dict[str, Any]] = []
         self.fix_rounds = 0
@@ -272,15 +274,17 @@ class Verify(Stage):
         if "base" not in values:
             raise VerifySetupError("the workspace repository has no base commit")
         self.base = values["base"]
-        self.facts = {
-            "repo_created": values.get("repo_created") == "1",
-            "rules_owned": values.get("rules_owned") == "1",
-        }
+        self.facts.update(
+            repo_created=values.get("repo_created") == "1",
+            rules_owned=values.get("rules_owned") == "1",
+        )
         self.tools["sha256_before"] = await self._tools_digest(checkpoint)
 
     async def _install_gate(self, checkpoint: Checkpoint, records: Path) -> None:
         paths = self.paths
-        config = json.dumps(gate_config(self.settings, paths), indent=2, sort_keys=True) + "\n"
+        configuration = gate_config(self.settings, paths)
+        configuration["prerequisites"] = self.facts["prerequisites"]
+        config = json.dumps(configuration, indent=2, sort_keys=True) + "\n"
         hook = f"#!/bin/sh\nexec {shlex.join(paths.gate_command)} hook --config {q(paths.config)}\n"
         block = rules_block(self.settings)
         for name, text in ((GATE_CONFIG, config), (PRE_COMMIT, hook), (RULES_RECORD, block)):
