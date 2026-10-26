@@ -28,6 +28,14 @@ STAGE_MODULES: Mapping[StageType, tuple[str, ...]] = {
         "subject/workflow/runner.py",
         "subject/workflow/inner.py",
         "subject/workflow/definition.py",
+        "subject/workflow/stage.py",
+    ),
+    "verify": (
+        "subject/workflow/runner.py",
+        "subject/workflow/definition.py",
+        "subject/workflow/stage.py",
+        "subject/workflow/verify.py",
+        "subject/workflow/verify_gate.py",
     ),
 }
 """Modules (below ``raidar/``) that carry out each implemented stage type."""
