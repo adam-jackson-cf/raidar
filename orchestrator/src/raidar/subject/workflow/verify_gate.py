@@ -8,12 +8,13 @@ one JSON file the stage writes (``root``, ``tools``, ``excludes``, ``test_timeou
 
 - ``hook``: the workspace's ``pre-commit`` hook, run by the agent's own ``git commit`` as the
   agent user. It decides the work tree, appends one JSON line (``who: hook``, the verdict, the
-  gate's exit, the index tree being committed, per-check results) to ``hook-runs.jsonl`` in
-  the hook's state directory, prints what it found and exits 0 (passed), 1 (refused) or 126
+  gate's exit, the index tree, checked workspace digest and per-check results) to
+  ``hook-runs.jsonl`` in the hook's state directory, prints what it found and exits 0 (passed),
+  1 (refused) or 126
   (the gate could not run). It decides nothing for the runner: the seal does.
 - ``seal``: the runner's own commit after a turn, as root (the authoritative verdict). It
   stages everything (``git add -A``, the workspace's excludes left out), writes the staged
-  tree, reuses the previous seal's verdict when the tree is the one it decided, else runs the
+  tree, reuses a previous verdict only for the same tree and checked workspace, else runs the
   checks; a pass is committed (the gated tree itself, so what is committed is what was
   checked), a refusal leaves the work staged and ``HEAD`` where it was. It prints one JSON
   record, with the repository's evidence for the bypass check: ``core.hooksPath`` and every
@@ -39,6 +40,7 @@ import os
 import pwd
 import signal
 import site
+import stat
 import subprocess
 import sys
 import time
@@ -141,6 +143,32 @@ def python_files(root: Path, excludes: Sequence[str]) -> list[str]:
             (base / name).relative_to(root).as_posix() for name in names if name.endswith(".py")
         ]
     return sorted(found)
+
+
+def _entry_identity(path: Path) -> tuple[bytes, bytes]:
+    mode = path.lstat().st_mode
+    if stat.S_ISLNK(mode):
+        return b"link", os.fsencode(os.readlink(path))
+    if not stat.S_ISREG(mode):
+        raise GateError(f"workspace entry is not a regular file or link: {path}")
+    with path.open("rb") as stream:
+        content = hashlib.file_digest(stream, "sha256").digest()
+    return f"file:{mode & 0o111:o}".encode(), content
+
+
+def _worktree_digest(root: Path, excludes: Sequence[str]) -> str:
+    """Checks inspect ignored and unstaged files too; the Git tree alone is not their input."""
+    digest = hashlib.sha256()
+    for current, dirs, names in os.walk(root):
+        dirs[:] = sorted(d for d in dirs if d not in excludes)
+        base = Path(current)
+        links = [name for name in dirs if (base / name).is_symlink()]
+        for name in sorted(names + links):
+            path = base / name
+            kind, content = _entry_identity(path)
+            digest.update(os.fsencode(path.relative_to(root)) + b"\0" + kind + b"\0")
+            digest.update(content + b"\0")
+    return digest.hexdigest()
 
 
 def _tool_env(config: dict[str, Any], cache: Path) -> dict[str, str]:
@@ -292,7 +320,9 @@ def _append_line(path: Path, record: dict[str, Any]) -> None:
 def hook(config: dict[str, Any]) -> int:
     root, state = Path(config["root"]), Path(config["hook_state"])
     tree = _git_or_none(root, "write-tree")
+    worktree = None
     try:
+        worktree = _worktree_digest(root, config["excludes"])
         decision = decide(config, state)
     except Exception as exc:  # noqa: BLE001 - a gate that cannot run is an error, never a pass
         decision = Decision(ERROR, 0.0, error=f"{type(exc).__name__}: {exc}")
@@ -303,6 +333,7 @@ def hook(config: dict[str, Any]) -> int:
         "verdict": decision.verdict,
         "exit": EXITS[decision.verdict],
         "tree": tree,
+        "worktree_sha256": worktree,
         "seconds": decision.seconds,
         "checks": decision.summary(),
         "error": decision.error,
@@ -364,6 +395,7 @@ def seal(config: dict[str, Any], args: argparse.Namespace) -> dict[str, Any]:
         record["commits"], record["base_is_ancestor"] = _commits(root, args.base)
         _git(root, "add", "-A", "--", ".", *_pathspec_excludes(config["excludes"]))
         tree = record["tree"] = _git(root, "write-tree")
+        record["worktree_sha256"] = _worktree_digest(root, config["excludes"])
         verdict = _decide_tree(config, state, args, record)
         if verdict == PASSED:
             record["commit"] = _commit(root, tree, record["head_before"], args)
@@ -389,6 +421,7 @@ def _decide_tree(
         decision = _verdict(required, sum(check.seconds for check in required))
     elif (
         record["tree"] == args.previous_tree
+        and record["worktree_sha256"] == args.previous_worktree
         and args.previous_verdict in (PASSED, REFUSED)
         and reusable
     ):
@@ -521,6 +554,7 @@ def _parser() -> argparse.ArgumentParser:
     sealing.add_argument("--base", required=True)
     sealing.add_argument("--previous-run", type=int)
     sealing.add_argument("--previous-tree")
+    sealing.add_argument("--previous-worktree")
     sealing.add_argument("--previous-verdict")
     commands.choices["restore"].add_argument("--tree", required=True)
     stripping = commands.add_parser("strip-rules")

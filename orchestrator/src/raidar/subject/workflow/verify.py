@@ -406,6 +406,7 @@ class Verify(Stage):
         if previous is not None:
             args += ["--previous-run", str(previous["run"]), "--previous-tree", previous["tree"]]
             args += ["--previous-verdict", previous["verdict"]]
+            args += ["--previous-worktree", previous["worktree_sha256"]]
         result = await checkpoint.environment.exec(shlex.join(args), user="root")
         gate = _last_json(result.stdout or "") or {
             "who": "seal", "run": run, "after": after, "verdict": verify_gate.ERROR,

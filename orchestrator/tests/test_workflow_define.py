@@ -18,7 +18,7 @@ from raidar.subject.workflow import define
 from raidar.subject.workflow.definition import load_workflow
 from raidar.subject.workflow.runner import WorkflowRunner
 from tests.release_support import REAL_LAB
-from tests.test_workflow_verify import (
+from tests.workflow_support import (
     CODE,
     PASSING,
     AgentTurn,
@@ -27,8 +27,6 @@ from tests.test_workflow_verify import (
     commit,
     write,
 )
-
-pytest_plugins = ("tests.test_workflow_verify",)
 
 TASK = "Add an add function that returns the sum of its two numbers."
 BLOCK = """title: Addition
