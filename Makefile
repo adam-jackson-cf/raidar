@@ -90,7 +90,7 @@ endif
 # registered in lab/releases.yaml (lab/agents/<name>.yaml); its tool pin must equal the Python
 # pack's (the lock refuses others: RT5). Model and reasoning default to codex's gpt-6-luna at
 # low; REASONING_EFFORT given (even empty: `REASONING_EFFORT=`) wins; empty means unset.
-RELEASE ?= codex@1
+RELEASE ?= codex@2
 AGENT_SMOKE_MODEL := gpt-6-luna
 AGENT_SMOKE_REASONING := low
 AGENT_SMOKE_EFFECTIVE_MODEL = $(or $(MODEL),$(AGENT_SMOKE_MODEL))
@@ -228,7 +228,7 @@ help:
 	@echo "Smoke (real agent trials of lab/experiments/smoke and the agent benchmark; locks under var/tmp/smoke, jobs under var/jobs/):"
 	@echo "  make orchestrator-smoke [SMOKE_ATTEMPTS=1] [SMOKE_CONCURRENCY=1] [TIMEOUT_SEC=]"
 	@echo "                                                        One one-shot trial with codex + gpt-6-luna (low), correctness only"
-	@echo "  make agent-smoke [RELEASE=codex@1 MODEL=gpt-6-luna REASONING_EFFORT=low] [TIMEOUT_SEC=]"
+	@echo "  make agent-smoke [RELEASE=codex@2 MODEL=gpt-6-luna REASONING_EFFORT=low] [TIMEOUT_SEC=]"
 	@echo "                                                        The same smoke with its agent replaced (a release from lab/releases.yaml;"
 	@echo "                                                        REASONING_EFFORT= unsets)"
 	@echo "  make smoke-agents [SMOKE_ARM=codex]                    One trial per released agent (codex: gpt-6-luna low)"
@@ -610,14 +610,14 @@ smoke-dry-run-check:
 	@$(MAKE) --no-print-directory -n smoke-agents SMOKE_ARM="codex"
 	@! $(MAKE) --no-print-directory -n smoke-agents SMOKE_ARM="unknown" \
 		>/dev/null 2>&1
-	@$(MAKE) --no-print-directory -n agent-smoke RELEASE="codex@1" MODEL="gpt-6-luna" \
-		| grep -q -- '--set "agents.0.release=codex@1" --set "agents.0.model=gpt-6-luna"'
+	@$(MAKE) --no-print-directory -n agent-smoke RELEASE="codex@2" MODEL="gpt-6-luna" \
+		| grep -q -- '--set "agents.0.release=codex@2" --set "agents.0.model=gpt-6-luna"'
 	@$(MAKE) --no-print-directory -n agent-smoke REASONING_EFFORT= \
 		| grep -q -- '--set "agents.0.reasoning="'
 	@$(MAKE) --no-print-directory -n agent-smoke \
 		| grep -q -- '--set "agents.0.reasoning=low"'
 	@$(MAKE) --no-print-directory -n agent-smoke \
-		RELEASE="codex@1" MODEL="gpt-6-luna" REASONING_EFFORT="low" TIMEOUT_SEC="300"
+		RELEASE="codex@2" MODEL="gpt-6-luna" REASONING_EFFORT="low" TIMEOUT_SEC="300"
 
 # Smoke and execute targets build the pack image first: trials bind the prebuilt
 # pack tag and Harbor cannot build it. pack-build is a no-op when the tag exists.

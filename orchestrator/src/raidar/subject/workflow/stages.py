@@ -37,6 +37,7 @@ ADAPTER_MODULES: Mapping[AgentName, tuple[str, ...]] = {
         "subject/agent/adapters/base.py",
         "subject/agent/adapters/harbor_cli.py",
         "subject/agent/adapters/codex_cli.py",
+        "subject/agent/isolated_codex.py",
     ),
     AgentName.CLAUDE_CODE: (
         "subject/agent/adapters/base.py",

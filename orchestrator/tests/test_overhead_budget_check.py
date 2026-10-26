@@ -27,7 +27,8 @@ from raidar.engine.perf.budgets import (
     percentile,
 )
 from raidar.engine.perf.phases import trial_phases
-from tests.execution_support import StepOutcome, write_trial
+from raidar.engine.trial.workspace import seed_duration
+from tests.execution_support import StepOutcome, write_seed_record, write_trial
 
 
 def _by_phase(samples: list[PhaseSample]) -> dict[tuple[str, str | None], PhaseSample]:
@@ -62,6 +63,44 @@ def test_every_n1_phase_is_recorded_with_phase0_definitions(tmp_path: Path) -> N
     cold_phases = _by_phase(cold)
     assert cold_phases[("environment_start", None)].condition == "cold"
     assert cold_phases[("per_trial_fixed_overhead", None)].condition == "cold"
+
+
+def test_workspace_seed_is_its_own_phase_and_leaves_environment_start(tmp_path: Path) -> None:
+    trial = write_trial(tmp_path / "t", [StepOutcome("checkpoint_1")])
+    assert seed_duration(trial, ("checkpoint_1",)) is None
+    plain = _by_phase(
+        trial_phases(trial, arm_apply_s=0.25, environment_cold=False, compose_init=True)
+    )
+    assert ("workspace_seed", None) not in plain
+    assert plain[("environment_start", None)].seconds == 10.0
+
+    write_seed_record(trial, "checkpoint_1", duration_s=4.0)
+    seed_s = seed_duration(trial, ("checkpoint_1",))
+    assert seed_s == 4.0
+    seeded = _by_phase(
+        trial_phases(
+            trial,
+            arm_apply_s=0.25,
+            environment_cold=True,
+            compose_init=True,
+            workspace_seed_s=seed_s,
+        )
+    )
+    assert seeded[("workspace_seed", None)].seconds == 4.0
+    assert seeded[("environment_start", None)].seconds == 6.0
+    assert seeded[("environment_start", None)].condition == "cold"
+    assert seeded[("per_trial_fixed_overhead", None)].seconds == pytest.approx(6.0 + 0.25 + 3.0)
+
+    over = _by_phase(
+        trial_phases(
+            trial,
+            arm_apply_s=0.25,
+            environment_cold=False,
+            compose_init=True,
+            workspace_seed_s=30.0,
+        )
+    )
+    assert over[("environment_start", None)].seconds == 0.0
 
 
 def _samples(phase: str, values: list[float], condition: str | None = None) -> list[PhaseSample]:

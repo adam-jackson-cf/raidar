@@ -610,6 +610,16 @@ def _pooling_lines(report: AnalysisReport) -> list[str]:
             "- **Timing and cost are not comparable:** the jobs ran on different "
             "execution-target hardware; only correctness and quality pool."
         )
+    if pooling.capabilities is not None:
+        lines.append(
+            "- Capabilities: every arm declares the same "
+            f"(isolation proof `{pooling.capabilities.get('isolation_proof')}`)"
+        )
+    lines.extend(
+        f"- Parity `{problem}`: {shared.trials} valid trial(s) share one record "
+        f"(image `{shared.record.get('image_id')}`, seed `{shared.record.get('seed_digest')}`)"
+        for problem, shared in pooling.parity.items()
+    )
     return lines
 
 

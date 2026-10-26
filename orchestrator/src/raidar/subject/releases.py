@@ -135,7 +135,11 @@ class AgentResolver:
         return ResolvedReference(
             ref=ref,
             digest=definition.digest,
-            metadata={"adapter": definition.adapter.value, "tool_version": definition.tool.version},
+            metadata={
+                "adapter": definition.adapter.value,
+                "tool_version": definition.tool.version,
+                "capabilities": definition.capabilities.model_dump(),
+            },
             binding={"harness": definition.harness.value, "tool": definition.tool.model_dump()},
         )
 

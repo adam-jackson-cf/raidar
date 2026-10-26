@@ -121,7 +121,11 @@ def test_a_registered_name_with_no_definition_is_reported(tree: Path) -> None:
 
 
 def test_an_agent_pin_that_differs_from_the_runtime_pack_is_reported(tree: Path) -> None:
-    edit_agent(tree, lambda doc: doc["tool"].update(version="0.0.1"))
+    def repin(doc: dict) -> None:
+        doc["tool"].update(version="0.0.1")
+        doc["capabilities"].update(version_pin="0.0.1")
+
+    edit_agent(tree, repin)
     write_register(tree)  # registered at the new hash: only the pack pin disagrees
 
     issues = release_issues(tree)

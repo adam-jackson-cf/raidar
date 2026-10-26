@@ -1,4 +1,5 @@
-"""The pooling gate: refusal kinds, tamper, overrides, pre-epoch jobs, timing across targets."""
+"""The pooling gate: refusal kinds, tamper, overrides, pre-epoch jobs, timing across targets,
+capability declarations and parity records."""
 
 from __future__ import annotations
 
@@ -7,11 +8,49 @@ from typing import Any
 
 import pytest
 
+from raidar.contract.trial import (
+    ExecutionValidity,
+    ParityRecord,
+    PlannedTrial,
+    ProgressionRule,
+    TrialHashes,
+    TrialRecord,
+)
 from raidar.engine.health.records_manifest import RECORDS_MANIFEST, seal_trial
 from raidar.evaluation.analysis.pooling import PoolingError, check_pooling
 from raidar.evaluation.analysis.sources import JobDir
 
 TRIAL = "t1"
+CAPABILITIES = {"permissions": "bypass", "isolation_proof": "full", "version_pin": "1.0"}
+PARITY = ParityRecord(
+    image_id="sha256:image",
+    seed_digest="seed",
+    limits={"agent_timeout_s": 1800.0},
+    network=({"network_mode": "allowlist", "allowed_hosts": ["api.openai.com"]},),
+)
+
+
+def _record(trial_id: str, arm: str, parity: ParityRecord | None) -> TrialRecord:
+    hashes = TrialHashes(
+        lock="l", problem="p", arm=arm, workflow="w", stage_code="s", agent="h", protocol="p",
+        trial=trial_id,
+    )  # fmt: skip
+    planned = PlannedTrial(
+        trial_id=trial_id, attempt=0, order=0, sequence=0, arm=arm, problem="scb/forge@x",
+        problem_index=0, steps=("checkpoint_1",), hashes=hashes,
+    )  # fmt: skip
+    return TrialRecord(
+        experiment="exp",
+        job_id="job",
+        trial=planned,
+        trial_dir=f"trials/{trial_id}",
+        progression=ProgressionRule(mode="continue", reward_key="solved"),
+        step_results=(),
+        reached=(),
+        reached_source="derived",
+        validity=ExecutionValidity(checks=()),
+        parity=parity,
+    )
 
 
 def _manifest(**changes: Any) -> dict[str, Any]:
@@ -40,7 +79,13 @@ def _manifest(**changes: Any) -> dict[str, Any]:
     return {**base, **changes}
 
 
-def _job(root: Path, name: str, manifest: dict[str, Any] | None = None, **plan: Any) -> JobDir:
+def _job(
+    root: Path,
+    name: str,
+    manifest: dict[str, Any] | None = None,
+    records: tuple[TrialRecord, ...] = (),
+    **plan: Any,
+) -> JobDir:
     """A job directory with one sealed trial; ``manifest`` is its job.json (default: epoch job)."""
     path = root / name
     (path / "trials" / TRIAL).mkdir(parents=True)
@@ -57,7 +102,11 @@ def _job(root: Path, name: str, manifest: dict[str, Any] | None = None, **plan: 
         "stage_code": plan.get("stage_code", "s1"),
     }
     trials = [{"trial_id": TRIAL, "arm": "a", "hashes": hashes}]
-    return JobDir(path=path, manifest=fields, plan={"trials": trials}, records=())
+    capabilities = plan.get("capabilities", CAPABILITIES)
+    arms = {"a": {"capabilities": capabilities} if capabilities is not None else {}}
+    return JobDir(
+        path=path, manifest=fields, plan={"arms": arms, "trials": trials}, records=records
+    )
 
 
 def _pair(tmp_path: Path, **changes: Any) -> list[JobDir]:
@@ -205,3 +254,48 @@ def test_tampering_refuses_even_with_every_override(tmp_path: Path, damage: str)
 def test_tamper_is_not_an_override_name(tmp_path: Path) -> None:
     with pytest.raises(PoolingError, match="never overridable"):
         check_pooling([_job(tmp_path, "solo")], ["tamper"])
+
+
+def _parity_pair(tmp_path: Path, two: ParityRecord | None) -> list[JobDir]:
+    return [
+        _job(tmp_path, "one", records=(_record(TRIAL, "a", PARITY),)),
+        _job(tmp_path, "two", records=(_record(TRIAL, "a", two),)),
+    ]
+
+
+def test_pooling_reports_the_shared_capabilities_and_parity(tmp_path: Path) -> None:
+    report = check_pooling(_parity_pair(tmp_path, PARITY))
+
+    assert report.capabilities == CAPABILITIES
+    shared = report.parity["scb/forge@x"]
+    assert (shared.trials, shared.record["image_id"]) == (2, "sha256:image")
+
+
+@pytest.mark.parametrize(
+    ("two", "message"),
+    [({**CAPABILITIES, "isolation_proof": "partial"}, r"different capabilities \(isolation_proof"),
+     (None, "no capability declaration recorded for arm.*two/a")],
+    ids=["different", "unrecorded"],
+)  # fmt: skip
+def test_arms_must_share_a_capability_declaration_with_no_override(
+    tmp_path: Path, two: dict[str, str] | None, message: str
+) -> None:
+    jobs = [_job(tmp_path, "one"), _job(tmp_path, "two", capabilities=two)]
+
+    with pytest.raises(PoolingError, match=message):
+        check_pooling(jobs)
+    with pytest.raises(PoolingError, match="capabilities is never overridable"):
+        check_pooling(jobs, ["capabilities"])
+
+
+def test_trials_of_a_problem_must_share_a_parity_record(tmp_path: Path) -> None:
+    jobs = _parity_pair(tmp_path, PARITY.model_copy(update={"seed_digest": "other-seed"}))
+
+    with pytest.raises(PoolingError, match=r"scb/forge@x: trials differ in seed_digest") as refused:
+        check_pooling(jobs)
+    assert "nothing lifts it" in str(refused.value)
+
+
+def test_a_valid_trial_without_a_parity_record_is_refused(tmp_path: Path) -> None:
+    with pytest.raises(PoolingError, match="no parity record for trial.*two/t1"):
+        check_pooling(_parity_pair(tmp_path, None))

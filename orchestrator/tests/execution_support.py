@@ -206,6 +206,7 @@ def write_seed_record(
     install_ok: bool = True,
     found_sha: str | None = SEED_SHA,
     digest: str | None = SEED_DIGEST,
+    duration_s: float | None = None,
 ) -> Path:
     """The workspace-seed provision record a step's agent logs hold (as Harbor archives them)."""
     log = trial_dir / "steps" / step / "agent" / "raidar-provision" / f"{SEED_SLUG}.jsonl"
@@ -220,6 +221,7 @@ def write_seed_record(
             "output": None if install_ok else "uv sync failed",
             "snapshot": "/app",
             "snapshot_digest": digest if install_ok else None,
+            **({} if duration_s is None else {"duration_s": duration_s}),
         },
         "check": {"ok": install_ok, "values": {SHA_KEY: found_sha}} if install_ok else None,
     }

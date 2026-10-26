@@ -11,7 +11,8 @@ the lab owes the solution the same environment it owes the tests (factory-x-loop
 
 Before checkpoint 1 the lab therefore writes ``/app/pyproject.toml`` naming those dependencies
 and runs ``uv sync`` as the agent user, as a per-trial provision at environment start
-(``raidar.engine.trial.provision``): outside every step, agent and verifier duration. The
+(``raidar.engine.trial.provision``): outside every step, agent and verifier duration; its
+time is the ``workspace_seed`` phase, taken out of ``environment_start``. The
 provision records what was seeded (dependencies, the file's sha256, the interpreter) and the
 digest of the seeded ``/app``, which is the parent of checkpoint 1's snapshot. Its check, run
 before every step's agent, reports the file's current sha256; at checkpoint 1 it must equal
@@ -108,3 +109,14 @@ def seeded_digest(agent_dir: Path) -> str | None:
     record = read_provision_record(agent_dir, SEED_SLUG)
     digest = ((record or {}).get("install") or {}).get("snapshot_digest")
     return digest if isinstance(digest, str) else None
+
+
+def seed_duration(trial_dir: Path, steps: Sequence[str]) -> float | None:
+    """The seed's install duration (the ``workspace_seed`` perf phase), from the first step's
+    provision record that has one; every step's record repeats the same install."""
+    for step in steps:
+        record = read_provision_record(trial_dir / "steps" / step / "agent", SEED_SLUG)
+        duration = ((record or {}).get("install") or {}).get("duration_s")
+        if isinstance(duration, int | float) and not isinstance(duration, bool):
+            return float(duration)
+    return None

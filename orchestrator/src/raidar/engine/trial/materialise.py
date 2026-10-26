@@ -30,7 +30,7 @@ from raidar.design.problem.content import content_digest
 from raidar.design.problem.harbor_engine import SOLVE_SH
 from raidar.engine.health.setup_script import write_setup_scripts
 from raidar.engine.trial.task_config import configure_trial_task
-from raidar.subject.environment.python.image import image_present
+from raidar.subject.environment.python.image import image_present, inspect_image
 
 COMPOSE_FILE = "environment/docker-compose.yaml"
 
@@ -109,8 +109,20 @@ def materialise_task(
     return MaterialisedTask(dest, content_digest(dest), arm_apply_s)
 
 
-def environment_cold(task_dir: Path) -> bool:
-    """True when the task's environment image is not in the local image store yet."""
+def _environment_image(task_dir: Path) -> str | None:
     document = tomllib.loads((task_dir / "task.toml").read_text())
     image = (document.get("environment") or {}).get("docker_image")
-    return isinstance(image, str) and not image_present(image)
+    return image if isinstance(image, str) else None
+
+
+def environment_cold(task_dir: Path) -> bool:
+    """True when the task's environment image is not in the local image store yet."""
+    image = _environment_image(task_dir)
+    return image is not None and not image_present(image)
+
+
+def environment_image_id(task_dir: Path) -> str | None:
+    """The Docker image id the task's environment tag names on the target, if present."""
+    image = _environment_image(task_dir)
+    record = inspect_image(image) if image is not None else None
+    return record.image_id if record is not None else None

@@ -18,11 +18,14 @@ Per turn, under the step's agent logs at ``workflow/<stage>-<n>/``:
 
 ``workflow/workflow.json`` records every turn: stage, turn index, session id, whether it
 resumed, start, end, seconds, error, the session's cumulative token total after the turn and
-the turn's own tokens. A native context after a resumed turn is the session's cumulative total,
-so a turn's tokens are the delta from the previous turn of the same session; the phase's usage
-is the sum of the deltas, which reconciles with the final session totals by construction. When
-a turn's usage cannot be read the phase reports none rather than a partial sum. The last
-turn's trajectory becomes the step's ``trajectory.json``.
+the turn's own tokens, and, from a native agent that isolates itself
+(``raidar.subject.agent.isolated_codex.IsolatedCodex``), ``harness_isolation`` (the flags and
+settings it applied to the turn's command) and ``agent_process`` (the user, ``PATH`` and
+``TMPDIR`` the agent process ran with). A native context after a resumed turn is the
+session's cumulative total, so a turn's tokens are the delta from the previous turn of the
+same session; the phase's usage is the sum of the deltas, which reconciles with the final
+session totals by construction. When a turn's usage cannot be read the phase reports none
+rather than a partial sum. The last turn's trajectory becomes the step's ``trajectory.json``.
 """
 
 from __future__ import annotations
@@ -42,6 +45,7 @@ from harbor.agents.options import AgentOptions
 from harbor.environments.base import BaseEnvironment
 from harbor.models.agent.context import AgentContext
 
+from raidar.subject.agent.isolated_codex import IsolatedCodex
 from raidar.subject.workflow.definition import StageType, WorkflowDefinition
 from raidar.subject.workflow.inner import InnerAgentSpec, create_inner
 
@@ -128,6 +132,8 @@ class Turn:
     session_id: str | None = None
     session_total: Tokens | None = None
     tokens: Tokens | None = None
+    harness_isolation: dict[str, Any] | None = None
+    agent_process: dict[str, str | None] | None = None
 
     @property
     def log_dir(self) -> str:
@@ -153,6 +159,8 @@ class Turn:
             "settle_error": self.settle_error,
             "session_total": self.session_total.record() if self.session_total else None,
             "tokens": self.tokens.record() if self.tokens else None,
+            "harness_isolation": self.harness_isolation,
+            "agent_process": self.agent_process,
         }
 
 
@@ -268,7 +276,10 @@ class WorkflowRunner(BaseAgent):
         inner: BaseAgent,
         context: AgentContext,
     ) -> None:
-        """Copy the turn's logs into its directory and read its session and usage."""
+        """Copy the turn's logs into its directory and read its isolation, session and usage."""
+        if isinstance(inner, IsolatedCodex):
+            turn.harness_isolation = inner.harness_isolation
+            turn.agent_process = inner.agent_process
         turn_dir = self.logs_dir / turn.log_dir
         try:
             await self._copy_turn_logs(environment, turn.log_dir, turn_dir)

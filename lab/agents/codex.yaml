@@ -8,11 +8,21 @@ tool:
   package: "@openai/codex"
   binary: codex
   version: 0.156.1
-# What Raidar already applies to every codex run: Harbor runs it with a fresh
-# CODEX_HOME (/tmp/codex-home) removed after the run, and passes no user config.toml.
+# Applied on every command, first turn and resumed (raidar.subject.agent.isolated_codex):
+# a fresh CODEX_HOME (/tmp/codex-home) holding only auth.json, removed after each turn;
+# --ignore-user-config; --disable for each of features_off; and -c skills.config switching
+# off, by SKILL.md path, every bundled skill and every skill in the container's
+# ~/.agents/skills and /etc/codex/skills. The workspace's own .agents/skills stay visible.
+# A container with /etc/codex/config.toml or requirements.toml is refused.
 settings:
   isolated_home: true
   ignore_user_config: true
+  # The plugin features `codex features list` shows for 0.156.1 in the Python pack image
+  # (plugins, remote_plugin, apps, plugin_sharing on by default; recommended_plugins off by
+  # default, yet its <recommended_plugins> message reached gpt-6-luna runs, so it is named).
+  features_off: [plugins, remote_plugin, apps, plugin_sharing, recommended_plugins]
+  # What codex 0.156.1 installs under $CODEX_HOME/skills/.system at startup.
+  bundled_skills: [imagegen, openai-docs, plugin-creator, review-agent, skill-creator, skill-installer]
 placement:
   skills: .agents/skills
   instructions: "{home}/AGENTS.md"
@@ -21,3 +31,14 @@ models:
   gpt-6-luna:
     canonical: gpt-6-luna
     reasoning: [low]
+# What this agent gives a model, by the names every agent declares (factory-x-loops parity).
+capabilities:
+  permissions: "--dangerously-bypass-approvals-and-sandbox on every command; the trial container is the sandbox"
+  network: "the trial's Harbor network policy: an allowlist of the provider's and the runtime's package hosts"
+  workflow_skills: "placement.skills .agents/skills in the workspace /app"
+  global_instructions: "placement.instructions {home}/AGENTS.md in the run's CODEX_HOME"
+  host_isolation: "fresh CODEX_HOME holding only auth.json; --ignore-user-config; --disable features_off; skills.config switches off bundled and container host skills by path"
+  isolation_proof: full
+  command_output: "command_execution and file_change items of the --json stream and the session rollout"
+  structured_output: prompted
+  version_pin: 0.156.1

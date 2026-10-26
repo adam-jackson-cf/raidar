@@ -1,8 +1,9 @@
 """Per-trial provisioning: lab work done in the agent container before any step.
 
 A ``TrialProvision`` is installed once per trial, right after the container starts
-(``RunScopedDockerEnvironment.add_post_start_hook``), so its time is the trial's
-``environment_start``: never a step's, never the agent's. Its payload files are uploaded to a
+(``RunScopedDockerEnvironment.add_post_start_hook``), so it runs inside the trial's
+``environment_setup`` span and is recorded on its own (``workspace_seed`` for the seed), never
+as a step's or the agent's time. Its payload files are uploaded to a
 root-only staging dir (``$RAIDAR_PAYLOAD_DIR`` in the script) and its ``install`` script runs
 as root, with ``$RAIDAR_AGENT_USER`` naming the agent user. ``snapshot`` names a container
 directory whose tree digest (``raidar.contract.snapshot`` excludes applied) is recorded after

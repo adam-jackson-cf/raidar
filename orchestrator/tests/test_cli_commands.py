@@ -350,13 +350,13 @@ def test_orchestrator_smoke_locks_and_runs_the_smoke_experiment_with_the_same_ov
 
 
 def test_agent_smoke_replaces_the_agent_release_model_and_reasoning() -> None:
-    result = _make_dry_run("agent-smoke", "RELEASE=codex@1", "MODEL=gpt-6-luna", "TIMEOUT_SEC=300")
+    result = _make_dry_run("agent-smoke", "RELEASE=codex@2", "MODEL=gpt-6-luna", "TIMEOUT_SEC=300")
 
     assert result.returncode == 0, result.stderr
     (lock_args,) = _raidar_lines(result.stdout, "lock")
     (run_args,) = _raidar_lines(result.stdout, "run")
     for assignment in (
-        "agents.0.release=codex@1",
+        "agents.0.release=codex@2",
         "agents.0.model=gpt-6-luna",
         "agents.0.reasoning=low",
         "protocol.agent_timeout_sec=300",
