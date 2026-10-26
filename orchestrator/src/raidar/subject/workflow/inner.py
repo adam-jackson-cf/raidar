@@ -2,7 +2,10 @@
 
 The runner is the Harbor agent of every real arm; the native Harbor installed agent (``codex``)
 it wraps is named in its ``inner_agent`` kwarg with that agent's own kwargs (the pinned
-``version``, ``reasoning_effort``). ``create_inner`` builds one instance for a turn, sharing the
+``version``, ``reasoning_effort``, the agent definition's isolation settings). ``import_path``
+names the Raidar class that runs it when the lab adapts Harbor's agent
+(``raidar.subject.agent.isolated_codex.IsolatedCodex`` for ``codex``); ``name`` stays the
+Harbor agent name either way. ``create_inner`` builds one instance for a turn, sharing the
 runner's model, environment variables, logger, MCP servers and skills directory, and writing
 its logs to the turn's directory.
 """
@@ -21,11 +24,12 @@ INNER_KWARG = "inner_agent"
 
 
 class InnerAgentSpec(BaseModel):
-    """The wrapped native agent: a Harbor agent ``name`` and its kwargs."""
+    """The wrapped native agent: a Harbor agent ``name``, the class running it and its kwargs."""
 
     model_config = ConfigDict(extra="forbid")
 
     name: str = Field(min_length=1)
+    import_path: str | None = None
     kwargs: dict[str, Any] = Field(default_factory=dict)
 
 
@@ -35,7 +39,11 @@ def create_inner(
     """Build ``spec`` with ``runner``'s model, env, tools and logger, logging to ``logs_dir``."""
     return AgentFactory.create_agent_from_config(
         AgentConfig(
-            name=spec.name, model_name=model_name, kwargs=spec.kwargs, env=runner.extra_env
+            name=None if spec.import_path else spec.name,
+            import_path=spec.import_path,
+            model_name=model_name,
+            kwargs=spec.kwargs,
+            env=runner.extra_env,
         ),
         logs_dir=logs_dir,
         logger=runner.logger,

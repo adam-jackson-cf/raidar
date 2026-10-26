@@ -68,7 +68,7 @@ def test_relocking_unchanged_inputs_is_byte_identical(tmp_path: Path) -> None:
     assert list(lock) == sorted(lock)
     execution, assessment = lock["execution"], lock["assessment"]
     assert execution["versions"]["harbor"] == "0.23.0"
-    assert execution["versions"]["agents"] == {"luna": {"release": "codex@1", "version": "0.156.1"}}
+    assert execution["versions"]["agents"] == {"luna": {"release": "codex@2", "version": "0.156.1"}}
     assert set(execution["references"]) == {"problem", "agent", "workflow"}
     assert set(assessment["references"]) == {"scorer", "metric"}
     # Tools are recorded with the section whose reference pins them.

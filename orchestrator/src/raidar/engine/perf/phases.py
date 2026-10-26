@@ -3,8 +3,10 @@
 Definitions follow the Phase 0 overhead baseline (docs/reboot/overhead-baseline.md
 §1-§2), so the accepted budgets apply unchanged:
 
-- ``environment_start``: Harbor ``environment_setup`` (condition warm/cold), including the
-  lab's per-trial provisions (workspace seeding) that run at container start.
+- ``environment_start``: Harbor ``environment_setup`` (condition warm/cold) less
+  ``workspace_seed``, so the lab's other container-start work stays budgeted.
+- ``workspace_seed``: the workspace-seeding provision's install duration (record-only; it
+  runs inside ``environment_setup`` and is subtracted from ``environment_start``).
 - ``arm_apply``: host-side resolution of the arm plus writing its inputs (the
   per-step ``setup.sh``, the network boundary) into the trial task (measured by the
   job). This is not the Phase 0 stub's quantity (an in-container bundle install, p95
@@ -171,17 +173,24 @@ def trial_phases(
     arm_apply_s: float,
     environment_cold: bool,
     compose_init: bool,
+    workspace_seed_s: float | None = None,
 ) -> list[PhaseSample]:
-    """Every N1 phase this trial exposes (raidar_result_write is added by the job)."""
+    """Every N1 phase this trial exposes (raidar_result_write is added by the job).
+
+    ``workspace_seed_s`` is the workspace seed's install duration, when one was recorded
+    (``raidar.engine.trial.workspace.seed_duration``).
+    """
     result = read_result(trial_dir) or {}
     condition = {"environment": "cold" if environment_cold else "warm"}
     condition["teardown"] = "init" if compose_init else "no-init"
-    samples = _sample(
-        "environment_start", span_s(result.get("environment_setup")), None, condition["environment"]
-    )
+    steps = [item for item in result.get("step_results") or [] if isinstance(item, dict)]
+    environment_s = span_s(result.get("environment_setup"))
+    if environment_s is not None and workspace_seed_s is not None:
+        environment_s -= workspace_seed_s
+    samples = _sample("environment_start", environment_s, None, condition["environment"])
+    samples += _sample("workspace_seed", workspace_seed_s)
     samples += _sample("agent_setup", span_s(result.get("agent_setup")))
     samples += _sample("arm_apply", arm_apply_s)
-    steps = [item for item in result.get("step_results") or [] if isinstance(item, dict)]
     step_samples, last_end = _step_samples(
         trial_dir, steps, (result.get("agent_setup") or {}).get("finished_at")
     )

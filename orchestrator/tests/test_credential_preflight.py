@@ -90,8 +90,8 @@ def test_issues_name_the_agent_field_of_each_selected_arm_only(tmp_path: Path) -
     env = _codex_home(tmp_path, with_auth=False)
     issues = credential_issues(plan, ["first", "second"], env)  # type: ignore[arg-type]
     assert [issue.field for issue in issues] == [
-        "agents.0.release ('luna', codex@1, arm 'first')",
-        "agents.1.release ('second', codex@1, arm 'second')",
+        "agents.0.release ('luna', codex@2, arm 'first')",
+        "agents.1.release ('second', codex@2, arm 'second')",
     ]
     only_second = credential_issues(plan, ["second"], env)  # type: ignore[arg-type]
     assert [issue.field.split(" ")[0] for issue in only_second] == ["agents.1.release"]

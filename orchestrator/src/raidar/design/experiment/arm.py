@@ -102,8 +102,13 @@ class ResolvedArm:
         return stage_code_digests(self.definition.enabled_stages, self.agent.name)
 
     def identity(self) -> dict[str, object]:
-        """The arm's full identity (agent + workflow + stage code), as the lock records it."""
+        """The arm's full identity (agent + workflow + stage code), as the lock records it.
+
+        ``capabilities`` is the agent's capability declaration: pooling and smoke admission
+        refuse arms whose declarations differ.
+        """
         agent = self.agent
+        definition = agent.released.definition
         body: dict[str, object] = {
             "agent": agent.entry.id,
             "agent_release": agent.released.ref,
@@ -111,7 +116,8 @@ class ResolvedArm:
             "provider": agent.provider,
             "model": agent.model,
             "reasoning": agent.reasoning,
-            "tool": agent.released.definition.tool.model_dump(),
+            "tool": definition.tool.model_dump(),
+            "capabilities": definition.capabilities.model_dump(),
             "workflow": self.workflow.ref,
             "workflow_sha256": self.definition.digest,
             "stage_code": self.stage_code,

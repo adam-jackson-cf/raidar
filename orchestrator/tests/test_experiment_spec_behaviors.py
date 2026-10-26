@@ -249,7 +249,7 @@ def test_set_overrides_change_only_the_addressed_yaml_alias(tmp_path: Path) -> N
         ({"model": "claude-opus-4-7"}, "agents.0.model"),
         ({"reasoning": "xhigh"}, "agents.0.reasoning"),
         ({"reasoning": None}, "agents.0.reasoning"),
-        ({"release": "codex@2"}, "agents.0.release"),
+        ({"release": "codex@3"}, "agents.0.release"),
         ({"release": "ghost@1"}, "agents.0.release"),
     ],
     ids=["model", "reasoning", "reasoning-required", "unregistered-version", "unknown-agent"],

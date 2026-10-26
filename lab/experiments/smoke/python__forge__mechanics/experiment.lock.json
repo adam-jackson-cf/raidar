@@ -789,19 +789,30 @@
       "tree-sitter-language-pack": "0.13.0"
     }
   },
-  "document_sha256": "a2443f55e9e41d76385b452a0c064fd5db5d6653aac2125d69d643322ff8d5ef",
+  "document_sha256": "d4159230bae944b15f75c8df0855e8da466eb8bb53cc3ff9084e541f6a3b0bd1",
   "execution": {
     "arms": {
       "baseline": {
         "adapter": "codex",
         "agent": "agent",
-        "agent_release": "codex@1",
-        "digest": "9fefc2e5f91dd97df7119a3506aff3e54c2d71ca381daa70d6dbf7243b4b60a6",
+        "agent_release": "codex@2",
+        "capabilities": {
+          "command_output": "command_execution and file_change items of the --json stream and the session rollout",
+          "global_instructions": "placement.instructions {home}/AGENTS.md in the run's CODEX_HOME",
+          "host_isolation": "fresh CODEX_HOME holding only auth.json; --ignore-user-config; --disable features_off; skills.config switches off bundled and container host skills by path",
+          "isolation_proof": "full",
+          "network": "the trial's Harbor network policy: an allowlist of the provider's and the runtime's package hosts",
+          "permissions": "--dangerously-bypass-approvals-and-sandbox on every command; the trial container is the sandbox",
+          "structured_output": "prompted",
+          "version_pin": "0.156.1",
+          "workflow_skills": "placement.skills .agents/skills in the workspace /app"
+        },
+        "digest": "46f590399742ec39c63570ad21473684bab767e09a5fd6127c3cae76206563f7",
         "model": "gpt-6-luna",
         "provider": "openai",
         "reasoning": "low",
         "stage_code": {
-          "build": "3511c97e9ab7638173a218afd0802c51c04161a6d4ca25754468d9df8497a489"
+          "build": "134f6ac314e68a8f1c0c283ac2cd446a416c234ca2452cc92c75ffc4485cb757"
         },
         "tool": {
           "binary": "codex",
@@ -818,7 +829,7 @@
           "id": "agent",
           "model": "gpt-6-luna",
           "reasoning": "low",
-          "release": "codex@1"
+          "release": "codex@2"
         }
       ],
       "arms": [
@@ -861,10 +872,21 @@
     ],
     "references": {
       "agent": {
-        "codex@1": {
-          "digest": "a2770e3282bcc6e3d1b16dd6d3a4f81e8fccc9a0dd0447a4dd288ce23a00fd43",
+        "codex@2": {
+          "digest": "36bf2bd7d6e482206c62eb4eed7bc06a5e03ce808a8022fae02ef8afc193989b",
           "metadata": {
             "adapter": "codex",
+            "capabilities": {
+              "command_output": "command_execution and file_change items of the --json stream and the session rollout",
+              "global_instructions": "placement.instructions {home}/AGENTS.md in the run's CODEX_HOME",
+              "host_isolation": "fresh CODEX_HOME holding only auth.json; --ignore-user-config; --disable features_off; skills.config switches off bundled and container host skills by path",
+              "isolation_proof": "full",
+              "network": "the trial's Harbor network policy: an allowlist of the provider's and the runtime's package hosts",
+              "permissions": "--dangerously-bypass-approvals-and-sandbox on every command; the trial container is the sandbox",
+              "structured_output": "prompted",
+              "version_pin": "0.156.1",
+              "workflow_skills": "placement.skills .agents/skills in the workspace /app"
+            },
             "tool_version": "0.156.1"
           }
         }
@@ -948,7 +970,7 @@
     "versions": {
       "agents": {
         "agent": {
-          "release": "codex@1",
+          "release": "codex@2",
           "version": "0.156.1"
         }
       },
@@ -958,10 +980,10 @@
   "experiment": {
     "id": "python__forge__mechanics",
     "source": "experiment.yaml",
-    "source_sha256": "0de713a72b24e785b38549da62c1eeb14f63928b69afa321a39c1fe3e501a1b9",
-    "spec_sha256": "c620c19ec16643b3794b02467e5c04e13c9c871912f002e3c665b96d4eba6e1b"
+    "source_sha256": "7886c14b311bcfc0388a31e9860273e6a0e8aa6fc2f3f2dcff8941629161d794",
+    "spec_sha256": "2b236aa4e97ed4d82b3f42fbb10415249074acf24b6b672d495bb45ce4dbc985"
   },
-  "lock_sha256": "806aba3af5d0a5da5d94545deb3c5fd2b714b589dd2b6c0d104467292ef36f55",
+  "lock_sha256": "e5a7335416b797664d421bdff26bc56336b0f926ecd38235443d2cf067f7f267",
   "lock_version": 4,
   "overrides": {
     "flags": {},
@@ -970,8 +992,8 @@
   "sections": {
     "analysis": "144d50057229f81b6136f89cfe8df3c9cf5dbbbec9a279c66acba88e027528b3",
     "assessment": "9054e3c6939db2987b382542fc1cbf12440cc29d1a49f7443d19664527b86bb3",
-    "execution": "806aba3af5d0a5da5d94545deb3c5fd2b714b589dd2b6c0d104467292ef36f55",
-    "toolchain": "66336e711ddcd2704230426fecc45ea4c9435dae931dc2179e94d2c82697479f"
+    "execution": "e5a7335416b797664d421bdff26bc56336b0f926ecd38235443d2cf067f7f267",
+    "toolchain": "037de8092c78cc029ff5b0266ac406e508a22714e4f2501420e1e2d18e9c2a20"
   },
   "spec": {
     "agents": [
@@ -979,7 +1001,7 @@
         "id": "agent",
         "model": "gpt-6-luna",
         "reasoning": "low",
-        "release": "codex@1"
+        "release": "codex@2"
       }
     ],
     "analysis": {
@@ -1040,6 +1062,6 @@
     "litellm": "1.102.1",
     "python": "3.13.7",
     "raidar": "0.15.0",
-    "raidar_spec": "be6266c5823943d46700fb0afb38129c2f8c5f511c44909dbcfc1908f6b14419"
+    "raidar_spec": "6430d2e9619154df6c2a28c466173a6b141782bf89f21a9e8d7eb02718a0c64f"
   }
 }

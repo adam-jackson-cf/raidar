@@ -3,8 +3,9 @@
 ``raidar run`` of any experiment kind except ``smoke`` is refused unless the jobs root holds
 clean smoke jobs covering the setup: matching Raidar execution/toolchain digests, pack recipe,
 the same execution target (name and Docker facts) and every arm's full identity (design 5.4,
-the lock's ``execution.arms``: agent release and CLI pin, model and reasoning, workflow
-release and resolved content hash, and the stage code digest of each enabled stage type).
+the lock's ``execution.arms``: agent release and CLI pin, the agent's capability declaration,
+model and reasoning, workflow release and resolved content hash, and the stage code digest of
+each enabled stage type).
 *Clean* means the job finished, every selected trial has a valid record, every trial's
 ``health.json`` exists with no violation, and in every trial every step's agent changed
 ``/app`` (the step's recorded snapshot digest differs from its parent's; the first step's parent
@@ -12,8 +13,9 @@ is the seeded workspace, or the empty tree when nothing was seeded), so a smoke 
 only asked a question cannot clear a run.
 ``--allow-unsmoked`` (``ALLOW_UNSMOKED=1``) admits without one; ``job.json`` records the
 decision under ``admission``. A smoke whose stage code differs never matches, so only that
-explicit, recorded override admits a job whose stage code no clean smoke ran. Smoke kinds are
-always admitted.
+explicit, recorded override admits a job whose stage code no clean smoke ran. Arms that declare
+different capabilities, or none, are refused outright (``capability_problem``; no override:
+an experiment that varies the harness is not supported). Smoke kinds are always admitted.
 """
 
 from __future__ import annotations
@@ -221,6 +223,16 @@ def _remaining_arms(arms: list[dict[str, Any]], smoke: Identity) -> list[dict[st
     return [arm for arm in arms if arm not in smoke["arms"]]
 
 
+def capability_problem(arms: list[dict[str, Any]]) -> str | None:
+    """Why the arms cannot be compared by their capability declarations, or ``None``."""
+    declared = [arm.get("capabilities") for arm in arms]
+    if not all(declared):
+        return "an arm declares no capabilities (a lock from before declarations): relock"
+    if len({json.dumps(item, sort_keys=True) for item in declared}) > 1:
+        return "the arms declare different capabilities: an experiment varying the harness"
+    return None
+
+
 def admit(
     kind: str | None,
     wanted: Identity | None,
@@ -231,6 +243,8 @@ def admit(
     """The ``job.json`` ``admission`` record, or ``AdmissionError`` when the job is refused."""
     if kind == SMOKE_KIND:
         return {"required": False, "kind": kind}
+    if wanted is not None and (problem := capability_problem(wanted["arms"])):
+        raise AdmissionError(f"this {kind} experiment's arms cannot be compared: {problem}")
     smoke_jobs, unmet = _search(wanted, jobs_root)
     if smoke_jobs:
         return {

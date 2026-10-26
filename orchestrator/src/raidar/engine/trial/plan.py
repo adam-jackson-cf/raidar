@@ -119,6 +119,9 @@ class ExperimentPlan:
                     "harbor_agent": blueprint.agent_config.name
                     or blueprint.agent_config.import_path,
                     "model": blueprint.agent_config.model_name,
+                    "capabilities": (
+                        blueprint.arm.agent.released.definition.capabilities.model_dump()
+                    ),
                 }
                 for arm_id, blueprint in self.arms.items()
             },

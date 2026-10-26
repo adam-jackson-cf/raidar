@@ -3,7 +3,8 @@
 A ``PlannedTrial`` is one arm x attempt x problem trial (one Harbor
 multi-step trial). After it runs, ``raidar.engine.trial.finish`` writes one ``TrialRecord``
 holding a ``StepResult`` per planned checkpoint (Harbor's per-step result),
-the execution-validity gate and the N1 phase timings. Correctness facts come
+the execution-validity gate, the N1 phase timings, the isolation the agent harness applied
+(``harness_isolation``) and the trial's ``ParityRecord``. Correctness facts come
 from the host-only verifier records (``raidar-oracle/steps/<step>/record.json``,
 an identity-bearing evidence name), never from Harbor's aggregated trial reward.
 
@@ -16,7 +17,7 @@ the paired, counterbalanced replicates of every arm.
 from __future__ import annotations
 
 from enum import StrEnum
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -145,6 +146,29 @@ class PhaseSample(ExecutionModel):
     )
 
 
+class AgentProcess(ExecutionModel):
+    """What the agent CLI's process ran with, read with its user, environment and shell."""
+
+    user: str | None = None
+    path: str | None = None
+    tmpdir: str | None = Field(default=None, description="TMPDIR; None: unset (the OS default)")
+
+
+class ParityRecord(ExecutionModel):
+    """The conditions every arm of a problem must share; pooling refuses any difference.
+
+    None of these is what an experiment varies (the arm: agent and workflow): the image the
+    trial ran in, the seeded ``/app`` it started from, its limits, the agent phases' network
+    policies, and the user, ``PATH`` and temporary folder of every agent turn's process.
+    """
+
+    image_id: str | None
+    seed_digest: str | None
+    limits: dict[str, Any]
+    network: tuple[dict[str, Any], ...]
+    agent_process: tuple[AgentProcess, ...] = ()
+
+
 class TrialRecord(ExecutionModel):
     kind: Literal["raidar-trial"] = "raidar-trial"
     schema_version: Literal[2] = 2
@@ -161,6 +185,10 @@ class TrialRecord(ExecutionModel):
     validity: ExecutionValidity
     phases: tuple[PhaseSample, ...] = ()
     trial_exception: str | None = None
+    harness_isolation: tuple[dict[str, Any], ...] = Field(
+        default=(), description="Each distinct isolation the agent harness applied to a turn"
+    )
+    parity: ParityRecord | None = None
 
     @property
     def valid(self) -> bool:
