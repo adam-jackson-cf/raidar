@@ -104,10 +104,19 @@ def _missing(gate: StepGate) -> str | None:
     return None
 
 
-def _sealed_verdicts(gate: StepGate) -> dict[str, str]:
-    """Each tree a seal decided by running its checks (not by reuse), with its verdict."""
+def _gate_input(run: dict[str, Any]) -> tuple[str, tuple[str, ...]]:
+    """A tree plus the non-tree prerequisites the gate actually checked."""
+    return str(run.get("tree")), tuple(
+        str(check.get("input_sha256"))
+        for check in run.get("checks", [])
+        if check.get("category") == "prerequisite"
+    )
+
+
+def _sealed_verdicts(gate: StepGate) -> dict[tuple[str, tuple[str, ...]], str]:
+    """Each tree and prerequisite input a seal decided, with its verdict."""
     decided = (g for g in _gates(gate) if g.get("verdict") in DECIDED and g.get("tree"))
-    return {g["tree"]: g["verdict"] for g in decided if g.get("reused_from") is None}
+    return {_gate_input(g): g["verdict"] for g in decided if g.get("reused_from") is None}
 
 
 def _g1_step(gate: StepGate) -> tuple[list[str], str | None]:
@@ -118,14 +127,14 @@ def _g1_step(gate: StepGate) -> tuple[list[str], str | None]:
     if not seals:
         return [], f"{gate.step}: no seal ran its checks to a verdict"
     both = [
-        (str(run.get("tree")), str(run.get("verdict")))
+        (_gate_input(run), str(run.get("verdict")))
         for run in gate.hook_runs or []
-        if run.get("verdict") in DECIDED and run.get("tree") in seals
+        if run.get("verdict") in DECIDED and _gate_input(run) in seals
     ]
     return [
-        f"{gate.step}: tree {tree[:12]} hook {verdict}, seal {seals[tree]}"
-        for tree, verdict in both
-        if seals[tree] != verdict
+        f"{gate.step}: tree {key[0][:12]} hook {verdict}, seal {seals[key]}"
+        for key, verdict in both
+        if seals[key] != verdict
     ], None
 
 

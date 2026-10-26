@@ -370,6 +370,7 @@ HEALTH_VALIDITY: Mapping[str, tuple[str, ...]] = {
     "health_tamper": ("T1", "T2", "T3"),
     "health_isolation": ("P8",),
     "health_gate": ("G1", "G2", "G3"),
+    "health_define": ("E1", "E2", "E3"),
 }
 
 

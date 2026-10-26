@@ -58,10 +58,11 @@ from harbor.environments.base import BaseEnvironment
 from harbor.models.agent.context import AgentContext
 
 from raidar.subject.agent.isolated_codex import IsolatedCodex
+from raidar.subject.workflow.components import skill_files
 from raidar.subject.workflow.definition import StageType, WorkflowDefinition
+from raidar.subject.workflow.factory import workflow_stages
 from raidar.subject.workflow.inner import InnerAgentSpec, create_inner
-from raidar.subject.workflow.stage import DEADLINE, TURN_ERROR, Build, Checkpoint, Stage, compose
-from raidar.subject.workflow.verify import Verify
+from raidar.subject.workflow.stage import DEADLINE, TURN_ERROR, Checkpoint, Stage, compose
 
 RUNNER_NAME = "raidar-workflow"
 WORKFLOW_DIR = "workflow"
@@ -77,6 +78,7 @@ class WorkflowRunnerOptions(AgentOptions):
     inner_agent: InnerAgentSpec
     workflow: str
     definition: WorkflowDefinition
+    skills_placement: str = ".agents/skills"
 
 
 @dataclass(frozen=True)
@@ -216,15 +218,6 @@ def _session_id(turn_dir: Path) -> str | None:
     return value if isinstance(value, str) and value else None
 
 
-def workflow_stages(definition: WorkflowDefinition) -> list[Stage]:
-    """One checkpoint's enabled stages, in stage order, each with the workflow's settings."""
-    stages: list[Stage] = [Build(definition.stages.build)]
-    verify = definition.stages.verify
-    if verify is not None and verify.enabled:
-        stages.append(Verify(verify))
-    return stages
-
-
 class WorkflowRunner(BaseAgent):
     """Runs the arm's workflow on its native agent, one turn at a time (module docstring)."""
 
@@ -256,7 +249,8 @@ class WorkflowRunner(BaseAgent):
     ) -> None:
         state = _Run()
         stages = workflow_stages(self.runner_options.definition)
-        checkpoint = Checkpoint(environment, self.logs_dir)
+        self.components: list[dict[str, str]] = []
+        checkpoint = Checkpoint(environment, self.logs_dir, instruction)
         cut: str | None = None
         try:
             await self._work(checkpoint, state, stages, instruction)
@@ -274,6 +268,7 @@ class WorkflowRunner(BaseAgent):
         self, checkpoint: Checkpoint, state: _Run, stages: list[Stage], instruction: str
     ) -> None:
         """Prepare every stage, run the one prompt, then resume while a stage's checks ask."""
+        await self._place_components(checkpoint)
         for stage in stages:
             await stage.prepare(checkpoint)
         prompt = compose(stages, instruction)
@@ -281,6 +276,22 @@ class WorkflowRunner(BaseAgent):
         while (followup := await self._checks(checkpoint, stages, state.turns[-1])) is not None:
             stage_type, message = followup
             await self._turn(checkpoint.environment, state, stage_type, message, resume=True)
+
+    async def _place_components(self, checkpoint: Checkpoint) -> None:
+        files = skill_files(self.runner_options.definition, self.runner_options.skills_placement)
+        for relative, text in files.items():
+            record = f"{WORKFLOW_DIR}/components/{relative}"
+            path = checkpoint.logs_dir / record
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(text, encoding="utf-8")
+            await checkpoint.environment.upload_file(path, f"/app/{relative}")
+            self.components.append(
+                {
+                    "path": relative,
+                    "sha256": hashlib.sha256(text.encode()).hexdigest(),
+                    "record": record,
+                }
+            )
 
     @staticmethod
     async def _checks(
@@ -383,6 +394,7 @@ class WorkflowRunner(BaseAgent):
             "instructions": [path for stage in stages for path in stage.instructions],
             "turns": [turn.record() for turn in state.turns],
             "tokens": usage.record() if usage else None,
+            "components": self.components,
         }
         outputs = {stage.name: stage.record() for stage in stages}
         return {**record, **{name: value for name, value in outputs.items() if value is not None}}

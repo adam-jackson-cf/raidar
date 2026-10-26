@@ -33,6 +33,7 @@ on the work. Every root-run command leaves ``root`` owned by the agent user.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import pwd
@@ -78,6 +79,7 @@ class CheckResult:
     exit: int | None
     seconds: float
     output: str = ""
+    input_sha256: str | None = None
 
 
 @dataclass
@@ -219,13 +221,53 @@ def _run_check(
     return result(PASSED if done.returncode == 0 else "failed", done.returncode, output)
 
 
-def decide(config: dict[str, Any], state: Path) -> Decision:
+def prerequisites(config: dict[str, Any]) -> list[CheckResult]:
+    """Workflow preconditions run before any commit, including a reused tree verdict."""
+    checks: list[CheckResult] = []
+    for requirement in config.get("prerequisites", []):
+        started = time.monotonic()
+        try:
+            done = subprocess.run(
+                requirement["argv"],
+                capture_output=True,
+                text=True,
+                timeout=CHECK_TIMEOUT_S,
+                check=False,
+            )
+            status = PASSED if done.returncode == 0 else "failed"
+            if done.returncode < 0 or done.returncode in (126, 127):
+                status = ERROR
+            code, output = done.returncode, done.stdout + done.stderr
+        except (OSError, subprocess.TimeoutExpired) as exc:
+            status, code, output = ERROR, None, str(exc)
+        checks.append(
+            CheckResult(
+                requirement["name"],
+                "prerequisite",
+                True,
+                status,
+                code,
+                round(time.monotonic() - started, 3),
+                output[-OUTPUT_CHARS:],
+                hashlib.sha256(output.encode()).hexdigest(),
+            )
+        )
+    return checks
+
+
+def decide(
+    config: dict[str, Any], state: Path, required: list[CheckResult] | None = None
+) -> Decision:
     """Run every check over the work tree; the verdict is the worst of them."""
     started = time.monotonic()
+    if required is None:
+        required = prerequisites(config)
+    if any(check.status != PASSED for check in required):
+        return _verdict(required, round(time.monotonic() - started, 3))
     cache = state / "cache"
     cache.mkdir(parents=True, exist_ok=True)
     files = python_files(Path(config["root"]), config["excludes"])
-    checks = [_run_check(config, check, files, cache) for check in config["checks"]]
+    checks = required + [_run_check(config, check, files, cache) for check in config["checks"]]
     return _verdict(checks, round(time.monotonic() - started, 3))
 
 
@@ -322,13 +364,7 @@ def seal(config: dict[str, Any], args: argparse.Namespace) -> dict[str, Any]:
         record["commits"], record["base_is_ancestor"] = _commits(root, args.base)
         _git(root, "add", "-A", "--", ".", *_pathspec_excludes(config["excludes"]))
         tree = record["tree"] = _git(root, "write-tree")
-        if tree == args.previous_tree and args.previous_verdict in (PASSED, REFUSED):
-            verdict, record["reused_from"] = args.previous_verdict, args.previous_run
-            record["output"] = f"verify-gate: gate run {args.previous_run} decided this tree\n"
-        else:
-            decision = decide(config, state)
-            verdict, record["checks"] = decision.verdict, decision.summary()
-            record["output"], record["error"] = decision.text(), decision.error
+        verdict = _decide_tree(config, state, args, record)
         if verdict == PASSED:
             record["commit"] = _commit(root, tree, record["head_before"], args)
         record["head_after"] = _git(root, "rev-parse", "HEAD")
@@ -341,6 +377,30 @@ def seal(config: dict[str, Any], args: argparse.Namespace) -> dict[str, Any]:
         (state / SEAL_PID).unlink(missing_ok=True)
     record["seconds"] = round(time.monotonic() - started, 3)
     return record
+
+
+def _decide_tree(
+    config: dict[str, Any], state: Path, args: argparse.Namespace, record: dict[str, Any]
+) -> str:
+    required = prerequisites(config)
+    ready = all(check.status == PASSED for check in required)
+    reusable = args.previous_verdict == PASSED or not config.get("prerequisites")
+    if not ready:
+        decision = _verdict(required, sum(check.seconds for check in required))
+    elif (
+        record["tree"] == args.previous_tree
+        and args.previous_verdict in (PASSED, REFUSED)
+        and reusable
+    ):
+        record["reused_from"] = args.previous_run
+        record["output"] = f"verify-gate: gate run {args.previous_run} decided this tree\n"
+        record["checks"] = Decision(PASSED, 0.0, required).summary()
+        return str(args.previous_verdict)
+    else:
+        decision = decide(config, state, required)
+    record["checks"] = decision.summary()
+    record["output"], record["error"] = decision.text(), decision.error
+    return decision.verdict
 
 
 def _commit(root: Path, tree: str, head: str, args: argparse.Namespace) -> str | None:

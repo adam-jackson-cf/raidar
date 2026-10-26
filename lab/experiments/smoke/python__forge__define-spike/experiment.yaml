@@ -1,0 +1,40 @@
+# Define-stage spike (split design S3): forge x one codex arm running define-build-verify@1 (the
+# deterministic define tool in the primary session, then build against the sealed definition, with
+# the verify gate) x one attempt, to show a stage with its own bespoke tool and what it costs.
+# Kind smoke, not citable.
+# Run detached: make experiment-execute EXPERIMENT=lab/experiments/smoke/python__forge__define-spike/experiment.yaml MAX_CHECKPOINTS=2 JOB_ID=<id> DETACH=1
+schema_version: 3
+kind: smoke
+id: python__forge__define-spike
+description: Define-stage spike on forge (define-build-verify@1); not citable.
+
+problems:
+  - ref: scb/forge@38d627ecf668
+
+runtime: python
+
+agents:
+  - id: agent
+    release: codex@2
+    model: gpt-6-luna
+    reasoning: low
+
+protocol:
+  progression: continue
+  agent_timeout_sec: 1800
+  verifier_timeout_sec: 900
+  snapshot_source: artifact
+
+arms:
+  - id: define
+    agent: agent
+    workflow: define-build-verify@1
+
+assessment:
+  scorers: [correctness@2, code-quality@4, resource-usage@2, process-compliance@7]
+  metric: scb-canonical@2
+
+analysis:
+  baseline_arm: define
+  attempts: 1
+  seed: 20261026
