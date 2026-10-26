@@ -13,6 +13,13 @@ All notable changes to this project are documented in this file.
 - Health E1–E3 audit definition validity, call/state consistency and unusable endings;
   workflow component bytes and digests are retained for P8 instruction isolation.
 
+### Fixes
+
+- Gate comparisons and verdict reuse fingerprint the checked workspace as well as the Git
+  tree and workflow prerequisites, including ignored or unstaged check inputs.
+- Fault recording interprets idle findings only for the liveness check, retaining gate and
+  definition violations without treating their text findings as idle events.
+
 ## 0.15.0 - 2026-10-24
 
 - pack: drop planning tags from parsed recipe comments; a test holds the Dockerfile's tag to the next pack release

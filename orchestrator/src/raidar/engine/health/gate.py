@@ -7,8 +7,8 @@ runner copied to the step's logs (``verify.hook_log``). A trial whose records na
 stage has no ``G`` checks; a verifying step whose evidence is missing makes a check
 ``unmeasured``, never ``pass``.
 
-- ``G1`` the hook's records agree with the seals': every tree that both the agent's own hook and
-  a seal that ran its checks decided got the same verdict from both, and every hook line reads;
+- ``G1`` hook and seal decisions for the same Git tree, checked workspace and workflow
+  prerequisite inputs agree, and every hook line reads;
 - ``G2`` no bypass: every commit the agent made since the checkpoint's base holds a tree its
   hook passed (a ``--no-verify`` commit, or one made with the hooks pointed elsewhere, has
   none), and ``core.hooksPath`` was the stage's hooks directory at every seal. A base the agent
@@ -104,25 +104,39 @@ def _missing(gate: StepGate) -> str | None:
     return None
 
 
-def _gate_input(run: dict[str, Any]) -> tuple[str, tuple[str, ...]]:
-    """A tree plus the non-tree prerequisites the gate actually checked."""
-    return str(run.get("tree")), tuple(
-        str(check.get("input_sha256"))
-        for check in run.get("checks", [])
-        if check.get("category") == "prerequisite"
+def _gate_input(run: dict[str, Any]) -> tuple[str, str, tuple[str, ...]]:
+    """The committed tree, checked workspace and non-tree workflow prerequisites."""
+    return (
+        str(run.get("tree")),
+        str(run.get("worktree_sha256")),
+        tuple(
+            str(check.get("input_sha256"))
+            for check in run.get("checks", [])
+            if check.get("category") == "prerequisite"
+        ),
     )
 
 
-def _sealed_verdicts(gate: StepGate) -> dict[tuple[str, tuple[str, ...]], str]:
-    """Each tree and prerequisite input a seal decided, with its verdict."""
+def _sealed_verdicts(gate: StepGate) -> dict[tuple[str, str, tuple[str, ...]], str]:
+    """Each complete checked input a seal decided, with its verdict."""
     decided = (g for g in _gates(gate) if g.get("verdict") in DECIDED and g.get("tree"))
     return {_gate_input(g): g["verdict"] for g in decided if g.get("reused_from") is None}
+
+
+def _missing_worktree(gate: StepGate) -> bool:
+    return any(
+        not isinstance(run.get("worktree_sha256"), str)
+        for run in [*_gates(gate), *(gate.hook_runs or [])]
+        if run.get("verdict") in DECIDED
+    )
 
 
 def _g1_step(gate: StepGate) -> tuple[list[str], str | None]:
     missing = _missing(gate)
     if missing is not None:
         return [], missing
+    if _missing_worktree(gate):
+        return [], f"{gate.step}: a decided run holds no checked workspace digest"
     seals = _sealed_verdicts(gate)
     if not seals:
         return [], f"{gate.step}: no seal ran its checks to a verdict"

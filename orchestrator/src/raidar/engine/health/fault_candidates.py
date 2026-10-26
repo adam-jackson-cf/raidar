@@ -28,6 +28,8 @@ def _steps(check: HealthCheck) -> list[str | None]:
 
 
 def _idle_findings(check: HealthCheck) -> list[dict[str, Any]]:
+    if check.id != "L2":
+        return []
     findings = check.evidence.get("findings") or []
     return [f for f in findings if f.get("decision") in IDLE_DECISIONS]
 

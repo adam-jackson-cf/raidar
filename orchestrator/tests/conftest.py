@@ -6,6 +6,8 @@ from pathlib import Path
 
 import pytest
 
+pytest_plugins = ("tests.workflow_support",)
+
 
 @pytest.fixture
 def docker_target_offline(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:

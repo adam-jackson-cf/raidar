@@ -288,6 +288,22 @@ def test_an_idle_kill_is_a_fault_candidate_with_its_reason_and_pids(tmp_path: Pa
     assert append_fault_candidates(t.job_dir, report) == []
 
 
+@pytest.mark.parametrize("check_id", ["G1", "E1"])
+def test_non_liveness_findings_are_retained_as_faults(tmp_path: Path, check_id: str) -> None:
+    check = HealthCheck(
+        id=check_id,
+        family=cast(Any, check_id[0]),
+        status="violation",
+        detail="the recorded inputs disagree",
+        evidence={"findings": ["input mismatch"]},
+    )
+    report = HealthReport(trial_id=TRIAL_ID, checks=(check,))
+    (fault,) = append_fault_candidates(tmp_path, report)
+    assert fault["check_id"] == check_id
+    assert fault["status"] == "violation"
+    assert fault["evidence"] == {"findings": ["input mismatch"]}
+
+
 def _report(*checks: tuple[str, str]) -> HealthReport:
     items = [
         HealthCheck(id=i, family=cast(Any, i[0]), status=cast(Any, s), detail=f"{i} {s}")
