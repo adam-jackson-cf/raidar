@@ -429,6 +429,116 @@
             "tool_lock": {}
           }
         },
+        "definition-coverage@1": {
+          "digest": "316a1002ea6209b981c24b732f5a88b35c88f5212cedae67dc6808448f0c2d60",
+          "metadata": {
+            "implementation": "raidar.scoring.definition_coverage:definition_coverage_scorer",
+            "implementation_digest": "4c33240850a67f93735cf0a891ed217afb198ab5af87b74beceaca955cda8c1b",
+            "manifest": {
+              "description": "FXL process audit stage A as recorded readings: for each required issue unit of a checkpoint's define stage, Jev scores each criterion citing it (its statement, aspects and examples) on three levels (other behaviour, concerns it, states it). Per-unit and per-criterion level probabilities and every raw Jev call are kept in the Assessment's raw payloads; the observations only count and average them. No cut-off is applied: FXL's own review found its audit cut-offs uncalibrated. Not applicable without a define stage.",
+              "evidence_required": [
+                "trace"
+              ],
+              "execution": "host-parse",
+              "id": "definition-coverage",
+              "metrics": [
+                {
+                  "description": "Issue units the define stage marked required.",
+                  "direction": "neutral",
+                  "exactness": "native",
+                  "id": "required_units",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "jev",
+                  "type": "count",
+                  "unit": null
+                },
+                {
+                  "description": "Required units no criterion of the sealed definition cites.",
+                  "direction": "neutral",
+                  "exactness": "native",
+                  "id": "uncited_units",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "jev",
+                  "type": "count",
+                  "unit": null
+                },
+                {
+                  "description": "Required units with at least one decided criterion score.",
+                  "direction": "neutral",
+                  "exactness": "native",
+                  "id": "judged_units",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "jev",
+                  "type": "count",
+                  "unit": null
+                },
+                {
+                  "description": "Required units cited by criteria whose every score stayed undecided.",
+                  "direction": "neutral",
+                  "exactness": "native",
+                  "id": "undecided_units",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "jev",
+                  "type": "count",
+                  "unit": null
+                },
+                {
+                  "description": "Criterion scores Jev left undecided after retries.",
+                  "direction": "neutral",
+                  "exactness": "native",
+                  "id": "undecided_questions",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "jev",
+                  "type": "count",
+                  "unit": null
+                },
+                {
+                  "description": "Jev requests made, every attempt counted.",
+                  "direction": "neutral",
+                  "exactness": "native",
+                  "id": "jev_calls",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "jev",
+                  "type": "count",
+                  "unit": null
+                },
+                {
+                  "description": "Mean over judged units of the best expected level (P1 + 2 * P2, 0 to 2) among the criteria citing the unit.",
+                  "direction": "neutral",
+                  "exactness": "native",
+                  "id": "mean_best_expected_level",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": [
+                    0.0,
+                    2.0
+                  ],
+                  "tier": "jev",
+                  "type": "real",
+                  "unit": "level"
+                }
+              ],
+              "runtimes": [
+                "*"
+              ],
+              "tools": [],
+              "version": "1"
+            },
+            "tool_lock": {}
+          }
+        },
         "process-compliance@7": {
           "digest": "59282337f843a819f699b06aab2d1a9cf32eb2f379d8942bd380f9faa6327027",
           "metadata": {
@@ -763,6 +873,128 @@
             },
             "tool_lock": {}
           }
+        },
+        "test-coverage@1": {
+          "digest": "38ddc92040a2f4534fd30eb3ed6009a6bb985e8d89757080b9f192bfc2ece4c9",
+          "metadata": {
+            "implementation": "raidar.scoring.test_coverage:make_test_coverage_scorer",
+            "implementation_digest": "415cb94b8b60ffd84e6d4d151e8b3132ca5ce30389f191253db580c32de3dec6",
+            "manifest": {
+              "description": "FXL process audit stage B as recorded readings: for each criterion of a checkpoint's sealed definition, Jev scores each of the builder's final mapped tests (source and one hop of helpers, from the retained test files) on three levels (never runs the situation, runs it but would still pass, would fail if the behaviour were wrong). A test with no real assertion, or marked skipped, is held to level 1 as FXL does. Per-criterion and per-test probabilities and every raw Jev call are kept in the Assessment's raw payloads; the observations only count and average them. No cut-off is applied. Not applicable without a define stage.",
+              "evidence_required": [
+                "trace"
+              ],
+              "execution": "host-parse",
+              "id": "test-coverage",
+              "metrics": [
+                {
+                  "description": "Criteria of the sealed definition, regression ones included.",
+                  "direction": "neutral",
+                  "exactness": "native",
+                  "id": "criteria",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "jev",
+                  "type": "count",
+                  "unit": null
+                },
+                {
+                  "description": "Criteria whose ac_tests entry names no test.",
+                  "direction": "neutral",
+                  "exactness": "native",
+                  "id": "unmapped_criteria",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "jev",
+                  "type": "count",
+                  "unit": null
+                },
+                {
+                  "description": "Criteria with at least one decided test score.",
+                  "direction": "neutral",
+                  "exactness": "native",
+                  "id": "judged_criteria",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "jev",
+                  "type": "count",
+                  "unit": null
+                },
+                {
+                  "description": "Criteria with mapped, readable tests whose every score stayed undecided.",
+                  "direction": "neutral",
+                  "exactness": "native",
+                  "id": "undecided_criteria",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "jev",
+                  "type": "count",
+                  "unit": null
+                },
+                {
+                  "description": "Mapped tests the retained test files do not hold.",
+                  "direction": "neutral",
+                  "exactness": "native",
+                  "id": "unread_tests",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "jev",
+                  "type": "count",
+                  "unit": null
+                },
+                {
+                  "description": "Test scores Jev left undecided after retries.",
+                  "direction": "neutral",
+                  "exactness": "native",
+                  "id": "undecided_questions",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "jev",
+                  "type": "count",
+                  "unit": null
+                },
+                {
+                  "description": "Jev requests made, every attempt counted.",
+                  "direction": "neutral",
+                  "exactness": "native",
+                  "id": "jev_calls",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "jev",
+                  "type": "count",
+                  "unit": null
+                },
+                {
+                  "description": "Mean over judged criteria of the best expected level (P1 + 2 * P2, 0 to 2) among its mapped tests, a test without a real assertion or marked skipped held to 1.",
+                  "direction": "neutral",
+                  "exactness": "native",
+                  "id": "mean_best_expected_level",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": [
+                    0.0,
+                    2.0
+                  ],
+                  "tier": "jev",
+                  "type": "real",
+                  "unit": "level"
+                }
+              ],
+              "runtimes": [
+                "*"
+              ],
+              "tools": [],
+              "version": "1"
+            },
+            "tool_lock": {}
+          }
         }
       }
     },
@@ -777,7 +1009,9 @@
         "correctness@2",
         "code-quality@4",
         "resource-usage@2",
-        "process-compliance@7"
+        "process-compliance@7",
+        "definition-coverage@1",
+        "test-coverage@1"
       ]
     },
     "tools": {
@@ -789,7 +1023,7 @@
       "tree-sitter-language-pack": "0.13.0"
     }
   },
-  "document_sha256": "59680527c66dc2fa0deda30687ee91e29738736547b035d34760c23e23317d8e",
+  "document_sha256": "7ecbd04e47bdb101e80fe02d2df2ddb2a830c47f1abfa313f7a6fd4e2abe5e13",
   "execution": {
     "arms": {
       "define": {
@@ -807,22 +1041,22 @@
           "version_pin": "0.156.1",
           "workflow_skills": "placement.skills .agents/skills in the workspace /app"
         },
-        "digest": "32d81da5cae9c69f223820fe11f597f599876572d423231bfeac2943a755f322",
+        "digest": "e775d6aa296cdb7bd36a949d1cda771c3bf3ed685339ba3a5e1e4d42069a6d2e",
         "model": "gpt-6-luna",
         "provider": "openai",
         "reasoning": "low",
         "stage_code": {
-          "build": "920077d2fc46ddf74d0ffb33ffe87cf0982e7eb6027a50f6723780a953111437",
-          "define": "70c40eaf0994d0c18e77f3a69f141ccb10f282c44872ca579376c13820de6da9",
-          "verify": "2451192eb84847b573c19b202a072ada89c3f3963ff05f86b9a82de92d6dee60"
+          "build": "d59f97bada9283ebb50bff74bf9fdbbf7226f1669bc7130d482afe680bd79ec5",
+          "define": "b2042b5c1a27d53799401326288ea5943c9343ee40ec144f15a31a6545d3f2dd",
+          "verify": "a30b2784c5888c9c74ec5d7b073da0fd85c6ab76e767eea00341f2dc8fd4fbfb"
         },
         "tool": {
           "binary": "codex",
           "package": "@openai/codex",
           "version": "0.156.1"
         },
-        "workflow": "define-build-verify@1",
-        "workflow_sha256": "c4e30bb22d7f5eb616ae0ac1cafb564166c4131fd678e2ac9320cb57dc9124dc"
+        "workflow": "define-build-verify@2",
+        "workflow_sha256": "dc7d72a744c4e0a487534c9a5227d8be3a3443e11f4ee40829fcb0d2511b15aa"
       }
     },
     "design": {
@@ -838,7 +1072,7 @@
         {
           "agent": "agent",
           "id": "define",
-          "workflow": "define-build-verify@1"
+          "workflow": "define-build-verify@2"
         }
       ],
       "attempts": 1,
@@ -958,8 +1192,8 @@
         }
       },
       "workflow": {
-        "define-build-verify@1": {
-          "digest": "c4e30bb22d7f5eb616ae0ac1cafb564166c4131fd678e2ac9320cb57dc9124dc",
+        "define-build-verify@2": {
+          "digest": "dc7d72a744c4e0a487534c9a5227d8be3a3443e11f4ee40829fcb0d2511b15aa",
           "metadata": {
             "stages": [
               "define",
@@ -984,10 +1218,10 @@
   "experiment": {
     "id": "python__forge__define-spike",
     "source": "experiment.yaml",
-    "source_sha256": "624b8915dfb55dd26efdb8c8c307fc5dd5b8a810f9995228d3bd9ce9751c2010",
-    "spec_sha256": "4a33f79bec95858812391959fb13a40d2347f191e9969d8d9f869859dd8ed2e9"
+    "source_sha256": "9dba0c03ef4ddcb068f56f39e086b3cdf3f9f5c95cef8566f612c683f430ca07",
+    "spec_sha256": "fb6e82af7e4e27faf9eb0ad458c099cbbf3f75322895268eddf0b4fba948282a"
   },
-  "lock_sha256": "e320ac86e81e8f1e0758ef30440ded6a2943eea6e150a08db52af2594013ad84",
+  "lock_sha256": "c8d0238618240e0db28150d6ef44f9913d90436f9b494f99cf09629240ecaaf2",
   "lock_version": 4,
   "overrides": {
     "flags": {},
@@ -995,8 +1229,8 @@
   },
   "sections": {
     "analysis": "5857cbd73862a8373632833c2dac16ea584aa2f92fc94b12b7181fb3804de9e7",
-    "assessment": "46b5cf8e2be9b494d132ee2858cc1da81f12a9b254452ae0546901a171227ff8",
-    "execution": "e320ac86e81e8f1e0758ef30440ded6a2943eea6e150a08db52af2594013ad84",
+    "assessment": "fe8801377641a9f3d4adb0ea07ebf77c5c970eb2422b0e8cfa7eb4b1bcfb0f47",
+    "execution": "c8d0238618240e0db28150d6ef44f9913d90436f9b494f99cf09629240ecaaf2",
     "toolchain": "037de8092c78cc029ff5b0266ac406e508a22714e4f2501420e1e2d18e9c2a20"
   },
   "spec": {
@@ -1022,7 +1256,7 @@
       {
         "agent": "agent",
         "id": "define",
-        "workflow": "define-build-verify@1"
+        "workflow": "define-build-verify@2"
       }
     ],
     "assessment": {
@@ -1036,10 +1270,12 @@
         "correctness@2",
         "code-quality@4",
         "resource-usage@2",
-        "process-compliance@7"
+        "process-compliance@7",
+        "definition-coverage@1",
+        "test-coverage@1"
       ]
     },
-    "description": "Define-stage spike on forge (define-build-verify@1); not citable.",
+    "description": "End-to-end define-build-verify@2 spike on forge; not citable.",
     "environment": {
       "compose_init": true,
       "type": "docker"

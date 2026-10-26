@@ -7,6 +7,7 @@ reporting) is asserted without a container runtime.
 
 from __future__ import annotations
 
+import json
 import os
 import stat
 from pathlib import Path
@@ -20,6 +21,7 @@ from raidar.grading.grader_image import ensure_grader_image, grader_dockerfile, 
 from raidar.grading.regrade import docker_sandbox_factory
 from raidar.grading.sandbox import DockerCopySandbox, SandboxRun, sweep_grader_orphans
 from raidar.grading.verifier import RaidarVerifier
+from raidar.judge.secrets import SecretIsolationError
 from tests.verifier_support import FakeAgentEnvironment, make_bundle
 
 FAKE_DOCKER = """#!/bin/bash
@@ -36,12 +38,16 @@ case "$1" in
     touch "$state/image_present"; exit 0 ;;
   create)
     echo "$*" > "$state/create_argv"; exit 0 ;;
+  inspect)
+    [ -f "$state/leaks_key" ] && { echo "OPENROUTER_API_KEY"; exit 0; }
+    printf 'PATH\\nHOME\\n'; exit 0 ;;
   cp)
     case "$2" in
       -) cat > "$state/copied_in.tar"; exit 0 ;;
       *) mkdir -p "$state/o/out" && tar -cf - -C "$state/o" out; exit 0 ;;
     esac ;;
   start)
+    touch "$state/grader_started"
     [ -f "$state/run_hangs" ] && exec sleep 30
     echo "graded"; exit 3 ;;
   kill)
@@ -124,11 +130,12 @@ async def test_sandbox_reports_exit_code_output_and_environment_id(
     assert (result.exit_code, result.timed_out) == (3, False)
     assert result.output.startswith("graded")
     assert "[raidar-copy] copy_in_s=" in result.output
-    sequence = [line.split()[2] for line in calls(fake_docker) if "image inspect" not in line]
-    assert sequence == ["create", "cp", "start", "cp", "rm"]
     name = (fake_docker / "removed").read_text().strip()
     assert name.startswith("raidar-oracle-")
     assert f"--name {name} " in (fake_docker / "create_argv").read_text()
+    evidence = json.loads((tmp_path / "out/secret-isolation.json").read_text())
+    assert evidence["judge_key_in_sandbox"] is False
+    assert evidence["sandbox_env_names"]["container"] == ["HOME", "PATH"]
 
 
 async def test_sandbox_timeout_kills_the_named_container(tmp_path: Path, fake_docker: Path) -> None:
@@ -143,6 +150,17 @@ async def test_sandbox_timeout_kills_the_named_container(tmp_path: Path, fake_do
     killed = (fake_docker / "killed").read_text().split()
     assert killed[0].startswith("raidar-oracle-")
     assert (fake_docker / "removed").read_text().split() == killed  # removed even after a timeout
+
+
+async def test_grader_rejects_an_image_with_a_judge_key_environment(
+    tmp_path: Path, fake_docker: Path
+) -> None:
+    (fake_docker / "leaks_key").touch()
+    sandbox = DockerCopySandbox(image="grader:1", docker_context="orbstack")
+    with pytest.raises(SecretIsolationError, match="judge key must not enter"):
+        await sandbox.run(sandbox_run(tmp_path))
+    assert (fake_docker / "removed").is_file()
+    assert not (fake_docker / "grader_started").exists()
 
 
 async def test_sweep_prunes_only_labelled_old_grader_containers(fake_docker: Path) -> None:

@@ -13,6 +13,7 @@ from pathlib import Path
 
 from raidar.contract.canonical import digest_json
 from raidar.contract.references import RefKind, RegistryRef, ResolvedReference
+from raidar.scoring.definition_coverage.manifest import DEFINITION_COVERAGE
 from raidar.scoring.framework.builtin_manifests import BUILTIN_MANIFESTS
 from raidar.scoring.framework.manifest import ScorerManifest
 from raidar.scoring.framework.registry import (
@@ -23,8 +24,15 @@ from raidar.scoring.framework.registry import (
 )
 from raidar.scoring.gate_effort.manifest import GATE_EFFORT
 from raidar.scoring.process_checks.manifest import PROCESS_COMPLIANCE
+from raidar.scoring.test_coverage.manifest import TEST_COVERAGE
 
-REGISTERED_MANIFESTS = (*BUILTIN_MANIFESTS, PROCESS_COMPLIANCE, GATE_EFFORT)
+REGISTERED_MANIFESTS = (
+    *BUILTIN_MANIFESTS,
+    PROCESS_COMPLIANCE,
+    GATE_EFFORT,
+    DEFINITION_COVERAGE,
+    TEST_COVERAGE,
+)
 
 BUILTIN_IMPLEMENTATIONS: dict[str, str] = {
     "correctness@2": "raidar.scoring.correctness:correctness_scorer",
@@ -34,6 +42,8 @@ BUILTIN_IMPLEMENTATIONS: dict[str, str] = {
         "raidar.scoring.process_checks:deterministic_process_compliance_scorer"
     ),
     "gate-effort@11": "raidar.scoring.gate_effort:gate_effort_scorer",
+    "definition-coverage@1": "raidar.scoring.definition_coverage:definition_coverage_scorer",
+    "test-coverage@1": "raidar.scoring.test_coverage:make_test_coverage_scorer",
 }
 # Scorers bound to the assessment store at rescore time.
 BUILTIN_STORE_IMPLEMENTATIONS: dict[str, str] = {

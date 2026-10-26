@@ -32,6 +32,7 @@ STAGE_MODULES: Mapping[StageType, tuple[str, ...]] = {
         "subject/workflow/definition.py",
         "subject/workflow/stage.py",
         "subject/workflow/components.py",
+        "subject/workflow/acceptance.py",
         "subject/workflow/define.py",
     ),
     "build": (
@@ -41,6 +42,9 @@ STAGE_MODULES: Mapping[StageType, tuple[str, ...]] = {
         "subject/workflow/definition.py",
         "subject/workflow/stage.py",
         "subject/workflow/components.py",
+        "subject/workflow/acceptance.py",
+        "subject/workflow/build.py",
+        "subject/workflow/reply.py",
     ),
     "verify": (
         "subject/workflow/runner.py",
@@ -48,13 +52,26 @@ STAGE_MODULES: Mapping[StageType, tuple[str, ...]] = {
         "subject/workflow/definition.py",
         "subject/workflow/stage.py",
         "subject/workflow/components.py",
+        "subject/workflow/acceptance.py",
         "subject/workflow/verify.py",
         "subject/workflow/verify_gate.py",
+        "subject/workflow/judging.py",
+        "subject/workflow/asking.py",
+        "subject/workflow/judgeloop.py",
+        "subject/workflow/pysource.py",
+        "judge/client.py",
+        "judge/protocol.py",
+        "judge/live.py",
+        "contract/activity.py",
     ),
 }
 """Modules (below ``raidar/``) that carry out each implemented stage type."""
 
-STAGE_PAYLOADS: Mapping[StageType, str] = {"define": PAYLOAD_DIR}
+STAGE_PAYLOADS: Mapping[StageType, str] = {
+    "define": PAYLOAD_DIR,
+    "build": PAYLOAD_DIR,
+    "verify": PAYLOAD_DIR,
+}
 """Directories (below ``raidar/``) of a stage's tool payload: every module in them, recursively."""
 
 ADAPTER_MODULES: Mapping[AgentName, tuple[str, ...]] = {

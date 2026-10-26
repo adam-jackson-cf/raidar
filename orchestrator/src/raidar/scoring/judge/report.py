@@ -21,9 +21,9 @@ from collections import Counter
 from collections.abc import Sequence
 from typing import Any
 
+from raidar.judge.protocol import JEV_PINNED_MODEL
 from raidar.scoring.judge.audit import SufficiencyLevel
 from raidar.scoring.judge.policies import PolicyMode
-from raidar.scoring.judge.protocol import JEV_PINNED_MODEL
 from raidar.scoring.judge.rubric import Judgement, JudgementStatus, RubricCheckpoint
 from raidar.scoring.judge.runtime import JevRuntime
 

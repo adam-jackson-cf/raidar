@@ -27,8 +27,8 @@ from typing import Any
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from raidar.contract.canonical import digest_json, pretty_canonical_json_bytes
-from raidar.scoring.judge.client import JevSuccess
-from raidar.scoring.judge.protocol import (
+from raidar.judge.client import JevSuccess
+from raidar.judge.protocol import (
     JEV_PINNED_MODEL,
     JevQuestions,
     answers_wire,

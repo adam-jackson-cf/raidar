@@ -10,8 +10,13 @@ time, all in the checkpoint's one primary session:
 2. one prompt (``compose``: build's frame, each stage's fragment at its token, the task text at
    ``%%%TASK%%%``) runs as the first turn, in a fresh session (``run``);
 3. when the agent stops, each enabled stage's checks run in stage order; the first that returns
-   a message resumes the same session with it (``resume``, a turn of that stage) and the checks
-   run again. Each stage bounds its own resumes; when none asks, the checkpoint ends;
+   a ``Resume`` resumes the same session with its message (``resume``, a turn of that stage and
+   of the ``Resume``'s kind: ``gate_fix``, ``rework``, ``repair`` or ``define``; the first prompt
+   is ``first_build``) and the checks run again. Each stage bounds its own resumes; when none
+   asks, the checkpoint ends. A stage may add to a turn's prompt (``Stage.decorate``: the build
+   reply's shape); each finished turn's kind and seconds is on ``Checkpoint.turns``, and
+   ``Checkpoint.deadline`` is when the phase is cut (``phase_timeout_s`` from the phase start:
+   the arm's agent timeout as Harbor scales it), so a stage can decline a turn it could not finish;
 4. every stage closes, also when a turn failed (``turn_error``) or the phase was cancelled
    (``deadline``), and its record goes into ``workflow.json`` under its name.
 
@@ -62,7 +67,16 @@ from raidar.subject.workflow.components import skill_files
 from raidar.subject.workflow.definition import StageType, WorkflowDefinition
 from raidar.subject.workflow.factory import workflow_stages
 from raidar.subject.workflow.inner import InnerAgentSpec, create_inner
-from raidar.subject.workflow.stage import DEADLINE, TURN_ERROR, Checkpoint, Stage, compose
+from raidar.subject.workflow.stage import (
+    DEADLINE,
+    FIRST_BUILD,
+    TURN_ERROR,
+    Checkpoint,
+    Resume,
+    Spent,
+    Stage,
+    compose,
+)
 
 RUNNER_NAME = "raidar-workflow"
 WORKFLOW_DIR = "workflow"
@@ -79,6 +93,7 @@ class WorkflowRunnerOptions(AgentOptions):
     workflow: str
     definition: WorkflowDefinition
     skills_placement: str = ".agents/skills"
+    phase_timeout_s: float | None = None
 
 
 @dataclass(frozen=True)
@@ -136,6 +151,7 @@ ZERO = Tokens(0, 0, 0, 0.0)
 @dataclass
 class Turn:
     stage: StageType
+    kind: str
     index: int
     resumed: bool
     prompt_sha256: str
@@ -163,6 +179,7 @@ class Turn:
     def record(self) -> dict[str, Any]:
         return {
             "stage": self.stage,
+            "kind": self.kind,
             "turn": self.index,
             "log_dir": self.log_dir,
             "session_id": self.session_id,
@@ -250,7 +267,9 @@ class WorkflowRunner(BaseAgent):
         state = _Run()
         stages = workflow_stages(self.runner_options.definition)
         self.components: list[dict[str, str]] = []
-        checkpoint = Checkpoint(environment, self.logs_dir, instruction)
+        timeout = self.runner_options.phase_timeout_s
+        deadline = None if timeout is None else time.monotonic() + timeout
+        checkpoint = Checkpoint(environment, self.logs_dir, instruction, deadline)
         cut: str | None = None
         try:
             await self._work(checkpoint, state, stages, instruction)
@@ -272,10 +291,12 @@ class WorkflowRunner(BaseAgent):
         for stage in stages:
             await stage.prepare(checkpoint)
         prompt = compose(stages, instruction)
-        await self._turn(checkpoint.environment, state, "build", prompt, resume=False)
+        await self._turn(checkpoint, state, stages, "build", FIRST_BUILD, prompt, resume=False)
         while (followup := await self._checks(checkpoint, stages, state.turns[-1])) is not None:
-            stage_type, message = followup
-            await self._turn(checkpoint.environment, state, stage_type, message, resume=True)
+            stage_type, resume = followup
+            await self._turn(
+                checkpoint, state, stages, stage_type, resume.kind, resume.message, resume=True
+            )
 
     async def _place_components(self, checkpoint: Checkpoint) -> None:
         files = skill_files(self.runner_options.definition, self.runner_options.skills_placement)
@@ -296,12 +317,12 @@ class WorkflowRunner(BaseAgent):
     @staticmethod
     async def _checks(
         checkpoint: Checkpoint, stages: list[Stage], turn: Turn
-    ) -> tuple[StageType, str] | None:
-        """The first stage, in stage order, whose checks resume the session, and its message."""
+    ) -> tuple[StageType, Resume] | None:
+        """The first stage, in stage order, whose checks resume the session, and its ``Resume``."""
         for stage in stages:
-            message = await stage.check(checkpoint, turn.log_dir)
-            if message is not None:
-                return stage.name, message
+            resume = await stage.check(checkpoint, turn.log_dir)
+            if resume is not None:
+                return stage.name, resume
         return None
 
     @staticmethod
@@ -311,15 +332,21 @@ class WorkflowRunner(BaseAgent):
 
     async def _turn(
         self,
-        environment: BaseEnvironment,
+        checkpoint: Checkpoint,
         state: _Run,
+        stages: list[Stage],
         stage: StageType,
+        kind: str,
         prompt: str,
         *,
         resume: bool,
     ) -> None:
+        environment = checkpoint.environment
+        for owner in stages:
+            prompt = owner.decorate(kind, prompt)
         turn = Turn(
             stage=stage,
+            kind=kind,
             index=len(state.turns) + 1,
             resumed=resume,
             prompt_sha256=hashlib.sha256(prompt.encode()).hexdigest(),
@@ -344,6 +371,7 @@ class WorkflowRunner(BaseAgent):
             await self._settle(environment, state, turn, inner, context)
             raise
         turn.stop()
+        checkpoint.turns.append(Spent(kind, turn.seconds or 0.0))
         await self._settle(environment, state, turn, inner, context)
 
     async def _settle(

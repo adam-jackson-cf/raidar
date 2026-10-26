@@ -19,6 +19,8 @@ one JSON file the stage writes (``root``, ``tools``, ``excludes``, ``test_timeou
   checked), a refusal leaves the work staged and ``HEAD`` where it was. It prints one JSON
   record, with the repository's evidence for the bypass check: ``core.hooksPath`` and every
   commit since the checkpoint's base.
+- ``baseline``: runs the tests check once over the work tree before the agent starts and prints
+  its per-test outcomes (the tests that pass on the base, for ``Kind: regression`` criteria).
 - ``restore``: after a cut, stops a running seal and the agent user's processes and puts the
   work tree back to a tree a seal decided.
 - ``strip-rules``: removes the stage's rules block from a file (or from standard input, as a
@@ -56,6 +58,7 @@ EXITS = {PASSED: 0, REFUSED: 1, ERROR: 126}
 HOOK_RUNS = "hook-runs.jsonl"
 SEAL_PID = "seal.pid"
 CHECK_TIMEOUT_S = 600
+TEST_OUTCOMES = "tests.json"
 OUTPUT_CHARS = 20_000
 RULES_BEGIN = "<!-- raidar verify rules: begin -->"
 RULES_END = "<!-- raidar verify rules: end -->"
@@ -82,6 +85,7 @@ class CheckResult:
     seconds: float
     output: str = ""
     input_sha256: str | None = None
+    tests: dict[str, Any] | None = None
 
 
 @dataclass
@@ -187,7 +191,20 @@ def _project_sites(root: Path) -> list[str]:
     return sorted(str(path) for path in root.glob(".venv/lib/python*/site-packages"))
 
 
-def _command(config: dict[str, Any], check: dict[str, Any], files: list[str]) -> list[str]:
+def _read_outcomes(path: Path, category: str) -> dict[str, Any] | None:
+    """The tests check's per-test record (``collected`` and ``outcomes``), if it wrote one."""
+    if category != "tests" or not path.is_file():
+        return None
+    try:
+        document = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    return document if isinstance(document, dict) else None
+
+
+def _command(
+    config: dict[str, Any], check: dict[str, Any], files: list[str], outcomes: Path
+) -> list[str]:
     root, tools = Path(config["root"]), Path(config["tools"])
     if check["category"] == "tests":
         sites = [arg for path in _project_sites(root) for arg in ("--site", path)]
@@ -197,6 +214,8 @@ def _command(config: dict[str, Any], check: dict[str, Any], files: list[str]) ->
             "pytest-run",
             "--timeout",
             str(config["test_timeout"]),
+            "--outcomes",
+            str(outcomes),
             *sites,
             "--",
             "-q",
@@ -215,17 +234,19 @@ def _run_check(
     config: dict[str, Any], check: dict[str, Any], files: list[str], cache: Path
 ) -> CheckResult:
     started = time.monotonic()
+    outcomes = cache.parent / TEST_OUTCOMES
 
     def result(status: str, code: int | None, output: str) -> CheckResult:
         seconds = round(time.monotonic() - started, 3)
         return CheckResult(
             check["name"], check["category"], check["blocking"], status, code, seconds,
-            output[-OUTPUT_CHARS:],
+            output[-OUTPUT_CHARS:], tests=_read_outcomes(outcomes, check["category"]),
         )  # fmt: skip
 
     if check["category"] != "tests" and not files:
         return result(PASSED, 0, "no Python files to check")
-    command = _command(config, check, files)
+    outcomes.unlink(missing_ok=True)
+    command = _command(config, check, files, outcomes)
     if not os.access(command[0], os.X_OK):
         return result(ERROR, None, f"tool not installed: {command[0]}")
     try:
@@ -517,7 +538,34 @@ def strip_file(path: Path, remove_empty: bool) -> dict[str, Any]:
     return {"path": str(path), "present": True, "removed": False}
 
 
-def pytest_run(timeout: int, sites: Sequence[str], args: Sequence[str]) -> int:
+class TestOutcomes:
+    """A pytest plugin: each collected node id and its result (the worst of its phases)."""
+
+    __test__ = False  # not a pytest test class
+
+    def __init__(self, target: Path | None) -> None:
+        self.target = target
+        self.collected: list[str] = []
+        self.results: dict[str, str] = {}
+
+    def pytest_collection_modifyitems(self, items: Sequence[Any]) -> None:
+        self.collected = [item.nodeid for item in items]
+
+    def pytest_runtest_logreport(self, report: Any) -> None:
+        if report.when != "call" and report.outcome == PASSED:
+            return
+        if self.results.get(report.nodeid) != "failed":
+            self.results[report.nodeid] = "skipped" if report.skipped else report.outcome
+
+    def pytest_sessionfinish(self) -> None:
+        if self.target is not None:
+            document = {"collected": self.collected, "outcomes": self.results}
+            self.target.write_text(json.dumps(document, sort_keys=True), encoding="utf-8")
+
+
+def pytest_run(
+    timeout: int, sites: Sequence[str], args: Sequence[str], outcomes: Path | None = None
+) -> int:
     for path in sites:
         site.addsitedir(path)
     sys.path[0] = os.getcwd()
@@ -537,16 +585,28 @@ def pytest_run(timeout: int, sites: Sequence[str], args: Sequence[str]) -> int:
                 signal.alarm(0)
                 signal.signal(signal.SIGALRM, previous)
 
-    return int(pytest.main(list(args), plugins=[StopSlowTests()]))
+    return int(pytest.main(list(args), plugins=[StopSlowTests(), TestOutcomes(outcomes)]))
+
+
+def baseline(config: dict[str, Any]) -> dict[str, Any]:
+    """Run the tests check once over the work tree, as the gate does, and report it.
+
+    The verify stage runs it before the agent starts: the tests that pass on the base are what a
+    ``Kind: regression`` criterion's mapped tests are compared with.
+    """
+    check = next(item for item in config["checks"] if item["category"] == "tests")
+    state = Path(config["seal_state"])
+    (state / "cache").mkdir(parents=True, exist_ok=True)
+    return asdict(_run_check(config, check, [], state / "cache"))
 
 
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="verify-gate")
     commands = parser.add_subparsers(dest="command", required=True)
-    for name in ("hook", "seal", "restore"):
+    for name in ("hook", "seal", "restore", "baseline"):
         command = commands.add_parser(name)
         command.add_argument("--config", type=Path, required=True)
-        if name != "hook":
+        if name not in ("hook", "baseline"):
             command.add_argument("--owner", required=True)
     sealing = commands.choices["seal"]
     sealing.add_argument("--run", type=int, required=True)
@@ -563,6 +623,7 @@ def _parser() -> argparse.ArgumentParser:
     testing = commands.add_parser("pytest-run")
     testing.add_argument("--timeout", type=int, required=True)
     testing.add_argument("--site", action="append", default=[])
+    testing.add_argument("--outcomes", type=Path)
     testing.add_argument("args", nargs="*")
     return parser
 
@@ -571,7 +632,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     args = _parser().parse_args(argv)
     os.umask(0o022)  # the container's exec umask is 0: nothing the gate writes is world-writable
     if args.command == "pytest-run":
-        return pytest_run(args.timeout, args.site, args.args)
+        return pytest_run(args.timeout, args.site, args.args, args.outcomes)
     if args.command == "strip-rules":
         if args.file is None:
             sys.stdout.write(strip_rules(sys.stdin.read()))
@@ -581,6 +642,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     config = json.loads(args.config.read_text(encoding="utf-8"))
     if args.command == "hook":
         return hook(config)
+    if args.command == "baseline":
+        print(json.dumps(baseline(config), sort_keys=True))
+        return 0
     run = seal if args.command == "seal" else restore
     print(json.dumps(run(config, args), sort_keys=True))
     return 0

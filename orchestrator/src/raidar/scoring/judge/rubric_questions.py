@@ -21,7 +21,7 @@ import yaml
 from pydantic import BaseModel, ConfigDict, Field
 
 from raidar.contract.paths import judge_root
-from raidar.scoring.judge.protocol import NoulCriteria, NoulQuestion
+from raidar.judge.protocol import NoulCriteria, NoulQuestion
 from raidar.scoring.judge.symbols import SymbolKind
 
 QUESTION_SET_DIR = judge_root() / "question_sets"

@@ -24,7 +24,7 @@ from typing import Any, Protocol
 import requests
 from pydantic import ValidationError
 
-from raidar.scoring.judge.protocol import (
+from raidar.judge.protocol import (
     DEFAULT_TIMEOUT_S,
     JEV_ENDPOINT,
     JEV_MODEL,
@@ -170,8 +170,22 @@ def api_key_from_env(environ: Mapping[str, str] | None = None) -> str | None:
     return value or None
 
 
+@dataclass(frozen=True)
+class Exchange:
+    """One decision attempt as it crossed the wire, for callers that record it.
+
+    ``request_body`` is None when nothing was sent (state too large); ``response`` is None when
+    the transport raised (``transport_error`` then names the failure, never a body).
+    """
+
+    result: JevResult
+    request_body: bytes | None
+    response: TransportResponse | None
+    transport_error: str | None = None
+
+
 class JevClient:
-    """Pinned-model Jev client. The key never leaves the Authorization header."""
+    """Jev client for one model id. The key never leaves the Authorization header."""
 
     def __init__(
         self,
@@ -179,29 +193,44 @@ class JevClient:
         *,
         transport: Transport | None = None,
         timeout_s: float = DEFAULT_TIMEOUT_S,
+        model: str = JEV_MODEL,
     ) -> None:
         if not api_key:
             raise ValueError("JevClient needs an API key")
         self._api_key = api_key
         self._transport = transport or RequestsTransport()
         self._timeout_s = timeout_s
+        self._model = model
 
     @property
     def api_key(self) -> str:
         return self._api_key
 
+    @property
+    def model(self) -> str:
+        """The model id every request names."""
+        return self._model
+
     def decide(self, state: Any, questions: JevQuestions) -> JevResult:
+        return self.exchange(state, questions).result
+
+    def exchange(self, state: Any, questions: JevQuestions) -> Exchange:
+        """One attempt, with the raw request body and response it produced."""
         validate_questions(questions)
         started = time.monotonic()
         serialised = state_text(state)
         if len(serialised) > JEV_STATE_CHAR_LIMIT:
-            return JevFailure(
-                FailureReason.STATE_TOO_LARGE,
-                f"Jev state is {len(serialised)} characters, over {JEV_STATE_CHAR_LIMIT}.",
-                0,
+            return Exchange(
+                JevFailure(
+                    FailureReason.STATE_TOO_LARGE,
+                    f"Jev state is {len(serialised)} characters, over {JEV_STATE_CHAR_LIMIT}.",
+                    0,
+                ),
+                None,
+                None,
             )
         body = json.dumps(
-            {"model": JEV_MODEL, "state": state, "questions": questions_wire(questions)},
+            {"model": self._model, "state": state, "questions": questions_wire(questions)},
             ensure_ascii=False,
             allow_nan=False,
             sort_keys=True,
@@ -212,12 +241,14 @@ class JevClient:
                 JEV_ENDPOINT, headers=headers, body=body, timeout_s=self._timeout_s
             )
         except TransportTimeoutError:
-            return _failure(FailureReason.TIMEOUT, "Jev request timed out.", started)
+            failure = _failure(FailureReason.TIMEOUT, "Jev request timed out.", started)
+            return Exchange(failure, body, None, "TransportTimeoutError")
         except TransportError:
-            return _failure(
+            failure = _failure(
                 FailureReason.NETWORK, "Jev request failed to reach OpenRouter.", started
             )
-        return _interpret(response, questions, started)
+            return Exchange(failure, body, None, "TransportError")
+        return Exchange(_interpret(response, questions, started), body, response)
 
 
 def _elapsed_ms(started: float) -> int:

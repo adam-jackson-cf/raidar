@@ -11,6 +11,7 @@ import yaml
 from click.testing import CliRunner
 
 from raidar.cli import main
+from raidar.judge.protocol import ChoiceQuestion, NoulQuestion, ScoreQuestion
 from raidar.scoring.judge.audit import LabelRecord, ReviewerKind
 from raidar.scoring.judge.blind import derive_blind_labels, export_blind
 from raidar.scoring.judge.calibration import (
@@ -29,7 +30,6 @@ from raidar.scoring.judge.promotion import (
     regression_corpus,
     split_metrics,
 )
-from raidar.scoring.judge.protocol import ChoiceQuestion, NoulQuestion, ScoreQuestion
 from tests.jev_support import (
     SUFFICIENT,
     RecordedTransport,

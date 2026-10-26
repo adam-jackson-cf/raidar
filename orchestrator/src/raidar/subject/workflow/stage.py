@@ -1,4 +1,4 @@
-"""The stage interface (design section 5.1) and the ``build`` stage type.
+"""The stage interface (design section 5.1).
 
 Every stage type implements the same five parts, and all of them happen inside the
 checkpoint's one primary session:
@@ -16,32 +16,82 @@ checkpoint's one primary session:
    ``instructions`` lists the step records holding text the stage placed in the workspace's
    instruction files, so the isolation check can tell it from text from elsewhere.
 
-``build`` has nothing to set up and no checks: its outputs are the runner's per-turn records.
+``build`` (``raidar.subject.workflow.build``) has nothing to set up; with structured replies it
+checks each turn's reply. A check returns a ``Resume`` (the message and the kind of turn it
+starts: ``gate_fix``, ``rework``, ``repair``, ``define``; the checkpoint's first prompt is
+``first_build``). ``Checkpoint.turns`` holds every finished turn's kind and seconds and
+``Checkpoint.deadline`` the time the agent phase is cut at, for a stage that must fit a turn in the
+time left. ``decorate`` lets a stage add to the prompt of a turn (the reply's shape).
 """
 
 from __future__ import annotations
 
+import time
 from abc import ABC, abstractmethod
 from collections.abc import Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, ClassVar
 
 from harbor.environments.base import BaseEnvironment
 
-from raidar.subject.workflow.definition import TASK_TOKEN, BuildSettings, StageType
+from raidar.subject.workflow.definition import TASK_TOKEN, StageType
 
 DEADLINE = "deadline"
 TURN_ERROR = "turn_error"
+FIRST_BUILD = "first_build"
+GATE_FIX = "gate_fix"
+REWORK = "rework"
+REPAIR = "repair"
+DEFINE_ROUND = "define"
+"""The kinds of turn: the checkpoint's first prompt, and what a stage's check resumes it with."""
+
+
+@dataclass(frozen=True)
+class Resume:
+    """A check's message that resumes the session, and the kind of turn it starts."""
+
+    message: str
+    kind: str
+
+
+@dataclass(frozen=True)
+class Spent:
+    """A finished turn's kind and seconds."""
+
+    kind: str
+    seconds: float
 
 
 @dataclass(frozen=True)
 class Checkpoint:
-    """Where one checkpoint's stages work: the sandbox and the step's agent logs (host side)."""
+    """Where one checkpoint's stages work: the sandbox and the step's agent logs (host side).
+
+    ``deadline`` is the monotonic time the agent phase is cut at (``None``: unbounded) and
+    ``turns`` every finished turn so far, which the runner appends to.
+    """
 
     environment: BaseEnvironment
     logs_dir: Path
     task: str
+    deadline: float | None = None
+    turns: list[Spent] = field(default_factory=list)
+
+    def remaining(self) -> float | None:
+        """Seconds left before the deadline, or ``None`` when there is none."""
+        return None if self.deadline is None else self.deadline - time.monotonic()
+
+    def last_seconds(self, kind: str) -> float:
+        """How long the last turn of ``kind`` took, the repairs that followed it included."""
+        total = 0.0
+        for spent in reversed(self.turns):
+            if spent.kind == REPAIR:
+                total += spent.seconds
+            elif spent.kind == kind:
+                return total + spent.seconds
+            else:
+                total = 0.0
+        return 0.0
 
 
 class Stage(ABC):
@@ -59,10 +109,15 @@ class Stage(ABC):
     def fragment(self) -> str:
         """The stage's piece of the checkpoint's prompt."""
 
-    async def check(self, checkpoint: Checkpoint, after: str) -> str | None:
-        """Check the agent's work after the turn logged at ``after``; a message resumes it."""
+    async def check(self, checkpoint: Checkpoint, after: str) -> Resume | None:
+        """Check the agent's work after the turn logged at ``after``; a ``Resume`` continues it."""
         del checkpoint, after
         return None
+
+    def decorate(self, kind: str, prompt: str) -> str:
+        """The prompt a turn of ``kind`` is sent, from the one the stage or runner built."""
+        del kind
+        return prompt
 
     async def close(self, checkpoint: Checkpoint, cut: str | None) -> None:
         """Leave the stage's outputs once the checkpoint ends (``cut``: why it was cut)."""
@@ -71,18 +126,6 @@ class Stage(ABC):
     def record(self) -> dict[str, Any] | None:
         """What the stage did this checkpoint, for ``workflow.json``."""
         return None
-
-
-class Build(Stage):
-    name = "build"
-    token = None
-
-    def __init__(self, settings: BuildSettings) -> None:
-        self.settings = settings
-        self.instructions = []
-
-    def fragment(self) -> str:
-        return self.settings.prompt
 
 
 def compose(stages: Sequence[Stage], task: str) -> str:

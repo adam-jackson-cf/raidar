@@ -25,17 +25,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
-from raidar.scoring.judge.audit import (
-    AuditLog,
-    DecisionRecord,
-    DecisionStage,
-    InputSufficiency,
-    SufficiencyLevel,
-    new_request_id,
-    utc_timestamp,
-)
-from raidar.scoring.judge.cache import CacheInvalidError, DecisionCache, decision_key
-from raidar.scoring.judge.client import (
+from raidar.judge.client import (
     FailureReason,
     JevClient,
     JevFailure,
@@ -43,8 +33,7 @@ from raidar.scoring.judge.client import (
     JevSuccess,
     state_text,
 )
-from raidar.scoring.judge.policies import JevPolicy, PolicyMode, PolicyRegistry
-from raidar.scoring.judge.protocol import (
+from raidar.judge.protocol import (
     JEV_PINNED_MODEL,
     JEV_STATE_CHAR_LIMIT,
     JevAnswers,
@@ -55,6 +44,17 @@ from raidar.scoring.judge.protocol import (
     questions_wire,
     validate_questions,
 )
+from raidar.scoring.judge.audit import (
+    AuditLog,
+    DecisionRecord,
+    DecisionStage,
+    InputSufficiency,
+    SufficiencyLevel,
+    new_request_id,
+    utc_timestamp,
+)
+from raidar.scoring.judge.cache import CacheInvalidError, DecisionCache, decision_key
+from raidar.scoring.judge.policies import JevPolicy, PolicyMode, PolicyRegistry
 from raidar.scoring.judge.redaction import redact, redact_value
 
 VERDICT_UNCALIBRATED = "uncalibrated"
