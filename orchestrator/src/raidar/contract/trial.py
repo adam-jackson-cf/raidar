@@ -40,8 +40,9 @@ class TrialHashes(ExecutionModel):
 
     lock: str
     problem: str
-    arm: str
-    condition: str = Field(description="CompiledCondition.digest, including setup.sh")
+    arm: str = Field(description="The lock's arm identity digest (agent + workflow + stage code)")
+    workflow: str = Field(description="The workflow's resolved content hash")
+    stage_code: str = Field(description="Digest of the arm's per-stage code digests")
     agent: str
     protocol: str
     trial: str
@@ -86,16 +87,10 @@ class SnapshotInfo(ExecutionModel):
 
 
 class ProbeSummary(ExecutionModel):
+    """The step's lab checks: the per-step context reset and every lab provision."""
+
     passed: bool
     failures: tuple[str, ...] = ()
-    flags: tuple[str, ...] = Field(
-        default=(),
-        description=(
-            "Integrity flags (raidar.subject.treatment.definition.integrity): agent behaviour "
-            "a component records without failing the step, e.g. an edited protected-config copy or "
-            "an attempt to get round a commit hook"
-        ),
-    )
 
 
 class StepResult(ExecutionModel):

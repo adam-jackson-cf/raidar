@@ -1,7 +1,7 @@
 """The ranking view of a benchmark: agents ordered by one outcome metric (kind ``benchmark``).
 
 A benchmark is one experiment whose arms differ only in the agent (one
-condition), so the paired verdicts against the reference agent (the
+workflow), so the paired verdicts against the reference agent (the
 baseline arm) come from the same engine as an ab-test. The ranking view adds,
 per arm:
 

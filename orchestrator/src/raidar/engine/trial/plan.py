@@ -7,9 +7,9 @@ balanced, random and reproducible. Trials start in plan order, at most
 ``analysis.concurrency`` at a time.
 
 Each trial carries content hashes of its inputs (N3): the lock, the problem,
-the arm, the compiled condition (``CompiledCondition.digest``, which covers
-the generated per-step ``setup.sh`` reset, so a baseline arm with no
-components still has a condition digest), the agent and the protocol.
+the arm (its full identity digest, design 5.4), the workflow release's resolved
+content, the stage code of its enabled stage types, the agent and the protocol.
+The plan refuses an arm whose identity resolved now differs from the lock's.
 """
 
 from __future__ import annotations
@@ -78,6 +78,8 @@ class ExperimentPlan:
     arms: Mapping[str, ArmBlueprint]
     problems: tuple[ProblemTarget, ...]
     trials: tuple[PlannedTrial, ...]
+    pack: PackSpec
+    """The runtime pack trials run on (the lock's runtime)."""
     selected: frozenset[str] = field(default_factory=frozenset)
     lock: Mapping[str, Any] = field(default_factory=dict)
     """The lock document the plan was built from; a job keeps a copy of it."""
@@ -111,8 +113,9 @@ class ExperimentPlan:
             },
             "arms": {
                 arm_id: {
-                    "condition": blueprint.compiled.condition_id,
-                    "condition_digest": blueprint.compiled.digest,
+                    "agent_release": blueprint.arm.agent.released.ref,
+                    "workflow": blueprint.arm.workflow.ref,
+                    "workflow_sha256": blueprint.arm.definition.digest,
                     "harbor_agent": blueprint.agent_config.name
                     or blueprint.agent_config.import_path,
                     "model": blueprint.agent_config.model_name,
@@ -193,18 +196,33 @@ class _HashInputs:
     def trial(
         self, blueprint: ArmBlueprint, problem: ProblemTarget, attempt: int, steps: tuple[str, ...]
     ) -> TrialHashes:
-        spec = self.loaded.spec
-        agent = spec.agent(next(a.agent for a in spec.arms if a.id == blueprint.arm_id))
+        arm = blueprint.arm
         parts = {
             "lock": str(_lock_field(self.lock, "lock_sha256")),
             "problem": problem.digest,
             "arm": str(_lock_field(self.lock, "execution", "arms", blueprint.arm_id, "digest")),
-            "condition": blueprint.compiled.digest,
-            "agent": agent_digest(agent, blueprint.agent_config, self.override),
+            "workflow": arm.definition.digest,
+            "stage_code": digest_json(arm.stage_code),
+            "agent": agent_digest(arm, blueprint.agent_config, self.override),
             "protocol": self.protocol,
         }
         trial = digest_json({**parts, "attempt": attempt, "steps": list(steps)})
         return TrialHashes(**parts, trial=trial)
+
+
+def _check_arm_identities(lock: Mapping[str, Any], arms: Mapping[str, ArmBlueprint]) -> None:
+    """Every arm still resolves to the identity its lock recorded (releases and stage code)."""
+    drifted = [
+        arm_id
+        for arm_id, blueprint in arms.items()
+        if blueprint.arm.identity()["digest"]
+        != _lock_field(lock, "execution", "arms", arm_id, "digest")
+    ]
+    if drifted:
+        raise PlanError(
+            f"arm(s) {drifted} no longer resolve to the identity the lock recorded (an agent or "
+            "workflow release, or the stage code, changed); relock"
+        )
 
 
 def _selection(trials: Sequence[PlannedTrial], options: PlanOptions) -> frozenset[str]:
@@ -254,6 +272,7 @@ def build_plan(
     hashes = _HashInputs(loaded, lock, protocol, options.agent_override)
     problems = _problems(loaded, lock, store)
     arms = arm_blueprints(loaded, pack, agent_override=options.agent_override)
+    _check_arm_identities(lock, arms)
     trials: list[PlannedTrial] = []
     for attempt in range(spec.analysis.attempts):
         for problem in problems:
@@ -281,6 +300,7 @@ def build_plan(
         arms=arms,
         problems=problems,
         trials=tuple(trials),
+        pack=pack,
         selected=_selection(trials, options),
         lock=lock,
     )

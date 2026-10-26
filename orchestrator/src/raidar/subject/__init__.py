@@ -1,1 +1,1 @@
-"""What is evaluated: agents, treatments (components) and runtime environments (packs)."""
+"""What is evaluated: agents, workflows and runtime environments (packs)."""

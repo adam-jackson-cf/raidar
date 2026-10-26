@@ -15,8 +15,7 @@ from raidar.contract.trial import (
     TrialRecord,
     ValidityCheck,
 )
-from raidar.design.experiment.arm import compile_condition
-from raidar.design.experiment.schema import AgentEntry, ConditionSpec, ProtocolSpec
+from raidar.design.experiment.schema import ProtocolSpec
 from raidar.engine.health.records_manifest import seal_trial
 from raidar.engine.trial.collect import TrialContext, classify_trial
 from raidar.engine.trial.progression import progression_rule
@@ -73,9 +72,15 @@ class HealthyTrial:
 
 
 def _context(steps: tuple[str, ...]) -> TrialContext:
-    agent = AgentEntry(id="luna", name="codex", provider="openai", model="m", version="0.156.1")
     hashes = TrialHashes(
-        lock="l", problem="p", arm="a", condition="c", agent="g", protocol="r", trial="t"
+        lock="l",
+        problem="p",
+        arm="a",
+        workflow="w",
+        stage_code="s",
+        agent="g",
+        protocol="r",
+        trial="t",
     )
     trial = PlannedTrial(
         trial_id=TRIAL_ID,
@@ -92,7 +97,7 @@ def _context(steps: tuple[str, ...]) -> TrialContext:
         trial=trial,
         planned_steps=tuple((step, step) for step in steps),
         task_dir=Path.cwd(),
-        compiled=compile_condition(ConditionSpec(id="baseline"), agent, base_dir=Path.cwd()),
+        provisions=(),
         pinned_harness_version="0.156.1",
         rule=CONTINUE,
     )

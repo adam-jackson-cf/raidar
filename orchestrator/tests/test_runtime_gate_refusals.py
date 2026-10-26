@@ -27,8 +27,8 @@ from raidar.scoring.framework.metrics import MetricResolver
 from raidar.subject.environment import UnknownPackError, load_runtime_pack
 from raidar.subject.environment.drift import LockedPackError, lock_runtime_pack, pack_drift_issues
 from raidar.subject.environment.python.image import image_tag
-from raidar.subject.environment.python.pack_definition import PackSpec
-from raidar.subject.treatment.definition.registry import ComponentResolver
+from raidar.subject.environment.python.pack_definition import HarnessPin, PackSpec
+from raidar.subject.releases import AgentResolver, WorkflowResolver
 from tests.experiment_spec_support import (
     InMemoryResolver,
     experiment_document,
@@ -47,7 +47,6 @@ PackLoader = Callable[[str], PackSpec]
 def _resolvers(
     *,
     problems: dict[str, dict[str, object]] | None = None,
-    components: dict[str, dict[str, object]] | None = None,
     scorers: dict[str, dict[str, object]] | None = None,
 ) -> ResolverSet:
     problem_bindings = {FORGE: PYTHON_BINDING, FORGE_NODE: NODE_BINDING, ONESHOT_NODE: NODE_BINDING}
@@ -62,14 +61,8 @@ def _resolvers(
                 },
                 bindings={**problem_bindings, **(problems or {})},
             ),
-            InMemoryResolver(
-                RefKind.COMPONENT,
-                {"rules-file@2": {"kind": "workspace"}, "lint-config@2": {"kind": "workspace"}},
-                bindings={
-                    "lint-config@2": {"runtimes": ["python"], "supports": ["codex-cli"]},
-                    **(components or {}),
-                },
-            ),
+            AgentResolver(),
+            WorkflowResolver(),
             InMemoryResolver(
                 RefKind.SCORER,
                 {"correctness@2": {"exact": True}, "code-quality@4": {"exact": True}},
@@ -208,33 +201,6 @@ def test_rt2_a_binding_of_another_pack_contract_is_stale(experiment: Path) -> No
 # ---- RT3, RT4 -------------------------------------------------------------------
 
 
-def test_rt3_components_must_cover_the_runtime_and_support_the_arms_agent(
-    tmp_path: Path,
-) -> None:
-    document = experiment_document(id="node-ts__fixture__test", runtime="node-ts")
-    document["problems"] = [{"ref": FORGE_NODE}]
-    document["conditions"][1]["components"].append({"use": "lint-config@2", "files": []})
-    document["shared_components"] = [{"use": "rules-file@2", "files": ["components/AGENTS.md"]}]
-    document["conditions"][1]["components"] = document["conditions"][1]["components"][1:]
-    path = write_experiment(tmp_path, document)
-    claude_only = {"runtimes": ["*"], "supports": ["claude-code"]}
-
-    issues = _issues(
-        path,
-        resolvers=_resolvers(components={"rules-file@2": claude_only}),
-        pack_loader=_node_pack,
-    )
-
-    assert (
-        "[RT3] lint-config@2 supports runtimes [python]; experiment runtime is node-ts"
-        in (issues["conditions.1.components.0.use"])
-    )
-    assert (
-        "[RT3] rules-file@2 does not support agent codex (arm baseline runs it)"
-        in (issues["shared_components.0.use"])
-    )
-
-
 def test_rt4_scorers_and_the_metric_must_cover_the_runtime(tmp_path: Path) -> None:
     document = experiment_document(id="node-ts__fixture__test", runtime="node-ts")
     document["problems"] = [{"ref": FORGE_NODE}]
@@ -254,24 +220,31 @@ def test_rt4_scorers_and_the_metric_must_cover_the_runtime(tmp_path: Path) -> No
 # ---- RT5 ------------------------------------------------------------------------
 
 
-def test_rt5_a_set_override_cannot_move_an_agent_off_the_pack_pin(experiment: Path) -> None:
-    issues = _issues(experiment, "agents.0.version='0.1.0'")
+def _pack_with_harnesses(harnesses: dict[str, HarnessPin]) -> PackLoader:
+    def load(runtime: str) -> PackSpec:
+        pack = load_runtime_pack(runtime)
+        return pack.model_copy(
+            update={"image": pack.image.model_copy(update={"harnesses": harnesses})}
+        )
 
-    assert issues["agents.0.version"] == (
-        "[RT5] codex 0.1.0 is not the pin in pack python@1 (0.156.1)"
-    )
+    return load
+
+
+def test_rt5_an_agent_pin_that_differs_from_the_pack_pin_is_refused(experiment: Path) -> None:
+    pin = load_runtime_pack("python").image.harnesses["codex-cli"]
+    drifted = pin.model_copy(update={"version": "0.1.0"})
+
+    issues = _issues(experiment, pack_loader=_pack_with_harnesses({"codex-cli": drifted}))
+
+    assert "[RT5]" in issues["agents.0.release"]
+    assert "0.1.0" in issues["agents.0.release"]
 
 
 def test_rt5_an_agent_the_pack_does_not_bake_in_is_refused(experiment: Path) -> None:
-    issues = _issues(
-        experiment,
-        "agents.0.name=gemini-cli",
-        "agents.0.provider=google",
-        "agents.0.model=gemini-3-flash-preview",
-        "agents.0.reasoning_effort=",
-    )
+    issues = _issues(experiment, pack_loader=_pack_with_harnesses({}))
 
-    assert issues["agents.0.name"] == "[RT5] pack python@1 bakes no agent gemini-cli"
+    assert "[RT5]" in issues["agents.0.release"]
+    assert "bakes no codex-cli harness" in issues["agents.0.release"]
 
 
 # ---- RT6 at lock and at plan/run ---------------------------------------------------
@@ -329,21 +302,17 @@ def test_the_real_resolvers_report_binding_facts() -> None:
     problem = ProblemResolver().resolve(
         RegistryRef.parse(RefKind.PROBLEM, "scb/forge@38d627ecf668"), base_dir=repo
     )
-    lint = ComponentResolver().resolve(
-        RegistryRef.parse(RefKind.COMPONENT, "lint-config@2"), base_dir=repo
-    )
-    rules = ComponentResolver().resolve(
-        RegistryRef.parse(RefKind.COMPONENT, "rules-file@2"), base_dir=repo
-    )
+    agent = AgentResolver().resolve(RegistryRef.parse(RefKind.AGENT, "codex@1"), base_dir=repo)
     quality = scorer_resolver().resolve(
         RegistryRef.parse(RefKind.SCORER, "code-quality@4"), base_dir=repo
     )
+    pin = load_runtime_pack("python").image.harnesses["codex-cli"]
 
     assert problem.binding == PYTHON_BINDING
-    assert lint.binding["runtimes"] == ["python"]
-    assert rules.binding["runtimes"] == ["*"]
-    assert rules.binding["supports"] == ["codex-cli", "claude-code"]
-    assert rules.metadata["supports"] == ["codex", "claude-code"]
+    assert agent.binding == {
+        "harness": "codex-cli",
+        "tool": {"package": pin.npm_package, "binary": pin.executable, "version": pin.version},
+    }
     assert quality.binding == {"runtimes": ["python"]}
 
 

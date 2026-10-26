@@ -2,13 +2,18 @@
 
 ``raidar run`` of any experiment kind except ``smoke`` is refused unless the jobs root holds
 clean smoke jobs covering the setup: matching Raidar execution/toolchain digests, pack recipe,
-every arm's agent name/model/effort and the same execution target (name and Docker facts).
+the same execution target (name and Docker facts) and every arm's full identity (design 5.4,
+the lock's ``execution.arms``: agent release and CLI pin, model and reasoning, workflow
+release and resolved content hash, and the stage code digest of each enabled stage type).
 *Clean* means the job finished, every selected trial has a valid record, every trial's
 ``health.json`` exists with no violation, and in every trial every step's agent changed
 ``/app`` (the step's recorded snapshot digest differs from its parent's; the first step's parent
-is the empty tree), so a smoke where the agent only asked a question cannot clear a run.
+is the seeded workspace, or the empty tree when nothing was seeded), so a smoke where the agent
+only asked a question cannot clear a run.
 ``--allow-unsmoked`` (``ALLOW_UNSMOKED=1``) admits without one; ``job.json`` records the
-decision under ``admission``. Smoke kinds are always admitted.
+decision under ``admission``. A smoke whose stage code differs never matches, so only that
+explicit, recorded override admits a job whose stage code no clean smoke ran. Smoke kinds are
+always admitted.
 """
 
 from __future__ import annotations
@@ -36,35 +41,24 @@ def experiment_kind(lock: Mapping[str, Any]) -> str | None:
     return str(kind) if kind else None
 
 
-def _agents(
-    lock: Mapping[str, Any], arm_ids: set[str] | None = None
-) -> list[list[str | None]] | None:
-    design = _execution_design(lock)
-    by_id = {entry.get("id"): entry for entry in design.get("agents") or []}
-    arms = _selected_arms(design, arm_ids)
-    if arms is None:
+ARM_IDENTITY_EXCLUDED = ("agent", "digest")
+"""Lock arm-identity keys that name the experiment's own agent id rather than what ran."""
+
+
+def _arms(lock: Mapping[str, Any], arm_ids: set[str] | None = None) -> list[dict[str, Any]] | None:
+    """The selected arms' identities (sorted, deduplicated), or ``None`` when unrecorded."""
+    recorded = (lock.get("execution") or {}).get("arms") or {}
+    selected = set(recorded) if arm_ids is None else arm_ids
+    if not selected or not selected <= set(recorded):
         return None
-    triples = set()
-    for arm in arms:
-        agent = by_id.get(arm.get("agent"))
-        if agent is None:
-            return None
-        triples.add((agent.get("name"), agent.get("model"), agent.get("reasoning_effort")))
-    return [list(t) for t in sorted(triples, key=repr)] or None
-
-
-def _execution_design(lock: Mapping[str, Any]) -> Mapping[str, Any]:
-    return (lock.get("execution") or {}).get("design") or {}
-
-
-def _selected_arms(
-    design: Mapping[str, Any], arm_ids: set[str] | None
-) -> list[dict[str, Any]] | None:
-    arms = design.get("arms") or []
-    if arm_ids is None:
-        return list(arms)
-    selected = [arm for arm in arms if arm.get("id") in arm_ids]
-    return selected if {arm.get("id") for arm in selected} == arm_ids else None
+    identities = {
+        json.dumps(
+            {k: v for k, v in recorded[arm].items() if k not in ARM_IDENTITY_EXCLUDED},
+            sort_keys=True,
+        )
+        for arm in selected
+    }
+    return [json.loads(item) for item in sorted(identities)]
 
 
 def identity(
@@ -76,8 +70,8 @@ def identity(
     arm_ids: set[str] | None = None,
 ) -> Identity | None:
     """What a smoke must share with the job it clears; ``None`` when any part is unrecorded."""
-    agents = _agents(lock, arm_ids)
-    parts = (runner or {}).get("toolchain_sha256"), (recipes or {}).get("pack"), agents, target
+    arms = _arms(lock, arm_ids)
+    parts = (runner or {}).get("toolchain_sha256"), (recipes or {}).get("pack"), arms, target
     execution = (runner or {}).get("execution_sha256")
     if not all(parts) or not execution:
         return None
@@ -86,7 +80,7 @@ def identity(
         "toolchain_sha256": parts[0],
         "execution_sha256": execution,
         "pack": parts[1],
-        "agents": agents,
+        "arms": arms,
         "target": {"name": target.get("name"), "docker": target.get("docker")},
     }
 
@@ -97,9 +91,9 @@ def mismatches(wanted: Identity, smoke: Identity) -> list[str]:
         for key in ("toolchain_sha256", "execution_sha256", "pack", "target")
         if wanted[key] != smoke[key]
     ]
-    uncovered = [a for a in wanted["agents"] if a not in smoke["agents"]]
+    uncovered = [arm for arm in wanted["arms"] if arm not in smoke["arms"]]
     if uncovered:
-        found.append(f"agent(s) {uncovered} not smoked")
+        found.append(f"arm identit(ies) {uncovered} not smoked")
     return found
 
 
@@ -196,7 +190,7 @@ def _candidate_identity(
     )
     if smoke is None:
         return None, "run provenance or executed-arm identity is incomplete"
-    differs = mismatches({**wanted, "agents": []}, smoke)
+    differs = mismatches({**wanted, "arms": []}, smoke)
     return (None, "; ".join(differs)) if differs else (smoke, None)
 
 
@@ -205,7 +199,7 @@ def _search(wanted: Identity | None, jobs_root: Path) -> tuple[list[str], dict[s
     if wanted is None:
         return [], {"": "run provenance is incomplete"}
     reasons: dict[str, str] = {}
-    remaining = list(wanted["agents"])
+    remaining = list(wanted["arms"])
     selected: list[str] = []
     for job_dir, manifest, lock in _smoke_jobs(jobs_root):
         name = str(job_dir.relative_to(jobs_root))
@@ -213,18 +207,18 @@ def _search(wanted: Identity | None, jobs_root: Path) -> tuple[list[str], dict[s
         if smoke is None:
             reasons[name] = reason or "no compatible smoke identity"
             continue
-        uncovered = _remaining_agents(remaining, smoke)
+        uncovered = _remaining_arms(remaining, smoke)
         if uncovered != remaining:
             selected.append(name)
             remaining = uncovered
         if not remaining:
             return selected, reasons
-        reasons[name] = f"agent(s) {remaining} not smoked"
+        reasons[name] = f"arm identit(ies) {remaining} not smoked"
     return [], reasons or {"": "no smoke job found"}
 
 
-def _remaining_agents(agents: list[list[str | None]], smoke: Identity) -> list[list[str | None]]:
-    return [agent for agent in agents if agent not in smoke["agents"]]
+def _remaining_arms(arms: list[dict[str, Any]], smoke: Identity) -> list[dict[str, Any]]:
+    return [arm for arm in arms if arm not in smoke["arms"]]
 
 
 def admit(

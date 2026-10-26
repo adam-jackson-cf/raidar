@@ -136,19 +136,6 @@ _CLAUDE_OAUTH_TOKEN = CredentialSpec(
 )
 
 
-def _environment_credential(name: str) -> CredentialSpec:
-    return CredentialSpec(
-        id=name.lower().replace("_", "-"),
-        accepted_names=(name,),
-        source_type=CredentialSourceType.ENVIRONMENT,
-        required=True,
-        transport=CredentialTransport.ENVIRONMENT,
-        transport_name=name,
-        export_names=(name,),
-        redaction=CredentialRedaction(assignment_names=(name,)),
-    )
-
-
 _DEFINITIONS: dict[str, HarnessDefinition] = {
     "codex-cli": HarnessDefinition(
         id="codex-cli",
@@ -159,38 +146,6 @@ _DEFINITIONS: dict[str, HarnessDefinition] = {
         id="claude-code",
         rule_filename="CLAUDE.md",
         credentials=(_CLAUDE_API_KEY, _CLAUDE_AUTH_TOKEN, _CLAUDE_OAUTH_TOKEN),
-    ),
-    "gemini": HarnessDefinition(
-        id="gemini",
-        rule_filename="GEMINI.md",
-        credentials=(
-            CredentialSpec(
-                id="gemini-api-key",
-                accepted_names=("GEMINI_API_KEY",),
-                source_type=CredentialSourceType.ENVIRONMENT,
-                required=True,
-                transport=CredentialTransport.SECRET_FILE,
-                transport_name="GEMINI_API_KEY",
-                mount_path="/tmp/agentic-eval-secrets/gemini_api_key",
-                export_names=("GEMINI_API_KEY",),
-                redaction=CredentialRedaction(assignment_names=("GEMINI_API_KEY",)),
-            ),
-        ),
-    ),
-    "cursor": HarnessDefinition(
-        id="cursor",
-        rule_filename="user-rules-setting.md",
-        credentials=(_environment_credential("CURSOR_API_KEY"),),
-    ),
-    "copilot": HarnessDefinition(
-        id="copilot",
-        rule_filename="copilot-instructions.md",
-        credentials=(_environment_credential("COPILOT_API_KEY"),),
-    ),
-    "pi": HarnessDefinition(
-        id="pi",
-        rule_filename="AGENTS.md",
-        credentials=(_environment_credential("PI_API_TOKEN"),),
     ),
 }
 

@@ -10,7 +10,7 @@ and return entries in the [Reconciliation result schema](reconciliation-result-s
 
 1. Establish identity from persisted artifacts: experiment id and kind, job ids,
    `lock_sha256`, problem pin, agent name and version, model, reasoning effort,
-   arms with condition digests, progression mode, scorers and headline metric.
+   arms with arm digests, progression mode, scorers and headline metric.
 2. Build the cohort ([evidence map](raidar-evidence-map.md#cohort)) and pair arms
    by attempt.
 3. Build the per-case failure matrix from verifier records: for every trial and
@@ -27,13 +27,13 @@ and return entries in the [Reconciliation result schema](reconciliation-result-s
    differ. Test them on paired counts (Fisher or McNemar, stated as
    exploratory) and find where in the step the behaviour was decided: the graded
    snapshot line, the review-loop round diff, the session call.
-7. Read the process side from trajectories and component evidence: whether the
-   condition's components were consumed (skill opened, hook output visible,
+7. Read the process side from trajectories and workflow evidence: whether the
+   arm's workflow stages ran as designed (context reset, guardrail-gate records,
    tools available), what process-compliance observed, and whether the agent's
    environment could run what the guidance asks for.
 8. Express each candidate as a reusable failure mode with one concrete example,
    a detection signal, the affected invariant, its impact on the headline
-   outcome, and a remediation target (component, verifier, problem, harness or
+   outcome, and a remediation target (agent release, workflow release, verifier, problem, harness or
    analysis).
 9. Compare every candidate with every existing record; classify it as an
    occurrence of an existing category or as potentially distinct. Do not

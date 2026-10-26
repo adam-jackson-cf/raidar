@@ -38,11 +38,11 @@ def test_every_n1_phase_is_recorded_with_phase0_definitions(tmp_path: Path) -> N
     trial = write_trial(
         tmp_path / "t", [StepOutcome("checkpoint_1"), StepOutcome("checkpoint_2", passed=False)]
     )
-    samples = trial_phases(trial, component_apply_s=0.25, environment_cold=False, compose_init=True)
+    samples = trial_phases(trial, arm_apply_s=0.25, environment_cold=False, compose_init=True)
     phases = _by_phase(samples)
     assert phases[("environment_start", None)].seconds == 10.0
     assert phases[("environment_start", None)].condition == "warm"
-    assert phases[("component_apply", None)].seconds == 0.25
+    assert phases[("arm_apply", None)].seconds == 0.25
     # 2 s gap before the agent, of which 0.5 s is the pre-agent leak scan.
     assert phases[("per_step_reset", "checkpoint_1")].seconds == pytest.approx(1.5)
     assert phases[("pre_agent_leak_check", "checkpoint_1")].seconds == 0.5
@@ -58,7 +58,7 @@ def test_every_n1_phase_is_recorded_with_phase0_definitions(tmp_path: Path) -> N
     fixed = phases[("per_trial_fixed_overhead", None)]
     assert fixed.seconds == pytest.approx(10.0 + 0.25 + 3.0)
     assert fixed.condition == "init"
-    cold = trial_phases(trial, component_apply_s=0.1, environment_cold=True, compose_init=False)
+    cold = trial_phases(trial, arm_apply_s=0.1, environment_cold=True, compose_init=False)
     cold_phases = _by_phase(cold)
     assert cold_phases[("environment_start", None)].condition == "cold"
     assert cold_phases[("per_trial_fixed_overhead", None)].condition == "cold"
@@ -114,7 +114,14 @@ def test_between_step_budgets_apply_only_when_a_trial_ran_two_checkpoints() -> N
 
 def _job_dir(root: Path, trials: int, steps: int = 2) -> Path:
     hashes = TrialHashes(
-        lock="l", problem="p", arm="a", condition="c", agent="g", protocol="r", trial="t"
+        lock="l",
+        problem="p",
+        arm="a",
+        workflow="w",
+        stage_code="s",
+        agent="g",
+        protocol="r",
+        trial="t",
     )
     names = tuple(f"checkpoint_{k}" for k in range(1, steps + 1))
     for index in range(trials):
@@ -122,7 +129,7 @@ def _job_dir(root: Path, trials: int, steps: int = 2) -> Path:
             root / "trials" / f"t{index}", [StepOutcome(name) for name in names]
         )
         phases = trial_phases(
-            trial_dir, component_apply_s=0.05, environment_cold=False, compose_init=True
+            trial_dir, arm_apply_s=0.05, environment_cold=False, compose_init=True
         )
         record = TrialRecord(
             experiment="e",

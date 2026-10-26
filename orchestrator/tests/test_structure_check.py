@@ -31,7 +31,7 @@ structure = _load_structure_module()
         "orchestrator/src/raidar/scoring/framework/gate_effort_v10/scorer.py",
         "orchestrator/tests/test_code_quality_v3.py",
         "lab/experiments/smoke/python__forge__mechanics-v1/experiment.yaml",
-        "orchestrator/src/raidar/subject/treatment/runtime/review_loop_v2.py",
+        "orchestrator/src/raidar/subject/workflow/runner_v2.py",
         "scripts/v2/run.sh",
         "orchestrator/src/raidar/scoring/framework/v3/x.py",
     ],
@@ -46,23 +46,20 @@ def test_version_suffixes_and_segments_are_refused(path: str) -> None:
         "orchestrator/src/raidar/scoring/code_quality/scorer.py",
         "orchestrator/src/raidar/grading/vector.py",
         "lab/experiments/smoke/python__forge__mechanics/experiment.yaml",
-        "lab/experiments/ab-test/x/components/python-guardrails/v8/ruff.toml",
-        "lab/components/rules/v2/AGENTS.md",
-        "lab/treatments/python_guardrails/v8/ruff.toml",
         "docs/reboot/mechanics-v1-design.md",
     ],
 )
-def test_unversioned_names_and_component_data_folders_pass(path: str) -> None:
+def test_unversioned_names_pass(path: str) -> None:
     assert structure.version_violations([path]) == []
 
 
-def test_a_version_segment_outside_components_is_refused_even_with_data_below_it() -> None:
+def test_a_version_segment_is_refused_even_with_data_below_it() -> None:
     path = "orchestrator/src/raidar/scoring/framework/v2/data.json"
     assert structure.version_violations([path]) == [f"version in path name: {path}"]
 
 
-def test_a_version_file_under_components_is_still_refused() -> None:
-    path = "lab/experiments/ab-test/x/components/v2"
+def test_a_version_folder_in_lab_data_is_refused() -> None:
+    path = "lab/workflows/one-shot/v2"
     assert structure.version_violations([path]) == [f"version in path name: {path}"]
 
 
@@ -105,7 +102,7 @@ def test_every_group_allows_only_its_own_subpackages() -> None:
     allowed = [
         f"{RAIDAR}/design/experiment/lock.py",
         f"{RAIDAR}/design/problem/store.py",
-        f"{RAIDAR}/subject/treatment/runtime/step_reset.sh",
+        f"{RAIDAR}/subject/workflow/inner.py",
         f"{RAIDAR}/engine/trial/driver.py",
         f"{RAIDAR}/engine/job/run.py",
         f"{RAIDAR}/engine/health/audit.py",
@@ -144,29 +141,31 @@ def test_package_depth_is_capped_at_three_below_raidar() -> None:
 
 
 def test_no_data_tree_is_exempt_from_the_depth_cap() -> None:
-    deep = f"{RAIDAR}/subject/treatment/payloads/python_guardrails/rules/ruff/file.toml"
+    deep = f"{RAIDAR}/subject/workflow/stages/rules/ruff/file.toml"
 
     assert structure.package_violations([deep]) == [
-        "package nests deeper than 3 below raidar/: "
-        f"{RAIDAR}/subject/treatment/payloads/python_guardrails/rules/ruff",
+        f"package nests deeper than 3 below raidar/: {RAIDAR}/subject/workflow/stages/rules/ruff",
     ]
 
 
-def test_lab_holds_only_the_allowlisted_data_trees() -> None:
+def test_lab_holds_only_the_allowlisted_data_trees_and_the_release_register() -> None:
     allowed = [
+        "lab/releases.yaml",
         "lab/experiments/smoke/x/experiment.yaml",
         "lab/problems/sources.yaml",
         "lab/ledger/faults/FCR-001.md",
-        "lab/treatments/python_guardrails/lib/guardrails/gate.py",
+        "lab/agents/codex.yaml",
+        "lab/workflows/one-shot/workflow.yaml",
         "lab/environments/python/pack.yaml",
         "lab/judge/policies/code-quality.rubric-smells.yaml",
     ]
-    refused = ["lab/components/rules/AGENTS.md", "lab/notes.md"]
+    refused = ["lab/components/rules/AGENTS.md", "lab/notes.md", "lab/releases.yaml/x.yaml"]
 
     assert structure.lab_violations(allowed) == []
     assert structure.lab_violations(refused) == [
         "unexpected lab entry: lab/components",
         "unexpected lab entry: lab/notes.md",
+        "unexpected lab entry: lab/releases.yaml",
     ]
 
 

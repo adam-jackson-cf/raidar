@@ -22,7 +22,6 @@ from raidar.evaluation.analysis.assessed import (
     gate_effort_ref,
 )
 from raidar.evaluation.analysis.lookup import AssessmentLookup, assessment_config
-from raidar.evaluation.analysis.manipulation import CheckRequest
 from raidar.evaluation.analysis.report import AnalysisInputs, DevRun
 from raidar.evaluation.analysis.sources import (
     AnalysisInputError,
@@ -83,14 +82,6 @@ def _scorer_refs(declared: tuple[str, ...], process_ref: str | None) -> tuple[st
         *((gate_ref,) if gate_ref else ()),
     )
     return tuple(dict.fromkeys(ref for ref in wanted if ref in declared))
-
-
-def manipulation_requests(analysis: Mapping[str, Any]) -> tuple[CheckRequest, ...] | None:
-    """The lock's pre-registered manipulation checks, or None when it declares none."""
-    declared = analysis.get("manipulation_checks")
-    if not declared:
-        return None
-    return tuple(CheckRequest.model_validate(item) for item in declared)
 
 
 # Per trial id: one scorer's result (AssessResult) or None.
@@ -173,7 +164,6 @@ def load_inputs(request: LoadRequest) -> tuple[AnalysisInputs, Mapping[str, Any]
         gate_results=gate if gate_ref else None,
         gate_scorer=gate_ref,
         process_scorer=process_ref,
-        manipulation_checks=manipulation_requests(spec["analysis"]),
         dev_job=_dev_job(options),
         pooling=pooling,
     )

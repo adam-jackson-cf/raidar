@@ -51,7 +51,7 @@ RAIDAR_SECRETS := $(SECRETS_DETECT) $(REPO_RUNTIME_ENV) $$secrets_cmd uv run --p
 # under its old name, on the command line or in the environment, fails loudly instead of
 # being ignored.
 RENAMED_VARS := RUN:JOB RUNS:JOBS RUN_ID:JOB_ID RUNS_DIR:JOBS_DIR HARNESS:AGENT \
-	HARNESS_VERSION:AGENT_VERSION BLOCK:ATTEMPT SMOKE_BLOCKS:SMOKE_ATTEMPTS \
+	BLOCK:ATTEMPT SMOKE_BLOCKS:SMOKE_ATTEMPTS \
 	ORACLE_BUNDLE:VERIFIER_BUNDLE REVIEW_RUNS_ROOT:REVIEW_JOBS_ROOT QUALITY_RUNS:QUALITY_JOBS \
 	ALLOW_DEV_RUNS:ALLOW_DEV_JOBS SMOKE_RUNS_DIR:SMOKE_JOBS_DIR
 $(foreach pair,$(RENAMED_VARS),$(if $(filter command line environment environment override,$(origin $(firstword $(subst :, ,$(pair))))),$(error $(firstword $(subst :, ,$(pair)))= was renamed $(lastword $(subst :, ,$(pair)))= (schema v2 uses Harbor's vocabulary; see README Concepts))))
@@ -77,35 +77,24 @@ SMOKE_JOBS_DIR ?= $(RAIDAR_VAR)/jobs
 SMOKE_LOCK_DIR ?= $(REPO_TMP_DIR)/smoke
 SMOKE_ATTEMPTS ?= 1
 SMOKE_CONCURRENCY ?= 1
-# smoke-agents arms: one per agent the Python pack bakes in (the arm ids of the
-# multi-agent smoke experiment). SMOKE_ARM selects one of them.
+# smoke-agents arms: one per released agent (the arm ids of the multi-agent smoke
+# experiment). SMOKE_ARM selects one of them.
 SMOKE_ARM ?=
-SMOKE_ARMS := codex claude
+SMOKE_ARMS := codex
 ifneq ($(strip $(SMOKE_ARM)),)
 ifeq ($(filter $(SMOKE_ARM),$(SMOKE_ARMS)),)
 $(error Unknown SMOKE_ARM '$(SMOKE_ARM)'; expected one of: $(SMOKE_ARMS))
 endif
 endif
-# agent-smoke: the smoke experiment with its one agent replaced. AGENT is a Harbor agent name
-# (codex, claude-code). Versions must equal the Python pack pins
-# (lab/environments/python/pack.yaml); the lock refuses others (RT5).
-# Provider/model/effort default per agent: codex runs gpt-6-luna at low effort;
-# claude-code runs claude-haiku-4-5, which has no effort levels, so its effort is unset.
-# REASONING_EFFORT given (even empty: `REASONING_EFFORT=`) wins; empty means unset.
-AGENT_SMOKE_AGENT ?= codex
-AGENT_SMOKE_PROVIDER_codex := openai
-AGENT_SMOKE_MODEL_codex := gpt-6-luna
-AGENT_SMOKE_REASONING_codex := low
-AGENT_SMOKE_PROVIDER_claude-code := anthropic
-AGENT_SMOKE_MODEL_claude-code := claude-haiku-4-5
-AGENT_SMOKE_REASONING_claude-code :=
-AGENT_SMOKE_VERSION_codex := 0.156.1
-AGENT_SMOKE_VERSION_claude-code := 2.1.285
-AGENT_SMOKE_EFFECTIVE_AGENT = $(or $(AGENT),$(AGENT_SMOKE_AGENT))
-AGENT_SMOKE_EFFECTIVE_PROVIDER = $(or $(PROVIDER),$(AGENT_SMOKE_PROVIDER_$(AGENT_SMOKE_EFFECTIVE_AGENT)))
-AGENT_SMOKE_EFFECTIVE_MODEL = $(or $(MODEL),$(AGENT_SMOKE_MODEL_$(AGENT_SMOKE_EFFECTIVE_AGENT)))
-AGENT_SMOKE_EFFECTIVE_REASONING = $(if $(filter command line environment,$(origin REASONING_EFFORT)),$(strip $(REASONING_EFFORT)),$(AGENT_SMOKE_REASONING_$(AGENT_SMOKE_EFFECTIVE_AGENT)))
-AGENT_SMOKE_EFFECTIVE_VERSION = $(or $(AGENT_VERSION),$(AGENT_SMOKE_VERSION_$(AGENT_SMOKE_EFFECTIVE_AGENT)))
+# agent-smoke: the smoke experiment with its one agent replaced. RELEASE is an agent release
+# registered in lab/releases.yaml (lab/agents/<name>.yaml); its tool pin must equal the Python
+# pack's (the lock refuses others: RT5). Model and reasoning default to codex's gpt-6-luna at
+# low; REASONING_EFFORT given (even empty: `REASONING_EFFORT=`) wins; empty means unset.
+RELEASE ?= codex@1
+AGENT_SMOKE_MODEL := gpt-6-luna
+AGENT_SMOKE_REASONING := low
+AGENT_SMOKE_EFFECTIVE_MODEL = $(or $(MODEL),$(AGENT_SMOKE_MODEL))
+AGENT_SMOKE_EFFECTIVE_REASONING = $(if $(filter command line environment,$(origin REASONING_EFFORT)),$(strip $(REASONING_EFFORT)),$(AGENT_SMOKE_REASONING))
 
 .PHONY: help \
 	env-setup agent-list agent-validate codex-auth-setup harbor-cleanup docker-check \
@@ -113,14 +102,13 @@ AGENT_SMOKE_EFFECTIVE_VERSION = $(or $(AGENT_VERSION),$(AGENT_SMOKE_VERSION_$(AG
 	experiment-init experiment-validate experiment-lock experiment-locks-check \
 	experiment-plan experiment-execute experiment-status \
 	perf-check perf-fixture perf-gate health \
-	ledger-check ledger-index \
+	ledger-check ledger-index releases-check \
 	problem-list problem-info problem-import problem-validate problem-errata-draft \
 	experiment-assess assess-regrade experiment-analyze jev-shadow-rubric \
 	jev-export-labels jev-import-labels jev-export-blind jev-import-blind \
 	jev-supersede-labels jev-record-split \
 	jev-verify-promotion jev-promote \
 	pack-info pack-build pack-audit pack-tool-provision \
-	component-probe-trials guardrails-verify \
 	smoke-dry-run-check orchestrator-smoke smoke-agents agent-smoke \
 	review-fixture-synthetic \
 	review-surface-data review-surface-build review-surface-serve review-surface-test \
@@ -147,7 +135,7 @@ help:
 	@echo "  make harbor-cleanup [JOB=<job-dir>] [DRY_RUN=1]        Remove trial environments a stopped job left behind"
 	@echo "  make quality                                           Run repo quality gates"
 	@echo "  make structure-check                                   Check the repository layout (no versions in names, root and package allowlists, depth); part of make quality"
-	@echo "  make release-archive REF=<name>@<N>                    Tag archive/<name>@<N> at HEAD before editing a released scorer or component in place (refuses an existing tag)"
+	@echo "  make release-archive REF=<name>@<N>                    Tag archive/<name>@<N> at HEAD before editing a released scorer in place (refuses an existing tag)"
 	@echo "  Generated data lives under var/ (git-ignored; RAIDAR_VAR=<dir> relocates it): jobs, stores, analysis, problems, tmp"
 	@echo "  Secrets: execute/smoke/assess/jev targets inject Infisical (project mac-os-cf, env dev) when the infisical"
 	@echo "  CLI is logged in, else read orchestrator/.env. [SECRETS=auto|infisical|dotenv] [INFISICAL_ENV=dev]"
@@ -174,9 +162,6 @@ help:
 	@echo "  make pack-build [RUNTIME=python] [FORCE=1]            Build the agent image once per lock hash and assert no scorer tools"
 	@echo "  make pack-audit [RUNTIME=python]                      Assert the built agent image has pinned agents, no scorer tools or browsers"
 	@echo "  make pack-tool-provision TOOL=<tool> [RUNTIME=python] Provision one host-parse measurement tool into the lock-keyed cache"
-	@echo "  make component-probe-trials [PROBE_EVIDENCE_DIR=<dir>] Real codex/gpt-6-luna low trials proving every built-in component's discovery probe"
-	@echo "  make guardrails-verify                                python-guardrails rule tests (86 rules, the test-class and --autofix canaries included): every rule (derived from the pack's config and codes) fires on its violating canary and"
-	@echo "                                                        passes its clean one against the pack installed in the pack image, plus a mutant-pack negative"
 	@echo "                                                        control (Docker target, PyPI; not in make quality)"
 	@echo ""
 	@echo "Experiments:"
@@ -186,6 +171,7 @@ help:
 	@echo "                                                        Validate an experiment.yaml (schema, kind and naming rules, factor guard)"
 	@echo "  make experiment-lock EXPERIMENT=... [LOCK_CHECK=1]     Write (or check, naming stale sections) <experiment>.lock.json; refuses runtime"
 	@echo "                                                        incompatibilities (RT0-RT6); lock_sha256 covers execution inputs only"
+	@echo "  make releases-check                                   Fail unless lab/releases.yaml registers each agent and workflow at its current hash and agent pins equal the pack's; part of make quality"
 	@echo "  make experiment-locks-check                           Fail unless every lab/experiments/*/*/*.lock.json is current (host Python patch aside); part of make quality"
 	@echo "  make ledger-check                                     Check lab/ledger/ (fault and remedy records, links, status transitions, README index); part of make quality"
 	@echo "  make ledger-index                                     Regenerate lab/ledger/README.md from the records"
@@ -202,7 +188,7 @@ help:
 	@echo "  make experiment-assess JOB=<job-dir> STORE=<assessment-store> SCORERS=\"correctness@2 ...\" [LOCK=] [ASSESSMENT_CONFIG=] [REPLAY=1] [CONCURRENCY=N] [ASSESS_OUT=report.json]"
 	@echo "                                                        Score a job's stored trials into an Assessment store (never re-runs agents; AS1-gated)"
 	@echo "                                                        (process-compliance@7 is deterministic only;"
-	@echo "                                                        with gate-effort@11 it first grades guardrail-gate@5 pre-fix snapshots into STORE, and with"
+	@echo "                                                        with gate-effort@11 it first grades pre-fix snapshots into STORE, and with"
 	@echo "                                                        code-quality@4 it first makes deferred coverage runs (verifier_coverage: offline) into STORE: Docker target;"
 	@echo "                                                        CONCURRENCY=N works on N trials at once, each trial's steps in order; default 1)"
 	@echo "  make assess-regrade JOB=<trial-or-job-dir> [VERIFIER_BUNDLE=<dir>] [STORE=<assessment-store>] [COVERAGE_CHECK=1 [CONCURRENCY=N]] [REGRADE_OUT=report.json]"
@@ -242,10 +228,10 @@ help:
 	@echo "Smoke (real agent trials of lab/experiments/smoke and the agent benchmark; locks under var/tmp/smoke, jobs under var/jobs/):"
 	@echo "  make orchestrator-smoke [SMOKE_ATTEMPTS=1] [SMOKE_CONCURRENCY=1] [TIMEOUT_SEC=]"
 	@echo "                                                        One one-shot trial with codex + gpt-6-luna (low), correctness only"
-	@echo "  make agent-smoke [AGENT=codex PROVIDER=openai MODEL=gpt-6-luna REASONING_EFFORT=low] [AGENT_VERSION=] [TIMEOUT_SEC=]"
-	@echo "                                                        The same smoke with its agent replaced (versions default to the pack pins;"
-	@echo "                                                        AGENT=claude-code defaults to claude-haiku-4-5, no effort; REASONING_EFFORT= unsets)"
-	@echo "  make smoke-agents [SMOKE_ARM=codex|claude]             One trial per pack agent (codex: gpt-6-luna low; claude: claude-haiku-4-5)"
+	@echo "  make agent-smoke [RELEASE=codex@1 MODEL=gpt-6-luna REASONING_EFFORT=low] [TIMEOUT_SEC=]"
+	@echo "                                                        The same smoke with its agent replaced (a release from lab/releases.yaml;"
+	@echo "                                                        REASONING_EFFORT= unsets)"
+	@echo "  make smoke-agents [SMOKE_ARM=codex]                    One trial per released agent (codex: gpt-6-luna low)"
 	@echo "  make smoke-dry-run-check                               Print the smoke command shapes (used by make quality)"
 	@echo ""
 	@echo "Review surface:"
@@ -274,23 +260,8 @@ pack-info:
 pack-build:
 	@$(TARGET_ENV) $(RAIDAR) pack build "$(RUNTIME)" $(if $(FORCE),--force,)
 
-PROBE_EVIDENCE_DIR ?=
-
-component-probe-trials:
-	@$(TARGET_ENV) export RAIDAR_REAL_LLM_PROBES=1 && \
-		$(if $(PROBE_EVIDENCE_DIR),export RAIDAR_PROBE_EVIDENCE_DIR="$(abspath $(PROBE_EVIDENCE_DIR))" &&,) \
-		$(SECRETS_DETECT) cd orchestrator && $(REPO_RUNTIME_ENV) $$secrets_cmd uv run --project . --extra dev \
-		python -m pytest tests/test_component_real_trial_probes.py -v
-
 pack-audit:
 	@$(TARGET_ENV) $(RAIDAR) pack audit "$(RUNTIME)"
-
-# python-guardrails' own rule tests in the pack image: every implemented rule's violating canary
-# fires and its clean canary passes (run_canaries.py; tests/test_component_python_guardrails_trial.py).
-guardrails-verify: docker-check pack-build
-	@$(TARGET_ENV) export RAIDAR_GUARDRAILS_VERIFY=1 && cd orchestrator && $(REPO_RUNTIME_ENV) \
-		uv run --project . --extra dev python -m pytest tests/test_component_python_guardrails_trial.py \
-		-k proven -v -s
 
 pack-tool-provision:
 	$(call require_var,TOOL)
@@ -431,6 +402,9 @@ experiment-validate:
 experiment-lock:
 	$(call require_var,EXPERIMENT)
 	@$(RAIDAR) lock "$(EXPERIMENT)" $(foreach item,$(EXPERIMENT_SET),--set "$(item)") $(if $(LOCK_CHECK),--check,)
+
+releases-check:
+	@$(RAIDAR) releases check
 
 # Every committed experiment lock must match a fresh lock of its experiment, section by section.
 EXPERIMENT_LOCKS := $(sort $(wildcard lab/experiments/*/*/*.lock.json))
@@ -626,28 +600,24 @@ endef
 SMOKE_SETS = --set "analysis.attempts=$(SMOKE_ATTEMPTS)" \
 	$(if $(TIMEOUT_SEC),--set "protocol.agent_timeout_sec=$(TIMEOUT_SEC)",)
 AGENT_SMOKE_SETS = $(SMOKE_SETS) \
-	--set "agents.0.name=$(AGENT_SMOKE_EFFECTIVE_AGENT)" \
-	--set "agents.0.provider=$(AGENT_SMOKE_EFFECTIVE_PROVIDER)" \
+	--set "agents.0.release=$(RELEASE)" \
 	--set "agents.0.model=$(AGENT_SMOKE_EFFECTIVE_MODEL)" \
-	--set "agents.0.reasoning_effort=$(AGENT_SMOKE_EFFECTIVE_REASONING)" \
-	--set "agents.0.version='$(AGENT_SMOKE_EFFECTIVE_VERSION)'"
+	--set "agents.0.reasoning=$(AGENT_SMOKE_EFFECTIVE_REASONING)"
 
 smoke-dry-run-check:
 	@$(MAKE) --no-print-directory -n orchestrator-smoke SMOKE_ATTEMPTS="2" SMOKE_CONCURRENCY="2"
 	@$(MAKE) --no-print-directory -n smoke-agents
 	@$(MAKE) --no-print-directory -n smoke-agents SMOKE_ARM="codex"
-	@$(MAKE) --no-print-directory -n smoke-agents SMOKE_ARM="claude"
 	@! $(MAKE) --no-print-directory -n smoke-agents SMOKE_ARM="unknown" \
 		>/dev/null 2>&1
-	@$(MAKE) --no-print-directory -n agent-smoke AGENT="claude-code" \
-		| grep -q -- '--set "agents.0.model=claude-haiku-4-5" --set "agents.0.reasoning_effort="'
+	@$(MAKE) --no-print-directory -n agent-smoke RELEASE="codex@1" MODEL="gpt-6-luna" \
+		| grep -q -- '--set "agents.0.release=codex@1" --set "agents.0.model=gpt-6-luna"'
 	@$(MAKE) --no-print-directory -n agent-smoke REASONING_EFFORT= \
-		| grep -q -- '--set "agents.0.reasoning_effort="'
+		| grep -q -- '--set "agents.0.reasoning="'
 	@$(MAKE) --no-print-directory -n agent-smoke \
-		| grep -q -- '--set "agents.0.reasoning_effort=low"'
+		| grep -q -- '--set "agents.0.reasoning=low"'
 	@$(MAKE) --no-print-directory -n agent-smoke \
-		AGENT="codex" PROVIDER="openai" MODEL="gpt-6-luna" REASONING_EFFORT="low" \
-		TIMEOUT_SEC="300"
+		RELEASE="codex@1" MODEL="gpt-6-luna" REASONING_EFFORT="low" TIMEOUT_SEC="300"
 
 # Smoke and execute targets build the pack image first: trials bind the prebuilt
 # pack tag and Harbor cannot build it. pack-build is a no-op when the tag exists.
@@ -655,10 +625,6 @@ orchestrator-smoke: docker-check pack-build
 	$(call smoke_run,$(SMOKE_EXPERIMENT),orchestrator-smoke,$(SMOKE_SETS),)
 
 agent-smoke: docker-check pack-build
-	@if [ -z "$(AGENT_SMOKE_EFFECTIVE_VERSION)" ]; then \
-		echo "No pack pin for agent '$(AGENT_SMOKE_EFFECTIVE_AGENT)'; set AGENT_VERSION"; \
-		exit 1; \
-	fi
 	$(call smoke_run,$(SMOKE_EXPERIMENT),agent-smoke,$(AGENT_SMOKE_SETS),)
 
 smoke-agents: docker-check pack-build
@@ -668,7 +634,7 @@ smoke-agents: docker-check pack-build
 structure-check:
 	@$(REPO_RUNTIME_ENV) uv run --project orchestrator python scripts/checks/check-structure.py --repo-root "$(CURDIR)"
 
-# The step before editing a released scorer or component in place: pin the current state as
+# The step before editing a released scorer in place: pin the current state as
 # an annotated tag so its old behaviour stays recoverable (REF=<name>@<N>, e.g. code-quality@3).
 REF ?=
 
@@ -684,6 +650,7 @@ release-archive:
 quality:
 	@$(MAKE) --no-print-directory structure-check
 	@$(MAKE) --no-print-directory smoke-dry-run-check
+	@$(MAKE) --no-print-directory releases-check
 	@$(MAKE) --no-print-directory experiment-locks-check
 	@$(MAKE) --no-print-directory ledger-check
 	@$(RAIDAR_DEV) quality gates

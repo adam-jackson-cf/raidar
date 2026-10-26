@@ -6,9 +6,11 @@ It holds the effective spec (file + CLI overrides) and four hashed sections,
 each with its own digest under ``sections``:
 
 - ``execution``: what a trial runs: the experiment design (kind, problems,
-  runtime, environment, agents, protocol, factors, conditions, arms, attempts,
-  seed), every problem and component file and reference digest, one digest
-  per arm over its agent and fully hashed condition, the Harbor and agent
+  runtime, environment, agents, protocol, arms, attempts, seed), every problem
+  file and the problem, agent and workflow reference digests, one identity per
+  arm (design 5.4: agent release and CLI pin, model and reasoning, workflow
+  release, the workflow's resolved content hash and a stage code digest per
+  enabled stage type, plus a digest over all of it), the Harbor and agent
   versions and any tools those references pin. Its digest **is**
   ``lock_sha256``, the identity every job records in ``job.json``: jobs and
   baselines match a lock through it. The kind is part of it, so relabelling an
@@ -58,24 +60,26 @@ from raidar.contract.references import (
     ResolverSet,
 )
 from raidar.contract.source_digest import SOURCE_DIGEST_SCHEME, python_source_digest
+from raidar.design.experiment.arm import ArmResolutionError, resolve_arm
 from raidar.design.experiment.loader import LoadedExperiment
 from raidar.design.experiment.runtime_gate import GateInputs, PackLoader, runtime_gate_issues
-from raidar.design.experiment.schema import ComponentUse, ExperimentSpec, ProblemEntry
+from raidar.design.experiment.schema import ExperimentSpec, ProblemEntry
 from raidar.design.experiment.validation import FieldIssue
 from raidar.scoring.framework.metrics import (
     DEFAULT_METRIC_REGISTRY,
     MetricRegistry,
     MetricResolver,
 )
+from raidar.subject.releases import AgentResolver, WorkflowResolver
 
-LOCK_VERSION = 3
-"""3: schema v2 vocabulary (kind, runtime, environment, agent names, metric, attempts)."""
+LOCK_VERSION = 4
+"""4: arms are an agent release plus a workflow release, with their full identity."""
 LOCK_SUFFIX = ".lock.json"
 TOOLCHAIN_PACKAGES = ("litellm", "raidar")
 SECTIONS = ("execution", "assessment", "analysis", "toolchain")
 DOCUMENT = "document"
 """Pseudo-section: the lock version, experiment file digests, overrides and effective spec."""
-EXECUTION_REF_KINDS = (RefKind.PROBLEM, RefKind.COMPONENT)
+EXECUTION_REF_KINDS = (RefKind.PROBLEM, RefKind.AGENT, RefKind.WORKFLOW)
 ASSESSMENT_REF_KINDS = (RefKind.SCORER, RefKind.METRIC)
 EXECUTION_SPEC_FIELDS = (
     "kind",
@@ -85,9 +89,6 @@ EXECUTION_SPEC_FIELDS = (
     "environment",
     "agents",
     "protocol",
-    "factors",
-    "shared_components",
-    "conditions",
     "arms",
 )
 EXECUTION_ANALYSIS_FIELDS = ("attempts", "seed")
@@ -131,8 +132,8 @@ def default_lock_path(experiment_path: Path) -> Path:
 
 
 def default_resolvers(metrics: MetricRegistry = DEFAULT_METRIC_REGISTRY) -> ResolverSet:
-    """Built-in metric resolver plus entry-point resolvers for other kinds."""
-    return ResolverSet([MetricResolver(metrics)])
+    """Built-in metric, agent and workflow resolvers plus entry-point resolvers for others."""
+    return ResolverSet([MetricResolver(metrics), AgentResolver(), WorkflowResolver()])
 
 
 SPEC_EXTERNAL_MODULES = (
@@ -338,35 +339,6 @@ class _LockBuilder:
             return None
         return {"ref": metric.ref, "selection": selection, "checkpoints": counts}
 
-    def component(self, loc: str, component: ComponentUse) -> dict[str, object]:
-        resolved = self.resolve(f"{loc}.use", RefKind.COMPONENT, component.use)
-        files: dict[str, dict[str, object]] = {}
-        for f_index, relative in enumerate(component.files):
-            files.update(self.hash_path(f"{loc}.files.{f_index}", relative))
-        return {
-            "use": component.use,
-            "use_digest": resolved.digest if resolved else None,
-            "with": component.with_,
-            "files": {path: entry["sha256"] for path, entry in files.items()},
-        }
-
-    def conditions(self) -> dict[str, object]:
-        """Each condition's effective manifest: the shared components, then its own."""
-        shared = [
-            self.component(f"shared_components.{index}", use)
-            for index, use in enumerate(self.spec.shared_components)
-        ]
-        hashed: dict[str, object] = {}
-        for c_index, condition in enumerate(self.spec.conditions):
-            hashed[condition.id] = [
-                *shared,
-                *(
-                    self.component(f"conditions.{c_index}.components.{u_index}", use)
-                    for u_index, use in enumerate(condition.components)
-                ),
-            ]
-        return hashed
-
     def grouped(self, kinds: tuple[RefKind, ...]) -> tuple[dict[str, object], dict[str, str]]:
         """(references, pinned tools) of the given reference kinds."""
         references: dict[str, object] = {
@@ -377,15 +349,24 @@ class _LockBuilder:
             tools.update(self.tools_by_kind.get(kind.value, {}))
         return references, dict(sorted(tools.items()))
 
-    def arms(self, conditions: Mapping[str, object]) -> dict[str, object]:
-        arms: dict[str, object] = {}
-        for arm in self.spec.arms:
-            agent = self.spec.agent(arm.agent).model_dump(mode="json", exclude={"id"})
-            arms[arm.id] = {
-                "agent": arm.agent,
-                "condition": arm.condition,
-                "digest": digest_json({"agent": agent, "condition": conditions[arm.condition]}),
-            }
+    def releases(self) -> None:
+        """Resolve every agent and workflow release (recorded under ``references``)."""
+        for index, agent in enumerate(self.spec.agents):
+            self.resolve(f"agents.{index}.release", RefKind.AGENT, agent.release)
+        seen: set[str] = set()
+        for index, arm in enumerate(self.spec.arms):
+            if arm.workflow not in seen:
+                seen.add(arm.workflow)
+                self.resolve(f"arms.{index}.workflow", RefKind.WORKFLOW, arm.workflow)
+
+    def arms(self) -> dict[str, dict[str, Any]]:
+        """Each arm's full identity (``ResolvedArm.identity``)."""
+        arms: dict[str, dict[str, Any]] = {}
+        for index, arm in enumerate(self.spec.arms):
+            try:
+                arms[arm.id] = resolve_arm(self.spec, arm.id).identity()
+            except ArmResolutionError as exc:
+                self.issues.append(FieldIssue(f"arms.{index}", str(exc)))
         return arms
 
 
@@ -412,7 +393,9 @@ def build_lock(
     problems = [builder.problem(index, entry) for index, entry in enumerate(spec.problems)]
     for index, scorer in enumerate(spec.assessment.scorers):
         builder.resolve(f"assessment.scorers.{index}", RefKind.SCORER, scorer)
-    conditions = builder.conditions()
+    builder.releases()
+    # A release that did not resolve is already an issue; resolving its arms would repeat it.
+    arms = builder.arms() if not builder.issues else {}
     resolved_problems = [problem for problem in problems if problem is not None]
     headline = (
         builder.metric(resolved_problems) if len(resolved_problems) == len(problems) else None
@@ -439,13 +422,15 @@ def build_lock(
             problems=resolved_problems,
             files=builder.files,
             references=execution_refs,
-            conditions=conditions,
-            arms=builder.arms(conditions),
+            arms=arms,
             versions={
                 "harbor": harbor_version(),
                 "agents": {
-                    agent.id: {"name": agent.name.value, "version": agent.version}
-                    for agent in spec.agents
+                    arm["agent"]: {
+                        "release": arm["agent_release"],
+                        "version": arm["tool"]["version"],
+                    }
+                    for arm in arms.values()
                 },
             },
             tools=execution_tools,
@@ -468,7 +453,6 @@ def execution_section(
     problems: object,
     files: object,
     references: object,
-    conditions: object,
     arms: object,
     versions: object,
     tools: object,
@@ -477,14 +461,12 @@ def execution_section(
     analysis = spec_json["analysis"]
     return {
         "design": {
-            # ``shared_components`` is absent from specs that declare none.
-            **{name: spec_json[name] for name in EXECUTION_SPEC_FIELDS if name in spec_json},
+            **{name: spec_json[name] for name in EXECUTION_SPEC_FIELDS},
             **{name: analysis[name] for name in EXECUTION_ANALYSIS_FIELDS},
         },
         "problems": problems,
         "files": files,
         "references": references,
-        "conditions": conditions,
         "arms": arms,
         "versions": versions,
         "tools": tools,

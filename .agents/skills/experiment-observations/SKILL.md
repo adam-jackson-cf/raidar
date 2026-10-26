@@ -21,5 +21,5 @@ description: "Use when reporting a completed Raidar experiment's observed outcom
 
 - Return only the concise observations view defined in Step 3, with its
   full-report link.
-- No recommendations here: proposing component changes is the `fault-catalog`
+- No recommendations here: proposing workflow or agent changes is the `fault-catalog`
   proposal runbook.

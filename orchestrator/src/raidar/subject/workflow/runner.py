@@ -1,0 +1,319 @@
+"""The workflow runner: the Harbor agent of every real arm (design section 5.5).
+
+Harbor runs one agent phase per checkpoint (one ``run`` per step), so the reaper, the liveness
+monitor and the per-step reset see the same phases they saw for the native agent. Inside the
+phase the runner drives the native agent (``inner_agent``, built by ``create_inner``) through
+the workflow's stages, host-side, one *turn* at a time. ``build`` is the only implemented
+stage: one turn running the build prompt with the checkpoint's task text in place of
+``%%%TASK%%%``, in a fresh session (``run``). Each checkpoint starts fresh because Harbor
+empties ``/logs/agent`` (the session store) before every step.
+
+Per turn, under the step's agent logs at ``workflow/<stage>-<n>/``:
+
+- ``prompt.txt``: exactly what the agent was sent;
+- a copy of everything the native agent left in ``/logs/agent`` (``sessions/``, its output
+  stream). The active session store ``/logs/agent/sessions`` is copied, never moved, so a later
+  turn can resume it;
+- ``trajectory.json``: the native agent's trajectory, built from that copy.
+
+``workflow/workflow.json`` records every turn: stage, turn index, session id, whether it
+resumed, start, end, seconds, error, the session's cumulative token total after the turn and
+the turn's own tokens. A native context after a resumed turn is the session's cumulative total,
+so a turn's tokens are the delta from the previous turn of the same session; the phase's usage
+is the sum of the deltas, which reconciles with the final session totals by construction. When
+a turn's usage cannot be read the phase reports none rather than a partial sum. The last
+turn's trajectory becomes the step's ``trajectory.json``.
+"""
+
+from __future__ import annotations
+
+import asyncio
+import hashlib
+import json
+import shlex
+import time
+from dataclasses import dataclass, field
+from datetime import UTC, datetime
+from pathlib import Path, PurePosixPath
+from typing import Any, cast
+
+from harbor.agents.base import BaseAgent
+from harbor.agents.options import AgentOptions
+from harbor.environments.base import BaseEnvironment
+from harbor.models.agent.context import AgentContext
+
+from raidar.subject.workflow.definition import StageType, WorkflowDefinition
+from raidar.subject.workflow.inner import InnerAgentSpec, create_inner
+
+RUNNER_NAME = "raidar-workflow"
+WORKFLOW_DIR = "workflow"
+RECORD_FILE = "workflow.json"
+RECORD_KIND = "raidar-workflow"
+PROMPT_FILE = "prompt.txt"
+TRAJECTORY_FILE = "trajectory.json"
+STEP_RECORD_PREFIX = "raidar-"
+"""Step-level lab records in ``/logs/agent`` (reset report, provision records): not a turn's."""
+
+
+class WorkflowRunnerOptions(AgentOptions):
+    inner_agent: InnerAgentSpec
+    workflow: str
+    definition: WorkflowDefinition
+
+
+@dataclass(frozen=True)
+class Tokens:
+    """A session's token counts (cumulative) or one turn's share of them (a delta)."""
+
+    input: int
+    cached: int
+    output: int
+    cost_usd: float | None
+
+    @classmethod
+    def of(cls, context: AgentContext) -> Tokens | None:
+        counts = (context.n_input_tokens, context.n_cache_tokens, context.n_output_tokens)
+        if any(count is None for count in counts):
+            return None
+        n_input, n_cached, n_output = cast(tuple[int, int, int], counts)
+        return cls(n_input, n_cached, n_output, context.cost_usd)
+
+    def minus(self, earlier: Tokens) -> Tokens:
+        cost = (
+            None
+            if self.cost_usd is None or earlier.cost_usd is None
+            else round(self.cost_usd - earlier.cost_usd, 10)
+        )
+        return Tokens(
+            self.input - earlier.input,
+            self.cached - earlier.cached,
+            self.output - earlier.output,
+            cost,
+        )
+
+    def plus(self, other: Tokens) -> Tokens:
+        cost = (
+            None
+            if self.cost_usd is None or other.cost_usd is None
+            else self.cost_usd + other.cost_usd
+        )
+        return Tokens(
+            self.input + other.input, self.cached + other.cached, self.output + other.output, cost
+        )
+
+    def record(self) -> dict[str, Any]:
+        return {
+            "input": self.input,
+            "cached": self.cached,
+            "output": self.output,
+            "cost_usd": self.cost_usd,
+        }
+
+
+ZERO = Tokens(0, 0, 0, 0.0)
+
+
+@dataclass
+class Turn:
+    stage: StageType
+    index: int
+    resumed: bool
+    prompt_sha256: str
+    started_at: str
+    started: float
+    finished_at: str | None = None
+    seconds: float | None = None
+    error: str | None = None
+    settle_error: str | None = None
+    session_id: str | None = None
+    session_total: Tokens | None = None
+    tokens: Tokens | None = None
+
+    @property
+    def log_dir(self) -> str:
+        return f"{WORKFLOW_DIR}/{self.stage}-{self.index}"
+
+    def stop(self, error: str | None = None) -> None:
+        self.finished_at = _now()
+        self.seconds = round(time.monotonic() - self.started, 3)
+        self.error = error
+
+    def record(self) -> dict[str, Any]:
+        return {
+            "stage": self.stage,
+            "turn": self.index,
+            "log_dir": self.log_dir,
+            "session_id": self.session_id,
+            "resumed": self.resumed,
+            "prompt_sha256": self.prompt_sha256,
+            "started_at": self.started_at,
+            "finished_at": self.finished_at,
+            "seconds": self.seconds,
+            "error": self.error,
+            "settle_error": self.settle_error,
+            "session_total": self.session_total.record() if self.session_total else None,
+            "tokens": self.tokens.record() if self.tokens else None,
+        }
+
+
+@dataclass
+class _Run:
+    turns: list[Turn] = field(default_factory=list)
+
+    def delta(self, turn: Turn) -> Tokens | None:
+        """The turn's tokens: its session total minus the same session's previous total."""
+        if turn.session_total is None:
+            return None
+        earlier = [
+            item.session_total
+            for item in self.turns
+            if item is not turn and item.session_id == turn.session_id and item.session_total
+        ]
+        return turn.session_total.minus(earlier[-1]) if earlier else turn.session_total
+
+    def usage(self) -> Tokens | None:
+        """The phase's tokens (sum of turn deltas); ``None`` when any turn's is unknown."""
+        total = ZERO
+        for turn in self.turns:
+            if turn.tokens is None:
+                return None
+            total = total.plus(turn.tokens)
+        return total if self.turns else None
+
+
+def _now() -> str:
+    return datetime.now(UTC).isoformat(timespec="milliseconds")
+
+
+def _session_id(turn_dir: Path) -> str | None:
+    path = turn_dir / TRAJECTORY_FILE
+    try:
+        value = json.loads(path.read_text()).get("session_id")
+    except (OSError, ValueError, AttributeError):
+        return None
+    return value if isinstance(value, str) and value else None
+
+
+class WorkflowRunner(BaseAgent):
+    """Runs the arm's workflow on its native agent, one turn at a time (module docstring)."""
+
+    options_model = WorkflowRunnerOptions
+
+    @staticmethod
+    def name() -> str:
+        return RUNNER_NAME
+
+    @property
+    def runner_options(self) -> WorkflowRunnerOptions:
+        return cast(WorkflowRunnerOptions, self.options)
+
+    def version(self) -> str | None:
+        """The native agent's pinned CLI version (what the turns run)."""
+        pinned = self.runner_options.inner_agent.kwargs.get("version")
+        return str(pinned) if pinned is not None else None
+
+    def _inner(self, logs_dir: Path) -> BaseAgent:
+        return create_inner(
+            self, self.runner_options.inner_agent, logs_dir, model_name=self.model_name
+        )
+
+    async def setup(self, environment: BaseEnvironment) -> None:
+        await self._inner(self.logs_dir).setup(environment)
+
+    async def run(
+        self, instruction: str, environment: BaseEnvironment, context: AgentContext
+    ) -> None:
+        state = _Run()
+        build = self.runner_options.definition.stages.build
+        try:
+            await self._turn(environment, state, "build", build.render(instruction))
+        finally:
+            self._finish(context, state)
+
+    async def _turn(
+        self, environment: BaseEnvironment, state: _Run, stage: StageType, prompt: str
+    ) -> None:
+        turn = Turn(
+            stage=stage,
+            index=len(state.turns) + 1,
+            resumed=False,
+            prompt_sha256=hashlib.sha256(prompt.encode()).hexdigest(),
+            started_at=_now(),
+            started=time.monotonic(),
+        )
+        state.turns.append(turn)
+        turn_dir = self.logs_dir / turn.log_dir
+        turn_dir.mkdir(parents=True, exist_ok=True)
+        (turn_dir / PROMPT_FILE).write_text(prompt, encoding="utf-8")
+        inner = self._inner(turn_dir)
+        context = AgentContext()
+        try:
+            await inner.run(prompt, environment, context)
+        except asyncio.CancelledError:
+            turn.stop("CancelledError: the agent phase was cancelled (agent timeout)")
+            await asyncio.shield(self._settle(environment, state, turn, inner, context))
+            raise
+        except Exception as exc:
+            turn.stop(f"{type(exc).__name__}: {exc}")
+            await self._settle(environment, state, turn, inner, context)
+            raise
+        turn.stop()
+        await self._settle(environment, state, turn, inner, context)
+
+    async def _settle(
+        self,
+        environment: BaseEnvironment,
+        state: _Run,
+        turn: Turn,
+        inner: BaseAgent,
+        context: AgentContext,
+    ) -> None:
+        """Copy the turn's logs into its directory and read its session and usage."""
+        turn_dir = self.logs_dir / turn.log_dir
+        try:
+            await self._copy_turn_logs(environment, turn.log_dir, turn_dir)
+        except Exception as exc:  # noqa: BLE001 - recorded on the turn; usage stays unknown
+            turn.settle_error = f"{type(exc).__name__}: {exc}"
+            return
+        if context.is_empty():
+            inner.populate_context_post_run(context)
+        turn.session_id = _session_id(turn_dir)
+        turn.session_total = Tokens.of(context)
+        turn.tokens = state.delta(turn)
+
+    async def _copy_turn_logs(
+        self, environment: BaseEnvironment, relative: str, turn_dir: Path
+    ) -> None:
+        logs = PurePosixPath(str(self.environment_logs_dir))
+        command = (
+            f"cd {shlex.quote(str(logs))} && mkdir -p {shlex.quote(relative)} && "
+            f"find . -mindepth 1 -maxdepth 1 ! -name {WORKFLOW_DIR} "
+            f"! -name '{STEP_RECORD_PREFIX}*' -exec cp -R {{}} {shlex.quote(relative)}/ \\;"
+        )
+        result = await environment.exec(command)
+        if result.return_code != 0:
+            raise RuntimeError(f"could not copy the turn's logs: {result.stderr or result.stdout}")
+        if not environment.capabilities.mounted:
+            await environment.download_dir(str(logs / relative), turn_dir)
+
+    def _finish(self, context: AgentContext, state: _Run) -> None:
+        usage = state.usage()
+        if usage is not None:
+            context.n_input_tokens = usage.input
+            context.n_cache_tokens = usage.cached
+            context.n_output_tokens = usage.output
+            context.cost_usd = usage.cost_usd
+        record = {
+            "kind": RECORD_KIND,
+            "workflow": self.runner_options.workflow,
+            "turns": [turn.record() for turn in state.turns],
+            "tokens": usage.record() if usage else None,
+        }
+        context.metadata = {**(context.metadata or {}), "workflow": record}
+        workflow_dir = self.logs_dir / WORKFLOW_DIR
+        workflow_dir.mkdir(parents=True, exist_ok=True)
+        (workflow_dir / RECORD_FILE).write_text(json.dumps(record, indent=2, sort_keys=True) + "\n")
+        last = state.turns[-1] if state.turns else None
+        trajectory = self.logs_dir / last.log_dir / TRAJECTORY_FILE if last else None
+        if trajectory is not None and trajectory.is_file():
+            (self.logs_dir / TRAJECTORY_FILE).write_bytes(trajectory.read_bytes())

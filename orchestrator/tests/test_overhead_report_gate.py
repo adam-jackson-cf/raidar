@@ -45,11 +45,18 @@ def _record(job_dir: Path, index: int, teardown_s: float) -> TrialRecord:
     phases = [
         sample if sample.phase != TEARDOWN else sample.model_copy(update={"seconds": teardown_s})
         for sample in trial_phases(
-            trial_dir, component_apply_s=0.05, environment_cold=False, compose_init=True
+            trial_dir, arm_apply_s=0.05, environment_cold=False, compose_init=True
         )
     ]
     hashes = TrialHashes(
-        lock="l", problem="p", arm="a", condition="c", agent="g", protocol="r", trial="t"
+        lock="l",
+        problem="p",
+        arm="a",
+        workflow="w",
+        stage_code="s",
+        agent="g",
+        protocol="r",
+        trial="t",
     )
     return TrialRecord(
         experiment="e",

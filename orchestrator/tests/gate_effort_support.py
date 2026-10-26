@@ -390,14 +390,3 @@ def _enforced_autofix(tmp_path: Path) -> StepInputs:
         ],
     )
     return step
-
-
-GUARDRAIL_STYLE_GATE = (
-    'if [ -f fixed.txt ]; then echo "guardrail-check: PASSED (0 blocking, 0 warnings, 1 Python '
-    'files)"; else echo "guardrail-check: REFUSED (2 blocking, 0 warnings, 1 Python files)"; '
-    'echo "Blocking (fix these) (2):"; echo "  feature.py:1:1: C901 too complex"; '
-    'echo "  feature.py:2:1: MYPY.no-untyped-def missing"; '
-    'printf \'{"schema": "%s", "findings": [{"code": "C901", "tier": "block"}, '
-    '{"code": "MYPY.no-untyped-def", "tier": "block"}]}\' '
-    f'"{REPORT_SCHEMA}" > "$RAIDAR_GATE_REPORT_DIR/gate-$RAIDAR_GATE_RUN.json"; exit 1; fi'
-)

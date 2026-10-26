@@ -30,7 +30,6 @@ from raidar.design.experiment.lock import (
 )
 from raidar.scoring.framework.metrics import MetricResolver
 from tests.experiment_spec_support import (
-    SHARED_FRAMING,
     InMemoryResolver,
     experiment_document,
     fixture_resolvers,
@@ -68,11 +67,9 @@ def test_relocking_unchanged_inputs_is_byte_identical(tmp_path: Path) -> None:
     lock = json.loads(first)
     assert list(lock) == sorted(lock)
     execution, assessment = lock["execution"], lock["assessment"]
-    assert execution["files"]["components/AGENTS.md"]["sha256"]
-    assert lock["experiment"]["source"] == "experiment.yaml"
     assert execution["versions"]["harbor"] == "0.23.0"
-    assert execution["versions"]["agents"] == {"luna": {"name": "codex", "version": "0.156.1"}}
-    assert set(execution["references"]) == {"problem", "component"}
+    assert execution["versions"]["agents"] == {"luna": {"release": "codex@1", "version": "0.156.1"}}
+    assert set(execution["references"]) == {"problem", "agent", "workflow"}
     assert set(assessment["references"]) == {"scorer", "metric"}
     # Tools are recorded with the section whose reference pins them.
     assert (execution["tools"], assessment["tools"]) == ({}, {"pytest": "8.4.1"})
@@ -82,53 +79,14 @@ def test_relocking_unchanged_inputs_is_byte_identical(tmp_path: Path) -> None:
     assert lock_integrity_issues(lock) == []
 
 
-def test_changing_a_component_file_changes_its_hash_and_the_arm_digest(tmp_path: Path) -> None:
-    path = write_experiment(tmp_path, experiment_document())
-    before = _lock(path)
-
-    (tmp_path / "components" / "AGENTS.md").write_text("Always write a plan.\n", encoding="utf-8")
-    after = _lock(path)
-
-    file_key = "components/AGENTS.md"
-    before_run, after_run = before["execution"], after["execution"]
-    assert before_run["files"][file_key]["sha256"] != after_run["files"][file_key]["sha256"]
-    assert before_run["arms"]["guided"]["digest"] != after_run["arms"]["guided"]["digest"]
-    assert before_run["arms"]["baseline"]["digest"] == after_run["arms"]["baseline"]["digest"]
-    assert before["lock_sha256"] != after["lock_sha256"]
-    assert stale_sections(before, after) == ("execution",)
-
-
-def test_shared_components_are_hashed_into_every_condition_manifest(tmp_path: Path) -> None:
-    path = write_experiment(tmp_path, experiment_document(shared_components=[SHARED_FRAMING]))
-    without = _lock(write_experiment(tmp_path / "plain", experiment_document()))
-
-    lock = _lock(path)
-
-    execution = lock["execution"]
-    conditions = execution["conditions"]
-    assert [entry["use"] for entry in conditions["baseline"]] == ["prompt-wrapper@1"]
-    assert [entry["use"] for entry in conditions["guided"]] == ["prompt-wrapper@1", "rules-file@2"]
-    assert conditions["baseline"][0] == conditions["guided"][0]
-    assert conditions["baseline"][0]["files"]["components/framing.md"]
-    assert execution["design"]["shared_components"] == [{**SHARED_FRAMING, "with": {}}]
-    # A spec that declares no shared components locks exactly as before the field.
-    assert "shared_components" not in without["execution"]["design"]
-    assert "shared_components" not in without["spec"]
-
-    (tmp_path / "components" / "framing.md").write_text("Work.\n{{ instruction }}\n")
-    after = _lock(path)["execution"]["arms"]
-    assert after["baseline"]["digest"] != execution["arms"]["baseline"]["digest"]
-    assert after["guided"]["digest"] != execution["arms"]["guided"]["digest"]
-
-
 def _scorer_resolvers(implementation: str) -> ResolverSet:
-    problem, component, _ = fixture_resolvers()
+    problem, agent, workflow, _ = fixture_resolvers()
     scorer = InMemoryResolver(
         RefKind.SCORER,
         {"correctness@2": {"implementation_digest": implementation}},
         tool_versions={"pytest": "8.4.1"},
     )
-    return ResolverSet([problem, component, scorer, MetricResolver()], entry_point_group=None)
+    return ResolverSet([problem, agent, workflow, scorer, MetricResolver()], entry_point_group=None)
 
 
 def test_assessment_and_analysis_changes_keep_the_run_identity(tmp_path: Path) -> None:
@@ -154,63 +112,6 @@ def test_assessment_and_analysis_changes_keep_the_run_identity(tmp_path: Path) -
     # concurrency is per machine: it is part of the document, not of any section.
     assert stale_sections(base, reanalysed) == ("analysis", "document")
     assert "rescore" in describe_staleness(("assessment",))
-
-
-def test_directory_components_hash_every_file_but_ignore_os_noise(tmp_path: Path) -> None:
-    skill = tmp_path / "components" / "skill"
-    (skill / "__pycache__").mkdir(parents=True)
-    (skill / "SKILL.md").write_text("skill\n", encoding="utf-8")
-    (skill / "__pycache__" / "x.pyc").write_bytes(b"\0")
-    (skill / ".DS_Store").write_bytes(b"\0")
-    document = experiment_document()
-    document["conditions"][1]["components"][0]["files"] = ["components/skill"]
-
-    lock = _lock(write_experiment(tmp_path, document))
-
-    assert list(lock["execution"]["files"]) == ["components/skill/SKILL.md"]
-
-
-def test_relock_ignores_its_own_output_inside_a_hashed_directory(tmp_path: Path) -> None:
-    document = experiment_document()
-    document["conditions"][1]["components"][0]["files"] = ["components"]
-    path = write_experiment(tmp_path, document)
-    lock_path = tmp_path / "components" / "experiment.lock.json"
-    resolvers = ResolverSet([*fixture_resolvers(), MetricResolver()], entry_point_group=None)
-
-    def relock() -> bytes:
-        rendered = render_lock(
-            build_lock(load_experiment(path), lock_path=lock_path, resolvers=resolvers)
-        )
-        lock_path.write_bytes(rendered)
-        return rendered
-
-    assert relock() == relock()
-    assert list(json.loads(lock_path.read_bytes())["execution"]["files"]) == [
-        "components/AGENTS.md"
-    ]
-
-
-def test_files_reached_through_symlinks_outside_the_experiment_are_refused(
-    tmp_path: Path,
-) -> None:
-    outside = tmp_path / "outside"
-    outside.mkdir()
-    (outside / "secret.txt").write_text("x\n", encoding="utf-8")
-    root = tmp_path / "exp"
-    (root / "components").mkdir(parents=True)
-    (root / "components" / "link.txt").symlink_to(outside / "secret.txt")
-    document = experiment_document()
-    document["conditions"][1]["components"][0]["files"] = [
-        "components/link.txt",
-        "components",
-    ]
-
-    with pytest.raises(LockError) as caught:
-        _lock(write_experiment(root, document))
-
-    messages = {issue.loc: issue.message for issue in caught.value.issues}
-    assert "outside the experiment directory" in messages["conditions.1.components.0.files.0"]
-    assert "outside the experiment directory" in messages["conditions.1.components.0.files.1"]
 
 
 def test_overrides_are_recorded_and_change_the_lock(tmp_path: Path) -> None:
@@ -311,12 +212,14 @@ def test_mixed_k_without_declared_policy_is_rejected(tmp_path: Path) -> None:
 
 def test_every_gap_is_reported_and_nothing_is_skipped(tmp_path: Path) -> None:
     document = experiment_document()
-    document["conditions"][1]["components"][0]["files"] = ["components/missing.md"]
     document["assessment"]["scorers"] = ["correctness@2", "jev@2"]
     path = write_experiment(tmp_path, document)
+    _, agent, workflow, _ = fixture_resolvers()
     resolvers = ResolverSet(
         [
             InMemoryResolver(RefKind.PROBLEM, {"scb/forge@abc123": {"checkpoints": 0}}),
+            agent,
+            workflow,
             InMemoryResolver(RefKind.SCORER, {"correctness@2": {}}),
         ],
         entry_point_group=None,
@@ -328,18 +231,18 @@ def test_every_gap_is_reported_and_nothing_is_skipped(tmp_path: Path) -> None:
     assert {issue.loc for issue in caught.value.issues} == {
         "problems.0.ref",
         "assessment.scorers.1",
-        "conditions.1.components.0.use",
-        "conditions.1.components.0.files.0",
     }
 
 
 def test_conflicting_tool_pins_are_rejected(tmp_path: Path) -> None:
     path = write_experiment(tmp_path, experiment_document())
-    problem, _, scorer = fixture_resolvers()
-    component = InMemoryResolver(
-        RefKind.COMPONENT, {"rules-file@2": {}}, tool_versions={"pytest": "7.0.0"}
+    problem, agent, _, scorer = fixture_resolvers()
+    workflow = InMemoryResolver(
+        RefKind.WORKFLOW, {"one-shot@1": {}}, tool_versions={"pytest": "7.0.0"}
     )
-    resolvers = ResolverSet([problem, component, scorer, MetricResolver()], entry_point_group=None)
+    resolvers = ResolverSet(
+        [problem, agent, workflow, scorer, MetricResolver()], entry_point_group=None
+    )
 
     with pytest.raises(LockError, match="tool 'pytest' pinned to both 8.4.1 and 7.0.0"):
         build_lock(load_experiment(path), lock_path=path, resolvers=resolvers)
@@ -373,7 +276,9 @@ def test_lock_command_writes_then_checks_and_reports_pending_resolvers(tmp_path:
 def test_lock_command_write_and_check_cycle(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    path = write_experiment(tmp_path, experiment_document())
+    document = experiment_document()
+    analysis = document["analysis"]
+    path = write_experiment(tmp_path, document)
     monkeypatch.setattr(
         "raidar.design.experiment.lock.default_resolvers",
         lambda policies: ResolverSet(
@@ -389,7 +294,7 @@ def test_lock_command_write_and_check_cycle(
         host.setattr("platform.python_version", lambda: "3.12.0")
         drifted = runner.invoke(main, ["lock", str(path), "--check"])
         tolerated = runner.invoke(main, ["lock", str(path), "--check", "--ignore-host-python"])
-    (tmp_path / "components" / "AGENTS.md").write_text("changed\n", encoding="utf-8")
+    write_experiment(tmp_path, experiment_document(analysis={**analysis, "attempts": 6}))
     stale = runner.invoke(main, ["lock", str(path), "--check"])
     lock_path.write_text(lock_path.read_text().replace('"harbor"', '"harbour"'))
     tampered = runner.invoke(main, ["lock", str(path), "--check"])

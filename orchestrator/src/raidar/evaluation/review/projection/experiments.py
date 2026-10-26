@@ -1,10 +1,10 @@
 """Experiment records: one per (experiment lock, problem, arm), comparing agent specs.
 
-The surface groups experiment records by ``problem`` and ``arm`` (the arm's
-condition label) and ranks agent specs inside each group, so one record holds
-the trials (attempts) of one arm on one problem. Scored runs are those
-with a headline score, repeatability flags a composite stddev of 0.1 or more,
-and the sample is adequate at 3 scored runs and preferred at 5.
+The surface groups experiment records by ``problem`` and ``arm`` (the arm id) and
+ranks agent specs inside each group, so one record holds the trials (attempts) of one
+arm on one problem. Scored runs are those with a headline score, repeatability flags
+a composite stddev of 0.1 or more, and the sample is adequate at 3 scored runs and
+preferred at 5.
 """
 
 from __future__ import annotations
@@ -18,7 +18,6 @@ from typing import Any
 from raidar.contract.canonical import digest_json
 from raidar.contract.references import RegistryReferenceError
 from raidar.contract.review import (
-    ArmChangeCategory,
     ArmComparableConfig,
     ResolvedScorerReviewConfig,
     ReviewExperimentRecord,
@@ -50,10 +49,6 @@ class ArmGroup:
     experiment_id: str
     spec: ExperimentSpec
     arm: str
-    condition_manifest: object
-    rules_artifacts: Mapping[str, str]
-    parent_arm: str | None
-    change_categories: Sequence[ArmChangeCategory]
     metric: str
     trials: Sequence[TrialInput]
     details: Sequence[ReviewRunDetail]
@@ -224,7 +219,6 @@ def _comparable(group: ArmGroup, task: Mapping[str, Any]) -> ArmComparableConfig
         "problem": labels.problem,
         "display_name": str(info.get("name") or labels.problem),
         "arm": labels.arm,
-        "parent_arm": group.parent_arm,
         "description": str(info.get("description") or spec.description or labels.problem),
         "difficulty": str(metadata.get("difficulty") or "unrated"),
         "languages": [spec.runtime.capitalize()],
@@ -238,12 +232,6 @@ def _comparable(group: ArmGroup, task: Mapping[str, Any]) -> ArmComparableConfig
             "checkpoints": [step_result.checkpoint for step_result in record.step_results],
         },
         "scorers": [_scorer(ref, _shares(group.metric)) for ref in spec.assessment.scorers],
-        "condition": {
-            "label": labels.arm,
-            "arm": group.arm,
-            "components": group.condition_manifest,
-        },
-        "rules_artifacts": dict(group.rules_artifacts),
     }
     config = ArmComparableConfig(**body, fingerprint="")
     identity = config.model_dump(mode="json", exclude={"fingerprint"})
@@ -296,7 +284,6 @@ def experiment_record(group: ArmGroup) -> ReviewExperimentRecord:
         repeats=group.spec.analysis.attempts,
         problem_meta=_metadata(comparable),
         comparable_config=comparable,
-        change_categories=list(group.change_categories),
         aggregate=aggregate,
         sample=sample,
         rerun=rerun,

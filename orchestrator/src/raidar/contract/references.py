@@ -1,9 +1,9 @@
 """Registry references (``name@version``) and the resolver protocol.
 
-An ``experiment.yaml`` names problems, components, scorers and score policies by
+An ``experiment.yaml`` names problems, agents, workflows, scorers and score policies by
 registry reference. The lock resolves each reference through a
 ``RegistryResolver`` registered for its kind. The design package ships the
-``metric`` resolver (the headline metric registry); every other kind registers a
+``metric``, ``agent`` and ``workflow`` resolvers; every other kind registers a
 zero-argument factory under the ``raidar.contract.resolvers`` entry-point group, or is
 passed to ``ResolverSet`` directly (one source per kind). Entry points are loaded lazily,
 only when a reference of that kind must be resolved.
@@ -31,7 +31,8 @@ class RefKind(StrEnum):
     """Registry kinds an experiment can reference."""
 
     PROBLEM = "problem"
-    COMPONENT = "component"
+    AGENT = "agent"
+    WORKFLOW = "workflow"
     SCORER = "scorer"
     METRIC = "metric"
 
@@ -77,7 +78,7 @@ class ResolvedReference:
 
     - problem: ``runtime`` (the binding's pack id), ``pack_version``,
       ``validated`` and, when not validated, ``validation_issue``;
-    - component: ``runtimes`` (``["*"]`` for any) and ``supports`` (agent CLI ids);
+    - agent: ``adapter`` (the Harbor agent name) and ``tool_version`` (the CLI pin);
     - scorer and metric: ``runtimes``.
     """
 

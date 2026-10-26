@@ -37,7 +37,7 @@ from raidar.engine.target.config import Target, TargetError
 from raidar.engine.target.health import ensure_target
 from raidar.subject.environment.python.image import image_tag
 from raidar.subject.environment.python.pack_definition import load_pack_spec
-from tests.component_trial_support import docker_target
+from tests.docker_trial_support import docker_target
 from tests.execution_support import imported_pack_fixture, locked_experiment
 
 OPT_IN = "RAIDAR_EXECUTION_DOCKER"
@@ -87,18 +87,9 @@ def test_fixture_experiment_runs_and_holds_the_n1_budgets(
     monkeypatch.setenv("DOCKER_CONTEXT", context)
     fixture = imported_pack_fixture(root / "fixture", context)
     monkeypatch.setenv(ROOT_ENV, str(fixture.store.root))
-    (root / "exp" / "components").mkdir(parents=True, exist_ok=True)
-    (root / "exp" / "components" / "ruff.toml").write_text("line-length = 100\n")
     loaded, _, _ = locked_experiment(
         root / "exp",
         fixture.ref,
-        conditions=[
-            {"id": "baseline", "components": []},
-            {
-                "id": "guided",
-                "components": [{"use": "lint-config@2", "files": ["components/ruff.toml"]}],
-            },
-        ],
         analysis={
             "baseline_arm": "baseline",
             "attempts": 5,

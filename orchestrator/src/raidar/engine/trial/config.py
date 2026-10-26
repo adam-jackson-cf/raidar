@@ -47,7 +47,7 @@ def harbor_trial_config(
     errata: Mapping[str, Any] | None = None,
 ) -> TrialConfig:
     spec = plan.loaded.spec
-    harness = spec.agent(next(a.agent for a in spec.arms if a.id == trial.arm)).harness
+    harness = plan.arms[trial.arm].arm.agent.harness
     grader_timeout = float(spec.protocol.verifier_timeout_sec)
     coverage = spec.protocol.verifier_coverage == "trial"
     return TrialConfig(

@@ -1,176 +1,145 @@
-"""Component compiler: one condition x one harness -> a ``CompiledCondition``.
+"""An arm, resolved: its agent release, model and reasoning, and its workflow release.
 
-``compile_condition`` resolves every component use through the registry and
-rejects the arm when any use is unknown, unsupported on the arm's harness,
-invalid, or conflicts with another use. Nothing is skipped silently.
+``resolve_arm`` loads both releases (``raidar.subject.releases``: only the release the tree
+holds, at its registered hash) and checks the agent entry's model and reasoning against the
+agent definition. ``ResolvedArm.identity`` is what the lock records per arm (design 5.4): the
+agent release and its CLI pin, the model and reasoning, the workflow release, the workflow's
+resolved content hash and one stage code digest per enabled stage type.
 """
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
-from pathlib import Path
+from dataclasses import dataclass
+from functools import cached_property
 
-from harbor.models.task.config import MCPServerConfig
-from pydantic import JsonValue
-
-from raidar.contract.references import RegistryReferenceError
-from raidar.design.experiment.schema import AgentEntry, ConditionSpec, ExperimentSpec
-from raidar.subject.treatment.definition.compiled import (
-    HARBOR_AGENT_NAMES,
-    CompiledCondition,
-    CompiledUse,
+from raidar.contract.canonical import digest_json
+from raidar.contract.releases import ReleaseError
+from raidar.design.experiment.schema import AgentEntry, ExperimentSpec
+from raidar.subject.agent.config import AgentName, Harness
+from raidar.subject.releases import (
+    ReleasedAgent,
+    ReleasedWorkflow,
+    released_agent,
+    released_workflow,
 )
-from raidar.subject.treatment.definition.contribution import (
-    AgentWrapper,
-    Contribution,
-    ContributionConflictError,
-    SupportFile,
-    merge_native_config,
-)
-from raidar.subject.treatment.definition.manifest import ComponentConfigError, ComponentUseContext
-from raidar.subject.treatment.definition.registry import ComponentRegistry, fingerprint
-from raidar.subject.treatment.runtime.setup_script import SETUP_SCRIPT_NAME
+from raidar.subject.workflow.definition import WorkflowDefinition
+from raidar.subject.workflow.stages import stage_code_digests
 
 
-class ComponentRejectedError(ValueError):
-    """The arm's condition cannot be compiled for its harness; the arm is rejected."""
-
-    def __init__(self, label: str, issues: list[str]) -> None:
-        self.label = label
-        self.issues = tuple(issues)
-        lines = "\n".join(f"  {issue}" for issue in self.issues)
-        super().__init__(f"{label}: rejected, {len(self.issues)} component issue(s)\n{lines}")
-
-
-@dataclass
-class _Merged:
-    overlay: dict[str, bytes] = field(default_factory=dict)
-    support_files: dict[str, SupportFile] = field(default_factory=dict)
-    native_config: dict[str, JsonValue] = field(default_factory=dict)
-    skills: list[Path] = field(default_factory=list)
-    mcp_servers: list[MCPServerConfig] = field(default_factory=list)
-    prompt_template: Path | None = None
-    agent_wrapper: AgentWrapper | None = None
-
-    def add(self, slug: str, contribution: Contribution) -> None:
-        for path, content in contribution.overlay.items():
-            if path in self.overlay or path == SETUP_SCRIPT_NAME:
-                raise ContributionConflictError(f"workspace path {path!r} is set twice")
-            self.overlay[path] = content
-        for relative, support in contribution.support_files.items():
-            self.support_files[f"{slug}/{relative}"] = support
-        self.native_config = merge_native_config(self.native_config, contribution.native_config)
-        self._add_skills(contribution.skills)
-        self._add_mcp(contribution.mcp_servers)
-        if contribution.prompt_template is not None:
-            if self.prompt_template is not None:
-                raise ContributionConflictError("more than one prompt template")
-            self.prompt_template = contribution.prompt_template
-        if contribution.agent_wrapper is not None:
-            if self.agent_wrapper is not None:
-                raise ContributionConflictError("more than one workflow wraps the agent")
-            self.agent_wrapper = contribution.agent_wrapper
-
-    def _add_skills(self, skills: tuple[Path, ...]) -> None:
-        names = {path.name for path in self.skills}
-        for path in skills:
-            if path.name in names:
-                raise ContributionConflictError(f"skill directory name {path.name!r} is used twice")
-            names.add(path.name)
-            self.skills.append(path)
-
-    def _add_mcp(self, servers: tuple[MCPServerConfig, ...]) -> None:
-        names = {server.name for server in self.mcp_servers}
-        for server in servers:
-            if server.name in names:
-                raise ContributionConflictError(f"MCP server name {server.name!r} is used twice")
-            names.add(server.name)
-            self.mcp_servers.append(server)
+def entry_issues(agent: AgentEntry, released: ReleasedAgent) -> list[tuple[str, str]]:
+    """``(field, message)`` for a model or reasoning level the agent definition does not offer."""
+    definition = released.definition
+    model = definition.models.get(agent.model)
+    if model is None:
+        offered = ", ".join(sorted(definition.models))
+        return [("model", f"{released.ref} offers models {offered}; got {agent.model!r}")]
+    if agent.reasoning is None:
+        if model.reasoning:
+            return [
+                (
+                    "reasoning",
+                    f"{agent.model} on {released.ref} needs one of {list(model.reasoning)}",
+                )
+            ]
+        return []
+    if agent.reasoning not in model.reasoning:
+        allowed = list(model.reasoning) or "none"
+        return [
+            (
+                "reasoning",
+                f"{agent.model} on {released.ref} allows reasoning {allowed}; "
+                f"got {agent.reasoning!r}",
+            )
+        ]
+    return []
 
 
-def _compile_use(
-    registry: ComponentRegistry, context: ComponentUseContext, ref: str
-) -> tuple[CompiledUse, Contribution]:
-    definition = registry.get(ref)
-    if context.harness not in definition.manifest.supports:
-        supported = ", ".join(harness.value for harness in definition.manifest.supports)
-        raise ComponentConfigError(
-            f"{ref} does not support harness {context.harness.value} (supports: {supported})"
-        )
-    contribution = definition.contribute(context)
-    compiled = CompiledUse(context.slug, ref, definition, context, fingerprint(definition))
-    return compiled, contribution
+@dataclass(frozen=True)
+class ResolvedAgent:
+    entry: AgentEntry
+    released: ReleasedAgent
+
+    @property
+    def name(self) -> AgentName:
+        """The Harbor agent the adapter drives (``codex``)."""
+        return self.released.definition.adapter
+
+    @property
+    def harness(self) -> Harness:
+        return self.released.definition.harness
+
+    @property
+    def provider(self) -> str:
+        return self.released.definition.provider
+
+    @property
+    def model(self) -> str:
+        """The model id passed to the CLI."""
+        return self.released.definition.models[self.entry.model].canonical
+
+    @property
+    def reasoning(self) -> str | None:
+        return self.entry.reasoning
+
+    @property
+    def version(self) -> str:
+        """The agent CLI pin."""
+        return self.released.definition.tool.version
 
 
-def _compile_uses(
-    condition: ConditionSpec, agent: AgentEntry, base_dir: Path, registry: ComponentRegistry
-) -> tuple[list[CompiledUse], _Merged, list[str]]:
-    """Compile every use; collect all issues so the rejection lists each one."""
-    uses: list[CompiledUse] = []
-    merged = _Merged()
-    issues: list[str] = []
-    for index, use in enumerate(condition.components):
-        name = use.use.split("@", 1)[0].replace("/", "-")
-        context = ComponentUseContext(
-            slug=f"{index:02d}-{name}",
-            harness=agent.harness,
-            base_dir=base_dir,
-            files=use.files,
-            with_=use.with_,
-        )
-        try:
-            compiled, contribution = _compile_use(registry, context, use.use)
-            merged.add(context.slug, contribution)
-        except (RegistryReferenceError, ComponentConfigError, ContributionConflictError) as exc:
-            issues.append(f"components.{index} ({use.use}): {exc}")
-            continue
-        uses.append(compiled)
-    return uses, merged, issues
+@dataclass(frozen=True)
+class ResolvedArm:
+    arm_id: str
+    agent: ResolvedAgent
+    workflow: ReleasedWorkflow
+
+    @property
+    def definition(self) -> WorkflowDefinition:
+        return self.workflow.definition
+
+    @cached_property
+    def stage_code(self) -> dict[str, str]:
+        return stage_code_digests(self.definition.enabled_stages, self.agent.name)
+
+    def identity(self) -> dict[str, object]:
+        """The arm's full identity (agent + workflow + stage code), as the lock records it."""
+        agent = self.agent
+        body: dict[str, object] = {
+            "agent": agent.entry.id,
+            "agent_release": agent.released.ref,
+            "adapter": agent.name.value,
+            "provider": agent.provider,
+            "model": agent.model,
+            "reasoning": agent.reasoning,
+            "tool": agent.released.definition.tool.model_dump(),
+            "workflow": self.workflow.ref,
+            "workflow_sha256": self.definition.digest,
+            "stage_code": self.stage_code,
+        }
+        return {**body, "digest": digest_json(body)}
 
 
-def compile_condition(
-    condition: ConditionSpec,
-    agent: AgentEntry,
-    *,
-    base_dir: Path,
-    registry: ComponentRegistry | None = None,
-) -> CompiledCondition:
-    """Compile a condition for one agent's harness; raise ``ComponentRejectedError``."""
-    label = f"condition {condition.id!r} on {agent.harness.value}"
-    if agent.harness not in HARBOR_AGENT_NAMES:
-        raise ComponentRejectedError(label, [f"no component mapping for {agent.harness.value}"])
-    uses, merged, issues = _compile_uses(
-        condition, agent, base_dir, registry or ComponentRegistry()
-    )
+class ArmResolutionError(ValueError):
+    """An arm's releases cannot be resolved, or its agent entry does not fit its release."""
+
+
+def resolve_agent(entry: AgentEntry) -> ResolvedAgent:
+    try:
+        released = released_agent(entry.release)
+    except ReleaseError as exc:
+        raise ArmResolutionError(f"agent {entry.id!r}: {exc}") from exc
+    issues = entry_issues(entry, released)
     if issues:
-        raise ComponentRejectedError(label, issues)
-    manifests = [use.definition.manifest for use in uses]
-    return CompiledCondition(
-        condition_id=condition.id,
-        harness=agent.harness,
-        uses=tuple(uses),
-        overlay=merged.overlay,
-        support_files=merged.support_files,
-        native_config=merged.native_config,
-        skills=tuple(merged.skills),
-        mcp_servers=tuple(merged.mcp_servers),
-        prompt_template=merged.prompt_template,
-        agent_wrapper=merged.agent_wrapper,
-        network_egress=tuple(sorted({h for m in manifests for h in m.network.egress_hosts})),
-        secrets=tuple(sorted({s for m in manifests for s in m.secrets})),
-    )
+        raise ArmResolutionError(f"agent {entry.id!r}: {'; '.join(m for _, m in issues)}")
+    return ResolvedAgent(entry, released)
 
 
-def compile_arm(
-    spec: ExperimentSpec,
-    arm_id: str,
-    *,
-    base_dir: Path,
-    registry: ComponentRegistry | None = None,
-) -> CompiledCondition:
-    arm = next((arm for arm in spec.arms if arm.id == arm_id), None)
-    if arm is None:
-        raise KeyError(f"unknown arm {arm_id!r}")
-    return compile_condition(
-        spec.condition(arm.condition), spec.agent(arm.agent), base_dir=base_dir, registry=registry
-    )
+def resolve_arm(spec: ExperimentSpec, arm_id: str) -> ResolvedArm:
+    """Resolve one arm of a validated spec; ``ArmResolutionError`` when a release fails."""
+    arm = spec.arm(arm_id)
+    agent = resolve_agent(spec.agent(arm.agent))
+    try:
+        workflow = released_workflow(arm.workflow)
+    except ReleaseError as exc:
+        raise ArmResolutionError(f"arm {arm_id!r}: {exc}") from exc
+    return ResolvedArm(arm_id, agent, workflow)

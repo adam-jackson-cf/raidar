@@ -1,9 +1,0 @@
-# Guided-arm lint configuration (lint-config@1): placed at the workspace root.
-line-length = 100
-target-version = "py312"
-
-[lint]
-select = ["E", "F", "W", "B", "C90", "SIM", "UP"]
-
-[lint.mccabe]
-max-complexity = 10

@@ -34,6 +34,7 @@ from raidar.design.problem.store import ProblemStore
 from raidar.design.problem.validator import ValidateOptions, validate_problem, write_report
 from raidar.engine.health.reaper import ReapReport, write_reap_report
 from raidar.engine.target.config import Target
+from raidar.engine.trial.workspace import SEED_SLUG, SHA_KEY
 from raidar.grading.leak import LeakReport
 from raidar.grading.models import CaseGroup, CaseResult, CaseStatus, InfraFailure, VerifierGrade
 from raidar.grading.records import (
@@ -194,18 +195,54 @@ def _write_reset(trial_dir: Path, step: str, ok: bool) -> None:
         (agent_dir / "raidar-reset.json").write_text(json.dumps(report))
 
 
+SEED_DIGEST = "d" * 64
+SEED_SHA = "5" * 64
+
+
+def write_seed_record(
+    trial_dir: Path,
+    step: str,
+    *,
+    install_ok: bool = True,
+    found_sha: str | None = SEED_SHA,
+    digest: str | None = SEED_DIGEST,
+) -> Path:
+    """The workspace-seed provision record a step's agent logs hold (as Harbor archives them)."""
+    log = trial_dir / "steps" / step / "agent" / "raidar-provision" / f"{SEED_SLUG}.jsonl"
+    log.parent.mkdir(parents=True, exist_ok=True)
+    record = {
+        "kind": "raidar-provision",
+        "slug": SEED_SLUG,
+        "step": step,
+        "facts": {"dependencies": [], "python": "3.12", SHA_KEY: SEED_SHA},
+        "install": {
+            "ok": install_ok,
+            "output": None if install_ok else "uv sync failed",
+            "snapshot": "/app",
+            "snapshot_digest": digest if install_ok else None,
+        },
+        "check": {"ok": install_ok, "values": {SHA_KEY: found_sha}} if install_ok else None,
+    }
+    log.write_text(json.dumps(record) + "\n")
+    return log
+
+
 def write_trial(
     trial_dir: Path,
     outcomes: Sequence[StepOutcome],
     *,
     agent_version: str = "0.156.1",
     trial_exception: str | None = None,
+    seeded: bool = False,
 ) -> Path:
     """A Harbor multi-step trial dir: result.json, verifier records, reset reports.
 
     Timeline (seconds): env setup 0-10, agent setup 10-11; each step takes 20 s
     (2 s reset gap incl. a 0.5 s pre-agent scan, 10 s agent, 3 s collection,
     5 s verifier); teardown 3 s.
+
+    ``seeded`` also writes each step's workspace-seed provision record (checkpoint 1's parent
+    snapshot is then ``SEED_DIGEST``).
     """
     trial_dir.mkdir(parents=True, exist_ok=True)
     step_results = []
@@ -213,6 +250,8 @@ def write_trial(
     for outcome in outcomes:
         a_start, a_end = clock + 2, clock + 12
         v_start, v_end = a_end + 3, a_end + 8
+        if seeded:
+            write_seed_record(trial_dir, outcome.name)
         item: dict[str, Any] = {
             "step_name": outcome.name,
             "agent_result": {

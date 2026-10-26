@@ -3,7 +3,7 @@
 There is one ``gate:<checkpoint>`` per checkpoint the trial attempted, passed
 exactly when the verifier's strict all-cases verdict solved it, plus the
 validity gates: ``gate:infra`` (every execution-validity check except the
-component probes) and ``gate:component-probes``. A checkpoint without a
+lab checks) and ``gate:lab-checks``. A checkpoint without a
 verdict because infrastructure broke keeps its failed gate span, and the
 finding explaining it comes from the infra gate.
 """
@@ -25,9 +25,9 @@ from raidar.evaluation.review.projection.spans import SpanBuilder
 from raidar.grading.models import CaseStatus
 from raidar.grading.records import StepRecord, load_step_record
 
-PROBE_CHECK = "component_probes"
+LAB_CHECK = "lab_checks"
 INFRA_GATE = "infra"
-PROBE_GATE = "component-probes"
+LAB_GATE = "lab-checks"
 _FAILING_CASE_LIMIT = 50
 
 
@@ -123,8 +123,8 @@ def _validity_finding(gate: str, failed: Sequence[ValidityCheck]) -> Finding:
     )
 
 
-def _validity_gate(ctx: GateContext, parent: str, gate: str, probes: bool) -> Finding | None:
-    checks = [c for c in ctx.record.validity.checks if (c.name == PROBE_CHECK) is probes]
+def _validity_gate(ctx: GateContext, parent: str, gate: str, lab: bool) -> Finding | None:
+    checks = [c for c in ctx.record.validity.checks if (c.name == LAB_CHECK) is lab]
     if not checks:
         return None
     failed = [check for check in checks if not check.passed]
@@ -171,8 +171,8 @@ def project_gates(ctx: GateContext) -> list[Finding]:
     )
     findings: Sequence[Finding | None] = [
         *(_checkpoint_gate(ctx, parent, step_result) for step_result in step_results),
-        _validity_gate(ctx, parent, INFRA_GATE, probes=False),
-        _validity_gate(ctx, parent, PROBE_GATE, probes=True),
+        _validity_gate(ctx, parent, INFRA_GATE, lab=False),
+        _validity_gate(ctx, parent, LAB_GATE, lab=True),
         _clean(ctx.record),
     ]
     return [finding for finding in findings if finding is not None]

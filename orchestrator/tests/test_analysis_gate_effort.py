@@ -1,5 +1,5 @@
 """Gate effort in analysis: per-arm descriptives, paired gate effects, ranking and the
-pre-registered ``gate_clean_at_step_end`` manipulation check.
+default ``gate_clean_at_step_end`` manipulation check.
 
 A baseline without the commit gate measures no gate effort (every value
 ``not_applicable``), so gate effects are paired only when both arms ran a gate;
@@ -9,21 +9,12 @@ otherwise the arms are described one by one and the comparison says why.
 from __future__ import annotations
 
 import dataclasses
-from pathlib import Path
 
 import pytest
 
-from raidar.design.experiment.loader import load_experiment
-from raidar.design.experiment.validation import SpecValidationError
 from raidar.evaluation.analysis.assessed import GATE_EFFORT_REF, gate_metrics
 from raidar.evaluation.analysis.effects import Settings
-from raidar.evaluation.analysis.load import manipulation_requests
-from raidar.evaluation.analysis.manipulation import (
-    CheckRequest,
-    Separation,
-    check_report,
-    step_share,
-)
+from raidar.evaluation.analysis.manipulation import Separation, check_report
 from raidar.evaluation.analysis.markdown import render_markdown
 from raidar.evaluation.analysis.outcomes import TrialOutcome, Value
 from raidar.evaluation.analysis.report import AnalysisReport, analyse
@@ -36,7 +27,6 @@ from raidar.scoring.framework.result import (
     Observation,
 )
 from tests.analysis_support import BASELINE, GUIDED, inputs, trial
-from tests.experiment_spec_support import experiment_document, write_experiment
 
 SETTINGS = Settings(min_pairs=5, max_exclusion_fraction=0.2, bootstrap_samples=2000, seed=7)
 NO_GATE = Value.missing("not_applicable", "no guardrail-gate record")
@@ -168,114 +158,56 @@ def test_gate_metrics_read_the_trajectory_observations() -> None:
     assert GATE_EFFORT_REF == "gate-effort@11"
 
 
-# ---- the pre-registered manipulation check ------------------------------------------------
+# ---- the default manipulation check -------------------------------------------------------
 
 
-def _report(
-    guided: list[AssessResult], baseline: list[AssessResult], min_share: float | None = 0.8
-) -> Separation:
+def _report(guided: list[AssessResult], baseline: list[AssessResult]) -> Separation:
     report = check_report(
         {GATE_CLEAN: {GUIDED: guided, BASELINE: baseline}},
-        [CheckRequest(check=GATE_CLEAN, min_share=min_share)],
+        [GATE_CLEAN],
         guided=GUIDED,
         baseline=BASELINE,
-        preregistered=True,
     )
-    assert report.preregistered
     return report.checks[0].verdict
 
 
-def test_the_gate_check_against_an_ungated_baseline_is_a_pre_registered_threshold() -> None:
+def test_the_gate_check_against_an_ungated_baseline_has_no_data_to_separate() -> None:
     ungated = [_signal([None, None]) for _ in range(5)]
-    clean = [_signal([1.0, 1.0]) for _ in range(4)] + [_signal([1.0, 0.0])]
+    clean = [_signal([1.0, 1.0]) for _ in range(5)]
 
-    report = check_report(
+    (check,) = check_report(
         {GATE_CLEAN: {GUIDED: clean, BASELINE: ungated}},
-        [CheckRequest(check=GATE_CLEAN, min_share=0.8)],
+        [GATE_CLEAN],
         guided=GUIDED,
         baseline=BASELINE,
-    )
+    ).checks
 
-    (check,) = report.checks
-    assert (check.basis, check.verdict) == ("threshold", Separation.SEPARATED)
-    assert check.guided_steps is not None
-    assert (check.guided_steps.passed, check.guided_steps.decided) == (9, 10)
-    assert "the condition is absent there" in check.reason
-    low = [_signal([0.0, 1.0]) for _ in range(5)]
-    assert _report(low, ungated) is Separation.NOT_SEPARATED
+    assert check.verdict is Separation.INSUFFICIENT_DATA
+    assert (check.guided.trials, check.baseline.trials) == (5, 0)
     assert _report([], ungated) is Separation.INSUFFICIENT_DATA
-    assert step_share([], GATE_CLEAN).share is None
 
 
-def test_two_gated_arms_need_the_threshold_and_separation() -> None:
+def test_two_gated_arms_need_separation() -> None:
     guided = [_signal([1.0, 1.0]) for _ in range(5)]
     baseline = [_signal([0.0, 0.0]) for _ in range(5)]
     assert _report(guided, baseline) is Separation.SEPARATED
     assert _report(guided, guided) is Separation.NOT_SEPARATED
     assert _report(baseline, guided) is Separation.NOT_SEPARATED
-    assert _report(guided, baseline, min_share=None) is Separation.SEPARATED
 
 
-def test_the_report_runs_the_locks_checks_from_their_own_scorer() -> None:
-    outcomes = _outcomes(baseline_gated=False)
+def test_the_report_runs_the_gate_check_from_the_gate_effort_scorer() -> None:
+    outcomes = _outcomes(baseline_gated=True)
     gate = {
-        outcome.trial_id: _signal([1.0, 1.0] if outcome.arm == GUIDED else [None, None])
+        outcome.trial_id: _signal([1.0, 1.0] if outcome.arm == GUIDED else [0.0, 0.0])
         for outcome in outcomes
     }
-    report = analyse(
-        dataclasses.replace(
-            inputs(outcomes, 5),
-            gate_results=gate,
-            manipulation_checks=(CheckRequest(check=GATE_CLEAN, min_share=0.8),),
-        ),
-        SETTINGS,
-    )
+    report = analyse(dataclasses.replace(inputs(outcomes, 5), gate_results=gate), SETTINGS)
 
     manipulation = report.comparisons[0].manipulation
     assert manipulation is not None
-    assert manipulation.preregistered
+    assert [check.check for check in manipulation.checks] == [GATE_CLEAN]
     assert manipulation.verdict is Separation.SEPARATED
-    assert "pre-registered by the lock" in render_markdown(report)
-    assert "threshold (min share 0.8)" in render_markdown(report)
-
-
-def test_lock_manipulation_checks_are_read_and_validated(tmp_path: Path) -> None:
-    assert manipulation_requests({}) is None
-    (request,) = (
-        manipulation_requests({"manipulation_checks": [{"check": GATE_CLEAN, "min_share": 0.8}]})
-        or ()
-    )
-    assert (request.check, request.min_share) == (GATE_CLEAN, 0.8)
-
-    document = experiment_document()
-    document["analysis"]["manipulation_checks"] = [{"check": GATE_CLEAN, "min_share": 0.8}]
-    with pytest.raises(SpecValidationError) as caught:
-        load_experiment(write_experiment(tmp_path / "undeclared", document))
-    issues = {issue.loc: issue.message for issue in caught.value.issues}
-    assert "declare it in assessment.scorers" in issues["analysis.manipulation_checks.0.check"]
-
-    document["analysis"]["manipulation_checks"] = [{"check": "vibes"}]
-    with pytest.raises(SpecValidationError) as caught:
-        load_experiment(write_experiment(tmp_path / "unknown", document))
-    assert "unknown check 'vibes'" in caught.value.issues[0].message
-
-    document["assessment"]["scorers"] = ["correctness@2", "gate-effort@11"]
-    document["analysis"]["manipulation_checks"] = [{"check": GATE_CLEAN, "min_share": 0.8}]
-    document["analysis"]["min_effects"] = {FIRST_PASS: 0.2}
-    spec = load_experiment(write_experiment(tmp_path / "ok", document)).spec
-    assert spec.to_json()["analysis"]["manipulation_checks"] == [
-        {"check": GATE_CLEAN, "min_share": 0.8}
-    ]
-    assert (
-        "manipulation_checks"
-        not in load_experiment(
-            write_experiment(tmp_path / "plain", experiment_document())
-        ).spec.to_json()["analysis"]
-    )
-
-    document["analysis"]["manipulation_checks"] = [{"check": GATE_CLEAN}, {"check": GATE_CLEAN}]
-    with pytest.raises(SpecValidationError, match="repeats"):
-        load_experiment(write_experiment(tmp_path / "twice", document))
+    assert GATE_CLEAN in render_markdown(report)
 
 
 # ---- the process outcomes ---------------------------------------------

@@ -19,7 +19,6 @@ from raidar.subject.agent.config import Harness
 from raidar.subject.agent.harness import harness_definition
 
 if TYPE_CHECKING:
-    from raidar.design.experiment.schema import ExperimentSpec
     from raidar.engine.trial.plan import ExperimentPlan
 
 # Harbor's claude-code agent authenticates with an API key (ANTHROPIC_API_KEY, or
@@ -90,19 +89,23 @@ def harness_credential_issue(harness: Harness, env: Mapping[str, str]) -> str | 
 
 
 def credential_issues(
-    spec: ExperimentSpec, arm_ids: list[str], env: Mapping[str, str]
+    plan: ExperimentPlan, arm_ids: list[str], env: Mapping[str, str]
 ) -> list[CredentialIssue]:
     """One issue per agent (by its ``agents.<i>`` field) that a selected arm cannot run."""
+    spec = plan.loaded.spec
     issues: list[CredentialIssue] = []
     seen: set[str] = set()
-    for arm in spec.arms:
-        if arm.id not in arm_ids or arm.agent in seen:
+    for arm_id in arm_ids:
+        agent = plan.arms[arm_id].arm.agent
+        if agent.entry.id in seen:
             continue
-        seen.add(arm.agent)
-        index, agent = next((i, a) for i, a in enumerate(spec.agents) if a.id == arm.agent)
+        seen.add(agent.entry.id)
+        index = next(i for i, entry in enumerate(spec.agents) if entry.id == agent.entry.id)
         problem = harness_credential_issue(agent.harness, env)
         if problem is not None:
-            field = f"agents.{index}.name ({agent.id!r}, {agent.name.value}, arm {arm.id!r})"
+            field = (
+                f"agents.{index}.release ({agent.entry.id!r}, {agent.released.ref}, arm {arm_id!r})"
+            )
             issues.append(CredentialIssue(field, problem))
     return issues
 
@@ -115,7 +118,7 @@ def preflight_credentials(plan: ExperimentPlan, env: Mapping[str, str] | None = 
     if plan.options.agent_override is not None:
         return
     arm_ids = sorted({trial.arm for trial in plan.selected_trials()})
-    issues = credential_issues(plan.loaded.spec, arm_ids, os.environ if env is None else env)
+    issues = credential_issues(plan, arm_ids, os.environ if env is None else env)
     if issues:
         lines = "\n".join(f"  {issue.render()}" for issue in issues)
         raise CredentialPreflightError(

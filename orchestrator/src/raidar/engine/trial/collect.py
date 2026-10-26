@@ -12,16 +12,16 @@ Per planned checkpoint the state is decided from host-only evidence:
   record (the verifier failed closed, e.g. no pre-agent leak check because the
   guard could not scan), a verifier infrastructure failure, a verifier leak, a
   step exception that is not the agent's own failure (setup.sh, healthcheck,
-  API/auth/network errors, the leak guard raising at agent start), or a failed
-  component discovery probe (F5, including the per-step reset probe), or an
-  agent-end reap that failed or left an agent process alive (F3).
+  API/auth/network errors, the leak guard raising at agent start), a failed lab
+  check (the per-step context reset; every lab provision, such as the workspace
+  seed, and at checkpoint 1 the seeded project's presence: F3, F5), or an agent-end
+  reap that failed or left an agent process alive (F3).
 - **solved** / **failed**: otherwise, from the verifier's strict all-cases verdict
   in ``raidar-oracle/steps/<step>/record.json``. Harbor's aggregated trial
   reward is never read.
 
-Component integrity flags (``raidar.subject.treatment.definition.integrity``: agent tampering
-with a component's guardrails) are kept in the step's probe summary and never
-change its state or the trial's validity.
+Checkpoint 1's parent snapshot is the seeded workspace (``raidar.engine.trial.workspace``),
+so "the agent changed ``/app``" is measured against what the lab put there.
 
 The trial's execution-validity gate fails when any step is an infra
 error, the trial raised, a halt run did not execute exactly what its gate
@@ -53,11 +53,12 @@ from raidar.contract.trial import (
 from raidar.engine.health.liveness import idle_killed_steps
 from raidar.engine.health.model import VIOLATION, HealthReport
 from raidar.engine.health.reaper import load_reap_report, reap_infra_reason
+from raidar.engine.trial.lab_checks import lab_checks, seed_parent
 from raidar.engine.trial.progression import derive_reached, gate_passes
 from raidar.grading.records import RECORD_FILE, StepRecord, load_step_record, step_record_dir
 from raidar.grading.verifier import LEAK_REWARD_KEY
-from raidar.subject.treatment import CompiledCondition
-from raidar.subject.treatment.definition.integrity import condition_step_flags
+
+LAB_CHECK = "lab_check"
 
 TRIAL_LOG = "trial.log"
 # Step exceptions that are the agent's own outcome: the step is still graded.
@@ -93,7 +94,7 @@ class TrialContext:
     trial: PlannedTrial
     planned_steps: tuple[tuple[str, str], ...]  # (step, checkpoint) for every checkpoint
     task_dir: Path
-    compiled: CompiledCondition
+    provisions: tuple[str, ...]  # slugs of the lab provisions every step must record
     pinned_harness_version: str | None  # None for a no-LLM agent override
     rule: ProgressionRule
 
@@ -122,7 +123,7 @@ def _infra_reasons(
     # like AgentTimeoutError: the agent's own outcome, so the step is graded on what exists.
     if exception is not None and exception not in AGENT_FAILURE_EXCEPTIONS and not idle_killed:
         reasons.append(f"step_exception:{exception}")
-    reasons.extend(f"component_probe:{failure}" for failure in probes.failures)
+    reasons.extend(f"{LAB_CHECK}:{failure}" for failure in probes.failures)
     return reasons
 
 
@@ -138,14 +139,15 @@ def _instruction_sha(task_dir: Path, step: str) -> str | None:
     return hashlib.sha256(path.read_bytes()).hexdigest() if path.is_file() else None
 
 
-def _probe(ctx: TrialContext, trial_dir: Path, step: str, index: int) -> ProbeSummary:
+def _lab_checks(ctx: TrialContext, trial_dir: Path, step: str, index: int) -> ProbeSummary:
     agent_dir = trial_dir / "steps" / step / "agent"
-    report = ctx.compiled.probe_step(agent_dir, index)
-    failures = tuple(
-        f"{r.component}{'/' + r.slug if r.slug else ''}: {r.detail}" for r in report.failures()
-    )
-    flags = condition_step_flags(ctx.compiled, agent_dir, index)
-    return ProbeSummary(passed=report.passed, failures=failures, flags=flags)
+    return lab_checks(agent_dir, ctx.provisions, first_step=index == 0)
+
+
+def _seed_parent(trial_dir: Path, ctx: TrialContext) -> str | None:
+    if not ctx.planned_steps:
+        return None
+    return seed_parent(trial_dir / "steps" / ctx.planned_steps[0][0] / "agent", ctx.provisions)
 
 
 def _not_run(
@@ -192,7 +194,7 @@ def _step_result(
         return _not_run(ctx, base, halted, trial_error)
     record = _load_record(trial_dir, step)
     exception = _exception_type(item)
-    probes = _probe(ctx, trial_dir, step, index)
+    probes = _lab_checks(ctx, trial_dir, step, index)
     reap = reap_infra_reason(load_reap_report(step_record_dir(trial_dir, step)))
     reasons = _infra_reasons(record, exception, probes, reap, step in idle_killed_steps(trial_dir))
     if reasons:
@@ -234,7 +236,7 @@ def classify_trial(trial_dir: Path, ctx: TrialContext) -> tuple[StepResult, ...]
     items = step_results(result)
     trial_error = _exception_type(result) if result is not None else "no_result"
     results: list[StepResult] = []
-    parent: str | None = None
+    parent: str | None = _seed_parent(trial_dir, ctx)
     halted = False
     for index, (step, _) in enumerate(ctx.planned_steps):
         step_result = _step_result(
@@ -349,7 +351,7 @@ def execution_validity(
         _reason_check("verifier_infra", step_results, "verifier_infra"),
         _reason_check("no_verifier_leak", step_results, "verifier_leak"),
         _reason_check("agent_infra", step_results, "step_exception"),
-        _reason_check("component_probes", step_results, "component_probe"),
+        _reason_check("lab_checks", step_results, LAB_CHECK),
         _halt_check(step_results, rule, runnable),
         _harness_check(result, pinned, trial_dir),
     ]

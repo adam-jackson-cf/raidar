@@ -38,18 +38,18 @@ layers =
     raidar.scoring.framework
 
 [importlinter:contract:subject-tiers]
-name = Subject: treatment > agent
+name = Subject: workflow > agent
 type = layers
 layers =
-    raidar.subject.treatment
+    raidar.subject.workflow
     raidar.subject.agent
 
-[importlinter:contract:subject-environment-independent-of-treatment]
-name = Runtime packs (environment) and treatments are independent
+[importlinter:contract:subject-environment-independent-of-workflow]
+name = Runtime packs (environment) and workflows are independent
 type = independence
 modules =
     raidar.subject.environment
-    raidar.subject.treatment
+    raidar.subject.workflow
 
 [importlinter:contract:subject-environment-independent-of-agent]
 name = Runtime packs (environment) and agents are independent
@@ -104,13 +104,13 @@ forbidden_modules =
     raidar.subject
 
 [importlinter:contract:scoring-boundary]
-name = Scoring stays independent of agents and treatments
+name = Scoring stays independent of agents and workflows
 type = forbidden
 source_modules =
     raidar.scoring
 forbidden_modules =
     raidar.subject.agent
-    raidar.subject.treatment
+    raidar.subject.workflow
 
 [importlinter:contract:deterministic-process-checks]
 name = process-compliance decides only deterministically: no Jev import, direct or indirect

@@ -42,10 +42,10 @@
       },
       "scorer": {
         "correctness@2": {
-          "digest": "8a251d29959d7898e84e9f99fae451782811ca0162c6fdf80a2f0f8d6de5145e",
+          "digest": "f558c7137297fa8212fe60b3457923ba04e2ffd8eafde57dfc662d5f8e3e4580",
           "metadata": {
             "implementation": "raidar.scoring.correctness:correctness_scorer",
-            "implementation_digest": "89ead5fa5b3a6a04bea23919aeec0794583d2b2060b4b4f4e46a382b238fd00e",
+            "implementation_digest": "faa3ef469503e3bb71f0f348410aec8aa9f54974755d8665d352778164427f0d",
             "manifest": {
               "description": "Oracle verdicts per checkpoint and trajectory, from the oracle step records.",
               "evidence_required": [
@@ -223,68 +223,50 @@
     },
     "tools": {}
   },
-  "document_sha256": "f42ceac101bd550345b9603b867687ea42e35626c0425216479a761e53aca6eb",
+  "document_sha256": "c76cfa1cb7a2401b5a4b30947ec158dceb5db7c72dfc8837248b97f35861b381",
   "execution": {
     "arms": {
-      "claude": {
-        "agent": "claude",
-        "condition": "baseline",
-        "digest": "c2969e051f9c45f57bbc7a076590da24a4cba7c8a8334b06ab4476708d960e3f"
-      },
       "codex": {
+        "adapter": "codex",
         "agent": "codex",
-        "condition": "baseline",
-        "digest": "31b80df56f756fd04ca0c4786f76a98b8217511c8962fef518c44d1a6bf95b1b"
+        "agent_release": "codex@1",
+        "digest": "d922b935bd014b3b47ea1744232a33577afa863426c534c43a1f065e4720b02c",
+        "model": "gpt-6-luna",
+        "provider": "openai",
+        "reasoning": "low",
+        "stage_code": {
+          "build": "3511c97e9ab7638173a218afd0802c51c04161a6d4ca25754468d9df8497a489"
+        },
+        "tool": {
+          "binary": "codex",
+          "package": "@openai/codex",
+          "version": "0.156.1"
+        },
+        "workflow": "one-shot@1",
+        "workflow_sha256": "7041679bb89e24a756cbcdd84ebf8260f960baf44c77ec48bdb26d43a86a1113"
       }
-    },
-    "conditions": {
-      "baseline": []
     },
     "design": {
       "agents": [
         {
           "id": "codex",
           "model": "gpt-6-luna",
-          "name": "codex",
-          "provider": "openai",
-          "reasoning_effort": "low",
-          "version": "0.156.1"
-        },
-        {
-          "id": "claude",
-          "model": "claude-haiku-4-5",
-          "name": "claude-code",
-          "provider": "anthropic",
-          "reasoning_effort": null,
-          "version": "2.1.285"
+          "reasoning": "low",
+          "release": "codex@1"
         }
       ],
       "arms": [
         {
           "agent": "codex",
-          "condition": "baseline",
-          "id": "codex"
-        },
-        {
-          "agent": "claude",
-          "condition": "baseline",
-          "id": "claude"
+          "id": "codex",
+          "workflow": "one-shot@1"
         }
       ],
       "attempts": 1,
-      "conditions": [
-        {
-          "components": [],
-          "id": "baseline"
-        }
-      ],
       "environment": {
         "compose_init": true,
         "type": "docker"
       },
-      "factors": [
-        "agent"
-      ],
       "id": "python__circuit_eval-cp1__agents",
       "kind": "benchmark",
       "problems": [
@@ -312,7 +294,15 @@
       }
     ],
     "references": {
-      "component": {},
+      "agent": {
+        "codex@1": {
+          "digest": "a2770e3282bcc6e3d1b16dd6d3a4f81e8fccc9a0dd0447a4dd288ce23a00fd43",
+          "metadata": {
+            "adapter": "codex",
+            "tool_version": "0.156.1"
+          }
+        }
+      },
       "problem": {
         "scb/circuit_eval.checkpoint_1@38d627ecf668": {
           "digest": "e2859eb9dd3804a99afb92aff8ac348b760c0b3aa05f7feb2384f95a8e582402",
@@ -338,17 +328,23 @@
             }
           }
         }
+      },
+      "workflow": {
+        "one-shot@1": {
+          "digest": "7041679bb89e24a756cbcdd84ebf8260f960baf44c77ec48bdb26d43a86a1113",
+          "metadata": {
+            "stages": [
+              "build"
+            ]
+          }
+        }
       }
     },
     "tools": {},
     "versions": {
       "agents": {
-        "claude": {
-          "name": "claude-code",
-          "version": "2.1.285"
-        },
         "codex": {
-          "name": "codex",
+          "release": "codex@1",
           "version": "0.156.1"
         }
       },
@@ -358,38 +354,28 @@
   "experiment": {
     "id": "python__circuit_eval-cp1__agents",
     "source": "experiment.yaml",
-    "source_sha256": "1489eb657544dd4720961ad7535ddf7951fcc51e954191d58bc0354e686068ac",
-    "spec_sha256": "82c37327106a30b3a0e4a956bcda6a131a9bd18752795d12a20aca5892d6ce6b"
+    "source_sha256": "c12dc5d8e0e34095b10a04afb6ce4e036b7748853a536c0588e7427775689bc3",
+    "spec_sha256": "a7ffd2b9d751699fd62e67bc5b30174a76fe8a9bb5c589da47b6baed33572fee"
   },
-  "lock_sha256": "1fef5da2c46a18f32154b93ee5abf47f1831cf55a73aeff181342b9e04028583",
-  "lock_version": 3,
+  "lock_sha256": "4adf9bd74e1dcbcdcfc06c213b34a447813c556218defef12a707bf9f88a955f",
+  "lock_version": 4,
   "overrides": {
     "flags": {},
     "set": []
   },
   "sections": {
     "analysis": "0a0fb32297e0c3abaad1f91cb80990bf42b3a3f0854246915ae017492003d1bc",
-    "assessment": "4f77c71780fadb0b9b8c3ccaa43d9d9dce8156c578ceba254d40bafd730b8476",
-    "execution": "1fef5da2c46a18f32154b93ee5abf47f1831cf55a73aeff181342b9e04028583",
-    "toolchain": "7963edf30de293f2236db8488cdc06ba5d43c4449ab31a18359e00676e5e94d6"
+    "assessment": "49e7ae0cb6c8d4e4557508bfa4c9f6fdec20b4f7c2fc59f034990645e27fb877",
+    "execution": "4adf9bd74e1dcbcdcfc06c213b34a447813c556218defef12a707bf9f88a955f",
+    "toolchain": "66336e711ddcd2704230426fecc45ea4c9435dae931dc2179e94d2c82697479f"
   },
   "spec": {
     "agents": [
       {
         "id": "codex",
         "model": "gpt-6-luna",
-        "name": "codex",
-        "provider": "openai",
-        "reasoning_effort": "low",
-        "version": "0.156.1"
-      },
-      {
-        "id": "claude",
-        "model": "claude-haiku-4-5",
-        "name": "claude-code",
-        "provider": "anthropic",
-        "reasoning_effort": null,
-        "version": "2.1.285"
+        "reasoning": "low",
+        "release": "codex@1"
       }
     ],
     "analysis": {
@@ -405,13 +391,8 @@
     "arms": [
       {
         "agent": "codex",
-        "condition": "baseline",
-        "id": "codex"
-      },
-      {
-        "agent": "claude",
-        "condition": "baseline",
-        "id": "claude"
+        "id": "codex",
+        "workflow": "one-shot@1"
       }
     ],
     "assessment": {
@@ -425,20 +406,11 @@
         "correctness@2"
       ]
     },
-    "conditions": [
-      {
-        "components": [],
-        "id": "baseline"
-      }
-    ],
-    "description": "Every pack agent on the smoke problem; a smoke-sized benchmark.",
+    "description": "Every released agent on the smoke problem; a smoke-sized benchmark.",
     "environment": {
       "compose_init": true,
       "type": "docker"
     },
-    "factors": [
-      "agent"
-    ],
     "id": "python__circuit_eval-cp1__agents",
     "kind": "benchmark",
     "problems": [
@@ -455,12 +427,12 @@
       "verifier_timeout_sec": 900
     },
     "runtime": "python",
-    "schema_version": 2
+    "schema_version": 3
   },
   "toolchain": {
     "litellm": "1.102.1",
     "python": "3.13.7",
     "raidar": "0.15.0",
-    "raidar_spec": "ce2f0b13ac1faa348f4f09650d8488db7cfba6d509f6a9bcafb85600f856ce48"
+    "raidar_spec": "be6266c5823943d46700fb0afb38129c2f8c5f511c44909dbcfc1908f6b14419"
   }
 }

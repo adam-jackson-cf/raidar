@@ -1,7 +1,8 @@
 """Repository layout: tracked ``lab/`` definitions and the generated ``var/`` root.
 
 ``lab/`` holds the run-time data the code loads, each tree at one explicit path below: the
-experiments, the problem pins, the ledger, the component payloads (``lab/treatments/``), the
+experiments, the problem pins, the ledger, the agent definitions (``lab/agents/``), the workflow
+definitions (``lab/workflows/``) with their release register (``lab/releases.yaml``), the
 runtime-pack recipes (``lab/environments/``) and the judge policies (``lab/judge/``).
 
 ``var/`` holds everything Raidar generates (jobs, Assessment stores, analysis output,
@@ -39,9 +40,19 @@ def lab_root(repo_root: Path = REPO_ROOT) -> Path:
     return repo_root / LAB_DIR
 
 
-def treatments_root(repo_root: Path = REPO_ROOT) -> Path:
-    """Run-time data of the treatment components: ``lab/treatments/<component>/``."""
-    return lab_root(repo_root) / "treatments"
+def agents_root(repo_root: Path = REPO_ROOT) -> Path:
+    """Agent definitions: ``lab/agents/<name>.yaml``."""
+    return lab_root(repo_root) / "agents"
+
+
+def workflows_root(repo_root: Path = REPO_ROOT) -> Path:
+    """Workflow definitions: ``lab/workflows/<name>/workflow.yaml``."""
+    return lab_root(repo_root) / "workflows"
+
+
+def releases_file(repo_root: Path = REPO_ROOT) -> Path:
+    """The release register of agents and workflows (``name@N`` -> content hash)."""
+    return lab_root(repo_root) / "releases.yaml"
 
 
 def problems_root(repo_root: Path = REPO_ROOT) -> Path:

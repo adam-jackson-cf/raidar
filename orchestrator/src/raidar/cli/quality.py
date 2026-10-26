@@ -21,7 +21,6 @@ TYPECHECK_TARGETS = [
     "src/raidar",
     "tests/test_codex_cli_adapter.py",
     "tests/test_claude_code_cli_adapter.py",
-    "tests/test_gemini_cli_adapter.py",
 ]
 COVERAGE_FAIL_UNDER = "95"
 

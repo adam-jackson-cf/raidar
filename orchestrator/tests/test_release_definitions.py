@@ -1,0 +1,138 @@
+"""Agent and workflow definitions: what the loaders refuse and how a build prompt renders."""
+
+from __future__ import annotations
+
+from pathlib import Path
+from typing import Any
+
+import pytest
+
+from raidar.contract.paths import agents_root, workflows_root
+from raidar.subject.agent.definition import AgentDefinitionError, load_agent
+from raidar.subject.workflow.definition import (
+    TASK_TOKEN,
+    BuildStage,
+    WorkflowDefinitionError,
+    load_workflow,
+)
+from tests.release_support import edit_agent, release_tree, write_workflow
+
+
+@pytest.fixture
+def tree(tmp_path: Path) -> Path:
+    return release_tree(tmp_path)
+
+
+def _workflow(stages: dict[str, Any], *, name: str = "one-shot") -> dict[str, Any]:
+    return {"schema": 1, "name": name, "stages": stages}
+
+
+def _build(prompt: str) -> dict[str, Any]:
+    return {"build": {"prompt": prompt}}
+
+
+def test_the_real_definitions_load(tree: Path) -> None:
+    assert load_agent(agents_root(tree), "codex").name == "codex"
+    assert load_workflow(workflows_root(tree), "one-shot").enabled_stages == ("build",)
+
+
+# ---- workflows -----------------------------------------------------------------------
+
+
+def test_a_workflow_with_an_unknown_stage_is_refused(tree: Path) -> None:
+    write_workflow(tree, _workflow({**_build(f"do {TASK_TOKEN}"), "polish": {"prompt": "x"}}))
+
+    with pytest.raises(WorkflowDefinitionError, match="unknown stage type 'polish'"):
+        load_workflow(workflows_root(tree), "one-shot")
+
+
+@pytest.mark.parametrize("stage", ["define", "verify"])
+def test_declared_but_unimplemented_stages_are_refused(tree: Path, stage: str) -> None:
+    write_workflow(tree, _workflow({**_build(f"do {TASK_TOKEN}"), stage: {"prompt": "x"}}))
+
+    with pytest.raises(WorkflowDefinitionError, match="not implemented"):
+        load_workflow(workflows_root(tree), "one-shot")
+
+
+@pytest.mark.parametrize(
+    "prompt", ["no task here", f"{TASK_TOKEN} twice {TASK_TOKEN}"], ids=["zero", "two"]
+)
+def test_a_build_prompt_needs_the_task_token_exactly_once(tree: Path, prompt: str) -> None:
+    write_workflow(tree, _workflow(_build(prompt)))
+
+    with pytest.raises(WorkflowDefinitionError, match="exactly once"):
+        load_workflow(workflows_root(tree), "one-shot")
+
+
+def test_a_workflow_without_a_build_stage_is_refused(tree: Path) -> None:
+    write_workflow(tree, _workflow({}))
+
+    with pytest.raises(WorkflowDefinitionError):
+        load_workflow(workflows_root(tree), "one-shot")
+
+
+def test_a_workflow_directory_may_hold_only_its_definition(tree: Path) -> None:
+    write_workflow(tree, _workflow(_build(f"do {TASK_TOKEN}")))
+    (workflows_root(tree) / "one-shot" / "notes.md").write_text("extra\n", encoding="utf-8")
+
+    with pytest.raises(WorkflowDefinitionError, match=r"notes\.md"):
+        load_workflow(workflows_root(tree), "one-shot")
+
+
+def test_a_workflow_must_be_named_for_its_directory(tree: Path) -> None:
+    write_workflow(tree, _workflow(_build(f"do {TASK_TOKEN}"), name="other"))
+
+    with pytest.raises(WorkflowDefinitionError, match="must equal its directory"):
+        load_workflow(workflows_root(tree), "one-shot")
+
+
+def test_the_build_stage_substitutes_the_task() -> None:
+    stage = BuildStage(prompt=f"Work the issue.\n\n{TASK_TOKEN}\n\nThanks")
+
+    assert stage.render("fix the parser") == "Work the issue.\n\nfix the parser\n\nThanks"
+
+
+# ---- agents --------------------------------------------------------------------------
+
+
+def test_an_agent_model_the_adapter_does_not_offer_is_refused(tree: Path) -> None:
+    edit_agent(tree, lambda doc: doc["models"]["gpt-6-luna"].update(canonical="gpt-nonexistent"))
+
+    with pytest.raises(AgentDefinitionError, match="gpt-nonexistent"):
+        load_agent(agents_root(tree), "codex")
+
+
+def test_an_agent_reasoning_level_the_adapter_does_not_offer_is_refused(tree: Path) -> None:
+    edit_agent(tree, lambda doc: doc["models"]["gpt-6-luna"].update(reasoning=["low", "ultra"]))
+
+    with pytest.raises(AgentDefinitionError, match="ultra"):
+        load_agent(agents_root(tree), "codex")
+
+
+@pytest.mark.parametrize("flag", ["isolated_home", "ignore_user_config"])
+def test_isolation_settings_cannot_be_switched_off(tree: Path, flag: str) -> None:
+    edit_agent(tree, lambda doc: doc["settings"].update({flag: False}))
+
+    with pytest.raises(AgentDefinitionError, match=flag):
+        load_agent(agents_root(tree), "codex")
+
+
+def test_an_unknown_adapter_is_refused(tree: Path) -> None:
+    edit_agent(tree, lambda doc: doc.update(adapter="ghost-cli"))
+
+    with pytest.raises(AgentDefinitionError, match="adapter"):
+        load_agent(agents_root(tree), "codex")
+
+
+def test_an_agent_must_be_named_for_its_file(tree: Path) -> None:
+    edit_agent(tree, lambda doc: doc.update(name="other"))
+
+    with pytest.raises(AgentDefinitionError, match="must equal the file name"):
+        load_agent(agents_root(tree), "codex")
+
+
+def test_an_agent_tool_version_must_be_pinned(tree: Path) -> None:
+    edit_agent(tree, lambda doc: doc["tool"].update(version="latest"))
+
+    with pytest.raises(AgentDefinitionError, match="version"):
+        load_agent(agents_root(tree), "codex")

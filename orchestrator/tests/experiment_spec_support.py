@@ -15,8 +15,10 @@ from raidar.contract.references import (
     RefKind,
     RegistryRef,
     RegistryReferenceError,
+    RegistryResolver,
     ResolvedReference,
 )
+from raidar.subject.releases import AgentResolver, WorkflowResolver
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 EXPERIMENTS = REPO_ROOT / "lab" / "experiments"
@@ -29,32 +31,15 @@ AGENTS_BENCHMARK = (
 MECHANICS_SMOKE = EXPERIMENTS / "smoke" / "python__forge__mechanics" / "experiment.yaml"
 
 BASE_EXPERIMENT: dict[str, Any] = {
-    "schema_version": 2,
+    "schema_version": 3,
     "kind": "ab-test",
     "id": "python__fixture__test",
     "problems": [{"ref": "scb/forge@abc123"}],
     "runtime": "python",
-    "agents": [
-        {
-            "id": "luna",
-            "name": "codex",
-            "provider": "openai",
-            "model": "gpt-6-luna",
-            "reasoning_effort": "low",
-            "version": "0.156.1",
-        }
-    ],
-    "factors": ["condition"],
-    "conditions": [
-        {"id": "baseline", "components": []},
-        {
-            "id": "guided",
-            "components": [{"use": "rules-file@2", "files": ["components/AGENTS.md"]}],
-        },
-    ],
+    "agents": [{"id": "luna", "release": "codex@1", "model": "gpt-6-luna", "reasoning": "low"}],
     "arms": [
-        {"id": "baseline", "condition": "baseline", "agent": "luna"},
-        {"id": "guided", "condition": "guided", "agent": "luna"},
+        {"id": "baseline", "agent": "luna", "workflow": "one-shot@1"},
+        {"id": "guided", "agent": "luna", "workflow": "one-shot@1"},
     ],
     "assessment": {"scorers": ["correctness@2"]},
     "analysis": {"baseline_arm": "baseline", "attempts": 5, "seed": 7},
@@ -67,20 +52,8 @@ def experiment_document(**changes: Any) -> dict[str, Any]:
     return document
 
 
-SHARED_FRAMING = {"use": "prompt-wrapper@1", "files": ["components/framing.md"]}
-"""A shared component use; ``write_experiment`` writes its template."""
-
-
 def write_experiment(root: Path, document: Mapping[str, Any]) -> Path:
-    """Write the experiment plus the component files it references."""
-    components = root / "components"
-    components.mkdir(parents=True, exist_ok=True)
-    rules = components / "AGENTS.md"
-    if not rules.exists():
-        rules.write_text("Run the tests before finishing.\n", encoding="utf-8")
-    framing = components / "framing.md"
-    if document.get("shared_components") and not framing.exists():
-        framing.write_text("Work in /app.\n\n{{ instruction }}\n", encoding="utf-8")
+    root.mkdir(parents=True, exist_ok=True)
     path = root / "experiment.yaml"
     path.write_text(yaml.safe_dump(dict(document), sort_keys=False), encoding="utf-8")
     return path
@@ -88,7 +61,6 @@ def write_experiment(root: Path, document: Mapping[str, Any]) -> Path:
 
 DEFAULT_BINDINGS: dict[RefKind, dict[str, object]] = {
     RefKind.PROBLEM: {"runtime": "python", "pack_version": 1, "validated": True},
-    RefKind.COMPONENT: {"runtimes": ["*"], "supports": ["codex-cli", "claude-code"]},
     RefKind.SCORER: {"runtimes": ["*"]},
     RefKind.METRIC: {"runtimes": ["python"]},
 }
@@ -123,13 +95,12 @@ class InMemoryResolver:
         )
 
 
-def fixture_resolvers(*, checkpoints: int = 8) -> list[InMemoryResolver]:
+def fixture_resolvers(*, checkpoints: int = 8) -> list[RegistryResolver]:
+    """In-memory problem and scorer resolvers, plus the tree's real agent/workflow releases."""
     return [
         InMemoryResolver(RefKind.PROBLEM, {"scb/forge@abc123": {"checkpoints": checkpoints}}),
-        InMemoryResolver(
-            RefKind.COMPONENT,
-            {"rules-file@2": {"kind": "workspace"}, "prompt-wrapper@1": {"kind": "prompt"}},
-        ),
+        AgentResolver(),
+        WorkflowResolver(),
         InMemoryResolver(
             RefKind.SCORER, {"correctness@2": {"exact": True}}, tool_versions={"pytest": "8.4.1"}
         ),

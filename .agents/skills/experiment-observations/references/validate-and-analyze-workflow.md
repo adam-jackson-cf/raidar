@@ -8,8 +8,8 @@
    and stop.
 2. Establish provenance: every job's `job.json` `lock_sha256` must match the
    lock the analysis used (`analysis.json` `lock_sha256`). Never pool jobs of
-   different locks. Record the problem pin, agent name and version, model,
-   reasoning effort, arms and condition digests from the lock.
+   different locks. Record the problem pin, agent release, model,
+   reasoning, arms and workflow digests from the lock.
 3. Build the cohort from trial records: a trial is included when every
    `validity.checks` entry passed and it is not in `replaced_trials`. Keep the
    ids, paths and reasons of excluded trials. Pair arms by attempt.
@@ -28,8 +28,7 @@
    headline metric's definition in the lock (each component in [0, 1], 1 best,
    unless the metric says otherwise). Render a missing or ineligible component as
    `Unavailable` with its reason; never as 0 or 1.
-7. Read the manipulation check (per check: shares, p, verdict) and the
-   per-arm cost, tokens and agent time. Label `cost_usd` as Harbor's
+7. Read the per-arm cost, tokens and agent time. Label `cost_usd` as Harbor's
    token-priced estimate unless billing evidence says otherwise.
 8. Build the per-case failure matrix and the mechanism classes described in
    `fault-catalog`'s evidence map, per arm and checkpoint. Keep it as candidate

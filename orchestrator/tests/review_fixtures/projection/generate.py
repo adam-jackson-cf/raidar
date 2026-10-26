@@ -3,15 +3,13 @@
 Writes clearly labelled synthetic experiments as a real ``raidar run`` would
 leave them, plus one Assessment store, under ``<dest>``:
 
-- ``synthetic-bugfix``: one 3-checkpoint problem, one condition, three agent
-  specs (reasoning effort is the factor). The low-effort spec has a degraded
+- ``synthetic-bugfix``: one 3-checkpoint problem, one workflow, three agent
+  specs (reasoning effort is the variable). The low-effort spec has a degraded
   trial (checkpoint 3 fails) and one whose agent exited before
   verification (no headline score), so ranking, Δ-vs-best, unscored and
   failure paths all render.
-- ``synthetic-skill``: one 2-checkpoint problem, conditions ``baseline`` and
-  ``skills`` crossed with two agent specs on two harnesses, so condition diffs
-  and per-condition comparisons render (each arm's condition digest covers its
-  harness, as ``CompiledCondition.digest`` does, yet both arms share a label).
+- ``synthetic-skill``: one 2-checkpoint problem, two arms on two harnesses, so
+  comparisons across harnesses render.
 - ``synthetic-policy-mix`` and ``synthetic-policy-mix-k2``: the same problem id
   locked once with one checkpoint (``scb-canonical-oneshot@1``) and once with
   two (``scb-canonical@1``). A real problem version has one checkpoint count;
@@ -75,9 +73,8 @@ _BUGFIX_PROMPT = (
     "this Python port is checked with pytest and ruff."
 )
 _SKILL_PROMPT = "Build sum_even for the ledger utilities with minimal churn and tests first."
-_SKILL_DIR = "skills/tdd"
-_SKILL_FILE = f"{_SKILL_DIR}/SKILL.md"
-_SKILL_TEXT = "# tdd\nWrite the failing test first, then the smallest change that passes it.\n"
+_WORKFLOW = "one-shot@1"
+# agent id -> (adapter, provider, model, reasoning, label)
 _AGENTS = {
     "gpt55-low": ("codex", "openai", "gpt-5.5", "low", "gpt-5.5-low"),
     "gpt55-medium": ("codex", "openai", "gpt-5.5", "medium", "gpt-5.5-medium"),
@@ -104,31 +101,10 @@ class Design:
     problem: str
     title: str
     prompt: str
-    factors: list[str]
-    conditions: dict[str, dict[str, str]]
-    component_paths: dict[str, list[str]]
-    arms: dict[str, tuple[str, str]]
+    arms: dict[str, str]
     baseline_arm: str
     attempts: int
     trials: tuple[FixtureTrial, ...]
-
-    def locked_conditions(self) -> dict[str, list[dict[str, object]]]:
-        """The lock's hashed conditions: ``skills@2`` with the hash of each skill file."""
-        return {
-            condition: (
-                [
-                    {
-                        "use": "skills@2",
-                        "use_digest": digest_json("skills@2"),
-                        "with": {},
-                        "files": {path: digest_json(text) for path, text in files.items()},
-                    }
-                ]
-                if files
-                else []
-            )
-            for condition, files in self.conditions.items()
-        }
 
 
 def _solved(checkpoints: int) -> tuple[tuple[Outcome, int, int], ...]:
@@ -156,10 +132,7 @@ def _bugfix() -> Design:
         problem="synthetic/ledger-balance@1",
         title="Synthetic ledger balance defect repair across three checkpoints",
         prompt=_BUGFIX_PROMPT,
-        factors=["agent.reasoning_effort"],
-        conditions={"baseline": {}},
-        component_paths={"baseline": []},
-        arms={arm: ("baseline", arm) for arm in ("gpt55-medium", "gpt55-high", "gpt55-low")},
+        arms={arm: arm for arm in ("gpt55-medium", "gpt55-high", "gpt55-low")},
         baseline_arm="gpt55-medium",
         attempts=5,
         trials=(
@@ -171,18 +144,13 @@ def _bugfix() -> Design:
 
 
 def _skill() -> Design:
-    quality = {
-        "baseline-gpt": 0.74,
-        "baseline-sonnet": 0.72,
-        "skills-gpt": 0.86,
-        "skills-sonnet": 0.9,
-    }
+    quality = {"gpt55-low": 0.74, "sonnet": 0.9}
     trials = [
         FixtureTrial(
             arm,
             attempt,
             (("solved", 4, 4), ("failed", 3, 4))
-            if arm.startswith("baseline") and attempt == 2
+            if arm == "gpt55-low" and attempt == 2
             else _solved(2),
             value + 0.01 * (attempt - 2),
         )
@@ -194,16 +162,8 @@ def _skill() -> Design:
         problem="synthetic/skill-coding@1",
         title="Synthetic sum_even feature built across two checkpoints",
         prompt=_SKILL_PROMPT,
-        factors=["condition", "agent"],
-        conditions={"baseline": {}, "skills": {_SKILL_FILE: _SKILL_TEXT}},
-        component_paths={"baseline": [], "skills": [_SKILL_DIR]},
-        arms={
-            "baseline-gpt": ("baseline", "gpt55-low"),
-            "baseline-sonnet": ("baseline", "sonnet"),
-            "skills-gpt": ("skills", "gpt55-low"),
-            "skills-sonnet": ("skills", "sonnet"),
-        },
-        baseline_arm="baseline-gpt",
+        arms={"gpt55-low": "gpt55-low", "sonnet": "sonnet"},
+        baseline_arm="gpt55-low",
         attempts=3,
         trials=tuple(trials),
     )
@@ -215,10 +175,7 @@ def _single_arm(experiment: str, problem: str, title: str, agent: str, checkpoin
         problem=problem,
         title=title,
         prompt=_BUGFIX_PROMPT,
-        factors=["agent.reasoning_effort"],
-        conditions={"baseline": {}},
-        component_paths={"baseline": []},
-        arms={agent: ("baseline", agent)},
+        arms={agent: agent},
         baseline_arm=agent,
         attempts=3,
         trials=tuple(
@@ -258,39 +215,26 @@ def _review_only() -> Design:
     )
 
 
+def _agent_entry(agent: str) -> dict[str, object]:
+    adapter, _, model, reasoning, _ = _AGENTS[agent]
+    entry: dict[str, object] = {"id": agent, "release": f"{adapter}@1", "model": model}
+    if reasoning is not None:
+        entry["reasoning"] = reasoning
+    return entry
+
+
 def _spec(design: Design) -> ExperimentSpec:
-    agents = sorted({agent for _, agent in design.arms.values()})
+    agents = sorted(set(design.arms.values()))
     return ExperimentSpec.model_validate(
         {
-            "schema_version": 2,
-            "kind": "ab-test" if "condition" in design.factors else "benchmark",
+            "schema_version": 3,
+            "kind": "benchmark",
             "id": design.experiment,
             "description": f"{design.title} (synthetic review-surface fixture)",
             "problems": [{"ref": design.problem}],
             "runtime": "python",
-            "agents": [
-                {
-                    "id": agent,
-                    "name": _AGENTS[agent][0],
-                    "provider": _AGENTS[agent][1],
-                    "model": _AGENTS[agent][2],
-                    "reasoning_effort": _AGENTS[agent][3],
-                    "version": "0.0.0",
-                }
-                for agent in agents
-            ],
-            "factors": design.factors,
-            "conditions": [
-                {
-                    "id": condition,
-                    "components": [{"use": "skills@2", "files": paths}] if paths else [],
-                }
-                for condition, paths in design.component_paths.items()
-            ],
-            "arms": [
-                {"id": arm, "condition": condition, "agent": agent}
-                for arm, (condition, agent) in design.arms.items()
-            ],
+            "agents": [_agent_entry(agent) for agent in agents],
+            "arms": [{"id": arm, "agent": agent} for arm, agent in design.arms.items()],
             "assessment": {"scorers": _SCORERS},
             "analysis": {
                 "baseline_arm": design.baseline_arm,
@@ -301,12 +245,30 @@ def _spec(design: Design) -> ExperimentSpec:
     )
 
 
+def _locked_arm(arm: str, agent: str) -> dict[str, object]:
+    """The lock's ``execution.arms`` entry: the agent release and the workflow it runs."""
+    adapter, provider, model, reasoning, _ = _AGENTS[agent]
+    return {
+        "agent": agent,
+        "agent_release": f"{adapter}@1",
+        "adapter": adapter,
+        "provider": provider,
+        "model": model,
+        "reasoning": reasoning,
+        "tool": {"package": f"@fixture/{adapter}", "binary": adapter, "version": "0.0.0"},
+        "workflow": _WORKFLOW,
+        "workflow_sha256": digest_json(_WORKFLOW),
+        "stage_code": {"build": digest_json(["build", _WORKFLOW])},
+        "digest": digest_json([arm, agent, _WORKFLOW]),
+    }
+
+
 def _lock(design: Design, spec: ExperimentSpec) -> dict[str, object]:
     return fixture_lock(
         spec.to_json(),
         problem=design.problem,
         checkpoints=len(design.trials[0].outcomes),
-        conditions=design.locked_conditions(),
+        arms={arm: _locked_arm(arm, agent) for arm, agent in design.arms.items()},
     )
 
 
@@ -329,13 +291,8 @@ def _checkpoint(step: str, outcome: tuple[Outcome, int, int], index: int) -> Che
 
 
 def _script(design: Design, trial: FixtureTrial, index: int) -> TrialScript:
-    condition, agent = design.arms[trial.arm]
-    label = _AGENTS[agent][4]
-    trial_id = (
-        f"{label}-{trial.attempt:02d}"
-        if len(design.conditions) == 1
-        else f"{trial.arm}-{trial.attempt:02d}"
-    )
+    agent = design.arms[trial.arm]
+    trial_id = f"{_AGENTS[agent][4]}-{trial.attempt:02d}"
     return TrialScript(
         trial_id=trial_id,
         arm=trial.arm,
@@ -347,7 +304,6 @@ def _script(design: Design, trial: FixtureTrial, index: int) -> TrialScript:
             _checkpoint(f"checkpoint_{k + 1}", outcome, k)
             for k, outcome in enumerate(trial.outcomes)
         ),
-        overlay=tuple(design.conditions[condition].items()),
         failure=trial.failure,
     )
 
@@ -389,9 +345,8 @@ def _run(design: Design, dest: Path, store: FixtureAssessments, root: str = JOBS
     (job_dir / "assessment-config.yaml").write_text(
         yaml.safe_dump(settings.model_dump(mode="json"), sort_keys=True)
     )
-    conditions = design.locked_conditions()
     for index, trial in enumerate(design.trials):
-        condition, agent = design.arms[trial.arm]
+        agent = design.arms[trial.arm]
         plan = TrialPlan(
             experiment=design.experiment,
             job_id=design.experiment,
@@ -400,10 +355,8 @@ def _run(design: Design, dest: Path, store: FixtureAssessments, root: str = JOBS
             problem_title=design.title,
             bundle=bundle,
             lock_sha256=str(lock["lock_sha256"]),
-            # Like CompiledCondition.digest: the contents compiled for this arm's agent.
-            condition_digest=digest_json(
-                {"agent": _AGENTS[agent][0], "condition": conditions[condition]}
-            ),
+            workflow_digest=digest_json(_WORKFLOW),
+            stage_code_digest=digest_json(["build", _WORKFLOW]),
             agent_digest=digest_json(_AGENTS[agent]),
         )
         script = _script(design, trial, index)
