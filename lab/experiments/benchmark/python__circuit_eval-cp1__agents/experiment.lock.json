@@ -42,10 +42,10 @@
       },
       "scorer": {
         "correctness@2": {
-          "digest": "f558c7137297fa8212fe60b3457923ba04e2ffd8eafde57dfc662d5f8e3e4580",
+          "digest": "636dc278b05c754a6fba915430a80a0af694100b027e277bb11f46bc3c38b0ba",
           "metadata": {
             "implementation": "raidar.scoring.correctness:correctness_scorer",
-            "implementation_digest": "faa3ef469503e3bb71f0f348410aec8aa9f54974755d8665d352778164427f0d",
+            "implementation_digest": "f3829aae8221fd79ee747c608ba8aca30de8e3081b05d13d70c3887830cf8711",
             "manifest": {
               "description": "Oracle verdicts per checkpoint and trajectory, from the oracle step records.",
               "evidence_required": [
@@ -223,7 +223,7 @@
     },
     "tools": {}
   },
-  "document_sha256": "d65b958790830e8020b901a904013757f443bd4f2987abdb823f53c7b0e9f54f",
+  "document_sha256": "88ac9ef77b44b82a1ea9bfb9bd7b6f93fa7b866814ba2a9fed1ce0c9ae09a9f2",
   "execution": {
     "arms": {
       "codex": {
@@ -241,12 +241,12 @@
           "version_pin": "0.156.1",
           "workflow_skills": "placement.skills .agents/skills in the workspace /app"
         },
-        "digest": "4fb803db05dd39b6b7a898750f6da8d9d4b9e762e1d7f5a489bf03578162de2e",
+        "digest": "acc0c6511c9cf72ea3e710da94e9f6a670ed04ce94fbc95df0d9eba5d792c7be",
         "model": "gpt-6-luna",
         "provider": "openai",
         "reasoning": "low",
         "stage_code": {
-          "build": "134f6ac314e68a8f1c0c283ac2cd446a416c234ca2452cc92c75ffc4485cb757"
+          "build": "0194365664e16447574af024142d60fe3db3e76dd9339999f0a1e2ef257ee67d"
         },
         "tool": {
           "binary": "codex",
@@ -379,7 +379,7 @@
     "source_sha256": "cd89c44e2d2d7d6d6d0576f38b59b07b2095122103fd2c0705dae6d30382b2da",
     "spec_sha256": "858b10e377c1b55c60a8452980beb3de12373e89f54dbfe04c2450370636f173"
   },
-  "lock_sha256": "bc18e1ec53517eeff20ff5642dc6642c8d1530b720c8b0f12fd6d3a2f003c20e",
+  "lock_sha256": "8fa85e3d445cd99ff809c4634ec26250ef0a2336b8e9ad4780c557e803141205",
   "lock_version": 4,
   "overrides": {
     "flags": {},
@@ -387,8 +387,8 @@
   },
   "sections": {
     "analysis": "0a0fb32297e0c3abaad1f91cb80990bf42b3a3f0854246915ae017492003d1bc",
-    "assessment": "49e7ae0cb6c8d4e4557508bfa4c9f6fdec20b4f7c2fc59f034990645e27fb877",
-    "execution": "bc18e1ec53517eeff20ff5642dc6642c8d1530b720c8b0f12fd6d3a2f003c20e",
+    "assessment": "beed0636db4c26990da7cc102462bab3eb148a498067683917b9292a34407db4",
+    "execution": "8fa85e3d445cd99ff809c4634ec26250ef0a2336b8e9ad4780c557e803141205",
     "toolchain": "037de8092c78cc029ff5b0266ac406e508a22714e4f2501420e1e2d18e9c2a20"
   },
   "spec": {

@@ -17,6 +17,9 @@ result can be trusted, and returns one ``HealthReport`` (``health.json``). Famil
   plugin recommendations, ``AGENTS.md`` text only from the workspace).
 - **T** tamper: ``T1`` the tool tree is unchanged since the first hash; ``T2`` the records
   manifest verifies; ``T3`` the reaper left no residual process.
+- **G** the verify gate, only when the workflow records show a verify stage
+  (``raidar.engine.health.gate``): ``G1`` the hook's records agree with the seals'; ``G2`` no
+  bypass; ``G3`` the gate's tools unchanged.
 
 A check without evidence is ``unmeasured`` with its reason, never ``pass``.
 """
@@ -28,10 +31,10 @@ from pathlib import Path
 from typing import Any
 
 from raidar.contract.harbor_result import span_s
-from raidar.contract.job_layout import TRIAL_RECORDS_DIR
 from raidar.contract.snapshot import tree_digest
 from raidar.contract.trial import CheckpointState, StepResult, TrialRecord
 from raidar.engine.health.base import Audit, make_check
+from raidar.engine.health.gate import check_gate
 from raidar.engine.health.isolation import check_p8
 from raidar.engine.health.model import PASS, UNMEASURED, VIOLATION, HealthCheck, HealthReport
 from raidar.engine.health.signals import (
@@ -43,7 +46,6 @@ from raidar.engine.health.signals import (
     check_t2,
     check_t3,
 )
-from raidar.engine.perf.contention import read_manifest
 from raidar.grading.records import StepRecord
 
 DEADLINE_GRACE_S = 60.0
@@ -277,12 +279,6 @@ def audit_trial(
 ) -> HealthReport:
     audit = Audit(job_dir, trial_dir, record, job)
     return HealthReport(
-        trial_id=record.trial.trial_id, checks=tuple(check(audit) for check in CHECKS)
+        trial_id=record.trial.trial_id,
+        checks=(*(check(audit) for check in CHECKS), *check_gate(audit)),
     )
-
-
-def audit_recorded_trial(job_dir: Path, trial_id: str) -> HealthReport:
-    """Audit a finished trial from its files (what ``raidar health`` does)."""
-    record_file = job_dir / TRIAL_RECORDS_DIR / f"{trial_id}.json"
-    record = TrialRecord.model_validate_json(record_file.read_text())
-    return audit_trial(job_dir, job_dir / record.trial_dir, record, read_manifest(job_dir))

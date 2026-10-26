@@ -362,12 +362,14 @@ def execution_validity(
 # is absent on purpose (the target guard already adds ``target_reachable``), as are the L family,
 # the other P checks and ``unmeasured`` results: an enforce-mode idle kill (``L2``
 # ``idle_killed``) is classified like an agent timeout, so it is a pass with a finding, never a
-# validity failure. ``P8`` is the isolation of the agent's skills and instructions.
+# validity failure. ``P8`` is the isolation of the agent's skills and instructions; ``G`` the
+# verify gate's integrity (a disagreeing hook record, a bypass, changed gate tools).
 HEALTH_VALIDITY: Mapping[str, tuple[str, ...]] = {
     "health_verdicts": ("V1", "V2", "V3"),
     "health_budgets": ("H1", "H3", "H4", "H5", "H6"),
     "health_tamper": ("T1", "T2", "T3"),
     "health_isolation": ("P8",),
+    "health_gate": ("G1", "G2", "G3"),
 }
 
 

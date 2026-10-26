@@ -3,10 +3,20 @@
 Harbor runs one agent phase per checkpoint (one ``run`` per step), so the reaper, the liveness
 monitor and the per-step reset see the same phases they saw for the native agent. Inside the
 phase the runner drives the native agent (``inner_agent``, built by ``create_inner``) through
-the workflow's stages, host-side, one *turn* at a time. ``build`` is the only implemented
-stage: one turn running the build prompt with the checkpoint's task text in place of
-``%%%TASK%%%``, in a fresh session (``run``). Each checkpoint starts fresh because Harbor
-empties ``/logs/agent`` (the session store) before every step.
+the workflow's enabled stages (``raidar.subject.workflow.stage``), host-side, one *turn* at a
+time, all in the checkpoint's one primary session:
+
+1. every enabled stage prepares (before the agent starts);
+2. one prompt (``compose``: build's frame, each stage's fragment at its token, the task text at
+   ``%%%TASK%%%``) runs as the first turn, in a fresh session (``run``);
+3. when the agent stops, each enabled stage's checks run in stage order; the first that returns
+   a message resumes the same session with it (``resume``, a turn of that stage) and the checks
+   run again. Each stage bounds its own resumes; when none asks, the checkpoint ends;
+4. every stage closes, also when a turn failed (``turn_error``) or the phase was cancelled
+   (``deadline``), and its record goes into ``workflow.json`` under its name.
+
+Each checkpoint starts a fresh session because Harbor empties ``/logs/agent`` (the session
+store) before every step.
 
 Per turn, under the step's agent logs at ``workflow/<stage>-<n>/``:
 
@@ -16,8 +26,10 @@ Per turn, under the step's agent logs at ``workflow/<stage>-<n>/``:
   turn can resume it;
 - ``trajectory.json``: the native agent's trajectory, built from that copy.
 
-``workflow/workflow.json`` records every turn: stage, turn index, session id, whether it
-resumed, start, end, seconds, error, the session's cumulative token total after the turn and
+``workflow/workflow.json`` records the enabled ``stages``, the step records holding text a
+stage placed in the workspace's instruction files (``instructions``), and every turn: stage,
+turn index, session id, whether it resumed, start, end, seconds, error, the session's
+cumulative token total after the turn and
 the turn's own tokens, and, from a native agent that isolates itself
 (``raidar.subject.agent.isolated_codex.IsolatedCodex``), ``harness_isolation`` (the flags and
 settings it applied to the turn's command) and ``agent_process`` (the user, ``PATH`` and
@@ -48,6 +60,8 @@ from harbor.models.agent.context import AgentContext
 from raidar.subject.agent.isolated_codex import IsolatedCodex
 from raidar.subject.workflow.definition import StageType, WorkflowDefinition
 from raidar.subject.workflow.inner import InnerAgentSpec, create_inner
+from raidar.subject.workflow.stage import DEADLINE, TURN_ERROR, Build, Checkpoint, Stage, compose
+from raidar.subject.workflow.verify import Verify
 
 RUNNER_NAME = "raidar-workflow"
 WORKFLOW_DIR = "workflow"
@@ -202,6 +216,15 @@ def _session_id(turn_dir: Path) -> str | None:
     return value if isinstance(value, str) and value else None
 
 
+def workflow_stages(definition: WorkflowDefinition) -> list[Stage]:
+    """One checkpoint's enabled stages, in stage order, each with the workflow's settings."""
+    stages: list[Stage] = [Build(definition.stages.build)]
+    verify = definition.stages.verify
+    if verify is not None and verify.enabled:
+        stages.append(Verify(verify))
+    return stages
+
+
 class WorkflowRunner(BaseAgent):
     """Runs the arm's workflow on its native agent, one turn at a time (module docstring)."""
 
@@ -232,19 +255,62 @@ class WorkflowRunner(BaseAgent):
         self, instruction: str, environment: BaseEnvironment, context: AgentContext
     ) -> None:
         state = _Run()
-        build = self.runner_options.definition.stages.build
+        stages = workflow_stages(self.runner_options.definition)
+        checkpoint = Checkpoint(environment, self.logs_dir)
+        cut: str | None = None
         try:
-            await self._turn(environment, state, "build", build.render(instruction))
+            await self._work(checkpoint, state, stages, instruction)
+        except asyncio.CancelledError:
+            cut = DEADLINE
+            raise
+        except Exception:
+            cut = TURN_ERROR
+            raise
         finally:
-            self._finish(context, state)
+            await asyncio.shield(self._close(checkpoint, stages, cut))
+            self._finish(context, state, stages)
+
+    async def _work(
+        self, checkpoint: Checkpoint, state: _Run, stages: list[Stage], instruction: str
+    ) -> None:
+        """Prepare every stage, run the one prompt, then resume while a stage's checks ask."""
+        for stage in stages:
+            await stage.prepare(checkpoint)
+        prompt = compose(stages, instruction)
+        await self._turn(checkpoint.environment, state, "build", prompt, resume=False)
+        while (followup := await self._checks(checkpoint, stages, state.turns[-1])) is not None:
+            stage_type, message = followup
+            await self._turn(checkpoint.environment, state, stage_type, message, resume=True)
+
+    @staticmethod
+    async def _checks(
+        checkpoint: Checkpoint, stages: list[Stage], turn: Turn
+    ) -> tuple[StageType, str] | None:
+        """The first stage, in stage order, whose checks resume the session, and its message."""
+        for stage in stages:
+            message = await stage.check(checkpoint, turn.log_dir)
+            if message is not None:
+                return stage.name, message
+        return None
+
+    @staticmethod
+    async def _close(checkpoint: Checkpoint, stages: list[Stage], cut: str | None) -> None:
+        for stage in stages:
+            await stage.close(checkpoint, cut)
 
     async def _turn(
-        self, environment: BaseEnvironment, state: _Run, stage: StageType, prompt: str
+        self,
+        environment: BaseEnvironment,
+        state: _Run,
+        stage: StageType,
+        prompt: str,
+        *,
+        resume: bool,
     ) -> None:
         turn = Turn(
             stage=stage,
             index=len(state.turns) + 1,
-            resumed=False,
+            resumed=resume,
             prompt_sha256=hashlib.sha256(prompt.encode()).hexdigest(),
             started_at=_now(),
             started=time.monotonic(),
@@ -255,8 +321,9 @@ class WorkflowRunner(BaseAgent):
         (turn_dir / PROMPT_FILE).write_text(prompt, encoding="utf-8")
         inner = self._inner(turn_dir)
         context = AgentContext()
+        send = inner.resume if resume else inner.run
         try:
-            await inner.run(prompt, environment, context)
+            await send(prompt, environment, context)
         except asyncio.CancelledError:
             turn.stop("CancelledError: the agent phase was cancelled (agent timeout)")
             await asyncio.shield(self._settle(environment, state, turn, inner, context))
@@ -307,19 +374,27 @@ class WorkflowRunner(BaseAgent):
         if not environment.capabilities.mounted:
             await environment.download_dir(str(logs / relative), turn_dir)
 
-    def _finish(self, context: AgentContext, state: _Run) -> None:
+    def _record(self, state: _Run, stages: list[Stage], usage: Tokens | None) -> dict[str, Any]:
+        """``workflow.json``: the stages, the turns, the phase's tokens and each stage's record."""
+        record: dict[str, Any] = {
+            "kind": RECORD_KIND,
+            "workflow": self.runner_options.workflow,
+            "stages": [stage.name for stage in stages],
+            "instructions": [path for stage in stages for path in stage.instructions],
+            "turns": [turn.record() for turn in state.turns],
+            "tokens": usage.record() if usage else None,
+        }
+        outputs = {stage.name: stage.record() for stage in stages}
+        return {**record, **{name: value for name, value in outputs.items() if value is not None}}
+
+    def _finish(self, context: AgentContext, state: _Run, stages: list[Stage]) -> None:
         usage = state.usage()
         if usage is not None:
             context.n_input_tokens = usage.input
             context.n_cache_tokens = usage.cached
             context.n_output_tokens = usage.output
             context.cost_usd = usage.cost_usd
-        record = {
-            "kind": RECORD_KIND,
-            "workflow": self.runner_options.workflow,
-            "turns": [turn.record() for turn in state.turns],
-            "tokens": usage.record() if usage else None,
-        }
+        record = self._record(state, stages, usage)
         context.metadata = {**(context.metadata or {}), "workflow": record}
         workflow_dir = self.logs_dir / WORKFLOW_DIR
         workflow_dir.mkdir(parents=True, exist_ok=True)
