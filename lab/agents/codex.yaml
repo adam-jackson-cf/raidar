@@ -1,0 +1,23 @@
+# Codex CLI agent, released as codex@N in lab/releases.yaml (raidar.subject.agent.definition).
+# tool.version is the single source of the harness pin: the Python pack's
+# image.harnesses.codex-cli must equal it (make releases-check, RT5).
+schema: 1
+name: codex
+adapter: codex
+tool:
+  package: "@openai/codex"
+  binary: codex
+  version: 0.156.1
+# What Raidar already applies to every codex run: Harbor runs it with a fresh
+# CODEX_HOME (/tmp/codex-home) removed after the run, and passes no user config.toml.
+settings:
+  isolated_home: true
+  ignore_user_config: true
+placement:
+  skills: .agents/skills
+  instructions: "{home}/AGENTS.md"
+resume: true
+models:
+  gpt-6-luna:
+    canonical: gpt-6-luna
+    reasoning: [low]

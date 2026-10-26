@@ -1,8 +1,8 @@
 """Bound Harbor's native task/phase egress policies before a trial starts.
 
 Only the materialized task is rewritten. Provider endpoints and runtime package
-registries form the baseline; components add their declared hosts. An authored
-task or phase can narrow this ceiling, including disabling the network entirely.
+registries form the ceiling. An authored task or phase can narrow it, including
+disabling the network entirely.
 """
 
 from __future__ import annotations
@@ -66,9 +66,7 @@ def _restrict_policy(policy: NetworkPolicy, ceiling: NetworkPolicy) -> NetworkPo
     return NetworkPolicy(network_mode=NetworkMode.ALLOWLIST, allowed_hosts=sorted(hosts))
 
 
-def restrict_trial_network(
-    task_dir: Path, *, runtime: str, provider: str, component_hosts: tuple[str, ...]
-) -> None:
+def restrict_trial_network(task_dir: Path, *, runtime: str, provider: str) -> None:
     """Write the effective native Harbor boundary for startup and every phase.
 
     Harbor ignores run-specific extra hosts on a public task baseline and allows
@@ -77,9 +75,7 @@ def restrict_trial_network(
     """
     if runtime not in RUNTIME_PACKAGE_HOSTS or provider not in PROVIDER_HOSTS:
         raise ValueError(f"no trial network host contract for {runtime}/{provider}")
-    hosts = normalize_allowed_hosts(
-        [*PROVIDER_HOSTS[provider], *RUNTIME_PACKAGE_HOSTS[runtime], *component_hosts]
-    )
+    hosts = normalize_allowed_hosts([*PROVIDER_HOSTS[provider], *RUNTIME_PACKAGE_HOSTS[runtime]])
     ceiling = NetworkPolicy(network_mode=NetworkMode.ALLOWLIST, allowed_hosts=sorted(set(hosts)))
     path = task_dir / "task.toml"
     task = TaskConfig.model_validate_toml(path.read_text())

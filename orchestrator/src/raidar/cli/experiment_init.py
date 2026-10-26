@@ -1,14 +1,13 @@
 """``raidar init``: start a new experiment.yaml from the two-arm starter.
 
-The starter is the README walkthrough's shape: an ``ab-test`` with one pinned
-problem, one agent on the pack's pinned version, a ``baseline`` condition and a ``rules``
-condition (``rules-file@2`` with a stub ``components/AGENTS.md``), and the
-paired analysis plan. It validates as written; the author then edits the
-problems, conditions and analysis plan. Another variant of an existing
-experiment's treatment is a new condition and arm inside that experiment, not
-a new file, so ``init`` refuses a path that already exists. The id follows the
-``<runtime>__<subject>__<intent>`` grammar (``NAME2``) and defaults to the
-directory name, so ``lab/experiments/ab-test/<id>/experiment.yaml`` satisfies ``NAME1``.
+The starter is the README walkthrough's shape: an ``ab-test`` with one pinned problem, the
+current codex agent release, and two arms, ``baseline`` and ``treatment``, both on the default
+workflow (``one-shot``) until the author points ``treatment`` at the workflow (or agent)
+release under test; then the paired analysis plan. It validates as written. Another variant
+of an existing experiment is a new arm inside that experiment, not a new file, so ``init``
+refuses a path that already exists. The id follows the ``<runtime>__<subject>__<intent>``
+grammar (``NAME2``) and defaults to the directory name, so
+``lab/experiments/ab-test/<id>/experiment.yaml`` satisfies ``NAME1``.
 """
 
 from __future__ import annotations
@@ -18,18 +17,17 @@ from pathlib import Path
 
 import click
 
-from raidar.subject.agent.config import AgentName, agent_cli
-from raidar.subject.environment import load_runtime_pack
+from raidar.contract.paths import releases_file
+from raidar.contract.releases import ReleaseKind, load_register
 
 DEFAULT_PROBLEM = "scb/circuit_eval.checkpoint_1@38d627ecf668"
-RULES_FILE = Path("components") / "AGENTS.md"
 _EXPERIMENT_ID = re.compile(r"^python__[a-z0-9][a-z0-9_.-]*__[a-z0-9][a-z0-9_-]*$")
 
 _STARTER = """\
-schema_version: 2
+schema_version: 3
 kind: ab-test
 id: {experiment_id}
-description: Does an AGENTS.md rules file change what the agent delivers?
+description: Does the treatment arm's workflow change what the agent delivers?
 
 problems:
   - ref: {problem}
@@ -38,29 +36,17 @@ runtime: python
 
 agents:
   - id: codex-luna
-    name: codex
-    provider: openai
+    release: {agent}          # lab/agents/, registered in lab/releases.yaml
     model: gpt-6-luna
-    reasoning_effort: low
-    version: {codex_version}          # must equal the pack pin
-
-factors: [condition]
-
-conditions:
-  - id: baseline
-    components: []
-  - id: rules
-    components:
-      - use: rules-file@2
-        files: [{rules_file}]
+    reasoning: low
 
 arms:
   - id: baseline
-    condition: baseline
     agent: codex-luna
-  - id: rules
-    condition: rules
+    workflow: {workflow}
+  - id: treatment
     agent: codex-luna
+    workflow: {workflow}      # point this at the workflow release under test
 
 assessment:
   scorers: [correctness@2, code-quality@4, resource-usage@2]
@@ -72,12 +58,6 @@ analysis:
   min_pairs: 5               # the lock pins these verdict thresholds
   max_exclusion_fraction: 0.2
   alpha: 0.05
-"""
-
-_RULES_STUB = """\
-# Working rules
-
-Replace this file with the rules the `rules` arm's agent should follow.
 """
 
 
@@ -97,13 +77,14 @@ def _experiment_id(experiment: Path, given: str | None) -> str:
 
 
 def render_starter(experiment_id: str, problem: str) -> str:
-    """The starter experiment.yaml text, pinned to the Python pack's codex version."""
-    codex = load_runtime_pack("python").image.harnesses[agent_cli(AgentName.CODEX).value]
+    """The starter experiment.yaml text, on the tree's current codex and one-shot releases."""
+    register = load_register(releases_file())
+    agent = register.latest(ReleaseKind.AGENT, "codex")
+    workflow = register.latest(ReleaseKind.WORKFLOW, "one-shot")
+    if agent is None or workflow is None:
+        raise click.ClickException("lab/releases.yaml must register codex and one-shot")
     return _STARTER.format(
-        experiment_id=experiment_id,
-        problem=problem,
-        codex_version=codex.version,
-        rules_file=RULES_FILE.as_posix(),
+        experiment_id=experiment_id, problem=problem, agent=agent, workflow=workflow
     )
 
 
@@ -117,18 +98,14 @@ def render_starter(experiment_id: str, problem: str) -> str:
     help="Pinned problem reference (<dataset>/<problem>[.<checkpoint>]@<version>).",
 )
 def init_command(experiment: Path, experiment_id: str | None, problem: str) -> None:
-    """Write a new two-arm EXPERIMENT (experiment.yaml) and its stub rules file."""
-    rules = experiment.parent / RULES_FILE
-    existing = [path for path in (experiment, rules) if path.exists()]
-    if existing:
+    """Write a new two-arm EXPERIMENT (experiment.yaml)."""
+    if experiment.exists():
         raise click.ClickException(
-            f"refusing to overwrite {', '.join(str(path) for path in existing)}; to test another "
-            "variant, add a condition and an arm to the existing experiment.yaml"
+            f"refusing to overwrite {experiment}; to test another variant, add an arm to the "
+            "existing experiment.yaml"
         )
     text = render_starter(_experiment_id(experiment, experiment_id), problem)
-    rules.parent.mkdir(parents=True, exist_ok=True)
+    experiment.parent.mkdir(parents=True, exist_ok=True)
     experiment.write_text(text, encoding="utf-8")
-    rules.write_text(_RULES_STUB, encoding="utf-8")
     click.echo(f"Wrote {experiment}")
-    click.echo(f"Wrote {rules}")
     click.echo(f"Next: make experiment-validate EXPERIMENT={experiment}")

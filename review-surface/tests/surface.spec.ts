@@ -257,14 +257,6 @@ test.describe('comparison visualisations', () => {
     await openExperiments(page);
     await expect(page.getByText('Failure patterns').first()).toBeVisible();
   });
-
-  test('arm movement diff expands with tabs', async ({ page }) => {
-    await openExperiments(page);
-    const card = page.getByRole('button', { name: /contract changes/ }).first();
-    await card.scrollIntoViewIfNeeded();
-    await card.click();
-    await expect(page.getByRole('button', { name: /contract \(/ })).toBeVisible();
-  });
 });
 
 test('no console or page errors across the core surfaces', async ({ page }) => {

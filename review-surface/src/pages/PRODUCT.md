@@ -4,28 +4,28 @@
 
 Raidar supports experimentation and measurement of e2e feature delivery with agents. Users declare experiments over problems that represent real delivery work, run harness and model pairs (agents) under a locked experiment contract (execution, scorers, analysis), inspect evidence and use those findings to decide what to run next.
 
-Users are usually in an investigative workflow rather than a passive reporting workflow. They need to move from a zoomed out lens into specific detail, so the next experiment (a new condition or variant) can be based on evidence instead of anecdotes.
+Users are usually in an investigative workflow rather than a passive reporting workflow. They need to move from a zoomed out lens into specific detail, so the next experiment (a new arm or variant) can be based on evidence instead of anecdotes.
 
 ## Product Purpose
 
 Raidar helps delivery teams answer which approach works best for a specific delivery task, why it performed that way, and what should be tested next. The product turns experiment runs, and evidence into a decision path that supports assessing agent selection, surrounding practices and scaffolding that contribute to an iterative improvement in delivery outcomes.
 
-The core loop is: declare an experiment against a problem with a locked scoring contract, run one or more agents, compare performance, quality and reliability, inspect failures and evidence, select one evidence-backed improvement hypothesis, change exactly one factor (a comparable condition), and run it to determine whether the change improved, tied, regressed, or remained inconclusive.
+The core loop is: declare an experiment against a problem with a locked scoring contract, run one or more agents, compare performance, quality and reliability, inspect failures and evidence, select one evidence-backed improvement hypothesis, change exactly one factor (a comparable arm), and run it to determine whether the change improved, tied, regressed, or remained inconclusive.
 
-Success means users can confidently choose an approach and agent combination for their delivery context and can improve an agent run through comparable conditions. A simple path might be a baseline condition with prompt instructions only, followed by a second condition that uses the evidence from the baseline to add behavioural guidance in an AGENTS.md file and test whether the target metric improves. A more elaborate approach may involve adding custom linting or bespoke deterministic tooling that guides agent behaviour.
+Success means users can confidently choose an approach and agent combination for their delivery context and can improve an agent run through comparable arms. A simple path might be a baseline arm with prompt instructions only, followed by a second arm that uses the evidence from the baseline to add behavioural guidance in an AGENTS.md file and test whether the target metric improves. A more elaborate approach may involve adding custom linting or bespoke deterministic tooling that guides agent behaviour.
 
 ## Anti-references
 
 Avoid noisy, confusing use of data and signals. Do not bury users in undifferentiated charts, shallow rankings, or visual density that obscures the next decision.
 
-Avoid generic SaaS dashboard polish, decorative AI gradients, hero-metric templates, analytics theater, vague "insight" copy, and any design that treats benchmark scores as self-explanatory. The UI must not imply confidence where sample adequacy, validity, gates, diffs, or run evidence do not support it.
+Avoid generic SaaS dashboard polish, decorative AI gradients, hero-metric templates, analytics theater, vague "insight" copy, and any design that treats benchmark scores as self-explanatory. The UI must not imply confidence where sample adequacy, validity, gates, or run evidence do not support it.
 
 Avoid flows that jump directly to run details without first establishing the broader context.
 
 ## Design Principles
 
 1. Start zoomed out, then earn the detail. let users narrow into evidence without losing orientation.
-2. Guide the next question. Every view should help users decide what to compare, what changed, what failed, what evidence matters, or what condition hypothesis is worth testing next.
+2. Guide the next question. Every view should help users decide what to compare, what changed, what failed, what evidence matters, or what arm hypothesis is worth testing next.
 3. Treat evidence as the source of authority. Aggregate views should lead to detail explains the result.
 4. The ux should be:
   1. Consistency Through Repetition Is Paramount

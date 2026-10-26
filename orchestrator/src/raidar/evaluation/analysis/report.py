@@ -20,8 +20,8 @@ where they came from and which of them differ from the documented defaults.
 
 When the lock declares ``gate-effort``, every arm carries its gate-effort
 descriptives and every comparison the gate effects both arms measured
-(``raidar.evaluation.analysis.gate_effort``). The manipulation check runs the lock's
-pre-registered ``analysis.manipulation_checks`` when it declares them.
+(``raidar.evaluation.analysis.gate_effort``). The manipulation check runs its default
+checks for each declared process scorer.
 
 The experiment's kind shapes the report, never the verdicts: a ``benchmark``
 adds the ranking view (``raidar.evaluation.analysis.ranking``) beside the paired verdicts
@@ -53,7 +53,6 @@ from raidar.evaluation.analysis.gate_effort import (
     gate_means,
 )
 from raidar.evaluation.analysis.manipulation import (
-    CheckRequest,
     ManipulationReport,
     treatment_check_report,
 )
@@ -116,8 +115,6 @@ class AnalysisInputs:
     """The gate-effort ref the lock declares."""
     process_scorer: str | None = None
     """The process-compliance ref the lock declares; it adds the process outcomes."""
-    manipulation_checks: tuple[CheckRequest, ...] | None = None
-    """The lock's pre-registered manipulation checks (None: the process defaults)."""
     dev_job: DevRun | None = None
     kind: str = "ab-test"
     rank_by: str | None = None
@@ -283,7 +280,6 @@ def _manipulation(
     inputs: AnalysisInputs, treatment: str, settings: Settings
 ) -> ManipulationReport | None:
     return treatment_check_report(
-        inputs.manipulation_checks,
         inputs.outcomes,
         process_results=inputs.process_results,
         gate_results=inputs.gate_results,

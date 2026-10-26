@@ -3,14 +3,14 @@
 Definitions follow the Phase 0 overhead baseline (docs/reboot/overhead-baseline.md
 §1-§2), so the accepted budgets apply unchanged:
 
-- ``environment_start``: Harbor ``environment_setup`` (condition warm/cold).
-- ``component_apply``: host-side compile of the arm's condition plus writing
-  its inputs into the trial task (measured by the job). This is not the
-  Phase 0 stub's quantity (an in-container bundle install, p95 2.1 s): the
-  in-container share, ``setup.sh`` materialising support files (about 20 ms of
-  a ~250 ms script, the rest being the reset), runs in Harbor's step
-  preparation and is therefore inside ``per_step_reset``. The accepted 2.5 s
-  budget thus bounds only host-side work here (overhead-baseline.md §8).
+- ``environment_start``: Harbor ``environment_setup`` (condition warm/cold), including the
+  lab's per-trial provisions (workspace seeding) that run at container start.
+- ``arm_apply``: host-side resolution of the arm plus writing its inputs (the
+  per-step ``setup.sh``, the network boundary) into the trial task (measured by the
+  job). This is not the Phase 0 stub's quantity (an in-container bundle install, p95
+  2.1 s): the in-container share, the ``setup.sh`` reset, runs in Harbor's step
+  preparation and is therefore inside ``per_step_reset``. The accepted 2.5 s budget
+  thus bounds only host-side work here (overhead-baseline.md §8).
 - ``per_step_reset``: previous step end (or agent setup end) to agent start:
   Harbor's workdir upload, ``setup.sh`` and healthcheck. The pre-agent leak
   scan that runs in that gap is recorded separately (``pre_agent_leak_check``)
@@ -57,7 +57,7 @@ STEP_OVERHEAD_PHASES = (
     "verifier_plumbing",
     "step_archive_gap",
 )
-TRIAL_FIXED_PHASES = ("environment_start", "component_apply", "teardown_result_write")
+TRIAL_FIXED_PHASES = ("environment_start", "arm_apply", "teardown_result_write")
 _RECORD_TIMINGS = {
     "snapshot_transfer": "snapshot_transfer_s",
     "verifier_plumbing": "verifier_plumbing_s",
@@ -168,7 +168,7 @@ def _aggregates(samples: Iterable[PhaseSample], condition: dict[str, str]) -> li
 def trial_phases(
     trial_dir: Path,
     *,
-    component_apply_s: float,
+    arm_apply_s: float,
     environment_cold: bool,
     compose_init: bool,
 ) -> list[PhaseSample]:
@@ -180,7 +180,7 @@ def trial_phases(
         "environment_start", span_s(result.get("environment_setup")), None, condition["environment"]
     )
     samples += _sample("agent_setup", span_s(result.get("agent_setup")))
-    samples += _sample("component_apply", component_apply_s)
+    samples += _sample("arm_apply", arm_apply_s)
     steps = [item for item in result.get("step_results") or [] if isinstance(item, dict)]
     step_samples, last_end = _step_samples(
         trial_dir, steps, (result.get("agent_setup") or {}).get("finished_at")

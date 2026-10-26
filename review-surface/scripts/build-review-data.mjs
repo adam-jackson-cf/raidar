@@ -68,21 +68,7 @@ function validateExperiment(experiment, index) {
   object(experiment.problem_meta, `experiments[${index}].problem_meta`);
   object(experiment.comparable_config, `experiments[${index}].comparable_config`);
   text(experiment.comparable_config.fingerprint, `experiments[${index}].comparable_config.fingerprint`);
-  array(experiment.change_categories, `experiments[${index}].change_categories`);
   array(experiment.run_ids, `experiments[${index}].run_ids`);
-}
-
-function validateArmDiff(diff, index) {
-  object(diff, `arm_diffs[${index}]`);
-  invariant(diff.schema_version === SCHEMA_VERSION, `arm_diffs[${index}].schema_version must be ${SCHEMA_VERSION}`);
-  for (const key of ['key', 'problem', 'from_arm', 'to_arm']) {
-    text(diff[key], `arm_diffs[${index}].${key}`);
-  }
-  array(diff.change_categories, `arm_diffs[${index}].change_categories`);
-  array(diff.summary, `arm_diffs[${index}].summary`);
-  array(diff.comparable_warnings, `arm_diffs[${index}].comparable_warnings`);
-  object(diff.sections, `arm_diffs[${index}].sections`);
-  object(diff.files, `arm_diffs[${index}].files`);
 }
 
 function loadProjection() {
@@ -97,7 +83,6 @@ function loadProjection() {
   text(projection.generated_from, 'generated_from');
   array(projection.runs, 'runs').forEach((run, index) => validateRun(run, `runs[${index}]`));
   array(projection.experiments, 'experiments').forEach(validateExperiment);
-  array(projection.arm_diffs, 'arm_diffs').forEach(validateArmDiff);
   const details = object(projection.run_details, 'run_details');
   for (const [runId, detail] of Object.entries(details)) validateDetail(detail, runId);
   const indexedIds = new Set(projection.runs.map((run) => run.id));
@@ -120,7 +105,7 @@ function main() {
   );
   fs.writeFileSync(
     path.join(dataRoot, 'experiments.json'),
-    `${JSON.stringify({ experiments: projection.experiments, arm_diffs: projection.arm_diffs }, null, 2)}\n`,
+    `${JSON.stringify({ experiments: projection.experiments }, null, 2)}\n`,
   );
   console.log(
     `Copied ${projection.runs.length} validated run(s) across ${projection.experiments.length} experiment(s) into ${path.relative(repoRoot, dataRoot)}`,

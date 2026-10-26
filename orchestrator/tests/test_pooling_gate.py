@@ -51,7 +51,12 @@ def _job(root: Path, name: str, manifest: dict[str, Any] | None = None, **plan: 
     fields = _manifest(job_id=name) if manifest is None else {**manifest, "job_id": name}
     if "mechanics_epoch" in fields:
         fields["records_manifests"] = {TRIAL: seal_trial(path / "trials" / TRIAL, record, path)}
-    trials = [{"trial_id": TRIAL, "arm": "a", "hashes": {"agent": plan.get("agent", "h1")}}]
+    hashes = {
+        "agent": plan.get("agent", "h1"),
+        "workflow": plan.get("workflow", "w1"),
+        "stage_code": plan.get("stage_code", "s1"),
+    }
+    trials = [{"trial_id": TRIAL, "arm": "a", "hashes": hashes}]
     return JobDir(path=path, manifest=fields, plan={"trials": trials}, records=())
 
 
@@ -125,11 +130,25 @@ def test_pooling_refuses_each_provenance_difference_naming_jobs_and_values(
     assert lifted.findings[0].message
 
 
-def test_pooling_refuses_a_different_subject(tmp_path: Path) -> None:
-    jobs = [_job(tmp_path, "one"), _job(tmp_path, "two", agent="h2")]
-    with pytest.raises(PoolingError, match=r"subject differs.*one=.*h1.*two=.*h2"):
+@pytest.mark.parametrize(
+    ("change", "one", "two"), [("agent", "h1", "h2"), ("workflow", "w1", "w2")]
+)
+def test_pooling_refuses_a_different_subject_but_the_override_lifts_it(
+    tmp_path: Path, change: str, one: str, two: str
+) -> None:
+    jobs = [_job(tmp_path, "one"), _job(tmp_path, "two", **{change: two})]
+    with pytest.raises(PoolingError, match=rf"subject differs.*one=.*{one}.*two=.*{two}"):
         check_pooling(jobs)
     assert check_pooling(jobs, ["subject"]).overrides_used == ("subject",)
+
+
+def test_pooling_refuses_different_stage_code_and_no_override_lifts_it(tmp_path: Path) -> None:
+    jobs = [_job(tmp_path, "one"), _job(tmp_path, "two", stage_code="s2")]
+    with pytest.raises(PoolingError, match=r"stage_code differs.*one=.*s1.*two=.*s2") as refused:
+        check_pooling(jobs)
+    assert "nothing lifts it" in str(refused.value)
+    with pytest.raises(PoolingError, match="stage_code is never overridable"):
+        check_pooling(jobs, ["stage_code"])
 
 
 def test_pooling_refuses_a_different_epoch_with_pre_epoch_as_missing(tmp_path: Path) -> None:

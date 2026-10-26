@@ -11,12 +11,14 @@ import pytest
 from click.testing import CliRunner
 
 from raidar.cli import main
+from raidar.contract.canonical import digest_json
 from raidar.design.experiment.loader import load_experiment
-from raidar.design.experiment.lock import LockError
 from raidar.design.problem.store import ROOT_ENV
+from raidar.engine.trial.agent_config import arm_agent_config
 from raidar.engine.trial.plan import PlanError, PlanOptions, arm_order, build_plan
 from raidar.subject.environment.python.harness import HarnessPinError
 from raidar.subject.environment.python.pack_definition import load_pack_spec
+from raidar.subject.workflow.runner import WorkflowRunner
 from tests.execution_support import ImportedFixture, locked_experiment, validated_fixture
 
 
@@ -51,17 +53,15 @@ def test_plan_lists_every_arm_attempt_trial_with_input_hashes(
     assert len(plan.trials) == len(spec.arms) * spec.analysis.attempts
     assert Counter(t.arm for t in plan.trials) == {"baseline": 5, "guided": 5}
     assert [t.sequence for t in plan.trials] == list(range(len(plan.trials)))
-    assert len({t.hashes.trial for t in plan.trials}) == len(plan.trials)
+    # The trial hash is content-addressed: arms with one identity share it per attempt.
+    assert len({t.hashes.trial for t in plan.trials}) == spec.analysis.attempts
     for trial in plan.trials:
+        arm = plan.arms[trial.arm].arm
         assert trial.hashes.lock == lock["lock_sha256"]
         assert trial.hashes.arm == lock["execution"]["arms"][trial.arm]["digest"]
         assert trial.hashes.problem == lock["execution"]["problems"][0]["digest"]
-        assert trial.hashes.condition == plan.arms[trial.arm].compiled.digest
-    # The baseline arm has no components but still has a compiled condition (its reset).
-    baseline = plan.arms["baseline"].compiled
-    assert not baseline.uses
-    assert "raidar-step-reset" in baseline.setup_script()
-    assert baseline.digest != plan.arms["guided"].compiled.digest
+        assert trial.hashes.workflow == arm.definition.digest
+        assert trial.hashes.stage_code == digest_json(arm.stage_code)
     # Replanning is deterministic.
     assert _plan(locked, fixture_problem).to_json() == plan.to_json()
 
@@ -118,7 +118,7 @@ def test_selection_and_truncation_change_what_runs_not_the_condition(
     original = next(t for t in full.trials if t.trial_id == trial.trial_id)
     assert trial.steps == ("checkpoint_1",)
     assert original.steps == ("checkpoint_1", "checkpoint_2")
-    assert trial.hashes.condition == original.hashes.condition
+    assert trial.hashes.arm == original.hashes.arm
     assert trial.hashes.protocol != original.hashes.protocol
     assert trial.hashes.trial != original.hashes.trial
     with pytest.raises(PlanError, match="unknown arms"):
@@ -127,15 +127,17 @@ def test_selection_and_truncation_change_what_runs_not_the_condition(
         _plan(locked, fixture_problem, attempts=(99,))
 
 
-def test_agent_runs_the_pack_pinned_harness_with_the_arm_condition(
+def test_agent_runs_the_pack_pinned_harness_as_a_workflow_runner_around_the_native_agent(
     locked: tuple[Any, dict[str, Any], Path], fixture_problem: ImportedFixture
 ) -> None:
     plan = _plan(locked, fixture_problem)
     config = plan.arms["guided"].agent_config
-    assert config.name == "codex"
+    assert config.import_path == WorkflowRunner.import_path()
     assert config.model_name == "openai/gpt-6-luna"
-    assert config.kwargs["version"] == "0.156.1"
-    assert config.kwargs["reasoning_effort"] == "low"
+    assert config.kwargs["workflow"] == "one-shot@1"
+    native = config.kwargs["inner_agent"]
+    assert (native["name"], native["kwargs"]["version"]) == ("codex", "0.156.1")
+    assert native["kwargs"]["reasoning_effort"] == "low"
     override = _plan(locked, fixture_problem, agent_override="oracle")
     assert override.arms["guided"].agent_config.name == "oracle"
     assert override.trials[0].hashes.agent != plan.trials[0].hashes.agent
@@ -156,24 +158,22 @@ def test_a_lock_that_no_longer_matches_the_experiment_is_refused(
         build_plan(changed, stale, store=fixture_problem.store, pack=load_pack_spec())
 
 
-def test_an_off_pin_harness_version_is_refused_before_any_trial(
-    tmp_path: Path, fixture_problem: ImportedFixture, monkeypatch: pytest.MonkeyPatch
+def test_an_agent_release_off_the_pack_pin_is_refused_before_any_trial(
+    locked: tuple[Any, dict[str, Any], Path],
+    fixture_problem: ImportedFixture,
 ) -> None:
-    monkeypatch.setenv(ROOT_ENV, str(fixture_problem.store.root))
-    agents = [
-        {
-            "id": "luna",
-            "name": "codex",
-            "provider": "openai",
-            "model": "gpt-6-luna",
-            "version": "0.1.0",
+    plan = _plan(locked, fixture_problem)
+    pack = load_pack_spec()
+    pin = pack.image.harnesses["codex-cli"]
+    moved = pack.model_copy(
+        update={
+            "image": pack.image.model_copy(
+                update={"harnesses": {"codex-cli": pin.model_copy(update={"version": "0.1.0"})}}
+            )
         }
-    ]
-    # The lock refuses it (RT5), so no plan or job can exist for it; the plan's own
-    # pin check (HarnessPinError) stays as the second line of defence.
-    with pytest.raises(LockError, match=r"agents\.0\.version: \[RT5\] codex 0\.1\.0"):
-        locked_experiment(tmp_path / "exp", fixture_problem.ref, agents=agents)
-    assert issubclass(HarnessPinError, ValueError)
+    )
+    with pytest.raises(HarnessPinError, match="0.1.0"):
+        arm_agent_config(plan.arms["guided"].arm, moved, agent_timeout_sec=60)
 
 
 def test_plan_command_dry_run_and_stale_lock(
@@ -184,11 +184,11 @@ def test_plan_command_dry_run_and_stale_lock(
     shown = runner.invoke(main, ["plan", str(loaded.path), "--arm", "baseline", "--attempt", "0"])
     assert shown.exit_code == 0, shown.output
     assert "1/10 trials selected" in shown.output
-    assert shown.output.count("condition=") == 10
+    assert shown.output.count("stage_code=") == 10
     as_json = runner.invoke(main, ["plan", str(loaded.path), "--json"])
     payload = json.loads(as_json.output)
     assert len(payload["trials"]) == 10
-    assert payload["arms"]["baseline"]["condition_digest"]
+    assert payload["arms"]["baseline"]["workflow_sha256"]
     source = loaded.path.read_text()
     loaded.path.write_text(source.replace("baseline_arm: baseline", "baseline_arm: guided"))
     reanalysed = runner.invoke(main, ["plan", str(loaded.path)])

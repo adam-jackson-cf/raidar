@@ -28,7 +28,7 @@ category: Behavioral | Integration | Recovery | Structural | Process | Measureme
 owner: raidar:<area> | subject:<repo>
 status: open
 evidence: [var/jobs/<group>/<experiment>/<job>/...:line]   # relative paths, `:line[-line]` optional
-configurations: ["experiment/job, arm (condition digest), checkpoints, agent+version, model, effort, measured result"]
+configurations: ["experiment/job, arm (arm digest), checkpoints, agent+version, model, effort, measured result"]
 impact: consequence for the headline outcome and cumulative work
 hypothesis: suspected cause, labelled [HYPOTHESIS]
 criterion: measurable condition set before targeting, or null
@@ -79,8 +79,8 @@ fault to `targeted` only when a locked experiment names it.
 | Integration | the program fails at a boundary (CLI contract, dependencies, environment) |
 | Recovery | the agent fails to repair a failure it could observe |
 | Structural | the change damages earlier behaviour or code structure (regressions, erosion) |
-| Process | the agent's process, or the condition's delivery of it, deviates from what the condition intends |
-| Measurement | the verifier, the problem or the harness measures something other than the intended construct; the owner is outside the component space |
+| Process | the agent's process, or the workflow's delivery of it, deviates from what the arm intends |
+| Measurement | the verifier, the problem or the harness measures something other than the intended construct; the owner is outside the agent and workflow release space |
 
 ## Status lifecycle
 

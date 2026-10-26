@@ -1,9 +1,7 @@
 """Versioned contract of the review-surface projection (``schema_version=2``).
 
 The surface groups experiment records by ``problem`` (the problem id) and
-``arm`` (the label of the arm's condition, so arms of one condition on
-different harnesses share it) and ranks agent specs inside each group.
-``arm_diffs`` are condition diffs between the baseline arm and another arm.
+``arm`` (the experiment's arm id) and ranks agent specs inside each group.
 """
 
 from __future__ import annotations
@@ -14,14 +12,6 @@ from pydantic import BaseModel, ConfigDict, Field
 
 ReviewStatus = Literal["OK", "ERROR", "UNSET"]
 ReviewSpanType = Literal["TRACE", "AGENT_ROOT", "LLM_GENERATION", "TOOL_CALL", "INTERNAL"]
-ArmChangeCategory = Literal[
-    "baseline",
-    "metadata",
-    "environment",
-    "starter",
-    "prompt",
-    "rules",
-]
 
 
 class ResolvedScorerReviewConfig(BaseModel):
@@ -44,7 +34,6 @@ class ArmComparableConfig(BaseModel):
     problem: str
     display_name: str
     arm: str
-    parent_arm: str | None
     description: str
     difficulty: str
     languages: list[str]
@@ -53,49 +42,7 @@ class ArmComparableConfig(BaseModel):
     environment: dict[str, Any]
     verification: dict[str, Any]
     scorers: list[ResolvedScorerReviewConfig]
-    condition: dict[str, Any]
-    rules_artifacts: dict[str, str] = Field(default_factory=dict)
     fingerprint: str
-
-
-class DiffLine(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    type: Literal["context", "added", "removed"]
-    text: str
-
-
-class TextDiff(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    added: int
-    removed: int
-    truncated: bool
-    lines: list[DiffLine]
-
-
-class FileDiff(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    path: str
-    diff: TextDiff
-
-
-class ArmDiffArtifact(BaseModel):
-    """Typed condition diff between the baseline arm and another arm of one problem."""
-
-    model_config = ConfigDict(extra="forbid")
-
-    schema_version: Literal[2] = 2
-    key: str
-    problem: str
-    from_arm: str
-    to_arm: str
-    change_categories: list[ArmChangeCategory]
-    summary: list[str]
-    comparable_warnings: list[str]
-    sections: dict[str, FileDiff]
-    files: dict[str, FileDiff]
 
 
 class ReviewSpan(BaseModel):
@@ -204,7 +151,6 @@ class ReviewExperimentRecord(BaseModel):
     repeats: int
     problem_meta: ReviewProblemMetadata
     comparable_config: ArmComparableConfig
-    change_categories: list[ArmChangeCategory]
     aggregate: dict[str, Any]
     sample: dict[str, Any]
     rerun: dict[str, Any]
@@ -223,4 +169,3 @@ class ReviewProjectionArtifact(BaseModel):
     experiments: list[ReviewExperimentRecord]
     runs: list[ReviewRunRecord]
     run_details: dict[str, ReviewRunDetail]
-    arm_diffs: list[ArmDiffArtifact]

@@ -12,11 +12,9 @@ every issue at once as field-level errors with a stable code:
   ``path`` task must declare ``[metadata] raidar_runtime`` in its ``task.toml``.
 - ``RT2``: a binding was imported against another contract version of the
   runtime's pack (stale binding: re-import it).
-- ``RT3``: a component used by an arm does not cover the runtime, or does not
-  support the arm's agent.
 - ``RT4``: a scorer, or the headline metric, does not cover the runtime.
-- ``RT5``: an agent's version is not the pack's pin for that agent (or the
-  pack bakes no such agent).
+- ``RT5``: an agent release's CLI pin (package, executable, version) is not the pack's
+  pin for that harness (or the pack bakes no such harness): the agent pin is the source.
 - ``RT6``: no runtime pack is registered for the runtime. ``plan``/``run`` also
   load the pack from the lock's runtime and refuse pack drift (a built image
   other than the locked one; ``raidar.subject.environment.drift.lock_runtime_pack``), and
@@ -36,7 +34,7 @@ from typing import TYPE_CHECKING
 
 from raidar.contract.references import ResolvedReference
 from raidar.contract.runtimes import ANY_RUNTIME
-from raidar.design.experiment.schema import ComponentUse, ExperimentSpec
+from raidar.design.experiment.schema import ExperimentSpec
 from raidar.design.experiment.validation import FieldIssue
 
 if TYPE_CHECKING:
@@ -137,50 +135,6 @@ def _ref_problem_issues(
     return issues
 
 
-def _arms_using(spec: ExperimentSpec, loc: str) -> list[tuple[str, str]]:
-    """(arm id, agent CLI id) of every arm whose effective condition holds ``loc``."""
-    if loc.startswith("shared_components."):
-        conditions = {condition.id for condition in spec.conditions}
-    else:
-        conditions = {spec.conditions[int(loc.split(".")[1])].id}
-    return [
-        (arm.id, spec.agent(arm.agent).harness.value)
-        for arm in spec.arms
-        if arm.condition in conditions
-    ]
-
-
-def _component_issues(inputs: GateInputs, loc: str, use: ComponentUse) -> list[FieldIssue]:
-    resolved = inputs.resolved.get(f"{loc}.use")
-    if resolved is None:
-        return []
-    spec, binding = inputs.spec, resolved.binding
-    issues = []
-    runtimes = binding.get("runtimes")
-    if not _covers(runtimes, spec.runtime):
-        issues.append(
-            FieldIssue(
-                f"{loc}.use",
-                f"[RT3] {use.use} supports runtimes [{_listed(runtimes)}]; experiment runtime "
-                f"is {spec.runtime}",
-            )
-        )
-    supports = binding.get("supports")
-    reported: set[str] = set()
-    for arm, cli in _arms_using(spec, loc):
-        if isinstance(supports, (list, tuple)) and cli in supports or cli in reported:
-            continue
-        reported.add(cli)
-        name = next(a.name.value for a in spec.agents if a.harness.value == cli)
-        issues.append(
-            FieldIssue(
-                f"{loc}.use",
-                f"[RT3] {use.use} does not support agent {name} (arm {arm} runs it)",
-            )
-        )
-    return issues
-
-
 def _scorer_issues(inputs: GateInputs) -> list[FieldIssue]:
     runtime, issues = inputs.spec.runtime, []
     for index, ref in enumerate(inputs.spec.assessment.scorers):
@@ -209,23 +163,28 @@ def _scorer_issues(inputs: GateInputs) -> list[FieldIssue]:
     return issues
 
 
-def _agent_issues(spec: ExperimentSpec, pack: PackSpec) -> list[FieldIssue]:
+def _agent_issues(inputs: GateInputs, pack: PackSpec) -> list[FieldIssue]:
     issues = []
-    for index, agent in enumerate(spec.agents):
-        pin = pack.image.harnesses.get(agent.harness.value)
-        if pin is None:
+    for index, agent in enumerate(inputs.spec.agents):
+        loc = f"agents.{index}.release"
+        resolved = inputs.resolved.get(loc)
+        if resolved is None:
+            continue
+        harness, tool = resolved.binding.get("harness"), resolved.binding.get("tool")
+        pin = pack.image.harnesses.get(str(harness))
+        if pin is None or not isinstance(tool, Mapping):
             issues.append(
-                FieldIssue(
-                    f"agents.{index}.name",
-                    f"[RT5] pack {pack.id}@{pack.version} bakes no agent {agent.name.value}",
-                )
+                FieldIssue(loc, f"[RT5] pack {pack.id}@{pack.version} bakes no {harness} harness")
             )
-        elif pin.version != agent.version:
+            continue
+        baked = (pin.npm_package, pin.executable, pin.version)
+        pinned = (tool.get("package"), tool.get("binary"), tool.get("version"))
+        if baked != pinned:
             issues.append(
                 FieldIssue(
-                    f"agents.{index}.version",
-                    f"[RT5] {agent.name.value} {agent.version} is not the pin in pack "
-                    f"{pack.id}@{pack.version} ({pin.version})",
+                    loc,
+                    f"[RT5] {agent.release} pins {pinned}; pack {pack.id}@{pack.version} bakes "
+                    f"{baked}",
                 )
             )
     return issues
@@ -247,9 +206,7 @@ def runtime_gate_issues(
             issues.extend(_path_problem_issues(inputs, index, entry.path))
         elif entry.ref is not None:
             issues.extend(_ref_problem_issues(inputs, index, entry.ref, pack))
-    for loc, use in spec.component_uses():
-        issues.extend(_component_issues(inputs, loc, use))
     issues.extend(_scorer_issues(inputs))
     if pack is not None:
-        issues.extend(_agent_issues(spec, pack))
+        issues.extend(_agent_issues(inputs, pack))
     return issues

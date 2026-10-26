@@ -4,7 +4,9 @@ A job executed under the mechanics epoch carries provenance in ``job.json`` (``r
 ``recipes``, ``effective_limits``, ``execution_target``) and a records manifest per trial.
 ``check_pooling`` always verifies each job's records manifests (tamper, never overridable);
 with two or more jobs it refuses any difference in the fields below unless named in
-``--pool-override``. A job without ``mechanics_epoch`` has no manifest: it is reported
+``--pool-override``. The arm identity is compared in full (design 5.4): ``subject`` (each
+arm's agent and workflow hashes) can be overridden, ``stage_code`` (each arm's stage code
+digest) never can. A job without ``mechanics_epoch`` has no manifest: it is reported
 ``unmeasured`` (warned and labelled, not refused).
 """
 
@@ -28,6 +30,7 @@ class PoolingError(ValueError):
 PRE_EPOCH = "pre-epoch"
 UNRECORDED = "unrecorded"
 TAMPER = "tamper"
+STAGE_CODE = "stage_code"
 OVERRIDABLE = (
     "mechanics_epoch",
     "toolchain",
@@ -64,11 +67,22 @@ def _hardware(job: JobDir) -> Any:
     }
 
 
-def _subject(job: JobDir) -> dict[str, str]:
-    arms: dict[str, str] = {}
+def _arm_hashes(job: JobDir, *keys: str) -> dict[str, Any]:
+    arms: dict[str, Any] = {}
     for trial in job.plan.get("trials", ()):
-        arms.setdefault(str(trial["arm"]), str(trial.get("hashes", {}).get("agent")))
+        hashes = trial.get("hashes", {})
+        arms.setdefault(str(trial["arm"]), {key: hashes.get(key, UNRECORDED) for key in keys})
     return dict(sorted(arms.items()))
+
+
+def _subject(job: JobDir) -> dict[str, Any]:
+    """Each arm's agent and workflow identity."""
+    return _arm_hashes(job, "agent", "workflow")
+
+
+def _stage_code(job: JobDir) -> dict[str, Any]:
+    """Each arm's stage code identity (never overridable)."""
+    return _arm_hashes(job, STAGE_CODE)
 
 
 def _tamper(job: JobDir) -> list[str]:
@@ -117,6 +131,7 @@ def _refusals(jobs: Sequence[JobDir]) -> list[PoolFinding]:
         ("pack_recipe", measured, lambda j: _get(j.manifest, "recipes", "pack")),
         ("grader_recipe", measured, lambda j: _get(j.manifest, "recipes", "graders")),
         ("subject", jobs, _subject),
+        (STAGE_CODE, jobs, _stage_code),
         ("effective_limits", measured, lambda j: _get(j.manifest, "effective_limits")),
         ("timing_cost", jobs, _hardware),
     ]
@@ -139,10 +154,14 @@ def _refusals(jobs: Sequence[JobDir]) -> list[PoolFinding]:
     return found
 
 
+NEVER_OVERRIDABLE = (TAMPER, STAGE_CODE)
+
+
 def _check_overrides(overrides: Sequence[str]) -> None:
     unknown = sorted(set(overrides) - set(OVERRIDABLE))
     if unknown:
-        hint = " (tamper is never overridable)" if TAMPER in unknown else ""
+        never = sorted(set(unknown) & set(NEVER_OVERRIDABLE))
+        hint = f" ({', '.join(never)} is never overridable)" if never else ""
         raise PoolingError(
             f"--pool-override names unknown fields {unknown}{hint}; choose from "
             f"{', '.join(OVERRIDABLE)}"
@@ -151,11 +170,12 @@ def _check_overrides(overrides: Sequence[str]) -> None:
 
 def _refuse(refused: Sequence[PoolFinding]) -> None:
     if refused:
-        names = ", ".join(item.field for item in refused)
+        lifts = [item.field for item in refused if item.field in OVERRIDABLE]
+        hint = f"lift with --pool-override ({', '.join(lifts)})" if lifts else "nothing lifts it"
         raise PoolingError(
             "the jobs cannot be pooled: "
             + "; ".join(item.message for item in refused)
-            + f". Analyse them apart, or lift with --pool-override ({names})"
+            + f". Analyse them apart, or {hint}"
         )
 
 

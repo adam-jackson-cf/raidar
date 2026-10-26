@@ -50,7 +50,14 @@ from tests.scorer_support import (
 PASS, FAIL = CaseStatus.PASSED, CaseStatus.FAILED
 STEPS = ("checkpoint_1", "checkpoint_2")
 HASHES = TrialHashes(
-    lock="l", problem="p", arm="a", condition="c", agent="g", protocol="r", trial="t"
+    lock="l",
+    problem="p",
+    arm="a",
+    workflow="w",
+    stage_code="s",
+    agent="g",
+    protocol="r",
+    trial="t",
 )
 # Guided solves both checkpoints except in attempt 3; baseline always fails checkpoint 2.
 SOLVES = {
@@ -620,10 +627,9 @@ def _write_gate_record(agent_dir: Path, *, clean: bool) -> None:
     (gate / "guardrail-gate.json").write_text(json.dumps(record))
 
 
-def test_gate_effort_and_the_preregistered_gate_check_reach_the_report(tmp_path: Path) -> None:
+def test_gate_effort_and_its_default_gate_check_reach_the_report(tmp_path: Path) -> None:
     scorers = ["correctness@2", "gate-effort@11"]
-    gate_check = [{"check": "gate_clean_at_step_end", "min_share": 0.8}]
-    lock = _lock(scorers, manipulation_checks=gate_check)
+    lock = _lock(scorers)
     lock_path = tmp_path / "lock.json"
     lock_path.write_text(json.dumps(lock))
     job_dir = _write_run(tmp_path, lock)
@@ -655,8 +661,9 @@ def test_gate_effort_and_the_preregistered_gate_check_reach_the_report(tmp_path:
     assert comparison["gate_effects"] == []
     assert "baseline arm measured no gate-effort value" in comparison["gate_note"]
     manipulation = comparison["manipulation"]
-    assert (manipulation["preregistered"], manipulation["verdict"]) == (True, "separated")
+    assert manipulation["verdict"] == "insufficient_data"
     (check,) = manipulation["checks"]
-    assert (check["basis"], check["guided_steps"]["decided"]) == ("threshold", 10)
+    assert check["check"] == "gate_clean_at_step_end"
+    assert (check["guided"]["trials"], check["baseline"]["trials"]) == (5, 0)
     markdown = (output / "analysis.md").read_text()
     assert "## Gate effort (gate-effort@11, per arm)" in markdown

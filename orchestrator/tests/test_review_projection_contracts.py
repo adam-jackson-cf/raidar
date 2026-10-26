@@ -43,10 +43,7 @@ def test_projection_wire_contract_uses_problem_and_arm(fixture_root: Path) -> No
     )
     document = json.loads(artifact.model_dump_json())
     assert document["schema_version"] == 2
-    assert "revision_diffs" not in document
-    [diff] = document["arm_diffs"]
-    assert {"problem", "from_arm", "to_arm"} <= diff.keys()
-    assert set(diff["files"]) == {"condition", "prompt"}
+    assert not {"revision_diffs", "arm_diffs"} & document.keys()
     run = document["runs"][0]
     assert {"problem", "arm"} <= run.keys()
     assert not {"scenario", "revision"} & run.keys()

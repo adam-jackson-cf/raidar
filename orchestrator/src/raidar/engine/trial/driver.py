@@ -5,11 +5,10 @@
 Harbor trial starts: the Raidar verifier's pre-agent leak guard is installed
 before ``trial.run()``, as ``RaidarVerifier`` requires (it fails closed
 without it), together with the agent-end reaper (``raidar.engine.health.reaper``) that
-kills agent processes before artifacts are collected and graded, and the
-provisioning hooks of any component that installs a tool in the trial
-container (``raidar.subject.treatment.runtime.provision``; trial provisions install at
-environment start), then the T1 tool-tree hash (``raidar.engine.health.tool_tree``) and the
-host-side liveness monitor (``raidar.engine.health.liveness``, enforce by default).
+kills agent processes before artifacts are collected and graded, the lab's per-trial
+provisions (``raidar.engine.trial.provision``: workspace seeding, installed at environment
+start), the T1 tool-tree hash (``raidar.engine.health.tool_tree``) and the host-side
+liveness monitor (``raidar.engine.health.liveness``, enforce by default).
 
 Decision (deviates from plan section 1 "Harbor JobConfigs", N4 "Harbor owns
 concurrency"): Raidar builds one Harbor ``TrialConfig`` per planned trial and
@@ -19,8 +18,8 @@ schedules them itself instead of submitting a ``JobConfig``. Reasons:
   ``Trial.create`` and ``Trial.run``; ``Job`` creates and runs trials
   internally and its ``on_agent_started`` hook fires after the agent's first
   step has already begun, which is too late for a pre-agent scan;
-- each trial runs its own materialised task (per-arm ``setup.sh``/overlay,
-  per-trial ``min_reward``), which a single ``JobConfig`` task list cannot
+- each trial runs its own materialised task (per-step ``setup.sh``, per-trial
+  ``min_reward``) and its own provisions, which a single ``JobConfig`` task list cannot
   express without one job per trial;
 - plan order (the seeded, counterbalanced arm order) must be the start order.
 
@@ -42,8 +41,8 @@ from harbor.trial.trial import Trial
 from raidar.engine.health.liveness import install_liveness_monitor
 from raidar.engine.health.reaper import install_agent_reaper
 from raidar.engine.health.tool_tree import install_tool_tree_watch
+from raidar.engine.trial.provision import TrialProvision, install_trial_provisioning
 from raidar.grading.guard import install_leak_guard
-from raidar.subject.treatment.runtime.provision import AnyProvision, install_trial_provisioning
 
 JobT = TypeVar("JobT")
 ResultT = TypeVar("ResultT")
@@ -57,12 +56,12 @@ class TrialRun:
 
 class TrialRunner(Protocol):
     async def __call__(
-        self, config: TrialConfig, bundle_root: Path, provisions: Sequence[AnyProvision] = ()
+        self, config: TrialConfig, bundle_root: Path, provisions: Sequence[TrialProvision] = ()
     ) -> TrialRun: ...
 
 
 async def run_harbor_trial(
-    config: TrialConfig, bundle_root: Path, provisions: Sequence[AnyProvision] = ()
+    config: TrialConfig, bundle_root: Path, provisions: Sequence[TrialProvision] = ()
 ) -> TrialRun:
     trial = await Trial.create(config)
     install_leak_guard(trial, bundle_root)

@@ -12,9 +12,10 @@ on:
     paths:
       - "orchestrator/src/raidar/engine/**"
       - "orchestrator/src/raidar/contract/**"
-      - "orchestrator/src/raidar/subject/treatment/**"
+      - "orchestrator/src/raidar/subject/workflow/**"
       - "orchestrator/src/raidar/subject/environment/**"
-      - "lab/treatments/**"
+      - "lab/agents/**"
+      - "lab/workflows/**"
       - "lab/environments/**"
       - "orchestrator/tests/test_overhead_fixture_run.py"
       - "orchestrator/tests/execution_support.py"

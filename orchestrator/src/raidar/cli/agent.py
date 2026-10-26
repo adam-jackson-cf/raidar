@@ -1,6 +1,6 @@
 """Agent discovery, validation and authentication CLI commands (``raidar agent``).
 
-Agents are named by Harbor ``AgentName`` (``codex``, ``claude-code``, ...); each maps
+Agents are named by Harbor ``AgentName`` (``codex``, ``claude-code``); each maps
 to the CLI install id its adapter and the pack image use internally.
 """
 

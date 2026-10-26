@@ -1,14 +1,9 @@
-// Arm movement and condition diff review, adapted from the deprecated
-// benchmark-view's trajectory/delta/diff panels: review what changed in the
-// condition contract before trusting score movement between arms.
-import { useMemo, useState } from 'react';
-import { ChevronDown, ChevronRight, MoveRight, TriangleAlert } from 'lucide-react';
+// Arm movement, adapted from the deprecated benchmark-view's trajectory/delta
+// panels: score, trial time and token deltas between arms of one problem.
+import { useMemo } from 'react';
 import { C } from '@/presentation/colors';
 import { fmtTokens } from '@/presentation/format';
-import type { ArmDiff, ExperimentRecord, FileDiff } from '@/api/types';
-
-/** Display names for the diff's wire keys (`condition` is the locked condition contract). */
-const TAB_LABEL = { prompt: 'prompt', condition: 'contract' } as const;
+import type { ExperimentRecord } from '@/api/types';
 
 function deltaColor(delta: number | null, higherIsBetter: boolean): string {
   if (delta == null || delta === 0) return C.fg1;
@@ -40,111 +35,7 @@ function DeltaCell({
   );
 }
 
-function DiffBlock({ file }: { file: FileDiff }) {
-  return (
-    <div
-      className="sb max-h-72 overflow-auto rounded p-2"
-      style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${C.border}` }}
-    >
-      {file.diff.lines.map((line, index) => (
-        <div
-          key={index}
-          className="num whitespace-pre-wrap break-words text-[10px] leading-relaxed"
-          style={{
-            color: line.type === 'added' ? C.green : line.type === 'removed' ? C.red : C.fg1,
-            background:
-              line.type === 'added'
-                ? 'rgba(96,227,109,0.06)'
-                : line.type === 'removed'
-                  ? 'rgba(235,20,20,0.06)'
-                  : 'transparent',
-          }}
-        >
-          {line.type === 'added' ? '+ ' : line.type === 'removed' ? '- ' : '  '}
-          {line.text}
-        </div>
-      ))}
-      {file.diff.truncated && (
-        <div className="mt-1 text-[10px]" style={{ color: C.orange }}>
-          diff truncated — review {file.path} directly
-        </div>
-      )}
-    </div>
-  );
-}
-
-function ArmDiffCard({ diff }: { diff: ArmDiff }) {
-  const [open, setOpen] = useState(false);
-  const [tab, setTab] = useState<'prompt' | 'condition'>('prompt');
-  const file = diff.files[tab];
-  return (
-    <div className="rounded-md p-2" style={{ background: 'rgba(255,255,255,0.015)', border: `1px solid ${C.border}` }}>
-      <button className="flex w-full flex-wrap items-center gap-2 text-left" onClick={() => setOpen((o) => !o)}>
-        {open ? (
-          <ChevronDown className="size-3.5" style={{ color: C.fg0 }} />
-        ) : (
-          <ChevronRight className="size-3.5" style={{ color: C.fg0 }} />
-        )}
-        <span className="num text-[11px] font-medium" style={{ color: C.fg3 }}>
-          {diff.from_arm} <MoveRight className="inline size-3" /> {diff.to_arm} contract changes
-        </span>
-        {diff.summary
-          .filter(
-            (flag) =>
-              !diff.comparable_warnings.some((w) => w.toLowerCase() === flag.toLowerCase()),
-          )
-          .map((flag) => (
-            <span
-              key={flag}
-              className="rounded px-1.5 py-px text-[9px] uppercase tracking-wide"
-              style={{ color: C.fg1, background: 'rgba(255,255,255,0.05)' }}
-            >
-              {flag}
-            </span>
-          ))}
-        {diff.comparable_warnings.length > 0 && (
-          <span
-            className="inline-flex items-center gap-1 rounded px-1.5 py-px text-[9px] font-medium uppercase tracking-wide"
-            style={{ color: C.orange, background: `${C.orange}12`, border: `1px solid ${C.orange}35` }}
-            title="The evaluation contract itself changed — score movement is not purely the agent's doing."
-          >
-            <TriangleAlert className="size-2.5" />
-            {diff.comparable_warnings.join(' · ')}
-          </span>
-        )}
-      </button>
-      {open && (
-        <div className="mt-2 flex flex-col gap-1.5">
-          <div className="flex gap-1">
-            {(['prompt', 'condition'] as const).map((name) => (
-              <button
-                key={name}
-                onClick={() => setTab(name)}
-                className="rounded px-2 py-0.5 text-[10px]"
-                style={{
-                  color: tab === name ? C.fg5 : C.fg1,
-                  background: tab === name ? 'rgba(255,255,255,0.08)' : 'transparent',
-                  border: `1px solid ${tab === name ? C.borderLight : C.border}`,
-                }}
-              >
-                {TAB_LABEL[name]} (+{diff.files[name].diff.added} −{diff.files[name].diff.removed})
-              </button>
-            ))}
-          </div>
-          <DiffBlock file={file} />
-        </div>
-      )}
-    </div>
-  );
-}
-
-export function ArmMovement({
-  experiments,
-  diffs,
-}: {
-  experiments: ExperimentRecord[];
-  diffs: ArmDiff[];
-}) {
+export function ArmMovement({ experiments }: { experiments: ExperimentRecord[] }) {
   const movements = useMemo(() => {
     const arms = [...new Set(experiments.map((e) => e.arm).filter(Boolean))].sort() as string[];
     const rows: Array<{
@@ -180,7 +71,7 @@ export function ArmMovement({
     return rows;
   }, [experiments]);
 
-  if (movements.length === 0 && diffs.length === 0) return null;
+  if (movements.length === 0) return null;
 
   return (
     <div
@@ -192,7 +83,7 @@ export function ArmMovement({
           Arm movement
         </span>
         <span className="text-[10px]" style={{ color: C.fg0 }}>
-          did the condition change make delivery better? review the contract diff before trusting movement
+          did the change between arms make delivery better?
         </span>
       </div>
 
@@ -245,10 +136,6 @@ export function ArmMovement({
           </tbody>
         </table>
       )}
-
-      {diffs.map((diff) => (
-        <ArmDiffCard key={diff.key} diff={diff} />
-      ))}
     </div>
   );
 }

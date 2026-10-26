@@ -12,9 +12,6 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import pytest
-
-from raidar.scoring.framework.context import StepInputs
 from raidar.scoring.framework.result import TRAJECTORY_SUBJECT, AssessStatus
 from raidar.scoring.gate_effort.shadow import SHADOW_REASON, SHADOW_STEP_NA, SHADOW_TOTAL_NA
 from raidar.scoring.gate_effort.sources import NO_SOURCE_CHANGE, unchanged_steps
@@ -22,7 +19,6 @@ from tests.gate_effort_support import (
     CP1,
     CP2,
     CP3,
-    GUARDRAIL_STYLE_GATE,
     PASSED,
     REFUSED,
     _assess,
@@ -38,9 +34,6 @@ from tests.gate_effort_support import (
     _values,
     _write_gate,
 )
-from tests.test_guardrail_gate_workflow import _agent, _run
-from tests.test_guardrail_gate_workflow import _reset_script as _reset_script  # noqa: F401
-from tests.test_guardrail_gate_workflow import shims as shims  # noqa: F401 (fixture)
 
 
 def test_a_shadow_trajectory_reports_first_run_outcomes_and_nothing_it_never_did(
@@ -86,34 +79,6 @@ def test_unreached_shadow_steps_stay_not_reached_and_mixed_modes_are_an_error(
     mixed = _assess(first, enforced)
     assert mixed.status is AssessStatus.ERROR
     assert "mixes shadow and enforced" in (mixed.reason or "")
-
-
-def test_a_real_shadow_wrapper_run_scores_end_to_end(tmp_path: Path, shims: Path) -> None:  # noqa: F811
-    agent, environment = _agent(tmp_path, shims, mode="shadow", command=GUARDRAIL_STYLE_GATE)
-    _run(agent, environment)
-    logs = tmp_path / "logs"
-    step = StepInputs(
-        step=CP1,
-        reached=True,
-        checkpoint=CP1,
-        snapshot=None,
-        snapshot_digest=None,
-        record=None,
-        record_digest=None,
-        trace_dir=logs,
-        trace_digest="t",
-        agent_result=None,
-    )
-
-    result = _assess(step)
-
-    assert _value(result, "first_pass_clean", CP1) == 0
-    assert _value(result, "first_run_blocking.complexity", CP1) == 1
-    assert _value(result, "first_run_blocking.typing", CP1) == 1
-    fix = _values(result)[("fix_rounds", CP1)]
-    assert fix.status is AssessStatus.NOT_APPLICABLE
-    with pytest.raises(KeyError):
-        _values(result)[("fix_rounds", "checkpoint_9")]
 
 
 def test_a_no_edit_step_is_not_first_pass_clean(tmp_path: Path) -> None:

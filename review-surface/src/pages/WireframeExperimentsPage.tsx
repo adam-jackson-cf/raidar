@@ -6,7 +6,6 @@ import { WireframePatternsMap } from './wireframe-components/WireframePatternsMa
 import { KIND_STYLES } from '@/components/AnnotationChip';
 import { EvidenceRefList } from '@/components/AnnotationCards';
 import { WireframeTradeoffScatter } from './wireframe-components/WireframeTradeoffScatter';
-import { ArmDiffCard } from './wireframe-components/WireframeArmMovement';
 import { compactSpec } from './wireframe-components/wireframeLabels';
 import { api } from '@/api/client';
 import { C } from '@/presentation/colors';
@@ -1337,7 +1336,6 @@ export function WireframeExperimentsPage() {
                 const allFamilyExps = arms.flatMap(({ exps }) => exps);
                 const allFamilyRunIds = new Set(allFamilyExps.flatMap((exp) => exp.run_ids));
                 const familyRuns = (runsQuery.data ?? []).filter((run) => allFamilyRunIds.has(run.id));
-                const familyDiffs = (query.data?.arm_diffs ?? []).filter((diff) => diff.problem === family);
                 const armSortMode = armSortModes[family] ?? 'outcome';
                 const baseArmRows = arms
                   .filter(({ arm }) => selectedSet.has(arm))
@@ -1462,7 +1460,7 @@ export function WireframeExperimentsPage() {
                           <Info className="size-3" />
                         </button>
                         <span className="text-[11px] font-normal leading-4" style={{ color: C.fg0 }}>
-                          Did the outcome improve, contract diff shows changes
+                          Did the outcome improve between arms
                         </span>
                       </div>
                       <div className="mt-2 flex items-center gap-2">
@@ -1720,9 +1718,6 @@ export function WireframeExperimentsPage() {
                         })}
                     </tbody>
                   </table>
-                </div>
-                <div className="space-y-1.5 border-t p-2.5" style={{ borderColor: C.border }}>
-                  {familyDiffs.filter((diff) => selectedSet.has(diff.to_arm)).map((diff) => <ArmDiffCard key={diff.key} diff={diff} />)}
                 </div>
               </div>
               <WireframePatternsMap experiments={allFamilyExps} runs={familyRuns} />

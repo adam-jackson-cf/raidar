@@ -23,7 +23,14 @@ from raidar.engine.trial.driver import run_in_order
 from tests.execution_support import fake_engine_target
 
 HASHES = TrialHashes(
-    lock="l", problem="p", arm="a", condition="c", agent="g", protocol="r", trial="t"
+    lock="l",
+    problem="p",
+    arm="a",
+    workflow="w",
+    stage_code="s",
+    agent="g",
+    protocol="r",
+    trial="t",
 )
 
 

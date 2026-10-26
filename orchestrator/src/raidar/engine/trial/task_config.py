@@ -12,13 +12,7 @@ from raidar.engine.trial.network import restrict_trial_network
 
 
 def configure_trial_task(
-    task_dir: Path,
-    steps: tuple[str, ...],
-    rule: ProgressionRule,
-    *,
-    runtime: str,
-    provider: str,
-    component_hosts: tuple[str, ...],
+    task_dir: Path, steps: tuple[str, ...], rule: ProgressionRule, *, runtime: str, provider: str
 ) -> None:
     """Select checkpoints, pin progression and bound the task's native egress."""
     path = task_dir / "task.toml"
@@ -32,6 +26,4 @@ def configure_trial_task(
     for name in set(by_name) - set(steps):
         shutil.rmtree(task_dir / "steps" / name, ignore_errors=True)
     path.write_text(config.model_copy(update={"steps": kept}).model_dump_toml())
-    restrict_trial_network(
-        task_dir, runtime=runtime, provider=provider, component_hosts=component_hosts
-    )
+    restrict_trial_network(task_dir, runtime=runtime, provider=provider)

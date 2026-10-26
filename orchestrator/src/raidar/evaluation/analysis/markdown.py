@@ -7,7 +7,7 @@ from collections.abc import Iterable, Sequence
 from raidar.evaluation.analysis.curves import Band, Curve
 from raidar.evaluation.analysis.effects import Effect, Exclusions, IntervalOut
 from raidar.evaluation.analysis.gate_effort import GateDescriptive
-from raidar.evaluation.analysis.manipulation import CheckSeparation, ManipulationReport
+from raidar.evaluation.analysis.manipulation import ManipulationReport
 from raidar.evaluation.analysis.ranking import Ranking, RankingRow
 from raidar.evaluation.analysis.report import AnalysisReport, ArmSummary, Comparison
 from raidar.evaluation.analysis.stats import confidence_label
@@ -135,12 +135,6 @@ def _curve(curve: Curve) -> list[str]:
     return lines + _table(("Checkpoint", "Baseline", "Treatment", "Δ"), rows)
 
 
-def _basis(check: CheckSeparation) -> str:
-    if check.min_share is None:
-        return check.basis
-    return f"{check.basis} (min share {check.min_share:g})"
-
-
 def _manipulation(report: ManipulationReport | None) -> list[str]:
     if report is None:
         return []
@@ -150,18 +144,14 @@ def _manipulation(report: ManipulationReport | None) -> list[str]:
             _num(check.baseline.mean),
             _num(check.guided.mean),
             _num(check.p_value),
-            _basis(check),
             check.verdict.value,
             check.reason,
         ]
         for check in report.checks
     )
-    source = "pre-registered by the lock" if report.preregistered else "process defaults"
-    header = ("Check", "Baseline", "Treatment", "p", "Basis", "Verdict", "Reason")
+    header = ("Check", "Baseline", "Treatment", "p", "Verdict", "Reason")
     return [
         f"### Manipulation check: **{report.verdict.value}**",
-        "",
-        f"Checks: {source}.",
         "",
         *_table(header, rows),
     ]
@@ -377,7 +367,7 @@ def _process_arms(report: AnalysisReport) -> list[str]:
         "not say its runner was not found (total_test_commands_not_run counts those). "
         "work_session_tests_run_rate is the share of steps whose work session "
         "itself ran tests after its last edit (a gate's fix sessions do not count); "
-        "plan_written counts in compliance_rate only when the condition asks for a plan. "
+        "plan_written counts in compliance_rate only when the arm's workflow asks for a plan. "
         "work_session_tests_run_any_rate is the share whose work session ran the "
         "tests at all and work_session_tests_after_last_code_edit_rate the share that ran them "
         "after its last edit to a non-test file.",
@@ -629,13 +619,13 @@ def render_markdown(report: AnalysisReport) -> str:
     if not report.citable and report.dev_job is not None:
         lines += [
             "> **Not citable:** development execution options change the declared "
-            "experiment; these results are not evidence about its treatment or agent.",
+            "experiment; these results are not evidence about its arms or agent.",
             "",
         ]
     elif not report.citable:
         lines += [
             f"> **Not citable:** a {report.experiment_kind} experiment checks operational "
-            "health; its verdicts are not evidence about any treatment or agent.",
+            "health; its verdicts are not evidence about any arm or agent.",
             "",
         ]
     if report.dev_job is not None:

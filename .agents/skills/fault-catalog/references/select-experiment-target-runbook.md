@@ -8,15 +8,15 @@ targeting before anything runs.
 ## Guidance
 
 - Consider records with `open` or `reopened` status whose owner can be changed by a
-  component (a `raidar:` component area or a `subject:` repo); never `Measurement` faults.
-  A `Measurement` record is routed to its owner, never targeted by a component.
+  agent or workflow release (a `raidar:` area or a `subject:` repo); never `Measurement` faults.
+  A `Measurement` record is routed to its owner, never targeted by a release change.
 - Rank by impact on the experiment's outcome, recurrence across attempts, the
-  size of the arm differential, and whether a component change can move the
+  size of the arm differential, and whether a release change can move the
   detection signal measurably.
 - Prefer few records with clear causal hypotheses. When several records are
-  targeted by one candidate condition, say that the experiment cannot attribute
+  targeted by one candidate arm, say that the experiment cannot attribute
   an effect to one change, and name the follow-up that would.
-- Record the experiment id, objective, intervention (the component change),
+- Record the experiment id, objective, intervention (the release change),
   expected direction, fixed controls (problem pin, agent, model, effort,
   protocol, scorers, thresholds) and the unchanged resolution criterion.
 - Transition each selected record to `targeted` with a dated `status_history`

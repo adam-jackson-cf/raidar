@@ -1,6 +1,6 @@
 """T1: hash Raidar's provisioned tool tree around the agent phases (mechanics-v1 design r2 §3.2).
 
-``/opt/raidar-tools`` holds the root-owned tools a component provisions (gate, linters,
+``/opt/raidar-tools`` holds the root-owned tools the lab provisions (gate, linters,
 their virtualenvs and configs); ``/usr/local/bin`` links that point into it are the
 provisioned entry points. ``install_tool_tree_watch`` hashes both through a root ``exec``
 before the trial's first agent phase (the baseline) and after every agent phase, once the

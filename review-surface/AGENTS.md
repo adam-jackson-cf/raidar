@@ -2,7 +2,7 @@
 
 - Preserve the existing user flow and every signal/persona question asserted by Playwright.
   Change assertions only when the flow legitimately changes, retaining coverage of each signal.
-- Use problem, condition, arm and trial wording in visible UI.
+- Use problem, arm and trial wording in visible UI.
 - Preserve /runs/:runId routes and data-run-id attributes as internal contracts.
 - Keep Jev dormant under the policy constraints in `lab/judge/AGENTS.md`.
 - After UI changes run `make review-surface-test`.

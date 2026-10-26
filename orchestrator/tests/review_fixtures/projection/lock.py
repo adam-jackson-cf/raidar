@@ -1,7 +1,7 @@
 """The synthetic review fixture's experiment lock: sealed like a real lock.
 
 Only what the review projection reads from a lock is filled in: the spec, the
-locked conditions and problem (execution section), the headline metric chosen
+locked arms and problem (execution section), the headline metric chosen
 by K (assessment section) and the analysis section. ``seal_lock`` adds the
 section digests, ``lock_sha256`` (the execution digest) and ``document_sha256``,
 so ``experiment_lock`` accepts it exactly as it accepts a ``raidar lock`` output.
@@ -22,7 +22,7 @@ def fixture_lock(
     *,
     problem: str,
     checkpoints: int,
-    conditions: Mapping[str, Any],
+    arms: Mapping[str, Any],
 ) -> dict[str, Any]:
     return seal_lock(
         {
@@ -30,7 +30,7 @@ def fixture_lock(
             "spec": spec_json,
             "execution": {
                 "design": {"id": spec_json["id"]},
-                "conditions": conditions,
+                "arms": arms,
                 "problems": [
                     {"label": problem, "checkpoints": checkpoints, "digest": digest_json(problem)}
                 ],

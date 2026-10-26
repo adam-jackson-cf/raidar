@@ -1,17 +1,18 @@
-"""Pydantic schema for ``experiment.yaml``, schema v2 (F9, F10).
+"""Pydantic schema for ``experiment.yaml``, schema v3.
 
 Every model forbids unknown keys, so typos surface as field-level errors.
-Cross-reference rules (unique ids, arm → agent/condition, baseline arm, known
-metric), the kind rules (``KIND*``) and the naming rules (``NAME*``) are
-checked by ``raidar.design.experiment.validation`` so each error carries the path of the
-offending field.
+Cross-reference rules (unique ids, arm -> agent, baseline arm, known metric), the
+release rules (agent release, model and reasoning), the kind rules (``KIND*``) and the
+naming rules (``NAME*``) are checked by ``raidar.design.experiment.validation`` so each
+error carries the path of the offending field.
 
-Vocabulary (Harbor's, requirements change log 2026-10-02): an experiment has
-a ``kind`` (``ab-test``, ``benchmark``, ``smoke``; ``research-loop`` is
-reserved), one ``runtime`` (a runtime pack id), a Harbor ``environment``
-(``type: docker``), agents named by Harbor ``AgentName`` (``codex``,
-``claude-code``), a headline ``metric`` and ``analysis.attempts``: the
-paired, counterbalanced replicates of every arm.
+Vocabulary (Harbor's): an experiment has a ``kind`` (``ab-test``, ``benchmark``,
+``smoke``; ``research-loop`` is reserved), one ``runtime`` (a runtime pack id), a Harbor
+``environment`` (``type: docker``), a headline ``metric`` and ``analysis.attempts``: the
+paired, counterbalanced replicates of every arm. An **arm** is an agent plus a workflow:
+``agents`` name an agent release (``codex@1``, ``lab/agents/``) with one of its models and
+that model's reasoning level; ``arms`` name an agent id and a workflow release
+(``lab/workflows/``), ``one-shot@1`` when omitted.
 """
 
 from __future__ import annotations
@@ -32,7 +33,9 @@ from pydantic import (
 )
 
 from raidar.contract.references import REFERENCE_PATTERN
-from raidar.subject.agent.config import AgentName, Harness, agent_cli
+
+DEFAULT_WORKFLOW = "one-shot@1"
+"""The workflow an arm runs when it names none (design section 2)."""
 
 IDENTIFIER_PATTERN = r"^[a-z0-9][a-z0-9_-]*$"
 EXPERIMENT_KINDS = ("ab-test", "benchmark", "smoke", "research-loop")
@@ -107,19 +110,12 @@ class EnvironmentSpec(SpecModel):
 
 
 class AgentEntry(SpecModel):
-    """One agent: Harbor agent ``name`` + model + kwargs (``reasoning_effort``) + version."""
+    """One agent: an agent release, one of its models and that model's reasoning level."""
 
     id: Identifier
-    name: AgentName
-    provider: str = Field(min_length=1)
+    release: Reference
     model: str = Field(min_length=1)
-    reasoning_effort: str | None = None
-    version: str = Field(pattern=PINNED_VERSION_PATTERN, description="Pinned agent CLI release")
-
-    @property
-    def harness(self) -> Harness:
-        """The agent's CLI install id, as released components and the pack image key it."""
-        return agent_cli(self.name)
+    reasoning: str | None = None
 
 
 class ProtocolSpec(SpecModel):
@@ -154,21 +150,12 @@ class ProtocolSpec(SpecModel):
         return self
 
 
-class ComponentUse(SpecModel):
-    use: Reference
-    files: tuple[RelativePath, ...] = ()
-    with_: FiniteJsonObject = Field(default_factory=dict, alias="with")
-
-
-class ConditionSpec(SpecModel):
-    id: Identifier
-    components: tuple[ComponentUse, ...] = ()
-
-
 class ArmSpec(SpecModel):
+    """One arm: an agent (by id) and the workflow release it runs."""
+
     id: Identifier
-    condition: Identifier
     agent: Identifier
+    workflow: Reference = DEFAULT_WORKFLOW
 
 
 class InventoryPolicySpec(SpecModel):
@@ -205,19 +192,6 @@ VERDICT_THRESHOLDS = ("min_pairs", "max_exclusion_fraction", "alpha", "min_effec
 PositiveFiniteFloat = Annotated[float, Field(gt=0.0, allow_inf_nan=False)]
 
 
-class ManipulationCheckSpec(SpecModel):
-    """One pre-registered manipulation check (``raidar.evaluation.analysis.manipulation``).
-
-    ``check`` names an available check (for example ``gate_clean_at_step_end``
-    from ``gate-effort``); ``min_share`` is the share of the treatment arm's
-    decided checkpoints that must pass. ``raidar.design.experiment.validation`` checks the
-    name and that a scorer reporting it is declared.
-    """
-
-    check: str = Field(min_length=1)
-    min_share: float | None = Field(default=None, gt=0.0, le=1.0)
-
-
 class AnalysisSpec(SpecModel):
     """Arm design plus the pre-registered verdict thresholds ``raidar analyze`` reads.
 
@@ -232,10 +206,7 @@ class AnalysisSpec(SpecModel):
     (unset: the progression's default, ``solve_rate`` under ``continue`` and
     ``reached`` under ``halt_on_failure``); it is analysis configuration, so
     setting it relocks the ``analysis`` section only and keeps ``lock_sha256``.
-    ``raidar.design.experiment.validation`` checks every metric id. ``manipulation_checks``
-    pre-registers the manipulation checks (and any threshold) analysis runs;
-    unset, analysis runs the process-compliance defaults when that scorer is
-    declared.
+    ``raidar.design.experiment.validation`` checks every metric id.
     """
 
     baseline_arm: Identifier
@@ -248,32 +219,10 @@ class AnalysisSpec(SpecModel):
     min_effects: dict[str, PositiveFiniteFloat] = Field(default_factory=dict)
     rank_by: str | None = None
     primary_outcome: str | None = None
-    manipulation_checks: tuple[ManipulationCheckSpec, ...] | None = Field(
-        default=None, min_length=1
-    )
-
-    @model_validator(mode="after")
-    def _unique_manipulation_checks(self) -> AnalysisSpec:
-        names = [item.check for item in self.manipulation_checks or ()]
-        duplicates = sorted({name for name in names if names.count(name) > 1})
-        if duplicates:
-            raise ValueError(f"manipulation_checks repeats {duplicates}")
-        return self
-
-
-FactorNoun = Literal[
-    "condition",
-    "agent",
-    "agent.name",
-    "agent.provider",
-    "agent.model",
-    "agent.reasoning_effort",
-    "agent.version",
-]
 
 
 class ExperimentSpec(SpecModel):
-    schema_version: Literal[2]
+    schema_version: Literal[3]
     kind: ExperimentKind
     id: Identifier
     description: str = ""
@@ -282,11 +231,6 @@ class ExperimentSpec(SpecModel):
     environment: EnvironmentSpec = EnvironmentSpec()
     agents: tuple[AgentEntry, ...] = Field(min_length=1)
     protocol: ProtocolSpec = ProtocolSpec()
-    factors: tuple[FactorNoun, ...] = ()
-    # Applied identically to every condition, ahead of its own components: framing
-    # every arm shares (e.g. a prompt-wrapper) without being part of any factor.
-    shared_components: tuple[ComponentUse, ...] = ()
-    conditions: tuple[ConditionSpec, ...] = Field(min_length=1)
     arms: tuple[ArmSpec, ...] = Field(min_length=1)
     assessment: AssessmentSpec
     analysis: AnalysisSpec
@@ -294,33 +238,16 @@ class ExperimentSpec(SpecModel):
     def agent(self, agent_id: str) -> AgentEntry:
         return next(agent for agent in self.agents if agent.id == agent_id)
 
-    def condition(self, condition_id: str) -> ConditionSpec:
-        """The effective condition: ``shared_components`` first, then its own components."""
-        declared = next(item for item in self.conditions if item.id == condition_id)
-        if not self.shared_components:
-            return declared
-        return declared.model_copy(
-            update={"components": (*self.shared_components, *declared.components)}
-        )
-
-    def component_uses(self) -> list[tuple[str, ComponentUse]]:
-        """Every declared component use with its field location (shared ones once)."""
-        shared = [
-            (f"shared_components.{index}", use) for index, use in enumerate(self.shared_components)
-        ]
-        own = [
-            (f"conditions.{c_index}.components.{u_index}", use)
-            for c_index, condition in enumerate(self.conditions)
-            for u_index, use in enumerate(condition.components)
-        ]
-        return [*shared, *own]
+    def arm(self, arm_id: str) -> ArmSpec:
+        return next(arm for arm in self.arms if arm.id == arm_id)
 
     def references(self) -> dict[str, tuple[str, ...]]:
         """Registry references by kind (metric only when declared)."""
         metric = self.assessment.metric
         return {
             "problem": tuple(p.ref for p in self.problems if p.ref is not None),
-            "component": tuple(use.use for _, use in self.component_uses()),
+            "agent": tuple(dict.fromkeys(agent.release for agent in self.agents)),
+            "workflow": tuple(dict.fromkeys(arm.workflow for arm in self.arms)),
             "scorer": self.assessment.scorers,
             "metric": (metric,) if metric is not None else (),
         }
@@ -328,14 +255,8 @@ class ExperimentSpec(SpecModel):
     def to_json(self) -> dict[str, object]:
         # Optional fields left unset are omitted, so a spec that does not set them keeps
         # its bytes (and so its lock digests) as they were before the field existed.
-        exclude: dict[str, Any] = {}
-        if not self.shared_components:
-            exclude["shared_components"] = True
         unset = {
-            name
-            for name in ("rank_by", "primary_outcome", "manipulation_checks")
-            if getattr(self.analysis, name) is None
+            name for name in ("rank_by", "primary_outcome") if getattr(self.analysis, name) is None
         }
-        if unset:
-            exclude["analysis"] = unset
+        exclude: dict[str, Any] = {"analysis": unset} if unset else {}
         return self.model_dump(mode="json", by_alias=True, exclude=exclude or None)

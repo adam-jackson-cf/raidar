@@ -11,7 +11,6 @@ from collections.abc import Sequence
 from pathlib import Path
 
 from raidar.contract.review import (
-    ArmDiffArtifact,
     ReviewExperimentRecord,
     ReviewProjectionArtifact,
     ReviewRunDetail,
@@ -51,22 +50,20 @@ def merge_review_projections(
     if not epoch.experiments:
         where = ", ".join(str(root) for root in job_roots) or "no source"
         raise ValueError(f"no projectable runs found under {where}")
-    experiments, diffs = mark_policy_mismatches(epoch.experiments, epoch.diffs)
-    return _artifact(job_roots, experiments, _unique_details(epoch.details), diffs)
+    experiments = mark_policy_mismatches(epoch.experiments)
+    return _artifact(job_roots, experiments, _unique_details(epoch.details))
 
 
 def _artifact(
     roots: Sequence[Path],
     experiments: Sequence[ReviewExperimentRecord],
     details: Sequence[ReviewRunDetail],
-    diffs: Sequence[ArmDiffArtifact],
 ) -> ReviewProjectionArtifact:
     return ReviewProjectionArtifact(
         generated_from=", ".join(repo_path(root) for root in roots),
         experiments=list(experiments),
         runs=sorted((detail.run for detail in details), key=lambda run: (-run.started_at, run.id)),
         run_details={detail.run.id: detail for detail in details},
-        arm_diffs=list(diffs),
     )
 
 

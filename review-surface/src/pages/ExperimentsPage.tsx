@@ -24,7 +24,7 @@ import {
   scorerName,
   spreadTier,
 } from '@/presentation/verdict';
-import type { AnnotationKind, ArmDiff, ExperimentRecord, RunRecord, StatBlock } from '@/api/types';
+import type { AnnotationKind, ExperimentRecord, RunRecord, StatBlock } from '@/api/types';
 
 function statDetail(stat: StatBlock | undefined): string {
   if (stat?.mean == null) return 'No scored trials';
@@ -259,7 +259,7 @@ function ExperimentExpansion({ exp }: { exp: ExperimentRecord }) {
   );
 }
 
-/** One plain-language sentence answering "who wins this problem condition, and what should I look at first?" */
+/** One plain-language sentence answering "who wins this problem, and what should I look at first?" */
 function GroupHeadline({ sorted, runsById }: { sorted: ExperimentRecord[]; runsById: Map<string, RunRecord> }) {
   const best = sorted[0];
   const bestMean = best?.aggregate.composite_score?.mean ?? null;
@@ -588,8 +588,6 @@ export function ExperimentsPage() {
     );
   }
 
-  const armDiffs = experiments.data?.arm_diffs ?? [];
-
   return (
     <div className="sb flex flex-1 flex-col gap-5 overflow-auto p-4">
       {families.length > 1 && (
@@ -615,7 +613,6 @@ export function ExperimentsPage() {
           family={family}
           arms={arms}
           all={all}
-          diffs={armDiffs.filter((diff) => diff.problem === family)}
         />
       ))}
     </div>
@@ -626,12 +623,10 @@ function FamilySection({
   family,
   arms,
   all,
-  diffs,
 }: {
   family: string;
   arms: Array<[string, ExperimentRecord[]]>;
   all: ExperimentRecord[];
-  diffs: ArmDiff[];
 }) {
   const runs = useQuery({ queryKey: ['runs'], queryFn: api.runs });
   const familyRunIds = new Set(all.flatMap((exp) => exp.run_ids));
@@ -646,7 +641,7 @@ function FamilySection({
         <TradeoffScatter runs={familyRuns} />
         <FailurePatterns runs={familyRuns} />
       </div>
-      <ArmMovement experiments={all} diffs={diffs} />
+      <ArmMovement experiments={all} />
     </div>
   );
 }

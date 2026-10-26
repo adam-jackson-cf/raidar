@@ -11,7 +11,6 @@ from click.testing import CliRunner
 from raidar.cli import main
 from raidar.design.problem.models import ProblemId
 from raidar.design.problem.store import ProblemStore, ProblemStoreError
-from raidar.subject.environment.python.pack_definition import load_pack_spec
 from tests.problems_support import (
     NEGATIVE_REF,
     ONESHOT_REF,
@@ -116,19 +115,16 @@ def test_init_writes_a_validating_two_arm_starter_and_refuses_to_overwrite(
 
     assert result.exit_code == 0, result.output
     text = experiment.read_text()
-    codex = load_pack_spec().image.harnesses["codex-cli"]
     assert f"id: {experiment_id}" in text
     assert "kind: ab-test" in text
-    assert "name: codex" in text
-    assert f"version: {codex.version}" in text
-    assert (experiment.parent / "components" / "AGENTS.md").is_file()
+    assert "release: codex@1" in text
+    assert "workflow: one-shot@1" in text
     validated = runner.invoke(main, ["validate", str(experiment)])
     assert validated.exit_code == 0, validated.output
-    assert "arms: baseline, rules" in validated.output
 
     again = runner.invoke(main, ["init", str(experiment)])
     assert again.exit_code != 0
-    assert "add a condition and an arm" in again.output
+    assert "refusing to overwrite" in again.output
 
 
 @pytest.mark.parametrize("bad", ["Not Valid", "rules-trial", "node-ts__x__y", "python__x"])

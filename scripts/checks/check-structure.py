@@ -4,11 +4,10 @@
 Rules (docs/reboot/repo-structure-design.md §3.5):
 
 * no repository path carries a version token (``_v2``, ``-v2``, a ``v2`` segment); the
-  version is data (``name@N`` in a manifest). ``v<N>/`` data folders under a
-  ``components/`` directory or under ``lab/treatments/`` are the one exception;
+  version is data (``name@N`` in a manifest);
 * the repository root holds only the allowlisted directories and files;
-* ``lab/`` holds only the allowlisted data trees (experiments, problem pins, the ledger, component
-  payloads, runtime-pack recipes and judge policies);
+* ``lab/`` holds only the allowlisted data trees (experiments, problem pins, the ledger, agent
+  and workflow definitions, runtime-pack recipes and judge policies);
 * ``orchestrator/src/raidar`` holds only the allowlisted stage packages, and each holds only its
   allowlisted subpackages (§8);
 * packages nest at most three levels below ``raidar/`` (run-time data lives under ``lab/``, not
@@ -55,8 +54,10 @@ ROOT_FILES = frozenset(
 )
 # The data trees the code loads at run time, each at one explicit path (contract/paths.py).
 LAB_DIRECTORIES = frozenset(
-    {"experiments", "problems", "ledger", "treatments", "environments", "judge"}
+    {"experiments", "problems", "ledger", "agents", "workflows", "environments", "judge"}
 )
+# The one data file at the lab root: the agent and workflow release register.
+LAB_FILES = frozenset({"releases.yaml"})
 RAIDAR_PACKAGE_DIR = "orchestrator/src/raidar"
 # Top-level packages (the stages of an evaluation, plus the CLI and the shared contracts), each with
 # the subpackages its group may hold (docs/reboot/repo-structure-design.md §8). Modules sit freely
@@ -65,7 +66,7 @@ RAIDAR_PACKAGES: dict[str, frozenset[str]] = {
     "cli": frozenset(),
     "contract": frozenset(),
     "design": frozenset({"experiment", "problem"}),
-    "subject": frozenset({"agent", "treatment", "environment"}),
+    "subject": frozenset({"agent", "workflow", "environment"}),
     "engine": frozenset({"target", "job", "trial", "health", "perf"}),
     "grading": frozenset({"runtime", "prefix", "coverage"}),
     "scoring": frozenset(
@@ -84,9 +85,6 @@ RAIDAR_PACKAGES: dict[str, frozenset[str]] = {
 }
 MAX_PACKAGE_DEPTH = 3
 VERSION_TOKEN = re.compile(r"(?<![A-Za-z0-9])v\d+(?![A-Za-z0-9])")
-DATA_VERSION_SEGMENT = re.compile(r"v\d+")
-DATA_PARENT = "components"
-DATA_PREFIX = "lab/treatments/"
 # Dated design records keep their historical file names (the docs tree is not product layout).
 VERSION_EXEMPT_PREFIXES = ("docs/",)
 
@@ -104,15 +102,6 @@ def repo_paths(repo_root: Path) -> list[str]:
     return sorted({line for line in result.stdout.splitlines() if line})
 
 
-def _is_data_version_dir(parts: tuple[str, ...], index: int) -> bool:
-    """A ``v<N>`` directory segment below a ``components`` directory."""
-    return (
-        index < len(parts) - 1
-        and DATA_VERSION_SEGMENT.fullmatch(parts[index]) is not None
-        and (DATA_PARENT in parts[:index] or "/".join(parts[:2]) + "/" == DATA_PREFIX)
-    )
-
-
 def version_violations(paths: list[str]) -> list[str]:
     found = []
     for path in paths:
@@ -120,7 +109,7 @@ def version_violations(paths: list[str]) -> list[str]:
             continue
         parts = PurePosixPath(path).parts
         for index, part in enumerate(parts):
-            if VERSION_TOKEN.search(part) and not _is_data_version_dir(parts, index):
+            if VERSION_TOKEN.search(part):
                 found.append(f"version in path name: {path}")
                 break
     return found
@@ -146,7 +135,10 @@ def lab_violations(paths: list[str]) -> list[str]:
     found = set()
     for path in paths:
         parts = PurePosixPath(path).parts
-        if parts[0] == "lab" and len(parts) > 1 and parts[1] not in LAB_DIRECTORIES:
+        if parts[0] != "lab" or len(parts) < 2:
+            continue
+        allowed = LAB_FILES if len(parts) == 2 else LAB_DIRECTORIES
+        if parts[1] not in allowed:
             found.add(f"unexpected lab entry: lab/{parts[1]}")
     return sorted(found)
 

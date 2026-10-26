@@ -80,7 +80,6 @@ class TrialScript:
     started: datetime
     prompt: str
     checkpoints: tuple[CheckpointScript, ...]
-    overlay: tuple[tuple[str, str], ...] = ()
     failure: str | None = None
 
 
@@ -95,7 +94,8 @@ class TrialPlan:
     problem_title: str
     bundle: Path
     lock_sha256: str
-    condition_digest: str
+    workflow_digest: str
+    stage_code_digest: str
     agent_digest: str
 
 
@@ -282,10 +282,6 @@ def _task(plan: TrialPlan, script: TrialScript) -> None:
         step = task / "steps" / checkpoint.step
         step.mkdir(parents=True, exist_ok=True)
         (step / "instruction.md").write_text(script.prompt + "\n", encoding="utf-8")
-        for path, content in script.overlay:
-            target = step / "workdir" / path
-            target.parent.mkdir(parents=True, exist_ok=True)
-            target.write_text(content, encoding="utf-8")
 
 
 def _state(checkpoint: CheckpointScript) -> CheckpointState:
@@ -366,7 +362,7 @@ def _validity(script: TrialScript, step_results: Sequence[StepResult]) -> Execut
         "verifier_infra": None,
         "no_verifier_leak": None,
         "agent_infra": _reason_detail(step_results, "step_exception"),
-        "component_probes": None,
+        "lab_checks": None,
         "progression": None,
         "agent_version": None,
     }
@@ -382,8 +378,11 @@ def _planned(plan: TrialPlan, script: TrialScript) -> PlannedTrial:
     hashes = {
         "lock": plan.lock_sha256,
         "problem": digest_json(plan.problem),
-        "arm": digest_json([script.arm, plan.condition_digest, plan.agent_digest]),
-        "condition": plan.condition_digest,
+        "arm": digest_json(
+            [script.arm, plan.workflow_digest, plan.stage_code_digest, plan.agent_digest]
+        ),
+        "workflow": plan.workflow_digest,
+        "stage_code": plan.stage_code_digest,
         "agent": plan.agent_digest,
         "protocol": digest_json(_CONTINUE.model_dump(mode="json")),
     }

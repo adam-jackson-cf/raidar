@@ -30,19 +30,27 @@ RUNNER = {
 }
 RECIPES = {"pack": "p" * 64, "graders": {}}
 TARGET = {"name": "mbp", "docker": {"ncpu": 4, "server_version": "29"}}
+STAGE_CODE = {"build": "b" * 64}
 AGENT = {
-    "id": "luna",
-    "name": "codex",
-    "model": "gpt-6-luna",
-    "reasoning_effort": "low",
+    "agent": "luna",
+    "agent_release": "codex@1",
+    "adapter": "codex",
     "provider": "openai",
+    "model": "gpt-6-luna",
+    "reasoning": "low",
+    "tool": {"package": "@openai/codex", "binary": "codex", "version": "0.156.1"},
+    "workflow": "one-shot@1",
+    "workflow_sha256": "w" * 64,
+    "stage_code": STAGE_CODE,
+    "digest": "d" * 64,
 }
+OTHER = {**AGENT, "agent": "terra", "model": "gpt-6-terra", "digest": "e" * 64}
 
 
-def lock(kind: str = "smoke", *agents: dict[str, Any]) -> dict[str, Any]:
-    entries = list(agents) or [AGENT]
-    arms = [{"id": f"arm-{a['id']}", "agent": a["id"]} for a in entries]
-    return {"execution": {"design": {"kind": kind, "agents": entries, "arms": arms}}}
+def lock(kind: str = "smoke", *arms: dict[str, Any]) -> dict[str, Any]:
+    """A lock whose ``execution.arms`` hold one identity per arm, ``arm-<agent>``."""
+    identities = {f"arm-{arm['agent']}": arm for arm in arms or (AGENT,)}
+    return {"execution": {"design": {"kind": kind}, "arms": identities}}
 
 
 def wanted(**changes: Any) -> dict[str, Any] | None:
@@ -56,7 +64,7 @@ def smoke_job(root: Path, name: str = "smoke-01", **changes: Any) -> HealthyTria
     job_dir = root / "exp" / name
     t = healthy_trial(root / ".work" / name, job_dir=job_dir)
     smoke_lock = changes.get("lock", lock("smoke"))
-    arm = changes.get("executed_arm", smoke_lock["execution"]["design"]["arms"][0]["id"])
+    arm = changes.get("executed_arm", next(iter(smoke_lock["execution"]["arms"])))
     t.record = t.record.model_copy(update={"trial": t.record.trial.model_copy(update={"arm": arm})})
     (job_dir / "trial-records" / f"{TRIAL_ID}.json").write_text(t.record.model_dump_json())
     manifest = {
@@ -85,7 +93,7 @@ def test_the_experiment_kind_and_identity_come_from_the_lock() -> None:
     assert experiment_kind({}) is None
     found = wanted()
     assert found is not None
-    assert found["agents"] == [["codex", "gpt-6-luna", "low"]]
+    assert found["arms"] == [{k: v for k, v in AGENT.items() if k not in ("agent", "digest")}]
     assert found["target"] == TARGET
     assert wanted(runner={}) is None
     assert wanted(target=None) is None
@@ -109,41 +117,40 @@ def test_a_clean_matching_smoke_admits_and_is_recorded(tmp_path: Path) -> None:
     }
 
 
-def test_a_smoke_covering_more_agents_still_clears_a_narrower_run(tmp_path: Path) -> None:
-    other = {**AGENT, "id": "haiku", "name": "claude-code", "model": "claude-haiku-4-5"}
-    smoke_job(tmp_path, lock=lock("smoke", AGENT, other))
+def test_a_smoke_covering_more_arms_still_clears_a_narrower_run(tmp_path: Path) -> None:
+    smoke_job(tmp_path, lock=lock("smoke", AGENT, OTHER))
     assert decide(tmp_path)["smoke_job"] == "exp/smoke-01"
 
 
-def test_only_executed_arms_clear_agents_and_per_agent_smokes_combine(tmp_path: Path) -> None:
-    other = {**AGENT, "id": "haiku", "name": "claude-code", "model": "claude-haiku-4-5"}
-    both = lock("smoke", AGENT, other)
+def test_only_executed_arms_clear_and_per_arm_smokes_combine(
+    tmp_path: Path,
+) -> None:
+    both = lock("smoke", AGENT, OTHER)
     smoke_job(tmp_path, "codex", lock=both, executed_arm="arm-luna")
-    wanted_both = wanted(lock=lock("benchmark", AGENT, other))
+    wanted_both = wanted(lock=lock("benchmark", AGENT, OTHER))
     with pytest.raises(AdmissionError, match="not smoked"):
         admit("benchmark", wanted_both, tmp_path, allow_unsmoked=False)
-    smoke_job(tmp_path, "claude-bad", lock=both, executed_arm="arm-haiku", health=False)
+    smoke_job(tmp_path, "claude-bad", lock=both, executed_arm="arm-terra", health=False)
     with pytest.raises(AdmissionError, match="not smoked"):
         admit("benchmark", wanted_both, tmp_path, allow_unsmoked=False)
-    smoke_job(tmp_path, "claude", lock=both, executed_arm="arm-haiku")
+    smoke_job(tmp_path, "claude", lock=both, executed_arm="arm-terra")
     decision = admit("benchmark", wanted_both, tmp_path, allow_unsmoked=False)
     assert decision["smoke_jobs"] == ["exp/claude", "exp/codex"]
     assert decision["overridden"] is False
 
 
-def test_incompatible_per_agent_smokes_cannot_complete_coverage(tmp_path: Path) -> None:
-    other = {**AGENT, "id": "haiku", "name": "claude-code", "model": "claude-haiku-4-5"}
+def test_incompatible_per_arm_smokes_cannot_complete_coverage(tmp_path: Path) -> None:
     smoke_job(tmp_path, "codex")
     smoke_job(
         tmp_path,
         "claude",
-        lock=lock("smoke", other),
+        lock=lock("smoke", OTHER),
         runner={**RUNNER, "execution_sha256": "x" * 64},
     )
     with pytest.raises(AdmissionError, match="execution_sha256 differs"):
         admit(
             "benchmark",
-            wanted(lock=lock("benchmark", AGENT, other)),
+            wanted(lock=lock("benchmark", AGENT, OTHER)),
             tmp_path,
             allow_unsmoked=False,
         )
@@ -176,7 +183,9 @@ def test_a_smoke_requires_actual_work_by_the_declared_agent(
         ({"target": {**TARGET, "name": "other"}}, {}, "target differs"),
         ({"target": {**TARGET, "docker": {"ncpu": 8}}}, {}, "target differs"),
         ({}, {"lock": lock("ab-test", {**AGENT, "model": "gpt-9"})}, "not smoked"),
-        ({}, {"lock": lock("ab-test", {**AGENT, "reasoning_effort": "high"})}, "not smoked"),
+        ({}, {"lock": lock("ab-test", {**AGENT, "reasoning": "high"})}, "not smoked"),
+        ({}, {"lock": lock("ab-test", {**AGENT, "stage_code": {"build": "x" * 64}})}, "not smoked"),
+        ({}, {"lock": lock("ab-test", {**AGENT, "workflow_sha256": "x" * 64})}, "not smoked"),
     ],
 )
 def test_each_mismatch_refuses(

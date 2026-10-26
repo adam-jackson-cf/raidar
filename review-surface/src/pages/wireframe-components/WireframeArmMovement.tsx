@@ -1,8 +1,8 @@
-import { useMemo, useState } from 'react';
-import { ChevronDown, ChevronRight, MoveRight, TriangleAlert, Trophy } from 'lucide-react';
+import { useMemo } from 'react';
+import { Trophy } from 'lucide-react';
 import { C } from '@/presentation/colors';
 import { fmtTokens } from '@/presentation/format';
-import type { ExperimentRecord, FileDiff, ArmDiff, StatBlock } from '@/api/types';
+import type { ExperimentRecord, StatBlock } from '@/api/types';
 import { compactSpec } from './wireframeLabels';
 
 type MovementMetric = 'outcome' | 'runtime' | 'spend';
@@ -108,163 +108,12 @@ function DeltaCell({
   );
 }
 
-function DiffBlock({ file }: { file: FileDiff }) {
-  return (
-    <div
-      className="sb max-h-72 overflow-auto rounded p-2"
-      style={{ background: C.subtle, border: `1px solid ${C.border}` }}
-    >
-      {file.diff.lines.map((line, index) => (
-        <div
-          key={index}
-          className="num whitespace-pre-wrap break-words text-[10px] leading-relaxed"
-          style={{
-            color: line.type === 'added' ? C.green : line.type === 'removed' ? C.red : C.fg1,
-            background:
-              line.type === 'added'
-                ? 'rgba(96,227,109,0.06)'
-                : line.type === 'removed'
-                  ? 'rgba(235,20,20,0.06)'
-                  : 'transparent',
-          }}
-        >
-          {line.type === 'added' ? '+ ' : line.type === 'removed' ? '- ' : '  '}
-          {line.text}
-        </div>
-      ))}
-      {file.diff.truncated && (
-        <div className="mt-1 text-[10px]" style={{ color: C.orange }}>
-          diff truncated — review {file.path} directly
-        </div>
-      )}
-    </div>
-  );
-}
-
-type DiffPill = { label: string; warning: boolean; tab: string };
-
-export function ArmDiffCard({ diff }: { diff: ArmDiff }) {
-  const [open, setOpen] = useState(false);
-  const [tab, setTab] = useState('prompt');
-  const pillConfig = (flag: string) => {
-    const normalized = flag.toLowerCase();
-    if (normalized === 'prompt changed') return { label: 'PROMPT', warning: false, tab: 'prompt' };
-    if (normalized === 'rules changed') return { label: 'RULES', warning: false, tab: 'rules' };
-    if (normalized === 'starter changed') return { label: 'STARTER', warning: false, tab: 'starter' };
-    if (normalized === 'quality gates changed') return { label: 'GATES', warning: false, tab: 'gates' };
-    if (normalized === 'requirements changed') return { label: 'REQS', warning: false, tab: 'reqs' };
-    if (normalized === 'evaluation profile changed') return { label: 'EVAL', warning: true, tab: 'eval' };
-    return null;
-  };
-  const pills = diff.summary.map(pillConfig).filter(Boolean) as DiffPill[];
-  const sections = diff.sections ?? { prompt: diff.files.prompt, condition: diff.files.condition };
-  const tabs = pills.filter((pill) => sections[pill.tab]);
-  const activeTab = sections[tab] ? tab : (tabs[0]?.tab ?? 'prompt');
-  const file = sections[activeTab] ?? diff.files.prompt;
-  const openTab = (nextTab: string) => {
-    if (!sections[nextTab]) return;
-    setTab(nextTab);
-    setOpen(true);
-  };
-  return (
-    <div className="rounded-md p-2" style={{ background: C.surface, border: `1px solid ${C.border}` }}>
-      <button className="flex w-full flex-wrap items-center gap-2 text-left" onClick={() => setOpen((openNow) => !openNow)}>
-        {open ? (
-          <ChevronDown className="size-3.5" style={{ color: C.fg0 }} />
-        ) : (
-          <ChevronRight className="size-3.5" style={{ color: C.fg0 }} />
-        )}
-        <span className="num text-[11px] font-medium" style={{ color: C.fg3 }}>
-          {diff.from_arm} <MoveRight className="inline size-3" /> {diff.to_arm}
-        </span>
-        {pills.filter((pill) => !pill.warning).map((pill) => (
-          <span
-            key={pill.label}
-            role="button"
-            tabIndex={0}
-            className="rounded px-1.5 py-px text-[9px] uppercase tracking-wide"
-            style={{
-              color: C.cyan,
-              background: `color-mix(in srgb, ${C.cyan} 14%, transparent)`,
-              border: `1px solid color-mix(in srgb, ${C.cyan} 42%, transparent)`,
-            }}
-            onClick={(event) => {
-              event.stopPropagation();
-              openTab(pill.tab);
-            }}
-            onKeyDown={(event) => {
-              if (event.key === 'Enter' || event.key === ' ') {
-                event.preventDefault();
-                event.stopPropagation();
-                openTab(pill.tab);
-              }
-            }}
-          >
-            {pill.label}
-          </span>
-        ))}
-        {pills.filter((pill) => pill.warning).map((pill) => (
-          <span
-            key={pill.label}
-            role="button"
-            tabIndex={0}
-            className="inline-flex items-center gap-1 rounded px-1.5 py-px text-[9px] font-medium uppercase tracking-wide"
-            style={{
-              color: C.orange,
-              background: `color-mix(in srgb, ${C.orange} 14%, transparent)`,
-              border: `1px solid color-mix(in srgb, ${C.orange} 42%, transparent)`,
-            }}
-            title="The evaluation contract itself changed - score movement is not purely the agent's doing."
-            onClick={(event) => {
-              event.stopPropagation();
-              openTab(pill.tab);
-            }}
-            onKeyDown={(event) => {
-              if (event.key === 'Enter' || event.key === ' ') {
-                event.preventDefault();
-                event.stopPropagation();
-                openTab(pill.tab);
-              }
-            }}
-          >
-            <TriangleAlert className="size-2.5" />
-            {pill.label}
-          </span>
-        ))}
-      </button>
-      {open && (
-        <div className="mt-2 flex flex-col gap-1.5">
-          <div className="flex gap-1">
-            {tabs.map((pill) => (
-              <button
-                key={pill.tab}
-                onClick={() => setTab(pill.tab)}
-                className="rounded px-2 py-0.5 text-[10px]"
-                style={{
-                  color: activeTab === pill.tab ? C.fg5 : C.fg1,
-                  background: activeTab === pill.tab ? C.selected : 'transparent',
-                  border: `1px solid ${activeTab === pill.tab ? C.borderLight : C.border}`,
-                }}
-              >
-                {pill.label.toLowerCase()} (+{sections[pill.tab].diff.added} -{sections[pill.tab].diff.removed})
-              </button>
-            ))}
-          </div>
-          <DiffBlock file={file} />
-        </div>
-      )}
-    </div>
-  );
-}
-
 export function WireframeArmMovement({
   experiments,
-  diffs,
   selectedArms,
   allArmSelected,
 }: {
   experiments: ExperimentRecord[];
-  diffs: ArmDiff[];
   selectedArms: string[];
   allArmSelected: boolean;
 }) {
@@ -284,7 +133,13 @@ export function WireframeArmMovement({
       const previousExperiments = experiments.filter((experiment) => experiment.arm === previousArm);
 
       for (const target of currentExperiments) {
-        const source = previousExperiments.find((experiment) => experiment.agent_spec === target.agent_spec);
+        // The same agent (harness, model, reasoning) under the other arm's workflow.
+        const source = previousExperiments.find(
+          (experiment) =>
+            experiment.harness === target.harness &&
+            experiment.model === target.model &&
+            experiment.reasoning_effort === target.reasoning_effort,
+        );
         if (!source) continue;
 
         rows.push({
@@ -320,11 +175,6 @@ export function WireframeArmMovement({
       .map((row, index) => ({ ...row, rank: index + 1 }));
   }, [allArmSelected, experiments, selectedArms]);
 
-  const visibleDiffs = useMemo(() => {
-    const pairs = new Set(movements.map((movement) => `${movement.from}->${movement.to}`));
-    return diffs.filter((diff) => pairs.has(`${diff.from_arm}->${diff.to_arm}`));
-  }, [diffs, movements]);
-
   return (
     <div className="flex flex-col gap-2 rounded-lg p-2.5" style={{ background: C.surface, border: `1px solid ${C.border}` }}>
       <div>
@@ -333,7 +183,7 @@ export function WireframeArmMovement({
           Arm movement
         </div>
         <div className="mt-1 text-[11px] leading-4" style={{ color: C.fg0 }}>
-          Did the outcome improve, contract diff shows changes
+          Did the outcome improve between arms
         </div>
       </div>
 
@@ -410,10 +260,6 @@ export function WireframeArmMovement({
           </tbody>
         </table>
       )}
-
-      {visibleDiffs.map((diff) => (
-        <ArmDiffCard key={diff.key} diff={diff} />
-      ))}
     </div>
   );
 }

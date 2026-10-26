@@ -1,6 +1,6 @@
 ---
 name: "raidar-release"
-description: "Use when changing a released Raidar component, scorer, headline metric or runtime pack, or relocking after toolchain edits."
+description: "Use when changing a released Raidar agent, workflow, scorer, headline metric or runtime pack, or relocking after toolchain edits."
 ---
 
 # Task
@@ -8,10 +8,10 @@ description: "Use when changing a released Raidar component, scorer, headline me
 ## Establish release impact
 
 - Identify manifest versions, fingerprint sources and affected experiment locks before editing.
-- Preserve released bytes first with `make release-archive REF=<name>@<N>` for each affected component or scorer.
+- Preserve released bytes first with `make release-archive REF=<name>@<N>` for each affected agent, workflow or scorer.
   Edit its single implementation in place and bump the manifest @N for behaviour changes.
   Recover old implementations from archive tags, never a parallel module.
-- Treat component fingerprint sources, scorer manifest descriptions, observation subject trajectory,
+- Treat agent and workflow release fingerprint sources, scorer manifest descriptions, observation subject trajectory,
   evidence input oracle.cases and problem oracle/ bundles as identity-bearing.
 - Preserve legacy wire names including Harness CLI ids, raidar_oracle_plugin.py,
   raidar-oracle/, oracle_leak, oracle_bundle and oracle-bundle.json unless deliberately releasing them.

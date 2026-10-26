@@ -39,11 +39,13 @@ from raidar.engine.trial.environment import (
 )
 from raidar.engine.trial.materialise import MaterialiseError, materialise_task
 from raidar.engine.trial.plan import PlanOptions, build_plan
+from raidar.engine.trial.provision import TrialProvision
+from raidar.engine.trial.workspace import SEED_SLUG
 from raidar.grading.verifier import RaidarVerifier
 from raidar.subject.agent.codex_auth import ResolvedCodexAuth
 from raidar.subject.agent.config import Harness
 from raidar.subject.environment.python.pack_definition import load_pack_spec
-from raidar.subject.treatment.runtime.provision import Provision
+from raidar.subject.workflow.runner import WorkflowRunner
 from tests.execution_support import (
     ImportedFixture,
     StepOutcome,
@@ -141,7 +143,7 @@ def test_the_leak_guard_is_installed_before_the_trial_runs(
         driver, "install_tool_tree_watch", lambda trial, bundle: events.append("tool-tree")
     )
     monkeypatch.setattr(driver, "install_liveness_monitor", lambda trial: events.append("liveness"))
-    provisions = (Provision("00-lint-tool", "lint-tool@2", "true", "true"),)
+    provisions = (TrialProvision("lint-tool", {}, "true", "true"),)
     outcome = asyncio.run(
         run_harbor_trial(TrialConfig.model_construct(), tmp_path / "bundle", provisions)
     )
@@ -220,13 +222,17 @@ def test_a_run_materialises_each_trial_and_writes_step_results(
     protocol = {"progression": "halt_on_failure", "min_reward": 1.0}
     plan = _plan(tmp_path, fixture_problem, protocol=protocol)
     seen: list[TrialConfig] = []
+    provided: list[Sequence[TrialProvision]] = []
 
     async def fake_runner(
-        config: TrialConfig, bundle_root: Path, provisions: Sequence[Provision] = ()
+        config: TrialConfig, bundle_root: Path, provisions: Sequence[TrialProvision] = ()
     ) -> TrialRun:
         seen.append(config)
+        provided.append(provisions)
         outcomes = [StepOutcome("checkpoint_1", passed=False)]  # halts after checkpoint 1
-        return TrialRun(write_trial(config.trials_dir / config.trial_name, outcomes), None)
+        return TrialRun(
+            write_trial(config.trials_dir / config.trial_name, outcomes, seeded=True), None
+        )
 
     ctx = JobContext(
         plan=plan,
@@ -251,32 +257,26 @@ def test_a_run_materialises_each_trial_and_writes_step_results(
     )
     # The verifier kwargs are ones the Raidar verifier accepts.
     assert set(kwargs) <= set(inspect.signature(RaidarVerifier.__init__).parameters)
-    assert config.agent.name == "codex"
-    assert config.agent.kwargs["version"] == "0.156.1"
+    assert config.agent.import_path == WorkflowRunner.import_path()
+    assert config.agent.kwargs["inner_agent"]["kwargs"]["version"] == "0.156.1"
+    assert config.agent.kwargs["workflow"] == "one-shot@1"
     task = Path(config.task.path or "")
     toml = tomllib.loads((task / "task.toml").read_text())
     assert [s["min_reward"] for s in toml["steps"]] == [{"strict_pass_rate": 1.0}] * 2
     assert (task / "steps" / "checkpoint_1" / "workdir" / "setup.sh").is_file()
-    guided = next(c for c in seen if c.trial_name.endswith("guided"))
-    assert (Path(guided.task.path or "") / "steps/checkpoint_1/workdir/AGENTS.md").is_file()
+    assert [[p.slug for p in given] for given in provided] == [[SEED_SLUG]] * len(records)
     record = next(r for r in records if r.trial.arm == "baseline")
     assert [a.checkpoint_state.value for a in record.step_results] == ["failed", "not_attempted"]
-    # The synthetic trial holds no harness context, so the guided arm's rules-file
-    # discovery probe fails: that step is infra_error and the trial is invalid.
-    guided_record = next(r for r in records if r.trial.arm == "guided")
-    assert guided_record.step_results[0].checkpoint_state.value == "infra_error"
-    assert guided_record.step_results[0].infra_reasons[0].startswith("component_probe:rules-file@2")
-    assert not guided_record.valid
     assert record.reached == (True, False)
     assert record.reached_source == "executed"
     assert record.valid
     phases = {p.phase for p in record.phases}
-    assert {"component_apply", "per_step_reset", "raidar_result_write"} <= phases
+    assert {"arm_apply", "per_step_reset", "raidar_result_write"} <= phases
     job_dir = ctx.job_dir
     stored = json.loads((job_dir / "trial-records" / f"{record.trial.trial_id}.json").read_text())
     assert stored["step_results"][0]["checkpoint_state"] == "failed"
     manifest = json.loads((job_dir / "job.json").read_text())
-    assert (manifest["partial"], manifest["summary"]["valid"]) == (True, 1)
+    assert (manifest["partial"], manifest["summary"]["valid"]) == (True, len(records))
     _assert_provenance(manifest, plan.concurrency)
     _assert_job_provenance(manifest, job_dir)
     assert json.loads((job_dir / "plan.json").read_text())["lock_sha256"] == plan.lock_sha256
@@ -354,7 +354,7 @@ def test_a_lost_target_marks_the_trial_and_aborts_the_job_before_the_next_trial(
             raise TargetUnavailableError("daemon down")
 
     async def fake_runner(
-        config: TrialConfig, bundle_root: Path, provisions: Sequence[Provision] = ()
+        config: TrialConfig, bundle_root: Path, provisions: Sequence[TrialProvision] = ()
     ) -> TrialRun:
         started.append(config.trial_name)
         up[0] = False  # the daemon goes away during the first trial
@@ -421,13 +421,15 @@ def test_a_trial_that_raises_is_recorded_as_infra_and_the_run_completes(
     failing = plan.selected_trials()[0].trial_id
 
     async def fake_runner(
-        config: TrialConfig, bundle_root: Path, provisions: Sequence[Provision] = ()
+        config: TrialConfig, bundle_root: Path, provisions: Sequence[TrialProvision] = ()
     ) -> TrialRun:
         if config.trial_name == failing:
             raise RuntimeError("Trial.create: docker unreachable")
         await asyncio.sleep(0.05)
         outcomes = [StepOutcome("checkpoint_1")]
-        return TrialRun(write_trial(config.trials_dir / config.trial_name, outcomes), None)
+        return TrialRun(
+            write_trial(config.trials_dir / config.trial_name, outcomes, seeded=True), None
+        )
 
     ctx = JobContext(
         plan=plan,
@@ -479,12 +481,14 @@ def test_verifier_override_carries_reference_solutions_only_then(
     tasks: list[Path] = []
 
     async def fake_runner(
-        config: TrialConfig, bundle_root: Path, provisions: Sequence[Provision] = ()
+        config: TrialConfig, bundle_root: Path, provisions: Sequence[TrialProvision] = ()
     ) -> TrialRun:
         tasks.append(Path(config.task.path or ""))
         assert config.agent.name == "oracle"
         return TrialRun(
-            write_trial(config.trials_dir / config.trial_name, [StepOutcome("checkpoint_1")]),
+            write_trial(
+                config.trials_dir / config.trial_name, [StepOutcome("checkpoint_1")], seeded=True
+            ),
             None,
         )
 
@@ -513,13 +517,13 @@ def test_materialising_refuses_drift_reuse_and_a_compose_mismatch(
     trial = plan.selected_trials()[0]
     source = fixture_problem.store.load(plan.problems[0].ref).task_dir
     arguments = {"steps": trial.steps, "rule": plan.rule}
-    with pytest.raises(MaterialiseError, match="compiles to"):
+    with pytest.raises(MaterialiseError, match="planned"):
         materialise_task(
-            source, tmp_path / "a", condition=(plan.loaded, trial.arm, "0" * 64), **arguments
+            source, tmp_path / "a", arm=(plan.loaded, trial.arm, "0" * 64), **arguments
         )
     with pytest.raises(MaterialiseError, match="never reused"):
         materialise_task(
-            source, tmp_path / "a", condition=(plan.loaded, trial.arm, "0" * 64), **arguments
+            source, tmp_path / "a", arm=(plan.loaded, trial.arm, "0" * 64), **arguments
         )
     with pytest.raises(MaterialiseError, match="no steps"):
         materialise_task(
@@ -527,13 +531,11 @@ def test_materialising_refuses_drift_reuse_and_a_compose_mismatch(
             tmp_path / "b",
             steps=("checkpoint_9",),
             rule=plan.rule,
-            condition=(plan.loaded, trial.arm, trial.hashes.condition),
+            arm=(plan.loaded, trial.arm, trial.hashes.arm),
         )
     init_loaded, _, _ = locked_experiment(tmp_path / "init", fixture_problem.ref)
     with pytest.raises(MaterialiseError, match="compose init"):
-        materialise_task(
-            source, tmp_path / "c", condition=(init_loaded, trial.arm, "x"), **arguments
-        )
+        materialise_task(source, tmp_path / "c", arm=(init_loaded, trial.arm, "x"), **arguments)
 
 
 def test_materialised_tasks_enforce_network_without_rewriting_the_pinned_source(
@@ -550,7 +552,7 @@ def test_materialised_tasks_enforce_network_without_rewriting_the_pinned_source(
         tmp_path / "task",
         steps=trial.steps,
         rule=plan.rule,
-        condition=(plan.loaded, trial.arm, trial.hashes.condition),
+        arm=(plan.loaded, trial.arm, trial.hashes.arm),
     )
 
     task = tomllib.loads((materialised.path / "task.toml").read_text())
@@ -570,7 +572,7 @@ def test_codex_gets_the_host_session_file_path_only(
     assert with_host_auth(codex, Harness.CODEX_CLI).env == {CODEX_AUTH_ENV: str(auth)}
     assert with_host_auth(AgentConfig(name="oracle"), Harness.CODEX_CLI).env == {}
     wrapper = AgentConfig(
-        import_path="raidar.subject.treatment.runtime.review_loop:ReviewLoopAgent",
+        import_path=WorkflowRunner.import_path(),
         kwargs={"inner_agent": {"name": "codex", "kwargs": {"version": "0.156.1"}}},
     )
     # A workflow wrapper is held to its wrapped harness's pin; a no-LLM override has none.
@@ -579,7 +581,7 @@ def test_codex_gets_the_host_session_file_path_only(
         "0.156.1"
     )
     assert reported_harness_pin(AgentConfig(name="oracle")) is None
-    # The wrapper passes its env to every inner session (implement/review/fix): without
+    # The runner passes its env to every inner turn: without
     # the session file its inner codex called the API with an empty key (401, pilot).
     assert with_host_auth(wrapper, Harness.CODEX_CLI).env == {CODEX_AUTH_ENV: str(auth)}
     api = ResolvedCodexAuth("auto", "api", None, "OPENAI_API_KEY")
