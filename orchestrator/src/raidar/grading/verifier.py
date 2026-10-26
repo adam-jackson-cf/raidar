@@ -283,6 +283,9 @@ def _keep_logs(runs: Path, record_dir: Path) -> None:
         log = runs / role / "out" / "sandbox.log"
         if log.is_file():
             shutil.copy2(log, record_dir / f"{role}.log")
+        isolation = runs / role / "out" / "secret-isolation.json"
+        if isolation.is_file():
+            shutil.copy2(isolation, record_dir / f"{role}-secret-isolation.json")
 
 
 def _plumbing(timings: dict[str, float]) -> float:

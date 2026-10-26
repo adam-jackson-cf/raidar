@@ -12,6 +12,14 @@ All notable changes to this project are documented in this file.
   repair and `define.unsealed` commit refusals; one verification pass, no judge.
 - Health E1–E3 audit definition validity, call/state consistency and unusable endings;
   workflow component bytes and digests are retained for P8 instruction isolation.
+- `define-build-verify@2`: structured replies with bounded repairs, merged test mappings,
+  recorded host-side aspect judging and up to three build/rework passes in one session.
+- `definition-coverage@1` and `test-coverage@1`: assessment-time per-unit and per-criterion
+  Jev readings, with raw evidence and no uncalibrated pass/fail cut-offs.
+- Health J1–J3 audit judge evidence, closure and undecided aspects; host judge windows
+  pause agent-idle accounting and rework obeys the remaining phase budget.
+- The Jev key is refused at sandbox boundaries; names-only agent, grader and coverage
+  environment records are retained without secret values.
 
 ### Fixes
 
@@ -19,6 +27,7 @@ All notable changes to this project are documented in this file.
   tree and workflow prerequisites, including ignored or unstaged check inputs.
 - Fault recording interprets idle findings only for the liveness check, retaining gate and
   definition violations without treating their text findings as idle events.
+- Preserve grader and coverage secret-isolation records beyond temporary sandbox cleanup.
 
 ## 0.15.0 - 2026-10-24
 
