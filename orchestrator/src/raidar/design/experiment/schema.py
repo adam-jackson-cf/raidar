@@ -87,20 +87,28 @@ class SpecModel(BaseModel):
 
 
 class ProblemEntry(SpecModel):
-    """One problem: a registry reference (a binding) or a local Harbor task directory."""
+    """One problem: a registry reference (a binding) or a local Harbor task directory.
+
+    ``checkpoints: k`` binds the first ``k`` checkpoints of a multi-checkpoint reference
+    (``scb/<problem>@<version>``) as one multi-step task; unset runs every checkpoint.
+    """
 
     ref: Reference | None = None
     path: RelativePath | None = None
+    checkpoints: Annotated[int, Field(strict=True, ge=1)] | None = None
 
     @model_validator(mode="after")
     def _exactly_one_source(self) -> ProblemEntry:
         if (self.ref is None) == (self.path is None):
             raise ValueError("set exactly one of 'ref' (name@version) or 'path'")
+        if self.checkpoints is not None and self.ref is None:
+            raise ValueError("'checkpoints' selects within a registry 'ref', not a local 'path'")
         return self
 
     @property
     def label(self) -> str:
-        return self.ref if self.ref is not None else f"path:{self.path}"
+        base = self.ref if self.ref is not None else f"path:{self.path}"
+        return base if self.checkpoints is None else f"{base}[:{self.checkpoints}]"
 
 
 class EnvironmentSpec(SpecModel):
@@ -122,7 +130,7 @@ class AgentEntry(SpecModel):
 
 class ProtocolSpec(SpecModel):
     # Also scorer config: raidar.engine.job.assessment writes it for every scorer
-    # that declares ``progression`` (correctness@2), so scoring follows the job.
+    # that declares ``progression`` (correctness@3), so scoring follows the job.
     progression: Literal["continue", "halt_on_failure"] = "continue"
     min_reward: float | None = Field(default=None, gt=0.0, le=1.0)
     agent_timeout_sec: int = Field(default=1800, gt=0)
@@ -205,8 +213,9 @@ class AnalysisSpec(SpecModel):
     ``rank_by`` (benchmarks only) names the outcome metric the ranking view
     orders agents by. ``primary_outcome`` names the pre-registered primary
     outcome the report, its markdown and the review surface label as primary
-    (unset: the progression's default, ``solve_rate`` under ``continue`` and
-    ``reached`` under ``halt_on_failure``); it is analysis configuration, so
+    (unset: the solvable-set solve rate from
+    ``raidar.scoring.catalog.outcomes.primary_metric``; an errata-applied outcome is a
+    pre-registered choice, never the default); it is analysis configuration, so
     setting it relocks the ``analysis`` section only and keeps ``lock_sha256``.
     ``raidar.design.experiment.validation`` checks every metric id.
     """
@@ -277,4 +286,10 @@ class ExperimentSpec(SpecModel):
         exclude: dict[str, Any] = {"analysis": unset} if unset else {}
         if not self.varies:
             exclude["varies"] = True
-        return self.model_dump(mode="json", by_alias=True, exclude=exclude or None)
+        dump = self.model_dump(mode="json", by_alias=True, exclude=exclude or None)
+        # An unset ``checkpoints`` is omitted too: bindings without it keep their lock bytes.
+        dump["problems"] = [
+            {k: v for k, v in problem.items() if k != "checkpoints" or v is not None}
+            for problem in dump["problems"]
+        ]
+        return dump

@@ -149,14 +149,16 @@ help:
 	@echo "  make docker-check [TARGET=name]                        Make the target reachable (restart its transport) and run its data check"
 	@echo ""
 	@echo "Problems and runtime packs (Docker target as above):"
-	@echo "  make problem-list                                      List registered problems with validation and import state"
-	@echo "  make problem-info PROBLEM=scb/forge@38d627ecf668       Show one problem's steps, source pin, pack binding and validation"
-	@echo "  make problem-import PROBLEM=scb/forge@38d627ecf668 [SOURCE_CHECKOUT=path] [UPDATE=1]"
-	@echo "                                                        Import a pinned problem binding (task + host-only verifier bundle) into var/problems/ (pins and manifests: lab/problems/)"
-	@echo "  make problem-validate PROBLEM=scb/forge@38d627ecf668 [ENGINE=direct|harbor] [NATIVE_RUNNER=path] [REPEATS=3] [CONCURRENCY=4] [AUDIT=0] [AUDIT_ONLY=1]"
-	@echo "                                                        Verifier-validate an imported problem and write its report, with the"
-	@echo "                                                        spec-determinacy audit (AUDIT_ONLY=1: audit only, into the committed report)"
-	@echo "  make problem-errata-draft PROBLEM=scb/forge@38d627ecf668 OUT=<path> REGISTERED=<yyyy-mm-dd>"
+	@echo "  make problem-list [SOURCE=scb@<commit>]                 List registered verdicts and solvable sizes, or the pinned source catalog"
+	@echo "  make problem-info PROBLEM=scb/<problem>@<version> [SOURCE=scb@<commit>]"
+	@echo "                                                        Show a registered binding or inspect a source problem before importing"
+	@echo "  make problem-import PROBLEM=scb/<problem>@<version> [SOURCE_CHECKOUT=path] [UPDATE=1]"
+	@echo "  make problem-import SOURCE=scb@<commit> PROBLEMS=all|a,b,c"
+	@echo "                                                        Generate task content and committed pins from one source pin"
+	@echo "  make problem-validate PROBLEM=<ref>|PROBLEMS=all|a,b,c [TARGET=name] [REPEATS=3] [CONCURRENCY=4]"
+	@echo "                                                        Validate references in parallel; record solvable sets and one verdict table"
+	@echo "                                                        [ENGINE=direct|harbor] [NATIVE_RUNNER=path] [AUDIT=0] [AUDIT_ONLY=1]"
+	@echo "  make problem-errata-draft PROBLEM=scb/<problem>@<version> OUT=<path> REGISTERED=<yyyy-mm-dd>"
 	@echo "                                                        Draft a problem errata from its report's audit (review, then commit it)"
 	@echo "  make pack-info [RUNTIME=python]                       Show the pack image tag, lock hashes and tool provisioning state"
 	@echo "  make pack-build [RUNTIME=python] [FORCE=1]            Build the agent image once per lock hash and assert no scorer tools"
@@ -176,6 +178,7 @@ help:
 	@echo "  make ledger-check                                     Check lab/ledger/ (fault and remedy records, links, status transitions, README index); part of make quality"
 	@echo "  make ledger-index                                     Regenerate lab/ledger/README.md from the records"
 	@echo "  make experiment-plan EXPERIMENT=... [LOCK=] [ARM=a] [ATTEMPT=0] [MAX_CHECKPOINTS=N] [CONCURRENCY=N] [PLAN_JSON=1]"
+	@echo "                                                        MAX_CHECKPOINTS is smoke/dev-only; other kinds lock a problem's checkpoints: k binding"
 	@echo "                                                        Dry run: list every trial of a locked experiment with its hashes"
 	@echo "  make experiment-execute EXPERIMENT=... [LOCK=] [ARM=a] [ATTEMPT=0] [MAX_CHECKPOINTS=N] [AGENT_OVERRIDE=oracle|nop] [CONCURRENCY=N] [JOBS_DIR=var/jobs] [JOB_ID=] [DETACH=1] [ALLOW_UNSMOKED=1]"
 	@echo "                                                        Run a locked experiment through Harbor as one job; writes step results, validity and N1 phases"
@@ -185,7 +188,7 @@ help:
 	@echo "                                                        ALLOW_UNSMOKED=1 overrides and records it in job.json (admission)"
 	@echo "  make experiment-status JOB=<job-dir> [LOG_LINES=20]   A job's state (running, finished, failed, died), trials recorded of selected, log tail"
 	@echo "  make health JOB=<job-dir>                             Recompute every trial's health.json (V/H/L/P/T checks) and append fault-candidates.jsonl; exit 1 on a violation"
-	@echo "  make experiment-assess JOB=<job-dir> STORE=<assessment-store> SCORERS=\"correctness@2 ...\" [LOCK=] [ASSESSMENT_CONFIG=] [REPLAY=1] [CONCURRENCY=N] [ASSESS_OUT=report.json]"
+	@echo "  make experiment-assess JOB=<job-dir> STORE=<assessment-store> SCORERS=\"correctness@3 ...\" [LOCK=] [ASSESSMENT_CONFIG=] [REPLAY=1] [CONCURRENCY=N] [ASSESS_OUT=report.json]"
 	@echo "                                                        Score a job's stored trials into an Assessment store (never re-runs agents; AS1-gated)"
 	@echo "                                                        (process-compliance@7 is deterministic only;"
 	@echo "                                                        with gate-effort@11 it first grades pre-fix snapshots into STORE, and with"
@@ -496,19 +499,22 @@ security-gate: docker-check
 		python -m pytest $(SECURITY_GATE_TESTS) -v -rs
 
 problem-list:
-	@$(RAIDAR) problem list $(if $(PROBLEM_STORE),--store "$(PROBLEM_STORE)",)
+	@$(RAIDAR) problem list $(if $(PROBLEM_STORE),--store "$(PROBLEM_STORE)",) \
+		$(if $(SOURCE),--source "$(SOURCE)",) $(if $(SOURCE_CHECKOUT),--source-checkout "$(SOURCE_CHECKOUT)",)
 
 problem-info:
 	$(call require_var,PROBLEM)
-	@$(RAIDAR) problem info "$(PROBLEM)" $(if $(PROBLEM_STORE),--store "$(PROBLEM_STORE)",)
+	@$(RAIDAR) problem info "$(PROBLEM)" $(if $(PROBLEM_STORE),--store "$(PROBLEM_STORE)",) \
+		$(if $(SOURCE),--source "$(SOURCE)",) $(if $(SOURCE_CHECKOUT),--source-checkout "$(SOURCE_CHECKOUT)",)
 
 problem-import:
-	$(call require_var,PROBLEM)
-	@$(RAIDAR) problem import $(PROBLEM) $(if $(SOURCE_CHECKOUT),--source-checkout "$(SOURCE_CHECKOUT)",) $(if $(UPDATE),--update,)
+	@$(RAIDAR) problem import $(PROBLEM) $(if $(PROBLEMS),--problems "$(PROBLEMS)",) \
+		$(if $(SOURCE),--source "$(SOURCE)",) $(if $(PROBLEM_STORE),--store "$(PROBLEM_STORE)",) \
+		$(if $(SOURCE_CHECKOUT),--source-checkout "$(SOURCE_CHECKOUT)",) $(if $(UPDATE),--update,)
 
 problem-validate:
-	$(call require_var,PROBLEM)
-	@$(TARGET_ENV) $(RAIDAR) problem validate "$(PROBLEM)" \
+	@$(TARGET_ENV) $(RAIDAR) problem validate $(PROBLEM) $(if $(PROBLEMS),--problems "$(PROBLEMS)",) \
+		$(if $(SOURCE),--source "$(SOURCE)",) \
 		$(if $(ENGINE),--engine "$(ENGINE)",) $(if $(REPEATS),--repeats "$(REPEATS)",) \
 		$(if $(NATIVE_RUNNER),--native-runner "$(NATIVE_RUNNER)",) \
 		$(if $(SOURCE_CHECKOUT),--source-checkout "$(SOURCE_CHECKOUT)",) \

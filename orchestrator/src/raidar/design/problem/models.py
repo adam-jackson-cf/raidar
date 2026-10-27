@@ -2,9 +2,9 @@
 
 A problem reference is ``<dataset>/<problem>[.<checkpoint>]@<version>``:
 
-- ``scb/forge@38d627ecf668``: every checkpoint of SCB ``forge`` as one
-  multi-step task;
-- ``scb/circuit_eval.checkpoint_1@38d627ecf668``: the first checkpoint alone
+- ``scb/<problem>@<version>``: every checkpoint of an SCB problem as one
+  multi-step task (for example ``scb/circuit_eval@38d627ecf668``);
+- ``scb/<problem>.checkpoint_1@<version>``: the first checkpoint alone
   as a one-shot (1-step) task.
 
 ``version`` is the first 12 hex characters of the pinned dataset commit, so a
@@ -127,6 +127,8 @@ class ProblemSource(ProblemModel):
 class ProblemStep(ProblemModel):
     name: str = Field(min_length=1)
     checkpoint: str = Field(min_length=1)
+    # sha256 of the step's rendered spec: the pinned upstream ``<checkpoint>.md``
+    # with only its entrypoint tokens substituted, byte for byte what the agent is given.
     instruction_sha256: str = Field(min_length=1)
     test_files: tuple[str, ...] = Field(min_length=1)
 
@@ -152,8 +154,11 @@ class ProblemManifest(ProblemModel):
     bundle_sha256: str
     references_sha256: str
     # Snapshot-relative entrypoint: the SCB config ``entry_file`` in the pack's
-    # format (``forge`` -> ``forge.py``). Scorers take it as a config default.
+    # format (``<name>`` -> ``<name>.py``). Scorers take it as a config default.
     entry_file: str | None = Field(default=None, min_length=1)
+    # The command Raidar's grader runs the submission with (``uv run --project
+    # /app <entry_file>``): the value substituted for ``%%%ENTRYPOINT:entry_command%%%``.
+    entry_command: str | None = Field(default=None, min_length=1)
 
     @model_validator(mode="after")
     def _consistent(self) -> ProblemManifest:
@@ -177,6 +182,8 @@ class ProblemManifest(ProblemModel):
         dumped = self.model_dump(mode="json")
         if self.entry_file is None:
             dumped.pop("entry_file")
+        if self.entry_command is None:
+            dumped.pop("entry_command")
         return dumped
 
     def digest(self) -> str:
@@ -200,4 +207,6 @@ class ProblemManifest(ProblemModel):
         }
         if self.entry_file is not None:
             metadata["entry_file"] = self.entry_file
+        if self.entry_command is not None:
+            metadata["entry_command"] = self.entry_command
         return metadata

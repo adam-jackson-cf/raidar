@@ -8,7 +8,7 @@
     {
       "name": "checkpoint_1",
       "checkpoint": "checkpoint_1",
-      "instruction_sha256": "0ce995ae4a8989c133d7ae07c9e2c0c100133cd51687eae72e203292e36b3507",
+      "instruction_sha256": "669b21a23d59bf79c0af8a1f57827b08436531e6fd8c7d397015751bb2278728",
       "test_files": [
         "test_checkpoint_1.py"
       ]
@@ -16,7 +16,7 @@
     {
       "name": "checkpoint_2",
       "checkpoint": "checkpoint_2",
-      "instruction_sha256": "28a60385e952be9278d96662d941debb187335b42428f23db991f96c1e05db97",
+      "instruction_sha256": "1af310cec1ce52bc96935b0d1e2b789f0ba6bb11cb44fc651b99d87ef71c3b2e",
       "test_files": [
         "test_checkpoint_1.py",
         "test_checkpoint_2.py"
@@ -25,7 +25,7 @@
     {
       "name": "checkpoint_3",
       "checkpoint": "checkpoint_3",
-      "instruction_sha256": "03b87bc986d43047bf4b1004f16d69198ecaca363cac165029682c62461b782d",
+      "instruction_sha256": "664e3ad7ef93918d4a2377dec9508db85489f74b79969fad936d5e69b28bc25c",
       "test_files": [
         "test_checkpoint_1.py",
         "test_checkpoint_2.py",
@@ -35,7 +35,7 @@
     {
       "name": "checkpoint_4",
       "checkpoint": "checkpoint_4",
-      "instruction_sha256": "5b43ec1d8889ab9ebba9b925593b0d1cb6f45c8b6c7f372e2b4178f6e7199187",
+      "instruction_sha256": "fc33905e0ea53fa388996e6a005a2d0b7e9ddca89f096c2f526660419fa4224b",
       "test_files": [
         "test_checkpoint_1.py",
         "test_checkpoint_2.py",
@@ -46,7 +46,7 @@
     {
       "name": "checkpoint_5",
       "checkpoint": "checkpoint_5",
-      "instruction_sha256": "878782c9f9f8bc549fe584f2bae9694d3ac0baa6f53d9dd4fec51f96820205f1",
+      "instruction_sha256": "b5c737ef63f557d6cba0b2a62350881fe1fca5e5158abcf617114373e6b3c982",
       "test_files": [
         "test_checkpoint_1.py",
         "test_checkpoint_2.py",
@@ -58,7 +58,7 @@
     {
       "name": "checkpoint_6",
       "checkpoint": "checkpoint_6",
-      "instruction_sha256": "cfd6b3b7473c9970dcb5cbfff08ac9cafb7e63f3ca447721653c2089d46badf9",
+      "instruction_sha256": "33599ccbd89685b861962eada5884aff20714566dc24644ce06668b421698618",
       "test_files": [
         "test_checkpoint_1.py",
         "test_checkpoint_2.py",
@@ -71,7 +71,7 @@
     {
       "name": "checkpoint_7",
       "checkpoint": "checkpoint_7",
-      "instruction_sha256": "8fd83a6cb134a833f9cf9308e8bd8a5a486c0caa4210b83a09b0fe7bc8b378e6",
+      "instruction_sha256": "007b3ee962cd65e376efeaff42150fa431125f431b5be636c542ee0dd651e408",
       "test_files": [
         "test_checkpoint_1.py",
         "test_checkpoint_2.py",
@@ -85,7 +85,7 @@
     {
       "name": "checkpoint_8",
       "checkpoint": "checkpoint_8",
-      "instruction_sha256": "afaf43a0d5a9eaafc45a21f66cf2bebb1222f5fdb857b47d04a26fb3020f3a3f",
+      "instruction_sha256": "9cef22f3dba84b4a67c857bb7ee07fcce7e667e4086bc4becec81b349072addd",
       "test_files": [
         "test_checkpoint_1.py",
         "test_checkpoint_2.py",
@@ -114,8 +114,9 @@
     "version": 1,
     "image": "raidar/pack-python:2b91a52663e099f2"
   },
-  "task_sha256": "596ae5b6af7e45c4b9a05dc8c495452042a21b9f7b23d6919516074ae5ada49f",
-  "bundle_sha256": "6ab17bb4ebf36d44b488de06a5143d9d15388f8dacf7ac8a4875eeddc941c04b",
+  "task_sha256": "70e93e9882fd776df49d4ae9fe3d9f9cef30c5dba69916db6b398cb942ad55c2",
+  "bundle_sha256": "85f93886a76ff38cc5ef0d1f027c0d3d8a40a1d066df71bad990aa071ccd959d",
   "references_sha256": "1451f566df2cdd5e9b9c0550056cbf051eeaa70cde8f91dbbbf7f0b1988aebb8",
-  "entry_file": "forge.py"
+  "entry_file": "forge.py",
+  "entry_command": "uv run --project /app forge.py"
 }

@@ -516,6 +516,27 @@ def _count(value: object) -> int:
     return len(value) if isinstance(value, list) else 0
 
 
+def _solvable_lines(report: AnalysisReport) -> list[str]:
+    """The solvable sets the ``*_solvable`` outcomes apply; the rest is the raw grade."""
+    if not report.solvable:
+        return []
+    pinned = "; ".join(
+        f"`{ref}` set `{str(entry.get('sha256'))[:12]}` ({_solvable_cases(entry.get('cases'))})"
+        for ref, entry in sorted(report.solvable.items())
+    )
+    return [
+        f"- Solvable sets: {pinned}. The `*_solvable` outcomes (solve rate, reached, final "
+        "solved) count only these cases, are `unavailable` where a set is missing, and "
+        "their raw SCB counterparts are reported beside them"
+    ]
+
+
+def _solvable_cases(cases: object) -> str:
+    if not isinstance(cases, dict):
+        return "no steps"
+    return ", ".join(f"{step}: {count} cases" for step, count in cases.items())
+
+
 def _errata_lines(report: AnalysisReport) -> list[str]:
     """Which errata the ``*_errata`` outcomes apply; every other outcome is the raw grade."""
     if not report.errata:
@@ -655,6 +676,7 @@ def render_markdown(report: AnalysisReport) -> str:
     ]
     if report.replaced_trials:
         lines.append(f"- Replaced invalid trials: {', '.join(report.replaced_trials)}")
+    lines.extend(_solvable_lines(report))
     lines.extend(_errata_lines(report))
     lines.extend(_pooling_lines(report))
     header = (

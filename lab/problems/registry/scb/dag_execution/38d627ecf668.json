@@ -1,0 +1,57 @@
+{
+  "kind": "raidar-problem",
+  "schema_version": 1,
+  "ref": "scb/dag_execution@38d627ecf668",
+  "mode": "multi_checkpoint",
+  "checkpoints": 3,
+  "steps": [
+    {
+      "name": "checkpoint_1",
+      "checkpoint": "checkpoint_1",
+      "instruction_sha256": "b7a3deb871a135cab12dd0ce3fd505ab067394cda84e632f2f686338c81013df",
+      "test_files": [
+        "test_checkpoint_1.py"
+      ]
+    },
+    {
+      "name": "checkpoint_2",
+      "checkpoint": "checkpoint_2",
+      "instruction_sha256": "142665005a0ad0a6b0920fa473f86e47c2a66d8da02fbf4dc75ffb1b08aa43b6",
+      "test_files": [
+        "test_checkpoint_1.py",
+        "test_checkpoint_2.py"
+      ]
+    },
+    {
+      "name": "checkpoint_3",
+      "checkpoint": "checkpoint_3",
+      "instruction_sha256": "e7dd2280b378db7557f570c4a2838cca492a4770f33ec53518ac5445889aa49e",
+      "test_files": [
+        "test_checkpoint_1.py",
+        "test_checkpoint_2.py",
+        "test_checkpoint_3.py"
+      ]
+    }
+  ],
+  "source": {
+    "dataset": "scb",
+    "url": "https://github.com/gabeorlanski/scb-problems",
+    "commit": "38d627ecf668a88f88f8d260f8df8df6116e9b03",
+    "problem": "dag_execution",
+    "checkpoint_selection": null,
+    "problem_tree": "29509494b463cc94bc1582920922255c40e4dcee",
+    "converter_tree": "4475c907ab812bdec61885f24e41f5a634b927ee",
+    "conversion_overrides": "733c1bef9ee8d233639a34439e67232bf5e445e8",
+    "converted_task_sha256": "ac69a081aa9c703b4aafba06e3ee86bf86b2de4e8bafc541eab5aef4d19aa0e8"
+  },
+  "pack": {
+    "id": "python",
+    "version": 1,
+    "image": "raidar/pack-python:2b91a52663e099f2"
+  },
+  "task_sha256": "5a8c97c1a560dbd2b3f0a027b2bd4c56522506f4fe8d06e3856ac3f95b64721e",
+  "bundle_sha256": "7b4c049ae04ae29eb25c4eed0ed0719696a2ea31fafabfc49115827240ac3776",
+  "references_sha256": "b61dbc2d6434a90dcf75a4f2e24681228fd35dbcab7231da351a84db49929388",
+  "entry_file": "launch.py",
+  "entry_command": "uv run --project /app launch.py"
+}

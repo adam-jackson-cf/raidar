@@ -184,7 +184,7 @@ def test_arm_results_load_from_the_assessment_store(tmp_path: Path, ref: str) ->
 
     other = assess(
         store,
-        registry.get("correctness@2"),
+        registry.get("correctness@3"),
         traced_context(tmp_path / "c", [TracedStep("checkpoint_1", trace=_trial_trace(True))]),
         trial="c",
     )

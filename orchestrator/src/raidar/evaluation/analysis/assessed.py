@@ -3,7 +3,7 @@
 Inputs are the job's ``TrialRecord`` (validity and identity) and the
 stored ``AssessResult`` of each scorer (``None`` when the store has no
 Assessment for this trial). Nothing is recomputed from raw run files:
-correctness comes from ``correctness@2``, quality from ``code-quality@4``,
+correctness comes from ``correctness@3``, quality from ``code-quality@4``,
 cost from ``resource-usage@2``, and the headline score from the experiment's
 Metric applied to those components.
 
@@ -17,8 +17,11 @@ Two derivations are analysis-owned:
 - ``final_solved`` under ``halt_on_failure`` is 0 when the trial halted
   before the last checkpoint (``not_attempted`` counts as unsolved, memo §10.1);
 - ``strict_solved[k]`` is 1 exactly when ``k`` lies in the reached prefix;
+- the ``*_solvable`` outcomes (the default primary) repeat ``solve_rate``, ``reached`` and
+  ``final_solved`` over the solvable-set metrics of ``correctness@3``; they are
+  ``unavailable`` for a problem whose lock pins no solvable set, and never replace the raw ones;
 - the ``*_errata`` outcomes repeat ``solve_rate``, ``reached`` and
-  ``final_solved`` over ``correctness@2``'s errata-applied metrics (the problem's
+  ``final_solved`` over ``correctness@3``'s errata-applied metrics (the problem's
   pinned errata); they are labelled as such and never replace the raw ones;
 - the ``gate.*`` outcomes (a gate-effort scorer, only when the lock declares
   one) are the scorer's trajectory metrics as stored: an arm without the commit
@@ -48,6 +51,7 @@ from raidar.scoring.catalog.outcomes import (
     CORRECTNESS_REF,
     FINAL_SOLVED,
     FINAL_SOLVED_ERRATA,
+    FINAL_SOLVED_SOLVABLE,
     GATE_EFFORT_REF,
     GATE_METRICS,
     GATE_PREFIX,
@@ -59,9 +63,11 @@ from raidar.scoring.catalog.outcomes import (
     QUALITY_COMPONENTS,
     REACHED,
     REACHED_ERRATA,
+    REACHED_SOLVABLE,
     RESOURCE_USAGE_REF,
     SOLVE_RATE,
     SOLVE_RATE_ERRATA,
+    SOLVE_RATE_SOLVABLE,
     SOLVED,
     STRICT_SOLVED,
     VERIFIER_DISAGREEMENT_SOURCE,
@@ -142,6 +148,7 @@ def infra_reasons(record: TrialRecord) -> tuple[str, ...]:
 
 
 ERRATA_SOLVED = "solved_errata"
+SOLVABLE_SOLVED = "solved_solvable"
 
 
 def _final_solved(
@@ -373,6 +380,15 @@ def build_outcome(
             record.progression.mode,
             solved=ERRATA_SOLVED,
             reached=REACHED_ERRATA,
+        ),
+        SOLVE_RATE_SOLVABLE: _solve_rate(correctness, checkpoints, "solved_checkpoints_solvable"),
+        REACHED_SOLVABLE: correctness.value(REACHED_SOLVABLE),
+        FINAL_SOLVED_SOLVABLE: _final_solved(
+            correctness,
+            steps,
+            record.progression.mode,
+            solved=SOLVABLE_SOLVED,
+            reached=REACHED_SOLVABLE,
         ),
         **quality,
         **{name: observed[RESOURCE_USAGE_REF].value(name) for name in _COST_TOTALS},

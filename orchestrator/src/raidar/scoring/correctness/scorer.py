@@ -1,4 +1,4 @@
-"""``correctness@2``: oracle verdicts per checkpoint and over the trajectory (plan G1).
+"""``correctness@3``: oracle verdicts per checkpoint and over the trajectory (plan G1).
 
 Every value is read from the oracle's host-side step record
 (``raidar-oracle/steps/<step>/record.json``), never from Harbor's trial-level
@@ -33,6 +33,13 @@ cases the problem's pinned errata keeps. The errata arrives as config
 errata for the trial's problem they are ``not_applicable``; when the verifier
 recorded a different errata digest than the config pins they are
 ``ineligible``. The raw metrics never change: both are always reported.
+
+Solvable-set metrics (``solved_solvable``, ``solved_checkpoints_solvable``,
+``reached_solvable``) are the primary outcome: a checkpoint is solved when every case in
+its solvable set (the cases the reference solution passes in every validation repeat,
+``raidar.grading.solvable``) passes. The sets arrive as config ``solvable``
+(``{problem ref: SolvableRef}``, set from the lock only). A checkpoint without a pinned
+set is ``unavailable``, never zero, and so is every trajectory metric over it.
 Under ``halt_on_failure`` the stop is the raw verdict's (Harbor's gate), so
 checkpoints after it stay unattempted under errata too.
 """
@@ -40,12 +47,14 @@ checkpoints after it stay unattempted under errata too.
 from __future__ import annotations
 
 from collections.abc import Callable, Iterable
+from dataclasses import dataclass
 from typing import Literal
 
 from pydantic import ValidationError
 
 from raidar.grading.errata import ErrataRef, errata_solved
 from raidar.grading.models import CaseGroup, CaseStatus, VerifierGrade
+from raidar.grading.solvable import SolvableRef, solvable_solved
 from raidar.scoring.framework.builtin_manifests import CORRECTNESS
 from raidar.scoring.framework.context import AssessContext, StepInputs, statused_result
 from raidar.scoring.framework.manifest import ScorerManifest, SdkModel
@@ -67,10 +76,11 @@ _CHECKPOINT_METRICS = (
 
 
 class CorrectnessConfig(SdkModel):
-    """Scorer config: the progression the trials ran under and the errata the lock pins."""
+    """The trials' progression and the lock-pinned errata and solvable sets."""
 
     progression: Literal["continue", "halt_on_failure"] = "continue"
     errata: dict[str, ErrataRef] = {}
+    solvable: dict[str, SolvableRef] = {}
 
 
 Verdict = Callable[[StepInputs], bool | None]
@@ -242,8 +252,28 @@ def solved_gap(steps: tuple[StepInputs, ...], progression: str) -> str:
     return reason
 
 
-ERRATA_CHECKPOINT_METRIC = "solved_errata"
-ERRATA_TRAJECTORY_METRICS = ("solved_checkpoints_errata", "reached_errata")
+@dataclass(frozen=True)
+class AppliedMetrics:
+    """The metric ids of one derived verdict: its checkpoint, solved-count and reached metrics."""
+
+    checkpoint: str
+    solved_checkpoints: str
+    reached: str
+    reached_reason: str
+
+
+ERRATA = AppliedMetrics(
+    "solved_errata",
+    "solved_checkpoints_errata",
+    "reached_errata",
+    "a checkpoint before the first errata-applied failure has no verdict",
+)
+SOLVABLE = AppliedMetrics(
+    "solved_solvable",
+    "solved_checkpoints_solvable",
+    "reached_solvable",
+    "a checkpoint before the first solvable-set failure has no verdict",
+)
 
 
 def errata_verdict(errata: ErrataRef) -> Verdict:
@@ -254,6 +284,17 @@ def errata_verdict(errata: ErrataRef) -> Verdict:
         if raw_verdict(step) is None or step.record is None:
             return None
         return errata_solved(step.record.grade, excluded)
+
+    return verdict
+
+
+def solvable_verdict(solvable: SolvableRef) -> Verdict:
+    """The solvable-set verdict: None for a step the lock pins no solvable set for."""
+
+    def verdict(step: StepInputs) -> bool | None:
+        if raw_verdict(step) is None or step.record is None:
+            return None
+        return solvable_solved(step.record.grade, solvable.steps.get(step.step, ()))
 
     return verdict
 
@@ -270,15 +311,51 @@ def _errata_mismatch(steps: Iterable[StepInputs], errata: ErrataRef) -> str | No
     return None
 
 
-def _statused_errata(
-    steps: tuple[StepInputs, ...], status: AssessStatus, reason: str
+def _statused(
+    steps: tuple[StepInputs, ...], applied: AppliedMetrics, status: AssessStatus, reason: str
 ) -> list[Observation]:
-    subjects = [(ERRATA_CHECKPOINT_METRIC, step.step) for step in steps]
-    subjects += [(metric, TRAJECTORY_SUBJECT) for metric in ERRATA_TRAJECTORY_METRICS]
+    subjects = [(applied.checkpoint, step.step) for step in steps]
+    trajectory = (applied.solved_checkpoints, applied.reached)
+    subjects += [(metric, TRAJECTORY_SUBJECT) for metric in trajectory]
     return [
         Observation(metric=metric, subject=subject, status=status, reason=reason)
         for metric, subject in subjects
     ]
+
+
+def _applied_observations(
+    steps: tuple[StepInputs, ...],
+    progression: str,
+    applied: AppliedMetrics,
+    verdict: Verdict,
+    no_verdict: Callable[[StepInputs], str],
+) -> list[Observation]:
+    observations = []
+    for step in steps:
+        gap = verdict_gap(step)
+        solved = verdict(step)
+        if gap is not None or solved is None:
+            status, reason = gap or (AssessStatus.UNAVAILABLE, no_verdict(step))
+            observations.append(
+                Observation(
+                    metric=applied.checkpoint, subject=step.step, status=status, reason=reason
+                )
+            )
+        else:
+            observations.append(_ok(applied.checkpoint, step.step, 1.0 if solved else 0.0))
+    observations.append(
+        _trajectory(
+            applied.solved_checkpoints,
+            solved_count(steps, progression, verdict),
+            solved_gap(steps, progression),
+        )
+    )
+    observations.append(
+        _trajectory(
+            applied.reached, reached_count(_verdicts(steps, verdict)), applied.reached_reason
+        )
+    )
+    return observations
 
 
 def errata_observations(ctx: AssessContext, config: CorrectnessConfig) -> list[Observation]:
@@ -286,39 +363,42 @@ def errata_observations(ctx: AssessContext, config: CorrectnessConfig) -> list[O
     errata = config.errata.get(ctx.problem)
     if errata is None:
         reason = f"no errata is pinned for {ctx.problem}"
-        return _statused_errata(ctx.steps, AssessStatus.NOT_APPLICABLE, reason)
+        return _statused(ctx.steps, ERRATA, AssessStatus.NOT_APPLICABLE, reason)
     mismatch = _errata_mismatch(ctx.steps, errata)
     if mismatch is not None:
-        return _statused_errata(ctx.steps, AssessStatus.INELIGIBLE, mismatch)
-    verdict = errata_verdict(errata)
-    observations = []
-    for step in ctx.steps:
-        gap = verdict_gap(step)
-        solved = verdict(step)
-        if gap is not None or solved is None:
-            status, reason = gap or (AssessStatus.UNAVAILABLE, "no oracle verdict")
-            observations.append(
-                Observation(
-                    metric=ERRATA_CHECKPOINT_METRIC, subject=step.step, status=status, reason=reason
-                )
-            )
-        else:
-            observations.append(_ok(ERRATA_CHECKPOINT_METRIC, step.step, 1.0 if solved else 0.0))
-    observations.append(
-        _trajectory(
-            "solved_checkpoints_errata",
-            solved_count(ctx.steps, config.progression, verdict),
-            solved_gap(ctx.steps, config.progression),
-        )
+        return _statused(ctx.steps, ERRATA, AssessStatus.INELIGIBLE, mismatch)
+    return _applied_observations(
+        ctx.steps,
+        config.progression,
+        ERRATA,
+        errata_verdict(errata),
+        lambda step: "no oracle verdict",
     )
-    observations.append(
-        _trajectory(
-            "reached_errata",
-            reached_count(_verdicts(ctx.steps, verdict)),
-            "a checkpoint before the first errata-applied failure has no verdict",
-        )
+
+
+def solvable_observations(ctx: AssessContext, config: CorrectnessConfig) -> list[Observation]:
+    """Solvable-set solve metrics; ``unavailable`` (never zero) without a pinned solvable set."""
+    solvable = config.solvable.get(ctx.problem)
+    if solvable is None:
+        reason = f"no solvable set is pinned for {ctx.problem}"
+        return _statused(ctx.steps, SOLVABLE, AssessStatus.UNAVAILABLE, reason)
+    observations = _applied_observations(
+        ctx.steps,
+        config.progression,
+        SOLVABLE,
+        solvable_verdict(solvable),
+        lambda step: f"no solvable set is pinned for {ctx.problem} {step.step}",
     )
-    return observations
+    missing = [step.step for step in ctx.steps if not solvable.steps.get(step.step)]
+    if not missing:
+        return observations
+    reason = f"no solvable set is pinned for {ctx.problem}: {', '.join(missing)}"
+    return [
+        _trajectory(item.metric, None, reason)
+        if item.metric == SOLVABLE.solved_checkpoints
+        else item
+        for item in observations
+    ]
 
 
 class CorrectnessScorer:
@@ -353,6 +433,7 @@ class CorrectnessScorer:
             )
         )
         observations.extend(errata_observations(ctx, config))
+        observations.extend(solvable_observations(ctx, config))
         measured = any(item.status is AssessStatus.OK for item in observations)
         return AssessResult(
             status=AssessStatus.OK if measured else AssessStatus.UNAVAILABLE,
@@ -362,5 +443,5 @@ class CorrectnessScorer:
 
 
 def correctness_scorer() -> CorrectnessScorer:
-    """Registry factory for ``correctness@2``."""
+    """Registry factory for ``correctness@3``."""
     return CorrectnessScorer()

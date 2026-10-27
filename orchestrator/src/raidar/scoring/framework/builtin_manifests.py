@@ -64,7 +64,7 @@ def _group_rate(group: str) -> MetricSpec:
 
 CORRECTNESS = ScorerManifest(
     id="correctness",
-    version="2",
+    version="3",
     description="Oracle verdicts per checkpoint and trajectory, from the oracle step records.",
     runtimes=("*",),
     evidence_required=(EvidenceInput.ORACLE_CASES,),
@@ -134,6 +134,32 @@ CORRECTNESS = ScorerManifest(
         _metric(
             "reached_errata",
             "Errata-applied consecutive checkpoints solved from the first (strict view).",
+            _TRAJECTORY,
+            MetricType.COUNT,
+            _HIGHER,
+            Exactness.NATIVE,
+        ),
+        _metric(
+            "solved_solvable",
+            "Solvable-set solve: every case in the checkpoint's solvable set (the cases the "
+            "reference passes in every validation repeat) passed; unavailable without a "
+            "solvable set, never zero.",
+            _CHECKPOINT,
+            MetricType.BOOLEAN,
+            _HIGHER,
+            Exactness.NATIVE,
+        ),
+        _metric(
+            "solved_checkpoints_solvable",
+            "Solvable-set solved checkpoints in the trajectory (continue view).",
+            _TRAJECTORY,
+            MetricType.COUNT,
+            _HIGHER,
+            Exactness.NATIVE,
+        ),
+        _metric(
+            "reached_solvable",
+            "Solvable-set consecutive checkpoints solved from the first (strict view).",
             _TRAJECTORY,
             MetricType.COUNT,
             _HIGHER,

@@ -214,7 +214,7 @@ def test_builtin_registrations_declare_their_store_protocol_and_problem_bindings
     bound = registry.get(DETERMINISTIC).load_for_store(tmp_path / "store")
     assert bound.manifest == registry.get(DETERMINISTIC).manifest
     assert registry.get("code-quality@4").problem_config == ("entry_file",)
-    assert registry.get("correctness@2").protocol_config == ("progression",)
+    assert registry.get("correctness@3").protocol_config == ("progression",)
     declared = {name for ref in registry.refs() for name in registry.get(ref).protocol_config}
     assert declared <= set(ProtocolSpec.model_fields), "protocol keys name ProtocolSpec fields"
     with pytest.raises(ValueError, match="needs an implementation"):
@@ -224,7 +224,7 @@ def test_builtin_registrations_declare_their_store_protocol_and_problem_bindings
 def test_a_plain_rescore_uses_the_runs_locked_assessment_config(tmp_path: Path) -> None:
     run = tmp_path / "run"
     trial = two_step_trial(run / "trials" / "trial")
-    locked = {"scorers": {"correctness@2": {"progression": "continue"}}}
+    locked = {"scorers": {"correctness@3": {"progression": "continue"}}}
     config = run / ASSESSMENT_CONFIG_FILE
     config.write_text(yaml.safe_dump(locked))
 
@@ -235,9 +235,9 @@ def test_a_plain_rescore_uses_the_runs_locked_assessment_config(tmp_path: Path) 
         assert result.exit_code == 0, result.output
         return json.loads(result.output)
 
-    explicit = rescore(trial, "correctness@2", "--config", str(config))
+    explicit = rescore(trial, "correctness@3", "--config", str(config))
     for target in (trial, trial.parent):  # a trial dir, and its job dir
-        default = rescore(target, "correctness@2")
+        default = rescore(target, "correctness@3")
         assert default["config"] == str(config.resolve())
         assert default["assessments"][0]["key"] == explicit["assessments"][0]["key"]  # type: ignore[index]
 
@@ -247,7 +247,7 @@ def test_a_plain_rescore_uses_the_runs_locked_assessment_config(tmp_path: Path) 
 
     # A trial outside any run falls back to an empty config.
     loose = two_step_trial(tmp_path / "loose" / "trial")
-    assert rescore(loose, "correctness@2")["config"] is None
+    assert rescore(loose, "correctness@3")["config"] is None
 
 
 def test_rescore_records_run_qualified_trial_ids_so_shared_trial_ids_stay_apart(

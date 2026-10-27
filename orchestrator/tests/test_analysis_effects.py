@@ -134,19 +134,24 @@ def test_bootstrap_from_ten_pairs_is_seeded_and_replays() -> None:
 
 
 @pytest.mark.parametrize(
-    ("progression", "primary"), [("continue", "solve_rate"), ("halt_on_failure", "reached")]
+    ("progression", "primary"),
+    [("continue", "solve_rate_solvable"), ("halt_on_failure", "solve_rate_solvable")],
 )
 def test_primary_outcome_follows_progression_and_s_is_secondary(
     progression: str, primary: str
 ) -> None:
     outcomes = []
     for attempt in range(5):
-        base = {"headline_score": 50.0, "solve_rate": 0.25, "reached": 1.0}
+        base = {
+            "headline_score": 50.0,
+            "solve_rate_solvable": 0.25,
+            "reached_solvable": 1.0,
+        }
         wiggle = attempt % 2
         treated = {
             "headline_score": 60.0 + wiggle,
-            "solve_rate": 0.75 - 0.125 * wiggle,
-            "reached": 3.0 - wiggle,
+            "solve_rate_solvable": 0.75 - 0.125 * wiggle,
+            "reached_solvable": 3.0 - wiggle,
         }
         outcomes += [trial(BASELINE, attempt, base), trial(GUIDED, attempt, treated)]
     report = analyse(inputs(outcomes, 5, progression=progression), SETTINGS)

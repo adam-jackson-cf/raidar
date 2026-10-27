@@ -13,7 +13,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from raidar.contract.job_layout import JOB_KIND, JOB_LOCK_FILE, JOB_MANIFEST, PLAN_FILE
-from raidar.engine.job.assessment import lock_errata, write_assessment_config
+from raidar.engine.job.assessment import lock_errata, lock_solvable, write_assessment_config
 from raidar.engine.job.provenance import effective_limits, runner_provenance
 from raidar.engine.job.recipe import recipe_digests
 from raidar.engine.trial.context import JobContext
@@ -34,6 +34,7 @@ def start_job(ctx: JobContext) -> dict[str, object]:
         plan.loaded.spec.protocol,
         ctx.job_dir,
         lock_errata(plan.lock),
+        lock_solvable(plan.lock),
     )
     manifest: dict[str, object] = {
         "kind": JOB_KIND,

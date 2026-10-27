@@ -1,7 +1,7 @@
 """Assessments projected as the surface's scorecard (``scorer:*`` and ``metric:*`` spans).
 
 The scorecard is the headline metric's view: ``S = 100·C·(base + inertia·I)``.
-``scorer:correctness@2`` carries C (the base share) with one metric per
+``scorer:correctness@3`` carries C (the base share) with one metric per
 checkpoint, and ``scorer:code-quality@4`` carries I (the inertia share) with one
 metric per inertia component at its policy weight; both shares are read from the
 policy (``policy_shares``). A scorer area is shown only when its
@@ -215,7 +215,7 @@ def _evidence_findings(ctx: ScoringContext) -> list[Finding]:
 
 
 def _regression_findings(ctx: ScoringContext) -> list[Finding]:
-    """Checkpoints where cases carried over from earlier checkpoints fail (correctness@2)."""
+    """Checkpoints where cases carried over from earlier checkpoints fail (correctness@3)."""
     assessment = ctx.assessments.get(CORRECTNESS_REF)
     if assessment is None:
         return []

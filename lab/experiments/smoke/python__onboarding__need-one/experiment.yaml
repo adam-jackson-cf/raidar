@@ -1,0 +1,30 @@
+schema_version: 3
+kind: smoke
+id: python__onboarding__need-one
+description: AT-N1 onboarding mechanics for two generated SCB bindings; not citable.
+problems:
+  - ref: scb/dag_execution@38d627ecf668
+    checkpoints: 2
+  - ref: scb/log_query@38d627ecf668
+runtime: python
+agents:
+  - id: codex-luna
+    release: codex@2
+    model: gpt-6-luna
+    reasoning: low
+protocol:
+  progression: continue
+  agent_timeout_sec: 600
+  verifier_timeout_sec: 900
+arms:
+  - id: baseline
+    agent: codex-luna
+    workflow: one-shot@1
+assessment:
+  scorers: [correctness@3]
+  metric: scb-canonical@2
+analysis:
+  baseline_arm: baseline
+  attempts: 1
+  seed: 20261027
+  concurrency: 1

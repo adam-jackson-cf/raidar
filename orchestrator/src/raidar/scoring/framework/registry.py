@@ -159,6 +159,8 @@ class ScorerRegistration:
     - ``errata_config``: the scorer takes the problem errata the lock pins
       (config key ``errata``: ``{problem ref: ErrataRef}``); set only from a
       lock, never by the experiment.
+    - ``solvable_config``: the scorer takes the solvable sets the lock pins
+      (config key ``solvable``: ``{problem ref: SolvableRef}``); lock only.
     """
 
     manifest: ScorerManifest
@@ -167,6 +169,7 @@ class ScorerRegistration:
     problem_config: tuple[str, ...] = ()
     protocol_config: tuple[str, ...] = ()
     errata_config: bool = False
+    solvable_config: bool = False
 
     def __post_init__(self) -> None:
         if self.implementation is not None:

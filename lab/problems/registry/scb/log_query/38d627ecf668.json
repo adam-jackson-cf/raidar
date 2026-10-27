@@ -1,0 +1,80 @@
+{
+  "kind": "raidar-problem",
+  "schema_version": 1,
+  "ref": "scb/log_query@38d627ecf668",
+  "mode": "multi_checkpoint",
+  "checkpoints": 5,
+  "steps": [
+    {
+      "name": "checkpoint_1",
+      "checkpoint": "checkpoint_1",
+      "instruction_sha256": "ba5baab77af31cb8693973522015d3dd22594b19ccf06773760eb743809318ce",
+      "test_files": [
+        "test_checkpoint_1.py"
+      ]
+    },
+    {
+      "name": "checkpoint_2",
+      "checkpoint": "checkpoint_2",
+      "instruction_sha256": "d5b3f9955a1ab110da45d452d0f7da59d3f5d4e56b3bfc74935518072208aff1",
+      "test_files": [
+        "test_checkpoint_1.py",
+        "test_checkpoint_2.py"
+      ]
+    },
+    {
+      "name": "checkpoint_3",
+      "checkpoint": "checkpoint_3",
+      "instruction_sha256": "e52a745d4a11e602558c07b94c693560f508b029726f198fb176dde01a21b1e3",
+      "test_files": [
+        "test_checkpoint_1.py",
+        "test_checkpoint_2.py",
+        "test_checkpoint_3.py"
+      ]
+    },
+    {
+      "name": "checkpoint_4",
+      "checkpoint": "checkpoint_4",
+      "instruction_sha256": "b47312d14b0a8a92f5a4c0d7642c11ad45674b4182f781724801bc005429cf47",
+      "test_files": [
+        "test_checkpoint_1.py",
+        "test_checkpoint_2.py",
+        "test_checkpoint_3.py",
+        "test_checkpoint_4.py"
+      ]
+    },
+    {
+      "name": "checkpoint_5",
+      "checkpoint": "checkpoint_5",
+      "instruction_sha256": "9dc202d54ad9ed9d73f808c661ec73a0f895404638c6aed96c36c7b1440079aa",
+      "test_files": [
+        "test_checkpoint_1.py",
+        "test_checkpoint_2.py",
+        "test_checkpoint_3.py",
+        "test_checkpoint_4.py",
+        "test_checkpoint_5.py"
+      ]
+    }
+  ],
+  "source": {
+    "dataset": "scb",
+    "url": "https://github.com/gabeorlanski/scb-problems",
+    "commit": "38d627ecf668a88f88f8d260f8df8df6116e9b03",
+    "problem": "log_query",
+    "checkpoint_selection": null,
+    "problem_tree": "9c30d2773a979cfd10b167aff03c44edc0ecc86d",
+    "converter_tree": "4475c907ab812bdec61885f24e41f5a634b927ee",
+    "conversion_overrides": "733c1bef9ee8d233639a34439e67232bf5e445e8",
+    "converted_task_sha256": "9126ed47d762291fd1a36c7b21542a3510c86fe692df3bd51f6f2079b1c2ae61"
+  },
+  "pack": {
+    "id": "python",
+    "version": 1,
+    "image": "raidar/pack-python:2b91a52663e099f2"
+  },
+  "task_sha256": "87bf08fbb0332d2ab4378772a81af8ad771c8d8391641a7592772a6d84979cdc",
+  "bundle_sha256": "1f75ee5afc2d5e0178b6cb47952d668f55748c143ba8bdc53eb6d1df39f7239a",
+  "references_sha256": "3ebc5353d3e331c3d0721094799b4ed2a491746ae07f6600c86b1cb330004cf8",
+  "entry_file": "logql.py",
+  "entry_command": "uv run --project /app logql.py"
+}
