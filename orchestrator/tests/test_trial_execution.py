@@ -171,7 +171,7 @@ def _plan(tmp_path: Path, fixture: ImportedFixture, **changes: Any) -> Any:
         fixture.ref,
         environment={"compose_init": False},
         assessment={
-            "scorers": ["correctness@3"],
+            "scorers": ["correctness@4"],
             "inventory_policy": {"generated_globs": ["gen/**"]},
         },
         **changes,

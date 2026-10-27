@@ -7,7 +7,7 @@ hidden test's verdict can depend on something besides the program's
 behaviour, such as wall-clock timing or the random values it generates, so it
 may pass a wrong program (or fail a right one) by chance. It is never an
 erratum and never changes a value: it is a typed note the analysis shows beside
-the grading-vs-coverage disagreement count (code-quality@4's
+the grading-vs-coverage disagreement count (code-quality@5's
 ``regression_parity_excluded_cases``), so a reader can tell a flipped case that
 is a known sensitivity from an unexplained one.
 

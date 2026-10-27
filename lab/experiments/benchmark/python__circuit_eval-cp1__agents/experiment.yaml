@@ -29,7 +29,7 @@ arms:
     workflow: one-shot@1
 
 assessment:
-  scorers: [correctness@3]
+  scorers: [correctness@4]
   metric: scb-canonical-oneshot@1
 
 analysis:

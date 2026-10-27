@@ -7,7 +7,7 @@ verifier's own artifact mechanism and excludes, under the step's agent logs
 offline, beside the step's final snapshot:
 
 - ``grade_pre_fix_path`` (run by ``raidar assess --rescore`` when a locked
-  scorer reads pre-fix grades, ``gate-effort@11``): every pre-fix snapshot of
+  scorer reads pre-fix grades, ``gate-effort@12``): every pre-fix snapshot of
   every graded step is checked against its recorded digest and graded with the
   step's own verifier bundle (its recorded digest is checked too), sandbox and
   grader timeout, exactly as ``raidar.grading.regrade`` regrades the final

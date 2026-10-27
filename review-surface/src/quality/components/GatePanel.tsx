@@ -187,7 +187,7 @@ export function GatePanel({ gate }: { gate: GateView | null | undefined }) {
           Commit gate
         </span>
         <span style={{ color: C.fg0 }}>
-          {gate.scorer ?? 'gate-effort@11'} · rounds, first-pass clean and blocking findings by rule family
+          {gate.scorer ?? 'gate-effort@12'} · rounds, first-pass clean and blocking findings by rule family
         </span>
         {shadow && (
           <span data-testid="gate-shadow" style={{ color: C.orange }} title="Recorded at each step's end, never enforced: no refusal, no fix session; the families shown are the first run's">

@@ -89,13 +89,13 @@ class StepFixture:
 
 
 def write_toy_bundle(
-    root: Path, steps: Sequence[str], *, entry_file: str | None = None
+    root: Path, steps: Sequence[str], *, entry_file: str | None = None, problem: str = "toy"
 ) -> VerifierBundle:
     """A host-side verifier bundle planning ``steps`` for problem ``toy``."""
     tests = root.parent / f"{root.name}-tests"
     write_files(tests, {f"test_{name}.py": "def test_ok():\n    pass\n" for name in steps})
     manifest = BundleManifest(
-        problem="toy",
+        problem=problem,
         grader=GraderSpec(base_image="local"),
         steps=tuple(
             VerifierStepSpec(
@@ -117,6 +117,7 @@ def write_trial(
     *,
     planned: Sequence[str] = (),
     entry_file: str | None = None,
+    problem: str = "toy",
 ) -> Path:
     """A stored multi-step Harbor trial with host-side verifier records.
 
@@ -127,6 +128,7 @@ def write_trial(
         trial_dir.parent / f"{trial_dir.name}-bundle",
         [*(s.name for s in steps), *planned],
         entry_file=entry_file,
+        problem=problem,
     )
     step_results = []
     for step in steps:
@@ -153,7 +155,7 @@ def write_trial(
         record = StepRecord(
             step=step.name,
             checkpoint=step.name,
-            bundle=BundleRef(root=str(bundle.root), digest=bundle.digest(), problem="toy"),
+            bundle=BundleRef(root=str(bundle.root), digest=bundle.digest(), problem=problem),
             snapshot=SnapshotRef(
                 requested="artifact",
                 used="artifact",
@@ -174,6 +176,12 @@ def write_trial(
         "step_results": step_results,
         "verifier_result": {"rewards": {"solved": 0.0}},
     }
+    task_dir = trial_dir.parent / f"{trial_dir.name}-task"
+    task_dir.mkdir(parents=True, exist_ok=True)
+    task_dir.joinpath("task.toml").write_text(
+        "\n".join(f'[[steps]]\nname = "{name}"' for name in [*(s.name for s in steps), *planned])
+    )
+    trial_dir.joinpath("config.json").write_text(json.dumps({"task": {"path": str(task_dir)}}))
     (trial_dir / "result.json").write_text(json.dumps(result, indent=2) + "\n")
     return trial_dir
 

@@ -41,11 +41,11 @@
         }
       },
       "scorer": {
-        "correctness@3": {
-          "digest": "783e4d08507c82f779b672b7013edb1dd436d5886015fd62cb7e6941dc814189",
+        "correctness@4": {
+          "digest": "6c2f10ca8361488500a32f23214b7867eec81650a86939368b8de4c3efbb43f1",
           "metadata": {
             "implementation": "raidar.scoring.correctness:correctness_scorer",
-            "implementation_digest": "35bc4fa9231dfaed1d7ae3f0d99a56fc09998ec42adb9275f7d27c6289a4379f",
+            "implementation_digest": "35b002328986f6dab40df4f60b2b42a97a9cf848328cb8e15baf5b35ea06887f",
             "manifest": {
               "description": "Oracle verdicts per checkpoint and trajectory, from the oracle step records.",
               "evidence_required": [
@@ -239,7 +239,7 @@
                 "*"
               ],
               "tools": [],
-              "version": "3"
+              "version": "4"
             },
             "tool_lock": {}
           }
@@ -254,12 +254,12 @@
       "metric": "scb-canonical@2",
       "scorer_config": {},
       "scorers": [
-        "correctness@3"
+        "correctness@4"
       ]
     },
     "tools": {}
   },
-  "document_sha256": "e2a07a91f12f2312183e87f92aa4212abfa05b1e3576772cb750230f180e1e8e",
+  "document_sha256": "118c1d9ada0f1dbe75cae3ea85b3150a7b0c8a10d525a726c4369e24aa754fa2",
   "execution": {
     "arms": {
       "baseline": {
@@ -1849,8 +1849,8 @@
   "experiment": {
     "id": "python__onboarding__need-one",
     "source": "experiment.yaml",
-    "source_sha256": "ea3ea43618a71ff5226e539f40bada3d57b290b089b9e223b23061517b8501b1",
-    "spec_sha256": "cd82d7fd1aaf0f7ac20ee783a2d59d766e956ec273e1f70bfadadc8a69789259"
+    "source_sha256": "4bf5ebb2e4ecf31ac1103e9d3d66719d54cfbdc11703f24b6e889abadd9f5052",
+    "spec_sha256": "76a47c46f55cba776b3f5863ec7b765de1c193cc4cb688cd9f5d82b946773759"
   },
   "lock_sha256": "c6fb3ed896949b8bccf4af7fd31dc2a064ea03d116cc448c99021008fbeaa19b",
   "lock_version": 4,
@@ -1860,7 +1860,7 @@
   },
   "sections": {
     "analysis": "144d50057229f81b6136f89cfe8df3c9cf5dbbbec9a279c66acba88e027528b3",
-    "assessment": "43020694265d45d730da38fdb56a9843dad20faa2c3513c3d2dfcc178ec6a67d",
+    "assessment": "0ab6ae1c44a7cecd75e0376ce955a93bac1c333b31381ba975396d5f47967514",
     "execution": "c6fb3ed896949b8bccf4af7fd31dc2a064ea03d116cc448c99021008fbeaa19b",
     "toolchain": "b6ef977873154c13b7d03140ffd4cfff64d0cfa32430af9f4e52db26e2a729cc"
   },
@@ -1898,7 +1898,7 @@
       "metric": "scb-canonical@2",
       "scorer_config": {},
       "scorers": [
-        "correctness@3"
+        "correctness@4"
       ]
     },
     "description": "AT-N1 onboarding mechanics for two generated SCB bindings; not citable.",
