@@ -36,7 +36,7 @@ def _metric(
 
 DEFINITION_COVERAGE = ScorerManifest(
     id="definition-coverage",
-    version="1",
+    version="2",
     description=(
         "FXL process audit stage A as recorded readings: for each required issue unit of a "
         "checkpoint's define stage, Jev scores each criterion citing it (its statement, aspects "

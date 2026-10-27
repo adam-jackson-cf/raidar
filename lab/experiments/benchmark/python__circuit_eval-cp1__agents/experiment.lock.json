@@ -41,11 +41,11 @@
         }
       },
       "scorer": {
-        "correctness@3": {
-          "digest": "783e4d08507c82f779b672b7013edb1dd436d5886015fd62cb7e6941dc814189",
+        "correctness@4": {
+          "digest": "6c2f10ca8361488500a32f23214b7867eec81650a86939368b8de4c3efbb43f1",
           "metadata": {
             "implementation": "raidar.scoring.correctness:correctness_scorer",
-            "implementation_digest": "35bc4fa9231dfaed1d7ae3f0d99a56fc09998ec42adb9275f7d27c6289a4379f",
+            "implementation_digest": "35b002328986f6dab40df4f60b2b42a97a9cf848328cb8e15baf5b35ea06887f",
             "manifest": {
               "description": "Oracle verdicts per checkpoint and trajectory, from the oracle step records.",
               "evidence_required": [
@@ -239,7 +239,7 @@
                 "*"
               ],
               "tools": [],
-              "version": "3"
+              "version": "4"
             },
             "tool_lock": {}
           }
@@ -254,12 +254,12 @@
       "metric": "scb-canonical-oneshot@1",
       "scorer_config": {},
       "scorers": [
-        "correctness@3"
+        "correctness@4"
       ]
     },
     "tools": {}
   },
-  "document_sha256": "ffb626f064c0aa273ab51a0e643f698f28140e4e1a67014e231bb05e78275d07",
+  "document_sha256": "0233afb8b67faf850093859b2711c3273f11244ec3c2f1ea93060e22b06c1428",
   "execution": {
     "arms": {
       "codex": {
@@ -459,8 +459,8 @@
   "experiment": {
     "id": "python__circuit_eval-cp1__agents",
     "source": "experiment.yaml",
-    "source_sha256": "c00289c2048442603e789fed49f7b5676e9369587d2a7b4295adc9abd4c021fa",
-    "spec_sha256": "c5ced6833054b3fe5fdc8eab686f34a0322a1e8039aa280852a2467d8969b3d4"
+    "source_sha256": "a73a4a93708c9036beb434208cd12447c09ca6d577280ea351a8b0ac4e1d2f1b",
+    "spec_sha256": "12cf345821051b0369da5038808d68680783d7f3d2e26dd75d5d9a7a9c0fe557"
   },
   "lock_sha256": "dcf10c7a7dfe36cb16d0b7a2fc4c1991b2067709c1fd03e54b15218f37149f9b",
   "lock_version": 4,
@@ -470,7 +470,7 @@
   },
   "sections": {
     "analysis": "0a0fb32297e0c3abaad1f91cb80990bf42b3a3f0854246915ae017492003d1bc",
-    "assessment": "254c011fa52bf25d276f59fbf7fff6750515e8ed3a90abad92527c00042e2051",
+    "assessment": "63dafc04e039dd0141c6628ac2f0baec5e258d7d5c5272a256b74f7661b56bd6",
     "execution": "dcf10c7a7dfe36cb16d0b7a2fc4c1991b2067709c1fd03e54b15218f37149f9b",
     "toolchain": "b6ef977873154c13b7d03140ffd4cfff64d0cfa32430af9f4e52db26e2a729cc"
   },
@@ -508,7 +508,7 @@
       "metric": "scb-canonical-oneshot@1",
       "scorer_config": {},
       "scorers": [
-        "correctness@3"
+        "correctness@4"
       ]
     },
     "description": "Every released agent on the smoke problem; a smoke-sized benchmark.",

@@ -49,7 +49,7 @@ export function RunQualityPanel({ run }: { run: RunRecord }) {
             Quality
           </span>
           <span className="text-[10px]" style={{ color: C.fg0 }}>
-            Not assessed yet. Rescore this trial's job with code-quality@4 and correctness@3, then run make
+            Not assessed yet. Rescore this trial's job with code-quality@5 and correctness@4, then run make
             review-surface-quality-data.
           </span>
         </span>

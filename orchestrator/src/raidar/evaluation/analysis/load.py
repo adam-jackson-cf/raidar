@@ -126,11 +126,24 @@ def _lookup(request: LoadRequest, scorer_refs: tuple[str, ...]) -> AssessmentLoo
     )
 
 
-def _solvable_summary(lock: Mapping[str, Any]) -> dict[str, Any]:
-    return {
-        ref: {"sha256": pinned.sha256, "cases": {s: len(c) for s, c in pinned.steps.items()}}
-        for ref, pinned in lock_solvable(lock).items()
-    }
+def _planned_by_problem(chosen: Mapping[str, tuple[Any, Any]]) -> dict[str, set[str]]:
+    """Per problem ref, the steps its chosen trials recorded as planned (the bound prefix)."""
+    planned: dict[str, set[str]] = {}
+    for _job, record in chosen.values():
+        planned.setdefault(record.trial.problem, set()).update(record.planned_steps)
+    return planned
+
+
+def _solvable_summary(lock: Mapping[str, Any], planned: Mapping[str, set[str]]) -> dict[str, Any]:
+    """The pinned solvable sets restricted to the chosen trials' recorded bound plans."""
+    summary: dict[str, Any] = {}
+    for ref, pinned in lock_solvable(lock).items():
+        if ref not in planned:
+            continue
+        steps = planned[ref]
+        cases = {step: len(found) for step, found in pinned.steps.items() if step in steps}
+        summary[ref] = {"sha256": pinned.sha256, "cases": cases}
+    return summary
 
 
 def load_inputs(request: LoadRequest) -> tuple[AnalysisInputs, Mapping[str, Any]]:
@@ -156,7 +169,7 @@ def load_inputs(request: LoadRequest) -> tuple[AnalysisInputs, Mapping[str, Any]
         experiment=str(lock["experiment"]["id"]),
         lock_sha256=str(lock["lock_sha256"]),
         errata={ref: errata.model_dump(mode="json") for ref, errata in lock_errata(lock).items()},
-        solvable=_solvable_summary(lock),
+        solvable=_solvable_summary(lock, _planned_by_problem(chosen)),
         jobs=tuple(job.job_id for job in jobs),
         kind=str(spec.get("kind", "ab-test")),
         rank_by=spec["analysis"].get("rank_by"),

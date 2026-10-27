@@ -41,11 +41,11 @@
         }
       },
       "scorer": {
-        "correctness@3": {
-          "digest": "783e4d08507c82f779b672b7013edb1dd436d5886015fd62cb7e6941dc814189",
+        "correctness@4": {
+          "digest": "6c2f10ca8361488500a32f23214b7867eec81650a86939368b8de4c3efbb43f1",
           "metadata": {
             "implementation": "raidar.scoring.correctness:correctness_scorer",
-            "implementation_digest": "35bc4fa9231dfaed1d7ae3f0d99a56fc09998ec42adb9275f7d27c6289a4379f",
+            "implementation_digest": "35b002328986f6dab40df4f60b2b42a97a9cf848328cb8e15baf5b35ea06887f",
             "manifest": {
               "description": "Oracle verdicts per checkpoint and trajectory, from the oracle step records.",
               "evidence_required": [
@@ -239,7 +239,7 @@
                 "*"
               ],
               "tools": [],
-              "version": "3"
+              "version": "4"
             },
             "tool_lock": {}
           }
@@ -254,12 +254,12 @@
       "metric": "scb-canonical-oneshot@1",
       "scorer_config": {},
       "scorers": [
-        "correctness@3"
+        "correctness@4"
       ]
     },
     "tools": {}
   },
-  "document_sha256": "14c5d459055bcf40d119606f1b4cf7e02121d44340e53e57882d3b8e0e8b2133",
+  "document_sha256": "0cad12d7316cb31c2d883d4fca48c88d9e8f810755038e76ee0a967f0cc57a9c",
   "execution": {
     "arms": {
       "baseline": {
@@ -459,8 +459,8 @@
   "experiment": {
     "id": "python__circuit_eval-cp1__agent-health",
     "source": "experiment.yaml",
-    "source_sha256": "4cee1f0ce503f07e836926f6bafe125678b400565aa32dbf1e6b45f47b5f34fa",
-    "spec_sha256": "6837e587e40058931dd0ac9541e244e14aaa165d17dec9c4dc9816ca404ac2b0"
+    "source_sha256": "2434554b5d26e53370009320467bcd221077f6e0da4a30cfa23cc6c2422a9747",
+    "spec_sha256": "8f9c31e060053559cbf1bfeafe54b13a9b66ba31339d11e0db2d5cc65e6d9ea0"
   },
   "lock_sha256": "261e6ddfff2af691b69f9a6473717d8a009297709177ac1c92ab60d3fe2e3e82",
   "lock_version": 4,
@@ -470,7 +470,7 @@
   },
   "sections": {
     "analysis": "144d50057229f81b6136f89cfe8df3c9cf5dbbbec9a279c66acba88e027528b3",
-    "assessment": "254c011fa52bf25d276f59fbf7fff6750515e8ed3a90abad92527c00042e2051",
+    "assessment": "63dafc04e039dd0141c6628ac2f0baec5e258d7d5c5272a256b74f7661b56bd6",
     "execution": "261e6ddfff2af691b69f9a6473717d8a009297709177ac1c92ab60d3fe2e3e82",
     "toolchain": "b6ef977873154c13b7d03140ffd4cfff64d0cfa32430af9f4e52db26e2a729cc"
   },
@@ -508,7 +508,7 @@
       "metric": "scb-canonical-oneshot@1",
       "scorer_config": {},
       "scorers": [
-        "correctness@3"
+        "correctness@4"
       ]
     },
     "description": "Operational smoke of the experiment path; not citable.",

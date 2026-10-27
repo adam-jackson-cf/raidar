@@ -7,7 +7,7 @@ job, Assessment and Jev shapes:
   (baseline arm and headline metric, as a real lock carries them), and
   ``jobs/<experiment>/<job>/`` job directories (``job.json`` naming the
   lock digest + ``trial-records/*.json`` TrialRecords);
-- ``store/``: ``code-quality@4`` and ``correctness@3`` Assessments whose
+- ``store/``: ``code-quality@5`` and ``correctness@4`` Assessments whose
   inputs carry each trial's snapshot digests (correctness in the real
   scorer's shape: per-checkpoint ``solved`` and ``strict_pass_rate``, and
   trial ``solved_checkpoints`` and ``reached``), plus a Jev audit of
@@ -374,7 +374,7 @@ def generate_quality_fixture(dest: Path) -> Path:
     experiment_file.write_text(
         f"# synthetic fixture: not benchmark evidence\nid: {EXPERIMENT}\n"
         "analysis:\n  baseline_arm: baseline\n  attempts: 6\n  seed: 20260930\n"
-        "assessment:\n  scorers: [correctness@3, code-quality@4, gate-effort@11]\n",
+        "assessment:\n  scorers: [correctness@4, code-quality@5, gate-effort@12]\n",
         encoding="utf-8",
     )
     lock_sha256 = write_synthetic_lock(
@@ -409,6 +409,9 @@ def generate_quality_fixture(dest: Path) -> Path:
             trial = _Trial(arm=arm, attempt=attempt, rng=random.Random(rng.random()))
             _measure(trial)
             record = write_inputs(job_dir, _record(trial), bundle)
+            (job_dir / "trial-records" / f"{trial.trial_id}.json").write_text(
+                record.model_dump_json(indent=2), encoding="utf-8"
+            )
             trial_dir = job_dir / record.trial_dir
             gate = gate_result(
                 trial_dir,
@@ -436,8 +439,5 @@ def generate_quality_fixture(dest: Path) -> Path:
                 )
             )
             store.put(assessments.assessment(GATE_EFFORT.ref, trial_dir, gate))
-            (job_dir / "trial-records" / f"{trial.trial_id}.json").write_text(
-                record.model_dump_json(indent=2), encoding="utf-8"
-            )
             _decisions(audit, trial)
     return dest

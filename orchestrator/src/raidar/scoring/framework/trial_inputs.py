@@ -1,12 +1,11 @@
 """Build an ``AssessContext`` from a stored Harbor trial directory (read-only).
 
-The planned checkpoints come from the trial's oracle bundle (located through
-its step records or the verifier's ``oracle_bundle`` argument, or an explicit
-override, and checked against the digest the records carry). Executed steps come from Harbor's
-``result.json`` ``step_results`` in order and must be a prefix of the plan; a
-one-step trial has no ``step_results`` and must have exactly one oracle
-record. Planned checkpoints the trial never reached are kept with
-``reached=False``, so every trial of a problem has the same subjects.
+The planned checkpoints come from the retained trial record (before smoke/dev
+truncation), or the configured task for standalone Harbor trials. The oracle
+bundle maps those steps to checkpoint identities; it does not select the plan.
+Executed steps come from Harbor's ``result.json`` ``step_results`` in order
+and must be a prefix of the plan. Planned checkpoints the trial never reached
+are kept with ``reached=False``.
 
 Correctness inputs come from the oracle's ``raidar-oracle/steps/<step>/record.json``;
 Harbor's trial-level ``verifier_result`` is never read. Each stored snapshot
@@ -22,6 +21,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import tomllib
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
@@ -29,7 +29,9 @@ from pathlib import Path
 from typing import Any
 
 from raidar.contract.canonical import digest_json
+from raidar.contract.job_layout import TRIAL_RECORDS_DIR
 from raidar.contract.snapshot import tree_digest
+from raidar.contract.trial import TrialRecord
 from raidar.grading.bundle import BundleError, VerifierBundle, load_bundle
 from raidar.grading.records import (
     FORK_EVIDENCE_FILE,
@@ -309,6 +311,36 @@ def _unreached(step: str, checkpoint: str) -> StepInputs:
     )
 
 
+def _recorded_steps(trial_dir: Path) -> tuple[str, ...]:
+    """Read the evaluation plan, not just the steps Harbor attempted.
+
+    TrialRecord retains the bound plan, including ``not_attempted`` results
+    beyond MAX_CHECKPOINTS. A standalone Harbor trial instead retains its
+    configured task; it has no Raidar smoke truncation or problem binding.
+    """
+    record_path = trial_dir.parent.parent / TRIAL_RECORDS_DIR / f"{trial_dir.name}.json"
+    if record_path.is_file():
+        try:
+            return TrialRecord.model_validate(_read_json(record_path)).planned_steps
+        except ValueError as exc:
+            raise TrialInputError(f"{record_path}: invalid trial record: {exc}") from exc
+    for name in _VERIFIER_CONFIG_FILES:
+        config_path = trial_dir / name
+        if not config_path.is_file():
+            continue
+        task = _read_json(config_path).get("task")
+        root = task.get("path") if isinstance(task, Mapping) else None
+        if isinstance(root, str) and root:
+            try:
+                document = tomllib.loads((Path(root) / "task.toml").read_text())
+                return tuple(step["name"] for step in document.get("steps", ()))
+            except (OSError, ValueError, KeyError, TypeError) as exc:
+                raise TrialInputError(
+                    f"{trial_dir}: cannot read planned task steps: {exc}"
+                ) from exc
+    raise TrialInputError(f"{trial_dir}: no retained trial record or configured task plan")
+
+
 def _planned_steps(
     trial_dir: Path,
     executed: Sequence[_Executed],
@@ -316,7 +348,14 @@ def _planned_steps(
     bundle: VerifierBundle,
 ) -> tuple[StepInputs, ...]:
     """Every planned checkpoint in order; the executed ones must be a prefix of the plan."""
-    planned = [(step.name, step.checkpoint) for step in bundle.manifest.steps]
+    names = _recorded_steps(trial_dir)
+    available = [(step.name, step.checkpoint) for step in bundle.manifest.steps]
+    planned = available[: len(names)]
+    if not names or list(names) != [name for name, _ in planned]:
+        raise TrialInputError(
+            f"{trial_dir}: recorded steps {names} are not a prefix of the planned "
+            f"checkpoints {[name for name, _ in available]}"
+        )
     ran = [item.step for item in executed]
     if ran != [name for name, _ in planned[: len(ran)]]:
         raise TrialInputError(
