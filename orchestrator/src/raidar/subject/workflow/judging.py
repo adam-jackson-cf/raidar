@@ -604,9 +604,11 @@ def stop_reason(
     """Why the loop stops after the last pass, or None to rework.
 
     Every criterion closed over a commit the gate refused is not ``verified``: an unchanged tree
-    is no progress, and the pass limit still holds.
+    is no progress, and the pass limit still holds. A pass over no criteria never verifies.
     """
     last = history[-1]
+    if not last.outcomes:
+        return NO_PROGRESS
     if not last.standing:
         if gate_passed:
             return VERIFIED

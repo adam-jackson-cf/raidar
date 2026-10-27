@@ -20,7 +20,14 @@ def workflow_stages(definition: WorkflowDefinition) -> list[Stage]:
     if define is not None and define.enabled:
         defining = Define(define, acceptance)
         stages.append(defining)
-        prerequisites.append({"name": "define.unsealed", "argv": defining.paths.inspector})
+        prerequisites.append(
+            {
+                "name": "define.unsealed",
+                "argv": defining.paths.prerequisite,
+                "watch": defining.paths.state,
+                "writes": [],
+            }
+        )
     stages.append(Build(definition.stages.build, acceptance, verify.PATHS.workspace))
     gate = definition.stages.verify
     if gate is not None and gate.enabled:

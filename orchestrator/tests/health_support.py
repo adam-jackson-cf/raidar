@@ -139,7 +139,7 @@ def write_agent_session(trial_dir: Path, step: str, rows: list[str] | None = Non
     rollout.write_text("\n".join(lines) + "\n")
     turns[0]["session_audit"] = codex_session_audit(agent / "workflow" / "build-1")
     (agent / "workflow" / "workflow.json").write_text(
-        json.dumps({"kind": "raidar-workflow", "turns": turns})
+        json.dumps({"kind": "raidar-workflow", "stages": ["build"], "turns": turns})
     )
     return rollout
 
@@ -159,6 +159,17 @@ def _write_evidence(trial_dir: Path) -> None:
     (trial_dir / "raidar-liveness.json").write_text(json.dumps({"phases": [phase]}))
 
 
+def write_trial_config(trial_dir: Path, *, define: bool, verify: bool, judge: bool) -> None:
+    """The lab's own ``config.json`` for a trial: the agent's resolved workflow definition."""
+    stages: dict[str, Any] = {"build": {"prompt": "build %%%TASK%%%"}}
+    if define:
+        stages["define"] = {"enabled": True}
+    if verify:
+        stages["verify"] = {"enabled": True, **({"judge": {"model": "m"}} if judge else {})}
+    config = {"agent": {"kwargs": {"definition": {"stages": stages}}}}
+    (trial_dir / "config.json").write_text(json.dumps(config))
+
+
 def healthy_trial(
     tmp_path: Path, outcomes: list[StepOutcome] | None = None, *, job_dir: Path | None = None
 ) -> HealthyTrial:
@@ -166,6 +177,7 @@ def healthy_trial(
     trial_dir = job_dir / "trials" / TRIAL_ID
     outcomes = outcomes or [StepOutcome(STEP)]
     write_trial(trial_dir, outcomes)
+    write_trial_config(trial_dir, define=False, verify=False, judge=False)
     for outcome in outcomes:
         if outcome.passed is not None:
             _store_snapshot(trial_dir, outcome.name)

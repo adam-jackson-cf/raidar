@@ -171,7 +171,7 @@ def run(
         environment_logs_dir=PurePosixPath(logs),
         model_name="openai/gpt-6-luna",
         inner_agent={"name": "codex"},
-        workflow="define-build-verify@2",
+        workflow="define-build-verify@3",
         definition=definition,
         phase_timeout_s=timeout_s,
     )
@@ -335,10 +335,10 @@ def test_a_rework_that_does_not_fit_the_time_left_is_declined_and_the_tree_stays
     assert (stage["ending"], stage["passes"]) == ("budget_exhausted", 1)
     assert kinds(record) == ["first_build"]
     assert stage["judged"][0]["open"] == ["F1.AC1"]
-    assert stage["restored"] is None
+    assert "restored" not in stage
 
 
-def test_no_judge_pass_starts_after_the_deadline_and_the_last_gated_tree_is_restored(
+def test_no_judge_pass_starts_after_the_deadline_and_the_graded_tree_is_what_the_agent_left(
     tmp_path: Path,
     define_paths: define.DefinePaths,
     agent_env: dict[str, str],
@@ -352,8 +352,8 @@ def test_no_judge_pass_starts_after_the_deadline_and_the_last_gated_tree_is_rest
 
     stage = record["verify"]
     assert (stage["ending"], stage["judged"], stage["judge_calls"]) == ("deadline", [], [])
-    assert stage["restored"]["reason"] == "deadline"
-    assert stage["restored"]["gate"] == 1
+    assert "restored" not in stage
+    assert stage["gates"][0]["tree"]
     assert fake.requests == []
 
 
@@ -524,6 +524,40 @@ def test_a_refusal_that_outlasts_its_fix_rounds_ends_gate_refused_with_the_tree_
         "gate_refused",
         2,
     )
+    assert [gate["verdict"] for gate in stage["gates"]] == ["refused"] * 3
+    assert stage["judged"][0]["criteria"] == []
+    assert fake.requests == []
+
+
+def test_a_draft_sealed_after_the_define_ended_unusable_never_passes_the_gate_or_verifies(
+    tmp_path: Path, define_paths: define.DefinePaths, agent_env: dict[str, str], jev: Any
+) -> None:
+    fake = jev(lambda call_number, situation: 0.95)
+
+    def build(ws: Path, prompt: str) -> str:
+        write(ws, calc=CODE, test_calc=PASSING)
+        return reply(TEST_ID)
+
+    def repair(ws: Path, prompt: str) -> str:
+        return reply(TEST_ID)
+
+    def seal_late(ws: Path, prompt: str) -> str:
+        call(define_paths, agent_env, "put", block=BLOCK)
+        call(define_paths, agent_env, "done", "ready")
+        assert commit(ws, agent_env) == 1  # the lab's closed state keeps the prerequisite failing
+        return reply(TEST_ID)
+
+    def commit_again(ws: Path, prompt: str) -> str:
+        write(ws, calc=CODE + "\n")
+        assert commit(ws, agent_env) == 1
+        return reply(TEST_ID)
+
+    record, _ = run(tmp_path, agent_env, [build, repair, seal_late, commit_again])
+
+    stage = record["verify"]
+    assert (record["define"]["ending"], record["define"]["closed"]) == ("definition_unusable", True)
+    assert record["define"]["definition"] is None
+    assert (stage["ending"], stage["gate_ending"]) == ("gate_refused", "gate_refused")
     assert [gate["verdict"] for gate in stage["gates"]] == ["refused"] * 3
     assert stage["judged"][0]["criteria"] == []
     assert fake.requests == []

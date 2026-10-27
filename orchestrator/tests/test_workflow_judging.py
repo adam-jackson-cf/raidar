@@ -484,6 +484,13 @@ def test_the_loop_is_verified_only_when_every_criterion_is_closed_over_an_accept
     assert judging.stop_reason([result(3, "closed")], SETTINGS, 3, ["a.py"], False) == "pass_limit"
 
 
+def test_a_pass_over_no_criteria_is_never_verified() -> None:
+    empty = judging.PassResult(1, ())
+
+    assert judging.stop_reason([empty], SETTINGS, 3, None, True) == "no_progress"
+    assert judging.stop_reason([empty], SETTINGS, 3, ["a.py"], True) == "no_progress"
+
+
 def test_an_open_or_undecided_criterion_sends_the_loop_to_rework_until_the_pass_limit() -> None:
     assert judging.stop_reason([result(1, "closed", "open")], SETTINGS, 3, None, True) is None
     assert judging.stop_reason([result(1, "undecided")], SETTINGS, 3, None, True) is None

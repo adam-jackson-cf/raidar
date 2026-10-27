@@ -4,50 +4,91 @@ factory-x-loops' ``one-shot-verify`` mechanics (``engine/workflow/gated.py``, ``
 ``capability/verify``), inside Raidar's container and the checkpoint's one primary session.
 The gate itself is ``raidar.subject.workflow.verify_gate``, uploaded beside its tools.
 
-**Before the agent starts** (``prepare``, as root unless said otherwise):
+**Privilege.** The stage's *recorder* never runs agent-written code with more privilege than the
+agent has. Root runs only the trusted installation (the tools environment from the pinned pack
+interpreter, the gate's files, ownership and modes of ``/opt`` and of the state directories) and
+hashes the tool directory with that same interpreter (``-I -B``); it never reads the workspace.
+Everything else that touches the agent's work runs as the agent's own user: the workspace's git
+setup, the setup check, the baseline, the hook's decision, the seal (which runs the agent's
+pytest, conftest and project configuration), the witness snapshots and the reaping of the
+agent's leftover processes. Each record the gate prints names the uid it ran as (``process``).
+The tools stay root-owned and read-only to the agent (G3 hashes them).
 
-- the gate's tools environment (``PATHS.tools``): a virtualenv on the workspace project's
-  interpreter holding every check's pinned tool, built once per trial and root-owned outside
-  the workspace; its resolved lock (``uv pip freeze``) is recorded with its sha256;
-- the gate (``verify_gate.py``), its configuration (``gate.json``) and the hooks directory
-  (``hooks/pre-commit``) beside it, root-owned; the hook's state directory, owned by the agent
-  user, with an empty run log; the seal's state directory, root's;
-- ``/app`` as a git repository: initialised and the seeded tree committed as the base when it
-  is not one; ``core.hooksPath`` pointing at the hooks directory; ``.git/info/exclude`` leaving
-  out the workspace caches and the workflow's own files (``SNAPSHOT_EXCLUDES``, and the rules
-  file when the stage created it); a rules file the task already had gets a git clean filter
-  that strips the stage's block, so no commit holds it. The checkpoint's base is ``HEAD``;
+**The hook broker.** The agent's own ``git commit`` runs the root-owned ``hooks/pre-commit``,
+a client of a small daemon (``verify_gate.py broker``) that root starts from root-owned files.
+It runs no agent code: for each request it spawns the gate's decision with the uid and gid
+dropped to the agent's, takes the record from a pipe the checks' processes do not inherit and is
+the only writer of the hook log, root-owned and read-only to the agent (the log's directory, the
+broker's socket and its directory are too). A request names no verdict or tree; the record's
+tree is the commit's only when it equals the raw work tree that was checked.
+
+**Where evidence lives.** The runner keeps every record host-side outside the mounted
+``/logs/agent`` (``Checkpoint.logs_dir`` is a staging directory) and publishes them after the
+agent's processes were reaped. The seal and the baseline print their record on standard output
+and the stage writes it; nothing the lab later trusts is read from a path the agent can write.
+What the agent's user can still write (native session logs, the workspace, a watched workflow
+state directory such as define's) is *draft* evidence, watched rather than trusted: host copies
+after every turn, and before and after each seal (``witness_findings``) for the watched
+directories a workflow prerequisite names; an earlier copy rewritten or touched is an
+``integrity`` entry, a named violation. A seal that finds the work tree changed by its own
+checks says so (``workspace_changed_during_gate``) and records the final tree it left: nothing
+is put back.
+
+**Before the agent starts** (``prepare``):
+
+- the gate's tools environment (``PATHS.tools``): a virtualenv on the pack's own interpreter
+  (``PATHS.system_python``, not the workspace's ``.venv``) holding every check's pinned tool,
+  built once per trial and root-owned outside the workspace; its resolved lock
+  (``uv pip freeze``) is recorded with its sha256;
+- the gate (``verify_gate.py``), its configuration (``gate.json``), the rules record and the
+  hooks directory (``hooks/pre-commit``) and the empty hooks directory the gate's git calls use
+  beside it, root-owned; the hook log's directory (root's, with the broker's socket directory)
+  and the gate's scratch directory (caches only, the agent's), freshly created;
+- ``/app`` as a git repository, set up as the agent user: initialised and the seeded tree
+  committed as the base when it is not one; ``core.hooksPath`` pointing at the hooks directory;
+  ``.git/info/exclude`` leaving out the workspace caches and the workflow's own files
+  (``SNAPSHOT_EXCLUDES``, and the rules file when the stage created it); a rules file the task
+  already had gets a git clean filter that strips the stage's block, so no agent commit holds
+  it. The checkpoint's base is ``HEAD``;
 - the rules (``rules_file``): the checks and what blocks, appended between fixed markers to
   the task's own file, or written as a new file;
-- the sha256 of the whole tool directory (gate, configuration, hooks, tools), read with the
-  system interpreter, never the tools' own.
+- the **setup check** (``verify_gate.py setup-check``): no agent code runs. Interpreter and
+  tool versions and hashes, tool ownership, the hook, the gate's own hash, the rules block and
+  the user (not root) are recorded in ``verify.setup_check``; one failed row makes the trial
+  invalid (an instrument failure, never an agent outcome) and stops the checkpoint before the
+  agent starts;
+- the sha256 of the whole tool directory (gate, configuration, hooks, tools).
 
 **Prompt fragment**: the stage's ``prompt`` with its tokens filled, at ``%%%VERIFY%%%``.
 
-**Checks when the agent stops** (``check``): the hook's run log is copied to the turn's logs,
-then the seal (``verify_gate.py seal``, as root: the authoritative verdict) commits the
-leftovers through the same checks. A tree the previous seal decided reuses its verdict.
-Passed ends the stage (``gate_passed``); refused resumes the session with factory-x-loops'
-resumed fix prompt and the gate's output, at most ``max_fix_rounds`` times, then ends
-``gate_refused`` on the last sealed tree; a gate that could not run ends ``gate_error`` and
-never starts a fix round.
+**Checks when the agent stops** (``check``): the agent's leftover processes are reaped, the
+hook's run log is copied to the turn's logs and checked for rewrites, then the seal
+(``verify_gate.py seal``, as the agent's user) *always* reruns every check over the work tree
+exactly as the agent left it and records the verdict and the tree and workspace digest it judged.
+It never commits, restores or changes the agent's work. Passed ends the stage (``gate_passed``);
+refused resumes the session with factory-x-loops' resumed fix prompt and the gate's output at most
+``max_fix_rounds`` times (default 0: no pushback, the agent must verify itself), then ends
+``gate_refused`` and the lab grades the workspace as the agent left it; a gate that could not run
+ends ``gate_error`` and never starts a fix round.
 
-**Outputs** (``close``): on a cut (``deadline``, ``turn_error``) or a gate error the workspace
-goes back to the last tree a seal decided (FXL ``restore_gated_work``: a running seal and the
-agent user's processes are stopped first), and the record says which gate it was, or that none
-had decided. Then the final hook log is copied, the rules block is stripped from the workspace
-(the file removed when the stage created it and nothing else is in it), so the graded snapshot
-never holds it, and the tool directory is hashed again. Records under the step's agent logs:
-``workflow/verify/gate-<n>.json`` per seal (who ran it, verdict, exits, per-check results with
-category, duration, output, the repository evidence), ``workflow/<turn>/verify-hook-runs.jsonl``
-after every turn and ``workflow/verify/hook-runs.jsonl`` at the end, ``workflow/verify/rules.md``
-(the block the agent was shown), and the stage record in ``workflow.json`` with every digest.
+**Outputs** (``close``): nothing is restored, on a cut (``deadline``, ``turn_error``) or
+otherwise: the graded tree is always what the agent left, never something the lab produced. The
+leftover processes are reaped, the final hook log is copied, the rules block is stripped from the
+workspace (the file removed when the stage created it and nothing else is in it), so the graded
+snapshot never holds it, and the tool directory is hashed again. Records under the step's agent
+logs: ``workflow/verify/gate-<n>.json`` per seal (who ran it and as which uid, verdict, exits,
+per-check results with category, duration, output, the tree, the per-file digests and the
+repository evidence), ``workflow/<turn>/verify-hook-runs.jsonl`` after every turn and
+``workflow/verify/hook-runs.jsonl`` at the end, ``workflow/verify/rules.md`` (the block the agent
+was shown), ``workflow/verify/setup-check.json``, and the stage record in ``workflow.json`` with
+every digest.
 
 **Judge** (``verify.judge``, design D3-D4): after every accepted seal, and after a refusal that
 used its fix rounds, the engine judges each criterion of the feature definition on the sealed
 tree (``raidar.subject.workflow.judging``): Jev is asked, host-side and never from the sandbox
 (``raidar.subject.workflow.asking``), one question per ``Aspect:`` over the mapped tests' source
-(read from the tree and kept under ``workflow/sources``). The tests that pass on the base, run
+(read from the work tree, checked against the seal's digest, and kept under ``workflow/sources``).
+The tests that pass on the base, run
 once before the agent starts, close ``Kind: regression`` criteria. Criteria still open come back
 to the builder as a ``rework`` turn (the pushback and the gate's result), then the work is sealed
 and judged again, up to ``max_passes``. Endings: ``verified``, ``pass_limit``, ``no_progress``,
@@ -63,12 +104,12 @@ import hashlib
 import json
 import shlex
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
 from raidar.contract.snapshot import SNAPSHOT_EXCLUDES
-from raidar.subject.workflow import judgeloop, judging, verify_gate
+from raidar.subject.workflow import judging, verify_gate
 from raidar.subject.workflow.acceptance import Acceptance
 from raidar.subject.workflow.definition import VERIFY_TOKEN, VerifySettings
 from raidar.subject.workflow.judgeloop import JudgeLoop
@@ -76,7 +117,6 @@ from raidar.subject.workflow.stage import (
     DEADLINE,
     GATE_FIX,
     REWORK,
-    TURN_ERROR,
     Checkpoint,
     Resume,
     Stage,
@@ -85,10 +125,11 @@ from raidar.subject.workflow.stage import (
 GATE_PASSED = "gate_passed"
 GATE_REFUSED = "gate_refused"
 GATE_ERROR = "gate_error"
-RESTORED_ON = (DEADLINE, TURN_ERROR, GATE_ERROR)
 BUDGET_EXHAUSTED = "budget_exhausted"
 BASELINE_RECORD = "base-tests.json"
+SETUP_RECORD = "setup-check.json"
 CLIP = 20_000
+CTIME_SCRIPT = "import os, sys; print(os.stat(sys.argv[1]).st_ctime_ns)"
 RECORD_DIR = "workflow/verify"
 HOOK_LOG = "verify-hook-runs.jsonl"
 RULES_RECORD = "rules.md"
@@ -113,8 +154,9 @@ RULES_HEAD = """\
 ## Verify gate rules
 
 The repository's pre-commit hook `verify-gate` runs these checks over the whole work tree
-(every Python file outside virtualenvs, caches and `.git`) on every `git commit`, and again
-when you stop. A commit is refused while a blocking check fails; a warning check only reports.
+(every Python file outside virtualenvs, caches and `.git`) on every `git commit`, and the same
+checks run again, and are recorded, when you stop. A commit is refused while a blocking check
+fails; a warning check only reports.
 """
 HASH_SCRIPT = """\
 import hashlib, os, sys
@@ -144,6 +186,10 @@ class VerifyPaths:
     workspace: str = "/app"
     home: str = "/opt/raidar-verify"
     state: str = "/var/lib/raidar-verify"
+    system_python: str = "/usr/local/bin/python3"
+    """The trusted pack interpreter root runs and builds the tools environment from."""
+    reap: bool = True
+    """Kill the agent user's leftover processes (off only where the agent's user is the test's)."""
 
     @property
     def tools(self) -> str:
@@ -171,12 +217,33 @@ class VerifyPaths:
         return f"{self.home}/hooks"
 
     @property
+    def rules_record(self) -> str:
+        return f"{self.home}/{RULES_RECORD}"
+
+    @property
     def hook_state(self) -> str:
         return f"{self.state}/hook"
 
     @property
-    def seal_state(self) -> str:
-        return f"{self.state}/seal"
+    def scratch(self) -> str:
+        return f"{self.state}/scratch"
+
+    @property
+    def run(self) -> str:
+        return f"{self.state}/run"
+
+    @property
+    def broker_socket(self) -> str:
+        return f"{self.run}/b.sock"
+
+    @property
+    def empty_hooks(self) -> str:
+        return f"{self.home}/nohooks"
+
+    @property
+    def root_gate(self) -> str:
+        """The gate as root runs its two trusted subcommands (the broker): isolated interpreter."""
+        return shlex.join([self.python, "-I", "-B", self.gate])
 
 
 PATHS = VerifyPaths()
@@ -187,16 +254,19 @@ class VerifySetupError(RuntimeError):
 
 
 def tools_install_command(paths: VerifyPaths, pins: list[str]) -> str:
-    """Build the tools environment once per trial, on the workspace project's interpreter."""
-    tools, cfg = shlex.quote(paths.tools), shlex.quote(f"{paths.workspace}/.venv/pyvenv.cfg")
+    """Build the tools environment once per trial, on the pack's own interpreter.
+
+    Run as root, so it reads nothing the agent can write: not the workspace's ``.venv`` or
+    ``pyproject.toml`` (a different working directory and no ``uv`` configuration).
+    """
+    tools = shlex.quote(paths.tools)
     return "\n".join(
         [
             "set -eu",
+            "cd /",
             f"[ -x {tools}/bin/python ] && exit 0",
-            "py=python3",
-            f'if [ -f {cfg} ]; then home=$(sed -n "s/^home = //p" {cfg}); '
-            'if [ -x "$home/python3" ]; then py="$home/python3"; fi; fi',
-            f'UV_PYTHON_DOWNLOADS=never uv venv -q --python "$py" {tools}',
+            "export UV_NO_CONFIG=1 UV_PYTHON_DOWNLOADS=never",
+            f"uv venv -q --python {shlex.quote(paths.system_python)} {tools}",
             f"uv pip install -q --python {tools}/bin/python {shlex.join(pins)}",
         ]
     )
@@ -221,6 +291,7 @@ def rules_block(settings: VerifySettings) -> str:
 def gate_config(settings: VerifySettings, paths: VerifyPaths) -> dict[str, Any]:
     return {
         "root": paths.workspace,
+        "home": paths.home,
         "tools": paths.tools,
         "excludes": list(SNAPSHOT_EXCLUDES),
         "test_timeout": settings.test_timeout,
@@ -229,7 +300,14 @@ def gate_config(settings: VerifySettings, paths: VerifyPaths) -> dict[str, Any]:
             for c in settings.checks
         ],
         "hook_state": paths.hook_state,
-        "seal_state": paths.seal_state,
+        "scratch": paths.scratch,
+        "broker_socket": paths.broker_socket,
+        "empty_hooks": paths.empty_hooks,
+        "rules_file": settings.rules_file,
+        "hooks": paths.hooks,
+        "rules_record": paths.rules_record,
+        "strip_command": shlex.join([*paths.gate_command, "strip-rules"]),
+        "session_paths": [],
     }
 
 
@@ -249,10 +327,6 @@ def _clip(text: str, limit: int = CLIP) -> str:
 
 def _sha256(text: str) -> str:
     return hashlib.sha256(text.encode()).hexdigest()
-
-
-def _values(stdout: str) -> dict[str, str]:
-    return dict(line.split("=", 1) for line in stdout.splitlines() if "=" in line)
 
 
 def _last_json(stdout: str) -> dict[str, Any] | None:
@@ -278,6 +352,19 @@ class Standing:
     """Every fix turn of the checkpoint."""
 
 
+@dataclass
+class GateEvidence:
+    """Host-owned records and the witnesses used to detect tampering."""
+
+    setup_check: dict[str, Any] | None = None
+    integrity: list[dict[str, str]] = field(default_factory=list)
+    reaps: list[dict[str, Any]] = field(default_factory=list)
+    hook_seen: str = ""
+    hook_ctime: str | None = None
+    hook_integrity_seen: int = 0
+    errors: list[str] = field(default_factory=list)
+
+
 class Verify(Stage):
     """The verify stage with one workflow's settings, for one checkpoint (module docstring)."""
 
@@ -300,8 +387,7 @@ class Verify(Stage):
         self.tools: dict[str, Any] = {"pins": settings.pins}
         self.gates: list[dict[str, Any]] = []
         self.standing = Standing()
-        self.restored: dict[str, Any] | None = None
-        self.errors: list[str] = []
+        self.evidence = GateEvidence()
         self.loop = (
             None
             if settings.judge is None or settings.rework is None
@@ -323,32 +409,66 @@ class Verify(Stage):
         started = time.monotonic()
         await self._exec(checkpoint, tools_install_command(self.paths, self.settings.pins))
         self.tools["install_seconds"] = round(time.monotonic() - started, 3)
-        lock = await self._exec(checkpoint, f"uv pip freeze -q --python {q(self.paths.python)}")
+        lock = await self._exec(
+            checkpoint, f"cd / && UV_NO_CONFIG=1 uv pip freeze -q --python {q(self.paths.python)}"
+        )
         self.tools["lock"] = lock.splitlines()
         self.tools["lock_sha256"] = _sha256(lock)
-        await self._install_gate(checkpoint, records)
-        values = _values(await self._exec(checkpoint, self._workspace_script()))
-        if "base" not in values:
-            raise VerifySetupError("the workspace repository has no base commit")
-        self.base = values["base"]
-        self.facts.update(
-            repo_created=values.get("repo_created") == "1",
-            rules_owned=values.get("rules_owned") == "1",
+        rules = q(f"{self.paths.workspace}/{self.settings.rules_file}")
+        owned = await self._exec(
+            checkpoint, f"if [ -e {rules} ]; then echo 0; else echo 1; fi", root=False
         )
+        self.facts["rules_owned"] = owned.strip() == "1"
+        await self._install_gate(checkpoint, records)
+        setup = shlex.join(
+            [*self.paths.gate_command, "workspace-setup", "--config", self.paths.config]
+        )
+        found = _last_json(await self._exec(checkpoint, setup, root=False))
+        if found is None or "base" not in found:
+            raise VerifySetupError(f"the workspace setup produced no base commit: {found}")
+        self.base = found["base"]
+        self.facts["repo_created"] = bool(found.get("repo_created"))
+        await self._setup_check(checkpoint, records)
         self.tools["sha256_before"] = await self._tools_digest(checkpoint)
         if self.loop is not None:
             await self._baseline(checkpoint, records, self.loop)
             self.loop.start(checkpoint)
 
+    async def _setup_check(self, checkpoint: Checkpoint, records: Path) -> None:
+        """Deterministic setup facts, no agent code run; a failed row stops the checkpoint."""
+        gate = [*self.paths.gate_command, "setup-check", "--config", self.paths.config]
+        command = shlex.join(gate)
+        result = await checkpoint.environment.exec(command, user=None)
+        found = _last_json(result.stdout or "") or {
+            "status": "error",
+            "checks": [
+                {
+                    "name": "setup_check",
+                    "status": "error",
+                    "detail": f"exit {result.return_code}: {(result.stderr or '').strip()[-500:]}",
+                }
+            ],
+        }
+        found["record"] = f"{RECORD_DIR}/{SETUP_RECORD}"
+        (records / SETUP_RECORD).write_text(
+            json.dumps(found, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+        )
+        self.evidence.setup_check = found
+        if found["status"] != verify_gate.PASSED:
+            failed = [c for c in found["checks"] if c.get("status") != verify_gate.PASSED]
+            names = ", ".join(f"{c['name']}: {c.get('detail', '')[:200]}" for c in failed)
+            raise VerifySetupError(f"the setup check failed: {names}")
+
     async def _baseline(self, checkpoint: Checkpoint, records: Path, loop: JudgeLoop) -> None:
         """Run the tests check over the base: the tests that pass before the agent starts.
 
         A ``Kind: regression`` criterion closes only when a test mapped to it is among them
-        (``judge.regression_needs_baseline``); a base the check could not run leaves none.
+        (``judge.regression_needs_baseline``); a base the check could not run leaves none. It
+        runs as the agent's user, like the seal; the stage writes the printed record.
         """
         paths = self.paths
         command = shlex.join([*paths.gate_command, "baseline", "--config", paths.config])
-        result = await checkpoint.environment.exec(command, user="root")
+        result = await checkpoint.environment.exec(command, user=None)
         found = _last_json(result.stdout or "") or {
             "status": "error",
             "output": f"exit {result.return_code}: {(result.stderr or '').strip()[-500:]}",
@@ -364,35 +484,53 @@ class Verify(Stage):
             "exit": found.get("exit"),
             "seconds": found.get("seconds"),
             "collected": len((tests or {}).get("collected", [])),
+            "process": found.get("process"),
+            "tree": found.get("tree"),
+            "worktree_sha256": found.get("worktree_sha256"),
         }
-        await self._exec(checkpoint, f"chown -R {q(f'{self.owner}:')} {q(paths.workspace)}")
 
     async def _install_gate(self, checkpoint: Checkpoint, records: Path) -> None:
+        """Root's whole job: install the trusted files, set modes and make fresh state dirs."""
         paths = self.paths
-        configuration = gate_config(self.settings, paths)
-        configuration["prerequisites"] = self.facts["prerequisites"]
-        config = json.dumps(configuration, indent=2, sort_keys=True) + "\n"
         hook = f"#!/bin/sh\nexec {shlex.join(paths.gate_command)} hook --config {q(paths.config)}\n"
         block = rules_block(self.settings)
+        configuration = gate_config(self.settings, paths)
+        reading = await self._exec(checkpoint, "echo $(id -u) $(id -g) $HOME", root=False)
+        uid, gid, home = reading.split()
+        configuration.update(
+            prerequisites=self.facts["prerequisites"],
+            rules_owned=self.facts["rules_owned"],
+            hook_sha256=_sha256(hook),
+            payload_sha256=hashlib.sha256(PAYLOAD.read_bytes()).hexdigest(),
+            trusted_uid=int((await self._exec(checkpoint, "id -u")).strip()),
+            agent_name=self.owner,
+            agent_uid=int(uid),
+            agent_gid=int(gid),
+            agent_home=home,
+            session_paths=list(checkpoint.session_paths),
+        )
+        config = json.dumps(configuration, indent=2, sort_keys=True) + "\n"
         for name, text in ((GATE_CONFIG, config), (PRE_COMMIT, hook), (RULES_RECORD, block)):
             (records / name).write_text(text, encoding="utf-8")
         self.facts.update(
             gate_config_sha256=_sha256(config),
-            payload_sha256=hashlib.sha256(PAYLOAD.read_bytes()).hexdigest(),
+            payload_sha256=configuration["payload_sha256"],
             rules_sha256=_sha256(block),
         )
-        await self._exec(
-            checkpoint,
-            f"mkdir -p {q(paths.hooks)} {q(paths.hook_state)} {q(paths.seal_state)}",
-        )
+        await self._exec(checkpoint, f"mkdir -p {q(paths.hooks)} {q(paths.empty_hooks)}")
         environment = checkpoint.environment
         await environment.upload_file(PAYLOAD, paths.gate)
         await environment.upload_file(records / GATE_CONFIG, paths.config)
         await environment.upload_file(records / PRE_COMMIT, f"{paths.hooks}/{PRE_COMMIT}")
-        await environment.upload_file(records / RULES_RECORD, f"{paths.seal_state}/{RULES_RECORD}")
+        await environment.upload_file(records / RULES_RECORD, paths.rules_record)
         owner = q(f"{self.owner}:")
+        hook_path = q(f"{paths.hooks}/{PRE_COMMIT}")
         runs = q(f"{paths.hook_state}/{verify_gate.HOOK_RUNS}")
-        hook = q(f"{paths.hooks}/{PRE_COMMIT}")
+        await self._exec(
+            checkpoint,
+            f"cd / && {paths.root_gate} broker-stop --config {q(paths.config)} >/dev/null 2>&1 "
+            "|| true",
+        )
         await self._exec(
             checkpoint,
             "\n".join(
@@ -400,52 +538,25 @@ class Verify(Stage):
                     "set -eu",
                     f'if [ "$(id -u)" = 0 ]; then chown -R root:root {q(paths.home)}; fi',
                     f"chmod -R go-w {q(paths.home)}",
-                    f"chmod 755 {q(paths.home)} {q(paths.hooks)} {hook}",
-                    f"chmod 644 {q(paths.gate)} {q(paths.config)}",
-                    f"rm -f {runs} && : > {runs}",
-                    f"chown -R {owner} {q(paths.hook_state)}",
-                    f"chmod 700 {q(paths.seal_state)}",
+                    f"chmod 755 {q(paths.home)} {q(paths.hooks)} "
+                    f"{q(paths.empty_hooks)} {hook_path}",
+                    f"chmod 644 {q(paths.gate)} {q(paths.config)} {q(paths.rules_record)}",
+                    # fresh directories each checkpoint: nothing the agent left is ever chowned
+                    f"rm -rf {q(paths.hook_state)} {q(paths.scratch)} {q(paths.run)}",
+                    f"mkdir -p {q(paths.hook_state)} {q(paths.scratch)} {q(paths.run)}",
+                    f"chown {owner} {q(paths.scratch)}",
+                    f"chmod 755 {q(paths.state)} {q(paths.hook_state)} {q(paths.run)}",
+                    # the hook log is the broker's: root-owned, readable, written by no one else
+                    f": > {runs}",
+                    f"chmod 644 {runs}",
                 ]
             ),
         )
-
-    def _workspace_script(self) -> str:
-        paths, rules = self.paths, q(self.settings.rules_file)
-        git = "git -c safe.directory=*"
-        strip = f"{shlex.join(paths.gate_command)} strip-rules"
-        block = q(f"{paths.seal_state}/{RULES_RECORD}")
-        excludes = " ".join(q(f"{name}/") for name in SNAPSHOT_EXCLUDES)
-        seal = " ".join(f"{key}={q(value)}" for key, value in verify_gate.SEAL_AUTHOR.items())
-        identity = (("user.name", "raidar-agent"), ("user.email", "agent@raidar.invalid"))
-        return "\n".join(
-            [
-                "set -eu",
-                f"cd {q(paths.workspace)}",
-                "created=0",
-                "if [ ! -d .git ]; then git init -q; created=1; fi",
-                f"{git} config core.hooksPath {q(paths.hooks)}",
-                *(
-                    f"{git} config {key} >/dev/null || {git} config {key} {value}"
-                    for key, value in identity
-                ),
-                f'if [ -L {rules} ]; then echo "{rules} is a symlink" >&2; exit 1; fi',
-                f"owned=0; if [ -f {rules} ]; then {strip} --file {rules} >/dev/null; "
-                f"else owned=1; : > {rules}; fi",
-                f"printf '\\n' >> {rules}; cat {block} >> {rules}",
-                "mkdir -p .git/info",
-                f"{{ printf '%s\\n' {excludes}; "
-                f"if [ $owned = 1 ]; then printf '/%s\\n' {rules}; fi; }} > .git/info/exclude",
-                f"if [ $owned = 0 ]; then printf '/%s filter=raidar-rules\\n' {rules} "
-                f"> .git/info/attributes; {git} config filter.raidar-rules.clean {q(strip)}; fi",
-                f"if ! {git} rev-parse -q --verify HEAD >/dev/null; then {git} add -A; {seal} "
-                f"{git} commit -q --no-verify --allow-empty -m 'raidar: the workspace before the "
-                "agent'; fi",
-                f'echo "base=$({git} rev-parse HEAD)"',
-                'echo "repo_created=$created"',
-                'echo "rules_owned=$owned"',
-                f"chown -R {q(f'{self.owner}:')} .",
-            ]
-        )
+        command = f"cd / && {paths.root_gate} broker --config {q(paths.config)}"
+        started = _last_json(await self._exec(checkpoint, command))
+        if started is None or "pid" not in started:
+            raise VerifySetupError(f"the hook broker did not start: {started}")
+        self.facts["broker"] = started
 
     # prompt fragment --------------------------------------------------------------------------
 
@@ -455,8 +566,11 @@ class Verify(Stage):
     # checks when the agent stops -------------------------------------------------------------
 
     async def check(self, checkpoint: Checkpoint, after: str) -> Resume | None:
-        await self._copy_hook_log(checkpoint, f"{after}/{HOOK_LOG}")
+        await self._reap(checkpoint)
+        await self._copy_hook_log(checkpoint, f"{after}/{HOOK_LOG}", after)
         gate = await self._seal(checkpoint, after)
+        # the seal runs the agent's pytest and conftest: the log must not have been touched
+        await self._copy_hook_log(checkpoint, f"{after}/{HOOK_LOG}", f"{after} (after the seal)")
         loop, standing = self.loop, self.standing
         if gate["verdict"] == verify_gate.PASSED:
             standing.gate_ending = GATE_PASSED
@@ -472,9 +586,7 @@ class Verify(Stage):
         else:
             standing.fix_rounds += 1
             standing.fixes += 1
-            seal = judgeloop.decided(self.gates, gate)
-            fix = fix_prompt(int(gate["exit"]), str(seal.get("output") or ""))
-            return Resume(fix, GATE_FIX)
+            return Resume(fix_prompt(int(gate["exit"]), str(gate.get("output") or "")), GATE_FIX)
         if loop is None:
             standing.ending = standing.gate_ending
             return None
@@ -500,107 +612,180 @@ class Verify(Stage):
             standing.ending = ended
             return None
         standing.fix_rounds = 0  # ``max_fix_rounds`` bounds each pass's fix turns
-        seal = judgeloop.decided(self.gates, gate)
-        return loop.rework(result, _clip(str(seal.get("output") or "(no output)")))
-
-    def _gate(self, run: object) -> dict[str, Any] | None:
-        return next((gate for gate in self.gates if gate["run"] == run), None)
-
-    def _last_decided(self) -> dict[str, Any] | None:
-        return next(
-            (
-                gate
-                for gate in reversed(self.gates)
-                if gate["verdict"] in (verify_gate.PASSED, verify_gate.REFUSED) and gate.get("tree")
-            ),
-            None,
-        )
+        return loop.rework(result, _clip(str(gate.get("output") or "(no output)")))
 
     async def _seal(self, checkpoint: Checkpoint, after: str) -> dict[str, Any]:
+        """Run the seal as the agent's user and write the record it printed (host side)."""
         paths, run = self.paths, len(self.gates) + 1
         args = [
-            *paths.gate_command, "seal", "--config", paths.config, "--owner", str(self.owner),
-            "--run", str(run), "--after", after, "--base", str(self.base),
+            *paths.gate_command, "seal", "--config", paths.config, "--run", str(run),
+            "--after", after, "--base", str(self.base),
         ]  # fmt: skip
-        previous = self._last_decided()
-        if previous is not None:
-            args += ["--previous-run", str(previous["run"]), "--previous-tree", previous["tree"]]
-            args += ["--previous-verdict", previous["verdict"]]
-            args += ["--previous-worktree", previous["worktree_sha256"]]
-        result = await checkpoint.environment.exec(shlex.join(args), user="root")
+        watches = verify_gate.watches(self.facts["prerequisites"])
+        snaps_before = [await self._snapshot(checkpoint, d) for _, d, _ in watches]
+        result = await checkpoint.environment.exec(shlex.join(args), user=None)
+        snaps_after = [await self._snapshot(checkpoint, d) for _, d, _ in watches]
         gate = _last_json(result.stdout or "") or {
             "who": "seal", "run": run, "after": after, "verdict": verify_gate.ERROR,
-            "exit": None, "tree": None, "commit": None, "reused_from": None, "checks": [],
-            "output": result.stdout or "",
+            "exit": None, "tree": None, "checks": [], "output": result.stdout or "",
             "error": f"the seal printed no record (exit {result.return_code}): "
             f"{(result.stderr or '').strip()[-500:]}",
         }  # fmt: skip
         gate["record"] = f"{RECORD_DIR}/gate-{run}.json"
         gate["turn_kind"] = checkpoint.turns[-1].kind if checkpoint.turns else None
+        if gate.get("changed_during_gate"):
+            self.evidence.integrity.append(
+                {
+                    "name": "workspace_changed_during_gate",
+                    "after": after,
+                    "detail": "the checks changed the work tree: "
+                    + ", ".join(gate["changed_during_gate"][:10]),
+                }
+            )
+        witnessed: list[dict[str, Any]] = []
+        for (label, _, allowed), was, now in zip(watches, snaps_before, snaps_after, strict=True):
+            found = verify_gate.witness_findings(label, was, now, allowed, after)
+            self.evidence.integrity += found
+            witnessed.append({"label": label, "findings": found})
+            kept = checkpoint.logs_dir / RECORD_DIR / f"witness-{run}-{label}.json"
+            document = {"before": was, "after": now, "findings": found}
+            kept.write_text(json.dumps(document, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        gate["witness"] = witnessed
         path = checkpoint.logs_dir / gate["record"]
         path.write_text(json.dumps(gate, indent=2, sort_keys=True) + "\n", encoding="utf-8")
         self.gates.append(gate)
         return gate
+
+    async def _snapshot(self, checkpoint: Checkpoint, directory: str) -> dict[str, Any]:
+        command = shlex.join([*self.paths.gate_command, "snapshot", "--dir", directory])
+        result = await checkpoint.environment.exec(command, user=None)
+        return _last_json(result.stdout or "") or {
+            "dir": directory, "present": False, "files": {},
+            "error": f"no snapshot (exit {result.return_code})",
+        }  # fmt: skip
+
+    async def _reap(self, checkpoint: Checkpoint) -> None:
+        """Kill the agent user's leftover processes, as the agent's user (a root process is
+        never needed to stop what the agent started), so nothing writes while the work is read."""
+        if not self.paths.reap:
+            return
+        command = shlex.join([*self.paths.gate_command, "reap"])
+        result = await checkpoint.environment.exec(command, user=None)
+        found = _last_json(result.stdout or "") or {"error": (result.stderr or "")[-300:]}
+        self.evidence.reaps.append(found)
 
     # outputs ----------------------------------------------------------------------------------
 
     async def close(self, checkpoint: Checkpoint, cut: str | None) -> None:
         if self.base is None:
             self.standing.ending = GATE_ERROR
-            self.errors.append("the gate was not set up before the agent started")
+            self.evidence.errors.append("the gate was not set up before the agent started")
             return
         if cut is not None and self.standing.ending is None:
             self.standing.ending = cut
         try:
-            if self.standing.ending in RESTORED_ON:
-                await self._restore(checkpoint)
-            await self._copy_hook_log(checkpoint, f"{RECORD_DIR}/{verify_gate.HOOK_RUNS}")
+            await self._reap(checkpoint)
+            await self._copy_hook_log(checkpoint, f"{RECORD_DIR}/{verify_gate.HOOK_RUNS}", "close")
+            config = q(self.paths.config)
+            await self._exec(
+                checkpoint, f"cd / && {self.paths.root_gate} broker-stop --config {config}"
+            )
             rules = q(f"{self.paths.workspace}/{self.settings.rules_file}")
             remove = " --remove-empty" if self.facts.get("rules_owned") else ""
             stripped = await self._exec(
                 checkpoint,
                 f"{shlex.join(self.paths.gate_command)} strip-rules --file {rules}{remove}",
+                root=False,
             )
             self.facts["rules_stripped"] = _last_json(stripped)
             self.tools["sha256_after"] = await self._tools_digest(checkpoint)
         except Exception as exc:  # noqa: BLE001 - recorded; the trial's records still get written
-            self.errors.append(f"{type(exc).__name__}: {exc}")
+            self.evidence.errors.append(f"{type(exc).__name__}: {exc}")
 
-    async def _restore(self, checkpoint: Checkpoint) -> None:
-        decided = self._last_decided()
-        self.restored = {"reason": self.standing.ending, "gate": None, "tree": None}
-        if decided is None:
-            self.restored["detail"] = (
-                "no seal decided a tree: the workspace is as the agent left it"
-            )
-            return
-        paths = self.paths
-        args = [
-            *paths.gate_command, "restore", "--config", paths.config,
-            "--owner", str(self.owner), "--tree", decided["tree"],
-        ]  # fmt: skip
-        result = await checkpoint.environment.exec(shlex.join(args), user="root")
-        outcome = _last_json(result.stdout or "") or {"error": (result.stderr or "")[-500:]}
-        self.restored.update(gate=decided["run"], tree=decided["tree"], outcome=outcome)
+    async def _copy_hook_log(self, checkpoint: Checkpoint, relative: str, after: str) -> None:
+        """Copy the hook's run log host-side and check it was only ever appended to.
 
-    async def _copy_hook_log(self, checkpoint: Checkpoint, relative: str) -> None:
+        The log is the broker's: root-owned, readable, written by no one else, so the agent's user
+        cannot rewrite, remove or forge a line (the Docker attacks show these attempts denied).
+        The checks here are defence in depth where a deployment's file permissions are weaker (a
+        test's own user): lines changed or removed (the earlier copy is no longer its prefix, or
+        the chain breaks) and a write that restored the same bytes (a later ``ctime`` on equal
+        content).
+        """
         runs = q(f"{self.paths.hook_state}/{verify_gate.HOOK_RUNS}")
-        text = await self._exec(checkpoint, f"cat {runs}")
+        environment = checkpoint.environment
+        result = await environment.exec(f"cat {runs} 2>/dev/null || true", user=None)
+        text = result.stdout or ""
+        stat = await environment.exec(
+            f"python3 -I -B -c {q(CTIME_SCRIPT)} {runs} 2>/dev/null || true", user=None
+        )
+        ctime = (stat.stdout or "").strip() or None
+        self._observe_hook_log(text, ctime, after)
         path = checkpoint.logs_dir / relative
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(text, encoding="utf-8")
         self.facts["hook_log"] = relative
         self.facts["hook_log_sha256"] = _sha256(text)
 
+    def _observe_hook_log(self, text: str, ctime: str | None, after: str) -> None:
+        problem = verify_gate.chain_problem(text)
+        if problem is not None:
+            self.evidence.integrity.append(
+                {"name": "hook_log_chain_broken", "after": after, "detail": problem}
+            )
+        if self.evidence.hook_seen and not text.startswith(self.evidence.hook_seen):
+            self.evidence.integrity.append(
+                {
+                    "name": "hook_log_rewritten",
+                    "after": after,
+                    "detail": "the hook's run log no longer begins with the lines the stage "
+                    f"copied earlier ({len(self.evidence.hook_seen)} bytes, now {len(text)})",
+                }
+            )
+        elif (
+            text == self.evidence.hook_seen
+            and self.evidence.hook_ctime
+            and ctime
+            and ctime != self.evidence.hook_ctime
+        ):
+            self.evidence.integrity.append(
+                {
+                    "name": "hook_log_touched",
+                    "after": after,
+                    "detail": "the hook's run log was written without changing its content",
+                }
+            )
+        elif len(text) >= len(self.evidence.hook_seen):
+            self.evidence.hook_seen = text
+        self.evidence.hook_ctime = ctime
+        self._ingest_hook_integrity(text, after)
+
+    def _ingest_hook_integrity(self, text: str, after: str) -> None:
+        """Findings the hook runs themselves recorded (they ran in the broker's decision, which
+        watched the workflow's state directories before and after the checks): the broker's log is
+        root-owned, so they are trusted as a hook run's own observations."""
+        lines = [line for line in text.splitlines() if line.strip()]
+        for line in lines[self.evidence.hook_integrity_seen :]:
+            try:
+                record = json.loads(line)
+            except ValueError:
+                continue
+            for item in record.get("integrity", []) if isinstance(record, dict) else []:
+                self.evidence.integrity.append(
+                    {**item, "after": f"{item.get('after', '')} ({after})"}
+                )
+        self.evidence.hook_integrity_seen = len(lines)
+
     async def _tools_digest(self, checkpoint: Checkpoint) -> str:
         script = q(HASH_SCRIPT)
-        return (await self._exec(checkpoint, f"python3 -c {script} {q(self.paths.home)}")).strip()
+        python = q(self.paths.system_python)
+        command = f"cd / && {python} -I -B -c {script} {q(self.paths.home)}"
+        return (await self._exec(checkpoint, command)).strip()
 
     async def _exec(self, checkpoint: Checkpoint, command: str, *, root: bool = True) -> str:
-        """Run ``command`` (as root, under ``umask 022``: the container's exec umask is 0, which
-        would leave the gate's tools writable by the agent user) and return its output."""
-        if root:
-            command = f"umask 022\n{command}"
+        """Run ``command`` (as root only for the trusted installation, else as the agent's
+        user; under ``umask 022``: the container's exec umask is 0) and return its output."""
+        command = f"umask 022\n{command}"
         result = await checkpoint.environment.exec(command, user="root" if root else None)
         if result.return_code != 0:
             detail = (result.stderr or result.stdout or "").strip()[-1000:]
@@ -621,9 +806,12 @@ class Verify(Stage):
             "rules_record": f"{RECORD_DIR}/{RULES_RECORD}",
             **self.facts,
             "tools": self.tools,
+            "setup_check": self.evidence.setup_check,
+            "integrity": self.evidence.integrity,
+            "reaps": self.evidence.reaps,
             "gates": [
                 {
-                    **{k: v for k, v in gate.items() if k != "output"},
+                    **{k: v for k, v in gate.items() if k not in ("output", "files")},
                     "checks": [
                         {k: v for k, v in check.items() if k != "tests"}
                         for check in gate.get("checks", [])
@@ -631,8 +819,7 @@ class Verify(Stage):
                 }
                 for gate in self.gates
             ],
-            "restored": self.restored,
-            "errors": self.errors,
+            "errors": self.evidence.errors,
             **({} if loop is None else loop.record()),
         }
 

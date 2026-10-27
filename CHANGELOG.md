@@ -27,13 +27,25 @@ All notable changes to this project are documented in this file.
   pause agent-idle accounting and rework obeys the remaining phase budget.
 - The Jev key is refused at sandbox boundaries; names-only agent, grader and coverage
   environment records are retained without secret values.
+- `one-shot-verify@2`: record-only final seals, no automatic fix turns; verify defaults to
+  `max_fix_rounds: 0`. `define-build-verify@3` preserves two fixes and three judge passes with
+  corrected runner responsibilities; earlier releases stay registered.
+- Agent-user baseline, seal and definition inspection; immutable tools, a root-owned hook
+  broker that drops privilege for checks, and host-authoritative records. Setup has its own
+  deterministic, task-code-free check. Gate Git calls disable external hooks/fsmonitor and
+  build raw trees without repository filters. Gate processes disable Linux dumpability to
+  prevent checks reopening parent record pipes through procfs.
+- Health W1–W11 enforce enabled-stage evidence completeness and integrity, with real Docker
+  rewrite/write-and-restore attacks against tools, hook state, drafts and session logs.
 
 ### Fixes
 
 - Read startup sandbox environment names with Docker inspect instead of running Python inside
   the container; workflow-owned `.claude` skills are excluded from graded snapshots.
-- Gate comparisons and verdict reuse fingerprint the checked workspace as well as the Git
-  tree and workflow prerequisites, including ignored or unstaged check inputs.
+- Final seals always rerun checks and fingerprint the checked workspace, including ignored
+  and unstaged inputs; they never commit, restore, modify the agent index or reuse verdicts.
+- Terminal unusable definitions cannot be reopened within a checkpoint, and empty judge
+  criterion sets cannot produce `verified`.
 - Fault recording interprets idle findings only for the liveness check, retaining gate and
   definition violations without treating their text findings as idle events.
 - Preserve grader and coverage secret-isolation records beyond temporary sandbox cleanup.
