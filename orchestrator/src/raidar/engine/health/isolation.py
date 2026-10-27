@@ -1,36 +1,14 @@
-"""Check ``P8``: the agent saw only its workflow's skills and instructions.
+"""P8: check normalized native-session evidence against workspace/workflow instructions.
 
-Codex records, at the head of every session, the skill roots it found and the ``AGENTS.md`` text
-it merged, plus any plugin recommendation. Over every turn rollout of every attempted step this
-check requires that:
-
-- every skill root lies inside the workspace (``/app``): the codex home, its bundled ``.system``
-  skills, a plugin cache, ``$HOME/.agents/skills`` and ``/etc/codex/skills`` are violations;
-- no ``<recommended_plugins>`` message reached the agent;
-- every non-blank ``<INSTRUCTIONS>`` line is a line of the workspace's own ``AGENTS.md`` or
-  ``AGENTS.override.md`` (codex's ``--- project-doc ---`` separator aside), read from the step's
-  stored ``/app`` snapshot and the one before it (the state the session started from).
-
-Files a workflow places for the agent (``placement.skills: .agents/skills``, instructions) go
-into the workspace, so the workspace rule covers them; nothing else is allowed. A stage's own
-text in the workspace's instruction files (the verify gate's rules block) is taken out of the
-graded snapshot, so its lines are read from the step's records instead: every file listed in
-the workflow record's ``instructions``. Skills and instruction files a workflow places are the
-workflow record's ``components`` (``path`` in the workspace, ``sha256`` of its text, ``record``:
-the host copy of the text, relative to the step's agent logs): each copy must hold the digest
-and a path inside the workspace, and a placed ``AGENTS.md`` or ``AGENTS.override.md`` allows the
-lines of its record, never the lines of anything unrecorded.
-
-A step without ``workflow/workflow.json``, a turn without a rollout, an ``AGENTS.md`` message
-without a stored snapshot, or an oracle/nop agent override (no codex ran) is ``unmeasured``.
+Harness adapters parse their own records. This check knows only loaded skill roots,
+instruction text, audit completeness and versioned developer/system message digests.
+Missing native evidence is unmeasured, never a passing isolation default.
 """
 
 from __future__ import annotations
 
 import hashlib
 import json
-import re
-from collections.abc import Iterator
 from pathlib import Path, PurePosixPath
 from typing import Any
 
@@ -39,13 +17,7 @@ from raidar.engine.health.base import Audit, make_check
 from raidar.engine.health.model import PASS, UNMEASURED, VIOLATION, HealthCheck
 
 WORKFLOW_FILE = "workflow/workflow.json"
-SKILL_ROOT = re.compile(r"^- `r\d+` = `(?P<path>[^`]+)`$", re.MULTILINE)
-INSTRUCTIONS = re.compile(r"<INSTRUCTIONS>(?P<text>.*?)</INSTRUCTIONS>", re.DOTALL)
-SKILLS_BLOCK = "<skills_instructions>"
-PLUGINS_BLOCK = "<recommended_plugins>"
-AGENTS_BLOCK = "# AGENTS.md instructions for "
-AGENTS_FILES = ("AGENTS.md", "AGENTS.override.md")
-CODEX_SEPARATORS = frozenset({"--- project-doc ---"})
+AGENTS_FILES = ("AGENTS.md", "AGENTS.override.md", "CLAUDE.md")
 _SHOWN = 3
 
 
@@ -54,22 +26,6 @@ def _json(path: Path) -> Any:
         return json.loads(path.read_text(encoding="utf-8"))
     except (OSError, ValueError):
         return None
-
-
-def _texts(rollout: Path) -> Iterator[str]:
-    """The text of every message in a codex rollout (``response_item`` rows)."""
-    for line in rollout.read_text(encoding="utf-8", errors="replace").splitlines():
-        try:
-            row = json.loads(line)
-        except ValueError:
-            continue
-        payload = row.get("payload") if isinstance(row, dict) else None
-        if not isinstance(payload, dict) or payload.get("type") != "message":
-            continue
-        for part in payload.get("content") or []:
-            text = part.get("text") if isinstance(part, dict) else None
-            if isinstance(text, str):
-                yield text
 
 
 def _snapshot_roots(a: Audit, step: str) -> list[Path]:
@@ -150,16 +106,10 @@ def _component_lines(agent: Path) -> set[str]:
 
 
 def _instructions(text: str, allowed: set[str] | None) -> tuple[list[str], list[str]]:
-    """(violations, unmeasured reasons) of one ``AGENTS.md`` instructions message."""
-    merged = INSTRUCTIONS.search(text)
-    if merged is None:
-        return [], ["an AGENTS.md message has no <INSTRUCTIONS> block"]
     if allowed is None:
-        return [], ["no stored /app snapshot to read the workspace AGENTS.md from"]
+        return [], ["no stored /app snapshot to read workspace instructions from"]
     foreign = [
-        line.strip()
-        for line in merged["text"].splitlines()
-        if line.strip() and line.strip() not in allowed | CODEX_SEPARATORS
+        line.strip() for line in text.splitlines() if line.strip() and line.strip() not in allowed
     ]
     if not foreign:
         return [], []
@@ -169,80 +119,121 @@ def _instructions(text: str, allowed: set[str] | None) -> tuple[list[str], list[
     ], []
 
 
-def _message(text: str, allowed: set[str] | None) -> tuple[list[str], list[str]]:
-    """(violations, unmeasured reasons) of one message."""
-    if text.startswith(PLUGINS_BLOCK):
-        return ["plugin recommendations reached the agent"], []
-    if text.startswith(SKILLS_BLOCK):
-        roots = SKILL_ROOT.findall(text)
-        return [
-            f"skill root outside the workspace: {root}"
-            for root in roots
-            if not PurePosixPath(root).is_relative_to(APP_SOURCE)
-        ], []
-    if text.startswith(AGENTS_BLOCK):
-        return _instructions(text, allowed)
-    return [], []
+def _audit_findings(
+    audit: dict[str, Any], allowed: set[str] | None, turn_dir: Path
+) -> tuple[list[str], list[str]]:
+    bad, missing = _source_findings(audit.get("sources") or [], turn_dir)
+    bad += list(audit.get("violations") or [])
+    missing += list(audit.get("unmeasured") or [])
+    if not audit.get("records"):
+        missing.append("no native session records")
+    bad.extend(
+        f"skill root outside the workspace: {root}"
+        for root in audit.get("skill_roots") or []
+        if not PurePosixPath(root).is_relative_to(APP_SOURCE)
+    )
+    for instruction in audit.get("instructions") or []:
+        found, absent = _instructions(instruction["text"], allowed)
+        bad += found
+        missing += absent
+    return bad, missing
 
 
-def _turn_logs(agent: Path) -> list[tuple[str, list[Path]]] | None:
-    """(label, rollouts) per workflow turn, or ``None`` without a readable workflow record."""
+def _source_findings(sources: list[dict[str, str]], turn_dir: Path) -> tuple[list[str], list[str]]:
+    bad: list[str] = []
+    missing: list[str] = []
+    if not sources:
+        missing.append("no native audit source files")
+    for source in sources:
+        relative = PurePosixPath(source["path"])
+        if relative.is_absolute() or ".." in relative.parts:
+            bad.append(f"audit source outside the turn: {relative}")
+            continue
+        try:
+            digest = hashlib.sha256((turn_dir / str(relative)).read_bytes()).hexdigest()
+        except OSError:
+            missing.append(f"native audit source missing: {relative}")
+            continue
+        if digest != source.get("sha256"):
+            bad.append(f"native audit source changed: {relative}")
+    return bad, missing
+
+
+def _turn_findings(
+    agent: Path, turn: dict[str, Any], allowed: set[str] | None
+) -> tuple[int, list[str], list[str]]:
+    audit = turn.get("session_audit")
+    if not isinstance(audit, dict):
+        return 0, [], ["no native session audit"]
+    log_dir = turn.get("log_dir")
+    relative = PurePosixPath(log_dir) if isinstance(log_dir, str) else None
+    if relative is None or relative.is_absolute() or ".." in relative.parts:
+        return 0, [], ["no valid turn log directory"]
+    bad, missing = _audit_findings(audit, allowed, agent / str(relative))
+    return int(audit.get("records") or 0), bad, missing
+
+
+def _record_messages(audit: Any, messages: dict[str, list[dict[str, str]]]) -> None:
+    if not isinstance(audit, dict):
+        return
+    version = f"{audit.get('harness')}@{audit.get('version')}"
+    group = messages.setdefault(version, [])
+    for message in audit.get("messages") or []:
+        if message not in group:
+            group.append(message)
+
+
+def _step_findings(
+    a: Audit,
+    step: str,
+    violations: dict[str, str],
+    unmeasured: list[str],
+    messages: dict[str, list[dict[str, str]]],
+) -> int:
+    agent = a.trial_dir / "steps" / step / "agent"
     workflow = _json(agent / WORKFLOW_FILE)
     turns = workflow.get("turns") if isinstance(workflow, dict) else None
     if not isinstance(turns, list) or not turns:
-        return None
-    found = []
-    for turn in turns:
-        turn = turn if isinstance(turn, dict) else {}
-        label = f"{turn.get('stage')}/{turn.get('turn')}"
-        log_dir = turn.get("log_dir")
-        sessions = agent / log_dir / "sessions" if isinstance(log_dir, str) else None
-        rollouts = sorted(sessions.rglob("rollout-*.jsonl")) if sessions else []
-        found.append((label, rollouts))
-    return found
-
-
-def _step_findings(a: Audit, step: str, violations: dict[str, str], unmeasured: list[str]) -> int:
-    """Check one step's rollouts into ``violations``/``unmeasured``; the rollouts checked."""
-    turns = _turn_logs(a.trial_dir / "steps" / step / "agent")
-    if turns is None:
         unmeasured.append(f"{step}: no readable {WORKFLOW_FILE}")
         return 0
     allowed = _workspace_lines(a, step)
-    broken = _broken_components(a.trial_dir / "steps" / step / "agent")
-    for path, why in broken:
+    for path, why in _broken_components(agent):
         violations.setdefault(f"component {path}: {why}", f"component {path}: {why} ({step})")
     checked = 0
-    for label, rollouts in turns:
-        if not rollouts:
-            unmeasured.append(f"{step}/{label}: no rollout recorded")
-        for rollout in rollouts:
-            checked += 1
-            for text in _texts(rollout):
-                bad, missing = _message(text, allowed)
-                for finding in bad:
-                    violations.setdefault(finding, f"{finding} ({step}/{label})")
-                unmeasured += [f"{step}/{label}: {m}" for m in missing]
+    for turn in turns:
+        label = f"{step}/{turn.get('stage')}/{turn.get('turn')}"
+        records, bad, missing = _turn_findings(agent, turn, allowed)
+        checked += records
+        for finding in bad:
+            violations.setdefault(finding, f"{finding} ({label})")
+        unmeasured += [f"{label}: {reason}" for reason in missing]
+        _record_messages(turn.get("session_audit"), messages)
     return checked
 
 
 def check_p8(a: Audit) -> HealthCheck:
     if a.record.agent_override:
         return make_check(
-            "P8", UNMEASURED, f"agent override {a.record.agent_override!r} runs no codex session"
+            "P8", UNMEASURED, f"agent override {a.record.agent_override!r} runs no native session"
         )
     violations: dict[str, str] = {}
     unmeasured: list[str] = []
-    checked = sum(_step_findings(a, s.step, violations, unmeasured) for s in a.attempted)
+    messages: dict[str, list[dict[str, str]]] = {}
+    checked = sum(_step_findings(a, s.step, violations, unmeasured, messages) for s in a.attempted)
     unmeasured = list(dict.fromkeys(unmeasured))
     if violations:
         found = list(violations.values())
         more = f"; and {len(found) - _SHOWN} more" if len(found) > _SHOWN else ""
         detail = "; ".join(found[:_SHOWN]) + more
-        return make_check("P8", VIOLATION, detail, findings=found, unmeasured=unmeasured)
+        return make_check(
+            "P8", VIOLATION, detail, findings=found, unmeasured=unmeasured, messages=messages
+        )
     if unmeasured or not checked:
         detail = "; ".join(unmeasured) or "no attempted step"
-        return make_check("P8", UNMEASURED, detail, unmeasured=unmeasured)
+        return make_check("P8", UNMEASURED, detail, unmeasured=unmeasured, messages=messages)
     return make_check(
-        "P8", PASS, f"{checked} rollout(s) saw only workspace skills and instructions"
+        "P8",
+        PASS,
+        f"{checked} native record(s) saw only workspace skills and instructions",
+        messages=messages,
     )

@@ -1,0 +1,39 @@
+# Claude Code CLI agent, released as claude-code@N in lab/releases.yaml (raidar.subject.agent.definition).
+# tool.version is the single source of the harness pin: the Python pack's
+# image.harnesses.claude-code must equal it (make releases-check, RT5).
+schema: 1
+name: claude-code
+adapter: claude-code
+tool:
+  package: "@anthropic-ai/claude-code"
+  binary: claude
+  version: 2.1.285
+# Applied on every command, first turn and resumed (raidar.subject.agent.isolated_claude):
+# a CLAUDE_CONFIG_DIR (/logs/agent/sessions, which also holds the session transcripts) created
+# for the session and stripped of skills, plugins, commands, agents, hooks, settings and CLAUDE.md
+# on every resumed turn; --setting-sources user,project,local; --strict-mcp-config;
+# DISABLE_AUTOUPDATER=1. A container with managed settings under /etc/claude-code or with
+# skills in the agent user's ~/.claude/skills is refused. The workspace's own .claude/skills
+# stay visible. The sign-in is the credential environment Raidar hands the turn.
+settings:
+  isolated_home: true
+  ignore_user_config: true
+placement:
+  skills: .claude/skills
+  instructions: "{home}/CLAUDE.md"
+resume: true
+models:
+  claude-sonnet-4-6:
+    canonical: claude-sonnet-4-6
+    reasoning: [low, medium, high, max]
+# What this agent gives a model, by the names every agent declares (factory-x-loops parity).
+capabilities:
+  permissions: "--permission-mode=bypassPermissions on every command; the trial container is the sandbox"
+  network: "the trial's Harbor network policy: an allowlist of the provider's and the runtime's package hosts"
+  workflow_skills: "placement.skills .claude/skills in the workspace /app"
+  global_instructions: "placement.instructions {home}/CLAUDE.md in the run's CLAUDE_CONFIG_DIR"
+  host_isolation: "CLAUDE_CONFIG_DIR created for the session and stripped of host-readable files; --setting-sources user,project,local; --strict-mcp-config; managed settings and container host skills refused"
+  isolation_proof: partial
+  command_output: "Bash, file-tool and Skill tool_use / tool_result pairs of the stream-json output and the session transcript (is_error marks a failure)"
+  structured_output: prompted
+  version_pin: 2.1.285

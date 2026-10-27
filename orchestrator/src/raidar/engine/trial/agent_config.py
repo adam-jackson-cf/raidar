@@ -1,9 +1,10 @@
 """The Harbor ``AgentConfig`` for one arm (plan WS-D D1/D2; design section 5.5).
 
 A real arm runs the workflow runner (``raidar.subject.workflow.runner.WorkflowRunner``) with
-the arm's workflow definition, around the native agent for the arm's adapter (``codex``, run
-by ``raidar.subject.agent.isolated_codex.IsolatedCodex``: Harbor's codex agent with the agent
-definition's isolation settings applied on every command) pinned to the version the Python
+the arm's workflow definition, around the native agent for the arm's adapter: the class its
+adapter names (``HarborCliAdapter.native_agent_class``: ``IsolatedCodex`` for ``codex``,
+``IsolatedClaudeCode`` for ``claude-code``; Harbor's agent with the agent definition's isolation
+settings applied on every command) pinned to the version the Python
 pack image bakes in, so no per-trial install happens (WS-I). The native agent's model,
 reasoning level, pin and isolation settings are read through the runner's ``inner_agent``.
 A dev/perf run may replace the agent with Harbor's no-LLM ``oracle`` or ``nop`` agent; the
@@ -20,8 +21,8 @@ from harbor.models.trial.config import AgentConfig, TrialConfig
 from raidar.contract.canonical import digest_json
 from raidar.design.experiment.arm import ResolvedArm
 from raidar.subject.agent.codex_auth import resolve_codex_auth
-from raidar.subject.agent.config import HARBOR_AGENT_NAMES, AgentName, Harness
-from raidar.subject.agent.isolated_codex import IsolatedCodex
+from raidar.subject.agent.config import HARBOR_AGENT_NAMES, Harness
+from raidar.subject.agent.definition import harbor_adapter
 from raidar.subject.environment.python.harness import harbor_agent_kwargs
 from raidar.subject.environment.python.pack_definition import PackSpec
 from raidar.subject.workflow.inner import INNER_KWARG, InnerAgentSpec
@@ -30,8 +31,6 @@ from raidar.subject.workflow.runner import WorkflowRunner
 AgentOverride = Literal["oracle", "nop"]
 AGENT_OVERRIDES: tuple[AgentOverride, ...] = ("oracle", "nop")
 CODEX_AUTH_ENV = "CODEX_AUTH_JSON_PATH"
-ISOLATED_AGENTS = {AgentName.CODEX: IsolatedCodex}
-"""The Raidar class that runs each adapter's native agent with its definition's isolation."""
 
 
 def effective_agent_timeout_s(agent_timeout_sec: int) -> float:
@@ -64,12 +63,9 @@ def arm_agent_config(
     )
     if agent.reasoning is not None:
         kwargs["reasoning_effort"] = agent.reasoning
-    isolated = ISOLATED_AGENTS.get(agent.name)
-    if isolated is None:
-        raise ValueError(f"adapter {agent.name.value!r} has no isolated native agent")
-    settings = agent.released.definition.settings
-    kwargs["features_off"] = list(settings.features_off)
-    kwargs["bundled_skills"] = list(settings.bundled_skills)
+    adapter = harbor_adapter(agent.name)
+    isolated = adapter.native_agent_class()
+    kwargs.update(adapter.isolation_kwargs(agent.released.definition.settings))
     native = InnerAgentSpec(
         name=HARBOR_AGENT_NAMES[agent.harness], import_path=isolated.import_path(), kwargs=kwargs
     )

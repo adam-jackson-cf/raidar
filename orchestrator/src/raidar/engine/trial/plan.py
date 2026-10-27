@@ -111,6 +111,9 @@ class ExperimentPlan:
                 "agent_override": self.options.agent_override,
                 "concurrency": self.options.concurrency,
             },
+            "varies": list(
+                ((self.lock.get("execution") or {}).get("design") or {}).get("varies") or ()
+            ),
             "arms": {
                 arm_id: {
                     "agent_release": blueprint.arm.agent.released.ref,
@@ -119,6 +122,8 @@ class ExperimentPlan:
                     "harbor_agent": blueprint.agent_config.name
                     or blueprint.agent_config.import_path,
                     "model": blueprint.agent_config.model_name,
+                    "canonical_model": blueprint.arm.agent.model,
+                    "reasoning": blueprint.arm.agent.reasoning,
                     "capabilities": (
                         blueprint.arm.agent.released.definition.capabilities.model_dump()
                     ),

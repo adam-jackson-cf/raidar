@@ -7,9 +7,12 @@ import json
 import shutil
 from pathlib import Path
 
+import pytest
+
 from raidar.engine.health.audit import audit_trial
 from raidar.engine.health.model import HealthCheck
 from raidar.engine.trial.collect import health_validity
+from raidar.subject.agent.claude_audit import claude_session_audit
 from tests.health_support import STEP, HealthyTrial, healthy_trial, write_agent_session
 
 SKILLS = "<skills_instructions>\n### Skill roots\n{roots}\n</skills_instructions>"
@@ -34,7 +37,6 @@ def session(tmp_path: Path, *rows: str) -> HealthyTrial:
 def test_workspace_skills_and_a_plain_prompt_pass(tmp_path: Path) -> None:
     check = p8(session(tmp_path, roots("/app/.agents/skills"), "solve the task"))
     assert check.status == "pass", check.detail
-    assert "1 rollout" in check.detail
 
 
 def test_a_bundled_skill_root_is_a_violation_naming_root_and_turn(tmp_path: Path) -> None:
@@ -114,7 +116,7 @@ def test_a_turn_without_a_rollout_or_a_workflow_record_is_unmeasured(tmp_path: P
     shutil.rmtree(agent / "workflow" / "build-1")
     missing = p8(t)
     assert missing.status == "unmeasured"
-    assert "no rollout" in missing.detail
+    assert missing.evidence["unmeasured"]
     (agent / "workflow" / "workflow.json").write_text(json.dumps({"turns": []}))
     assert "workflow.json" in p8(t).detail
     assert p8(t).status == "unmeasured"
@@ -130,7 +132,10 @@ def test_a_violation_outranks_missing_evidence_and_findings_are_deduplicated(
         {"stage": "build", "turn": 1, "log_dir": "workflow/build-1"},
         {"stage": "build", "turn": 2, "log_dir": "workflow/build-2"},
     ]
-    (agent / "workflow" / "workflow.json").write_text(json.dumps({"turns": turns}))
+    workflow_path = agent / "workflow" / "workflow.json"
+    original = json.loads(workflow_path.read_text())
+    turns[0]["session_audit"] = original["turns"][0]["session_audit"]
+    workflow_path.write_text(json.dumps({"turns": turns}))
     check = p8(t)
     assert check.status == "violation"
     assert len(check.evidence["findings"]) == 1
@@ -143,10 +148,73 @@ def test_many_findings_are_summarised(tmp_path: Path) -> None:
     assert len(check.evidence["findings"]) == 5
 
 
-def test_an_agent_override_runs_no_codex_and_is_unmeasured(tmp_path: Path) -> None:
+def test_an_agent_override_runs_no_native_session_and_is_unmeasured(tmp_path: Path) -> None:
     t = healthy_trial(tmp_path)
     record = t.record.model_copy(update={"agent_override": "oracle"})
     report = audit_trial(t.job_dir, t.trial_dir, record, t.job())
     check = next(c for c in report.checks if c.id == "P8")
     assert check.status == "unmeasured"
     assert "oracle" in check.detail
+
+
+@pytest.mark.parametrize(
+    ("rule", "skills", "status"),
+    [
+        ("use uv", [], "pass"),
+        ("unrecorded host rule", [], "violation"),
+        ("use uv", ["unknown-origin"], "unmeasured"),
+    ],
+)
+def test_claude_native_audit_feeds_p8(
+    tmp_path: Path, rule: str, skills: list[str], status: str
+) -> None:
+    trial = healthy_trial(tmp_path)
+    agent = trial.trial_dir / "steps" / STEP / "agent"
+    turn_dir = agent / "workflow" / "build-1"
+    stream = {
+        "type": "system",
+        "subtype": "init",
+        "claude_code_version": "2.1.285",
+        "skills": skills,
+        "plugins": [{"name": "cc-plugin-agents-md", "path": "builtin"}],
+        "mcp_servers": [],
+    }
+    (turn_dir / "claude-code.txt").write_text(json.dumps(stream) + "\n")
+    transcript = turn_dir / "sessions" / "projects" / "-app" / "claude.jsonl"
+    transcript.parent.mkdir(parents=True)
+    message = {
+        "type": "user",
+        "message": {"content": f"Contents of /app/CLAUDE.md (project instructions):\n\n{rule}"},
+    }
+    system = {"type": "system", "content": "native harness instructions"}
+    transcript.write_text(json.dumps(message) + "\n" + json.dumps(system) + "\n")
+    (trial.trial_dir / "steps" / STEP / "artifacts" / "app" / "CLAUDE.md").write_text("use uv\n")
+    workflow = {
+        "turns": [
+            {
+                "stage": "build",
+                "turn": 1,
+                "log_dir": "workflow/build-1",
+                "session_audit": claude_session_audit(turn_dir),
+            }
+        ]
+    }
+    (agent / "workflow" / "workflow.json").write_text(json.dumps(workflow))
+
+    check = p8(trial)
+
+    assert check.status == status, check.detail
+    assert check.evidence["messages"]["claude-code@2.1.285"] == [
+        {"role": "system", "sha256": hashlib.sha256(b"native harness instructions").hexdigest()}
+    ]
+
+
+def test_changed_native_audit_source_invalidates_retained_evidence(tmp_path: Path) -> None:
+    trial = session(tmp_path, "solve the task")
+    source = next(trial.trial_dir.rglob("rollout-*.jsonl"))
+    source.write_text(source.read_text() + "{}\n")
+
+    check = p8(trial)
+
+    assert check.status == "violation"
+    assert "native audit source changed" in check.detail
