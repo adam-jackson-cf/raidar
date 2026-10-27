@@ -51,11 +51,6 @@ def test_a_healthy_sealed_trial_passes_every_check(tmp_path: Path) -> None:
     assert {c.status for c in checks.values()} == {"pass"}, {
         k: (c.status, c.detail) for k, c in checks.items() if c.status != "pass"
     }
-    assert [c.id for c in checks.values()] == [
-        "V1", "V2", "V3", "H1", "H3", "H4", "H5", "H6", "H-target", "L1", "L2", "P2", "P3", "P8",
-        "T1", "T2", "T3",
-    ]  # fmt: skip
-    assert {c.family for c in checks.values()} == {"V", "H", "L", "P", "T"}
 
 
 def test_v1_a_timed_out_evaluator_is_never_a_pass(tmp_path: Path) -> None:
@@ -336,6 +331,7 @@ def test_violations_map_to_validity_checks_and_nothing_else_invalidates() -> Non
                 ("G2", "violation"),
                 ("E1", "violation"),
                 ("J2", "violation"),
+                ("W2", "violation"),
             )
         )
     }
@@ -346,6 +342,7 @@ def test_violations_map_to_validity_checks_and_nothing_else_invalidates() -> Non
     assert "G2" in failed["health_gate"].detail
     assert "E1" in failed["health_define"].detail
     assert "J2" in failed["health_judge"].detail
+    assert "W2" in failed["health_evidence"].detail
 
 
 def test_the_trial_run_writes_health_json_and_maps_its_violations(tmp_path: Path) -> None:

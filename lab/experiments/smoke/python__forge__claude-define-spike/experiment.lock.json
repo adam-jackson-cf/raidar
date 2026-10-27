@@ -1023,7 +1023,7 @@
       "tree-sitter-language-pack": "0.13.0"
     }
   },
-  "document_sha256": "21696520e9bb9dbbd7a9ba5bd0dd3900d1c19a29abd2563bba39110b6e069da9",
+  "document_sha256": "7855a430044f72fcffe5ba2b3c5cae00fe585921d22e626fd55b431330f9bf0f",
   "execution": {
     "arms": {
       "define": {
@@ -1041,22 +1041,22 @@
           "version_pin": "2.1.285",
           "workflow_skills": "placement.skills .claude/skills in the workspace /app"
         },
-        "digest": "d8d32e479be629450ef385f0065402acb9a5770be49fe47597a4eb4d316b02b1",
+        "digest": "6c468aa8aaa9c6ecc80f05f363ca71f58dc08b8f897782e55367a4b59de26547",
         "model": "claude-sonnet-4-6",
         "provider": "anthropic",
         "reasoning": "low",
         "stage_code": {
-          "build": "b51530b2b608dd2865d4b6aff9fc4b19ca2fabfdf687e131402debf4bc9447d6",
-          "define": "ebe8825b87308949cfa3f7ce0b3e0e07de4e3c468c7086b2d26c7c892f6f9cb8",
-          "verify": "6d5064416db84ae218af96e819ecf62deb36b5b1004ec2fe4a40b929a27d2884"
+          "build": "5a3cdd5431c23072efa2b52a121f3ec281a539ef1fa2ba9775668d968bee679f",
+          "define": "63f81366fc518e532e5ad0e6765e43e8ebd45ce41b2a117029e281aba86c950a",
+          "verify": "82a0b558095fc833af0c89130f6df0110643737ace85dbb3068a9c8cda6afdba"
         },
         "tool": {
           "binary": "claude",
           "package": "@anthropic-ai/claude-code",
           "version": "2.1.285"
         },
-        "workflow": "define-build-verify@2",
-        "workflow_sha256": "dc7d72a744c4e0a487534c9a5227d8be3a3443e11f4ee40829fcb0d2511b15aa"
+        "workflow": "define-build-verify@3",
+        "workflow_sha256": "52190a8da774cd846bb283dc71363ca2e9cb7dbd6bda140d1eccc9ff95fb3d91"
       }
     },
     "design": {
@@ -1072,7 +1072,7 @@
         {
           "agent": "agent",
           "id": "define",
-          "workflow": "define-build-verify@2"
+          "workflow": "define-build-verify@3"
         }
       ],
       "attempts": 1,
@@ -1192,8 +1192,8 @@
         }
       },
       "workflow": {
-        "define-build-verify@2": {
-          "digest": "dc7d72a744c4e0a487534c9a5227d8be3a3443e11f4ee40829fcb0d2511b15aa",
+        "define-build-verify@3": {
+          "digest": "52190a8da774cd846bb283dc71363ca2e9cb7dbd6bda140d1eccc9ff95fb3d91",
           "metadata": {
             "stages": [
               "define",
@@ -1218,10 +1218,10 @@
   "experiment": {
     "id": "python__forge__claude-define-spike",
     "source": "experiment.yaml",
-    "source_sha256": "02dca0a1e6121cdc661837b9f125f04587e8e80731653e5307e7ecfaee916b0a",
-    "spec_sha256": "419089fb90c235791b9dc2916f7b5bb4a831405a3bdae4861e394ceb1a7d1f48"
+    "source_sha256": "436a75e947bee83d3dbb1485cfd251fc035244d30cdcb46055e0897bd9cfff00",
+    "spec_sha256": "04a1d62a096f28ce99cf08ff0506cffa2825fec8c793404046643c6193054394"
   },
-  "lock_sha256": "848cb0962a52ee694ad78695db0b9a928017db5052d65ac08d6e5817d591b6bf",
+  "lock_sha256": "a7952960c019af0fc8d60a31ca5959d48908df5243a026bdfe8a5bddf1466fed",
   "lock_version": 4,
   "overrides": {
     "flags": {},
@@ -1230,7 +1230,7 @@
   "sections": {
     "analysis": "5857cbd73862a8373632833c2dac16ea584aa2f92fc94b12b7181fb3804de9e7",
     "assessment": "1554593bc055f7ba3cddad1cca2c0a1516ebc8683c9a410b8125d27c713c6572",
-    "execution": "848cb0962a52ee694ad78695db0b9a928017db5052d65ac08d6e5817d591b6bf",
+    "execution": "a7952960c019af0fc8d60a31ca5959d48908df5243a026bdfe8a5bddf1466fed",
     "toolchain": "031137799a0b2e57592e387ee88c1ca084774b984efc988333e59348ad537ad2"
   },
   "spec": {
@@ -1256,7 +1256,7 @@
       {
         "agent": "agent",
         "id": "define",
-        "workflow": "define-build-verify@2"
+        "workflow": "define-build-verify@3"
       }
     ],
     "assessment": {
@@ -1275,7 +1275,7 @@
         "test-coverage@1"
       ]
     },
-    "description": "Claude Code define-build-verify@2 mechanics on forge; not citable.",
+    "description": "Claude Code define-build-verify@3 mechanics on forge; not citable.",
     "environment": {
       "compose_init": true,
       "type": "docker"

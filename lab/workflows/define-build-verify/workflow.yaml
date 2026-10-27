@@ -207,7 +207,7 @@ stages:
     prompt: |-
       ## Verification
 
-      Your work is read from the repository's commits.
+      Your work is graded from the workspace exactly as you leave it.
 
       Commit with `git commit` after each logical step, starting as soon as your
       first test passes. The repository's pre-commit hook is the verify gate: every
@@ -220,9 +220,9 @@ stages:
 
       Implementation work is not complete until a commit passes the gate. Do not end
       your turn while a commit is refused: a refused commit means the work is
-      unfinished. When you stop, the process that runs you commits whatever is left
-      through the same gate; a refusal comes back to you with the gate's output, at
-      most %%%MAX_FIX_ROUNDS%%% times.
+      unfinished. When you stop, the process that runs you checks whatever is left
+      through the same gate without committing or restoring it; a refusal comes back
+      to you with the gate's output, at most %%%MAX_FIX_ROUNDS%%% times.
 
       The gate's rules are in `%%%RULES_FILE%%%` at the repository root: what blocks a
       commit and what only warns. It runs ruff, ruff's formatter check, strict mypy
@@ -254,8 +254,8 @@ stages:
       sets up and asserts, an `Example:` value no mapped test states, a mapped test
       that did not pass) and its mapped tests with their gate result. Fix every one
       in this turn, keep every criterion's tests mapped and passing, and do not break
-      what already works. When you stop, the engine commits through the gate and
-      checks every criterion again.
+      what already works. When you stop, the engine records the gate's verdict without
+      changing your work and checks every criterion again.
 
       Reply as before: `account` says criterion by criterion (by id) what you changed;
       `ac_tests` lists only the criteria whose tests you added, changed, moved or

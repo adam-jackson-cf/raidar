@@ -2,7 +2,7 @@
 schema_version: 3
 kind: smoke
 id: python__forge__claude-define-spike
-description: Claude Code define-build-verify@2 mechanics on forge; not citable.
+description: Claude Code define-build-verify@3 mechanics on forge; not citable.
 problems:
   - ref: scb/forge@38d627ecf668
 runtime: python
@@ -19,7 +19,7 @@ protocol:
 arms:
   - id: define
     agent: agent
-    workflow: define-build-verify@2
+    workflow: define-build-verify@3
 assessment:
   scorers: [correctness@2, code-quality@4, resource-usage@2, process-compliance@7, definition-coverage@1, test-coverage@1]
   metric: scb-canonical@2

@@ -789,7 +789,7 @@
       "tree-sitter-language-pack": "0.13.0"
     }
   },
-  "document_sha256": "a89bef674c4752f6197e5c171a1d6e95566f4b14cc3439c18e2fa0761893d445",
+  "document_sha256": "4fa1bc43d59c852aaf117beb8fe50825c347fef02615feb7abab7e90fbe2e7c0",
   "execution": {
     "arms": {
       "verify": {
@@ -807,21 +807,21 @@
           "version_pin": "2.1.285",
           "workflow_skills": "placement.skills .claude/skills in the workspace /app"
         },
-        "digest": "bf99d166e3ced946b9990a02723d5084cf85078c69c8b293d5255caf8d0f9146",
+        "digest": "6abfbd6d48975d9269857ab62711ea1ce3fa25b97d95e13eb3014e29d61d14c9",
         "model": "claude-sonnet-4-6",
         "provider": "anthropic",
         "reasoning": "low",
         "stage_code": {
-          "build": "b51530b2b608dd2865d4b6aff9fc4b19ca2fabfdf687e131402debf4bc9447d6",
-          "verify": "6d5064416db84ae218af96e819ecf62deb36b5b1004ec2fe4a40b929a27d2884"
+          "build": "5a3cdd5431c23072efa2b52a121f3ec281a539ef1fa2ba9775668d968bee679f",
+          "verify": "82a0b558095fc833af0c89130f6df0110643737ace85dbb3068a9c8cda6afdba"
         },
         "tool": {
           "binary": "claude",
           "package": "@anthropic-ai/claude-code",
           "version": "2.1.285"
         },
-        "workflow": "one-shot-verify@1",
-        "workflow_sha256": "b1576514260095087e315d11424e3aa73b02d0b81574fbbb737a19937437e5cc"
+        "workflow": "one-shot-verify@2",
+        "workflow_sha256": "8ed329ac39a77aa5edac4d0e2373832502342275113c15943d3fb8fa88c70c51"
       }
     },
     "design": {
@@ -837,7 +837,7 @@
         {
           "agent": "agent",
           "id": "verify",
-          "workflow": "one-shot-verify@1"
+          "workflow": "one-shot-verify@2"
         }
       ],
       "attempts": 1,
@@ -957,8 +957,8 @@
         }
       },
       "workflow": {
-        "one-shot-verify@1": {
-          "digest": "b1576514260095087e315d11424e3aa73b02d0b81574fbbb737a19937437e5cc",
+        "one-shot-verify@2": {
+          "digest": "8ed329ac39a77aa5edac4d0e2373832502342275113c15943d3fb8fa88c70c51",
           "metadata": {
             "stages": [
               "build",
@@ -982,10 +982,10 @@
   "experiment": {
     "id": "python__forge__claude-verify-spike",
     "source": "experiment.yaml",
-    "source_sha256": "cffd4b9cfff2feadbbe7d9b5518b1bede22ef952081c9af26ba9f161da79f7d1",
-    "spec_sha256": "69d123a2e655a186c2ac6381c9ebdef43e946aeeb42e0980b50ca954ddedb22a"
+    "source_sha256": "f2a878103fd4a11a0a7e7e3dc4e0089c49b35af312a4e3876dc1da741e5ae93c",
+    "spec_sha256": "f00d48cc9bbe7c062b39bd883ae8a1601717edbb7ed529c06297bc82f254cc17"
   },
-  "lock_sha256": "b231aa5279a1c07a5ca55660dce44d64583126fbbbe69b6bf500bc8b2ce50282",
+  "lock_sha256": "4c2812e09802af96b7b29dd6e43c776a5cbbef812079f0f2a8c58d73e2fbfa61",
   "lock_version": 4,
   "overrides": {
     "flags": {},
@@ -994,7 +994,7 @@
   "sections": {
     "analysis": "106c4f180e5678e19b2bf6fc3a34aa5ef836ed7199f3b57cf1bffbfe2bfc5ac6",
     "assessment": "01861739516d6425eb6f87cef6bf38393c417f4bc50fa97404b337307b21a8fc",
-    "execution": "b231aa5279a1c07a5ca55660dce44d64583126fbbbe69b6bf500bc8b2ce50282",
+    "execution": "4c2812e09802af96b7b29dd6e43c776a5cbbef812079f0f2a8c58d73e2fbfa61",
     "toolchain": "031137799a0b2e57592e387ee88c1ca084774b984efc988333e59348ad537ad2"
   },
   "spec": {
@@ -1020,7 +1020,7 @@
       {
         "agent": "agent",
         "id": "verify",
-        "workflow": "one-shot-verify@1"
+        "workflow": "one-shot-verify@2"
       }
     ],
     "assessment": {

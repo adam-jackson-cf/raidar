@@ -120,7 +120,7 @@ def _gate_input(run: dict[str, Any]) -> tuple[str, str, tuple[str, ...]]:
 def _sealed_verdicts(gate: StepGate) -> dict[tuple[str, str, tuple[str, ...]], str]:
     """Each complete checked input a seal decided, with its verdict."""
     decided = (g for g in _gates(gate) if g.get("verdict") in DECIDED and g.get("tree"))
-    return {_gate_input(g): g["verdict"] for g in decided if g.get("reused_from") is None}
+    return {_gate_input(g): g["verdict"] for g in decided}
 
 
 def _missing_worktree(gate: StepGate) -> bool:
@@ -166,16 +166,14 @@ def _hook_passed(gate: StepGate) -> set[str]:
 
 
 def _unhooked_commits(gate: StepGate) -> list[str]:
-    """Commits since the base that the seals did not make and no hook run passed."""
+    """Every commit since the base must hold a tree its hook passed; seals never commit."""
     gates = _gates(gate)
-    sealed = {g.get("commit") for g in gates}
     commits = {c["commit"]: c for g in gates for c in g.get("commits") or []}
-    agents = [commit for sha, commit in commits.items() if sha not in sealed]
     passed = _hook_passed(gate)
     return [
         f"{gate.step}: commit {c['commit'][:12]} ({c.get('subject', '')[:40]!r}) holds a tree "
         "no hook run passed"
-        for c in agents
+        for c in commits.values()
         if c.get("tree") not in passed
     ]
 

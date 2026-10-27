@@ -1,8 +1,8 @@
 # One-shot-verify: the one-shot build prompt with the verify stage (design section 5.3), spike-sized;
 # released as one-shot-verify@N in lab/releases.yaml. Mechanics after factory-x-loops
-# workflow/one-shot-verify/v1.toml: the agent commits through the gate as its pre-commit hook, the
-# runner seals what is left after every turn, a refusal resumes the session with the gate's output
-# at most max_fix_rounds times. The build prompt is FXL's [stage_prompts] implement; the verify
+# workflow/one-shot-verify/v1.toml: the agent commits through the gate as its pre-commit hook;
+# the runner records an authoritative verdict after every turn without changing the work.
+# This release provides no fix turns. The build prompt is FXL's [stage_prompts] implement; the verify
 # prompt is FXL workflow/templates/verify/v1.md with its tokens renamed, and without what this
 # spike's gate does not do (gate policies, idle limits, test workers, safe fixes and formatting
 # applied first, retiring tests through a decisions file).
@@ -22,7 +22,7 @@ stages:
     prompt: |-
       ## Verification
 
-      Your work is read from the repository's commits.
+      Your work is graded from the workspace exactly as you leave it.
 
       Commit with `git commit` after each logical step, starting as soon as your
       first test passes. The repository's pre-commit hook is the verify gate: every
@@ -35,9 +35,9 @@ stages:
 
       Implementation work is not complete until a commit passes the gate. Do not end
       your turn while a commit is refused: a refused commit means the work is
-      unfinished. When you stop, the process that runs you commits whatever is left
-      through the same gate; a refusal comes back to you with the gate's output, at
-      most %%%MAX_FIX_ROUNDS%%% times.
+      unfinished. When you stop, the process that runs you checks whatever is left
+      through the same gate and records its verdict. It never commits or restores
+      your work, and this workflow provides no fix turns after you stop.
 
       The gate's rules are in `%%%RULES_FILE%%%` at the repository root: what blocks a
       commit and what only warns. It runs ruff, ruff's formatter check, strict mypy
@@ -49,7 +49,7 @@ stages:
       write it to a temporary or configured location, or have the project's
       `.gitignore` exclude it.
     gate: { on_commit: true, after_turn: true }
-    max_fix_rounds: 2
+    max_fix_rounds: 0
     max_passes: 1
     test_timeout: 60
     rules_file: AGENTS.md

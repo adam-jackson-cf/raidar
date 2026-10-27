@@ -1,12 +1,12 @@
-# Verify-stage spike (split design S2): forge x one codex arm running one-shot-verify@1 (the
-# build prompt plus the verify gate: hook, seal after every turn, at most 2 fix turns) x one
+# Verify-stage spike: forge x one codex arm running one-shot-verify@2 (the
+# build prompt plus the verify gate: hook and recording seal, no fix turns) x one
 # attempt, to show the second stage's mechanics inside the checkpoint's one primary session and
 # what they cost. Kind smoke, not citable.
-# Run detached: make experiment-execute EXPERIMENT=lab/experiments/smoke/python__forge__verify-spike/experiment.yaml MAX_CHECKPOINTS=3 JOB_ID=<id> DETACH=1
+# Run detached: make experiment-execute EXPERIMENT=lab/experiments/smoke/python__forge__verify-spike/experiment.yaml TARGET=mbp MAX_CHECKPOINTS=2 JOB_ID=<id> DETACH=1
 schema_version: 3
 kind: smoke
 id: python__forge__verify-spike
-description: Verify-stage spike on forge (one-shot-verify@1); not citable.
+description: Verify-stage spike on forge (one-shot-verify@2); not citable.
 
 problems:
   - ref: scb/forge@38d627ecf668
@@ -28,7 +28,7 @@ protocol:
 arms:
   - id: verify
     agent: agent
-    workflow: one-shot-verify@1
+    workflow: one-shot-verify@2
 
 assessment:
   scorers: [correctness@2, code-quality@4, resource-usage@2, process-compliance@7]

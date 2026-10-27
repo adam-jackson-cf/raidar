@@ -55,6 +55,26 @@ class DefinePaths:
             f"{{'RAIDAR_DEFINE_STATE': {self.state!r}}}))",
         )
 
+    @property
+    def closed(self) -> str:
+        """The root-owned flag the lab sets once the checkpoint's define ended unusable."""
+        return f"{self.home}/unusable"
+
+    @property
+    def prerequisite(self) -> list[str]:
+        """The gate's define prerequisite: the inspector, which fails while ``closed`` exists.
+
+        The flag lives in the lab-owned home (not writable by the agent's user), so a draft
+        sealed ready after the define ended unusable can never satisfy the gate.
+        """
+        return self.invocation(
+            "status",
+            f"import os; closed = os.path.exists({self.closed!r}); "
+            "closed and print('definition_unusable: the checkpoint define ended unusable'); "
+            f"raise SystemExit(1 if closed else status.main(['--write', '--context', "
+            f"{self.home + '/context.json'!r}], {{'RAIDAR_DEFINE_STATE': {self.state!r}}}))",
+        )
+
 
 PATHS = DefinePaths()
 
@@ -129,16 +149,16 @@ class Define(Stage):
             f"{shlex.quote(self.paths.home)} {shlex.quote(self.paths.command)}; fi\n"
             f"chmod -R go-w {shlex.quote(self.paths.home)} && "
             f"chmod 755 {shlex.quote(self.paths.command)} && "
-            f"rm -rf {shlex.quote(self.paths.state)} && "
-            f"mkdir -p {shlex.quote(self.paths.state)} && "
-            f"rm -f {shlex.quote(self.paths.workspace + '/.raidar/feature-definition.md')}",
+            f"rm -f {shlex.quote(self.paths.closed)}",
         )
-        await self._inputs(checkpoint)
-        owner = (await self._exec(checkpoint, "id -un", root=False)).strip()
+        state = shlex.quote(self.paths.state)
         await self._exec(
             checkpoint,
-            f"chown -R {shlex.quote(owner + ':')} {shlex.quote(self.paths.workspace + '/.raidar')}",
+            f"rm -rf {state} && mkdir -p {state} && "
+            f"rm -f {shlex.quote(self.paths.workspace + '/.raidar/feature-definition.md')}",
+            root=False,
         )
+        await self._inputs(checkpoint)
 
     async def _inputs(self, checkpoint: Checkpoint) -> None:
         from raidar.subject.workflow.define_tool import compact  # noqa: PLC0415
@@ -161,12 +181,16 @@ class Define(Stage):
             + "\n",
             encoding="utf-8",
         )
-        await checkpoint.environment.upload_file(inputs, f"{self.paths.state}/context.json")
         await checkpoint.environment.upload_file(inputs, f"{self.paths.home}/context.json")
         immutable = shlex.quote(self.paths.home + "/context.json")
         await self._exec(
             checkpoint,
             f'if [ "$(id -u)" = 0 ]; then chown root:root {immutable}; fi\nchmod 644 {immutable}',
+        )
+        await self._exec(
+            checkpoint,
+            f"cp {immutable} {shlex.quote(self.paths.state + '/context.json')}",
+            root=False,
         )
 
     def fragment(self) -> str:
@@ -175,7 +199,7 @@ class Define(Stage):
     async def check(self, checkpoint: Checkpoint, after: str) -> Resume | None:
         if self.ending in ("definition_unusable", "definition_ready"):
             return None
-        result = await checkpoint.environment.exec(shlex.join(self.paths.inspector), user="root")
+        result = await checkpoint.environment.exec(shlex.join(self.paths.inspector))
         try:
             inspected: dict[str, Any] = json.loads(result.stdout or "")
         except ValueError:
@@ -209,8 +233,7 @@ class Define(Stage):
         if not self.repairs:
             self.repairs.append({"after": after, "findings": findings})
             return Resume(REPAIR.format(error="; ".join(findings)), DEFINE_ROUND)
-        self.ending = "definition_unusable"
-        self.definition_sha256 = None
+        await self._close(checkpoint)
         return None
 
     async def _accept(
@@ -229,7 +252,7 @@ class Define(Stage):
             }
         )
         if not accepted:
-            self.ending = "definition_unusable"
+            await self._close(checkpoint)
             return None
         records = checkpoint.logs_dir / RECORD_DIR
         archive = records / f"round-{number}"
@@ -247,7 +270,7 @@ class Define(Stage):
             f"tool.next_round(Path({self.paths.state!r}), tool.Context.read("
             f"json.loads({json.dumps(self.context)!r})))"
         )
-        await self._exec(checkpoint, shlex.join(self.paths.invocation("tool", script)))
+        await self._exec(checkpoint, shlex.join(self.paths.invocation("tool", script)), root=False)
         await self._inputs(checkpoint)
         return Resume(
             "Every proposal is accepted (benchmark policy). Build a fresh definition with these "
@@ -256,10 +279,17 @@ class Define(Stage):
             DEFINE_ROUND,
         )
 
+    async def _close(self, checkpoint: Checkpoint) -> None:
+        """End the define as unusable for good: a root-written flag the prerequisite reads."""
+        flag = shlex.quote(self.paths.closed)
+        await self._exec(checkpoint, f"echo definition_unusable > {flag} && chmod 644 {flag}")
+        self.ending = "definition_unusable"
+        self.definition_sha256 = None
+
     async def _keep(self, checkpoint: Checkpoint) -> None:
         for name in ("state.json", "define-calls.jsonl", "define-events.jsonl"):
             result = await checkpoint.environment.exec(
-                f"cat {shlex.quote(self.paths.state + '/' + name)}", user="root"
+                f"cat {shlex.quote(self.paths.state + '/' + name)}"
             )
             if result.return_code == 0:
                 (checkpoint.logs_dir / RECORD_DIR / name).write_text(
@@ -267,7 +297,7 @@ class Define(Stage):
                 )
 
     async def close(self, checkpoint: Checkpoint, cut: str | None) -> None:
-        if cut is not None:
+        if cut is not None and self.ending != "definition_unusable":
             self.ending = cut
         try:
             await self._keep(checkpoint)
@@ -288,6 +318,7 @@ class Define(Stage):
             "source_commit": SOURCE_COMMIT,
             "python": PYTHON_PIN,
             "ending": self.ending,
+            "closed": self.ending == "definition_unusable",
             "unit_rules": 2,
             "inputs": f"{RECORD_DIR}/inputs.json",
             "state": f"{RECORD_DIR}/state.json",

@@ -1023,7 +1023,7 @@
       "tree-sitter-language-pack": "0.13.0"
     }
   },
-  "document_sha256": "4cf1f56e106d30c375067b0a0094a69afee21d6e61f69d07db2a9d24c7936112",
+  "document_sha256": "06f9fae5200969da03183981cd8cec55b753f04d71289d121738aec614cabe4a",
   "execution": {
     "arms": {
       "define": {
@@ -1041,22 +1041,22 @@
           "version_pin": "0.156.1",
           "workflow_skills": "placement.skills .agents/skills in the workspace /app"
         },
-        "digest": "b7264f9d7be24f543dc6cbf543b1b67bb1c3949ea10926de897cf41b89cbbddf",
+        "digest": "9bb6b66ee09dc8bd2bc15960bd0c7425e8a73c06a8534fe82b1837bfb8819ee2",
         "model": "gpt-6-luna",
         "provider": "openai",
         "reasoning": "low",
         "stage_code": {
-          "build": "1e11ded6a9dbccc494116a5e4fe61a83e99207d0115f03f013c14a586ca237ca",
-          "define": "283f94f6478d95b5d0285f4f0dbc996173fb567b0caeb5bd584eccb74c1f27c4",
-          "verify": "ddc9bb59611dbda953823292c03ca79d6f98b1dfd801f954f43432550d9cc0d7"
+          "build": "cdaeb11dd4136fbfaee90608ce10723280b5a76e658331f74b05a477db1a712f",
+          "define": "568e772e00e46d83444ab0ed22750c6c6d635a750a2323d05b7e193b28a5c5cf",
+          "verify": "9ed9f5f79103d651a88fbf274e23160b53bd8d41aeddaac4e822f2f8f44d79c0"
         },
         "tool": {
           "binary": "codex",
           "package": "@openai/codex",
           "version": "0.156.1"
         },
-        "workflow": "define-build-verify@2",
-        "workflow_sha256": "dc7d72a744c4e0a487534c9a5227d8be3a3443e11f4ee40829fcb0d2511b15aa"
+        "workflow": "define-build-verify@3",
+        "workflow_sha256": "52190a8da774cd846bb283dc71363ca2e9cb7dbd6bda140d1eccc9ff95fb3d91"
       }
     },
     "design": {
@@ -1072,7 +1072,7 @@
         {
           "agent": "agent",
           "id": "define",
-          "workflow": "define-build-verify@2"
+          "workflow": "define-build-verify@3"
         }
       ],
       "attempts": 1,
@@ -1192,8 +1192,8 @@
         }
       },
       "workflow": {
-        "define-build-verify@2": {
-          "digest": "dc7d72a744c4e0a487534c9a5227d8be3a3443e11f4ee40829fcb0d2511b15aa",
+        "define-build-verify@3": {
+          "digest": "52190a8da774cd846bb283dc71363ca2e9cb7dbd6bda140d1eccc9ff95fb3d91",
           "metadata": {
             "stages": [
               "define",
@@ -1218,10 +1218,10 @@
   "experiment": {
     "id": "python__forge__define-spike",
     "source": "experiment.yaml",
-    "source_sha256": "9dba0c03ef4ddcb068f56f39e086b3cdf3f9f5c95cef8566f612c683f430ca07",
-    "spec_sha256": "fb6e82af7e4e27faf9eb0ad458c099cbbf3f75322895268eddf0b4fba948282a"
+    "source_sha256": "7415fed6152d5d7655b17c0d4f1b654ae7d267daf80db65a0ea2e827bd45145b",
+    "spec_sha256": "b85ba5ae0520926644498dc692c442a42d1d8608a79344f81a84236ea3073728"
   },
-  "lock_sha256": "404f9f071f140c3689ea03ef9af57528dafecc0ca62c279fb660009f8bb4c9ae",
+  "lock_sha256": "21a6bea9cd688c3defcb8d450feb7ead49f892910709fca10e00fc39fd1eb936",
   "lock_version": 4,
   "overrides": {
     "flags": {},
@@ -1230,7 +1230,7 @@
   "sections": {
     "analysis": "5857cbd73862a8373632833c2dac16ea584aa2f92fc94b12b7181fb3804de9e7",
     "assessment": "1554593bc055f7ba3cddad1cca2c0a1516ebc8683c9a410b8125d27c713c6572",
-    "execution": "404f9f071f140c3689ea03ef9af57528dafecc0ca62c279fb660009f8bb4c9ae",
+    "execution": "21a6bea9cd688c3defcb8d450feb7ead49f892910709fca10e00fc39fd1eb936",
     "toolchain": "031137799a0b2e57592e387ee88c1ca084774b984efc988333e59348ad537ad2"
   },
   "spec": {
@@ -1256,7 +1256,7 @@
       {
         "agent": "agent",
         "id": "define",
-        "workflow": "define-build-verify@2"
+        "workflow": "define-build-verify@3"
       }
     ],
     "assessment": {
@@ -1275,7 +1275,7 @@
         "test-coverage@1"
       ]
     },
-    "description": "End-to-end define-build-verify@2 spike on forge; not citable.",
+    "description": "End-to-end define-build-verify@3 spike on forge; not citable.",
     "environment": {
       "compose_init": true,
       "type": "docker"

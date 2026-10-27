@@ -789,7 +789,7 @@
       "tree-sitter-language-pack": "0.13.0"
     }
   },
-  "document_sha256": "b820781c60e19f5d68ab13d84eee563d5c709169c022b5c21d391f0fbd432704",
+  "document_sha256": "d32a2ede1b55fd766ce45d42c5e4ec9ce86c01f06c60a327f8c60c84a821160e",
   "execution": {
     "arms": {
       "baseline": {
@@ -807,12 +807,12 @@
           "version_pin": "2.1.285",
           "workflow_skills": "placement.skills .claude/skills in the workspace /app"
         },
-        "digest": "a37f329a29d526d637cfac472d9df7d1e5c9f54f76c8227d49e24338c098a6ae",
+        "digest": "1f88c632b976c4ac1eefb9941db1c3cd330bfeefbf95466a439eaf4f76ae7853",
         "model": "claude-sonnet-4-6",
         "provider": "anthropic",
         "reasoning": "low",
         "stage_code": {
-          "build": "b51530b2b608dd2865d4b6aff9fc4b19ca2fabfdf687e131402debf4bc9447d6"
+          "build": "5a3cdd5431c23072efa2b52a121f3ec281a539ef1fa2ba9775668d968bee679f"
         },
         "tool": {
           "binary": "claude",
@@ -983,7 +983,7 @@
     "source_sha256": "d62a7f0678cf8a6dd698c570320df34c01befed3488494c5b9b2a5fc7d6d4ae1",
     "spec_sha256": "77f478eefb186427dfb34fa43c716d751f112c52dfe66e9bcd1c228afd82d68e"
   },
-  "lock_sha256": "e587ad447af91c4232c9b0915ce0bd1f674b1d2e6437858fb7de6d0ebde4c274",
+  "lock_sha256": "2640d4c8e036a02afd328cbd3ee09687146ae73185622f4c192840e3a314649c",
   "lock_version": 4,
   "overrides": {
     "flags": {},
@@ -992,7 +992,7 @@
   "sections": {
     "analysis": "144d50057229f81b6136f89cfe8df3c9cf5dbbbec9a279c66acba88e027528b3",
     "assessment": "01861739516d6425eb6f87cef6bf38393c417f4bc50fa97404b337307b21a8fc",
-    "execution": "e587ad447af91c4232c9b0915ce0bd1f674b1d2e6437858fb7de6d0ebde4c274",
+    "execution": "2640d4c8e036a02afd328cbd3ee09687146ae73185622f4c192840e3a314649c",
     "toolchain": "031137799a0b2e57592e387ee88c1ca084774b984efc988333e59348ad537ad2"
   },
   "spec": {

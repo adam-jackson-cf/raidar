@@ -25,6 +25,13 @@ The native-agent protocol owns isolation, process facts, usage normalization, fi
 resume storage and session auditing. The runner copies logs without moving the native store,
 records normalized per-turn deltas and session totals, and writes ``last-message.txt`` for
 stage consumers. Unknown usage remains unknown rather than a partial phase total.
+
+**Evidence stays host-side.** ``/logs/agent`` is mounted and the agent's user can write it, so
+the stages' records (``Checkpoint.logs_dir``) are kept in a host staging directory outside it,
+each turn's logs are copied by the host (links kept as links) after the turn, and everything is
+published into the step's agent logs (replacing whatever the agent put under ``workflow/``) only
+after the stages closed and reaped the agent's processes. ``SessionWatch`` records a named
+``integrity`` entry when an earlier copy of the native session store was rewritten.
 """
 
 from __future__ import annotations
@@ -33,10 +40,14 @@ import asyncio
 import hashlib
 import json
 import shlex
+import shutil
+import tempfile
 import time
+from collections.abc import Sequence
+from contextlib import suppress
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
-from pathlib import Path, PurePosixPath
+from pathlib import Path
 from typing import Any, cast
 
 from harbor.agents.base import BaseAgent
@@ -66,6 +77,20 @@ RECORD_FILE = "workflow.json"
 RECORD_KIND = "raidar-workflow"
 PROMPT_FILE = "prompt.txt"
 TRAJECTORY_FILE = "trajectory.json"
+CTIME_SCRIPT = """\
+import json, os, sys
+root, found = sys.argv[1], {}
+for name in sys.argv[2:]:
+    base = os.path.join(root, name)
+    if os.path.isfile(base):
+        paths = [base]
+    else:
+        paths = [os.path.join(d, f) for d, _, files in os.walk(base) for f in files]
+    for path in paths:
+        if not os.path.islink(path):
+            found[os.path.relpath(path, root)] = os.lstat(path).st_ctime_ns
+print(json.dumps(found))
+"""
 LAST_MESSAGE_FILE = "last-message.txt"
 STEP_RECORD_PREFIX = "raidar-"
 """Step-level lab records in ``/logs/agent`` (reset report, provision records): not a turn's."""
@@ -99,6 +124,7 @@ class Turn:
     agent_process: dict[str, str | None] | None = None
     session_audit: dict[str, Any] | None = None
     session_store: tuple[str, ...] = ()
+    integrity: list[dict[str, str]] = field(default_factory=list)
 
     @property
     def log_dir(self) -> str:
@@ -129,6 +155,7 @@ class Turn:
             "agent_process": self.agent_process,
             "session_audit": self.session_audit,
             "session_store": list(self.session_store),
+            "integrity": self.integrity,
         }
 
 
@@ -170,6 +197,84 @@ def _session_id(turn_dir: Path) -> str | None:
     return value if isinstance(value, str) and value else None
 
 
+class SessionWatch:
+    """Honest detection of rewrites of the native session store (the agent's user can write it).
+
+    After each turn the runner keeps a host copy and remembers each file's size, the digest of its
+    content and its ``ctime`` as the container reports it (read by the agent's user, whether or not
+    ``/logs/agent`` is mounted). At the next turn every earlier file
+    must still begin with the bytes it had (append-only), must exist, and must not have been
+    *touched* without growing: a ``ctime`` cannot be set back by the agent's user, so a write
+    followed by a restore of the same bytes shows as a changed ``ctime`` on an unchanged file.
+    What it cannot see: a rewrite that is restored within one turn of a file the native agent was
+    also appending to, and any forgery in the part of a file written during the turn itself.
+    """
+
+    def __init__(self) -> None:
+        self.seen: dict[str, tuple[int, str, int | None]] = {}
+
+    @staticmethod
+    def _files(staged: Path, store: Sequence[str]) -> list[Path]:
+        found: list[Path] = []
+        for name in store:
+            base = staged / name
+            if base.is_file() and not base.is_symlink():
+                found.append(base)
+            elif base.is_dir():
+                found += sorted(p for p in base.rglob("*") if p.is_file() and not p.is_symlink())
+        return found
+
+    def observe(
+        self,
+        staged: Path,
+        ctimes: dict[str, int] | None,
+        store: Sequence[str],
+        *,
+        grew_expected: bool,
+    ) -> list[dict[str, str]]:
+        """Violations seen in this turn's copy of the session store (and remember its state)."""
+        found: list[dict[str, str]] = []
+        current: dict[str, tuple[int, str, int | None]] = {}
+        for path in self._files(staged, store):
+            relative = path.relative_to(staged).as_posix()
+            data = path.read_bytes()
+            ctime = None if ctimes is None else ctimes.get(relative)
+            current[relative] = (len(data), hashlib.sha256(data).hexdigest(), ctime)
+            before = self.seen.get(relative)
+            if before is None:
+                continue
+            finding = self._changed(relative, data, ctime, before, grew_expected)
+            if finding is not None:
+                found.append(finding)
+        found += [
+            {"name": "session_log_removed", "detail": f"{name}: removed"}
+            for name in sorted(set(self.seen) - set(current))
+        ]
+        self.seen = current
+        return found
+
+    @staticmethod
+    def _changed(
+        relative: str,
+        data: bytes,
+        ctime: int | None,
+        before: tuple[int, str, int | None],
+        grew_expected: bool,
+    ) -> dict[str, str] | None:
+        size, digest, old = before
+        if len(data) < size or hashlib.sha256(data[:size]).hexdigest() != digest:
+            return {
+                "name": "session_log_rewritten",
+                "detail": f"{relative}: its earlier {size} bytes were rewritten",
+            }
+        if len(data) == size and grew_expected and None not in (ctime, old) and ctime != old:
+            return {
+                "name": "session_log_touched",
+                "detail": f"{relative}: written without growing (ctime changed)",
+            }
+        return None
+
+
 class WorkflowRunner(BaseAgent):
     """Runs the arm's workflow on its native agent, one turn at a time (module docstring)."""
 
@@ -202,9 +307,16 @@ class WorkflowRunner(BaseAgent):
         state = _Run()
         stages = workflow_stages(self.runner_options.definition)
         self.components: list[dict[str, str]] = []
+        self.watch = SessionWatch()
+        self.integrity: list[dict[str, str]] = []
+        self.staging = Path(tempfile.mkdtemp(prefix="raidar-workflow-"))
         timeout = self.runner_options.phase_timeout_s
         deadline = None if timeout is None else time.monotonic() + timeout
-        checkpoint = Checkpoint(environment, self.logs_dir, instruction, deadline)
+        store = cast(NativeAgent, self._inner(self.logs_dir)).session_store()
+        paths = tuple(f"{self.environment_logs_dir}/{name}" for name in store)
+        checkpoint = Checkpoint(
+            environment, self.staging, instruction, deadline, session_paths=paths
+        )
         cut: str | None = None
         try:
             await self._work(checkpoint, state, stages, instruction)
@@ -216,7 +328,22 @@ class WorkflowRunner(BaseAgent):
             raise
         finally:
             await asyncio.shield(self._close(checkpoint, stages, cut))
+            await asyncio.shield(self._lock_logs(environment))
             self._finish(context, state, stages)
+
+    async def _lock_logs(self, environment: BaseEnvironment) -> None:
+        """A non-mounted ``/logs/agent`` is downloaded by Harbor after the run, over what the
+        runner published. The agent's processes were reaped, so the records' directory in the
+        container is recreated root-owned and empty: nothing the agent left there can overwrite a
+        published record."""
+        if environment.capabilities.mounted:
+            return
+        target = shlex.quote(f"{self.environment_logs_dir}/{WORKFLOW_DIR}")
+        command = (
+            f"rm -rf {target} && mkdir {target} && chown root:root {target} && chmod 755 {target}"  # noqa: E501
+        )
+        with suppress(Exception):
+            await environment.exec(command, user="root")
 
     async def _work(
         self, checkpoint: Checkpoint, state: _Run, stages: list[Stage], instruction: str
@@ -227,11 +354,57 @@ class WorkflowRunner(BaseAgent):
             await stage.prepare(checkpoint)
         prompt = compose(stages, instruction)
         await self._turn(checkpoint, state, stages, "build", FIRST_BUILD, prompt, resume=False)
-        while (followup := await self._checks(checkpoint, stages, state.turns[-1])) is not None:
+        while True:
+            followup = await self._checks(checkpoint, stages, state.turns[-1])
+            await self._rewatch(checkpoint, state.turns[-1])
+            if followup is None:
+                break
             stage_type, resume = followup
             await self._turn(
                 checkpoint, state, stages, stage_type, resume.kind, resume.message, resume=True
             )
+
+    async def _rewatch(self, checkpoint: Checkpoint, turn: Turn) -> None:
+        """The checks ran the agent's own code after the turn (its pytest and conftest): the
+        native session store must still be exactly as the turn left it."""
+        staged = self.staging / turn.log_dir
+        environment = checkpoint.environment
+        try:
+            links = await self._copy_turn_logs(environment, turn, staged)
+            self._note_links(turn, links, f"{turn.log_dir} (after the checks)")
+        except Exception as exc:  # noqa: BLE001 - recorded on the turn
+            turn.settle_error = f"{type(exc).__name__}: {exc}"
+            return
+        ctimes = await self._remote_ctimes(environment, turn, f"{turn.log_dir} (after the checks)")
+        found = self.watch.observe(staged, ctimes, turn.session_store, grew_expected=True)
+        turn.integrity += found
+        self.integrity += [{**item, "turn": f"{turn.log_dir} (after the checks)"} for item in found]
+
+    async def _remote_ctimes(
+        self, environment: BaseEnvironment, turn: Turn, where: str
+    ) -> dict[str, int] | None:
+        """Each session-store file's ``ctime`` in the container, read by the agent's user with the
+        standard library only (the agent's user cannot set a ``ctime`` back). A read that fails is
+        a named ``session_metadata_missing`` violation: without it a write and restore of the
+        session log could not be seen, and that is never silently skipped."""
+        store = turn.session_store
+        if not store:
+            return {}
+        command = shlex.join(
+            ["python3", "-I", "-B", "-c", CTIME_SCRIPT, str(self.environment_logs_dir), *store]
+        )
+        try:
+            result = await environment.exec(command)
+            found = json.loads(result.stdout or "")
+        except (ValueError, OSError):
+            found = None
+        if not isinstance(found, dict):
+            detail = "the session store's ctimes could not be read in the container"
+            item = {"name": "session_metadata_missing", "detail": detail}
+            turn.integrity.append(item)
+            self.integrity.append({**item, "turn": where})
+            return None
+        return {str(k): int(v) for k, v in found.items()}
 
     async def _place_components(self, checkpoint: Checkpoint) -> None:
         files = skill_files(self.runner_options.definition, self.runner_options.skills_placement)
@@ -291,7 +464,9 @@ class WorkflowRunner(BaseAgent):
         state.turns.append(turn)
         turn_dir = self.logs_dir / turn.log_dir
         turn_dir.mkdir(parents=True, exist_ok=True)
-        (turn_dir / PROMPT_FILE).write_text(prompt, encoding="utf-8")
+        staged = self.staging / turn.log_dir
+        staged.mkdir(parents=True, exist_ok=True)
+        (staged / PROMPT_FILE).write_text(prompt, encoding="utf-8")
         inner = self._inner(turn_dir)
         context = AgentContext()
         send = inner.resume if resume else inner.run
@@ -322,37 +497,73 @@ class WorkflowRunner(BaseAgent):
         turn.harness_isolation = native.harness_isolation
         turn.agent_process = native.process_facts()
         turn.session_store = native.session_store()
-        turn_dir = self.logs_dir / turn.log_dir
+        turn_dir = self.staging / turn.log_dir
         try:
-            await self._copy_turn_logs(environment, turn.log_dir, turn_dir)
+            links = await self._copy_turn_logs(environment, turn, turn_dir)
+            self._note_links(turn, links, turn.log_dir)
         except Exception as exc:  # noqa: BLE001 - recorded on the turn; usage stays unknown
             turn.settle_error = f"{type(exc).__name__}: {exc}"
             return
         if context.is_empty():
-            inner.populate_context_post_run(context)
+            original, inner.logs_dir = inner.logs_dir, turn_dir  # parse the sanitized copy only
+            try:
+                inner.populate_context_post_run(context)
+            finally:
+                inner.logs_dir = original
         turn.session_id = _session_id(turn_dir)
         previous = state.previous(turn)
         if not turn.resumed or previous is not None:
             turn.tokens, turn.session_total = native.accounting(context, previous)
         turn.session_audit = native.session_audit(turn_dir)
+        ctimes = await self._remote_ctimes(environment, turn, turn.log_dir)
+        seen = self.watch.observe(
+            turn_dir, ctimes, turn.session_store, grew_expected=turn.error is None
+        )
+        turn.integrity += seen
+        self.integrity += [{**item, "turn": turn.log_dir} for item in seen]
         text = native.last_message(turn_dir)
         if text is not None:
             (turn_dir / LAST_MESSAGE_FILE).write_text(text, encoding="utf-8")
 
+    def _note_links(self, turn: Turn, links: list[str], where: str) -> None:
+        for path in links:
+            item = {"name": "source_symlink", "detail": f"{path}: a link in the agent's logs"}
+            turn.integrity.append(item)
+            self.integrity.append({**item, "turn": where})
+
     async def _copy_turn_logs(
-        self, environment: BaseEnvironment, relative: str, turn_dir: Path
-    ) -> None:
-        logs = PurePosixPath(str(self.environment_logs_dir))
-        command = (
-            f"cd {shlex.quote(str(logs))} && mkdir -p {shlex.quote(relative)} && "
-            f"find . -mindepth 1 -maxdepth 1 ! -name {WORKFLOW_DIR} "
-            f"! -name '{STEP_RECORD_PREFIX}*' -exec cp -R {{}} {shlex.quote(relative)}/ \\;"
-        )
-        result = await environment.exec(command)
-        if result.return_code != 0:
-            raise RuntimeError(f"could not copy the turn's logs: {result.stderr or result.stdout}")
+        self, environment: BaseEnvironment, turn: Turn, staged: Path
+    ) -> list[str]:
+        """Keep the turn's logs host-side, outside the mounted ``/logs/agent`` the agent writes.
+
+        The copy is made by the host and leaves out every link (an agent can plant one that points
+        at a host file, and a parser would read that file): the paths of the links left out are
+        returned, for a named ``source_symlink`` violation.
+        """
+        links: list[str] = []
+
+        def ignore(directory: str, names: list[str]) -> list[str]:
+            skipped = [n for n in names if Path(directory, n).is_symlink()]
+            links.extend(str(Path(directory, n)) for n in skipped)
+            return skipped
+
+        source = self.logs_dir
         if not environment.capabilities.mounted:
-            await environment.download_dir(str(logs / relative), turn_dir)
+            source = Path(tempfile.mkdtemp(prefix="logs-", dir=self.staging))
+            await environment.download_dir(str(self.environment_logs_dir), source)
+        for entry in sorted(source.iterdir()):
+            if entry.name == WORKFLOW_DIR or entry.name.startswith(STEP_RECORD_PREFIX):
+                continue
+            if entry.is_symlink():
+                links.append(str(entry))
+            elif entry.is_dir():
+                shutil.copytree(entry, staged / entry.name, ignore=ignore, dirs_exist_ok=True)
+            else:
+                shutil.copy2(entry, staged / entry.name)
+        own = self.logs_dir / turn.log_dir  # what the native agent itself wrote, host side
+        if own.is_dir() and not own.is_symlink():
+            shutil.copytree(own, staged, ignore=ignore, dirs_exist_ok=True)
+        return links
 
     def _record(self, state: _Run, stages: list[Stage], usage: Tokens | None) -> dict[str, Any]:
         """``workflow.json``: the stages, the turns, the phase's tokens and each stage's record."""
@@ -364,6 +575,7 @@ class WorkflowRunner(BaseAgent):
             "turns": [turn.record() for turn in state.turns],
             "tokens": usage.record() if usage else None,
             "components": self.components,
+            "integrity": self.integrity,
         }
         outputs = {stage.name: stage.record() for stage in stages}
         return {**record, **{name: value for name, value in outputs.items() if value is not None}}
@@ -377,10 +589,19 @@ class WorkflowRunner(BaseAgent):
             context.cost_usd = usage.cost_usd
         record = self._record(state, stages, usage)
         context.metadata = {**(context.metadata or {}), "workflow": record}
-        workflow_dir = self.logs_dir / WORKFLOW_DIR
+        workflow_dir = self.staging / WORKFLOW_DIR
         workflow_dir.mkdir(parents=True, exist_ok=True)
         (workflow_dir / RECORD_FILE).write_text(json.dumps(record, indent=2, sort_keys=True) + "\n")
         last = state.turns[-1] if state.turns else None
-        trajectory = self.logs_dir / last.log_dir / TRAJECTORY_FILE if last else None
+        trajectory = self.staging / last.log_dir / TRAJECTORY_FILE if last else None
+        self._publish(workflow_dir, trajectory)
+
+    def _publish(self, workflow_dir: Path, trajectory: Path | None) -> None:
+        """Put the host-kept records in the step's agent logs once the agent's processes were
+        reaped (the stages' ``close``): what the agent wrote there during the run is replaced."""
+        target = self.logs_dir / WORKFLOW_DIR
+        shutil.rmtree(target, ignore_errors=True)
+        shutil.copytree(workflow_dir, target, symlinks=True)
         if trajectory is not None and trajectory.is_file():
             (self.logs_dir / TRAJECTORY_FILE).write_bytes(trajectory.read_bytes())
+        shutil.rmtree(self.staging, ignore_errors=True)

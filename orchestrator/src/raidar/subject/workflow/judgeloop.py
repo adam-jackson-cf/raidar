@@ -8,6 +8,7 @@ criteria go back to the builder. It holds no ending: the stage does, from what i
 
 from __future__ import annotations
 
+import hashlib
 import shlex
 import shutil
 import time
@@ -22,21 +23,32 @@ from raidar.subject.workflow.definition import TOKEN, JudgeSettings
 from raidar.subject.workflow.stage import REWORK, Checkpoint, Resume
 
 SOURCES_DIR = "workflow/sources"
+SOURCE_SCRIPT = """\
+import os, sys
+root = os.path.realpath(sys.argv[1])
+path = os.path.realpath(os.path.join(root, sys.argv[2]))
+if not path.startswith(root + os.sep) or not os.path.isfile(path):
+    sys.exit(3)
+with open(path, "rb") as handle:
+    sys.stdout.buffer.write(handle.read())
+"""
+"""Reads one workspace file by raw bytes, never through a link that leaves the workspace."""
 ACCEPTED = "passed"
 
 
-def decided(gates: Sequence[dict[str, Any]], gate: dict[str, Any]) -> dict[str, Any]:
-    """The seal that decided ``gate``'s tree: itself, or the earlier one whose verdict it reused."""
-    found = next((item for item in gates if item["run"] == gate.get("reused_from")), None)
-    return found or gate
-
-
 def gate_seconds(gates: Sequence[dict[str, Any]]) -> float:
-    """How long the next gate is expected to take: the last that actually ran (not a reuse)."""
+    """How long the next gate is expected to take: the last that ran with a duration."""
     for gate in reversed(gates):
-        if gate.get("reused_from") is None and gate.get("seconds") is not None:
+        if gate.get("seconds") is not None:
             return float(gate["seconds"])
     return 0.0
+
+
+def _gate_tests(gate: dict[str, Any]) -> dict[str, Any] | None:
+    return next(
+        (c.get("tests") for c in gate.get("checks", []) if c.get("category") == "tests"),
+        None,
+    )
 
 
 class JudgeLoop:
@@ -61,7 +73,7 @@ class JudgeLoop:
         self.baseline: dict[str, Any] | None = None
         self.baseline_passed: list[str] = []
         self.seconds = 0.0
-        self.previous_tree: str | None = None
+        self.previous_files: dict[str, str] | None = None
 
     def start(self, checkpoint: Checkpoint) -> None:
         """Ready the asker, before the agent starts."""
@@ -97,13 +109,11 @@ class JudgeLoop:
             raise RuntimeError("the judge was not started before the agent")
         number = len(self.history) + 1
         started = time.monotonic()
-        seal = decided(gates, gate)
         tree = str(gate["tree"])
-        texts = await self._sources(checkpoint, tree, number)
-        tests = next(
-            (c.get("tests") for c in seal.get("checks", []) if c.get("category") == "tests"),
-            None,
-        )
+        files: dict[str, str] = gate.get("files") or {}
+        mismatched: list[str] = []
+        texts = await self._sources(checkpoint, files, mismatched, number)
+        tests = _gate_tests(gate)
         subjects = judging.subjects(self.acceptance.features, self.acceptance.ac_tests)
         contexts = [
             judging.assemble(s, tests, texts.get, self.judge.context_tokens) for s in subjects
@@ -124,16 +134,16 @@ class JudgeLoop:
                 for s, c in zip(subjects, contexts, strict=True)
             ),
         )
-        changed = await self._changed(checkpoint, tree)
+        changed = self._changed(files)
         self.history.append(result)
-        self.previous_tree = tree
+        self.previous_files = files
         self.seconds = round(time.monotonic() - started, 3)
         self.judged.append(
             {
                 "pass": number,
                 "gate": gate["run"],
                 "gate_verdict": gate["verdict"],
-                "decided_gate": seal["run"],
+                "source_mismatch": mismatched,
                 "tree": tree,
                 "sources": f"{SOURCES_DIR}/pass-{number}",
                 "seconds": self.seconds,
@@ -157,9 +167,11 @@ class JudgeLoop:
         return Resume(TOKEN.sub(lambda found: values[found[1]], self.rework_prompt), REWORK)
 
     async def _sources(
-        self, checkpoint: Checkpoint, tree: str, number: int
+        self, checkpoint: Checkpoint, files: dict[str, str], mismatched: list[str], number: int
     ) -> dict[str, str | None]:
-        """The mapped tests' files at ``tree``, kept host-side under ``workflow/sources``."""
+        """The mapped tests' files, read as raw bytes from the work tree the seal judged (the
+        agent's processes were reaped and the file's digest must be the seal's), kept host-side
+        under ``workflow/sources``."""
         found: dict[str, str | None] = {}
         root = checkpoint.logs_dir / SOURCES_DIR
         final = root / "final"
@@ -168,34 +180,32 @@ class JudgeLoop:
             path = judging.normalise_test_id(name)
             found[path] = None
             parts = PurePosixPath(path).parts
-            if not path or PurePosixPath(path).is_absolute() or ".." in parts:
+            if not path or PurePosixPath(path).is_absolute() or ".." in parts or path not in files:
                 continue
             shown = await checkpoint.environment.exec(
-                f"cd {shlex.quote(self.workspace)} && "
-                f"git -c safe.directory=* show {shlex.quote(f'{tree}:{path}')}",
-                user="root",
+                f"python3 -I -B -c {shlex.quote(SOURCE_SCRIPT)} "
+                f"{shlex.quote(self.workspace)} {shlex.quote(path)}",
+                user=None,
             )
             if shown.return_code != 0:
                 continue
-            found[path] = shown.stdout or ""
+            text = shown.stdout or ""
+            if files[path].split(":", 1)[1] != hashlib.sha256(text.encode()).hexdigest():
+                mismatched.append(path)
+                continue
+            found[path] = text
             for target in (root / f"pass-{number}" / path, final / path):
                 target.parent.mkdir(parents=True, exist_ok=True)
-                target.write_text(found[path] or "", encoding="utf-8")
+                target.write_text(text, encoding="utf-8")
         self.acceptance.sources = f"{SOURCES_DIR}/final"
         return found
 
-    async def _changed(self, checkpoint: Checkpoint, tree: str) -> list[str] | None:
-        """The files that differ between the previous judged tree and ``tree`` (None: unknown)."""
-        if self.previous_tree is None:
+    def _changed(self, files: dict[str, str]) -> list[str] | None:
+        """The files that differ from the previous judged work tree (None: unknown)."""
+        if self.previous_files is None:
             return None
-        shown = await checkpoint.environment.exec(
-            f"cd {shlex.quote(self.workspace)} && git -c safe.directory=* diff --name-only "
-            f"{shlex.quote(self.previous_tree)} {shlex.quote(tree)}",
-            user="root",
-        )
-        if shown.return_code != 0:
-            return None
-        return [line for line in (shown.stdout or "").splitlines() if line]
+        before = self.previous_files
+        return sorted(p for p in {*before, *files} if before.get(p) != files.get(p))
 
     def record(self) -> dict[str, Any]:
         """The judge's part of the stage record."""
