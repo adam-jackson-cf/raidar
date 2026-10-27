@@ -180,17 +180,19 @@ def _problems(
         manifest = store.load_manifest(problem)
         if manifest.digest() != locked[index]["digest"]:
             raise PlanError(f"problems.{index}: {entry.ref} changed since the lock; relock")
+        steps = tuple(s.name for s in manifest.steps)[: entry.checkpoints]
+        if len(steps) != locked[index]["checkpoints"]:
+            raise PlanError(
+                f"problems.{index}: the binding selects {len(steps)} checkpoint(s) but the lock "
+                f"pins {locked[index]['checkpoints']}; relock"
+            )
         references = _lock_field(lock, "execution", "references").get("problem", {})
         pinned = ((references.get(entry.ref) or {}).get("metadata") or {}).get("errata")
         try:
             errata = store.pinned_errata(problem, manifest, pinned)
         except ProblemStoreError as exc:
             raise PlanError(f"problems.{index}: {exc}") from exc
-        targets.append(
-            ProblemTarget(
-                index, problem, manifest.digest(), tuple(s.name for s in manifest.steps), errata
-            )
-        )
+        targets.append(ProblemTarget(index, problem, manifest.digest(), steps, errata))
     return tuple(targets)
 
 
@@ -248,10 +250,20 @@ def _check_options(loaded: LoadedExperiment, options: PlanOptions) -> None:
     bad_attempts = sorted(b for b in options.attempts if not 0 <= b < spec.analysis.attempts)
     if unknown_arms or bad_attempts:
         raise PlanError(f"unknown arms {unknown_arms} or attempts {bad_attempts} in the selection")
-    if options.max_checkpoints is not None and options.max_checkpoints < 1:
-        raise PlanError("max_checkpoints must be >= 1")
+    _check_checkpoint_limit(spec.kind, options.max_checkpoints)
     if options.concurrency is not None and options.concurrency < 1:
         raise PlanError("concurrency must be >= 1")
+
+
+def _check_checkpoint_limit(kind: str, max_checkpoints: int | None) -> None:
+    if max_checkpoints is not None:
+        if kind != "smoke":
+            raise PlanError(
+                f"max_checkpoints is a smoke/dev option; a {kind} experiment binds its "
+                "checkpoints with `checkpoints:` on the problem and locks them"
+            )
+        if max_checkpoints < 1:
+            raise PlanError("max_checkpoints must be >= 1")
 
 
 def build_plan(

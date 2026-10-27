@@ -413,6 +413,7 @@ The rule is therefore attribution by control run, from `stage-stop-failure-opus.
   | `make stage-check NAME=x [REPLAY=<trial>]` | Schema, contracts, digest and closure; runs the fixtures offline in the pack container as the agent's user; prints the release line |
   | `make stage-list` | Every package, its latest release and digest |
   | `make stage-info NAME=x` | The expanded manifest: commands, triggers, outputs, resolved params, closure |
+  | `make workflow-new NAME=x [FROM=one-shot-verify]` | Copies a shipped workflow as a starting point; the default template is `one-shot-verify` |
 
   `releases-check` and `structure-check` are extended to cover packages.
 - **Trust (C4, accepted for the first version, documented).**
@@ -432,10 +433,17 @@ lab/stages/
   verify/       Python gate: ruff, mypy, pytest (pytest kind), skills test-per-aspect, pytest-templates
   docs-check/   the smallest example and the stage-new template: one pinned tool as a gate check
 lab/workflows/
-  one-shot/              build frame only (default)
+  one-shot/              build frame only (the default workflow of an arm that names none)
   one-shot-verify/       build + verify (max_fix_rounds 0)
   define-build-verify/   build (acceptance-reply/1) + define + verify + jev-judge/1
 ```
+
+**Verify is optional; `one-shot-verify` is the default template (user decision A, 2026-10-27).**
+- **Build is a frame** because a run can't exist without a prompt.
+- **Verify is a method choice.** "Does a gate help?" is an experiment, its tools are runtime-specific, and the hidden tests and code-quality scoring measure the outcome either way.
+- **No default-on verify.** A default-on verify would silently make every unmarked arm a gated arm, and `one-shot` would stop being the agent as shipped. So `one-shot` stays the default workflow.
+- **Authors start from verify.** `make workflow-new` copies `one-shot-verify` unless told otherwise, so authors begin with verify included and remove it if they don't want it.
+- **`raidar/verify` is maintained** and released by Raidar like any shipped package.
 
 **Authoring tiers** (counts are estimates from the design sessions):
 1. **Tweak.** Change a build prompt or a package param in `workflow.yaml`: one file, about 2 concepts.
@@ -494,8 +502,11 @@ lab/workflows/
 - **Solved checkpoint, unreached checkpoint and grader failures:** as agreed (unchanged).
 - **Primary outcome: the solvable-set solve rate** (section 3.2). The raw SCB outcome is reported beside it. Errata are a pre-registered option only.
 - **Wilson 95% intervals** for single-arm solve rates (FXL `evaluation/analysis/stats.py:35`).
-- **`process-compliance` stops being a scorer.** Its metrics become health readings.
-- **`gate-effort` becomes `verification-effort@1`.** It reads the gate records, and is `not_applicable` without a `gate/1` package.
+- **`process-compliance` stops being a scorer** (phase 6). Its metrics are about the agent's behaviour, not about verify, so they become health readings.
+- **`gate-effort` becomes `verification-effort@1`** (phase 5). It answers the same questions: fix rounds, blocking findings, clean at step end, and the cost of fix turns. It reads `gate/1` records, and is `not_applicable` without a `gate/1` package.
+  - Today `gate-effort@11` reads `guardrail-gate` records that nothing has written since phase 2.
+- **Pre-fix grading is kept** (phase 5). The hidden tests grade the tree as it was before each fix turn, to show what fix rounds bought. `gate/1` saves that tree before each fix turn; today the seal records only its digest. It applies only when `max_fix_rounds` > 0.
+  - It replaces `grading/prefix`'s reading of `guardrail-gate@3` snapshots.
 - **`definition-coverage@1` and `test-coverage@1`** (FXL's offline audit, stages A and B) run host-side at assessment time.
   - They read `criteria/1` outputs and `ac_tests`.
   - They are uncalibrated **readings** until they are validated against labels (FXL `docs/design/jev-review.md`).
@@ -559,9 +570,9 @@ Migration, in order:
 | 2 | One-shot cutover | Agents, workflows, releases, runner, `one-shot@1`, seeding, lock and admission identity; treatment catalogue deleted | Done 2026-10-26 (`b55b6eb`) |
 | S | Workflow spike (mechanics; not a test of which method is better) | S1 isolation and parity; S2 verify; S3 define; S4 define-build-verify + judge + coverage scorers; S5 agent protocol + `claude-code@1`; S6 record-only seals, agent-user checks, validity rows W1–W11 | S1 `7e5c834`; S2 `155f4f7`; S3 `30a066b`, `0dbe2cf`, `c544323`; S4 `e245949`, `6b11515`; S5 `7c827d7`; S6 `b99048e`. Quality on S6: 2,324 passed, 95.30%. 21 Docker attack regressions pass. Smokes `s6-verify-record-02` and `s6-define-record-02` valid. Judge repeatability: 4.96% (test 2). Claude live runs blocked on Anthropic credit. Warm start at concurrency 3: p95 5.10 s against a 5 s budget |
 | 3 | Problems (Need 1) | Task text from `checkpoint_N.md`; spec hash per checkpoint; solvable sets and nondeterminism at validation; solvable-set primary outcome; bulk import and validate; `checkpoints: k` binding; runtime-pack contract page; forge removed as a default | AT-N1 (below) |
-| 4 | Package contract and primitives (Need 2 core) | Contract page first: manifest keys, call protocol, statuses, `criteria/1`. Generic package stage; `frame/1`, `install/1`, `setup/1`, `gate/1` (package checks, `pytest` kind, canary rule including the `gate_error` fix), `stop/1`, `outputs/1`; offline wheel install; registry `stages:`; `stage-tree/1`; lock `packages`/`primitive_code`; ST1–ST7; `stage-new`, `stage-lock`, `stage-check`, `stage-list`, `stage-info`; `DRAFT=1`; decision on the hook broker | Contract tests for each primitive; AT3, AT4 |
-| 5 | Port the shipped stages | `verify` package, then `define` (tool moved out of `orchestrator/src`), then `docs-check`; `acceptance-reply/1` and `jev-judge/1` read `criteria/1`; delete `StageType`, the `Define`/`Verify` classes, `factory.py` wiring, `stages.py` inventories and the spike settings models; new releases; relock | AT1, AT2 |
-| 6 | Health | Full outcome table (section 6) first; health becomes the sole validity producer; L registry; generic W and S families; provider failures classified without retry; per-arm exclusion report; delete `process-compliance` | A forced provider failure is excluded, not retried; each table row covered by a test |
+| 4 | Package contract and primitives (Need 2 core) | Contract page first (`lab/stages/README.md`): manifest keys, call protocol, statuses, `criteria/1`. Generic package stage; `frame/1`, `install/1`, `setup/1`, `gate/1` (package checks, `pytest` kind, canary rule including the `gate_error` fix, pre-fix tree snapshots), `stop/1`, `outputs/1`; offline wheel install; registry `stages:`; `stage-tree/1`; lock `packages`/`primitive_code`; ST1–ST7; `stage-new`, `stage-lock`, `stage-check`, `stage-list`, `stage-info`, `workflow-new`; `DRAFT=1`; decision on the hook broker | Contract tests for each primitive; AT3, AT4; `make security-gate` |
+| 5 | Port the shipped stages | `verify` package, then `define` (tool moved out of `orchestrator/src`), then `docs-check`; `acceptance-reply/1` and `jev-judge/1` read `criteria/1`; `verification-effort@1` and pre-fix grading on `gate/1` records (replacing `gate-effort`, `grading/prefix` and their analysis and review consumers); delete `StageType`, the `Define`/`Verify` classes, `factory.py` wiring, `stages.py` inventories and the spike settings models; new releases; relock | AT1, AT2 (including `verification-effort@1` read from the smoke); `make security-gate` |
+| 6 | Health | Full outcome table (section 6) first; health becomes the sole validity producer; L registry; generic W and S families; provider failures classified without retry; per-arm exclusion report; `process-compliance` metrics become health readings, and the scorer is deleted | A forced provider failure is excluded, not retried; each table row covered by a test |
 | 7 | Image split | Toolchain image; per-agent CLI layer keyed by agent hash; stage-tool layer keyed by package digest | `make perf-gate` within budget, including warm start at concurrency 3 |
 | 8 | Clean slate | Scorers and metrics to `@1`; formats to 1; archive tags; Wilson intervals; ledger migration (section 8); clear `var/` | Fresh smokes on every experiment; ledger check passes with no run data |
 | 9 | Lab validation | Range audit; margins; A/A and degraded controls; discrimination reading | A/A not `improved`/`worse`; degraded detected `worse`; readings in every report |

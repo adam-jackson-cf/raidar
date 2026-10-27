@@ -31,7 +31,7 @@ from raidar.design.problem.content import content_digest, hidden_content_in_task
 from raidar.design.problem.importer import ProblemDriftError, import_problem
 from raidar.design.problem.models import ProblemId, ProblemManifest, ProblemMode
 from raidar.design.problem.resolver import ProblemResolver, resolver_factory
-from raidar.design.problem.rewrite import VERIFIER_IMPORT_PATH
+from raidar.design.problem.rewrite import VERIFIER_IMPORT_PATH, RewriteError, render_spec
 from raidar.design.problem.source import SourceError
 from raidar.design.problem.store import (
     ROOT_ENV,
@@ -148,6 +148,34 @@ def test_import_splits_the_converted_task_into_agent_task_bundle_and_references(
 
 # sha256 of task/tests/test.sh in every problem registered since 2026-09-30.
 RELEASED_STUB_TEST_SH_SHA256 = "ebd7fd24b020b73cd159d980ff998a6200dbf3ca941b847123e8d7bcc65f82f0"
+
+
+def test_imported_specs_are_the_pinned_upstream_specs_with_only_the_entrypoint_tokens_replaced(
+    scb: tuple[ProblemStore, Path, str],
+) -> None:
+    store, repo, commit = scb
+    result = import_problem(store, _ref(commit), source_checkout=repo)
+    manifest = result.manifest
+    assert manifest.entry_command == "uv run --project /app app.py"
+    assert manifest.lock_metadata()["entry_command"] == manifest.entry_command
+    for step in manifest.steps:
+        upstream = (repo / "adder" / f"{step.name}.md").read_bytes().decode()
+        expected = upstream.replace("%%%ENTRYPOINT:entry_command%%%", manifest.entry_command)
+        expected = expected.replace("%%%ENTRYPOINT:entry_file%%%", "app.py")
+        rendered = (
+            result.content_dir / "task" / "steps" / step.name / "instruction.md"
+        ).read_bytes()
+        assert rendered == expected.encode()
+        assert step.instruction_sha256 == hashlib.sha256(expected.encode()).hexdigest()
+
+
+def test_a_spec_token_the_problem_does_not_define_is_refused() -> None:
+    assert (
+        render_spec("run %%%ENTRYPOINT:other%%%", entry_command="c", entry_file="f.py")
+        == "run %%%ENTRYPOINT:other%%%"
+    )
+    with pytest.raises(RewriteError, match="does not define"):
+        render_spec("run %%%ENTRYPOINT:entry_file%%%", entry_command="c", entry_file=None)
 
 
 def test_imported_task_stub_keeps_the_bytes_bound_by_registered_pins(

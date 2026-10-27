@@ -77,7 +77,11 @@ class ProblemResolver:
                 metadata=manifest.lock_metadata(),
                 binding={**binding, "validated": False, "validation_issue": str(exc)},
             )
-        metadata = {**manifest.lock_metadata(), "validation": validation.lock_metadata()}
+        metadata = {
+            **manifest.lock_metadata(),
+            "validation": validation.lock_metadata(),
+            "solvable": validation.solvable_lock(),
+        }
         if errata is not None:
             metadata["errata"] = errata.lock_metadata()
         return ResolvedReference(

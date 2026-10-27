@@ -7,9 +7,9 @@ which a Metric defines as higher-better (F15).
 
 ``primary_metric`` names the experiment's primary outcome (memo §2.3,
 §10.1): the lock's pre-registered ``analysis.primary_outcome`` when it sets
-one, else the checkpoint-solve rate (solved / K, the memo's ``C_r``) under
-``continue`` progression and the strict ``reached`` count under
-``halt_on_failure``. The score component C that the headline metric weighs is
+one, else the solvable-set solve rate (checkpoints whose every solvable case passes, / K).
+The raw SCB outcome is always reported beside it (``RAW_COUNTERPART``).
+The score component C that the headline metric weighs is
 a different quantity (``correctness``: the mean per-checkpoint case pass rate,
 the SCB fork's ``C_p``) and is reported as its own metric.
 """
@@ -75,13 +75,19 @@ CORRECTNESS_METRIC = "correctness"
 SOLVE_RATE = "solve_rate"
 REACHED = "reached"
 FINAL_SOLVED = "final_solved"
-# Errata-applied solve outcomes (``correctness@2`` ``*_errata`` metrics): the same rules
+# Errata-applied solve outcomes (``correctness@3`` ``*_errata`` metrics): the same rules
 # over the cases the problem's pinned errata keeps. Primary only when the experiment
 # pre-registers one (``analysis.primary_outcome``), and then always reported beside its
 # raw counterpart (``RAW_COUNTERPART``); ``not_applicable`` for a problem without an errata.
 SOLVE_RATE_ERRATA = "solve_rate_errata"
 REACHED_ERRATA = "reached_errata"
 FINAL_SOLVED_ERRATA = "final_solved_errata"
+# Solvable-set solve outcomes (``correctness@3`` ``*_solvable`` metrics): the same rules over
+# the cases the reference solution passes in every validation repeat. The default primary;
+# ``unavailable`` (never zero) for a problem whose lock pins no solvable set.
+SOLVE_RATE_SOLVABLE = "solve_rate_solvable"
+REACHED_SOLVABLE = "reached_solvable"
+FINAL_SOLVED_SOLVABLE = "final_solved_solvable"
 QUALITY_COMPONENTS = {
     "verbosity": "V",
     "erosion": "E",
@@ -147,6 +153,28 @@ OUTCOME_METRICS: tuple[MetricDef, ...] = (
         "Final checkpoint solved under errata (errata-applied)",
         View.CONTINUE,
         declared_direction(CORRECTNESS, "solved_errata"),
+        0.25,
+        Kind.BINARY,
+    ),
+    MetricDef(
+        SOLVE_RATE_SOLVABLE,
+        "Checkpoint solve rate over the solvable set (primary; the raw SCB grade is beside it)",
+        View.CONTINUE,
+        declared_direction(CORRECTNESS, "solved_checkpoints_solvable"),
+        0.125,
+    ),
+    MetricDef(
+        REACHED_SOLVABLE,
+        "Checkpoints reached over the solvable set (strict)",
+        View.STRICT,
+        declared_direction(CORRECTNESS, REACHED_SOLVABLE),
+        1.0,
+    ),
+    MetricDef(
+        FINAL_SOLVED_SOLVABLE,
+        "Final checkpoint solved over the solvable set",
+        View.CONTINUE,
+        declared_direction(CORRECTNESS, "solved_solvable"),
         0.25,
         Kind.BINARY,
     ),
@@ -438,23 +466,24 @@ COST_METRICS = ("total_cost_usd", "total_tokens", "total_turns", "total_agent_wa
 
 
 RAW_COUNTERPART = {
+    SOLVE_RATE_SOLVABLE: SOLVE_RATE,
+    REACHED_SOLVABLE: REACHED,
+    FINAL_SOLVED_SOLVABLE: FINAL_SOLVED,
     SOLVE_RATE_ERRATA: SOLVE_RATE,
     REACHED_ERRATA: REACHED,
     FINAL_SOLVED_ERRATA: FINAL_SOLVED,
 }
-"""The raw SCB outcome an errata-applied primary is always reported beside."""
+"""The raw SCB outcome a solvable-set or errata-applied primary is always reported beside."""
 PRIMARY_FROM_LOCK = "lock (analysis.primary_outcome)"
 PRIMARY_DEFAULT = "default for {progression} progression"
 
 
 def primary_metric(progression: str, configured: str | None = None) -> str:
-    """The primary outcome: the pre-registered one, else the progression's (memo §2.3, §10.1)."""
+    """The pre-registered primary outcome, else the solvable-set solve rate."""
     if configured is not None:
         return outcome_metric(configured).id
-    if progression == "continue":
-        return SOLVE_RATE
-    if progression == "halt_on_failure":
-        return REACHED
+    if progression in ("continue", "halt_on_failure"):
+        return SOLVE_RATE_SOLVABLE
     raise ValueError(f"no primary outcome is defined for progression {progression!r}")
 
 

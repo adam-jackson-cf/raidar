@@ -26,8 +26,10 @@ from raidar.design.problem.models import (
 )
 from raidar.design.problem.rewrite import (
     build_bundle,
+    checkpoint_specs,
     converted_steps,
     copy_references,
+    grader_entry_command,
     render_task,
     select_steps,
 )
@@ -114,6 +116,7 @@ def _manifest(
         bundle_sha256=content_digest(content / "oracle"),
         references_sha256=content_digest(content / "references"),
         entry_file=materialised.bundle.manifest.entry_file,
+        entry_command=grader_entry_command(materialised.bundle),
     )
 
 
@@ -146,7 +149,7 @@ def _materialise(
     converted_sha256 = content_digest(converted)
     steps = select_steps(converted_steps(converted), problem.checkpoint)
     content = staging / "content"
-    render_task(converted, content / "task", problem=problem, steps=steps, pack=pack)
+    entry_file = problem_entry_file(checkout, problem, pack)
     bundle = build_bundle(
         converted,
         content / "oracle",
@@ -158,8 +161,13 @@ def _materialise(
             "commit": checkout.pin.commit,
             "problem": problem.problem,
         },
-        entry_file=problem_entry_file(checkout, problem, pack),
+        entry_file=entry_file,
     )
+    entry_command = grader_entry_command(bundle)
+    specs = checkpoint_specs(
+        checkout.root / problem.problem, steps, entry_command=entry_command, entry_file=entry_file
+    )
+    render_task(converted, content / "task", problem=problem, steps=steps, pack=pack, specs=specs)
     copy_references(converted, content / "references", steps)
     leaked = hidden_content_in_task(content / "task", bundle)
     if leaked:

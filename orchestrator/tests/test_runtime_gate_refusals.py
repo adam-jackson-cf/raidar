@@ -65,7 +65,7 @@ def _resolvers(
             WorkflowResolver(),
             InMemoryResolver(
                 RefKind.SCORER,
-                {"correctness@2": {"exact": True}, "code-quality@4": {"exact": True}},
+                {"correctness@3": {"exact": True}, "code-quality@4": {"exact": True}},
                 bindings={"code-quality@4": {"runtimes": ["python"]}, **(scorers or {})},
             ),
             MetricResolver(),
@@ -204,7 +204,7 @@ def test_rt2_a_binding_of_another_pack_contract_is_stale(experiment: Path) -> No
 def test_rt4_scorers_and_the_metric_must_cover_the_runtime(tmp_path: Path) -> None:
     document = experiment_document(id="node-ts__fixture__test", runtime="node-ts")
     document["problems"] = [{"ref": FORGE_NODE}]
-    document["assessment"] = {"scorers": ["correctness@2", "code-quality@4"]}
+    document["assessment"] = {"scorers": ["correctness@3", "code-quality@4"]}
     path = write_experiment(tmp_path, document)
 
     issues = _issues(path, pack_loader=_node_pack)
@@ -326,7 +326,7 @@ def _job(root: Path, runtime: str, bundle_digest: str) -> Path:
         {
             "lock_version": LOCK_VERSION,
             "experiment": {"id": "e"},
-            "spec": {"runtime": runtime, "assessment": {"scorers": ["correctness@2"]}},
+            "spec": {"runtime": runtime, "assessment": {"scorers": ["correctness@3"]}},
             "execution": {
                 "references": {
                     "problem": {
@@ -373,7 +373,7 @@ def test_as1_rescore_scorers_must_cover_the_jobs_runtime(tmp_path: Path) -> None
         "--store",
         str(store),
         "--scorer",
-        "correctness@2",
+        "correctness@3",
     )
 
     assert refused.exit_code != 0
@@ -411,7 +411,7 @@ def test_as1_a_bundle_override_must_be_the_verifier_bundle_the_lock_binds(
     target = job / "trials" if mode == "--rescore" else job
     lock = ["--lock", str(job / "job.lock.json")]
     store = (
-        ["--store", str(tmp_path / "s"), "--scorer", "correctness@2"] if mode == "--rescore" else []
+        ["--store", str(tmp_path / "s"), "--scorer", "correctness@3"] if mode == "--rescore" else []
     )
 
     refused = _assess(mode, str(target), *lock, *store, "--bundle", str(other.root))

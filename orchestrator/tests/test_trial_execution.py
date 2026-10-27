@@ -171,7 +171,7 @@ def _plan(tmp_path: Path, fixture: ImportedFixture, **changes: Any) -> Any:
         fixture.ref,
         environment={"compose_init": False},
         assessment={
-            "scorers": ["correctness@2"],
+            "scorers": ["correctness@3"],
             "inventory_policy": {"generated_globs": ["gen/**"]},
         },
         **changes,
@@ -342,6 +342,7 @@ def test_a_lost_target_marks_the_trial_and_aborts_the_job_before_the_next_trial(
     loaded, lock, _ = locked_experiment(
         tmp_path / "exp",
         fixture_problem.ref,
+        kind="smoke",
         environment={"compose_init": False},
         analysis={"baseline_arm": "baseline", "attempts": 2, "seed": 1, "concurrency": 1},
     )
@@ -415,6 +416,7 @@ def test_a_trial_that_raises_is_recorded_as_infra_and_the_run_completes(
     loaded, lock, _ = locked_experiment(
         tmp_path / "exp",
         fixture_problem.ref,
+        kind="smoke",
         environment={"compose_init": False},
         analysis={"baseline_arm": "baseline", "attempts": 2, "seed": 1, "concurrency": 2},
     )
@@ -472,7 +474,7 @@ def test_verifier_override_carries_reference_solutions_only_then(
     monkeypatch.setenv(ROOT_ENV, str(fixture_problem.store.root))
     monkeypatch.setattr("raidar.engine.trial.materialise.image_present", lambda tag: False)
     loaded, lock, _ = locked_experiment(
-        tmp_path / "exp", fixture_problem.ref, environment={"compose_init": False}
+        tmp_path / "exp", fixture_problem.ref, kind="smoke", environment={"compose_init": False}
     )
     plan = build_plan(
         loaded,

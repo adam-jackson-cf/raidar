@@ -2,19 +2,27 @@
 
 For each step k (checkpoint k):
 
-- ``reference_k_passes_1..k``: reference solution k passes every graded case;
+- ``solvable_set``: the cases reference solution k passes in *every* repeat,
+  regression cases from earlier checkpoints included, form the step's solvable
+  set (the benchmark-neutral reading of factory-x-loops
+  ``evaluation/analysis/solving.py`` at ac5db0f). Cases whose outcome differs
+  across repeats (or is absent from a repeat) are nondeterministic and left
+  out. A step with an empty set is ``excluded``. The check fails only when *no*
+  step has a solvable case: a partly solvable problem stays usable, and its
+  per-step sets are what the lock pins;
 - ``reference_k-1_fails_k``: reference k-1 (the empty starter for the first
   step and for a one-shot problem) fails at least one case;
-- ``repeat_identical_{positive,negative}``: every repeat gives identical
-  per-case outcomes and group counts;
+- ``repeat_identical_{positive,negative}``: positive repeats are compared case
+  by case (differences are listed as nondeterministic cases, not failures);
+  negative repeats must give identical per-case outcomes and group counts;
 - ``native_parity_{positive,negative}``: SCB's native runner grades the same
   snapshots case by case like the Raidar verifier (``not_run`` when skipped).
 
-A step "passes" under the strict all-cases rule. An infrastructure failure (no
-verifier record, a grader infra code, no native evaluation) is never a pass or a
-fail: the check it touches is ``infra_error`` and, unless another check found
-a real defect, the verdict is ``infra_failure`` - evidence is missing, so the
-problem is neither validated nor excluded.
+An infrastructure failure (no verifier record, a grader infra code, no native
+evaluation) is never a pass or a fail: the check it touches is ``infra_error``
+and, unless another check found a real defect, the verdict is
+``infra_failure`` - evidence is missing, so the problem is neither validated
+nor excluded.
 
 Verdict precedence: any ``fail`` -> ``excluded``; else any ``infra_error`` ->
 ``infra_failure``; else any ``not_run`` -> ``validated_partial`` (the report
@@ -28,6 +36,7 @@ errata (``raidar.design.problem.errata``) is the policy response.
 
 from __future__ import annotations
 
+import hashlib
 import json
 from collections.abc import Mapping, Sequence
 from dataclasses import asdict, dataclass, field
@@ -35,7 +44,9 @@ from decimal import Decimal
 from enum import StrEnum
 from pathlib import Path
 
+from raidar.contract.canonical import digest_json
 from raidar.grading.models import CaseGroup, CaseStatus, VerifierGrade
+from raidar.grading.solvable import case_key
 from raidar.scoring.framework.metrics import (
     DEFAULT_METRIC_REGISTRY,
     checkpoint_pass_rate,
@@ -82,10 +93,7 @@ class Grade:
 
     @classmethod
     def from_verifier(cls, grade: VerifierGrade, source: str = "oracle") -> Grade:
-        outcomes = {
-            f"{case.checkpoint_origin}::{case.id.split('::', 1)[-1]}": case.status.value
-            for case in grade.cases
-        }
+        outcomes = {case_key(case): case.status.value for case in grade.cases}
         groups = {
             group.value: (count.passed, count.total)
             for group, count in grade.group_counts().items()
@@ -174,19 +182,107 @@ def _check(name: str, failures: list[str], infra: list[str]) -> Check:
     return Check(name, status, tuple(failures + infra))
 
 
-def check_expectation(name: str, runs: Sequence[StepGrades], *, expect_pass: bool) -> Check:
+def check_reference_fails(name: str, runs: Sequence[StepGrades]) -> Check:
     failures: list[str] = []
     infra: list[str] = []
     for index, grades in enumerate(runs):
         for step, grade in grades.items():
             if not grade.has_verdict:
                 infra.append(_no_verdict(f"repeat {index} {step}", grade))
-            elif grade.all_pass != expect_pass:
-                expected = "all pass" if expect_pass else "at least one failure"
+            elif grade.all_pass:
                 failures.append(
-                    f"repeat {index} {step}: {grade.passed}/{grade.total} (expected {expected})"
+                    f"repeat {index} {step}: {grade.passed}/{grade.total} "
+                    "(expected at least one failure)"
                 )
     return _check(name, failures, infra)
+
+
+@dataclass(frozen=True)
+class StepSolvable:
+    """One step's solvable set: cases passed in every repeat, and the cases that varied."""
+
+    step: str
+    verdict: Verdict
+    solvable: tuple[str, ...] = ()
+    nondeterministic: tuple[str, ...] = ()
+
+    @property
+    def digest(self) -> str:
+        return solvable_digest(self.solvable)
+
+    def to_json(self) -> dict[str, object]:
+        return {
+            "verdict": self.verdict.value,
+            "solvable": list(self.solvable),
+            "size": len(self.solvable),
+            "digest": self.digest,
+            "nondeterministic": list(self.nondeterministic),
+            "nondeterministic_count": len(self.nondeterministic),
+        }
+
+
+def solvable_digest(cases: Sequence[str]) -> str:
+    """Digest of the exact sorted case-id set (``origin::case`` ids)."""
+    return hashlib.sha256(json.dumps(sorted(cases), separators=(",", ":")).encode()).hexdigest()
+
+
+def _step_solvable(step: str, grades: Sequence[Grade | None]) -> StepSolvable:
+    if not grades or any(grade is None or not grade.has_verdict for grade in grades):
+        return StepSolvable(step, Verdict.INFRA_FAILURE)
+    usable = [grade for grade in grades if grade is not None]
+    solvable, varying = _case_sets(usable)
+    verdict = Verdict.VALIDATED if solvable else Verdict.EXCLUDED
+    return StepSolvable(step, verdict, solvable, varying)
+
+
+def _case_sets(grades: Sequence[Grade]) -> tuple[tuple[str, ...], tuple[str, ...]]:
+    solvable: list[str] = []
+    varying: list[str] = []
+    for case in sorted({key for grade in grades for key in grade.outcomes}):
+        statuses = {grade.outcomes.get(case) for grade in grades}
+        if len(statuses) > 1:
+            varying.append(case)
+        elif statuses == {CaseStatus.PASSED.value}:
+            solvable.append(case)
+    return tuple(solvable), tuple(varying)
+
+
+def solvable_sets(runs: Sequence[StepGrades]) -> dict[str, StepSolvable]:
+    """Per-step solvable sets from the positive-reference repeats, in step order."""
+    steps = list(dict.fromkeys(step for grades in runs for step in grades))
+    return {step: _step_solvable(step, [grades.get(step) for grades in runs]) for step in steps}
+
+
+def check_solvable(name: str, runs: Sequence[StepGrades]) -> Check:
+    sets = solvable_sets(runs)
+    infra = [
+        f"{step}: no verdict in every repeat"
+        for step, one in sets.items()
+        if one.verdict is Verdict.INFRA_FAILURE
+    ]
+    empty = [f"{step}: empty solvable set" for step, one in sets.items() if not one.solvable]
+    nothing = not any(one.solvable for one in sets.values())
+    if infra:
+        return _check(name, [], infra)
+    return _check(name, empty if nothing else [], [])
+
+
+def check_positive_repeats(name: str, runs: Sequence[StepGrades]) -> Check:
+    """Repeat evidence for the positive reference; differing cases are listed, not failed."""
+    if len(runs) < 2:
+        return Check(name, CheckStatus.NOT_RUN, ("needs at least 2 repeats",))
+    sets = solvable_sets(runs)
+    infra = [
+        f"{step}: no verdict in every repeat"
+        for step, one in sets.items()
+        if one.verdict is Verdict.INFRA_FAILURE
+    ]
+    notes = [
+        f"{step}: {len(one.nondeterministic)} nondeterministic"
+        for step, one in sets.items()
+        if one.nondeterministic
+    ]
+    return Check(name, CheckStatus.INFRA if infra else CheckStatus.PASS, tuple(infra + notes))
 
 
 def check_determinism(name: str, runs: Sequence[StepGrades]) -> Check:
@@ -241,9 +337,9 @@ class ValidationRuns:
 
 def run_checks(runs: ValidationRuns) -> list[Check]:
     checks = [
-        check_expectation("reference_k_passes_1..k", runs.oracle[POSITIVE], expect_pass=True),
-        check_expectation("reference_k-1_fails_k", runs.oracle[NEGATIVE], expect_pass=False),
-        check_determinism("repeat_identical_positive", runs.oracle[POSITIVE]),
+        check_solvable("solvable_set", runs.oracle[POSITIVE]),
+        check_reference_fails("reference_k-1_fails_k", runs.oracle[NEGATIVE]),
+        check_positive_repeats("repeat_identical_positive", runs.oracle[POSITIVE]),
         check_determinism("repeat_identical_negative", runs.oracle[NEGATIVE]),
     ]
     for variant in VARIANTS:
@@ -315,6 +411,18 @@ def _compact(grades: StepGrades) -> dict[str, object]:
     return {step: grade.compact() for step, grade in grades.items()}
 
 
+def _grades_json(runs: ValidationRuns) -> dict[str, object]:
+    oracle = {
+        variant: [_compact(run) for run in repeats] for variant, repeats in runs.oracle.items()
+    }
+    native = (
+        {variant: _compact(grades) for variant, grades in runs.native.items()}
+        if runs.native is not None
+        else None
+    )
+    return {"oracle": oracle, "native": native}
+
+
 @dataclass
 class ValidationReport:
     problem: str
@@ -333,14 +441,6 @@ class ValidationReport:
         return verdict(self.checks)
 
     def to_json(self) -> dict[str, object]:
-        oracle = {
-            variant: [_compact(run) for run in runs] for variant, runs in self.runs.oracle.items()
-        }
-        native = (
-            {variant: _compact(grades) for variant, grades in self.runs.native.items()}
-            if self.runs.native is not None
-            else None
-        )
         return {
             "kind": "raidar-problem-validation",
             "schema_version": 1,
@@ -356,7 +456,11 @@ class ValidationReport:
                 {"name": c.name, "status": c.status.value, "detail": list(c.detail)}
                 for c in self.checks
             ],
-            "grades": {"oracle": oracle, "native": native},
+            "grades": _grades_json(self.runs),
+            "solvable": {
+                step: one.to_json()
+                for step, one in solvable_sets(self.runs.oracle[POSITIVE]).items()
+            },
             "headline_policy": policy_preview(self.runs.oracle[POSITIVE][0], len(self.steps)),
             "environment": self.environment,
             "group_order": [group.value for group in CaseGroup],
@@ -379,6 +483,7 @@ class ValidationRecord:
     verdict: Verdict
     manifest_sha256: str
     not_run: tuple[str, ...]
+    solvable: Mapping[str, StepSolvableRecord] = field(default_factory=dict)
 
     @property
     def missing_required(self) -> tuple[str, ...]:
@@ -400,6 +505,52 @@ class ValidationRecord:
         """
         return {"verdict": self.verdict.value, "not_run": list(self.not_run)}
 
+    def solvable_lock(self) -> dict[str, object]:
+        """The solvable sets the lock pins: ``{"sha256", "steps": {step: [sorted case ids]}}``.
+
+        A step with an empty set maps to ``[]`` (its metric is ``unavailable``,
+        never zero); a step the record has no evidence for is absent.
+        """
+        steps = {step: list(one.cases) for step, one in sorted(self.solvable.items())}
+        return {"sha256": digest_json(steps), "steps": steps}
+
+    def solvable_cases(self, step: str) -> tuple[str, ...] | None:
+        """The step's exact sorted solvable set; ``None`` when none is usable (absent or empty)."""
+        one = self.solvable.get(step)
+        return one.cases if one is not None and one.cases else None
+
+    def solvable_size(self, step: str) -> int:
+        return len(self.solvable[step].cases) if step in self.solvable else 0
+
+    def nondeterministic_count(self, step: str) -> int:
+        return self.solvable[step].nondeterministic_count if step in self.solvable else 0
+
+
+@dataclass(frozen=True)
+class StepSolvableRecord:
+    """A step's recorded solvable set as read back from the committed report."""
+
+    verdict: Verdict
+    cases: tuple[str, ...]
+    digest: str
+    nondeterministic_count: int
+
+
+def _read_solvable(data: object) -> dict[str, StepSolvableRecord]:
+    records: dict[str, StepSolvableRecord] = {}
+    for step, raw in (data if isinstance(data, Mapping) else {}).items():
+        cases = tuple(sorted(str(case) for case in raw["solvable"]))
+        digest = str(raw["digest"])
+        if digest != solvable_digest(cases):
+            raise ValueError(f"solvable digest of step {step} does not match its cases")
+        records[str(step)] = StepSolvableRecord(
+            verdict=Verdict(raw["verdict"]),
+            cases=cases,
+            digest=digest,
+            nondeterministic_count=int(raw["nondeterministic_count"]),
+        )
+    return records
+
 
 def read_validation_record(path: Path) -> ValidationRecord:
     try:
@@ -408,6 +559,7 @@ def read_validation_record(path: Path) -> ValidationRecord:
             verdict=Verdict(data["verdict"]),
             manifest_sha256=str(data["manifest_sha256"]),
             not_run=tuple(str(name) for name in data.get("not_run", ())),
+            solvable=_read_solvable(data.get("solvable")),
         )
     except FileNotFoundError as exc:
         raise ValidationRecordError(f"no validation report at {path}") from exc

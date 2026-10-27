@@ -6,16 +6,20 @@
 reads, so scoring a run uses exactly the locked assessor settings.
 
 The protocol the trials ran under reaches the scorers that read it: every
-``protocol_config`` key a scorer's registration declares (``correctness@2``:
+``protocol_config`` key a scorer's registration declares (``correctness@3``:
 ``progression``) is set from ``protocol``. The spec already rejects an
 explicit scorer config that contradicts the protocol. Problem facts
 (``entry_file``) are not written here: they travel with each trial's oracle
 bundle, so a run over several problems still scores each with its own.
 
 Problem errata the lock pins (``execution.references.problem.<ref>.metadata.errata``)
-reach every scorer whose registration takes them (``correctness@2``) as config
+reach every scorer whose registration takes them (``correctness@3``) as config
 key ``errata``, ``{problem ref: ErrataRef}``. A lock that pins no errata adds no
 key, so its config, and the Assessment keys derived from it, are unchanged.
+
+The solvable sets the lock pins (``...metadata.solvable``, from the validation record)
+reach the scorers whose registration takes them the same way, as config key
+``solvable``, ``{problem ref: SolvableRef}``.
 """
 
 from __future__ import annotations
@@ -29,7 +33,12 @@ import yaml
 from raidar.design.experiment.schema import AssessmentSpec, ProtocolSpec
 from raidar.design.problem.errata import errata_ref_from_metadata
 from raidar.grading.errata import ErrataRef
-from raidar.scoring.catalog.builtin import ERRATA_CONFIG_KEY, default_scorer_registry
+from raidar.grading.solvable import SolvableRef, solvable_ref_from_metadata
+from raidar.scoring.catalog.builtin import (
+    ERRATA_CONFIG_KEY,
+    SOLVABLE_CONFIG_KEY,
+    default_scorer_registry,
+)
 from raidar.scoring.framework.inventory import InventoryPolicy
 from raidar.scoring.framework.registry import ScorerRegistry
 from raidar.scoring.framework.rescore_config import RescoreConfig
@@ -54,21 +63,50 @@ def lock_errata(lock: Mapping[str, Any]) -> dict[str, ErrataRef]:
     return pinned
 
 
+ProblemSolvable = Mapping[str, SolvableRef]
+"""``{problem ref: SolvableRef}``: the solvable sets a lock pins, per problem."""
+
+
+def lock_solvable(lock: Mapping[str, Any]) -> dict[str, SolvableRef]:
+    """The solvable sets a lock pins for each of its problems (problems without are absent)."""
+    execution = lock.get("execution")
+    references = execution.get("references") if isinstance(execution, Mapping) else None
+    problems = references.get("problem") if isinstance(references, Mapping) else None
+    pinned: dict[str, SolvableRef] = {}
+    for ref, record in sorted((problems or {}).items()):
+        solvable = solvable_ref_from_metadata(record.get("metadata"))
+        if solvable is not None:
+            pinned[ref] = solvable
+    return pinned
+
+
+def _pinned_configs(errata: ProblemErrata, solvable: ProblemSolvable) -> dict[str, object]:
+    return {
+        ERRATA_CONFIG_KEY: {key: value.model_dump(mode="json") for key, value in errata.items()},
+        SOLVABLE_CONFIG_KEY: {
+            key: value.model_dump(mode="json") for key, value in solvable.items()
+        },
+    }
+
+
 def _scorer_configs(
     assessment: AssessmentSpec,
     protocol: ProtocolSpec,
     registry: ScorerRegistry,
     errata: ProblemErrata,
+    solvable: ProblemSolvable,
 ) -> dict[str, dict[str, object]]:
     settings = protocol.model_dump(mode="json")
     configs: dict[str, dict[str, object]] = {}
+    pinned = _pinned_configs(errata, solvable)
     for ref in assessment.scorers:
         registration = registry.get(ref)
         from_protocol = {name: settings[name] for name in registration.protocol_config}
-        pinned = {key: value.model_dump(mode="json") for key, value in errata.items()}
-        from_lock: dict[str, object] = (
-            {ERRATA_CONFIG_KEY: pinned} if registration.errata_config and pinned else {}
-        )
+        enabled = {
+            ERRATA_CONFIG_KEY: registration.errata_config,
+            SOLVABLE_CONFIG_KEY: registration.solvable_config,
+        }
+        from_lock = {key: value for key, value in pinned.items() if enabled[key] and value}
         explicit = dict(assessment.scorer_config.get(ref, {}))
         if from_protocol or from_lock or explicit:
             configs[ref] = {**from_protocol, **explicit, **from_lock}
@@ -80,6 +118,7 @@ def rescore_config(
     protocol: ProtocolSpec,
     registry: ScorerRegistry | None = None,
     errata: ProblemErrata | None = None,
+    solvable: ProblemSolvable | None = None,
 ) -> RescoreConfig:
     policy = assessment.inventory_policy
     return RescoreConfig(
@@ -87,7 +126,11 @@ def rescore_config(
             generated_globs=policy.generated_globs, test_globs=policy.test_globs
         ),
         scorers=_scorer_configs(
-            assessment, protocol, registry or default_scorer_registry(), errata or {}
+            assessment,
+            protocol,
+            registry or default_scorer_registry(),
+            errata or {},
+            solvable or {},
         ),
     )
 
@@ -110,6 +153,7 @@ def lock_rescore_config(
         ProtocolSpec.model_validate(spec.get("protocol") or {}),
         registry,
         lock_errata(lock),
+        lock_solvable(lock),
     )
 
 
@@ -118,8 +162,11 @@ def write_assessment_config(
     protocol: ProtocolSpec,
     job_dir: Path,
     errata: ProblemErrata | None = None,
+    solvable: ProblemSolvable | None = None,
 ) -> Path:
     path = job_dir / ASSESSMENT_CONFIG_FILE
-    document = rescore_config(assessment, protocol, errata=errata).model_dump(mode="json")
+    document = rescore_config(assessment, protocol, errata=errata, solvable=solvable).model_dump(
+        mode="json"
+    )
     path.write_text(yaml.safe_dump(document, sort_keys=True))
     return path

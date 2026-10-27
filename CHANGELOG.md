@@ -6,6 +6,25 @@ All notable changes to this project are documented in this file.
 
 ### Features
 
+- Problem onboarding from one pinned SCB source through `problem-list`/`problem-info`,
+  bulk `problem-import SOURCE=… PROBLEMS=all|a,b,c`, and target-bounded parallel
+  `problem-validate PROBLEMS=… REPEATS=3`. Generated pins require no per-problem source file.
+- Task instructions now preserve each upstream checkpoint spec byte-for-byte except its
+  two entrypoint substitutions, including canaries; pins record the grader entry command
+  and `instruction_sha256` remains the rendered per-checkpoint spec hash.
+- Repeated reference validation records per-step solvable sets and their digests,
+  nondeterministic cases and excluded empty sets, including regression cases.
+- `correctness@3` adds lock-pinned solvable-set solve metrics. The solvable-set checkpoint
+  solve rate is the default primary outcome with raw SCB beside it; missing/empty sets are
+  unavailable, never zero. Errata remain an explicit pre-registered primary-outcome option.
+- Problem bindings accept `checkpoints: k` for a locked first-k multi-step task;
+  `MAX_CHECKPOINTS` is refused outside smoke experiments.
+- `lab/environments/README.md` states the six-capability runtime-pack contract. Python is
+  the only implemented runtime; forge remains historical spike evidence, not a default.
+- AT-N1 smoke definition binds generated dag_execution and log_query pins, with
+  dag_execution's first two checkpoints, on one-shot/codex/gpt-6-luna/low; execution requires
+  user approval.
+
 - `make releases-check` refuses a removed or re-hashed release: the register is append-only
   against the merge base with `main` (or `HEAD`'s parent on `main`; `RELEASES_BASE` overrides).
   CI checks out full history for it.
@@ -47,6 +66,9 @@ All notable changes to this project are documented in this file.
 
 ### Fixes
 
+- Reference validation uses the canonical grader's offline dependency handling instead
+  of rejecting every reference with a requirements file.
+- A halt cannot turn a missing or empty planned solvable set into a measured zero rate.
 - Read startup sandbox environment names with Docker inspect instead of running Python inside
   the container; workflow-owned `.claude` skills are excluded from graded snapshots.
 - Final seals always rerun checks and fingerprint the checked workspace, including ignored

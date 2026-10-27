@@ -2,7 +2,7 @@
   "checks": [
     {
       "detail": [],
-      "name": "reference_k_passes_1..k",
+      "name": "solvable_set",
       "status": "pass"
     },
     {
@@ -21,83 +21,31 @@
       "status": "pass"
     },
     {
-      "detail": [],
+      "detail": [
+        "native runner not run"
+      ],
       "name": "native_parity_positive",
-      "status": "pass"
+      "status": "not_run"
     },
     {
-      "detail": [],
+      "detail": [
+        "native runner not run"
+      ],
       "name": "native_parity_negative",
-      "status": "pass"
+      "status": "not_run"
     }
   ],
-  "engine": "harbor",
+  "engine": "direct",
   "environment": {
-    "docker_context": "orbstack",
-    "engine": "harbor",
-    "grader_image": "raidar-oracle-grader:466e21c75a524af1",
+    "docker_context": "raidar-mbp",
+    "engine": "direct",
+    "grader_environment_id": "sha256:874d2b90b9adadca5aae0958053763e32c961f56990fcb952b2ed02a015ef9bf",
+    "grader_image": "raidar-oracle-grader:76fabb7fb4f407d7",
     "harbor": "0.23.0",
-    "native_runner": {
-      "commit": "25069ba83cdaf7abcf08acb4cf6e2b024e66d109",
-      "dirty": false
-    },
     "pack_image": "raidar/pack-python:2b91a52663e099f2"
   },
   "grades": {
-    "native": {
-      "negative": {
-        "checkpoint_1": {
-          "all_pass": false,
-          "groups": {
-            "core": [
-              0,
-              9
-            ],
-            "error": [
-              0,
-              12
-            ],
-            "functionality": [
-              0,
-              15
-            ],
-            "regression": [
-              0,
-              0
-            ]
-          },
-          "infra_failure": null,
-          "passed": 0,
-          "total": 36
-        }
-      },
-      "positive": {
-        "checkpoint_1": {
-          "all_pass": true,
-          "groups": {
-            "core": [
-              9,
-              9
-            ],
-            "error": [
-              12,
-              12
-            ],
-            "functionality": [
-              15,
-              15
-            ],
-            "regression": [
-              0,
-              0
-            ]
-          },
-          "infra_failure": null,
-          "passed": 36,
-          "total": 36
-        }
-      }
-    },
+    "native": null,
     "oracle": {
       "negative": [
         {
@@ -300,12 +248,62 @@
     "selection": "default_by_k"
   },
   "kind": "raidar-problem-validation",
-  "manifest_sha256": "e2859eb9dd3804a99afb92aff8ac348b760c0b3aa05f7feb2384f95a8e582402",
+  "manifest_sha256": "b089b0d32cbd563738e38880a044074583791709cabd4b40c9b84cca0795a243",
   "mode": "one_shot",
-  "not_run": [],
+  "not_run": [
+    "native_parity_positive",
+    "native_parity_negative"
+  ],
   "problem": "scb/circuit_eval.checkpoint_1@38d627ecf668",
   "repeats": 3,
   "schema_version": 1,
+  "solvable": {
+    "checkpoint_1": {
+      "digest": "2728c9e58acc69909612816d628f6c5014a65b0c292179d64849ddcde9800979",
+      "nondeterministic": [],
+      "nondeterministic_count": 0,
+      "size": 36,
+      "solvable": [
+        "checkpoint_1::test_check_accepts_all_operators",
+        "checkpoint_1::test_check_arity_errors[arity_and_too_few-a-AND(a)]",
+        "checkpoint_1::test_check_arity_errors[arity_buf_too_many-a b-BUF(a, b)]",
+        "checkpoint_1::test_check_arity_errors[arity_nand_too_few-a-NAND(a)]",
+        "checkpoint_1::test_check_arity_errors[arity_nor_too_few-a-NOR(a)]",
+        "checkpoint_1::test_check_arity_errors[arity_not_too_many-a-NOT(a, a)]",
+        "checkpoint_1::test_check_arity_errors[arity_or_too_few-a-OR(a)]",
+        "checkpoint_1::test_check_arity_errors[arity_xnor_too_few-a-XNOR(a)]",
+        "checkpoint_1::test_check_arity_errors[arity_xor_too_few-a-XOR(a)]",
+        "checkpoint_1::test_check_comparator_2bit_circuit",
+        "checkpoint_1::test_check_cycle_error_message",
+        "checkpoint_1::test_check_decoder_circuit",
+        "checkpoint_1::test_check_file_not_found",
+        "checkpoint_1::test_check_identifiers_are_case_sensitive",
+        "checkpoint_1::test_check_majority_vote_circuit",
+        "checkpoint_1::test_check_parity_generator_circuit",
+        "checkpoint_1::test_check_parse_errors_have_location[bad_syntax-            input a b\\n            output y\\n            y = AND(a, b\\n            ]",
+        "checkpoint_1::test_check_parse_errors_have_location[brackets-            input a[0]\\n            output y\\n            y = a\\n            ]",
+        "checkpoint_1::test_check_parse_errors_have_location[literal_x-            input a\\n            output y\\n            y = X\\n            ]",
+        "checkpoint_1::test_check_shared_scalar_circuit",
+        "checkpoint_1::test_check_valid_circuit_reports_interface",
+        "checkpoint_1::test_check_validation_errors[declaration_after_assignment-            input a\\n            output y\\n            y = a\\n            wire t1\\n            t1 = a\\n            -DeclarationAfterAssignmentError]",
+        "checkpoint_1::test_check_validation_errors[duplicate_name-            input a a\\n            output y\\n            y = a\\n            -DuplicateNameError]",
+        "checkpoint_1::test_check_validation_errors[duplicate_name_across_lines-            input a\\n            input a\\n            output y\\n            y = a\\n            -DuplicateNameError]",
+        "checkpoint_1::test_check_validation_errors[input_assignment-            input a\\n            output y\\n            y = a\\n            a = 1\\n            -InputAssignmentError]",
+        "checkpoint_1::test_check_validation_errors[multiple_assignment-            input a\\n            output y\\n            y = a\\n            y = NOT(a)\\n            -MultipleAssignmentError]",
+        "checkpoint_1::test_check_validation_errors[unassigned_signal-            input a\\n            output y\\n            -UnassignedSignalError]",
+        "checkpoint_1::test_check_validation_errors[unassigned_wire-            input a\\n            output y\\n            wire t1\\n            y = a\\n            -UnassignedSignalError]",
+        "checkpoint_1::test_check_validation_errors[undeclared_lhs-            input a\\n            output y\\n            t1 = a\\n            y = a\\n            -UndefinedNameError]",
+        "checkpoint_1::test_check_validation_errors[undefined_name-            input a\\n            output y\\n            y = z\\n            -UndefinedNameError]",
+        "checkpoint_1::test_cli_unknown_command",
+        "checkpoint_1::test_cli_usage_error_no_args",
+        "checkpoint_1::test_cli_usage_error_without_command",
+        "checkpoint_1::test_help_ignores_json_flag",
+        "checkpoint_1::test_version_json",
+        "checkpoint_1::test_version_plain_text"
+      ],
+      "verdict": "validated"
+    }
+  },
   "spec_determinacy": {
     "assertions": {
       "audited": 2,
@@ -316,11 +314,7 @@
     },
     "audit_version": 1,
     "dynamic": {
-      "environment": {
-        "docker_context": "orbstack",
-        "grader_environment_id": "sha256:874d2b90b9adadca5aae0958053763e32c961f56990fcb952b2ed02a015ef9bf",
-        "grader_image": "raidar-oracle-grader:76fabb7fb4f407d7"
-      },
+      "environment": {},
       "reason": null,
       "status": "ran"
     },
@@ -388,5 +382,5 @@
   "steps": [
     "checkpoint_1"
   ],
-  "verdict": "validated"
+  "verdict": "validated_partial"
 }

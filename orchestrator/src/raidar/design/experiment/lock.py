@@ -303,13 +303,34 @@ class _LockBuilder:
         resolved = self.resolve(f"{loc}.ref", RefKind.PROBLEM, entry.ref or "")
         if resolved is None:
             return None
-        reported = resolved.metadata.get("checkpoints")
+        selected = self.problem_checkpoints(loc, entry, resolved.metadata)
+        if selected is None:
+            return None
+        return {"label": entry.label, "checkpoints": selected, "digest": resolved.digest}
+
+    def problem_checkpoints(
+        self, loc: str, entry: ProblemEntry, metadata: Mapping[str, Any]
+    ) -> int | None:
+        reported = metadata.get("checkpoints")
         if not isinstance(reported, int) or isinstance(reported, bool) or reported < 1:
             self.issues.append(
                 FieldIssue(f"{loc}.ref", "problem resolver must report integer checkpoints >= 1")
             )
             return None
-        return {"label": entry.label, "checkpoints": reported, "digest": resolved.digest}
+        selected = reported
+        if entry.checkpoints is not None:
+            if entry.checkpoints > reported or metadata.get("mode") == "one_shot":
+                self.issues.append(
+                    FieldIssue(
+                        f"{loc}.checkpoints",
+                        f"cannot take the first {entry.checkpoints} checkpoint(s) of "
+                        f"{entry.ref}, which has {reported}; select within a multi-checkpoint "
+                        "reference (scb/<problem>@<version>)",
+                    )
+                )
+            else:
+                selected = entry.checkpoints
+        return selected
 
     def metric(self, problems: list[dict[str, object]]) -> dict[str, object] | None:
         loc = "assessment.metric"

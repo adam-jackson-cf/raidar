@@ -191,9 +191,10 @@ def analyze(
         raise click.ClickException(str(exc)) from exc
     output.mkdir(parents=True, exist_ok=True)
     payload = report.model_dump(mode="json")
-    if payload.get("errata") is None:
-        # A lock without problem errata writes the report exactly as before errata existed.
-        payload.pop("errata", None)
+    for optional in ("errata", "solvable"):
+        # A lock without problem errata or solvable sets writes the report without the key.
+        if payload.get(optional) is None:
+            payload.pop(optional, None)
     (output / REPORT_JSON).write_bytes(pretty_canonical_json_bytes(payload))
     (output / REPORT_MARKDOWN).write_text(render_markdown(report))
     if report.dev_job is not None:

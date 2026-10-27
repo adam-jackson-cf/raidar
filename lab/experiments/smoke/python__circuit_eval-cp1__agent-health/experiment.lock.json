@@ -41,11 +41,11 @@
         }
       },
       "scorer": {
-        "correctness@2": {
-          "digest": "68531aa409b69db20e03c15653e9242b2f3c9e3018d9cb65fd3c0eb04caa110d",
+        "correctness@3": {
+          "digest": "783e4d08507c82f779b672b7013edb1dd436d5886015fd62cb7e6941dc814189",
           "metadata": {
             "implementation": "raidar.scoring.correctness:correctness_scorer",
-            "implementation_digest": "5e7cc7f393c68c08a25041296cb217ff3f697d9bc7d2c704a54eff238af2c602",
+            "implementation_digest": "35bc4fa9231dfaed1d7ae3f0d99a56fc09998ec42adb9275f7d27c6289a4379f",
             "manifest": {
               "description": "Oracle verdicts per checkpoint and trajectory, from the oracle step records.",
               "evidence_required": [
@@ -197,13 +197,49 @@
                   "tier": "deterministic",
                   "type": "count",
                   "unit": null
+                },
+                {
+                  "description": "Solvable-set solve: every case in the checkpoint's solvable set (the cases the reference passes in every validation repeat) passed; unavailable without a solvable set, never zero.",
+                  "direction": "higher_better",
+                  "exactness": "native",
+                  "id": "solved_solvable",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "boolean",
+                  "unit": null
+                },
+                {
+                  "description": "Solvable-set solved checkpoints in the trajectory (continue view).",
+                  "direction": "higher_better",
+                  "exactness": "native",
+                  "id": "solved_checkpoints_solvable",
+                  "inputs": [],
+                  "level": "trajectory",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "count",
+                  "unit": null
+                },
+                {
+                  "description": "Solvable-set consecutive checkpoints solved from the first (strict view).",
+                  "direction": "higher_better",
+                  "exactness": "native",
+                  "id": "reached_solvable",
+                  "inputs": [],
+                  "level": "trajectory",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "count",
+                  "unit": null
                 }
               ],
               "runtimes": [
                 "*"
               ],
               "tools": [],
-              "version": "2"
+              "version": "3"
             },
             "tool_lock": {}
           }
@@ -218,12 +254,12 @@
       "metric": "scb-canonical-oneshot@1",
       "scorer_config": {},
       "scorers": [
-        "correctness@2"
+        "correctness@3"
       ]
     },
     "tools": {}
   },
-  "document_sha256": "c2ab4b10a92881adb6dc0f61a2fed4ec633d7bafacda403f29050d65dca19963",
+  "document_sha256": "14c5d459055bcf40d119606f1b4cf7e02121d44340e53e57882d3b8e0e8b2133",
   "execution": {
     "arms": {
       "baseline": {
@@ -300,7 +336,7 @@
     "problems": [
       {
         "checkpoints": 1,
-        "digest": "e2859eb9dd3804a99afb92aff8ac348b760c0b3aa05f7feb2384f95a8e582402",
+        "digest": "b089b0d32cbd563738e38880a044074583791709cabd4b40c9b84cca0795a243",
         "label": "scb/circuit_eval.checkpoint_1@38d627ecf668"
       }
     ],
@@ -327,13 +363,57 @@
       },
       "problem": {
         "scb/circuit_eval.checkpoint_1@38d627ecf668": {
-          "digest": "e2859eb9dd3804a99afb92aff8ac348b760c0b3aa05f7feb2384f95a8e582402",
+          "digest": "b089b0d32cbd563738e38880a044074583791709cabd4b40c9b84cca0795a243",
           "metadata": {
-            "bundle_sha256": "f21fe219a120a77f882162e0844e4a550e371cc505d9b1f7824882e685d16fc9",
+            "bundle_sha256": "568bed1216bcb149bad2ca7ce0af1ee66164b4ff6f22a9fffebc9addfcd297b8",
             "checkpoints": 1,
+            "entry_command": "uv run --project /app circopt.py",
             "entry_file": "circopt.py",
             "mode": "one_shot",
             "pack_image": "raidar/pack-python:2b91a52663e099f2",
+            "solvable": {
+              "sha256": "6b273d0cfa751e986bbd9314179295cd98ddfd110e151692495a17aac3125a03",
+              "steps": {
+                "checkpoint_1": [
+                  "checkpoint_1::test_check_accepts_all_operators",
+                  "checkpoint_1::test_check_arity_errors[arity_and_too_few-a-AND(a)]",
+                  "checkpoint_1::test_check_arity_errors[arity_buf_too_many-a b-BUF(a, b)]",
+                  "checkpoint_1::test_check_arity_errors[arity_nand_too_few-a-NAND(a)]",
+                  "checkpoint_1::test_check_arity_errors[arity_nor_too_few-a-NOR(a)]",
+                  "checkpoint_1::test_check_arity_errors[arity_not_too_many-a-NOT(a, a)]",
+                  "checkpoint_1::test_check_arity_errors[arity_or_too_few-a-OR(a)]",
+                  "checkpoint_1::test_check_arity_errors[arity_xnor_too_few-a-XNOR(a)]",
+                  "checkpoint_1::test_check_arity_errors[arity_xor_too_few-a-XOR(a)]",
+                  "checkpoint_1::test_check_comparator_2bit_circuit",
+                  "checkpoint_1::test_check_cycle_error_message",
+                  "checkpoint_1::test_check_decoder_circuit",
+                  "checkpoint_1::test_check_file_not_found",
+                  "checkpoint_1::test_check_identifiers_are_case_sensitive",
+                  "checkpoint_1::test_check_majority_vote_circuit",
+                  "checkpoint_1::test_check_parity_generator_circuit",
+                  "checkpoint_1::test_check_parse_errors_have_location[bad_syntax-            input a b\\n            output y\\n            y = AND(a, b\\n            ]",
+                  "checkpoint_1::test_check_parse_errors_have_location[brackets-            input a[0]\\n            output y\\n            y = a\\n            ]",
+                  "checkpoint_1::test_check_parse_errors_have_location[literal_x-            input a\\n            output y\\n            y = X\\n            ]",
+                  "checkpoint_1::test_check_shared_scalar_circuit",
+                  "checkpoint_1::test_check_valid_circuit_reports_interface",
+                  "checkpoint_1::test_check_validation_errors[declaration_after_assignment-            input a\\n            output y\\n            y = a\\n            wire t1\\n            t1 = a\\n            -DeclarationAfterAssignmentError]",
+                  "checkpoint_1::test_check_validation_errors[duplicate_name-            input a a\\n            output y\\n            y = a\\n            -DuplicateNameError]",
+                  "checkpoint_1::test_check_validation_errors[duplicate_name_across_lines-            input a\\n            input a\\n            output y\\n            y = a\\n            -DuplicateNameError]",
+                  "checkpoint_1::test_check_validation_errors[input_assignment-            input a\\n            output y\\n            y = a\\n            a = 1\\n            -InputAssignmentError]",
+                  "checkpoint_1::test_check_validation_errors[multiple_assignment-            input a\\n            output y\\n            y = a\\n            y = NOT(a)\\n            -MultipleAssignmentError]",
+                  "checkpoint_1::test_check_validation_errors[unassigned_signal-            input a\\n            output y\\n            -UnassignedSignalError]",
+                  "checkpoint_1::test_check_validation_errors[unassigned_wire-            input a\\n            output y\\n            wire t1\\n            y = a\\n            -UnassignedSignalError]",
+                  "checkpoint_1::test_check_validation_errors[undeclared_lhs-            input a\\n            output y\\n            t1 = a\\n            y = a\\n            -UndefinedNameError]",
+                  "checkpoint_1::test_check_validation_errors[undefined_name-            input a\\n            output y\\n            y = z\\n            -UndefinedNameError]",
+                  "checkpoint_1::test_cli_unknown_command",
+                  "checkpoint_1::test_cli_usage_error_no_args",
+                  "checkpoint_1::test_cli_usage_error_without_command",
+                  "checkpoint_1::test_help_ignores_json_flag",
+                  "checkpoint_1::test_version_json",
+                  "checkpoint_1::test_version_plain_text"
+                ]
+              }
+            },
             "source": {
               "commit": "38d627ecf668a88f88f8d260f8df8df6116e9b03",
               "dataset": "scb",
@@ -343,10 +423,13 @@
             "steps": [
               "checkpoint_1"
             ],
-            "task_sha256": "96ec208ea91b81ed25b3703cd63f3da045bb80ca2a25b526b12c307bc6a3213d",
+            "task_sha256": "0cdda12fb5a2c68270f63581682b7f7e94a0cc8be0641a0ab1b78142cf278938",
             "validation": {
-              "not_run": [],
-              "verdict": "validated"
+              "not_run": [
+                "native_parity_positive",
+                "native_parity_negative"
+              ],
+              "verdict": "validated_partial"
             }
           }
         }
@@ -376,10 +459,10 @@
   "experiment": {
     "id": "python__circuit_eval-cp1__agent-health",
     "source": "experiment.yaml",
-    "source_sha256": "97f0ea73c35ff625bc72fe24daab96961588f61dd73d465e06fb373fd48be707",
-    "spec_sha256": "f6c24db7609d79d5bbb23527532d8d8d2340008be9e1d688e9aa5989d2c15826"
+    "source_sha256": "4cee1f0ce503f07e836926f6bafe125678b400565aa32dbf1e6b45f47b5f34fa",
+    "spec_sha256": "6837e587e40058931dd0ac9541e244e14aaa165d17dec9c4dc9816ca404ac2b0"
   },
-  "lock_sha256": "beeb66d4dc46294f2e40d4f59d2bca1f9109e94d8db6a9fc0a2e235301992e2b",
+  "lock_sha256": "261e6ddfff2af691b69f9a6473717d8a009297709177ac1c92ab60d3fe2e3e82",
   "lock_version": 4,
   "overrides": {
     "flags": {},
@@ -387,9 +470,9 @@
   },
   "sections": {
     "analysis": "144d50057229f81b6136f89cfe8df3c9cf5dbbbec9a279c66acba88e027528b3",
-    "assessment": "d27dfc32efbc8ff7278cc713dd7e99d3aed5d66e5f511a12e8212c6a2934e5db",
-    "execution": "beeb66d4dc46294f2e40d4f59d2bca1f9109e94d8db6a9fc0a2e235301992e2b",
-    "toolchain": "031137799a0b2e57592e387ee88c1ca084774b984efc988333e59348ad537ad2"
+    "assessment": "254c011fa52bf25d276f59fbf7fff6750515e8ed3a90abad92527c00042e2051",
+    "execution": "261e6ddfff2af691b69f9a6473717d8a009297709177ac1c92ab60d3fe2e3e82",
+    "toolchain": "b6ef977873154c13b7d03140ffd4cfff64d0cfa32430af9f4e52db26e2a729cc"
   },
   "spec": {
     "agents": [
@@ -425,7 +508,7 @@
       "metric": "scb-canonical-oneshot@1",
       "scorer_config": {},
       "scorers": [
-        "correctness@2"
+        "correctness@3"
       ]
     },
     "description": "Operational smoke of the experiment path; not citable.",
@@ -455,6 +538,6 @@
     "litellm": "1.102.1",
     "python": "3.13.7",
     "raidar": "0.15.0",
-    "raidar_spec": "a2e76b4c89de726028669f1a332105b4fcf96701bb438257b5463b8bf8a99c8e"
+    "raidar_spec": "63c73e76c83bcd5b4d8ea9bdb59dfbc83a46710312177fd6f814fc2d149a7aad"
   }
 }
