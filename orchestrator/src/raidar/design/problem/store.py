@@ -195,7 +195,7 @@ class ProblemStore:
     def write_manifest(self, manifest: ProblemManifest) -> Path:
         path = self.manifest_path(manifest.problem_id)
         path.parent.mkdir(parents=True, exist_ok=True)
-        omit = {"entry_file"} if manifest.entry_file is None else None
+        omit = {name for name in ("entry_file", "entry_command") if getattr(manifest, name) is None}
         path.write_text(manifest.model_dump_json(indent=2, exclude=omit) + "\n")
         return path
 

@@ -180,7 +180,7 @@ def test_validate_command_exits_nonzero_with_field_errors(tmp_path: Path) -> Non
         ({"problems": [{"ref": "scb/forge@abc123", "path": "tasks/forge"}]}, "problems.0"),
         ({"problems": [{"ref": "scb/forge@abc123"}] * 2}, "problems.1"),
         ({"protocol": {"min_reward": 0.5}}, "protocol"),
-        ({"assessment": {"scorers": ["correctness@2", "correctness@2"]}}, "assessment.scorers.1"),
+        ({"assessment": {"scorers": ["correctness@3", "correctness@3"]}}, "assessment.scorers.1"),
     ],
     ids=["problem-two-sources", "duplicate-problem", "min-reward-in-continue", "dup-scorer"],
 )

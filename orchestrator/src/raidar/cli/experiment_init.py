@@ -49,7 +49,7 @@ arms:
     workflow: {workflow}      # point this at the workflow release under test
 
 assessment:
-  scorers: [correctness@2, code-quality@4, resource-usage@2]
+  scorers: [correctness@3, code-quality@4, resource-usage@2]
 
 analysis:
   baseline_arm: baseline

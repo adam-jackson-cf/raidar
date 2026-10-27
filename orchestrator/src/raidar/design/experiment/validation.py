@@ -30,7 +30,11 @@ from raidar.design.experiment.schema import (
     RESERVED_KINDS,
     ExperimentSpec,
 )
-from raidar.scoring.catalog.builtin import BUILTIN_PROTOCOL_CONFIG
+from raidar.scoring.catalog.builtin import (
+    BUILTIN_PROTOCOL_CONFIG,
+    ERRATA_CONFIG_KEY,
+    SOLVABLE_CONFIG_KEY,
+)
 from raidar.scoring.catalog.outcomes import ALL_METRICS, OUTCOME_METRICS
 from raidar.scoring.framework.metrics import DEFAULT_METRIC_REGISTRY, MetricRegistry
 from raidar.subject.releases import released_agent, released_workflow
@@ -237,7 +241,7 @@ def name_issues(spec: ExperimentSpec, path: Path | None) -> list[FieldIssue]:
             FieldIssue(
                 "id",
                 f"[NAME2] id {spec.id!r} must be <runtime>__<subject>__<intent> with runtime "
-                f"{spec.runtime!r} first (for example {spec.runtime}__forge__review-loop)",
+                f"{spec.runtime!r} first (for example {spec.runtime}__problem__review-loop)",
             )
         )
     return issues
@@ -318,19 +322,21 @@ def _protocol_config_issues(
     ]
 
 
-ERRATA_CONFIG_KEY = "errata"
+LOCK_PINNED_CONFIG = {
+    ERRATA_CONFIG_KEY: "problem errata are pinned by the problem's committed "
+    "<version>.errata.yaml and reach scorers through the lock; leave it out",
+    SOLVABLE_CONFIG_KEY: "the solvable sets are pinned from the problem's validation record "
+    "and reach scorers through the lock; leave it out",
+}
 
 
-def _errata_config_issues(spec: ExperimentSpec) -> list[FieldIssue]:
-    """Problem errata come from the problem's committed errata file through the lock only."""
+def _lock_pinned_config_issues(spec: ExperimentSpec) -> list[FieldIssue]:
+    """Errata and solvable sets reach scorers through the lock only, never the experiment."""
     return [
-        FieldIssue(
-            f"assessment.scorer_config.{ref}.{ERRATA_CONFIG_KEY}",
-            "problem errata are pinned by the problem's committed <version>.errata.yaml and "
-            "reach scorers through the lock; leave it out",
-        )
+        FieldIssue(f"assessment.scorer_config.{ref}.{key}", message)
         for ref, config in spec.assessment.scorer_config.items()
-        if ERRATA_CONFIG_KEY in config
+        for key, message in LOCK_PINNED_CONFIG.items()
+        if key in config
     ]
 
 
@@ -354,7 +360,7 @@ def semantic_issues(
         *_protocol_config_issues(
             spec, _default_protocol_config() if protocol_config is None else protocol_config
         ),
-        *_errata_config_issues(spec),
+        *_lock_pinned_config_issues(spec),
         *kind_issues(spec),
         *name_issues(spec, path),
     ]

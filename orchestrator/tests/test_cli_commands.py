@@ -582,12 +582,12 @@ def test_experiment_assess_rescores_the_run_trials_with_the_named_scorers(tmp_pa
         "experiment-assess",
         f"JOB={tmp_path}",
         "STORE=.tmp/store",
-        "SCORERS=correctness@2 code-quality@4",
+        "SCORERS=correctness@3 code-quality@4",
         "REPLAY=1",
     )
 
     assert result.returncode == 0, result.stderr
     (assess_args,) = _raidar_lines(result.stdout, "assess")
     assert assess_args.startswith(f'--rescore "{tmp_path}/trials" --store ".tmp/store"')
-    assert '--scorer "correctness@2" --scorer "code-quality@4"' in assess_args
+    assert '--scorer "correctness@3" --scorer "code-quality@4"' in assess_args
     assert "--replay" in assess_args

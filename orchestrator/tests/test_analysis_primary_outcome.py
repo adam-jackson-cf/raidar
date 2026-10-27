@@ -1,7 +1,7 @@
 """``analysis.primary_outcome``: the pre-registered primary the report, markdown and review label.
 
-Unset, the primary is the progression's default (``solve_rate`` under
-``continue``), exactly as before. Set, it must be a known trial outcome; it is
+Unset, the primary is the progression's default (``solve_rate_solvable`` under
+``continue``, the raw ``solve_rate`` beside it). Set, it must be a known trial outcome; it is
 analysis configuration (the lock's ``analysis`` section), so ``lock_sha256``
 does not move; and an errata-applied primary is always reported with its raw
 counterpart beside it.
@@ -23,12 +23,14 @@ from raidar.design.experiment.validation import SpecValidationError
 from raidar.evaluation.analysis.assessed import GATE_EFFORT_REF, gate_effort_ref
 from raidar.evaluation.analysis.effects import Settings
 from raidar.evaluation.analysis.markdown import render_markdown
+from raidar.evaluation.analysis.outcomes import Value
 from raidar.evaluation.analysis.report import analyse
 from raidar.scoring.catalog.outcomes import (
     PRIMARY_FROM_LOCK,
     RAW_COUNTERPART,
     SOLVE_RATE,
     SOLVE_RATE_ERRATA,
+    SOLVE_RATE_SOLVABLE,
     primary_metric,
     primary_source,
 )
@@ -98,20 +100,46 @@ def test_setting_the_primary_relocks_the_analysis_section_only(tmp_path: Path) -
 # ---- the analysis report ---------------------------------------------------------------
 
 
-def test_the_default_primary_is_unchanged() -> None:
-    report = analyse(inputs(_outcomes(), 6), SETTINGS)
+def test_the_default_primary_is_the_solvable_set_rate_with_raw_beside_it() -> None:
+    solvable = paired_arms(SOLVE_RATE_SOLVABLE, [0.5] * 6, [0.75] * 6)
+    outcomes = [
+        raw.model_copy(update={"metrics": {**raw.metrics, **extra.metrics}})
+        for raw, extra in zip(_outcomes(), solvable, strict=True)
+    ]
+    report = analyse(inputs(outcomes, 6), SETTINGS)
 
     assert (report.primary_metric, report.primary_source) == (
-        SOLVE_RATE,
+        SOLVE_RATE_SOLVABLE,
         "default for continue progression",
     )
     (comparison,) = report.comparisons
-    assert comparison.primary.metric == SOLVE_RATE
-    assert comparison.primary_raw is None
+    assert comparison.primary.metric == SOLVE_RATE_SOLVABLE
+    assert comparison.primary_raw is not None
+    assert comparison.primary_raw.metric == SOLVE_RATE
     markdown = render_markdown(report)
-    assert "**Primary outcome** `solve_rate`" in markdown
-    assert "Raw (beside the primary)" not in markdown
-    assert primary_metric("halt_on_failure") == "reached"
+    assert "**Primary outcome** `solve_rate_solvable`" in markdown
+    assert "**Raw (beside the primary)** `solve_rate`" in markdown
+    assert primary_metric("halt_on_failure") == SOLVE_RATE_SOLVABLE
+
+
+def test_a_primary_without_solvable_sets_is_unavailable_never_zero() -> None:
+    outcomes = [
+        outcome.model_copy(
+            update={
+                "metrics": {
+                    **outcome.metrics,
+                    SOLVE_RATE_SOLVABLE: Value.missing("unavailable", "no solvable set"),
+                }
+            }
+        )
+        for outcome in _outcomes()
+    ]
+    report = analyse(inputs(outcomes, 6), SETTINGS)
+
+    (comparison,) = report.comparisons
+    assert comparison.primary.verdict.value == "insufficient"
+    assert comparison.primary_raw is not None
+    assert comparison.primary_raw.verdict.value != "insufficient"
 
 
 def test_a_preregistered_errata_primary_is_labelled_with_raw_beside_it() -> None:
@@ -164,5 +192,5 @@ def test_arms_with_no_shared_attempt_are_refused_not_crashed() -> None:
 
 def test_the_lock_declared_gate_effort_scorer_is_read() -> None:
     assert GATE_EFFORT_REF == "gate-effort@11"
-    assert gate_effort_ref(["correctness@2", "gate-effort@11"]) == "gate-effort@11"
-    assert gate_effort_ref(["correctness@2"]) is None
+    assert gate_effort_ref(["correctness@3", "gate-effort@11"]) == "gate-effort@11"
+    assert gate_effort_ref(["correctness@3"]) is None

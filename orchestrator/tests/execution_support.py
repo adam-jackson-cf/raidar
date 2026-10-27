@@ -109,7 +109,7 @@ def locked_experiment(
     root: Path, ref: str, **changes: Any
 ) -> tuple[LoadedExperiment, dict[str, Any], Path]:
     """Write and lock an experiment over ``ref`` (RAIDAR_PROBLEMS_ROOT must name the store)."""
-    document = experiment_document(problems=[{"ref": ref}], **changes)
+    document = experiment_document(**{"problems": [{"ref": ref}], **changes})
     path = write_experiment(root, document)
     loaded = load_experiment(path)
     lock_path = default_lock_path(path)

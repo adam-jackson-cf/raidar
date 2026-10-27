@@ -14,7 +14,7 @@ from pathlib import Path
 from typing import Any
 
 from raidar.design.problem.store import ProblemStore, open_store
-from raidar.engine.job.assessment import lock_errata
+from raidar.engine.job.assessment import lock_errata, lock_solvable
 from raidar.evaluation.analysis.assessed import (
     ANALYSED_SCORERS,
     PROCESS_COMPLIANCE_REF,
@@ -126,6 +126,13 @@ def _lookup(request: LoadRequest, scorer_refs: tuple[str, ...]) -> AssessmentLoo
     )
 
 
+def _solvable_summary(lock: Mapping[str, Any]) -> dict[str, Any]:
+    return {
+        ref: {"sha256": pinned.sha256, "cases": {s: len(c) for s, c in pinned.steps.items()}}
+        for ref, pinned in lock_solvable(lock).items()
+    }
+
+
 def load_inputs(request: LoadRequest) -> tuple[AnalysisInputs, Mapping[str, Any]]:
     """The analysis inputs and the lock they were checked against."""
     if not request.job_dirs:
@@ -149,6 +156,7 @@ def load_inputs(request: LoadRequest) -> tuple[AnalysisInputs, Mapping[str, Any]
         experiment=str(lock["experiment"]["id"]),
         lock_sha256=str(lock["lock_sha256"]),
         errata={ref: errata.model_dump(mode="json") for ref, errata in lock_errata(lock).items()},
+        solvable=_solvable_summary(lock),
         jobs=tuple(job.job_id for job in jobs),
         kind=str(spec.get("kind", "ab-test")),
         rank_by=spec["analysis"].get("rank_by"),

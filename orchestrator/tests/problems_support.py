@@ -231,7 +231,7 @@ fi
     "${{PRIOR_TESTS[@]}}" \\
     /tests/test_{step}.py \\
     --checkpoint "{step}" \\
-    --entrypoint "python3 /app/app.py" \\
+    --entrypoint "uv run --project /app app.py" \\
     --ctrf=/tmp/ctrf.json \\
     -rA
 PYTEST_RC=$?
@@ -266,6 +266,17 @@ from scb_to_harbor_lib.cli import main
 """
 
 
+# An upstream checkpoint spec: a leading comment (kept verbatim), both entrypoint tokens, and
+# a final line without a newline.
+UPSTREAM_SPEC = (
+    "<!-- upstream header -->\n"
+    "# {step}\n\n"
+    "Run `%%%ENTRYPOINT:entry_command%%% --json` (the file is `%%%ENTRYPOINT:entry_file%%%`).\n"
+    "Keep other syntax: %%%ENTRYPOINT:other%%%.\n"
+    "No trailing newline"
+)
+
+
 def _write_converted(root: Path) -> None:
     (root).mkdir(parents=True)
     (root / "task.toml").write_text(CONVERTED_TASK_TOML)
@@ -280,7 +291,7 @@ def _write_converted(root: Path) -> None:
         (step_dir / "tests" / "test.sh").write_text(
             CONVERTED_TEST_SH.format(step=step, prior=prior, include_prior="true")
         )
-        (step_dir / "instruction.md").write_text(f"# {step}\nBuild the {step} operations.\n")
+        (step_dir / "instruction.md").write_text("converter-emitted text, never the agent's spec\n")
         write_app(step_dir / "solution" / "payload", mul=bool(index))
         (step_dir / "solution" / "solve.sh").write_text("#!/bin/bash\ncp -a payload/. /app/\n")
 
@@ -298,6 +309,8 @@ def build_fake_scb_repo(root: Path) -> tuple[Path, str]:
     (repo / "adder" / "config.yaml").write_text(
         "entry_file: app\ncheckpoints:\n  checkpoint_1: {}\n  checkpoint_2: {}\n"
     )
+    for step in ("checkpoint_1", "checkpoint_2"):
+        (repo / "adder" / f"{step}.md").write_text(UPSTREAM_SPEC.format(step=step))
     lib = repo / "scripts" / "scb_to_harbor_lib"
     lib.mkdir(parents=True)
     (lib / "__init__.py").write_text("")

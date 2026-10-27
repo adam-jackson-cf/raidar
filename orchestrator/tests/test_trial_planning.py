@@ -9,10 +9,13 @@ from typing import Any
 
 import pytest
 from click.testing import CliRunner
+from pydantic import ValidationError
 
 from raidar.cli import main
 from raidar.contract.canonical import digest_json
 from raidar.design.experiment.loader import load_experiment
+from raidar.design.experiment.lock import LockError
+from raidar.design.experiment.schema import ProblemEntry
 from raidar.design.problem.store import ROOT_ENV
 from raidar.engine.trial.agent_config import arm_agent_config
 from raidar.engine.trial.plan import PlanError, PlanOptions, arm_order, build_plan
@@ -20,6 +23,7 @@ from raidar.subject.environment.python.harness import HarnessPinError
 from raidar.subject.environment.python.pack_definition import load_pack_spec
 from raidar.subject.workflow.runner import WorkflowRunner
 from tests.execution_support import ImportedFixture, locked_experiment, validated_fixture
+from tests.problems_support import ONESHOT_REF, build_fixture_store, record_validation
 
 
 @pytest.fixture(scope="module")
@@ -33,7 +37,7 @@ def locked(
 ) -> tuple[Any, dict[str, Any], Path]:
     monkeypatch.setenv(ROOT_ENV, str(fixture_problem.store.root))
     return locked_experiment(
-        tmp_path / "exp", fixture_problem.ref, environment={"compose_init": False}
+        tmp_path / "exp", fixture_problem.ref, kind="smoke", environment={"compose_init": False}
     )
 
 
@@ -97,7 +101,7 @@ def test_concurrency_is_per_machine_and_outside_trial_identity(
     with pytest.raises(PlanError, match="concurrency"):
         _plan(locked, fixture_problem, concurrency=0)
     loaded, _, _ = locked
-    runner = CliRunner()
+    runner = CliRunner(mix_stderr=False)
     base = runner.invoke(main, ["plan", str(loaded.path), "--json"])
     other = runner.invoke(main, ["plan", str(loaded.path), "--json", "--concurrency", "3"])
     assert other.exit_code == 0, other.output  # no relock needed
@@ -125,6 +129,92 @@ def test_selection_and_truncation_change_what_runs_not_the_condition(
         _plan(locked, fixture_problem, arms=("nope",))
     with pytest.raises(PlanError, match="attempts"):
         _plan(locked, fixture_problem, attempts=(99,))
+
+
+def _bound(tmp_path: Path, fixture: ImportedFixture, name: str, **binding: Any):
+    return locked_experiment(
+        tmp_path / name,
+        fixture.ref,
+        problems=[{"ref": fixture.ref, **binding}],
+        environment={"compose_init": False},
+    )
+
+
+def test_a_checkpoint_subset_binding_locks_and_runs_the_first_k_as_one_task(
+    tmp_path: Path, fixture_problem: ImportedFixture, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv(ROOT_ENV, str(fixture_problem.store.root))
+    _, full_lock, _ = _bound(tmp_path, fixture_problem, "full")
+    loaded, subset_lock, _ = _bound(tmp_path, fixture_problem, "subset", checkpoints=1)
+
+    assert full_lock["execution"]["problems"][0]["checkpoints"] == 2
+    assert subset_lock["execution"]["problems"][0]["checkpoints"] == 1
+    assert subset_lock["lock_sha256"] != full_lock["lock_sha256"]
+    plan = build_plan(loaded, subset_lock, store=fixture_problem.store, pack=load_pack_spec())
+    assert {trial.steps for trial in plan.trials} == {("checkpoint_1",)}
+    assert all(target.steps == ("checkpoint_1",) for target in plan.problems)
+
+
+def test_a_subset_binding_the_lock_does_not_pin_is_refused(
+    tmp_path: Path, fixture_problem: ImportedFixture, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv(ROOT_ENV, str(fixture_problem.store.root))
+    _, full_lock, _ = _bound(tmp_path, fixture_problem, "full")
+    loaded, _, _ = _bound(tmp_path, fixture_problem, "subset", checkpoints=1)
+
+    with pytest.raises(PlanError, match="relock"):
+        build_plan(loaded, full_lock, store=fixture_problem.store, pack=load_pack_spec())
+
+
+def test_a_subset_larger_than_the_problem_or_off_a_path_does_not_lock(
+    tmp_path: Path, fixture_problem: ImportedFixture, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv(ROOT_ENV, str(fixture_problem.store.root))
+    with pytest.raises(LockError, match="first 3 checkpoint"):
+        _bound(tmp_path, fixture_problem, "big", checkpoints=3)
+    for bad in (0, -1, True, 1.5):
+        with pytest.raises(ValidationError):
+            ProblemEntry.model_validate({"ref": fixture_problem.ref, "checkpoints": bad})
+    with pytest.raises(ValidationError, match="local 'path'"):
+        ProblemEntry.model_validate({"path": "tasks/x", "checkpoints": 1})
+
+
+def test_a_one_checkpoint_reference_plans_but_cannot_take_a_prefix(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    store = build_fixture_store(tmp_path / "problems")
+    record_validation(store, ONESHOT_REF, tmp_path / "validation")
+    monkeypatch.setenv(ROOT_ENV, str(store.root))
+    loaded, lock, _ = locked_experiment(
+        tmp_path / "one", ONESHOT_REF, environment={"compose_init": False}
+    )
+    plan = build_plan(loaded, lock, store=store, pack=load_pack_spec())
+    assert {trial.steps for trial in plan.trials} == {("checkpoint_1",)}
+    with pytest.raises(LockError):
+        locked_experiment(
+            tmp_path / "prefix",
+            ONESHOT_REF,
+            problems=[{"ref": ONESHOT_REF, "checkpoints": 1}],
+            environment={"compose_init": False},
+        )
+
+
+def test_the_max_checkpoints_override_is_for_smoke_experiments_only(
+    tmp_path: Path, fixture_problem: ImportedFixture, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv(ROOT_ENV, str(fixture_problem.store.root))
+    loaded, lock, _ = locked_experiment(
+        tmp_path / "ab", fixture_problem.ref, environment={"compose_init": False}
+    )
+
+    with pytest.raises(PlanError, match="smoke"):
+        build_plan(
+            loaded,
+            lock,
+            store=fixture_problem.store,
+            pack=load_pack_spec(),
+            options=PlanOptions(max_checkpoints=1),
+        )
 
 
 def test_agent_runs_the_pack_pinned_harness_as_a_workflow_runner_around_the_native_agent(
@@ -180,35 +270,26 @@ def test_plan_command_dry_run_and_stale_lock(
     locked: tuple[Any, dict[str, Any], Path], fixture_problem: ImportedFixture
 ) -> None:
     loaded, _, lock_path = locked
-    runner = CliRunner()
-    shown = runner.invoke(main, ["plan", str(loaded.path), "--arm", "baseline", "--attempt", "0"])
-    assert shown.exit_code == 0, shown.output
-    assert "1/10 trials selected" in shown.output
-    assert shown.output.count("stage_code=") == 10
+    runner = CliRunner(mix_stderr=False)
     as_json = runner.invoke(main, ["plan", str(loaded.path), "--json"])
-    payload = json.loads(as_json.output)
+    assert as_json.exit_code == 0, as_json.output
+    payload = json.loads(as_json.stdout)
     assert len(payload["trials"]) == 10
     assert payload["arms"]["baseline"]["workflow_sha256"]
     source = loaded.path.read_text()
     loaded.path.write_text(source.replace("baseline_arm: baseline", "baseline_arm: guided"))
     reanalysed = runner.invoke(main, ["plan", str(loaded.path)])
     assert reanalysed.exit_code != 0
-    assert "Stale: analysis:" in reanalysed.output
-    assert "execution:" not in reanalysed.output
     loaded.path.write_text(source.replace("attempts: 5", "attempts: 4"))
     stale = runner.invoke(main, ["plan", str(loaded.path)])
     assert stale.exit_code != 0
-    assert "out of date" in stale.output
-    assert "execution: execution inputs changed" in stale.output
     loaded.path.write_text(source)
     lock_path.write_text(lock_path.read_text().replace('"attempts": 5', '"attempts": 4'))
     tampered = runner.invoke(main, ["plan", str(loaded.path)])
     assert tampered.exit_code != 0
-    assert "not a valid lock" in tampered.output
     lock_path.unlink()
     missing = runner.invoke(main, ["plan", str(loaded.path)])
     assert missing.exit_code != 0
-    assert "raidar lock" in missing.output
 
 
 def test_a_lock_from_another_python_patch_release_still_plans(

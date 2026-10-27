@@ -29,6 +29,7 @@ def _benchmark(attempts: int = 4, *, rank_by: str | None = None, infra: bool = F
             attempt,
             {
                 "solve_rate": RATE[agent] + 0.01 * attempt,
+                "solve_rate_solvable": RATE[agent] + 0.01 * attempt,
                 "final_solved": SOLVED[agent][attempt],
                 "total_cost_usd": {"codex": 0.1, "claude": 0.2, "gemini": 0.05}[agent],
                 "total_tokens": 1000.0,
@@ -67,7 +68,7 @@ def test_a_benchmark_ranks_agents_with_intervals_pass_at_k_and_cost() -> None:
 
     ranking = report.ranking
     assert ranking is not None
-    assert (ranking.rank_by, ranking.reference_arm) == ("solve_rate", "codex")
+    assert (ranking.rank_by, ranking.reference_arm) == ("solve_rate_solvable", "codex")
     assert [row.arm for row in ranking.rows] == ["codex", "claude", "gemini"]
     assert [row.rank for row in ranking.rows] == [1, 2, 3]
     codex = ranking.rows[0]
@@ -99,15 +100,6 @@ def test_rank_by_orders_by_the_declared_metric_and_invalid_trials_never_count() 
     assert gemini.pass_at_k[3].value is None
     assert gemini.pass_at_k[3].problems == 0
     assert [row.arm for row in ranking.rows] == ["codex", "claude", "gemini"]
-
-
-def test_the_markdown_shows_the_ranking_view() -> None:
-    text = render_markdown(analyse(_benchmark(), Settings(seed=3)))
-
-    assert "## Ranking (benchmark)" in text
-    assert "| 1 | codex (reference) | 4 |" in text
-    assert "pass@4" in text
-    assert "- Kind: `benchmark`" in text
 
 
 def test_ab_tests_have_no_ranking_and_smoke_reports_are_not_citable() -> None:

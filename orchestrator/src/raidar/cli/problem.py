@@ -4,12 +4,13 @@ from __future__ import annotations
 
 import asyncio
 import json
+from dataclasses import replace
 from pathlib import Path
 
 import click
 
 from raidar.cli.target_options import docker_selection, target_option
-from raidar.contract.references import RegistryReferenceError
+from raidar.design.problem.catalog import select_problems, source_catalog
 from raidar.design.problem.errata import Disposition, draft_errata, report_entries
 from raidar.design.problem.importer import import_problem
 from raidar.design.problem.models import ProblemId, ProblemManifest
@@ -18,6 +19,7 @@ from raidar.design.problem.store import ProblemStore, ProblemStoreError, open_st
 from raidar.design.problem.validation import (
     Check,
     CheckStatus,
+    ValidationRecord,
     ValidationRecordError,
     Verdict,
     read_validation_record,
@@ -54,6 +56,25 @@ _CHECKOUT_OPTION = click.option(
     default=None,
     help="Existing dataset checkout at the pinned commit (default: clone into var/problems/cache).",
 )
+_SOURCE_OPTION = click.option("--source", help="Pinned source: <dataset>@<commit>.")
+_PROBLEMS_OPTION = click.option("--problems", help="Comma-separated problem names, or all.")
+
+
+def _selected(
+    store: ProblemStore,
+    refs: tuple[str, ...],
+    names: str | None,
+    source: str | None,
+    checkout: Path | None,
+    *,
+    importing: bool = False,
+) -> tuple[ProblemId, ...]:
+    try:
+        for ref in refs:
+            _problem_id(ref)
+        return select_problems(store, refs, names, source, checkout, importing=importing)
+    except (ProblemStoreError, SourceError, ValueError) as exc:
+        raise click.ClickException(str(exc)) from exc
 
 
 def register(main: click.Group) -> None:
@@ -70,7 +91,7 @@ def _store(store_root: Path | None) -> ProblemStore:
 def _problem_id(ref: str) -> ProblemId:
     try:
         return ProblemId.parse(ref)
-    except RegistryReferenceError as exc:
+    except ValueError as exc:
         raise click.BadParameter(str(exc), param_hint="REF") from exc
 
 
@@ -114,13 +135,24 @@ def _store_state(store: ProblemStore, problem_id: ProblemId) -> str:
 
 @problem.command("list")
 @_STORE_OPTION
-def list_command(store_root: Path | None) -> None:
+@_SOURCE_OPTION
+@_CHECKOUT_OPTION
+def list_command(store_root: Path | None, source: str | None, source_checkout: Path | None) -> None:
     """List every registered problem with its mode, validation and import state."""
     store = _store(store_root)
     try:
+        if source is not None:
+            checkout, catalog = source_catalog(store, source, source_checkout)
+            registered = set(store.registered())
+            click.echo("PROBLEM  CHECKPOINTS  STATE")
+            for problem_id in catalog:
+                count = len(tuple((checkout.root / problem_id.problem).glob("checkpoint_*.md")))
+                state = "registered" if problem_id in registered else "not imported"
+                click.echo(f"{problem_id}  {count}  {state}")
+            return
         problems = store.registered()
         rows = [(problem_id, store.load_manifest(problem_id)) for problem_id in problems]
-    except ProblemStoreError as exc:
+    except (ProblemStoreError, SourceError, OSError, ValueError) as exc:
         raise click.ClickException(str(exc)) from exc
     if not rows:
         click.echo(f"No problems registered under {store.root / 'registry'}")
@@ -129,6 +161,7 @@ def list_command(store_root: Path | None) -> None:
         click.echo(str(problem_id))
         click.echo(f"  mode: {manifest.mode.value}  checkpoints: {manifest.checkpoints}")
         click.echo(f"  validation: {_validation_state(store, problem_id, manifest)}")
+        _echo_solvable(store, problem_id, manifest)
         click.echo(f"  errata: {_errata_state(store, problem_id, manifest)}")
         click.echo(f"  store: {_store_state(store, problem_id)}")
 
@@ -136,46 +169,69 @@ def list_command(store_root: Path | None) -> None:
 @problem.command("info")
 @click.argument("ref")
 @_STORE_OPTION
-def info_command(ref: str, store_root: Path | None) -> None:
+@_SOURCE_OPTION
+@_CHECKOUT_OPTION
+def info_command(
+    ref: str, store_root: Path | None, source: str | None, source_checkout: Path | None
+) -> None:
     """Show REF's manifest: steps, source pin, pack binding, validation and import state."""
     store = _store(store_root)
     problem_id = _problem_id(ref)
     try:
+        if source is not None:
+            checkout, problems = source_catalog(store, source, source_checkout)
+            if problem_id not in problems:
+                raise ProblemStoreError(f"{problem_id} is not in {source}")
+            steps = sorted((checkout.root / problem_id.problem).glob("checkpoint_*.md"))
+            click.echo(str(problem_id))
+            click.echo(f"  checkpoints: {len(steps)}")
+            click.echo(f"  steps: {', '.join(path.stem for path in steps)}")
+            click.echo(f"  source: {checkout.pin.url}@{checkout.pin.commit}")
+            click.echo((checkout.root / problem_id.problem / "config.yaml").read_text())
+            return
         manifest = store.load_manifest(problem_id)
-    except ProblemStoreError as exc:
+    except (ProblemStoreError, SourceError, OSError, ValueError) as exc:
         raise click.ClickException(str(exc)) from exc
-    source = manifest.source
+    pin = manifest.source
     click.echo(str(problem_id))
     click.echo(f"  mode: {manifest.mode.value}  checkpoints: {manifest.checkpoints}")
     click.echo(f"  steps: {', '.join(step.name for step in manifest.steps)}")
-    click.echo(f"  source: {source.url}@{source.commit} ({source.problem})")
+    click.echo(f"  source: {pin.url}@{pin.commit} ({pin.problem})")
     click.echo(f"  pack: {manifest.pack.id}@{manifest.pack.version} image {manifest.pack.image}")
     if manifest.entry_file is not None:
         click.echo(f"  entry_file: {manifest.entry_file}")
     click.echo(f"  manifest: {store.manifest_path(problem_id)}  sha256: {manifest.digest()}")
     click.echo(f"  validation: {_validation_state(store, problem_id, manifest)}")
+    _echo_solvable(store, problem_id, manifest)
     click.echo(f"  validation report: {store.validation_path(problem_id)}")
     click.echo(f"  errata: {_errata_state(store, problem_id, manifest)}")
     click.echo(f"  store: {_store_state(store, problem_id)} ({store.content_dir(problem_id)})")
 
 
 @problem.command("import")
-@click.argument("refs", nargs=-1, required=True)
+@click.argument("refs", nargs=-1)
 @_STORE_OPTION
 @_CHECKOUT_OPTION
 @click.option("--update", is_flag=True, help="Accept content that differs from the manifest.")
+@_SOURCE_OPTION
+@_PROBLEMS_OPTION
 def import_command(
-    refs: tuple[str, ...], store_root: Path | None, source_checkout: Path | None, update: bool
+    refs: tuple[str, ...],
+    store_root: Path | None,
+    source_checkout: Path | None,
+    update: bool,
+    source: str | None,
+    problems: str | None,
 ) -> None:
     """Import REFS (<dataset>/<problem>[.<checkpoint>]@<version>) from the pinned dataset."""
     store = _store(store_root)
-    for ref in refs:
+    for problem_id in _selected(store, refs, problems, source, source_checkout, importing=True):
         try:
             result = import_problem(
-                store, _problem_id(ref), source_checkout=source_checkout, update=update
+                store, problem_id, source_checkout=source_checkout, update=update
             )
         except (ProblemStoreError, SourceError, ValueError) as exc:
-            raise click.ClickException(f"{ref}: {exc}") from exc
+            raise click.ClickException(f"{problem_id}: {exc}") from exc
         manifest = result.manifest
         state = "imported" if result.changed else "verified (matches manifest)"
         click.echo(f"{manifest.ref}: {state}")
@@ -186,9 +242,11 @@ def import_command(
 
 
 @problem.command("validate")
-@click.argument("ref")
+@click.argument("refs", nargs=-1)
 @_STORE_OPTION
 @_CHECKOUT_OPTION
+@_SOURCE_OPTION
+@_PROBLEMS_OPTION
 @click.option("--engine", type=click.Choice(ENGINES), default="direct", show_default=True)
 @click.option("--repeats", type=click.IntRange(min=1), default=3, show_default=True)
 @click.option("--concurrency", type=click.IntRange(min=1), default=4, show_default=True)
@@ -221,7 +279,9 @@ def import_command(
     ),
 )
 def validate_command(
-    ref: str,
+    refs: tuple[str, ...],
+    source: str | None,
+    problems: str | None,
     store_root: Path | None,
     source_checkout: Path | None,
     engine: str,
@@ -241,7 +301,9 @@ def validate_command(
     failed (exclude the problem), 2 when infrastructure failed (no verdict).
     """
     store = _store(store_root)
-    problem_id = _problem_id(ref)
+    problem_ids = _selected(store, refs, problems, source, source_checkout)
+    if report_path is not None and len(problem_ids) != 1:
+        raise click.BadParameter("--report requires exactly one problem")
     selection = docker_selection(
         target_name,
         trial_purpose="problem validation (hidden tests)",
@@ -257,25 +319,77 @@ def validate_command(
         audit=audit or audit_only,
     )
     if audit_only:
-        return _audit_only(store, problem_id, options)
+        for problem_id in problem_ids:
+            _audit_only(store, problem_id, options)
+        return
+    asyncio.run(_validate_selected(store, problem_ids, options, report_path))
+
+
+async def _validate_selected(
+    store: ProblemStore,
+    problem_ids: tuple[ProblemId, ...],
+    options: ValidateOptions,
+    report_path: Path | None,
+) -> None:
+    # Each validation owns at most one slot; divide the target's capacity between
+    # problems rather than multiplying per-problem grader concurrency.
+    workers = min(options.concurrency, len(problem_ids))
+    if not workers:
+        raise click.ClickException("no problems selected")
+    semaphore = asyncio.Semaphore(workers)
+    per_problem = replace(options, concurrency=max(1, options.concurrency // workers))
+
+    async def run(problem_id: ProblemId) -> tuple[str, str, int]:
+        async with semaphore:
+            try:
+                report = await validate_problem(store, problem_id, per_problem)
+            except (ProblemStoreError, SourceError, RuntimeError, ValueError) as exc:
+                click.echo(f"{problem_id}: INFRA: {exc}", err=True)
+                return str(problem_id), Verdict.INFRA_FAILURE.value, EXIT_INFRA
+            path = write_report(report, report_path or default_report_path(store, report))
+            _echo_checks(report.checks)
+            payload = report.to_json()
+            click.echo(f"headline metric: {json.dumps(payload['headline_policy'])}")
+            _echo_audit(report.spec_determinacy)
+            click.echo(f"{report.problem}: {report.verdict.value.upper()}")
+            click.echo(f"report: {path}")
+            _echo_solvable_record(read_validation_record(path))
+            code = _verdict_exit(report.verdict)
+            return report.problem, report.verdict.value, code
+
+    results = await asyncio.gather(*(run(problem_id) for problem_id in problem_ids))
+    click.echo("PROBLEM  VERDICT")
+    for ref, state, _ in results:
+        click.echo(f"{ref}  {state}")
+    code = max(result[2] for result in results)
+    if code:
+        raise SystemExit(code)
+
+
+def _verdict_exit(verdict: Verdict) -> int:
+    if verdict is Verdict.INFRA_FAILURE:
+        return EXIT_INFRA
+    return EXIT_EXCLUDED if verdict is Verdict.EXCLUDED else 0
+
+
+def _echo_solvable(store: ProblemStore, problem: ProblemId, manifest: ProblemManifest) -> None:
     try:
-        report = asyncio.run(validate_problem(store, problem_id, options))
-    except (ProblemStoreError, SourceError, RuntimeError, ValueError) as exc:
-        click.echo(f"INFRA: {exc}", err=True)
-        raise SystemExit(EXIT_INFRA) from exc
-    path = write_report(report, report_path or default_report_path(store, report))
-    _echo_checks(report.checks)
-    payload = report.to_json()
-    click.echo(f"headline metric: {json.dumps(payload['headline_policy'])}")
-    not_run = payload["not_run"]
-    skipped = f" (not run: {', '.join(not_run)})" if isinstance(not_run, list) and not_run else ""
-    _echo_audit(report.spec_determinacy)
-    click.echo(f"{report.problem}: {report.verdict.value.upper()}{skipped}")
-    click.echo(f"report: {path}")
-    if report.verdict is Verdict.EXCLUDED:
-        raise SystemExit(EXIT_EXCLUDED)
-    if report.verdict is Verdict.INFRA_FAILURE:
-        raise SystemExit(EXIT_INFRA)
+        record = read_validation_record(store.validation_path(problem))
+    except ValidationRecordError:
+        return
+    if record.manifest_sha256 != manifest.digest():
+        return
+    _echo_solvable_record(record)
+
+
+def _echo_solvable_record(record: ValidationRecord) -> None:
+    if not record.solvable:
+        click.echo("  solvable sets: unavailable")
+    for step, one in record.solvable.items():
+        click.echo(
+            f"  {step}: {one.verdict.value} solvable={len(one.cases)}"
+            f" nondeterministic={one.nondeterministic_count}"
+        )
 
 
 def _echo_checks(checks: list[Check]) -> None:

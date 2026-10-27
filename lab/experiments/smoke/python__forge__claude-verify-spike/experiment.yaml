@@ -22,7 +22,7 @@ arms:
     agent: agent
     workflow: one-shot-verify@2
 assessment:
-  scorers: [correctness@2, code-quality@4, resource-usage@2, process-compliance@7]
+  scorers: [correctness@3, code-quality@4, resource-usage@2, process-compliance@7]
   metric: scb-canonical@2
 analysis:
   baseline_arm: verify

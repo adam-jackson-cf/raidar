@@ -120,6 +120,7 @@ class AnalysisInputs:
     rank_by: str | None = None
     attempts: int = 1
     errata: Mapping[str, Mapping[str, object]] | None = None
+    solvable: Mapping[str, Mapping[str, object]] | None = None
     primary_outcome: str | None = None
     """The lock's pre-registered ``analysis.primary_outcome`` (None: the progression's)."""
     pooling: PoolingReport | None = None
@@ -230,6 +231,9 @@ class AnalysisReport(AnalysisModel):
     errata: dict[str, dict[str, object]] | None = None
     """``{problem ref: {sha256, exclude_from_solved}}`` the lock pins; only the ``*_errata``
     outcomes apply it. Absent (not written) when the lock pins no errata."""
+    solvable: dict[str, dict[str, object]] | None = None
+    """``{problem ref: {sha256, cases: {step: solvable case count}}}`` the lock pins; the
+    solvable-set outcomes (the default primary) apply it. Absent when the lock pins none."""
     pooling: PoolingReport | None = None
     """The pooling gate's outcome: unmeasured jobs, lifted refusals, timing/cost comparability."""
     verifier_sensitivities: dict[str, list[dict[str, object]]] | None = None
@@ -476,6 +480,7 @@ def analyse(inputs: AnalysisInputs, settings: Settings) -> AnalysisReport:
         comparisons=tuple(_comparison(inputs, arm, settings) for arm in treatments),
         ranking=_ranking(inputs, settings, summaries),
         errata=_errata(inputs),
+        solvable=_solvable(inputs),
         verifier_sensitivities=_sensitivities(inputs),
         pooling=inputs.pooling,
     )
@@ -485,6 +490,12 @@ def _errata(inputs: AnalysisInputs) -> dict[str, dict[str, object]] | None:
     if not inputs.errata:
         return None
     return {ref: dict(pinned) for ref, pinned in inputs.errata.items()}
+
+
+def _solvable(inputs: AnalysisInputs) -> dict[str, dict[str, object]] | None:
+    if not inputs.solvable:
+        return None
+    return {ref: dict(pinned) for ref, pinned in inputs.solvable.items()}
 
 
 def _ranking(

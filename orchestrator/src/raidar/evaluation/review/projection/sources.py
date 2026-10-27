@@ -27,7 +27,7 @@ from raidar.contract.job_layout import JOB_KIND, JOB_MANIFEST, PLAN_FILE
 from raidar.contract.trial import TrialRecord
 from raidar.design.experiment.lock import default_lock_path
 from raidar.design.experiment.schema import ExperimentSpec
-from raidar.engine.job.assessment import lock_errata, rescore_config
+from raidar.engine.job.assessment import lock_errata, lock_solvable, rescore_config
 from raidar.evaluation.analysis.sources import (
     AnalysisInputError,
     JobDir,
@@ -37,6 +37,7 @@ from raidar.evaluation.analysis.sources import (
 )
 from raidar.evaluation.review.integrity import check_review_jobs
 from raidar.grading.errata import ErrataRef
+from raidar.grading.solvable import SolvableRef
 from raidar.scoring.framework.rescore_config import RescoreConfig
 
 SYNTHETIC_MARKER = "synthetic"
@@ -55,6 +56,8 @@ class ExperimentLock:
     path: Path | None = None
     errata: Mapping[str, ErrataRef] = field(default_factory=dict)
     """The problem errata the lock pins; correctness Assessments are keyed with them."""
+    solvable: Mapping[str, SolvableRef] = field(default_factory=dict)
+    """The solvable sets the lock pins; correctness Assessments are keyed with them."""
 
 
 @dataclass(frozen=True)
@@ -122,6 +125,7 @@ def experiment_lock(path: Path) -> ExperimentLock:
             problems=tuple(execution.get("problems") or ()),
             path=path,
             errata=lock_errata(document),
+            solvable=lock_solvable(document),
         )
     except (KeyError, TypeError, ValueError) as exc:
         raise AnalysisInputError(f"{path} is not an experiment lock: {exc}") from exc
@@ -165,7 +169,9 @@ def load_job(job_dir: Path, locks: LockIndex) -> JobSource:
         manifest=manifest,
         plan=read_json_object(job_dir / PLAN_FILE),
         lock=lock,
-        assessment=rescore_config(lock.spec.assessment, lock.spec.protocol, errata=lock.errata),
+        assessment=rescore_config(
+            lock.spec.assessment, lock.spec.protocol, errata=lock.errata, solvable=lock.solvable
+        ),
         records=read_trial_records(job_dir),
         assessment_path=lock.path,
     )

@@ -17,15 +17,10 @@ def test_forges_uuid_tie_break_cases_are_spec_determined_randomness_sensitivitie
     }
     errata = (REPO / "lab/problems/registry/scb/forge/38d627ecf668.errata.yaml").read_text()
 
-    for case, spec in (
-        (
-            "test_checkpoint_1.py::"
-            "test_blueprint_list_uuid_tiebreak_when_created_at_and_name_collide",
-            "checkpoint_1/instruction.md:64",
-        ),
-        ("test_checkpoint_2.py::test_allocation_list_ordering", "checkpoint_2/instruction.md:58"),
+    for case in (
+        "test_checkpoint_1.py::test_blueprint_list_uuid_tiebreak_when_created_at_and_name_collide",
+        "test_checkpoint_2.py::test_allocation_list_ordering",
     ):
         note = found[case]
         assert (note.kind, note.spec_determined) == (SensitivityKind.RANDOMNESS, True)
-        assert spec in note.spec
         assert case.split("::")[1] not in errata

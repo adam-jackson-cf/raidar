@@ -1,9 +1,11 @@
 # Pinned errata for scb/forge@38d627ecf668 (raidar.design.problem.errata). The lock pins the
 # sha256 of this file; editing it changes lock_sha256 (relock, then migrate executed jobs).
+# Re-pinned after restoring the upstream canary. Historical instruction line citations
+# below use the former converter view; add 3 for the current verbatim checkpoint specs.
 kind: raidar-problem-errata
 schema_version: 1
 problem: scb/forge@38d627ecf668
-manifest_sha256: 029cca8f775cc8cd5524647f6f2562883aec117bec667f7cf021181e613fbe94
+manifest_sha256: b642041b7e34697a26fdfdb392e5df6c309a9e92784b4ee79eb57df9d6587255
 registered: '2026-10-02'
 basis: 'spec-determinacy audit v1 (validation report problems/registry/scb/forge/38d627ecf668.validation.json,
   section spec_determinacy): every flagged case, by the audit rule alone. Registered before any experiment

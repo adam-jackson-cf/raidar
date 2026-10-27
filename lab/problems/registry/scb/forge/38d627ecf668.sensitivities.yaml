@@ -12,9 +12,9 @@ sensitivities:
     kind: timing
     spec_determined: true
     spec: >-
-      task/steps/checkpoint_1/instruction.md:64 ("Ordering: created_at ascending, then name
+      task/steps/checkpoint_1/instruction.md:67 ("Ordering: created_at ascending, then name
       ascending lexicographic, then uuid ascending lexicographic as final tie-breaker") and
-      :24/:103 (created_at is ISO 8601 UTC with second precision)
+      :27/:106 (created_at is ISO 8601 UTC with second precision)
     mechanism: >-
       The test creates zeta, alpha and mango in that order and asserts the listed
       (created_at, name, uuid) tuples are sorted. When all three creates land in the same
@@ -30,7 +30,7 @@ sensitivities:
     kind: randomness
     spec_determined: true
     spec: >-
-      task/steps/checkpoint_1/instruction.md:64 ("Ordering: created_at ascending, then name
+      task/steps/checkpoint_1/instruction.md:67 ("Ordering: created_at ascending, then name
       ascending lexicographic, then uuid ascending lexicographic as final tie-breaker")
     mechanism: >-
       The test creates two blueprints, rewrites both stored rows to the same created_at and
@@ -48,8 +48,8 @@ sensitivities:
     kind: randomness
     spec_determined: true
     spec: >-
-      task/steps/checkpoint_2/instruction.md:58 ("List output: ordered by created_at
-      ascending; ties broken by uuid ascending lexicographic"), :18 and :28 (created_at at
+      task/steps/checkpoint_2/instruction.md:61 ("List output: ordered by created_at
+      ascending; ties broken by uuid ascending lexicographic"), :21 and :31 (created_at at
       second precision; allocations from one create share it)
     mechanism: >-
       The test makes two allocations with two separate creates and asserts the listed

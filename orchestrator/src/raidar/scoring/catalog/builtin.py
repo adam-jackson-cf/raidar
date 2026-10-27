@@ -35,7 +35,7 @@ REGISTERED_MANIFESTS = (
 )
 
 BUILTIN_IMPLEMENTATIONS: dict[str, str] = {
-    "correctness@2": "raidar.scoring.correctness:correctness_scorer",
+    "correctness@3": "raidar.scoring.correctness:correctness_scorer",
     "code-quality@4": "raidar.scoring.code_quality:code_quality_scorer",
     "resource-usage@2": "raidar.scoring.resource_usage:resource_usage_scorer",
     "process-compliance@7": (
@@ -61,11 +61,14 @@ BUILTIN_PROBLEM_CONFIG: dict[str, tuple[str, ...]] = {
 }
 # Config keys the experiment's protocol sets (``ProtocolSpec`` field names).
 BUILTIN_PROTOCOL_CONFIG: dict[str, tuple[str, ...]] = {
-    "correctness@2": ("progression",),
+    "correctness@3": ("progression",),
 }
 # Scorers that take the lock's pinned problem errata as config key ``errata``.
 ERRATA_CONFIG_KEY = "errata"
-BUILTIN_ERRATA_CONFIG: frozenset[str] = frozenset({"correctness@2"})
+BUILTIN_ERRATA_CONFIG: frozenset[str] = frozenset({"correctness@3"})
+# Scorers that take the lock's pinned solvable sets as config key ``solvable``.
+SOLVABLE_CONFIG_KEY = "solvable"
+BUILTIN_SOLVABLE_CONFIG: frozenset[str] = frozenset({"correctness@3"})
 
 
 def _builtin(manifest: ScorerManifest) -> ScorerRegistration:
@@ -76,6 +79,7 @@ def _builtin(manifest: ScorerManifest) -> ScorerRegistration:
         problem_config=BUILTIN_PROBLEM_CONFIG.get(manifest.ref, ()),
         protocol_config=BUILTIN_PROTOCOL_CONFIG.get(manifest.ref, ()),
         errata_config=manifest.ref in BUILTIN_ERRATA_CONFIG,
+        solvable_config=manifest.ref in BUILTIN_SOLVABLE_CONFIG,
     )
 
 

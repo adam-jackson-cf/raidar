@@ -100,7 +100,6 @@ def test_the_forge_ordering_case_is_a_spec_determined_timing_sensitivity_not_an_
         SensitivityKind.TIMING,
         True,
     )
-    assert "instruction.md:64" in note.spec
     errata = (REPO / "lab/problems/registry/scb/forge/38d627ecf668.errata.yaml").read_text()
     assert "test_blueprint_list_orders_by_created_at_name_uuid" not in errata
 

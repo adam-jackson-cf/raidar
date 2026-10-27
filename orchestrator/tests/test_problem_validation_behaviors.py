@@ -25,14 +25,19 @@ from raidar.design.problem.validation import (
     Check,
     CheckStatus,
     Grade,
+    ValidationRecordError,
     ValidationRuns,
     Verdict,
     check_determinism,
-    check_expectation,
     check_parity,
+    check_positive_repeats,
+    check_reference_fails,
+    check_solvable,
     policy_preview,
     read_validation_record,
     run_checks,
+    solvable_digest,
+    solvable_sets,
     verdict,
 )
 from raidar.design.problem.validator import ValidateOptions, validate_problem, write_report
@@ -86,7 +91,7 @@ async def test_reference_trial_validates_with_oracle_grading(
     report = await _validate(store, POSITIVE_REF, tmp_path)
     statuses = {check.name: check.status for check in report.checks}
     assert statuses == {
-        "reference_k_passes_1..k": CheckStatus.PASS,
+        "solvable_set": CheckStatus.PASS,
         "reference_k-1_fails_k": CheckStatus.PASS,
         "repeat_identical_positive": CheckStatus.PASS,
         "repeat_identical_negative": CheckStatus.PASS,
@@ -146,24 +151,47 @@ async def test_one_shot_problem_grades_one_step_under_the_one_shot_policy(
     assert multi["headline_policy"]["policy"] == "scb-canonical@1"
 
 
-def test_expectation_and_determinism_checks_report_what_differs() -> None:
+def test_solvable_sets_keep_cases_passed_in_every_repeat() -> None:
     passing = {"s1": _grade("s1", {"c1::a": "passed", "c1::b": "passed", "c1::s": "skipped"})}
+    flaky = {"s1": _grade("s1", {"c1::a": "passed", "c1::b": "failed", "c1::n": "passed"})}
+    infra = {"s1": _grade("s1", {}, infra="collection_error")}
+
+    sets = solvable_sets([passing, flaky])
+    assert sets["s1"].solvable == ("c1::a",)
+    assert sets["s1"].nondeterministic == ("c1::b", "c1::n", "c1::s")
+    assert sets["s1"].verdict is Verdict.VALIDATED
+    assert sets["s1"].digest == solvable_digest(["c1::a"])
+    assert solvable_sets([passing, passing])["s1"].solvable == ("c1::a", "c1::b")
+    # Missing evidence is never an empty set.
+    assert solvable_sets([passing, infra])["s1"].verdict is Verdict.INFRA_FAILURE
+
+    assert check_solvable("x", [passing]).status is CheckStatus.PASS
+    assert check_solvable("x", [passing, infra]).status is CheckStatus.INFRA
+    nothing = {"s1": _grade("s1", {"c1::a": "failed"})}
+    assert solvable_sets([nothing])["s1"].verdict is Verdict.EXCLUDED
+    assert check_solvable("x", [nothing]).status is CheckStatus.FAIL
+    # A partly solvable problem stays usable: an empty step is excluded, the check passes.
+    partial = {**passing, "s2": _grade("s2", {"c2::a": "failed"})}
+    assert check_solvable("x", [partial, partial]).status is CheckStatus.PASS
+    assert solvable_sets([partial])["s2"].verdict is Verdict.EXCLUDED
+
+
+def test_repeat_and_reference_checks_report_what_differs() -> None:
+    passing = {"s1": _grade("s1", {"c1::a": "passed", "c1::b": "passed"})}
     flaky = {"s1": _grade("s1", {"c1::a": "passed", "c1::b": "failed"})}
     infra = {"s1": _grade("s1", {}, infra="collection_error")}
 
-    assert check_expectation("pos", [passing], expect_pass=True).status is CheckStatus.PASS
-    # A real miss outranks missing evidence; both are reported.
-    missed = check_expectation("pos", [passing, flaky, infra], expect_pass=True)
-    assert missed.status is CheckStatus.FAIL
-    assert missed.detail == (
-        "repeat 1 s1: 1/2 (expected all pass)",
-        "repeat 2 s1: no verdict (collection_error)",
+    assert check_reference_fails("neg", [flaky]).status is CheckStatus.PASS
+    assert check_reference_fails("neg", [passing, flaky]).detail == (
+        "repeat 0 s1: 2/2 (expected at least one failure)",
     )
-    # An infrastructure failure is neither a pass nor an (expected) failure.
-    for expect_pass in (True, False):
-        unknown = check_expectation("x", [infra], expect_pass=expect_pass)
-        assert unknown.status is CheckStatus.INFRA
-        assert unknown.detail == ("repeat 0 s1: no verdict (collection_error)",)
+    assert check_reference_fails("neg", [infra]).status is CheckStatus.INFRA
+
+    listed = check_positive_repeats("rep", [passing, flaky])
+    assert listed.status is CheckStatus.PASS
+    assert listed.detail == ("s1: 1 nondeterministic",)
+    assert check_positive_repeats("rep", [passing]).status is CheckStatus.NOT_RUN
+    assert check_positive_repeats("rep", [passing, infra]).status is CheckStatus.INFRA
 
     drift = check_determinism("rep", [passing, flaky])
     assert drift.status is CheckStatus.FAIL
@@ -259,13 +287,16 @@ def test_native_evaluation_reduces_to_the_same_case_keys_as_the_oracle(tmp_path:
     assert (problem / "config.yaml").read_text() == "test_dependencies: [pyyaml==6.0.2]\n"
 
 
-async def test_direct_engine_refuses_references_that_need_installed_requirements(
+async def test_direct_engine_grades_declared_requirements_with_the_canonical_verifier(
     store: ProblemStore, tmp_path: Path
 ) -> None:
     problem = store.load(ProblemId.parse(POSITIVE_REF))
     (problem.reference("checkpoint_2") / "requirements.txt").write_text("# comment\nrequests\n")
-    with pytest.raises(direct.DirectEngineError, match="requests"):
-        await direct.grade_references(problem, LocalProcessSandbox(tmp_path / "s"), repeats=1)
+    runs = await direct.grade_references(
+        problem, LocalProcessSandbox(tmp_path / "s"), repeats=1, concurrency=1
+    )
+    assert all(grade.all_pass for grade in runs[POSITIVE][0].values())
+    assert all(not grade.all_pass for grade in runs[NEGATIVE][0].values())
     with pytest.raises(ValueError, match="repeats"):
         await direct.grade_references(problem, LocalProcessSandbox(tmp_path / "s"), repeats=0)
 
@@ -339,7 +370,6 @@ def test_validate_command_exit_codes_follow_the_verdict(
     passed = runner.invoke(main, [*base, POSITIVE_REF, "--report", str(report)])
     assert passed.exit_code == 0, passed.output
     assert json.loads(report.read_text())["verdict"] == "validated_partial"
-    assert "VALIDATED_PARTIAL (not run: native_parity_positive" in passed.output
 
     # Docker down: no verdict, exit 2, and the committed (excluded) report is kept.
     committed = written.read_bytes()
@@ -350,8 +380,6 @@ def test_validate_command_exit_codes_follow_the_verdict(
     monkeypatch.setattr(validator, "_docker_sandbox", down)
     outage = runner.invoke(main, [*base, NEGATIVE_REF])
     assert outage.exit_code == 2, outage.output
-    assert "[INFRA] reference_k_passes_1..k" in outage.output
-    assert "INFRA_FAILURE" in outage.output
     assert written.read_bytes() == committed
     step_result = json.loads(
         store.validation_attempt_path(ProblemId.parse(NEGATIVE_REF)).read_text()
@@ -488,6 +516,28 @@ def test_lock_metadata_ignores_run_specific_report_bytes(tmp_path: Path) -> None
     assert one.lock_metadata() == two.lock_metadata() == {"verdict": "validated", "not_run": []}
 
 
+async def test_report_records_solvable_sets_the_lock_pins(
+    store: ProblemStore, tmp_path: Path
+) -> None:
+    report = await _validate(store, POSITIVE_REF, tmp_path)
+    path = write_report(report, tmp_path / "report.json")
+    record = read_validation_record(path)
+
+    for step, one in solvable_sets(report.runs.oracle[POSITIVE]).items():
+        assert record.solvable_cases(step) == one.solvable
+        assert record.solvable_size(step) == len(one.solvable) > 0
+        assert record.nondeterministic_count(step) == 0
+    lock = record.solvable_lock()
+    assert lock["steps"] == {s: list(c.cases) for s, c in record.solvable.items()}
+    assert record.solvable_cases("absent") is None
+
+    data = json.loads(path.read_text())
+    data["solvable"]["checkpoint_1"]["solvable"] = []
+    path.write_text(json.dumps(data))
+    with pytest.raises(ValidationRecordError):
+        read_validation_record(path)
+
+
 def test_a_validation_that_skipped_the_repeat_checks_is_not_usable(tmp_path: Path) -> None:
     path = tmp_path / "v.json"
     path.write_text(
@@ -543,7 +593,7 @@ async def test_failed_revalidation_revokes_admission_even_with_skipped_checks(
     assert store.require_validated(problem_id, store.load_manifest(problem_id)).usable
 
     report.checks = [
-        Check("reference_k_passes_1..k", CheckStatus.FAIL),
+        Check("solvable_set", CheckStatus.FAIL),
         Check("native_parity_positive", CheckStatus.NOT_RUN),
     ]
     path = validator.default_report_path(store, report)

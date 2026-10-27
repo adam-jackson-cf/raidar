@@ -62,7 +62,8 @@ def _plan_options(command: Callable[..., Any]) -> Callable[..., Any]:
             "--max-checkpoints",
             type=click.IntRange(min=1),
             default=None,
-            help="Truncate every trial to its first N checkpoints (dev/validation).",
+            help="Truncate every trial to its first N checkpoints (smoke experiments only; other "
+            "kinds bind `checkpoints:` on the problem).",
         ),
         click.option(
             "--agent-override",
