@@ -50,6 +50,7 @@ ROOT_FILES = frozenset(
         "Makefile",
         "README.md",
         "skills-lock.json",
+        "split-design.md",
     }
 )
 # The data trees the code loads at run time, each at one explicit path (contract/paths.py).

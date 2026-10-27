@@ -1,6 +1,6 @@
 # Phase 1 spike: codex session resume under Harbor
 
-Date 2026-10-25. Design: [split-design.md](../split-design.md) section 5.5, phase 1. Scope: codex only (user decision).
+Date 2026-10-25. Design: [split-design.md](../../../split-design.md) section 5.5, phase 1. Scope: codex only (user decision).
 
 ## Method
 

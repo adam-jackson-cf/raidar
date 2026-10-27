@@ -10,7 +10,8 @@ under the next integer version of its name::
       one-shot@1: <sha256 of the resolved definition>
 
 Earlier versions stay in the register as history; the tree holds only the definition of each
-name's latest version, so only that version resolves (older ones live in archive tags).
+name's latest version, so only that version resolves (older ones live in archive tags). The
+register is append-only: a released ``name@N`` keeps its hash forever (``rewritten_releases``).
 """
 
 from __future__ import annotations
@@ -82,13 +83,13 @@ class ReleaseRegister:
         return frozenset(release.name for release in self.of(kind))
 
 
-def load_register(path: Path) -> ReleaseRegister:
-    """Parse the register; raise ``ReleaseError`` naming the first malformed entry."""
+def parse_register(text: str, source: str) -> ReleaseRegister:
+    """Parse register ``text`` (read from ``source``); ``ReleaseError`` names a malformed entry."""
     try:
-        document = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+        document = yaml.safe_load(text) or {}
         register = _Register.model_validate(document)
-    except (OSError, yaml.YAMLError, ValidationError) as exc:
-        raise ReleaseError(f"{path}: unreadable release register: {exc}") from exc
+    except (yaml.YAMLError, ValidationError) as exc:
+        raise ReleaseError(f"{source}: unreadable release register: {exc}") from exc
     entries = {
         ReleaseKind.AGENT: {Release.parse(ref): digest for ref, digest in register.agents.items()},
         ReleaseKind.WORKFLOW: {
@@ -96,3 +97,29 @@ def load_register(path: Path) -> ReleaseRegister:
         },
     }
     return ReleaseRegister(entries)
+
+
+def load_register(path: Path) -> ReleaseRegister:
+    """Parse the register file; raise ``ReleaseError`` naming the first malformed entry."""
+    try:
+        text = path.read_text(encoding="utf-8")
+    except OSError as exc:
+        raise ReleaseError(f"{path}: unreadable release register: {exc}") from exc
+    return parse_register(text, str(path))
+
+
+def rewritten_releases(earlier: ReleaseRegister, now: ReleaseRegister) -> list[str]:
+    """Every release of ``earlier`` that ``now`` removed or re-hashed (released means frozen)."""
+    issues = []
+    for kind in ReleaseKind:
+        current = now.of(kind)
+        for release, digest in sorted(earlier.of(kind).items()):
+            if release not in current:
+                issues.append(f"{kind.value} release {release} was removed: releases are frozen")
+            elif current[release] != digest:
+                issues.append(
+                    f"{kind.value} release {release} was re-hashed ({digest[:12]} -> "
+                    f"{current[release][:12]}): releases are frozen; register "
+                    f"{release.name}@<next> instead"
+                )
+    return issues
