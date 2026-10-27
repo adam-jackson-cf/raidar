@@ -13,7 +13,7 @@ description: "Use when assessing, regrading or pooling stored Raidar jobs into a
   The job's job.lock.json is not a substitute for assessment settings.
 - Run `make experiment-assess JOB=<job-dir> STORE=<store> SCORERS="<locked scorers>" [LOCK=<path>]`.
 - Keep scorer and verifier bundles compatible with the job's locked runtime and problem.
-- For protocol.verifier_coverage: offline, let code-quality@4 create coverage from stored step snapshots into the store.
+- For protocol.verifier_coverage: offline, let code-quality@5 create coverage from stored step snapshots into the store.
 - Use `make assess-regrade JOB=<trial-or-job> COVERAGE_CHECK=1 STORE=<store>` to compare coverage reruns.
   Use assess-regrade without COVERAGE_CHECK for verifier/pre-fix regrading as required.
 - After assessment-only changes, rescore existing jobs rather than rerunning agents when lock_sha256 still matches.

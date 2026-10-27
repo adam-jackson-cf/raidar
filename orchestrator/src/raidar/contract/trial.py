@@ -191,5 +191,12 @@ class TrialRecord(ExecutionModel):
     parity: ParityRecord | None = None
 
     @property
+    def planned_steps(self) -> tuple[str, ...]:
+        """The bound task, including checkpoints a smoke limit left not attempted."""
+        if self.truncated_to is not None:
+            return tuple(result.step for result in self.step_results)
+        return self.trial.steps
+
+    @property
     def valid(self) -> bool:
         return self.validity.passed

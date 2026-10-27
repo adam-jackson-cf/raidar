@@ -207,7 +207,7 @@ export function QualityPage() {
   } else if (!current) {
     body = (
       <p className="text-xs" style={{ color: C.fg1 }}>
-        No assessed trials yet. Rescore a job with code-quality@4 and correctness@3, then run make review-surface-quality-data.
+        No assessed trials yet. Rescore a job with code-quality@5 and correctness@4, then run make review-surface-quality-data.
       </p>
     );
   } else {

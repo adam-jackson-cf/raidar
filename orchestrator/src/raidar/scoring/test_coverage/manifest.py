@@ -36,7 +36,7 @@ def _metric(
 
 TEST_COVERAGE = ScorerManifest(
     id="test-coverage",
-    version="1",
+    version="2",
     description=(
         "FXL process audit stage B as recorded readings: for each criterion of a "
         "checkpoint's sealed definition, Jev scores each of the builder's final mapped tests "

@@ -66,6 +66,11 @@ All notable changes to this project are documented in this file.
 
 ### Fixes
 
+- Locked checkpoint prefixes now govern assessment subjects, solve-rate denominators and
+  analysis solvable-set summaries from retained trial plans, rather than the full problem
+  bundle. Smoke-only `MAX_CHECKPOINTS` tails remain planned and `not_attempted`.
+  Released as `correctness@4`, `code-quality@5`, `resource-usage@3`, `process-compliance@8`,
+  `gate-effort@12`, `definition-coverage@2` and `test-coverage@2`; previous releases are archived.
 - Reference validation uses the canonical grader's offline dependency handling instead
   of rejecting every reference with a requirements file.
 - A halt cannot turn a missing or empty planned solvable set into a measured zero rate.

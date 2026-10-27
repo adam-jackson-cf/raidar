@@ -65,8 +65,8 @@ def _resolvers(
             WorkflowResolver(),
             InMemoryResolver(
                 RefKind.SCORER,
-                {"correctness@3": {"exact": True}, "code-quality@4": {"exact": True}},
-                bindings={"code-quality@4": {"runtimes": ["python"]}, **(scorers or {})},
+                {"correctness@4": {"exact": True}, "code-quality@5": {"exact": True}},
+                bindings={"code-quality@5": {"runtimes": ["python"]}, **(scorers or {})},
             ),
             MetricResolver(),
         ],
@@ -204,12 +204,12 @@ def test_rt2_a_binding_of_another_pack_contract_is_stale(experiment: Path) -> No
 def test_rt4_scorers_and_the_metric_must_cover_the_runtime(tmp_path: Path) -> None:
     document = experiment_document(id="node-ts__fixture__test", runtime="node-ts")
     document["problems"] = [{"ref": FORGE_NODE}]
-    document["assessment"] = {"scorers": ["correctness@3", "code-quality@4"]}
+    document["assessment"] = {"scorers": ["correctness@4", "code-quality@5"]}
     path = write_experiment(tmp_path, document)
 
     issues = _issues(path, pack_loader=_node_pack)
 
-    assert "[RT4] code-quality@4 supports runtimes [python]" in issues["assessment.scorers.1"]
+    assert "[RT4] code-quality@5 supports runtimes [python]" in issues["assessment.scorers.1"]
     assert (
         "[RT4] headline metric scb-canonical@1 measures quality components for runtimes "
         in (issues["assessment.metric"])
@@ -304,7 +304,7 @@ def test_the_real_resolvers_report_binding_facts() -> None:
     )
     agent = AgentResolver().resolve(RegistryRef.parse(RefKind.AGENT, "codex@2"), base_dir=repo)
     quality = scorer_resolver().resolve(
-        RegistryRef.parse(RefKind.SCORER, "code-quality@4"), base_dir=repo
+        RegistryRef.parse(RefKind.SCORER, "code-quality@5"), base_dir=repo
     )
     pin = load_runtime_pack("python").image.harnesses["codex-cli"]
 
@@ -326,7 +326,7 @@ def _job(root: Path, runtime: str, bundle_digest: str) -> Path:
         {
             "lock_version": LOCK_VERSION,
             "experiment": {"id": "e"},
-            "spec": {"runtime": runtime, "assessment": {"scorers": ["correctness@3"]}},
+            "spec": {"runtime": runtime, "assessment": {"scorers": ["correctness@4"]}},
             "execution": {
                 "references": {
                     "problem": {
@@ -363,7 +363,7 @@ def test_as1_rescore_scorers_must_cover_the_jobs_runtime(tmp_path: Path) -> None
         "--store",
         str(store),
         "--scorer",
-        "code-quality@4",
+        "code-quality@5",
     )
     allowed = _assess(
         "--rescore",
@@ -373,12 +373,12 @@ def test_as1_rescore_scorers_must_cover_the_jobs_runtime(tmp_path: Path) -> None
         "--store",
         str(store),
         "--scorer",
-        "correctness@3",
+        "correctness@4",
     )
 
     assert refused.exit_code != 0
     assert (
-        "[AS1] scorer code-quality@4 supports runtimes [python]; the job's runtime is node-ts"
+        "[AS1] scorer code-quality@5 supports runtimes [python]; the job's runtime is node-ts"
         in (refused.output)
     )
     assert "[AS1]" not in allowed.output
@@ -391,7 +391,7 @@ def test_as1_a_trial_outside_any_job_accepts_only_runtime_agnostic_scorers(
     trial.mkdir(parents=True)
 
     refused = _assess(
-        "--rescore", str(trial), "--store", str(tmp_path / "s"), "--scorer", "code-quality@4"
+        "--rescore", str(trial), "--store", str(tmp_path / "s"), "--scorer", "code-quality@5"
     )
 
     assert refused.exit_code != 0
@@ -411,7 +411,7 @@ def test_as1_a_bundle_override_must_be_the_verifier_bundle_the_lock_binds(
     target = job / "trials" if mode == "--rescore" else job
     lock = ["--lock", str(job / "job.lock.json")]
     store = (
-        ["--store", str(tmp_path / "s"), "--scorer", "correctness@3"] if mode == "--rescore" else []
+        ["--store", str(tmp_path / "s"), "--scorer", "correctness@4"] if mode == "--rescore" else []
     )
 
     refused = _assess(mode, str(target), *lock, *store, "--bundle", str(other.root))

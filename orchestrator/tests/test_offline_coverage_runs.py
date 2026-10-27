@@ -6,7 +6,7 @@ Assessment store, never the job, with the same parity verdict and the same G
 input the in-trial pass writes for the same snapshot; ``check_coverage_path``
 makes it again and compares it with the trial's own pass or the stored run,
 writing nothing. ``raidar assess --rescore`` makes it first only when a scorer
-that reads it (``code-quality@4``) runs; the trial config defers it only when
+that reads it (``code-quality@5``) runs; the trial config defers it only when
 the protocol says so.
 """
 
@@ -239,9 +239,9 @@ async def test_a_changed_snapshot_is_an_error_never_a_run(tmp_path: Path) -> Non
 @pytest.mark.parametrize(
     ("scorers", "replay", "makes"),
     [
-        (("code-quality@4",), False, True),
-        (("code-quality@4", "correctness@3"), True, False),
-        (("correctness@3", "resource-usage@2"), False, False),
+        (("code-quality@5",), False, True),
+        (("code-quality@5", "correctness@4"), True, False),
+        (("correctness@4", "resource-usage@3"), False, False),
     ],
 )
 def test_rescore_makes_coverage_first_only_for_a_scorer_that_reads_it(

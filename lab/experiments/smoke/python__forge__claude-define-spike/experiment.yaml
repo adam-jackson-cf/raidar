@@ -21,7 +21,7 @@ arms:
     agent: agent
     workflow: define-build-verify@3
 assessment:
-  scorers: [correctness@3, code-quality@4, resource-usage@2, process-compliance@7, definition-coverage@1, test-coverage@1]
+  scorers: [correctness@4, code-quality@5, resource-usage@3, process-compliance@8, definition-coverage@2, test-coverage@2]
   metric: scb-canonical@2
 analysis:
   baseline_arm: define

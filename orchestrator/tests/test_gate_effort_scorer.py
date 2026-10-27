@@ -300,7 +300,7 @@ def test_config_is_refused_and_the_scorer_is_registered(tmp_path: Path) -> None:
     step = _step(tmp_path, "checkpoint_1")
     ctx = AssessContext(problem="p", steps=(step,), config={"x": 1})
     assert gate_effort_scorer().assess(ctx).status is AssessStatus.ERROR
-    registration = default_scorer_registry().get("gate-effort@11")
+    registration = default_scorer_registry().get("gate-effort@12")
     assert registration.load().manifest == GATE_EFFORT
 
 
