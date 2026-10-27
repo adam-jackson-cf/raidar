@@ -30,6 +30,7 @@ from __future__ import annotations
 
 import json
 import shlex
+from pathlib import Path
 from typing import Any, override
 
 from harbor.agents.installed.codex import Codex, CodexOptions
@@ -37,13 +38,15 @@ from harbor.environments.base import BaseEnvironment
 from harbor.models.agent.context import AgentContext
 from pydantic import Field
 
+from raidar.subject.agent.codex_audit import SESSIONS_DIR, codex_last_message, codex_session_audit
+from raidar.subject.agent.probe import parse_probe, probe_command
+from raidar.subject.agent.protocol import Tokens, cumulative_accounting
+
 MANAGED_CONFIGS = ("/etc/codex/config.toml", "/etc/codex/requirements.toml")
 SYSTEM_SKILLS = "/etc/codex/skills"
 USER_SKILLS = "$HOME/.agents/skills"
 NVM = "if [ -s ~/.nvm/nvm.sh ]; then . ~/.nvm/nvm.sh; fi"
 """Harbor's codex command sources nvm first; the process facts are read after the same."""
-SKILL_PREFIX = "skill="
-FACTS = ("user", "path", "tmpdir")
 
 
 class CodexIsolationError(RuntimeError):
@@ -65,32 +68,7 @@ def skills_config(manifests: list[str]) -> str:
 
 
 def _probe_command() -> str:
-    roots = " ".join((f'"{USER_SKILLS}"', SYSTEM_SKILLS))
-    return "; ".join(
-        (
-            NVM,
-            'echo "user=$(id -un)"',
-            'echo "path=$PATH"',
-            'echo "tmpdir=${TMPDIR-}"',
-            f"for root in {roots}; do "
-            f'[ -d "$root" ] && find "$root" -name SKILL.md -type f -exec printf '
-            f"'{SKILL_PREFIX}%s\\n' {{}} \\; ; done; true",
-        )
-    )
-
-
-def parse_probe(stdout: str) -> tuple[dict[str, str | None], list[str]]:
-    """``(agent process facts, host SKILL.md paths)`` from the probe's output."""
-    facts: dict[str, str | None] = dict.fromkeys(FACTS)
-    skills: list[str] = []
-    for line in stdout.splitlines():
-        if line.startswith(SKILL_PREFIX):
-            skills.append(line.removeprefix(SKILL_PREFIX))
-            continue
-        key, sep, value = line.partition("=")
-        if sep and key in facts:
-            facts[key] = value or None
-    return facts, sorted(set(skills))
+    return probe_command(NVM, (f'"{USER_SKILLS}"', SYSTEM_SKILLS))
 
 
 class IsolatedCodex(Codex):
@@ -126,10 +104,10 @@ class IsolatedCodex(Codex):
     async def run(
         self, instruction: str, environment: BaseEnvironment, context: AgentContext
     ) -> None:
-        await self._isolate(environment)
+        await self.isolate(environment)
         await super().run(instruction, environment, context)
 
-    async def _isolate(self, environment: BaseEnvironment) -> None:
+    async def isolate(self, environment: BaseEnvironment) -> None:
         """Refuse what the home cannot keep out, start a fresh home and fix the flags."""
         if self.skills_dir:
             raise CodexIsolationError(
@@ -182,3 +160,22 @@ class IsolatedCodex(Codex):
                 "must hold only auth.json"
             )
         return config
+
+    def process_facts(self) -> dict[str, str | None] | None:
+        return self.agent_process
+
+    def accounting(
+        self, context: AgentContext, previous: Tokens | None
+    ) -> tuple[Tokens | None, Tokens | None]:
+        """Codex reports the session's running total: the delta is that less the previous one."""
+        return cumulative_accounting(context, previous)
+
+    def last_message(self, turn_dir: Path) -> str | None:
+        return codex_last_message(turn_dir)
+
+    def session_store(self) -> tuple[str, ...]:
+        """Harbor copies ``sessions`` back into ``CODEX_HOME`` to resume the last session."""
+        return (SESSIONS_DIR,)
+
+    def session_audit(self, turn_dir: Path) -> dict[str, Any]:
+        return codex_session_audit(turn_dir)

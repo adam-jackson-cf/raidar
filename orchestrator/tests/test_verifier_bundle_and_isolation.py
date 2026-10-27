@@ -210,6 +210,8 @@ def test_snapshot_copy_drops_excludes_and_keeps_symlinks(tmp_path: Path) -> None
     app = tmp_path / "app"
     (app / ".git").mkdir(parents=True)
     (app / ".git" / "HEAD").write_text("ref")
+    (app / ".claude" / "skills" / "workflow").mkdir(parents=True)
+    (app / ".claude" / "skills" / "workflow" / "SKILL.md").write_text("workflow-only skill")
     (app / "main.py").write_text("print(1)\n")
     os.symlink("main.py", app / "alias.py")
     copy = tmp_path / "copy"

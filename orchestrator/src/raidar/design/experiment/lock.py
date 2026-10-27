@@ -90,6 +90,7 @@ EXECUTION_SPEC_FIELDS = (
     "agents",
     "protocol",
     "arms",
+    "varies",
 )
 EXECUTION_ANALYSIS_FIELDS = ("attempts", "seed")
 """The analysis fields that shape the plan; ``concurrency`` is per machine (PlanOptions)."""
@@ -461,7 +462,7 @@ def execution_section(
     analysis = spec_json["analysis"]
     return {
         "design": {
-            **{name: spec_json[name] for name in EXECUTION_SPEC_FIELDS},
+            **{name: spec_json[name] for name in EXECUTION_SPEC_FIELDS if name in spec_json},
             **{name: analysis[name] for name in EXECUTION_ANALYSIS_FIELDS},
         },
         "problems": problems,

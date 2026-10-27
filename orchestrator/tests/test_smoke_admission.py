@@ -20,6 +20,7 @@ from raidar.engine.health.admission import (
 )
 from raidar.engine.health.audit import audit_trial
 from raidar.engine.health.model import HealthCheck, HealthReport, write_health
+from tests.capability_support import CAPABILITIES, OTHER_HARNESS
 from tests.health_support import TRIAL_ID, HealthyTrial, healthy_trial
 
 RUNNER = {
@@ -31,7 +32,6 @@ RUNNER = {
 RECIPES = {"pack": "p" * 64, "graders": {}}
 TARGET = {"name": "mbp", "docker": {"ncpu": 4, "server_version": "29"}}
 STAGE_CODE = {"build": "b" * 64}
-CAPABILITIES = {"permissions": "bypass", "isolation_proof": "full", "version_pin": "0.156.1"}
 AGENT = {
     "agent": "luna",
     "agent_release": "codex@2",
@@ -49,10 +49,13 @@ AGENT = {
 OTHER = {**AGENT, "agent": "terra", "model": "gpt-6-terra", "digest": "e" * 64}
 
 
-def lock(kind: str = "smoke", *arms: dict[str, Any]) -> dict[str, Any]:
+def lock(
+    kind: str = "smoke", *arms: dict[str, Any], varies: tuple[str, ...] = ()
+) -> dict[str, Any]:
     """A lock whose ``execution.arms`` hold one identity per arm, ``arm-<agent>``."""
     identities = {f"arm-{arm['agent']}": arm for arm in arms or (AGENT,)}
-    return {"execution": {"design": {"kind": kind}, "arms": identities}}
+    design: dict[str, Any] = {"kind": kind, **({"varies": list(varies)} if varies else {})}
+    return {"execution": {"design": design, "arms": identities}}
 
 
 def wanted(**changes: Any) -> dict[str, Any] | None:
@@ -158,24 +161,81 @@ def test_incompatible_per_arm_smokes_cannot_complete_coverage(tmp_path: Path) ->
         )
 
 
-@pytest.mark.parametrize(
-    ("other", "reason"),
-    [({**OTHER, "capabilities": {**CAPABILITIES, "isolation_proof": "partial"}}, "different"),
-     ({k: v for k, v in OTHER.items() if k != "capabilities"}, "declares no capabilities")],
-    ids=["different", "undeclared"],
-)  # fmt: skip
-def test_arms_with_different_or_no_capability_declarations_are_refused_outright(
-    tmp_path: Path, other: dict[str, Any], reason: str
-) -> None:
-    smoke_job(tmp_path, lock=lock("smoke", AGENT, other))
-    arms = wanted(lock=lock("benchmark", AGENT, other))
+def harness_lock(*, varies: tuple[str, ...] = ("harness",), **changes: Any) -> dict[str, Any]:
+    """A benchmark lock whose second arm is another harness (``changes`` override its identity)."""
+    other = {"capabilities": OTHER_HARNESS, **changes}
+    return lock("benchmark", AGENT, {**OTHER, **other}, varies=varies)
 
-    with pytest.raises(AdmissionError, match=reason):
-        admit("benchmark", arms, tmp_path, allow_unsmoked=True)
+
+def refusal(kind_lock: dict[str, Any], tmp_path: Path) -> str:
+    with pytest.raises(AdmissionError) as raised:
+        admit("benchmark", wanted(lock=kind_lock), tmp_path, allow_unsmoked=True)
+    return str(raised.value)
+
+
+def test_the_same_harness_for_every_arm_is_unchanged_and_needs_no_declaration(
+    tmp_path: Path,
+) -> None:
+    decision = admit(
+        "benchmark", wanted(lock=lock("benchmark", AGENT, OTHER)), tmp_path, allow_unsmoked=True
+    )
+    assert decision["overridden"] is True
+
+
+def test_differing_capabilities_without_a_harness_declaration_are_refused_even_overridden(
+    tmp_path: Path,
+) -> None:
+    assert "varies: [harness]" in refusal(harness_lock(varies=()), tmp_path)
+
+
+@pytest.mark.parametrize("missing", [None, "network"])
+def test_an_arm_must_declare_every_capability_even_when_the_harness_varies(
+    tmp_path: Path, missing: str | None
+) -> None:
+    if missing is None:
+        broken = harness_lock(capabilities=None)
+        reason = "declares no capabilities"
+    else:
+        partial = {k: v for k, v in OTHER_HARNESS.items() if k != missing}
+        broken = harness_lock(capabilities=partial)
+        reason = f"lacks {missing}"
+    assert reason in refusal(broken, tmp_path)
+
+
+def test_a_declared_harness_comparison_with_one_model_and_reasoning_is_admitted(
+    tmp_path: Path,
+) -> None:
+    same = harness_lock(model=AGENT["model"])
+    decision = admit("benchmark", wanted(lock=same), tmp_path, allow_unsmoked=True)
+    assert decision["overridden"] is True
+
+
+@pytest.mark.parametrize(
+    ("changes", "declared", "refused"),
+    [
+        ({"model": "other-model"}, ("harness",), "canonical model"),
+        ({"model": "other-model"}, ("harness", "model"), None),
+        ({"model": AGENT["model"], "reasoning": "high"}, ("harness",), "reasoning"),
+        ({"model": AGENT["model"], "reasoning": "high"}, ("harness", "reasoning"), None),
+    ],
+)
+def test_a_harness_comparison_differing_in_model_or_reasoning_must_declare_it(
+    tmp_path: Path, changes: dict[str, Any], declared: tuple[str, ...], refused: str | None
+) -> None:
+    candidate = harness_lock(varies=declared, **changes)
+    if refused is None:
+        assert admit("benchmark", wanted(lock=candidate), tmp_path, allow_unsmoked=True)
+    else:
+        assert refused in refusal(candidate, tmp_path)
+
+
+def test_an_arm_without_declared_capabilities_is_refused_outright(tmp_path: Path) -> None:
+    undeclared = lock("benchmark", AGENT, {k: v for k, v in OTHER.items() if k != "capabilities"})
+    assert "declares no capabilities" in refusal(undeclared, tmp_path)
 
 
 def test_a_smoke_whose_arm_declared_other_capabilities_does_not_clear(tmp_path: Path) -> None:
-    smoke_job(tmp_path, lock=lock("smoke", {**AGENT, "capabilities": {"permissions": "x"}}))
+    smoke_job(tmp_path, lock=lock("smoke", {**AGENT, "capabilities": OTHER_HARNESS}))
 
     with pytest.raises(AdmissionError, match="not smoked"):
         decide(tmp_path)

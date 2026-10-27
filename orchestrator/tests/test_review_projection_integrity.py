@@ -12,6 +12,7 @@ from raidar.engine.health.records_manifest import seal_trial
 from raidar.evaluation.analysis.pooling import PoolingError
 from raidar.evaluation.review.projection import merge_review_projections
 from raidar.evaluation.review.quality.projection import build_quality_projection
+from tests.capability_support import CAPABILITIES
 from tests.review_fixtures.projection.generate import REVIEW_ONLY_DIR, generate_review_fixture
 
 
@@ -43,7 +44,7 @@ def _modern(job: Path, **changes: object) -> None:
     for path in (job / "trial-records").glob("*.json"):
         record = json.loads(path.read_text())
         arm = plan.setdefault("arms", {}).setdefault(record["trial"]["arm"], {})
-        arm["capabilities"] = {"isolation_proof": "full"}
+        arm["capabilities"] = CAPABILITIES
         path.write_text(json.dumps({**record, "parity": PARITY}))
     plan_path.write_text(json.dumps(plan))
     manifest_path = job / "job.json"

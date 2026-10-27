@@ -20,29 +20,11 @@ time, all in the checkpoint's one primary session:
 4. every stage closes, also when a turn failed (``turn_error``) or the phase was cancelled
    (``deadline``), and its record goes into ``workflow.json`` under its name.
 
-Each checkpoint starts a fresh session because Harbor empties ``/logs/agent`` (the session
-store) before every step.
-
-Per turn, under the step's agent logs at ``workflow/<stage>-<n>/``:
-
-- ``prompt.txt``: exactly what the agent was sent;
-- a copy of everything the native agent left in ``/logs/agent`` (``sessions/``, its output
-  stream). The active session store ``/logs/agent/sessions`` is copied, never moved, so a later
-  turn can resume it;
-- ``trajectory.json``: the native agent's trajectory, built from that copy.
-
-``workflow/workflow.json`` records the enabled ``stages``, the step records holding text a
-stage placed in the workspace's instruction files (``instructions``), and every turn: stage,
-turn index, session id, whether it resumed, start, end, seconds, error, the session's
-cumulative token total after the turn and
-the turn's own tokens, and, from a native agent that isolates itself
-(``raidar.subject.agent.isolated_codex.IsolatedCodex``), ``harness_isolation`` (the flags and
-settings it applied to the turn's command) and ``agent_process`` (the user, ``PATH`` and
-``TMPDIR`` the agent process ran with). A native context after a resumed turn is the
-session's cumulative total, so a turn's tokens are the delta from the previous turn of the
-same session; the phase's usage is the sum of the deltas, which reconciles with the final
-session totals by construction. When a turn's usage cannot be read the phase reports none
-rather than a partial sum. The last turn's trajectory becomes the step's ``trajectory.json``.
+Each checkpoint starts a fresh session because Harbor empties ``/logs/agent`` before each step.
+The native-agent protocol owns isolation, process facts, usage normalization, final replies,
+resume storage and session auditing. The runner copies logs without moving the native store,
+records normalized per-turn deltas and session totals, and writes ``last-message.txt`` for
+stage consumers. Unknown usage remains unknown rather than a partial phase total.
 """
 
 from __future__ import annotations
@@ -62,7 +44,7 @@ from harbor.agents.options import AgentOptions
 from harbor.environments.base import BaseEnvironment
 from harbor.models.agent.context import AgentContext
 
-from raidar.subject.agent.isolated_codex import IsolatedCodex
+from raidar.subject.agent.protocol import ZERO, NativeAgent, Tokens
 from raidar.subject.workflow.components import skill_files
 from raidar.subject.workflow.definition import StageType, WorkflowDefinition
 from raidar.subject.workflow.factory import workflow_stages
@@ -84,6 +66,7 @@ RECORD_FILE = "workflow.json"
 RECORD_KIND = "raidar-workflow"
 PROMPT_FILE = "prompt.txt"
 TRAJECTORY_FILE = "trajectory.json"
+LAST_MESSAGE_FILE = "last-message.txt"
 STEP_RECORD_PREFIX = "raidar-"
 """Step-level lab records in ``/logs/agent`` (reset report, provision records): not a turn's."""
 
@@ -94,58 +77,6 @@ class WorkflowRunnerOptions(AgentOptions):
     definition: WorkflowDefinition
     skills_placement: str = ".agents/skills"
     phase_timeout_s: float | None = None
-
-
-@dataclass(frozen=True)
-class Tokens:
-    """A session's token counts (cumulative) or one turn's share of them (a delta)."""
-
-    input: int
-    cached: int
-    output: int
-    cost_usd: float | None
-
-    @classmethod
-    def of(cls, context: AgentContext) -> Tokens | None:
-        counts = (context.n_input_tokens, context.n_cache_tokens, context.n_output_tokens)
-        if any(count is None for count in counts):
-            return None
-        n_input, n_cached, n_output = cast(tuple[int, int, int], counts)
-        return cls(n_input, n_cached, n_output, context.cost_usd)
-
-    def minus(self, earlier: Tokens) -> Tokens:
-        cost = (
-            None
-            if self.cost_usd is None or earlier.cost_usd is None
-            else round(self.cost_usd - earlier.cost_usd, 10)
-        )
-        return Tokens(
-            self.input - earlier.input,
-            self.cached - earlier.cached,
-            self.output - earlier.output,
-            cost,
-        )
-
-    def plus(self, other: Tokens) -> Tokens:
-        cost = (
-            None
-            if self.cost_usd is None or other.cost_usd is None
-            else self.cost_usd + other.cost_usd
-        )
-        return Tokens(
-            self.input + other.input, self.cached + other.cached, self.output + other.output, cost
-        )
-
-    def record(self) -> dict[str, Any]:
-        return {
-            "input": self.input,
-            "cached": self.cached,
-            "output": self.output,
-            "cost_usd": self.cost_usd,
-        }
-
-
-ZERO = Tokens(0, 0, 0, 0.0)
 
 
 @dataclass
@@ -166,6 +97,8 @@ class Turn:
     tokens: Tokens | None = None
     harness_isolation: dict[str, Any] | None = None
     agent_process: dict[str, str | None] | None = None
+    session_audit: dict[str, Any] | None = None
+    session_store: tuple[str, ...] = ()
 
     @property
     def log_dir(self) -> str:
@@ -194,6 +127,8 @@ class Turn:
             "tokens": self.tokens.record() if self.tokens else None,
             "harness_isolation": self.harness_isolation,
             "agent_process": self.agent_process,
+            "session_audit": self.session_audit,
+            "session_store": list(self.session_store),
         }
 
 
@@ -201,16 +136,16 @@ class Turn:
 class _Run:
     turns: list[Turn] = field(default_factory=list)
 
-    def delta(self, turn: Turn) -> Tokens | None:
-        """The turn's tokens: its session total minus the same session's previous total."""
-        if turn.session_total is None:
-            return None
-        earlier = [
-            item.session_total
-            for item in self.turns
-            if item is not turn and item.session_id == turn.session_id and item.session_total
-        ]
-        return turn.session_total.minus(earlier[-1]) if earlier else turn.session_total
+    def previous(self, turn: Turn) -> Tokens | None:
+        """The preceding normalized total of this session, if one was measured."""
+        return next(
+            (
+                item.session_total
+                for item in reversed(self.turns)
+                if item is not turn and item.session_id == turn.session_id
+            ),
+            None,
+        )
 
     def usage(self) -> Tokens | None:
         """The phase's tokens (sum of turn deltas); ``None`` when any turn's is unknown."""
@@ -383,9 +318,10 @@ class WorkflowRunner(BaseAgent):
         context: AgentContext,
     ) -> None:
         """Copy the turn's logs into its directory and read its isolation, session and usage."""
-        if isinstance(inner, IsolatedCodex):
-            turn.harness_isolation = inner.harness_isolation
-            turn.agent_process = inner.agent_process
+        native = cast(NativeAgent, inner)
+        turn.harness_isolation = native.harness_isolation
+        turn.agent_process = native.process_facts()
+        turn.session_store = native.session_store()
         turn_dir = self.logs_dir / turn.log_dir
         try:
             await self._copy_turn_logs(environment, turn.log_dir, turn_dir)
@@ -395,8 +331,13 @@ class WorkflowRunner(BaseAgent):
         if context.is_empty():
             inner.populate_context_post_run(context)
         turn.session_id = _session_id(turn_dir)
-        turn.session_total = Tokens.of(context)
-        turn.tokens = state.delta(turn)
+        previous = state.previous(turn)
+        if not turn.resumed or previous is not None:
+            turn.tokens, turn.session_total = native.accounting(context, previous)
+        turn.session_audit = native.session_audit(turn_dir)
+        text = native.last_message(turn_dir)
+        if text is not None:
+            (turn_dir / LAST_MESSAGE_FILE).write_text(text, encoding="utf-8")
 
     async def _copy_turn_logs(
         self, environment: BaseEnvironment, relative: str, turn_dir: Path

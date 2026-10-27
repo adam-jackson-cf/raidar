@@ -6,6 +6,13 @@ All notable changes to this project are documented in this file.
 
 ### Features
 
+- Native-agent protocol for isolation, process facts, usage, final text, resume stores and
+  session audits; workflow and P8 consumers no longer parse Codex-specific records.
+- `claude-code@1` at the existing pack pin `2.1.285`, with isolated config, strict MCP,
+  auto-updates disabled, Sonnet model metadata and forge smoke definitions. Isolation proof
+  is partial because native records list skill names without their roots.
+- P8 retains developer/system message digests by harness version and validates audit source hashes.
+- Experiment field `varies` (`harness`, `model`, `reasoning`): an experiment that declares `harness` may compare arms whose agents declare different capability manifests. Every arm must still declare all nine capabilities; the arms share canonical model id and reasoning unless `model` / `reasoning` are declared too. Admission and pooling apply the rule; the plan records `varies`, each arm's canonical model and reasoning. Specs that omit it keep their lock bytes.
 - Define stage in the primary session: FXL `ac5db0f` command grammar, unit rules 2,
   deterministic checks and renderer on an offline, root-owned CPython 3.12.14 tool environment.
 - `define-build-verify@1`: four workflow-owned skills, proposal acceptance, one definition
@@ -23,6 +30,8 @@ All notable changes to this project are documented in this file.
 
 ### Fixes
 
+- Read startup sandbox environment names with Docker inspect instead of running Python inside
+  the container; workflow-owned `.claude` skills are excluded from graded snapshots.
 - Gate comparisons and verdict reuse fingerprint the checked workspace as well as the Git
   tree and workflow prerequisites, including ignored or unstaged check inputs.
 - Fault recording interprets idle findings only for the liveness check, retaining gate and

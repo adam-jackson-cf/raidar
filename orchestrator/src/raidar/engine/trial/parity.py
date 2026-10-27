@@ -9,8 +9,8 @@ agent turn's process. Pooling refuses runs whose parity records differ
 (``raidar.evaluation.analysis.pooling``).
 
 **Harness isolation** is what the agent harness applied to each turn's command
-(``raidar.subject.agent.isolated_codex``): the workflow runner records it per turn in each
-step's ``workflow/workflow.json``, and the trial record keeps each distinct one.
+(``raidar.subject.agent.protocol.NativeAgent``): the workflow runner records it per turn in
+each step's ``workflow/workflow.json``, and the trial record keeps each distinct one.
 """
 
 from __future__ import annotations

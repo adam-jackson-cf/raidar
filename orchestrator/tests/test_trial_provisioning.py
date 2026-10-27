@@ -16,7 +16,6 @@ from types import SimpleNamespace
 from typing import Any, cast
 
 import pytest
-from harbor.environments.base import ExecResult
 from harbor.models.trial.paths import TrialPaths
 from harbor.trial.hooks import TrialEvent
 
@@ -169,8 +168,8 @@ async def test_post_start_hooks_run_inside_start_after_the_container_is_up(
     async def warm() -> None:
         return None
 
-    async def observe_environment(*_: Any, **__: Any) -> ExecResult:
-        return ExecResult(return_code=0, stdout='["PATH"]')
+    async def inspected(*_: Any, **__: Any) -> list[str]:
+        return ["PATH"]
 
     monkeypatch.setattr("harbor.environments.docker.docker.DockerEnvironment.start", compose_start)
     monkeypatch.setattr(env_module, "warm_agent_imports", warm)
@@ -180,7 +179,7 @@ async def test_post_start_hooks_run_inside_start_after_the_container_is_up(
     env._compose_task_env = {}  # noqa: SLF001
     env._sandbox_env_names = {}  # noqa: SLF001
     env.trial_paths = TrialPaths(tmp_path)
-    monkeypatch.setattr(env, "exec", observe_environment)
+    monkeypatch.setattr(env, "_inspect_container_env_names", inspected)
     monkeypatch.setattr(env, "_is_rootless_docker", rootless, raising=False)
 
     async def hook() -> None:

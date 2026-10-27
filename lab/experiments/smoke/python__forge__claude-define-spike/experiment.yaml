@@ -1,0 +1,29 @@
+# S5 counterpart of the forge define-build-verify spike; operational, not citable.
+schema_version: 3
+kind: smoke
+id: python__forge__claude-define-spike
+description: Claude Code define-build-verify@2 mechanics on forge; not citable.
+problems:
+  - ref: scb/forge@38d627ecf668
+runtime: python
+agents:
+  - id: agent
+    release: claude-code@1
+    model: claude-sonnet-4-6
+    reasoning: low
+protocol:
+  progression: continue
+  agent_timeout_sec: 1800
+  verifier_timeout_sec: 900
+  snapshot_source: artifact
+arms:
+  - id: define
+    agent: agent
+    workflow: define-build-verify@2
+assessment:
+  scorers: [correctness@2, code-quality@4, resource-usage@2, process-compliance@7, definition-coverage@1, test-coverage@1]
+  metric: scb-canonical@2
+analysis:
+  baseline_arm: define
+  attempts: 1
+  seed: 20261027

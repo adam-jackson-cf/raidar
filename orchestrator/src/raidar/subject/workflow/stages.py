@@ -80,11 +80,18 @@ ADAPTER_MODULES: Mapping[AgentName, tuple[str, ...]] = {
         "subject/agent/adapters/harbor_cli.py",
         "subject/agent/adapters/codex_cli.py",
         "subject/agent/isolated_codex.py",
+        "subject/agent/protocol.py",
+        "subject/agent/probe.py",
+        "subject/agent/codex_audit.py",
     ),
     AgentName.CLAUDE_CODE: (
         "subject/agent/adapters/base.py",
         "subject/agent/adapters/harbor_cli.py",
         "subject/agent/adapters/claude_code_cli.py",
+        "subject/agent/protocol.py",
+        "subject/agent/probe.py",
+        "subject/agent/isolated_claude.py",
+        "subject/agent/claude_audit.py",
     ),
 }
 """Adapter modules (below ``raidar/``) of each agent a stage drives."""
