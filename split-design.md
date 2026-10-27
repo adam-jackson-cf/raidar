@@ -7,15 +7,23 @@
 - **2026-10-27: revised for the user's two product needs.**
   - **Need 1: problem-agnostic onboarding.** See section 3.
   - **Need 2: user-authored stages.** Stages become **packages** on one Raidar-owned contract, held in a shared registry (section 5).
-  - **Evidence for Need 2:** the decisions rest on read-only design sessions, filed under [evidence/](evidence/):
+  - **Evidence for Need 2:** the decisions rest on read-only design sessions, filed under [docs/reboot/evidence/](docs/reboot/evidence/):
     - stage authoring: `stage-authoring-opus.md` and `stage-authoring-astra.md`;
     - the registry: `stage-registry-opus.md` and `stage-registry-astra.md`;
     - stop-call failures: `stage-stop-failure-opus.md`.
-  - **Not adopted yet.** Nothing in section 5 is implemented beyond the spike. **This revision awaits the user's approval before any code changes.**
-- **Supersedes:** the earlier versions of this file. The first version had open decisions O1–O9 and "arm = agent + workflow owned by its provider". The 2026-10-26 version had fixed stage types in code.
+  - **Approved by the user on 2026-10-27.** Nothing in section 5 is implemented beyond the spike.
+- **2026-10-27: enforcement review** ([docs/reboot/evidence/enforcement-review-opus.md](docs/reboot/evidence/enforcement-review-opus.md)). User decisions:
+  - this file moves to the repository root, so contributors and coding agents can read it;
+  - the branch merges to `main` once the spike is proved and the design approved, and CI then runs through `main`;
+  - the `stage/1` contract page lives at `lab/stages/README.md`;
+  - credential preflight and host auth join the agent protocol;
+  - in-tree packages stay under `make quality` (ruff, mypy, coverage);
+  - `make security-gate` is a required phase-exit check, run on `mbp`;
+  - released versions are append-only, checked against `main`'s history.
+- **Supersedes:** the earlier versions of this file, which lived at `docs/reboot/split-design.md`. The first version had open decisions O1–O9 and "arm = agent + workflow owned by its provider". The 2026-10-26 version had fixed stage types in code.
 - **Background:**
-  - [split-exploration.md](split-exploration.md);
-  - the [versioned-items map](show-me-versioned-items-map.html).
+  - [docs/reboot/split-exploration.md](docs/reboot/split-exploration.md);
+  - the [versioned-items map](docs/reboot/show-me-versioned-items-map.html).
 - **Citations to factory-x-loops (FXL)** point at `/Users/adamjackson/Projects/inflight/factory-x-loops/factory-x-loops`, branch `feat/plan-gate`. The branch has moved since it was read, so each port re-reads its source at a pinned commit.
 
 ## 1. The boundary
@@ -538,6 +546,7 @@ Migration, in order:
 - `env -u AGENT make quality` stays green: coverage ≥ 95%, import-linter contracts, the structure allowlist and experiment locks.
 - Whenever an identity changes, the same commit relocks every experiment.
 - A phase that changes a run is smoke-proved. Real runs use codex `gpt-6-luna` at `low` with `DETACH=1`, after the user approves.
+- A phase that changes a primitive, the runner or `engine/trial` passes `make security-gate` on `mbp` before it closes.
 
 **Phase reordering.** Phases 3–9 are re-sequenced around Need 1 and Need 2:
 - solvable sets move from the clean-slate phase into problems (phase 3);
@@ -546,7 +555,7 @@ Migration, in order:
 | # | Phase | Main work | Exit |
 |---|---|---|---|
 | 0 | Review | Two independent reviews; D1–D5 settled | Done |
-| 1 | Session spike | Codex build turn plus a resumed turn under Harbor | Done 2026-10-25 ([evidence/session-resume-spike.md](evidence/session-resume-spike.md)) |
+| 1 | Session spike | Codex build turn plus a resumed turn under Harbor | Done 2026-10-25 ([docs/reboot/evidence/session-resume-spike.md](docs/reboot/evidence/session-resume-spike.md)) |
 | 2 | One-shot cutover | Agents, workflows, releases, runner, `one-shot@1`, seeding, lock and admission identity; treatment catalogue deleted | Done 2026-10-26 (`b55b6eb`) |
 | S | Workflow spike (mechanics; not a test of which method is better) | S1 isolation and parity; S2 verify; S3 define; S4 define-build-verify + judge + coverage scorers; S5 agent protocol + `claude-code@1`; S6 record-only seals, agent-user checks, validity rows W1–W11 | S1 `7e5c834`; S2 `155f4f7`; S3 `30a066b`, `0dbe2cf`, `c544323`; S4 `e245949`, `6b11515`; S5 `7c827d7`; S6 `b99048e`. Quality on S6: 2,324 passed, 95.30%. 21 Docker attack regressions pass. Smokes `s6-verify-record-02` and `s6-define-record-02` valid. Judge repeatability: 4.96% (test 2). Claude live runs blocked on Anthropic credit. Warm start at concurrency 3: p95 5.10 s against a 5 s budget |
 | 3 | Problems (Need 1) | Task text from `checkpoint_N.md`; spec hash per checkpoint; solvable sets and nondeterminism at validation; solvable-set primary outcome; bulk import and validate; `checkpoints: k` binding; runtime-pack contract page; forge removed as a default | AT-N1 (below) |
@@ -588,7 +597,7 @@ Throughout, no file is hand-written per problem and no edit is made under `orche
 
 ## 11. Independent review record
 
-- **2026-10-25: first version.** Read-only reviews: [evidence/split-design-review-opus.md](evidence/split-design-review-opus.md) (Claude Opus 5.5, high) and [evidence/split-design-review-sol.md](evidence/split-design-review-sol.md) (GPT-6.1 Sol, xhigh). Both rated it "sound with changes".
+- **2026-10-25: first version.** Read-only reviews: [docs/reboot/evidence/split-design-review-opus.md](docs/reboot/evidence/split-design-review-opus.md) (Claude Opus 5.5, high) and [docs/reboot/evidence/split-design-review-sol.md](docs/reboot/evidence/split-design-review-sol.md) (GPT-6.1 Sol, xhigh). Both rated it "sound with changes".
   - Their findings were folded into sections 3–9.
   - D1–D5 were settled as recommended.
 - **2026-10-27: spike review and Need 2 sessions.**

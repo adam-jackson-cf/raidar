@@ -6,12 +6,16 @@ new release, an unregistered name or an archived version is refused, so a lock a
 exactly the bytes it ran.
 
 ``release_issues`` is the register check ``make quality`` runs: every definition in the tree
-is registered at its current hash, every registered name is defined, and every agent's CLI pin
-equals the pin of each runtime pack that bakes its harness in (the agent pin is the source).
+is registered at its current hash, every registered name is defined, every agent's CLI pin
+equals the pin of each runtime pack that bakes its harness in (the agent pin is the source),
+and, given a base commit, no release the base registered was removed or re-hashed (released
+means frozen). ``release_base`` picks that base: the merge base with ``main``, or ``HEAD``'s
+parent when ``HEAD`` is on ``main`` itself.
 """
 
 from __future__ import annotations
 
+import subprocess
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
@@ -29,6 +33,8 @@ from raidar.contract.releases import (
     ReleaseKind,
     ReleaseRegister,
     load_register,
+    parse_register,
+    rewritten_releases,
 )
 from raidar.subject.agent.definition import (
     AgentDefinition,
@@ -214,8 +220,52 @@ def _pin_issues(agents: list[AgentDefinition]) -> list[str]:
     return issues
 
 
-def release_issues(repo_root: Path = REPO_ROOT) -> list[str]:
-    """Every register, definition and pin problem in the tree (empty when consistent)."""
+def _git(repo_root: Path, *args: str) -> str | None:
+    done = subprocess.run(
+        ["git", "-C", str(repo_root), *args], capture_output=True, text=True, check=False
+    )
+    return done.stdout.strip() if done.returncode == 0 else None
+
+
+MAIN_REFS = ("main", "origin/main")
+
+
+def release_base(repo_root: Path = REPO_ROOT) -> str | None:
+    """The commit whose register the tree's must extend; ``None`` when there is nothing before.
+
+    Off ``main``: the merge base with ``main`` (local, else ``origin/main``). On ``main``'s tip
+    (merge base is ``HEAD``): ``HEAD``'s parent. ``ReleaseError`` when no ``main`` is found.
+    """
+    head = _git(repo_root, "rev-parse", "HEAD")
+    if head is None:
+        return None
+    base = next((b for ref in MAIN_REFS if (b := _git(repo_root, "merge-base", "HEAD", ref))), None)
+    if base is None:
+        raise ReleaseError(
+            "no main branch to check released versions against: fetch main or set RELEASES_BASE"
+        )
+    return _git(repo_root, "rev-parse", "HEAD~1") if base == head else base
+
+
+def history_issues(base: str, repo_root: Path = REPO_ROOT) -> list[str]:
+    """Releases registered at commit ``base`` that the tree's register removed or re-hashed."""
+    path = releases_file(repo_root)
+    relative = path.relative_to(repo_root).as_posix()
+    text = _git(repo_root, "show", f"{base}:{relative}")
+    if text is None:
+        if _git(repo_root, "cat-file", "-e", f"{base}^{{commit}}") is None:
+            return [f"release base {base!r} is not a commit"]
+        return []  # the register did not exist yet at the base
+    try:
+        earlier = parse_register(text, f"{base}:{relative}")
+        now = load_register(path)
+    except ReleaseError as exc:
+        return [str(exc)]
+    return rewritten_releases(earlier, now)
+
+
+def release_issues(repo_root: Path = REPO_ROOT, *, base: str | None = None) -> list[str]:
+    """Every register, definition, pin and (given ``base``) history problem; empty when sound."""
     try:
         register = load_register(releases_file(repo_root))
     except ReleaseError as exc:
@@ -236,4 +286,7 @@ def release_issues(repo_root: Path = REPO_ROOT) -> list[str]:
             agents.append(load_agent(a_root, name))
         except AgentDefinitionError:
             continue  # already reported above
-    return issues + _pin_issues(agents)
+    issues += _pin_issues(agents)
+    if base is not None:
+        issues += history_issues(base, repo_root)
+    return issues

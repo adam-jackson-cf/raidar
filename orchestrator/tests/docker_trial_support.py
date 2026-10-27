@@ -3,6 +3,10 @@
 Builds a multi-step Harbor task (optionally with the generated per-step ``setup.sh`` reset),
 then runs it through Harbor's Python API with the verifier disabled. Used by the isolation
 regression test (no LLM), the liveness probes and the health-audit tests.
+
+Those tests skip without a ready target, except under ``make security-gate``, which sets
+``RAIDAR_REQUIRE_DOCKER=1``: there a missing target fails instead of skipping, so the gate can
+never pass by running nothing.
 """
 
 from __future__ import annotations
@@ -10,6 +14,7 @@ from __future__ import annotations
 import asyncio
 import functools
 import json
+import os
 import shlex
 import shutil
 import subprocess
@@ -87,9 +92,18 @@ def docker_target_reachable() -> bool:
     return True
 
 
+REQUIRE_DOCKER = "RAIDAR_REQUIRE_DOCKER"
+
+
 def docker_target_ready() -> bool:
-    """A reachable current target that also holds the pack image."""
-    return docker_target_reachable() and pack_image_present(docker_target())
+    """A reachable current target that also holds the pack image.
+
+    ``RuntimeError`` instead of ``False`` when ``RAIDAR_REQUIRE_DOCKER=1``.
+    """
+    ready = docker_target_reachable() and pack_image_present(docker_target())
+    if not ready and os.environ.get(REQUIRE_DOCKER) == "1":
+        raise RuntimeError(f"{REQUIRE_DOCKER}=1 but the Docker target or pack image is not ready")
+    return ready
 
 
 def build_task(

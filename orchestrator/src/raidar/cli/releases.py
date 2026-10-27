@@ -4,7 +4,8 @@ from __future__ import annotations
 
 import click
 
-from raidar.subject.releases import release_issues
+from raidar.contract.releases import ReleaseError
+from raidar.subject.releases import release_base, release_issues
 
 
 def register(main: click.Group) -> None:
@@ -17,9 +18,21 @@ def releases_group() -> None:
 
 
 @releases_group.command("check")
-def releases_check_command() -> None:
-    """Fail unless every definition is released at its current hash and pins agree."""
-    problems = release_issues()
+@click.option(
+    "--base",
+    default=None,
+    help="Commit whose released versions must be unchanged (default: merge base with main, "
+    "or HEAD's parent on main).",
+)
+def releases_check_command(base: str | None) -> None:
+    """Fail unless every definition is released at its current hash, pins agree and no
+    earlier release was removed or re-hashed."""
+    try:
+        resolved = base or release_base()
+    except ReleaseError as exc:
+        problems = [str(exc)]
+    else:
+        problems = release_issues(base=resolved)
     for problem in problems:
         click.echo(f"releases: {problem}", err=True)
     if problems:

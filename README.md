@@ -2,7 +2,7 @@
 
 <h1>Raidar</h1>
 
-**Controlled experiments on coding agents: does a workflow (staged agent sessions such as a review loop or guardrail gate) change what an agent + model delivers on pinned problems, and which agent does best?**
+**Controlled experiments on coding agents: does a workflow (a build prompt plus stage packages such as a verify gate or a feature definition, all in one agent session per checkpoint) change what an agent + model delivers on pinned problems, and which agent does best?**
 
 ![Status](https://img.shields.io/badge/status-active-brightgreen.svg?style=flat-square)
 ![Python](https://img.shields.io/badge/python-3.12-blue.svg?style=flat-square)
@@ -15,7 +15,7 @@ Raidar runs an **experiment**: the same pinned **problems** under two or more **
 
 Raidar uses [Harbor's vocabulary](#concepts) wherever Harbor has a term (job, trial, step result, attempts, verifier, reward, agent name, environment type, metric), and keeps SCB's *problem* and *checkpoint* and its own *experiment*, *arm*, *agent release*, *workflow release*, *lock* and *verdict*.
 
-The design lives in [`docs/reboot/requirements.md`](docs/reboot/requirements.md) (frozen v1), [`docs/reboot/implementation-plan.md`](docs/reboot/implementation-plan.md), [`docs/reboot/adr-001.md`](docs/reboot/adr-001.md) and [`docs/reboot/design-memo.md`](docs/reboot/design-memo.md).
+The binding design is [`split-design.md`](split-design.md): arms, workflows and stage packages, problem onboarding, health, measurement and the implementation plan. Earlier design records live under [`docs/reboot/`](docs/reboot/).
 
 > **History.** The scenario, revision and matrix workflow was retired at the reboot cutover: no code, target or check reads `scenarios/`, `matrices/`, `environments/` or `spikes/` any more, and they have been removed from the tree. Their definitions are preserved at tag `archive/scenario-epoch`, and [`CHANGELOG.md`](CHANGELOG.md) maps each removed target to its replacement. The review surface no longer reads scenario-epoch history.
 

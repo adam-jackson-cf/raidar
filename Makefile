@@ -101,7 +101,7 @@ AGENT_SMOKE_EFFECTIVE_REASONING = $(if $(filter command line environment,$(origi
 	target-list target-status target-up target-down target-init target-prune \
 	experiment-init experiment-validate experiment-lock experiment-locks-check \
 	experiment-plan experiment-execute experiment-status \
-	perf-check perf-fixture perf-gate health \
+	perf-check perf-fixture perf-gate security-gate health \
 	ledger-check ledger-index releases-check \
 	problem-list problem-info problem-import problem-validate problem-errata-draft \
 	experiment-assess assess-regrade experiment-analyze jev-shadow-rubric \
@@ -171,7 +171,7 @@ help:
 	@echo "                                                        Validate an experiment.yaml (schema, kind and naming rules, factor guard)"
 	@echo "  make experiment-lock EXPERIMENT=... [LOCK_CHECK=1]     Write (or check, naming stale sections) <experiment>.lock.json; refuses runtime"
 	@echo "                                                        incompatibilities (RT0-RT6); lock_sha256 covers execution inputs only"
-	@echo "  make releases-check                                   Fail unless lab/releases.yaml registers each agent and workflow at its current hash and agent pins equal the pack's; part of make quality"
+	@echo "  make releases-check [RELEASES_BASE=<commit>]          Fail unless lab/releases.yaml registers each agent and workflow at its current hash, agent pins equal the pack's, and no release in the base commit (default: merge base with main, or HEAD's parent on main) was removed or re-hashed; part of make quality"
 	@echo "  make experiment-locks-check                           Fail unless every lab/experiments/*/*/*.lock.json is current (host Python patch aside); part of make quality"
 	@echo "  make ledger-check                                     Check lab/ledger/ (fault and remedy records, links, status transitions, README index); part of make quality"
 	@echo "  make ledger-index                                     Regenerate lab/ledger/README.md from the records"
@@ -203,6 +203,7 @@ help:
 	@echo "  make perf-fixture [PERF_FIXTURE_DIR=<dir>] [PERF_FIXTURE_CONCURRENCY=1]"
 	@echo "                                                        No-LLM fixture experiment (5 attempts x 2 arms) then strict perf check (Docker; builds the pack image if absent; fails, never skips, without Docker)"
 	@echo "  make perf-gate [PERF_GATE_DIR=var/tmp/perf-gate]       Enforced N1 overhead gate: perf-fixture at concurrency 1 and 3, strict; fails on any breach (Docker; release/gate check, not in make quality)"
+	@echo "  make security-gate [TARGET=<name>]                    Security regressions (no LLM): planted agent code vs the verify gate and tool tree, real containers; fails, never skips, without Docker (phase-exit check, not in make quality)"
 	@echo "  Jev targets below are DORMANT (Jev parked 2026-10-04: both policies off, out of scoring and analysis;"
 	@echo "  kept for history and a future decision; see docs/reboot/requirements.md change log, F7):"
 	@echo "  make jev-shadow-rubric SNAPSHOTS=<checkpoint-dirs> STORE=<assessment-store> [SPECS=<steps-dir>] [WITHIN=artifacts/app] [TRIAL=<id>] [REPLAY_ONLY=1] [OUT=report.json]"
@@ -404,7 +405,7 @@ experiment-lock:
 	@$(RAIDAR) lock "$(EXPERIMENT)" $(foreach item,$(EXPERIMENT_SET),--set "$(item)") $(if $(LOCK_CHECK),--check,)
 
 releases-check:
-	@$(RAIDAR) releases check
+	@$(RAIDAR) releases check $(if $(RELEASES_BASE),--base "$(RELEASES_BASE)",)
 
 # Every committed experiment lock must match a fresh lock of its experiment, section by section.
 EXPERIMENT_LOCKS := $(sort $(wildcard lab/experiments/*/*/*.lock.json))
@@ -482,6 +483,17 @@ perf-gate: docker-check
 	@rm -rf "$(PERF_GATE_DIR)"
 	@$(MAKE) --no-print-directory perf-fixture PERF_FIXTURE_CONCURRENCY=1 PERF_FIXTURE_DIR="$(PERF_GATE_DIR)/concurrency-1"
 	@$(MAKE) --no-print-directory perf-fixture PERF_FIXTURE_CONCURRENCY=3 PERF_FIXTURE_DIR="$(PERF_GATE_DIR)/concurrency-3"
+
+# The security regressions (no LLM): planted agent code against the verify gate and the
+# protected tool tree, in real containers. Needs Docker, so like perf-gate it is a phase-exit
+# check, not part of make quality; RAIDAR_REQUIRE_DOCKER=1 makes a missing target fail, not skip.
+SECURITY_GATE_TESTS := tests/test_workflow_verify_docker.py tests/test_trial_health_audit_docker.py
+
+security-gate: docker-check
+	@$(TARGET_ENV) $(RAIDAR) pack build python
+	@$(TARGET_ENV) export RAIDAR_REQUIRE_DOCKER=1 && \
+		cd orchestrator && $(REPO_RUNTIME_ENV) uv run --project . --extra dev \
+		python -m pytest $(SECURITY_GATE_TESTS) -v -rs
 
 problem-list:
 	@$(RAIDAR) problem list $(if $(PROBLEM_STORE),--store "$(PROBLEM_STORE)",)
