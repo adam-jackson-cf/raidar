@@ -16,6 +16,7 @@ from harbor.models.trial.paths import TrialPaths
 
 from raidar.engine.trial import environment as env_module
 from raidar.engine.trial.environment import RunScopedDockerEnvironment, engine_command
+from raidar.judge.secrets import JUDGE_KEY_ENV, SecretIsolationError
 
 
 @pytest.mark.parametrize(
@@ -212,28 +213,69 @@ async def test_preparing_logs_for_the_host_runs_nothing(
     await env.prepare_logs_for_host()
 
 
-async def test_start_warms_agent_imports_alongside(
-    monkeypatch: pytest.MonkeyPatch,
-    tmp_path: Path,
-) -> None:
-    calls: list[str] = []
+def _inspecting_env(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, *, stdout: str, code: int = 0
+) -> tuple[RunScopedDockerEnvironment, list[list[str]]]:
+    """A started environment whose only container access is recorded engine commands."""
 
     async def compose_start(self: Any, force_build: bool) -> None:
-        calls.append(f"start:{force_build}")
+        return None
 
     async def warm() -> None:
-        calls.append("warm")
+        return None
 
-    async def observe_environment(*_: Any, **__: Any) -> ExecResult:
-        return ExecResult(return_code=0, stdout='["PATH"]')
+    async def forbidden(*_: Any, **__: Any) -> ExecResult:
+        raise AssertionError("start must not exec in the container")
+
+    engine: list[list[str]] = []
+
+    async def run_engine(argv: list[str], **_: Any) -> ExecResult:
+        engine.append(argv)
+        return ExecResult(return_code=code, stdout=stdout)
 
     monkeypatch.setattr("harbor.environments.docker.docker.DockerEnvironment.start", compose_start)
     monkeypatch.setattr(env_module, "warm_agent_imports", warm)
-    env = _bare_env("stale", tmp_path)
-    monkeypatch.setattr(env, "exec", observe_environment)
+    env = _bare_env(None, tmp_path)
+    monkeypatch.setattr(env, "exec", forbidden)
+    monkeypatch.setattr(env, "_resolve_main_container", lambda: _resolved("cid"), raising=False)
+    monkeypatch.setattr(env, "_run_engine_command", run_engine)
+    return env, engine
+
+
+async def _resolved(container: str) -> str:
+    return container
+
+
+async def test_start_records_inspected_environment_names_without_a_container_exec(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    env, engine = _inspecting_env(monkeypatch, tmp_path, stdout="PATH\nHOME\n")
     await env.start(False)
-    assert sorted(calls) == ["start:False", "warm"]
-    assert env._main_container is None  # noqa: SLF001  (a new container is resolved again)
+    assert [argv[0] for argv in engine] == ["inspect"]
+    assert engine[0][-1] == "cid"
+    record = json.loads((tmp_path / "raidar-secret-isolation.json").read_text())
+    assert record["sandbox_env_names"]["container"] == ["HOME", "PATH"]
+
+
+async def test_start_fails_when_the_container_environment_cannot_be_inspected(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    env, _ = _inspecting_env(monkeypatch, tmp_path, stdout="", code=1)
+    with pytest.raises(RuntimeError, match="could not record sandbox environment names"):
+        await env.start(False)
+
+
+async def test_start_refuses_a_container_that_inherits_the_judge_key(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setenv(JUDGE_KEY_ENV, "sk-test-value")
+    env, _ = _inspecting_env(monkeypatch, tmp_path, stdout=f"PATH\n{JUDGE_KEY_ENV}\n")
+    with pytest.raises(SecretIsolationError, match="running container"):
+        await env.start(False)
+    assert "sk-test-value" not in (tmp_path / "raidar-secret-isolation.json").read_text()
 
 
 async def test_warm_agent_imports_loads_missing_modules_and_tolerates_absent_ones(

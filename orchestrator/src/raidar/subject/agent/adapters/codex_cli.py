@@ -3,8 +3,12 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any, override
+
+from harbor.agents.base import BaseAgent
 
 from raidar.subject.agent.codex_auth import ResolvedCodexAuth, resolve_codex_auth
+from raidar.subject.agent.isolated_codex import IsolatedCodex
 
 from ..config import AgentSpec
 from .harbor_cli import HarborCliAdapter, SupportedModelProfile
@@ -30,6 +34,19 @@ class CodexCliAdapter(HarborCliAdapter):
         "gpt-5.4": SupportedModelProfile(reasoning_levels=("low", "medium", "high", "xhigh")),
         "gpt-5.4-mini": SupportedModelProfile(reasoning_levels=("low",)),
     }
+
+    @classmethod
+    @override
+    def native_agent_class(cls) -> type[BaseAgent]:
+        return IsolatedCodex
+
+    @classmethod
+    @override
+    def isolation_kwargs(cls, settings: Any) -> dict[str, Any]:
+        return {
+            "features_off": list(settings.features_off),
+            "bundled_skills": list(settings.bundled_skills),
+        }
 
     def __init__(self, config: AgentSpec) -> None:
         super().__init__(config)

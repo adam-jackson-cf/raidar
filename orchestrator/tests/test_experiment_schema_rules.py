@@ -93,6 +93,26 @@ def test_rank_by_is_a_benchmark_setting_naming_an_outcome_metric(tmp_path: Path)
     )
 
 
+def test_an_experiment_declares_the_factors_it_varies_beyond_its_agents(tmp_path: Path) -> None:
+    plain = load_experiment(write_experiment(tmp_path / "plain", _benchmark())).spec
+    assert plain.varies == ()
+    assert "varies" not in plain.to_json()  # an undeclared spec keeps its lock bytes
+
+    declared = _benchmark()
+    declared["varies"] = ["harness", "model"]
+    spec = load_experiment(write_experiment(tmp_path / "ok", declared)).spec
+    assert spec.to_json()["varies"] == ["harness", "model"]
+
+
+@pytest.mark.parametrize("varies", [["model"], ["harness", "harness"], ["colour"]])
+def test_invalid_variation_declarations_are_refused(tmp_path: Path, varies: list[str]) -> None:
+    document = _benchmark()
+    document["varies"] = varies
+
+    with pytest.raises(SpecValidationError):
+        load_experiment(write_experiment(tmp_path, document))
+
+
 def test_small_benchmarks_and_smoke_runs_validate_with_warnings(tmp_path: Path) -> None:
     small = _benchmark()
     small["analysis"]["attempts"] = 2

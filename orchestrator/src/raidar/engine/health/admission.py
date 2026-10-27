@@ -14,21 +14,24 @@ only asked a question cannot clear a run.
 ``--allow-unsmoked`` (``ALLOW_UNSMOKED=1``) admits without one; ``job.json`` records the
 decision under ``admission``. A smoke whose stage code differs never matches, so only that
 explicit, recorded override admits a job whose stage code no clean smoke ran. Arms that declare
-different capabilities, or none, are refused outright (``capability_problem``; no override:
-an experiment that varies the harness is not supported). Smoke kinds are always admitted.
+different capabilities, or incomplete or no capabilities, are refused outright
+(``capability_problem``; no override), except that an experiment declaring ``varies: [harness]``
+may compare differing complete manifests; the arms then share canonical model id and reasoning
+unless ``model`` / ``reasoning`` are declared too. Smoke kinds are always admitted.
 """
 
 from __future__ import annotations
 
 import hashlib
 import json
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Any
 
 from raidar.contract.job_layout import JOB_LOCK_FILE, JOB_MANIFEST, TRIAL_RECORDS_DIR
 from raidar.contract.trial import TrialRecord
 from raidar.engine.health.model import load_health
+from raidar.subject.agent.definition import Capabilities
 
 SMOKE_KIND = "smoke"
 Identity = dict[str, Any]
@@ -83,6 +86,7 @@ def identity(
         "execution_sha256": execution,
         "pack": parts[1],
         "arms": arms,
+        "varies": list(((lock.get("execution") or {}).get("design") or {}).get("varies") or ()),
         "target": {"name": target.get("name"), "docker": target.get("docker")},
     }
 
@@ -223,14 +227,49 @@ def _remaining_arms(arms: list[dict[str, Any]], smoke: Identity) -> list[dict[st
     return [arm for arm in arms if arm not in smoke["arms"]]
 
 
-def capability_problem(arms: list[dict[str, Any]]) -> str | None:
-    """Why the arms cannot be compared by their capability declarations, or ``None``."""
-    declared = [arm.get("capabilities") for arm in arms]
+CAPABILITY_NAMES = frozenset(Capabilities.model_fields)
+
+
+def _declaration_problem(declared: Sequence[Mapping[str, Any] | None]) -> str | None:
+    """Why a capability declaration is absent or incomplete, or ``None``."""
     if not all(declared):
         return "an arm declares no capabilities (a lock from before declarations): relock"
-    if len({json.dumps(item, sort_keys=True) for item in declared}) > 1:
-        return "the arms declare different capabilities: an experiment varying the harness"
+    for item in declared:
+        if missing := sorted(CAPABILITY_NAMES - set(item or ())):
+            return f"an arm's capability declaration lacks {', '.join(missing)}"
     return None
+
+
+def _confounding_problem(arms: Sequence[Mapping[str, Any]], varies: Sequence[str]) -> str | None:
+    """A harness comparison's model or reasoning difference that is not declared varied."""
+    for factor, label in (("model", "canonical model"), ("reasoning", "reasoning")):
+        values = {arm.get(factor) for arm in arms}
+        if len(values) > 1 and factor not in varies:
+            return (
+                f"a harness comparison differs in {label} ({sorted(map(str, values))}): "
+                f"declare `{factor}` in `varies` or share it"
+            )
+    return None
+
+
+def capability_problem(arms: Sequence[Mapping[str, Any]], varies: Sequence[str] = ()) -> str | None:
+    """Why the arms cannot be compared, or ``None`` (FXL's comparing-harnesses rule).
+
+    Each arm is ``{"capabilities", "model", "reasoning"}`` (the lock identity's keys; ``model``
+    is the canonical id). Every arm must declare all nine capabilities, whatever else holds.
+    Differing declarations are comparable only when the experiment declares ``varies: [harness]``;
+    a harness comparison must then share the canonical model id and reasoning unless it declares
+    ``model`` / ``reasoning`` varied too.
+    """
+    declared = [arm.get("capabilities") for arm in arms]
+    if problem := _declaration_problem(declared):
+        return problem
+    if len({json.dumps(item, sort_keys=True) for item in declared}) > 1 and "harness" not in varies:
+        return (
+            "the arms declare different capabilities: declare `varies: [harness]` "
+            "to compare harnesses"
+        )
+    return _confounding_problem(arms, varies) if "harness" in varies else None
 
 
 def admit(
@@ -243,7 +282,9 @@ def admit(
     """The ``job.json`` ``admission`` record, or ``AdmissionError`` when the job is refused."""
     if kind == SMOKE_KIND:
         return {"required": False, "kind": kind}
-    if wanted is not None and (problem := capability_problem(wanted["arms"])):
+    if wanted is not None and (
+        problem := capability_problem(wanted["arms"], wanted.get("varies", ()))
+    ):
         raise AdmissionError(f"this {kind} experiment's arms cannot be compared: {problem}")
     smoke_jobs, unmet = _search(wanted, jobs_root)
     if smoke_jobs:

@@ -19,9 +19,9 @@ from raidar.contract.trial import (
 from raidar.engine.health.records_manifest import RECORDS_MANIFEST, seal_trial
 from raidar.evaluation.analysis.pooling import PoolingError, check_pooling
 from raidar.evaluation.analysis.sources import JobDir
+from tests.capability_support import CAPABILITIES, OTHER_HARNESS
 
 TRIAL = "t1"
-CAPABILITIES = {"permissions": "bypass", "isolation_proof": "full", "version_pin": "1.0"}
 PARITY = ParityRecord(
     image_id="sha256:image",
     seed_digest="seed",
@@ -103,9 +103,17 @@ def _job(
     }
     trials = [{"trial_id": TRIAL, "arm": "a", "hashes": hashes}]
     capabilities = plan.get("capabilities", CAPABILITIES)
-    arms = {"a": {"capabilities": capabilities} if capabilities is not None else {}}
+    arm = {
+        "capabilities": capabilities,
+        "canonical_model": plan.get("canonical_model"),
+        "reasoning": plan.get("reasoning"),
+    }
+    arms = {"a": arm if capabilities is not None else {}}
     return JobDir(
-        path=path, manifest=fields, plan={"arms": arms, "trials": trials}, records=records
+        path=path,
+        manifest=fields,
+        plan={"arms": arms, "trials": trials, "varies": plan.get("varies", [])},
+        records=records,
     )
 
 
@@ -273,11 +281,12 @@ def test_pooling_reports_the_shared_capabilities_and_parity(tmp_path: Path) -> N
 
 @pytest.mark.parametrize(
     ("two", "message"),
-    [({**CAPABILITIES, "isolation_proof": "partial"}, r"different capabilities \(isolation_proof"),
-     (None, "no capability declaration recorded for arm.*two/a")],
-    ids=["different", "unrecorded"],
+    [({**CAPABILITIES, "isolation_proof": "partial"}, r"different capabilities.*isolation_proof"),
+     (None, "no capability declaration recorded for arm.*two/a"),
+     ({k: v for k, v in CAPABILITIES.items() if k != "network"}, "lacks network")],
+    ids=["different", "unrecorded", "incomplete"],
 )  # fmt: skip
-def test_arms_must_share_a_capability_declaration_with_no_override(
+def test_arms_must_share_a_complete_capability_declaration_with_no_override(
     tmp_path: Path, two: dict[str, str] | None, message: str
 ) -> None:
     jobs = [_job(tmp_path, "one"), _job(tmp_path, "two", capabilities=two)]
@@ -286,6 +295,65 @@ def test_arms_must_share_a_capability_declaration_with_no_override(
         check_pooling(jobs)
     with pytest.raises(PoolingError, match="capabilities is never overridable"):
         check_pooling(jobs, ["capabilities"])
+
+
+def _harness_jobs(tmp_path: Path, **two: Any) -> list[JobDir]:
+    """Two jobs whose experiment declares a harness comparison; ``two`` shapes the second."""
+    return [
+        _job(tmp_path, "one", varies=["harness"], canonical_model="m", reasoning="low"),
+        _job(
+            tmp_path,
+            "two",
+            **{
+                "capabilities": OTHER_HARNESS,
+                "varies": ["harness"],
+                "canonical_model": "m",
+                "reasoning": "low",
+                **two,
+            },
+        ),
+    ]
+
+
+def test_a_declared_harness_comparison_pools_and_is_reported(tmp_path: Path) -> None:
+    report = check_pooling(_harness_jobs(tmp_path))
+
+    assert report.capabilities is None
+    assert report.varies == ("harness",)
+
+
+def test_every_job_must_declare_the_harness_variation(tmp_path: Path) -> None:
+    jobs = _harness_jobs(tmp_path, varies=[])
+
+    with pytest.raises(PoolingError, match=r"declare `varies: \[harness\]`"):
+        check_pooling(jobs)
+
+
+@pytest.mark.parametrize(
+    ("two", "varies", "message"),
+    [({"canonical_model": "other"}, ["harness"], "canonical model"),
+     ({"canonical_model": "other"}, ["harness", "model"], None),
+     ({"reasoning": "high"}, ["harness"], "reasoning"),
+     ({"reasoning": "high"}, ["harness", "reasoning"], None)],
+)  # fmt: skip
+def test_a_harness_comparison_differing_in_model_or_reasoning_must_declare_it(
+    tmp_path: Path, two: dict[str, str], varies: list[str], message: str | None
+) -> None:
+    jobs = [
+        _job(tmp_path, "one", varies=varies, canonical_model="m", reasoning="low"),
+        _job(
+            tmp_path,
+            "two",
+            **{"capabilities": OTHER_HARNESS, "varies": varies, "canonical_model": "m",
+               "reasoning": "low", **two},
+        ),
+    ]  # fmt: skip
+
+    if message is None:
+        assert check_pooling(jobs).varies == tuple(sorted(varies))
+    else:
+        with pytest.raises(PoolingError, match=message):
+            check_pooling(jobs)
 
 
 def test_trials_of_a_problem_must_share_a_parity_record(tmp_path: Path) -> None:

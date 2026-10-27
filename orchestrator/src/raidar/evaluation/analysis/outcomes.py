@@ -47,7 +47,9 @@ class PoolingReport(AnalysisModel):
     """False when the jobs ran on different execution-target hardware: timing and cost
     metrics are then not comparable across them (correctness and quality still pool)."""
     capabilities: dict[str, str] | None = None
-    """The capability declaration every arm shares (``None``: only pre-epoch jobs)."""
+    """The declaration every arm shares (``None``: it differs, or only pre-epoch jobs)."""
+    varies: tuple[str, ...] = ()
+    """The factors the experiment declared it varies (``harness``, ``model``, ``reasoning``)."""
     parity: dict[str, ParityComparison] = Field(default_factory=dict)
     """Per problem, the parity record every valid trial of every arm shares."""
 

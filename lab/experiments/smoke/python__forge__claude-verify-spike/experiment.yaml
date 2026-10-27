@@ -1,0 +1,30 @@
+# S5 operational smoke: one-shot-verify@1 with the isolated Claude release.
+# make experiment-execute EXPERIMENT=lab/experiments/smoke/python__forge__claude-verify-spike/experiment.yaml TARGET=mbp MAX_CHECKPOINTS=2 JOB_ID=<id> DETACH=1
+schema_version: 3
+kind: smoke
+id: python__forge__claude-verify-spike
+description: Claude Code verify-stage mechanics on forge; not citable.
+problems:
+  - ref: scb/forge@38d627ecf668
+runtime: python
+agents:
+  - id: agent
+    release: claude-code@1
+    model: claude-sonnet-4-6
+    reasoning: low
+protocol:
+  progression: continue
+  agent_timeout_sec: 1800
+  verifier_timeout_sec: 900
+  snapshot_source: artifact
+arms:
+  - id: verify
+    agent: agent
+    workflow: one-shot-verify@1
+assessment:
+  scorers: [correctness@2, code-quality@4, resource-usage@2, process-compliance@7]
+  metric: scb-canonical@2
+analysis:
+  baseline_arm: verify
+  attempts: 1
+  seed: 20261027

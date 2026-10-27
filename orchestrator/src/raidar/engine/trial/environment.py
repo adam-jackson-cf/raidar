@@ -79,6 +79,7 @@ TRANSFER_TIMEOUT_S = 600
 CONTAINER_LOOKUP_TIMEOUT_S = 10
 _EXEC_VALUE_FLAGS = frozenset({"-w", "-e", "-u"})
 _MAIN_PREFIX = f"{MAIN_SERVICE_NAME}:"
+_ENV_NAMES_TEMPLATE = '{{range .Config.Env}}{{println (index (split . "=") 0)}}{{end}}'
 # Imported lazily by Harbor's installed agents (codex, claude-code) to price a
 # step, i.e. inside the first step's post-agent gap (about 1.6-2 s, once per
 # process). Imported while the environment starts instead.
@@ -233,17 +234,30 @@ class RunScopedDockerEnvironment(DockerEnvironment):
         self._record_sandbox_env("persistent", self._persistent_env)
         self._record_sandbox_env("task", self._compose_task_env)
         await asyncio.gather(super().start(force_build), warm_agent_imports())
-        observed = await self.exec(
-            "python3 -c 'import json,os; print(json.dumps(sorted(os.environ)))'",
-            user="root",
-        )
-        if observed.return_code != 0:
-            raise RuntimeError("could not record sandbox environment names")
-        inherited = dict.fromkeys(json.loads(observed.stdout), "")
+        inherited = dict.fromkeys(await self._inspect_container_env_names(), "")
         require_key_absent(inherited, "the running container")
         self._record_sandbox_env("container", inherited)
         for hook in self._post_start:
             await hook()
+
+    async def _inspect_container_env_names(self) -> list[str]:
+        """Names (never values) of the started container's configured environment.
+
+        One ``docker inspect`` against the engine: no process runs inside the container.
+        """
+        container = await self._resolve_main_container()
+        if container is None:
+            raise RuntimeError("could not record sandbox environment names")
+        result = await self._run_engine_command(
+            ["inspect", "--format", _ENV_NAMES_TEMPLATE, container],
+            check=False,
+            timeout_sec=CONTAINER_LOOKUP_TIMEOUT_S,
+            stdin_data=None,
+            on_output=None,
+        )
+        if result.return_code != 0:
+            raise RuntimeError("could not record sandbox environment names")
+        return (result.stdout or "").splitlines()
 
     async def stop(self, delete: bool) -> None:
         try:

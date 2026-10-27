@@ -18,6 +18,7 @@ import pytest
 from harbor.agents.base import BaseAgent
 from harbor.models.agent.context import AgentContext
 
+from raidar.subject.agent.isolated_codex import IsolatedCodex
 from raidar.subject.workflow import verify
 
 CODE = "def add(a: int, b: int) -> int:\n    return a + b\n"
@@ -50,7 +51,7 @@ class LocalEnvironment:
         shutil.copyfile(source, target)
 
 
-class ScriptedAgent(BaseAgent):
+class ScriptedAgent(IsolatedCodex):
     """A native agent whose turns are scripted edits and commits in the workspace."""
 
     turns: ClassVar[list[AgentTurn]] = []
@@ -88,6 +89,14 @@ class ScriptedAgent(BaseAgent):
         )
         trajectory = {"session_id": "session-1", "steps": steps}
         (self.logs_dir / "trajectory.json").write_text(json.dumps(trajectory))
+        output = (
+            []
+            if reply is None
+            else [{"type": "item.completed", "item": {"type": "agent_message", "text": reply}}]
+        )
+        (self.logs_dir / "codex.txt").write_text(
+            "\n".join(json.dumps(item) for item in output) + "\n"
+        )
 
 
 @pytest.fixture

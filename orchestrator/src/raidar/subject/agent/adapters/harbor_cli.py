@@ -3,6 +3,9 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Any
+
+from harbor.agents.base import BaseAgent
 
 from .base import HarnessAdapter
 
@@ -24,6 +27,19 @@ class HarborCliAdapter(HarnessAdapter):
     REQUIRED_PROVIDER: str = ""
     ADAPTER_LABEL: str = ""
     REASONING_UNSUPPORTED_MESSAGE: str | None = None
+
+    @classmethod
+    def native_agent_class(cls) -> type[BaseAgent]:
+        """The Raidar class that runs this harness's Harbor agent with the definition's isolation.
+
+        It implements ``raidar.subject.agent.protocol.NativeAgent``.
+        """
+        raise NotImplementedError(f"{cls.__name__} declares no native agent class")
+
+    @classmethod
+    def isolation_kwargs(cls, settings: Any) -> dict[str, Any]:
+        """The native agent's keyword arguments for an agent definition's ``settings``."""
+        return {}
 
     @classmethod
     def supported_model_summary(cls) -> str:

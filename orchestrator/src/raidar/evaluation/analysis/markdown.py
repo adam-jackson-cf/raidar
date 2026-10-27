@@ -615,6 +615,11 @@ def _pooling_lines(report: AnalysisReport) -> list[str]:
             "- Capabilities: every arm declares the same "
             f"(isolation proof `{pooling.capabilities.get('isolation_proof')}`)"
         )
+    elif pooling.varies:
+        lines.append(
+            "- Capabilities: the experiment declares it varies "
+            f"{', '.join(f'`{item}`' for item in pooling.varies)}; arms declare their own"
+        )
     lines.extend(
         f"- Parity `{problem}`: {shared.trials} valid trial(s) share one record "
         f"(image `{shared.record.get('image_id')}`, seed `{shared.record.get('seed_digest')}`)"

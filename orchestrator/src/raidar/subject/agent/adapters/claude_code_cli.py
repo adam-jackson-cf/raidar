@@ -2,6 +2,12 @@
 
 from __future__ import annotations
 
+from typing import override
+
+from harbor.agents.base import BaseAgent
+
+from raidar.subject.agent.isolated_claude import IsolatedClaudeCode
+
 from .harbor_cli import HarborCliAdapter, SupportedModelProfile
 
 
@@ -26,3 +32,8 @@ class ClaudeCodeCliAdapter(HarborCliAdapter):
         "claude-sonnet-4-5": SupportedModelProfile(),
         "claude-haiku-4-5": SupportedModelProfile(),
     }
+
+    @classmethod
+    @override
+    def native_agent_class(cls) -> type[BaseAgent]:
+        return IsolatedClaudeCode

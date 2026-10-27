@@ -47,6 +47,8 @@ Reference = Annotated[str, Field(pattern=REFERENCE_PATTERN)]
 Runtime = Literal["python", "node-ts", "go", "rust", "java", "dotnet"]
 """Runtime pack ids (F8). A runtime is a language toolchain; only ``python`` has a pack yet."""
 ExperimentKind = Literal["ab-test", "benchmark", "smoke", "research-loop"]
+Variation = Literal["harness", "model", "reasoning"]
+"""A factor an experiment may declare it varies beyond the arm's agent entry (``varies``)."""
 # A pinned release (``0.156.1``, ``2.1.4-beta.2``): starts with a digit, so
 # floating tags (``latest``, ``stable``) and ranges (``^1.2``, ``>=1``) are refused.
 PINNED_VERSION_PATTERN = r"^[0-9]+(\.[0-9]+)*([-+][0-9A-Za-z][0-9A-Za-z.-]*)?$"
@@ -232,8 +234,22 @@ class ExperimentSpec(SpecModel):
     agents: tuple[AgentEntry, ...] = Field(min_length=1)
     protocol: ProtocolSpec = ProtocolSpec()
     arms: tuple[ArmSpec, ...] = Field(min_length=1)
+    varies: tuple[Variation, ...] = ()
+    """The factors the arms differ in on top of the agent entry, declared so admission and
+    pooling accept it. ``harness``: the arms' agent releases declare different capability
+    manifests (every arm must still declare all nine); the arms then must share the canonical
+    model id and reasoning, unless ``model`` / ``reasoning`` is declared too (those are only
+    meaningful with ``harness``)."""
     assessment: AssessmentSpec
     analysis: AnalysisSpec
+
+    @model_validator(mode="after")
+    def _variation_declared_once(self) -> ExperimentSpec:
+        if len(set(self.varies)) != len(self.varies):
+            raise ValueError("varies lists a factor more than once")
+        if self.varies and "harness" not in self.varies:
+            raise ValueError("varies: model and reasoning variation is declared with harness")
+        return self
 
     def agent(self, agent_id: str) -> AgentEntry:
         return next(agent for agent in self.agents if agent.id == agent_id)
@@ -259,4 +275,6 @@ class ExperimentSpec(SpecModel):
             name for name in ("rank_by", "primary_outcome") if getattr(self.analysis, name) is None
         }
         exclude: dict[str, Any] = {"analysis": unset} if unset else {}
+        if not self.varies:
+            exclude["varies"] = True
         return self.model_dump(mode="json", by_alias=True, exclude=exclude or None)

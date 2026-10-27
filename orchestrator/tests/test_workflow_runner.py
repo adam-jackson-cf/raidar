@@ -9,10 +9,10 @@ from types import SimpleNamespace
 from typing import Any
 
 import pytest
-from harbor.agents.base import BaseAgent
 from harbor.models.agent.context import AgentContext
 
 from raidar.contract.paths import workflows_root
+from raidar.subject.agent.isolated_codex import IsolatedCodex
 from raidar.subject.workflow.definition import load_workflow
 from raidar.subject.workflow.runner import (
     PROMPT_FILE,
@@ -28,7 +28,7 @@ ONE_SHOT_PROMPT = f"Work the issue below per the repository's own rules.\n\n{INS
 SESSION = "session-1"
 
 
-class FakeInner(BaseAgent):
+class FakeInner(IsolatedCodex):
     """A native agent that records its prompt and leaves a trajectory and token usage behind."""
 
     prompts: list[str] = []

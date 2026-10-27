@@ -25,6 +25,7 @@ from raidar.grading.records import (
     step_record_dir,
     write_step_record,
 )
+from raidar.subject.agent.codex_audit import codex_session_audit
 from tests.execution_support import StepOutcome, write_trial
 
 TRIAL_ID = "b00-p0-baseline"
@@ -125,9 +126,6 @@ def write_agent_session(trial_dir: Path, step: str, rows: list[str] | None = Non
     sessions = agent / "workflow" / "build-1" / "sessions" / "2026" / "10" / "26"
     sessions.mkdir(parents=True, exist_ok=True)
     turns = [{"stage": "build", "turn": 1, "log_dir": "workflow/build-1"}]
-    (agent / "workflow" / "workflow.json").write_text(
-        json.dumps({"kind": "raidar-workflow", "turns": turns})
-    )
     lines = [
         json.dumps(
             {
@@ -139,6 +137,10 @@ def write_agent_session(trial_dir: Path, step: str, rows: list[str] | None = Non
     ]
     rollout = sessions / "rollout-2026-10-26T00-00-00-abc.jsonl"
     rollout.write_text("\n".join(lines) + "\n")
+    turns[0]["session_audit"] = codex_session_audit(agent / "workflow" / "build-1")
+    (agent / "workflow" / "workflow.json").write_text(
+        json.dumps({"kind": "raidar-workflow", "turns": turns})
+    )
     return rollout
 
 

@@ -9,12 +9,16 @@ arm's agent and workflow hashes) can be overridden, ``stage_code`` (each arm's s
 digest) never can. A job without ``mechanics_epoch`` has no manifest: it is reported
 ``unmeasured`` (warned and labelled, not refused).
 
-Whatever the number of jobs, every arm of every measured job must carry the same capability
-declaration (``plan.json`` ``arms.<arm>.capabilities``; none recorded is refused), and every
-valid trial of a problem, across arms and jobs, the same parity record (``TrialRecord.parity``:
-image, seeded workspace, limits, network policy, agent process; none recorded is refused).
-Neither can be overridden: the arm is the only thing an experiment varies. The report records
-the shared declaration and, per problem, the shared parity record and how many trials share it.
+Whatever the number of jobs, every arm of every measured job must declare all nine capabilities
+(``plan.json`` ``arms.<arm>.capabilities``; none recorded is refused), and the declarations must
+be equal unless every job's experiment declared ``varies: [harness]`` (``plan.json``
+``varies``); a harness comparison then needs one canonical model id and reasoning across arms
+unless ``model`` / ``reasoning`` are declared varied too. Every valid trial of a problem, across
+arms and jobs, must also carry the same parity record (``TrialRecord.parity``: image, seeded
+workspace, limits, network policy, agent process; none recorded is refused). Neither can be
+overridden: the experiment declares what it varies. The report records the shared declaration
+(or the declared variation) and, per problem, the shared parity record and how many trials
+share it.
 """
 
 from __future__ import annotations
@@ -24,6 +28,7 @@ from collections.abc import Callable, Mapping, Sequence
 from typing import TYPE_CHECKING, Any
 
 from raidar.contract.job_layout import TRIAL_RECORDS_DIR, TRIALS_DIR
+from raidar.engine.health.admission import capability_problem
 from raidar.engine.health.records_manifest import tamper_findings
 from raidar.evaluation.analysis.outcomes import ParityComparison, PoolFinding, PoolingReport
 
@@ -176,15 +181,24 @@ def _differing_keys(variants: Sequence[Mapping[str, Any]]) -> list[str]:
     return [key for key in keys if len({_canonical(v.get(key)) for v in variants}) > 1]
 
 
-def _declarations(job: JobDir) -> dict[str, dict[str, str] | None]:
-    """Each arm the job planned or recorded, with its capability declaration (``None``: none)."""
+def _declarations(job: JobDir) -> dict[str, dict[str, Any] | None]:
+    """Each arm the job planned or recorded: its capability declaration, canonical model and
+    reasoning (``None``: no declaration recorded)."""
     arms = job.plan.get("arms") or {}
     planned = {str(trial["arm"]) for trial in job.plan.get("trials", ())}
-    found: dict[str, dict[str, str] | None] = {}
+    found: dict[str, dict[str, Any] | None] = {}
     for arm in sorted(planned | {record.trial.arm for record in job.records}):
         entry = arms.get(arm)
         value = entry.get(CAPABILITIES) if isinstance(entry, Mapping) else None
-        found[f"{job.job_id}/{arm}"] = dict(value) if isinstance(value, Mapping) and value else None
+        found[f"{job.job_id}/{arm}"] = (
+            {
+                CAPABILITIES: dict(value),
+                "model": entry.get("canonical_model"),
+                "reasoning": entry.get("reasoning"),
+            }
+            if isinstance(value, Mapping) and value and isinstance(entry, Mapping)
+            else None
+        )
     return found
 
 
@@ -192,28 +206,40 @@ def _measured(jobs: Sequence[JobDir]) -> list[JobDir]:
     return [job for job in jobs if _epoch(job) != PRE_EPOCH]
 
 
+def _declared_variation(jobs: Sequence[JobDir]) -> tuple[str, ...]:
+    """The factors every measured job's experiment declared it varies."""
+    declared = [set(job.plan.get("varies") or ()) for job in jobs]
+    return tuple(sorted(set.intersection(*declared))) if declared else ()
+
+
 def _capability_findings(
-    missing: Sequence[str], variants: Mapping[str, Mapping[str, str]]
+    missing: Sequence[str], arms: Sequence[Mapping[str, Any]], varies: Sequence[str]
 ) -> list[PoolFinding]:
-    found = []
     if missing:
         message = f"no capability declaration recorded for arm(s) {', '.join(missing)}"
-        found.append(PoolFinding(field=CAPABILITIES, message=message))
-    if len(variants) > 1:
-        keys = _differing_keys(list(variants.values()))
-        message = f"the arms declare different capabilities ({', '.join(keys)})"
-        found.append(PoolFinding(field=CAPABILITIES, message=message))
-    return found
+        return [PoolFinding(field=CAPABILITIES, message=message)]
+    if problem := capability_problem(arms, varies):
+        declared = [arm[CAPABILITIES] for arm in arms]
+        keys = _differing_keys(declared)
+        detail = f" ({', '.join(keys)})" if keys else ""
+        return [PoolFinding(field=CAPABILITIES, message=f"{problem}{detail}")]
+    return []
 
 
-def _capabilities(jobs: Sequence[JobDir]) -> tuple[dict[str, str] | None, list[PoolFinding]]:
-    """The one declaration every arm of every measured job shares, and what refuses it."""
-    arms = {name: value for job in _measured(jobs) for name, value in _declarations(job).items()}
+def _capabilities(
+    jobs: Sequence[JobDir],
+) -> tuple[dict[str, str] | None, tuple[str, ...], list[PoolFinding]]:
+    """The one declaration every arm shares (``None``: it differs, under a declared harness
+    variation, or nothing is measured), the declared variation, and what refuses the pool."""
+    measured = _measured(jobs)
+    arms = {name: value for job in measured for name, value in _declarations(job).items()}
     missing = [name for name, value in arms.items() if value is None]
-    variants = {_canonical(value): value for value in arms.values() if value is not None}
-    found = _capability_findings(missing, variants)
+    declared = [value for value in arms.values() if value is not None]
+    varies = _declared_variation(measured)
+    found = _capability_findings(missing, declared, varies)
+    variants = {_canonical(value[CAPABILITIES]): value[CAPABILITIES] for value in declared}
     shared = next(iter(variants.values())) if len(variants) == 1 and not found else None
-    return shared, found
+    return shared, varies, found
 
 
 def _parity_records(jobs: Sequence[JobDir]) -> list[tuple[str, str, dict[str, Any] | None]]:
@@ -292,6 +318,7 @@ def _report(
     jobs: Sequence[JobDir],
     lifted: Sequence[PoolFinding],
     capabilities: dict[str, str] | None,
+    varies: tuple[str, ...],
     parity: dict[str, ParityComparison],
 ) -> PoolingReport:
     return PoolingReport(
@@ -300,6 +327,7 @@ def _report(
         findings=tuple(lifted),
         timing_cost_comparable=all(item.field != "timing_cost" for item in lifted),
         capabilities=capabilities,
+        varies=varies,
         parity=parity,
     )
 
@@ -309,9 +337,9 @@ def check_pooling(jobs: Sequence[JobDir], overrides: Sequence[str] = ()) -> Pool
     _check_overrides(overrides)
     _require_intact(jobs)
     refusals = _refusals(jobs) if len(jobs) > 1 else []
-    capabilities, capability_refusals = _capabilities(jobs)
+    capabilities, varies, capability_refusals = _capabilities(jobs)
     parity, parity_refusals = _parity(jobs)
     refused = [item for item in refusals if item.field not in overrides]
     _refuse([*refused, *capability_refusals, *parity_refusals])
     lifted = [item for item in refusals if item.field in overrides]
-    return _report(jobs, lifted, capabilities, parity)
+    return _report(jobs, lifted, capabilities, varies, parity)

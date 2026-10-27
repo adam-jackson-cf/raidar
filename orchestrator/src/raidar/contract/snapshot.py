@@ -31,6 +31,7 @@ SNAPSHOT_EXCLUDES: tuple[str, ...] = (
     "build",
     ".raidar",
     ".agents",
+    ".claude",
 )
 
 

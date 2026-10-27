@@ -2,8 +2,8 @@
 
 ``build`` has nothing to set up. With ``structured`` (factory-x-loops' shared reply contract) the
 runner appends a compact skeleton of ``{account, ac_tests, adrs}`` to the prompt of every build,
-gate-fix, rework and repair turn, and this stage reads each such turn's reply from its trajectory
-(the agent's last message of the turn):
+gate-fix, rework and repair turn, and reads the native adapter's normalized final text from
+that turn's ``last-message.txt``:
 
 - one parser for every agent (``raidar.subject.workflow.reply``): the last top-level JSON object,
   undeclared properties dropped and recorded, every violation listed;
@@ -43,7 +43,7 @@ SYNTAX = "syntax"
 SEMANTIC = "semantic"
 REPLY_KINDS = (FIRST_BUILD, GATE_FIX, REWORK, REPAIR)
 """The turns whose reply is the structured one."""
-TRAJECTORY = "trajectory.json"
+LAST_MESSAGE_FILE = "last-message.txt"
 REPLY_RECORD = "reply.json"
 PRESENT = """\
 import os, sys
@@ -54,20 +54,6 @@ for path in sys.argv[2:]:
         print(path)
 """
 """The mapped files that are files inside the working tree (a path outside it is absent)."""
-
-
-def last_message(trajectory: Path) -> tuple[str, str]:
-    """The agent's last message in a trajectory and its identity (step, timestamp), or empty."""
-    try:
-        document = json.loads(trajectory.read_text(encoding="utf-8"))
-    except (OSError, ValueError):
-        return "", ""
-    steps = document.get("steps") if isinstance(document, dict) else None
-    for step in reversed(steps if isinstance(steps, list) else []):
-        message = step.get("message") if isinstance(step, dict) else None
-        if step.get("source") == "agent" and isinstance(message, str) and message.strip():
-            return message, f"{step.get('step_id')}@{step.get('timestamp')}"
-    return "", ""
 
 
 class Build(Stage):
@@ -85,7 +71,6 @@ class Build(Stage):
         self.adrs: dict[str, dict[str, Any]] = {}
         self.repairs = {SYNTAX: 0, SEMANTIC: 0}
         self._repaired: set[str] = set()
-        self._stamp = ""
 
     def fragment(self) -> str:
         return self.settings.prompt
@@ -101,7 +86,7 @@ class Build(Stage):
             return None
         if kind != REPAIR:
             self._repaired = set()
-        text = self._reply_text(checkpoint.logs_dir / after / TRAJECTORY)
+        text = self._reply_text(checkpoint.logs_dir / after / LAST_MESSAGE_FILE)
         value, error, dropped = read_reply(text, BUILD_SCHEMA)
         fault = SYNTAX if value is None else None
         reported = rows(value or {}, "ac_tests")
@@ -122,12 +107,12 @@ class Build(Stage):
         self._save(checkpoint, record, reported)
         return self._repair(fault, error)
 
-    def _reply_text(self, trajectory: Path) -> str:
-        text, stamp = last_message(trajectory)
-        if stamp == self._stamp:
-            text = ""  # a cumulative trajectory ended without a new reply
-        self._stamp = stamp or self._stamp
-        return text
+    @staticmethod
+    def _reply_text(path: Path) -> str:
+        try:
+            return path.read_text(encoding="utf-8")
+        except OSError:
+            return ""
 
     def _save(
         self, checkpoint: Checkpoint, record: dict[str, Any], reported: list[dict[str, Any]]
