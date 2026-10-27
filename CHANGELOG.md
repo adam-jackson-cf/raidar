@@ -6,6 +6,13 @@ All notable changes to this project are documented in this file.
 
 ### Features
 
+- `make releases-check` refuses a removed or re-hashed release: the register is append-only
+  against the merge base with `main` (or `HEAD`'s parent on `main`; `RELEASES_BASE` overrides).
+  CI checks out full history for it.
+- `make security-gate`: the Docker security regressions (verify-gate attacks, tool-tree T1) as a
+  phase-exit check; a missing Docker target fails instead of skipping (`RAIDAR_REQUIRE_DOCKER=1`).
+- The binding design moves to `split-design.md` at the repository root; `AGENTS.md`, README and
+  the package guidance point to it.
 - Native-agent protocol for isolation, process facts, usage, final text, resume stores and
   session audits; workflow and P8 consumers no longer parse Codex-specific records.
 - `claude-code@1` at the existing pack pin `2.1.285`, with isolated config, strict MCP,
