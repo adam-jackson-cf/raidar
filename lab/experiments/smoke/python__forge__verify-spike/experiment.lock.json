@@ -789,7 +789,7 @@
       "tree-sitter-language-pack": "0.13.0"
     }
   },
-  "document_sha256": "686eb1f952e1429acc9ca423cc9410e268acf0e42e27846817274982430441c5",
+  "document_sha256": "82b85cd2f5c0450b2f71441026cc77c9851a201f74372e7eba7d5290cd2e08ff",
   "execution": {
     "arms": {
       "verify": {
@@ -807,21 +807,21 @@
           "version_pin": "0.156.1",
           "workflow_skills": "placement.skills .agents/skills in the workspace /app"
         },
-        "digest": "dae5434073cf76c25cd54b56ad1a11e15a995caa96e151245b2d288052132dd7",
+        "digest": "da8adba31c37f533c5402c15192c0c5957d889cc5a1c8e705d3f3dd49300bd9f",
         "model": "gpt-6-luna",
         "provider": "openai",
         "reasoning": "low",
         "stage_code": {
-          "build": "1e11ded6a9dbccc494116a5e4fe61a83e99207d0115f03f013c14a586ca237ca",
-          "verify": "ddc9bb59611dbda953823292c03ca79d6f98b1dfd801f954f43432550d9cc0d7"
+          "build": "cdaeb11dd4136fbfaee90608ce10723280b5a76e658331f74b05a477db1a712f",
+          "verify": "9ed9f5f79103d651a88fbf274e23160b53bd8d41aeddaac4e822f2f8f44d79c0"
         },
         "tool": {
           "binary": "codex",
           "package": "@openai/codex",
           "version": "0.156.1"
         },
-        "workflow": "one-shot-verify@1",
-        "workflow_sha256": "b1576514260095087e315d11424e3aa73b02d0b81574fbbb737a19937437e5cc"
+        "workflow": "one-shot-verify@2",
+        "workflow_sha256": "8ed329ac39a77aa5edac4d0e2373832502342275113c15943d3fb8fa88c70c51"
       }
     },
     "design": {
@@ -837,7 +837,7 @@
         {
           "agent": "agent",
           "id": "verify",
-          "workflow": "one-shot-verify@1"
+          "workflow": "one-shot-verify@2"
         }
       ],
       "attempts": 1,
@@ -957,8 +957,8 @@
         }
       },
       "workflow": {
-        "one-shot-verify@1": {
-          "digest": "b1576514260095087e315d11424e3aa73b02d0b81574fbbb737a19937437e5cc",
+        "one-shot-verify@2": {
+          "digest": "8ed329ac39a77aa5edac4d0e2373832502342275113c15943d3fb8fa88c70c51",
           "metadata": {
             "stages": [
               "build",
@@ -982,10 +982,10 @@
   "experiment": {
     "id": "python__forge__verify-spike",
     "source": "experiment.yaml",
-    "source_sha256": "25e4c5bf2feff8ffcc240ca897b0c2d4c490817881e2ce46f780c0791f3be6de",
-    "spec_sha256": "4966aa96a44672942b4482ea59ff462d74aa276ca584862bdebd98aed72451de"
+    "source_sha256": "fa8ade52b536a40514dfed960ba90d943bb8469bd24ce536950d6b831d67b80c",
+    "spec_sha256": "89b33966d3c0a9c70e5df4e93abb0fef60090119398b068b2c3ec17c8d04481a"
   },
-  "lock_sha256": "dd32ec9a7d7d3fdb845229c1619950900cde090f5abbcac3895ac6f9f714e387",
+  "lock_sha256": "4a2c0dedca47cd42f20baa1f9a14469dbf0e59e111de00b34087f4064ccd7795",
   "lock_version": 4,
   "overrides": {
     "flags": {},
@@ -994,7 +994,7 @@
   "sections": {
     "analysis": "106c4f180e5678e19b2bf6fc3a34aa5ef836ed7199f3b57cf1bffbfe2bfc5ac6",
     "assessment": "01861739516d6425eb6f87cef6bf38393c417f4bc50fa97404b337307b21a8fc",
-    "execution": "dd32ec9a7d7d3fdb845229c1619950900cde090f5abbcac3895ac6f9f714e387",
+    "execution": "4a2c0dedca47cd42f20baa1f9a14469dbf0e59e111de00b34087f4064ccd7795",
     "toolchain": "031137799a0b2e57592e387ee88c1ca084774b984efc988333e59348ad537ad2"
   },
   "spec": {
@@ -1020,7 +1020,7 @@
       {
         "agent": "agent",
         "id": "verify",
-        "workflow": "one-shot-verify@1"
+        "workflow": "one-shot-verify@2"
       }
     ],
     "assessment": {
@@ -1037,7 +1037,7 @@
         "process-compliance@7"
       ]
     },
-    "description": "Verify-stage spike on forge (one-shot-verify@1); not citable.",
+    "description": "Verify-stage spike on forge (one-shot-verify@2); not citable.",
     "environment": {
       "compose_init": true,
       "type": "docker"

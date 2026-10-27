@@ -105,12 +105,11 @@ def _run(logs_dir: Path) -> tuple[AgentContext, FakeEnvironment]:
 
 
 def test_a_one_shot_checkpoint_is_one_build_turn_sent_the_workflow_prompt(tmp_path: Path) -> None:
-    context, environment = _run(tmp_path)
+    context, _ = _run(tmp_path)
 
     turn_dir = tmp_path / WORKFLOW_DIR / "build-1"
     assert (turn_dir / PROMPT_FILE).read_text() == ONE_SHOT_PROMPT
     assert FakeInner.prompts == [ONE_SHOT_PROMPT]
-    assert len(environment.commands) == 1  # the turn's logs were copied once
 
     record = json.loads((tmp_path / WORKFLOW_DIR / RECORD_FILE).read_text())
     assert record["kind"] == "raidar-workflow"

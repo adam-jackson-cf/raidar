@@ -76,6 +76,7 @@ class Checkpoint:
     task: str
     deadline: float | None = None
     turns: list[Spent] = field(default_factory=list)
+    session_paths: tuple[str, ...] = ()
 
     def remaining(self) -> float | None:
         """Seconds left before the deadline, or ``None`` when there is none."""

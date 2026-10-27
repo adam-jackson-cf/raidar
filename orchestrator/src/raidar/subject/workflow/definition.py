@@ -191,7 +191,7 @@ class VerifySettings(_Model):
     language: Literal["python"]
     prompt: str = Field(min_length=1)
     gate: GateTriggers
-    max_fix_rounds: int = Field(ge=0)
+    max_fix_rounds: int = Field(default=0, ge=0)
     max_passes: int = Field(ge=1)
     test_timeout: int = Field(gt=0)
     rules_file: str = Field(pattern=r"^[A-Za-z0-9][A-Za-z0-9._-]*$")

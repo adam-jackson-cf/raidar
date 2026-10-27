@@ -126,7 +126,11 @@ def agent_env(tmp_path: Path) -> Iterator[dict[str, str]]:
 @pytest.fixture
 def workspace(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, agent_env: dict[str, str]) -> Path:
     paths = verify.VerifyPaths(
-        workspace=str(tmp_path / "app"), home=str(tmp_path / "opt"), state=str(tmp_path / "state")
+        workspace=str(tmp_path / "app"),
+        home=str(tmp_path / "opt"),
+        state=str(tmp_path / "state"),
+        system_python=sys.executable,
+        reap=False,  # the agent's user is the test's own: reaping would kill the test run
     )
     monkeypatch.setattr(verify, "PATHS", paths)
     monkeypatch.setattr(

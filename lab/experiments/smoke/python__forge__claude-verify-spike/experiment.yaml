@@ -1,4 +1,4 @@
-# S5 operational smoke: one-shot-verify@1 with the isolated Claude release.
+# Operational smoke: one-shot-verify@2 with the isolated Claude release.
 # make experiment-execute EXPERIMENT=lab/experiments/smoke/python__forge__claude-verify-spike/experiment.yaml TARGET=mbp MAX_CHECKPOINTS=2 JOB_ID=<id> DETACH=1
 schema_version: 3
 kind: smoke
@@ -20,7 +20,7 @@ protocol:
 arms:
   - id: verify
     agent: agent
-    workflow: one-shot-verify@1
+    workflow: one-shot-verify@2
 assessment:
   scorers: [correctness@2, code-quality@4, resource-usage@2, process-compliance@7]
   metric: scb-canonical@2

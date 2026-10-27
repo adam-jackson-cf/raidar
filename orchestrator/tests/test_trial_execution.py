@@ -54,6 +54,7 @@ from tests.execution_support import (
     validated_fixture,
     write_trial,
 )
+from tests.health_support import write_agent_session
 
 SELECTION = Selection.of(fake_engine_target("orbstack"))
 
@@ -213,6 +214,14 @@ def test_the_verifier_runs_the_coverage_pass_unless_the_protocol_defers_it(
     assert config.verifier.override_timeout_sec == timeout
 
 
+def _recorded_trial(config: TrialConfig, outcomes: Sequence[StepOutcome]) -> TrialRun:
+    trial_dir = write_trial(config.trials_dir / config.trial_name, outcomes, seeded=True)
+    (trial_dir / "config.json").write_text(config.model_dump_json())
+    for outcome in outcomes:
+        write_agent_session(trial_dir, outcome.name)
+    return TrialRun(trial_dir, None)
+
+
 def test_a_run_materialises_each_trial_and_writes_step_results(
     tmp_path: Path, fixture_problem: ImportedFixture, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -230,9 +239,7 @@ def test_a_run_materialises_each_trial_and_writes_step_results(
         seen.append(config)
         provided.append(provisions)
         outcomes = [StepOutcome("checkpoint_1", passed=False)]  # halts after checkpoint 1
-        return TrialRun(
-            write_trial(config.trials_dir / config.trial_name, outcomes, seeded=True), None
-        )
+        return _recorded_trial(config, outcomes)
 
     ctx = JobContext(
         plan=plan,
@@ -427,9 +434,7 @@ def test_a_trial_that_raises_is_recorded_as_infra_and_the_run_completes(
             raise RuntimeError("Trial.create: docker unreachable")
         await asyncio.sleep(0.05)
         outcomes = [StepOutcome("checkpoint_1")]
-        return TrialRun(
-            write_trial(config.trials_dir / config.trial_name, outcomes, seeded=True), None
-        )
+        return _recorded_trial(config, outcomes)
 
     ctx = JobContext(
         plan=plan,
