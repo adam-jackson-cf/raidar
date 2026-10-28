@@ -97,7 +97,7 @@ def test_bulk_validation_preserves_each_verdict_and_report(
         report = json.loads(store.validation_path(ProblemId.parse(ref)).read_text())
         assert report["verdict"] == verdict
         assert report["repeats"] == 3
-        assert report["solvable"]["checkpoint_1"]["size"] == 3
+        assert report["solvable"]["checkpoint_1"]["size"] == (3 if verdict != "excluded" else 0)
     # One aggregate table retains both results even though one problem is excluded.
     assert f"{POSITIVE_REF}  validated_partial" in result.output
     assert f"{NEGATIVE_REF}  excluded" in result.output

@@ -55,7 +55,7 @@ ROOT_FILES = frozenset(
 )
 # The data trees the code loads at run time, each at one explicit path (contract/paths.py).
 LAB_DIRECTORIES = frozenset(
-    {"experiments", "problems", "ledger", "agents", "workflows", "environments", "judge"}
+    {"experiments", "problems", "ledger", "agents", "workflows", "stages", "environments", "judge"}
 )
 # The one data file at the lab root: the agent and workflow release register.
 LAB_FILES = frozenset({"releases.yaml"})

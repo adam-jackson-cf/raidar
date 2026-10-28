@@ -3,8 +3,8 @@
 Inputs are the job's ``TrialRecord`` (validity and identity) and the
 stored ``AssessResult`` of each scorer (``None`` when the store has no
 Assessment for this trial). Nothing is recomputed from raw run files:
-correctness comes from ``correctness@5``, quality from ``code-quality@6``,
-cost from ``resource-usage@4``, and the headline score from the experiment's
+correctness comes from ``correctness@6``, quality from ``code-quality@7``,
+cost from ``resource-usage@5``, and the headline score from the experiment's
 Metric applied to those components.
 
 The score component C (``correctness``) is the policy's definition
@@ -18,10 +18,10 @@ Two derivations are analysis-owned:
   before the last checkpoint (``not_attempted`` counts as unsolved, memo §10.1);
 - ``strict_solved[k]`` is 1 exactly when ``k`` lies in the reached prefix;
 - the ``*_solvable`` outcomes (the default primary) repeat ``solve_rate``, ``reached`` and
-  ``final_solved`` over the solvable-set metrics of ``correctness@5``; they are
+  ``final_solved`` over the solvable-set metrics of ``correctness@6``; they are
   ``unavailable`` for a problem whose lock pins no solvable set, and never replace the raw ones;
 - the ``*_errata`` outcomes repeat ``solve_rate``, ``reached`` and
-  ``final_solved`` over ``correctness@5``'s errata-applied metrics (the problem's
+  ``final_solved`` over ``correctness@6``'s errata-applied metrics (the problem's
   pinned errata); they are labelled as such and never replace the raw ones;
 - the ``gate.*`` outcomes (a gate-effort scorer, only when the lock declares
   one) are the scorer's trajectory metrics as stored: an arm without the commit
@@ -45,6 +45,7 @@ from decimal import Decimal
 from raidar.contract.trial import CheckpointState, TrialRecord
 from raidar.evaluation.analysis.outcomes import TRUNCATED, UNASSESSED, TrialOutcome, Value
 from raidar.evaluation.analysis.policy_inputs import ComponentInput, score_inputs
+from raidar.grading.solvable import EXCLUDED_STEP_REASON
 from raidar.scoring.catalog.outcomes import (
     CODE_QUALITY_REF,
     CORRECTNESS_METRIC,
@@ -159,23 +160,37 @@ def _final_solved(
     solved: str = SOLVED,
     reached: str = REACHED,
 ) -> Value:
-    last = correctness.value(solved, steps[-1])
+    scored = _scored_steps(correctness, steps, solved)
+    last = correctness.value(solved, scored[-1])
     halted = (
         progression == "halt_on_failure"
         and last.status == AssessStatus.NOT_APPLICABLE.value
         and correctness.value(reached).measured
-        and correctness.value(SOLVED, steps[-1]).status == AssessStatus.NOT_APPLICABLE.value
+        and correctness.value(SOLVED, scored[-1]).status == AssessStatus.NOT_APPLICABLE.value
     )
     return Value.ok(0.0) if halted else last
 
 
 def _solve_rate(
-    correctness: Observed, checkpoints: int, metric: str = "solved_checkpoints"
+    correctness: Observed,
+    checkpoints: int,
+    metric: str = "solved_checkpoints",
+    *,
+    counted: int | None = None,
 ) -> Value:
+    """Solved / K, or / ``counted`` when the metric covers only some planned steps."""
     solved = correctness.value(metric)
     if solved.value is None:
         return solved
-    return Value.ok(float(checkpoint_solve_rate(int(solved.value), checkpoints)))
+    return Value.ok(float(checkpoint_solve_rate(int(solved.value), counted or checkpoints)))
+
+
+def _scored_steps(correctness: Observed, steps: tuple[str, ...], solved: str) -> tuple[str, ...]:
+    """The steps whose per-step ``solved`` metric is not marked excluded from the solvable set."""
+    scored = tuple(
+        step for step in steps if correctness.value(solved, step).reason != EXCLUDED_STEP_REASON
+    )
+    return scored or steps
 
 
 def _checkpoint_rate(correctness: Observed, step: str) -> Decimal | Value:
@@ -324,7 +339,7 @@ EXCLUDED_CASES = "regression_parity_excluded_cases"
 def disagreements(result: AssessResult | None) -> Value:
     """Grader cases whose outcome differed between grading and coverage, over a trial.
 
-    The sum of code-quality@6's per-transition ``regression_parity_excluded_cases``
+    The sum of code-quality@7's per-transition ``regression_parity_excluded_cases``
     over the transitions that measured it (a transition whose G read no run is not
     applicable and adds nothing). A diagnostic of the verifier, described, never compared.
     """
@@ -381,7 +396,12 @@ def build_outcome(
             solved=ERRATA_SOLVED,
             reached=REACHED_ERRATA,
         ),
-        SOLVE_RATE_SOLVABLE: _solve_rate(correctness, checkpoints, "solved_checkpoints_solvable"),
+        SOLVE_RATE_SOLVABLE: _solve_rate(
+            correctness,
+            checkpoints,
+            "solved_checkpoints_solvable",
+            counted=len(_scored_steps(correctness, steps, SOLVABLE_SOLVED)),
+        ),
         REACHED_SOLVABLE: correctness.value(REACHED_SOLVABLE),
         FINAL_SOLVED_SOLVABLE: _final_solved(
             correctness,

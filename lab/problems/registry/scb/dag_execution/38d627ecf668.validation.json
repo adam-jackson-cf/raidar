@@ -6,7 +6,11 @@
       "status": "pass"
     },
     {
-      "detail": [],
+      "detail": [
+        "checkpoint_1: pass (empty starter reference on checkpoint_1 tests)",
+        "checkpoint_2: pass (checkpoint_1 reference on checkpoint_2 tests)",
+        "checkpoint_3: pass (checkpoint_2 reference on checkpoint_3 tests)"
+      ],
       "name": "reference_k-1_fails_k",
       "status": "pass"
     },
@@ -553,11 +557,24 @@
     "native_parity_negative"
   ],
   "problem": "scb/dag_execution@38d627ecf668",
+  "reference_digests": {
+    "negative": {
+      "checkpoint_1": "1d2ed42b2c50b3936372a558871e17eb96c66636e686c6b081289c316f23a791",
+      "checkpoint_2": "2498bba594f667cb806838bb4fa084915a8f6805ac241e2e2d84ed0af9f1ccf5",
+      "checkpoint_3": "5b637fb7554fbfd003261b5bec209b1d402b16671cabf873e680a8986c57ce30"
+    },
+    "positive": {
+      "checkpoint_1": "2498bba594f667cb806838bb4fa084915a8f6805ac241e2e2d84ed0af9f1ccf5",
+      "checkpoint_2": "5b637fb7554fbfd003261b5bec209b1d402b16671cabf873e680a8986c57ce30",
+      "checkpoint_3": "4481722f21cdc47037f8f79142e424f630d73621e7d4f0c704295d371ead2f1e"
+    }
+  },
   "repeats": 3,
   "schema_version": 1,
   "solvable": {
     "checkpoint_1": {
       "digest": "16ecfdc4b029a2d616192f0b961f12a8c3fa137c001b318409e062d1a54ff5e0",
+      "exclusion": null,
       "nondeterministic": [],
       "nondeterministic_count": 0,
       "size": 33,
@@ -600,6 +617,7 @@
     },
     "checkpoint_2": {
       "digest": "77a2ca43119f036c57e08b27e160185714074959c95c4bb88aedd82ecaf9f6dc",
+      "exclusion": null,
       "nondeterministic": [],
       "nondeterministic_count": 0,
       "size": 41,
@@ -650,6 +668,7 @@
     },
     "checkpoint_3": {
       "digest": "0d5c0811a403b0ebe1ca74528214d0f5a1b269ee69a85f01ef4cb14fa2cd3904",
+      "exclusion": null,
       "nondeterministic": [],
       "nondeterministic_count": 0,
       "size": 51,
@@ -707,130 +726,6 @@
         "checkpoint_3::test_ttl_override_basic"
       ],
       "verdict": "validated"
-    }
-  },
-  "spec_determinacy": {
-    "assertions": {
-      "audited": 1,
-      "by_rule": {
-        "exact-unstated": 1
-      }
-    },
-    "audit_version": 1,
-    "dynamic": {
-      "environment": {},
-      "reason": null,
-      "status": "ran"
-    },
-    "flagged": [],
-    "method": "Static: each audited assertion of a test (error-detail/message equality, containment or pattern; byte-level stdout comparison) is classified against the text of its origin checkpoint's specification and every earlier one (rules below). Dynamic: reference k and spec-conformant variants of it (variants below) are graded at step k; a case is sensitive to a variant when it passes on the reference and not on the variant. A case is flagged when its test has an undetermined assertion of the kind a variant it is sensitive to rewrites.",
-    "rules": {
-      "content-stated": "determined: a paragraph states what the category's detail contains",
-      "content-unstated": "undetermined: error text must contain an input value or match a pattern; no paragraph states what the category's detail contains",
-      "exact-stated": "determined: a paragraph states the exact content of the category's detail",
-      "exact-unstated": "undetermined: error text must equal an input value; no paragraph states exact content",
-      "format-stated": "determined: the specification names an output byte format",
-      "format-unstated": "undetermined: stdout compared byte for byte; no byte format stated",
-      "literal-in-spec": "determined: the asserted literal occurs in the specification text",
-      "wording-unstated": "undetermined: an error-text literal in neither the specification nor the test's inputs"
-    },
-    "sensitive_determined": [],
-    "sensitive_unexplained": [],
-    "static_undetermined": [
-      {
-        "assertion": "assert write_job['params'] == {'message': 'Hello, World!', 'prefix': 'GREETING: '}",
-        "category": null,
-        "checkpoint_origin": "checkpoint_1",
-        "expected": "write_job['params']",
-        "function": "test_checkpoint_1.py::test_string_params",
-        "kind": "error_text_equals",
-        "line": 1334,
-        "rule": "exact-unstated",
-        "why": "the error_text_equals assertion needs the <unknown category> error text to equal write_job['params'], but no paragraph of the specification states what a <unknown category> detail or message contains"
-      }
-    ],
-    "steps": {
-      "checkpoint_1": {
-        "reference": {
-          "infra_failure": null,
-          "passed": 33,
-          "total": 33
-        },
-        "variants": {
-          "neutral_error_text": {
-            "infra_failure": null,
-            "passed": 33,
-            "sensitive": [],
-            "total": 33
-          },
-          "reformatted_json": {
-            "infra_failure": null,
-            "passed": 33,
-            "sensitive": [],
-            "total": 33
-          }
-        }
-      },
-      "checkpoint_2": {
-        "reference": {
-          "infra_failure": null,
-          "passed": 41,
-          "total": 41
-        },
-        "variants": {
-          "neutral_error_text": {
-            "infra_failure": null,
-            "passed": 41,
-            "sensitive": [],
-            "total": 41
-          },
-          "reformatted_json": {
-            "infra_failure": null,
-            "passed": 41,
-            "sensitive": [],
-            "total": 41
-          }
-        }
-      },
-      "checkpoint_3": {
-        "reference": {
-          "infra_failure": null,
-          "passed": 51,
-          "total": 51
-        },
-        "variants": {
-          "neutral_error_text": {
-            "infra_failure": null,
-            "passed": 51,
-            "sensitive": [],
-            "total": 51
-          },
-          "reformatted_json": {
-            "infra_failure": null,
-            "passed": 51,
-            "sensitive": [],
-            "total": 51
-          }
-        }
-      }
-    },
-    "summary": {
-      "flagged": 0,
-      "flagged_by_checkpoint": {},
-      "flagged_by_rule": {},
-      "sensitive_determined": 0,
-      "sensitive_unexplained": 0,
-      "unconfirmed": 1
-    },
-    "unconfirmed": [
-      {
-        "case": "test_checkpoint_1.py::test_string_params",
-        "reason": "no variant changed its outcome"
-      }
-    ],
-    "variants": {
-      "neutral_error_text": "every error's human-readable text (an error object's detail or message) replaced by 'request rejected'; category, exit code and format kept",
-      "reformatted_json": "JSON stdout re-serialised with two-space indentation and a trailing newline; value and key order kept"
     }
   },
   "steps": [

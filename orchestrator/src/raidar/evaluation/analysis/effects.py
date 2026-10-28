@@ -182,7 +182,7 @@ class McNemar(AnalysisModel):
 
 
 class CostBeside(AnalysisModel):
-    """Resource usage on the effect's own pairs (descriptive; ``resource-usage@4``)."""
+    """Resource usage on the effect's own pairs (descriptive; ``resource-usage@5``)."""
 
     metric: str = TOTAL_COST
     n: int

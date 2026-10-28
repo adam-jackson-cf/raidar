@@ -6,7 +6,13 @@
       "status": "pass"
     },
     {
-      "detail": [],
+      "detail": [
+        "checkpoint_1: pass (empty starter reference on checkpoint_1 tests)",
+        "checkpoint_2: pass (checkpoint_1 reference on checkpoint_2 tests)",
+        "checkpoint_3: pass (checkpoint_2 reference on checkpoint_3 tests)",
+        "checkpoint_4: pass (checkpoint_3 reference on checkpoint_4 tests)",
+        "checkpoint_5: pass (checkpoint_4 reference on checkpoint_5 tests)"
+      ],
       "name": "reference_k-1_fails_k",
       "status": "pass"
     },
@@ -841,11 +847,28 @@
     "native_parity_negative"
   ],
   "problem": "scb/log_query@38d627ecf668",
+  "reference_digests": {
+    "negative": {
+      "checkpoint_1": "1d2ed42b2c50b3936372a558871e17eb96c66636e686c6b081289c316f23a791",
+      "checkpoint_2": "d99fba64f06834c06c3d89410c6bcff4e8849f495d937993c33757ea064e32c4",
+      "checkpoint_3": "feac6f1798e7967a754e2dae63809bf7196ef4de40399fbbada7a03ed30ba020",
+      "checkpoint_4": "a7f9b3af98ac6f06f59f23d1e698f392257ccbf1110fae284092fcbb9882cc02",
+      "checkpoint_5": "c1f22472ee26377e664ea8bfbdd3d4ef14ffcde1df7818cf09ae8107823c89bf"
+    },
+    "positive": {
+      "checkpoint_1": "d99fba64f06834c06c3d89410c6bcff4e8849f495d937993c33757ea064e32c4",
+      "checkpoint_2": "feac6f1798e7967a754e2dae63809bf7196ef4de40399fbbada7a03ed30ba020",
+      "checkpoint_3": "a7f9b3af98ac6f06f59f23d1e698f392257ccbf1110fae284092fcbb9882cc02",
+      "checkpoint_4": "c1f22472ee26377e664ea8bfbdd3d4ef14ffcde1df7818cf09ae8107823c89bf",
+      "checkpoint_5": "104e2bcc39b66ab31c8c1ffc2a4dbf39e226be36cc848fa487ba41b417a45ca9"
+    }
+  },
   "repeats": 3,
   "schema_version": 1,
   "solvable": {
     "checkpoint_1": {
       "digest": "4e1d9b1d643a852e892f42ac1ba594463cf176e3d48919af4305fdc1ffd2bb8f",
+      "exclusion": null,
       "nondeterministic": [],
       "nondeterministic_count": 0,
       "size": 134,
@@ -989,6 +1012,7 @@
     },
     "checkpoint_2": {
       "digest": "c40ab66f0a77703b078695db0b78e1f3793c2dc9e8291cdc8b58278fbee35cf2",
+      "exclusion": null,
       "nondeterministic": [],
       "nondeterministic_count": 0,
       "size": 207,
@@ -1205,6 +1229,7 @@
     },
     "checkpoint_3": {
       "digest": "5c248e3f8c2b68581fc51988bfa4bfa44dba20a34c4f41157dac9524657f5383",
+      "exclusion": null,
       "nondeterministic": [],
       "nondeterministic_count": 0,
       "size": 262,
@@ -1476,6 +1501,7 @@
     },
     "checkpoint_4": {
       "digest": "73c206bfc985ff44d9feaea186abdaba4ba3559574405346ffe04242e7d10146",
+      "exclusion": null,
       "nondeterministic": [],
       "nondeterministic_count": 0,
       "size": 299,
@@ -1784,6 +1810,7 @@
     },
     "checkpoint_5": {
       "digest": "3c8a6c70c66cc063d579ca5875820851788f1405ebe8ef56e75fce1d36bab283",
+      "exclusion": null,
       "nondeterministic": [],
       "nondeterministic_count": 0,
       "size": 336,
@@ -2126,153 +2153,6 @@
         "checkpoint_5::test_checkpoint_5_table_pocket_outside_where_error"
       ],
       "verdict": "validated"
-    }
-  },
-  "spec_determinacy": {
-    "assertions": {
-      "audited": 0,
-      "by_rule": {}
-    },
-    "audit_version": 1,
-    "dynamic": {
-      "environment": {},
-      "reason": null,
-      "status": "ran"
-    },
-    "flagged": [],
-    "method": "Static: each audited assertion of a test (error-detail/message equality, containment or pattern; byte-level stdout comparison) is classified against the text of its origin checkpoint's specification and every earlier one (rules below). Dynamic: reference k and spec-conformant variants of it (variants below) are graded at step k; a case is sensitive to a variant when it passes on the reference and not on the variant. A case is flagged when its test has an undetermined assertion of the kind a variant it is sensitive to rewrites.",
-    "rules": {
-      "content-stated": "determined: a paragraph states what the category's detail contains",
-      "content-unstated": "undetermined: error text must contain an input value or match a pattern; no paragraph states what the category's detail contains",
-      "exact-stated": "determined: a paragraph states the exact content of the category's detail",
-      "exact-unstated": "undetermined: error text must equal an input value; no paragraph states exact content",
-      "format-stated": "determined: the specification names an output byte format",
-      "format-unstated": "undetermined: stdout compared byte for byte; no byte format stated",
-      "literal-in-spec": "determined: the asserted literal occurs in the specification text",
-      "wording-unstated": "undetermined: an error-text literal in neither the specification nor the test's inputs"
-    },
-    "sensitive_determined": [],
-    "sensitive_unexplained": [],
-    "static_undetermined": [],
-    "steps": {
-      "checkpoint_1": {
-        "reference": {
-          "infra_failure": null,
-          "passed": 134,
-          "total": 134
-        },
-        "variants": {
-          "neutral_error_text": {
-            "infra_failure": null,
-            "passed": 134,
-            "sensitive": [],
-            "total": 134
-          },
-          "reformatted_json": {
-            "infra_failure": null,
-            "passed": 134,
-            "sensitive": [],
-            "total": 134
-          }
-        }
-      },
-      "checkpoint_2": {
-        "reference": {
-          "infra_failure": null,
-          "passed": 207,
-          "total": 207
-        },
-        "variants": {
-          "neutral_error_text": {
-            "infra_failure": null,
-            "passed": 207,
-            "sensitive": [],
-            "total": 207
-          },
-          "reformatted_json": {
-            "infra_failure": null,
-            "passed": 207,
-            "sensitive": [],
-            "total": 207
-          }
-        }
-      },
-      "checkpoint_3": {
-        "reference": {
-          "infra_failure": null,
-          "passed": 262,
-          "total": 262
-        },
-        "variants": {
-          "neutral_error_text": {
-            "infra_failure": null,
-            "passed": 262,
-            "sensitive": [],
-            "total": 262
-          },
-          "reformatted_json": {
-            "infra_failure": null,
-            "passed": 262,
-            "sensitive": [],
-            "total": 262
-          }
-        }
-      },
-      "checkpoint_4": {
-        "reference": {
-          "infra_failure": null,
-          "passed": 299,
-          "total": 299
-        },
-        "variants": {
-          "neutral_error_text": {
-            "infra_failure": null,
-            "passed": 299,
-            "sensitive": [],
-            "total": 299
-          },
-          "reformatted_json": {
-            "infra_failure": null,
-            "passed": 299,
-            "sensitive": [],
-            "total": 299
-          }
-        }
-      },
-      "checkpoint_5": {
-        "reference": {
-          "infra_failure": null,
-          "passed": 336,
-          "total": 336
-        },
-        "variants": {
-          "neutral_error_text": {
-            "infra_failure": null,
-            "passed": 336,
-            "sensitive": [],
-            "total": 336
-          },
-          "reformatted_json": {
-            "infra_failure": null,
-            "passed": 336,
-            "sensitive": [],
-            "total": 336
-          }
-        }
-      }
-    },
-    "summary": {
-      "flagged": 0,
-      "flagged_by_checkpoint": {},
-      "flagged_by_rule": {},
-      "sensitive_determined": 0,
-      "sensitive_unexplained": 0,
-      "unconfirmed": 0
-    },
-    "unconfirmed": [],
-    "variants": {
-      "neutral_error_text": "every error's human-readable text (an error object's detail or message) replaced by 'request rejected'; category, exit code and format kept",
-      "reformatted_json": "JSON stdout re-serialised with two-space indentation and a trailing newline; value and key order kept"
     }
   },
   "steps": [
