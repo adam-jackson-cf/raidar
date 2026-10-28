@@ -51,15 +51,15 @@ from pathlib import Path
 from typing import Any, cast
 
 from harbor.agents.base import BaseAgent
-from harbor.agents.options import AgentOptions
 from harbor.environments.base import BaseEnvironment
 from harbor.models.agent.context import AgentContext
 
 from raidar.subject.agent.protocol import ZERO, NativeAgent, Tokens
-from raidar.subject.workflow.components import skill_files
-from raidar.subject.workflow.definition import StageType, WorkflowDefinition
-from raidar.subject.workflow.factory import workflow_stages
-from raidar.subject.workflow.inner import InnerAgentSpec, create_inner
+from raidar.subject.primitive import calls
+from raidar.subject.primitive.site import TrialInvalid
+from raidar.subject.workflow.factory import checkpoint_stages, place_components
+from raidar.subject.workflow.inner import WorkflowRunnerOptions, create_inner
+from raidar.subject.workflow.package_stage import PackageStage
 from raidar.subject.workflow.stage import (
     DEADLINE,
     FIRST_BUILD,
@@ -94,19 +94,13 @@ print(json.dumps(found))
 LAST_MESSAGE_FILE = "last-message.txt"
 STEP_RECORD_PREFIX = "raidar-"
 """Step-level lab records in ``/logs/agent`` (reset report, provision records): not a turn's."""
-
-
-class WorkflowRunnerOptions(AgentOptions):
-    inner_agent: InnerAgentSpec
-    workflow: str
-    definition: WorkflowDefinition
-    skills_placement: str = ".agents/skills"
-    phase_timeout_s: float | None = None
+INVALID = "invalid"
+"""Why a checkpoint was cut when a package's instrument failed (``TrialInvalid``)."""
 
 
 @dataclass
 class Turn:
-    stage: StageType
+    stage: str
     kind: str
     index: int
     resumed: bool
@@ -293,10 +287,23 @@ class WorkflowRunner(BaseAgent):
         pinned = self.runner_options.inner_agent.kwargs.get("version")
         return str(pinned) if pinned is not None else None
 
+    instructions_text: str | None = None
+    package_stage: PackageStage | None = None
+    invalid: dict[str, Any] | None = None
+
+    def _invalid(self, invalid: TrialInvalid) -> None:
+        """The instrument failed: recorded as an integrity finding (W11), never an agent outcome."""
+        name = f"package_{invalid.kind}"
+        self.invalid = {"kind": invalid.kind, "detail": invalid.detail, "record": invalid.record}
+        self.integrity.append({"name": name, "detail": invalid.detail, "turn": "packages"})
+
     def _inner(self, logs_dir: Path) -> BaseAgent:
-        return create_inner(
-            self, self.runner_options.inner_agent, logs_dir, model_name=self.model_name
-        )
+        spec = self.runner_options.inner_agent
+        if self.instructions_text:
+            spec = spec.model_copy(
+                update={"kwargs": {**spec.kwargs, "instructions": self.instructions_text}}
+            )
+        return create_inner(self, spec, logs_dir, model_name=self.model_name)
 
     async def setup(self, environment: BaseEnvironment) -> None:
         await self._inner(self.logs_dir).setup(environment)
@@ -305,29 +312,45 @@ class WorkflowRunner(BaseAgent):
         self, instruction: str, environment: BaseEnvironment, context: AgentContext
     ) -> None:
         state = _Run()
-        stages = workflow_stages(self.runner_options.definition)
+        options = self.runner_options
         self.components: list[dict[str, str]] = []
         self.watch = SessionWatch()
         self.integrity: list[dict[str, str]] = []
-        self.staging = Path(tempfile.mkdtemp(prefix="raidar-workflow-"))
-        timeout = self.runner_options.phase_timeout_s
-        deadline = None if timeout is None else time.monotonic() + timeout
-        store = cast(NativeAgent, self._inner(self.logs_dir)).session_store()
-        paths = tuple(f"{self.environment_logs_dir}/{name}" for name in store)
-        checkpoint = Checkpoint(
-            environment, self.staging, instruction, deadline, session_paths=paths
+        self.invalid = None
+        stages, self.package_stage = checkpoint_stages(
+            options.definition,
+            locked=options.locked_packages,
+            primitives=options.primitives,
+            pack=options.pack,
+            skills_placement=options.skills_placement,
         )
+        self.staging = Path(tempfile.mkdtemp(prefix="raidar-workflow-"))
+        timeout = options.phase_timeout_s
+        deadline = None if timeout is None else time.monotonic() + timeout
         cut: str | None = None
+        checkpoint: Checkpoint | None = None
         try:
+            if self.package_stage:
+                self.package_stage.load()
+                self.instructions_text = self.package_stage.instructions_text
+            store = cast(NativeAgent, self._inner(self.logs_dir)).session_store()
+            paths = tuple(f"{self.environment_logs_dir}/{name}" for name in store)
+            checkpoint = Checkpoint(
+                environment, self.staging, instruction, deadline, session_paths=paths
+            )
             await self._work(checkpoint, state, stages, instruction)
         except asyncio.CancelledError:
             cut = DEADLINE
             raise
+        except TrialInvalid as invalid:
+            cut = INVALID
+            self._invalid(invalid)
         except Exception:
             cut = TURN_ERROR
             raise
         finally:
-            await asyncio.shield(self._close(checkpoint, stages, cut))
+            if checkpoint is not None:
+                await asyncio.shield(self._close(checkpoint, stages, cut))
             await asyncio.shield(self._lock_logs(environment))
             self._finish(context, state, stages)
 
@@ -343,16 +366,21 @@ class WorkflowRunner(BaseAgent):
             f"rm -rf {target} && mkdir {target} && chown root:root {target} && chmod 755 {target}"  # noqa: E501
         )
         with suppress(Exception):
-            await environment.exec(command, user="root")
+            await calls.trusted_exec(environment, command, user="root")
 
     async def _work(
         self, checkpoint: Checkpoint, state: _Run, stages: list[Stage], instruction: str
     ) -> None:
         """Prepare every stage, run the one prompt, then resume while a stage's checks ask."""
-        await self._place_components(checkpoint)
+        await place_components(
+            checkpoint,
+            self.runner_options.definition,
+            self.runner_options.skills_placement,
+            self.components,
+        )
         for stage in stages:
             await stage.prepare(checkpoint)
-        prompt = compose(stages, instruction)
+        prompt = self.package_stage.prompt if self.package_stage else compose(stages, instruction)
         await self._turn(checkpoint, state, stages, "build", FIRST_BUILD, prompt, resume=False)
         while True:
             followup = await self._checks(checkpoint, stages, state.turns[-1])
@@ -394,7 +422,7 @@ class WorkflowRunner(BaseAgent):
             ["python3", "-I", "-B", "-c", CTIME_SCRIPT, str(self.environment_logs_dir), *store]
         )
         try:
-            result = await environment.exec(command)
+            result = await calls.trusted_exec(environment, command)
             found = json.loads(result.stdout or "")
         except (ValueError, OSError):
             found = None
@@ -406,26 +434,10 @@ class WorkflowRunner(BaseAgent):
             return None
         return {str(k): int(v) for k, v in found.items()}
 
-    async def _place_components(self, checkpoint: Checkpoint) -> None:
-        files = skill_files(self.runner_options.definition, self.runner_options.skills_placement)
-        for relative, text in files.items():
-            record = f"{WORKFLOW_DIR}/components/{relative}"
-            path = checkpoint.logs_dir / record
-            path.parent.mkdir(parents=True, exist_ok=True)
-            path.write_text(text, encoding="utf-8")
-            await checkpoint.environment.upload_file(path, f"/app/{relative}")
-            self.components.append(
-                {
-                    "path": relative,
-                    "sha256": hashlib.sha256(text.encode()).hexdigest(),
-                    "record": record,
-                }
-            )
-
     @staticmethod
     async def _checks(
         checkpoint: Checkpoint, stages: list[Stage], turn: Turn
-    ) -> tuple[StageType, Resume] | None:
+    ) -> tuple[str, Resume] | None:
         """The first stage, in stage order, whose checks resume the session, and its ``Resume``."""
         for stage in stages:
             resume = await stage.check(checkpoint, turn.log_dir)
@@ -433,17 +445,19 @@ class WorkflowRunner(BaseAgent):
                 return stage.name, resume
         return None
 
-    @staticmethod
-    async def _close(checkpoint: Checkpoint, stages: list[Stage], cut: str | None) -> None:
+    async def _close(self, checkpoint: Checkpoint, stages: list[Stage], cut: str | None) -> None:
         for stage in stages:
-            await stage.close(checkpoint, cut)
+            try:
+                await stage.close(checkpoint, cut)
+            except TrialInvalid as invalid:
+                self._invalid(invalid)
 
     async def _turn(
         self,
         checkpoint: Checkpoint,
         state: _Run,
         stages: list[Stage],
-        stage: StageType,
+        stage: str,
         kind: str,
         prompt: str,
         *,
@@ -578,7 +592,20 @@ class WorkflowRunner(BaseAgent):
             "integrity": self.integrity,
         }
         outputs = {stage.name: stage.record() for stage in stages}
-        return {**record, **{name: value for name, value in outputs.items() if value is not None}}
+        found: dict[str, Any] = {**record}
+        found.update({name: value for name, value in outputs.items() if value is not None})
+        found.update(self._package_record())
+        return found
+
+    def _package_record(self) -> dict[str, Any]:
+        """What a package workflow adds: per-primitive evidence, its components and an invalid."""
+        found: dict[str, Any] = {}
+        if self.package_stage is not None:
+            found.update(self.package_stage.package_record())
+            found["components"] = [*self.components, *self.package_stage.components]
+        if self.invalid is not None:
+            found["invalid"] = self.invalid
+        return found
 
     def _finish(self, context: AgentContext, state: _Run, stages: list[Stage]) -> None:
         usage = state.usage()

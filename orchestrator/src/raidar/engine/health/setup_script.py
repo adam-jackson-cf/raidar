@@ -19,7 +19,10 @@ from dataclasses import dataclass
 from importlib.resources import files
 from pathlib import Path
 
+from raidar.subject.agent.native import state_paths
+
 SETUP_SCRIPT_NAME = "setup.sh"
+STATE_TARGETS_MARKER = "@STATE_TARGETS@"
 RESET_REPORT = "raidar-reset.json"
 
 # Where the agent-end reaper keeps a copy of an agent-authored ``/app/setup.sh``.
@@ -27,7 +30,12 @@ AGENT_SETUP_STASH = "/tmp/.raidar-agent-setup.sh"
 
 
 def reset_body() -> str:
-    return files("raidar.engine.health").joinpath("step_reset.sh").read_text(encoding="utf-8")
+    """``step_reset.sh`` with every native agent's ``state_paths`` as its state targets."""
+    body = files("raidar.engine.health").joinpath("step_reset.sh").read_text(encoding="utf-8")
+    entries = "\n".join(f'  "{p.target}|{p.baseline}|{p.kind}"' for p in state_paths())
+    if STATE_TARGETS_MARKER not in body:
+        raise ValueError(f"step_reset.sh has no {STATE_TARGETS_MARKER} line")
+    return body.replace(STATE_TARGETS_MARKER, entries)
 
 
 def render_setup_script() -> str:

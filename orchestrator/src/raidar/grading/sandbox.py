@@ -23,6 +23,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import json
+import shutil
 import socket
 import stat
 import subprocess
@@ -35,6 +36,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import IO, Any, Protocol
 
+from raidar.contract.snapshot import copy_snapshot
 from raidar.grading.bundle import (
     APP_PLACEHOLDER,
     TESTS_PLACEHOLDER,
@@ -114,6 +116,17 @@ class GradingSandbox(Protocol):
     async def closure_image(self, lock_text: str) -> ClosureImage: ...
 
     async def run(self, run: SandboxRun) -> SandboxResult: ...
+
+
+def stage_snapshot(snapshot: Path, run_dir: Path) -> tuple[Path, Path]:
+    """Create the fresh submission copy and output directory for one sandbox run."""
+    if run_dir.exists():
+        shutil.rmtree(run_dir)
+    app, out = run_dir / "app", run_dir / "out"
+    app.mkdir(parents=True)
+    copy_snapshot(snapshot, app)
+    out.mkdir()
+    return app, out
 
 
 def render_pytest_args(step: VerifierStepSpec, layout: SandboxLayout) -> tuple[str, ...]:

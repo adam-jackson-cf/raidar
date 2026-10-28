@@ -28,7 +28,7 @@ from raidar.engine.target.guard import REAP_FILE, TargetGuard, TargetLostError
 from raidar.engine.target.health import TargetUnavailableError
 from raidar.engine.target.job import JobTarget
 from raidar.engine.trial import driver
-from raidar.engine.trial.agent_config import CODEX_AUTH_ENV, reported_harness_pin, with_host_auth
+from raidar.engine.trial.agent_config import reported_harness_pin
 from raidar.engine.trial.config import harbor_trial_config
 from raidar.engine.trial.context import JobContext
 from raidar.engine.trial.driver import TrialRun, run_harbor_trial, run_in_order
@@ -37,12 +37,12 @@ from raidar.engine.trial.environment import (
     RunScopedDockerEnvironment,
     run_scope,
 )
+from raidar.engine.trial.host_auth import CODEX_AUTH_ENV, with_host_auth
 from raidar.engine.trial.materialise import MaterialiseError, materialise_task
 from raidar.engine.trial.plan import PlanOptions, build_plan
 from raidar.engine.trial.provision import TrialProvision
 from raidar.engine.trial.workspace import SEED_SLUG
 from raidar.grading.verifier import RaidarVerifier
-from raidar.subject.agent.codex_auth import ResolvedCodexAuth
 from raidar.subject.agent.config import Harness
 from raidar.subject.environment.python.pack_definition import load_pack_spec
 from raidar.subject.workflow.runner import WorkflowRunner
@@ -171,7 +171,7 @@ def _plan(tmp_path: Path, fixture: ImportedFixture, **changes: Any) -> Any:
         fixture.ref,
         environment={"compose_init": False},
         assessment={
-            "scorers": ["correctness@6"],
+            "scorers": ["correctness@7"],
             "inventory_policy": {"generated_globs": ["gen/**"]},
         },
         **changes,
@@ -573,8 +573,10 @@ def test_codex_gets_the_host_session_file_path_only(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     auth = tmp_path / "auth.json"
-    session = ResolvedCodexAuth("auto", "chatgpt", auth, "file")
-    monkeypatch.setattr("raidar.engine.trial.agent_config.resolve_codex_auth", lambda: session)
+    auth.write_text('{"tokens": {"access_token": "x"}}')
+    monkeypatch.setenv("CODEX_HOME", str(tmp_path))
+    monkeypatch.setenv("CODEX_AUTH_MODE", "auto")
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
     codex = AgentConfig(name="codex")
     assert with_host_auth(codex, Harness.CODEX_CLI).env == {CODEX_AUTH_ENV: str(auth)}
     assert with_host_auth(AgentConfig(name="oracle"), Harness.CODEX_CLI).env == {}
@@ -591,8 +593,8 @@ def test_codex_gets_the_host_session_file_path_only(
     # The runner passes its env to every inner turn: without
     # the session file its inner codex called the API with an empty key (401, pilot).
     assert with_host_auth(wrapper, Harness.CODEX_CLI).env == {CODEX_AUTH_ENV: str(auth)}
-    api = ResolvedCodexAuth("auto", "api", None, "OPENAI_API_KEY")
-    monkeypatch.setattr("raidar.engine.trial.agent_config.resolve_codex_auth", lambda: api)
+    monkeypatch.setenv("CODEX_AUTH_MODE", "api")
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
     assert with_host_auth(codex, Harness.CODEX_CLI).env == {}
 
 

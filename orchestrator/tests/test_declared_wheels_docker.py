@@ -16,10 +16,10 @@ from pathlib import Path
 
 import pytest
 
+from raidar.contract import wheel_cache
 from raidar.design.problem.models import ProblemId
 from raidar.design.problem.store import open_store
 from raidar.engine.trial.workspace import seed_locks, workspace_seed
-from raidar.grading import wheel_cache
 from raidar.grading.closure import build_context
 from raidar.grading.dependency_pins import lock_sha256, set_sha256
 from raidar.grading.grader import grade_step

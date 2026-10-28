@@ -1,0 +1,24 @@
+contract: stage/1
+name: note-state
+summary: Keep a short local note and verify it before the session ends.
+requires: {setup: setup/1, gate: gate/1, stop: stop/1, outputs: outputs/1}
+params: {min_words: 3}
+tokens: [GUIDANCE]
+tool:
+  project: tool
+  commands: {note-state: [python, -I, -B, -m, note_state]}
+setup: {run: [note-state, setup], timeout_s: 60}
+gate:
+  - name: note-ready
+    run: [note-state, check]
+    before: true
+    watch: /app/.raidar/note-state
+    timeout_s: 60
+on_stop:
+  run: [note-state, inspect]
+  watch: /app/.raidar/note-state
+  timeout_s: 60
+  max_rounds: 2
+outputs:
+  note: {path: /app/.raidar/note-state/note.md}
+skills: [note-keeping]

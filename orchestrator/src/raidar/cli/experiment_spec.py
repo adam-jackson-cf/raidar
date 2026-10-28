@@ -8,6 +8,7 @@ from typing import Any
 
 import click
 
+from raidar.contract.paths import tmp_root
 from raidar.contract.references import RefKind
 from raidar.design.experiment.loader import LoadedExperiment, load_experiment, overrides_from_cli
 from raidar.design.experiment.lock import (
@@ -20,6 +21,7 @@ from raidar.design.experiment.lock import (
     render_lock,
 )
 from raidar.design.experiment.validation import SpecValidationError, spec_warnings
+from raidar.subject.draft import draft_resolution
 
 
 def register(main: click.Group) -> None:
@@ -106,6 +108,12 @@ def validate_command(
     is_flag=True,
     help="With --check: accept a different host Python patch in toolchain.python only.",
 )
+@click.option(
+    "--draft",
+    is_flag=True,
+    help="Smoke experiments only: resolve unregistered packages and workflows from the working "
+    "tree and write the lock under var/tmp/drafts (a dev job; never admits a measured run).",
+)
 def lock_command(
     experiment: Path,
     attempts: int | None,
@@ -114,6 +122,7 @@ def lock_command(
     output: Path | None,
     check: bool,
     ignore_host_python: bool,
+    draft: bool,
 ) -> None:
     """Resolve an experiment to content hashes and pinned versions.
 
@@ -121,23 +130,49 @@ def lock_command(
     after a scorer, metric, threshold or toolchain change keeps it, so jobs
     executed under the earlier lock still match.
     """
-    if ignore_host_python and not check:
-        raise click.UsageError("--ignore-host-python needs --check")
-    loaded = load_cli_experiment(experiment, attempts, seed, assignments)
-    lock_path = output or default_lock_path(loaded.path)
-    try:
-        lock = build_lock(loaded, lock_path=lock_path)
-        note = (
-            check_lock_file(lock_path, lock, ignore_host_python=ignore_host_python)
-            if check
-            else None
-        )
-    except (LockError, StaleLockError) as exc:
-        raise click.ClickException(str(exc)) from exc
+    _reject_combinations(check, draft, ignore_host_python, output)
+    with draft_resolution(draft):
+        loaded = load_cli_experiment(experiment, attempts, seed, assignments)
+    lock_path = output or _default_target(loaded, draft)
+    lock, note = _resolve(loaded, lock_path, draft, check, ignore_host_python)
+    summary = f"{lock_path} (lock_sha256 {str(lock['lock_sha256'])[:12]})"
     if check:
         if note:
             click.echo(f"Note: {note}")
-        click.echo(f"Lock is current: {lock_path} (lock_sha256 {str(lock['lock_sha256'])[:12]})")
+        click.echo(f"Lock is current: {summary}")
         return
+    lock_path.parent.mkdir(parents=True, exist_ok=True)
     lock_path.write_bytes(render_lock(lock))
-    click.echo(f"Wrote {lock_path} (lock_sha256 {str(lock['lock_sha256'])[:12]})")
+    click.echo(f"Wrote {summary}")
+    if draft:
+        click.echo(f"draft lock: a dev job; run it with `--lock {lock_path}`, never measured.")
+
+
+def _reject_combinations(
+    check: bool, draft: bool, ignore_host_python: bool, output: Path | None
+) -> None:
+    if ignore_host_python and not check:
+        raise click.UsageError("--ignore-host-python needs --check")
+    if draft and check:
+        raise click.UsageError("--draft writes a lock; it cannot be combined with --check")
+    if draft and output is not None:
+        raise click.UsageError("--draft chooses its output under var/tmp; do not pass --output")
+
+
+def _resolve(
+    loaded: LoadedExperiment, lock_path: Path, draft: bool, check: bool, ignore_host_python: bool
+) -> tuple[dict[str, object], str | None]:
+    """The lock, and with ``check`` the note of comparing it to the file on disk."""
+    try:
+        lock = build_lock(loaded, lock_path=lock_path, draft=draft)
+        if not check:
+            return lock, None
+        return lock, check_lock_file(lock_path, lock, ignore_host_python=ignore_host_python)
+    except (LockError, StaleLockError) as exc:
+        raise click.ClickException(str(exc)) from exc
+
+
+def _default_target(loaded: LoadedExperiment, draft: bool) -> Path:
+    """Next to the experiment, or in its own ``var/tmp/drafts/<id>`` folder."""
+    target = default_lock_path(loaded.path)
+    return tmp_root() / "drafts" / loaded.spec.id / target.name if draft else target

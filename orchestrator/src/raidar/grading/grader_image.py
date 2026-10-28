@@ -30,6 +30,7 @@ import time
 from dataclasses import dataclass
 from pathlib import Path
 
+from raidar.contract.wheel_cache import fetch_wheels
 from raidar.grading.bundle import BundleError, VerifierBundle
 from raidar.grading.closure import (
     build_context,
@@ -40,7 +41,6 @@ from raidar.grading.closure import (
     run_install,
 )
 from raidar.grading.sandbox import CONTAINER_LAYOUT, SUBMISSION_PYTHON
-from raidar.grading.wheel_cache import fetch_wheels
 
 GRADER_VENV = CONTAINER_LAYOUT.python.removesuffix("/bin/python")
 GRADER_REPOSITORY = "raidar-oracle-grader"

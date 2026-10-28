@@ -41,9 +41,10 @@ class TrialHashes(ExecutionModel):
 
     lock: str
     problem: str
-    arm: str = Field(description="The lock's arm identity digest (agent + workflow + stage code)")
+    arm: str = Field(description="The lock's arm identity digest (agent + workflow + packages)")
     workflow: str = Field(description="The workflow's resolved content hash")
-    stage_code: str = Field(description="Digest of the arm's per-stage code digests")
+    packages: str = Field(description="Digest of the arm's packages (release, digest, proof)")
+    primitive_code: str = Field(description="Digest of the arm's per-primitive code digests")
     agent: str
     protocol: str
     trial: str

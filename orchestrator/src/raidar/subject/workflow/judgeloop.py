@@ -16,6 +16,7 @@ from collections.abc import Sequence
 from pathlib import PurePosixPath
 from typing import Any
 
+from raidar.subject.primitive import calls
 from raidar.subject.workflow import judging
 from raidar.subject.workflow.acceptance import Acceptance
 from raidar.subject.workflow.asking import Asker
@@ -182,7 +183,8 @@ class JudgeLoop:
             parts = PurePosixPath(path).parts
             if not path or PurePosixPath(path).is_absolute() or ".." in parts or path not in files:
                 continue
-            shown = await checkpoint.environment.exec(
+            shown = await calls.trusted_exec(
+                checkpoint.environment,
                 f"python3 -I -B -c {shlex.quote(SOURCE_SCRIPT)} "
                 f"{shlex.quote(self.workspace)} {shlex.quote(path)}",
                 user=None,

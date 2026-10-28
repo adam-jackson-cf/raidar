@@ -34,7 +34,7 @@ arms:
     workflow: one-shot@1
 
 assessment:
-  scorers: [correctness@6, code-quality@7, resource-usage@5, process-compliance@10]
+  scorers: [correctness@7, code-quality@8, resource-usage@6, process-compliance@11]
   metric: scb-canonical@2
 
 analysis:

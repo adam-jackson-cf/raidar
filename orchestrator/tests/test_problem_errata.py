@@ -186,7 +186,7 @@ def test_errata_reach_correctness_config_from_the_lock_only(
     loaded, lock, _ = locked_experiment(
         tmp_path / "exp", fixture.ref, environment={"compose_init": False}
     )
-    config = lock_rescore_config(lock).scorers["correctness@6"]
+    config = lock_rescore_config(lock).scorers["correctness@7"]
     assert config["errata"] == {
         fixture.ref: {
             "sha256": lock_errata(lock)[fixture.ref].sha256,
@@ -197,13 +197,13 @@ def test_errata_reach_correctness_config_from_the_lock_only(
     explicit = loaded.spec.model_copy(
         update={
             "assessment": loaded.spec.assessment.model_copy(
-                update={"scorer_config": {"correctness@6": {"errata": {}}}}
+                update={"scorer_config": {"correctness@7": {"errata": {}}}}
             )
         }
     )
     issues = [issue.render() for issue in semantic_issues(explicit)]
     assert any(
-        issue.startswith("assessment.scorer_config.correctness@6.errata:") for issue in issues
+        issue.startswith("assessment.scorer_config.correctness@7.errata:") for issue in issues
     )
 
 

@@ -17,10 +17,10 @@ import asyncio
 import time
 from pathlib import Path
 
+from raidar.contract.wheels import ARCHES, DependencyInfraError
 from raidar.grading.bundle import BundleError, VerifierBundle
-from raidar.grading.dependency_pins import ARCHES, lock_sha256, set_sha256
+from raidar.grading.dependency_pins import lock_sha256, set_sha256
 from raidar.grading.resolver import (
-    DependencyInfraError,
     Resolution,
     Resolver,
     UvResolver,

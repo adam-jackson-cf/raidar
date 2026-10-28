@@ -41,8 +41,9 @@ from collections.abc import Mapping, Sequence
 from pathlib import Path
 
 from raidar.contract.snapshot import APP_SOURCE
+from raidar.contract.wheels import ARCHES
 from raidar.engine.trial.provision import PayloadFile, TrialProvision, read_provision_record
-from raidar.grading.dependency_pins import ARCHES, DependencyLocks, DependencyPins
+from raidar.grading.dependency_pins import DependencyLocks, DependencyPins
 
 SEED_SLUG = "workspace-project"
 PROJECT_FILE = "pyproject.toml"

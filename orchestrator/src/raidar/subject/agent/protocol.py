@@ -1,9 +1,10 @@
 """The boundary every native agent (a Harbor installed agent run by Raidar) implements.
 
 The workflow runner drives one native agent per turn and knows nothing of the harness behind it:
-what must differ between harnesses is behind these six methods, implemented by
-``raidar.subject.agent.isolated_codex.IsolatedCodex`` and
-``raidar.subject.agent.isolated_claude.IsolatedClaudeCode``.
+what must differ between harnesses is behind these six methods and two classmethods, implemented
+by ``raidar.subject.agent.adapters.isolated_codex.IsolatedCodex`` and
+``raidar.subject.agent.adapters.isolated_claude.IsolatedClaudeCode`` (private to the adapters:
+callers reach a native agent through ``raidar.subject.agent.native``).
 
 - ``isolate`` prepares the turn's home, flags and environment on every dispatch (first turn and
   resumed) and sets ``harness_isolation`` (what was applied, or ``None`` before the first call).
@@ -20,17 +21,57 @@ what must differ between harnesses is behind these six methods, implemented by
 - ``session_audit`` is what the isolation check needs, normalized from the harness's own
   records; see ``session_audit_record``. Records that are missing or cannot show something are
   ``unmeasured``, never a pass.
+- ``credentials`` (class-level, no instance) says whether a host environment can authenticate the
+  harness and where a file-backed session login is kept; see ``Credentials``.
+- ``state_paths`` (class-level) lists the harness state the per-step reset returns to baseline;
+  see ``StatePath``.
 """
 
 from __future__ import annotations
 
 import hashlib
+from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Protocol, cast
+from typing import Any, Literal, Protocol, cast
 
 from harbor.environments.base import BaseEnvironment
 from harbor.models.agent.context import AgentContext
+
+
+class IsolationError(RuntimeError):
+    """The container or the agent's configuration would let host settings reach the harness."""
+
+
+@dataclass(frozen=True, slots=True)
+class Credentials:
+    """Whether a host environment can authenticate a harness.
+
+    ``issue`` is why it cannot (``None`` when it can). ``session_file`` is where a file-backed
+    session login is kept (``None`` for a harness with none), ``session_present`` whether that
+    file holds a login and ``session_used`` whether the harness would authenticate from it.
+    ``mode_env`` names the variable that selects the authentication source, if any.
+    """
+
+    issue: str | None
+    session_file: Path | None = None
+    session_present: bool = False
+    session_used: bool = False
+    mode_env: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class StatePath:
+    """One harness-persisted location the per-step reset returns to the harness baseline.
+
+    ``target`` is a shell expression the reset script evaluates (``$HOME_DIR``, ``$LOGS_DIR``),
+    ``baseline`` the entry of the harness baseline it is restored from (removed when the baseline
+    has none) and ``kind`` whether it is a directory or a file.
+    """
+
+    target: str
+    baseline: str
+    kind: Literal["dir", "file"]
 
 
 @dataclass(frozen=True)
@@ -103,6 +144,12 @@ class NativeAgent(Protocol):
     def session_store(self) -> tuple[str, ...]: ...
 
     def session_audit(self, turn_dir: Path) -> dict[str, Any]: ...
+
+    @classmethod
+    def credentials(cls, env: Mapping[str, str]) -> Credentials: ...
+
+    @classmethod
+    def state_paths(cls) -> tuple[StatePath, ...]: ...
 
 
 def cumulative_accounting(

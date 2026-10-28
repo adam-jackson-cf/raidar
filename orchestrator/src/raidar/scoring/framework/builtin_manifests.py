@@ -64,7 +64,7 @@ def _group_rate(group: str) -> MetricSpec:
 
 CORRECTNESS = ScorerManifest(
     id="correctness",
-    version="6",
+    version="7",
     description="Oracle verdicts per checkpoint and trajectory, from the oracle step records.",
     runtimes=("*",),
     evidence_required=(EvidenceInput.ORACLE_CASES,),
@@ -182,7 +182,7 @@ def _component(metric_id: str, name: str, level: MetricLevel) -> MetricSpec:
 
 CODE_QUALITY = ScorerManifest(
     id="code-quality",
-    version="7",
+    version="8",
     description=(
         "SCB-fork code-quality and inertia components over the per-step snapshots; a step "
         "graded without the in-trial coverage pass reads G's coverage run from the offline "
@@ -246,7 +246,7 @@ def _usage(metric_id: str, description: str, level: MetricLevel, unit: str) -> M
 
 RESOURCE_USAGE = ScorerManifest(
     id="resource-usage",
-    version="5",
+    version="6",
     description="Tokens, cost, turns and agent wall time from Harbor per-step usage and timing.",
     runtimes=("*",),
     evidence_required=(EvidenceInput.TRACE,),
@@ -270,7 +270,7 @@ RESOURCE_USAGE = ScorerManifest(
     ),
 )
 
-# Not registered: the metric base ``process-compliance@10`` derives its deterministic metrics
+# Not registered: the metric base ``process-compliance@11`` derives its deterministic metrics
 # from (``process_checks.manifest``); the Jev-tier metric is the fixture of the Jev gating tests.
 PROCESS_COMPLIANCE = ScorerManifest(
     id="process-compliance",

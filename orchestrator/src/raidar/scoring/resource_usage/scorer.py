@@ -1,4 +1,4 @@
-"""``resource-usage@5``: tokens, cost, turns and agent wall time (plan G4).
+"""``resource-usage@6``: tokens, cost, turns and agent wall time (plan G4).
 
 Per checkpoint, the values come from Harbor as it recorded the step:
 
@@ -198,5 +198,5 @@ class ResourceUsageScorer:
 
 
 def resource_usage_scorer() -> ResourceUsageScorer:
-    """Registry factory for ``resource-usage@5``."""
+    """Registry factory for ``resource-usage@6``."""
     return ResourceUsageScorer()

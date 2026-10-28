@@ -8,7 +8,7 @@ tool:
   package: "@openai/codex"
   binary: codex
   version: 0.156.1
-# Applied on every command, first turn and resumed (raidar.subject.agent.isolated_codex):
+# Applied on every command, first turn and resumed (raidar.subject.agent.adapters.isolated_codex):
 # a fresh CODEX_HOME (/tmp/codex-home) holding only auth.json, removed after each turn;
 # --ignore-user-config; --disable for each of features_off; and -c skills.config switching
 # off, by SKILL.md path, every bundled skill and every skill in the container's

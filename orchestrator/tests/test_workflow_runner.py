@@ -12,7 +12,6 @@ import pytest
 from harbor.models.agent.context import AgentContext
 
 from raidar.contract.paths import workflows_root
-from raidar.subject.agent.isolated_codex import IsolatedCodex
 from raidar.subject.workflow.definition import load_workflow
 from raidar.subject.workflow.runner import (
     PROMPT_FILE,
@@ -22,13 +21,14 @@ from raidar.subject.workflow.runner import (
     WorkflowRunner,
 )
 from tests.experiment_spec_support import REPO_ROOT
+from tests.native_support import CodexNative
 
 INSTRUCTION = "Add a function `add(a, b)` to main.py."
 ONE_SHOT_PROMPT = f"Work the issue below per the repository's own rules.\n\n{INSTRUCTION}"
 SESSION = "session-1"
 
 
-class FakeInner(IsolatedCodex):
+class FakeInner(CodexNative):
     """A native agent that records its prompt and leaves a trajectory and token usage behind."""
 
     prompts: list[str] = []

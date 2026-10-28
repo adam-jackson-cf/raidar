@@ -18,6 +18,7 @@ that model's reasoning level; ``arms`` name an agent id and a workflow release
 from __future__ import annotations
 
 import math
+from dataclasses import dataclass
 from pathlib import PurePosixPath
 from typing import Annotated, Any, Literal
 
@@ -52,6 +53,17 @@ Variation = Literal["harness", "model", "reasoning"]
 # A pinned release (``0.156.1``, ``2.1.4-beta.2``): starts with a digit, so
 # floating tags (``latest``, ``stable``) and ranges (``^1.2``, ``>=1``) are refused.
 PINNED_VERSION_PATTERN = r"^[0-9]+(\.[0-9]+)*([-+][0-9A-Za-z][0-9A-Za-z.-]*)?$"
+
+
+@dataclass(frozen=True, order=True)
+class FieldIssue:
+    """One problem, located by a dotted path into the experiment document."""
+
+    loc: str
+    message: str
+
+    def render(self) -> str:
+        return f"{self.loc or '<root>'}: {self.message}"
 
 
 def _relative_posix_path(value: str) -> str:
@@ -130,7 +142,7 @@ class AgentEntry(SpecModel):
 
 class ProtocolSpec(SpecModel):
     # Also scorer config: raidar.engine.job.assessment writes it for every scorer
-    # that declares ``progression`` (correctness@6), so scoring follows the job.
+    # that declares ``progression`` (correctness@7), so scoring follows the job.
     progression: Literal["continue", "halt_on_failure"] = "continue"
     min_reward: float | None = Field(default=None, gt=0.0, le=1.0)
     agent_timeout_sec: int = Field(default=1800, gt=0)
@@ -140,7 +152,7 @@ class ProtocolSpec(SpecModel):
     # Where the verifier's per-test coverage pass (G's evidence) runs: ``trial`` after each
     # step's grading run, on the trial's critical path; ``offline`` from the stored step
     # snapshots when an assessment needs it (raidar.grading.coverage.offline, read by
-    # code-quality@7). Left at ``trial`` it is omitted from every dump, so the locks, plans
+    # code-quality@8). Left at ``trial`` it is omitted from every dump, so the locks, plans
     # and hashes of experiments that do not set it keep their bytes.
     verifier_coverage: Literal["trial", "offline"] = "trial"
 

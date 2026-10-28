@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import base64
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
@@ -10,7 +11,9 @@ from typing import Any
 import pytest
 from harbor.models.agent.context import AgentContext
 
-from raidar.subject.agent.isolated_codex import CodexIsolationError, IsolatedCodex
+from raidar.subject.agent.config import Harness
+from raidar.subject.agent.protocol import IsolationError
+from tests.native_support import native_agent
 
 FEATURES = ["plugins", "remote_plugin", "apps", "plugin_sharing", "recommended_plugins"]
 BUNDLED = ["imagegen", "skill-installer"]
@@ -44,21 +47,15 @@ class ScriptedEnvironment:
         return [call["command"] for call in self.calls if needle in call["command"]]
 
 
-def _agent(logs_dir: Path, **kwargs: Any) -> IsolatedCodex:
-    return IsolatedCodex(
-        logs_dir=logs_dir,
-        model_name="openai/gpt-6-luna",
-        version="0.156.1",
-        reasoning_effort="low",
-        features_off=FEATURES,
-        bundled_skills=BUNDLED,
-        **kwargs,
+def _agent(logs_dir: Path, **kwargs: Any) -> Any:
+    return native_agent(
+        Harness.CODEX_CLI, logs_dir, features_off=FEATURES, bundled_skills=BUNDLED, **kwargs
     )
 
 
-def _turn(agent: IsolatedCodex, environment: ScriptedEnvironment, *, resume: bool) -> None:
+def _turn(agent: Any, environment: ScriptedEnvironment, *, resume: bool) -> None:
     turn = agent.resume if resume else agent.run
-    asyncio.run(turn("do the task", environment, AgentContext()))  # type: ignore[arg-type]
+    asyncio.run(turn("do the task", environment, AgentContext()))
 
 
 @pytest.mark.parametrize("resume", [False, True], ids=["first-turn", "resumed-turn"])
@@ -106,7 +103,7 @@ def test_the_turn_starts_from_a_fresh_codex_home(tmp_path: Path) -> None:
 def test_a_container_with_managed_codex_config_is_refused(tmp_path: Path) -> None:
     environment = ScriptedEnvironment(managed="/etc/codex/requirements.toml\n")
 
-    with pytest.raises(CodexIsolationError, match="requirements.toml"):
+    with pytest.raises(IsolationError, match="requirements.toml"):
         _turn(_agent(tmp_path), environment, resume=False)
     assert environment.commands("codex exec") == []
 
@@ -114,7 +111,7 @@ def test_a_container_with_managed_codex_config_is_refused(tmp_path: Path) -> Non
 def test_a_harbor_skills_dir_is_refused(tmp_path: Path) -> None:
     environment = ScriptedEnvironment()
 
-    with pytest.raises(CodexIsolationError, match="skills_dir"):
+    with pytest.raises(IsolationError, match="skills_dir"):
         _turn(_agent(tmp_path, skills_dir="/skills"), environment, resume=False)
     assert environment.calls == []
 
@@ -122,6 +119,44 @@ def test_a_harbor_skills_dir_is_refused(tmp_path: Path) -> None:
 def test_a_native_config_that_would_land_in_codex_home_is_refused(tmp_path: Path) -> None:
     environment = ScriptedEnvironment()
 
-    with pytest.raises(CodexIsolationError, match=r"config\.toml"):
+    with pytest.raises(IsolationError, match=r"config\.toml"):
         _turn(_agent(tmp_path, config={"model": "o3"}), environment, resume=False)
     assert environment.commands("codex exec") == []
+
+
+@pytest.mark.parametrize("resume", [False, True], ids=["first-turn", "resumed-turn"])
+def test_instructions_are_placed_at_the_definitions_path_in_the_isolated_home(
+    tmp_path: Path, resume: bool
+) -> None:
+    environment = ScriptedEnvironment()
+    text = "Use tabs.\nüñí\n"
+    agent = _agent(tmp_path, instructions=text, instructions_path="{home}/notes/RULES.md")
+
+    _turn(agent, environment, resume=resume)
+
+    (placed,) = environment.commands("base64 -d")
+    assert placed.endswith("| base64 -d > /tmp/codex-home/notes/RULES.md")
+    assert base64.b64encode(text.encode()).decode() in placed
+    assert "/app/AGENTS.md" not in placed
+    call = next(c for c in environment.calls if "base64 -d" in c["command"])
+    assert call["env"]["CODEX_HOME"] == "/tmp/codex-home"
+
+
+def test_no_instructions_place_nothing(tmp_path: Path) -> None:
+    environment = ScriptedEnvironment()
+
+    _turn(_agent(tmp_path, instructions_path="{home}/AGENTS.md"), environment, resume=False)
+
+    assert environment.commands("base64 -d") == []
+
+
+@pytest.mark.parametrize("path", [None, "/app/AGENTS.md", "{home}/../../app/AGENTS.md"])
+def test_instructions_never_land_outside_the_isolated_home(
+    tmp_path: Path, path: str | None
+) -> None:
+    environment = ScriptedEnvironment()
+    agent = _agent(tmp_path, instructions="x", instructions_path=path)
+
+    with pytest.raises(IsolationError):
+        _turn(agent, environment, resume=False)
+    assert environment.commands("base64 -d") == []

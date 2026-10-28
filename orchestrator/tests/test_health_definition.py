@@ -54,7 +54,23 @@ def _sealed_step(tmp_path: Path, *, verify: str | None = "gate_passed") -> Path:
         "events": "workflow/define/define-events.jsonl",
         "definition": "workflow/define/feature-definition.md",
         "definition_sha256": hashlib.sha256(output.read_bytes()).hexdigest(),
-        "checks": [{"after": "agent", "sealed": True, "status": "passed", "blocking": 0}],
+        "checks": [
+            {
+                "after": "agent",
+                "sealed": "ready",
+                "status": "ready",
+                "blocking": [],
+                "validated": {
+                    "state_sha256": hashlib.sha256(
+                        (define / "state.json").read_bytes()
+                    ).hexdigest(),
+                    "inputs_sha256": hashlib.sha256(
+                        (define / "inputs.json").read_bytes()
+                    ).hexdigest(),
+                    "rendered_sha256": hashlib.sha256(output.read_bytes()).hexdigest(),
+                },
+            }
+        ],
         "repairs": [],
         "questions": [],
         "unit_rules": 2,

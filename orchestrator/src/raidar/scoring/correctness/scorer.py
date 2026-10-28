@@ -1,4 +1,4 @@
-"""``correctness@6``: oracle verdicts per checkpoint and over the trajectory (plan G1).
+"""``correctness@7``: oracle verdicts per checkpoint and over the trajectory (plan G1).
 
 Every value is read from the oracle's host-side step record
 (``raidar-oracle/steps/<step>/record.json``), never from Harbor's trial-level
@@ -485,5 +485,5 @@ class CorrectnessScorer:
 
 
 def correctness_scorer() -> CorrectnessScorer:
-    """Registry factory for ``correctness@6``."""
+    """Registry factory for ``correctness@7``."""
     return CorrectnessScorer()

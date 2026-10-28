@@ -18,13 +18,9 @@ from pathlib import Path
 from pydantic import Field
 
 from raidar.contract.canonical import digest_json
+from raidar.contract.wheels import ARCHES
 from raidar.grading.models import VerifierModel
 
-POLICY = "declared-wheels/1"
-INDEX = "https://pypi.org/simple"
-PYTHON = "3.12"
-ARCHES = ("amd64", "arm64")
-PLATFORMS = {"amd64": "x86_64-manylinux_2_28", "arm64": "aarch64-manylinux_2_28"}
 DEPENDENCY_DIR_SUFFIX = ".deps"
 REFUSAL_REASON = "dependency_unresolvable"
 _SET_CHARS = 12

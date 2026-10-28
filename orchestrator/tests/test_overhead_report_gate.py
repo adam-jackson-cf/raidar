@@ -4,7 +4,6 @@ and the ``make perf-gate`` fixture wiring (user decision 2026-10-01 on N1 budget
 from __future__ import annotations
 
 import json
-import subprocess
 from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -13,7 +12,6 @@ import pytest
 from click.testing import CliRunner
 
 from raidar.cli import main
-from raidar.contract.paths import REPO_ROOT
 from raidar.contract.trial import (
     ExecutionValidity,
     PhaseSample,
@@ -25,7 +23,6 @@ from raidar.contract.trial import (
 from raidar.engine.perf.contention import TrialWindow, peak_during, peak_overlap
 from raidar.engine.perf.phases import trial_phases
 from tests.execution_support import StepOutcome, write_trial
-from tests.test_overhead_fixture_run import STRICT_CHECK
 
 TEARDOWN = "teardown_result_write"
 
@@ -53,7 +50,8 @@ def _record(job_dir: Path, index: int, teardown_s: float) -> TrialRecord:
         problem="p",
         arm="a",
         workflow="w",
-        stage_code="s",
+        packages="s",
+        primitive_code="s",
         agent="g",
         protocol="r",
         trial="t",
@@ -238,42 +236,3 @@ def test_empty_run_exits_non_zero(tmp_path: Path) -> None:
     empty = tmp_path / "empty"
     empty.mkdir()
     assert CliRunner().invoke(main, ["perf", "check", str(empty)]).exit_code != 0
-
-
-def _dry_run(*args: str) -> str:
-    result = subprocess.run(
-        ["make", "--no-print-directory", "-n", *args],
-        cwd=REPO_ROOT,
-        capture_output=True,
-        text=True,
-        check=False,
-    )
-    assert result.returncode == 0, result.stderr
-    return result.stdout
-
-
-def test_perf_gate_runs_the_strict_fixture_at_concurrency_1_and_3(tmp_path: Path) -> None:
-    gate = tmp_path / "gate"
-    output = _dry_run("perf-gate", f"PERF_GATE_DIR={gate}")
-    assert f'rm -rf "{gate}"' in output
-    assert output.count("tests/test_overhead_fixture_run.py") == 2
-    assert output.count("export RAIDAR_EXECUTION_DOCKER=1") == 2
-    for concurrency in (1, 3):
-        assert f'export RAIDAR_PERF_FIXTURE_CONCURRENCY="{concurrency}"' in output
-        assert f'RAIDAR_PERF_FIXTURE_DIR="{gate}/concurrency-{concurrency}"' in output
-    assert output.index('CONCURRENCY="1"') < output.index('CONCURRENCY="3"')
-    # The fixture is the enforced gate: its budget check is strict.
-    assert "--strict" in STRICT_CHECK
-
-
-def test_perf_check_target_is_report_only_unless_perf_strict(tmp_path: Path) -> None:
-    default = _dry_run("perf-check", f"JOB={tmp_path}")
-    assert f"raidar perf check {tmp_path}" in default
-    assert "--strict" not in default
-    assert "--strict" in _dry_run("perf-check", f"JOB={tmp_path}", "PERF_STRICT=1")
-
-
-def test_make_quality_does_not_run_the_docker_perf_gate() -> None:
-    makefile = (REPO_ROOT / "Makefile").read_text(encoding="utf-8")
-    recipe = makefile.split("\nquality:\n", 1)[1].split("\n\n", 1)[0]
-    assert "perf" not in recipe

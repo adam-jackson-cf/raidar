@@ -191,6 +191,6 @@ def test_arms_with_no_shared_attempt_are_refused_not_crashed() -> None:
 
 
 def test_the_lock_declared_gate_effort_scorer_is_read() -> None:
-    assert GATE_EFFORT_REF == "gate-effort@14"
-    assert gate_effort_ref(["correctness@6", "gate-effort@14"]) == "gate-effort@14"
-    assert gate_effort_ref(["correctness@6"]) is None
+    assert GATE_EFFORT_REF == "gate-effort@15"
+    assert gate_effort_ref(["correctness@7", "gate-effort@15"]) == "gate-effort@15"
+    assert gate_effort_ref(["correctness@7"]) is None

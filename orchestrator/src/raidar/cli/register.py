@@ -4,11 +4,23 @@ from __future__ import annotations
 
 import click
 
-from raidar.cli import agent, env_harbor, health, ledger, quality, releases, target, workflow
+from raidar.cli import (
+    agent,
+    env_harbor,
+    health,
+    ledger,
+    quality,
+    releases,
+    stage,
+    target,
+    workflow,
+)
 
 
 def register_commands(main: click.Group) -> None:
-    """Attach the experiment workflow, then the operational commands."""
+    """Attach the package and workflow authoring commands, the experiment workflow, then the
+    operational commands."""
+    stage.register(main)
     workflow.register(main)
     agent.register(main)
     env_harbor.register(main)
