@@ -9,7 +9,34 @@ All notable changes to this project are documented in this file.
 - Published the external-author `stage/1` contract at `lab/stages/README.md` before
   implementation: strict manifest, primitive call/stop/output protocols, bounded state,
   canary attribution and fixtures, `criteria/1`, stage identity, releases and author commands.
-  Generic runtime and commands are not yet implemented; shipped spike classes remain.
+  Shipped spike classes remain until their phase-5 package ports.
+- Added pure package/criteria validation, `stage-tree/1` hashing and the six generic primitives:
+  framed prompts, root-owned offline wheel installs, confined setup/gate/stop calls, canary
+  attribution, bounded replay snapshots and validated output copies. Shared wheel policy,
+  cache and install flags now live below both grading and subject tooling.
+- Relocated the package-capable gate payload without changing the S6 broker/client functions.
+  Generic lifecycle evidence is keyed by primitive; shipped workflows still use spike stages.
+  Declared outputs retain immutable per-call snapshots, including intermediate setup/stop results
+  and individual gate checks at seals and commits. Transport loss stays integrity-invalid even
+  below resource floors; output absence alone does not invalidate setup, resume or closed.
+- Added the `stages:` release register, strict `[ns/]name@N` references, workflow package/param
+  identity, ST1–ST7 refusals, and `packages`/`primitive_code` execution identity and pooling.
+  Expected installed trees are pinned rather than trusted from a new trial's self-baseline.
+  Immutable installs are measured and reused across checkpoints; terminal package prerequisites
+  cannot reopen when another package resumes. Canary state and closed flags are checkpoint-local.
+  Reserved task slots and duplicate declared tokens are refused before locking.
+- Added stage creation, wheel locking, offline container fixtures/replay, listing/info, workflow
+  creation and smoke-only draft locks under `var/tmp/`; no author code runs on the host.
+- Enforced primitive import inventories, install ownership, the single container-call boundary,
+  record-only health imports and private native-agent adapters. Credential preflight and reset
+  state paths now belong to the native-agent protocol. Definition health reads the inspector's
+  pinned state/input/render evidence instead of executing the method on the host.
+  Package instructions use the agent definition's isolated-home placement, never task AGENTS.md.
+- Added AT3 no-model Docker scenarios for setup/canary failures, one junk-result repair,
+  terminal round exhaustion and agent-planted pytest exit 126/timeouts; wired into security-gate.
+  Docker proof and the execution-path perf-gate are pending while `mbp` is offline.
+  Local phase-4 quality passed: 3,103 tests, 48 skips, 95.18% coverage. AT4 identity/stale-lock
+  refusals and public authoring commands passed locally; no real-model trials were run.
 
 - Problem onboarding from one pinned SCB source through `problem-list`/`problem-info`,
   bulk `problem-import SOURCE=… PROBLEMS=all|a,b,c`, and target-bounded parallel
