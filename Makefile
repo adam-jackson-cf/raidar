@@ -102,6 +102,7 @@ AGENT_SMOKE_EFFECTIVE_REASONING = $(if $(filter command line environment,$(origi
 	experiment-init experiment-validate experiment-lock experiment-locks-check \
 	experiment-plan experiment-execute experiment-status \
 	perf-check perf-fixture perf-gate security-gate health \
+	stage-new stage-lock stage-check stage-list stage-info workflow-new \
 	ledger-check ledger-index releases-check \
 	problem-list problem-info problem-import problem-validate problem-errata-draft \
 	experiment-assess assess-regrade experiment-analyze jev-shadow-rubric \
@@ -173,7 +174,16 @@ help:
 	@echo "                                                        Validate an experiment.yaml (schema, kind and naming rules, factor guard)"
 	@echo "  make experiment-lock EXPERIMENT=... [LOCK_CHECK=1]     Write (or check, naming stale sections) <experiment>.lock.json; refuses runtime"
 	@echo "                                                        incompatibilities (RT0-RT6); lock_sha256 covers execution inputs only"
-	@echo "  make releases-check [RELEASES_BASE=<commit>]          Fail unless lab/releases.yaml registers each agent and workflow at its current hash, agent pins equal the pack's, and no release in the base commit (default: merge base with main, or HEAD's parent on main) was removed or re-hashed; part of make quality"
+	@echo "                                                        DRAFT=1: smoke experiments only; writes under var/tmp/, jobs are dev, never admitted to a measured comparison"
+	@echo "  make stage-new NAME=[<ns>/]<name> [FROM=docs-check]   Write the complete tier-2 command package (pinned codespell gate, uv.lock, fixtures) under lab/stages/ (never overwrites)"
+	@echo "  make stage-lock NAME=[<ns>/]<name>                    Generate the package's wheels-only tool/uv.lock (resolution only; no package code runs on the host)"
+	@echo "  make stage-check NAME=[<ns>/]<name> [REPLAY=<trial-dir>] [TARGET=name]"
+	@echo "                                                        Run fixtures twice, offline as UID 1000 in a throwaway pack container (never on the host), validate the static"
+	@echo "                                                        contract and publish the canary record; REPLAY runs a trial's captured state through the package"
+	@echo "  make stage-list                                       List stage packages with digest and release state"
+	@echo "  make stage-info NAME=[<ns>/]<name>                    Show a package's manifest facts, digest, next register line, lock state and canary record"
+	@echo "  make workflow-new NAME=<name> [FROM=one-shot-verify]  Copy a workflow template to lab/workflows/<name> (never overwrites)"
+	@echo "  make releases-check [RELEASES_BASE=<commit>]          Fail unless lab/releases.yaml registers each agent, workflow and stage at its current hash, agent pins equal the pack's, and no release in the base commit (default: merge base with main, or HEAD's parent on main) was removed or re-hashed; part of make quality"
 	@echo "  make experiment-locks-check                           Fail unless every lab/experiments/*/*/*.lock.json is current (host Python patch aside); part of make quality"
 	@echo "  make ledger-check                                     Check lab/ledger/ (fault and remedy records, links, status transitions, README index); part of make quality"
 	@echo "  make ledger-index                                     Regenerate lab/ledger/README.md from the records"
@@ -405,7 +415,32 @@ experiment-validate:
 
 experiment-lock:
 	$(call require_var,EXPERIMENT)
-	@$(RAIDAR) lock "$(EXPERIMENT)" $(foreach item,$(EXPERIMENT_SET),--set "$(item)") $(if $(LOCK_CHECK),--check,)
+	@$(RAIDAR) lock "$(EXPERIMENT)" $(foreach item,$(EXPERIMENT_SET),--set "$(item)") $(if $(LOCK_CHECK),--check,) $(if $(DRAFT),--draft,)
+
+stage-new:
+	$(call require_var,NAME)
+	@$(RAIDAR) stage new "$(NAME)" $(if $(FROM),--from "$(FROM)",)
+
+stage-lock:
+	$(call require_var,NAME)
+	@$(RAIDAR) stage lock "$(NAME)"
+
+# Fixtures and replay run offline in a throwaway pack container on the Docker target, never on the host.
+stage-check:
+	$(call require_var,NAME)
+	@$(TARGET_ENV) $(RAIDAR) pack build "python"
+	@$(TARGET_ENV) $(RAIDAR) stage check "$(NAME)" $(if $(REPLAY),--replay "$(REPLAY)",)
+
+stage-list:
+	@$(RAIDAR) stage list
+
+stage-info:
+	$(call require_var,NAME)
+	@$(RAIDAR) stage info "$(NAME)"
+
+workflow-new:
+	$(call require_var,NAME)
+	@$(RAIDAR) workflow new "$(NAME)" $(if $(FROM),--from "$(FROM)",)
 
 releases-check:
 	@$(RAIDAR) releases check $(if $(RELEASES_BASE),--base "$(RELEASES_BASE)",)
@@ -490,7 +525,7 @@ perf-gate: docker-check
 # The security regressions (no LLM): planted agent code against the verify gate and the
 # protected tool tree, in real containers. Needs Docker, so like perf-gate it is a phase-exit
 # check, not part of make quality; RAIDAR_REQUIRE_DOCKER=1 makes a missing target fail, not skip.
-SECURITY_GATE_TESTS := tests/test_workflow_verify_docker.py tests/test_trial_health_audit_docker.py tests/test_declared_wheels_docker.py
+SECURITY_GATE_TESTS := tests/test_workflow_verify_docker.py tests/test_trial_health_audit_docker.py tests/test_declared_wheels_docker.py tests/test_package_at3_docker.py
 
 security-gate: docker-check
 	@$(TARGET_ENV) $(RAIDAR) pack build python
