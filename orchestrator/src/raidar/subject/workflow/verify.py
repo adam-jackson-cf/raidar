@@ -2,7 +2,7 @@
 
 factory-x-loops' ``one-shot-verify`` mechanics (``engine/workflow/gated.py``, ``verified.py``,
 ``capability/verify``), inside Raidar's container and the checkpoint's one primary session.
-The gate itself is ``raidar.subject.workflow.verify_gate``, uploaded beside its tools.
+The gate itself is ``raidar.subject.primitive.gate_tool``, uploaded beside its tools.
 
 **Privilege.** The stage's *recorder* never runs agent-written code with more privilege than the
 agent has. Root runs only the trusted installation (the tools environment from the pinned pack
@@ -109,7 +109,8 @@ from pathlib import Path
 from typing import Any
 
 from raidar.contract.snapshot import SNAPSHOT_EXCLUDES
-from raidar.subject.workflow import judging, verify_gate
+from raidar.subject.primitive import calls, gate_tool
+from raidar.subject.workflow import judging
 from raidar.subject.workflow.acceptance import Acceptance
 from raidar.subject.workflow.definition import VERIFY_TOKEN, VerifySettings
 from raidar.subject.workflow.judgeloop import JudgeLoop
@@ -135,7 +136,7 @@ HOOK_LOG = "verify-hook-runs.jsonl"
 RULES_RECORD = "rules.md"
 GATE_CONFIG = "gate.json"
 PRE_COMMIT = "pre-commit"
-PAYLOAD = Path(verify_gate.__file__)
+PAYLOAD = Path(gate_tool.__file__)
 PROMPT_LIMIT = 120_000
 TRUNCATED = "\n... gate output truncated to fit the prompt limit ...\n"
 FIX_PROMPT = """\
@@ -274,7 +275,7 @@ def tools_install_command(paths: VerifyPaths, pins: list[str]) -> str:
 
 def rules_block(settings: VerifySettings) -> str:
     """The rules the agent reads in ``rules_file``, between the gate's markers."""
-    lines = [verify_gate.RULES_BEGIN, RULES_HEAD]
+    lines = [gate_tool.RULES_BEGIN, RULES_HEAD]
     for check in settings.checks:
         kind = "blocking" if check.blocking else "warning"
         what = (
@@ -284,7 +285,7 @@ def rules_block(settings: VerifySettings) -> str:
             else f"`{check.run}`"
         )
         lines.append(f"- `{check.name}` ({check.category}, {kind}, {check.tool}): {what}")
-    lines += ["", verify_gate.RULES_END, ""]
+    lines += ["", gate_tool.RULES_END, ""]
     return "\n".join(lines)
 
 
@@ -438,7 +439,7 @@ class Verify(Stage):
         """Deterministic setup facts, no agent code run; a failed row stops the checkpoint."""
         gate = [*self.paths.gate_command, "setup-check", "--config", self.paths.config]
         command = shlex.join(gate)
-        result = await checkpoint.environment.exec(command, user=None)
+        result = await calls.trusted_exec(checkpoint.environment, command, user=None)
         found = _last_json(result.stdout or "") or {
             "status": "error",
             "checks": [
@@ -454,8 +455,8 @@ class Verify(Stage):
             json.dumps(found, indent=2, sort_keys=True) + "\n", encoding="utf-8"
         )
         self.evidence.setup_check = found
-        if found["status"] != verify_gate.PASSED:
-            failed = [c for c in found["checks"] if c.get("status") != verify_gate.PASSED]
+        if found["status"] != gate_tool.PASSED:
+            failed = [c for c in found["checks"] if c.get("status") != gate_tool.PASSED]
             names = ", ".join(f"{c['name']}: {c.get('detail', '')[:200]}" for c in failed)
             raise VerifySetupError(f"the setup check failed: {names}")
 
@@ -468,7 +469,7 @@ class Verify(Stage):
         """
         paths = self.paths
         command = shlex.join([*paths.gate_command, "baseline", "--config", paths.config])
-        result = await checkpoint.environment.exec(command, user=None)
+        result = await calls.trusted_exec(checkpoint.environment, command, user=None)
         found = _last_json(result.stdout or "") or {
             "status": "error",
             "output": f"exit {result.return_code}: {(result.stderr or '').strip()[-500:]}",
@@ -476,7 +477,7 @@ class Verify(Stage):
         (records / BASELINE_RECORD).write_text(
             json.dumps(found, indent=2, sort_keys=True) + "\n", encoding="utf-8"
         )
-        tests = found.get("tests") if found.get("status") != verify_gate.ERROR else None
+        tests = found.get("tests") if found.get("status") != gate_tool.ERROR else None
         loop.baseline_passed = sorted(judging.passed_tests(tests))
         loop.baseline = {
             "record": f"{RECORD_DIR}/{BASELINE_RECORD}",
@@ -519,13 +520,13 @@ class Verify(Stage):
         )
         await self._exec(checkpoint, f"mkdir -p {q(paths.hooks)} {q(paths.empty_hooks)}")
         environment = checkpoint.environment
-        await environment.upload_file(PAYLOAD, paths.gate)
-        await environment.upload_file(records / GATE_CONFIG, paths.config)
-        await environment.upload_file(records / PRE_COMMIT, f"{paths.hooks}/{PRE_COMMIT}")
-        await environment.upload_file(records / RULES_RECORD, paths.rules_record)
+        await calls.upload_file(environment, PAYLOAD, paths.gate)
+        await calls.upload_file(environment, records / GATE_CONFIG, paths.config)
+        await calls.upload_file(environment, records / PRE_COMMIT, f"{paths.hooks}/{PRE_COMMIT}")
+        await calls.upload_file(environment, records / RULES_RECORD, paths.rules_record)
         owner = q(f"{self.owner}:")
         hook_path = q(f"{paths.hooks}/{PRE_COMMIT}")
-        runs = q(f"{paths.hook_state}/{verify_gate.HOOK_RUNS}")
+        runs = q(f"{paths.hook_state}/{gate_tool.HOOK_RUNS}")
         await self._exec(
             checkpoint,
             f"cd / && {paths.root_gate} broker-stop --config {q(paths.config)} >/dev/null 2>&1 "
@@ -572,9 +573,9 @@ class Verify(Stage):
         # the seal runs the agent's pytest and conftest: the log must not have been touched
         await self._copy_hook_log(checkpoint, f"{after}/{HOOK_LOG}", f"{after} (after the seal)")
         loop, standing = self.loop, self.standing
-        if gate["verdict"] == verify_gate.PASSED:
+        if gate["verdict"] == gate_tool.PASSED:
             standing.gate_ending = GATE_PASSED
-        elif gate["verdict"] != verify_gate.REFUSED:
+        elif gate["verdict"] != gate_tool.REFUSED:
             standing.gate_ending = standing.ending = GATE_ERROR
             return None
         elif standing.fix_rounds >= self.settings.max_fix_rounds:
@@ -621,12 +622,12 @@ class Verify(Stage):
             *paths.gate_command, "seal", "--config", paths.config, "--run", str(run),
             "--after", after, "--base", str(self.base),
         ]  # fmt: skip
-        watches = verify_gate.watches(self.facts["prerequisites"])
+        watches = gate_tool.watches(self.facts["prerequisites"])
         snaps_before = [await self._snapshot(checkpoint, d) for _, d, _ in watches]
-        result = await checkpoint.environment.exec(shlex.join(args), user=None)
+        result = await calls.trusted_exec(checkpoint.environment, shlex.join(args), user=None)
         snaps_after = [await self._snapshot(checkpoint, d) for _, d, _ in watches]
         gate = _last_json(result.stdout or "") or {
-            "who": "seal", "run": run, "after": after, "verdict": verify_gate.ERROR,
+            "who": "seal", "run": run, "after": after, "verdict": gate_tool.ERROR,
             "exit": None, "tree": None, "checks": [], "output": result.stdout or "",
             "error": f"the seal printed no record (exit {result.return_code}): "
             f"{(result.stderr or '').strip()[-500:]}",
@@ -644,7 +645,7 @@ class Verify(Stage):
             )
         witnessed: list[dict[str, Any]] = []
         for (label, _, allowed), was, now in zip(watches, snaps_before, snaps_after, strict=True):
-            found = verify_gate.witness_findings(label, was, now, allowed, after)
+            found = gate_tool.witness_findings(label, was, now, allowed, after)
             self.evidence.integrity += found
             witnessed.append({"label": label, "findings": found})
             kept = checkpoint.logs_dir / RECORD_DIR / f"witness-{run}-{label}.json"
@@ -658,7 +659,7 @@ class Verify(Stage):
 
     async def _snapshot(self, checkpoint: Checkpoint, directory: str) -> dict[str, Any]:
         command = shlex.join([*self.paths.gate_command, "snapshot", "--dir", directory])
-        result = await checkpoint.environment.exec(command, user=None)
+        result = await calls.trusted_exec(checkpoint.environment, command, user=None)
         return _last_json(result.stdout or "") or {
             "dir": directory, "present": False, "files": {},
             "error": f"no snapshot (exit {result.return_code})",
@@ -670,7 +671,7 @@ class Verify(Stage):
         if not self.paths.reap:
             return
         command = shlex.join([*self.paths.gate_command, "reap"])
-        result = await checkpoint.environment.exec(command, user=None)
+        result = await calls.trusted_exec(checkpoint.environment, command, user=None)
         found = _last_json(result.stdout or "") or {"error": (result.stderr or "")[-300:]}
         self.evidence.reaps.append(found)
 
@@ -685,7 +686,7 @@ class Verify(Stage):
             self.standing.ending = cut
         try:
             await self._reap(checkpoint)
-            await self._copy_hook_log(checkpoint, f"{RECORD_DIR}/{verify_gate.HOOK_RUNS}", "close")
+            await self._copy_hook_log(checkpoint, f"{RECORD_DIR}/{gate_tool.HOOK_RUNS}", "close")
             config = q(self.paths.config)
             await self._exec(
                 checkpoint, f"cd / && {self.paths.root_gate} broker-stop --config {config}"
@@ -712,12 +713,12 @@ class Verify(Stage):
         the chain breaks) and a write that restored the same bytes (a later ``ctime`` on equal
         content).
         """
-        runs = q(f"{self.paths.hook_state}/{verify_gate.HOOK_RUNS}")
+        runs = q(f"{self.paths.hook_state}/{gate_tool.HOOK_RUNS}")
         environment = checkpoint.environment
-        result = await environment.exec(f"cat {runs} 2>/dev/null || true", user=None)
+        result = await calls.trusted_exec(environment, f"cat {runs} 2>/dev/null || true", user=None)
         text = result.stdout or ""
-        stat = await environment.exec(
-            f"python3 -I -B -c {q(CTIME_SCRIPT)} {runs} 2>/dev/null || true", user=None
+        stat = await calls.trusted_exec(
+            environment, f"python3 -I -B -c {q(CTIME_SCRIPT)} {runs} 2>/dev/null || true", user=None
         )
         ctime = (stat.stdout or "").strip() or None
         self._observe_hook_log(text, ctime, after)
@@ -728,7 +729,7 @@ class Verify(Stage):
         self.facts["hook_log_sha256"] = _sha256(text)
 
     def _observe_hook_log(self, text: str, ctime: str | None, after: str) -> None:
-        problem = verify_gate.chain_problem(text)
+        problem = gate_tool.chain_problem(text)
         if problem is not None:
             self.evidence.integrity.append(
                 {"name": "hook_log_chain_broken", "after": after, "detail": problem}
@@ -786,7 +787,9 @@ class Verify(Stage):
         """Run ``command`` (as root only for the trusted installation, else as the agent's
         user; under ``umask 022``: the container's exec umask is 0) and return its output."""
         command = f"umask 022\n{command}"
-        result = await checkpoint.environment.exec(command, user="root" if root else None)
+        result = await calls.trusted_exec(
+            checkpoint.environment, command, user="root" if root else None
+        )
         if result.return_code != 0:
             detail = (result.stderr or result.stdout or "").strip()[-1000:]
             raise VerifySetupError(f"exit {result.return_code}: {command[:120]!r}: {detail}")

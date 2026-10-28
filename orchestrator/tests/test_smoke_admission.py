@@ -31,7 +31,7 @@ RUNNER = {
 }
 RECIPES = {"pack": "p" * 64, "graders": {}}
 TARGET = {"name": "mbp", "docker": {"ncpu": 4, "server_version": "29"}}
-STAGE_CODE = {"build": "b" * 64}
+PRIMITIVE_CODE = {"build": "b" * 64}
 AGENT = {
     "agent": "luna",
     "agent_release": "codex@2",
@@ -43,7 +43,8 @@ AGENT = {
     "capabilities": CAPABILITIES,
     "workflow": "one-shot@1",
     "workflow_sha256": "w" * 64,
-    "stage_code": STAGE_CODE,
+    "packages": {},
+    "primitive_code": PRIMITIVE_CODE,
     "digest": "d" * 64,
 }
 OTHER = {**AGENT, "agent": "terra", "model": "gpt-6-terra", "digest": "e" * 64}
@@ -125,6 +126,14 @@ def test_a_clean_matching_smoke_admits_and_is_recorded(tmp_path: Path) -> None:
 def test_a_smoke_covering_more_arms_still_clears_a_narrower_run(tmp_path: Path) -> None:
     smoke_job(tmp_path, lock=lock("smoke", AGENT, OTHER))
     assert decide(tmp_path)["smoke_job"] == "exp/smoke-01"
+
+
+def test_a_draft_smoke_is_a_dev_job_and_never_admits_a_measured_run(tmp_path: Path) -> None:
+    smoke_job(tmp_path, lock={**lock("smoke"), "draft": True})
+    with pytest.raises(AdmissionError, match="draft lock marks a dev job"):
+        decide(tmp_path)
+    smoke_job(tmp_path, "smoke-02")
+    assert decide(tmp_path)["smoke_job"] == "exp/smoke-02"
 
 
 def test_only_executed_arms_clear_and_per_arm_smokes_combine(
@@ -269,7 +278,16 @@ def test_a_smoke_requires_actual_work_by_the_declared_agent(
         ({"target": {**TARGET, "docker": {"ncpu": 8}}}, {}, "target differs"),
         ({}, {"lock": lock("ab-test", {**AGENT, "model": "gpt-9"})}, "not smoked"),
         ({}, {"lock": lock("ab-test", {**AGENT, "reasoning": "high"})}, "not smoked"),
-        ({}, {"lock": lock("ab-test", {**AGENT, "stage_code": {"build": "x" * 64}})}, "not smoked"),
+        (
+            {},
+            {"lock": lock("ab-test", {**AGENT, "primitive_code": {"build": "x" * 64}})},
+            "not smoked",
+        ),
+        (
+            {},
+            {"lock": lock("ab-test", {**AGENT, "packages": {"p": {"sha256": "x" * 64}}})},
+            "not smoked",
+        ),
         ({}, {"lock": lock("ab-test", {**AGENT, "workflow_sha256": "x" * 64})}, "not smoked"),
     ],
 )

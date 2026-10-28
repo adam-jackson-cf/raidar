@@ -34,8 +34,7 @@ from typing import TYPE_CHECKING
 
 from raidar.contract.references import ResolvedReference
 from raidar.contract.runtimes import ANY_RUNTIME
-from raidar.design.experiment.schema import ExperimentSpec
-from raidar.design.experiment.validation import FieldIssue
+from raidar.design.experiment.schema import ExperimentSpec, FieldIssue
 
 if TYPE_CHECKING:
     from raidar.subject.environment.python.pack_definition import PackSpec

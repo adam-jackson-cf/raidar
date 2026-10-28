@@ -25,6 +25,7 @@ import pytest
 from harbor.models.agent.context import AgentContext
 
 from raidar.engine.health.gate import gate_family
+from raidar.subject.primitive.gate_tool import RULES_BEGIN, witness_findings
 from raidar.subject.workflow import verify
 from raidar.subject.workflow.definition import load_workflow
 from raidar.subject.workflow.runner import (
@@ -34,7 +35,6 @@ from raidar.subject.workflow.runner import (
     SessionWatch,
     WorkflowRunner,
 )
-from raidar.subject.workflow.verify_gate import RULES_BEGIN, witness_findings
 from tests.release_support import REAL_LAB
 from tests.workflow_support import (
     CODE,

@@ -6,10 +6,11 @@ from pathlib import Path
 
 import pytest
 
-from raidar.subject.agent.adapters.codex_cli import CodexCliAdapter
-from raidar.subject.agent.adapters.factory import resolve_adapter
-from raidar.subject.agent.codex_auth import CODEX_AUTH_MODE_ENV
 from raidar.subject.agent.config import AgentSpec, Harness, ModelTarget
+from raidar.subject.agent.native import adapter_class_for_harness, resolve_adapter
+
+CODEX_AUTH_MODE_ENV = "CODEX_AUTH_MODE"
+CodexCliAdapter = adapter_class_for_harness(Harness.CODEX_CLI)
 
 
 def _config(

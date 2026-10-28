@@ -20,17 +20,16 @@ from harbor.models.trial.config import AgentConfig, TrialConfig
 
 from raidar.contract.canonical import digest_json
 from raidar.design.experiment.arm import ResolvedArm
-from raidar.subject.agent.codex_auth import resolve_codex_auth
-from raidar.subject.agent.config import HARBOR_AGENT_NAMES, Harness
+from raidar.subject.agent.config import HARBOR_AGENT_NAMES
 from raidar.subject.agent.definition import harbor_adapter
 from raidar.subject.environment.python.harness import harbor_agent_kwargs
+from raidar.subject.environment.python.image import image_lock_hash
 from raidar.subject.environment.python.pack_definition import PackSpec
 from raidar.subject.workflow.inner import INNER_KWARG, InnerAgentSpec
 from raidar.subject.workflow.runner import WorkflowRunner
 
 AgentOverride = Literal["oracle", "nop"]
 AGENT_OVERRIDES: tuple[AgentOverride, ...] = ("oracle", "nop")
-CODEX_AUTH_ENV = "CODEX_AUTH_JSON_PATH"
 
 
 def effective_agent_timeout_s(agent_timeout_sec: int) -> float:
@@ -45,6 +44,18 @@ def effective_agent_timeout_s(agent_timeout_sec: int) -> float:
     return (
         float(agent_timeout_sec) * scale * float(fields["agent_timeout_multiplier"].default or 1.0)
     )
+
+
+def _package_kwargs(arm: ResolvedArm, pack: PackSpec) -> dict[str, object]:
+    """What a package workflow's runner needs beyond its definition: the locked packages, the
+    primitives' code identities and the pack the trial's container is built from."""
+    if not arm.workflow.stages:
+        return {}
+    return {
+        "locked_packages": arm.packages,
+        "primitives": arm.primitive_code,
+        "pack": image_lock_hash(pack),
+    }
 
 
 def arm_agent_config(
@@ -66,6 +77,8 @@ def arm_agent_config(
     adapter = harbor_adapter(agent.name)
     isolated = adapter.native_agent_class()
     kwargs.update(adapter.isolation_kwargs(agent.released.definition.settings))
+    if arm.workflow.stages:
+        kwargs["instructions_path"] = agent.released.definition.placement.instructions
     native = InnerAgentSpec(
         name=HARBOR_AGENT_NAMES[agent.harness], import_path=isolated.import_path(), kwargs=kwargs
     )
@@ -78,6 +91,7 @@ def arm_agent_config(
             "definition": arm.definition.to_json(),
             "skills_placement": agent.released.definition.placement.skills,
             "phase_timeout_s": effective_agent_timeout_s(agent_timeout_sec),
+            **_package_kwargs(arm, pack),
         },
         override_timeout_sec=float(agent_timeout_sec),
     )
@@ -117,21 +131,3 @@ def reported_harness_pin(config: AgentConfig) -> str | None:
         return None
     version = kwargs.get("version")
     return str(version) if version is not None else None
-
-
-def with_host_auth(config: AgentConfig, harness: Harness) -> AgentConfig:
-    """Point Harbor's codex agent at the host's file-backed session auth, if configured.
-
-    Only the file path is passed (presence-checked); the credential itself is
-    never read here. Without a session file Harbor falls back to OPENAI_API_KEY.
-    The workflow runner hands its env to every native turn, so every turn authenticates.
-    """
-    name, _ = native_agent(config)
-    if name != HARBOR_AGENT_NAMES[Harness.CODEX_CLI] or harness is not Harness.CODEX_CLI:
-        return config
-    auth = resolve_codex_auth()
-    if auth.resolved_mode != "chatgpt" or auth.auth_json_path is None:
-        return config
-    return config.model_copy(
-        update={"env": {**config.env, CODEX_AUTH_ENV: str(auth.auth_json_path)}}
-    )

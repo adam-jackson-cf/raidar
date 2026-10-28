@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib.util
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -199,3 +200,40 @@ def test_this_repository_has_no_legacy_top_level_directories() -> None:
     top_level = {path.split("/", 1)[0] for path in structure.repo_paths(REPO_ROOT) if "/" in path}
 
     assert top_level <= structure.ROOT_DIRECTORIES
+
+
+def _stage_package(tmp_path: Path) -> Path:
+    package = tmp_path / "lab" / "stages" / "team" / "note-state"
+    shutil.copytree(Path(__file__).parent / "fixtures" / "stages" / "note-state", package)
+    return package
+
+
+def _stage_paths(root: Path) -> list[str]:
+    return [path.relative_to(root).as_posix() for path in root.rglob("*") if path.is_file()]
+
+
+def test_stage_structure_accepts_namespaced_packages_with_authored_tools(tmp_path: Path) -> None:
+    _stage_package(tmp_path)
+    assert structure.stage_violations(_stage_paths(tmp_path), tmp_path) == []
+
+
+def test_stage_structure_refuses_files_outside_a_declared_package(tmp_path: Path) -> None:
+    assert structure.stage_violations(["lab/stages/loose.py"], tmp_path) == [
+        "stage file outside a declared package: lab/stages/loose.py"
+    ]
+
+
+@pytest.mark.parametrize("mutation", ["extra", "missing_prompt", "symlink"])
+def test_stage_structure_rejects_malformed_package_layouts(tmp_path: Path, mutation: str) -> None:
+    package = _stage_package(tmp_path)
+    if mutation == "extra":
+        (package / "extra.py").write_text("pass\n")
+    elif mutation == "missing_prompt":
+        (package / "prompt.md").unlink()
+    else:
+        prompt = package / "prompt.md"
+        prompt.unlink()
+        prompt.symlink_to(package / "instructions.md")
+    issues = structure.stage_violations(_stage_paths(tmp_path), tmp_path)
+    assert len(issues) == 1
+    assert "invalid stage package lab/stages/team/note-state:" in issues[0]

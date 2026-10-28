@@ -95,7 +95,8 @@ class TrialPlan:
     bundle: Path
     lock_sha256: str
     workflow_digest: str
-    stage_code_digest: str
+    packages_digest: str
+    primitive_code_digest: str
     agent_digest: str
 
 
@@ -379,10 +380,11 @@ def _planned(plan: TrialPlan, script: TrialScript) -> PlannedTrial:
         "lock": plan.lock_sha256,
         "problem": digest_json(plan.problem),
         "arm": digest_json(
-            [script.arm, plan.workflow_digest, plan.stage_code_digest, plan.agent_digest]
+            [script.arm, plan.workflow_digest, plan.primitive_code_digest, plan.agent_digest]
         ),
         "workflow": plan.workflow_digest,
-        "stage_code": plan.stage_code_digest,
+        "packages": plan.packages_digest,
+        "primitive_code": plan.primitive_code_digest,
         "agent": plan.agent_digest,
         "protocol": digest_json(_CONTINUE.model_dump(mode="json")),
     }

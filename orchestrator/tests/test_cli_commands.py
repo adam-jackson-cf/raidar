@@ -297,8 +297,10 @@ def test_cli_exposes_only_the_experiment_model_commands() -> None:
         "problem",
         "quality",
         "run",
+        "stage",
         "target",
         "validate",
+        "workflow",
     }
     problem = main.commands["problem"]
     assert isinstance(problem, click.Group)
@@ -435,6 +437,32 @@ def test_smoke_dry_run_check_prints_every_public_smoke_shape() -> None:
             "init",
             ['"my-exp/experiment.yaml"', "--id", '"my-exp"'],
         ),
+        (("stage-new", "NAME=ns/my-check"), "stage", ["new", '"ns/my-check"']),
+        (
+            ("stage-new", "NAME=my-check", "FROM=docs-check"),
+            "stage",
+            ["new", '"my-check"', "--from", '"docs-check"'],
+        ),
+        (("stage-lock", "NAME=my-check"), "stage", ["lock", '"my-check"']),
+        (("stage-info", "NAME=my-check"), "stage", ["info", '"my-check"']),
+        (("stage-list",), "stage", ["list"]),
+        (
+            ("stage-check", "NAME=my-check", "REPLAY=var/jobs/t1"),
+            "stage",
+            ["check", '"my-check"', "--replay", '"var/jobs/t1"'],
+        ),
+        (("stage-check", "NAME=my-check"), "stage", ["check", '"my-check"']),
+        (("workflow-new", "NAME=mine"), "workflow", ["new", '"mine"']),
+        (
+            ("workflow-new", "NAME=mine", "FROM=one-shot"),
+            "workflow",
+            ["new", '"mine"', "--from", '"one-shot"'],
+        ),
+        (
+            ("experiment-lock", "EXPERIMENT=e/experiment.yaml", "DRAFT=1"),
+            "lock",
+            ['"e/experiment.yaml"', "--draft"],
+        ),
     ],
 )
 def test_registry_and_init_targets_call_their_raidar_verbs(
@@ -448,7 +476,15 @@ def test_registry_and_init_targets_call_their_raidar_verbs(
 
 
 @pytest.mark.parametrize(
-    ("target", "variable"), [("problem-info", "PROBLEM"), ("experiment-init", "EXPERIMENT")]
+    ("target", "variable"),
+    [
+        ("problem-info", "PROBLEM"),
+        ("experiment-init", "EXPERIMENT"),
+        ("stage-new", "NAME"),
+        ("stage-lock", "NAME"),
+        ("stage-info", "NAME"),
+        ("workflow-new", "NAME"),
+    ],
 )
 def test_registry_and_init_targets_require_their_argument(target: str, variable: str) -> None:
     result = subprocess.run(
@@ -574,20 +610,3 @@ def test_secrets_dotenv_without_an_env_file_fails_before_running_anything() -> N
     assert result.returncode != 0
     assert "SECRETS=dotenv but orchestrator/.env does not exist" in result.stderr
     assert "secrets: orchestrator/.env" not in result.stderr
-
-
-def test_experiment_assess_rescores_the_run_trials_with_the_named_scorers(tmp_path: Path) -> None:
-    (tmp_path / "trials").mkdir()
-    result = _make_dry_run(
-        "experiment-assess",
-        f"JOB={tmp_path}",
-        "STORE=.tmp/store",
-        "SCORERS=correctness@6 code-quality@7",
-        "REPLAY=1",
-    )
-
-    assert result.returncode == 0, result.stderr
-    (assess_args,) = _raidar_lines(result.stdout, "assess")
-    assert assess_args.startswith(f'--rescore "{tmp_path}/trials" --store ".tmp/store"')
-    assert '--scorer "correctness@6" --scorer "code-quality@7"' in assess_args
-    assert "--replay" in assess_args

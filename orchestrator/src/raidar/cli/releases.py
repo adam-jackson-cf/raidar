@@ -5,7 +5,7 @@ from __future__ import annotations
 import click
 
 from raidar.contract.releases import ReleaseError
-from raidar.subject.releases import release_base, release_issues
+from raidar.subject.release_check import release_base, release_issues
 
 
 def register(main: click.Group) -> None:

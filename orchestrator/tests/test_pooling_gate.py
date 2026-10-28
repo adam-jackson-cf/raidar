@@ -32,7 +32,8 @@ PARITY = ParityRecord(
 
 def _record(trial_id: str, arm: str, parity: ParityRecord | None) -> TrialRecord:
     hashes = TrialHashes(
-        lock="l", problem="p", arm=arm, workflow="w", stage_code="s", agent="h", protocol="p",
+        lock="l", problem="p", arm=arm, workflow="w", packages="s", primitive_code="s",
+        agent="h", protocol="p",
         trial=trial_id,
     )  # fmt: skip
     planned = PlannedTrial(
@@ -99,7 +100,8 @@ def _job(
     hashes = {
         "agent": plan.get("agent", "h1"),
         "workflow": plan.get("workflow", "w1"),
-        "stage_code": plan.get("stage_code", "s1"),
+        "packages": plan.get("packages", "s1"),
+        "primitive_code": plan.get("primitive_code", "s1"),
     }
     trials = [{"trial_id": TRIAL, "arm": "a", "hashes": hashes}]
     capabilities = plan.get("capabilities", CAPABILITIES)
@@ -199,13 +201,25 @@ def test_pooling_refuses_a_different_subject_but_the_override_lifts_it(
     assert check_pooling(jobs, ["subject"]).overrides_used == ("subject",)
 
 
-def test_pooling_refuses_different_stage_code_and_no_override_lifts_it(tmp_path: Path) -> None:
-    jobs = [_job(tmp_path, "one"), _job(tmp_path, "two", stage_code="s2")]
-    with pytest.raises(PoolingError, match=r"stage_code differs.*one=.*s1.*two=.*s2") as refused:
+@pytest.mark.parametrize("field", ["packages", "primitive_code"])
+def test_pooling_refuses_different_package_or_primitive_identity_and_no_override_lifts_it(
+    tmp_path: Path, field: str
+) -> None:
+    jobs = [_job(tmp_path, "one"), _job(tmp_path, "two", **{field: "s2"})]
+    with pytest.raises(PoolingError, match=rf"{field} differs.*one=.*s1.*two=.*s2") as refused:
         check_pooling(jobs)
     assert "nothing lifts it" in str(refused.value)
-    with pytest.raises(PoolingError, match="stage_code is never overridable"):
-        check_pooling(jobs, ["stage_code"])
+    with pytest.raises(PoolingError, match=f"{field} is never overridable"):
+        check_pooling(jobs, [field])
+
+
+def test_pooling_lets_workflow_text_and_params_be_overridden_but_not_packages(
+    tmp_path: Path,
+) -> None:
+    jobs = [_job(tmp_path, "one"), _job(tmp_path, "two", workflow="w2")]
+    with pytest.raises(PoolingError, match="subject differs"):
+        check_pooling(jobs)
+    check_pooling(jobs, ["subject"])
 
 
 def test_pooling_refuses_a_different_epoch_with_pre_epoch_as_missing(tmp_path: Path) -> None:

@@ -7,10 +7,9 @@ file and its digest) and the verify stage's ending. A trial whose records name n
 has no ``E`` checks; a step whose evidence is missing makes a check ``unmeasured``, never
 ``pass``.
 
-- ``E1`` every checkpoint that ended ``gate_passed`` holds a sealed, passing definition: the
-  recorded draft is sealed ``ready``, the define tool's checks pass on it again (without the
-  workspace: a ``path:line`` is checked for its form only), the recorded definition is the
-  draft's render byte for byte, and its digest is the recorded one;
+- ``E1`` every checkpoint that passed a gate holds the exact state and definition checked by
+  the container's inspector: a ready seal, no blocking findings, and matching input, state
+  and rendered-definition digests. Health reads evidence; it never executes method code;
 - ``E2`` the recorded ``define`` calls agree with the final draft: one event per recorded
   call, the last event's state digest is the digest of the recorded state and its seal is the
   state's, and a sealed state is the outcome of a ``done`` call that printed nothing blocking
@@ -30,9 +29,6 @@ from typing import Any
 
 from raidar.engine.health.base import Audit, make_check
 from raidar.engine.health.model import PASS, UNMEASURED, VIOLATION, HealthCheck
-from raidar.subject.workflow.define_tool import tool
-from raidar.subject.workflow.define_tool.draft import Draft, DraftError
-from raidar.subject.workflow.define_tool.schemas import INTAKE_REPLY_SCHEMA, violations
 
 WORKFLOW_RECORD = "workflow/workflow.json"
 READY = "definition_ready"
@@ -171,18 +167,23 @@ def step_defines(steps: Sequence[tuple[str, Path]]) -> tuple[list[StepDefine], l
     return found, unread
 
 
-def _draft(define: StepDefine) -> tuple[Draft | None, str | None]:
-    """(the recorded draft, why it cannot be read)."""
+def _draft(define: StepDefine) -> tuple[dict[str, Any] | None, str | None]:
+    """Read the recorded state envelope, without executing the package's parser."""
     raw = _bytes(define.agent, define.record, "state")
     if raw is None:
         return None, f"{define.step}: the define state is missing"
     try:
-        return Draft.read(json.loads(raw)), None
-    except (ValueError, DraftError) as error:
+        record = json.loads(raw)
+    except ValueError as error:
         return None, f"{define.step}: the define state does not read ({error})"
+    if not isinstance(record, dict) or not isinstance(record.get("items"), list):
+        return None, f"{define.step}: the define state is not a draft"
+    if record.get("sealed") not in ("", "ready", "ask"):
+        return None, f"{define.step}: the define state has an invalid seal"
+    return record, None
 
 
-def _context(define: StepDefine) -> tuple[tool.Context | None, str | None]:
+def _context(define: StepDefine) -> tuple[dict[str, Any] | None, str | None]:
     raw = _bytes(define.agent, define.record, "inputs")
     if raw is None:
         return None, f"{define.step}: the define inputs are missing"
@@ -190,7 +191,7 @@ def _context(define: StepDefine) -> tuple[tool.Context | None, str | None]:
         record = json.loads(raw)
         if not isinstance(record, dict):
             raise ValueError("not an object")
-        return tool.Context.read(record), None
+        return record, None
     except ValueError as error:
         return None, f"{define.step}: the define inputs do not read ({error})"
 
@@ -209,30 +210,33 @@ def _e1_step(define: StepDefine) -> tuple[list[str], str | None]:
     written = _bytes(define.agent, define.record, "definition")
     if written is None:
         return [], f"{step}: the recorded definition file is missing"
-    return _ready_definition(define, draft, context, written), None
+    return _ready_definition(define, draft, written), None
 
 
-def _ready_definition(
-    define: StepDefine, draft: Draft, context: tool.Context, written: bytes
-) -> list[str]:
+def _ready_definition(define: StepDefine, draft: dict[str, Any], written: bytes) -> list[str]:
     step = define.step
-    if draft.sealed != "ready":
-        return [f"{step}: the recorded draft is sealed {draft.sealed!r}, not 'ready'"]
-    try:
-        faults = violations(draft.reply("ready"), INTAKE_REPLY_SCHEMA)
-    except (ValueError, KeyError, TypeError) as error:
-        faults = [f"the reply cannot be built ({error})"]
-    if faults:
-        return [f"{step}: the draft breaks the intake reply schema: {faults[0]}"]
-    found = [
-        f"{step}: the tool's check fails on the draft: {item.text}"
-        for item in tool.recheck(draft, context, "ready").findings
-        if not item.advisory
-    ]
+    if draft["sealed"] != "ready":
+        return [f"{step}: the recorded draft is sealed {draft['sealed']!r}, not 'ready'"]
+    checked = _last_check(define.record)
+    if not isinstance(checked, dict) or not isinstance(checked.get("validated"), dict):
+        return [f"{step}: the inspector validation evidence is missing"]
+    return _validated_definition(define, checked, written)
+
+
+def _validated_definition(define: StepDefine, checked: dict[str, Any], written: bytes) -> list[str]:
+    step = define.step
+    validated = checked["validated"]
+    found = []
+    if checked.get("status") != "ready" or checked.get("blocking"):
+        found.append(f"{step}: the container inspector did not accept the definition")
+    for key in ("state", "inputs"):
+        raw = _bytes(define.agent, define.record, key) or b""
+        if validated.get(f"{key}_sha256") != _sha(raw):
+            found.append(f"{step}: {key} is not the one the inspector checked")
     if _sha(written) != define.record.get("definition_sha256"):
         found.append(f"{step}: the definition file is not the recorded digest")
-    if tool.definition_text(draft, context).encode("utf-8") != written:
-        found.append(f"{step}: the definition file is not the draft's render")
+    if validated.get("rendered_sha256") != _sha(written):
+        found.append(f"{step}: the definition file is not the inspector's render")
     return found
 
 
@@ -251,7 +255,7 @@ def _events(define: StepDefine) -> list[dict[str, Any]] | None:
 
 
 def _call_event_mismatches(
-    step: str, calls_raw: bytes, events: list[dict[str, Any]], calls: list[tool.Call]
+    step: str, calls_raw: bytes, events: list[dict[str, Any]], calls: list[dict[str, Any]]
 ) -> list[str]:
     lines = [
         line for line in calls_raw.decode("utf-8", errors="replace").splitlines() if line.strip()
@@ -259,9 +263,9 @@ def _call_event_mismatches(
     if len(calls) != len(lines) or len(events) != len(calls):
         return [f"{step}: {len(lines)} call line(s), {len(calls)} readable, {len(events)} event(s)"]
     return [
-        f"{step}: call {n + 1} is {call.command!r}, its event {event.get('command')!r}"
+        f"{step}: call {n + 1} is {call.get('command')!r}, its event {event.get('command')!r}"
         for n, (call, event) in enumerate(zip(calls, events, strict=True))
-        if event.get("command") != call.command
+        if event.get("command") != call.get("command")
     ]
 
 
@@ -281,7 +285,7 @@ def _e2_step(define: StepDefine) -> tuple[list[str], str | None]:
         return [], why
     if calls_raw is None or events is None:
         return [], f"{step}: the define calls or events are missing"
-    calls = tool.parse_calls(calls_raw.decode("utf-8", errors="replace"))
+    calls = _call_records(calls_raw)
     found = _call_event_mismatches(step, calls_raw, events, calls)
     inputs = _bytes(define.agent, define.record, "inputs")
     if inputs is None:
@@ -291,23 +295,38 @@ def _e2_step(define: StepDefine) -> tuple[list[str], str | None]:
     return found, None
 
 
+def _call_records(raw: bytes) -> list[dict[str, Any]]:
+    found = []
+    for line in raw.decode("utf-8", errors="replace").splitlines():
+        try:
+            record = json.loads(line)
+        except ValueError:
+            continue
+        if isinstance(record, dict):
+            found.append(record)
+    return found
+
+
 def _state_hash_problem(
-    step: str, draft: Draft, events: list[dict[str, Any]], state: bytes
+    step: str, draft: dict[str, Any], events: list[dict[str, Any]], state: bytes
 ) -> str | None:
     held = [e for e in events if e.get("state_sha256") is not None]
     if not held:
-        if draft.items or draft.sealed:
+        if draft["items"] or draft["sealed"]:
             return f"{step}: the state holds a draft no call recorded"
         return None
     if held[-1].get("state_sha256") != _sha(state):
         return f"{step}: the state is not the one the last call left"
-    if held[-1].get("sealed") not in (None, draft.sealed):
-        return f"{step}: the state's seal {draft.sealed!r} is not the last call's"
+    if held[-1].get("sealed") not in (None, draft["sealed"]):
+        return f"{step}: the state's seal {draft['sealed']!r} is not the last call's"
     return None
 
 
 def _state_consistency(
-    define: StepDefine, draft: Draft, events: list[dict[str, Any]], calls: list[tool.Call]
+    define: StepDefine,
+    draft: dict[str, Any],
+    events: list[dict[str, Any]],
+    calls: list[dict[str, Any]],
 ) -> list[str]:
     step = define.step
     found: list[str] = []
@@ -315,11 +334,20 @@ def _state_consistency(
     problem = _state_hash_problem(step, draft, events, state)
     if problem:
         found.append(problem)
-    if draft.sealed:
-        done = [call for call in calls if call.command == "done"]
-        if not done or done[-1].blocking:
+    if draft["sealed"]:
+        done = [call for call in calls if call.get("command") == "done"]
+        if not done or _call_blocking(done[-1]):
             found.append(f"{step}: the state is sealed but no `done` call sealed it")
     return found
+
+
+def _call_blocking(call: dict[str, Any]) -> bool:
+    texts, advisory = call.get("texts", []), call.get("advisory", [])
+    if not isinstance(texts, list) or not isinstance(advisory, list):
+        return True
+    if len(texts) != len(advisory):
+        return True
+    return any(soft is not True for soft in advisory)
 
 
 def _unusable_kept(record: dict[str, Any]) -> bool:
@@ -344,7 +372,7 @@ def _e3_step(define: StepDefine) -> tuple[list[str], str | None]:
     draft, why = _draft(define)
     if draft is None:
         return found, why
-    if draft.sealed == "ready" and not last.get("blocking"):
+    if draft["sealed"] == "ready" and not last.get("blocking"):
         found.append(f"{step}: unusable, but its draft is sealed ready and its last check passed")
     if define.verify_accepted:
         found.append(f"{step}: the gate passed on an unusable definition")

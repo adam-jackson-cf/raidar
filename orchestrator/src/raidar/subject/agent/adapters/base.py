@@ -9,45 +9,19 @@ checks agent entries against) and its host-side credential and CLI checks
 from __future__ import annotations
 
 import os
-import shutil
-import sys
 from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
 from raidar.subject.agent.config import AgentSpec
+from raidar.subject.agent.executables import resolve_cli_executable
 from raidar.subject.agent.harness import (
     CredentialSourceType,
     CredentialSpec,
     HarnessDefinition,
     harness_definition,
 )
-
-
-def harbor_executable() -> str:
-    """Return the project-pinned Harbor CLI, installed next to this interpreter."""
-    candidate = Path(sys.executable).parent / "harbor"
-    if not (candidate.is_file() and os.access(candidate, os.X_OK)):
-        raise FileNotFoundError(f"project-pinned Harbor CLI not found at {candidate}")
-    return str(candidate)
-
-
-def resolve_cli_executable(
-    *,
-    cli_env_var: str,
-    default_binary: str,
-    harness_label: str,
-) -> str:
-    """Resolve a harness CLI executable from env override or PATH."""
-    candidate = os.environ.get(cli_env_var) or default_binary
-    executable = shutil.which(candidate) if candidate else None
-    if executable is None:
-        raise FileNotFoundError(
-            f"{harness_label} CLI not found or not executable. "
-            f"Set {cli_env_var} to an executable or add '{default_binary}' to PATH."
-        )
-    return executable
 
 
 @dataclass(frozen=True, slots=True)

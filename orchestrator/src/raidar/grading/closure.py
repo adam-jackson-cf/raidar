@@ -3,7 +3,7 @@
 The layer is ``FROM <grader image>`` plus one ``RUN`` that installs the lock's
 wheels with ``--require-hashes --no-deps --only-binary :all:`` from a local wheel
 directory, with the build network disabled (``RUN --network=none``). The wheels
-come from the host wheel cache (``raidar.grading.wheel_cache``), so no package
+come from the host wheel cache (``raidar.contract.wheel_cache``), so no package
 code runs and no sdist is built. The build context holds only ``requirements.txt``
 and ``wheels/``; hidden tests never enter it. The tag is the digest of the base
 tag and the lock, so a coherent closure is built once per (base, lock) and reused.
@@ -17,12 +17,17 @@ import os
 import shutil
 import tempfile
 import time
-import tomllib
 from dataclasses import dataclass
 from pathlib import Path
 
+from raidar.contract.wheel_cache import fetch_wheels
+from raidar.contract.wheels import (
+    LOCKED_FLAGS,
+    OFFLINE_FLAGS,
+    hashed_requirements,
+    pylock_wheels,
+)
 from raidar.grading.submission_deps import closure_dir
-from raidar.grading.wheel_cache import fetch_wheels
 
 CLOSURE_REPOSITORY = "raidar-oracle-closure"
 BUILD_TIMEOUT_S = 900.0
@@ -30,8 +35,8 @@ CONTEXT_MOUNT = "/raidar-ctx"
 REQUIREMENTS_FILE = "requirements.txt"
 WHEELS_DIR = "wheels"
 _INSTALL = (
-    "uv pip install --no-cache --offline --no-index --find-links {mount}/{wheels} "
-    "--require-hashes --no-deps --only-binary :all: --python {python} {target} "
+    f"uv pip install {OFFLINE_FLAGS} --find-links {{mount}}/{{wheels}} "
+    f"{LOCKED_FLAGS} --python {{python}} {{target}} "
     "-r {mount}/{requirements}"
 )
 
@@ -72,13 +77,7 @@ async def run_docker(
 
 def requirements_text(lock_text: str) -> str:
     """The lock as a hashed ``requirements.txt`` (every listed wheel hash is allowed)."""
-    blocks: list[str] = []
-    for package in tomllib.loads(lock_text).get("packages", []):
-        hashes = sorted({str(wheel["hashes"]["sha256"]) for wheel in package.get("wheels", [])})
-        lines = [f"{package['name']}=={package['version']}"]
-        lines += [f"    --hash=sha256:{digest}" for digest in hashes]
-        blocks.append(" \\\n".join(lines))
-    return "\n".join(blocks) + "\n"
+    return hashed_requirements(pylock_wheels(lock_text))
 
 
 def build_context(lock_text: str, wheels_dir: Path, dest: Path) -> None:

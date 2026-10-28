@@ -32,12 +32,7 @@ fi
 
 # target_path|baseline_entry|kind(dir|file)
 STATE_TARGETS=(
-  "${RAIDAR_CODEX_HOME:-/tmp/codex-home}|codex-home|dir"
-  "$HOME_DIR/.codex|codex-home|dir"
-  "$HOME_DIR/.agents|agents-home|dir"
-  "${RAIDAR_CLAUDE_CONFIG_DIR:-$LOGS_DIR/sessions}|claude-config|dir"
-  "$HOME_DIR/.claude|claude-config|dir"
-  "$HOME_DIR/.claude.json|claude.json|file"
+@STATE_TARGETS@
 )
 
 json_escape() { local s=${1//\\/\\\\}; s=${s//\"/\\\"}; s=${s//$'\n'/ }; s=${s//$'\t'/ }; printf '%s' "$s"; }

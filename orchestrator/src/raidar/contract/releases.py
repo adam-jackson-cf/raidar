@@ -1,13 +1,16 @@
 """The release register: ``lab/releases.yaml`` maps ``name@N`` to a content hash.
 
-Agents and workflows are edited in place under ``lab/agents/`` and ``lab/workflows/``; the
-version is data, never part of a file name. Releasing a definition records its content hash
-under the next integer version of its name::
+Agents and workflows are edited in place under ``lab/agents/`` and ``lab/workflows/``; stage
+packages live under ``lab/stages/[<ns>/]<name>/``. The version is data, never part of a file
+name. Releasing a definition records its content hash under the next integer version of its
+name::
 
     agents:
       codex@1: <sha256 of the resolved definition>
     workflows:
       one-shot@1: <sha256 of the resolved definition>
+    stages:
+      docs-check@1: <sha256 stage-tree/1 digest of the package>
 
 Earlier versions stay in the register as history; the tree holds only the definition of each
 name's latest version, so only that version resolves (older ones live in archive tags). The
@@ -26,7 +29,7 @@ from typing import Annotated
 import yaml
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
-RELEASE_PATTERN = r"^[a-z0-9][a-z0-9-]*@[1-9][0-9]*$"
+RELEASE_PATTERN = r"^(?:[a-z0-9][a-z0-9-]*/)?[a-z0-9][a-z0-9-]*@[1-9][0-9]*$"
 _RELEASE_RE = re.compile(RELEASE_PATTERN)
 Sha256 = Annotated[str, Field(pattern=r"^[0-9a-f]{64}$")]
 
@@ -34,6 +37,7 @@ Sha256 = Annotated[str, Field(pattern=r"^[0-9a-f]{64}$")]
 class ReleaseKind(StrEnum):
     AGENT = "agents"
     WORKFLOW = "workflows"
+    STAGE = "stages"
 
 
 class ReleaseError(ValueError):
@@ -42,7 +46,7 @@ class ReleaseError(ValueError):
 
 @dataclass(frozen=True, order=True)
 class Release:
-    """A parsed ``name@N`` release reference."""
+    """A parsed ``[namespace/]name@N`` immutable release reference."""
 
     name: str
     version: int
@@ -50,9 +54,13 @@ class Release:
     @classmethod
     def parse(cls, text: str) -> Release:
         if not _RELEASE_RE.fullmatch(text):
-            raise ReleaseError(f"invalid release {text!r}: expected <name>@<N> (N from 1)")
+            raise ReleaseError(f"invalid release {text!r}: expected [<ns>/]<name>@<N> (N from 1)")
         name, version = text.split("@", 1)
         return cls(name, int(version))
+
+    @property
+    def leaf(self) -> str:
+        return self.name.rsplit("/", 1)[-1]
 
     def __str__(self) -> str:
         return f"{self.name}@{self.version}"
@@ -63,6 +71,7 @@ class _Register(BaseModel):
 
     agents: dict[str, Sha256] = Field(default_factory=dict)
     workflows: dict[str, Sha256] = Field(default_factory=dict)
+    stages: dict[str, Sha256] = Field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -95,6 +104,7 @@ def parse_register(text: str, source: str) -> ReleaseRegister:
         ReleaseKind.WORKFLOW: {
             Release.parse(ref): digest for ref, digest in register.workflows.items()
         },
+        ReleaseKind.STAGE: {Release.parse(ref): digest for ref, digest in register.stages.items()},
     }
     return ReleaseRegister(entries)
 
@@ -106,6 +116,37 @@ def load_register(path: Path) -> ReleaseRegister:
     except OSError as exc:
         raise ReleaseError(f"{path}: unreadable release register: {exc}") from exc
     return parse_register(text, str(path))
+
+
+def resolve_registered(
+    register: ReleaseRegister, kind: ReleaseKind, text: str, *, draft: bool = False
+) -> tuple[Release, str | None]:
+    """The parsed release ``text`` and its registered hash.
+
+    Only the register's latest version of a name resolves. A ``draft`` (smoke experiments only)
+    may name an unregistered or older release: its hash is ``None`` or whatever is registered.
+    """
+    release = Release.parse(text)
+    registered = register.of(kind).get(release)
+    if registered is None:
+        if draft:
+            return release, None
+        raise ReleaseError(f"{kind.value} release {text} is not in lab/releases.yaml")
+    latest = register.latest(kind, release.name)
+    if latest != release and not draft:
+        raise ReleaseError(
+            f"{text} is not the {kind.value} release the tree holds ({latest}); "
+            "earlier releases live in archive tags"
+        )
+    return release, registered
+
+
+def changed_message(release: Release, registered: str, now: str) -> str:
+    """Why a release no longer matches its register entry, naming the next release to add."""
+    return (
+        f"{release.name} changed since {release} was released (registered {registered[:12]}, "
+        f"now {now[:12]}): register {release.name}@{release.version + 1}"
+    )
 
 
 def rewritten_releases(earlier: ReleaseRegister, now: ReleaseRegister) -> list[str]:

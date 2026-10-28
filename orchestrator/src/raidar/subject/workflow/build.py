@@ -26,6 +26,7 @@ import shlex
 from pathlib import Path
 from typing import Any
 
+from raidar.subject.primitive import calls
 from raidar.subject.workflow.acceptance import Acceptance, rows
 from raidar.subject.workflow.definition import BuildSettings
 from raidar.subject.workflow.reply import BUILD_SCHEMA, REPAIR_PROMPT, read_reply, shape_suffix
@@ -155,7 +156,7 @@ class Build(Stage):
         command = f"python3 -c {shlex.quote(PRESENT)} {shlex.quote(self.workspace)} " + " ".join(
             shlex.quote(name) for name in files
         )
-        result = await checkpoint.environment.exec(command, user="root")
+        result = await calls.trusted_exec(checkpoint.environment, command, user="root")
         return set((result.stdout or "").split("\n")) - {""}
 
     def record(self) -> dict[str, Any] | None:

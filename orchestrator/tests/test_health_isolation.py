@@ -12,8 +12,9 @@ import pytest
 from raidar.engine.health.audit import audit_trial
 from raidar.engine.health.model import HealthCheck
 from raidar.engine.trial.collect import health_validity
-from raidar.subject.agent.claude_audit import claude_session_audit
+from raidar.subject.agent.config import Harness
 from tests.health_support import STEP, HealthyTrial, healthy_trial, write_agent_session
+from tests.native_support import session_audit
 
 SKILLS = "<skills_instructions>\n### Skill roots\n{roots}\n</skills_instructions>"
 AGENTS = "# AGENTS.md instructions for /app\n\n<INSTRUCTIONS>\n{body}\n</INSTRUCTIONS>"
@@ -195,7 +196,7 @@ def test_claude_native_audit_feeds_p8(
                 "stage": "build",
                 "turn": 1,
                 "log_dir": "workflow/build-1",
-                "session_audit": claude_session_audit(turn_dir),
+                "session_audit": session_audit(Harness.CLAUDE_CODE, turn_dir),
             }
         ]
     }

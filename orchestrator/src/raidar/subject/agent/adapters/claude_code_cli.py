@@ -6,7 +6,7 @@ from typing import override
 
 from harbor.agents.base import BaseAgent
 
-from raidar.subject.agent.isolated_claude import IsolatedClaudeCode
+from raidar.subject.agent.adapters.isolated_claude import IsolatedClaudeCode
 
 from .harbor_cli import HarborCliAdapter, SupportedModelProfile
 

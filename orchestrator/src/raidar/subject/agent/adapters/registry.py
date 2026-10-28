@@ -35,9 +35,13 @@ class AdapterRegistry:
             raise ValueError(f"No adapter registered for harness {harness.value}")
         return adapter_class
 
+    def adapter_classes(self) -> tuple[AdapterType, ...]:
+        """Every registered adapter class, in registration order."""
+        return tuple(self._adapters.values())
+
 
 registry = AdapterRegistry()
 
 
-registry.register(Harness.CLAUDE_CODE, ClaudeCodeCliAdapter)
 registry.register(Harness.CODEX_CLI, CodexCliAdapter)
+registry.register(Harness.CLAUDE_CODE, ClaudeCodeCliAdapter)

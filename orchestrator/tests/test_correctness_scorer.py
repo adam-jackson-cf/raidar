@@ -1,4 +1,4 @@
-"""correctness@6 behaviour: values equal the verifier step records, gaps are statused."""
+"""correctness@7 behaviour: values equal the verifier step records, gaps are statused."""
 
 from __future__ import annotations
 
@@ -214,6 +214,6 @@ def test_ungraded_trials_and_bad_config_produce_statused_results(tmp_path: Path)
 
 
 def test_correctness_is_bound_in_the_default_registry() -> None:
-    registration = default_scorer_registry().get("correctness@6")
+    registration = default_scorer_registry().get("correctness@7")
     assert registration.load().manifest == registration.manifest
     assert registration.implementation_digest() is not None

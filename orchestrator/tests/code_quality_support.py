@@ -1,4 +1,4 @@
-"""Shared inputs for the code-quality@7 tests: fork goldens, tool env, stored trials.
+"""Shared inputs for the code-quality@8 tests: fork goldens, tool env, stored trials.
 
 ``fixtures/code_quality/fork_goldens.json.gz`` is produced by running the SCB
 fork's own code (``fixtures/code_quality/generate_fork_goldens.py``); it holds

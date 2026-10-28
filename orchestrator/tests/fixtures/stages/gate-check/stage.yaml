@@ -1,0 +1,16 @@
+contract: stage/1
+name: gate-check
+summary: A conventional command check and a pytest check over the workspace; no setup or stop.
+requires: {gate: gate/1}
+params: {marker: FIXME}
+tool:
+  project: tool
+  commands: {gate-check: [python, -I, -B, -m, gate_check]}
+gate:
+  - name: no-marker
+    run: [gate-check, scan]
+    before: true
+    timeout_s: 30
+  - name: unit-specs
+    kind: pytest
+    timeout_s: 60

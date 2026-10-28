@@ -4,9 +4,10 @@ import sys
 
 import pytest
 
-from raidar.subject.agent.adapters.claude_code_cli import ClaudeCodeCliAdapter
-from raidar.subject.agent.adapters.factory import resolve_adapter
 from raidar.subject.agent.config import AgentSpec, Harness, ModelTarget
+from raidar.subject.agent.native import adapter_class_for_harness, resolve_adapter
+
+ClaudeCodeCliAdapter = adapter_class_for_harness(Harness.CLAUDE_CODE)
 
 
 def _config(

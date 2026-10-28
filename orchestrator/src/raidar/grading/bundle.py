@@ -32,7 +32,7 @@ from pydantic import Field, ValidationError, model_validator
 
 from raidar.contract.snapshot import tree_digest
 from raidar.grading.dependency_pins import DependencyLocks, DependencyPins, LockKey
-from raidar.grading.models import VerifierModel
+from raidar.grading.models import CorpusEvidence, VerifierModel
 
 BUNDLE_MANIFEST = "oracle-bundle.json"  # wire name in the problem store (v1 layout)
 TESTS_DIR = "tests"
@@ -125,6 +125,12 @@ class VerifierBundle:
     @property
     def tests_dir(self) -> Path:
         return self.root / TESTS_DIR
+
+    def corpus_evidence(self, step: VerifierStepSpec) -> CorpusEvidence:
+        """The corpus identity and selected tests used for grading and coverage parity."""
+        return CorpusEvidence(
+            corpus_sha256=tree_digest(self.tests_dir), selected_tests=step.test_files
+        )
 
     def step(self, name: str) -> VerifierStepSpec:
         for step in self.manifest.steps:

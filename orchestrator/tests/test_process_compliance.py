@@ -57,7 +57,7 @@ from tests.trace_trial_support import (
     write_traced_trial,
 )
 
-REF = "process-compliance@10"
+REF = "process-compliance@11"
 CHECKS = ("tests_run_before_finish", "plan_written")
 PLAN = tool_call("p0", "update_plan", {"plan": [{"step": "write"}]})
 EDIT = codex_patch("e0", "/app/app/main.py")
