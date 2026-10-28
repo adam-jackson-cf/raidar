@@ -1,0 +1,16 @@
+contract: stage/1
+name: fault-probe
+summary: Read one JSON file the agent keeps; a parameter makes its setup fail on demand.
+requires: {setup: setup/1, stop: stop/1, outputs: outputs/1}
+params: {setup_exit: 0}
+tool:
+  project: tool
+  commands: {fault-probe: [python, -I, -B, -m, fault_probe]}
+setup: {run: [fault-probe, setup], timeout_s: 60}
+on_stop:
+  run: [fault-probe, inspect]
+  watch: /app/.raidar/fault-probe
+  timeout_s: 60
+  max_rounds: 2
+outputs:
+  data: {path: /app/.raidar/fault-probe/data.json}

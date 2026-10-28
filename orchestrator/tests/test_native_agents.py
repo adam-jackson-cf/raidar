@@ -11,12 +11,10 @@ from typing import Any
 import pytest
 from harbor.models.agent.context import AgentContext
 
-from raidar.subject.agent.adapters.claude_code_cli import ClaudeCodeCliAdapter
-from raidar.subject.agent.claude_audit import claude_session_audit, claude_turn_usage
-from raidar.subject.agent.codex_audit import codex_session_audit
-from raidar.subject.agent.isolated_claude import ClaudeIsolationError, IsolatedClaudeCode
-from raidar.subject.agent.isolated_codex import IsolatedCodex
-from raidar.subject.agent.protocol import Tokens
+from raidar.subject.agent.config import Harness
+from raidar.subject.agent.native import adapter_class_for_harness
+from raidar.subject.agent.protocol import IsolationError, Tokens
+from tests.native_support import native_agent
 
 AUDIT_KEYS = {
     "harness",
@@ -46,21 +44,26 @@ def _context(input_: int | None, cached: int, output: int, cost: float | None) -
     )
 
 
-def _codex(logs_dir: Path) -> IsolatedCodex:
-    return IsolatedCodex(
-        logs_dir=logs_dir, model_name="openai/gpt-6-luna", version="0.156.1", reasoning_effort="low"
-    )
+def _codex(logs_dir: Path) -> Any:
+    return native_agent(Harness.CODEX_CLI, logs_dir)
 
 
-def _claude(logs_dir: Path, **kwargs: Any) -> IsolatedClaudeCode:
-    settings = SimpleNamespace()
-    return IsolatedClaudeCode(
-        logs_dir=logs_dir,
-        model_name="anthropic/claude-sonnet-4-6",
-        version="2.1.285",
-        reasoning_effort="low",
-        **ClaudeCodeCliAdapter.isolation_kwargs(settings),
-        **kwargs,
+def _claude(logs_dir: Path, **kwargs: Any) -> Any:
+    isolation = adapter_class_for_harness(Harness.CLAUDE_CODE).isolation_kwargs(SimpleNamespace())
+    return native_agent(Harness.CLAUDE_CODE, logs_dir, **isolation, **kwargs)
+
+
+def _usage(turn_dir: Path) -> Tokens | None:
+    """The turn's own usage as the claude agent leaves it in the turn's context."""
+    context = AgentContext()
+    _claude(turn_dir).populate_context_post_run(context)
+    if context.n_input_tokens is None:
+        return None
+    return Tokens(
+        context.n_input_tokens,
+        context.n_cache_tokens or 0,
+        context.n_output_tokens or 0,
+        context.cost_usd,
     )
 
 
@@ -127,9 +130,9 @@ def test_a_claude_turn_is_metered_from_its_own_stream(tmp_path: Path) -> None:
         )
     )
 
-    assert claude_turn_usage(first) == Tokens(18, 5, 7, 0.5)
-    assert claude_turn_usage(second) == Tokens(22, 20, 5, 0.5)
-    assert claude_turn_usage(tmp_path / "missing") is None
+    assert _usage(first) == Tokens(18, 5, 7, 0.5)
+    assert _usage(second) == Tokens(22, 20, 5, 0.5)
+    assert _usage(tmp_path / "missing") is None
 
 
 @pytest.mark.parametrize(
@@ -147,7 +150,7 @@ def test_claude_usage_distinguishes_unmeasured_from_zero(
 ) -> None:
     (tmp_path / "claude-code.txt").write_text(_lines({"type": "result", "usage": usage}))
 
-    assert claude_turn_usage(tmp_path) == expected
+    assert _usage(tmp_path) == expected
 
 
 # --- final text -----------------------------------------------------------------------------
@@ -212,9 +215,9 @@ class ClaudeEnvironment:
         return [call for call in self.calls if needle in call["command"]]
 
 
-def _turn(agent: IsolatedClaudeCode, env: ClaudeEnvironment, *, resume: bool) -> None:
+def _turn(agent: Any, env: ClaudeEnvironment, *, resume: bool) -> None:
     send = agent.resume if resume else agent.run
-    asyncio.run(send("do the task", env, AgentContext()))  # type: ignore[arg-type]
+    asyncio.run(send("do the task", env, AgentContext()))
 
 
 @pytest.mark.parametrize("resume", [False, True], ids=["first-turn", "resumed-turn"])
@@ -258,7 +261,7 @@ def test_a_session_starts_from_a_fresh_home_and_a_resume_keeps_its_transcripts(
 def test_managed_claude_settings_are_refused_before_any_claude_command(tmp_path: Path) -> None:
     env = ClaudeEnvironment(managed="/etc/claude-code/managed-settings.json\n")
 
-    with pytest.raises(ClaudeIsolationError, match="managed-settings"):
+    with pytest.raises(IsolationError, match="managed-settings"):
         _turn(_claude(tmp_path), env, resume=False)
 
     assert env.commands("claude --verbose") == []
@@ -269,7 +272,7 @@ def test_container_host_skills_would_be_copied_into_the_home_and_are_refused(
 ) -> None:
     env = ClaudeEnvironment(host_skill="skill=/home/agent/.claude/skills/x/SKILL.md\n")
 
-    with pytest.raises(ClaudeIsolationError, match=r"~/\.claude/skills"):
+    with pytest.raises(IsolationError, match=r"~/\.claude/skills"):
         _turn(_claude(tmp_path), env, resume=False)
 
     assert env.commands("claude --verbose") == []
@@ -278,7 +281,7 @@ def test_container_host_skills_would_be_copied_into_the_home_and_are_refused(
 def test_harbor_inputs_that_land_in_the_claude_home_are_refused(tmp_path: Path) -> None:
     env = ClaudeEnvironment()
 
-    with pytest.raises(ClaudeIsolationError, match="skills_dir"):
+    with pytest.raises(IsolationError, match="skills_dir"):
         _turn(_claude(tmp_path, skills_dir="/skills"), env, resume=False)
 
     assert env.calls == []
@@ -316,7 +319,7 @@ def test_a_codex_audit_normalizes_roots_instructions_and_developer_messages(tmp_
         ),
     )
 
-    audit = codex_session_audit(tmp_path)
+    audit = _codex(tmp_path).session_audit(tmp_path)
 
     assert audit["harness"] == "codex"
     assert audit["version"] == "0.156.1"
@@ -333,9 +336,9 @@ def test_a_codex_audit_normalizes_roots_instructions_and_developer_messages(tmp_
 def test_a_codex_audit_reports_plugin_recommendations_and_a_missing_rollout(
     tmp_path: Path,
 ) -> None:
-    empty = codex_session_audit(tmp_path / "none")
+    empty = _codex(tmp_path).session_audit(tmp_path / "none")
     _rollout(tmp_path, _message("user", "<recommended_plugins>\nuse x\n"))
-    recommended = codex_session_audit(tmp_path)
+    recommended = _codex(tmp_path).session_audit(tmp_path)
 
     assert empty["unmeasured"] == ["no rollout recorded"]
     assert empty["records"] == 0
@@ -366,7 +369,7 @@ def test_a_claude_audit_reads_instructions_skill_roots_and_system_messages(tmp_p
         {"type": "system", "content": "compacted"},
     )
 
-    audit = claude_session_audit(tmp_path)
+    audit = _claude(tmp_path).session_audit(tmp_path)
 
     assert set(audit) == AUDIT_KEYS
     assert audit["harness"] == "claude-code"
@@ -396,14 +399,14 @@ def test_a_claude_audit_flags_plugins_and_does_not_pass_unrecorded_skill_roots(
     (tmp_path / "claude-code.txt").write_text(_lines(init))
     _transcript(tmp_path, {"type": "user", "message": {"content": "hi"}})
 
-    audit = claude_session_audit(tmp_path)
+    audit = _claude(tmp_path).session_audit(tmp_path)
 
     assert audit["violations"] == ["claude loaded 1 plugin(s)", "claude loaded 1 MCP server(s)"]
     assert any("2 skill(s)" in reason for reason in audit["unmeasured"])
 
 
 def test_a_claude_audit_without_records_is_unmeasured(tmp_path: Path) -> None:
-    audit = claude_session_audit(tmp_path)
+    audit = _claude(tmp_path).session_audit(tmp_path)
 
     assert audit["records"] == 0
     assert audit["sources"] == []

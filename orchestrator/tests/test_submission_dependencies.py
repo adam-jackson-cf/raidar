@@ -8,7 +8,9 @@ from pathlib import Path
 
 import pytest
 
-from raidar.grading import closure, wheel_cache
+from raidar.contract import wheel_cache
+from raidar.contract.wheels import DependencyInfraError
+from raidar.grading import closure
 from raidar.grading.bundle import (
     BundleError,
     BundleManifest,
@@ -24,7 +26,7 @@ from raidar.grading.dependency_pins import lock_sha256, set_sha256
 from raidar.grading.grader import grade_step
 from raidar.grading.grader_image import ensure_grader_image, grader_dockerfile, grader_image_tag
 from raidar.grading.provision import prepare_dependencies
-from raidar.grading.resolver import DependencyInfraError, resolve_pins
+from raidar.grading.resolver import resolve_pins
 from raidar.grading.sandbox import RUNTIME_DIR, DockerCopySandbox, SandboxRun
 from raidar.grading.submission_deps import (
     SubmissionDependencies,

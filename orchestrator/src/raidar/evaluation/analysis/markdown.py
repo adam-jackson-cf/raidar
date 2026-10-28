@@ -341,7 +341,7 @@ def _verifier_arms(report: AnalysisReport) -> list[str]:
         "## Verifier sensitivity (diagnostic; never an outcome)",
         "",
         "Grader cases whose outcome differed between the grading run and the coverage run, "
-        "per trial (code-quality@7 regression_parity_excluded_cases, summed). Correctness "
+        "per trial (code-quality@8 regression_parity_excluded_cases, summed). Correctness "
         "and the solve rates read the grading run's verdict; G leaves such cases out.",
         "",
         *_table(("Metric", "Better", *(arm.arm for arm in arms)), rows),

@@ -79,11 +79,34 @@ def test_relocking_unchanged_inputs_is_byte_identical(tmp_path: Path) -> None:
     assert lock_integrity_issues(lock) == []
 
 
+def test_a_lock_records_package_and_primitive_identity_without_stage_code(tmp_path: Path) -> None:
+    lock = _lock(write_experiment(tmp_path, experiment_document()))
+
+    for arm in lock["execution"]["arms"].values():
+        assert "stage_code" not in arm
+        assert arm["packages"] == {}  # a spike workflow runs no packages
+        assert arm["primitive_code"]
+    assert "draft" not in lock
+
+
+def test_a_draft_lock_is_for_smoke_experiments_only(tmp_path: Path) -> None:
+    path = write_experiment(tmp_path, experiment_document())
+    resolvers = ResolverSet([*fixture_resolvers(), MetricResolver()], entry_point_group=None)
+
+    with pytest.raises(LockError, match="a draft lock is for smoke experiments"):
+        build_lock(
+            load_experiment(path),
+            lock_path=path.with_name("experiment.lock.json"),
+            resolvers=resolvers,
+            draft=True,
+        )
+
+
 def _scorer_resolvers(implementation: str) -> ResolverSet:
     problem, agent, workflow, _ = fixture_resolvers()
     scorer = InMemoryResolver(
         RefKind.SCORER,
-        {"correctness@6": {"implementation_digest": implementation}},
+        {"correctness@7": {"implementation_digest": implementation}},
         tool_versions={"pytest": "8.4.1"},
     )
     return ResolverSet([problem, agent, workflow, scorer, MetricResolver()], entry_point_group=None)
@@ -212,7 +235,7 @@ def test_mixed_k_without_declared_policy_is_rejected(tmp_path: Path) -> None:
 
 def test_every_gap_is_reported_and_nothing_is_skipped(tmp_path: Path) -> None:
     document = experiment_document()
-    document["assessment"]["scorers"] = ["correctness@6", "jev@2"]
+    document["assessment"]["scorers"] = ["correctness@7", "jev@2"]
     path = write_experiment(tmp_path, document)
     _, agent, workflow, _ = fixture_resolvers()
     resolvers = ResolverSet(
@@ -220,7 +243,7 @@ def test_every_gap_is_reported_and_nothing_is_skipped(tmp_path: Path) -> None:
             InMemoryResolver(RefKind.PROBLEM, {"scb/forge@abc123": {"checkpoints": 0}}),
             agent,
             workflow,
-            InMemoryResolver(RefKind.SCORER, {"correctness@6": {}}),
+            InMemoryResolver(RefKind.SCORER, {"correctness@7": {}}),
         ],
         entry_point_group=None,
     )
@@ -315,6 +338,31 @@ def test_lock_command_write_and_check_cycle(
     assert "section execution does not match its digest" in tampered.output
 
 
+def test_draft_locks_keep_distinct_smoke_experiments_separate(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("RAIDAR_VAR", str(tmp_path / "var"))
+    monkeypatch.setattr(
+        "raidar.design.experiment.lock.default_resolvers",
+        lambda policies: ResolverSet(
+            [*fixture_resolvers(), MetricResolver(policies)], entry_point_group=None
+        ),
+    )
+    ids = ("python__fixture__first", "python__fixture__second")
+    for identity in ids:
+        document = experiment_document()
+        document.update(kind="smoke", id=identity)
+        path = write_experiment(tmp_path / identity, document)
+        result = CliRunner().invoke(main, ["lock", str(path), "--draft"])
+        assert result.exit_code == 0, result.output
+        assert not path.with_name("experiment.lock.json").exists()
+    for identity in ids:
+        lock_path = tmp_path / "var" / "tmp" / "drafts" / identity / "experiment.lock.json"
+        lock = json.loads(lock_path.read_bytes())
+        assert lock["experiment"]["id"] == identity
+        assert lock["draft"] is True
+
+
 class _EntryPoint:
     def __init__(self, name: str, factory: Any) -> None:
         self.name = name
@@ -330,7 +378,7 @@ def test_entry_point_resolvers_load_lazily_by_kind(monkeypatch: pytest.MonkeyPat
 
     def scorer_factory() -> InMemoryResolver:
         loaded.append("scorer")
-        return InMemoryResolver(RefKind.SCORER, {"correctness@6": {}})
+        return InMemoryResolver(RefKind.SCORER, {"correctness@7": {}})
 
     monkeypatch.setattr(
         "raidar.contract.references.entry_points",

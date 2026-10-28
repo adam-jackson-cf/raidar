@@ -30,9 +30,9 @@ import yaml
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
 
 from raidar.contract.canonical import digest_json
-from raidar.subject.agent.adapters.factory import adapter_class_for_harness
 from raidar.subject.agent.adapters.harbor_cli import HarborCliAdapter
 from raidar.subject.agent.config import AgentName, Harness, agent_cli
+from raidar.subject.agent.native import adapter_class_for_harness
 
 AGENT_SCHEMA = 1
 AGENT_SUFFIX = ".yaml"

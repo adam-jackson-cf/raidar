@@ -64,8 +64,11 @@ def test_plan_lists_every_arm_attempt_trial_with_input_hashes(
         assert trial.hashes.lock == lock["lock_sha256"]
         assert trial.hashes.arm == lock["execution"]["arms"][trial.arm]["digest"]
         assert trial.hashes.problem == lock["execution"]["problems"][0]["digest"]
-        assert trial.hashes.workflow == arm.definition.digest
-        assert trial.hashes.stage_code == digest_json(arm.stage_code)
+        assert trial.hashes.workflow == arm.workflow.digest
+        assert trial.hashes.packages == digest_json(arm.packages)
+        assert trial.hashes.primitive_code == digest_json(arm.primitive_code)
+        assert lock["execution"]["arms"][trial.arm]["packages"] == arm.packages
+        assert lock["execution"]["arms"][trial.arm]["primitive_code"] == arm.primitive_code
     # Replanning is deterministic.
     assert _plan(locked, fixture_problem).to_json() == plan.to_json()
 

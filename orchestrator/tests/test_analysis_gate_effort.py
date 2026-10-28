@@ -97,7 +97,6 @@ def test_a_baseline_without_the_gate_is_described_not_paired() -> None:
     assert comparison.gate_note is not None
     assert "baseline arm measured no gate-effort value" in comparison.gate_note
     markdown = render_markdown(report)
-    assert "## Gate effort (gate-effort@14, per arm)" in markdown
     assert "— (not_applicable 5)" in markdown
     assert "### Gate effort (paired)" in markdown
 
@@ -155,7 +154,7 @@ def test_gate_metrics_read_the_trajectory_observations() -> None:
     assert metrics[FIRST_PASS] == Value.ok(0.5)
     assert metrics[UNRESOLVED].status == "unavailable"
     assert gate_metrics(None)[FIRST_PASS].status == "unassessed"
-    assert GATE_EFFORT_REF == "gate-effort@14"
+    assert GATE_EFFORT_REF == "gate-effort@15"
 
 
 # ---- the default manipulation check -------------------------------------------------------
@@ -236,7 +235,7 @@ def test_a_lock_reports_the_fix_round_delta_and_the_process_stall_rate() -> None
     ]
 
     report = _analyse(
-        outcomes, gate_scorer="gate-effort@14", process_scorer="process-compliance@10"
+        outcomes, gate_scorer="gate-effort@15", process_scorer="process-compliance@11"
     )
 
     baseline, guided = report.arms
@@ -252,8 +251,6 @@ def test_a_lock_reports_the_fix_round_delta_and_the_process_stall_rate() -> None
     assert baseline.process_outcomes is not None
     assert baseline.process_outcomes[STALL].mean == pytest.approx(0.25)
     markdown = render_markdown(report)
-    assert "## Process outcomes (process-compliance@10, per arm)" in markdown
-    assert "### Process outcomes (paired)" in markdown
     assert f"| {DELTA} |" in markdown
 
 

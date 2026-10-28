@@ -41,11 +41,11 @@
         }
       },
       "scorer": {
-        "correctness@6": {
-          "digest": "784c2ae8d4d22e7c053601221f9d701f12e5e31c0105bf0de255b069191334d9",
+        "correctness@7": {
+          "digest": "52c3b299d2ee8aac6197186226b76c79a2ab069fe73932e3d81c9d67ffcdee17",
           "metadata": {
             "implementation": "raidar.scoring.correctness:correctness_scorer",
-            "implementation_digest": "8d397ef611fe24a389d410e79a7f734551b1561c5d07885d144ef5ab052b6cbf",
+            "implementation_digest": "70d2b74c0bcf0a48419f67bbaf7c694009b2ac080263550150edc77496fcf80e",
             "manifest": {
               "description": "Oracle verdicts per checkpoint and trajectory, from the oracle step records.",
               "evidence_required": [
@@ -239,7 +239,7 @@
                 "*"
               ],
               "tools": [],
-              "version": "6"
+              "version": "7"
             },
             "tool_lock": {}
           }
@@ -254,12 +254,12 @@
       "metric": "scb-canonical@2",
       "scorer_config": {},
       "scorers": [
-        "correctness@6"
+        "correctness@7"
       ]
     },
     "tools": {}
   },
-  "document_sha256": "537d72b5a2fa325c7498a72185dd4ec9bca00e959264e8f0bf595f53b1d18ac0",
+  "document_sha256": "5ebab524989352b313719cc3ca8be3f1427731c1d72e464ef25a710ae8363b80",
   "execution": {
     "arms": {
       "baseline": {
@@ -277,13 +277,14 @@
           "version_pin": "0.156.1",
           "workflow_skills": "placement.skills .agents/skills in the workspace /app"
         },
-        "digest": "2db51237770dcddda3fdcbb90b4fb5dd4d2fdc5c53917c3c45f40eb1f0371a04",
+        "digest": "c00ac1280a15575c76f863d6d8c53f1c621dd618c31f18250241451c610fdaf5",
         "model": "gpt-6-luna",
+        "packages": {},
+        "primitive_code": {
+          "build": "b3b52ae87b6244ce6a83f6cb0db3566718415f9972c4c39451952568b530a959"
+        },
         "provider": "openai",
         "reasoning": "low",
-        "stage_code": {
-          "build": "cdaeb11dd4136fbfaee90608ce10723280b5a76e658331f74b05a477db1a712f"
-        },
         "tool": {
           "binary": "codex",
           "package": "@openai/codex",
@@ -1851,20 +1852,20 @@
   "experiment": {
     "id": "python__onboarding__need-one",
     "source": "experiment.yaml",
-    "source_sha256": "7186c5c1f31f35e89b7fc5831031437f682ee0a0b6904716dcef1ddacebd99fd",
-    "spec_sha256": "dba2fe524e6c1d70e107fc3f5267d24f7c601423c63859ad66e539991d1676d6"
+    "source_sha256": "2ec9582499ae259a8eee2112c9cb743291a3443f8fa8eff57cb57f7e9d6f5984",
+    "spec_sha256": "b96b6b8ff7a29ffdc7b0f8df03d9da4df84d462baa15429cdf782b2ad143761f"
   },
-  "lock_sha256": "04088440abb7f36324dc065bd5ef93d5d7cf88808b44f59496b3c128b3a6d3ce",
-  "lock_version": 4,
+  "lock_sha256": "eaab76a5eb7326bba8a3f0d990ff2225ae17daed6a4060dc132fc381d1246776",
+  "lock_version": 5,
   "overrides": {
     "flags": {},
     "set": []
   },
   "sections": {
     "analysis": "144d50057229f81b6136f89cfe8df3c9cf5dbbbec9a279c66acba88e027528b3",
-    "assessment": "15ab574589bc2e5c39cdf1d34c0217b193ee77cdc6c8f7e264020041bf11bf85",
-    "execution": "04088440abb7f36324dc065bd5ef93d5d7cf88808b44f59496b3c128b3a6d3ce",
-    "toolchain": "b6ef977873154c13b7d03140ffd4cfff64d0cfa32430af9f4e52db26e2a729cc"
+    "assessment": "d46a26339035c67122dc58e018a9ba3b2cadf7091a2a880677ca621d5e1197c3",
+    "execution": "eaab76a5eb7326bba8a3f0d990ff2225ae17daed6a4060dc132fc381d1246776",
+    "toolchain": "df7f62209849294be7fe28203b50c7865e833f912557e05e62948413912ff363"
   },
   "spec": {
     "agents": [
@@ -1900,7 +1901,7 @@
       "metric": "scb-canonical@2",
       "scorer_config": {},
       "scorers": [
-        "correctness@6"
+        "correctness@7"
       ]
     },
     "description": "AT-N1 onboarding mechanics for two generated SCB bindings; not citable.",
@@ -1935,6 +1936,6 @@
     "litellm": "1.102.1",
     "python": "3.13.7",
     "raidar": "0.15.0",
-    "raidar_spec": "63c73e76c83bcd5b4d8ea9bdb59dfbc83a46710312177fd6f814fc2d149a7aad"
+    "raidar_spec": "955279cceab002f47035eb9e1c07e510f8f242f9303b71399bc6d40f6fb2787c"
   }
 }

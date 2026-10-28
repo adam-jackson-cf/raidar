@@ -20,7 +20,16 @@ from raidar.design.experiment.lock import (
 from raidar.design.problem.store import ProblemStore, ProblemStoreError, open_store
 from raidar.engine.trial.agent_config import AgentOverride
 from raidar.engine.trial.plan import ExperimentPlan, PlanError, PlanOptions, build_plan
+from raidar.subject.draft import set_draft_resolution
 from raidar.subject.environment.drift import LockedPackError, lock_runtime_pack
+
+
+def _is_draft(lock_path: Path) -> bool:
+    """Whether the lock on disk is a smoke draft (written by ``raidar lock --draft``)."""
+    try:
+        return bool(json.loads(lock_path.read_bytes()).get("draft"))
+    except (OSError, ValueError, AttributeError):
+        return False
 
 
 def _current_lock(loaded: Any, lock_path: Path) -> dict[str, Any]:
@@ -32,8 +41,9 @@ def _current_lock(loaded: Any, lock_path: Path) -> dict[str, Any]:
     may differ from a committed lock, as ``make experiment-locks-check`` allows;
     the job records the host's value in its own ``job.lock.json``.
     """
+    draft = _is_draft(lock_path)
     try:
-        current = build_lock(loaded, lock_path=lock_path)
+        current = build_lock(loaded, lock_path=lock_path, draft=draft)
         note = check_lock_file(lock_path, current, ignore_host_python=True)
     except (LockError, StaleLockError) as exc:
         raise click.ClickException(str(exc)) from exc
@@ -43,13 +53,17 @@ def _current_lock(loaded: Any, lock_path: Path) -> dict[str, Any]:
 
 
 def build_cli_plan(options: dict[str, Any]) -> tuple[ExperimentPlan, ProblemStore]:
+    lock_file: Path | None = options["lock_path"]
+    # A draft lock (``raidar lock --draft``) resolves from the working tree for this process:
+    # validation, the lock check, planning and the run all read the same bytes.
+    set_draft_resolution(_is_draft(lock_file or default_lock_path(options["experiment"])))
     loaded = load_cli_experiment(
         options["experiment"],
         options["attempts"],
         options["seed"],
         options["assignments"],
     )
-    lock = _current_lock(loaded, options["lock_path"] or default_lock_path(loaded.path))
+    lock = _current_lock(loaded, lock_file or default_lock_path(loaded.path))
     override: AgentOverride | None = options["agent_override"]
     try:
         store = open_store()

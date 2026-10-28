@@ -179,6 +179,8 @@ def _smoke_jobs(jobs_root: Path) -> list[tuple[Path, dict[str, Any], dict[str, A
 def _candidate_identity(
     job_dir: Path, manifest: dict[str, Any], lock: dict[str, Any], wanted: Identity
 ) -> tuple[Identity | None, str | None]:
+    if lock.get("draft"):
+        return None, "a draft lock marks a dev job: it never admits a measured run"
     if problem := smoke_problem(job_dir, manifest):
         return None, problem
     arms = {

@@ -1,4 +1,4 @@
-"""code-quality@7 rejection boundaries: evidence that cannot be trusted never becomes a value.
+"""code-quality@8 rejection boundaries: evidence that cannot be trusted never becomes a value.
 
 Mirrors the fork's own boundary contract: a wrong Ruff version, a foreign
 diagnostic, a parser failure, a missing or unsuccessful file row, malformed

@@ -4,9 +4,10 @@ A job executed under the mechanics epoch carries provenance in ``job.json`` (``r
 ``recipes``, ``effective_limits``, ``execution_target``) and a records manifest per trial.
 ``check_pooling`` always verifies each job's records manifests (tamper, never overridable);
 with two or more jobs it refuses any difference in the fields below unless named in
-``--pool-override``. The arm identity is compared in full (design 5.4): ``subject`` (each
-arm's agent and workflow hashes) can be overridden, ``stage_code`` (each arm's stage code
-digest) never can. A job without ``mechanics_epoch`` has no manifest: it is reported
+``--pool-override``. The arm identity is compared in full: ``subject`` (each arm's agent and
+workflow hashes: workflow text and params) can be overridden; ``packages`` (each arm's package
+releases, digests and stage-check proof) and ``primitive_code`` (each arm's primitive code
+digests) never can. A job without ``mechanics_epoch`` has no manifest: it is reported
 ``unmeasured`` (warned and labelled, not refused).
 
 Whatever the number of jobs, every arm of every measured job must declare all nine capabilities
@@ -43,7 +44,8 @@ class PoolingError(ValueError):
 PRE_EPOCH = "pre-epoch"
 UNRECORDED = "unrecorded"
 TAMPER = "tamper"
-STAGE_CODE = "stage_code"
+PACKAGES = "packages"
+PRIMITIVE_CODE = "primitive_code"
 OVERRIDABLE = (
     "mechanics_epoch",
     "toolchain",
@@ -93,9 +95,14 @@ def _subject(job: JobDir) -> dict[str, Any]:
     return _arm_hashes(job, "agent", "workflow")
 
 
-def _stage_code(job: JobDir) -> dict[str, Any]:
-    """Each arm's stage code identity (never overridable)."""
-    return _arm_hashes(job, STAGE_CODE)
+def _packages(job: JobDir) -> dict[str, Any]:
+    """Each arm's package identity: releases, digests and stage-check proof (never overridable)."""
+    return _arm_hashes(job, PACKAGES)
+
+
+def _primitive_code(job: JobDir) -> dict[str, Any]:
+    """Each arm's primitive code identity (never overridable)."""
+    return _arm_hashes(job, PRIMITIVE_CODE)
 
 
 def _tamper(job: JobDir) -> list[str]:
@@ -144,7 +151,8 @@ def _refusals(jobs: Sequence[JobDir]) -> list[PoolFinding]:
         ("pack_recipe", measured, lambda j: _get(j.manifest, "recipes", "pack")),
         ("grader_recipe", measured, lambda j: _get(j.manifest, "recipes", "graders")),
         ("subject", jobs, _subject),
-        (STAGE_CODE, jobs, _stage_code),
+        (PACKAGES, jobs, _packages),
+        (PRIMITIVE_CODE, jobs, _primitive_code),
         ("effective_limits", measured, lambda j: _get(j.manifest, "effective_limits")),
         ("timing_cost", jobs, _hardware),
     ]
@@ -169,7 +177,7 @@ def _refusals(jobs: Sequence[JobDir]) -> list[PoolFinding]:
 
 CAPABILITIES = "capabilities"
 PARITY = "parity"
-NEVER_OVERRIDABLE = (TAMPER, STAGE_CODE, CAPABILITIES, PARITY)
+NEVER_OVERRIDABLE = (TAMPER, PACKAGES, PRIMITIVE_CODE, CAPABILITIES, PARITY)
 
 
 def _canonical(value: Any) -> str:

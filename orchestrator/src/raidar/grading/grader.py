@@ -16,13 +16,12 @@ from __future__ import annotations
 
 import hashlib
 import json
-import shutil
 import time
 from collections import defaultdict
 from pathlib import Path
 from typing import Any
 
-from raidar.contract.snapshot import copy_snapshot, tree_digest
+from raidar.contract.wheels import DependencyInfraError
 from raidar.grading.bundle import VerifierBundle, VerifierStepSpec
 from raidar.grading.models import (
     CorpusEvidence,
@@ -46,7 +45,7 @@ from raidar.grading.normalise import (
 from raidar.grading.outcomes import RunOutcome, StepGrade
 from raidar.grading.parity import check_parity, ineligible, outcome_differences
 from raidar.grading.provision import prepare_dependencies
-from raidar.grading.resolver import DependencyInfraError, Resolver
+from raidar.grading.resolver import Resolver
 from raidar.grading.sandbox import (
     LEDGER_NAME,
     PLUGIN_FILE,
@@ -56,6 +55,7 @@ from raidar.grading.sandbox import (
     render_pytest_args,
     sandbox_argv,
     sandbox_env,
+    stage_snapshot,
 )
 from raidar.grading.submission_deps import SubmissionDependencies, python_path_entries
 
@@ -129,16 +129,6 @@ def grading_budget(step: VerifierStepSpec, timeout_s: float) -> float | None:
     return budget if budget > 0 else None
 
 
-def _stage(snapshot: Path, run_dir: Path) -> tuple[Path, Path]:
-    if run_dir.exists():
-        shutil.rmtree(run_dir)
-    app, out = run_dir / "app", run_dir / "out"
-    app.mkdir(parents=True)
-    copy_snapshot(snapshot, app)
-    out.mkdir()
-    return app, out
-
-
 async def run_oracle(
     bundle: VerifierBundle,
     step: VerifierStepSpec,
@@ -153,7 +143,7 @@ async def run_oracle(
 ) -> RunOutcome:
     role = "coverage" if coverage else "grading"
     started = time.perf_counter()
-    app, out = _stage(snapshot, run_dir)
+    app, out = stage_snapshot(snapshot, run_dir)
     try:
         dependencies = await prepare_dependencies(
             bundle, app, sandbox, resolver=resolver, recorded=recorded
@@ -193,9 +183,7 @@ async def run_oracle(
             role,
             ledger,
             environment_id=await sandbox.environment_id(),
-            corpus=CorpusEvidence(
-                corpus_sha256=tree_digest(bundle.tests_dir), selected_tests=step.test_files
-            ),
+            corpus=bundle.corpus_evidence(step),
             invocation=InvocationEvidence(
                 argv=render_pytest_args(step, sandbox.layout), cwd=sandbox.layout.app
             ),

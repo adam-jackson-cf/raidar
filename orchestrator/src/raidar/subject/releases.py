@@ -3,20 +3,18 @@
 Only the version the tree holds resolves: the register's latest version of the name, whose
 registered hash must equal the definition's content hash now. An edited definition with no
 new release, an unregistered name or an archived version is refused, so a lock always names
-exactly the bytes it ran.
+exactly the bytes it ran. A reference is always ``[ns/]name@N``: a bare name, ``latest``, a
+branch, a tag or a path never parses.
 
-``release_issues`` is the register check ``make quality`` runs: every definition in the tree
-is registered at its current hash, every registered name is defined, every agent's CLI pin
-equals the pin of each runtime pack that bakes its harness in (the agent pin is the source),
-and, given a base commit, no release the base registered was removed or re-hashed (released
-means frozen). ``release_base`` picks that base: the merge base with ``main``, or ``HEAD``'s
-parent when ``HEAD`` is on ``main`` itself.
+A package workflow's hash folds in each package's release, digest and effective params
+(``subject.stages`` resolves them), so releasing a changed package makes every workflow that uses
+it need its own new release. ``draft`` resolution (``subject.draft``, smoke experiments only)
+resolves what the working tree holds without the register: an unregistered or edited package or
+workflow, never an agent. The register check ``make quality`` runs is ``subject.release_check``.
 """
 
 from __future__ import annotations
 
-import subprocess
-from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -32,25 +30,21 @@ from raidar.contract.releases import (
     ReleaseError,
     ReleaseKind,
     ReleaseRegister,
+    changed_message,
     load_register,
-    parse_register,
-    rewritten_releases,
+    resolve_registered,
 )
-from raidar.subject.agent.definition import (
-    AgentDefinition,
-    AgentDefinitionError,
-    agent_names,
-    load_agent,
-)
-from raidar.subject.environment import available_runtimes, load_runtime_pack
-from raidar.subject.workflow.definition import (
-    WorkflowDefinition,
-    WorkflowDefinitionError,
-    load_workflow,
-    workflow_names,
+from raidar.subject.agent.definition import AgentDefinition, AgentDefinitionError, load_agent
+from raidar.subject.draft import drafting
+from raidar.subject.stages import resolve_stages
+from raidar.subject.workflow.loading import WORKFLOW_ERRORS, AnyWorkflow, load_any_workflow
+from raidar.subject.workflow.package_checks import ResolvedStage
+from raidar.subject.workflow.package_definition import (
+    PackageWorkflowDefinition,
+    package_workflow_digest,
 )
 
-DEFINITION_ERRORS = (AgentDefinitionError, WorkflowDefinitionError)
+DEFINITION_ERRORS = (AgentDefinitionError, *WORKFLOW_ERRORS)
 
 
 @dataclass(frozen=True)
@@ -65,60 +59,77 @@ class ReleasedAgent:
 
 @dataclass(frozen=True)
 class ReleasedWorkflow:
+    """A workflow release with resolved packages folded into its identity."""
+
     release: Release
-    definition: WorkflowDefinition
+    definition: AnyWorkflow
+    stages: tuple[ResolvedStage, ...] = ()
+    draft: bool = False
 
     @property
     def ref(self) -> str:
         return str(self.release)
 
+    @property
+    def digest(self) -> str:
+        """The workflow's identity: what a release registers and the lock records."""
+        return workflow_digest(self.definition, self.stages)
 
-def _check_release[T: (AgentDefinition, WorkflowDefinition)](
-    kind: ReleaseKind,
-    text: str,
-    load: Callable[[str], T],
-    register: ReleaseRegister,
-) -> tuple[Release, T]:
-    release = Release.parse(text)
-    registered = register.of(kind).get(release)
-    if registered is None:
-        raise ReleaseError(f"{kind.value} release {text} is not in lab/releases.yaml")
-    latest = register.latest(kind, release.name)
-    if latest != release:
-        raise ReleaseError(
-            f"{text} is not the {kind.value} release the tree holds ({latest}); "
-            "earlier releases live in archive tags"
-        )
-    try:
-        definition = load(release.name)
-    except DEFINITION_ERRORS as exc:
-        raise ReleaseError(str(exc)) from exc
-    if definition.digest != registered:
-        raise ReleaseError(
-            f"{release.name} changed since {text} was released (registered {registered[:12]}, "
-            f"now {definition.digest[:12]}): register {release.name}@{release.version + 1}"
-        )
-    return release, definition
+
+def workflow_digest(definition: AnyWorkflow, stages: tuple[ResolvedStage, ...]) -> str:
+    """The definition's content hash, folding packages for ``schema: 2``."""
+    if isinstance(definition, PackageWorkflowDefinition):
+        return package_workflow_digest(definition, [stage.entry for stage in stages])
+    return definition.digest
 
 
 def released_agent(text: str, *, repo_root: Path = REPO_ROOT) -> ReleasedAgent:
     """The agent release ``text``; ``ReleaseError`` unless it is the tree's current release."""
-    root = agents_root(repo_root)
     register = load_register(releases_file(repo_root))
-    release, definition = _check_release(
-        ReleaseKind.AGENT, text, lambda name: load_agent(root, name), register
-    )
+    release, registered = resolve_registered(register, ReleaseKind.AGENT, text)
+    try:
+        definition = load_agent(agents_root(repo_root), release.name)
+    except AgentDefinitionError as exc:
+        raise ReleaseError(str(exc)) from exc
+    if definition.digest != registered:
+        raise ReleaseError(changed_message(release, str(registered), definition.digest))
     return ReleasedAgent(release, definition)
 
 
-def released_workflow(text: str, *, repo_root: Path = REPO_ROOT) -> ReleasedWorkflow:
-    """The workflow release ``text``; ``ReleaseError`` unless it is the tree's current release."""
-    root = workflows_root(repo_root)
+def _workflow(
+    name: str, repo_root: Path, register: ReleaseRegister, *, draft: bool
+) -> tuple[AnyWorkflow, tuple[ResolvedStage, ...]]:
+    try:
+        definition = load_any_workflow(workflows_root(repo_root), name)
+    except WORKFLOW_ERRORS as exc:
+        raise ReleaseError(str(exc)) from exc
+    if not isinstance(definition, PackageWorkflowDefinition):
+        return definition, ()
+    return definition, resolve_stages(definition, repo_root, register, draft=draft)
+
+
+def released_workflow(
+    text: str, *, repo_root: Path = REPO_ROOT, draft: bool | None = None
+) -> ReleasedWorkflow:
+    """The workflow release ``text``; ``ReleaseError`` unless it is the tree's current release.
+
+    With ``draft`` the working tree resolves without the register (smoke experiments only).
+    """
+    draft = drafting() if draft is None else draft
     register = load_register(releases_file(repo_root))
-    release, definition = _check_release(
-        ReleaseKind.WORKFLOW, text, lambda name: load_workflow(root, name), register
-    )
-    return ReleasedWorkflow(release, definition)
+    release, registered = resolve_registered(register, ReleaseKind.WORKFLOW, text, draft=draft)
+    definition, stages = _workflow(release.name, repo_root, register, draft=draft)
+    released = ReleasedWorkflow(release, definition, stages, draft)
+    if not draft and released.digest != registered:
+        raise ReleaseError(changed_message(release, str(registered), released.digest))
+    return released
+
+
+def tree_workflow_digest(name: str, repo_root: Path, register: ReleaseRegister) -> str:
+    """A workflow's identity as the tree holds it (packages read from the tree, not the register:
+    an unreleased package is its own register-check entry)."""
+    definition, stages = _workflow(name, repo_root, register, draft=True)
+    return workflow_digest(definition, stages)
 
 
 @dataclass(frozen=True)
@@ -152,7 +163,7 @@ class AgentResolver:
 
 @dataclass(frozen=True)
 class WorkflowResolver:
-    """The lock's ``workflow`` resolver: digest and the enabled stage types."""
+    """The lock's ``workflow`` resolver: digest and the enabled stages (types or packages)."""
 
     repo_root: Path = REPO_ROOT
 
@@ -166,127 +177,5 @@ class WorkflowResolver:
             workflow = released_workflow(str(ref), repo_root=self.repo_root)
         except ReleaseError as exc:
             raise RegistryReferenceError(str(exc)) from exc
-        definition = workflow.definition
-        return ResolvedReference(
-            ref=ref,
-            digest=definition.digest,
-            metadata={"stages": list(definition.enabled_stages)},
-        )
-
-
-def _registration_issues(
-    kind: ReleaseKind,
-    names: list[str],
-    load: Callable[[str], AgentDefinition | WorkflowDefinition],
-    register: ReleaseRegister,
-) -> list[str]:
-    issues = []
-    for name in names:
-        try:
-            digest = load(name).digest
-        except DEFINITION_ERRORS as exc:
-            issues.append(str(exc))
-            continue
-        latest = register.latest(kind, name)
-        if latest is None:
-            issues.append(f"{kind.value}/{name} is not released: register {name}@1: {digest}")
-        elif register.of(kind)[latest] != digest:
-            issues.append(
-                f"{kind.value}/{name} changed since {latest}: register "
-                f"{name}@{latest.version + 1}: {digest}"
-            )
-    issues.extend(
-        f"{kind.value} release name {name!r} is registered but not defined in the tree"
-        for name in sorted(register.names(kind) - set(names))
-    )
-    return issues
-
-
-def _pin_issues(agents: list[AgentDefinition]) -> list[str]:
-    issues = []
-    for runtime in available_runtimes():
-        pack = load_runtime_pack(runtime)
-        for agent in agents:
-            pin = pack.image.harnesses.get(agent.harness.value)
-            if pin is None:
-                continue
-            baked = (pin.npm_package, pin.executable, pin.version)
-            pinned = (agent.tool.package, agent.tool.binary, agent.tool.version)
-            if baked != pinned:
-                issues.append(
-                    f"agents/{agent.name}: tool {pinned} differs from pack {pack.id} "
-                    f"image.harnesses.{agent.harness.value} {baked}; the agent pin is the source"
-                )
-    return issues
-
-
-def _git(repo_root: Path, *args: str) -> str | None:
-    done = subprocess.run(
-        ["git", "-C", str(repo_root), *args], capture_output=True, text=True, check=False
-    )
-    return done.stdout.strip() if done.returncode == 0 else None
-
-
-MAIN_REFS = ("main", "origin/main")
-
-
-def release_base(repo_root: Path = REPO_ROOT) -> str | None:
-    """The commit whose register the tree's must extend; ``None`` when there is nothing before.
-
-    Off ``main``: the merge base with ``main`` (local, else ``origin/main``). On ``main``'s tip
-    (merge base is ``HEAD``): ``HEAD``'s parent. ``ReleaseError`` when no ``main`` is found.
-    """
-    head = _git(repo_root, "rev-parse", "HEAD")
-    if head is None:
-        return None
-    base = next((b for ref in MAIN_REFS if (b := _git(repo_root, "merge-base", "HEAD", ref))), None)
-    if base is None:
-        raise ReleaseError(
-            "no main branch to check released versions against: fetch main or set RELEASES_BASE"
-        )
-    return _git(repo_root, "rev-parse", "HEAD~1") if base == head else base
-
-
-def history_issues(base: str, repo_root: Path = REPO_ROOT) -> list[str]:
-    """Releases registered at commit ``base`` that the tree's register removed or re-hashed."""
-    path = releases_file(repo_root)
-    relative = path.relative_to(repo_root).as_posix()
-    text = _git(repo_root, "show", f"{base}:{relative}")
-    if text is None:
-        if _git(repo_root, "cat-file", "-e", f"{base}^{{commit}}") is None:
-            return [f"release base {base!r} is not a commit"]
-        return []  # the register did not exist yet at the base
-    try:
-        earlier = parse_register(text, f"{base}:{relative}")
-        now = load_register(path)
-    except ReleaseError as exc:
-        return [str(exc)]
-    return rewritten_releases(earlier, now)
-
-
-def release_issues(repo_root: Path = REPO_ROOT, *, base: str | None = None) -> list[str]:
-    """Every register, definition, pin and (given ``base``) history problem; empty when sound."""
-    try:
-        register = load_register(releases_file(repo_root))
-    except ReleaseError as exc:
-        return [str(exc)]
-    a_root, w_root = agents_root(repo_root), workflows_root(repo_root)
-    issues = _registration_issues(
-        ReleaseKind.AGENT, agent_names(a_root), lambda name: load_agent(a_root, name), register
-    )
-    issues += _registration_issues(
-        ReleaseKind.WORKFLOW,
-        workflow_names(w_root),
-        lambda name: load_workflow(w_root, name),
-        register,
-    )
-    agents = []
-    for name in agent_names(a_root):
-        try:
-            agents.append(load_agent(a_root, name))
-        except AgentDefinitionError:
-            continue  # already reported above
-    issues += _pin_issues(agents)
-    if base is not None:
-        issues += history_issues(base, repo_root)
-    return issues
+        stages = list(workflow.definition.enabled_stages)
+        return ResolvedReference(ref=ref, digest=workflow.digest, metadata={"stages": stages})

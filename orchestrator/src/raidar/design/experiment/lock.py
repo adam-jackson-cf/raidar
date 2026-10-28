@@ -8,10 +8,10 @@ each with its own digest under ``sections``:
 - ``execution``: what a trial runs: the experiment design (kind, problems,
   runtime, environment, agents, protocol, arms, attempts, seed), every problem
   file and the problem, agent and workflow reference digests, one identity per
-  arm (design 5.4: agent release and CLI pin, model and reasoning, workflow
-  release, the workflow's resolved content hash and a stage code digest per
-  enabled stage type, plus a digest over all of it), the Harbor and agent
-  versions and any tools those references pin. Its digest **is**
+  arm (agent release and CLI pin, model and reasoning, workflow
+  release, the workflow's resolved content hash, each package's release, digest and
+  stage-check proof and each primitive's code digest, plus a digest over all of it),
+  the Harbor and agent versions and any tools those references pin. Its digest **is**
   ``lock_sha256``, the identity every job records in ``job.json``: jobs and
   baselines match a lock through it. The kind is part of it, so relabelling an
   experiment after data exists makes a new experiment.
@@ -63,17 +63,17 @@ from raidar.contract.source_digest import SOURCE_DIGEST_SCHEME, python_source_di
 from raidar.design.experiment.arm import ArmResolutionError, resolve_arm
 from raidar.design.experiment.loader import LoadedExperiment
 from raidar.design.experiment.runtime_gate import GateInputs, PackLoader, runtime_gate_issues
-from raidar.design.experiment.schema import ExperimentSpec, ProblemEntry
-from raidar.design.experiment.validation import FieldIssue
+from raidar.design.experiment.schema import ExperimentSpec, FieldIssue, ProblemEntry
 from raidar.scoring.framework.metrics import (
     DEFAULT_METRIC_REGISTRY,
     MetricRegistry,
     MetricResolver,
 )
+from raidar.subject.draft import draft_resolution
 from raidar.subject.releases import AgentResolver, WorkflowResolver
 
-LOCK_VERSION = 4
-"""4: arms are an agent release plus a workflow release, with their full identity."""
+LOCK_VERSION = 5
+"""5: an arm's identity carries ``packages`` and ``primitive_code`` (no ``stage_code``)."""
 LOCK_SUFFIX = ".lock.json"
 TOOLCHAIN_PACKAGES = ("litellm", "raidar")
 SECTIONS = ("execution", "assessment", "analysis", "toolchain")
@@ -399,18 +399,48 @@ def build_lock(
     resolvers: ResolverSet | None = None,
     metrics: MetricRegistry = DEFAULT_METRIC_REGISTRY,
     pack_loader: PackLoader | None = None,
+    draft: bool = False,
 ) -> dict[str, object]:
     """Resolve the experiment into a lock document; raise ``LockError`` on any gap.
 
-    Resolution gaps and the compatibility gate's ``RT*`` issues are reported
-    together. ``pack_loader`` replaces the runtime pack registry (tests).
+    ``draft`` (smoke experiments only) resolves unregistered packages and workflows from the
+    working tree, marks the lock ``draft`` and records absent stage-check proof as absent: a dev
+    job that never admits a measured run.
     """
-    builder = _LockBuilder(
-        loaded=loaded,
-        resolvers=resolvers or default_resolvers(metrics),
-        metrics=metrics,
-        lock_path=lock_path,
-    )
+    with draft_resolution(draft):
+        return _build_lock(
+            loaded,
+            lock_path=lock_path,
+            resolvers=resolvers,
+            metrics=metrics,
+            pack_loader=pack_loader,
+            draft=draft,
+        )
+
+
+def _require_smoke_draft(loaded: LoadedExperiment, draft: bool) -> None:
+    if draft and loaded.spec.kind != "smoke":
+        raise LockError(
+            str(loaded.path),
+            [FieldIssue("kind", f"a draft lock is for smoke experiments, not {loaded.spec.kind}")],
+        )
+
+
+def _versions(arms: Mapping[str, Mapping[str, Any]]) -> dict[str, object]:
+    """The Harbor release and each arm's agent release and CLI pin."""
+    return {
+        "harbor": harbor_version(),
+        "agents": {
+            arm["agent"]: {"release": arm["agent_release"], "version": arm["tool"]["version"]}
+            for arm in arms.values()
+        },
+    }
+
+
+def _resolve_all(
+    builder: _LockBuilder, loaded: LoadedExperiment, pack_loader: PackLoader | None
+) -> tuple[list[dict[str, object]], dict[str, dict[str, Any]], dict[str, object] | None]:
+    """Resolve every reference and arm and run the runtime gate; ``LockError`` on any gap."""
     spec = loaded.spec
     problems = [builder.problem(index, entry) for index, entry in enumerate(spec.problems)]
     for index, scorer in enumerate(spec.assessment.scorers):
@@ -418,14 +448,38 @@ def build_lock(
     builder.releases()
     # A release that did not resolve is already an issue; resolving its arms would repeat it.
     arms = builder.arms() if not builder.issues else {}
-    resolved_problems = [problem for problem in problems if problem is not None]
-    headline = (
-        builder.metric(resolved_problems) if len(resolved_problems) == len(problems) else None
-    )
+    resolved = [problem for problem in problems if problem is not None]
+    headline = builder.metric(resolved) if len(resolved) == len(problems) else None
     gate = GateInputs(spec=spec, base_dir=loaded.base_dir, resolved=builder.resolved)
     builder.issues.extend(runtime_gate_issues(gate, pack_loader=pack_loader))
     if builder.issues:
         raise LockError(str(loaded.path), builder.issues)
+    return resolved, arms, headline
+
+
+def _build_lock(
+    loaded: LoadedExperiment,
+    *,
+    lock_path: Path,
+    resolvers: ResolverSet | None,
+    metrics: MetricRegistry,
+    pack_loader: PackLoader | None,
+    draft: bool,
+) -> dict[str, object]:
+    """``build_lock`` inside its draft-resolution block.
+
+    Resolution gaps and the compatibility gate's ``RT*`` issues are reported together.
+    ``pack_loader`` replaces the runtime pack registry (tests).
+    """
+    _require_smoke_draft(loaded, draft)
+    builder = _LockBuilder(
+        loaded=loaded,
+        resolvers=resolvers or default_resolvers(metrics),
+        metrics=metrics,
+        lock_path=lock_path,
+    )
+    spec = loaded.spec
+    resolved_problems, arms, headline = _resolve_all(builder, loaded, pack_loader)
     spec_json = spec.to_json()
     execution_refs, execution_tools = builder.grouped(EXECUTION_REF_KINDS)
     assessment_refs, assessment_tools = builder.grouped(ASSESSMENT_REF_KINDS)
@@ -438,6 +492,7 @@ def build_lock(
             "spec_sha256": digest_json(spec_json),
         },
         "overrides": loaded.overrides.to_json(),
+        **({"draft": True} if draft else {}),
         "spec": spec_json,
         "execution": execution_section(
             spec_json,
@@ -445,16 +500,7 @@ def build_lock(
             files=builder.files,
             references=execution_refs,
             arms=arms,
-            versions={
-                "harbor": harbor_version(),
-                "agents": {
-                    arm["agent"]: {
-                        "release": arm["agent_release"],
-                        "version": arm["tool"]["version"],
-                    }
-                    for arm in arms.values()
-                },
-            },
+            versions=_versions(arms),
             tools=execution_tools,
         ),
         "assessment": {

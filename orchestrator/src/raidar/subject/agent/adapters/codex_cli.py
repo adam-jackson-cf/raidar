@@ -7,10 +7,10 @@ from typing import Any, override
 
 from harbor.agents.base import BaseAgent
 
-from raidar.subject.agent.codex_auth import ResolvedCodexAuth, resolve_codex_auth
-from raidar.subject.agent.isolated_codex import IsolatedCodex
+from raidar.subject.agent.adapters.codex_auth import ResolvedCodexAuth, resolve_codex_auth
+from raidar.subject.agent.adapters.isolated_codex import IsolatedCodex
+from raidar.subject.agent.config import AgentSpec
 
-from ..config import AgentSpec
 from .harbor_cli import HarborCliAdapter, SupportedModelProfile
 
 

@@ -16,7 +16,6 @@ Besides the cross-reference rules, schema v3 checks:
 from __future__ import annotations
 
 from collections.abc import Iterable, Mapping, Sequence
-from dataclasses import dataclass
 from pathlib import Path
 
 from pydantic import ValidationError
@@ -29,6 +28,7 @@ from raidar.design.experiment.schema import (
     EXPERIMENT_KINDS,
     RESERVED_KINDS,
     ExperimentSpec,
+    FieldIssue,
 )
 from raidar.scoring.catalog.builtin import (
     BUILTIN_PROTOCOL_CONFIG,
@@ -41,17 +41,6 @@ from raidar.subject.releases import released_agent, released_workflow
 
 EXPERIMENTS_ROOT = "experiments"
 ID_SEPARATOR = "__"
-
-
-@dataclass(frozen=True, order=True)
-class FieldIssue:
-    """One problem, located by a dotted path into the experiment document."""
-
-    loc: str
-    message: str
-
-    def render(self) -> str:
-        return f"{self.loc or '<root>'}: {self.message}"
 
 
 class SpecValidationError(Exception):

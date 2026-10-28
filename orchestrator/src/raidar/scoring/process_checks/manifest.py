@@ -19,7 +19,7 @@ from raidar.scoring.process_checks.work_tests import WORK_TESTS_METRICS
 
 PROCESS_COMPLIANCE = ScorerManifest(
     id="process-compliance",
-    version="10",
+    version="11",
     description=(
         "Deterministic trace checks of agent process (stall "
         "outcomes, a test command counts only when it ran, the step's work session's own "

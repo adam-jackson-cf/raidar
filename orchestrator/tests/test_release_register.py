@@ -11,14 +11,10 @@ from click.testing import CliRunner
 
 from raidar.cli import main
 from raidar.contract.paths import agents_root
-from raidar.contract.releases import ReleaseError
+from raidar.contract.releases import Release, ReleaseError
 from raidar.subject.agent.definition import load_agent
-from raidar.subject.releases import (
-    release_base,
-    release_issues,
-    released_agent,
-    released_workflow,
-)
+from raidar.subject.release_check import release_base, release_issues
+from raidar.subject.releases import released_agent, released_workflow
 from tests.release_support import edit_agent, release_tree, write_register, write_workflow
 
 
@@ -69,7 +65,30 @@ def test_a_workflow_changed_since_its_release_is_refused(tree: Path) -> None:
         released_workflow("one-shot@1", repo_root=tree)
 
 
-@pytest.mark.parametrize("ref", ["codex", "codex@0", "codex@one", "Codex@1", "@1", "codex@01"])
+def test_a_namespaced_release_keeps_its_namespace_and_leaf_distinct() -> None:
+    release = Release.parse("raidar/review-notes@12")
+    assert release.name == "raidar/review-notes"
+    assert release.leaf == "review-notes"
+    assert release.version == 12
+
+
+@pytest.mark.parametrize(
+    "ref",
+    [
+        "codex",
+        "codex@0",
+        "codex@one",
+        "Codex@1",
+        "@1",
+        "codex@01",
+        "../codex@1",
+        "/codex@1",
+        "a/b/c@1",
+        "a//b@1",
+        "codex@latest",
+        "codex@main",
+    ],
+)
 def test_a_malformed_release_reference_is_refused(tree: Path, ref: str) -> None:
     with pytest.raises(ReleaseError, match="invalid release"):
         released_agent(ref, repo_root=tree)

@@ -9,13 +9,14 @@ from pathlib import Path
 
 import pytest
 
+from raidar.contract.wheels import DependencyInfraError
 from raidar.design.problem.importer import ProblemDriftError, import_problem
 from raidar.design.problem.models import ProblemId
 from raidar.design.problem.store import ProblemStore, ProblemStoreError
 from raidar.design.problem.validation import DEPENDENCY_CHECK, Verdict
 from raidar.design.problem.validator import ValidateOptions, validate_problem
 from raidar.grading.dependency_pins import REFUSAL_REASON, DependencyLocks, Unprovided
-from raidar.grading.resolver import DependencyInfraError, Resolution
+from raidar.grading.resolver import Resolution
 from tests.problems_support import FakeResolver, build_fake_scb_repo, fake_store
 
 

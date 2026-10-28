@@ -10,6 +10,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from raidar.subject.primitive import calls
 from raidar.subject.workflow.acceptance import Acceptance
 from raidar.subject.workflow.definition import DEFINE_TOKEN, DefineSettings
 from raidar.subject.workflow.stage import DEFINE_ROUND, Checkpoint, Resume, Stage
@@ -133,8 +134,8 @@ class Define(Stage):
         self.install_seconds = round(time.monotonic() - started, 3)
         await self._exec(checkpoint, f"mkdir -p {shlex.quote(self.paths.home + '/define_tool')}")
         for source in sorted(PAYLOAD.glob("*.py")):
-            await checkpoint.environment.upload_file(
-                source, f"{self.paths.home}/define_tool/{source.name}"
+            await calls.upload_file(
+                checkpoint.environment, source, f"{self.paths.home}/define_tool/{source.name}"
             )
         launcher = records / "define"
         argv = self.paths.invocation(
@@ -142,7 +143,7 @@ class Define(Stage):
             f"raise SystemExit(tool.main(environ={{'RAIDAR_DEFINE_STATE': {self.paths.state!r}}}))",
         )
         launcher.write_text("#!/bin/sh\nexec " + shlex.join(argv) + ' "$@"\n', encoding="utf-8")
-        await checkpoint.environment.upload_file(launcher, self.paths.command)
+        await calls.upload_file(checkpoint.environment, launcher, self.paths.command)
         await self._exec(
             checkpoint,
             f'if [ "$(id -u)" = 0 ]; then chown -R root:root '
@@ -181,7 +182,7 @@ class Define(Stage):
             + "\n",
             encoding="utf-8",
         )
-        await checkpoint.environment.upload_file(inputs, f"{self.paths.home}/context.json")
+        await calls.upload_file(checkpoint.environment, inputs, f"{self.paths.home}/context.json")
         immutable = shlex.quote(self.paths.home + "/context.json")
         await self._exec(
             checkpoint,
@@ -199,7 +200,7 @@ class Define(Stage):
     async def check(self, checkpoint: Checkpoint, after: str) -> Resume | None:
         if self.ending in ("definition_unusable", "definition_ready"):
             return None
-        result = await checkpoint.environment.exec(shlex.join(self.paths.inspector))
+        result = await calls.trusted_exec(checkpoint.environment, shlex.join(self.paths.inspector))
         try:
             inspected: dict[str, Any] = json.loads(result.stdout or "")
         except ValueError:
@@ -222,6 +223,12 @@ class Define(Stage):
         await self._keep(checkpoint)
         if state == "ready":
             text = str(inspected["checked"]["file"]["rendered"])
+            records = checkpoint.logs_dir / RECORD_DIR
+            record["validated"] = {
+                "state_sha256": hashlib.sha256((records / "state.json").read_bytes()).hexdigest(),
+                "inputs_sha256": hashlib.sha256((records / "inputs.json").read_bytes()).hexdigest(),
+                "rendered_sha256": hashlib.sha256(text.encode("utf-8")).hexdigest(),
+            }
             path = checkpoint.logs_dir / RECORD_DIR / "feature-definition.md"
             path.write_text(text, encoding="utf-8")
             self.definition_sha256 = hashlib.sha256(text.encode()).hexdigest()
@@ -288,8 +295,8 @@ class Define(Stage):
 
     async def _keep(self, checkpoint: Checkpoint) -> None:
         for name in ("state.json", "define-calls.jsonl", "define-events.jsonl"):
-            result = await checkpoint.environment.exec(
-                f"cat {shlex.quote(self.paths.state + '/' + name)}"
+            result = await calls.trusted_exec(
+                checkpoint.environment, f"cat {shlex.quote(self.paths.state + '/' + name)}"
             )
             if result.return_code == 0:
                 (checkpoint.logs_dir / RECORD_DIR / name).write_text(
@@ -305,8 +312,8 @@ class Define(Stage):
             self.errors.append(f"{type(exc).__name__}: {exc}")
 
     async def _exec(self, checkpoint: Checkpoint, command: str, *, root: bool = True) -> str:
-        result = await checkpoint.environment.exec(
-            "umask 022\n" + command, user="root" if root else None
+        result = await calls.trusted_exec(
+            checkpoint.environment, "umask 022\n" + command, user="root" if root else None
         )
         if result.return_code != 0:
             detail = (result.stderr or result.stdout or "")[-1000:]

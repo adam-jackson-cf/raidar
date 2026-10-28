@@ -99,7 +99,8 @@ def _echo_plan(plan: ExperimentPlan) -> None:
             f" {mark} {trial.sequence:03d} {trial.trial_id} "
             f"attempt={trial.attempt} order={trial.order} "
             f"steps={len(trial.steps)} trial={hashes.trial[:12]} arm={hashes.arm[:12]} "
-            f"workflow={hashes.workflow[:12]} stage_code={hashes.stage_code[:12]} "
+            f"workflow={hashes.workflow[:12]} packages={hashes.packages[:12]} "
+            f"primitive_code={hashes.primitive_code[:12]} "
             f"problem={hashes.problem[:12]} agent={hashes.agent[:12]} "
             f"protocol={hashes.protocol[:12]}"
         )

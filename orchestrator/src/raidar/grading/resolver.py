@@ -19,7 +19,6 @@ from __future__ import annotations
 
 import json
 import os
-import re
 import subprocess
 import tempfile
 import time
@@ -30,7 +29,7 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Protocol, cast
+from typing import Protocol
 
 from packaging.requirements import InvalidRequirement, Requirement
 from packaging.specifiers import SpecifierSet
@@ -42,12 +41,18 @@ from packaging.utils import (
     parse_wheel_filename,
 )
 
-from raidar.grading.dependency_pins import (
+from raidar.contract.wheels import (
     ARCHES,
     INDEX,
+    MAX_WHEEL_BYTES,
     PLATFORMS,
     POLICY,
     PYTHON,
+    WHEEL_URL_PREFIXES,
+    DependencyInfraError,
+    wheel_fits,
+)
+from raidar.grading.dependency_pins import (
     DependencyPins,
     DependencySet,
     LockKey,
@@ -57,8 +62,6 @@ from raidar.grading.dependency_pins import (
 )
 
 MAX_PACKAGES = 200
-MAX_WHEEL_BYTES = 1 << 30
-WHEEL_URL_PREFIXES = ("https://files.pythonhosted.org/",)
 TIMEOUT_S = 120.0
 CANARY_TIMEOUT_S = 30.0
 CANARY_REQUIREMENT = "pip==25.0"
@@ -97,13 +100,6 @@ _NETWORK_SIGNS = (
     "tls handshake",
     "certificate",
 )
-_GLIBC = re.compile(r"manylinux_(\d+)_(\d+)_(.+)")
-_LEGACY_MANYLINUX = {"manylinux1": (2, 5), "manylinux2010": (2, 12), "manylinux2014": (2, 17)}
-_MACHINES = {"amd64": "x86_64", "arm64": "aarch64"}
-
-
-class DependencyInfraError(RuntimeError):
-    """The index or uv is unavailable: an infrastructure failure, not a verdict about packages."""
 
 
 class _Exhausted(Exception):  # noqa: N818 - internal control flow: the resolution budget ran out
@@ -179,14 +175,6 @@ def pylock_packages(lock_text: str) -> list[tuple[str, str]]:
     ]
 
 
-def lock_wheels(lock_text: str) -> list[dict[str, object]]:
-    """Every wheel entry (``url``, ``size``, ``hashes``) the lock lists."""
-    wheels: list[dict[str, object]] = []
-    for package in tomllib.loads(lock_text).get("packages", []):
-        wheels.extend(package.get("wheels", []))
-    return wheels
-
-
 _SOURCE_KEYS = ("vcs", "directory", "archive", "sdist")
 
 
@@ -203,7 +191,11 @@ def lock_sources_ok(lock_text: str, prefixes: Sequence[str]) -> bool:
 
 def _closure_bytes(lock_text: str) -> int:
     """Wheel bytes a fetch of the lock downloads: every wheel it lists."""
-    return sum(int(cast(int, wheel.get("size", 0))) for wheel in lock_wheels(lock_text))
+    return sum(
+        int(wheel.get("size", 0))
+        for package in tomllib.loads(lock_text).get("packages", [])
+        for wheel in package.get("wheels", [])
+    )
 
 
 def provided_by_lock(requirements: Sequence[str], lock_text: str) -> tuple[str, ...]:
@@ -299,42 +291,6 @@ def _file_version(filename: str) -> object | None:
         return None
 
 
-def _python_fits(interpreter: str, abi: str) -> bool:
-    if interpreter.startswith("py3") or interpreter == "cp312":
-        return True
-    return abi == "abi3" and interpreter.startswith("cp3") and _cp_minor(interpreter) <= 12
-
-
-def _wheel_fits(filename: str, arch: str) -> bool:
-    """Whether the wheel could install on CPython 3.12 / manylinux_2_28 for ``arch``."""
-    try:
-        tags = parse_wheel_filename(filename)[3]
-    except InvalidWheelFilename:
-        return False
-    machine = _MACHINES[arch]
-    return any(
-        _python_fits(tag.interpreter, tag.abi) and _platform_fits(tag.platform, machine)
-        for tag in tags
-    )
-
-
-def _cp_minor(interpreter: str) -> int:
-    digits = interpreter.removeprefix("cp3")
-    return int(digits) if digits.isdigit() else 99
-
-
-def _platform_fits(platform: str, machine: str) -> bool:
-    if platform in {"any", f"linux_{machine}"}:
-        return True
-    modern = _GLIBC.fullmatch(platform)
-    if modern is not None:
-        return (int(modern[1]), int(modern[2])) <= (2, 28) and modern[3] == machine
-    return any(
-        platform == f"{legacy}_{machine}" and glibc <= (2, 28)
-        for legacy, glibc in _LEGACY_MANYLINUX.items()
-    )
-
-
 def _matching_files(requirement: str, files: list[IndexFile]) -> list[IndexFile]:
     specifier = Requirement(requirement).specifier or SpecifierSet()
     found: list[IndexFile] = []
@@ -355,7 +311,7 @@ def classify_failure(
     before = [file for file in matching if file.uploaded is None or file.uploaded <= cutoff]
     if not before:
         return "after-cutoff"
-    if any(file.filename.endswith(".whl") and _wheel_fits(file.filename, arch) for file in before):
+    if any(file.filename.endswith(".whl") and wheel_fits(file.filename, arch) for file in before):
         return "unresolvable"
     return "no-wheel"
 

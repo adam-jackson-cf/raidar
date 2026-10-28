@@ -18,11 +18,11 @@ from pathlib import Path
 
 import pytest
 
+from raidar.contract import wheel_cache
+from raidar.contract.wheels import DependencyInfraError
 from raidar.grading import resolver as resolver_module
-from raidar.grading import wheel_cache
 from raidar.grading.dependency_pins import lock_sha256, set_sha256
 from raidar.grading.resolver import (
-    DependencyInfraError,
     DependencyUnresolvable,
     DirectoryIndex,
     IndexFile,

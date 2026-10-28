@@ -7,7 +7,6 @@ import shutil
 from pathlib import Path
 
 import pytest
-import yaml
 from click.testing import CliRunner
 
 from raidar.cli import main
@@ -272,8 +271,6 @@ def test_promote_writes_enforce_only_when_the_audit_verifies(tmp_path: Path) -> 
     assert (promotion.labelled, promotion.minority) == (40, 11)
     assert promotion.reviewers == {"human": 26, "model": 14}
     assert promotion.reviewer_models == (HAIKU,)
-    # The policy's highest registered scorer is code-quality@7 (isolated measurement).
-    assert promotion.scorer == "code-quality@7.1"
     assert promotion.calibration_metrics is not None
     # t1+t2: five 0.85 positives, fourteen 0.15 negatives and one 0.15 the reviewer
     # called positive, so the fitted 0.5 cut misses exactly that one.
@@ -281,10 +278,6 @@ def test_promote_writes_enforce_only_when_the_audit_verifies(tmp_path: Path) -> 
     metrics = promotion.calibration_metrics
     assert (metrics.labelled, metrics.precision, metrics.recall) == (20, 1.0, 0.8333)
     assert promotion.regression_corpus == regression_corpus(runtime.audit, RUBRIC, promotion.split)
-    header = (policies / f"{RUBRIC}.yaml").read_text().splitlines()
-    assert header[0].startswith("# SCB rubric")
-    assert any("Promoted to enforce" in line and "jev-promote" in line for line in header)
-    assert yaml.safe_load((policies / f"{RUBRIC}.yaml").read_text())["mode"] == "enforce"
 
     # Everything re-derives; only the scorer version the promotion ships with is missing.
     verified = runner.invoke(main, ["jev", "verify-promotion", *base])

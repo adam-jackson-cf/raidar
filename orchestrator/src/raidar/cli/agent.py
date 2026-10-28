@@ -6,19 +6,16 @@ to the CLI install id its adapter and the pack image use internally.
 
 from __future__ import annotations
 
+import os
 import subprocess
 
 import click
 
-from raidar.subject.agent.adapters.base import resolve_cli_executable
-from raidar.subject.agent.adapters.factory import adapter_class_for_harness, resolve_adapter
-from raidar.subject.agent.codex_auth import (
-    CODEX_AUTH_MODE_ENV,
-    codex_auth_json_path,
-    has_file_backed_codex_auth,
-)
 from raidar.subject.agent.config import AgentName, AgentSpec, Harness, ModelTarget, agent_cli
+from raidar.subject.agent.definition import harbor_adapter
+from raidar.subject.agent.executables import resolve_cli_executable
 from raidar.subject.agent.harness import harness_definition
+from raidar.subject.agent.native import adapter_class_for_harness, credentials, resolve_adapter
 
 _AGENT_CHOICES = click.Choice([name.value for name in AgentName])
 
@@ -95,17 +92,21 @@ def agent_setup_auth(agent_name: str, device_auth: bool) -> None:
             f"Agent auth setup is only implemented for {AgentName.CODEX.value}."
         )
 
-    auth_path = codex_auth_json_path()
-    if has_file_backed_codex_auth(auth_path):
+    host = credentials(Harness.CODEX_CLI, os.environ)
+    auth_path = host.session_file
+    if auth_path is None:
+        raise click.ClickException("Codex has no file-backed session login location.")
+    if host.session_present:
         click.echo("Codex auth is already configured.")
         click.echo("  auth_mode: chatgpt")
         click.echo(f"  auth_json_path: {auth_path}")
         return
 
     try:
+        adapter = harbor_adapter(AgentName.CODEX)
         executable = resolve_cli_executable(
-            cli_env_var="CODEX_CLI_PATH",
-            default_binary="codex",
+            cli_env_var=adapter.CLI_ENV_VAR,
+            default_binary=adapter.DEFAULT_BINARY,
             harness_label=Harness.CODEX_CLI.value,
         )
     except OSError as error:
@@ -121,12 +122,12 @@ def agent_setup_auth(agent_name: str, device_auth: bool) -> None:
             "Resolve the login error and retry `make codex-auth-setup`."
         )
 
-    if not has_file_backed_codex_auth(auth_path):
+    if not credentials(Harness.CODEX_CLI, os.environ).session_present:
         raise click.ClickException(
             "Codex login completed but no file-backed auth.json was found. "
             f"Configure Codex to use file-backed credentials in {auth_path.parent} "
             f'(for example via `cli_auth_credentials_store = "file"`) and retry. '
-            f"{CODEX_AUTH_MODE_ENV}=chatgpt requires file-backed auth."
+            f"{host.mode_env}=chatgpt requires file-backed auth."
         )
 
     click.echo("Codex auth setup complete.")

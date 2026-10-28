@@ -36,6 +36,16 @@ def tmp_root() -> Path:
     return var_root() / "tmp"
 
 
+def stage_checks_root() -> Path:
+    """``stage-check`` records, one ``<package digest>.json`` each (generated, never tracked)."""
+    return var_root() / "stage-checks"
+
+
+def stages_root(repo_root: Path = REPO_ROOT) -> Path:
+    """Stage packages: ``lab/stages/[<ns>/]<name>/``."""
+    return lab_root(repo_root) / "stages"
+
+
 def lab_root(repo_root: Path = REPO_ROOT) -> Path:
     return repo_root / LAB_DIR
 
@@ -51,7 +61,7 @@ def workflows_root(repo_root: Path = REPO_ROOT) -> Path:
 
 
 def releases_file(repo_root: Path = REPO_ROOT) -> Path:
-    """The release register of agents and workflows (``name@N`` -> content hash)."""
+    """The release register of agents, workflows and stages (``name@N`` -> content hash)."""
     return lab_root(repo_root) / "releases.yaml"
 
 

@@ -118,7 +118,7 @@ class ExperimentPlan:
                 arm_id: {
                     "agent_release": blueprint.arm.agent.released.ref,
                     "workflow": blueprint.arm.workflow.ref,
-                    "workflow_sha256": blueprint.arm.definition.digest,
+                    "workflow_sha256": blueprint.arm.workflow.digest,
                     "harbor_agent": blueprint.agent_config.name
                     or blueprint.agent_config.import_path,
                     "model": blueprint.agent_config.model_name,
@@ -211,8 +211,9 @@ class _HashInputs:
             "lock": str(_lock_field(self.lock, "lock_sha256")),
             "problem": problem.digest,
             "arm": str(_lock_field(self.lock, "execution", "arms", blueprint.arm_id, "digest")),
-            "workflow": arm.definition.digest,
-            "stage_code": digest_json(arm.stage_code),
+            "workflow": arm.workflow.digest,
+            "packages": digest_json(arm.packages),
+            "primitive_code": digest_json(arm.primitive_code),
             "agent": agent_digest(arm, blueprint.agent_config, self.override),
             "protocol": self.protocol,
         }

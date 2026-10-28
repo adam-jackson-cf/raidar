@@ -18,8 +18,8 @@ import pytest
 from harbor.agents.base import BaseAgent
 from harbor.models.agent.context import AgentContext
 
-from raidar.subject.agent.isolated_codex import IsolatedCodex
 from raidar.subject.workflow import verify
+from tests.native_support import CodexNative
 
 CODE = "def add(a: int, b: int) -> int:\n    return a + b\n"
 PASSING = "from calc import add\n\n\ndef test_add() -> None:\n    assert add(2, 3) == 5\n"
@@ -51,7 +51,7 @@ class LocalEnvironment:
         shutil.copyfile(source, target)
 
 
-class ScriptedAgent(IsolatedCodex):
+class ScriptedAgent(CodexNative):
     """A native agent whose turns are scripted edits and commits in the workspace."""
 
     turns: ClassVar[list[AgentTurn]] = []

@@ -58,7 +58,7 @@ JOBS_DIR = "jobs"
 REVIEW_ONLY_DIR = "review-only"
 POLICY_MIX_PROBLEM = "synthetic/policy-mix@1"
 _STARTED = datetime(2026, 1, 1, tzinfo=UTC)
-_SCORERS = ["correctness@6", "code-quality@7", "resource-usage@5"]
+_SCORERS = ["correctness@7", "code-quality@8", "resource-usage@6"]
 _LEDGER = (
     "import os\n\n\n"
     "def balance(entries):\n"
@@ -258,7 +258,8 @@ def _locked_arm(arm: str, agent: str) -> dict[str, object]:
         "tool": {"package": f"@fixture/{adapter}", "binary": adapter, "version": "0.0.0"},
         "workflow": _WORKFLOW,
         "workflow_sha256": digest_json(_WORKFLOW),
-        "stage_code": {"build": digest_json(["build", _WORKFLOW])},
+        "packages": {},
+        "primitive_code": {"build": digest_json(["build", _WORKFLOW])},
         "digest": digest_json([arm, agent, _WORKFLOW]),
     }
 
@@ -356,7 +357,8 @@ def _run(design: Design, dest: Path, store: FixtureAssessments, root: str = JOBS
             bundle=bundle,
             lock_sha256=str(lock["lock_sha256"]),
             workflow_digest=digest_json(_WORKFLOW),
-            stage_code_digest=digest_json(["build", _WORKFLOW]),
+            packages_digest=digest_json({}),
+            primitive_code_digest=digest_json(["build", _WORKFLOW]),
             agent_digest=digest_json(_AGENTS[agent]),
         )
         script = _script(design, trial, index)

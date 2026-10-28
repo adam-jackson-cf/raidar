@@ -8,7 +8,7 @@ tool:
   package: "@anthropic-ai/claude-code"
   binary: claude
   version: 2.1.285
-# Applied on every command, first turn and resumed (raidar.subject.agent.isolated_claude):
+# Applied on every command, first turn and resumed (raidar.subject.agent.adapters.isolated_claude):
 # a CLAUDE_CONFIG_DIR (/logs/agent/sessions, which also holds the session transcripts) created
 # for the session and stripped of skills, plugins, commands, agents, hooks, settings and CLAUDE.md
 # on every resumed turn; --setting-sources user,project,local; --strict-mcp-config;

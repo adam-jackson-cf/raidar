@@ -13,7 +13,7 @@ from raidar.cli.process import run_or_raise
 from raidar.cli.target_options import docker_selection, target_option
 from raidar.contract.paths import ORCHESTRATOR_ROOT
 from raidar.engine.trial.cleanup import cleanup_trial_projects
-from raidar.subject.agent.adapters.base import harbor_executable
+from raidar.subject.agent.executables import harbor_executable
 
 COMPOSE_MINIMUM_VERSION = (2, 40, 1)
 _VERSION = re.compile(r"v?(\d+)\.(\d+)\.(\d+)")

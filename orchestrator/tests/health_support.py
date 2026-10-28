@@ -25,8 +25,9 @@ from raidar.grading.records import (
     step_record_dir,
     write_step_record,
 )
-from raidar.subject.agent.codex_audit import codex_session_audit
+from raidar.subject.agent.config import Harness
 from tests.execution_support import StepOutcome, write_trial
+from tests.native_support import session_audit
 
 TRIAL_ID = "b00-p0-baseline"
 STEP = "checkpoint_1"
@@ -78,7 +79,8 @@ def _context(steps: tuple[str, ...]) -> TrialContext:
         problem="p",
         arm="a",
         workflow="w",
-        stage_code="s",
+        packages="s",
+        primitive_code="s",
         agent="g",
         protocol="r",
         trial="t",
@@ -137,7 +139,7 @@ def write_agent_session(trial_dir: Path, step: str, rows: list[str] | None = Non
     ]
     rollout = sessions / "rollout-2026-10-26T00-00-00-abc.jsonl"
     rollout.write_text("\n".join(lines) + "\n")
-    turns[0]["session_audit"] = codex_session_audit(agent / "workflow" / "build-1")
+    turns[0]["session_audit"] = session_audit(Harness.CODEX_CLI, agent / "workflow" / "build-1")
     (agent / "workflow" / "workflow.json").write_text(
         json.dumps({"kind": "raidar-workflow", "stages": ["build"], "turns": turns})
     )
