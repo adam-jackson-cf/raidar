@@ -41,11 +41,11 @@
         }
       },
       "scorer": {
-        "correctness@5": {
-          "digest": "7521f1118a762ea3718e4408a24a44a40129f2028906031acce88c5f2701775c",
+        "correctness@6": {
+          "digest": "784c2ae8d4d22e7c053601221f9d701f12e5e31c0105bf0de255b069191334d9",
           "metadata": {
             "implementation": "raidar.scoring.correctness:correctness_scorer",
-            "implementation_digest": "1be7308c22b6fb6373bfa774ea1ef6052179e56bc02aec453eb7d0a2473b9f7d",
+            "implementation_digest": "8d397ef611fe24a389d410e79a7f734551b1561c5d07885d144ef5ab052b6cbf",
             "manifest": {
               "description": "Oracle verdicts per checkpoint and trajectory, from the oracle step records.",
               "evidence_required": [
@@ -239,7 +239,7 @@
                 "*"
               ],
               "tools": [],
-              "version": "5"
+              "version": "6"
             },
             "tool_lock": {}
           }
@@ -254,12 +254,12 @@
       "metric": "scb-canonical-oneshot@1",
       "scorer_config": {},
       "scorers": [
-        "correctness@5"
+        "correctness@6"
       ]
     },
     "tools": {}
   },
-  "document_sha256": "24f9ec44e46ad1338f12e2a06736ef215c344a27c6ceca1de2d6d7ccec05c264",
+  "document_sha256": "27775fdd9975e1b89a83d8fa4db06ac6e7aa04f49c20cfdd4cd356d6de72c19c",
   "execution": {
     "arms": {
       "codex": {
@@ -460,8 +460,8 @@
   "experiment": {
     "id": "python__circuit_eval-cp1__pack-agent-health",
     "source": "experiment.yaml",
-    "source_sha256": "3a4d1029655a434e2b01fd710150865bda029ada21e970a1eff26452c6e45fb0",
-    "spec_sha256": "2571cfde800343c8c4e000eabb907be4893ce244b83e54a6070a5b498b8c45f9"
+    "source_sha256": "f1015cfd2362f00985c35d25e38e65744bd25fd5fdcd917c9e1e382d28e2e466",
+    "spec_sha256": "7f84586d33e4da317fe35381540341072725588e18ae5a575de46b938099fcbc"
   },
   "lock_sha256": "79321a81c6360ea61355f805bb08d883d5dc8833748cbb1800d37ab8fc4972c5",
   "lock_version": 4,
@@ -471,7 +471,7 @@
   },
   "sections": {
     "analysis": "0a0fb32297e0c3abaad1f91cb80990bf42b3a3f0854246915ae017492003d1bc",
-    "assessment": "bbb5dbb0b430be70493dbffa4e9c2292a743272d3233f89d3543901120942671",
+    "assessment": "f45841e10964be680c4a3942166c7c880de173de923d584879f1123bb9186c40",
     "execution": "79321a81c6360ea61355f805bb08d883d5dc8833748cbb1800d37ab8fc4972c5",
     "toolchain": "b6ef977873154c13b7d03140ffd4cfff64d0cfa32430af9f4e52db26e2a729cc"
   },
@@ -509,7 +509,7 @@
       "metric": "scb-canonical-oneshot@1",
       "scorer_config": {},
       "scorers": [
-        "correctness@5"
+        "correctness@6"
       ]
     },
     "description": "Operational health of every released agent; not citable.",

@@ -6,12 +6,30 @@
       "status": "pass"
     },
     {
-      "detail": [],
+      "detail": [
+        "checkpoint_1: pass (empty starter reference on checkpoint_1 tests)",
+        "checkpoint_2: pass (checkpoint_1 reference on checkpoint_2 tests)",
+        "checkpoint_3: pass (checkpoint_2 reference on checkpoint_3 tests)",
+        "checkpoint_4: pass (checkpoint_3 reference on checkpoint_4 tests)",
+        "checkpoint_5: pass (checkpoint_4 reference on checkpoint_5 tests)",
+        "checkpoint_6: pass (checkpoint_5 reference on checkpoint_6 tests)",
+        "checkpoint_7: pass (checkpoint_6 reference on checkpoint_7 tests)",
+        "checkpoint_8: pass (checkpoint_7 reference on checkpoint_8 tests)"
+      ],
       "name": "reference_k-1_fails_k",
       "status": "pass"
     },
     {
-      "detail": [],
+      "detail": [
+        "checkpoint_1: 21 nondeterministic",
+        "checkpoint_2: 44 nondeterministic",
+        "checkpoint_3: 71 nondeterministic",
+        "checkpoint_4: 84 nondeterministic",
+        "checkpoint_5: 100 nondeterministic",
+        "checkpoint_6: 124 nondeterministic",
+        "checkpoint_7: 124 nondeterministic",
+        "checkpoint_8: 124 nondeterministic"
+      ],
       "name": "repeat_identical_positive",
       "status": "pass"
     },
@@ -1273,118 +1291,114 @@
     "native_parity_negative"
   ],
   "problem": "scb/forge@38d627ecf668",
+  "reference_digests": {
+    "negative": {
+      "checkpoint_1": "1d2ed42b2c50b3936372a558871e17eb96c66636e686c6b081289c316f23a791",
+      "checkpoint_2": "deee1be8741632b5c73f96ec7a820b6822d14203759e1f2ad8d73cc8d5277bc2",
+      "checkpoint_3": "80e119e5f0fd6b61071d8c1f65f0e9cf50d97f86a61361093af2a1d7a538cafc",
+      "checkpoint_4": "499795f3a2beef0eba86fff0667df5763ed465c0dd4de2364d6ee624189c43a7",
+      "checkpoint_5": "06dd5741a4fadc0a8a8e0cca1623495be8480bf6c05cd1ba170cd8d1d632a1bd",
+      "checkpoint_6": "5a5fec4aae29d55de1a9d62e10831175958fb1c4fc2f7ca534ac9d154b40f7ae",
+      "checkpoint_7": "7fa5a6e3b7cb0dc3d0afcdee98a97d8027bbdc8808ecaaf712d1781a4731915d",
+      "checkpoint_8": "bb1cd74ec8b5dfc19ff69362de8be34b40a073244db50fc18d12bbd5e2e3160a"
+    },
+    "positive": {
+      "checkpoint_1": "deee1be8741632b5c73f96ec7a820b6822d14203759e1f2ad8d73cc8d5277bc2",
+      "checkpoint_2": "80e119e5f0fd6b61071d8c1f65f0e9cf50d97f86a61361093af2a1d7a538cafc",
+      "checkpoint_3": "499795f3a2beef0eba86fff0667df5763ed465c0dd4de2364d6ee624189c43a7",
+      "checkpoint_4": "06dd5741a4fadc0a8a8e0cca1623495be8480bf6c05cd1ba170cd8d1d632a1bd",
+      "checkpoint_5": "5a5fec4aae29d55de1a9d62e10831175958fb1c4fc2f7ca534ac9d154b40f7ae",
+      "checkpoint_6": "7fa5a6e3b7cb0dc3d0afcdee98a97d8027bbdc8808ecaaf712d1781a4731915d",
+      "checkpoint_7": "bb1cd74ec8b5dfc19ff69362de8be34b40a073244db50fc18d12bbd5e2e3160a",
+      "checkpoint_8": "67e01b1dd1b5b2a46419a138bbd27af0f4793f41ba8c3768a6a42dc593d95828"
+    }
+  },
   "repeats": 3,
   "schema_version": 1,
   "solvable": {
     "checkpoint_1": {
-      "digest": "3a259e64cdea6db4fe430666e78eb3b25aec1dd9d5ea19911b25f053ebebcd07",
-      "nondeterministic": [],
-      "nondeterministic_count": 0,
-      "size": 40,
-      "solvable": [
-        "checkpoint_1::test_blueprint_delete_missing_uuid_returns_not_found",
+      "digest": "bc06ce256c4b6a4b3c6eeada021c5a6ea27651c128b4c6b4c2307bf7bc8b04b1",
+      "exclusion": null,
+      "nondeterministic": [
         "checkpoint_1::test_blueprint_get_and_delete_single_uuid",
-        "checkpoint_1::test_blueprint_get_nonexistent_uuid_returns_not_found",
         "checkpoint_1::test_blueprint_get_returns_all_stored_fields",
         "checkpoint_1::test_blueprint_list_empty_returns_empty_array",
         "checkpoint_1::test_blueprint_list_name_tiebreak_when_created_at_collides",
         "checkpoint_1::test_blueprint_list_orders_by_created_at_name_uuid",
         "checkpoint_1::test_blueprint_list_uuid_tiebreak_when_created_at_and_name_collide",
         "checkpoint_1::test_create_blueprint_returns_persisted_resource",
-        "checkpoint_1::test_create_generates_valid_uuid_v4_format",
         "checkpoint_1::test_create_ignores_caller_supplied_created_at",
         "checkpoint_1::test_create_ignores_caller_supplied_uuid",
         "checkpoint_1::test_create_ignores_unknown_top_level_keys",
-        "checkpoint_1::test_create_missing_required_fields_reports_sorted_unique_messages",
-        "checkpoint_1::test_create_output_is_compact_sorted_json_without_trailing_newline",
         "checkpoint_1::test_create_preserves_empty_capabilities_array",
-        "checkpoint_1::test_create_rejects_boolean_resource_count",
-        "checkpoint_1::test_create_rejects_capabilities_with_non_string_elements",
-        "checkpoint_1::test_create_rejects_duplicate_name_with_conflict",
         "checkpoint_1::test_create_rejects_empty_name_string",
         "checkpoint_1::test_create_rejects_empty_requirement_sets",
-        "checkpoint_1::test_create_rejects_float_resource_count",
-        "checkpoint_1::test_create_rejects_invalid_json_input",
-        "checkpoint_1::test_create_rejects_multiple_unsupported_keys",
-        "checkpoint_1::test_create_rejects_non_array_requirement_sets",
         "checkpoint_1::test_create_rejects_non_object_json_payload",
-        "checkpoint_1::test_create_rejects_non_string_name_type",
         "checkpoint_1::test_create_rejects_requirement_set_missing_required_keys",
-        "checkpoint_1::test_create_rejects_requirement_sets_with_non_object_elements",
-        "checkpoint_1::test_create_rejects_unsupported_key_as_sole_violation",
-        "checkpoint_1::test_create_validation_aggregates_top_level_and_nested_failures",
-        "checkpoint_1::test_create_validation_aggregates_unique_sorted_messages",
-        "checkpoint_1::test_create_validation_deduplicates_messages_across_requirement_sets",
         "checkpoint_1::test_create_validation_failure_is_atomic",
         "checkpoint_1::test_delete_names_duplicate_members_count_unique_deletions",
         "checkpoint_1::test_delete_names_is_atomic_and_reports_sorted_unresolved",
         "checkpoint_1::test_delete_names_rejects_blank_csv_members_atomically",
         "checkpoint_1::test_delete_names_single_name_succeeds",
-        "checkpoint_1::test_delete_names_success_returns_deleted_count",
+        "checkpoint_1::test_delete_names_success_returns_deleted_count"
+      ],
+      "nondeterministic_count": 21,
+      "size": 19,
+      "solvable": [
+        "checkpoint_1::test_blueprint_delete_missing_uuid_returns_not_found",
+        "checkpoint_1::test_blueprint_get_nonexistent_uuid_returns_not_found",
+        "checkpoint_1::test_create_generates_valid_uuid_v4_format",
+        "checkpoint_1::test_create_missing_required_fields_reports_sorted_unique_messages",
+        "checkpoint_1::test_create_output_is_compact_sorted_json_without_trailing_newline",
+        "checkpoint_1::test_create_rejects_boolean_resource_count",
+        "checkpoint_1::test_create_rejects_capabilities_with_non_string_elements",
+        "checkpoint_1::test_create_rejects_duplicate_name_with_conflict",
+        "checkpoint_1::test_create_rejects_float_resource_count",
+        "checkpoint_1::test_create_rejects_invalid_json_input",
+        "checkpoint_1::test_create_rejects_multiple_unsupported_keys",
+        "checkpoint_1::test_create_rejects_non_array_requirement_sets",
+        "checkpoint_1::test_create_rejects_non_string_name_type",
+        "checkpoint_1::test_create_rejects_requirement_sets_with_non_object_elements",
+        "checkpoint_1::test_create_rejects_unsupported_key_as_sole_violation",
+        "checkpoint_1::test_create_validation_aggregates_top_level_and_nested_failures",
+        "checkpoint_1::test_create_validation_aggregates_unique_sorted_messages",
+        "checkpoint_1::test_create_validation_deduplicates_messages_across_requirement_sets",
         "checkpoint_1::test_requirement_set_order_preserved_non_lexicographic"
       ],
       "verdict": "validated"
     },
     "checkpoint_2": {
-      "digest": "44046a8821d8bb09c6a355801523ae1f30e676424fb712bedd02c6fb1e28a58d",
-      "nondeterministic": [],
-      "nondeterministic_count": 0,
-      "size": 70,
-      "solvable": [
-        "checkpoint_1::test_blueprint_delete_missing_uuid_returns_not_found",
+      "digest": "4f18368074be711d6268feaf1269166cf95a000f53ab08cfaa89cf9654613f54",
+      "exclusion": null,
+      "nondeterministic": [
         "checkpoint_1::test_blueprint_get_and_delete_single_uuid",
-        "checkpoint_1::test_blueprint_get_nonexistent_uuid_returns_not_found",
         "checkpoint_1::test_blueprint_get_returns_all_stored_fields",
         "checkpoint_1::test_blueprint_list_empty_returns_empty_array",
         "checkpoint_1::test_blueprint_list_name_tiebreak_when_created_at_collides",
         "checkpoint_1::test_blueprint_list_orders_by_created_at_name_uuid",
         "checkpoint_1::test_blueprint_list_uuid_tiebreak_when_created_at_and_name_collide",
         "checkpoint_1::test_create_blueprint_returns_persisted_resource",
-        "checkpoint_1::test_create_generates_valid_uuid_v4_format",
         "checkpoint_1::test_create_ignores_caller_supplied_created_at",
         "checkpoint_1::test_create_ignores_caller_supplied_uuid",
         "checkpoint_1::test_create_ignores_unknown_top_level_keys",
-        "checkpoint_1::test_create_missing_required_fields_reports_sorted_unique_messages",
-        "checkpoint_1::test_create_output_is_compact_sorted_json_without_trailing_newline",
         "checkpoint_1::test_create_preserves_empty_capabilities_array",
-        "checkpoint_1::test_create_rejects_boolean_resource_count",
-        "checkpoint_1::test_create_rejects_capabilities_with_non_string_elements",
-        "checkpoint_1::test_create_rejects_duplicate_name_with_conflict",
         "checkpoint_1::test_create_rejects_empty_name_string",
         "checkpoint_1::test_create_rejects_empty_requirement_sets",
-        "checkpoint_1::test_create_rejects_float_resource_count",
-        "checkpoint_1::test_create_rejects_invalid_json_input",
-        "checkpoint_1::test_create_rejects_multiple_unsupported_keys",
-        "checkpoint_1::test_create_rejects_non_array_requirement_sets",
         "checkpoint_1::test_create_rejects_non_object_json_payload",
-        "checkpoint_1::test_create_rejects_non_string_name_type",
         "checkpoint_1::test_create_rejects_requirement_set_missing_required_keys",
-        "checkpoint_1::test_create_rejects_requirement_sets_with_non_object_elements",
-        "checkpoint_1::test_create_rejects_unsupported_key_as_sole_violation",
-        "checkpoint_1::test_create_validation_aggregates_top_level_and_nested_failures",
-        "checkpoint_1::test_create_validation_aggregates_unique_sorted_messages",
-        "checkpoint_1::test_create_validation_deduplicates_messages_across_requirement_sets",
         "checkpoint_1::test_create_validation_failure_is_atomic",
         "checkpoint_1::test_delete_names_duplicate_members_count_unique_deletions",
         "checkpoint_1::test_delete_names_is_atomic_and_reports_sorted_unresolved",
         "checkpoint_1::test_delete_names_rejects_blank_csv_members_atomically",
         "checkpoint_1::test_delete_names_single_name_succeeds",
         "checkpoint_1::test_delete_names_success_returns_deleted_count",
-        "checkpoint_1::test_requirement_set_order_preserved_non_lexicographic",
         "checkpoint_2::test_allocation_create_expands_requirement_sets",
         "checkpoint_2::test_allocation_create_generated_uuid_is_canonical_v4",
         "checkpoint_2::test_allocation_create_output_is_scoped_to_current_batch",
-        "checkpoint_2::test_allocation_create_rejects_invalid_payload_shapes[blueprint_name_empty]",
-        "checkpoint_2::test_allocation_create_rejects_invalid_payload_shapes[blueprint_name_wrong_type]",
-        "checkpoint_2::test_allocation_create_rejects_invalid_payload_shapes[missing_blueprint_name]",
-        "checkpoint_2::test_allocation_create_rejects_invalid_payload_shapes[non_object_payload]",
         "checkpoint_2::test_allocation_create_returns_complete_field_set",
         "checkpoint_2::test_allocation_create_same_blueprint_twice_distinct_uuids",
-        "checkpoint_2::test_allocation_create_unknown_blueprint_not_found",
-        "checkpoint_2::test_allocation_get_malformed_uuid_returns_not_found",
         "checkpoint_2::test_allocation_get_returns_single_resource",
         "checkpoint_2::test_allocation_get_round_trip_preserves_all_fields",
-        "checkpoint_2::test_allocation_get_unknown_uuid_not_found",
         "checkpoint_2::test_allocation_list_breaks_created_at_ties_by_uuid",
         "checkpoint_2::test_allocation_list_empty_returns_empty_array",
         "checkpoint_2::test_allocation_list_filters_compose_conjunctively",
@@ -1402,68 +1416,70 @@
         "checkpoint_2::test_multiplier_requires_exact_capability_match",
         "checkpoint_2::test_type_a_multiplier_rows_match_except_for_uuid"
       ],
+      "nondeterministic_count": 44,
+      "size": 26,
+      "solvable": [
+        "checkpoint_1::test_blueprint_delete_missing_uuid_returns_not_found",
+        "checkpoint_1::test_blueprint_get_nonexistent_uuid_returns_not_found",
+        "checkpoint_1::test_create_generates_valid_uuid_v4_format",
+        "checkpoint_1::test_create_missing_required_fields_reports_sorted_unique_messages",
+        "checkpoint_1::test_create_output_is_compact_sorted_json_without_trailing_newline",
+        "checkpoint_1::test_create_rejects_boolean_resource_count",
+        "checkpoint_1::test_create_rejects_capabilities_with_non_string_elements",
+        "checkpoint_1::test_create_rejects_duplicate_name_with_conflict",
+        "checkpoint_1::test_create_rejects_float_resource_count",
+        "checkpoint_1::test_create_rejects_invalid_json_input",
+        "checkpoint_1::test_create_rejects_multiple_unsupported_keys",
+        "checkpoint_1::test_create_rejects_non_array_requirement_sets",
+        "checkpoint_1::test_create_rejects_non_string_name_type",
+        "checkpoint_1::test_create_rejects_requirement_sets_with_non_object_elements",
+        "checkpoint_1::test_create_rejects_unsupported_key_as_sole_violation",
+        "checkpoint_1::test_create_validation_aggregates_top_level_and_nested_failures",
+        "checkpoint_1::test_create_validation_aggregates_unique_sorted_messages",
+        "checkpoint_1::test_create_validation_deduplicates_messages_across_requirement_sets",
+        "checkpoint_1::test_requirement_set_order_preserved_non_lexicographic",
+        "checkpoint_2::test_allocation_create_rejects_invalid_payload_shapes[blueprint_name_empty]",
+        "checkpoint_2::test_allocation_create_rejects_invalid_payload_shapes[blueprint_name_wrong_type]",
+        "checkpoint_2::test_allocation_create_rejects_invalid_payload_shapes[missing_blueprint_name]",
+        "checkpoint_2::test_allocation_create_rejects_invalid_payload_shapes[non_object_payload]",
+        "checkpoint_2::test_allocation_create_unknown_blueprint_not_found",
+        "checkpoint_2::test_allocation_get_malformed_uuid_returns_not_found",
+        "checkpoint_2::test_allocation_get_unknown_uuid_not_found"
+      ],
       "verdict": "validated"
     },
     "checkpoint_3": {
-      "digest": "5cc773fb9074d6c6d56a41d5357ed7faba5da5eebe27d11ad7981737853a5ac4",
-      "nondeterministic": [],
-      "nondeterministic_count": 0,
-      "size": 101,
-      "solvable": [
-        "checkpoint_1::test_blueprint_delete_missing_uuid_returns_not_found",
+      "digest": "d0aecfd188fe9c076d2ed12f096218297b4e23cc4dbcdeb1e8c3ce2adbbf7694",
+      "exclusion": null,
+      "nondeterministic": [
         "checkpoint_1::test_blueprint_get_and_delete_single_uuid",
-        "checkpoint_1::test_blueprint_get_nonexistent_uuid_returns_not_found",
         "checkpoint_1::test_blueprint_get_returns_all_stored_fields",
         "checkpoint_1::test_blueprint_list_empty_returns_empty_array",
         "checkpoint_1::test_blueprint_list_name_tiebreak_when_created_at_collides",
         "checkpoint_1::test_blueprint_list_orders_by_created_at_name_uuid",
         "checkpoint_1::test_blueprint_list_uuid_tiebreak_when_created_at_and_name_collide",
         "checkpoint_1::test_create_blueprint_returns_persisted_resource",
-        "checkpoint_1::test_create_generates_valid_uuid_v4_format",
         "checkpoint_1::test_create_ignores_caller_supplied_created_at",
         "checkpoint_1::test_create_ignores_caller_supplied_uuid",
         "checkpoint_1::test_create_ignores_unknown_top_level_keys",
-        "checkpoint_1::test_create_missing_required_fields_reports_sorted_unique_messages",
-        "checkpoint_1::test_create_output_is_compact_sorted_json_without_trailing_newline",
         "checkpoint_1::test_create_preserves_empty_capabilities_array",
-        "checkpoint_1::test_create_rejects_boolean_resource_count",
-        "checkpoint_1::test_create_rejects_capabilities_with_non_string_elements",
-        "checkpoint_1::test_create_rejects_duplicate_name_with_conflict",
         "checkpoint_1::test_create_rejects_empty_name_string",
         "checkpoint_1::test_create_rejects_empty_requirement_sets",
-        "checkpoint_1::test_create_rejects_float_resource_count",
-        "checkpoint_1::test_create_rejects_invalid_json_input",
-        "checkpoint_1::test_create_rejects_multiple_unsupported_keys",
-        "checkpoint_1::test_create_rejects_non_array_requirement_sets",
         "checkpoint_1::test_create_rejects_non_object_json_payload",
-        "checkpoint_1::test_create_rejects_non_string_name_type",
         "checkpoint_1::test_create_rejects_requirement_set_missing_required_keys",
-        "checkpoint_1::test_create_rejects_requirement_sets_with_non_object_elements",
-        "checkpoint_1::test_create_rejects_unsupported_key_as_sole_violation",
-        "checkpoint_1::test_create_validation_aggregates_top_level_and_nested_failures",
-        "checkpoint_1::test_create_validation_aggregates_unique_sorted_messages",
-        "checkpoint_1::test_create_validation_deduplicates_messages_across_requirement_sets",
         "checkpoint_1::test_create_validation_failure_is_atomic",
         "checkpoint_1::test_delete_names_duplicate_members_count_unique_deletions",
         "checkpoint_1::test_delete_names_is_atomic_and_reports_sorted_unresolved",
         "checkpoint_1::test_delete_names_rejects_blank_csv_members_atomically",
         "checkpoint_1::test_delete_names_single_name_succeeds",
         "checkpoint_1::test_delete_names_success_returns_deleted_count",
-        "checkpoint_1::test_requirement_set_order_preserved_non_lexicographic",
         "checkpoint_2::test_allocation_create_expands_requirement_sets",
         "checkpoint_2::test_allocation_create_generated_uuid_is_canonical_v4",
         "checkpoint_2::test_allocation_create_output_is_scoped_to_current_batch",
-        "checkpoint_2::test_allocation_create_rejects_invalid_payload_shapes[blueprint_name_empty]",
-        "checkpoint_2::test_allocation_create_rejects_invalid_payload_shapes[blueprint_name_wrong_type]",
-        "checkpoint_2::test_allocation_create_rejects_invalid_payload_shapes[missing_blueprint_name]",
-        "checkpoint_2::test_allocation_create_rejects_invalid_payload_shapes[non_object_payload]",
         "checkpoint_2::test_allocation_create_returns_complete_field_set",
         "checkpoint_2::test_allocation_create_same_blueprint_twice_distinct_uuids",
-        "checkpoint_2::test_allocation_create_unknown_blueprint_not_found",
-        "checkpoint_2::test_allocation_get_malformed_uuid_returns_not_found",
         "checkpoint_2::test_allocation_get_returns_single_resource",
         "checkpoint_2::test_allocation_get_round_trip_preserves_all_fields",
-        "checkpoint_2::test_allocation_get_unknown_uuid_not_found",
         "checkpoint_2::test_allocation_list_breaks_created_at_ties_by_uuid",
         "checkpoint_2::test_allocation_list_empty_returns_empty_array",
         "checkpoint_2::test_allocation_list_filters_compose_conjunctively",
@@ -1490,8 +1506,6 @@
         "checkpoint_3::test_bind_missing_assignment_id",
         "checkpoint_3::test_bind_mixed_ops_success",
         "checkpoint_3::test_bind_not_found_lists_sorted_ids",
-        "checkpoint_3::test_bind_rejects_empty_allocations[empty_allocations]",
-        "checkpoint_3::test_bind_rejects_empty_allocations[missing_allocations]",
         "checkpoint_3::test_bind_remove_clears_assignment_id_to_null",
         "checkpoint_3::test_bind_remove_is_idempotent",
         "checkpoint_3::test_delete_by_assignment_is_idempotent",
@@ -1501,8 +1515,6 @@
         "checkpoint_3::test_delete_ids_rejects_blank_csv",
         "checkpoint_3::test_delete_ids_rejects_partial_matches",
         "checkpoint_3::test_delete_ids_reports_missing_uuids",
-        "checkpoint_3::test_delete_requires_exactly_one_mode_flag[both_flags]",
-        "checkpoint_3::test_delete_requires_exactly_one_mode_flag[no_flag]",
         "checkpoint_3::test_duplicate_guard_blocks_mixed_ops",
         "checkpoint_3::test_invalid_op_no_remove_side_effects",
         "checkpoint_3::test_invalid_op_precedes_duplicate",
@@ -1512,68 +1524,74 @@
         "checkpoint_3::test_remove_unbinds_ignoring_assignment",
         "checkpoint_3::test_validation_precedes_op_and_not_found"
       ],
+      "nondeterministic_count": 71,
+      "size": 30,
+      "solvable": [
+        "checkpoint_1::test_blueprint_delete_missing_uuid_returns_not_found",
+        "checkpoint_1::test_blueprint_get_nonexistent_uuid_returns_not_found",
+        "checkpoint_1::test_create_generates_valid_uuid_v4_format",
+        "checkpoint_1::test_create_missing_required_fields_reports_sorted_unique_messages",
+        "checkpoint_1::test_create_output_is_compact_sorted_json_without_trailing_newline",
+        "checkpoint_1::test_create_rejects_boolean_resource_count",
+        "checkpoint_1::test_create_rejects_capabilities_with_non_string_elements",
+        "checkpoint_1::test_create_rejects_duplicate_name_with_conflict",
+        "checkpoint_1::test_create_rejects_float_resource_count",
+        "checkpoint_1::test_create_rejects_invalid_json_input",
+        "checkpoint_1::test_create_rejects_multiple_unsupported_keys",
+        "checkpoint_1::test_create_rejects_non_array_requirement_sets",
+        "checkpoint_1::test_create_rejects_non_string_name_type",
+        "checkpoint_1::test_create_rejects_requirement_sets_with_non_object_elements",
+        "checkpoint_1::test_create_rejects_unsupported_key_as_sole_violation",
+        "checkpoint_1::test_create_validation_aggregates_top_level_and_nested_failures",
+        "checkpoint_1::test_create_validation_aggregates_unique_sorted_messages",
+        "checkpoint_1::test_create_validation_deduplicates_messages_across_requirement_sets",
+        "checkpoint_1::test_requirement_set_order_preserved_non_lexicographic",
+        "checkpoint_2::test_allocation_create_rejects_invalid_payload_shapes[blueprint_name_empty]",
+        "checkpoint_2::test_allocation_create_rejects_invalid_payload_shapes[blueprint_name_wrong_type]",
+        "checkpoint_2::test_allocation_create_rejects_invalid_payload_shapes[missing_blueprint_name]",
+        "checkpoint_2::test_allocation_create_rejects_invalid_payload_shapes[non_object_payload]",
+        "checkpoint_2::test_allocation_create_unknown_blueprint_not_found",
+        "checkpoint_2::test_allocation_get_malformed_uuid_returns_not_found",
+        "checkpoint_2::test_allocation_get_unknown_uuid_not_found",
+        "checkpoint_3::test_bind_rejects_empty_allocations[empty_allocations]",
+        "checkpoint_3::test_bind_rejects_empty_allocations[missing_allocations]",
+        "checkpoint_3::test_delete_requires_exactly_one_mode_flag[both_flags]",
+        "checkpoint_3::test_delete_requires_exactly_one_mode_flag[no_flag]"
+      ],
       "verdict": "validated"
     },
     "checkpoint_4": {
-      "digest": "ad747c89e61e0ef23394a9a71ab5f36ce4f4b66aae2a0f34f82338d1ce638fa8",
-      "nondeterministic": [],
-      "nondeterministic_count": 0,
-      "size": 142,
-      "solvable": [
-        "checkpoint_1::test_blueprint_delete_missing_uuid_returns_not_found",
+      "digest": "ac706fbfeea55ad2c015dafe44f40baa74d7cf3d0034641c3dd87558ac22cea0",
+      "exclusion": null,
+      "nondeterministic": [
         "checkpoint_1::test_blueprint_get_and_delete_single_uuid",
-        "checkpoint_1::test_blueprint_get_nonexistent_uuid_returns_not_found",
         "checkpoint_1::test_blueprint_get_returns_all_stored_fields",
         "checkpoint_1::test_blueprint_list_empty_returns_empty_array",
         "checkpoint_1::test_blueprint_list_name_tiebreak_when_created_at_collides",
         "checkpoint_1::test_blueprint_list_orders_by_created_at_name_uuid",
         "checkpoint_1::test_blueprint_list_uuid_tiebreak_when_created_at_and_name_collide",
         "checkpoint_1::test_create_blueprint_returns_persisted_resource",
-        "checkpoint_1::test_create_generates_valid_uuid_v4_format",
         "checkpoint_1::test_create_ignores_caller_supplied_created_at",
         "checkpoint_1::test_create_ignores_caller_supplied_uuid",
         "checkpoint_1::test_create_ignores_unknown_top_level_keys",
-        "checkpoint_1::test_create_missing_required_fields_reports_sorted_unique_messages",
-        "checkpoint_1::test_create_output_is_compact_sorted_json_without_trailing_newline",
         "checkpoint_1::test_create_preserves_empty_capabilities_array",
-        "checkpoint_1::test_create_rejects_boolean_resource_count",
-        "checkpoint_1::test_create_rejects_capabilities_with_non_string_elements",
-        "checkpoint_1::test_create_rejects_duplicate_name_with_conflict",
         "checkpoint_1::test_create_rejects_empty_name_string",
         "checkpoint_1::test_create_rejects_empty_requirement_sets",
-        "checkpoint_1::test_create_rejects_float_resource_count",
-        "checkpoint_1::test_create_rejects_invalid_json_input",
-        "checkpoint_1::test_create_rejects_multiple_unsupported_keys",
-        "checkpoint_1::test_create_rejects_non_array_requirement_sets",
         "checkpoint_1::test_create_rejects_non_object_json_payload",
-        "checkpoint_1::test_create_rejects_non_string_name_type",
         "checkpoint_1::test_create_rejects_requirement_set_missing_required_keys",
-        "checkpoint_1::test_create_rejects_requirement_sets_with_non_object_elements",
-        "checkpoint_1::test_create_rejects_unsupported_key_as_sole_violation",
-        "checkpoint_1::test_create_validation_aggregates_top_level_and_nested_failures",
-        "checkpoint_1::test_create_validation_aggregates_unique_sorted_messages",
-        "checkpoint_1::test_create_validation_deduplicates_messages_across_requirement_sets",
         "checkpoint_1::test_create_validation_failure_is_atomic",
         "checkpoint_1::test_delete_names_duplicate_members_count_unique_deletions",
         "checkpoint_1::test_delete_names_is_atomic_and_reports_sorted_unresolved",
         "checkpoint_1::test_delete_names_rejects_blank_csv_members_atomically",
         "checkpoint_1::test_delete_names_single_name_succeeds",
         "checkpoint_1::test_delete_names_success_returns_deleted_count",
-        "checkpoint_1::test_requirement_set_order_preserved_non_lexicographic",
         "checkpoint_2::test_allocation_create_expands_requirement_sets",
         "checkpoint_2::test_allocation_create_generated_uuid_is_canonical_v4",
         "checkpoint_2::test_allocation_create_output_is_scoped_to_current_batch",
-        "checkpoint_2::test_allocation_create_rejects_invalid_payload_shapes[blueprint_name_empty]",
-        "checkpoint_2::test_allocation_create_rejects_invalid_payload_shapes[blueprint_name_wrong_type]",
-        "checkpoint_2::test_allocation_create_rejects_invalid_payload_shapes[missing_blueprint_name]",
-        "checkpoint_2::test_allocation_create_rejects_invalid_payload_shapes[non_object_payload]",
         "checkpoint_2::test_allocation_create_returns_complete_field_set",
         "checkpoint_2::test_allocation_create_same_blueprint_twice_distinct_uuids",
-        "checkpoint_2::test_allocation_create_unknown_blueprint_not_found",
-        "checkpoint_2::test_allocation_get_malformed_uuid_returns_not_found",
         "checkpoint_2::test_allocation_get_returns_single_resource",
         "checkpoint_2::test_allocation_get_round_trip_preserves_all_fields",
-        "checkpoint_2::test_allocation_get_unknown_uuid_not_found",
         "checkpoint_2::test_allocation_list_breaks_created_at_ties_by_uuid",
         "checkpoint_2::test_allocation_list_empty_returns_empty_array",
         "checkpoint_2::test_allocation_list_filters_compose_conjunctively",
@@ -1600,8 +1618,6 @@
         "checkpoint_3::test_bind_missing_assignment_id",
         "checkpoint_3::test_bind_mixed_ops_success",
         "checkpoint_3::test_bind_not_found_lists_sorted_ids",
-        "checkpoint_3::test_bind_rejects_empty_allocations[empty_allocations]",
-        "checkpoint_3::test_bind_rejects_empty_allocations[missing_allocations]",
         "checkpoint_3::test_bind_remove_clears_assignment_id_to_null",
         "checkpoint_3::test_bind_remove_is_idempotent",
         "checkpoint_3::test_delete_by_assignment_is_idempotent",
@@ -1611,8 +1627,6 @@
         "checkpoint_3::test_delete_ids_rejects_blank_csv",
         "checkpoint_3::test_delete_ids_rejects_partial_matches",
         "checkpoint_3::test_delete_ids_reports_missing_uuids",
-        "checkpoint_3::test_delete_requires_exactly_one_mode_flag[both_flags]",
-        "checkpoint_3::test_delete_requires_exactly_one_mode_flag[no_flag]",
         "checkpoint_3::test_duplicate_guard_blocks_mixed_ops",
         "checkpoint_3::test_invalid_op_no_remove_side_effects",
         "checkpoint_3::test_invalid_op_precedes_duplicate",
@@ -1621,31 +1635,6 @@
         "checkpoint_3::test_remove_only_bypasses_duplicate_guard",
         "checkpoint_3::test_remove_unbinds_ignoring_assignment",
         "checkpoint_3::test_validation_precedes_op_and_not_found",
-        "checkpoint_4::test_create_bool_capacity[False]",
-        "checkpoint_4::test_create_bool_capacity[True]",
-        "checkpoint_4::test_create_child_ref_parent",
-        "checkpoint_4::test_create_defaults",
-        "checkpoint_4::test_create_empty_required_field",
-        "checkpoint_4::test_create_float_capacity",
-        "checkpoint_4::test_create_invalid_parent_uuid[123]",
-        "checkpoint_4::test_create_invalid_parent_uuid[]",
-        "checkpoint_4::test_create_missing_all_required_fields",
-        "checkpoint_4::test_create_negative_capacity",
-        "checkpoint_4::test_create_parent_not_found",
-        "checkpoint_4::test_create_rejects_all_system_fields",
-        "checkpoint_4::test_create_rejects_system_field[created_at-2020-01-01T00:00:00Z]",
-        "checkpoint_4::test_create_rejects_system_field[module_uuids-field_value2]",
-        "checkpoint_4::test_create_rejects_system_field[status-inactive]",
-        "checkpoint_4::test_create_rejects_system_field[uuid-00000000-0000-0000-0000-000000000000]",
-        "checkpoint_4::test_create_rejects_wrong_types[category-123]",
-        "checkpoint_4::test_create_rejects_wrong_types[host-field_value2]",
-        "checkpoint_4::test_create_rejects_wrong_types[manufacturer-True]",
-        "checkpoint_4::test_create_reports_all_invalid",
-        "checkpoint_4::test_create_string_capacity",
-        "checkpoint_4::test_create_uuid_parent_not_found[11111111-1111-1111-1111-111111111111]",
-        "checkpoint_4::test_create_uuid_parent_not_found[aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa]",
-        "checkpoint_4::test_create_uuid_timestamp_format",
-        "checkpoint_4::test_create_zero_capacity",
         "checkpoint_4::test_filter_by_parent_uuid",
         "checkpoint_4::test_filter_int_decimal_only",
         "checkpoint_4::test_filter_no_match[array_field]",
@@ -1653,78 +1642,109 @@
         "checkpoint_4::test_filter_splits_first_equals",
         "checkpoint_4::test_filters_conjunctive",
         "checkpoint_4::test_get_list_flat_hierarchy",
-        "checkpoint_4::test_get_missing_not_found",
-        "checkpoint_4::test_get_not_found_exact_detail",
         "checkpoint_4::test_list_empty_returns_empty_array",
         "checkpoint_4::test_list_get_ordering",
-        "checkpoint_4::test_list_invalid_filter_format",
         "checkpoint_4::test_list_order_created_at_ascending",
         "checkpoint_4::test_list_order_tiebreaks",
         "checkpoint_4::test_parent_null_excludes_children",
         "checkpoint_4::test_string_filters_case_sensitive"
       ],
+      "nondeterministic_count": 84,
+      "size": 58,
+      "solvable": [
+        "checkpoint_1::test_blueprint_delete_missing_uuid_returns_not_found",
+        "checkpoint_1::test_blueprint_get_nonexistent_uuid_returns_not_found",
+        "checkpoint_1::test_create_generates_valid_uuid_v4_format",
+        "checkpoint_1::test_create_missing_required_fields_reports_sorted_unique_messages",
+        "checkpoint_1::test_create_output_is_compact_sorted_json_without_trailing_newline",
+        "checkpoint_1::test_create_rejects_boolean_resource_count",
+        "checkpoint_1::test_create_rejects_capabilities_with_non_string_elements",
+        "checkpoint_1::test_create_rejects_duplicate_name_with_conflict",
+        "checkpoint_1::test_create_rejects_float_resource_count",
+        "checkpoint_1::test_create_rejects_invalid_json_input",
+        "checkpoint_1::test_create_rejects_multiple_unsupported_keys",
+        "checkpoint_1::test_create_rejects_non_array_requirement_sets",
+        "checkpoint_1::test_create_rejects_non_string_name_type",
+        "checkpoint_1::test_create_rejects_requirement_sets_with_non_object_elements",
+        "checkpoint_1::test_create_rejects_unsupported_key_as_sole_violation",
+        "checkpoint_1::test_create_validation_aggregates_top_level_and_nested_failures",
+        "checkpoint_1::test_create_validation_aggregates_unique_sorted_messages",
+        "checkpoint_1::test_create_validation_deduplicates_messages_across_requirement_sets",
+        "checkpoint_1::test_requirement_set_order_preserved_non_lexicographic",
+        "checkpoint_2::test_allocation_create_rejects_invalid_payload_shapes[blueprint_name_empty]",
+        "checkpoint_2::test_allocation_create_rejects_invalid_payload_shapes[blueprint_name_wrong_type]",
+        "checkpoint_2::test_allocation_create_rejects_invalid_payload_shapes[missing_blueprint_name]",
+        "checkpoint_2::test_allocation_create_rejects_invalid_payload_shapes[non_object_payload]",
+        "checkpoint_2::test_allocation_create_unknown_blueprint_not_found",
+        "checkpoint_2::test_allocation_get_malformed_uuid_returns_not_found",
+        "checkpoint_2::test_allocation_get_unknown_uuid_not_found",
+        "checkpoint_3::test_bind_rejects_empty_allocations[empty_allocations]",
+        "checkpoint_3::test_bind_rejects_empty_allocations[missing_allocations]",
+        "checkpoint_3::test_delete_requires_exactly_one_mode_flag[both_flags]",
+        "checkpoint_3::test_delete_requires_exactly_one_mode_flag[no_flag]",
+        "checkpoint_4::test_create_bool_capacity[False]",
+        "checkpoint_4::test_create_bool_capacity[True]",
+        "checkpoint_4::test_create_child_ref_parent",
+        "checkpoint_4::test_create_defaults",
+        "checkpoint_4::test_create_empty_required_field",
+        "checkpoint_4::test_create_float_capacity",
+        "checkpoint_4::test_create_invalid_parent_uuid[123]",
+        "checkpoint_4::test_create_invalid_parent_uuid[]",
+        "checkpoint_4::test_create_missing_all_required_fields",
+        "checkpoint_4::test_create_negative_capacity",
+        "checkpoint_4::test_create_parent_not_found",
+        "checkpoint_4::test_create_rejects_all_system_fields",
+        "checkpoint_4::test_create_rejects_system_field[created_at-2020-01-01T00:00:00Z]",
+        "checkpoint_4::test_create_rejects_system_field[module_uuids-field_value2]",
+        "checkpoint_4::test_create_rejects_system_field[status-inactive]",
+        "checkpoint_4::test_create_rejects_system_field[uuid-00000000-0000-0000-0000-000000000000]",
+        "checkpoint_4::test_create_rejects_wrong_types[category-123]",
+        "checkpoint_4::test_create_rejects_wrong_types[host-field_value2]",
+        "checkpoint_4::test_create_rejects_wrong_types[manufacturer-True]",
+        "checkpoint_4::test_create_reports_all_invalid",
+        "checkpoint_4::test_create_string_capacity",
+        "checkpoint_4::test_create_uuid_parent_not_found[11111111-1111-1111-1111-111111111111]",
+        "checkpoint_4::test_create_uuid_parent_not_found[aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa]",
+        "checkpoint_4::test_create_uuid_timestamp_format",
+        "checkpoint_4::test_create_zero_capacity",
+        "checkpoint_4::test_get_missing_not_found",
+        "checkpoint_4::test_get_not_found_exact_detail",
+        "checkpoint_4::test_list_invalid_filter_format"
+      ],
       "verdict": "validated"
     },
     "checkpoint_5": {
-      "digest": "f48c7b0473805031f6018a7ee2055e7391026c77e189619841abe3d65960284b",
-      "nondeterministic": [],
-      "nondeterministic_count": 0,
-      "size": 166,
-      "solvable": [
-        "checkpoint_1::test_blueprint_delete_missing_uuid_returns_not_found",
+      "digest": "50d4359dbee869b58f9af31de92db18d2bb603d91dc52300e302a4dbc422c1fe",
+      "exclusion": null,
+      "nondeterministic": [
         "checkpoint_1::test_blueprint_get_and_delete_single_uuid",
-        "checkpoint_1::test_blueprint_get_nonexistent_uuid_returns_not_found",
         "checkpoint_1::test_blueprint_get_returns_all_stored_fields",
         "checkpoint_1::test_blueprint_list_empty_returns_empty_array",
         "checkpoint_1::test_blueprint_list_name_tiebreak_when_created_at_collides",
         "checkpoint_1::test_blueprint_list_orders_by_created_at_name_uuid",
         "checkpoint_1::test_blueprint_list_uuid_tiebreak_when_created_at_and_name_collide",
         "checkpoint_1::test_create_blueprint_returns_persisted_resource",
-        "checkpoint_1::test_create_generates_valid_uuid_v4_format",
         "checkpoint_1::test_create_ignores_caller_supplied_created_at",
         "checkpoint_1::test_create_ignores_caller_supplied_uuid",
         "checkpoint_1::test_create_ignores_unknown_top_level_keys",
-        "checkpoint_1::test_create_missing_required_fields_reports_sorted_unique_messages",
-        "checkpoint_1::test_create_output_is_compact_sorted_json_without_trailing_newline",
         "checkpoint_1::test_create_preserves_empty_capabilities_array",
-        "checkpoint_1::test_create_rejects_boolean_resource_count",
-        "checkpoint_1::test_create_rejects_capabilities_with_non_string_elements",
-        "checkpoint_1::test_create_rejects_duplicate_name_with_conflict",
         "checkpoint_1::test_create_rejects_empty_name_string",
         "checkpoint_1::test_create_rejects_empty_requirement_sets",
-        "checkpoint_1::test_create_rejects_float_resource_count",
-        "checkpoint_1::test_create_rejects_invalid_json_input",
-        "checkpoint_1::test_create_rejects_multiple_unsupported_keys",
-        "checkpoint_1::test_create_rejects_non_array_requirement_sets",
         "checkpoint_1::test_create_rejects_non_object_json_payload",
-        "checkpoint_1::test_create_rejects_non_string_name_type",
         "checkpoint_1::test_create_rejects_requirement_set_missing_required_keys",
-        "checkpoint_1::test_create_rejects_requirement_sets_with_non_object_elements",
-        "checkpoint_1::test_create_rejects_unsupported_key_as_sole_violation",
-        "checkpoint_1::test_create_validation_aggregates_top_level_and_nested_failures",
-        "checkpoint_1::test_create_validation_aggregates_unique_sorted_messages",
-        "checkpoint_1::test_create_validation_deduplicates_messages_across_requirement_sets",
         "checkpoint_1::test_create_validation_failure_is_atomic",
         "checkpoint_1::test_delete_names_duplicate_members_count_unique_deletions",
         "checkpoint_1::test_delete_names_is_atomic_and_reports_sorted_unresolved",
         "checkpoint_1::test_delete_names_rejects_blank_csv_members_atomically",
         "checkpoint_1::test_delete_names_single_name_succeeds",
         "checkpoint_1::test_delete_names_success_returns_deleted_count",
-        "checkpoint_1::test_requirement_set_order_preserved_non_lexicographic",
         "checkpoint_2::test_allocation_create_expands_requirement_sets",
         "checkpoint_2::test_allocation_create_generated_uuid_is_canonical_v4",
         "checkpoint_2::test_allocation_create_output_is_scoped_to_current_batch",
-        "checkpoint_2::test_allocation_create_rejects_invalid_payload_shapes[blueprint_name_empty]",
-        "checkpoint_2::test_allocation_create_rejects_invalid_payload_shapes[blueprint_name_wrong_type]",
-        "checkpoint_2::test_allocation_create_rejects_invalid_payload_shapes[missing_blueprint_name]",
-        "checkpoint_2::test_allocation_create_rejects_invalid_payload_shapes[non_object_payload]",
         "checkpoint_2::test_allocation_create_returns_complete_field_set",
         "checkpoint_2::test_allocation_create_same_blueprint_twice_distinct_uuids",
-        "checkpoint_2::test_allocation_create_unknown_blueprint_not_found",
-        "checkpoint_2::test_allocation_get_malformed_uuid_returns_not_found",
         "checkpoint_2::test_allocation_get_returns_single_resource",
         "checkpoint_2::test_allocation_get_round_trip_preserves_all_fields",
-        "checkpoint_2::test_allocation_get_unknown_uuid_not_found",
         "checkpoint_2::test_allocation_list_breaks_created_at_ties_by_uuid",
         "checkpoint_2::test_allocation_list_empty_returns_empty_array",
         "checkpoint_2::test_allocation_list_filters_compose_conjunctively",
@@ -1751,8 +1771,6 @@
         "checkpoint_3::test_bind_missing_assignment_id",
         "checkpoint_3::test_bind_mixed_ops_success",
         "checkpoint_3::test_bind_not_found_lists_sorted_ids",
-        "checkpoint_3::test_bind_rejects_empty_allocations[empty_allocations]",
-        "checkpoint_3::test_bind_rejects_empty_allocations[missing_allocations]",
         "checkpoint_3::test_bind_remove_clears_assignment_id_to_null",
         "checkpoint_3::test_bind_remove_is_idempotent",
         "checkpoint_3::test_delete_by_assignment_is_idempotent",
@@ -1762,8 +1780,6 @@
         "checkpoint_3::test_delete_ids_rejects_blank_csv",
         "checkpoint_3::test_delete_ids_rejects_partial_matches",
         "checkpoint_3::test_delete_ids_reports_missing_uuids",
-        "checkpoint_3::test_delete_requires_exactly_one_mode_flag[both_flags]",
-        "checkpoint_3::test_delete_requires_exactly_one_mode_flag[no_flag]",
         "checkpoint_3::test_duplicate_guard_blocks_mixed_ops",
         "checkpoint_3::test_invalid_op_no_remove_side_effects",
         "checkpoint_3::test_invalid_op_precedes_duplicate",
@@ -1772,31 +1788,6 @@
         "checkpoint_3::test_remove_only_bypasses_duplicate_guard",
         "checkpoint_3::test_remove_unbinds_ignoring_assignment",
         "checkpoint_3::test_validation_precedes_op_and_not_found",
-        "checkpoint_4::test_create_bool_capacity[False]",
-        "checkpoint_4::test_create_bool_capacity[True]",
-        "checkpoint_4::test_create_child_ref_parent",
-        "checkpoint_4::test_create_defaults",
-        "checkpoint_4::test_create_empty_required_field",
-        "checkpoint_4::test_create_float_capacity",
-        "checkpoint_4::test_create_invalid_parent_uuid[123]",
-        "checkpoint_4::test_create_invalid_parent_uuid[]",
-        "checkpoint_4::test_create_missing_all_required_fields",
-        "checkpoint_4::test_create_negative_capacity",
-        "checkpoint_4::test_create_parent_not_found",
-        "checkpoint_4::test_create_rejects_all_system_fields",
-        "checkpoint_4::test_create_rejects_system_field[created_at-2020-01-01T00:00:00Z]",
-        "checkpoint_4::test_create_rejects_system_field[module_uuids-field_value2]",
-        "checkpoint_4::test_create_rejects_system_field[status-inactive]",
-        "checkpoint_4::test_create_rejects_system_field[uuid-00000000-0000-0000-0000-000000000000]",
-        "checkpoint_4::test_create_rejects_wrong_types[category-123]",
-        "checkpoint_4::test_create_rejects_wrong_types[host-field_value2]",
-        "checkpoint_4::test_create_rejects_wrong_types[manufacturer-True]",
-        "checkpoint_4::test_create_reports_all_invalid",
-        "checkpoint_4::test_create_string_capacity",
-        "checkpoint_4::test_create_uuid_parent_not_found[11111111-1111-1111-1111-111111111111]",
-        "checkpoint_4::test_create_uuid_parent_not_found[aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa]",
-        "checkpoint_4::test_create_uuid_timestamp_format",
-        "checkpoint_4::test_create_zero_capacity",
         "checkpoint_4::test_filter_by_parent_uuid",
         "checkpoint_4::test_filter_int_decimal_only",
         "checkpoint_4::test_filter_no_match[array_field]",
@@ -1804,25 +1795,17 @@
         "checkpoint_4::test_filter_splits_first_equals",
         "checkpoint_4::test_filters_conjunctive",
         "checkpoint_4::test_get_list_flat_hierarchy",
-        "checkpoint_4::test_get_missing_not_found",
-        "checkpoint_4::test_get_not_found_exact_detail",
         "checkpoint_4::test_list_empty_returns_empty_array",
         "checkpoint_4::test_list_get_ordering",
-        "checkpoint_4::test_list_invalid_filter_format",
         "checkpoint_4::test_list_order_created_at_ascending",
         "checkpoint_4::test_list_order_tiebreaks",
         "checkpoint_4::test_parent_null_excludes_children",
         "checkpoint_4::test_string_filters_case_sensitive",
         "checkpoint_5::test_activate_restores_capabilities_in_ledger",
         "checkpoint_5::test_activate_sets_zero_reserved_and_active",
-        "checkpoint_5::test_create_rejects_non_array_capabilities",
-        "checkpoint_5::test_create_rejects_non_string_capabilities",
-        "checkpoint_5::test_create_sorts_capabilities_even_with_duplicates",
         "checkpoint_5::test_deactivate_sets_reserved_capacity_and_inactive",
         "checkpoint_5::test_deactivate_zero_capacity_unit",
         "checkpoint_5::test_get_sorted_capabilities",
-        "checkpoint_5::test_invalid_transition[activate-active]",
-        "checkpoint_5::test_invalid_transition[deactivate-inactive]",
         "checkpoint_5::test_ledger_capabilities_sorted_lexicographic",
         "checkpoint_5::test_ledger_capabilities_tracks_active_units_only",
         "checkpoint_5::test_ledger_empty_when_no_capabilities",
@@ -1832,74 +1815,113 @@
         "checkpoint_5::test_reactivation_no_duplicate_in_ledger",
         "checkpoint_5::test_reserved_capacity_in_list_and_get[active]",
         "checkpoint_5::test_reserved_capacity_in_list_and_get[deactivated]",
-        "checkpoint_5::test_transition_unknown_unit_not_found",
         "checkpoint_5::test_transitions_include_empty_capabilities",
-        "checkpoint_5::test_transitions_return_sorted_capabilities",
+        "checkpoint_5::test_transitions_return_sorted_capabilities"
+      ],
+      "nondeterministic_count": 100,
+      "size": 66,
+      "solvable": [
+        "checkpoint_1::test_blueprint_delete_missing_uuid_returns_not_found",
+        "checkpoint_1::test_blueprint_get_nonexistent_uuid_returns_not_found",
+        "checkpoint_1::test_create_generates_valid_uuid_v4_format",
+        "checkpoint_1::test_create_missing_required_fields_reports_sorted_unique_messages",
+        "checkpoint_1::test_create_output_is_compact_sorted_json_without_trailing_newline",
+        "checkpoint_1::test_create_rejects_boolean_resource_count",
+        "checkpoint_1::test_create_rejects_capabilities_with_non_string_elements",
+        "checkpoint_1::test_create_rejects_duplicate_name_with_conflict",
+        "checkpoint_1::test_create_rejects_float_resource_count",
+        "checkpoint_1::test_create_rejects_invalid_json_input",
+        "checkpoint_1::test_create_rejects_multiple_unsupported_keys",
+        "checkpoint_1::test_create_rejects_non_array_requirement_sets",
+        "checkpoint_1::test_create_rejects_non_string_name_type",
+        "checkpoint_1::test_create_rejects_requirement_sets_with_non_object_elements",
+        "checkpoint_1::test_create_rejects_unsupported_key_as_sole_violation",
+        "checkpoint_1::test_create_validation_aggregates_top_level_and_nested_failures",
+        "checkpoint_1::test_create_validation_aggregates_unique_sorted_messages",
+        "checkpoint_1::test_create_validation_deduplicates_messages_across_requirement_sets",
+        "checkpoint_1::test_requirement_set_order_preserved_non_lexicographic",
+        "checkpoint_2::test_allocation_create_rejects_invalid_payload_shapes[blueprint_name_empty]",
+        "checkpoint_2::test_allocation_create_rejects_invalid_payload_shapes[blueprint_name_wrong_type]",
+        "checkpoint_2::test_allocation_create_rejects_invalid_payload_shapes[missing_blueprint_name]",
+        "checkpoint_2::test_allocation_create_rejects_invalid_payload_shapes[non_object_payload]",
+        "checkpoint_2::test_allocation_create_unknown_blueprint_not_found",
+        "checkpoint_2::test_allocation_get_malformed_uuid_returns_not_found",
+        "checkpoint_2::test_allocation_get_unknown_uuid_not_found",
+        "checkpoint_3::test_bind_rejects_empty_allocations[empty_allocations]",
+        "checkpoint_3::test_bind_rejects_empty_allocations[missing_allocations]",
+        "checkpoint_3::test_delete_requires_exactly_one_mode_flag[both_flags]",
+        "checkpoint_3::test_delete_requires_exactly_one_mode_flag[no_flag]",
+        "checkpoint_4::test_create_bool_capacity[False]",
+        "checkpoint_4::test_create_bool_capacity[True]",
+        "checkpoint_4::test_create_child_ref_parent",
+        "checkpoint_4::test_create_defaults",
+        "checkpoint_4::test_create_empty_required_field",
+        "checkpoint_4::test_create_float_capacity",
+        "checkpoint_4::test_create_invalid_parent_uuid[123]",
+        "checkpoint_4::test_create_invalid_parent_uuid[]",
+        "checkpoint_4::test_create_missing_all_required_fields",
+        "checkpoint_4::test_create_negative_capacity",
+        "checkpoint_4::test_create_parent_not_found",
+        "checkpoint_4::test_create_rejects_all_system_fields",
+        "checkpoint_4::test_create_rejects_system_field[created_at-2020-01-01T00:00:00Z]",
+        "checkpoint_4::test_create_rejects_system_field[module_uuids-field_value2]",
+        "checkpoint_4::test_create_rejects_system_field[status-inactive]",
+        "checkpoint_4::test_create_rejects_system_field[uuid-00000000-0000-0000-0000-000000000000]",
+        "checkpoint_4::test_create_rejects_wrong_types[category-123]",
+        "checkpoint_4::test_create_rejects_wrong_types[host-field_value2]",
+        "checkpoint_4::test_create_rejects_wrong_types[manufacturer-True]",
+        "checkpoint_4::test_create_reports_all_invalid",
+        "checkpoint_4::test_create_string_capacity",
+        "checkpoint_4::test_create_uuid_parent_not_found[11111111-1111-1111-1111-111111111111]",
+        "checkpoint_4::test_create_uuid_parent_not_found[aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa]",
+        "checkpoint_4::test_create_uuid_timestamp_format",
+        "checkpoint_4::test_create_zero_capacity",
+        "checkpoint_4::test_get_missing_not_found",
+        "checkpoint_4::test_get_not_found_exact_detail",
+        "checkpoint_4::test_list_invalid_filter_format",
+        "checkpoint_5::test_create_rejects_non_array_capabilities",
+        "checkpoint_5::test_create_rejects_non_string_capabilities",
+        "checkpoint_5::test_create_sorts_capabilities_even_with_duplicates",
+        "checkpoint_5::test_invalid_transition[activate-active]",
+        "checkpoint_5::test_invalid_transition[deactivate-inactive]",
+        "checkpoint_5::test_transition_unknown_unit_not_found",
         "checkpoint_5::test_unit_create_empty_capabilities[default]",
         "checkpoint_5::test_unit_create_empty_capabilities[explicit_empty]"
       ],
       "verdict": "validated"
     },
     "checkpoint_6": {
-      "digest": "02a4768b0fe759107a060f423dcb7fb7b67d50e873ca0d6fef5e78b4136bc878",
-      "nondeterministic": [],
-      "nondeterministic_count": 0,
-      "size": 214,
-      "solvable": [
-        "checkpoint_1::test_blueprint_delete_missing_uuid_returns_not_found",
+      "digest": "ba2b194d52ff0fc479b6d98a7839e192e8886c7228e23e18ef27e0e7940c52a5",
+      "exclusion": null,
+      "nondeterministic": [
         "checkpoint_1::test_blueprint_get_and_delete_single_uuid",
-        "checkpoint_1::test_blueprint_get_nonexistent_uuid_returns_not_found",
         "checkpoint_1::test_blueprint_get_returns_all_stored_fields",
         "checkpoint_1::test_blueprint_list_empty_returns_empty_array",
         "checkpoint_1::test_blueprint_list_name_tiebreak_when_created_at_collides",
         "checkpoint_1::test_blueprint_list_orders_by_created_at_name_uuid",
         "checkpoint_1::test_blueprint_list_uuid_tiebreak_when_created_at_and_name_collide",
         "checkpoint_1::test_create_blueprint_returns_persisted_resource",
-        "checkpoint_1::test_create_generates_valid_uuid_v4_format",
         "checkpoint_1::test_create_ignores_caller_supplied_created_at",
         "checkpoint_1::test_create_ignores_caller_supplied_uuid",
         "checkpoint_1::test_create_ignores_unknown_top_level_keys",
-        "checkpoint_1::test_create_missing_required_fields_reports_sorted_unique_messages",
-        "checkpoint_1::test_create_output_is_compact_sorted_json_without_trailing_newline",
         "checkpoint_1::test_create_preserves_empty_capabilities_array",
-        "checkpoint_1::test_create_rejects_boolean_resource_count",
-        "checkpoint_1::test_create_rejects_capabilities_with_non_string_elements",
-        "checkpoint_1::test_create_rejects_duplicate_name_with_conflict",
         "checkpoint_1::test_create_rejects_empty_name_string",
         "checkpoint_1::test_create_rejects_empty_requirement_sets",
-        "checkpoint_1::test_create_rejects_float_resource_count",
-        "checkpoint_1::test_create_rejects_invalid_json_input",
-        "checkpoint_1::test_create_rejects_multiple_unsupported_keys",
-        "checkpoint_1::test_create_rejects_non_array_requirement_sets",
         "checkpoint_1::test_create_rejects_non_object_json_payload",
-        "checkpoint_1::test_create_rejects_non_string_name_type",
         "checkpoint_1::test_create_rejects_requirement_set_missing_required_keys",
-        "checkpoint_1::test_create_rejects_requirement_sets_with_non_object_elements",
-        "checkpoint_1::test_create_rejects_unsupported_key_as_sole_violation",
-        "checkpoint_1::test_create_validation_aggregates_top_level_and_nested_failures",
-        "checkpoint_1::test_create_validation_aggregates_unique_sorted_messages",
-        "checkpoint_1::test_create_validation_deduplicates_messages_across_requirement_sets",
         "checkpoint_1::test_create_validation_failure_is_atomic",
         "checkpoint_1::test_delete_names_duplicate_members_count_unique_deletions",
         "checkpoint_1::test_delete_names_is_atomic_and_reports_sorted_unresolved",
         "checkpoint_1::test_delete_names_rejects_blank_csv_members_atomically",
         "checkpoint_1::test_delete_names_single_name_succeeds",
         "checkpoint_1::test_delete_names_success_returns_deleted_count",
-        "checkpoint_1::test_requirement_set_order_preserved_non_lexicographic",
         "checkpoint_2::test_allocation_create_expands_requirement_sets",
         "checkpoint_2::test_allocation_create_generated_uuid_is_canonical_v4",
         "checkpoint_2::test_allocation_create_output_is_scoped_to_current_batch",
-        "checkpoint_2::test_allocation_create_rejects_invalid_payload_shapes[blueprint_name_empty]",
-        "checkpoint_2::test_allocation_create_rejects_invalid_payload_shapes[blueprint_name_wrong_type]",
-        "checkpoint_2::test_allocation_create_rejects_invalid_payload_shapes[missing_blueprint_name]",
-        "checkpoint_2::test_allocation_create_rejects_invalid_payload_shapes[non_object_payload]",
         "checkpoint_2::test_allocation_create_returns_complete_field_set",
         "checkpoint_2::test_allocation_create_same_blueprint_twice_distinct_uuids",
-        "checkpoint_2::test_allocation_create_unknown_blueprint_not_found",
-        "checkpoint_2::test_allocation_get_malformed_uuid_returns_not_found",
         "checkpoint_2::test_allocation_get_returns_single_resource",
         "checkpoint_2::test_allocation_get_round_trip_preserves_all_fields",
-        "checkpoint_2::test_allocation_get_unknown_uuid_not_found",
         "checkpoint_2::test_allocation_list_breaks_created_at_ties_by_uuid",
         "checkpoint_2::test_allocation_list_empty_returns_empty_array",
         "checkpoint_2::test_allocation_list_filters_compose_conjunctively",
@@ -1926,8 +1948,6 @@
         "checkpoint_3::test_bind_missing_assignment_id",
         "checkpoint_3::test_bind_mixed_ops_success",
         "checkpoint_3::test_bind_not_found_lists_sorted_ids",
-        "checkpoint_3::test_bind_rejects_empty_allocations[empty_allocations]",
-        "checkpoint_3::test_bind_rejects_empty_allocations[missing_allocations]",
         "checkpoint_3::test_bind_remove_clears_assignment_id_to_null",
         "checkpoint_3::test_bind_remove_is_idempotent",
         "checkpoint_3::test_delete_by_assignment_is_idempotent",
@@ -1937,8 +1957,6 @@
         "checkpoint_3::test_delete_ids_rejects_blank_csv",
         "checkpoint_3::test_delete_ids_rejects_partial_matches",
         "checkpoint_3::test_delete_ids_reports_missing_uuids",
-        "checkpoint_3::test_delete_requires_exactly_one_mode_flag[both_flags]",
-        "checkpoint_3::test_delete_requires_exactly_one_mode_flag[no_flag]",
         "checkpoint_3::test_duplicate_guard_blocks_mixed_ops",
         "checkpoint_3::test_invalid_op_no_remove_side_effects",
         "checkpoint_3::test_invalid_op_precedes_duplicate",
@@ -1947,6 +1965,93 @@
         "checkpoint_3::test_remove_only_bypasses_duplicate_guard",
         "checkpoint_3::test_remove_unbinds_ignoring_assignment",
         "checkpoint_3::test_validation_precedes_op_and_not_found",
+        "checkpoint_4::test_filter_by_parent_uuid",
+        "checkpoint_4::test_filter_int_decimal_only",
+        "checkpoint_4::test_filter_no_match[array_field]",
+        "checkpoint_4::test_filter_no_match[unknown_field]",
+        "checkpoint_4::test_filter_splits_first_equals",
+        "checkpoint_4::test_filters_conjunctive",
+        "checkpoint_4::test_get_list_flat_hierarchy",
+        "checkpoint_4::test_list_empty_returns_empty_array",
+        "checkpoint_4::test_list_get_ordering",
+        "checkpoint_4::test_list_order_created_at_ascending",
+        "checkpoint_4::test_list_order_tiebreaks",
+        "checkpoint_4::test_parent_null_excludes_children",
+        "checkpoint_4::test_string_filters_case_sensitive",
+        "checkpoint_5::test_activate_restores_capabilities_in_ledger",
+        "checkpoint_5::test_activate_sets_zero_reserved_and_active",
+        "checkpoint_5::test_deactivate_sets_reserved_capacity_and_inactive",
+        "checkpoint_5::test_deactivate_zero_capacity_unit",
+        "checkpoint_5::test_get_sorted_capabilities",
+        "checkpoint_5::test_ledger_capabilities_sorted_lexicographic",
+        "checkpoint_5::test_ledger_capabilities_tracks_active_units_only",
+        "checkpoint_5::test_ledger_empty_when_no_capabilities",
+        "checkpoint_5::test_ledger_overlap_preserves_capabilities",
+        "checkpoint_5::test_list_includes_empty_capabilities_field",
+        "checkpoint_5::test_list_sorted_capabilities",
+        "checkpoint_5::test_reactivation_no_duplicate_in_ledger",
+        "checkpoint_5::test_reserved_capacity_in_list_and_get[active]",
+        "checkpoint_5::test_reserved_capacity_in_list_and_get[deactivated]",
+        "checkpoint_5::test_transitions_include_empty_capabilities",
+        "checkpoint_5::test_transitions_return_sorted_capabilities",
+        "checkpoint_6::test_create_accepts_null_firmware",
+        "checkpoint_6::test_create_updates_unit_module_uuids",
+        "checkpoint_6::test_filter_splits_on_first_equals",
+        "checkpoint_6::test_filters_combine_unit_null_equals_split",
+        "checkpoint_6::test_flash_requires_stored_image",
+        "checkpoint_6::test_flash_updates_firmware_image",
+        "checkpoint_6::test_list_filter_non_null_firmware_exact_match",
+        "checkpoint_6::test_list_filter_null_firmware",
+        "checkpoint_6::test_list_filter_unknown_field_empty",
+        "checkpoint_6::test_module_create_list_get",
+        "checkpoint_6::test_module_filters_conjunctive",
+        "checkpoint_6::test_module_get_all_fields",
+        "checkpoint_6::test_module_list_ordering",
+        "checkpoint_6::test_module_list_unit_nonexistent_empty",
+        "checkpoint_6::test_repeated_flash_uses_latest",
+        "checkpoint_6::test_tag_create_list_get_delete",
+        "checkpoint_6::test_tag_create_requires_module",
+        "checkpoint_6::test_tag_delete_removes_from_get_and_list",
+        "checkpoint_6::test_tag_key_scope_per_module",
+        "checkpoint_6::test_tag_list_filters_module_key",
+        "checkpoint_6::test_tag_list_key_case_sensitive",
+        "checkpoint_6::test_tag_list_key_nonexistent_empty",
+        "checkpoint_6::test_tag_list_module_nonexistent_empty",
+        "checkpoint_6::test_tag_list_ordering"
+      ],
+      "nondeterministic_count": 124,
+      "size": 90,
+      "solvable": [
+        "checkpoint_1::test_blueprint_delete_missing_uuid_returns_not_found",
+        "checkpoint_1::test_blueprint_get_nonexistent_uuid_returns_not_found",
+        "checkpoint_1::test_create_generates_valid_uuid_v4_format",
+        "checkpoint_1::test_create_missing_required_fields_reports_sorted_unique_messages",
+        "checkpoint_1::test_create_output_is_compact_sorted_json_without_trailing_newline",
+        "checkpoint_1::test_create_rejects_boolean_resource_count",
+        "checkpoint_1::test_create_rejects_capabilities_with_non_string_elements",
+        "checkpoint_1::test_create_rejects_duplicate_name_with_conflict",
+        "checkpoint_1::test_create_rejects_float_resource_count",
+        "checkpoint_1::test_create_rejects_invalid_json_input",
+        "checkpoint_1::test_create_rejects_multiple_unsupported_keys",
+        "checkpoint_1::test_create_rejects_non_array_requirement_sets",
+        "checkpoint_1::test_create_rejects_non_string_name_type",
+        "checkpoint_1::test_create_rejects_requirement_sets_with_non_object_elements",
+        "checkpoint_1::test_create_rejects_unsupported_key_as_sole_violation",
+        "checkpoint_1::test_create_validation_aggregates_top_level_and_nested_failures",
+        "checkpoint_1::test_create_validation_aggregates_unique_sorted_messages",
+        "checkpoint_1::test_create_validation_deduplicates_messages_across_requirement_sets",
+        "checkpoint_1::test_requirement_set_order_preserved_non_lexicographic",
+        "checkpoint_2::test_allocation_create_rejects_invalid_payload_shapes[blueprint_name_empty]",
+        "checkpoint_2::test_allocation_create_rejects_invalid_payload_shapes[blueprint_name_wrong_type]",
+        "checkpoint_2::test_allocation_create_rejects_invalid_payload_shapes[missing_blueprint_name]",
+        "checkpoint_2::test_allocation_create_rejects_invalid_payload_shapes[non_object_payload]",
+        "checkpoint_2::test_allocation_create_unknown_blueprint_not_found",
+        "checkpoint_2::test_allocation_get_malformed_uuid_returns_not_found",
+        "checkpoint_2::test_allocation_get_unknown_uuid_not_found",
+        "checkpoint_3::test_bind_rejects_empty_allocations[empty_allocations]",
+        "checkpoint_3::test_bind_rejects_empty_allocations[missing_allocations]",
+        "checkpoint_3::test_delete_requires_exactly_one_mode_flag[both_flags]",
+        "checkpoint_3::test_delete_requires_exactly_one_mode_flag[no_flag]",
         "checkpoint_4::test_create_bool_capacity[False]",
         "checkpoint_4::test_create_bool_capacity[True]",
         "checkpoint_4::test_create_child_ref_parent",
@@ -1972,47 +2077,17 @@
         "checkpoint_4::test_create_uuid_parent_not_found[aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa]",
         "checkpoint_4::test_create_uuid_timestamp_format",
         "checkpoint_4::test_create_zero_capacity",
-        "checkpoint_4::test_filter_by_parent_uuid",
-        "checkpoint_4::test_filter_int_decimal_only",
-        "checkpoint_4::test_filter_no_match[array_field]",
-        "checkpoint_4::test_filter_no_match[unknown_field]",
-        "checkpoint_4::test_filter_splits_first_equals",
-        "checkpoint_4::test_filters_conjunctive",
-        "checkpoint_4::test_get_list_flat_hierarchy",
         "checkpoint_4::test_get_missing_not_found",
         "checkpoint_4::test_get_not_found_exact_detail",
-        "checkpoint_4::test_list_empty_returns_empty_array",
-        "checkpoint_4::test_list_get_ordering",
         "checkpoint_4::test_list_invalid_filter_format",
-        "checkpoint_4::test_list_order_created_at_ascending",
-        "checkpoint_4::test_list_order_tiebreaks",
-        "checkpoint_4::test_parent_null_excludes_children",
-        "checkpoint_4::test_string_filters_case_sensitive",
-        "checkpoint_5::test_activate_restores_capabilities_in_ledger",
-        "checkpoint_5::test_activate_sets_zero_reserved_and_active",
         "checkpoint_5::test_create_rejects_non_array_capabilities",
         "checkpoint_5::test_create_rejects_non_string_capabilities",
         "checkpoint_5::test_create_sorts_capabilities_even_with_duplicates",
-        "checkpoint_5::test_deactivate_sets_reserved_capacity_and_inactive",
-        "checkpoint_5::test_deactivate_zero_capacity_unit",
-        "checkpoint_5::test_get_sorted_capabilities",
         "checkpoint_5::test_invalid_transition[activate-active]",
         "checkpoint_5::test_invalid_transition[deactivate-inactive]",
-        "checkpoint_5::test_ledger_capabilities_sorted_lexicographic",
-        "checkpoint_5::test_ledger_capabilities_tracks_active_units_only",
-        "checkpoint_5::test_ledger_empty_when_no_capabilities",
-        "checkpoint_5::test_ledger_overlap_preserves_capabilities",
-        "checkpoint_5::test_list_includes_empty_capabilities_field",
-        "checkpoint_5::test_list_sorted_capabilities",
-        "checkpoint_5::test_reactivation_no_duplicate_in_ledger",
-        "checkpoint_5::test_reserved_capacity_in_list_and_get[active]",
-        "checkpoint_5::test_reserved_capacity_in_list_and_get[deactivated]",
         "checkpoint_5::test_transition_unknown_unit_not_found",
-        "checkpoint_5::test_transitions_include_empty_capabilities",
-        "checkpoint_5::test_transitions_return_sorted_capabilities",
         "checkpoint_5::test_unit_create_empty_capabilities[default]",
         "checkpoint_5::test_unit_create_empty_capabilities[explicit_empty]",
-        "checkpoint_6::test_create_accepts_null_firmware",
         "checkpoint_6::test_create_component_type_null",
         "checkpoint_6::test_create_firmware_image_empty_string",
         "checkpoint_6::test_create_invalid_firmware_image",
@@ -2021,108 +2096,57 @@
         "checkpoint_6::test_create_rejects_bad_component_type[7]",
         "checkpoint_6::test_create_rejects_bad_component_type[]",
         "checkpoint_6::test_create_unknown_unit_not_found",
-        "checkpoint_6::test_create_updates_unit_module_uuids",
-        "checkpoint_6::test_filter_splits_on_first_equals",
-        "checkpoint_6::test_filters_combine_unit_null_equals_split",
         "checkpoint_6::test_flash_bad_image[invalid-format]",
         "checkpoint_6::test_flash_bad_image[unknown-image]",
         "checkpoint_6::test_flash_bad_image[uppercase-uuid]",
         "checkpoint_6::test_flash_invalid_image_precedes_not_found",
-        "checkpoint_6::test_flash_requires_stored_image",
         "checkpoint_6::test_flash_unknown_image_rejected_consistently",
-        "checkpoint_6::test_flash_updates_firmware_image",
         "checkpoint_6::test_get_flash_nonexistent_not_found",
-        "checkpoint_6::test_list_filter_non_null_firmware_exact_match",
-        "checkpoint_6::test_list_filter_null_firmware",
         "checkpoint_6::test_list_filter_requires_equals",
-        "checkpoint_6::test_list_filter_unknown_field_empty",
-        "checkpoint_6::test_module_create_list_get",
-        "checkpoint_6::test_module_filters_conjunctive",
-        "checkpoint_6::test_module_get_all_fields",
-        "checkpoint_6::test_module_list_ordering",
-        "checkpoint_6::test_module_list_unit_nonexistent_empty",
-        "checkpoint_6::test_repeated_flash_uses_latest",
         "checkpoint_6::test_tag_conflict_detail",
         "checkpoint_6::test_tag_create_all_fields",
-        "checkpoint_6::test_tag_create_list_get_delete",
         "checkpoint_6::test_tag_create_missing_fields",
         "checkpoint_6::test_tag_create_rejects_empty",
-        "checkpoint_6::test_tag_create_requires_module",
-        "checkpoint_6::test_tag_delete_removes_from_get_and_list",
         "checkpoint_6::test_tag_duplicate_key_conflict",
         "checkpoint_6::test_tag_get_delete_nonexistent[delete]",
         "checkpoint_6::test_tag_get_delete_nonexistent[get]",
         "checkpoint_6::test_tag_key_case_sensitive",
-        "checkpoint_6::test_tag_key_scope_per_module",
-        "checkpoint_6::test_tag_list_filters_module_key",
-        "checkpoint_6::test_tag_list_key_case_sensitive",
-        "checkpoint_6::test_tag_list_key_nonexistent_empty",
-        "checkpoint_6::test_tag_list_module_nonexistent_empty",
-        "checkpoint_6::test_tag_list_ordering",
         "checkpoint_6::test_tag_update_unknown_command"
       ],
       "verdict": "validated"
     },
     "checkpoint_7": {
-      "digest": "66a21cd8fc729596db3a151eff6d451f5e59e8c44c13c42c1e062383051f19c2",
-      "nondeterministic": [],
-      "nondeterministic_count": 0,
-      "size": 251,
-      "solvable": [
-        "checkpoint_1::test_blueprint_delete_missing_uuid_returns_not_found",
+      "digest": "220289964007a69e11abf1384737e04151d7ee0836f62cb39c73f8d65a75fe1e",
+      "exclusion": null,
+      "nondeterministic": [
         "checkpoint_1::test_blueprint_get_and_delete_single_uuid",
-        "checkpoint_1::test_blueprint_get_nonexistent_uuid_returns_not_found",
         "checkpoint_1::test_blueprint_get_returns_all_stored_fields",
         "checkpoint_1::test_blueprint_list_empty_returns_empty_array",
         "checkpoint_1::test_blueprint_list_name_tiebreak_when_created_at_collides",
         "checkpoint_1::test_blueprint_list_orders_by_created_at_name_uuid",
         "checkpoint_1::test_blueprint_list_uuid_tiebreak_when_created_at_and_name_collide",
         "checkpoint_1::test_create_blueprint_returns_persisted_resource",
-        "checkpoint_1::test_create_generates_valid_uuid_v4_format",
         "checkpoint_1::test_create_ignores_caller_supplied_created_at",
         "checkpoint_1::test_create_ignores_caller_supplied_uuid",
         "checkpoint_1::test_create_ignores_unknown_top_level_keys",
-        "checkpoint_1::test_create_missing_required_fields_reports_sorted_unique_messages",
-        "checkpoint_1::test_create_output_is_compact_sorted_json_without_trailing_newline",
         "checkpoint_1::test_create_preserves_empty_capabilities_array",
-        "checkpoint_1::test_create_rejects_boolean_resource_count",
-        "checkpoint_1::test_create_rejects_capabilities_with_non_string_elements",
-        "checkpoint_1::test_create_rejects_duplicate_name_with_conflict",
         "checkpoint_1::test_create_rejects_empty_name_string",
         "checkpoint_1::test_create_rejects_empty_requirement_sets",
-        "checkpoint_1::test_create_rejects_float_resource_count",
-        "checkpoint_1::test_create_rejects_invalid_json_input",
-        "checkpoint_1::test_create_rejects_multiple_unsupported_keys",
-        "checkpoint_1::test_create_rejects_non_array_requirement_sets",
         "checkpoint_1::test_create_rejects_non_object_json_payload",
-        "checkpoint_1::test_create_rejects_non_string_name_type",
         "checkpoint_1::test_create_rejects_requirement_set_missing_required_keys",
-        "checkpoint_1::test_create_rejects_requirement_sets_with_non_object_elements",
-        "checkpoint_1::test_create_rejects_unsupported_key_as_sole_violation",
-        "checkpoint_1::test_create_validation_aggregates_top_level_and_nested_failures",
-        "checkpoint_1::test_create_validation_aggregates_unique_sorted_messages",
-        "checkpoint_1::test_create_validation_deduplicates_messages_across_requirement_sets",
         "checkpoint_1::test_create_validation_failure_is_atomic",
         "checkpoint_1::test_delete_names_duplicate_members_count_unique_deletions",
         "checkpoint_1::test_delete_names_is_atomic_and_reports_sorted_unresolved",
         "checkpoint_1::test_delete_names_rejects_blank_csv_members_atomically",
         "checkpoint_1::test_delete_names_single_name_succeeds",
         "checkpoint_1::test_delete_names_success_returns_deleted_count",
-        "checkpoint_1::test_requirement_set_order_preserved_non_lexicographic",
         "checkpoint_2::test_allocation_create_expands_requirement_sets",
         "checkpoint_2::test_allocation_create_generated_uuid_is_canonical_v4",
         "checkpoint_2::test_allocation_create_output_is_scoped_to_current_batch",
-        "checkpoint_2::test_allocation_create_rejects_invalid_payload_shapes[blueprint_name_empty]",
-        "checkpoint_2::test_allocation_create_rejects_invalid_payload_shapes[blueprint_name_wrong_type]",
-        "checkpoint_2::test_allocation_create_rejects_invalid_payload_shapes[missing_blueprint_name]",
-        "checkpoint_2::test_allocation_create_rejects_invalid_payload_shapes[non_object_payload]",
         "checkpoint_2::test_allocation_create_returns_complete_field_set",
         "checkpoint_2::test_allocation_create_same_blueprint_twice_distinct_uuids",
-        "checkpoint_2::test_allocation_create_unknown_blueprint_not_found",
-        "checkpoint_2::test_allocation_get_malformed_uuid_returns_not_found",
         "checkpoint_2::test_allocation_get_returns_single_resource",
         "checkpoint_2::test_allocation_get_round_trip_preserves_all_fields",
-        "checkpoint_2::test_allocation_get_unknown_uuid_not_found",
         "checkpoint_2::test_allocation_list_breaks_created_at_ties_by_uuid",
         "checkpoint_2::test_allocation_list_empty_returns_empty_array",
         "checkpoint_2::test_allocation_list_filters_compose_conjunctively",
@@ -2149,8 +2173,6 @@
         "checkpoint_3::test_bind_missing_assignment_id",
         "checkpoint_3::test_bind_mixed_ops_success",
         "checkpoint_3::test_bind_not_found_lists_sorted_ids",
-        "checkpoint_3::test_bind_rejects_empty_allocations[empty_allocations]",
-        "checkpoint_3::test_bind_rejects_empty_allocations[missing_allocations]",
         "checkpoint_3::test_bind_remove_clears_assignment_id_to_null",
         "checkpoint_3::test_bind_remove_is_idempotent",
         "checkpoint_3::test_delete_by_assignment_is_idempotent",
@@ -2160,8 +2182,6 @@
         "checkpoint_3::test_delete_ids_rejects_blank_csv",
         "checkpoint_3::test_delete_ids_rejects_partial_matches",
         "checkpoint_3::test_delete_ids_reports_missing_uuids",
-        "checkpoint_3::test_delete_requires_exactly_one_mode_flag[both_flags]",
-        "checkpoint_3::test_delete_requires_exactly_one_mode_flag[no_flag]",
         "checkpoint_3::test_duplicate_guard_blocks_mixed_ops",
         "checkpoint_3::test_invalid_op_no_remove_side_effects",
         "checkpoint_3::test_invalid_op_precedes_duplicate",
@@ -2170,6 +2190,93 @@
         "checkpoint_3::test_remove_only_bypasses_duplicate_guard",
         "checkpoint_3::test_remove_unbinds_ignoring_assignment",
         "checkpoint_3::test_validation_precedes_op_and_not_found",
+        "checkpoint_4::test_filter_by_parent_uuid",
+        "checkpoint_4::test_filter_int_decimal_only",
+        "checkpoint_4::test_filter_no_match[array_field]",
+        "checkpoint_4::test_filter_no_match[unknown_field]",
+        "checkpoint_4::test_filter_splits_first_equals",
+        "checkpoint_4::test_filters_conjunctive",
+        "checkpoint_4::test_get_list_flat_hierarchy",
+        "checkpoint_4::test_list_empty_returns_empty_array",
+        "checkpoint_4::test_list_get_ordering",
+        "checkpoint_4::test_list_order_created_at_ascending",
+        "checkpoint_4::test_list_order_tiebreaks",
+        "checkpoint_4::test_parent_null_excludes_children",
+        "checkpoint_4::test_string_filters_case_sensitive",
+        "checkpoint_5::test_activate_restores_capabilities_in_ledger",
+        "checkpoint_5::test_activate_sets_zero_reserved_and_active",
+        "checkpoint_5::test_deactivate_sets_reserved_capacity_and_inactive",
+        "checkpoint_5::test_deactivate_zero_capacity_unit",
+        "checkpoint_5::test_get_sorted_capabilities",
+        "checkpoint_5::test_ledger_capabilities_sorted_lexicographic",
+        "checkpoint_5::test_ledger_capabilities_tracks_active_units_only",
+        "checkpoint_5::test_ledger_empty_when_no_capabilities",
+        "checkpoint_5::test_ledger_overlap_preserves_capabilities",
+        "checkpoint_5::test_list_includes_empty_capabilities_field",
+        "checkpoint_5::test_list_sorted_capabilities",
+        "checkpoint_5::test_reactivation_no_duplicate_in_ledger",
+        "checkpoint_5::test_reserved_capacity_in_list_and_get[active]",
+        "checkpoint_5::test_reserved_capacity_in_list_and_get[deactivated]",
+        "checkpoint_5::test_transitions_include_empty_capabilities",
+        "checkpoint_5::test_transitions_return_sorted_capabilities",
+        "checkpoint_6::test_create_accepts_null_firmware",
+        "checkpoint_6::test_create_updates_unit_module_uuids",
+        "checkpoint_6::test_filter_splits_on_first_equals",
+        "checkpoint_6::test_filters_combine_unit_null_equals_split",
+        "checkpoint_6::test_flash_requires_stored_image",
+        "checkpoint_6::test_flash_updates_firmware_image",
+        "checkpoint_6::test_list_filter_non_null_firmware_exact_match",
+        "checkpoint_6::test_list_filter_null_firmware",
+        "checkpoint_6::test_list_filter_unknown_field_empty",
+        "checkpoint_6::test_module_create_list_get",
+        "checkpoint_6::test_module_filters_conjunctive",
+        "checkpoint_6::test_module_get_all_fields",
+        "checkpoint_6::test_module_list_ordering",
+        "checkpoint_6::test_module_list_unit_nonexistent_empty",
+        "checkpoint_6::test_repeated_flash_uses_latest",
+        "checkpoint_6::test_tag_create_list_get_delete",
+        "checkpoint_6::test_tag_create_requires_module",
+        "checkpoint_6::test_tag_delete_removes_from_get_and_list",
+        "checkpoint_6::test_tag_key_scope_per_module",
+        "checkpoint_6::test_tag_list_filters_module_key",
+        "checkpoint_6::test_tag_list_key_case_sensitive",
+        "checkpoint_6::test_tag_list_key_nonexistent_empty",
+        "checkpoint_6::test_tag_list_module_nonexistent_empty",
+        "checkpoint_6::test_tag_list_ordering"
+      ],
+      "nondeterministic_count": 124,
+      "size": 127,
+      "solvable": [
+        "checkpoint_1::test_blueprint_delete_missing_uuid_returns_not_found",
+        "checkpoint_1::test_blueprint_get_nonexistent_uuid_returns_not_found",
+        "checkpoint_1::test_create_generates_valid_uuid_v4_format",
+        "checkpoint_1::test_create_missing_required_fields_reports_sorted_unique_messages",
+        "checkpoint_1::test_create_output_is_compact_sorted_json_without_trailing_newline",
+        "checkpoint_1::test_create_rejects_boolean_resource_count",
+        "checkpoint_1::test_create_rejects_capabilities_with_non_string_elements",
+        "checkpoint_1::test_create_rejects_duplicate_name_with_conflict",
+        "checkpoint_1::test_create_rejects_float_resource_count",
+        "checkpoint_1::test_create_rejects_invalid_json_input",
+        "checkpoint_1::test_create_rejects_multiple_unsupported_keys",
+        "checkpoint_1::test_create_rejects_non_array_requirement_sets",
+        "checkpoint_1::test_create_rejects_non_string_name_type",
+        "checkpoint_1::test_create_rejects_requirement_sets_with_non_object_elements",
+        "checkpoint_1::test_create_rejects_unsupported_key_as_sole_violation",
+        "checkpoint_1::test_create_validation_aggregates_top_level_and_nested_failures",
+        "checkpoint_1::test_create_validation_aggregates_unique_sorted_messages",
+        "checkpoint_1::test_create_validation_deduplicates_messages_across_requirement_sets",
+        "checkpoint_1::test_requirement_set_order_preserved_non_lexicographic",
+        "checkpoint_2::test_allocation_create_rejects_invalid_payload_shapes[blueprint_name_empty]",
+        "checkpoint_2::test_allocation_create_rejects_invalid_payload_shapes[blueprint_name_wrong_type]",
+        "checkpoint_2::test_allocation_create_rejects_invalid_payload_shapes[missing_blueprint_name]",
+        "checkpoint_2::test_allocation_create_rejects_invalid_payload_shapes[non_object_payload]",
+        "checkpoint_2::test_allocation_create_unknown_blueprint_not_found",
+        "checkpoint_2::test_allocation_get_malformed_uuid_returns_not_found",
+        "checkpoint_2::test_allocation_get_unknown_uuid_not_found",
+        "checkpoint_3::test_bind_rejects_empty_allocations[empty_allocations]",
+        "checkpoint_3::test_bind_rejects_empty_allocations[missing_allocations]",
+        "checkpoint_3::test_delete_requires_exactly_one_mode_flag[both_flags]",
+        "checkpoint_3::test_delete_requires_exactly_one_mode_flag[no_flag]",
         "checkpoint_4::test_create_bool_capacity[False]",
         "checkpoint_4::test_create_bool_capacity[True]",
         "checkpoint_4::test_create_child_ref_parent",
@@ -2195,47 +2302,17 @@
         "checkpoint_4::test_create_uuid_parent_not_found[aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa]",
         "checkpoint_4::test_create_uuid_timestamp_format",
         "checkpoint_4::test_create_zero_capacity",
-        "checkpoint_4::test_filter_by_parent_uuid",
-        "checkpoint_4::test_filter_int_decimal_only",
-        "checkpoint_4::test_filter_no_match[array_field]",
-        "checkpoint_4::test_filter_no_match[unknown_field]",
-        "checkpoint_4::test_filter_splits_first_equals",
-        "checkpoint_4::test_filters_conjunctive",
-        "checkpoint_4::test_get_list_flat_hierarchy",
         "checkpoint_4::test_get_missing_not_found",
         "checkpoint_4::test_get_not_found_exact_detail",
-        "checkpoint_4::test_list_empty_returns_empty_array",
-        "checkpoint_4::test_list_get_ordering",
         "checkpoint_4::test_list_invalid_filter_format",
-        "checkpoint_4::test_list_order_created_at_ascending",
-        "checkpoint_4::test_list_order_tiebreaks",
-        "checkpoint_4::test_parent_null_excludes_children",
-        "checkpoint_4::test_string_filters_case_sensitive",
-        "checkpoint_5::test_activate_restores_capabilities_in_ledger",
-        "checkpoint_5::test_activate_sets_zero_reserved_and_active",
         "checkpoint_5::test_create_rejects_non_array_capabilities",
         "checkpoint_5::test_create_rejects_non_string_capabilities",
         "checkpoint_5::test_create_sorts_capabilities_even_with_duplicates",
-        "checkpoint_5::test_deactivate_sets_reserved_capacity_and_inactive",
-        "checkpoint_5::test_deactivate_zero_capacity_unit",
-        "checkpoint_5::test_get_sorted_capabilities",
         "checkpoint_5::test_invalid_transition[activate-active]",
         "checkpoint_5::test_invalid_transition[deactivate-inactive]",
-        "checkpoint_5::test_ledger_capabilities_sorted_lexicographic",
-        "checkpoint_5::test_ledger_capabilities_tracks_active_units_only",
-        "checkpoint_5::test_ledger_empty_when_no_capabilities",
-        "checkpoint_5::test_ledger_overlap_preserves_capabilities",
-        "checkpoint_5::test_list_includes_empty_capabilities_field",
-        "checkpoint_5::test_list_sorted_capabilities",
-        "checkpoint_5::test_reactivation_no_duplicate_in_ledger",
-        "checkpoint_5::test_reserved_capacity_in_list_and_get[active]",
-        "checkpoint_5::test_reserved_capacity_in_list_and_get[deactivated]",
         "checkpoint_5::test_transition_unknown_unit_not_found",
-        "checkpoint_5::test_transitions_include_empty_capabilities",
-        "checkpoint_5::test_transitions_return_sorted_capabilities",
         "checkpoint_5::test_unit_create_empty_capabilities[default]",
         "checkpoint_5::test_unit_create_empty_capabilities[explicit_empty]",
-        "checkpoint_6::test_create_accepts_null_firmware",
         "checkpoint_6::test_create_component_type_null",
         "checkpoint_6::test_create_firmware_image_empty_string",
         "checkpoint_6::test_create_invalid_firmware_image",
@@ -2244,44 +2321,21 @@
         "checkpoint_6::test_create_rejects_bad_component_type[7]",
         "checkpoint_6::test_create_rejects_bad_component_type[]",
         "checkpoint_6::test_create_unknown_unit_not_found",
-        "checkpoint_6::test_create_updates_unit_module_uuids",
-        "checkpoint_6::test_filter_splits_on_first_equals",
-        "checkpoint_6::test_filters_combine_unit_null_equals_split",
         "checkpoint_6::test_flash_bad_image[invalid-format]",
         "checkpoint_6::test_flash_bad_image[unknown-image]",
         "checkpoint_6::test_flash_bad_image[uppercase-uuid]",
         "checkpoint_6::test_flash_invalid_image_precedes_not_found",
-        "checkpoint_6::test_flash_requires_stored_image",
         "checkpoint_6::test_flash_unknown_image_rejected_consistently",
-        "checkpoint_6::test_flash_updates_firmware_image",
         "checkpoint_6::test_get_flash_nonexistent_not_found",
-        "checkpoint_6::test_list_filter_non_null_firmware_exact_match",
-        "checkpoint_6::test_list_filter_null_firmware",
         "checkpoint_6::test_list_filter_requires_equals",
-        "checkpoint_6::test_list_filter_unknown_field_empty",
-        "checkpoint_6::test_module_create_list_get",
-        "checkpoint_6::test_module_filters_conjunctive",
-        "checkpoint_6::test_module_get_all_fields",
-        "checkpoint_6::test_module_list_ordering",
-        "checkpoint_6::test_module_list_unit_nonexistent_empty",
-        "checkpoint_6::test_repeated_flash_uses_latest",
         "checkpoint_6::test_tag_conflict_detail",
         "checkpoint_6::test_tag_create_all_fields",
-        "checkpoint_6::test_tag_create_list_get_delete",
         "checkpoint_6::test_tag_create_missing_fields",
         "checkpoint_6::test_tag_create_rejects_empty",
-        "checkpoint_6::test_tag_create_requires_module",
-        "checkpoint_6::test_tag_delete_removes_from_get_and_list",
         "checkpoint_6::test_tag_duplicate_key_conflict",
         "checkpoint_6::test_tag_get_delete_nonexistent[delete]",
         "checkpoint_6::test_tag_get_delete_nonexistent[get]",
         "checkpoint_6::test_tag_key_case_sensitive",
-        "checkpoint_6::test_tag_key_scope_per_module",
-        "checkpoint_6::test_tag_list_filters_module_key",
-        "checkpoint_6::test_tag_list_key_case_sensitive",
-        "checkpoint_6::test_tag_list_key_nonexistent_empty",
-        "checkpoint_6::test_tag_list_module_nonexistent_empty",
-        "checkpoint_6::test_tag_list_ordering",
         "checkpoint_6::test_tag_update_unknown_command",
         "checkpoint_7::test_bad_revision_on_version",
         "checkpoint_7::test_bad_revision_parse_error",
@@ -2324,65 +2378,37 @@
       "verdict": "validated"
     },
     "checkpoint_8": {
-      "digest": "2c5776657a526cfc0d1cde440704269a0e678d4b208ed1a6d64189971a5d4b3d",
-      "nondeterministic": [],
-      "nondeterministic_count": 0,
-      "size": 295,
-      "solvable": [
-        "checkpoint_1::test_blueprint_delete_missing_uuid_returns_not_found",
+      "digest": "cbf2143c94d7eb12e29027cfad04af56e92355f529ac21196d45630c172b2157",
+      "exclusion": null,
+      "nondeterministic": [
         "checkpoint_1::test_blueprint_get_and_delete_single_uuid",
-        "checkpoint_1::test_blueprint_get_nonexistent_uuid_returns_not_found",
         "checkpoint_1::test_blueprint_get_returns_all_stored_fields",
         "checkpoint_1::test_blueprint_list_empty_returns_empty_array",
         "checkpoint_1::test_blueprint_list_name_tiebreak_when_created_at_collides",
         "checkpoint_1::test_blueprint_list_orders_by_created_at_name_uuid",
         "checkpoint_1::test_blueprint_list_uuid_tiebreak_when_created_at_and_name_collide",
         "checkpoint_1::test_create_blueprint_returns_persisted_resource",
-        "checkpoint_1::test_create_generates_valid_uuid_v4_format",
         "checkpoint_1::test_create_ignores_caller_supplied_created_at",
         "checkpoint_1::test_create_ignores_caller_supplied_uuid",
         "checkpoint_1::test_create_ignores_unknown_top_level_keys",
-        "checkpoint_1::test_create_missing_required_fields_reports_sorted_unique_messages",
-        "checkpoint_1::test_create_output_is_compact_sorted_json_without_trailing_newline",
         "checkpoint_1::test_create_preserves_empty_capabilities_array",
-        "checkpoint_1::test_create_rejects_boolean_resource_count",
-        "checkpoint_1::test_create_rejects_capabilities_with_non_string_elements",
-        "checkpoint_1::test_create_rejects_duplicate_name_with_conflict",
         "checkpoint_1::test_create_rejects_empty_name_string",
         "checkpoint_1::test_create_rejects_empty_requirement_sets",
-        "checkpoint_1::test_create_rejects_float_resource_count",
-        "checkpoint_1::test_create_rejects_invalid_json_input",
-        "checkpoint_1::test_create_rejects_multiple_unsupported_keys",
-        "checkpoint_1::test_create_rejects_non_array_requirement_sets",
         "checkpoint_1::test_create_rejects_non_object_json_payload",
-        "checkpoint_1::test_create_rejects_non_string_name_type",
         "checkpoint_1::test_create_rejects_requirement_set_missing_required_keys",
-        "checkpoint_1::test_create_rejects_requirement_sets_with_non_object_elements",
-        "checkpoint_1::test_create_rejects_unsupported_key_as_sole_violation",
-        "checkpoint_1::test_create_validation_aggregates_top_level_and_nested_failures",
-        "checkpoint_1::test_create_validation_aggregates_unique_sorted_messages",
-        "checkpoint_1::test_create_validation_deduplicates_messages_across_requirement_sets",
         "checkpoint_1::test_create_validation_failure_is_atomic",
         "checkpoint_1::test_delete_names_duplicate_members_count_unique_deletions",
         "checkpoint_1::test_delete_names_is_atomic_and_reports_sorted_unresolved",
         "checkpoint_1::test_delete_names_rejects_blank_csv_members_atomically",
         "checkpoint_1::test_delete_names_single_name_succeeds",
         "checkpoint_1::test_delete_names_success_returns_deleted_count",
-        "checkpoint_1::test_requirement_set_order_preserved_non_lexicographic",
         "checkpoint_2::test_allocation_create_expands_requirement_sets",
         "checkpoint_2::test_allocation_create_generated_uuid_is_canonical_v4",
         "checkpoint_2::test_allocation_create_output_is_scoped_to_current_batch",
-        "checkpoint_2::test_allocation_create_rejects_invalid_payload_shapes[blueprint_name_empty]",
-        "checkpoint_2::test_allocation_create_rejects_invalid_payload_shapes[blueprint_name_wrong_type]",
-        "checkpoint_2::test_allocation_create_rejects_invalid_payload_shapes[missing_blueprint_name]",
-        "checkpoint_2::test_allocation_create_rejects_invalid_payload_shapes[non_object_payload]",
         "checkpoint_2::test_allocation_create_returns_complete_field_set",
         "checkpoint_2::test_allocation_create_same_blueprint_twice_distinct_uuids",
-        "checkpoint_2::test_allocation_create_unknown_blueprint_not_found",
-        "checkpoint_2::test_allocation_get_malformed_uuid_returns_not_found",
         "checkpoint_2::test_allocation_get_returns_single_resource",
         "checkpoint_2::test_allocation_get_round_trip_preserves_all_fields",
-        "checkpoint_2::test_allocation_get_unknown_uuid_not_found",
         "checkpoint_2::test_allocation_list_breaks_created_at_ties_by_uuid",
         "checkpoint_2::test_allocation_list_empty_returns_empty_array",
         "checkpoint_2::test_allocation_list_filters_compose_conjunctively",
@@ -2409,8 +2435,6 @@
         "checkpoint_3::test_bind_missing_assignment_id",
         "checkpoint_3::test_bind_mixed_ops_success",
         "checkpoint_3::test_bind_not_found_lists_sorted_ids",
-        "checkpoint_3::test_bind_rejects_empty_allocations[empty_allocations]",
-        "checkpoint_3::test_bind_rejects_empty_allocations[missing_allocations]",
         "checkpoint_3::test_bind_remove_clears_assignment_id_to_null",
         "checkpoint_3::test_bind_remove_is_idempotent",
         "checkpoint_3::test_delete_by_assignment_is_idempotent",
@@ -2420,8 +2444,6 @@
         "checkpoint_3::test_delete_ids_rejects_blank_csv",
         "checkpoint_3::test_delete_ids_rejects_partial_matches",
         "checkpoint_3::test_delete_ids_reports_missing_uuids",
-        "checkpoint_3::test_delete_requires_exactly_one_mode_flag[both_flags]",
-        "checkpoint_3::test_delete_requires_exactly_one_mode_flag[no_flag]",
         "checkpoint_3::test_duplicate_guard_blocks_mixed_ops",
         "checkpoint_3::test_invalid_op_no_remove_side_effects",
         "checkpoint_3::test_invalid_op_precedes_duplicate",
@@ -2430,6 +2452,93 @@
         "checkpoint_3::test_remove_only_bypasses_duplicate_guard",
         "checkpoint_3::test_remove_unbinds_ignoring_assignment",
         "checkpoint_3::test_validation_precedes_op_and_not_found",
+        "checkpoint_4::test_filter_by_parent_uuid",
+        "checkpoint_4::test_filter_int_decimal_only",
+        "checkpoint_4::test_filter_no_match[array_field]",
+        "checkpoint_4::test_filter_no_match[unknown_field]",
+        "checkpoint_4::test_filter_splits_first_equals",
+        "checkpoint_4::test_filters_conjunctive",
+        "checkpoint_4::test_get_list_flat_hierarchy",
+        "checkpoint_4::test_list_empty_returns_empty_array",
+        "checkpoint_4::test_list_get_ordering",
+        "checkpoint_4::test_list_order_created_at_ascending",
+        "checkpoint_4::test_list_order_tiebreaks",
+        "checkpoint_4::test_parent_null_excludes_children",
+        "checkpoint_4::test_string_filters_case_sensitive",
+        "checkpoint_5::test_activate_restores_capabilities_in_ledger",
+        "checkpoint_5::test_activate_sets_zero_reserved_and_active",
+        "checkpoint_5::test_deactivate_sets_reserved_capacity_and_inactive",
+        "checkpoint_5::test_deactivate_zero_capacity_unit",
+        "checkpoint_5::test_get_sorted_capabilities",
+        "checkpoint_5::test_ledger_capabilities_sorted_lexicographic",
+        "checkpoint_5::test_ledger_capabilities_tracks_active_units_only",
+        "checkpoint_5::test_ledger_empty_when_no_capabilities",
+        "checkpoint_5::test_ledger_overlap_preserves_capabilities",
+        "checkpoint_5::test_list_includes_empty_capabilities_field",
+        "checkpoint_5::test_list_sorted_capabilities",
+        "checkpoint_5::test_reactivation_no_duplicate_in_ledger",
+        "checkpoint_5::test_reserved_capacity_in_list_and_get[active]",
+        "checkpoint_5::test_reserved_capacity_in_list_and_get[deactivated]",
+        "checkpoint_5::test_transitions_include_empty_capabilities",
+        "checkpoint_5::test_transitions_return_sorted_capabilities",
+        "checkpoint_6::test_create_accepts_null_firmware",
+        "checkpoint_6::test_create_updates_unit_module_uuids",
+        "checkpoint_6::test_filter_splits_on_first_equals",
+        "checkpoint_6::test_filters_combine_unit_null_equals_split",
+        "checkpoint_6::test_flash_requires_stored_image",
+        "checkpoint_6::test_flash_updates_firmware_image",
+        "checkpoint_6::test_list_filter_non_null_firmware_exact_match",
+        "checkpoint_6::test_list_filter_null_firmware",
+        "checkpoint_6::test_list_filter_unknown_field_empty",
+        "checkpoint_6::test_module_create_list_get",
+        "checkpoint_6::test_module_filters_conjunctive",
+        "checkpoint_6::test_module_get_all_fields",
+        "checkpoint_6::test_module_list_ordering",
+        "checkpoint_6::test_module_list_unit_nonexistent_empty",
+        "checkpoint_6::test_repeated_flash_uses_latest",
+        "checkpoint_6::test_tag_create_list_get_delete",
+        "checkpoint_6::test_tag_create_requires_module",
+        "checkpoint_6::test_tag_delete_removes_from_get_and_list",
+        "checkpoint_6::test_tag_key_scope_per_module",
+        "checkpoint_6::test_tag_list_filters_module_key",
+        "checkpoint_6::test_tag_list_key_case_sensitive",
+        "checkpoint_6::test_tag_list_key_nonexistent_empty",
+        "checkpoint_6::test_tag_list_module_nonexistent_empty",
+        "checkpoint_6::test_tag_list_ordering"
+      ],
+      "nondeterministic_count": 124,
+      "size": 171,
+      "solvable": [
+        "checkpoint_1::test_blueprint_delete_missing_uuid_returns_not_found",
+        "checkpoint_1::test_blueprint_get_nonexistent_uuid_returns_not_found",
+        "checkpoint_1::test_create_generates_valid_uuid_v4_format",
+        "checkpoint_1::test_create_missing_required_fields_reports_sorted_unique_messages",
+        "checkpoint_1::test_create_output_is_compact_sorted_json_without_trailing_newline",
+        "checkpoint_1::test_create_rejects_boolean_resource_count",
+        "checkpoint_1::test_create_rejects_capabilities_with_non_string_elements",
+        "checkpoint_1::test_create_rejects_duplicate_name_with_conflict",
+        "checkpoint_1::test_create_rejects_float_resource_count",
+        "checkpoint_1::test_create_rejects_invalid_json_input",
+        "checkpoint_1::test_create_rejects_multiple_unsupported_keys",
+        "checkpoint_1::test_create_rejects_non_array_requirement_sets",
+        "checkpoint_1::test_create_rejects_non_string_name_type",
+        "checkpoint_1::test_create_rejects_requirement_sets_with_non_object_elements",
+        "checkpoint_1::test_create_rejects_unsupported_key_as_sole_violation",
+        "checkpoint_1::test_create_validation_aggregates_top_level_and_nested_failures",
+        "checkpoint_1::test_create_validation_aggregates_unique_sorted_messages",
+        "checkpoint_1::test_create_validation_deduplicates_messages_across_requirement_sets",
+        "checkpoint_1::test_requirement_set_order_preserved_non_lexicographic",
+        "checkpoint_2::test_allocation_create_rejects_invalid_payload_shapes[blueprint_name_empty]",
+        "checkpoint_2::test_allocation_create_rejects_invalid_payload_shapes[blueprint_name_wrong_type]",
+        "checkpoint_2::test_allocation_create_rejects_invalid_payload_shapes[missing_blueprint_name]",
+        "checkpoint_2::test_allocation_create_rejects_invalid_payload_shapes[non_object_payload]",
+        "checkpoint_2::test_allocation_create_unknown_blueprint_not_found",
+        "checkpoint_2::test_allocation_get_malformed_uuid_returns_not_found",
+        "checkpoint_2::test_allocation_get_unknown_uuid_not_found",
+        "checkpoint_3::test_bind_rejects_empty_allocations[empty_allocations]",
+        "checkpoint_3::test_bind_rejects_empty_allocations[missing_allocations]",
+        "checkpoint_3::test_delete_requires_exactly_one_mode_flag[both_flags]",
+        "checkpoint_3::test_delete_requires_exactly_one_mode_flag[no_flag]",
         "checkpoint_4::test_create_bool_capacity[False]",
         "checkpoint_4::test_create_bool_capacity[True]",
         "checkpoint_4::test_create_child_ref_parent",
@@ -2455,47 +2564,17 @@
         "checkpoint_4::test_create_uuid_parent_not_found[aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa]",
         "checkpoint_4::test_create_uuid_timestamp_format",
         "checkpoint_4::test_create_zero_capacity",
-        "checkpoint_4::test_filter_by_parent_uuid",
-        "checkpoint_4::test_filter_int_decimal_only",
-        "checkpoint_4::test_filter_no_match[array_field]",
-        "checkpoint_4::test_filter_no_match[unknown_field]",
-        "checkpoint_4::test_filter_splits_first_equals",
-        "checkpoint_4::test_filters_conjunctive",
-        "checkpoint_4::test_get_list_flat_hierarchy",
         "checkpoint_4::test_get_missing_not_found",
         "checkpoint_4::test_get_not_found_exact_detail",
-        "checkpoint_4::test_list_empty_returns_empty_array",
-        "checkpoint_4::test_list_get_ordering",
         "checkpoint_4::test_list_invalid_filter_format",
-        "checkpoint_4::test_list_order_created_at_ascending",
-        "checkpoint_4::test_list_order_tiebreaks",
-        "checkpoint_4::test_parent_null_excludes_children",
-        "checkpoint_4::test_string_filters_case_sensitive",
-        "checkpoint_5::test_activate_restores_capabilities_in_ledger",
-        "checkpoint_5::test_activate_sets_zero_reserved_and_active",
         "checkpoint_5::test_create_rejects_non_array_capabilities",
         "checkpoint_5::test_create_rejects_non_string_capabilities",
         "checkpoint_5::test_create_sorts_capabilities_even_with_duplicates",
-        "checkpoint_5::test_deactivate_sets_reserved_capacity_and_inactive",
-        "checkpoint_5::test_deactivate_zero_capacity_unit",
-        "checkpoint_5::test_get_sorted_capabilities",
         "checkpoint_5::test_invalid_transition[activate-active]",
         "checkpoint_5::test_invalid_transition[deactivate-inactive]",
-        "checkpoint_5::test_ledger_capabilities_sorted_lexicographic",
-        "checkpoint_5::test_ledger_capabilities_tracks_active_units_only",
-        "checkpoint_5::test_ledger_empty_when_no_capabilities",
-        "checkpoint_5::test_ledger_overlap_preserves_capabilities",
-        "checkpoint_5::test_list_includes_empty_capabilities_field",
-        "checkpoint_5::test_list_sorted_capabilities",
-        "checkpoint_5::test_reactivation_no_duplicate_in_ledger",
-        "checkpoint_5::test_reserved_capacity_in_list_and_get[active]",
-        "checkpoint_5::test_reserved_capacity_in_list_and_get[deactivated]",
         "checkpoint_5::test_transition_unknown_unit_not_found",
-        "checkpoint_5::test_transitions_include_empty_capabilities",
-        "checkpoint_5::test_transitions_return_sorted_capabilities",
         "checkpoint_5::test_unit_create_empty_capabilities[default]",
         "checkpoint_5::test_unit_create_empty_capabilities[explicit_empty]",
-        "checkpoint_6::test_create_accepts_null_firmware",
         "checkpoint_6::test_create_component_type_null",
         "checkpoint_6::test_create_firmware_image_empty_string",
         "checkpoint_6::test_create_invalid_firmware_image",
@@ -2504,44 +2583,21 @@
         "checkpoint_6::test_create_rejects_bad_component_type[7]",
         "checkpoint_6::test_create_rejects_bad_component_type[]",
         "checkpoint_6::test_create_unknown_unit_not_found",
-        "checkpoint_6::test_create_updates_unit_module_uuids",
-        "checkpoint_6::test_filter_splits_on_first_equals",
-        "checkpoint_6::test_filters_combine_unit_null_equals_split",
         "checkpoint_6::test_flash_bad_image[invalid-format]",
         "checkpoint_6::test_flash_bad_image[unknown-image]",
         "checkpoint_6::test_flash_bad_image[uppercase-uuid]",
         "checkpoint_6::test_flash_invalid_image_precedes_not_found",
-        "checkpoint_6::test_flash_requires_stored_image",
         "checkpoint_6::test_flash_unknown_image_rejected_consistently",
-        "checkpoint_6::test_flash_updates_firmware_image",
         "checkpoint_6::test_get_flash_nonexistent_not_found",
-        "checkpoint_6::test_list_filter_non_null_firmware_exact_match",
-        "checkpoint_6::test_list_filter_null_firmware",
         "checkpoint_6::test_list_filter_requires_equals",
-        "checkpoint_6::test_list_filter_unknown_field_empty",
-        "checkpoint_6::test_module_create_list_get",
-        "checkpoint_6::test_module_filters_conjunctive",
-        "checkpoint_6::test_module_get_all_fields",
-        "checkpoint_6::test_module_list_ordering",
-        "checkpoint_6::test_module_list_unit_nonexistent_empty",
-        "checkpoint_6::test_repeated_flash_uses_latest",
         "checkpoint_6::test_tag_conflict_detail",
         "checkpoint_6::test_tag_create_all_fields",
-        "checkpoint_6::test_tag_create_list_get_delete",
         "checkpoint_6::test_tag_create_missing_fields",
         "checkpoint_6::test_tag_create_rejects_empty",
-        "checkpoint_6::test_tag_create_requires_module",
-        "checkpoint_6::test_tag_delete_removes_from_get_and_list",
         "checkpoint_6::test_tag_duplicate_key_conflict",
         "checkpoint_6::test_tag_get_delete_nonexistent[delete]",
         "checkpoint_6::test_tag_get_delete_nonexistent[get]",
         "checkpoint_6::test_tag_key_case_sensitive",
-        "checkpoint_6::test_tag_key_scope_per_module",
-        "checkpoint_6::test_tag_list_filters_module_key",
-        "checkpoint_6::test_tag_list_key_case_sensitive",
-        "checkpoint_6::test_tag_list_key_nonexistent_empty",
-        "checkpoint_6::test_tag_list_module_nonexistent_empty",
-        "checkpoint_6::test_tag_list_ordering",
         "checkpoint_6::test_tag_update_unknown_command",
         "checkpoint_7::test_bad_revision_on_version",
         "checkpoint_7::test_bad_revision_parse_error",
@@ -2626,1534 +2682,6 @@
         "checkpoint_8::test_unprotected_system_scope_with_rules"
       ],
       "verdict": "validated"
-    }
-  },
-  "spec_determinacy": {
-    "assertions": {
-      "audited": 95,
-      "by_rule": {
-        "content-stated": 39,
-        "content-unstated": 6,
-        "exact-unstated": 14,
-        "format-unstated": 1,
-        "literal-in-spec": 33,
-        "wording-unstated": 2
-      }
-    },
-    "audit_version": 1,
-    "dynamic": {
-      "environment": {},
-      "reason": null,
-      "status": "ran"
-    },
-    "flagged": [
-      {
-        "assertions": [
-          {
-            "assertion": "assert_error(result, category='validation_error', detail_contains='name must be a non-empty string')",
-            "category": "validation_error",
-            "checkpoint_origin": "checkpoint_1",
-            "expected": "'name must be a non-empty string'",
-            "function": "test_checkpoint_1.py::test_create_rejects_empty_name_string",
-            "kind": "error_text_contains",
-            "line": 568,
-            "rule": "wording-unstated",
-            "why": "'name must be a non-empty string' occurs neither in the specification nor among the test's inputs, so a conforming program would have to guess this wording"
-          }
-        ],
-        "case": "test_checkpoint_1.py::test_create_rejects_empty_name_string",
-        "checkpoint_origin": "checkpoint_1",
-        "variants": [
-          "neutral_error_text"
-        ]
-      },
-      {
-        "assertions": [
-          {
-            "assertion": "assert_error(result, category='validation_error', detail_contains='requirement_sets must be a non-empty array')",
-            "category": "validation_error",
-            "checkpoint_origin": "checkpoint_1",
-            "expected": "'requirement_sets must be a non-empty array'",
-            "function": "test_checkpoint_1.py::test_create_rejects_empty_requirement_sets",
-            "kind": "error_text_contains",
-            "line": 588,
-            "rule": "wording-unstated",
-            "why": "'requirement_sets must be a non-empty array' occurs neither in the specification nor among the test's inputs, so a conforming program would have to guess this wording"
-          }
-        ],
-        "case": "test_checkpoint_1.py::test_create_rejects_empty_requirement_sets",
-        "checkpoint_origin": "checkpoint_1",
-        "variants": [
-          "neutral_error_text"
-        ]
-      },
-      {
-        "assertions": [
-          {
-            "assertion": "assert_error(duplicate, category='duplicate_assignment', detail_contains=assignment_id)",
-            "category": "duplicate_assignment",
-            "checkpoint_origin": "checkpoint_3",
-            "expected": "assignment_id",
-            "function": "test_checkpoint_3.py::test_bind_duplicate_assignment_guard",
-            "kind": "error_text_contains",
-            "line": 310,
-            "rule": "content-unstated",
-            "why": "the error_text_contains assertion needs the duplicate_assignment error text to contain assignment_id, but no paragraph of the specification states what a duplicate_assignment detail or message contains"
-          }
-        ],
-        "case": "test_checkpoint_3.py::test_bind_duplicate_assignment_guard",
-        "checkpoint_origin": "checkpoint_3",
-        "variants": [
-          "neutral_error_text"
-        ]
-      },
-      {
-        "assertions": [
-          {
-            "assertion": "assert_error(result, category='invalid_operation', detail_contains='not-an-op')",
-            "category": "invalid_operation",
-            "checkpoint_origin": "checkpoint_3",
-            "expected": "'not-an-op'",
-            "function": "test_checkpoint_3.py::test_bind_invalid_op_precedes_not_found",
-            "kind": "error_text_contains",
-            "line": 381,
-            "rule": "content-unstated",
-            "why": "the error_text_contains assertion needs the invalid_operation error text to contain 'not-an-op', but no paragraph of the specification states what a invalid_operation detail or message contains"
-          }
-        ],
-        "case": "test_checkpoint_3.py::test_bind_invalid_op_precedes_not_found",
-        "checkpoint_origin": "checkpoint_3",
-        "variants": [
-          "neutral_error_text"
-        ]
-      },
-      {
-        "assertions": [
-          {
-            "assertion": "assert_error(result, category='invalid_operation', detail_contains='invalid-op')",
-            "category": "invalid_operation",
-            "checkpoint_origin": "checkpoint_3",
-            "expected": "'invalid-op'",
-            "function": "test_checkpoint_3.py::test_bind_invalid_op_reports_bad_value",
-            "kind": "error_text_contains",
-            "line": 265,
-            "rule": "content-unstated",
-            "why": "the error_text_contains assertion needs the invalid_operation error text to contain 'invalid-op', but no paragraph of the specification states what a invalid_operation detail or message contains"
-          }
-        ],
-        "case": "test_checkpoint_3.py::test_bind_invalid_op_reports_bad_value",
-        "checkpoint_origin": "checkpoint_3",
-        "variants": [
-          "neutral_error_text"
-        ]
-      },
-      {
-        "assertions": [
-          {
-            "assertion": "assert_error(mixed, category='duplicate_assignment', detail_contains=assignment_id)",
-            "category": "duplicate_assignment",
-            "checkpoint_origin": "checkpoint_3",
-            "expected": "assignment_id",
-            "function": "test_checkpoint_3.py::test_duplicate_guard_blocks_mixed_ops",
-            "kind": "error_text_contains",
-            "line": 344,
-            "rule": "content-unstated",
-            "why": "the error_text_contains assertion needs the duplicate_assignment error text to contain assignment_id, but no paragraph of the specification states what a duplicate_assignment detail or message contains"
-          }
-        ],
-        "case": "test_checkpoint_3.py::test_duplicate_guard_blocks_mixed_ops",
-        "checkpoint_origin": "checkpoint_3",
-        "variants": [
-          "neutral_error_text"
-        ]
-      },
-      {
-        "assertions": [
-          {
-            "assertion": "assert_error(result, category='invalid_operation', detail_contains='bad-op')",
-            "category": "invalid_operation",
-            "checkpoint_origin": "checkpoint_3",
-            "expected": "'bad-op'",
-            "function": "test_checkpoint_3.py::test_invalid_op_no_remove_side_effects",
-            "kind": "error_text_contains",
-            "line": 499,
-            "rule": "content-unstated",
-            "why": "the error_text_contains assertion needs the invalid_operation error text to contain 'bad-op', but no paragraph of the specification states what a invalid_operation detail or message contains"
-          }
-        ],
-        "case": "test_checkpoint_3.py::test_invalid_op_no_remove_side_effects",
-        "checkpoint_origin": "checkpoint_3",
-        "variants": [
-          "neutral_error_text"
-        ]
-      },
-      {
-        "assertions": [
-          {
-            "assertion": "assert_error(result, category='invalid_operation', detail_contains='bad-op')",
-            "category": "invalid_operation",
-            "checkpoint_origin": "checkpoint_3",
-            "expected": "'bad-op'",
-            "function": "test_checkpoint_3.py::test_invalid_op_precedes_duplicate",
-            "kind": "error_text_contains",
-            "line": 624,
-            "rule": "content-unstated",
-            "why": "the error_text_contains assertion needs the invalid_operation error text to contain 'bad-op', but no paragraph of the specification states what a invalid_operation detail or message contains"
-          }
-        ],
-        "case": "test_checkpoint_3.py::test_invalid_op_precedes_duplicate",
-        "checkpoint_origin": "checkpoint_3",
-        "variants": [
-          "neutral_error_text"
-        ]
-      },
-      {
-        "assertions": [
-          {
-            "assertion": "assert_error(result, category='invalid_image', detail='A1B2C3D4-E5F6-7890-ABCD-EF1234567890')",
-            "category": "invalid_image",
-            "checkpoint_origin": "checkpoint_6",
-            "expected": "'A1B2C3D4-E5F6-7890-ABCD-EF1234567890'",
-            "function": "test_checkpoint_6.py::test_create_invalid_firmware_image",
-            "kind": "error_text_equals",
-            "line": 362,
-            "rule": "exact-unstated",
-            "why": "the error_text_equals assertion needs the invalid_image error text to equal 'A1B2C3D4-E5F6-7890-ABCD-EF1234567890', but no paragraph of the specification states what a invalid_image detail or message contains"
-          }
-        ],
-        "case": "test_checkpoint_6.py::test_create_invalid_firmware_image",
-        "checkpoint_origin": "checkpoint_6",
-        "variants": [
-          "neutral_error_text"
-        ]
-      },
-      {
-        "assertions": [
-          {
-            "assertion": "assert_error(result, category='not_found', detail=missing)",
-            "category": "not_found",
-            "checkpoint_origin": "checkpoint_6",
-            "expected": "missing",
-            "function": "test_checkpoint_6.py::test_create_unknown_unit_not_found",
-            "kind": "error_text_equals",
-            "line": 208,
-            "rule": "exact-unstated",
-            "why": "the error_text_equals assertion needs the not_found error text to equal missing, but no paragraph of the specification states what a not_found detail or message contains"
-          }
-        ],
-        "case": "test_checkpoint_6.py::test_create_unknown_unit_not_found",
-        "checkpoint_origin": "checkpoint_6",
-        "variants": [
-          "neutral_error_text"
-        ]
-      },
-      {
-        "assertions": [
-          {
-            "assertion": "assert_error(result, category=category, detail=detail)",
-            "category": null,
-            "checkpoint_origin": "checkpoint_6",
-            "expected": "detail",
-            "function": "test_checkpoint_6.py::test_flash_bad_image",
-            "kind": "error_text_equals",
-            "line": 329,
-            "rule": "exact-unstated",
-            "why": "the error_text_equals assertion needs the <unknown category> error text to equal detail, but no paragraph of the specification states what a <unknown category> detail or message contains"
-          }
-        ],
-        "case": "test_checkpoint_6.py::test_flash_bad_image[invalid-format]",
-        "checkpoint_origin": "checkpoint_6",
-        "variants": [
-          "neutral_error_text"
-        ]
-      },
-      {
-        "assertions": [
-          {
-            "assertion": "assert_error(result, category=category, detail=detail)",
-            "category": null,
-            "checkpoint_origin": "checkpoint_6",
-            "expected": "detail",
-            "function": "test_checkpoint_6.py::test_flash_bad_image",
-            "kind": "error_text_equals",
-            "line": 329,
-            "rule": "exact-unstated",
-            "why": "the error_text_equals assertion needs the <unknown category> error text to equal detail, but no paragraph of the specification states what a <unknown category> detail or message contains"
-          }
-        ],
-        "case": "test_checkpoint_6.py::test_flash_bad_image[unknown-image]",
-        "checkpoint_origin": "checkpoint_6",
-        "variants": [
-          "neutral_error_text"
-        ]
-      },
-      {
-        "assertions": [
-          {
-            "assertion": "assert_error(result, category=category, detail=detail)",
-            "category": null,
-            "checkpoint_origin": "checkpoint_6",
-            "expected": "detail",
-            "function": "test_checkpoint_6.py::test_flash_bad_image",
-            "kind": "error_text_equals",
-            "line": 329,
-            "rule": "exact-unstated",
-            "why": "the error_text_equals assertion needs the <unknown category> error text to equal detail, but no paragraph of the specification states what a <unknown category> detail or message contains"
-          }
-        ],
-        "case": "test_checkpoint_6.py::test_flash_bad_image[uppercase-uuid]",
-        "checkpoint_origin": "checkpoint_6",
-        "variants": [
-          "neutral_error_text"
-        ]
-      },
-      {
-        "assertions": [
-          {
-            "assertion": "assert_error(result, category='invalid_image', detail='NOT-A-VALID-UUID')",
-            "category": "invalid_image",
-            "checkpoint_origin": "checkpoint_6",
-            "expected": "'NOT-A-VALID-UUID'",
-            "function": "test_checkpoint_6.py::test_flash_invalid_image_precedes_not_found",
-            "kind": "error_text_equals",
-            "line": 343,
-            "rule": "exact-unstated",
-            "why": "the error_text_equals assertion needs the invalid_image error text to equal 'NOT-A-VALID-UUID', but no paragraph of the specification states what a invalid_image detail or message contains"
-          }
-        ],
-        "case": "test_checkpoint_6.py::test_flash_invalid_image_precedes_not_found",
-        "checkpoint_origin": "checkpoint_6",
-        "variants": [
-          "neutral_error_text"
-        ]
-      },
-      {
-        "assertions": [
-          {
-            "assertion": "assert_error(final_attempt, category='flash_failed', detail=image_a)",
-            "category": "flash_failed",
-            "checkpoint_origin": "checkpoint_6",
-            "expected": "image_a",
-            "function": "test_checkpoint_6.py::test_flash_requires_stored_image",
-            "kind": "error_text_equals",
-            "line": 193,
-            "rule": "exact-unstated",
-            "why": "the error_text_equals assertion needs the flash_failed error text to equal image_a, but no paragraph of the specification states what a flash_failed detail or message contains"
-          }
-        ],
-        "case": "test_checkpoint_6.py::test_flash_requires_stored_image",
-        "checkpoint_origin": "checkpoint_6",
-        "variants": [
-          "neutral_error_text"
-        ]
-      },
-      {
-        "assertions": [
-          {
-            "assertion": "assert_error(first_attempt, category='flash_failed', detail=new_image)",
-            "category": "flash_failed",
-            "checkpoint_origin": "checkpoint_6",
-            "expected": "new_image",
-            "function": "test_checkpoint_6.py::test_flash_unknown_image_rejected_consistently",
-            "kind": "error_text_equals",
-            "line": 1017,
-            "rule": "exact-unstated",
-            "why": "the error_text_equals assertion needs the flash_failed error text to equal new_image, but no paragraph of the specification states what a flash_failed detail or message contains"
-          },
-          {
-            "assertion": "assert_error(second_attempt, category='flash_failed', detail=new_image)",
-            "category": "flash_failed",
-            "checkpoint_origin": "checkpoint_6",
-            "expected": "new_image",
-            "function": "test_checkpoint_6.py::test_flash_unknown_image_rejected_consistently",
-            "kind": "error_text_equals",
-            "line": 1024,
-            "rule": "exact-unstated",
-            "why": "the error_text_equals assertion needs the flash_failed error text to equal new_image, but no paragraph of the specification states what a flash_failed detail or message contains"
-          }
-        ],
-        "case": "test_checkpoint_6.py::test_flash_unknown_image_rejected_consistently",
-        "checkpoint_origin": "checkpoint_6",
-        "variants": [
-          "neutral_error_text"
-        ]
-      },
-      {
-        "assertions": [
-          {
-            "assertion": "assert_error(result, category='not_found', detail=missing)",
-            "category": "not_found",
-            "checkpoint_origin": "checkpoint_6",
-            "expected": "missing",
-            "function": "test_checkpoint_6.py::test_get_flash_nonexistent_not_found",
-            "kind": "error_text_equals",
-            "line": 376,
-            "rule": "exact-unstated",
-            "why": "the error_text_equals assertion needs the not_found error text to equal missing, but no paragraph of the specification states what a not_found detail or message contains"
-          },
-          {
-            "assertion": "assert_error(flash, category='not_found', detail=missing)",
-            "category": "not_found",
-            "checkpoint_origin": "checkpoint_6",
-            "expected": "missing",
-            "function": "test_checkpoint_6.py::test_get_flash_nonexistent_not_found",
-            "kind": "error_text_equals",
-            "line": 383,
-            "rule": "exact-unstated",
-            "why": "the error_text_equals assertion needs the not_found error text to equal missing, but no paragraph of the specification states what a not_found detail or message contains"
-          }
-        ],
-        "case": "test_checkpoint_6.py::test_get_flash_nonexistent_not_found",
-        "checkpoint_origin": "checkpoint_6",
-        "variants": [
-          "neutral_error_text"
-        ]
-      },
-      {
-        "assertions": [
-          {
-            "assertion": "assert_error(result, category='not_found', detail=missing)",
-            "category": "not_found",
-            "checkpoint_origin": "checkpoint_6",
-            "expected": "missing",
-            "function": "test_checkpoint_6.py::test_tag_create_requires_module",
-            "kind": "error_text_equals",
-            "line": 519,
-            "rule": "exact-unstated",
-            "why": "the error_text_equals assertion needs the not_found error text to equal missing, but no paragraph of the specification states what a not_found detail or message contains"
-          }
-        ],
-        "case": "test_checkpoint_6.py::test_tag_create_requires_module",
-        "checkpoint_origin": "checkpoint_6",
-        "variants": [
-          "neutral_error_text"
-        ]
-      },
-      {
-        "assertions": [
-          {
-            "assertion": "assert_error(get_deleted, category='not_found', detail=tag['uuid'])",
-            "category": "not_found",
-            "checkpoint_origin": "checkpoint_6",
-            "expected": "tag['uuid']",
-            "function": "test_checkpoint_6.py::test_tag_delete_removes_from_get_and_list",
-            "kind": "error_text_equals",
-            "line": 289,
-            "rule": "exact-unstated",
-            "why": "the error_text_equals assertion needs the not_found error text to equal tag['uuid'], but no paragraph of the specification states what a not_found detail or message contains"
-          }
-        ],
-        "case": "test_checkpoint_6.py::test_tag_delete_removes_from_get_and_list",
-        "checkpoint_origin": "checkpoint_6",
-        "variants": [
-          "neutral_error_text"
-        ]
-      },
-      {
-        "assertions": [
-          {
-            "assertion": "assert_error(result, category='not_found', detail=missing)",
-            "category": "not_found",
-            "checkpoint_origin": "checkpoint_6",
-            "expected": "missing",
-            "function": "test_checkpoint_6.py::test_tag_get_delete_nonexistent",
-            "kind": "error_text_equals",
-            "line": 1170,
-            "rule": "exact-unstated",
-            "why": "the error_text_equals assertion needs the not_found error text to equal missing, but no paragraph of the specification states what a not_found detail or message contains"
-          }
-        ],
-        "case": "test_checkpoint_6.py::test_tag_get_delete_nonexistent[delete]",
-        "checkpoint_origin": "checkpoint_6",
-        "variants": [
-          "neutral_error_text"
-        ]
-      },
-      {
-        "assertions": [
-          {
-            "assertion": "assert_error(result, category='not_found', detail=missing)",
-            "category": "not_found",
-            "checkpoint_origin": "checkpoint_6",
-            "expected": "missing",
-            "function": "test_checkpoint_6.py::test_tag_get_delete_nonexistent",
-            "kind": "error_text_equals",
-            "line": 1170,
-            "rule": "exact-unstated",
-            "why": "the error_text_equals assertion needs the not_found error text to equal missing, but no paragraph of the specification states what a not_found detail or message contains"
-          }
-        ],
-        "case": "test_checkpoint_6.py::test_tag_get_delete_nonexistent[get]",
-        "checkpoint_origin": "checkpoint_6",
-        "variants": [
-          "neutral_error_text"
-        ]
-      },
-      {
-        "assertions": [
-          {
-            "assertion": "assert_error(result, category='not_found', detail=uuid_shaped_name, revision='1.2')",
-            "category": "not_found",
-            "checkpoint_origin": "checkpoint_7",
-            "expected": "uuid_shaped_name",
-            "function": "test_checkpoint_7.py::test_blueprint_get_uuid_shaped_name_uses_uuid_lookup",
-            "kind": "error_text_equals",
-            "line": 925,
-            "rule": "exact-unstated",
-            "why": "the error_text_equals assertion needs the not_found error text to equal uuid_shaped_name, but no paragraph of the specification states what a not_found detail or message contains"
-          }
-        ],
-        "case": "test_checkpoint_7.py::test_blueprint_get_uuid_shaped_name_uses_uuid_lookup",
-        "checkpoint_origin": "checkpoint_7",
-        "variants": [
-          "neutral_error_text"
-        ]
-      },
-      {
-        "assertions": [
-          {
-            "assertion": "assert_compact_sorted_json_output(result)",
-            "category": null,
-            "checkpoint_origin": "checkpoint_7",
-            "expected": "",
-            "function": "test_checkpoint_7.py::test_revision_preserves_compact_json",
-            "kind": "output_bytes",
-            "line": 469,
-            "rule": "format-unstated",
-            "why": "the test compares stdout byte for byte, but the specification names no output byte format (none of: compact, sorted key, sort_keys, key order, keys sorted, whitespace between, no whitespace, trailing newline, no newline, indent, separators)"
-          }
-        ],
-        "case": "test_checkpoint_7.py::test_revision_preserves_compact_json",
-        "checkpoint_origin": "checkpoint_7",
-        "variants": [
-          "reformatted_json"
-        ]
-      },
-      {
-        "assertions": [
-          {
-            "assertion": "assert_error(result, category='not_found', detail=parent_uuid, revision=revision)",
-            "category": "not_found",
-            "checkpoint_origin": "checkpoint_7",
-            "expected": "parent_uuid",
-            "function": "test_checkpoint_7.py::test_unit_missing_parent_not_found",
-            "kind": "error_text_equals",
-            "line": 952,
-            "rule": "exact-unstated",
-            "why": "the error_text_equals assertion needs the not_found error text to equal parent_uuid, but no paragraph of the specification states what a not_found detail or message contains"
-          }
-        ],
-        "case": "test_checkpoint_7.py::test_unit_missing_parent_not_found[1.1]",
-        "checkpoint_origin": "checkpoint_7",
-        "variants": [
-          "neutral_error_text"
-        ]
-      },
-      {
-        "assertions": [
-          {
-            "assertion": "assert_error(result, category='not_found', detail=parent_uuid, revision=revision)",
-            "category": "not_found",
-            "checkpoint_origin": "checkpoint_7",
-            "expected": "parent_uuid",
-            "function": "test_checkpoint_7.py::test_unit_missing_parent_not_found",
-            "kind": "error_text_equals",
-            "line": 952,
-            "rule": "exact-unstated",
-            "why": "the error_text_equals assertion needs the not_found error text to equal parent_uuid, but no paragraph of the specification states what a not_found detail or message contains"
-          }
-        ],
-        "case": "test_checkpoint_7.py::test_unit_missing_parent_not_found[1.2]",
-        "checkpoint_origin": "checkpoint_7",
-        "variants": [
-          "neutral_error_text"
-        ]
-      }
-    ],
-    "method": "Static: each audited assertion of a test (error-detail/message equality, containment or pattern; byte-level stdout comparison) is classified against the text of its origin checkpoint's specification and every earlier one (rules below). Dynamic: reference k and spec-conformant variants of it (variants below) are graded at step k; a case is sensitive to a variant when it passes on the reference and not on the variant. A case is flagged when its test has an undetermined assertion of the kind a variant it is sensitive to rewrites.",
-    "rules": {
-      "content-stated": "determined: a paragraph states what the category's detail contains",
-      "content-unstated": "undetermined: error text must contain an input value or match a pattern; no paragraph states what the category's detail contains",
-      "exact-stated": "determined: a paragraph states the exact content of the category's detail",
-      "exact-unstated": "undetermined: error text must equal an input value; no paragraph states exact content",
-      "format-stated": "determined: the specification names an output byte format",
-      "format-unstated": "undetermined: stdout compared byte for byte; no byte format stated",
-      "literal-in-spec": "determined: the asserted literal occurs in the specification text",
-      "wording-unstated": "undetermined: an error-text literal in neither the specification nor the test's inputs"
-    },
-    "sensitive_determined": [
-      {
-        "case": "test_checkpoint_1.py::test_blueprint_delete_missing_uuid_returns_not_found",
-        "variants": [
-          "neutral_error_text"
-        ]
-      },
-      {
-        "case": "test_checkpoint_1.py::test_blueprint_get_and_delete_single_uuid",
-        "variants": [
-          "neutral_error_text"
-        ]
-      },
-      {
-        "case": "test_checkpoint_1.py::test_blueprint_get_nonexistent_uuid_returns_not_found",
-        "variants": [
-          "neutral_error_text"
-        ]
-      },
-      {
-        "case": "test_checkpoint_1.py::test_create_missing_required_fields_reports_sorted_unique_messages",
-        "variants": [
-          "neutral_error_text"
-        ]
-      },
-      {
-        "case": "test_checkpoint_1.py::test_create_rejects_boolean_resource_count",
-        "variants": [
-          "neutral_error_text"
-        ]
-      },
-      {
-        "case": "test_checkpoint_1.py::test_create_rejects_capabilities_with_non_string_elements",
-        "variants": [
-          "neutral_error_text"
-        ]
-      },
-      {
-        "case": "test_checkpoint_1.py::test_create_rejects_duplicate_name_with_conflict",
-        "variants": [
-          "neutral_error_text"
-        ]
-      },
-      {
-        "case": "test_checkpoint_1.py::test_create_rejects_float_resource_count",
-        "variants": [
-          "neutral_error_text"
-        ]
-      },
-      {
-        "case": "test_checkpoint_1.py::test_create_rejects_invalid_json_input",
-        "variants": [
-          "neutral_error_text"
-        ]
-      },
-      {
-        "case": "test_checkpoint_1.py::test_create_rejects_multiple_unsupported_keys",
-        "variants": [
-          "neutral_error_text"
-        ]
-      },
-      {
-        "case": "test_checkpoint_1.py::test_create_rejects_non_array_requirement_sets",
-        "variants": [
-          "neutral_error_text"
-        ]
-      },
-      {
-        "case": "test_checkpoint_1.py::test_create_rejects_non_string_name_type",
-        "variants": [
-          "neutral_error_text"
-        ]
-      },
-      {
-        "case": "test_checkpoint_1.py::test_create_rejects_requirement_set_missing_required_keys",
-        "variants": [
-          "neutral_error_text"
-        ]
-      },
-      {
-        "case": "test_checkpoint_1.py::test_create_rejects_unsupported_key_as_sole_violation",
-        "variants": [
-          "neutral_error_text"
-        ]
-      },
-      {
-        "case": "test_checkpoint_1.py::test_create_validation_aggregates_top_level_and_nested_failures",
-        "variants": [
-          "neutral_error_text"
-        ]
-      },
-      {
-        "case": "test_checkpoint_1.py::test_create_validation_aggregates_unique_sorted_messages",
-        "variants": [
-          "neutral_error_text"
-        ]
-      },
-      {
-        "case": "test_checkpoint_1.py::test_create_validation_deduplicates_messages_across_requirement_sets",
-        "variants": [
-          "neutral_error_text"
-        ]
-      },
-      {
-        "case": "test_checkpoint_1.py::test_create_validation_failure_is_atomic",
-        "variants": [
-          "neutral_error_text"
-        ]
-      },
-      {
-        "case": "test_checkpoint_1.py::test_delete_names_is_atomic_and_reports_sorted_unresolved",
-        "variants": [
-          "neutral_error_text"
-        ]
-      },
-      {
-        "case": "test_checkpoint_2.py::test_allocation_create_unknown_blueprint_not_found",
-        "variants": [
-          "neutral_error_text"
-        ]
-      },
-      {
-        "case": "test_checkpoint_2.py::test_allocation_get_malformed_uuid_returns_not_found",
-        "variants": [
-          "neutral_error_text"
-        ]
-      },
-      {
-        "case": "test_checkpoint_2.py::test_allocation_get_unknown_uuid_not_found",
-        "variants": [
-          "neutral_error_text"
-        ]
-      },
-      {
-        "case": "test_checkpoint_3.py::test_bind_missing_assignment_id",
-        "variants": [
-          "neutral_error_text"
-        ]
-      },
-      {
-        "case": "test_checkpoint_3.py::test_bind_not_found_lists_sorted_ids",
-        "variants": [
-          "neutral_error_text"
-        ]
-      },
-      {
-        "case": "test_checkpoint_3.py::test_bind_rejects_empty_allocations[empty_allocations]",
-        "variants": [
-          "neutral_error_text"
-        ]
-      },
-      {
-        "case": "test_checkpoint_3.py::test_bind_rejects_empty_allocations[missing_allocations]",
-        "variants": [
-          "neutral_error_text"
-        ]
-      },
-      {
-        "case": "test_checkpoint_3.py::test_delete_ids_rejects_partial_matches",
-        "variants": [
-          "neutral_error_text"
-        ]
-      },
-      {
-        "case": "test_checkpoint_3.py::test_delete_ids_reports_missing_uuids",
-        "variants": [
-          "neutral_error_text"
-        ]
-      },
-      {
-        "case": "test_checkpoint_3.py::test_delete_requires_exactly_one_mode_flag[both_flags]",
-        "variants": [
-          "neutral_error_text"
-        ]
-      },
-      {
-        "case": "test_checkpoint_3.py::test_delete_requires_exactly_one_mode_flag[no_flag]",
-        "variants": [
-          "neutral_error_text"
-        ]
-      },
-      {
-        "case": "test_checkpoint_3.py::test_not_found_mixed_ops_atomic_vs_duplicate",
-        "variants": [
-          "neutral_error_text"
-        ]
-      },
-      {
-        "case": "test_checkpoint_3.py::test_not_found_precedes_duplicate",
-        "variants": [
-          "neutral_error_text"
-        ]
-      },
-      {
-        "case": "test_checkpoint_3.py::test_validation_precedes_op_and_not_found",
-        "variants": [
-          "neutral_error_text"
-        ]
-      },
-      {
-        "case": "test_checkpoint_4.py::test_create_bool_capacity[False]",
-        "variants": [
-          "neutral_error_text"
-        ]
-      },
-      {
-        "case": "test_checkpoint_4.py::test_create_bool_capacity[True]",
-        "variants": [
-          "neutral_error_text"
-        ]
-      },
-      {
-        "case": "test_checkpoint_4.py::test_create_float_capacity",
-        "variants": [
-          "neutral_error_text"
-        ]
-      },
-      {
-        "case": "test_checkpoint_4.py::test_create_invalid_parent_uuid[123]",
-        "variants": [
-          "neutral_error_text"
-        ]
-      },
-      {
-        "case": "test_checkpoint_4.py::test_create_invalid_parent_uuid[]",
-        "variants": [
-          "neutral_error_text"
-        ]
-      },
-      {
-        "case": "test_checkpoint_4.py::test_create_missing_all_required_fields",
-        "variants": [
-          "neutral_error_text"
-        ]
-      },
-      {
-        "case": "test_checkpoint_4.py::test_create_parent_not_found",
-        "variants": [
-          "neutral_error_text"
-        ]
-      },
-      {
-        "case": "test_checkpoint_4.py::test_create_rejects_wrong_types[category-123]",
-        "variants": [
-          "neutral_error_text"
-        ]
-      },
-      {
-        "case": "test_checkpoint_4.py::test_create_rejects_wrong_types[host-field_value2]",
-        "variants": [
-          "neutral_error_text"
-        ]
-      },
-      {
-        "case": "test_checkpoint_4.py::test_create_rejects_wrong_types[manufacturer-True]",
-        "variants": [
-          "neutral_error_text"
-        ]
-      },
-      {
-        "case": "test_checkpoint_4.py::test_create_reports_all_invalid",
-        "variants": [
-          "neutral_error_text"
-        ]
-      },
-      {
-        "case": "test_checkpoint_4.py::test_create_string_capacity",
-        "variants": [
-          "neutral_error_text"
-        ]
-      },
-      {
-        "case": "test_checkpoint_4.py::test_create_uuid_parent_not_found[11111111-1111-1111-1111-111111111111]",
-        "variants": [
-          "neutral_error_text"
-        ]
-      },
-      {
-        "case": "test_checkpoint_4.py::test_create_uuid_parent_not_found[aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa]",
-        "variants": [
-          "neutral_error_text"
-        ]
-      },
-      {
-        "case": "test_checkpoint_4.py::test_get_missing_not_found",
-        "variants": [
-          "neutral_error_text"
-        ]
-      },
-      {
-        "case": "test_checkpoint_4.py::test_get_not_found_exact_detail",
-        "variants": [
-          "neutral_error_text"
-        ]
-      },
-      {
-        "case": "test_checkpoint_5.py::test_create_rejects_non_array_capabilities",
-        "variants": [
-          "neutral_error_text"
-        ]
-      },
-      {
-        "case": "test_checkpoint_5.py::test_create_rejects_non_string_capabilities",
-        "variants": [
-          "neutral_error_text"
-        ]
-      },
-      {
-        "case": "test_checkpoint_5.py::test_transition_unknown_unit_not_found",
-        "variants": [
-          "neutral_error_text"
-        ]
-      },
-      {
-        "case": "test_checkpoint_6.py::test_create_component_type_null",
-        "variants": [
-          "neutral_error_text"
-        ]
-      },
-      {
-        "case": "test_checkpoint_6.py::test_create_missing_component_type",
-        "variants": [
-          "neutral_error_text"
-        ]
-      },
-      {
-        "case": "test_checkpoint_6.py::test_create_missing_unit_uuid",
-        "variants": [
-          "neutral_error_text"
-        ]
-      },
-      {
-        "case": "test_checkpoint_6.py::test_create_rejects_bad_component_type[7]",
-        "variants": [
-          "neutral_error_text"
-        ]
-      },
-      {
-        "case": "test_checkpoint_6.py::test_create_rejects_bad_component_type[]",
-        "variants": [
-          "neutral_error_text"
-        ]
-      },
-      {
-        "case": "test_checkpoint_6.py::test_list_filter_requires_equals",
-        "variants": [
-          "neutral_error_text"
-        ]
-      },
-      {
-        "case": "test_checkpoint_6.py::test_tag_conflict_detail",
-        "variants": [
-          "neutral_error_text"
-        ]
-      },
-      {
-        "case": "test_checkpoint_6.py::test_tag_create_rejects_empty",
-        "variants": [
-          "neutral_error_text"
-        ]
-      },
-      {
-        "case": "test_checkpoint_6.py::test_tag_duplicate_key_conflict",
-        "variants": [
-          "neutral_error_text"
-        ]
-      },
-      {
-        "case": "test_checkpoint_6.py::test_tag_key_scope_per_module",
-        "variants": [
-          "neutral_error_text"
-        ]
-      },
-      {
-        "case": "test_checkpoint_6.py::test_tag_update_unknown_command",
-        "variants": [
-          "neutral_error_text"
-        ]
-      },
-      {
-        "case": "test_checkpoint_7.py::test_blueprint_get_missing_name",
-        "variants": [
-          "neutral_error_text"
-        ]
-      },
-      {
-        "case": "test_checkpoint_7.py::test_blueprint_get_name_requires_1_2",
-        "variants": [
-          "neutral_error_text"
-        ]
-      },
-      {
-        "case": "test_checkpoint_7.py::test_blueprint_get_uppercase_uuid_as_name",
-        "variants": [
-          "neutral_error_text"
-        ]
-      },
-      {
-        "case": "test_checkpoint_7.py::test_blueprint_get_uuid_not_gated",
-        "variants": [
-          "neutral_error_text"
-        ]
-      },
-      {
-        "case": "test_checkpoint_7.py::test_blueprint_name_lookup_at_1_1_rejected",
-        "variants": [
-          "neutral_error_text"
-        ]
-      },
-      {
-        "case": "test_checkpoint_7.py::test_not_found_atomic_bind_state",
-        "variants": [
-          "neutral_error_text"
-        ]
-      },
-      {
-        "case": "test_checkpoint_7.py::test_tenant_bind_requires_1_1",
-        "variants": [
-          "neutral_error_text"
-        ]
-      }
-    ],
-    "sensitive_unexplained": [],
-    "static_undetermined": [
-      {
-        "assertion": "assert_error(result, category='validation_error', detail_contains='name must be a non-empty string')",
-        "category": "validation_error",
-        "checkpoint_origin": "checkpoint_1",
-        "expected": "'name must be a non-empty string'",
-        "function": "test_checkpoint_1.py::test_create_rejects_empty_name_string",
-        "kind": "error_text_contains",
-        "line": 568,
-        "rule": "wording-unstated",
-        "why": "'name must be a non-empty string' occurs neither in the specification nor among the test's inputs, so a conforming program would have to guess this wording"
-      },
-      {
-        "assertion": "assert_error(result, category='validation_error', detail_contains='requirement_sets must be a non-empty array')",
-        "category": "validation_error",
-        "checkpoint_origin": "checkpoint_1",
-        "expected": "'requirement_sets must be a non-empty array'",
-        "function": "test_checkpoint_1.py::test_create_rejects_empty_requirement_sets",
-        "kind": "error_text_contains",
-        "line": 588,
-        "rule": "wording-unstated",
-        "why": "'requirement_sets must be a non-empty array' occurs neither in the specification nor among the test's inputs, so a conforming program would have to guess this wording"
-      },
-      {
-        "assertion": "assert_error(result, category='invalid_operation', detail_contains='invalid-op')",
-        "category": "invalid_operation",
-        "checkpoint_origin": "checkpoint_3",
-        "expected": "'invalid-op'",
-        "function": "test_checkpoint_3.py::test_bind_invalid_op_reports_bad_value",
-        "kind": "error_text_contains",
-        "line": 265,
-        "rule": "content-unstated",
-        "why": "the error_text_contains assertion needs the invalid_operation error text to contain 'invalid-op', but no paragraph of the specification states what a invalid_operation detail or message contains"
-      },
-      {
-        "assertion": "assert_error(duplicate, category='duplicate_assignment', detail_contains=assignment_id)",
-        "category": "duplicate_assignment",
-        "checkpoint_origin": "checkpoint_3",
-        "expected": "assignment_id",
-        "function": "test_checkpoint_3.py::test_bind_duplicate_assignment_guard",
-        "kind": "error_text_contains",
-        "line": 310,
-        "rule": "content-unstated",
-        "why": "the error_text_contains assertion needs the duplicate_assignment error text to contain assignment_id, but no paragraph of the specification states what a duplicate_assignment detail or message contains"
-      },
-      {
-        "assertion": "assert_error(mixed, category='duplicate_assignment', detail_contains=assignment_id)",
-        "category": "duplicate_assignment",
-        "checkpoint_origin": "checkpoint_3",
-        "expected": "assignment_id",
-        "function": "test_checkpoint_3.py::test_duplicate_guard_blocks_mixed_ops",
-        "kind": "error_text_contains",
-        "line": 344,
-        "rule": "content-unstated",
-        "why": "the error_text_contains assertion needs the duplicate_assignment error text to contain assignment_id, but no paragraph of the specification states what a duplicate_assignment detail or message contains"
-      },
-      {
-        "assertion": "assert_error(result, category='invalid_operation', detail_contains='not-an-op')",
-        "category": "invalid_operation",
-        "checkpoint_origin": "checkpoint_3",
-        "expected": "'not-an-op'",
-        "function": "test_checkpoint_3.py::test_bind_invalid_op_precedes_not_found",
-        "kind": "error_text_contains",
-        "line": 381,
-        "rule": "content-unstated",
-        "why": "the error_text_contains assertion needs the invalid_operation error text to contain 'not-an-op', but no paragraph of the specification states what a invalid_operation detail or message contains"
-      },
-      {
-        "assertion": "assert_error(result, category='invalid_operation', detail_contains='bad-op')",
-        "category": "invalid_operation",
-        "checkpoint_origin": "checkpoint_3",
-        "expected": "'bad-op'",
-        "function": "test_checkpoint_3.py::test_invalid_op_no_remove_side_effects",
-        "kind": "error_text_contains",
-        "line": 499,
-        "rule": "content-unstated",
-        "why": "the error_text_contains assertion needs the invalid_operation error text to contain 'bad-op', but no paragraph of the specification states what a invalid_operation detail or message contains"
-      },
-      {
-        "assertion": "assert_error(result, category='invalid_operation', detail_contains='bad-op')",
-        "category": "invalid_operation",
-        "checkpoint_origin": "checkpoint_3",
-        "expected": "'bad-op'",
-        "function": "test_checkpoint_3.py::test_invalid_op_precedes_duplicate",
-        "kind": "error_text_contains",
-        "line": 624,
-        "rule": "content-unstated",
-        "why": "the error_text_contains assertion needs the invalid_operation error text to contain 'bad-op', but no paragraph of the specification states what a invalid_operation detail or message contains"
-      },
-      {
-        "assertion": "assert_error(final_attempt, category='flash_failed', detail=image_a)",
-        "category": "flash_failed",
-        "checkpoint_origin": "checkpoint_6",
-        "expected": "image_a",
-        "function": "test_checkpoint_6.py::test_flash_requires_stored_image",
-        "kind": "error_text_equals",
-        "line": 193,
-        "rule": "exact-unstated",
-        "why": "the error_text_equals assertion needs the flash_failed error text to equal image_a, but no paragraph of the specification states what a flash_failed detail or message contains"
-      },
-      {
-        "assertion": "assert_error(result, category='not_found', detail=missing)",
-        "category": "not_found",
-        "checkpoint_origin": "checkpoint_6",
-        "expected": "missing",
-        "function": "test_checkpoint_6.py::test_create_unknown_unit_not_found",
-        "kind": "error_text_equals",
-        "line": 208,
-        "rule": "exact-unstated",
-        "why": "the error_text_equals assertion needs the not_found error text to equal missing, but no paragraph of the specification states what a not_found detail or message contains"
-      },
-      {
-        "assertion": "assert_error(get_deleted, category='not_found', detail=tag['uuid'])",
-        "category": "not_found",
-        "checkpoint_origin": "checkpoint_6",
-        "expected": "tag['uuid']",
-        "function": "test_checkpoint_6.py::test_tag_delete_removes_from_get_and_list",
-        "kind": "error_text_equals",
-        "line": 289,
-        "rule": "exact-unstated",
-        "why": "the error_text_equals assertion needs the not_found error text to equal tag['uuid'], but no paragraph of the specification states what a not_found detail or message contains"
-      },
-      {
-        "assertion": "assert_error(result, category=category, detail=detail)",
-        "category": null,
-        "checkpoint_origin": "checkpoint_6",
-        "expected": "detail",
-        "function": "test_checkpoint_6.py::test_flash_bad_image",
-        "kind": "error_text_equals",
-        "line": 329,
-        "rule": "exact-unstated",
-        "why": "the error_text_equals assertion needs the <unknown category> error text to equal detail, but no paragraph of the specification states what a <unknown category> detail or message contains"
-      },
-      {
-        "assertion": "assert_error(result, category='invalid_image', detail='NOT-A-VALID-UUID')",
-        "category": "invalid_image",
-        "checkpoint_origin": "checkpoint_6",
-        "expected": "'NOT-A-VALID-UUID'",
-        "function": "test_checkpoint_6.py::test_flash_invalid_image_precedes_not_found",
-        "kind": "error_text_equals",
-        "line": 343,
-        "rule": "exact-unstated",
-        "why": "the error_text_equals assertion needs the invalid_image error text to equal 'NOT-A-VALID-UUID', but no paragraph of the specification states what a invalid_image detail or message contains"
-      },
-      {
-        "assertion": "assert_error(result, category='invalid_image', detail='A1B2C3D4-E5F6-7890-ABCD-EF1234567890')",
-        "category": "invalid_image",
-        "checkpoint_origin": "checkpoint_6",
-        "expected": "'A1B2C3D4-E5F6-7890-ABCD-EF1234567890'",
-        "function": "test_checkpoint_6.py::test_create_invalid_firmware_image",
-        "kind": "error_text_equals",
-        "line": 362,
-        "rule": "exact-unstated",
-        "why": "the error_text_equals assertion needs the invalid_image error text to equal 'A1B2C3D4-E5F6-7890-ABCD-EF1234567890', but no paragraph of the specification states what a invalid_image detail or message contains"
-      },
-      {
-        "assertion": "assert_error(result, category='not_found', detail=missing)",
-        "category": "not_found",
-        "checkpoint_origin": "checkpoint_6",
-        "expected": "missing",
-        "function": "test_checkpoint_6.py::test_get_flash_nonexistent_not_found",
-        "kind": "error_text_equals",
-        "line": 376,
-        "rule": "exact-unstated",
-        "why": "the error_text_equals assertion needs the not_found error text to equal missing, but no paragraph of the specification states what a not_found detail or message contains"
-      },
-      {
-        "assertion": "assert_error(flash, category='not_found', detail=missing)",
-        "category": "not_found",
-        "checkpoint_origin": "checkpoint_6",
-        "expected": "missing",
-        "function": "test_checkpoint_6.py::test_get_flash_nonexistent_not_found",
-        "kind": "error_text_equals",
-        "line": 383,
-        "rule": "exact-unstated",
-        "why": "the error_text_equals assertion needs the not_found error text to equal missing, but no paragraph of the specification states what a not_found detail or message contains"
-      },
-      {
-        "assertion": "assert_error(result, category='not_found', detail=missing)",
-        "category": "not_found",
-        "checkpoint_origin": "checkpoint_6",
-        "expected": "missing",
-        "function": "test_checkpoint_6.py::test_tag_create_requires_module",
-        "kind": "error_text_equals",
-        "line": 519,
-        "rule": "exact-unstated",
-        "why": "the error_text_equals assertion needs the not_found error text to equal missing, but no paragraph of the specification states what a not_found detail or message contains"
-      },
-      {
-        "assertion": "assert_error(first_attempt, category='flash_failed', detail=new_image)",
-        "category": "flash_failed",
-        "checkpoint_origin": "checkpoint_6",
-        "expected": "new_image",
-        "function": "test_checkpoint_6.py::test_flash_unknown_image_rejected_consistently",
-        "kind": "error_text_equals",
-        "line": 1017,
-        "rule": "exact-unstated",
-        "why": "the error_text_equals assertion needs the flash_failed error text to equal new_image, but no paragraph of the specification states what a flash_failed detail or message contains"
-      },
-      {
-        "assertion": "assert_error(second_attempt, category='flash_failed', detail=new_image)",
-        "category": "flash_failed",
-        "checkpoint_origin": "checkpoint_6",
-        "expected": "new_image",
-        "function": "test_checkpoint_6.py::test_flash_unknown_image_rejected_consistently",
-        "kind": "error_text_equals",
-        "line": 1024,
-        "rule": "exact-unstated",
-        "why": "the error_text_equals assertion needs the flash_failed error text to equal new_image, but no paragraph of the specification states what a flash_failed detail or message contains"
-      },
-      {
-        "assertion": "assert_error(result, category='not_found', detail=missing)",
-        "category": "not_found",
-        "checkpoint_origin": "checkpoint_6",
-        "expected": "missing",
-        "function": "test_checkpoint_6.py::test_tag_get_delete_nonexistent",
-        "kind": "error_text_equals",
-        "line": 1170,
-        "rule": "exact-unstated",
-        "why": "the error_text_equals assertion needs the not_found error text to equal missing, but no paragraph of the specification states what a not_found detail or message contains"
-      },
-      {
-        "assertion": "assert_compact_sorted_json_output(result)",
-        "category": null,
-        "checkpoint_origin": "checkpoint_7",
-        "expected": "",
-        "function": "test_checkpoint_7.py::test_revision_preserves_compact_json",
-        "kind": "output_bytes",
-        "line": 469,
-        "rule": "format-unstated",
-        "why": "the test compares stdout byte for byte, but the specification names no output byte format (none of: compact, sorted key, sort_keys, key order, keys sorted, whitespace between, no whitespace, trailing newline, no newline, indent, separators)"
-      },
-      {
-        "assertion": "assert_error(result, category='not_found', detail=uuid_shaped_name, revision='1.2')",
-        "category": "not_found",
-        "checkpoint_origin": "checkpoint_7",
-        "expected": "uuid_shaped_name",
-        "function": "test_checkpoint_7.py::test_blueprint_get_uuid_shaped_name_uses_uuid_lookup",
-        "kind": "error_text_equals",
-        "line": 925,
-        "rule": "exact-unstated",
-        "why": "the error_text_equals assertion needs the not_found error text to equal uuid_shaped_name, but no paragraph of the specification states what a not_found detail or message contains"
-      },
-      {
-        "assertion": "assert_error(result, category='not_found', detail=parent_uuid, revision=revision)",
-        "category": "not_found",
-        "checkpoint_origin": "checkpoint_7",
-        "expected": "parent_uuid",
-        "function": "test_checkpoint_7.py::test_unit_missing_parent_not_found",
-        "kind": "error_text_equals",
-        "line": 952,
-        "rule": "exact-unstated",
-        "why": "the error_text_equals assertion needs the not_found error text to equal parent_uuid, but no paragraph of the specification states what a not_found detail or message contains"
-      }
-    ],
-    "steps": {
-      "checkpoint_1": {
-        "reference": {
-          "infra_failure": null,
-          "passed": 40,
-          "total": 40
-        },
-        "variants": {
-          "neutral_error_text": {
-            "infra_failure": null,
-            "passed": 19,
-            "sensitive": [
-              "test_checkpoint_1.py::test_blueprint_delete_missing_uuid_returns_not_found",
-              "test_checkpoint_1.py::test_blueprint_get_and_delete_single_uuid",
-              "test_checkpoint_1.py::test_blueprint_get_nonexistent_uuid_returns_not_found",
-              "test_checkpoint_1.py::test_create_missing_required_fields_reports_sorted_unique_messages",
-              "test_checkpoint_1.py::test_create_rejects_boolean_resource_count",
-              "test_checkpoint_1.py::test_create_rejects_capabilities_with_non_string_elements",
-              "test_checkpoint_1.py::test_create_rejects_duplicate_name_with_conflict",
-              "test_checkpoint_1.py::test_create_rejects_empty_name_string",
-              "test_checkpoint_1.py::test_create_rejects_empty_requirement_sets",
-              "test_checkpoint_1.py::test_create_rejects_float_resource_count",
-              "test_checkpoint_1.py::test_create_rejects_invalid_json_input",
-              "test_checkpoint_1.py::test_create_rejects_multiple_unsupported_keys",
-              "test_checkpoint_1.py::test_create_rejects_non_array_requirement_sets",
-              "test_checkpoint_1.py::test_create_rejects_non_string_name_type",
-              "test_checkpoint_1.py::test_create_rejects_requirement_set_missing_required_keys",
-              "test_checkpoint_1.py::test_create_rejects_unsupported_key_as_sole_violation",
-              "test_checkpoint_1.py::test_create_validation_aggregates_top_level_and_nested_failures",
-              "test_checkpoint_1.py::test_create_validation_aggregates_unique_sorted_messages",
-              "test_checkpoint_1.py::test_create_validation_deduplicates_messages_across_requirement_sets",
-              "test_checkpoint_1.py::test_create_validation_failure_is_atomic",
-              "test_checkpoint_1.py::test_delete_names_is_atomic_and_reports_sorted_unresolved"
-            ],
-            "total": 40
-          },
-          "reformatted_json": {
-            "infra_failure": null,
-            "passed": 40,
-            "sensitive": [],
-            "total": 40
-          }
-        }
-      },
-      "checkpoint_2": {
-        "reference": {
-          "infra_failure": null,
-          "passed": 70,
-          "total": 70
-        },
-        "variants": {
-          "neutral_error_text": {
-            "infra_failure": null,
-            "passed": 46,
-            "sensitive": [
-              "test_checkpoint_2.py::test_allocation_create_unknown_blueprint_not_found",
-              "test_checkpoint_2.py::test_allocation_get_malformed_uuid_returns_not_found",
-              "test_checkpoint_2.py::test_allocation_get_unknown_uuid_not_found"
-            ],
-            "total": 70
-          },
-          "reformatted_json": {
-            "infra_failure": null,
-            "passed": 70,
-            "sensitive": [],
-            "total": 70
-          }
-        }
-      },
-      "checkpoint_3": {
-        "reference": {
-          "infra_failure": null,
-          "passed": 101,
-          "total": 101
-        },
-        "variants": {
-          "neutral_error_text": {
-            "infra_failure": null,
-            "passed": 60,
-            "sensitive": [
-              "test_checkpoint_3.py::test_bind_duplicate_assignment_guard",
-              "test_checkpoint_3.py::test_bind_invalid_op_precedes_not_found",
-              "test_checkpoint_3.py::test_bind_invalid_op_reports_bad_value",
-              "test_checkpoint_3.py::test_bind_missing_assignment_id",
-              "test_checkpoint_3.py::test_bind_not_found_lists_sorted_ids",
-              "test_checkpoint_3.py::test_bind_rejects_empty_allocations[empty_allocations]",
-              "test_checkpoint_3.py::test_bind_rejects_empty_allocations[missing_allocations]",
-              "test_checkpoint_3.py::test_delete_ids_rejects_partial_matches",
-              "test_checkpoint_3.py::test_delete_ids_reports_missing_uuids",
-              "test_checkpoint_3.py::test_delete_requires_exactly_one_mode_flag[both_flags]",
-              "test_checkpoint_3.py::test_delete_requires_exactly_one_mode_flag[no_flag]",
-              "test_checkpoint_3.py::test_duplicate_guard_blocks_mixed_ops",
-              "test_checkpoint_3.py::test_invalid_op_no_remove_side_effects",
-              "test_checkpoint_3.py::test_invalid_op_precedes_duplicate",
-              "test_checkpoint_3.py::test_not_found_mixed_ops_atomic_vs_duplicate",
-              "test_checkpoint_3.py::test_not_found_precedes_duplicate",
-              "test_checkpoint_3.py::test_validation_precedes_op_and_not_found"
-            ],
-            "total": 101
-          },
-          "reformatted_json": {
-            "infra_failure": null,
-            "passed": 101,
-            "sensitive": [],
-            "total": 101
-          }
-        }
-      },
-      "checkpoint_4": {
-        "reference": {
-          "infra_failure": null,
-          "passed": 142,
-          "total": 142
-        },
-        "variants": {
-          "neutral_error_text": {
-            "infra_failure": null,
-            "passed": 85,
-            "sensitive": [
-              "test_checkpoint_4.py::test_create_bool_capacity[False]",
-              "test_checkpoint_4.py::test_create_bool_capacity[True]",
-              "test_checkpoint_4.py::test_create_float_capacity",
-              "test_checkpoint_4.py::test_create_invalid_parent_uuid[123]",
-              "test_checkpoint_4.py::test_create_invalid_parent_uuid[]",
-              "test_checkpoint_4.py::test_create_missing_all_required_fields",
-              "test_checkpoint_4.py::test_create_parent_not_found",
-              "test_checkpoint_4.py::test_create_rejects_wrong_types[category-123]",
-              "test_checkpoint_4.py::test_create_rejects_wrong_types[host-field_value2]",
-              "test_checkpoint_4.py::test_create_rejects_wrong_types[manufacturer-True]",
-              "test_checkpoint_4.py::test_create_reports_all_invalid",
-              "test_checkpoint_4.py::test_create_string_capacity",
-              "test_checkpoint_4.py::test_create_uuid_parent_not_found[11111111-1111-1111-1111-111111111111]",
-              "test_checkpoint_4.py::test_create_uuid_parent_not_found[aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa]",
-              "test_checkpoint_4.py::test_get_missing_not_found",
-              "test_checkpoint_4.py::test_get_not_found_exact_detail"
-            ],
-            "total": 142
-          },
-          "reformatted_json": {
-            "infra_failure": null,
-            "passed": 142,
-            "sensitive": [],
-            "total": 142
-          }
-        }
-      },
-      "checkpoint_5": {
-        "reference": {
-          "infra_failure": null,
-          "passed": 166,
-          "total": 166
-        },
-        "variants": {
-          "neutral_error_text": {
-            "infra_failure": null,
-            "passed": 106,
-            "sensitive": [
-              "test_checkpoint_5.py::test_create_rejects_non_array_capabilities",
-              "test_checkpoint_5.py::test_create_rejects_non_string_capabilities",
-              "test_checkpoint_5.py::test_transition_unknown_unit_not_found"
-            ],
-            "total": 166
-          },
-          "reformatted_json": {
-            "infra_failure": null,
-            "passed": 166,
-            "sensitive": [],
-            "total": 166
-          }
-        }
-      },
-      "checkpoint_6": {
-        "reference": {
-          "infra_failure": null,
-          "passed": 214,
-          "total": 214
-        },
-        "variants": {
-          "neutral_error_text": {
-            "infra_failure": null,
-            "passed": 130,
-            "sensitive": [
-              "test_checkpoint_6.py::test_create_component_type_null",
-              "test_checkpoint_6.py::test_create_invalid_firmware_image",
-              "test_checkpoint_6.py::test_create_missing_component_type",
-              "test_checkpoint_6.py::test_create_missing_unit_uuid",
-              "test_checkpoint_6.py::test_create_rejects_bad_component_type[7]",
-              "test_checkpoint_6.py::test_create_rejects_bad_component_type[]",
-              "test_checkpoint_6.py::test_create_unknown_unit_not_found",
-              "test_checkpoint_6.py::test_flash_bad_image[invalid-format]",
-              "test_checkpoint_6.py::test_flash_bad_image[unknown-image]",
-              "test_checkpoint_6.py::test_flash_bad_image[uppercase-uuid]",
-              "test_checkpoint_6.py::test_flash_invalid_image_precedes_not_found",
-              "test_checkpoint_6.py::test_flash_requires_stored_image",
-              "test_checkpoint_6.py::test_flash_unknown_image_rejected_consistently",
-              "test_checkpoint_6.py::test_get_flash_nonexistent_not_found",
-              "test_checkpoint_6.py::test_list_filter_requires_equals",
-              "test_checkpoint_6.py::test_tag_conflict_detail",
-              "test_checkpoint_6.py::test_tag_create_rejects_empty",
-              "test_checkpoint_6.py::test_tag_create_requires_module",
-              "test_checkpoint_6.py::test_tag_delete_removes_from_get_and_list",
-              "test_checkpoint_6.py::test_tag_duplicate_key_conflict",
-              "test_checkpoint_6.py::test_tag_get_delete_nonexistent[delete]",
-              "test_checkpoint_6.py::test_tag_get_delete_nonexistent[get]",
-              "test_checkpoint_6.py::test_tag_key_scope_per_module",
-              "test_checkpoint_6.py::test_tag_update_unknown_command"
-            ],
-            "total": 214
-          },
-          "reformatted_json": {
-            "infra_failure": null,
-            "passed": 214,
-            "sensitive": [],
-            "total": 214
-          }
-        }
-      },
-      "checkpoint_7": {
-        "reference": {
-          "infra_failure": null,
-          "passed": 251,
-          "total": 251
-        },
-        "variants": {
-          "neutral_error_text": {
-            "infra_failure": null,
-            "passed": 157,
-            "sensitive": [
-              "test_checkpoint_7.py::test_blueprint_get_missing_name",
-              "test_checkpoint_7.py::test_blueprint_get_name_requires_1_2",
-              "test_checkpoint_7.py::test_blueprint_get_uppercase_uuid_as_name",
-              "test_checkpoint_7.py::test_blueprint_get_uuid_not_gated",
-              "test_checkpoint_7.py::test_blueprint_get_uuid_shaped_name_uses_uuid_lookup",
-              "test_checkpoint_7.py::test_blueprint_name_lookup_at_1_1_rejected",
-              "test_checkpoint_7.py::test_not_found_atomic_bind_state",
-              "test_checkpoint_7.py::test_tenant_bind_requires_1_1",
-              "test_checkpoint_7.py::test_unit_missing_parent_not_found[1.1]",
-              "test_checkpoint_7.py::test_unit_missing_parent_not_found[1.2]"
-            ],
-            "total": 251
-          },
-          "reformatted_json": {
-            "infra_failure": null,
-            "passed": 250,
-            "sensitive": [
-              "test_checkpoint_7.py::test_revision_preserves_compact_json"
-            ],
-            "total": 251
-          }
-        }
-      },
-      "checkpoint_8": {
-        "reference": {
-          "infra_failure": null,
-          "passed": 295,
-          "total": 295
-        },
-        "variants": {
-          "neutral_error_text": {
-            "infra_failure": null,
-            "passed": 201,
-            "sensitive": [],
-            "total": 295
-          },
-          "reformatted_json": {
-            "infra_failure": null,
-            "passed": 294,
-            "sensitive": [],
-            "total": 295
-          }
-        }
-      }
-    },
-    "summary": {
-      "flagged": 25,
-      "flagged_by_checkpoint": {
-        "checkpoint_1": 2,
-        "checkpoint_3": 6,
-        "checkpoint_6": 13,
-        "checkpoint_7": 4
-      },
-      "flagged_by_rule": {
-        "content-unstated": 6,
-        "exact-unstated": 16,
-        "format-unstated": 1,
-        "wording-unstated": 2
-      },
-      "sensitive_determined": 70,
-      "sensitive_unexplained": 0,
-      "unconfirmed": 0
-    },
-    "unconfirmed": [],
-    "variants": {
-      "neutral_error_text": "every error's human-readable text (an error object's detail or message) replaced by 'request rejected'; category, exit code and format kept",
-      "reformatted_json": "JSON stdout re-serialised with two-space indentation and a trailing newline; value and key order kept"
     }
   },
   "steps": [

@@ -1,4 +1,4 @@
-"""``correctness@5``: oracle verdicts per checkpoint and over the trajectory (plan G1).
+"""``correctness@6``: oracle verdicts per checkpoint and over the trajectory (plan G1).
 
 Every value is read from the oracle's host-side step record
 (``raidar-oracle/steps/<step>/record.json``), never from Harbor's trial-level
@@ -54,7 +54,7 @@ from pydantic import ValidationError
 
 from raidar.grading.errata import ErrataRef, errata_solved
 from raidar.grading.models import CaseGroup, CaseStatus, VerifierGrade
-from raidar.grading.solvable import SolvableRef, solvable_solved
+from raidar.grading.solvable import EXCLUDED_STEP_REASON, SolvableRef, solvable_solved
 from raidar.scoring.framework.builtin_manifests import CORRECTNESS
 from raidar.scoring.framework.context import AssessContext, StepInputs, statused_result
 from raidar.scoring.framework.manifest import ScorerManifest, SdkModel
@@ -376,6 +376,48 @@ def errata_observations(ctx: AssessContext, config: CorrectnessConfig) -> list[O
     )
 
 
+def _excluded_checkpoint_observations(
+    observations: list[Observation], excluded: set[str]
+) -> list[Observation]:
+    """Keep checkpoint readings, marking explicitly excluded steps as not applicable."""
+    return [
+        Observation(
+            metric=item.metric,
+            subject=item.subject,
+            status=AssessStatus.NOT_APPLICABLE,
+            reason=EXCLUDED_STEP_REASON,
+        )
+        if item.metric == SOLVABLE.checkpoint and item.subject in excluded
+        else item
+        for item in observations
+        if item.subject != TRAJECTORY_SUBJECT
+    ]
+
+
+def _skip_excluded(
+    observations: list[Observation],
+    steps: tuple[StepInputs, ...],
+    config: CorrectnessConfig,
+    solvable: SolvableRef,
+) -> list[Observation]:
+    """Trajectory over the steps that have a solvable set; an excluded step is skipped.
+
+    An excluded step (pinned with an empty set) has no verdict of its own and neither hides
+    the trajectory of the usable steps nor counts in the solve-rate denominator (analysis
+    counts the steps not marked ``EXCLUDED_STEP_REASON``).
+    """
+    usable = tuple(step for step in steps if solvable.steps.get(step.step))
+    excluded = {step.step for step in steps} - {step.step for step in usable}
+    verdict = solvable_verdict(solvable)
+    solved = solved_count(usable, config.progression, verdict) if usable else None
+    reason = solved_gap(usable, config.progression) if usable else EXCLUDED_STEP_REASON
+    kept = _excluded_checkpoint_observations(observations, excluded)
+    kept.append(_trajectory(SOLVABLE.solved_checkpoints, solved, reason))
+    reached = reached_count(_verdicts(usable, verdict)) if usable else None
+    kept.append(_trajectory(SOLVABLE.reached, reached, SOLVABLE.reached_reason))
+    return kept
+
+
 def solvable_observations(ctx: AssessContext, config: CorrectnessConfig) -> list[Observation]:
     """Solvable-set solve metrics; ``unavailable`` (never zero) without a pinned solvable set."""
     solvable = config.solvable.get(ctx.problem)
@@ -389,10 +431,10 @@ def solvable_observations(ctx: AssessContext, config: CorrectnessConfig) -> list
         solvable_verdict(solvable),
         lambda step: f"no solvable set is pinned for {ctx.problem} {step.step}",
     )
-    missing = [step.step for step in ctx.steps if not solvable.steps.get(step.step)]
-    if not missing:
-        return observations
-    reason = f"no solvable set is pinned for {ctx.problem}: {', '.join(missing)}"
+    unpinned = [step.step for step in ctx.steps if step.step not in solvable.steps]
+    if not unpinned:
+        return _skip_excluded(observations, ctx.steps, config, solvable)
+    reason = f"no solvable set is pinned for {ctx.problem}: {', '.join(unpinned)}"
     return [
         _trajectory(item.metric, None, reason)
         if item.metric == SOLVABLE.solved_checkpoints
@@ -443,5 +485,5 @@ class CorrectnessScorer:
 
 
 def correctness_scorer() -> CorrectnessScorer:
-    """Registry factory for ``correctness@5``."""
+    """Registry factory for ``correctness@6``."""
     return CorrectnessScorer()

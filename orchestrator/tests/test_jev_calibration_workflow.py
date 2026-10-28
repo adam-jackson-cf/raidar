@@ -272,8 +272,8 @@ def test_promote_writes_enforce_only_when_the_audit_verifies(tmp_path: Path) -> 
     assert (promotion.labelled, promotion.minority) == (40, 11)
     assert promotion.reviewers == {"human": 26, "model": 14}
     assert promotion.reviewer_models == (HAIKU,)
-    # The policy's highest registered scorer is code-quality@6 (isolated measurement).
-    assert promotion.scorer == "code-quality@6.1"
+    # The policy's highest registered scorer is code-quality@7 (isolated measurement).
+    assert promotion.scorer == "code-quality@7.1"
     assert promotion.calibration_metrics is not None
     # t1+t2: five 0.85 positives, fourteen 0.15 negatives and one 0.15 the reviewer
     # called positive, so the fitted 0.5 cut misses exactly that one.

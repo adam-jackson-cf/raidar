@@ -21,7 +21,7 @@ arms:
     agent: codex-luna
     workflow: one-shot@1
 assessment:
-  scorers: [correctness@5]
+  scorers: [correctness@6]
   metric: scb-canonical@2
 analysis:
   baseline_arm: baseline
