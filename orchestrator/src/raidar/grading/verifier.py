@@ -136,9 +136,7 @@ class RaidarVerifier(BaseVerifier):
 
     # --------------------------------------------------------------- hooks
     async def prepare_sandbox(self) -> tuple[GradingSandbox, GraderRef]:
-        image = await ensure_grader_image(
-            self.bundle.manifest.grader, docker_context=self.docker_context
-        )
+        image = await ensure_grader_image(self.bundle, docker_context=self.docker_context)
         sandbox = DockerCopySandbox(
             image=image.tag,
             docker_context=self.docker_context,

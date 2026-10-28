@@ -5,9 +5,9 @@ a fresh grader sandbox (Docker, ``--network none``) on a fresh copy of the
 reference snapshot. This is the grading the verifier performs inside a
 Harbor trial, without the agent environment around it.
 
-Declared dependencies follow the canonical grader's offline provisioning rules.
-Direct validation does not run the converter's networked ``solve.sh`` installer;
-the verifier records which declared packages are provided or unavailable.
+Each reference is graded with its declared set installed from the problem pin's lock
+(``declared-wheels/1``, ``raidar.grading.dependency_pins``); the sandbox stays offline.
+Direct validation does not run the converter's networked ``solve.sh`` installer.
 """
 
 from __future__ import annotations

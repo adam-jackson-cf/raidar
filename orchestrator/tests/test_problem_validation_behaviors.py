@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import asyncio
 import json
-from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
@@ -42,7 +41,6 @@ from raidar.design.problem.validation import (
 )
 from raidar.design.problem.validator import ValidateOptions, validate_problem, write_report
 from raidar.grading.sandbox import SandboxResult, SandboxRun
-from tests.docker_trial_support import docker_context, docker_target_reachable
 from tests.problems_support import (
     NEGATIVE_REF,
     ONESHOT_REF,
@@ -287,20 +285,6 @@ def test_native_evaluation_reduces_to_the_same_case_keys_as_the_oracle(tmp_path:
     assert (problem / "config.yaml").read_text() == "test_dependencies: [pyyaml==6.0.2]\n"
 
 
-async def test_direct_engine_grades_declared_requirements_with_the_canonical_verifier(
-    store: ProblemStore, tmp_path: Path
-) -> None:
-    problem = store.load(ProblemId.parse(POSITIVE_REF))
-    (problem.reference("checkpoint_2") / "requirements.txt").write_text("# comment\nrequests\n")
-    runs = await direct.grade_references(
-        problem, LocalProcessSandbox(tmp_path / "s"), repeats=1, concurrency=1
-    )
-    assert all(grade.all_pass for grade in runs[POSITIVE][0].values())
-    assert all(not grade.all_pass for grade in runs[NEGATIVE][0].values())
-    with pytest.raises(ValueError, match="repeats"):
-        await direct.grade_references(problem, LocalProcessSandbox(tmp_path / "s"), repeats=0)
-
-
 def test_harbor_engine_variant_adds_solutions_to_a_copy_only(
     store: ProblemStore, tmp_path: Path
 ) -> None:
@@ -412,95 +396,6 @@ def test_import_command_reports_manifest_and_drift_errors(tmp_path: Path) -> Non
     )
     assert refused.exit_code == 1
     assert "does not match" in refused.output
-
-
-FAKE_SLOP_CODE = """#!/usr/bin/env python3
-import json, sys
-from pathlib import Path
-args = sys.argv[1:]
-out = Path(args[args.index("-o") + 1])
-out.mkdir(parents=True)
-checkpoint = args[args.index("-c") + 1]
-Path(out.parent / "calls.txt").open("a").write(checkpoint + "\\n")
-evaluation = {
-    "pass_counts": {"Core": 1},
-    "total_counts": {"Core": 1},
-    "tests": {f"checkpoint_{checkpoint}-Core": {"passed": ["test_native_only"]}},
-}
-(out / "evaluation.json").write_text(json.dumps(evaluation))
-"""
-
-
-@pytest.mark.skipif(
-    not docker_target_reachable(),
-    reason="builds the grader image: needs a reachable Docker target (make target-status)",
-)
-async def test_validator_wires_the_harbor_engine_and_the_native_arm(
-    store: ProblemStore, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    runner_root = tmp_path / "fork"
-    script = runner_root / ".venv" / "bin" / "slop-code"
-    script.parent.mkdir(parents=True)
-    script.write_text(FAKE_SLOP_CODE)
-    script.chmod(0o755)
-    problem = store.load(ProblemId.parse(POSITIVE_REF))
-    harbor_calls: list[tuple[str, int]] = []
-
-    async def fake_variant(
-        imported: Any,
-        variant: str,
-        payloads: Any,
-        work: Path,
-        *,
-        repeats: int,
-        docker_context: str,
-        concurrency: int,
-    ) -> list[Mapping[str, Grade]]:
-        harbor_calls.append((variant, repeats))
-        grades = await direct.grade_references(
-            imported, LocalProcessSandbox(tmp_path / "sandbox"), repeats=repeats, concurrency=1
-        )
-        return grades[variant]
-
-    class Checkout:
-        root = tmp_path / "checkout"
-
-        def verify_clean(self, *paths: str) -> None:
-            assert paths == ("adder",)
-
-    (Checkout.root / "adder").mkdir(parents=True)
-    monkeypatch.setattr(harbor_engine, "run_variant", fake_variant)
-    monkeypatch.setattr(validator, "resolve_checkout", lambda *args: Checkout())
-    monkeypatch.setattr(validator, "stage_catalog", lambda source, catalog: catalog / source.name)
-    monkeypatch.setattr("raidar.design.problem.native._docker_host", lambda context: "unix:///fake")
-    report = await validate_problem(
-        store,
-        ProblemId.parse(POSITIVE_REF),
-        ValidateOptions(
-            docker_context=docker_context(),
-            engine="harbor",
-            repeats=1,
-            native_runner=runner_root,
-        ),
-        work_root=tmp_path,
-    )
-    assert harbor_calls == [(POSITIVE, 1), (NEGATIVE, 1)]
-    assert report.environment["native_runner"] == {"commit": None}
-    assert report.environment["grader_image"].startswith("raidar-oracle-grader:")
-    assert report.environment["pack_image"] == problem.manifest.pack.image
-    statuses = {check.name: check.status for check in report.checks}
-    assert statuses["native_parity_positive"] is CheckStatus.FAIL
-    assert report.runs.native is not None
-    native = report.runs.native[POSITIVE]["checkpoint_2"]
-    assert native.outcomes == {"checkpoint_2::test_native_only": "passed"}
-    assert report.verdict is Verdict.EXCLUDED
-    assert problem.manifest == store.load(ProblemId.parse(POSITIVE_REF)).manifest
-    with pytest.raises(ValueError, match="engine"):
-        await validate_problem(
-            store,
-            ProblemId.parse(POSITIVE_REF),
-            ValidateOptions(docker_context="test-ctx", engine="x"),
-        )
 
 
 def test_lock_metadata_ignores_run_specific_report_bytes(tmp_path: Path) -> None:

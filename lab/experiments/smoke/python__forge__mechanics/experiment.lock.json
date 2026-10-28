@@ -40,11 +40,11 @@
         }
       },
       "scorer": {
-        "code-quality@5": {
-          "digest": "c549ef3c62c90a420cdac45697699cc21e9bb65bd3ceb64d95422e76fb2aca2c",
+        "code-quality@6": {
+          "digest": "7b9620b5befbeaafe1e4adc06ea73eb096c269c1267653f7312dbb8b8c4539de",
           "metadata": {
             "implementation": "raidar.scoring.code_quality:code_quality_scorer",
-            "implementation_digest": "1b765b685967e45510dc505c72a3feceb7f60035dac0240780e4175d4eaa88b6",
+            "implementation_digest": "179571e83323103b870deb55a5d9453c2365f4e898d724bad0891a81560a21df",
             "manifest": {
               "description": "SCB-fork code-quality and inertia components over the per-step snapshots; a step graded without the in-trial coverage pass reads G's coverage run from the offline run in the Assessment store, and G leaves out at most 3 cases whose outcome differs between the grading and coverage runs instead of reading the step as ineligible.",
               "evidence_required": [
@@ -219,7 +219,7 @@
                 "scb-python-quality",
                 "scb-check"
               ],
-              "version": "5"
+              "version": "6"
             },
             "tool_lock": {
               "python": {
@@ -262,11 +262,11 @@
             }
           }
         },
-        "correctness@4": {
-          "digest": "6c2f10ca8361488500a32f23214b7867eec81650a86939368b8de4c3efbb43f1",
+        "correctness@5": {
+          "digest": "7521f1118a762ea3718e4408a24a44a40129f2028906031acce88c5f2701775c",
           "metadata": {
             "implementation": "raidar.scoring.correctness:correctness_scorer",
-            "implementation_digest": "35b002328986f6dab40df4f60b2b42a97a9cf848328cb8e15baf5b35ea06887f",
+            "implementation_digest": "1be7308c22b6fb6373bfa774ea1ef6052179e56bc02aec453eb7d0a2473b9f7d",
             "manifest": {
               "description": "Oracle verdicts per checkpoint and trajectory, from the oracle step records.",
               "evidence_required": [
@@ -460,16 +460,16 @@
                 "*"
               ],
               "tools": [],
-              "version": "4"
+              "version": "5"
             },
             "tool_lock": {}
           }
         },
-        "process-compliance@8": {
-          "digest": "460e9517fdeab6d7757363a7e54989b412f1020b03c013ebb2f376131a55c222",
+        "process-compliance@9": {
+          "digest": "502a16b64c62056afb6396985a726b16bdfd517cfb488651fbf47cd1706caa11",
           "metadata": {
             "implementation": "raidar.scoring.process_checks:deterministic_process_compliance_scorer",
-            "implementation_digest": "d059eceed817804aff66214f6b4a249a82a7c658ed53c9cb05f9dae1faeafbe6",
+            "implementation_digest": "e09585f04144a08e1ad9b58f17c9b9dac37ead30139550f96c844dd7d99d9dc9",
             "manifest": {
               "description": "Deterministic trace checks of agent process (stall outcomes, a test command counts only when it ran, the step's work session's own test run after its last edit, a compliance rate without the plan check unless the condition asks for a plan); a check the trace cannot decide is undetermined, never judged by a model. Adds whether the work session ran the tests at all, and whether it ran them after its last edit to a non-test file.",
               "evidence_required": [
@@ -664,16 +664,16 @@
                 "*"
               ],
               "tools": [],
-              "version": "8"
+              "version": "9"
             },
             "tool_lock": {}
           }
         },
-        "resource-usage@3": {
-          "digest": "e514eed8066c481796d2ac998b9a409f9b0f6a2a4e276ce4e914bade97e5a419",
+        "resource-usage@4": {
+          "digest": "f813e5a0da65a883e05c71582fcb38372ce8ddc44d4084b5828e6b41cb46a206",
           "metadata": {
             "implementation": "raidar.scoring.resource_usage:resource_usage_scorer",
-            "implementation_digest": "3fe0eaacd03d541f513b147f44ecf8a054802367d556eb3099658884755e8792",
+            "implementation_digest": "ef9776b56a9fc10ada617fc891063582a1d8b65aac5801747e58cdee485efcfe",
             "manifest": {
               "description": "Tokens, cost, turns and agent wall time from Harbor per-step usage and timing.",
               "evidence_required": [
@@ -795,7 +795,7 @@
                 "*"
               ],
               "tools": [],
-              "version": "3"
+              "version": "4"
             },
             "tool_lock": {}
           }
@@ -810,10 +810,10 @@
       "metric": "scb-canonical@2",
       "scorer_config": {},
       "scorers": [
-        "correctness@4",
-        "code-quality@5",
-        "resource-usage@3",
-        "process-compliance@8"
+        "correctness@5",
+        "code-quality@6",
+        "resource-usage@4",
+        "process-compliance@9"
       ]
     },
     "tools": {
@@ -825,7 +825,7 @@
       "tree-sitter-language-pack": "0.13.0"
     }
   },
-  "document_sha256": "07a2cf5cd2ab47331de6181e0db85e8a9c220d45baef30451e4c141489038b08",
+  "document_sha256": "c5c75c05c8ec9bc55bcf9fa427c7e8aa01baa6ac253459be64648d501dd13517",
   "execution": {
     "arms": {
       "baseline": {
@@ -902,7 +902,7 @@
     "problems": [
       {
         "checkpoints": 8,
-        "digest": "b642041b7e34697a26fdfdb392e5df6c309a9e92784b4ee79eb57df9d6587255",
+        "digest": "e710fc7da3e363605e9b0b78cd45eb8bdf6dbe87295a2707b36d013763341dfb",
         "label": "scb/forge@38d627ecf668"
       }
     ],
@@ -929,10 +929,11 @@
       },
       "problem": {
         "scb/forge@38d627ecf668": {
-          "digest": "b642041b7e34697a26fdfdb392e5df6c309a9e92784b4ee79eb57df9d6587255",
+          "digest": "e710fc7da3e363605e9b0b78cd45eb8bdf6dbe87295a2707b36d013763341dfb",
           "metadata": {
-            "bundle_sha256": "85f93886a76ff38cc5ef0d1f027c0d3d8a40a1d066df71bad990aa071ccd959d",
+            "bundle_sha256": "fc79461c25dfb1fb4660e9fd3a688a55f6587ff88ed3b3b12d1ec6d804977040",
             "checkpoints": 8,
+            "dependencies_sha256": "c4c71b394551c34e93d709c5f038f353a9d859fde73a13f6062d0f4d25f456a6",
             "entry_command": "uv run --project /app forge.py",
             "entry_file": "forge.py",
             "errata": {
@@ -964,7 +965,7 @@
                 "test_checkpoint_7.py::test_unit_missing_parent_not_found[1.2]"
               ],
               "informational": [],
-              "sha256": "640cb46e93c36a31a02afed8c7d2d5794ae9d1417b4c4fe04e3f69049d3ce336"
+              "sha256": "68a2416b0cc51b56dbe8393fc6c64dd74400f60bc8422ab28474d96b7959b168"
             },
             "mode": "multi_checkpoint",
             "pack_image": "raidar/pack-python:2b91a52663e099f2",
@@ -2320,10 +2321,10 @@
   "experiment": {
     "id": "python__forge__mechanics",
     "source": "experiment.yaml",
-    "source_sha256": "f829a100392b1c676a2f047bc8c09fdc5e373643dabe478404c22f8377faf205",
-    "spec_sha256": "46e8e9f3eaea3097c53f2a64ce549a9bbe60dca8b93fea7d876d645825d39fd1"
+    "source_sha256": "f36df9c6a1284ec169407edfa9859f5885c97e66fe6b8016242cea2330cf42ab",
+    "spec_sha256": "c544cc6ca7a7b5bdc00c95b69570ee7c1b4dff15823846e6f249515999ac2705"
   },
-  "lock_sha256": "4959dcf9a7007c67098fb659a2a07c43aa95038ccae5a28e9e75dfdce1dcde93",
+  "lock_sha256": "76f3672727b2b116a6e323dbac95881d9eedd703d1a9e0d22b537eede6ffda7d",
   "lock_version": 4,
   "overrides": {
     "flags": {},
@@ -2331,8 +2332,8 @@
   },
   "sections": {
     "analysis": "144d50057229f81b6136f89cfe8df3c9cf5dbbbec9a279c66acba88e027528b3",
-    "assessment": "0b224d78ff3b26cdd2d6f5c9f56512ec73bb1a533280ce4dc571df9e3989e394",
-    "execution": "4959dcf9a7007c67098fb659a2a07c43aa95038ccae5a28e9e75dfdce1dcde93",
+    "assessment": "466e5a2ae77f1120338fa3ec6fb525178df9b225f06059cda98ff2731730893f",
+    "execution": "76f3672727b2b116a6e323dbac95881d9eedd703d1a9e0d22b537eede6ffda7d",
     "toolchain": "b6ef977873154c13b7d03140ffd4cfff64d0cfa32430af9f4e52db26e2a729cc"
   },
   "spec": {
@@ -2369,10 +2370,10 @@
       "metric": "scb-canonical@2",
       "scorer_config": {},
       "scorers": [
-        "correctness@4",
-        "code-quality@5",
-        "resource-usage@3",
-        "process-compliance@8"
+        "correctness@5",
+        "code-quality@6",
+        "resource-usage@4",
+        "process-compliance@9"
       ]
     },
     "description": "Mechanics declaration smoke on forge (8 checkpoints); not citable.",

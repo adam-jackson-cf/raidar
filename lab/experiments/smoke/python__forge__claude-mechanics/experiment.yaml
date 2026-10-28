@@ -21,7 +21,7 @@ arms:
     agent: agent
     workflow: one-shot@1
 assessment:
-  scorers: [correctness@4, code-quality@5, resource-usage@3, process-compliance@8]
+  scorers: [correctness@5, code-quality@6, resource-usage@4, process-compliance@9]
   metric: scb-canonical@2
 analysis:
   baseline_arm: baseline

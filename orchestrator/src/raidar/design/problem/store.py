@@ -39,13 +39,18 @@ from pydantic import ValidationError
 from raidar.contract.paths import problems_root, var_root
 from raidar.design.problem.content import content_digest, hidden_content_in_task
 from raidar.design.problem.errata import ERRATA_SUFFIX, ErrataError, LoadedErrata, load_errata
-from raidar.design.problem.models import ProblemId, ProblemManifest, SourcePin
+from raidar.design.problem.models import OPTIONAL_FIELDS, ProblemId, ProblemManifest, SourcePin
 from raidar.design.problem.validation import (
     ValidationRecord,
     ValidationRecordError,
     read_validation_record,
 )
 from raidar.grading.bundle import VerifierBundle, load_bundle
+from raidar.grading.dependency_pins import (
+    DEPENDENCY_DIR_SUFFIX,
+    DependencyLockError,
+    DependencyLocks,
+)
 
 ROOT_ENV = "RAIDAR_PROBLEMS_ROOT"
 STORE_DIR = Path("lab") / "problems"
@@ -89,6 +94,12 @@ class ImportedProblem:
     def reference(self, step: str) -> Path:
         return self.references_dir / step
 
+    @property
+    def locks(self) -> DependencyLocks | None:
+        """The pin's lock files as carried by the bundle (``None`` for a refused problem)."""
+        carried = self.bundle.dependencies
+        return None if carried is None else carried.locks
+
 
 @dataclass(frozen=True)
 class ProblemStore:
@@ -119,6 +130,10 @@ class ProblemStore:
 
     def manifest_path(self, problem: ProblemId) -> Path:
         return self.root / "registry" / problem.name / f"{problem.version}.json"
+
+    def deps_dir(self, problem: ProblemId) -> Path:
+        """The generated dependency locks, committed beside the manifest."""
+        return self.root / "registry" / problem.name / f"{problem.version}{DEPENDENCY_DIR_SUFFIX}"
 
     def validation_path(self, problem: ProblemId) -> Path:
         return self.root / "registry" / problem.name / f"{problem.version}.validation.json"
@@ -172,8 +187,9 @@ class ProblemStore:
                 raise ProblemStoreError(f"unexpected registry entry {path}: {exc}") from exc
         return sorted(found, key=str)
 
-    def content_dir(self, problem: ProblemId) -> Path:
-        return self.data / "store" / problem.name / problem.version
+    def content_dir(self, problem: ProblemId, key: str) -> Path:
+        """Where the content with ``key`` (``ProblemManifest.content_key()``) is materialised."""
+        return self.data / "store" / problem.name / problem.version / key
 
     def cache_dir(self) -> Path:
         return self.data / "cache"
@@ -195,14 +211,31 @@ class ProblemStore:
     def write_manifest(self, manifest: ProblemManifest) -> Path:
         path = self.manifest_path(manifest.problem_id)
         path.parent.mkdir(parents=True, exist_ok=True)
-        omit = {name for name in ("entry_file", "entry_command") if getattr(manifest, name) is None}
+        omit = {name for name in OPTIONAL_FIELDS if getattr(manifest, name) is None}
         path.write_text(manifest.model_dump_json(indent=2, exclude=omit) + "\n")
         return path
+
+    def _check_dependencies(
+        self, problem: ProblemId, manifest: ProblemManifest, bundle: VerifierBundle
+    ) -> None:
+        """The bundle carries exactly the pin's locks, and the registry still holds them."""
+        pins = manifest.dependencies
+        carried = bundle.dependencies
+        if pins is None:
+            if carried is not None:
+                raise ProblemStoreError(f"problem {problem} bundle carries unpinned dependencies")
+            return
+        if carried is None or carried.pins != pins:
+            raise ProblemStoreError(f"problem {problem} bundle dependencies differ from its pin")
+        try:
+            DependencyLocks(self.deps_dir(problem)).read_pins(pins)
+        except DependencyLockError as exc:
+            raise ProblemStoreError(f"problem {problem}: {exc}") from exc
 
     def load(self, problem: ProblemId) -> ImportedProblem:
         """Load an imported problem, refusing content that drifted from its manifest."""
         manifest = self.load_manifest(problem)
-        content = self.content_dir(problem)
+        content = self.content_dir(problem, manifest.content_key())
         task_dir, bundle_dir, references = (
             content / "task",
             content / "oracle",
@@ -226,6 +259,7 @@ class ProblemStore:
         if drift:
             raise ProblemStoreError(f"problem {problem} content drifted: {'; '.join(drift)}")
         bundle = load_bundle(bundle_dir)
+        self._check_dependencies(problem, manifest, bundle)
         leaked = hidden_content_in_task(task_dir, bundle)
         if leaked:
             raise ProblemStoreError(
@@ -259,5 +293,10 @@ class ProblemStore:
             raise ProblemStoreError(
                 f"problem {problem} is not usable: "
                 f"validation verdict {record.verdict.value}{skipped} ({path})"
+            )
+        if manifest.dependencies is None:
+            raise ProblemStoreError(
+                f"problem {problem} has no declared-wheels/1 dependency pin; "
+                "re-import it with `--update` and re-validate"
             )
         return record

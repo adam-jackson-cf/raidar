@@ -16,13 +16,24 @@ from pathlib import Path
 from raidar.design.problem.content import content_digest
 from raidar.design.problem.models import (
     PackBinding,
+    ProblemId,
     ProblemManifest,
     ProblemMode,
     ProblemSource,
     ProblemStep,
+    dependency_content_key,
 )
 from raidar.design.problem.store import ImportedProblem, ProblemStore
-from raidar.grading.bundle import BundleManifest, GraderSpec, VerifierStepSpec, write_bundle
+from raidar.grading.bundle import (
+    BundleManifest,
+    GraderSpec,
+    VerifierStepSpec,
+    write_bundle,
+    write_bundle_dependencies,
+)
+from raidar.grading.dependency_pins import DependencyLocks
+from raidar.grading.resolver import resolve_pins
+from tests.problems_support import FIXTURE_CUTOFF, FakeResolver
 
 KV_VERSION = "ab" * 6
 KV_REF = f"fixture/kv@{KV_VERSION}"
@@ -202,7 +213,14 @@ def build_kv_problem(root: Path) -> tuple[ProblemStore, ImportedProblem]:
         f"    commit: {KV_VERSION * 3}{KV_VERSION[:4]}\n"
     )
     store = ProblemStore(root)
-    content = root / "store" / "fixture" / "kv" / KV_VERSION
+    steps_names = ("checkpoint_1", "checkpoint_2")
+    pins, locks = resolve_pins(
+        dict.fromkeys(steps_names, ()),
+        (),
+        exclude_newer=FIXTURE_CUTOFF,
+        resolver=FakeResolver(),
+    )
+    content = store.content_dir(ProblemId.parse(KV_REF), dependency_content_key(pins))
     tests = root / "work-tests"
     for name, text in {
         "conftest.py": CONFTEST,
@@ -228,6 +246,8 @@ def build_kv_problem(root: Path) -> tuple[ProblemStore, ImportedProblem]:
     )
     for index, step in enumerate(steps, start=1):
         _write(content / "references" / step / "kv.py", APP.replace("PUT", str(index == 2)))
+    bundle = write_bundle_dependencies(bundle.root, pins, locks)
+    DependencyLocks(store.deps_dir(ProblemId.parse(KV_REF))).write_all(locks)
     task = content / "task"
     _write(task / "task.toml", 'schema_version = "1.1"\n')
     manifest_steps = []
@@ -261,10 +281,9 @@ def build_kv_problem(root: Path) -> tuple[ProblemStore, ImportedProblem]:
             pack=PackBinding(id="python", version=1, image="local"),
             task_sha256=content_digest(task),
             bundle_sha256=content_digest(bundle.root),
+            dependencies=pins,
             references_sha256=content_digest(content / "references"),
             entry_file="kv.py",
         )
     )
-    from raidar.design.problem.models import ProblemId
-
     return store, store.load(ProblemId.parse(KV_REF))

@@ -1,0 +1,158 @@
+{
+  "kind": "raidar-problem",
+  "schema_version": 1,
+  "ref": "scb/execution_server@38d627ecf668",
+  "mode": "multi_checkpoint",
+  "checkpoints": 6,
+  "steps": [
+    {
+      "name": "checkpoint_1",
+      "checkpoint": "checkpoint_1",
+      "instruction_sha256": "d7b4f81915e3a1bea9a1961936fb3c06e8fbbd22f09dbd516c4c0508c0ea9d19",
+      "test_files": [
+        "test_checkpoint_1.py"
+      ]
+    },
+    {
+      "name": "checkpoint_2",
+      "checkpoint": "checkpoint_2",
+      "instruction_sha256": "5254df8ed6779738ed17232ce6967db36afc515424918a93bf38fb5aea0bbd9e",
+      "test_files": [
+        "test_checkpoint_1.py",
+        "test_checkpoint_2.py"
+      ]
+    },
+    {
+      "name": "checkpoint_3",
+      "checkpoint": "checkpoint_3",
+      "instruction_sha256": "8f3ff579d2ecc3f830b8f1d515b22b5d6fbdf137e628ac4d45241123ceb1a14e",
+      "test_files": [
+        "test_checkpoint_1.py",
+        "test_checkpoint_2.py",
+        "test_checkpoint_3.py"
+      ]
+    },
+    {
+      "name": "checkpoint_4",
+      "checkpoint": "checkpoint_4",
+      "instruction_sha256": "ed4aab0e3f527a554ccb951330292e0ae3e505bf83b4da71ab53c3e4dde6ae2d",
+      "test_files": [
+        "test_checkpoint_1.py",
+        "test_checkpoint_2.py",
+        "test_checkpoint_3.py",
+        "test_checkpoint_4.py"
+      ]
+    },
+    {
+      "name": "checkpoint_5",
+      "checkpoint": "checkpoint_5",
+      "instruction_sha256": "cf3be66a91bdbe05abf07abb34f7791f691591147c7eed345eceee3e5bea9901",
+      "test_files": [
+        "test_checkpoint_1.py",
+        "test_checkpoint_2.py",
+        "test_checkpoint_3.py",
+        "test_checkpoint_4.py",
+        "test_checkpoint_5.py"
+      ]
+    },
+    {
+      "name": "checkpoint_6",
+      "checkpoint": "checkpoint_6",
+      "instruction_sha256": "1df3b06eeb2d4c6c7e74907a273f864ece87e6b31eaf2a6629b5cdc2bc13d961",
+      "test_files": [
+        "test_checkpoint_6.py"
+      ]
+    }
+  ],
+  "source": {
+    "dataset": "scb",
+    "url": "https://github.com/gabeorlanski/scb-problems",
+    "commit": "38d627ecf668a88f88f8d260f8df8df6116e9b03",
+    "problem": "execution_server",
+    "checkpoint_selection": null,
+    "problem_tree": "9890fd3218ad9092da7bbee160231ad09eb608aa",
+    "converter_tree": "4475c907ab812bdec61885f24e41f5a634b927ee",
+    "conversion_overrides": "733c1bef9ee8d233639a34439e67232bf5e445e8",
+    "converted_task_sha256": "3a695486285a7e03c3652df718f66c81a78e73cb96e9aa8704aefbdfc103d304"
+  },
+  "pack": {
+    "id": "python",
+    "version": 1,
+    "image": "raidar/pack-python:2b91a52663e099f2"
+  },
+  "task_sha256": "f70027c95a82f2b6076f75b2442772a0be2735b9d55ae7094e91c4d392e6795b",
+  "bundle_sha256": "89e0c0f5ad5a509379ace62c7327ff58e0c6d0b962a9454e7e03c1b509477abb",
+  "references_sha256": "5204eb4329ddb3fc37f491ee18b2e8a05a280252834ba78649766a49c244c0fa",
+  "entry_file": "execution_server.py",
+  "entry_command": "uv run --project /app execution_server.py",
+  "dependencies": {
+    "policy": "declared-wheels/1",
+    "resolver": "uv@0.10.0",
+    "index": "https://pypi.org/simple",
+    "python": "3.12",
+    "platforms": [
+      "x86_64-manylinux_2_28",
+      "aarch64-manylinux_2_28"
+    ],
+    "exclude_newer": "2026-10-27T21:20:08Z",
+    "sets": {
+      "1a8128092dcf4bed7a776e290367df002e85289bf38b3b87d3865dd260751dc9": {
+        "requirements": [
+          "PyYAML>=6.0",
+          "fastapi>=0.110.0,<1",
+          "httpx>=0.26,<1",
+          "pytest>=7,<9",
+          "uvicorn>=0.23,<1"
+        ],
+        "amd64": "6817dc87556c371f4cc0b72f47697ca39e3e7c8b842fbe4addd839fdade9c0b2",
+        "arm64": "d9f62d646d15639da08fe3252fb929ec22d057812cb148584ff873fceb3aca0d"
+      },
+      "5f852adc4557912fb660e6803cafe4df634af16a30c9c7e33581dc000542d839": {
+        "requirements": [
+          "coverage==7.13.4",
+          "httpx",
+          "jsonschema",
+          "pytest-timeout==2.4.0",
+          "pytest==9.0.3",
+          "pyyaml"
+        ],
+        "amd64": "9e257d305e44efc3d81847972729396a16dc3dc33cb08228f35d70a1016c98c8",
+        "arm64": "aed227b8e23ea69b3d69a04e536182d9851870c0a75e4b6981297bd96339b01b"
+      },
+      "729a5edfe49ce8993757a449c46b12da5b6d4af1d714fcd4959cb9555cdf470d": {
+        "requirements": [
+          "fastapi>=0.109.0",
+          "httpx>=0.26.0",
+          "numpy>=1.26.0",
+          "pydantic>=2.5.0",
+          "pytest-asyncio>=0.23.0",
+          "pytest>=7.4.0",
+          "pyyaml>=6.0.0",
+          "uvicorn[standard]>=0.27.0",
+          "wcmatch>=8.5.0"
+        ],
+        "amd64": "c1cede0ade67ffb418deaa98a93b87e891dcbd421909aab9860b7918094c52b1",
+        "arm64": "6a05b2b40de12277edb412a5be22b0b84ae5a4c3bcb1466d88f826eb6f3c2629"
+      },
+      "9ff2aeccab8da662840113c45034bd6ce64763fc734bbc30b4792a649398bc70": {
+        "requirements": [
+          "httpx",
+          "jsonschema",
+          "pyyaml"
+        ],
+        "amd64": "7a88337040138bb85a332cb7e3b7921217ca023b245b68199cdfe3783bd28dc8",
+        "arm64": "8614d754cc0480f83c4c7aa089ed22a6566a6f728726ae4c2f19378aefb34895"
+      }
+    },
+    "steps": {
+      "checkpoint_1": "729a5edfe49ce8993757a449c46b12da5b6d4af1d714fcd4959cb9555cdf470d",
+      "checkpoint_2": "729a5edfe49ce8993757a449c46b12da5b6d4af1d714fcd4959cb9555cdf470d",
+      "checkpoint_3": "729a5edfe49ce8993757a449c46b12da5b6d4af1d714fcd4959cb9555cdf470d",
+      "checkpoint_4": "729a5edfe49ce8993757a449c46b12da5b6d4af1d714fcd4959cb9555cdf470d",
+      "checkpoint_5": "729a5edfe49ce8993757a449c46b12da5b6d4af1d714fcd4959cb9555cdf470d",
+      "checkpoint_6": "1a8128092dcf4bed7a776e290367df002e85289bf38b3b87d3865dd260751dc9"
+    },
+    "seed": "9ff2aeccab8da662840113c45034bd6ce64763fc734bbc30b4792a649398bc70",
+    "grader": "5f852adc4557912fb660e6803cafe4df634af16a30c9c7e33581dc000542d839"
+  }
+}

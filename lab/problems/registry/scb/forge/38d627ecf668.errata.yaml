@@ -2,11 +2,13 @@
 # sha256 of this file; editing it changes lock_sha256 (relock, then migrate executed jobs).
 # Re-pinned after restoring the upstream canary. Historical instruction line citations
 # below use the former converter view; add 3 for the current verbatim checkpoint specs.
+# Re-registered after declared-wheels/1 validation. The 25 cases and audit rules are unchanged;
+# their original registration was 2026-10-02.
 kind: raidar-problem-errata
 schema_version: 1
 problem: scb/forge@38d627ecf668
-manifest_sha256: b642041b7e34697a26fdfdb392e5df6c309a9e92784b4ee79eb57df9d6587255
-registered: '2026-10-02'
+manifest_sha256: e710fc7da3e363605e9b0b78cd45eb8bdf6dbe87295a2707b36d013763341dfb
+registered: '2026-10-27'
 basis: 'spec-determinacy audit v1 (validation report problems/registry/scb/forge/38d627ecf668.validation.json,
   section spec_determinacy): every flagged case, by the audit rule alone. Registered before any experiment
   that applies it; pilot v2 outcomes are cited as context only. Upstream report draft: docs/reboot/upstream/scb-forge-unspecified-assertions.md.'

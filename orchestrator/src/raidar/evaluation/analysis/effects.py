@@ -48,6 +48,7 @@ from raidar.evaluation.analysis.outcomes import UNASSESSED, AnalysisModel, Trial
 from raidar.evaluation.analysis.stats import (
     BOOTSTRAP_SAMPLES,
     CONFIDENCE,
+    POWER_CONSTANT,
     Interval,
     IntervalMethod,
     Summary,
@@ -181,7 +182,7 @@ class McNemar(AnalysisModel):
 
 
 class CostBeside(AnalysisModel):
-    """Resource usage on the effect's own pairs (descriptive; ``resource-usage@3``)."""
+    """Resource usage on the effect's own pairs (descriptive; ``resource-usage@4``)."""
 
     metric: str = TOTAL_COST
     n: int
@@ -210,6 +211,21 @@ class SampleSize(AnalysisModel):
     per_pair_cost_usd: float | None
     projected_cost_usd: float | None
     reason: str | None = None
+
+
+STANDARDIZED_EFFECTS = (1.0, 0.5, 0.25)
+
+
+class SampleSizeBasis(AnalysisModel):
+    formula: str = f"n = ceil({POWER_CONSTANT} * (SD / delta)^2)"
+    power: float = 0.8
+    alpha: float = 0.05
+    standardized: dict[str, int]
+
+    @classmethod
+    def standard(cls) -> SampleSizeBasis:
+        """The pairs needed at the standardized effect sizes (SD 1)."""
+        return cls(standardized={f"{d:g}": pairs_for_power(1.0, d) for d in STANDARDIZED_EFFECTS})
 
 
 class Effect(AnalysisModel):

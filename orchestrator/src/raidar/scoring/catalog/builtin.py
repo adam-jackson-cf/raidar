@@ -35,40 +35,40 @@ REGISTERED_MANIFESTS = (
 )
 
 BUILTIN_IMPLEMENTATIONS: dict[str, str] = {
-    "correctness@4": "raidar.scoring.correctness:correctness_scorer",
-    "code-quality@5": "raidar.scoring.code_quality:code_quality_scorer",
-    "resource-usage@3": "raidar.scoring.resource_usage:resource_usage_scorer",
-    "process-compliance@8": (
+    "correctness@5": "raidar.scoring.correctness:correctness_scorer",
+    "code-quality@6": "raidar.scoring.code_quality:code_quality_scorer",
+    "resource-usage@4": "raidar.scoring.resource_usage:resource_usage_scorer",
+    "process-compliance@9": (
         "raidar.scoring.process_checks:deterministic_process_compliance_scorer"
     ),
-    "gate-effort@12": "raidar.scoring.gate_effort:gate_effort_scorer",
-    "definition-coverage@2": "raidar.scoring.definition_coverage:definition_coverage_scorer",
-    "test-coverage@2": "raidar.scoring.test_coverage:make_test_coverage_scorer",
+    "gate-effort@13": "raidar.scoring.gate_effort:gate_effort_scorer",
+    "definition-coverage@3": "raidar.scoring.definition_coverage:definition_coverage_scorer",
+    "test-coverage@3": "raidar.scoring.test_coverage:make_test_coverage_scorer",
 }
 # Scorers bound to the assessment store at rescore time.
 BUILTIN_STORE_IMPLEMENTATIONS: dict[str, str] = {
     # gate-effort reads the offline grades of guardrail-gate's pre-fix snapshots,
     # which ``raidar assess --rescore`` writes to the store (raidar.grading.prefix.grade).
-    "gate-effort@12": "raidar.scoring.gate_effort:gate_effort_scorer_for_store",
+    "gate-effort@13": "raidar.scoring.gate_effort:gate_effort_scorer_for_store",
     # code-quality reads the offline coverage runs of steps whose trial deferred the
     # coverage pass, which ``raidar assess --rescore`` makes into the store
     # (raidar.grading.coverage.offline).
-    "code-quality@5": "raidar.scoring.code_quality:code_quality_scorer_for_store",
+    "code-quality@6": "raidar.scoring.code_quality:code_quality_scorer_for_store",
 }
 # Config keys a scorer takes from the problem unless the experiment sets them.
 BUILTIN_PROBLEM_CONFIG: dict[str, tuple[str, ...]] = {
-    "code-quality@5": ("entry_file",),
+    "code-quality@6": ("entry_file",),
 }
 # Config keys the experiment's protocol sets (``ProtocolSpec`` field names).
 BUILTIN_PROTOCOL_CONFIG: dict[str, tuple[str, ...]] = {
-    "correctness@4": ("progression",),
+    "correctness@5": ("progression",),
 }
 # Scorers that take the lock's pinned problem errata as config key ``errata``.
 ERRATA_CONFIG_KEY = "errata"
-BUILTIN_ERRATA_CONFIG: frozenset[str] = frozenset({"correctness@4"})
+BUILTIN_ERRATA_CONFIG: frozenset[str] = frozenset({"correctness@5"})
 # Scorers that take the lock's pinned solvable sets as config key ``solvable``.
 SOLVABLE_CONFIG_KEY = "solvable"
-BUILTIN_SOLVABLE_CONFIG: frozenset[str] = frozenset({"correctness@4"})
+BUILTIN_SOLVABLE_CONFIG: frozenset[str] = frozenset({"correctness@5"})
 
 
 def _builtin(manifest: ScorerManifest) -> ScorerRegistration:

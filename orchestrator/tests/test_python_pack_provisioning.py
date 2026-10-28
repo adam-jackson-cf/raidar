@@ -13,7 +13,7 @@ from click.testing import CliRunner
 from pydantic import ValidationError
 
 from raidar.cli import main
-from raidar.grading.grader_image import GRADER_TOOLS
+from raidar.grading.resolver import GRADER_TOOLS
 from raidar.subject.environment.python import provisioner as provisioner_module
 from raidar.subject.environment.python.pack_definition import (
     PROVISIONING_PHASE,

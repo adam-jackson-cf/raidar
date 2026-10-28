@@ -45,6 +45,8 @@ from raidar.grading.normalise import (
 )
 from raidar.grading.outcomes import RunOutcome, StepGrade
 from raidar.grading.parity import check_parity, ineligible, outcome_differences
+from raidar.grading.provision import prepare_dependencies
+from raidar.grading.resolver import DependencyInfraError, Resolver
 from raidar.grading.sandbox import (
     LEDGER_NAME,
     PLUGIN_FILE,
@@ -55,12 +57,7 @@ from raidar.grading.sandbox import (
     sandbox_argv,
     sandbox_env,
 )
-from raidar.grading.submission_deps import (
-    declared_requirements,
-    provisioned_pins,
-    python_path_entries,
-    resolve_dependencies,
-)
+from raidar.grading.submission_deps import SubmissionDependencies, python_path_entries
 
 DEFAULT_RUN_TIMEOUT_S = 900.0
 BUDGET_MARGIN_S = 60.0
@@ -151,20 +148,20 @@ async def run_oracle(
     *,
     coverage: bool,
     timeout_s: float = DEFAULT_RUN_TIMEOUT_S,
+    resolver: Resolver | None = None,
+    recorded: SubmissionDependencies | None = None,
 ) -> RunOutcome:
     role = "coverage" if coverage else "grading"
     started = time.perf_counter()
     app, out = _stage(snapshot, run_dir)
-    marker_environment = (
-        await sandbox.marker_environment()
-        if any(";" in requirement for requirement in declared_requirements(app))
-        else None
-    )
-    dependencies = resolve_dependencies(
-        app,
-        provisioned_pins(bundle.manifest.grader.test_dependencies),
-        marker_environment=marker_environment,
-    )
+    try:
+        dependencies = await prepare_dependencies(
+            bundle, app, sandbox, resolver=resolver, recorded=recorded
+        )
+    except DependencyInfraError as error:
+        # A resolver or index outage is never a verdict about the submission.
+        unavailable = InfraFailure(code="dependency_resolver_unavailable", detail=str(error))
+        return RunOutcome(role, (), unavailable, None, (), time.perf_counter() - started)
     argv, prefix = sandbox_argv(step, sandbox.layout, coverage=coverage)
     result = await sandbox.run(
         SandboxRun(
@@ -182,6 +179,7 @@ async def run_oracle(
             timeout_s=timeout_s,
             cpus=bundle.manifest.grader.cpus,
             memory_mb=bundle.manifest.grader.memory_mb,
+            image=dependencies.image_id or None,
         )
     )
     (out / "sandbox.log").write_text(result.output)
@@ -249,10 +247,20 @@ async def grade_step(
     *,
     coverage: bool,
     timeout_s: float = DEFAULT_RUN_TIMEOUT_S,
+    resolver: Resolver | None = None,
+    recorded: SubmissionDependencies | None = None,
 ) -> StepGrade:
     step = bundle.step(step_name)
     grading = await run_oracle(
-        bundle, step, snapshot, sandbox, work / "grading", coverage=False, timeout_s=timeout_s
+        bundle,
+        step,
+        snapshot,
+        sandbox,
+        work / "grading",
+        coverage=False,
+        timeout_s=timeout_s,
+        resolver=resolver,
+        recorded=recorded,
     )
     grade = VerifierGrade(
         step=step.name,
@@ -267,7 +275,14 @@ async def grade_step(
         verdict = ineligible(f"grading_infra_failure:{grading.infra_failure.code}")
         return StepGrade(grade, grading, None, verdict, timings=timings)
     measured = await run_oracle(
-        bundle, step, snapshot, sandbox, work / "coverage", coverage=True, timeout_s=timeout_s
+        bundle,
+        step,
+        snapshot,
+        sandbox,
+        work / "coverage",
+        coverage=True,
+        timeout_s=timeout_s,
+        recorded=grading.dependencies,
     )
     timings["coverage_run_s"] = measured.seconds
     verdict, differences = parity_verdict(grading, measured)

@@ -1,0 +1,3016 @@
+{
+  "checks": [
+    {
+      "detail": [],
+      "name": "solvable_set",
+      "status": "pass"
+    },
+    {
+      "detail": [
+        "repeat 0 checkpoint_7: 405/405 (expected at least one failure)"
+      ],
+      "name": "reference_k-1_fails_k",
+      "status": "fail"
+    },
+    {
+      "detail": [],
+      "name": "repeat_identical_positive",
+      "status": "pass"
+    },
+    {
+      "detail": [
+        "repeat 1 vs 0 checkpoint_7: checkpoint_6::TestCore::test_allowlist_blocks_upload_export: oracle=pass oracle=fail",
+        "repeat 2 vs 0 checkpoint_7: checkpoint_6::TestCore::test_allowlist_blocks_upload_export: oracle=pass oracle=fail"
+      ],
+      "name": "repeat_identical_negative",
+      "status": "fail"
+    },
+    {
+      "detail": [
+        "native runner not run"
+      ],
+      "name": "native_parity_positive",
+      "status": "not_run"
+    },
+    {
+      "detail": [
+        "native runner not run"
+      ],
+      "name": "native_parity_negative",
+      "status": "not_run"
+    }
+  ],
+  "engine": "direct",
+  "environment": {
+    "docker_context": "raidar-mbp",
+    "engine": "direct",
+    "grader_environment_id": "sha256:5aa29cfe66b4a83ae83dba9b65aa3c05f4a8fcd6a4d3120363396411fbc2ce6d",
+    "grader_image": "raidar-oracle-grader:81cc253926b5099e",
+    "harbor": "0.23.0",
+    "pack_image": "raidar/pack-python:2b91a52663e099f2"
+  },
+  "grades": {
+    "native": null,
+    "oracle": {
+      "negative": [
+        {
+          "checkpoint_1": {
+            "all_pass": false,
+            "groups": {
+              "core": [
+                0,
+                4
+              ],
+              "error": [
+                0,
+                12
+              ],
+              "functionality": [
+                0,
+                34
+              ],
+              "regression": [
+                0,
+                0
+              ]
+            },
+            "infra_failure": null,
+            "passed": 0,
+            "total": 50
+          },
+          "checkpoint_2": {
+            "all_pass": false,
+            "groups": {
+              "core": [
+                2,
+                9
+              ],
+              "error": [
+                0,
+                30
+              ],
+              "functionality": [
+                15,
+                33
+              ],
+              "regression": [
+                50,
+                50
+              ]
+            },
+            "infra_failure": null,
+            "passed": 67,
+            "total": 122
+          },
+          "checkpoint_3": {
+            "all_pass": false,
+            "groups": {
+              "core": [
+                0,
+                5
+              ],
+              "error": [
+                0,
+                13
+              ],
+              "functionality": [
+                6,
+                34
+              ],
+              "regression": [
+                122,
+                122
+              ]
+            },
+            "infra_failure": null,
+            "passed": 128,
+            "total": 174
+          },
+          "checkpoint_4": {
+            "all_pass": false,
+            "groups": {
+              "core": [
+                1,
+                12
+              ],
+              "error": [
+                4,
+                15
+              ],
+              "functionality": [
+                1,
+                32
+              ],
+              "regression": [
+                174,
+                174
+              ]
+            },
+            "infra_failure": null,
+            "passed": 180,
+            "total": 233
+          },
+          "checkpoint_5": {
+            "all_pass": false,
+            "groups": {
+              "core": [
+                4,
+                6
+              ],
+              "error": [
+                0,
+                20
+              ],
+              "functionality": [
+                11,
+                17
+              ],
+              "regression": [
+                233,
+                233
+              ]
+            },
+            "infra_failure": null,
+            "passed": 248,
+            "total": 276
+          },
+          "checkpoint_6": {
+            "all_pass": false,
+            "groups": {
+              "core": [
+                5,
+                12
+              ],
+              "error": [
+                0,
+                10
+              ],
+              "functionality": [
+                31,
+                55
+              ],
+              "regression": [
+                276,
+                276
+              ]
+            },
+            "infra_failure": null,
+            "passed": 312,
+            "total": 353
+          },
+          "checkpoint_7": {
+            "all_pass": true,
+            "groups": {
+              "core": [
+                16,
+                16
+              ],
+              "error": [
+                2,
+                2
+              ],
+              "functionality": [
+                34,
+                34
+              ],
+              "regression": [
+                353,
+                353
+              ]
+            },
+            "infra_failure": null,
+            "passed": 405,
+            "total": 405
+          }
+        },
+        {
+          "checkpoint_1": {
+            "all_pass": false,
+            "groups": {
+              "core": [
+                0,
+                4
+              ],
+              "error": [
+                0,
+                12
+              ],
+              "functionality": [
+                0,
+                34
+              ],
+              "regression": [
+                0,
+                0
+              ]
+            },
+            "infra_failure": null,
+            "passed": 0,
+            "total": 50
+          },
+          "checkpoint_2": {
+            "all_pass": false,
+            "groups": {
+              "core": [
+                2,
+                9
+              ],
+              "error": [
+                0,
+                30
+              ],
+              "functionality": [
+                15,
+                33
+              ],
+              "regression": [
+                50,
+                50
+              ]
+            },
+            "infra_failure": null,
+            "passed": 67,
+            "total": 122
+          },
+          "checkpoint_3": {
+            "all_pass": false,
+            "groups": {
+              "core": [
+                0,
+                5
+              ],
+              "error": [
+                0,
+                13
+              ],
+              "functionality": [
+                6,
+                34
+              ],
+              "regression": [
+                122,
+                122
+              ]
+            },
+            "infra_failure": null,
+            "passed": 128,
+            "total": 174
+          },
+          "checkpoint_4": {
+            "all_pass": false,
+            "groups": {
+              "core": [
+                1,
+                12
+              ],
+              "error": [
+                4,
+                15
+              ],
+              "functionality": [
+                1,
+                32
+              ],
+              "regression": [
+                174,
+                174
+              ]
+            },
+            "infra_failure": null,
+            "passed": 180,
+            "total": 233
+          },
+          "checkpoint_5": {
+            "all_pass": false,
+            "groups": {
+              "core": [
+                4,
+                6
+              ],
+              "error": [
+                0,
+                20
+              ],
+              "functionality": [
+                11,
+                17
+              ],
+              "regression": [
+                233,
+                233
+              ]
+            },
+            "infra_failure": null,
+            "passed": 248,
+            "total": 276
+          },
+          "checkpoint_6": {
+            "all_pass": false,
+            "groups": {
+              "core": [
+                5,
+                12
+              ],
+              "error": [
+                0,
+                10
+              ],
+              "functionality": [
+                31,
+                55
+              ],
+              "regression": [
+                276,
+                276
+              ]
+            },
+            "infra_failure": null,
+            "passed": 312,
+            "total": 353
+          },
+          "checkpoint_7": {
+            "all_pass": false,
+            "groups": {
+              "core": [
+                16,
+                16
+              ],
+              "error": [
+                2,
+                2
+              ],
+              "functionality": [
+                34,
+                34
+              ],
+              "regression": [
+                352,
+                353
+              ]
+            },
+            "infra_failure": null,
+            "passed": 404,
+            "total": 405
+          }
+        },
+        {
+          "checkpoint_1": {
+            "all_pass": false,
+            "groups": {
+              "core": [
+                0,
+                4
+              ],
+              "error": [
+                0,
+                12
+              ],
+              "functionality": [
+                0,
+                34
+              ],
+              "regression": [
+                0,
+                0
+              ]
+            },
+            "infra_failure": null,
+            "passed": 0,
+            "total": 50
+          },
+          "checkpoint_2": {
+            "all_pass": false,
+            "groups": {
+              "core": [
+                2,
+                9
+              ],
+              "error": [
+                0,
+                30
+              ],
+              "functionality": [
+                15,
+                33
+              ],
+              "regression": [
+                50,
+                50
+              ]
+            },
+            "infra_failure": null,
+            "passed": 67,
+            "total": 122
+          },
+          "checkpoint_3": {
+            "all_pass": false,
+            "groups": {
+              "core": [
+                0,
+                5
+              ],
+              "error": [
+                0,
+                13
+              ],
+              "functionality": [
+                6,
+                34
+              ],
+              "regression": [
+                122,
+                122
+              ]
+            },
+            "infra_failure": null,
+            "passed": 128,
+            "total": 174
+          },
+          "checkpoint_4": {
+            "all_pass": false,
+            "groups": {
+              "core": [
+                1,
+                12
+              ],
+              "error": [
+                4,
+                15
+              ],
+              "functionality": [
+                1,
+                32
+              ],
+              "regression": [
+                174,
+                174
+              ]
+            },
+            "infra_failure": null,
+            "passed": 180,
+            "total": 233
+          },
+          "checkpoint_5": {
+            "all_pass": false,
+            "groups": {
+              "core": [
+                4,
+                6
+              ],
+              "error": [
+                0,
+                20
+              ],
+              "functionality": [
+                11,
+                17
+              ],
+              "regression": [
+                233,
+                233
+              ]
+            },
+            "infra_failure": null,
+            "passed": 248,
+            "total": 276
+          },
+          "checkpoint_6": {
+            "all_pass": false,
+            "groups": {
+              "core": [
+                5,
+                12
+              ],
+              "error": [
+                0,
+                10
+              ],
+              "functionality": [
+                31,
+                55
+              ],
+              "regression": [
+                276,
+                276
+              ]
+            },
+            "infra_failure": null,
+            "passed": 312,
+            "total": 353
+          },
+          "checkpoint_7": {
+            "all_pass": false,
+            "groups": {
+              "core": [
+                16,
+                16
+              ],
+              "error": [
+                2,
+                2
+              ],
+              "functionality": [
+                34,
+                34
+              ],
+              "regression": [
+                352,
+                353
+              ]
+            },
+            "infra_failure": null,
+            "passed": 404,
+            "total": 405
+          }
+        }
+      ],
+      "positive": [
+        {
+          "checkpoint_1": {
+            "all_pass": true,
+            "groups": {
+              "core": [
+                4,
+                4
+              ],
+              "error": [
+                12,
+                12
+              ],
+              "functionality": [
+                34,
+                34
+              ],
+              "regression": [
+                0,
+                0
+              ]
+            },
+            "infra_failure": null,
+            "passed": 50,
+            "total": 50
+          },
+          "checkpoint_2": {
+            "all_pass": true,
+            "groups": {
+              "core": [
+                9,
+                9
+              ],
+              "error": [
+                30,
+                30
+              ],
+              "functionality": [
+                33,
+                33
+              ],
+              "regression": [
+                50,
+                50
+              ]
+            },
+            "infra_failure": null,
+            "passed": 122,
+            "total": 122
+          },
+          "checkpoint_3": {
+            "all_pass": true,
+            "groups": {
+              "core": [
+                5,
+                5
+              ],
+              "error": [
+                13,
+                13
+              ],
+              "functionality": [
+                34,
+                34
+              ],
+              "regression": [
+                122,
+                122
+              ]
+            },
+            "infra_failure": null,
+            "passed": 174,
+            "total": 174
+          },
+          "checkpoint_4": {
+            "all_pass": true,
+            "groups": {
+              "core": [
+                12,
+                12
+              ],
+              "error": [
+                15,
+                15
+              ],
+              "functionality": [
+                32,
+                32
+              ],
+              "regression": [
+                174,
+                174
+              ]
+            },
+            "infra_failure": null,
+            "passed": 233,
+            "total": 233
+          },
+          "checkpoint_5": {
+            "all_pass": true,
+            "groups": {
+              "core": [
+                6,
+                6
+              ],
+              "error": [
+                20,
+                20
+              ],
+              "functionality": [
+                17,
+                17
+              ],
+              "regression": [
+                233,
+                233
+              ]
+            },
+            "infra_failure": null,
+            "passed": 276,
+            "total": 276
+          },
+          "checkpoint_6": {
+            "all_pass": true,
+            "groups": {
+              "core": [
+                12,
+                12
+              ],
+              "error": [
+                10,
+                10
+              ],
+              "functionality": [
+                55,
+                55
+              ],
+              "regression": [
+                276,
+                276
+              ]
+            },
+            "infra_failure": null,
+            "passed": 353,
+            "total": 353
+          },
+          "checkpoint_7": {
+            "all_pass": true,
+            "groups": {
+              "core": [
+                16,
+                16
+              ],
+              "error": [
+                2,
+                2
+              ],
+              "functionality": [
+                34,
+                34
+              ],
+              "regression": [
+                353,
+                353
+              ]
+            },
+            "infra_failure": null,
+            "passed": 405,
+            "total": 405
+          }
+        },
+        {
+          "checkpoint_1": {
+            "all_pass": true,
+            "groups": {
+              "core": [
+                4,
+                4
+              ],
+              "error": [
+                12,
+                12
+              ],
+              "functionality": [
+                34,
+                34
+              ],
+              "regression": [
+                0,
+                0
+              ]
+            },
+            "infra_failure": null,
+            "passed": 50,
+            "total": 50
+          },
+          "checkpoint_2": {
+            "all_pass": true,
+            "groups": {
+              "core": [
+                9,
+                9
+              ],
+              "error": [
+                30,
+                30
+              ],
+              "functionality": [
+                33,
+                33
+              ],
+              "regression": [
+                50,
+                50
+              ]
+            },
+            "infra_failure": null,
+            "passed": 122,
+            "total": 122
+          },
+          "checkpoint_3": {
+            "all_pass": true,
+            "groups": {
+              "core": [
+                5,
+                5
+              ],
+              "error": [
+                13,
+                13
+              ],
+              "functionality": [
+                34,
+                34
+              ],
+              "regression": [
+                122,
+                122
+              ]
+            },
+            "infra_failure": null,
+            "passed": 174,
+            "total": 174
+          },
+          "checkpoint_4": {
+            "all_pass": true,
+            "groups": {
+              "core": [
+                12,
+                12
+              ],
+              "error": [
+                15,
+                15
+              ],
+              "functionality": [
+                32,
+                32
+              ],
+              "regression": [
+                174,
+                174
+              ]
+            },
+            "infra_failure": null,
+            "passed": 233,
+            "total": 233
+          },
+          "checkpoint_5": {
+            "all_pass": true,
+            "groups": {
+              "core": [
+                6,
+                6
+              ],
+              "error": [
+                20,
+                20
+              ],
+              "functionality": [
+                17,
+                17
+              ],
+              "regression": [
+                233,
+                233
+              ]
+            },
+            "infra_failure": null,
+            "passed": 276,
+            "total": 276
+          },
+          "checkpoint_6": {
+            "all_pass": true,
+            "groups": {
+              "core": [
+                12,
+                12
+              ],
+              "error": [
+                10,
+                10
+              ],
+              "functionality": [
+                55,
+                55
+              ],
+              "regression": [
+                276,
+                276
+              ]
+            },
+            "infra_failure": null,
+            "passed": 353,
+            "total": 353
+          },
+          "checkpoint_7": {
+            "all_pass": true,
+            "groups": {
+              "core": [
+                16,
+                16
+              ],
+              "error": [
+                2,
+                2
+              ],
+              "functionality": [
+                34,
+                34
+              ],
+              "regression": [
+                353,
+                353
+              ]
+            },
+            "infra_failure": null,
+            "passed": 405,
+            "total": 405
+          }
+        },
+        {
+          "checkpoint_1": {
+            "all_pass": true,
+            "groups": {
+              "core": [
+                4,
+                4
+              ],
+              "error": [
+                12,
+                12
+              ],
+              "functionality": [
+                34,
+                34
+              ],
+              "regression": [
+                0,
+                0
+              ]
+            },
+            "infra_failure": null,
+            "passed": 50,
+            "total": 50
+          },
+          "checkpoint_2": {
+            "all_pass": true,
+            "groups": {
+              "core": [
+                9,
+                9
+              ],
+              "error": [
+                30,
+                30
+              ],
+              "functionality": [
+                33,
+                33
+              ],
+              "regression": [
+                50,
+                50
+              ]
+            },
+            "infra_failure": null,
+            "passed": 122,
+            "total": 122
+          },
+          "checkpoint_3": {
+            "all_pass": true,
+            "groups": {
+              "core": [
+                5,
+                5
+              ],
+              "error": [
+                13,
+                13
+              ],
+              "functionality": [
+                34,
+                34
+              ],
+              "regression": [
+                122,
+                122
+              ]
+            },
+            "infra_failure": null,
+            "passed": 174,
+            "total": 174
+          },
+          "checkpoint_4": {
+            "all_pass": true,
+            "groups": {
+              "core": [
+                12,
+                12
+              ],
+              "error": [
+                15,
+                15
+              ],
+              "functionality": [
+                32,
+                32
+              ],
+              "regression": [
+                174,
+                174
+              ]
+            },
+            "infra_failure": null,
+            "passed": 233,
+            "total": 233
+          },
+          "checkpoint_5": {
+            "all_pass": true,
+            "groups": {
+              "core": [
+                6,
+                6
+              ],
+              "error": [
+                20,
+                20
+              ],
+              "functionality": [
+                17,
+                17
+              ],
+              "regression": [
+                233,
+                233
+              ]
+            },
+            "infra_failure": null,
+            "passed": 276,
+            "total": 276
+          },
+          "checkpoint_6": {
+            "all_pass": true,
+            "groups": {
+              "core": [
+                12,
+                12
+              ],
+              "error": [
+                10,
+                10
+              ],
+              "functionality": [
+                55,
+                55
+              ],
+              "regression": [
+                276,
+                276
+              ]
+            },
+            "infra_failure": null,
+            "passed": 353,
+            "total": 353
+          },
+          "checkpoint_7": {
+            "all_pass": true,
+            "groups": {
+              "core": [
+                16,
+                16
+              ],
+              "error": [
+                2,
+                2
+              ],
+              "functionality": [
+                34,
+                34
+              ],
+              "regression": [
+                353,
+                353
+              ]
+            },
+            "infra_failure": null,
+            "passed": 405,
+            "total": 405
+          }
+        }
+      ]
+    }
+  },
+  "group_order": [
+    "core",
+    "functionality",
+    "error",
+    "regression"
+  ],
+  "headline_policy": {
+    "checkpoints": 7,
+    "components": {
+      "C": "used",
+      "E": "missing",
+      "G": "missing",
+      "H": "missing",
+      "R": "missing",
+      "V": "missing"
+    },
+    "eligible": false,
+    "policy": "scb-canonical@1",
+    "reasons": [
+      {
+        "code": "component_missing",
+        "component": "V",
+        "detail": "scb-canonical@1 requires component V"
+      },
+      {
+        "code": "component_missing",
+        "component": "E",
+        "detail": "scb-canonical@1 requires component E"
+      },
+      {
+        "code": "component_missing",
+        "component": "H",
+        "detail": "scb-canonical@1 requires component H"
+      },
+      {
+        "code": "component_missing",
+        "component": "R",
+        "detail": "scb-canonical@1 requires component R"
+      },
+      {
+        "code": "component_missing",
+        "component": "G",
+        "detail": "scb-canonical@1 requires component G"
+      }
+    ],
+    "reference_correctness": "1",
+    "selection": "default_by_k"
+  },
+  "kind": "raidar-problem-validation",
+  "manifest_sha256": "14ec0bc2ec3b5b9f86eaa8c78a89de7cecea2776e2153fb81d3ba3a28297cd80",
+  "mode": "multi_checkpoint",
+  "not_run": [
+    "native_parity_positive",
+    "native_parity_negative"
+  ],
+  "problem": "scb/datagate@38d627ecf668",
+  "repeats": 3,
+  "schema_version": 1,
+  "solvable": {
+    "checkpoint_1": {
+      "digest": "e4566521d7c049bf1ca33c2356ac9014c408f89b84ae533e0b102973754f7f42",
+      "nondeterministic": [],
+      "nondeterministic_count": 0,
+      "size": 50,
+      "solvable": [
+        "checkpoint_1::TestCore::test_autodetect_latin1",
+        "checkpoint_1::TestCore::test_charset_latin1",
+        "checkpoint_1::TestCore::test_convert_bad_params[invalid-url]",
+        "checkpoint_1::TestCore::test_convert_bad_params[missing-source]",
+        "checkpoint_1::TestCore::test_decimals_as_numbers",
+        "checkpoint_1::TestCore::test_default_limit_100",
+        "checkpoint_1::TestCore::test_non_tabular_payload",
+        "checkpoint_1::TestCore::test_order_preserved",
+        "checkpoint_1::TestCore::test_query_envelope",
+        "checkpoint_1::TestCore::test_semicolon_delimiter",
+        "checkpoint_1::TestCore::test_single_column_csv",
+        "checkpoint_1::TestCore::test_success_returns_id",
+        "checkpoint_1::TestCore::test_time_values_as_text",
+        "checkpoint_1::TestCore::test_unknown_route_404",
+        "checkpoint_1::TestCore::test_unreachable_source",
+        "checkpoint_1::TestCore::test_upstream_500_to_404",
+        "checkpoint_1::TestError::test_convert_bad_url[bad-scheme]",
+        "checkpoint_1::TestError::test_convert_bad_url[missing-scheme]",
+        "checkpoint_1::TestError::test_empty_source_parameter",
+        "checkpoint_1::TestError::test_header_only_rejected",
+        "checkpoint_1::TestError::test_malformed_charset",
+        "checkpoint_1::TestError::test_unknown_dataset_404",
+        "checkpoint_1::TestError::test_upstream_403_to_404",
+        "checkpoint_1::TestFunctionality::test_common_delimiters[,]",
+        "checkpoint_1::TestFunctionality::test_common_delimiters[;]",
+        "checkpoint_1::TestFunctionality::test_common_delimiters[\\t]",
+        "checkpoint_1::TestFunctionality::test_cors_on_dataset_query",
+        "checkpoint_1::TestFunctionality::test_cors_on_routes[/convert]",
+        "checkpoint_1::TestFunctionality::test_cors_on_routes[/not-found]",
+        "checkpoint_1::TestFunctionality::test_different_urls_different_ids",
+        "checkpoint_1::TestFunctionality::test_empty_file_rejected",
+        "checkpoint_1::TestFunctionality::test_extra_columns_trimmed",
+        "checkpoint_1::TestFunctionality::test_id_from_url_not_charset",
+        "checkpoint_1::TestFunctionality::test_ingest_varied_text_payloads[id,text-1,xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\\n]",
+        "checkpoint_1::TestFunctionality::test_ingest_varied_text_payloads[k,v-left,  space\\nright,space  \\n]",
+        "checkpoint_1::TestFunctionality::test_ingest_varied_text_payloads[name,emoji-alice,smile\\nbob,wave\\n]",
+        "checkpoint_1::TestFunctionality::test_ingest_varied_text_payloads[name,note-alice,naive\\nbob,cafe\\n]",
+        "checkpoint_1::TestFunctionality::test_large_dataset_limit_order",
+        "checkpoint_1::TestFunctionality::test_limit_exactly_100",
+        "checkpoint_1::TestFunctionality::test_multiple_datasets_independent",
+        "checkpoint_1::TestFunctionality::test_negative_values_as_numbers",
+        "checkpoint_1::TestFunctionality::test_options_preflight_cors[/convert]",
+        "checkpoint_1::TestFunctionality::test_options_preflight_cors[/datasets/does-not-exist]",
+        "checkpoint_1::TestFunctionality::test_preserves_header_and_time_whitespace",
+        "checkpoint_1::TestFunctionality::test_preserves_whitespace",
+        "checkpoint_1::TestFunctionality::test_query_stable",
+        "checkpoint_1::TestFunctionality::test_relative_endpoint",
+        "checkpoint_1::TestFunctionality::test_same_url_same_id",
+        "checkpoint_1::TestFunctionality::test_time_boundary_values_are_text",
+        "checkpoint_1::TestFunctionality::test_trailing_empty_line_excluded"
+      ],
+      "verdict": "validated"
+    },
+    "checkpoint_2": {
+      "digest": "3bb8f50947da1b46625b69689ddaace261e585dc2fa6b6333bbea088c4b36600",
+      "nondeterministic": [],
+      "nondeterministic_count": 0,
+      "size": 122,
+      "solvable": [
+        "checkpoint_1::TestCore::test_autodetect_latin1",
+        "checkpoint_1::TestCore::test_charset_latin1",
+        "checkpoint_1::TestCore::test_convert_bad_params[invalid-url]",
+        "checkpoint_1::TestCore::test_convert_bad_params[missing-source]",
+        "checkpoint_1::TestCore::test_decimals_as_numbers",
+        "checkpoint_1::TestCore::test_default_limit_100",
+        "checkpoint_1::TestCore::test_non_tabular_payload",
+        "checkpoint_1::TestCore::test_order_preserved",
+        "checkpoint_1::TestCore::test_query_envelope",
+        "checkpoint_1::TestCore::test_semicolon_delimiter",
+        "checkpoint_1::TestCore::test_single_column_csv",
+        "checkpoint_1::TestCore::test_success_returns_id",
+        "checkpoint_1::TestCore::test_time_values_as_text",
+        "checkpoint_1::TestCore::test_unknown_route_404",
+        "checkpoint_1::TestCore::test_unreachable_source",
+        "checkpoint_1::TestCore::test_upstream_500_to_404",
+        "checkpoint_1::TestError::test_convert_bad_url[bad-scheme]",
+        "checkpoint_1::TestError::test_convert_bad_url[missing-scheme]",
+        "checkpoint_1::TestError::test_empty_source_parameter",
+        "checkpoint_1::TestError::test_header_only_rejected",
+        "checkpoint_1::TestError::test_malformed_charset",
+        "checkpoint_1::TestError::test_unknown_dataset_404",
+        "checkpoint_1::TestError::test_upstream_403_to_404",
+        "checkpoint_1::TestFunctionality::test_common_delimiters[,]",
+        "checkpoint_1::TestFunctionality::test_common_delimiters[;]",
+        "checkpoint_1::TestFunctionality::test_common_delimiters[\\t]",
+        "checkpoint_1::TestFunctionality::test_cors_on_dataset_query",
+        "checkpoint_1::TestFunctionality::test_cors_on_routes[/convert]",
+        "checkpoint_1::TestFunctionality::test_cors_on_routes[/not-found]",
+        "checkpoint_1::TestFunctionality::test_different_urls_different_ids",
+        "checkpoint_1::TestFunctionality::test_empty_file_rejected",
+        "checkpoint_1::TestFunctionality::test_extra_columns_trimmed",
+        "checkpoint_1::TestFunctionality::test_id_from_url_not_charset",
+        "checkpoint_1::TestFunctionality::test_ingest_varied_text_payloads[id,text-1,xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\\n]",
+        "checkpoint_1::TestFunctionality::test_ingest_varied_text_payloads[k,v-left,  space\\nright,space  \\n]",
+        "checkpoint_1::TestFunctionality::test_ingest_varied_text_payloads[name,emoji-alice,smile\\nbob,wave\\n]",
+        "checkpoint_1::TestFunctionality::test_ingest_varied_text_payloads[name,note-alice,naive\\nbob,cafe\\n]",
+        "checkpoint_1::TestFunctionality::test_large_dataset_limit_order",
+        "checkpoint_1::TestFunctionality::test_limit_exactly_100",
+        "checkpoint_1::TestFunctionality::test_multiple_datasets_independent",
+        "checkpoint_1::TestFunctionality::test_negative_values_as_numbers",
+        "checkpoint_1::TestFunctionality::test_options_preflight_cors[/convert]",
+        "checkpoint_1::TestFunctionality::test_options_preflight_cors[/datasets/does-not-exist]",
+        "checkpoint_1::TestFunctionality::test_preserves_header_and_time_whitespace",
+        "checkpoint_1::TestFunctionality::test_preserves_whitespace",
+        "checkpoint_1::TestFunctionality::test_query_stable",
+        "checkpoint_1::TestFunctionality::test_relative_endpoint",
+        "checkpoint_1::TestFunctionality::test_same_url_same_id",
+        "checkpoint_1::TestFunctionality::test_time_boundary_values_are_text",
+        "checkpoint_1::TestFunctionality::test_trailing_empty_line_excluded",
+        "checkpoint_2::TestCore::test_invalid_param_400[invalid_shape]",
+        "checkpoint_2::TestCore::test_invalid_param_400[invalid_size]",
+        "checkpoint_2::TestCore::test_rowid_hide_removes_rowid",
+        "checkpoint_2::TestCore::test_rowid_ignores_sort",
+        "checkpoint_2::TestCore::test_shape_objects_includes_rowid",
+        "checkpoint_2::TestCore::test_size_and_offset_apply",
+        "checkpoint_2::TestCore::test_sort_ascending_is_stable",
+        "checkpoint_2::TestCore::test_sort_desc_paginate",
+        "checkpoint_2::TestCore::test_sort_desc_precedence",
+        "checkpoint_2::TestCore::test_total_before_pagination",
+        "checkpoint_2::TestCore::test_total_hide_removes_total",
+        "checkpoint_2::TestError::test_bad_offset_values[-1]",
+        "checkpoint_2::TestError::test_bad_offset_values[2.5]",
+        "checkpoint_2::TestError::test_bad_offset_values[oops]",
+        "checkpoint_2::TestError::test_bad_size_values[-1]",
+        "checkpoint_2::TestError::test_bad_size_values[0]",
+        "checkpoint_2::TestError::test_bad_size_values[3.1]",
+        "checkpoint_2::TestError::test_bad_size_values[abc]",
+        "checkpoint_2::TestError::test_duplicate_control_params_400[_offset=1&_offset=2]",
+        "checkpoint_2::TestError::test_duplicate_control_params_400[_rowid=hide&_rowid=hide]",
+        "checkpoint_2::TestError::test_duplicate_control_params_400[_shape=lists&_shape=objects]",
+        "checkpoint_2::TestError::test_duplicate_control_params_400[_size=1&_size=2]",
+        "checkpoint_2::TestError::test_duplicate_control_params_400[_sort=age&_sort=name]",
+        "checkpoint_2::TestError::test_duplicate_control_params_400[_sort_desc=age&_sort_desc=name]",
+        "checkpoint_2::TestError::test_duplicate_control_params_400[_total=hide&_total=hide]",
+        "checkpoint_2::TestError::test_empty_param_value_400[offset]",
+        "checkpoint_2::TestError::test_empty_param_value_400[shape]",
+        "checkpoint_2::TestError::test_empty_param_value_400[size]",
+        "checkpoint_2::TestError::test_empty_sort_both_params_400[_sort=age&_sort_desc=]",
+        "checkpoint_2::TestError::test_empty_sort_value_400[_sort]",
+        "checkpoint_2::TestError::test_empty_sort_value_400[_sort_desc]",
+        "checkpoint_2::TestError::test_invalid_rowid_list_or_default[params0]",
+        "checkpoint_2::TestError::test_invalid_rowid_list_or_default[params1]",
+        "checkpoint_2::TestError::test_invalid_total_default_shape",
+        "checkpoint_2::TestError::test_unknown_sort_column_400",
+        "checkpoint_2::TestError::test_visibility_invalid_value_400[_rowid-false]",
+        "checkpoint_2::TestError::test_visibility_invalid_value_400[_rowid-show]",
+        "checkpoint_2::TestError::test_visibility_invalid_value_400[_total-0]",
+        "checkpoint_2::TestError::test_visibility_invalid_value_400[_total-show]",
+        "checkpoint_2::TestFunctionality::test_columns_exclude_rowid",
+        "checkpoint_2::TestFunctionality::test_composed_controls",
+        "checkpoint_2::TestFunctionality::test_empty_toggle_value_400[_rowid]",
+        "checkpoint_2::TestFunctionality::test_empty_toggle_value_400[_total]",
+        "checkpoint_2::TestFunctionality::test_large_size_returns_all_rows",
+        "checkpoint_2::TestFunctionality::test_offset_at_dataset_length",
+        "checkpoint_2::TestFunctionality::test_offset_variants[0-Alice]",
+        "checkpoint_2::TestFunctionality::test_offset_variants[1-Bob]",
+        "checkpoint_2::TestFunctionality::test_offset_variants[10-None]",
+        "checkpoint_2::TestFunctionality::test_offset_variants[4-Eve]",
+        "checkpoint_2::TestFunctionality::test_rowid_hide_noop_default",
+        "checkpoint_2::TestFunctionality::test_rowid_hide_noop_lists",
+        "checkpoint_2::TestFunctionality::test_rowid_sequential_all_rows",
+        "checkpoint_2::TestFunctionality::test_shape_and_visibility_combinations[params0]",
+        "checkpoint_2::TestFunctionality::test_shape_and_visibility_combinations[params1]",
+        "checkpoint_2::TestFunctionality::test_shape_and_visibility_combinations[params2]",
+        "checkpoint_2::TestFunctionality::test_shapes_consistent_values",
+        "checkpoint_2::TestFunctionality::test_size_variants[1-1]",
+        "checkpoint_2::TestFunctionality::test_size_variants[2-2]",
+        "checkpoint_2::TestFunctionality::test_size_variants[20-5]",
+        "checkpoint_2::TestFunctionality::test_size_variants[5-5]",
+        "checkpoint_2::TestFunctionality::test_sort_desc_keys[age]",
+        "checkpoint_2::TestFunctionality::test_sort_desc_keys[city]",
+        "checkpoint_2::TestFunctionality::test_sort_desc_keys[name]",
+        "checkpoint_2::TestFunctionality::test_sort_desc_precedence_different_columns",
+        "checkpoint_2::TestFunctionality::test_sort_desc_tie_stability",
+        "checkpoint_2::TestFunctionality::test_sort_keys[age]",
+        "checkpoint_2::TestFunctionality::test_sort_keys[city]",
+        "checkpoint_2::TestFunctionality::test_sort_keys[name]",
+        "checkpoint_2::TestFunctionality::test_sort_name_and_city_order_values",
+        "checkpoint_2::TestFunctionality::test_sorted_requests_stable",
+        "checkpoint_2::TestFunctionality::test_total_default_bare_request",
+        "checkpoint_2::TestFunctionality::test_total_ignores_offset_size"
+      ],
+      "verdict": "validated"
+    },
+    "checkpoint_3": {
+      "digest": "1e6f3798877209c14c78495ce99111a7ecff3a5383045844a6967552e61c8a22",
+      "nondeterministic": [],
+      "nondeterministic_count": 0,
+      "size": 174,
+      "solvable": [
+        "checkpoint_1::TestCore::test_autodetect_latin1",
+        "checkpoint_1::TestCore::test_charset_latin1",
+        "checkpoint_1::TestCore::test_convert_bad_params[invalid-url]",
+        "checkpoint_1::TestCore::test_convert_bad_params[missing-source]",
+        "checkpoint_1::TestCore::test_decimals_as_numbers",
+        "checkpoint_1::TestCore::test_default_limit_100",
+        "checkpoint_1::TestCore::test_non_tabular_payload",
+        "checkpoint_1::TestCore::test_order_preserved",
+        "checkpoint_1::TestCore::test_query_envelope",
+        "checkpoint_1::TestCore::test_semicolon_delimiter",
+        "checkpoint_1::TestCore::test_single_column_csv",
+        "checkpoint_1::TestCore::test_success_returns_id",
+        "checkpoint_1::TestCore::test_time_values_as_text",
+        "checkpoint_1::TestCore::test_unknown_route_404",
+        "checkpoint_1::TestCore::test_unreachable_source",
+        "checkpoint_1::TestCore::test_upstream_500_to_404",
+        "checkpoint_1::TestError::test_convert_bad_url[bad-scheme]",
+        "checkpoint_1::TestError::test_convert_bad_url[missing-scheme]",
+        "checkpoint_1::TestError::test_empty_source_parameter",
+        "checkpoint_1::TestError::test_header_only_rejected",
+        "checkpoint_1::TestError::test_malformed_charset",
+        "checkpoint_1::TestError::test_unknown_dataset_404",
+        "checkpoint_1::TestError::test_upstream_403_to_404",
+        "checkpoint_1::TestFunctionality::test_common_delimiters[,]",
+        "checkpoint_1::TestFunctionality::test_common_delimiters[;]",
+        "checkpoint_1::TestFunctionality::test_common_delimiters[\\t]",
+        "checkpoint_1::TestFunctionality::test_cors_on_dataset_query",
+        "checkpoint_1::TestFunctionality::test_cors_on_routes[/convert]",
+        "checkpoint_1::TestFunctionality::test_cors_on_routes[/not-found]",
+        "checkpoint_1::TestFunctionality::test_different_urls_different_ids",
+        "checkpoint_1::TestFunctionality::test_empty_file_rejected",
+        "checkpoint_1::TestFunctionality::test_extra_columns_trimmed",
+        "checkpoint_1::TestFunctionality::test_id_from_url_not_charset",
+        "checkpoint_1::TestFunctionality::test_ingest_varied_text_payloads[id,text-1,xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\\n]",
+        "checkpoint_1::TestFunctionality::test_ingest_varied_text_payloads[k,v-left,  space\\nright,space  \\n]",
+        "checkpoint_1::TestFunctionality::test_ingest_varied_text_payloads[name,emoji-alice,smile\\nbob,wave\\n]",
+        "checkpoint_1::TestFunctionality::test_ingest_varied_text_payloads[name,note-alice,naive\\nbob,cafe\\n]",
+        "checkpoint_1::TestFunctionality::test_large_dataset_limit_order",
+        "checkpoint_1::TestFunctionality::test_limit_exactly_100",
+        "checkpoint_1::TestFunctionality::test_multiple_datasets_independent",
+        "checkpoint_1::TestFunctionality::test_negative_values_as_numbers",
+        "checkpoint_1::TestFunctionality::test_options_preflight_cors[/convert]",
+        "checkpoint_1::TestFunctionality::test_options_preflight_cors[/datasets/does-not-exist]",
+        "checkpoint_1::TestFunctionality::test_preserves_header_and_time_whitespace",
+        "checkpoint_1::TestFunctionality::test_preserves_whitespace",
+        "checkpoint_1::TestFunctionality::test_query_stable",
+        "checkpoint_1::TestFunctionality::test_relative_endpoint",
+        "checkpoint_1::TestFunctionality::test_same_url_same_id",
+        "checkpoint_1::TestFunctionality::test_time_boundary_values_are_text",
+        "checkpoint_1::TestFunctionality::test_trailing_empty_line_excluded",
+        "checkpoint_2::TestCore::test_invalid_param_400[invalid_shape]",
+        "checkpoint_2::TestCore::test_invalid_param_400[invalid_size]",
+        "checkpoint_2::TestCore::test_rowid_hide_removes_rowid",
+        "checkpoint_2::TestCore::test_rowid_ignores_sort",
+        "checkpoint_2::TestCore::test_shape_objects_includes_rowid",
+        "checkpoint_2::TestCore::test_size_and_offset_apply",
+        "checkpoint_2::TestCore::test_sort_ascending_is_stable",
+        "checkpoint_2::TestCore::test_sort_desc_paginate",
+        "checkpoint_2::TestCore::test_sort_desc_precedence",
+        "checkpoint_2::TestCore::test_total_before_pagination",
+        "checkpoint_2::TestCore::test_total_hide_removes_total",
+        "checkpoint_2::TestError::test_bad_offset_values[-1]",
+        "checkpoint_2::TestError::test_bad_offset_values[2.5]",
+        "checkpoint_2::TestError::test_bad_offset_values[oops]",
+        "checkpoint_2::TestError::test_bad_size_values[-1]",
+        "checkpoint_2::TestError::test_bad_size_values[0]",
+        "checkpoint_2::TestError::test_bad_size_values[3.1]",
+        "checkpoint_2::TestError::test_bad_size_values[abc]",
+        "checkpoint_2::TestError::test_duplicate_control_params_400[_offset=1&_offset=2]",
+        "checkpoint_2::TestError::test_duplicate_control_params_400[_rowid=hide&_rowid=hide]",
+        "checkpoint_2::TestError::test_duplicate_control_params_400[_shape=lists&_shape=objects]",
+        "checkpoint_2::TestError::test_duplicate_control_params_400[_size=1&_size=2]",
+        "checkpoint_2::TestError::test_duplicate_control_params_400[_sort=age&_sort=name]",
+        "checkpoint_2::TestError::test_duplicate_control_params_400[_sort_desc=age&_sort_desc=name]",
+        "checkpoint_2::TestError::test_duplicate_control_params_400[_total=hide&_total=hide]",
+        "checkpoint_2::TestError::test_empty_param_value_400[offset]",
+        "checkpoint_2::TestError::test_empty_param_value_400[shape]",
+        "checkpoint_2::TestError::test_empty_param_value_400[size]",
+        "checkpoint_2::TestError::test_empty_sort_both_params_400[_sort=age&_sort_desc=]",
+        "checkpoint_2::TestError::test_empty_sort_value_400[_sort]",
+        "checkpoint_2::TestError::test_empty_sort_value_400[_sort_desc]",
+        "checkpoint_2::TestError::test_invalid_rowid_list_or_default[params0]",
+        "checkpoint_2::TestError::test_invalid_rowid_list_or_default[params1]",
+        "checkpoint_2::TestError::test_invalid_total_default_shape",
+        "checkpoint_2::TestError::test_unknown_sort_column_400",
+        "checkpoint_2::TestError::test_visibility_invalid_value_400[_rowid-false]",
+        "checkpoint_2::TestError::test_visibility_invalid_value_400[_rowid-show]",
+        "checkpoint_2::TestError::test_visibility_invalid_value_400[_total-0]",
+        "checkpoint_2::TestError::test_visibility_invalid_value_400[_total-show]",
+        "checkpoint_2::TestFunctionality::test_columns_exclude_rowid",
+        "checkpoint_2::TestFunctionality::test_composed_controls",
+        "checkpoint_2::TestFunctionality::test_empty_toggle_value_400[_rowid]",
+        "checkpoint_2::TestFunctionality::test_empty_toggle_value_400[_total]",
+        "checkpoint_2::TestFunctionality::test_large_size_returns_all_rows",
+        "checkpoint_2::TestFunctionality::test_offset_at_dataset_length",
+        "checkpoint_2::TestFunctionality::test_offset_variants[0-Alice]",
+        "checkpoint_2::TestFunctionality::test_offset_variants[1-Bob]",
+        "checkpoint_2::TestFunctionality::test_offset_variants[10-None]",
+        "checkpoint_2::TestFunctionality::test_offset_variants[4-Eve]",
+        "checkpoint_2::TestFunctionality::test_rowid_hide_noop_default",
+        "checkpoint_2::TestFunctionality::test_rowid_hide_noop_lists",
+        "checkpoint_2::TestFunctionality::test_rowid_sequential_all_rows",
+        "checkpoint_2::TestFunctionality::test_shape_and_visibility_combinations[params0]",
+        "checkpoint_2::TestFunctionality::test_shape_and_visibility_combinations[params1]",
+        "checkpoint_2::TestFunctionality::test_shape_and_visibility_combinations[params2]",
+        "checkpoint_2::TestFunctionality::test_shapes_consistent_values",
+        "checkpoint_2::TestFunctionality::test_size_variants[1-1]",
+        "checkpoint_2::TestFunctionality::test_size_variants[2-2]",
+        "checkpoint_2::TestFunctionality::test_size_variants[20-5]",
+        "checkpoint_2::TestFunctionality::test_size_variants[5-5]",
+        "checkpoint_2::TestFunctionality::test_sort_desc_keys[age]",
+        "checkpoint_2::TestFunctionality::test_sort_desc_keys[city]",
+        "checkpoint_2::TestFunctionality::test_sort_desc_keys[name]",
+        "checkpoint_2::TestFunctionality::test_sort_desc_precedence_different_columns",
+        "checkpoint_2::TestFunctionality::test_sort_desc_tie_stability",
+        "checkpoint_2::TestFunctionality::test_sort_keys[age]",
+        "checkpoint_2::TestFunctionality::test_sort_keys[city]",
+        "checkpoint_2::TestFunctionality::test_sort_keys[name]",
+        "checkpoint_2::TestFunctionality::test_sort_name_and_city_order_values",
+        "checkpoint_2::TestFunctionality::test_sorted_requests_stable",
+        "checkpoint_2::TestFunctionality::test_total_default_bare_request",
+        "checkpoint_2::TestFunctionality::test_total_ignores_offset_size",
+        "checkpoint_3::TestCore::test_contains_filter",
+        "checkpoint_3::TestCore::test_exact_filter",
+        "checkpoint_3::TestCore::test_excludes_non_numeric_cell",
+        "checkpoint_3::TestCore::test_filter_sort_paginate",
+        "checkpoint_3::TestCore::test_greater_strict",
+        "checkpoint_3::TestCore::test_less_filter",
+        "checkpoint_3::TestCore::test_multi_filter_and",
+        "checkpoint_3::TestCore::test_original_header_filter",
+        "checkpoint_3::TestCore::test_rejects_non_numeric_value",
+        "checkpoint_3::TestCore::test_same_col_filters_and",
+        "checkpoint_3::TestCore::test_total_post_filter",
+        "checkpoint_3::TestError::test_col_name_case_mismatch_400",
+        "checkpoint_3::TestError::test_col_name_must_match_header",
+        "checkpoint_3::TestError::test_duplicate_identical_key_400",
+        "checkpoint_3::TestError::test_duplicate_key_400",
+        "checkpoint_3::TestError::test_numeric_rejects_non_numeric[greater_1,2]",
+        "checkpoint_3::TestError::test_numeric_rejects_non_numeric[greater_abc]",
+        "checkpoint_3::TestError::test_numeric_rejects_non_numeric[greater_none]",
+        "checkpoint_3::TestError::test_numeric_rejects_non_numeric[less_1,2]",
+        "checkpoint_3::TestError::test_numeric_rejects_non_numeric[less_abc]",
+        "checkpoint_3::TestError::test_numeric_rejects_non_numeric[less_none]",
+        "checkpoint_3::TestError::test_unknown_column_400",
+        "checkpoint_3::TestError::test_unknown_comparator_400",
+        "checkpoint_3::TestFunctionality::test_contains_case_sensitive",
+        "checkpoint_3::TestFunctionality::test_contains_empty_value_matches_all",
+        "checkpoint_3::TestFunctionality::test_contains_whitespace_value_match",
+        "checkpoint_3::TestFunctionality::test_exact_empty_value_matches_empty_cells",
+        "checkpoint_3::TestFunctionality::test_exact_whitespace_value_match",
+        "checkpoint_3::TestFunctionality::test_exposed_col_filter",
+        "checkpoint_3::TestFunctionality::test_filter_control_compose[params0]",
+        "checkpoint_3::TestFunctionality::test_filter_control_compose[params1]",
+        "checkpoint_3::TestFunctionality::test_filter_control_compose[params2]",
+        "checkpoint_3::TestFunctionality::test_filter_control_compose[params3]",
+        "checkpoint_3::TestFunctionality::test_filter_matrix[params0-3]",
+        "checkpoint_3::TestFunctionality::test_filter_matrix[params1-2]",
+        "checkpoint_3::TestFunctionality::test_filter_matrix[params2-2]",
+        "checkpoint_3::TestFunctionality::test_filter_matrix[params3-3]",
+        "checkpoint_3::TestFunctionality::test_filter_matrix[params4-1]",
+        "checkpoint_3::TestFunctionality::test_filter_matrix[params5-1]",
+        "checkpoint_3::TestFunctionality::test_filter_sort_paginate_shape",
+        "checkpoint_3::TestFunctionality::test_filter_sort_ties_stable",
+        "checkpoint_3::TestFunctionality::test_header_no_trim",
+        "checkpoint_3::TestFunctionality::test_numeric_bounds_strict",
+        "checkpoint_3::TestFunctionality::test_numeric_like_cells_preserve_whitespace_for_string_filters",
+        "checkpoint_3::TestFunctionality::test_numeric_scientific_notation",
+        "checkpoint_3::TestFunctionality::test_numeric_signed_bounds",
+        "checkpoint_3::TestFunctionality::test_plain_param_ignored",
+        "checkpoint_3::TestFunctionality::test_string_cmp_numeric_cells",
+        "checkpoint_3::TestFunctionality::test_zero_match_filter[contains_whitespace]",
+        "checkpoint_3::TestFunctionality::test_zero_match_filter[exact_case]",
+        "checkpoint_3::TestFunctionality::test_zero_match_filter[exact_whitespace]",
+        "checkpoint_3::TestFunctionality::test_zero_match_filter[no_match]"
+      ],
+      "verdict": "validated"
+    },
+    "checkpoint_4": {
+      "digest": "a9d5dc5e254bfc99a96332ca8cb4e7ed9aa6d92bb426d11ef93e174eb3ade377",
+      "nondeterministic": [],
+      "nondeterministic_count": 0,
+      "size": 233,
+      "solvable": [
+        "checkpoint_1::TestCore::test_autodetect_latin1",
+        "checkpoint_1::TestCore::test_charset_latin1",
+        "checkpoint_1::TestCore::test_convert_bad_params[invalid-url]",
+        "checkpoint_1::TestCore::test_convert_bad_params[missing-source]",
+        "checkpoint_1::TestCore::test_decimals_as_numbers",
+        "checkpoint_1::TestCore::test_default_limit_100",
+        "checkpoint_1::TestCore::test_non_tabular_payload",
+        "checkpoint_1::TestCore::test_order_preserved",
+        "checkpoint_1::TestCore::test_query_envelope",
+        "checkpoint_1::TestCore::test_semicolon_delimiter",
+        "checkpoint_1::TestCore::test_single_column_csv",
+        "checkpoint_1::TestCore::test_success_returns_id",
+        "checkpoint_1::TestCore::test_time_values_as_text",
+        "checkpoint_1::TestCore::test_unknown_route_404",
+        "checkpoint_1::TestCore::test_unreachable_source",
+        "checkpoint_1::TestCore::test_upstream_500_to_404",
+        "checkpoint_1::TestError::test_convert_bad_url[bad-scheme]",
+        "checkpoint_1::TestError::test_convert_bad_url[missing-scheme]",
+        "checkpoint_1::TestError::test_empty_source_parameter",
+        "checkpoint_1::TestError::test_header_only_rejected",
+        "checkpoint_1::TestError::test_malformed_charset",
+        "checkpoint_1::TestError::test_unknown_dataset_404",
+        "checkpoint_1::TestError::test_upstream_403_to_404",
+        "checkpoint_1::TestFunctionality::test_common_delimiters[,]",
+        "checkpoint_1::TestFunctionality::test_common_delimiters[;]",
+        "checkpoint_1::TestFunctionality::test_common_delimiters[\\t]",
+        "checkpoint_1::TestFunctionality::test_cors_on_dataset_query",
+        "checkpoint_1::TestFunctionality::test_cors_on_routes[/convert]",
+        "checkpoint_1::TestFunctionality::test_cors_on_routes[/not-found]",
+        "checkpoint_1::TestFunctionality::test_different_urls_different_ids",
+        "checkpoint_1::TestFunctionality::test_empty_file_rejected",
+        "checkpoint_1::TestFunctionality::test_extra_columns_trimmed",
+        "checkpoint_1::TestFunctionality::test_id_from_url_not_charset",
+        "checkpoint_1::TestFunctionality::test_ingest_varied_text_payloads[id,text-1,xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\\n]",
+        "checkpoint_1::TestFunctionality::test_ingest_varied_text_payloads[k,v-left,  space\\nright,space  \\n]",
+        "checkpoint_1::TestFunctionality::test_ingest_varied_text_payloads[name,emoji-alice,smile\\nbob,wave\\n]",
+        "checkpoint_1::TestFunctionality::test_ingest_varied_text_payloads[name,note-alice,naive\\nbob,cafe\\n]",
+        "checkpoint_1::TestFunctionality::test_large_dataset_limit_order",
+        "checkpoint_1::TestFunctionality::test_limit_exactly_100",
+        "checkpoint_1::TestFunctionality::test_multiple_datasets_independent",
+        "checkpoint_1::TestFunctionality::test_negative_values_as_numbers",
+        "checkpoint_1::TestFunctionality::test_options_preflight_cors[/convert]",
+        "checkpoint_1::TestFunctionality::test_options_preflight_cors[/datasets/does-not-exist]",
+        "checkpoint_1::TestFunctionality::test_preserves_header_and_time_whitespace",
+        "checkpoint_1::TestFunctionality::test_preserves_whitespace",
+        "checkpoint_1::TestFunctionality::test_query_stable",
+        "checkpoint_1::TestFunctionality::test_relative_endpoint",
+        "checkpoint_1::TestFunctionality::test_same_url_same_id",
+        "checkpoint_1::TestFunctionality::test_time_boundary_values_are_text",
+        "checkpoint_1::TestFunctionality::test_trailing_empty_line_excluded",
+        "checkpoint_2::TestCore::test_invalid_param_400[invalid_shape]",
+        "checkpoint_2::TestCore::test_invalid_param_400[invalid_size]",
+        "checkpoint_2::TestCore::test_rowid_hide_removes_rowid",
+        "checkpoint_2::TestCore::test_rowid_ignores_sort",
+        "checkpoint_2::TestCore::test_shape_objects_includes_rowid",
+        "checkpoint_2::TestCore::test_size_and_offset_apply",
+        "checkpoint_2::TestCore::test_sort_ascending_is_stable",
+        "checkpoint_2::TestCore::test_sort_desc_paginate",
+        "checkpoint_2::TestCore::test_sort_desc_precedence",
+        "checkpoint_2::TestCore::test_total_before_pagination",
+        "checkpoint_2::TestCore::test_total_hide_removes_total",
+        "checkpoint_2::TestError::test_bad_offset_values[-1]",
+        "checkpoint_2::TestError::test_bad_offset_values[2.5]",
+        "checkpoint_2::TestError::test_bad_offset_values[oops]",
+        "checkpoint_2::TestError::test_bad_size_values[-1]",
+        "checkpoint_2::TestError::test_bad_size_values[0]",
+        "checkpoint_2::TestError::test_bad_size_values[3.1]",
+        "checkpoint_2::TestError::test_bad_size_values[abc]",
+        "checkpoint_2::TestError::test_duplicate_control_params_400[_offset=1&_offset=2]",
+        "checkpoint_2::TestError::test_duplicate_control_params_400[_rowid=hide&_rowid=hide]",
+        "checkpoint_2::TestError::test_duplicate_control_params_400[_shape=lists&_shape=objects]",
+        "checkpoint_2::TestError::test_duplicate_control_params_400[_size=1&_size=2]",
+        "checkpoint_2::TestError::test_duplicate_control_params_400[_sort=age&_sort=name]",
+        "checkpoint_2::TestError::test_duplicate_control_params_400[_sort_desc=age&_sort_desc=name]",
+        "checkpoint_2::TestError::test_duplicate_control_params_400[_total=hide&_total=hide]",
+        "checkpoint_2::TestError::test_empty_param_value_400[offset]",
+        "checkpoint_2::TestError::test_empty_param_value_400[shape]",
+        "checkpoint_2::TestError::test_empty_param_value_400[size]",
+        "checkpoint_2::TestError::test_empty_sort_both_params_400[_sort=age&_sort_desc=]",
+        "checkpoint_2::TestError::test_empty_sort_value_400[_sort]",
+        "checkpoint_2::TestError::test_empty_sort_value_400[_sort_desc]",
+        "checkpoint_2::TestError::test_invalid_rowid_list_or_default[params0]",
+        "checkpoint_2::TestError::test_invalid_rowid_list_or_default[params1]",
+        "checkpoint_2::TestError::test_invalid_total_default_shape",
+        "checkpoint_2::TestError::test_unknown_sort_column_400",
+        "checkpoint_2::TestError::test_visibility_invalid_value_400[_rowid-false]",
+        "checkpoint_2::TestError::test_visibility_invalid_value_400[_rowid-show]",
+        "checkpoint_2::TestError::test_visibility_invalid_value_400[_total-0]",
+        "checkpoint_2::TestError::test_visibility_invalid_value_400[_total-show]",
+        "checkpoint_2::TestFunctionality::test_columns_exclude_rowid",
+        "checkpoint_2::TestFunctionality::test_composed_controls",
+        "checkpoint_2::TestFunctionality::test_empty_toggle_value_400[_rowid]",
+        "checkpoint_2::TestFunctionality::test_empty_toggle_value_400[_total]",
+        "checkpoint_2::TestFunctionality::test_large_size_returns_all_rows",
+        "checkpoint_2::TestFunctionality::test_offset_at_dataset_length",
+        "checkpoint_2::TestFunctionality::test_offset_variants[0-Alice]",
+        "checkpoint_2::TestFunctionality::test_offset_variants[1-Bob]",
+        "checkpoint_2::TestFunctionality::test_offset_variants[10-None]",
+        "checkpoint_2::TestFunctionality::test_offset_variants[4-Eve]",
+        "checkpoint_2::TestFunctionality::test_rowid_hide_noop_default",
+        "checkpoint_2::TestFunctionality::test_rowid_hide_noop_lists",
+        "checkpoint_2::TestFunctionality::test_rowid_sequential_all_rows",
+        "checkpoint_2::TestFunctionality::test_shape_and_visibility_combinations[params0]",
+        "checkpoint_2::TestFunctionality::test_shape_and_visibility_combinations[params1]",
+        "checkpoint_2::TestFunctionality::test_shape_and_visibility_combinations[params2]",
+        "checkpoint_2::TestFunctionality::test_shapes_consistent_values",
+        "checkpoint_2::TestFunctionality::test_size_variants[1-1]",
+        "checkpoint_2::TestFunctionality::test_size_variants[2-2]",
+        "checkpoint_2::TestFunctionality::test_size_variants[20-5]",
+        "checkpoint_2::TestFunctionality::test_size_variants[5-5]",
+        "checkpoint_2::TestFunctionality::test_sort_desc_keys[age]",
+        "checkpoint_2::TestFunctionality::test_sort_desc_keys[city]",
+        "checkpoint_2::TestFunctionality::test_sort_desc_keys[name]",
+        "checkpoint_2::TestFunctionality::test_sort_desc_precedence_different_columns",
+        "checkpoint_2::TestFunctionality::test_sort_desc_tie_stability",
+        "checkpoint_2::TestFunctionality::test_sort_keys[age]",
+        "checkpoint_2::TestFunctionality::test_sort_keys[city]",
+        "checkpoint_2::TestFunctionality::test_sort_keys[name]",
+        "checkpoint_2::TestFunctionality::test_sort_name_and_city_order_values",
+        "checkpoint_2::TestFunctionality::test_sorted_requests_stable",
+        "checkpoint_2::TestFunctionality::test_total_default_bare_request",
+        "checkpoint_2::TestFunctionality::test_total_ignores_offset_size",
+        "checkpoint_3::TestCore::test_contains_filter",
+        "checkpoint_3::TestCore::test_exact_filter",
+        "checkpoint_3::TestCore::test_excludes_non_numeric_cell",
+        "checkpoint_3::TestCore::test_filter_sort_paginate",
+        "checkpoint_3::TestCore::test_greater_strict",
+        "checkpoint_3::TestCore::test_less_filter",
+        "checkpoint_3::TestCore::test_multi_filter_and",
+        "checkpoint_3::TestCore::test_original_header_filter",
+        "checkpoint_3::TestCore::test_rejects_non_numeric_value",
+        "checkpoint_3::TestCore::test_same_col_filters_and",
+        "checkpoint_3::TestCore::test_total_post_filter",
+        "checkpoint_3::TestError::test_col_name_case_mismatch_400",
+        "checkpoint_3::TestError::test_col_name_must_match_header",
+        "checkpoint_3::TestError::test_duplicate_identical_key_400",
+        "checkpoint_3::TestError::test_duplicate_key_400",
+        "checkpoint_3::TestError::test_numeric_rejects_non_numeric[greater_1,2]",
+        "checkpoint_3::TestError::test_numeric_rejects_non_numeric[greater_abc]",
+        "checkpoint_3::TestError::test_numeric_rejects_non_numeric[greater_none]",
+        "checkpoint_3::TestError::test_numeric_rejects_non_numeric[less_1,2]",
+        "checkpoint_3::TestError::test_numeric_rejects_non_numeric[less_abc]",
+        "checkpoint_3::TestError::test_numeric_rejects_non_numeric[less_none]",
+        "checkpoint_3::TestError::test_unknown_column_400",
+        "checkpoint_3::TestError::test_unknown_comparator_400",
+        "checkpoint_3::TestFunctionality::test_contains_case_sensitive",
+        "checkpoint_3::TestFunctionality::test_contains_empty_value_matches_all",
+        "checkpoint_3::TestFunctionality::test_contains_whitespace_value_match",
+        "checkpoint_3::TestFunctionality::test_exact_empty_value_matches_empty_cells",
+        "checkpoint_3::TestFunctionality::test_exact_whitespace_value_match",
+        "checkpoint_3::TestFunctionality::test_exposed_col_filter",
+        "checkpoint_3::TestFunctionality::test_filter_control_compose[params0]",
+        "checkpoint_3::TestFunctionality::test_filter_control_compose[params1]",
+        "checkpoint_3::TestFunctionality::test_filter_control_compose[params2]",
+        "checkpoint_3::TestFunctionality::test_filter_control_compose[params3]",
+        "checkpoint_3::TestFunctionality::test_filter_matrix[params0-3]",
+        "checkpoint_3::TestFunctionality::test_filter_matrix[params1-2]",
+        "checkpoint_3::TestFunctionality::test_filter_matrix[params2-2]",
+        "checkpoint_3::TestFunctionality::test_filter_matrix[params3-3]",
+        "checkpoint_3::TestFunctionality::test_filter_matrix[params4-1]",
+        "checkpoint_3::TestFunctionality::test_filter_matrix[params5-1]",
+        "checkpoint_3::TestFunctionality::test_filter_sort_paginate_shape",
+        "checkpoint_3::TestFunctionality::test_filter_sort_ties_stable",
+        "checkpoint_3::TestFunctionality::test_header_no_trim",
+        "checkpoint_3::TestFunctionality::test_numeric_bounds_strict",
+        "checkpoint_3::TestFunctionality::test_numeric_like_cells_preserve_whitespace_for_string_filters",
+        "checkpoint_3::TestFunctionality::test_numeric_scientific_notation",
+        "checkpoint_3::TestFunctionality::test_numeric_signed_bounds",
+        "checkpoint_3::TestFunctionality::test_plain_param_ignored",
+        "checkpoint_3::TestFunctionality::test_string_cmp_numeric_cells",
+        "checkpoint_3::TestFunctionality::test_zero_match_filter[contains_whitespace]",
+        "checkpoint_3::TestFunctionality::test_zero_match_filter[exact_case]",
+        "checkpoint_3::TestFunctionality::test_zero_match_filter[exact_whitespace]",
+        "checkpoint_3::TestFunctionality::test_zero_match_filter[no_match]",
+        "checkpoint_4::TestCore::test_convert_csv_charset_honored",
+        "checkpoint_4::TestCore::test_convert_spreadsheet[xls]",
+        "checkpoint_4::TestCore::test_convert_spreadsheet[xlsx]",
+        "checkpoint_4::TestCore::test_convert_spreadsheet_invalid_charset_ignored[xls]",
+        "checkpoint_4::TestCore::test_convert_spreadsheet_invalid_charset_ignored[xlsx]",
+        "checkpoint_4::TestCore::test_convert_unrecognized_format_400",
+        "checkpoint_4::TestCore::test_empty_first_sheet_rejected",
+        "checkpoint_4::TestCore::test_export_content_disposition",
+        "checkpoint_4::TestCore::test_export_csv_headers",
+        "checkpoint_4::TestCore::test_export_filter_sort_page",
+        "checkpoint_4::TestCore::test_export_rows",
+        "checkpoint_4::TestCore::test_export_shape_controls",
+        "checkpoint_4::TestCore::test_export_sort_without_filter",
+        "checkpoint_4::TestCore::test_multisheet_first_only",
+        "checkpoint_4::TestCore::test_spreadsheet_charset_ignored",
+        "checkpoint_4::TestCore::test_spreadsheet_query_controls",
+        "checkpoint_4::TestCore::test_upload_attachment_field",
+        "checkpoint_4::TestCore::test_upload_csv_charset_honored",
+        "checkpoint_4::TestCore::test_upload_file_field",
+        "checkpoint_4::TestCore::test_upload_missing_file_400",
+        "checkpoint_4::TestCore::test_upload_multisheet_first_only",
+        "checkpoint_4::TestCore::test_upload_same_content_deterministic",
+        "checkpoint_4::TestCore::test_upload_spreadsheet_invalid_charset_ignored[xls]",
+        "checkpoint_4::TestCore::test_upload_spreadsheet_invalid_charset_ignored[xlsx]",
+        "checkpoint_4::TestCore::test_upload_xls_attachment",
+        "checkpoint_4::TestCore::test_upload_xlsx_attachment",
+        "checkpoint_4::TestError::test_export_unknown_dataset_404",
+        "checkpoint_4::TestError::test_upload_invalid_body_400",
+        "checkpoint_4::TestError::test_upload_json_rejected",
+        "checkpoint_4::TestFunctionality::test_content_disposition_quoted_filename",
+        "checkpoint_4::TestFunctionality::test_convert_rejects_corrupt_spreadsheet[xls]",
+        "checkpoint_4::TestFunctionality::test_convert_rejects_corrupt_spreadsheet[xlsx]",
+        "checkpoint_4::TestFunctionality::test_export_charset_upload",
+        "checkpoint_4::TestFunctionality::test_export_empty_result_header",
+        "checkpoint_4::TestFunctionality::test_export_matches_query_params",
+        "checkpoint_4::TestFunctionality::test_export_single_row",
+        "checkpoint_4::TestFunctionality::test_export_sort_desc_filter",
+        "checkpoint_4::TestFunctionality::test_export_special_csv_chars",
+        "checkpoint_4::TestFunctionality::test_export_spreadsheet_column_order",
+        "checkpoint_4::TestFunctionality::test_header_only_first_sheet_rejected",
+        "checkpoint_4::TestFunctionality::test_numeric_cells_preserved",
+        "checkpoint_4::TestFunctionality::test_spreadsheet_support_matrix[xls]",
+        "checkpoint_4::TestFunctionality::test_spreadsheet_support_matrix[xlsx]",
+        "checkpoint_4::TestFunctionality::test_spreadsheet_upload_same_bytes_are_deterministic[same.xls-xls-application/vnd.ms-excel]",
+        "checkpoint_4::TestFunctionality::test_spreadsheet_upload_same_bytes_are_deterministic[same.xlsx-xlsx-application/vnd.openxmlformats-officedocument.spreadsheetml.sheet]",
+        "checkpoint_4::TestFunctionality::test_upload_convert_parity",
+        "checkpoint_4::TestFunctionality::test_upload_diff_name_deterministic",
+        "checkpoint_4::TestFunctionality::test_upload_empty_file_400",
+        "checkpoint_4::TestFunctionality::test_upload_field_matrix[attachment]",
+        "checkpoint_4::TestFunctionality::test_upload_field_matrix[file]",
+        "checkpoint_4::TestFunctionality::test_upload_field_name_interchangeable_deterministic",
+        "checkpoint_4::TestFunctionality::test_upload_header_only_csv",
+        "checkpoint_4::TestFunctionality::test_upload_invalid_first_sheet_rejected[empty-first-sheet]",
+        "checkpoint_4::TestFunctionality::test_upload_invalid_first_sheet_rejected[header-only-first-sheet]",
+        "checkpoint_4::TestFunctionality::test_upload_rejects_corrupt_spreadsheet[xls]",
+        "checkpoint_4::TestFunctionality::test_upload_rejects_corrupt_spreadsheet[xlsx]",
+        "checkpoint_4::TestFunctionality::test_upload_unrecognized_format_400",
+        "checkpoint_4::TestFunctionality::test_upload_xlsx_exportable",
+        "checkpoint_4::TestFunctionality::test_uploaded_export_params"
+      ],
+      "verdict": "validated"
+    },
+    "checkpoint_5": {
+      "digest": "a621f32d85c36bad9c87b3088508eb6fda79f33b289803350c5ba0c1ab573619",
+      "nondeterministic": [],
+      "nondeterministic_count": 0,
+      "size": 276,
+      "solvable": [
+        "checkpoint_1::TestCore::test_autodetect_latin1",
+        "checkpoint_1::TestCore::test_charset_latin1",
+        "checkpoint_1::TestCore::test_convert_bad_params[invalid-url]",
+        "checkpoint_1::TestCore::test_convert_bad_params[missing-source]",
+        "checkpoint_1::TestCore::test_decimals_as_numbers",
+        "checkpoint_1::TestCore::test_default_limit_100",
+        "checkpoint_1::TestCore::test_non_tabular_payload",
+        "checkpoint_1::TestCore::test_order_preserved",
+        "checkpoint_1::TestCore::test_query_envelope",
+        "checkpoint_1::TestCore::test_semicolon_delimiter",
+        "checkpoint_1::TestCore::test_single_column_csv",
+        "checkpoint_1::TestCore::test_success_returns_id",
+        "checkpoint_1::TestCore::test_time_values_as_text",
+        "checkpoint_1::TestCore::test_unknown_route_404",
+        "checkpoint_1::TestCore::test_unreachable_source",
+        "checkpoint_1::TestCore::test_upstream_500_to_404",
+        "checkpoint_1::TestError::test_convert_bad_url[bad-scheme]",
+        "checkpoint_1::TestError::test_convert_bad_url[missing-scheme]",
+        "checkpoint_1::TestError::test_empty_source_parameter",
+        "checkpoint_1::TestError::test_header_only_rejected",
+        "checkpoint_1::TestError::test_malformed_charset",
+        "checkpoint_1::TestError::test_unknown_dataset_404",
+        "checkpoint_1::TestError::test_upstream_403_to_404",
+        "checkpoint_1::TestFunctionality::test_common_delimiters[,]",
+        "checkpoint_1::TestFunctionality::test_common_delimiters[;]",
+        "checkpoint_1::TestFunctionality::test_common_delimiters[\\t]",
+        "checkpoint_1::TestFunctionality::test_cors_on_dataset_query",
+        "checkpoint_1::TestFunctionality::test_cors_on_routes[/convert]",
+        "checkpoint_1::TestFunctionality::test_cors_on_routes[/not-found]",
+        "checkpoint_1::TestFunctionality::test_different_urls_different_ids",
+        "checkpoint_1::TestFunctionality::test_empty_file_rejected",
+        "checkpoint_1::TestFunctionality::test_extra_columns_trimmed",
+        "checkpoint_1::TestFunctionality::test_id_from_url_not_charset",
+        "checkpoint_1::TestFunctionality::test_ingest_varied_text_payloads[id,text-1,xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\\n]",
+        "checkpoint_1::TestFunctionality::test_ingest_varied_text_payloads[k,v-left,  space\\nright,space  \\n]",
+        "checkpoint_1::TestFunctionality::test_ingest_varied_text_payloads[name,emoji-alice,smile\\nbob,wave\\n]",
+        "checkpoint_1::TestFunctionality::test_ingest_varied_text_payloads[name,note-alice,naive\\nbob,cafe\\n]",
+        "checkpoint_1::TestFunctionality::test_large_dataset_limit_order",
+        "checkpoint_1::TestFunctionality::test_limit_exactly_100",
+        "checkpoint_1::TestFunctionality::test_multiple_datasets_independent",
+        "checkpoint_1::TestFunctionality::test_negative_values_as_numbers",
+        "checkpoint_1::TestFunctionality::test_options_preflight_cors[/convert]",
+        "checkpoint_1::TestFunctionality::test_options_preflight_cors[/datasets/does-not-exist]",
+        "checkpoint_1::TestFunctionality::test_preserves_header_and_time_whitespace",
+        "checkpoint_1::TestFunctionality::test_preserves_whitespace",
+        "checkpoint_1::TestFunctionality::test_query_stable",
+        "checkpoint_1::TestFunctionality::test_relative_endpoint",
+        "checkpoint_1::TestFunctionality::test_same_url_same_id",
+        "checkpoint_1::TestFunctionality::test_time_boundary_values_are_text",
+        "checkpoint_1::TestFunctionality::test_trailing_empty_line_excluded",
+        "checkpoint_2::TestCore::test_invalid_param_400[invalid_shape]",
+        "checkpoint_2::TestCore::test_invalid_param_400[invalid_size]",
+        "checkpoint_2::TestCore::test_rowid_hide_removes_rowid",
+        "checkpoint_2::TestCore::test_rowid_ignores_sort",
+        "checkpoint_2::TestCore::test_shape_objects_includes_rowid",
+        "checkpoint_2::TestCore::test_size_and_offset_apply",
+        "checkpoint_2::TestCore::test_sort_ascending_is_stable",
+        "checkpoint_2::TestCore::test_sort_desc_paginate",
+        "checkpoint_2::TestCore::test_sort_desc_precedence",
+        "checkpoint_2::TestCore::test_total_before_pagination",
+        "checkpoint_2::TestCore::test_total_hide_removes_total",
+        "checkpoint_2::TestError::test_bad_offset_values[-1]",
+        "checkpoint_2::TestError::test_bad_offset_values[2.5]",
+        "checkpoint_2::TestError::test_bad_offset_values[oops]",
+        "checkpoint_2::TestError::test_bad_size_values[-1]",
+        "checkpoint_2::TestError::test_bad_size_values[0]",
+        "checkpoint_2::TestError::test_bad_size_values[3.1]",
+        "checkpoint_2::TestError::test_bad_size_values[abc]",
+        "checkpoint_2::TestError::test_duplicate_control_params_400[_offset=1&_offset=2]",
+        "checkpoint_2::TestError::test_duplicate_control_params_400[_rowid=hide&_rowid=hide]",
+        "checkpoint_2::TestError::test_duplicate_control_params_400[_shape=lists&_shape=objects]",
+        "checkpoint_2::TestError::test_duplicate_control_params_400[_size=1&_size=2]",
+        "checkpoint_2::TestError::test_duplicate_control_params_400[_sort=age&_sort=name]",
+        "checkpoint_2::TestError::test_duplicate_control_params_400[_sort_desc=age&_sort_desc=name]",
+        "checkpoint_2::TestError::test_duplicate_control_params_400[_total=hide&_total=hide]",
+        "checkpoint_2::TestError::test_empty_param_value_400[offset]",
+        "checkpoint_2::TestError::test_empty_param_value_400[shape]",
+        "checkpoint_2::TestError::test_empty_param_value_400[size]",
+        "checkpoint_2::TestError::test_empty_sort_both_params_400[_sort=age&_sort_desc=]",
+        "checkpoint_2::TestError::test_empty_sort_value_400[_sort]",
+        "checkpoint_2::TestError::test_empty_sort_value_400[_sort_desc]",
+        "checkpoint_2::TestError::test_invalid_rowid_list_or_default[params0]",
+        "checkpoint_2::TestError::test_invalid_rowid_list_or_default[params1]",
+        "checkpoint_2::TestError::test_invalid_total_default_shape",
+        "checkpoint_2::TestError::test_unknown_sort_column_400",
+        "checkpoint_2::TestError::test_visibility_invalid_value_400[_rowid-false]",
+        "checkpoint_2::TestError::test_visibility_invalid_value_400[_rowid-show]",
+        "checkpoint_2::TestError::test_visibility_invalid_value_400[_total-0]",
+        "checkpoint_2::TestError::test_visibility_invalid_value_400[_total-show]",
+        "checkpoint_2::TestFunctionality::test_columns_exclude_rowid",
+        "checkpoint_2::TestFunctionality::test_composed_controls",
+        "checkpoint_2::TestFunctionality::test_empty_toggle_value_400[_rowid]",
+        "checkpoint_2::TestFunctionality::test_empty_toggle_value_400[_total]",
+        "checkpoint_2::TestFunctionality::test_large_size_returns_all_rows",
+        "checkpoint_2::TestFunctionality::test_offset_at_dataset_length",
+        "checkpoint_2::TestFunctionality::test_offset_variants[0-Alice]",
+        "checkpoint_2::TestFunctionality::test_offset_variants[1-Bob]",
+        "checkpoint_2::TestFunctionality::test_offset_variants[10-None]",
+        "checkpoint_2::TestFunctionality::test_offset_variants[4-Eve]",
+        "checkpoint_2::TestFunctionality::test_rowid_hide_noop_default",
+        "checkpoint_2::TestFunctionality::test_rowid_hide_noop_lists",
+        "checkpoint_2::TestFunctionality::test_rowid_sequential_all_rows",
+        "checkpoint_2::TestFunctionality::test_shape_and_visibility_combinations[params0]",
+        "checkpoint_2::TestFunctionality::test_shape_and_visibility_combinations[params1]",
+        "checkpoint_2::TestFunctionality::test_shape_and_visibility_combinations[params2]",
+        "checkpoint_2::TestFunctionality::test_shapes_consistent_values",
+        "checkpoint_2::TestFunctionality::test_size_variants[1-1]",
+        "checkpoint_2::TestFunctionality::test_size_variants[2-2]",
+        "checkpoint_2::TestFunctionality::test_size_variants[20-5]",
+        "checkpoint_2::TestFunctionality::test_size_variants[5-5]",
+        "checkpoint_2::TestFunctionality::test_sort_desc_keys[age]",
+        "checkpoint_2::TestFunctionality::test_sort_desc_keys[city]",
+        "checkpoint_2::TestFunctionality::test_sort_desc_keys[name]",
+        "checkpoint_2::TestFunctionality::test_sort_desc_precedence_different_columns",
+        "checkpoint_2::TestFunctionality::test_sort_desc_tie_stability",
+        "checkpoint_2::TestFunctionality::test_sort_keys[age]",
+        "checkpoint_2::TestFunctionality::test_sort_keys[city]",
+        "checkpoint_2::TestFunctionality::test_sort_keys[name]",
+        "checkpoint_2::TestFunctionality::test_sort_name_and_city_order_values",
+        "checkpoint_2::TestFunctionality::test_sorted_requests_stable",
+        "checkpoint_2::TestFunctionality::test_total_default_bare_request",
+        "checkpoint_2::TestFunctionality::test_total_ignores_offset_size",
+        "checkpoint_3::TestCore::test_contains_filter",
+        "checkpoint_3::TestCore::test_exact_filter",
+        "checkpoint_3::TestCore::test_excludes_non_numeric_cell",
+        "checkpoint_3::TestCore::test_filter_sort_paginate",
+        "checkpoint_3::TestCore::test_greater_strict",
+        "checkpoint_3::TestCore::test_less_filter",
+        "checkpoint_3::TestCore::test_multi_filter_and",
+        "checkpoint_3::TestCore::test_original_header_filter",
+        "checkpoint_3::TestCore::test_rejects_non_numeric_value",
+        "checkpoint_3::TestCore::test_same_col_filters_and",
+        "checkpoint_3::TestCore::test_total_post_filter",
+        "checkpoint_3::TestError::test_col_name_case_mismatch_400",
+        "checkpoint_3::TestError::test_col_name_must_match_header",
+        "checkpoint_3::TestError::test_duplicate_identical_key_400",
+        "checkpoint_3::TestError::test_duplicate_key_400",
+        "checkpoint_3::TestError::test_numeric_rejects_non_numeric[greater_1,2]",
+        "checkpoint_3::TestError::test_numeric_rejects_non_numeric[greater_abc]",
+        "checkpoint_3::TestError::test_numeric_rejects_non_numeric[greater_none]",
+        "checkpoint_3::TestError::test_numeric_rejects_non_numeric[less_1,2]",
+        "checkpoint_3::TestError::test_numeric_rejects_non_numeric[less_abc]",
+        "checkpoint_3::TestError::test_numeric_rejects_non_numeric[less_none]",
+        "checkpoint_3::TestError::test_unknown_column_400",
+        "checkpoint_3::TestError::test_unknown_comparator_400",
+        "checkpoint_3::TestFunctionality::test_contains_case_sensitive",
+        "checkpoint_3::TestFunctionality::test_contains_empty_value_matches_all",
+        "checkpoint_3::TestFunctionality::test_contains_whitespace_value_match",
+        "checkpoint_3::TestFunctionality::test_exact_empty_value_matches_empty_cells",
+        "checkpoint_3::TestFunctionality::test_exact_whitespace_value_match",
+        "checkpoint_3::TestFunctionality::test_exposed_col_filter",
+        "checkpoint_3::TestFunctionality::test_filter_control_compose[params0]",
+        "checkpoint_3::TestFunctionality::test_filter_control_compose[params1]",
+        "checkpoint_3::TestFunctionality::test_filter_control_compose[params2]",
+        "checkpoint_3::TestFunctionality::test_filter_control_compose[params3]",
+        "checkpoint_3::TestFunctionality::test_filter_matrix[params0-3]",
+        "checkpoint_3::TestFunctionality::test_filter_matrix[params1-2]",
+        "checkpoint_3::TestFunctionality::test_filter_matrix[params2-2]",
+        "checkpoint_3::TestFunctionality::test_filter_matrix[params3-3]",
+        "checkpoint_3::TestFunctionality::test_filter_matrix[params4-1]",
+        "checkpoint_3::TestFunctionality::test_filter_matrix[params5-1]",
+        "checkpoint_3::TestFunctionality::test_filter_sort_paginate_shape",
+        "checkpoint_3::TestFunctionality::test_filter_sort_ties_stable",
+        "checkpoint_3::TestFunctionality::test_header_no_trim",
+        "checkpoint_3::TestFunctionality::test_numeric_bounds_strict",
+        "checkpoint_3::TestFunctionality::test_numeric_like_cells_preserve_whitespace_for_string_filters",
+        "checkpoint_3::TestFunctionality::test_numeric_scientific_notation",
+        "checkpoint_3::TestFunctionality::test_numeric_signed_bounds",
+        "checkpoint_3::TestFunctionality::test_plain_param_ignored",
+        "checkpoint_3::TestFunctionality::test_string_cmp_numeric_cells",
+        "checkpoint_3::TestFunctionality::test_zero_match_filter[contains_whitespace]",
+        "checkpoint_3::TestFunctionality::test_zero_match_filter[exact_case]",
+        "checkpoint_3::TestFunctionality::test_zero_match_filter[exact_whitespace]",
+        "checkpoint_3::TestFunctionality::test_zero_match_filter[no_match]",
+        "checkpoint_4::TestCore::test_convert_csv_charset_honored",
+        "checkpoint_4::TestCore::test_convert_spreadsheet[xls]",
+        "checkpoint_4::TestCore::test_convert_spreadsheet[xlsx]",
+        "checkpoint_4::TestCore::test_convert_spreadsheet_invalid_charset_ignored[xls]",
+        "checkpoint_4::TestCore::test_convert_spreadsheet_invalid_charset_ignored[xlsx]",
+        "checkpoint_4::TestCore::test_convert_unrecognized_format_400",
+        "checkpoint_4::TestCore::test_empty_first_sheet_rejected",
+        "checkpoint_4::TestCore::test_export_content_disposition",
+        "checkpoint_4::TestCore::test_export_csv_headers",
+        "checkpoint_4::TestCore::test_export_filter_sort_page",
+        "checkpoint_4::TestCore::test_export_rows",
+        "checkpoint_4::TestCore::test_export_shape_controls",
+        "checkpoint_4::TestCore::test_export_sort_without_filter",
+        "checkpoint_4::TestCore::test_multisheet_first_only",
+        "checkpoint_4::TestCore::test_spreadsheet_charset_ignored",
+        "checkpoint_4::TestCore::test_spreadsheet_query_controls",
+        "checkpoint_4::TestCore::test_upload_attachment_field",
+        "checkpoint_4::TestCore::test_upload_csv_charset_honored",
+        "checkpoint_4::TestCore::test_upload_file_field",
+        "checkpoint_4::TestCore::test_upload_missing_file_400",
+        "checkpoint_4::TestCore::test_upload_multisheet_first_only",
+        "checkpoint_4::TestCore::test_upload_same_content_deterministic",
+        "checkpoint_4::TestCore::test_upload_spreadsheet_invalid_charset_ignored[xls]",
+        "checkpoint_4::TestCore::test_upload_spreadsheet_invalid_charset_ignored[xlsx]",
+        "checkpoint_4::TestCore::test_upload_xls_attachment",
+        "checkpoint_4::TestCore::test_upload_xlsx_attachment",
+        "checkpoint_4::TestError::test_export_unknown_dataset_404",
+        "checkpoint_4::TestError::test_upload_invalid_body_400",
+        "checkpoint_4::TestError::test_upload_json_rejected",
+        "checkpoint_4::TestFunctionality::test_content_disposition_quoted_filename",
+        "checkpoint_4::TestFunctionality::test_convert_rejects_corrupt_spreadsheet[xls]",
+        "checkpoint_4::TestFunctionality::test_convert_rejects_corrupt_spreadsheet[xlsx]",
+        "checkpoint_4::TestFunctionality::test_export_charset_upload",
+        "checkpoint_4::TestFunctionality::test_export_empty_result_header",
+        "checkpoint_4::TestFunctionality::test_export_matches_query_params",
+        "checkpoint_4::TestFunctionality::test_export_single_row",
+        "checkpoint_4::TestFunctionality::test_export_sort_desc_filter",
+        "checkpoint_4::TestFunctionality::test_export_special_csv_chars",
+        "checkpoint_4::TestFunctionality::test_export_spreadsheet_column_order",
+        "checkpoint_4::TestFunctionality::test_header_only_first_sheet_rejected",
+        "checkpoint_4::TestFunctionality::test_numeric_cells_preserved",
+        "checkpoint_4::TestFunctionality::test_spreadsheet_support_matrix[xls]",
+        "checkpoint_4::TestFunctionality::test_spreadsheet_support_matrix[xlsx]",
+        "checkpoint_4::TestFunctionality::test_spreadsheet_upload_same_bytes_are_deterministic[same.xls-xls-application/vnd.ms-excel]",
+        "checkpoint_4::TestFunctionality::test_spreadsheet_upload_same_bytes_are_deterministic[same.xlsx-xlsx-application/vnd.openxmlformats-officedocument.spreadsheetml.sheet]",
+        "checkpoint_4::TestFunctionality::test_upload_convert_parity",
+        "checkpoint_4::TestFunctionality::test_upload_diff_name_deterministic",
+        "checkpoint_4::TestFunctionality::test_upload_empty_file_400",
+        "checkpoint_4::TestFunctionality::test_upload_field_matrix[attachment]",
+        "checkpoint_4::TestFunctionality::test_upload_field_matrix[file]",
+        "checkpoint_4::TestFunctionality::test_upload_field_name_interchangeable_deterministic",
+        "checkpoint_4::TestFunctionality::test_upload_header_only_csv",
+        "checkpoint_4::TestFunctionality::test_upload_invalid_first_sheet_rejected[empty-first-sheet]",
+        "checkpoint_4::TestFunctionality::test_upload_invalid_first_sheet_rejected[header-only-first-sheet]",
+        "checkpoint_4::TestFunctionality::test_upload_rejects_corrupt_spreadsheet[xls]",
+        "checkpoint_4::TestFunctionality::test_upload_rejects_corrupt_spreadsheet[xlsx]",
+        "checkpoint_4::TestFunctionality::test_upload_unrecognized_format_400",
+        "checkpoint_4::TestFunctionality::test_upload_xlsx_exportable",
+        "checkpoint_4::TestFunctionality::test_uploaded_export_params",
+        "checkpoint_5::TestCore::test_cache_disabled_refetches",
+        "checkpoint_5::TestCore::test_cache_reuses_without_refetch",
+        "checkpoint_5::TestCore::test_cached_serves_when_source_down",
+        "checkpoint_5::TestCore::test_dataset_id_url_deterministic",
+        "checkpoint_5::TestCore::test_disabled_convert_replaces",
+        "checkpoint_5::TestCore::test_failed_force_keeps_cached",
+        "checkpoint_5::TestCore::test_false_spellings_disable_cache[0]",
+        "checkpoint_5::TestCore::test_false_spellings_disable_cache[false]",
+        "checkpoint_5::TestCore::test_false_spellings_disable_cache[no]",
+        "checkpoint_5::TestCore::test_false_spellings_disable_cache[off]",
+        "checkpoint_5::TestCore::test_force_failure_returns_404",
+        "checkpoint_5::TestCore::test_force_updates_dataset",
+        "checkpoint_5::TestCore::test_invalid_value_fails_startup",
+        "checkpoint_5::TestCore::test_response_shape_consistent",
+        "checkpoint_5::TestCore::test_true_spellings_enable_cache[1]",
+        "checkpoint_5::TestCore::test_true_spellings_enable_cache[on]",
+        "checkpoint_5::TestCore::test_true_spellings_enable_cache[true]",
+        "checkpoint_5::TestCore::test_true_spellings_enable_cache[yes]",
+        "checkpoint_5::TestError::test_disabled_source_failure_propagates",
+        "checkpoint_5::TestError::test_duplicate_force_returns_400",
+        "checkpoint_5::TestError::test_force_unreachable_stays_404",
+        "checkpoint_5::TestFunctionality::test_arbitrary_force_triggers_refresh",
+        "checkpoint_5::TestFunctionality::test_cache_hit_preserves_data",
+        "checkpoint_5::TestFunctionality::test_cache_isolation_across_sources",
+        "checkpoint_5::TestFunctionality::test_different_urls_get_different_ids[different-urls]",
+        "checkpoint_5::TestFunctionality::test_different_urls_get_different_ids[same-content-different-urls]",
+        "checkpoint_5::TestFunctionality::test_disabled_force_no_extra_effect",
+        "checkpoint_5::TestFunctionality::test_disabled_same_url_same_id",
+        "checkpoint_5::TestFunctionality::test_disabled_unparseable_returns_400",
+        "checkpoint_5::TestFunctionality::test_duplicate_force_disabled_400",
+        "checkpoint_5::TestFunctionality::test_force_bare_param_triggers_refresh",
+        "checkpoint_5::TestFunctionality::test_force_on_first_convert",
+        "checkpoint_5::TestFunctionality::test_force_reingest_when_disabled",
+        "checkpoint_5::TestFunctionality::test_force_then_cache_source_down",
+        "checkpoint_5::TestFunctionality::test_force_unparseable_keeps_dataset",
+        "checkpoint_5::TestFunctionality::test_force_variants_trigger_refresh[1]",
+        "checkpoint_5::TestFunctionality::test_force_variants_trigger_refresh[on]",
+        "checkpoint_5::TestFunctionality::test_force_variants_trigger_refresh[true]",
+        "checkpoint_5::TestFunctionality::test_force_variants_trigger_refresh[yes]",
+        "checkpoint_5::TestFunctionality::test_forced_error_keys_match_normal",
+        "checkpoint_5::TestFunctionality::test_forced_response_keys_match_fresh",
+        "checkpoint_5::TestFunctionality::test_no_force_after_refresh_updated",
+        "checkpoint_5::TestFunctionality::test_whitespace_fails_startup"
+      ],
+      "verdict": "validated"
+    },
+    "checkpoint_6": {
+      "digest": "af8db42d4f9a60c7f6cd093301c2a38808772171d96de894fefe7f149fa29b82",
+      "nondeterministic": [],
+      "nondeterministic_count": 0,
+      "size": 353,
+      "solvable": [
+        "checkpoint_1::TestCore::test_autodetect_latin1",
+        "checkpoint_1::TestCore::test_charset_latin1",
+        "checkpoint_1::TestCore::test_convert_bad_params[invalid-url]",
+        "checkpoint_1::TestCore::test_convert_bad_params[missing-source]",
+        "checkpoint_1::TestCore::test_decimals_as_numbers",
+        "checkpoint_1::TestCore::test_default_limit_100",
+        "checkpoint_1::TestCore::test_non_tabular_payload",
+        "checkpoint_1::TestCore::test_order_preserved",
+        "checkpoint_1::TestCore::test_query_envelope",
+        "checkpoint_1::TestCore::test_semicolon_delimiter",
+        "checkpoint_1::TestCore::test_single_column_csv",
+        "checkpoint_1::TestCore::test_success_returns_id",
+        "checkpoint_1::TestCore::test_time_values_as_text",
+        "checkpoint_1::TestCore::test_unknown_route_404",
+        "checkpoint_1::TestCore::test_unreachable_source",
+        "checkpoint_1::TestCore::test_upstream_500_to_404",
+        "checkpoint_1::TestError::test_convert_bad_url[bad-scheme]",
+        "checkpoint_1::TestError::test_convert_bad_url[missing-scheme]",
+        "checkpoint_1::TestError::test_empty_source_parameter",
+        "checkpoint_1::TestError::test_header_only_rejected",
+        "checkpoint_1::TestError::test_malformed_charset",
+        "checkpoint_1::TestError::test_unknown_dataset_404",
+        "checkpoint_1::TestError::test_upstream_403_to_404",
+        "checkpoint_1::TestFunctionality::test_common_delimiters[,]",
+        "checkpoint_1::TestFunctionality::test_common_delimiters[;]",
+        "checkpoint_1::TestFunctionality::test_common_delimiters[\\t]",
+        "checkpoint_1::TestFunctionality::test_cors_on_dataset_query",
+        "checkpoint_1::TestFunctionality::test_cors_on_routes[/convert]",
+        "checkpoint_1::TestFunctionality::test_cors_on_routes[/not-found]",
+        "checkpoint_1::TestFunctionality::test_different_urls_different_ids",
+        "checkpoint_1::TestFunctionality::test_empty_file_rejected",
+        "checkpoint_1::TestFunctionality::test_extra_columns_trimmed",
+        "checkpoint_1::TestFunctionality::test_id_from_url_not_charset",
+        "checkpoint_1::TestFunctionality::test_ingest_varied_text_payloads[id,text-1,xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\\n]",
+        "checkpoint_1::TestFunctionality::test_ingest_varied_text_payloads[k,v-left,  space\\nright,space  \\n]",
+        "checkpoint_1::TestFunctionality::test_ingest_varied_text_payloads[name,emoji-alice,smile\\nbob,wave\\n]",
+        "checkpoint_1::TestFunctionality::test_ingest_varied_text_payloads[name,note-alice,naive\\nbob,cafe\\n]",
+        "checkpoint_1::TestFunctionality::test_large_dataset_limit_order",
+        "checkpoint_1::TestFunctionality::test_limit_exactly_100",
+        "checkpoint_1::TestFunctionality::test_multiple_datasets_independent",
+        "checkpoint_1::TestFunctionality::test_negative_values_as_numbers",
+        "checkpoint_1::TestFunctionality::test_options_preflight_cors[/convert]",
+        "checkpoint_1::TestFunctionality::test_options_preflight_cors[/datasets/does-not-exist]",
+        "checkpoint_1::TestFunctionality::test_preserves_header_and_time_whitespace",
+        "checkpoint_1::TestFunctionality::test_preserves_whitespace",
+        "checkpoint_1::TestFunctionality::test_query_stable",
+        "checkpoint_1::TestFunctionality::test_relative_endpoint",
+        "checkpoint_1::TestFunctionality::test_same_url_same_id",
+        "checkpoint_1::TestFunctionality::test_time_boundary_values_are_text",
+        "checkpoint_1::TestFunctionality::test_trailing_empty_line_excluded",
+        "checkpoint_2::TestCore::test_invalid_param_400[invalid_shape]",
+        "checkpoint_2::TestCore::test_invalid_param_400[invalid_size]",
+        "checkpoint_2::TestCore::test_rowid_hide_removes_rowid",
+        "checkpoint_2::TestCore::test_rowid_ignores_sort",
+        "checkpoint_2::TestCore::test_shape_objects_includes_rowid",
+        "checkpoint_2::TestCore::test_size_and_offset_apply",
+        "checkpoint_2::TestCore::test_sort_ascending_is_stable",
+        "checkpoint_2::TestCore::test_sort_desc_paginate",
+        "checkpoint_2::TestCore::test_sort_desc_precedence",
+        "checkpoint_2::TestCore::test_total_before_pagination",
+        "checkpoint_2::TestCore::test_total_hide_removes_total",
+        "checkpoint_2::TestError::test_bad_offset_values[-1]",
+        "checkpoint_2::TestError::test_bad_offset_values[2.5]",
+        "checkpoint_2::TestError::test_bad_offset_values[oops]",
+        "checkpoint_2::TestError::test_bad_size_values[-1]",
+        "checkpoint_2::TestError::test_bad_size_values[0]",
+        "checkpoint_2::TestError::test_bad_size_values[3.1]",
+        "checkpoint_2::TestError::test_bad_size_values[abc]",
+        "checkpoint_2::TestError::test_duplicate_control_params_400[_offset=1&_offset=2]",
+        "checkpoint_2::TestError::test_duplicate_control_params_400[_rowid=hide&_rowid=hide]",
+        "checkpoint_2::TestError::test_duplicate_control_params_400[_shape=lists&_shape=objects]",
+        "checkpoint_2::TestError::test_duplicate_control_params_400[_size=1&_size=2]",
+        "checkpoint_2::TestError::test_duplicate_control_params_400[_sort=age&_sort=name]",
+        "checkpoint_2::TestError::test_duplicate_control_params_400[_sort_desc=age&_sort_desc=name]",
+        "checkpoint_2::TestError::test_duplicate_control_params_400[_total=hide&_total=hide]",
+        "checkpoint_2::TestError::test_empty_param_value_400[offset]",
+        "checkpoint_2::TestError::test_empty_param_value_400[shape]",
+        "checkpoint_2::TestError::test_empty_param_value_400[size]",
+        "checkpoint_2::TestError::test_empty_sort_both_params_400[_sort=age&_sort_desc=]",
+        "checkpoint_2::TestError::test_empty_sort_value_400[_sort]",
+        "checkpoint_2::TestError::test_empty_sort_value_400[_sort_desc]",
+        "checkpoint_2::TestError::test_invalid_rowid_list_or_default[params0]",
+        "checkpoint_2::TestError::test_invalid_rowid_list_or_default[params1]",
+        "checkpoint_2::TestError::test_invalid_total_default_shape",
+        "checkpoint_2::TestError::test_unknown_sort_column_400",
+        "checkpoint_2::TestError::test_visibility_invalid_value_400[_rowid-false]",
+        "checkpoint_2::TestError::test_visibility_invalid_value_400[_rowid-show]",
+        "checkpoint_2::TestError::test_visibility_invalid_value_400[_total-0]",
+        "checkpoint_2::TestError::test_visibility_invalid_value_400[_total-show]",
+        "checkpoint_2::TestFunctionality::test_columns_exclude_rowid",
+        "checkpoint_2::TestFunctionality::test_composed_controls",
+        "checkpoint_2::TestFunctionality::test_empty_toggle_value_400[_rowid]",
+        "checkpoint_2::TestFunctionality::test_empty_toggle_value_400[_total]",
+        "checkpoint_2::TestFunctionality::test_large_size_returns_all_rows",
+        "checkpoint_2::TestFunctionality::test_offset_at_dataset_length",
+        "checkpoint_2::TestFunctionality::test_offset_variants[0-Alice]",
+        "checkpoint_2::TestFunctionality::test_offset_variants[1-Bob]",
+        "checkpoint_2::TestFunctionality::test_offset_variants[10-None]",
+        "checkpoint_2::TestFunctionality::test_offset_variants[4-Eve]",
+        "checkpoint_2::TestFunctionality::test_rowid_hide_noop_default",
+        "checkpoint_2::TestFunctionality::test_rowid_hide_noop_lists",
+        "checkpoint_2::TestFunctionality::test_rowid_sequential_all_rows",
+        "checkpoint_2::TestFunctionality::test_shape_and_visibility_combinations[params0]",
+        "checkpoint_2::TestFunctionality::test_shape_and_visibility_combinations[params1]",
+        "checkpoint_2::TestFunctionality::test_shape_and_visibility_combinations[params2]",
+        "checkpoint_2::TestFunctionality::test_shapes_consistent_values",
+        "checkpoint_2::TestFunctionality::test_size_variants[1-1]",
+        "checkpoint_2::TestFunctionality::test_size_variants[2-2]",
+        "checkpoint_2::TestFunctionality::test_size_variants[20-5]",
+        "checkpoint_2::TestFunctionality::test_size_variants[5-5]",
+        "checkpoint_2::TestFunctionality::test_sort_desc_keys[age]",
+        "checkpoint_2::TestFunctionality::test_sort_desc_keys[city]",
+        "checkpoint_2::TestFunctionality::test_sort_desc_keys[name]",
+        "checkpoint_2::TestFunctionality::test_sort_desc_precedence_different_columns",
+        "checkpoint_2::TestFunctionality::test_sort_desc_tie_stability",
+        "checkpoint_2::TestFunctionality::test_sort_keys[age]",
+        "checkpoint_2::TestFunctionality::test_sort_keys[city]",
+        "checkpoint_2::TestFunctionality::test_sort_keys[name]",
+        "checkpoint_2::TestFunctionality::test_sort_name_and_city_order_values",
+        "checkpoint_2::TestFunctionality::test_sorted_requests_stable",
+        "checkpoint_2::TestFunctionality::test_total_default_bare_request",
+        "checkpoint_2::TestFunctionality::test_total_ignores_offset_size",
+        "checkpoint_3::TestCore::test_contains_filter",
+        "checkpoint_3::TestCore::test_exact_filter",
+        "checkpoint_3::TestCore::test_excludes_non_numeric_cell",
+        "checkpoint_3::TestCore::test_filter_sort_paginate",
+        "checkpoint_3::TestCore::test_greater_strict",
+        "checkpoint_3::TestCore::test_less_filter",
+        "checkpoint_3::TestCore::test_multi_filter_and",
+        "checkpoint_3::TestCore::test_original_header_filter",
+        "checkpoint_3::TestCore::test_rejects_non_numeric_value",
+        "checkpoint_3::TestCore::test_same_col_filters_and",
+        "checkpoint_3::TestCore::test_total_post_filter",
+        "checkpoint_3::TestError::test_col_name_case_mismatch_400",
+        "checkpoint_3::TestError::test_col_name_must_match_header",
+        "checkpoint_3::TestError::test_duplicate_identical_key_400",
+        "checkpoint_3::TestError::test_duplicate_key_400",
+        "checkpoint_3::TestError::test_numeric_rejects_non_numeric[greater_1,2]",
+        "checkpoint_3::TestError::test_numeric_rejects_non_numeric[greater_abc]",
+        "checkpoint_3::TestError::test_numeric_rejects_non_numeric[greater_none]",
+        "checkpoint_3::TestError::test_numeric_rejects_non_numeric[less_1,2]",
+        "checkpoint_3::TestError::test_numeric_rejects_non_numeric[less_abc]",
+        "checkpoint_3::TestError::test_numeric_rejects_non_numeric[less_none]",
+        "checkpoint_3::TestError::test_unknown_column_400",
+        "checkpoint_3::TestError::test_unknown_comparator_400",
+        "checkpoint_3::TestFunctionality::test_contains_case_sensitive",
+        "checkpoint_3::TestFunctionality::test_contains_empty_value_matches_all",
+        "checkpoint_3::TestFunctionality::test_contains_whitespace_value_match",
+        "checkpoint_3::TestFunctionality::test_exact_empty_value_matches_empty_cells",
+        "checkpoint_3::TestFunctionality::test_exact_whitespace_value_match",
+        "checkpoint_3::TestFunctionality::test_exposed_col_filter",
+        "checkpoint_3::TestFunctionality::test_filter_control_compose[params0]",
+        "checkpoint_3::TestFunctionality::test_filter_control_compose[params1]",
+        "checkpoint_3::TestFunctionality::test_filter_control_compose[params2]",
+        "checkpoint_3::TestFunctionality::test_filter_control_compose[params3]",
+        "checkpoint_3::TestFunctionality::test_filter_matrix[params0-3]",
+        "checkpoint_3::TestFunctionality::test_filter_matrix[params1-2]",
+        "checkpoint_3::TestFunctionality::test_filter_matrix[params2-2]",
+        "checkpoint_3::TestFunctionality::test_filter_matrix[params3-3]",
+        "checkpoint_3::TestFunctionality::test_filter_matrix[params4-1]",
+        "checkpoint_3::TestFunctionality::test_filter_matrix[params5-1]",
+        "checkpoint_3::TestFunctionality::test_filter_sort_paginate_shape",
+        "checkpoint_3::TestFunctionality::test_filter_sort_ties_stable",
+        "checkpoint_3::TestFunctionality::test_header_no_trim",
+        "checkpoint_3::TestFunctionality::test_numeric_bounds_strict",
+        "checkpoint_3::TestFunctionality::test_numeric_like_cells_preserve_whitespace_for_string_filters",
+        "checkpoint_3::TestFunctionality::test_numeric_scientific_notation",
+        "checkpoint_3::TestFunctionality::test_numeric_signed_bounds",
+        "checkpoint_3::TestFunctionality::test_plain_param_ignored",
+        "checkpoint_3::TestFunctionality::test_string_cmp_numeric_cells",
+        "checkpoint_3::TestFunctionality::test_zero_match_filter[contains_whitespace]",
+        "checkpoint_3::TestFunctionality::test_zero_match_filter[exact_case]",
+        "checkpoint_3::TestFunctionality::test_zero_match_filter[exact_whitespace]",
+        "checkpoint_3::TestFunctionality::test_zero_match_filter[no_match]",
+        "checkpoint_4::TestCore::test_convert_csv_charset_honored",
+        "checkpoint_4::TestCore::test_convert_spreadsheet[xls]",
+        "checkpoint_4::TestCore::test_convert_spreadsheet[xlsx]",
+        "checkpoint_4::TestCore::test_convert_spreadsheet_invalid_charset_ignored[xls]",
+        "checkpoint_4::TestCore::test_convert_spreadsheet_invalid_charset_ignored[xlsx]",
+        "checkpoint_4::TestCore::test_convert_unrecognized_format_400",
+        "checkpoint_4::TestCore::test_empty_first_sheet_rejected",
+        "checkpoint_4::TestCore::test_export_content_disposition",
+        "checkpoint_4::TestCore::test_export_csv_headers",
+        "checkpoint_4::TestCore::test_export_filter_sort_page",
+        "checkpoint_4::TestCore::test_export_rows",
+        "checkpoint_4::TestCore::test_export_shape_controls",
+        "checkpoint_4::TestCore::test_export_sort_without_filter",
+        "checkpoint_4::TestCore::test_multisheet_first_only",
+        "checkpoint_4::TestCore::test_spreadsheet_charset_ignored",
+        "checkpoint_4::TestCore::test_spreadsheet_query_controls",
+        "checkpoint_4::TestCore::test_upload_attachment_field",
+        "checkpoint_4::TestCore::test_upload_csv_charset_honored",
+        "checkpoint_4::TestCore::test_upload_file_field",
+        "checkpoint_4::TestCore::test_upload_missing_file_400",
+        "checkpoint_4::TestCore::test_upload_multisheet_first_only",
+        "checkpoint_4::TestCore::test_upload_same_content_deterministic",
+        "checkpoint_4::TestCore::test_upload_spreadsheet_invalid_charset_ignored[xls]",
+        "checkpoint_4::TestCore::test_upload_spreadsheet_invalid_charset_ignored[xlsx]",
+        "checkpoint_4::TestCore::test_upload_xls_attachment",
+        "checkpoint_4::TestCore::test_upload_xlsx_attachment",
+        "checkpoint_4::TestError::test_export_unknown_dataset_404",
+        "checkpoint_4::TestError::test_upload_invalid_body_400",
+        "checkpoint_4::TestError::test_upload_json_rejected",
+        "checkpoint_4::TestFunctionality::test_content_disposition_quoted_filename",
+        "checkpoint_4::TestFunctionality::test_convert_rejects_corrupt_spreadsheet[xls]",
+        "checkpoint_4::TestFunctionality::test_convert_rejects_corrupt_spreadsheet[xlsx]",
+        "checkpoint_4::TestFunctionality::test_export_charset_upload",
+        "checkpoint_4::TestFunctionality::test_export_empty_result_header",
+        "checkpoint_4::TestFunctionality::test_export_matches_query_params",
+        "checkpoint_4::TestFunctionality::test_export_single_row",
+        "checkpoint_4::TestFunctionality::test_export_sort_desc_filter",
+        "checkpoint_4::TestFunctionality::test_export_special_csv_chars",
+        "checkpoint_4::TestFunctionality::test_export_spreadsheet_column_order",
+        "checkpoint_4::TestFunctionality::test_header_only_first_sheet_rejected",
+        "checkpoint_4::TestFunctionality::test_numeric_cells_preserved",
+        "checkpoint_4::TestFunctionality::test_spreadsheet_support_matrix[xls]",
+        "checkpoint_4::TestFunctionality::test_spreadsheet_support_matrix[xlsx]",
+        "checkpoint_4::TestFunctionality::test_spreadsheet_upload_same_bytes_are_deterministic[same.xls-xls-application/vnd.ms-excel]",
+        "checkpoint_4::TestFunctionality::test_spreadsheet_upload_same_bytes_are_deterministic[same.xlsx-xlsx-application/vnd.openxmlformats-officedocument.spreadsheetml.sheet]",
+        "checkpoint_4::TestFunctionality::test_upload_convert_parity",
+        "checkpoint_4::TestFunctionality::test_upload_diff_name_deterministic",
+        "checkpoint_4::TestFunctionality::test_upload_empty_file_400",
+        "checkpoint_4::TestFunctionality::test_upload_field_matrix[attachment]",
+        "checkpoint_4::TestFunctionality::test_upload_field_matrix[file]",
+        "checkpoint_4::TestFunctionality::test_upload_field_name_interchangeable_deterministic",
+        "checkpoint_4::TestFunctionality::test_upload_header_only_csv",
+        "checkpoint_4::TestFunctionality::test_upload_invalid_first_sheet_rejected[empty-first-sheet]",
+        "checkpoint_4::TestFunctionality::test_upload_invalid_first_sheet_rejected[header-only-first-sheet]",
+        "checkpoint_4::TestFunctionality::test_upload_rejects_corrupt_spreadsheet[xls]",
+        "checkpoint_4::TestFunctionality::test_upload_rejects_corrupt_spreadsheet[xlsx]",
+        "checkpoint_4::TestFunctionality::test_upload_unrecognized_format_400",
+        "checkpoint_4::TestFunctionality::test_upload_xlsx_exportable",
+        "checkpoint_4::TestFunctionality::test_uploaded_export_params",
+        "checkpoint_5::TestCore::test_cache_disabled_refetches",
+        "checkpoint_5::TestCore::test_cache_reuses_without_refetch",
+        "checkpoint_5::TestCore::test_cached_serves_when_source_down",
+        "checkpoint_5::TestCore::test_dataset_id_url_deterministic",
+        "checkpoint_5::TestCore::test_disabled_convert_replaces",
+        "checkpoint_5::TestCore::test_failed_force_keeps_cached",
+        "checkpoint_5::TestCore::test_false_spellings_disable_cache[0]",
+        "checkpoint_5::TestCore::test_false_spellings_disable_cache[false]",
+        "checkpoint_5::TestCore::test_false_spellings_disable_cache[no]",
+        "checkpoint_5::TestCore::test_false_spellings_disable_cache[off]",
+        "checkpoint_5::TestCore::test_force_failure_returns_404",
+        "checkpoint_5::TestCore::test_force_updates_dataset",
+        "checkpoint_5::TestCore::test_invalid_value_fails_startup",
+        "checkpoint_5::TestCore::test_response_shape_consistent",
+        "checkpoint_5::TestCore::test_true_spellings_enable_cache[1]",
+        "checkpoint_5::TestCore::test_true_spellings_enable_cache[on]",
+        "checkpoint_5::TestCore::test_true_spellings_enable_cache[true]",
+        "checkpoint_5::TestCore::test_true_spellings_enable_cache[yes]",
+        "checkpoint_5::TestError::test_disabled_source_failure_propagates",
+        "checkpoint_5::TestError::test_duplicate_force_returns_400",
+        "checkpoint_5::TestError::test_force_unreachable_stays_404",
+        "checkpoint_5::TestFunctionality::test_arbitrary_force_triggers_refresh",
+        "checkpoint_5::TestFunctionality::test_cache_hit_preserves_data",
+        "checkpoint_5::TestFunctionality::test_cache_isolation_across_sources",
+        "checkpoint_5::TestFunctionality::test_different_urls_get_different_ids[different-urls]",
+        "checkpoint_5::TestFunctionality::test_different_urls_get_different_ids[same-content-different-urls]",
+        "checkpoint_5::TestFunctionality::test_disabled_force_no_extra_effect",
+        "checkpoint_5::TestFunctionality::test_disabled_same_url_same_id",
+        "checkpoint_5::TestFunctionality::test_disabled_unparseable_returns_400",
+        "checkpoint_5::TestFunctionality::test_duplicate_force_disabled_400",
+        "checkpoint_5::TestFunctionality::test_force_bare_param_triggers_refresh",
+        "checkpoint_5::TestFunctionality::test_force_on_first_convert",
+        "checkpoint_5::TestFunctionality::test_force_reingest_when_disabled",
+        "checkpoint_5::TestFunctionality::test_force_then_cache_source_down",
+        "checkpoint_5::TestFunctionality::test_force_unparseable_keeps_dataset",
+        "checkpoint_5::TestFunctionality::test_force_variants_trigger_refresh[1]",
+        "checkpoint_5::TestFunctionality::test_force_variants_trigger_refresh[on]",
+        "checkpoint_5::TestFunctionality::test_force_variants_trigger_refresh[true]",
+        "checkpoint_5::TestFunctionality::test_force_variants_trigger_refresh[yes]",
+        "checkpoint_5::TestFunctionality::test_forced_error_keys_match_normal",
+        "checkpoint_5::TestFunctionality::test_forced_response_keys_match_fresh",
+        "checkpoint_5::TestFunctionality::test_no_force_after_refresh_updated",
+        "checkpoint_5::TestFunctionality::test_whitespace_fails_startup",
+        "checkpoint_6::TestCore::test_allowlist_blocks_upload_export",
+        "checkpoint_6::TestCore::test_allowlist_boundary_confusable_rejects",
+        "checkpoint_6::TestCore::test_allowlist_case_insensitive",
+        "checkpoint_6::TestCore::test_allowlist_rejects[no_referer]",
+        "checkpoint_6::TestCore::test_allowlist_rejects[non_matching_referer]",
+        "checkpoint_6::TestCore::test_allowlist_suffix_match_allows",
+        "checkpoint_6::TestCore::test_config_file_loaded",
+        "checkpoint_6::TestCore::test_config_ignores_comments",
+        "checkpoint_6::TestCore::test_default_storage_dir_used_when_unset",
+        "checkpoint_6::TestCore::test_env_overrides_config",
+        "checkpoint_6::TestCore::test_invalid_config_values_fail",
+        "checkpoint_6::TestCore::test_missing_config_fails",
+        "checkpoint_6::TestCore::test_size_limit_equal_accepted",
+        "checkpoint_6::TestCore::test_size_limit_exceeded_convert",
+        "checkpoint_6::TestCore::test_size_limit_exceeded_upload",
+        "checkpoint_6::TestCore::test_storage_dir_created",
+        "checkpoint_6::TestCore::test_storage_dir_persists_restart",
+        "checkpoint_6::TestCore::test_tls_convert_endpoint_https",
+        "checkpoint_6::TestCore::test_tls_upload_endpoint_https",
+        "checkpoint_6::TestError::test_invalid_cache_config_fails",
+        "checkpoint_6::TestError::test_invalid_env_fails[max_source_size_nan]",
+        "checkpoint_6::TestError::test_invalid_env_fails[require_tls_invalid]",
+        "checkpoint_6::TestError::test_invalid_referer_forbidden",
+        "checkpoint_6::TestFunctionality::test_allowlist_allows_export",
+        "checkpoint_6::TestFunctionality::test_allowlist_allows_upload",
+        "checkpoint_6::TestFunctionality::test_allowlist_before_convert",
+        "checkpoint_6::TestFunctionality::test_allowlist_empty_referer_header",
+        "checkpoint_6::TestFunctionality::test_allowlist_exact_hostname_match",
+        "checkpoint_6::TestFunctionality::test_allowlist_http_scheme_referer",
+        "checkpoint_6::TestFunctionality::test_allowlist_rejects_convert_with_wrong_referer",
+        "checkpoint_6::TestFunctionality::test_allowlist_secondary_suffix",
+        "checkpoint_6::TestFunctionality::test_allowlist_suffix_matrix[https://EXAMPLE.com/]",
+        "checkpoint_6::TestFunctionality::test_allowlist_suffix_matrix[https://a.example.com/path]",
+        "checkpoint_6::TestFunctionality::test_allowlist_suffix_matrix[https://deep.sub.example.com/app?q=1]",
+        "checkpoint_6::TestFunctionality::test_allowlist_userinfo_port",
+        "checkpoint_6::TestFunctionality::test_config_allowlist_allows_upload",
+        "checkpoint_6::TestFunctionality::test_config_allowlist_comma_split",
+        "checkpoint_6::TestFunctionality::test_config_allowlist_key_value",
+        "checkpoint_6::TestFunctionality::test_config_cache_false_disables_caching",
+        "checkpoint_6::TestFunctionality::test_config_dir_path_fails",
+        "checkpoint_6::TestFunctionality::test_config_max_source_size_enforced_upload",
+        "checkpoint_6::TestFunctionality::test_config_whitespace_comments",
+        "checkpoint_6::TestFunctionality::test_empty_allowlist_disables",
+        "checkpoint_6::TestFunctionality::test_env_only_config",
+        "checkpoint_6::TestFunctionality::test_inactive_allowlist_ignores_present_referer[env_overrides0-https://evil.com/path]",
+        "checkpoint_6::TestFunctionality::test_inactive_allowlist_ignores_present_referer[env_overrides1-not-a-valid-url]",
+        "checkpoint_6::TestFunctionality::test_inactive_allowlist_ignores_present_referer[env_overrides2-https://evil.com/path]",
+        "checkpoint_6::TestFunctionality::test_inactive_allowlist_ignores_present_referer[env_overrides3-not-a-valid-url]",
+        "checkpoint_6::TestFunctionality::test_invalid_cache_env_fails",
+        "checkpoint_6::TestFunctionality::test_no_allowlist_allows_no_referer",
+        "checkpoint_6::TestFunctionality::test_no_size_limit_no_cap",
+        "checkpoint_6::TestFunctionality::test_require_tls_false_env_spellings[ FALSE ]",
+        "checkpoint_6::TestFunctionality::test_require_tls_false_env_spellings[0]",
+        "checkpoint_6::TestFunctionality::test_require_tls_false_env_spellings[false]",
+        "checkpoint_6::TestFunctionality::test_require_tls_false_env_spellings[no]",
+        "checkpoint_6::TestFunctionality::test_require_tls_false_env_spellings[off]",
+        "checkpoint_6::TestFunctionality::test_require_tls_host_variants[api.example.com:443]",
+        "checkpoint_6::TestFunctionality::test_require_tls_host_variants[api.example.com]",
+        "checkpoint_6::TestFunctionality::test_require_tls_host_variants[sub.domain.example.com]",
+        "checkpoint_6::TestFunctionality::test_require_tls_true_env_spellings[ TRUE ]",
+        "checkpoint_6::TestFunctionality::test_require_tls_true_env_spellings[1]",
+        "checkpoint_6::TestFunctionality::test_require_tls_true_env_spellings[on]",
+        "checkpoint_6::TestFunctionality::test_require_tls_true_env_spellings[true]",
+        "checkpoint_6::TestFunctionality::test_require_tls_true_env_spellings[yes]",
+        "checkpoint_6::TestFunctionality::test_size_limit_zero_rejects_nonempty",
+        "checkpoint_6::TestFunctionality::test_storage_dir_via_config_file",
+        "checkpoint_6::TestFunctionality::test_tls_and_allowlist",
+        "checkpoint_6::TestFunctionality::test_trimmed_cache_enabled_false_values[ FALSE ]",
+        "checkpoint_6::TestFunctionality::test_trimmed_cache_enabled_false_values[ No ]",
+        "checkpoint_6::TestFunctionality::test_trimmed_cache_enabled_false_values[ OfF ]",
+        "checkpoint_6::TestFunctionality::test_trimmed_cache_enabled_true_values[ On ]",
+        "checkpoint_6::TestFunctionality::test_trimmed_cache_enabled_true_values[ TRUE ]",
+        "checkpoint_6::TestFunctionality::test_trimmed_cache_enabled_true_values[ YeS ]",
+        "checkpoint_6::TestFunctionality::test_upload_relative_no_tls",
+        "checkpoint_6::TestFunctionality::test_upload_size_limit_boundaries[0]",
+        "checkpoint_6::TestFunctionality::test_upload_size_limit_boundaries[1]",
+        "checkpoint_6::TestFunctionality::test_upload_size_limit_boundaries[2]"
+      ],
+      "verdict": "validated"
+    },
+    "checkpoint_7": {
+      "digest": "1c2618c8b58c7b6e863e15df82d1ae0eeb07161da8b96a50f7fd0fcf7d2ec95a",
+      "nondeterministic": [],
+      "nondeterministic_count": 0,
+      "size": 405,
+      "solvable": [
+        "checkpoint_1::TestCore::test_autodetect_latin1",
+        "checkpoint_1::TestCore::test_charset_latin1",
+        "checkpoint_1::TestCore::test_convert_bad_params[invalid-url]",
+        "checkpoint_1::TestCore::test_convert_bad_params[missing-source]",
+        "checkpoint_1::TestCore::test_decimals_as_numbers",
+        "checkpoint_1::TestCore::test_default_limit_100",
+        "checkpoint_1::TestCore::test_non_tabular_payload",
+        "checkpoint_1::TestCore::test_order_preserved",
+        "checkpoint_1::TestCore::test_query_envelope",
+        "checkpoint_1::TestCore::test_semicolon_delimiter",
+        "checkpoint_1::TestCore::test_single_column_csv",
+        "checkpoint_1::TestCore::test_success_returns_id",
+        "checkpoint_1::TestCore::test_time_values_as_text",
+        "checkpoint_1::TestCore::test_unknown_route_404",
+        "checkpoint_1::TestCore::test_unreachable_source",
+        "checkpoint_1::TestCore::test_upstream_500_to_404",
+        "checkpoint_1::TestError::test_convert_bad_url[bad-scheme]",
+        "checkpoint_1::TestError::test_convert_bad_url[missing-scheme]",
+        "checkpoint_1::TestError::test_empty_source_parameter",
+        "checkpoint_1::TestError::test_header_only_rejected",
+        "checkpoint_1::TestError::test_malformed_charset",
+        "checkpoint_1::TestError::test_unknown_dataset_404",
+        "checkpoint_1::TestError::test_upstream_403_to_404",
+        "checkpoint_1::TestFunctionality::test_common_delimiters[,]",
+        "checkpoint_1::TestFunctionality::test_common_delimiters[;]",
+        "checkpoint_1::TestFunctionality::test_common_delimiters[\\t]",
+        "checkpoint_1::TestFunctionality::test_cors_on_dataset_query",
+        "checkpoint_1::TestFunctionality::test_cors_on_routes[/convert]",
+        "checkpoint_1::TestFunctionality::test_cors_on_routes[/not-found]",
+        "checkpoint_1::TestFunctionality::test_different_urls_different_ids",
+        "checkpoint_1::TestFunctionality::test_empty_file_rejected",
+        "checkpoint_1::TestFunctionality::test_extra_columns_trimmed",
+        "checkpoint_1::TestFunctionality::test_id_from_url_not_charset",
+        "checkpoint_1::TestFunctionality::test_ingest_varied_text_payloads[id,text-1,xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\\n]",
+        "checkpoint_1::TestFunctionality::test_ingest_varied_text_payloads[k,v-left,  space\\nright,space  \\n]",
+        "checkpoint_1::TestFunctionality::test_ingest_varied_text_payloads[name,emoji-alice,smile\\nbob,wave\\n]",
+        "checkpoint_1::TestFunctionality::test_ingest_varied_text_payloads[name,note-alice,naive\\nbob,cafe\\n]",
+        "checkpoint_1::TestFunctionality::test_large_dataset_limit_order",
+        "checkpoint_1::TestFunctionality::test_limit_exactly_100",
+        "checkpoint_1::TestFunctionality::test_multiple_datasets_independent",
+        "checkpoint_1::TestFunctionality::test_negative_values_as_numbers",
+        "checkpoint_1::TestFunctionality::test_options_preflight_cors[/convert]",
+        "checkpoint_1::TestFunctionality::test_options_preflight_cors[/datasets/does-not-exist]",
+        "checkpoint_1::TestFunctionality::test_preserves_header_and_time_whitespace",
+        "checkpoint_1::TestFunctionality::test_preserves_whitespace",
+        "checkpoint_1::TestFunctionality::test_query_stable",
+        "checkpoint_1::TestFunctionality::test_relative_endpoint",
+        "checkpoint_1::TestFunctionality::test_same_url_same_id",
+        "checkpoint_1::TestFunctionality::test_time_boundary_values_are_text",
+        "checkpoint_1::TestFunctionality::test_trailing_empty_line_excluded",
+        "checkpoint_2::TestCore::test_invalid_param_400[invalid_shape]",
+        "checkpoint_2::TestCore::test_invalid_param_400[invalid_size]",
+        "checkpoint_2::TestCore::test_rowid_hide_removes_rowid",
+        "checkpoint_2::TestCore::test_rowid_ignores_sort",
+        "checkpoint_2::TestCore::test_shape_objects_includes_rowid",
+        "checkpoint_2::TestCore::test_size_and_offset_apply",
+        "checkpoint_2::TestCore::test_sort_ascending_is_stable",
+        "checkpoint_2::TestCore::test_sort_desc_paginate",
+        "checkpoint_2::TestCore::test_sort_desc_precedence",
+        "checkpoint_2::TestCore::test_total_before_pagination",
+        "checkpoint_2::TestCore::test_total_hide_removes_total",
+        "checkpoint_2::TestError::test_bad_offset_values[-1]",
+        "checkpoint_2::TestError::test_bad_offset_values[2.5]",
+        "checkpoint_2::TestError::test_bad_offset_values[oops]",
+        "checkpoint_2::TestError::test_bad_size_values[-1]",
+        "checkpoint_2::TestError::test_bad_size_values[0]",
+        "checkpoint_2::TestError::test_bad_size_values[3.1]",
+        "checkpoint_2::TestError::test_bad_size_values[abc]",
+        "checkpoint_2::TestError::test_duplicate_control_params_400[_offset=1&_offset=2]",
+        "checkpoint_2::TestError::test_duplicate_control_params_400[_rowid=hide&_rowid=hide]",
+        "checkpoint_2::TestError::test_duplicate_control_params_400[_shape=lists&_shape=objects]",
+        "checkpoint_2::TestError::test_duplicate_control_params_400[_size=1&_size=2]",
+        "checkpoint_2::TestError::test_duplicate_control_params_400[_sort=age&_sort=name]",
+        "checkpoint_2::TestError::test_duplicate_control_params_400[_sort_desc=age&_sort_desc=name]",
+        "checkpoint_2::TestError::test_duplicate_control_params_400[_total=hide&_total=hide]",
+        "checkpoint_2::TestError::test_empty_param_value_400[offset]",
+        "checkpoint_2::TestError::test_empty_param_value_400[shape]",
+        "checkpoint_2::TestError::test_empty_param_value_400[size]",
+        "checkpoint_2::TestError::test_empty_sort_both_params_400[_sort=age&_sort_desc=]",
+        "checkpoint_2::TestError::test_empty_sort_value_400[_sort]",
+        "checkpoint_2::TestError::test_empty_sort_value_400[_sort_desc]",
+        "checkpoint_2::TestError::test_invalid_rowid_list_or_default[params0]",
+        "checkpoint_2::TestError::test_invalid_rowid_list_or_default[params1]",
+        "checkpoint_2::TestError::test_invalid_total_default_shape",
+        "checkpoint_2::TestError::test_unknown_sort_column_400",
+        "checkpoint_2::TestError::test_visibility_invalid_value_400[_rowid-false]",
+        "checkpoint_2::TestError::test_visibility_invalid_value_400[_rowid-show]",
+        "checkpoint_2::TestError::test_visibility_invalid_value_400[_total-0]",
+        "checkpoint_2::TestError::test_visibility_invalid_value_400[_total-show]",
+        "checkpoint_2::TestFunctionality::test_columns_exclude_rowid",
+        "checkpoint_2::TestFunctionality::test_composed_controls",
+        "checkpoint_2::TestFunctionality::test_empty_toggle_value_400[_rowid]",
+        "checkpoint_2::TestFunctionality::test_empty_toggle_value_400[_total]",
+        "checkpoint_2::TestFunctionality::test_large_size_returns_all_rows",
+        "checkpoint_2::TestFunctionality::test_offset_at_dataset_length",
+        "checkpoint_2::TestFunctionality::test_offset_variants[0-Alice]",
+        "checkpoint_2::TestFunctionality::test_offset_variants[1-Bob]",
+        "checkpoint_2::TestFunctionality::test_offset_variants[10-None]",
+        "checkpoint_2::TestFunctionality::test_offset_variants[4-Eve]",
+        "checkpoint_2::TestFunctionality::test_rowid_hide_noop_default",
+        "checkpoint_2::TestFunctionality::test_rowid_hide_noop_lists",
+        "checkpoint_2::TestFunctionality::test_rowid_sequential_all_rows",
+        "checkpoint_2::TestFunctionality::test_shape_and_visibility_combinations[params0]",
+        "checkpoint_2::TestFunctionality::test_shape_and_visibility_combinations[params1]",
+        "checkpoint_2::TestFunctionality::test_shape_and_visibility_combinations[params2]",
+        "checkpoint_2::TestFunctionality::test_shapes_consistent_values",
+        "checkpoint_2::TestFunctionality::test_size_variants[1-1]",
+        "checkpoint_2::TestFunctionality::test_size_variants[2-2]",
+        "checkpoint_2::TestFunctionality::test_size_variants[20-5]",
+        "checkpoint_2::TestFunctionality::test_size_variants[5-5]",
+        "checkpoint_2::TestFunctionality::test_sort_desc_keys[age]",
+        "checkpoint_2::TestFunctionality::test_sort_desc_keys[city]",
+        "checkpoint_2::TestFunctionality::test_sort_desc_keys[name]",
+        "checkpoint_2::TestFunctionality::test_sort_desc_precedence_different_columns",
+        "checkpoint_2::TestFunctionality::test_sort_desc_tie_stability",
+        "checkpoint_2::TestFunctionality::test_sort_keys[age]",
+        "checkpoint_2::TestFunctionality::test_sort_keys[city]",
+        "checkpoint_2::TestFunctionality::test_sort_keys[name]",
+        "checkpoint_2::TestFunctionality::test_sort_name_and_city_order_values",
+        "checkpoint_2::TestFunctionality::test_sorted_requests_stable",
+        "checkpoint_2::TestFunctionality::test_total_default_bare_request",
+        "checkpoint_2::TestFunctionality::test_total_ignores_offset_size",
+        "checkpoint_3::TestCore::test_contains_filter",
+        "checkpoint_3::TestCore::test_exact_filter",
+        "checkpoint_3::TestCore::test_excludes_non_numeric_cell",
+        "checkpoint_3::TestCore::test_filter_sort_paginate",
+        "checkpoint_3::TestCore::test_greater_strict",
+        "checkpoint_3::TestCore::test_less_filter",
+        "checkpoint_3::TestCore::test_multi_filter_and",
+        "checkpoint_3::TestCore::test_original_header_filter",
+        "checkpoint_3::TestCore::test_rejects_non_numeric_value",
+        "checkpoint_3::TestCore::test_same_col_filters_and",
+        "checkpoint_3::TestCore::test_total_post_filter",
+        "checkpoint_3::TestError::test_col_name_case_mismatch_400",
+        "checkpoint_3::TestError::test_col_name_must_match_header",
+        "checkpoint_3::TestError::test_duplicate_identical_key_400",
+        "checkpoint_3::TestError::test_duplicate_key_400",
+        "checkpoint_3::TestError::test_numeric_rejects_non_numeric[greater_1,2]",
+        "checkpoint_3::TestError::test_numeric_rejects_non_numeric[greater_abc]",
+        "checkpoint_3::TestError::test_numeric_rejects_non_numeric[greater_none]",
+        "checkpoint_3::TestError::test_numeric_rejects_non_numeric[less_1,2]",
+        "checkpoint_3::TestError::test_numeric_rejects_non_numeric[less_abc]",
+        "checkpoint_3::TestError::test_numeric_rejects_non_numeric[less_none]",
+        "checkpoint_3::TestError::test_unknown_column_400",
+        "checkpoint_3::TestError::test_unknown_comparator_400",
+        "checkpoint_3::TestFunctionality::test_contains_case_sensitive",
+        "checkpoint_3::TestFunctionality::test_contains_empty_value_matches_all",
+        "checkpoint_3::TestFunctionality::test_contains_whitespace_value_match",
+        "checkpoint_3::TestFunctionality::test_exact_empty_value_matches_empty_cells",
+        "checkpoint_3::TestFunctionality::test_exact_whitespace_value_match",
+        "checkpoint_3::TestFunctionality::test_exposed_col_filter",
+        "checkpoint_3::TestFunctionality::test_filter_control_compose[params0]",
+        "checkpoint_3::TestFunctionality::test_filter_control_compose[params1]",
+        "checkpoint_3::TestFunctionality::test_filter_control_compose[params2]",
+        "checkpoint_3::TestFunctionality::test_filter_control_compose[params3]",
+        "checkpoint_3::TestFunctionality::test_filter_matrix[params0-3]",
+        "checkpoint_3::TestFunctionality::test_filter_matrix[params1-2]",
+        "checkpoint_3::TestFunctionality::test_filter_matrix[params2-2]",
+        "checkpoint_3::TestFunctionality::test_filter_matrix[params3-3]",
+        "checkpoint_3::TestFunctionality::test_filter_matrix[params4-1]",
+        "checkpoint_3::TestFunctionality::test_filter_matrix[params5-1]",
+        "checkpoint_3::TestFunctionality::test_filter_sort_paginate_shape",
+        "checkpoint_3::TestFunctionality::test_filter_sort_ties_stable",
+        "checkpoint_3::TestFunctionality::test_header_no_trim",
+        "checkpoint_3::TestFunctionality::test_numeric_bounds_strict",
+        "checkpoint_3::TestFunctionality::test_numeric_like_cells_preserve_whitespace_for_string_filters",
+        "checkpoint_3::TestFunctionality::test_numeric_scientific_notation",
+        "checkpoint_3::TestFunctionality::test_numeric_signed_bounds",
+        "checkpoint_3::TestFunctionality::test_plain_param_ignored",
+        "checkpoint_3::TestFunctionality::test_string_cmp_numeric_cells",
+        "checkpoint_3::TestFunctionality::test_zero_match_filter[contains_whitespace]",
+        "checkpoint_3::TestFunctionality::test_zero_match_filter[exact_case]",
+        "checkpoint_3::TestFunctionality::test_zero_match_filter[exact_whitespace]",
+        "checkpoint_3::TestFunctionality::test_zero_match_filter[no_match]",
+        "checkpoint_4::TestCore::test_convert_csv_charset_honored",
+        "checkpoint_4::TestCore::test_convert_spreadsheet[xls]",
+        "checkpoint_4::TestCore::test_convert_spreadsheet[xlsx]",
+        "checkpoint_4::TestCore::test_convert_spreadsheet_invalid_charset_ignored[xls]",
+        "checkpoint_4::TestCore::test_convert_spreadsheet_invalid_charset_ignored[xlsx]",
+        "checkpoint_4::TestCore::test_convert_unrecognized_format_400",
+        "checkpoint_4::TestCore::test_empty_first_sheet_rejected",
+        "checkpoint_4::TestCore::test_export_content_disposition",
+        "checkpoint_4::TestCore::test_export_csv_headers",
+        "checkpoint_4::TestCore::test_export_filter_sort_page",
+        "checkpoint_4::TestCore::test_export_rows",
+        "checkpoint_4::TestCore::test_export_shape_controls",
+        "checkpoint_4::TestCore::test_export_sort_without_filter",
+        "checkpoint_4::TestCore::test_multisheet_first_only",
+        "checkpoint_4::TestCore::test_spreadsheet_charset_ignored",
+        "checkpoint_4::TestCore::test_spreadsheet_query_controls",
+        "checkpoint_4::TestCore::test_upload_attachment_field",
+        "checkpoint_4::TestCore::test_upload_csv_charset_honored",
+        "checkpoint_4::TestCore::test_upload_file_field",
+        "checkpoint_4::TestCore::test_upload_missing_file_400",
+        "checkpoint_4::TestCore::test_upload_multisheet_first_only",
+        "checkpoint_4::TestCore::test_upload_same_content_deterministic",
+        "checkpoint_4::TestCore::test_upload_spreadsheet_invalid_charset_ignored[xls]",
+        "checkpoint_4::TestCore::test_upload_spreadsheet_invalid_charset_ignored[xlsx]",
+        "checkpoint_4::TestCore::test_upload_xls_attachment",
+        "checkpoint_4::TestCore::test_upload_xlsx_attachment",
+        "checkpoint_4::TestError::test_export_unknown_dataset_404",
+        "checkpoint_4::TestError::test_upload_invalid_body_400",
+        "checkpoint_4::TestError::test_upload_json_rejected",
+        "checkpoint_4::TestFunctionality::test_content_disposition_quoted_filename",
+        "checkpoint_4::TestFunctionality::test_convert_rejects_corrupt_spreadsheet[xls]",
+        "checkpoint_4::TestFunctionality::test_convert_rejects_corrupt_spreadsheet[xlsx]",
+        "checkpoint_4::TestFunctionality::test_export_charset_upload",
+        "checkpoint_4::TestFunctionality::test_export_empty_result_header",
+        "checkpoint_4::TestFunctionality::test_export_matches_query_params",
+        "checkpoint_4::TestFunctionality::test_export_single_row",
+        "checkpoint_4::TestFunctionality::test_export_sort_desc_filter",
+        "checkpoint_4::TestFunctionality::test_export_special_csv_chars",
+        "checkpoint_4::TestFunctionality::test_export_spreadsheet_column_order",
+        "checkpoint_4::TestFunctionality::test_header_only_first_sheet_rejected",
+        "checkpoint_4::TestFunctionality::test_numeric_cells_preserved",
+        "checkpoint_4::TestFunctionality::test_spreadsheet_support_matrix[xls]",
+        "checkpoint_4::TestFunctionality::test_spreadsheet_support_matrix[xlsx]",
+        "checkpoint_4::TestFunctionality::test_spreadsheet_upload_same_bytes_are_deterministic[same.xls-xls-application/vnd.ms-excel]",
+        "checkpoint_4::TestFunctionality::test_spreadsheet_upload_same_bytes_are_deterministic[same.xlsx-xlsx-application/vnd.openxmlformats-officedocument.spreadsheetml.sheet]",
+        "checkpoint_4::TestFunctionality::test_upload_convert_parity",
+        "checkpoint_4::TestFunctionality::test_upload_diff_name_deterministic",
+        "checkpoint_4::TestFunctionality::test_upload_empty_file_400",
+        "checkpoint_4::TestFunctionality::test_upload_field_matrix[attachment]",
+        "checkpoint_4::TestFunctionality::test_upload_field_matrix[file]",
+        "checkpoint_4::TestFunctionality::test_upload_field_name_interchangeable_deterministic",
+        "checkpoint_4::TestFunctionality::test_upload_header_only_csv",
+        "checkpoint_4::TestFunctionality::test_upload_invalid_first_sheet_rejected[empty-first-sheet]",
+        "checkpoint_4::TestFunctionality::test_upload_invalid_first_sheet_rejected[header-only-first-sheet]",
+        "checkpoint_4::TestFunctionality::test_upload_rejects_corrupt_spreadsheet[xls]",
+        "checkpoint_4::TestFunctionality::test_upload_rejects_corrupt_spreadsheet[xlsx]",
+        "checkpoint_4::TestFunctionality::test_upload_unrecognized_format_400",
+        "checkpoint_4::TestFunctionality::test_upload_xlsx_exportable",
+        "checkpoint_4::TestFunctionality::test_uploaded_export_params",
+        "checkpoint_5::TestCore::test_cache_disabled_refetches",
+        "checkpoint_5::TestCore::test_cache_reuses_without_refetch",
+        "checkpoint_5::TestCore::test_cached_serves_when_source_down",
+        "checkpoint_5::TestCore::test_dataset_id_url_deterministic",
+        "checkpoint_5::TestCore::test_disabled_convert_replaces",
+        "checkpoint_5::TestCore::test_failed_force_keeps_cached",
+        "checkpoint_5::TestCore::test_false_spellings_disable_cache[0]",
+        "checkpoint_5::TestCore::test_false_spellings_disable_cache[false]",
+        "checkpoint_5::TestCore::test_false_spellings_disable_cache[no]",
+        "checkpoint_5::TestCore::test_false_spellings_disable_cache[off]",
+        "checkpoint_5::TestCore::test_force_failure_returns_404",
+        "checkpoint_5::TestCore::test_force_updates_dataset",
+        "checkpoint_5::TestCore::test_invalid_value_fails_startup",
+        "checkpoint_5::TestCore::test_response_shape_consistent",
+        "checkpoint_5::TestCore::test_true_spellings_enable_cache[1]",
+        "checkpoint_5::TestCore::test_true_spellings_enable_cache[on]",
+        "checkpoint_5::TestCore::test_true_spellings_enable_cache[true]",
+        "checkpoint_5::TestCore::test_true_spellings_enable_cache[yes]",
+        "checkpoint_5::TestError::test_disabled_source_failure_propagates",
+        "checkpoint_5::TestError::test_duplicate_force_returns_400",
+        "checkpoint_5::TestError::test_force_unreachable_stays_404",
+        "checkpoint_5::TestFunctionality::test_arbitrary_force_triggers_refresh",
+        "checkpoint_5::TestFunctionality::test_cache_hit_preserves_data",
+        "checkpoint_5::TestFunctionality::test_cache_isolation_across_sources",
+        "checkpoint_5::TestFunctionality::test_different_urls_get_different_ids[different-urls]",
+        "checkpoint_5::TestFunctionality::test_different_urls_get_different_ids[same-content-different-urls]",
+        "checkpoint_5::TestFunctionality::test_disabled_force_no_extra_effect",
+        "checkpoint_5::TestFunctionality::test_disabled_same_url_same_id",
+        "checkpoint_5::TestFunctionality::test_disabled_unparseable_returns_400",
+        "checkpoint_5::TestFunctionality::test_duplicate_force_disabled_400",
+        "checkpoint_5::TestFunctionality::test_force_bare_param_triggers_refresh",
+        "checkpoint_5::TestFunctionality::test_force_on_first_convert",
+        "checkpoint_5::TestFunctionality::test_force_reingest_when_disabled",
+        "checkpoint_5::TestFunctionality::test_force_then_cache_source_down",
+        "checkpoint_5::TestFunctionality::test_force_unparseable_keeps_dataset",
+        "checkpoint_5::TestFunctionality::test_force_variants_trigger_refresh[1]",
+        "checkpoint_5::TestFunctionality::test_force_variants_trigger_refresh[on]",
+        "checkpoint_5::TestFunctionality::test_force_variants_trigger_refresh[true]",
+        "checkpoint_5::TestFunctionality::test_force_variants_trigger_refresh[yes]",
+        "checkpoint_5::TestFunctionality::test_forced_error_keys_match_normal",
+        "checkpoint_5::TestFunctionality::test_forced_response_keys_match_fresh",
+        "checkpoint_5::TestFunctionality::test_no_force_after_refresh_updated",
+        "checkpoint_5::TestFunctionality::test_whitespace_fails_startup",
+        "checkpoint_6::TestCore::test_allowlist_blocks_upload_export",
+        "checkpoint_6::TestCore::test_allowlist_boundary_confusable_rejects",
+        "checkpoint_6::TestCore::test_allowlist_case_insensitive",
+        "checkpoint_6::TestCore::test_allowlist_rejects[no_referer]",
+        "checkpoint_6::TestCore::test_allowlist_rejects[non_matching_referer]",
+        "checkpoint_6::TestCore::test_allowlist_suffix_match_allows",
+        "checkpoint_6::TestCore::test_config_file_loaded",
+        "checkpoint_6::TestCore::test_config_ignores_comments",
+        "checkpoint_6::TestCore::test_default_storage_dir_used_when_unset",
+        "checkpoint_6::TestCore::test_env_overrides_config",
+        "checkpoint_6::TestCore::test_invalid_config_values_fail",
+        "checkpoint_6::TestCore::test_missing_config_fails",
+        "checkpoint_6::TestCore::test_size_limit_equal_accepted",
+        "checkpoint_6::TestCore::test_size_limit_exceeded_convert",
+        "checkpoint_6::TestCore::test_size_limit_exceeded_upload",
+        "checkpoint_6::TestCore::test_storage_dir_created",
+        "checkpoint_6::TestCore::test_storage_dir_persists_restart",
+        "checkpoint_6::TestCore::test_tls_convert_endpoint_https",
+        "checkpoint_6::TestCore::test_tls_upload_endpoint_https",
+        "checkpoint_6::TestError::test_invalid_cache_config_fails",
+        "checkpoint_6::TestError::test_invalid_env_fails[max_source_size_nan]",
+        "checkpoint_6::TestError::test_invalid_env_fails[require_tls_invalid]",
+        "checkpoint_6::TestError::test_invalid_referer_forbidden",
+        "checkpoint_6::TestFunctionality::test_allowlist_allows_export",
+        "checkpoint_6::TestFunctionality::test_allowlist_allows_upload",
+        "checkpoint_6::TestFunctionality::test_allowlist_before_convert",
+        "checkpoint_6::TestFunctionality::test_allowlist_empty_referer_header",
+        "checkpoint_6::TestFunctionality::test_allowlist_exact_hostname_match",
+        "checkpoint_6::TestFunctionality::test_allowlist_http_scheme_referer",
+        "checkpoint_6::TestFunctionality::test_allowlist_rejects_convert_with_wrong_referer",
+        "checkpoint_6::TestFunctionality::test_allowlist_secondary_suffix",
+        "checkpoint_6::TestFunctionality::test_allowlist_suffix_matrix[https://EXAMPLE.com/]",
+        "checkpoint_6::TestFunctionality::test_allowlist_suffix_matrix[https://a.example.com/path]",
+        "checkpoint_6::TestFunctionality::test_allowlist_suffix_matrix[https://deep.sub.example.com/app?q=1]",
+        "checkpoint_6::TestFunctionality::test_allowlist_userinfo_port",
+        "checkpoint_6::TestFunctionality::test_config_allowlist_allows_upload",
+        "checkpoint_6::TestFunctionality::test_config_allowlist_comma_split",
+        "checkpoint_6::TestFunctionality::test_config_allowlist_key_value",
+        "checkpoint_6::TestFunctionality::test_config_cache_false_disables_caching",
+        "checkpoint_6::TestFunctionality::test_config_dir_path_fails",
+        "checkpoint_6::TestFunctionality::test_config_max_source_size_enforced_upload",
+        "checkpoint_6::TestFunctionality::test_config_whitespace_comments",
+        "checkpoint_6::TestFunctionality::test_empty_allowlist_disables",
+        "checkpoint_6::TestFunctionality::test_env_only_config",
+        "checkpoint_6::TestFunctionality::test_inactive_allowlist_ignores_present_referer[env_overrides0-https://evil.com/path]",
+        "checkpoint_6::TestFunctionality::test_inactive_allowlist_ignores_present_referer[env_overrides1-not-a-valid-url]",
+        "checkpoint_6::TestFunctionality::test_inactive_allowlist_ignores_present_referer[env_overrides2-https://evil.com/path]",
+        "checkpoint_6::TestFunctionality::test_inactive_allowlist_ignores_present_referer[env_overrides3-not-a-valid-url]",
+        "checkpoint_6::TestFunctionality::test_invalid_cache_env_fails",
+        "checkpoint_6::TestFunctionality::test_no_allowlist_allows_no_referer",
+        "checkpoint_6::TestFunctionality::test_no_size_limit_no_cap",
+        "checkpoint_6::TestFunctionality::test_require_tls_false_env_spellings[ FALSE ]",
+        "checkpoint_6::TestFunctionality::test_require_tls_false_env_spellings[0]",
+        "checkpoint_6::TestFunctionality::test_require_tls_false_env_spellings[false]",
+        "checkpoint_6::TestFunctionality::test_require_tls_false_env_spellings[no]",
+        "checkpoint_6::TestFunctionality::test_require_tls_false_env_spellings[off]",
+        "checkpoint_6::TestFunctionality::test_require_tls_host_variants[api.example.com:443]",
+        "checkpoint_6::TestFunctionality::test_require_tls_host_variants[api.example.com]",
+        "checkpoint_6::TestFunctionality::test_require_tls_host_variants[sub.domain.example.com]",
+        "checkpoint_6::TestFunctionality::test_require_tls_true_env_spellings[ TRUE ]",
+        "checkpoint_6::TestFunctionality::test_require_tls_true_env_spellings[1]",
+        "checkpoint_6::TestFunctionality::test_require_tls_true_env_spellings[on]",
+        "checkpoint_6::TestFunctionality::test_require_tls_true_env_spellings[true]",
+        "checkpoint_6::TestFunctionality::test_require_tls_true_env_spellings[yes]",
+        "checkpoint_6::TestFunctionality::test_size_limit_zero_rejects_nonempty",
+        "checkpoint_6::TestFunctionality::test_storage_dir_via_config_file",
+        "checkpoint_6::TestFunctionality::test_tls_and_allowlist",
+        "checkpoint_6::TestFunctionality::test_trimmed_cache_enabled_false_values[ FALSE ]",
+        "checkpoint_6::TestFunctionality::test_trimmed_cache_enabled_false_values[ No ]",
+        "checkpoint_6::TestFunctionality::test_trimmed_cache_enabled_false_values[ OfF ]",
+        "checkpoint_6::TestFunctionality::test_trimmed_cache_enabled_true_values[ On ]",
+        "checkpoint_6::TestFunctionality::test_trimmed_cache_enabled_true_values[ TRUE ]",
+        "checkpoint_6::TestFunctionality::test_trimmed_cache_enabled_true_values[ YeS ]",
+        "checkpoint_6::TestFunctionality::test_upload_relative_no_tls",
+        "checkpoint_6::TestFunctionality::test_upload_size_limit_boundaries[0]",
+        "checkpoint_6::TestFunctionality::test_upload_size_limit_boundaries[1]",
+        "checkpoint_6::TestFunctionality::test_upload_size_limit_boundaries[2]",
+        "checkpoint_7::TestCore::test_cache_upgrade_reingests",
+        "checkpoint_7::TestCore::test_cache_upgrade_to_enriched",
+        "checkpoint_7::TestCore::test_column_detail_deterministic_counts",
+        "checkpoint_7::TestCore::test_column_detail_keys_match",
+        "checkpoint_7::TestCore::test_column_detail_required_fields",
+        "checkpoint_7::TestCore::test_enrich_adds_metadata",
+        "checkpoint_7::TestCore::test_enrich_cache_disabled",
+        "checkpoint_7::TestCore::test_enrich_preserves_base_fields",
+        "checkpoint_7::TestCore::test_enriched_cache_source_down",
+        "checkpoint_7::TestCore::test_export_unchanged_by_enrich",
+        "checkpoint_7::TestCore::test_force_removes_metadata",
+        "checkpoint_7::TestCore::test_no_enrich_no_metadata",
+        "checkpoint_7::TestCore::test_plain_spreadsheet_no_metadata",
+        "checkpoint_7::TestCore::test_spreadsheet_cache_upgrade_to_enriched",
+        "checkpoint_7::TestCore::test_spreadsheet_enrich_no_column_details",
+        "checkpoint_7::TestCore::test_summary_required_keys",
+        "checkpoint_7::TestCore::test_upload_no_enrich_effect",
+        "checkpoint_7::TestError::test_enrich_preserves_ingest_errors",
+        "checkpoint_7::TestError::test_enrich_unreachable_source",
+        "checkpoint_7::TestFunctionality::test_column_detail_keys_exact_match",
+        "checkpoint_7::TestFunctionality::test_column_detail_type_labels",
+        "checkpoint_7::TestFunctionality::test_convert_response_no_metadata",
+        "checkpoint_7::TestFunctionality::test_duplicate_enrich_params_do_not_enable_metadata[no-then-yes]",
+        "checkpoint_7::TestFunctionality::test_duplicate_enrich_params_do_not_enable_metadata[yes-then-no]",
+        "checkpoint_7::TestFunctionality::test_enrich_failure_preserves_metadata",
+        "checkpoint_7::TestFunctionality::test_enriched_plain_isolation",
+        "checkpoint_7::TestFunctionality::test_enriched_plain_query_parity",
+        "checkpoint_7::TestFunctionality::test_export_enriched_plain_identical",
+        "checkpoint_7::TestFunctionality::test_force_enrich_recomputes",
+        "checkpoint_7::TestFunctionality::test_metadata_with_empty_rows",
+        "checkpoint_7::TestFunctionality::test_metadata_with_visibility_controls",
+        "checkpoint_7::TestFunctionality::test_mixed_numeric_column_type",
+        "checkpoint_7::TestFunctionality::test_non_exact_yes_no_metadata[ yes]",
+        "checkpoint_7::TestFunctionality::test_non_exact_yes_no_metadata[yes ]",
+        "checkpoint_7::TestFunctionality::test_non_exact_yes_no_metadata[yes\\t]",
+        "checkpoint_7::TestFunctionality::test_non_yes_enrich_no_metadata[1]",
+        "checkpoint_7::TestFunctionality::test_non_yes_enrich_no_metadata[YES]",
+        "checkpoint_7::TestFunctionality::test_non_yes_enrich_no_metadata[]",
+        "checkpoint_7::TestFunctionality::test_non_yes_enrich_no_metadata[no]",
+        "checkpoint_7::TestFunctionality::test_non_yes_enrich_no_metadata[on]",
+        "checkpoint_7::TestFunctionality::test_non_yes_enrich_no_metadata[true]",
+        "checkpoint_7::TestFunctionality::test_plain_ingest_ignores_enrich",
+        "checkpoint_7::TestFunctionality::test_query_controls_with_enrich[params0]",
+        "checkpoint_7::TestFunctionality::test_query_controls_with_enrich[params1]",
+        "checkpoint_7::TestFunctionality::test_query_controls_with_enrich[params2]",
+        "checkpoint_7::TestFunctionality::test_query_controls_with_enrich[params3]",
+        "checkpoint_7::TestFunctionality::test_query_controls_with_enrich[params4]",
+        "checkpoint_7::TestFunctionality::test_repeated_enrich_stable",
+        "checkpoint_7::TestFunctionality::test_spreadsheet_controls_no_column_details",
+        "checkpoint_7::TestFunctionality::test_upload_enrich_no_metadata",
+        "checkpoint_7::TestFunctionality::test_xls_enrich_summary[default_route]",
+        "checkpoint_7::TestFunctionality::test_xls_enrich_summary[strict_route]"
+      ],
+      "verdict": "validated"
+    }
+  },
+  "spec_determinacy": {
+    "assertions": {
+      "audited": 0,
+      "by_rule": {}
+    },
+    "audit_version": 1,
+    "dynamic": {
+      "environment": {},
+      "reason": null,
+      "status": "ran"
+    },
+    "flagged": [],
+    "method": "Static: each audited assertion of a test (error-detail/message equality, containment or pattern; byte-level stdout comparison) is classified against the text of its origin checkpoint's specification and every earlier one (rules below). Dynamic: reference k and spec-conformant variants of it (variants below) are graded at step k; a case is sensitive to a variant when it passes on the reference and not on the variant. A case is flagged when its test has an undetermined assertion of the kind a variant it is sensitive to rewrites.",
+    "rules": {
+      "content-stated": "determined: a paragraph states what the category's detail contains",
+      "content-unstated": "undetermined: error text must contain an input value or match a pattern; no paragraph states what the category's detail contains",
+      "exact-stated": "determined: a paragraph states the exact content of the category's detail",
+      "exact-unstated": "undetermined: error text must equal an input value; no paragraph states exact content",
+      "format-stated": "determined: the specification names an output byte format",
+      "format-unstated": "undetermined: stdout compared byte for byte; no byte format stated",
+      "literal-in-spec": "determined: the asserted literal occurs in the specification text",
+      "wording-unstated": "undetermined: an error-text literal in neither the specification nor the test's inputs"
+    },
+    "sensitive_determined": [],
+    "sensitive_unexplained": [],
+    "static_undetermined": [],
+    "steps": {
+      "checkpoint_1": {
+        "reference": {
+          "infra_failure": null,
+          "passed": 50,
+          "total": 50
+        },
+        "variants": {
+          "neutral_error_text": {
+            "infra_failure": null,
+            "passed": 50,
+            "sensitive": [],
+            "total": 50
+          },
+          "reformatted_json": {
+            "infra_failure": null,
+            "passed": 50,
+            "sensitive": [],
+            "total": 50
+          }
+        }
+      },
+      "checkpoint_2": {
+        "reference": {
+          "infra_failure": null,
+          "passed": 122,
+          "total": 122
+        },
+        "variants": {
+          "neutral_error_text": {
+            "infra_failure": null,
+            "passed": 122,
+            "sensitive": [],
+            "total": 122
+          },
+          "reformatted_json": {
+            "infra_failure": null,
+            "passed": 122,
+            "sensitive": [],
+            "total": 122
+          }
+        }
+      },
+      "checkpoint_3": {
+        "reference": {
+          "infra_failure": null,
+          "passed": 174,
+          "total": 174
+        },
+        "variants": {
+          "neutral_error_text": {
+            "infra_failure": null,
+            "passed": 174,
+            "sensitive": [],
+            "total": 174
+          },
+          "reformatted_json": {
+            "infra_failure": null,
+            "passed": 174,
+            "sensitive": [],
+            "total": 174
+          }
+        }
+      },
+      "checkpoint_4": {
+        "reference": {
+          "infra_failure": null,
+          "passed": 233,
+          "total": 233
+        },
+        "variants": {
+          "neutral_error_text": {
+            "infra_failure": null,
+            "passed": 233,
+            "sensitive": [],
+            "total": 233
+          },
+          "reformatted_json": {
+            "infra_failure": null,
+            "passed": 233,
+            "sensitive": [],
+            "total": 233
+          }
+        }
+      },
+      "checkpoint_5": {
+        "reference": {
+          "infra_failure": null,
+          "passed": 276,
+          "total": 276
+        },
+        "variants": {
+          "neutral_error_text": {
+            "infra_failure": null,
+            "passed": 276,
+            "sensitive": [],
+            "total": 276
+          },
+          "reformatted_json": {
+            "infra_failure": null,
+            "passed": 276,
+            "sensitive": [],
+            "total": 276
+          }
+        }
+      },
+      "checkpoint_6": {
+        "reference": {
+          "infra_failure": null,
+          "passed": 353,
+          "total": 353
+        },
+        "variants": {
+          "neutral_error_text": {
+            "infra_failure": null,
+            "passed": 353,
+            "sensitive": [],
+            "total": 353
+          },
+          "reformatted_json": {
+            "infra_failure": null,
+            "passed": 353,
+            "sensitive": [],
+            "total": 353
+          }
+        }
+      },
+      "checkpoint_7": {
+        "reference": {
+          "infra_failure": null,
+          "passed": 405,
+          "total": 405
+        },
+        "variants": {
+          "neutral_error_text": {
+            "infra_failure": null,
+            "passed": 405,
+            "sensitive": [],
+            "total": 405
+          },
+          "reformatted_json": {
+            "infra_failure": null,
+            "passed": 405,
+            "sensitive": [],
+            "total": 405
+          }
+        }
+      }
+    },
+    "summary": {
+      "flagged": 0,
+      "flagged_by_checkpoint": {},
+      "flagged_by_rule": {},
+      "sensitive_determined": 0,
+      "sensitive_unexplained": 0,
+      "unconfirmed": 0
+    },
+    "unconfirmed": [],
+    "variants": {
+      "neutral_error_text": "every error's human-readable text (an error object's detail or message) replaced by 'request rejected'; category, exit code and format kept",
+      "reformatted_json": "JSON stdout re-serialised with two-space indentation and a trailing newline; value and key order kept"
+    }
+  },
+  "steps": [
+    "checkpoint_1",
+    "checkpoint_2",
+    "checkpoint_3",
+    "checkpoint_4",
+    "checkpoint_5",
+    "checkpoint_6",
+    "checkpoint_7"
+  ],
+  "verdict": "excluded"
+}

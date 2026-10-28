@@ -1,0 +1,1831 @@
+{
+  "checks": [
+    {
+      "detail": [],
+      "name": "solvable_set",
+      "status": "pass"
+    },
+    {
+      "detail": [],
+      "name": "reference_k-1_fails_k",
+      "status": "pass"
+    },
+    {
+      "detail": [],
+      "name": "repeat_identical_positive",
+      "status": "pass"
+    },
+    {
+      "detail": [],
+      "name": "repeat_identical_negative",
+      "status": "pass"
+    },
+    {
+      "detail": [
+        "native runner not run"
+      ],
+      "name": "native_parity_positive",
+      "status": "not_run"
+    },
+    {
+      "detail": [
+        "native runner not run"
+      ],
+      "name": "native_parity_negative",
+      "status": "not_run"
+    }
+  ],
+  "engine": "direct",
+  "environment": {
+    "docker_context": "raidar-mbp",
+    "engine": "direct",
+    "grader_environment_id": "sha256:3c86bb7af4152eff19c4db6840553945703b05802080358710a97074e20986d0",
+    "grader_image": "raidar-oracle-grader:4d9f312562ca60cb",
+    "harbor": "0.23.0",
+    "pack_image": "raidar/pack-python:2b91a52663e099f2"
+  },
+  "grades": {
+    "native": null,
+    "oracle": {
+      "negative": [
+        {
+          "checkpoint_1": {
+            "all_pass": false,
+            "groups": {
+              "core": [
+                0,
+                7
+              ],
+              "error": [
+                0,
+                0
+              ],
+              "functionality": [
+                0,
+                38
+              ],
+              "regression": [
+                0,
+                0
+              ]
+            },
+            "infra_failure": null,
+            "passed": 0,
+            "total": 45
+          },
+          "checkpoint_2": {
+            "all_pass": false,
+            "groups": {
+              "core": [
+                4,
+                6
+              ],
+              "error": [
+                6,
+                6
+              ],
+              "functionality": [
+                1,
+                1
+              ],
+              "regression": [
+                45,
+                45
+              ]
+            },
+            "infra_failure": null,
+            "passed": 56,
+            "total": 58
+          },
+          "checkpoint_3": {
+            "all_pass": false,
+            "groups": {
+              "core": [
+                2,
+                16
+              ],
+              "error": [
+                1,
+                1
+              ],
+              "functionality": [
+                3,
+                26
+              ],
+              "regression": [
+                58,
+                58
+              ]
+            },
+            "infra_failure": null,
+            "passed": 64,
+            "total": 101
+          },
+          "checkpoint_4": {
+            "all_pass": false,
+            "groups": {
+              "core": [
+                14,
+                16
+              ],
+              "error": [
+                0,
+                0
+              ],
+              "functionality": [
+                32,
+                32
+              ],
+              "regression": [
+                101,
+                101
+              ]
+            },
+            "infra_failure": null,
+            "passed": 147,
+            "total": 149
+          },
+          "checkpoint_5": {
+            "all_pass": false,
+            "groups": {
+              "core": [
+                0,
+                9
+              ],
+              "error": [
+                0,
+                0
+              ],
+              "functionality": [
+                0,
+                19
+              ],
+              "regression": [
+                149,
+                157
+              ]
+            },
+            "infra_failure": null,
+            "passed": 149,
+            "total": 185
+          },
+          "checkpoint_6": {
+            "all_pass": false,
+            "groups": {
+              "core": [
+                0,
+                14
+              ],
+              "error": [
+                2,
+                9
+              ],
+              "functionality": [
+                0,
+                11
+              ],
+              "regression": [
+                0,
+                36
+              ]
+            },
+            "infra_failure": null,
+            "passed": 2,
+            "total": 70
+          }
+        },
+        {
+          "checkpoint_1": {
+            "all_pass": false,
+            "groups": {
+              "core": [
+                0,
+                7
+              ],
+              "error": [
+                0,
+                0
+              ],
+              "functionality": [
+                0,
+                38
+              ],
+              "regression": [
+                0,
+                0
+              ]
+            },
+            "infra_failure": null,
+            "passed": 0,
+            "total": 45
+          },
+          "checkpoint_2": {
+            "all_pass": false,
+            "groups": {
+              "core": [
+                4,
+                6
+              ],
+              "error": [
+                6,
+                6
+              ],
+              "functionality": [
+                1,
+                1
+              ],
+              "regression": [
+                45,
+                45
+              ]
+            },
+            "infra_failure": null,
+            "passed": 56,
+            "total": 58
+          },
+          "checkpoint_3": {
+            "all_pass": false,
+            "groups": {
+              "core": [
+                2,
+                16
+              ],
+              "error": [
+                1,
+                1
+              ],
+              "functionality": [
+                3,
+                26
+              ],
+              "regression": [
+                58,
+                58
+              ]
+            },
+            "infra_failure": null,
+            "passed": 64,
+            "total": 101
+          },
+          "checkpoint_4": {
+            "all_pass": false,
+            "groups": {
+              "core": [
+                14,
+                16
+              ],
+              "error": [
+                0,
+                0
+              ],
+              "functionality": [
+                32,
+                32
+              ],
+              "regression": [
+                101,
+                101
+              ]
+            },
+            "infra_failure": null,
+            "passed": 147,
+            "total": 149
+          },
+          "checkpoint_5": {
+            "all_pass": false,
+            "groups": {
+              "core": [
+                0,
+                9
+              ],
+              "error": [
+                0,
+                0
+              ],
+              "functionality": [
+                0,
+                19
+              ],
+              "regression": [
+                149,
+                157
+              ]
+            },
+            "infra_failure": null,
+            "passed": 149,
+            "total": 185
+          },
+          "checkpoint_6": {
+            "all_pass": false,
+            "groups": {
+              "core": [
+                0,
+                14
+              ],
+              "error": [
+                2,
+                9
+              ],
+              "functionality": [
+                0,
+                11
+              ],
+              "regression": [
+                0,
+                36
+              ]
+            },
+            "infra_failure": null,
+            "passed": 2,
+            "total": 70
+          }
+        },
+        {
+          "checkpoint_1": {
+            "all_pass": false,
+            "groups": {
+              "core": [
+                0,
+                7
+              ],
+              "error": [
+                0,
+                0
+              ],
+              "functionality": [
+                0,
+                38
+              ],
+              "regression": [
+                0,
+                0
+              ]
+            },
+            "infra_failure": null,
+            "passed": 0,
+            "total": 45
+          },
+          "checkpoint_2": {
+            "all_pass": false,
+            "groups": {
+              "core": [
+                4,
+                6
+              ],
+              "error": [
+                6,
+                6
+              ],
+              "functionality": [
+                1,
+                1
+              ],
+              "regression": [
+                45,
+                45
+              ]
+            },
+            "infra_failure": null,
+            "passed": 56,
+            "total": 58
+          },
+          "checkpoint_3": {
+            "all_pass": false,
+            "groups": {
+              "core": [
+                2,
+                16
+              ],
+              "error": [
+                1,
+                1
+              ],
+              "functionality": [
+                3,
+                26
+              ],
+              "regression": [
+                58,
+                58
+              ]
+            },
+            "infra_failure": null,
+            "passed": 64,
+            "total": 101
+          },
+          "checkpoint_4": {
+            "all_pass": false,
+            "groups": {
+              "core": [
+                14,
+                16
+              ],
+              "error": [
+                0,
+                0
+              ],
+              "functionality": [
+                32,
+                32
+              ],
+              "regression": [
+                101,
+                101
+              ]
+            },
+            "infra_failure": null,
+            "passed": 147,
+            "total": 149
+          },
+          "checkpoint_5": {
+            "all_pass": false,
+            "groups": {
+              "core": [
+                0,
+                9
+              ],
+              "error": [
+                0,
+                0
+              ],
+              "functionality": [
+                0,
+                19
+              ],
+              "regression": [
+                149,
+                157
+              ]
+            },
+            "infra_failure": null,
+            "passed": 149,
+            "total": 185
+          },
+          "checkpoint_6": {
+            "all_pass": false,
+            "groups": {
+              "core": [
+                0,
+                14
+              ],
+              "error": [
+                2,
+                9
+              ],
+              "functionality": [
+                0,
+                11
+              ],
+              "regression": [
+                0,
+                36
+              ]
+            },
+            "infra_failure": null,
+            "passed": 2,
+            "total": 70
+          }
+        }
+      ],
+      "positive": [
+        {
+          "checkpoint_1": {
+            "all_pass": true,
+            "groups": {
+              "core": [
+                7,
+                7
+              ],
+              "error": [
+                0,
+                0
+              ],
+              "functionality": [
+                38,
+                38
+              ],
+              "regression": [
+                0,
+                0
+              ]
+            },
+            "infra_failure": null,
+            "passed": 45,
+            "total": 45
+          },
+          "checkpoint_2": {
+            "all_pass": true,
+            "groups": {
+              "core": [
+                6,
+                6
+              ],
+              "error": [
+                6,
+                6
+              ],
+              "functionality": [
+                1,
+                1
+              ],
+              "regression": [
+                45,
+                45
+              ]
+            },
+            "infra_failure": null,
+            "passed": 58,
+            "total": 58
+          },
+          "checkpoint_3": {
+            "all_pass": true,
+            "groups": {
+              "core": [
+                16,
+                16
+              ],
+              "error": [
+                1,
+                1
+              ],
+              "functionality": [
+                26,
+                26
+              ],
+              "regression": [
+                58,
+                58
+              ]
+            },
+            "infra_failure": null,
+            "passed": 101,
+            "total": 101
+          },
+          "checkpoint_4": {
+            "all_pass": true,
+            "groups": {
+              "core": [
+                16,
+                16
+              ],
+              "error": [
+                0,
+                0
+              ],
+              "functionality": [
+                32,
+                32
+              ],
+              "regression": [
+                101,
+                101
+              ]
+            },
+            "infra_failure": null,
+            "passed": 149,
+            "total": 149
+          },
+          "checkpoint_5": {
+            "all_pass": true,
+            "groups": {
+              "core": [
+                9,
+                9
+              ],
+              "error": [
+                0,
+                0
+              ],
+              "functionality": [
+                19,
+                19
+              ],
+              "regression": [
+                157,
+                157
+              ]
+            },
+            "infra_failure": null,
+            "passed": 185,
+            "total": 185
+          },
+          "checkpoint_6": {
+            "all_pass": true,
+            "groups": {
+              "core": [
+                14,
+                14
+              ],
+              "error": [
+                9,
+                9
+              ],
+              "functionality": [
+                11,
+                11
+              ],
+              "regression": [
+                36,
+                36
+              ]
+            },
+            "infra_failure": null,
+            "passed": 70,
+            "total": 70
+          }
+        },
+        {
+          "checkpoint_1": {
+            "all_pass": true,
+            "groups": {
+              "core": [
+                7,
+                7
+              ],
+              "error": [
+                0,
+                0
+              ],
+              "functionality": [
+                38,
+                38
+              ],
+              "regression": [
+                0,
+                0
+              ]
+            },
+            "infra_failure": null,
+            "passed": 45,
+            "total": 45
+          },
+          "checkpoint_2": {
+            "all_pass": true,
+            "groups": {
+              "core": [
+                6,
+                6
+              ],
+              "error": [
+                6,
+                6
+              ],
+              "functionality": [
+                1,
+                1
+              ],
+              "regression": [
+                45,
+                45
+              ]
+            },
+            "infra_failure": null,
+            "passed": 58,
+            "total": 58
+          },
+          "checkpoint_3": {
+            "all_pass": true,
+            "groups": {
+              "core": [
+                16,
+                16
+              ],
+              "error": [
+                1,
+                1
+              ],
+              "functionality": [
+                26,
+                26
+              ],
+              "regression": [
+                58,
+                58
+              ]
+            },
+            "infra_failure": null,
+            "passed": 101,
+            "total": 101
+          },
+          "checkpoint_4": {
+            "all_pass": true,
+            "groups": {
+              "core": [
+                16,
+                16
+              ],
+              "error": [
+                0,
+                0
+              ],
+              "functionality": [
+                32,
+                32
+              ],
+              "regression": [
+                101,
+                101
+              ]
+            },
+            "infra_failure": null,
+            "passed": 149,
+            "total": 149
+          },
+          "checkpoint_5": {
+            "all_pass": true,
+            "groups": {
+              "core": [
+                9,
+                9
+              ],
+              "error": [
+                0,
+                0
+              ],
+              "functionality": [
+                19,
+                19
+              ],
+              "regression": [
+                157,
+                157
+              ]
+            },
+            "infra_failure": null,
+            "passed": 185,
+            "total": 185
+          },
+          "checkpoint_6": {
+            "all_pass": true,
+            "groups": {
+              "core": [
+                14,
+                14
+              ],
+              "error": [
+                9,
+                9
+              ],
+              "functionality": [
+                11,
+                11
+              ],
+              "regression": [
+                36,
+                36
+              ]
+            },
+            "infra_failure": null,
+            "passed": 70,
+            "total": 70
+          }
+        },
+        {
+          "checkpoint_1": {
+            "all_pass": true,
+            "groups": {
+              "core": [
+                7,
+                7
+              ],
+              "error": [
+                0,
+                0
+              ],
+              "functionality": [
+                38,
+                38
+              ],
+              "regression": [
+                0,
+                0
+              ]
+            },
+            "infra_failure": null,
+            "passed": 45,
+            "total": 45
+          },
+          "checkpoint_2": {
+            "all_pass": true,
+            "groups": {
+              "core": [
+                6,
+                6
+              ],
+              "error": [
+                6,
+                6
+              ],
+              "functionality": [
+                1,
+                1
+              ],
+              "regression": [
+                45,
+                45
+              ]
+            },
+            "infra_failure": null,
+            "passed": 58,
+            "total": 58
+          },
+          "checkpoint_3": {
+            "all_pass": true,
+            "groups": {
+              "core": [
+                16,
+                16
+              ],
+              "error": [
+                1,
+                1
+              ],
+              "functionality": [
+                26,
+                26
+              ],
+              "regression": [
+                58,
+                58
+              ]
+            },
+            "infra_failure": null,
+            "passed": 101,
+            "total": 101
+          },
+          "checkpoint_4": {
+            "all_pass": true,
+            "groups": {
+              "core": [
+                16,
+                16
+              ],
+              "error": [
+                0,
+                0
+              ],
+              "functionality": [
+                32,
+                32
+              ],
+              "regression": [
+                101,
+                101
+              ]
+            },
+            "infra_failure": null,
+            "passed": 149,
+            "total": 149
+          },
+          "checkpoint_5": {
+            "all_pass": true,
+            "groups": {
+              "core": [
+                9,
+                9
+              ],
+              "error": [
+                0,
+                0
+              ],
+              "functionality": [
+                19,
+                19
+              ],
+              "regression": [
+                157,
+                157
+              ]
+            },
+            "infra_failure": null,
+            "passed": 185,
+            "total": 185
+          },
+          "checkpoint_6": {
+            "all_pass": true,
+            "groups": {
+              "core": [
+                14,
+                14
+              ],
+              "error": [
+                9,
+                9
+              ],
+              "functionality": [
+                11,
+                11
+              ],
+              "regression": [
+                36,
+                36
+              ]
+            },
+            "infra_failure": null,
+            "passed": 70,
+            "total": 70
+          }
+        }
+      ]
+    }
+  },
+  "group_order": [
+    "core",
+    "functionality",
+    "error",
+    "regression"
+  ],
+  "headline_policy": {
+    "checkpoints": 6,
+    "components": {
+      "C": "used",
+      "E": "missing",
+      "G": "missing",
+      "H": "missing",
+      "R": "missing",
+      "V": "missing"
+    },
+    "eligible": false,
+    "policy": "scb-canonical@1",
+    "reasons": [
+      {
+        "code": "component_missing",
+        "component": "V",
+        "detail": "scb-canonical@1 requires component V"
+      },
+      {
+        "code": "component_missing",
+        "component": "E",
+        "detail": "scb-canonical@1 requires component E"
+      },
+      {
+        "code": "component_missing",
+        "component": "H",
+        "detail": "scb-canonical@1 requires component H"
+      },
+      {
+        "code": "component_missing",
+        "component": "R",
+        "detail": "scb-canonical@1 requires component R"
+      },
+      {
+        "code": "component_missing",
+        "component": "G",
+        "detail": "scb-canonical@1 requires component G"
+      }
+    ],
+    "reference_correctness": "1",
+    "selection": "default_by_k"
+  },
+  "kind": "raidar-problem-validation",
+  "manifest_sha256": "547e8e110f44b53dae8bf3f8de80a700ee4ecac01751c328af8e90fb4e2224ed",
+  "mode": "multi_checkpoint",
+  "not_run": [
+    "native_parity_positive",
+    "native_parity_negative"
+  ],
+  "problem": "scb/execution_server@38d627ecf668",
+  "repeats": 3,
+  "schema_version": 1,
+  "solvable": {
+    "checkpoint_1": {
+      "digest": "3aff19b089a9a226db33b0b7d707d1e5730e3c28c77a39199a8a6bec4bbbd389",
+      "nondeterministic": [],
+      "nondeterministic_count": 0,
+      "size": 45,
+      "solvable": [
+        "checkpoint_1::TestCore::test_execute_core[echo]",
+        "checkpoint_1::TestCore::test_execute_core[time_out]",
+        "checkpoint_1::TestCore::test_execute_core[with_env]",
+        "checkpoint_1::TestCore::test_execute_core[with_files]",
+        "checkpoint_1::TestCore::test_execute_core[with_stdin]",
+        "checkpoint_1::TestCore::test_final_stats",
+        "checkpoint_1::TestCore::test_initial_stats",
+        "checkpoint_1::TestEdgeCases::test_error_does_not_increment_stats",
+        "checkpoint_1::TestEdgeCases::test_execute_duration_is_rounded",
+        "checkpoint_1::TestEdgeCases::test_execute_edge_errors[env_is_null]",
+        "checkpoint_1::TestEdgeCases::test_execute_edge_errors[files_is_null]",
+        "checkpoint_1::TestEdgeCases::test_execute_edge_errors[stdin_array_with_non_string]",
+        "checkpoint_1::TestEdgeCases::test_invalid_json_returns_json_error",
+        "checkpoint_1::TestEdgeCases::test_stats_duration_is_rounded",
+        "checkpoint_1::TestError::test_execute_errors[command_type_not_string]",
+        "checkpoint_1::TestError::test_execute_errors[empty_command_string]",
+        "checkpoint_1::TestError::test_execute_errors[env_values_not_strings]",
+        "checkpoint_1::TestError::test_execute_errors[invalid_env_type]",
+        "checkpoint_1::TestError::test_execute_errors[invalid_files_type]",
+        "checkpoint_1::TestError::test_execute_errors[invalid_stdin_type]",
+        "checkpoint_1::TestError::test_execute_errors[invalid_timeout_negative]",
+        "checkpoint_1::TestError::test_execute_errors[invalid_timeout_type]",
+        "checkpoint_1::TestError::test_execute_errors[invalid_timeout_zero]",
+        "checkpoint_1::TestError::test_execute_errors[missing_command_field]",
+        "checkpoint_1::TestHidden::test_execute_hidden[all_features_combined]",
+        "checkpoint_1::TestHidden::test_execute_hidden[command_with_shell_metacharacters]",
+        "checkpoint_1::TestHidden::test_execute_hidden[default_timeout_and_empty_stdin]",
+        "checkpoint_1::TestHidden::test_execute_hidden[env_and_files_together]",
+        "checkpoint_1::TestHidden::test_execute_hidden[env_and_stdin_together]",
+        "checkpoint_1::TestHidden::test_execute_hidden[env_multiline_values]",
+        "checkpoint_1::TestHidden::test_execute_hidden[env_override_system]",
+        "checkpoint_1::TestHidden::test_execute_hidden[exit_code_variations]",
+        "checkpoint_1::TestHidden::test_execute_hidden[files_and_stdin_together]",
+        "checkpoint_1::TestHidden::test_execute_hidden[multiple_env_vars_multiple_files]",
+        "checkpoint_1::TestHidden::test_execute_hidden[nested_file_execution]",
+        "checkpoint_1::TestHidden::test_execute_hidden[nonzero_exit_with_stderr]",
+        "checkpoint_1::TestHidden::test_execute_hidden[stdin_array_with_files]",
+        "checkpoint_1::TestHidden::test_execute_hidden[stdin_string_stream]",
+        "checkpoint_1::TestHidden::test_execute_hidden[stdout_without_newline]",
+        "checkpoint_1::TestHidden::test_execute_hidden[timeout_with_env_and_files]",
+        "checkpoint_1::TestHidden::test_execute_hidden[unicode_in_output]",
+        "checkpoint_1::TestHidden::test_execute_hidden[very_long_stdout]",
+        "checkpoint_1::TestHidden::test_execute_hidden[very_small_timeout]",
+        "checkpoint_1::TestHidden::test_final_stats",
+        "checkpoint_1::TestHidden::test_initial_stats"
+      ],
+      "verdict": "validated"
+    },
+    "checkpoint_2": {
+      "digest": "48f83ff21c0aaab3226f5c352e948a9f3daf0c1f0e18325941291b53b72ba3b4",
+      "nondeterministic": [],
+      "nondeterministic_count": 0,
+      "size": 58,
+      "solvable": [
+        "checkpoint_1::TestCore::test_execute_core[echo]",
+        "checkpoint_1::TestCore::test_execute_core[time_out]",
+        "checkpoint_1::TestCore::test_execute_core[with_env]",
+        "checkpoint_1::TestCore::test_execute_core[with_files]",
+        "checkpoint_1::TestCore::test_execute_core[with_stdin]",
+        "checkpoint_1::TestCore::test_final_stats",
+        "checkpoint_1::TestCore::test_initial_stats",
+        "checkpoint_1::TestEdgeCases::test_error_does_not_increment_stats",
+        "checkpoint_1::TestEdgeCases::test_execute_duration_is_rounded",
+        "checkpoint_1::TestEdgeCases::test_execute_edge_errors[env_is_null]",
+        "checkpoint_1::TestEdgeCases::test_execute_edge_errors[files_is_null]",
+        "checkpoint_1::TestEdgeCases::test_execute_edge_errors[stdin_array_with_non_string]",
+        "checkpoint_1::TestEdgeCases::test_invalid_json_returns_json_error",
+        "checkpoint_1::TestEdgeCases::test_stats_duration_is_rounded",
+        "checkpoint_1::TestError::test_execute_errors[command_type_not_string]",
+        "checkpoint_1::TestError::test_execute_errors[empty_command_string]",
+        "checkpoint_1::TestError::test_execute_errors[env_values_not_strings]",
+        "checkpoint_1::TestError::test_execute_errors[invalid_env_type]",
+        "checkpoint_1::TestError::test_execute_errors[invalid_files_type]",
+        "checkpoint_1::TestError::test_execute_errors[invalid_stdin_type]",
+        "checkpoint_1::TestError::test_execute_errors[invalid_timeout_negative]",
+        "checkpoint_1::TestError::test_execute_errors[invalid_timeout_type]",
+        "checkpoint_1::TestError::test_execute_errors[invalid_timeout_zero]",
+        "checkpoint_1::TestError::test_execute_errors[missing_command_field]",
+        "checkpoint_1::TestHidden::test_execute_hidden[all_features_combined]",
+        "checkpoint_1::TestHidden::test_execute_hidden[command_with_shell_metacharacters]",
+        "checkpoint_1::TestHidden::test_execute_hidden[default_timeout_and_empty_stdin]",
+        "checkpoint_1::TestHidden::test_execute_hidden[env_and_files_together]",
+        "checkpoint_1::TestHidden::test_execute_hidden[env_and_stdin_together]",
+        "checkpoint_1::TestHidden::test_execute_hidden[env_multiline_values]",
+        "checkpoint_1::TestHidden::test_execute_hidden[env_override_system]",
+        "checkpoint_1::TestHidden::test_execute_hidden[exit_code_variations]",
+        "checkpoint_1::TestHidden::test_execute_hidden[files_and_stdin_together]",
+        "checkpoint_1::TestHidden::test_execute_hidden[multiple_env_vars_multiple_files]",
+        "checkpoint_1::TestHidden::test_execute_hidden[nested_file_execution]",
+        "checkpoint_1::TestHidden::test_execute_hidden[nonzero_exit_with_stderr]",
+        "checkpoint_1::TestHidden::test_execute_hidden[stdin_array_with_files]",
+        "checkpoint_1::TestHidden::test_execute_hidden[stdin_string_stream]",
+        "checkpoint_1::TestHidden::test_execute_hidden[stdout_without_newline]",
+        "checkpoint_1::TestHidden::test_execute_hidden[timeout_with_env_and_files]",
+        "checkpoint_1::TestHidden::test_execute_hidden[unicode_in_output]",
+        "checkpoint_1::TestHidden::test_execute_hidden[very_long_stdout]",
+        "checkpoint_1::TestHidden::test_execute_hidden[very_small_timeout]",
+        "checkpoint_1::TestHidden::test_final_stats",
+        "checkpoint_1::TestHidden::test_initial_stats",
+        "checkpoint_2::TestCore::test_execute_with_track[not_recursive]",
+        "checkpoint_2::TestCore::test_execute_with_track[recursive_glob]",
+        "checkpoint_2::TestCore::test_execute_with_track[touch_file_glob]",
+        "checkpoint_2::TestCore::test_execute_with_track[touch_file_glob_mismatch]",
+        "checkpoint_2::TestCore::test_execute_with_track[touch_file_no_glob]",
+        "checkpoint_2::TestCore::test_final_stats",
+        "checkpoint_2::TestCore::test_initial_stats",
+        "checkpoint_2::TestError::test_track_validation_errors[invalid_track_element_null]",
+        "checkpoint_2::TestError::test_track_validation_errors[invalid_track_element_number]",
+        "checkpoint_2::TestError::test_track_validation_errors[invalid_track_element_object]",
+        "checkpoint_2::TestError::test_track_validation_errors[invalid_track_type_number]",
+        "checkpoint_2::TestError::test_track_validation_errors[invalid_track_type_object]",
+        "checkpoint_2::TestError::test_track_validation_errors[invalid_track_type_string]"
+      ],
+      "verdict": "validated"
+    },
+    "checkpoint_3": {
+      "digest": "aae58145ecee11bdaf20070dd761a8ea6473c8bd1ade5e9bf7087b2ae54bdd09",
+      "nondeterministic": [],
+      "nondeterministic_count": 0,
+      "size": 101,
+      "solvable": [
+        "checkpoint_1::TestCore::test_execute_core[echo]",
+        "checkpoint_1::TestCore::test_execute_core[time_out]",
+        "checkpoint_1::TestCore::test_execute_core[with_env]",
+        "checkpoint_1::TestCore::test_execute_core[with_files]",
+        "checkpoint_1::TestCore::test_execute_core[with_stdin]",
+        "checkpoint_1::TestCore::test_final_stats",
+        "checkpoint_1::TestCore::test_initial_stats",
+        "checkpoint_1::TestEdgeCases::test_error_does_not_increment_stats",
+        "checkpoint_1::TestEdgeCases::test_execute_duration_is_rounded",
+        "checkpoint_1::TestEdgeCases::test_execute_edge_errors[env_is_null]",
+        "checkpoint_1::TestEdgeCases::test_execute_edge_errors[files_is_null]",
+        "checkpoint_1::TestEdgeCases::test_execute_edge_errors[stdin_array_with_non_string]",
+        "checkpoint_1::TestEdgeCases::test_invalid_json_returns_json_error",
+        "checkpoint_1::TestEdgeCases::test_stats_duration_is_rounded",
+        "checkpoint_1::TestError::test_execute_errors[command_type_not_string]",
+        "checkpoint_1::TestError::test_execute_errors[empty_command_string]",
+        "checkpoint_1::TestError::test_execute_errors[env_values_not_strings]",
+        "checkpoint_1::TestError::test_execute_errors[invalid_env_type]",
+        "checkpoint_1::TestError::test_execute_errors[invalid_files_type]",
+        "checkpoint_1::TestError::test_execute_errors[invalid_stdin_type]",
+        "checkpoint_1::TestError::test_execute_errors[invalid_timeout_negative]",
+        "checkpoint_1::TestError::test_execute_errors[invalid_timeout_type]",
+        "checkpoint_1::TestError::test_execute_errors[invalid_timeout_zero]",
+        "checkpoint_1::TestError::test_execute_errors[missing_command_field]",
+        "checkpoint_1::TestHidden::test_execute_hidden[all_features_combined]",
+        "checkpoint_1::TestHidden::test_execute_hidden[command_with_shell_metacharacters]",
+        "checkpoint_1::TestHidden::test_execute_hidden[default_timeout_and_empty_stdin]",
+        "checkpoint_1::TestHidden::test_execute_hidden[env_and_files_together]",
+        "checkpoint_1::TestHidden::test_execute_hidden[env_and_stdin_together]",
+        "checkpoint_1::TestHidden::test_execute_hidden[env_multiline_values]",
+        "checkpoint_1::TestHidden::test_execute_hidden[env_override_system]",
+        "checkpoint_1::TestHidden::test_execute_hidden[exit_code_variations]",
+        "checkpoint_1::TestHidden::test_execute_hidden[files_and_stdin_together]",
+        "checkpoint_1::TestHidden::test_execute_hidden[multiple_env_vars_multiple_files]",
+        "checkpoint_1::TestHidden::test_execute_hidden[nested_file_execution]",
+        "checkpoint_1::TestHidden::test_execute_hidden[nonzero_exit_with_stderr]",
+        "checkpoint_1::TestHidden::test_execute_hidden[stdin_array_with_files]",
+        "checkpoint_1::TestHidden::test_execute_hidden[stdin_string_stream]",
+        "checkpoint_1::TestHidden::test_execute_hidden[stdout_without_newline]",
+        "checkpoint_1::TestHidden::test_execute_hidden[timeout_with_env_and_files]",
+        "checkpoint_1::TestHidden::test_execute_hidden[unicode_in_output]",
+        "checkpoint_1::TestHidden::test_execute_hidden[very_long_stdout]",
+        "checkpoint_1::TestHidden::test_execute_hidden[very_small_timeout]",
+        "checkpoint_1::TestHidden::test_final_stats",
+        "checkpoint_1::TestHidden::test_initial_stats",
+        "checkpoint_2::TestCore::test_execute_with_track[not_recursive]",
+        "checkpoint_2::TestCore::test_execute_with_track[recursive_glob]",
+        "checkpoint_2::TestCore::test_execute_with_track[touch_file_glob]",
+        "checkpoint_2::TestCore::test_execute_with_track[touch_file_glob_mismatch]",
+        "checkpoint_2::TestCore::test_execute_with_track[touch_file_no_glob]",
+        "checkpoint_2::TestCore::test_final_stats",
+        "checkpoint_2::TestCore::test_initial_stats",
+        "checkpoint_2::TestError::test_track_validation_errors[invalid_track_element_null]",
+        "checkpoint_2::TestError::test_track_validation_errors[invalid_track_element_number]",
+        "checkpoint_2::TestError::test_track_validation_errors[invalid_track_element_object]",
+        "checkpoint_2::TestError::test_track_validation_errors[invalid_track_type_number]",
+        "checkpoint_2::TestError::test_track_validation_errors[invalid_track_type_object]",
+        "checkpoint_2::TestError::test_track_validation_errors[invalid_track_type_string]",
+        "checkpoint_3::TestCore::test_final_stats",
+        "checkpoint_3::TestCore::test_initial_stats",
+        "checkpoint_3::TestCore::test_structured_files[bz2_compression]",
+        "checkpoint_3::TestCore::test_structured_files[csv_cell_types]",
+        "checkpoint_3::TestCore::test_structured_files[csv_columns]",
+        "checkpoint_3::TestCore::test_structured_files[csv_list_objects]",
+        "checkpoint_3::TestCore::test_structured_files[csv_quoting]",
+        "checkpoint_3::TestCore::test_structured_files[csv_sorted_headers]",
+        "checkpoint_3::TestCore::test_structured_files[gz_compression]",
+        "checkpoint_3::TestCore::test_structured_files[json_array]",
+        "checkpoint_3::TestCore::test_structured_files[json_object]",
+        "checkpoint_3::TestCore::test_structured_files[jsonl_columns]",
+        "checkpoint_3::TestCore::test_structured_files[jsonl_list]",
+        "checkpoint_3::TestCore::test_structured_files[tsv_basic]",
+        "checkpoint_3::TestCore::test_structured_files[unknown_extension]",
+        "checkpoint_3::TestCore::test_structured_files[yaml_data]",
+        "checkpoint_3::TestError::test_error_cases[multiple_compression_extensions]",
+        "checkpoint_3::TestFunctionality::test_structured_files_extended[csv_column_many_columns]",
+        "checkpoint_3::TestFunctionality::test_structured_files_extended[csv_decimals_preserved]",
+        "checkpoint_3::TestFunctionality::test_structured_files_extended[csv_empty_array]",
+        "checkpoint_3::TestFunctionality::test_structured_files_extended[csv_empty_strings]",
+        "checkpoint_3::TestFunctionality::test_structured_files_extended[csv_gz_compression]",
+        "checkpoint_3::TestFunctionality::test_structured_files_extended[csv_single_column]",
+        "checkpoint_3::TestFunctionality::test_structured_files_extended[fallback_no_extension]",
+        "checkpoint_3::TestFunctionality::test_structured_files_extended[fallback_unknown_with_string]",
+        "checkpoint_3::TestFunctionality::test_structured_files_extended[json_boolean]",
+        "checkpoint_3::TestFunctionality::test_structured_files_extended[json_empty_array]",
+        "checkpoint_3::TestFunctionality::test_structured_files_extended[json_empty_object]",
+        "checkpoint_3::TestFunctionality::test_structured_files_extended[json_null]",
+        "checkpoint_3::TestFunctionality::test_structured_files_extended[json_number]",
+        "checkpoint_3::TestFunctionality::test_structured_files_extended[json_string]",
+        "checkpoint_3::TestFunctionality::test_structured_files_extended[jsonl_gz_compression]",
+        "checkpoint_3::TestFunctionality::test_structured_files_extended[multiple_structured_files]",
+        "checkpoint_3::TestFunctionality::test_structured_files_extended[ndjson_columns]",
+        "checkpoint_3::TestFunctionality::test_structured_files_extended[ndjson_list]",
+        "checkpoint_3::TestFunctionality::test_structured_files_extended[track_with_structured_files]",
+        "checkpoint_3::TestFunctionality::test_structured_files_extended[tsv_bz2_compression]",
+        "checkpoint_3::TestFunctionality::test_structured_files_extended[tsv_columns]",
+        "checkpoint_3::TestFunctionality::test_structured_files_extended[tsv_mixed_types]",
+        "checkpoint_3::TestFunctionality::test_structured_files_extended[tsv_quoting_with_tabs]",
+        "checkpoint_3::TestFunctionality::test_structured_files_extended[yaml_array]",
+        "checkpoint_3::TestFunctionality::test_structured_files_extended[yaml_gz_compression]",
+        "checkpoint_3::TestFunctionality::test_structured_files_extended[yml_extension]"
+      ],
+      "verdict": "validated"
+    },
+    "checkpoint_4": {
+      "digest": "54de64ebd5f5aefdf9cb49aa0507ad01008163b613ca707dbec5a35be7cdcc16",
+      "nondeterministic": [],
+      "nondeterministic_count": 0,
+      "size": 149,
+      "solvable": [
+        "checkpoint_1::TestCore::test_execute_core[echo]",
+        "checkpoint_1::TestCore::test_execute_core[time_out]",
+        "checkpoint_1::TestCore::test_execute_core[with_env]",
+        "checkpoint_1::TestCore::test_execute_core[with_files]",
+        "checkpoint_1::TestCore::test_execute_core[with_stdin]",
+        "checkpoint_1::TestCore::test_final_stats",
+        "checkpoint_1::TestCore::test_initial_stats",
+        "checkpoint_1::TestEdgeCases::test_error_does_not_increment_stats",
+        "checkpoint_1::TestEdgeCases::test_execute_duration_is_rounded",
+        "checkpoint_1::TestEdgeCases::test_execute_edge_errors[env_is_null]",
+        "checkpoint_1::TestEdgeCases::test_execute_edge_errors[files_is_null]",
+        "checkpoint_1::TestEdgeCases::test_execute_edge_errors[stdin_array_with_non_string]",
+        "checkpoint_1::TestEdgeCases::test_invalid_json_returns_json_error",
+        "checkpoint_1::TestEdgeCases::test_stats_duration_is_rounded",
+        "checkpoint_1::TestError::test_execute_errors[command_type_not_string]",
+        "checkpoint_1::TestError::test_execute_errors[empty_command_string]",
+        "checkpoint_1::TestError::test_execute_errors[env_values_not_strings]",
+        "checkpoint_1::TestError::test_execute_errors[invalid_env_type]",
+        "checkpoint_1::TestError::test_execute_errors[invalid_files_type]",
+        "checkpoint_1::TestError::test_execute_errors[invalid_stdin_type]",
+        "checkpoint_1::TestError::test_execute_errors[invalid_timeout_negative]",
+        "checkpoint_1::TestError::test_execute_errors[invalid_timeout_type]",
+        "checkpoint_1::TestError::test_execute_errors[invalid_timeout_zero]",
+        "checkpoint_1::TestError::test_execute_errors[missing_command_field]",
+        "checkpoint_1::TestHidden::test_execute_hidden[all_features_combined]",
+        "checkpoint_1::TestHidden::test_execute_hidden[command_with_shell_metacharacters]",
+        "checkpoint_1::TestHidden::test_execute_hidden[default_timeout_and_empty_stdin]",
+        "checkpoint_1::TestHidden::test_execute_hidden[env_and_files_together]",
+        "checkpoint_1::TestHidden::test_execute_hidden[env_and_stdin_together]",
+        "checkpoint_1::TestHidden::test_execute_hidden[env_multiline_values]",
+        "checkpoint_1::TestHidden::test_execute_hidden[env_override_system]",
+        "checkpoint_1::TestHidden::test_execute_hidden[exit_code_variations]",
+        "checkpoint_1::TestHidden::test_execute_hidden[files_and_stdin_together]",
+        "checkpoint_1::TestHidden::test_execute_hidden[multiple_env_vars_multiple_files]",
+        "checkpoint_1::TestHidden::test_execute_hidden[nested_file_execution]",
+        "checkpoint_1::TestHidden::test_execute_hidden[nonzero_exit_with_stderr]",
+        "checkpoint_1::TestHidden::test_execute_hidden[stdin_array_with_files]",
+        "checkpoint_1::TestHidden::test_execute_hidden[stdin_string_stream]",
+        "checkpoint_1::TestHidden::test_execute_hidden[stdout_without_newline]",
+        "checkpoint_1::TestHidden::test_execute_hidden[timeout_with_env_and_files]",
+        "checkpoint_1::TestHidden::test_execute_hidden[unicode_in_output]",
+        "checkpoint_1::TestHidden::test_execute_hidden[very_long_stdout]",
+        "checkpoint_1::TestHidden::test_execute_hidden[very_small_timeout]",
+        "checkpoint_1::TestHidden::test_final_stats",
+        "checkpoint_1::TestHidden::test_initial_stats",
+        "checkpoint_2::TestCore::test_execute_with_track[not_recursive]",
+        "checkpoint_2::TestCore::test_execute_with_track[recursive_glob]",
+        "checkpoint_2::TestCore::test_execute_with_track[touch_file_glob]",
+        "checkpoint_2::TestCore::test_execute_with_track[touch_file_glob_mismatch]",
+        "checkpoint_2::TestCore::test_execute_with_track[touch_file_no_glob]",
+        "checkpoint_2::TestCore::test_final_stats",
+        "checkpoint_2::TestCore::test_initial_stats",
+        "checkpoint_2::TestError::test_track_validation_errors[invalid_track_element_null]",
+        "checkpoint_2::TestError::test_track_validation_errors[invalid_track_element_number]",
+        "checkpoint_2::TestError::test_track_validation_errors[invalid_track_element_object]",
+        "checkpoint_2::TestError::test_track_validation_errors[invalid_track_type_number]",
+        "checkpoint_2::TestError::test_track_validation_errors[invalid_track_type_object]",
+        "checkpoint_2::TestError::test_track_validation_errors[invalid_track_type_string]",
+        "checkpoint_3::TestCore::test_final_stats",
+        "checkpoint_3::TestCore::test_initial_stats",
+        "checkpoint_3::TestCore::test_structured_files[bz2_compression]",
+        "checkpoint_3::TestCore::test_structured_files[csv_cell_types]",
+        "checkpoint_3::TestCore::test_structured_files[csv_columns]",
+        "checkpoint_3::TestCore::test_structured_files[csv_list_objects]",
+        "checkpoint_3::TestCore::test_structured_files[csv_quoting]",
+        "checkpoint_3::TestCore::test_structured_files[csv_sorted_headers]",
+        "checkpoint_3::TestCore::test_structured_files[gz_compression]",
+        "checkpoint_3::TestCore::test_structured_files[json_array]",
+        "checkpoint_3::TestCore::test_structured_files[json_object]",
+        "checkpoint_3::TestCore::test_structured_files[jsonl_columns]",
+        "checkpoint_3::TestCore::test_structured_files[jsonl_list]",
+        "checkpoint_3::TestCore::test_structured_files[tsv_basic]",
+        "checkpoint_3::TestCore::test_structured_files[unknown_extension]",
+        "checkpoint_3::TestCore::test_structured_files[yaml_data]",
+        "checkpoint_3::TestError::test_error_cases[multiple_compression_extensions]",
+        "checkpoint_3::TestFunctionality::test_structured_files_extended[csv_column_many_columns]",
+        "checkpoint_3::TestFunctionality::test_structured_files_extended[csv_decimals_preserved]",
+        "checkpoint_3::TestFunctionality::test_structured_files_extended[csv_empty_array]",
+        "checkpoint_3::TestFunctionality::test_structured_files_extended[csv_empty_strings]",
+        "checkpoint_3::TestFunctionality::test_structured_files_extended[csv_gz_compression]",
+        "checkpoint_3::TestFunctionality::test_structured_files_extended[csv_single_column]",
+        "checkpoint_3::TestFunctionality::test_structured_files_extended[fallback_no_extension]",
+        "checkpoint_3::TestFunctionality::test_structured_files_extended[fallback_unknown_with_string]",
+        "checkpoint_3::TestFunctionality::test_structured_files_extended[json_boolean]",
+        "checkpoint_3::TestFunctionality::test_structured_files_extended[json_empty_array]",
+        "checkpoint_3::TestFunctionality::test_structured_files_extended[json_empty_object]",
+        "checkpoint_3::TestFunctionality::test_structured_files_extended[json_null]",
+        "checkpoint_3::TestFunctionality::test_structured_files_extended[json_number]",
+        "checkpoint_3::TestFunctionality::test_structured_files_extended[json_string]",
+        "checkpoint_3::TestFunctionality::test_structured_files_extended[jsonl_gz_compression]",
+        "checkpoint_3::TestFunctionality::test_structured_files_extended[multiple_structured_files]",
+        "checkpoint_3::TestFunctionality::test_structured_files_extended[ndjson_columns]",
+        "checkpoint_3::TestFunctionality::test_structured_files_extended[ndjson_list]",
+        "checkpoint_3::TestFunctionality::test_structured_files_extended[track_with_structured_files]",
+        "checkpoint_3::TestFunctionality::test_structured_files_extended[tsv_bz2_compression]",
+        "checkpoint_3::TestFunctionality::test_structured_files_extended[tsv_columns]",
+        "checkpoint_3::TestFunctionality::test_structured_files_extended[tsv_mixed_types]",
+        "checkpoint_3::TestFunctionality::test_structured_files_extended[tsv_quoting_with_tabs]",
+        "checkpoint_3::TestFunctionality::test_structured_files_extended[yaml_array]",
+        "checkpoint_3::TestFunctionality::test_structured_files_extended[yaml_gz_compression]",
+        "checkpoint_3::TestFunctionality::test_structured_files_extended[yml_extension]",
+        "checkpoint_4::TestCore::test_backward_compatible_string",
+        "checkpoint_4::TestCore::test_command_chains[all_commands_succeed]",
+        "checkpoint_4::TestCore::test_command_chains[chain_continue_on_error]",
+        "checkpoint_4::TestCore::test_command_chains[chain_per_command_timeout]",
+        "checkpoint_4::TestCore::test_command_chains[chain_required_runs]",
+        "checkpoint_4::TestCore::test_command_chains[chain_stop_on_failure]",
+        "checkpoint_4::TestCore::test_command_chains[chain_with_env_vars]",
+        "checkpoint_4::TestCore::test_command_chains[chain_with_input_files]",
+        "checkpoint_4::TestCore::test_command_chains[long_command_chain]",
+        "checkpoint_4::TestCore::test_command_chains[multiple_failures]",
+        "checkpoint_4::TestCore::test_command_chains[multiple_required_commands]",
+        "checkpoint_4::TestCore::test_command_chains[required_command_fails]",
+        "checkpoint_4::TestCore::test_command_chains[single_command_array]",
+        "checkpoint_4::TestCore::test_command_chains[working_directory_persistence]",
+        "checkpoint_4::TestCore::test_final_stats",
+        "checkpoint_4::TestCore::test_initial_stats",
+        "checkpoint_4::TestFunctionality::test_command_chains_extended[all_commands_timeout]",
+        "checkpoint_4::TestFunctionality::test_command_chains_extended[all_required_commands]",
+        "checkpoint_4::TestFunctionality::test_command_chains_extended[all_success_with_false_required]",
+        "checkpoint_4::TestFunctionality::test_command_chains_extended[alternating_success_failure_continue]",
+        "checkpoint_4::TestFunctionality::test_command_chains_extended[chain_creates_and_modifies_files]",
+        "checkpoint_4::TestFunctionality::test_command_chains_extended[chain_deletes_then_recreates_file]",
+        "checkpoint_4::TestFunctionality::test_command_chains_extended[chain_success_then_failure_at_end]",
+        "checkpoint_4::TestFunctionality::test_command_chains_extended[chain_track_multiple_patterns]",
+        "checkpoint_4::TestFunctionality::test_command_chains_extended[chain_with_all_features]",
+        "checkpoint_4::TestFunctionality::test_command_chains_extended[chain_with_env_and_files]",
+        "checkpoint_4::TestFunctionality::test_command_chains_extended[chain_with_special_characters]",
+        "checkpoint_4::TestFunctionality::test_command_chains_extended[chain_with_specific_exit_codes]",
+        "checkpoint_4::TestFunctionality::test_command_chains_extended[chain_with_stderr]",
+        "checkpoint_4::TestFunctionality::test_command_chains_extended[chain_with_stdin]",
+        "checkpoint_4::TestFunctionality::test_command_chains_extended[continue_on_error_false_explicit]",
+        "checkpoint_4::TestFunctionality::test_command_chains_extended[continue_on_error_with_required]",
+        "checkpoint_4::TestFunctionality::test_command_chains_extended[failure_at_start_required_at_end]",
+        "checkpoint_4::TestFunctionality::test_command_chains_extended[global_timeout_applies_to_commands]",
+        "checkpoint_4::TestFunctionality::test_command_chains_extended[mixed_timeouts_and_errors]",
+        "checkpoint_4::TestFunctionality::test_command_chains_extended[multiple_failures_with_continue]",
+        "checkpoint_4::TestFunctionality::test_command_chains_extended[multiple_timeouts_in_chain]",
+        "checkpoint_4::TestFunctionality::test_command_chains_extended[per_command_timeout_overrides_global]",
+        "checkpoint_4::TestFunctionality::test_command_chains_extended[required_after_multiple_failures]",
+        "checkpoint_4::TestFunctionality::test_command_chains_extended[required_command_at_beginning]",
+        "checkpoint_4::TestFunctionality::test_command_chains_extended[required_command_in_middle]",
+        "checkpoint_4::TestFunctionality::test_command_chains_extended[required_command_itself_times_out]",
+        "checkpoint_4::TestFunctionality::test_command_chains_extended[required_false_explicit]",
+        "checkpoint_4::TestFunctionality::test_command_chains_extended[single_required_only]",
+        "checkpoint_4::TestFunctionality::test_command_chains_extended[timeout_on_last_command]",
+        "checkpoint_4::TestFunctionality::test_command_chains_extended[timeout_then_required_then_timeout]",
+        "checkpoint_4::TestFunctionality::test_command_chains_extended[very_long_chain]",
+        "checkpoint_4::TestFunctionality::test_command_chains_extended[zero_duration_commands]"
+      ],
+      "verdict": "validated"
+    },
+    "checkpoint_5": {
+      "digest": "85f1a693fd0f7f6f020bf345b63d9d8ac4dc7c03218646701bb4d3d3a812ec3a",
+      "nondeterministic": [],
+      "nondeterministic_count": 0,
+      "size": 185,
+      "solvable": [
+        "checkpoint_1::TestCore::test_execute_core[echo]",
+        "checkpoint_1::TestCore::test_execute_core[time_out]",
+        "checkpoint_1::TestCore::test_execute_core[with_env]",
+        "checkpoint_1::TestCore::test_execute_core[with_files]",
+        "checkpoint_1::TestCore::test_execute_core[with_stdin]",
+        "checkpoint_1::TestCore::test_final_stats",
+        "checkpoint_1::TestCore::test_initial_stats",
+        "checkpoint_1::TestEdgeCases::test_error_does_not_increment_stats",
+        "checkpoint_1::TestEdgeCases::test_execute_duration_is_rounded",
+        "checkpoint_1::TestEdgeCases::test_execute_edge_errors[env_is_null]",
+        "checkpoint_1::TestEdgeCases::test_execute_edge_errors[files_is_null]",
+        "checkpoint_1::TestEdgeCases::test_execute_edge_errors[stdin_array_with_non_string]",
+        "checkpoint_1::TestEdgeCases::test_invalid_json_returns_json_error",
+        "checkpoint_1::TestEdgeCases::test_stats_duration_is_rounded",
+        "checkpoint_1::TestError::test_execute_errors[command_type_not_string]",
+        "checkpoint_1::TestError::test_execute_errors[empty_command_string]",
+        "checkpoint_1::TestError::test_execute_errors[env_values_not_strings]",
+        "checkpoint_1::TestError::test_execute_errors[invalid_env_type]",
+        "checkpoint_1::TestError::test_execute_errors[invalid_files_type]",
+        "checkpoint_1::TestError::test_execute_errors[invalid_stdin_type]",
+        "checkpoint_1::TestError::test_execute_errors[invalid_timeout_negative]",
+        "checkpoint_1::TestError::test_execute_errors[invalid_timeout_type]",
+        "checkpoint_1::TestError::test_execute_errors[invalid_timeout_zero]",
+        "checkpoint_1::TestError::test_execute_errors[missing_command_field]",
+        "checkpoint_1::TestHidden::test_execute_hidden[all_features_combined]",
+        "checkpoint_1::TestHidden::test_execute_hidden[command_with_shell_metacharacters]",
+        "checkpoint_1::TestHidden::test_execute_hidden[default_timeout_and_empty_stdin]",
+        "checkpoint_1::TestHidden::test_execute_hidden[env_and_files_together]",
+        "checkpoint_1::TestHidden::test_execute_hidden[env_and_stdin_together]",
+        "checkpoint_1::TestHidden::test_execute_hidden[env_multiline_values]",
+        "checkpoint_1::TestHidden::test_execute_hidden[env_override_system]",
+        "checkpoint_1::TestHidden::test_execute_hidden[exit_code_variations]",
+        "checkpoint_1::TestHidden::test_execute_hidden[files_and_stdin_together]",
+        "checkpoint_1::TestHidden::test_execute_hidden[multiple_env_vars_multiple_files]",
+        "checkpoint_1::TestHidden::test_execute_hidden[nested_file_execution]",
+        "checkpoint_1::TestHidden::test_execute_hidden[nonzero_exit_with_stderr]",
+        "checkpoint_1::TestHidden::test_execute_hidden[stdin_array_with_files]",
+        "checkpoint_1::TestHidden::test_execute_hidden[stdin_string_stream]",
+        "checkpoint_1::TestHidden::test_execute_hidden[stdout_without_newline]",
+        "checkpoint_1::TestHidden::test_execute_hidden[timeout_with_env_and_files]",
+        "checkpoint_1::TestHidden::test_execute_hidden[unicode_in_output]",
+        "checkpoint_1::TestHidden::test_execute_hidden[very_long_stdout]",
+        "checkpoint_1::TestHidden::test_execute_hidden[very_small_timeout]",
+        "checkpoint_1::TestHidden::test_final_stats",
+        "checkpoint_1::TestHidden::test_initial_stats",
+        "checkpoint_2::TestCore::test_execute_with_track[not_recursive]",
+        "checkpoint_2::TestCore::test_execute_with_track[recursive_glob]",
+        "checkpoint_2::TestCore::test_execute_with_track[touch_file_glob]",
+        "checkpoint_2::TestCore::test_execute_with_track[touch_file_glob_mismatch]",
+        "checkpoint_2::TestCore::test_execute_with_track[touch_file_no_glob]",
+        "checkpoint_2::TestCore::test_final_stats",
+        "checkpoint_2::TestCore::test_initial_stats",
+        "checkpoint_2::TestError::test_track_validation_errors[invalid_track_element_null]",
+        "checkpoint_2::TestError::test_track_validation_errors[invalid_track_element_number]",
+        "checkpoint_2::TestError::test_track_validation_errors[invalid_track_element_object]",
+        "checkpoint_2::TestError::test_track_validation_errors[invalid_track_type_number]",
+        "checkpoint_2::TestError::test_track_validation_errors[invalid_track_type_object]",
+        "checkpoint_2::TestError::test_track_validation_errors[invalid_track_type_string]",
+        "checkpoint_3::TestCore::test_final_stats",
+        "checkpoint_3::TestCore::test_initial_stats",
+        "checkpoint_3::TestCore::test_structured_files[bz2_compression]",
+        "checkpoint_3::TestCore::test_structured_files[csv_cell_types]",
+        "checkpoint_3::TestCore::test_structured_files[csv_columns]",
+        "checkpoint_3::TestCore::test_structured_files[csv_list_objects]",
+        "checkpoint_3::TestCore::test_structured_files[csv_quoting]",
+        "checkpoint_3::TestCore::test_structured_files[csv_sorted_headers]",
+        "checkpoint_3::TestCore::test_structured_files[gz_compression]",
+        "checkpoint_3::TestCore::test_structured_files[json_array]",
+        "checkpoint_3::TestCore::test_structured_files[json_object]",
+        "checkpoint_3::TestCore::test_structured_files[jsonl_columns]",
+        "checkpoint_3::TestCore::test_structured_files[jsonl_list]",
+        "checkpoint_3::TestCore::test_structured_files[tsv_basic]",
+        "checkpoint_3::TestCore::test_structured_files[unknown_extension]",
+        "checkpoint_3::TestCore::test_structured_files[yaml_data]",
+        "checkpoint_3::TestError::test_error_cases[multiple_compression_extensions]",
+        "checkpoint_3::TestFunctionality::test_structured_files_extended[csv_column_many_columns]",
+        "checkpoint_3::TestFunctionality::test_structured_files_extended[csv_decimals_preserved]",
+        "checkpoint_3::TestFunctionality::test_structured_files_extended[csv_empty_array]",
+        "checkpoint_3::TestFunctionality::test_structured_files_extended[csv_empty_strings]",
+        "checkpoint_3::TestFunctionality::test_structured_files_extended[csv_gz_compression]",
+        "checkpoint_3::TestFunctionality::test_structured_files_extended[csv_single_column]",
+        "checkpoint_3::TestFunctionality::test_structured_files_extended[fallback_no_extension]",
+        "checkpoint_3::TestFunctionality::test_structured_files_extended[fallback_unknown_with_string]",
+        "checkpoint_3::TestFunctionality::test_structured_files_extended[json_boolean]",
+        "checkpoint_3::TestFunctionality::test_structured_files_extended[json_empty_array]",
+        "checkpoint_3::TestFunctionality::test_structured_files_extended[json_empty_object]",
+        "checkpoint_3::TestFunctionality::test_structured_files_extended[json_null]",
+        "checkpoint_3::TestFunctionality::test_structured_files_extended[json_number]",
+        "checkpoint_3::TestFunctionality::test_structured_files_extended[json_string]",
+        "checkpoint_3::TestFunctionality::test_structured_files_extended[jsonl_gz_compression]",
+        "checkpoint_3::TestFunctionality::test_structured_files_extended[multiple_structured_files]",
+        "checkpoint_3::TestFunctionality::test_structured_files_extended[ndjson_columns]",
+        "checkpoint_3::TestFunctionality::test_structured_files_extended[ndjson_list]",
+        "checkpoint_3::TestFunctionality::test_structured_files_extended[track_with_structured_files]",
+        "checkpoint_3::TestFunctionality::test_structured_files_extended[tsv_bz2_compression]",
+        "checkpoint_3::TestFunctionality::test_structured_files_extended[tsv_columns]",
+        "checkpoint_3::TestFunctionality::test_structured_files_extended[tsv_mixed_types]",
+        "checkpoint_3::TestFunctionality::test_structured_files_extended[tsv_quoting_with_tabs]",
+        "checkpoint_3::TestFunctionality::test_structured_files_extended[yaml_array]",
+        "checkpoint_3::TestFunctionality::test_structured_files_extended[yaml_gz_compression]",
+        "checkpoint_3::TestFunctionality::test_structured_files_extended[yml_extension]",
+        "checkpoint_4::TestCore::test_backward_compatible_string",
+        "checkpoint_4::TestCore::test_command_chains[all_commands_succeed]",
+        "checkpoint_4::TestCore::test_command_chains[chain_continue_on_error]",
+        "checkpoint_4::TestCore::test_command_chains[chain_per_command_timeout]",
+        "checkpoint_4::TestCore::test_command_chains[chain_required_runs]",
+        "checkpoint_4::TestCore::test_command_chains[chain_stop_on_failure]",
+        "checkpoint_4::TestCore::test_command_chains[chain_with_env_vars]",
+        "checkpoint_4::TestCore::test_command_chains[chain_with_input_files]",
+        "checkpoint_4::TestCore::test_command_chains[long_command_chain]",
+        "checkpoint_4::TestCore::test_command_chains[multiple_failures]",
+        "checkpoint_4::TestCore::test_command_chains[multiple_required_commands]",
+        "checkpoint_4::TestCore::test_command_chains[required_command_fails]",
+        "checkpoint_4::TestCore::test_command_chains[single_command_array]",
+        "checkpoint_4::TestCore::test_command_chains[working_directory_persistence]",
+        "checkpoint_4::TestCore::test_final_stats",
+        "checkpoint_4::TestCore::test_initial_stats",
+        "checkpoint_4::TestFunctionality::test_command_chains_extended[all_commands_timeout]",
+        "checkpoint_4::TestFunctionality::test_command_chains_extended[all_required_commands]",
+        "checkpoint_4::TestFunctionality::test_command_chains_extended[all_success_with_false_required]",
+        "checkpoint_4::TestFunctionality::test_command_chains_extended[alternating_success_failure_continue]",
+        "checkpoint_4::TestFunctionality::test_command_chains_extended[chain_creates_and_modifies_files]",
+        "checkpoint_4::TestFunctionality::test_command_chains_extended[chain_deletes_then_recreates_file]",
+        "checkpoint_4::TestFunctionality::test_command_chains_extended[chain_success_then_failure_at_end]",
+        "checkpoint_4::TestFunctionality::test_command_chains_extended[chain_track_multiple_patterns]",
+        "checkpoint_4::TestFunctionality::test_command_chains_extended[chain_with_all_features]",
+        "checkpoint_4::TestFunctionality::test_command_chains_extended[chain_with_env_and_files]",
+        "checkpoint_4::TestFunctionality::test_command_chains_extended[chain_with_special_characters]",
+        "checkpoint_4::TestFunctionality::test_command_chains_extended[chain_with_specific_exit_codes]",
+        "checkpoint_4::TestFunctionality::test_command_chains_extended[chain_with_stderr]",
+        "checkpoint_4::TestFunctionality::test_command_chains_extended[chain_with_stdin]",
+        "checkpoint_4::TestFunctionality::test_command_chains_extended[continue_on_error_false_explicit]",
+        "checkpoint_4::TestFunctionality::test_command_chains_extended[continue_on_error_with_required]",
+        "checkpoint_4::TestFunctionality::test_command_chains_extended[failure_at_start_required_at_end]",
+        "checkpoint_4::TestFunctionality::test_command_chains_extended[global_timeout_applies_to_commands]",
+        "checkpoint_4::TestFunctionality::test_command_chains_extended[mixed_timeouts_and_errors]",
+        "checkpoint_4::TestFunctionality::test_command_chains_extended[multiple_failures_with_continue]",
+        "checkpoint_4::TestFunctionality::test_command_chains_extended[multiple_timeouts_in_chain]",
+        "checkpoint_4::TestFunctionality::test_command_chains_extended[per_command_timeout_overrides_global]",
+        "checkpoint_4::TestFunctionality::test_command_chains_extended[required_after_multiple_failures]",
+        "checkpoint_4::TestFunctionality::test_command_chains_extended[required_command_at_beginning]",
+        "checkpoint_4::TestFunctionality::test_command_chains_extended[required_command_in_middle]",
+        "checkpoint_4::TestFunctionality::test_command_chains_extended[required_command_itself_times_out]",
+        "checkpoint_4::TestFunctionality::test_command_chains_extended[required_false_explicit]",
+        "checkpoint_4::TestFunctionality::test_command_chains_extended[single_required_only]",
+        "checkpoint_4::TestFunctionality::test_command_chains_extended[timeout_on_last_command]",
+        "checkpoint_4::TestFunctionality::test_command_chains_extended[timeout_then_required_then_timeout]",
+        "checkpoint_4::TestFunctionality::test_command_chains_extended[very_long_chain]",
+        "checkpoint_4::TestFunctionality::test_command_chains_extended[zero_duration_commands]",
+        "checkpoint_5::TestCore::test_01_initial_stats",
+        "checkpoint_5::TestCore::test_02_cache_miss_first_execution",
+        "checkpoint_5::TestCore::test_03_cache_hit_identical_request",
+        "checkpoint_5::TestCore::test_04_files_cache_miss_first",
+        "checkpoint_5::TestCore::test_05_different_files_cache_miss",
+        "checkpoint_5::TestCore::test_06_force_setup",
+        "checkpoint_5::TestCore::test_07_force_bypass",
+        "checkpoint_5::TestCore::test_08_force_bypass_updates_cache",
+        "checkpoint_5::TestCore::test_09_final_stats",
+        "checkpoint_5::TestHidden::test_01_env_cache_miss",
+        "checkpoint_5::TestHidden::test_02_env_cache_hit",
+        "checkpoint_5::TestHidden::test_03_env_changes_cache",
+        "checkpoint_5::TestHidden::test_04_stdin_cache_miss",
+        "checkpoint_5::TestHidden::test_05_stdin_cache_hit",
+        "checkpoint_5::TestHidden::test_06_timeout_variation_short",
+        "checkpoint_5::TestHidden::test_07_timeout_variation_long",
+        "checkpoint_5::TestHidden::test_08_tracking_chain_cache_miss",
+        "checkpoint_5::TestHidden::test_09_tracking_chain_cache_hit",
+        "checkpoint_5::TestHidden::test_10_track_pattern_change_miss",
+        "checkpoint_5::TestHidden::test_11_continue_on_error_true_miss",
+        "checkpoint_5::TestHidden::test_12_continue_on_error_true_hit",
+        "checkpoint_5::TestHidden::test_13_continue_on_error_false_miss",
+        "checkpoint_5::TestHidden::test_14_continue_on_error_false_hit",
+        "checkpoint_5::TestHidden::test_15_force_seed_miss",
+        "checkpoint_5::TestHidden::test_16_force_seed_hit",
+        "checkpoint_5::TestHidden::test_17_force_bypass_miss",
+        "checkpoint_5::TestHidden::test_18_force_followup_hit",
+        "checkpoint_5::TestHidden::test_19_stats_cache_metrics",
+        "checkpoint_5::TestRegression::test_cache_chain_order_matters",
+        "checkpoint_5::TestRegression::test_cache_failed_command",
+        "checkpoint_5::TestRegression::test_cache_special_chars_cmd",
+        "checkpoint_5::TestRegression::test_cache_unicode",
+        "checkpoint_5::TestRegression::test_command_chain_with_required",
+        "checkpoint_5::TestRegression::test_force_on_chain",
+        "checkpoint_5::TestRegression::test_recursive_file_tracking",
+        "checkpoint_5::TestRegression::test_timeout_execution"
+      ],
+      "verdict": "validated"
+    },
+    "checkpoint_6": {
+      "digest": "2a751a5f2a87aca91b7df8f7651f1caf6de533da74983badf7e778661798f8ec",
+      "nondeterministic": [],
+      "nondeterministic_count": 0,
+      "size": 70,
+      "solvable": [
+        "checkpoint_6::TestCore::test_01_create_environment_never",
+        "checkpoint_6::TestCore::test_02_create_environment_fork",
+        "checkpoint_6::TestCore::test_03_create_environment_base",
+        "checkpoint_6::TestCore::test_04_execute_never_mode",
+        "checkpoint_6::TestCore::test_05_execute_fork_mode",
+        "checkpoint_6::TestCore::test_06_execute_base_mode",
+        "checkpoint_6::TestCore::test_07_execute_base_mode_isolated",
+        "checkpoint_6::TestCore::test_08_missing_environment_field",
+        "checkpoint_6::TestCore::test_09_unknown_environment",
+        "checkpoint_6::TestCore::test_10_verify_never_persistence",
+        "checkpoint_6::TestCore::test_11_create_duplicate_environment",
+        "checkpoint_6::TestCore::test_12_environment_with_overlay_files",
+        "checkpoint_6::TestCore::test_13_create_environment_default_mode",
+        "checkpoint_6::TestCore::test_14_create_environment_no_files",
+        "checkpoint_6::TestError::test_01_missing_environment_field",
+        "checkpoint_6::TestError::test_02_empty_environment_field",
+        "checkpoint_6::TestError::test_03_invalid_environment_path",
+        "checkpoint_6::TestError::test_04_unknown_environment",
+        "checkpoint_6::TestError::test_05_setup_duplicate_environment",
+        "checkpoint_6::TestError::test_06_duplicate_environment_name",
+        "checkpoint_6::TestError::test_07_invalid_concurrency_type",
+        "checkpoint_6::TestError::test_08_invalid_concurrency_value",
+        "checkpoint_6::TestError::test_09_invalid_environment_name",
+        "checkpoint_6::TestHidden::test_01_create_never_environment",
+        "checkpoint_6::TestHidden::test_02_create_fork_environment",
+        "checkpoint_6::TestHidden::test_03_create_base_environment",
+        "checkpoint_6::TestHidden::test_04_create_default_environment",
+        "checkpoint_6::TestHidden::test_05_create_empty_environment",
+        "checkpoint_6::TestHidden::test_06_execute_never_initial_write",
+        "checkpoint_6::TestHidden::test_07_execute_never_persistence",
+        "checkpoint_6::TestHidden::test_08_execute_fork_counter_update",
+        "checkpoint_6::TestHidden::test_09_execute_base_create_state",
+        "checkpoint_6::TestHidden::test_10_execute_base_clean_snapshot",
+        "checkpoint_6::TestHidden::test_11_execute_overlay_files",
+        "checkpoint_6::TestRegression::test_01_create_environment",
+        "checkpoint_6::TestRegression::test_02_stdin_execution",
+        "checkpoint_6::TestRegression::test_03_csv_structured_file",
+        "checkpoint_6::TestRegression::test_04_track_glob_no_match",
+        "checkpoint_6::TestRegression::test_05_create_env_fork",
+        "checkpoint_6::TestRegression::test_06_create_env_base",
+        "checkpoint_6::TestRegression::test_07_create_env_many_files",
+        "checkpoint_6::TestRegression::test_08_create_env_nested_dirs",
+        "checkpoint_6::TestRegression::test_09_create_env_structured",
+        "checkpoint_6::TestRegression::test_10_create_env_long_name",
+        "checkpoint_6::TestRegression::test_11_create_env_numeric_name",
+        "checkpoint_6::TestRegression::test_12_env_stdin_shell_injection",
+        "checkpoint_6::TestRegression::test_13_env_stdin_unicode",
+        "checkpoint_6::TestRegression::test_14_env_stdin_long",
+        "checkpoint_6::TestRegression::test_15_env_stdin_empty_string",
+        "checkpoint_6::TestRegression::test_16_env_chain_basic",
+        "checkpoint_6::TestRegression::test_17_env_chain_with_required",
+        "checkpoint_6::TestRegression::test_18_env_chain_file_tracking",
+        "checkpoint_6::TestRegression::test_19_env_chain_timeout",
+        "checkpoint_6::TestRegression::test_20_env_overlay_basic",
+        "checkpoint_6::TestRegression::test_21_env_overlay_overwrite",
+        "checkpoint_6::TestRegression::test_22_env_overlay_plus_stdin",
+        "checkpoint_6::TestRegression::test_23_env_overlay_structured",
+        "checkpoint_6::TestRegression::test_24_env_overlay_nested_path",
+        "checkpoint_6::TestRegression::test_25_env_fork_stdin",
+        "checkpoint_6::TestRegression::test_26_env_base_stdin",
+        "checkpoint_6::TestRegression::test_27_env_kitchen_sink",
+        "checkpoint_6::TestRegression::test_28_env_cache_setup",
+        "checkpoint_6::TestRegression::test_29_env_cache_hit",
+        "checkpoint_6::TestRegression::test_30_env_cache_stdin_miss",
+        "checkpoint_6::TestRegression::test_31_env_whitespace_stdin",
+        "checkpoint_6::TestRegression::test_32_env_empty_overlay",
+        "checkpoint_6::TestRegression::test_33_env_nested_read",
+        "checkpoint_6::TestRegression::test_34_env_stdin_quotes_escapes",
+        "checkpoint_6::TestRegression::test_35_env_chain_continue_on_error",
+        "checkpoint_6::TestRegression::test_36_env_many_files_count"
+      ],
+      "verdict": "validated"
+    }
+  },
+  "spec_determinacy": {
+    "assertions": {
+      "audited": 0,
+      "by_rule": {}
+    },
+    "audit_version": 1,
+    "dynamic": {
+      "environment": {},
+      "reason": null,
+      "status": "ran"
+    },
+    "flagged": [],
+    "method": "Static: each audited assertion of a test (error-detail/message equality, containment or pattern; byte-level stdout comparison) is classified against the text of its origin checkpoint's specification and every earlier one (rules below). Dynamic: reference k and spec-conformant variants of it (variants below) are graded at step k; a case is sensitive to a variant when it passes on the reference and not on the variant. A case is flagged when its test has an undetermined assertion of the kind a variant it is sensitive to rewrites.",
+    "rules": {
+      "content-stated": "determined: a paragraph states what the category's detail contains",
+      "content-unstated": "undetermined: error text must contain an input value or match a pattern; no paragraph states what the category's detail contains",
+      "exact-stated": "determined: a paragraph states the exact content of the category's detail",
+      "exact-unstated": "undetermined: error text must equal an input value; no paragraph states exact content",
+      "format-stated": "determined: the specification names an output byte format",
+      "format-unstated": "undetermined: stdout compared byte for byte; no byte format stated",
+      "literal-in-spec": "determined: the asserted literal occurs in the specification text",
+      "wording-unstated": "undetermined: an error-text literal in neither the specification nor the test's inputs"
+    },
+    "sensitive_determined": [],
+    "sensitive_unexplained": [],
+    "static_undetermined": [],
+    "steps": {
+      "checkpoint_1": {
+        "reference": {
+          "infra_failure": null,
+          "passed": 45,
+          "total": 45
+        },
+        "variants": {
+          "neutral_error_text": {
+            "infra_failure": null,
+            "passed": 45,
+            "sensitive": [],
+            "total": 45
+          },
+          "reformatted_json": {
+            "infra_failure": null,
+            "passed": 45,
+            "sensitive": [],
+            "total": 45
+          }
+        }
+      },
+      "checkpoint_2": {
+        "reference": {
+          "infra_failure": null,
+          "passed": 58,
+          "total": 58
+        },
+        "variants": {
+          "neutral_error_text": {
+            "infra_failure": null,
+            "passed": 58,
+            "sensitive": [],
+            "total": 58
+          },
+          "reformatted_json": {
+            "infra_failure": null,
+            "passed": 58,
+            "sensitive": [],
+            "total": 58
+          }
+        }
+      },
+      "checkpoint_3": {
+        "reference": {
+          "infra_failure": null,
+          "passed": 101,
+          "total": 101
+        },
+        "variants": {
+          "neutral_error_text": {
+            "infra_failure": null,
+            "passed": 101,
+            "sensitive": [],
+            "total": 101
+          },
+          "reformatted_json": {
+            "infra_failure": null,
+            "passed": 101,
+            "sensitive": [],
+            "total": 101
+          }
+        }
+      },
+      "checkpoint_4": {
+        "reference": {
+          "infra_failure": null,
+          "passed": 149,
+          "total": 149
+        },
+        "variants": {
+          "neutral_error_text": {
+            "infra_failure": null,
+            "passed": 149,
+            "sensitive": [],
+            "total": 149
+          },
+          "reformatted_json": {
+            "infra_failure": null,
+            "passed": 149,
+            "sensitive": [],
+            "total": 149
+          }
+        }
+      },
+      "checkpoint_5": {
+        "reference": {
+          "infra_failure": null,
+          "passed": 185,
+          "total": 185
+        },
+        "variants": {
+          "neutral_error_text": {
+            "infra_failure": null,
+            "passed": 185,
+            "sensitive": [],
+            "total": 185
+          },
+          "reformatted_json": {
+            "infra_failure": null,
+            "passed": 185,
+            "sensitive": [],
+            "total": 185
+          }
+        }
+      },
+      "checkpoint_6": {
+        "reference": {
+          "infra_failure": null,
+          "passed": 70,
+          "total": 70
+        },
+        "variants": {
+          "neutral_error_text": {
+            "infra_failure": null,
+            "passed": 70,
+            "sensitive": [],
+            "total": 70
+          },
+          "reformatted_json": {
+            "infra_failure": null,
+            "passed": 70,
+            "sensitive": [],
+            "total": 70
+          }
+        }
+      }
+    },
+    "summary": {
+      "flagged": 0,
+      "flagged_by_checkpoint": {},
+      "flagged_by_rule": {},
+      "sensitive_determined": 0,
+      "sensitive_unexplained": 0,
+      "unconfirmed": 0
+    },
+    "unconfirmed": [],
+    "variants": {
+      "neutral_error_text": "every error's human-readable text (an error object's detail or message) replaced by 'request rejected'; category, exit code and format kept",
+      "reformatted_json": "JSON stdout re-serialised with two-space indentation and a trailing newline; value and key order kept"
+    }
+  },
+  "steps": [
+    "checkpoint_1",
+    "checkpoint_2",
+    "checkpoint_3",
+    "checkpoint_4",
+    "checkpoint_5",
+    "checkpoint_6"
+  ],
+  "verdict": "validated_partial"
+}

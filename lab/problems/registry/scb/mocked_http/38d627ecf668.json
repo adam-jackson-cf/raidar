@@ -1,0 +1,194 @@
+{
+  "kind": "raidar-problem",
+  "schema_version": 1,
+  "ref": "scb/mocked_http@38d627ecf668",
+  "mode": "multi_checkpoint",
+  "checkpoints": 8,
+  "steps": [
+    {
+      "name": "checkpoint_1",
+      "checkpoint": "checkpoint_1",
+      "instruction_sha256": "99c11d55acaf146a70241ba1f32ded3c52c55759343a0701a50c1f2c4190768a",
+      "test_files": [
+        "test_checkpoint_1.py"
+      ]
+    },
+    {
+      "name": "checkpoint_2",
+      "checkpoint": "checkpoint_2",
+      "instruction_sha256": "8f0621a85792396c1bf208a6cedaabb216f2d3bb46c0687b3fb95babd0b8c633",
+      "test_files": [
+        "test_checkpoint_1.py",
+        "test_checkpoint_2.py"
+      ]
+    },
+    {
+      "name": "checkpoint_3",
+      "checkpoint": "checkpoint_3",
+      "instruction_sha256": "5dadbdcf0f6e41144e5c70b9f76271145fb653983522ecfb826386160798b35e",
+      "test_files": [
+        "test_checkpoint_1.py",
+        "test_checkpoint_2.py",
+        "test_checkpoint_3.py"
+      ]
+    },
+    {
+      "name": "checkpoint_4",
+      "checkpoint": "checkpoint_4",
+      "instruction_sha256": "68635c2126e795ae5e466b16b6df737de6eadb4ca36c9afc20c4957698a633ad",
+      "test_files": [
+        "test_checkpoint_1.py",
+        "test_checkpoint_2.py",
+        "test_checkpoint_3.py",
+        "test_checkpoint_4.py"
+      ]
+    },
+    {
+      "name": "checkpoint_5",
+      "checkpoint": "checkpoint_5",
+      "instruction_sha256": "f1a0e529fac5520fb8894274e74ca6ee6f78b63cfeccac7cf5c1b00468892ba0",
+      "test_files": [
+        "test_checkpoint_1.py",
+        "test_checkpoint_2.py",
+        "test_checkpoint_3.py",
+        "test_checkpoint_4.py",
+        "test_checkpoint_5.py"
+      ]
+    },
+    {
+      "name": "checkpoint_6",
+      "checkpoint": "checkpoint_6",
+      "instruction_sha256": "38eb01a5e403331068812cc961ebda8a404e6ceea550ba78494520df9a262062",
+      "test_files": [
+        "test_checkpoint_1.py",
+        "test_checkpoint_2.py",
+        "test_checkpoint_3.py",
+        "test_checkpoint_4.py",
+        "test_checkpoint_5.py",
+        "test_checkpoint_6.py"
+      ]
+    },
+    {
+      "name": "checkpoint_7",
+      "checkpoint": "checkpoint_7",
+      "instruction_sha256": "c504d76bc8b372bdc4183c63af1d515ac56d22a83abb0a408f5c7795673a1d57",
+      "test_files": [
+        "test_checkpoint_1.py",
+        "test_checkpoint_2.py",
+        "test_checkpoint_3.py",
+        "test_checkpoint_4.py",
+        "test_checkpoint_5.py",
+        "test_checkpoint_6.py",
+        "test_checkpoint_7.py"
+      ]
+    },
+    {
+      "name": "checkpoint_8",
+      "checkpoint": "checkpoint_8",
+      "instruction_sha256": "a3309dbc0ae7b59c55da2cf8ec2f66bbf84346b06bebc320c03b759a74293c5f",
+      "test_files": [
+        "test_checkpoint_1.py",
+        "test_checkpoint_2.py",
+        "test_checkpoint_3.py",
+        "test_checkpoint_4.py",
+        "test_checkpoint_5.py",
+        "test_checkpoint_6.py",
+        "test_checkpoint_7.py",
+        "test_checkpoint_8.py"
+      ]
+    }
+  ],
+  "source": {
+    "dataset": "scb",
+    "url": "https://github.com/gabeorlanski/scb-problems",
+    "commit": "38d627ecf668a88f88f8d260f8df8df6116e9b03",
+    "problem": "mocked_http",
+    "checkpoint_selection": null,
+    "problem_tree": "3cd244b4dc2ebf21d267d2031d0af8c1fb350c3c",
+    "converter_tree": "4475c907ab812bdec61885f24e41f5a634b927ee",
+    "conversion_overrides": "733c1bef9ee8d233639a34439e67232bf5e445e8",
+    "converted_task_sha256": "de5eec668d3c5a0bd637b919bd30f05eae7deda2d24ff2de181c3f78de28c694"
+  },
+  "pack": {
+    "id": "python",
+    "version": 1,
+    "image": "raidar/pack-python:2b91a52663e099f2"
+  },
+  "task_sha256": "821a4ae4a6b91174d4776e0f0d06e1296c3a6672326785eb14988540b24518ee",
+  "bundle_sha256": "7cfa045f83f371ef5bbef4dede950da11ae19bc84e4456ec836c9534dec97446",
+  "references_sha256": "670f59ddaf4a34efaab0103d36ad785d68dc1699da5c3291903c03479df55cb5",
+  "entry_file": "hmock.py",
+  "entry_command": "uv run --project /app hmock.py",
+  "dependencies": {
+    "policy": "declared-wheels/1",
+    "resolver": "uv@0.10.0",
+    "index": "https://pypi.org/simple",
+    "python": "3.12",
+    "platforms": [
+      "x86_64-manylinux_2_28",
+      "aarch64-manylinux_2_28"
+    ],
+    "exclude_newer": "2026-10-27T21:20:13Z",
+    "sets": {
+      "1725d3663d8fa7dec12453a9cf20e33d566cf72e4bb87b13bbe89742440a7cb5": {
+        "requirements": [
+          "PyYAML>=6.0",
+          "pika>=1.3",
+          "requests>=2.31"
+        ],
+        "amd64": "db9e332d36341925026cea10dab476416a69b55f44f8ee61eed82e2332b471c5",
+        "arm64": "9228b155e9200d82af2cc8f676499505562557c9bc41ddce14fa4f05dc9985d8"
+      },
+      "256265f9dcb0837912b5c0c53ed3c7b3adc178730f449328b5d01a977785a295": {
+        "requirements": [
+          "grpcio",
+          "grpcio-tools",
+          "httpx",
+          "pika",
+          "pyyaml",
+          "requests"
+        ],
+        "amd64": "4f2c7fab9ea34ea7c9e6587daba178b35c191267b24b2373653fbea3af21421c",
+        "arm64": "bf659e419d58057569d4bcd87f4f3f06a16baf74b863926f6210ab862aad4ad5"
+      },
+      "d824164473e87f18680bf27f6bebd76a802c1e2ae3200d40a2b5b3e36155c35b": {
+        "requirements": [
+          "PyYAML>=6.0",
+          "grpcio>=1.60",
+          "pika>=1.3",
+          "protobuf>=5.0",
+          "requests>=2.31"
+        ],
+        "amd64": "e06b09f53c7bd2bc5f4105d21fbe219dc336a929a854e9cef3b0d997cd1ca0f4",
+        "arm64": "5536afb98c8661476cb6b031dbaad58d0303c65338cef228e0e3a5bcde320ef7"
+      },
+      "d886559b7529e93c44922004ea42b5587f1c4c80f1ffd879409c087ade9269b6": {
+        "requirements": [
+          "coverage==7.13.4",
+          "grpcio",
+          "grpcio-tools",
+          "httpx",
+          "pika",
+          "pytest-timeout==2.4.0",
+          "pytest==9.0.3",
+          "pyyaml",
+          "requests"
+        ],
+        "amd64": "6be8645275d55809d6ef766a61c67b03f1befcf336e48eb0a827a147b58236b2",
+        "arm64": "f9fa90ce8c5262426682a1a9ea4cdf052098b83ee862f5073e7a6384012831e8"
+      }
+    },
+    "steps": {
+      "checkpoint_1": "1725d3663d8fa7dec12453a9cf20e33d566cf72e4bb87b13bbe89742440a7cb5",
+      "checkpoint_2": "1725d3663d8fa7dec12453a9cf20e33d566cf72e4bb87b13bbe89742440a7cb5",
+      "checkpoint_3": "1725d3663d8fa7dec12453a9cf20e33d566cf72e4bb87b13bbe89742440a7cb5",
+      "checkpoint_4": "1725d3663d8fa7dec12453a9cf20e33d566cf72e4bb87b13bbe89742440a7cb5",
+      "checkpoint_5": "1725d3663d8fa7dec12453a9cf20e33d566cf72e4bb87b13bbe89742440a7cb5",
+      "checkpoint_6": "1725d3663d8fa7dec12453a9cf20e33d566cf72e4bb87b13bbe89742440a7cb5",
+      "checkpoint_7": "1725d3663d8fa7dec12453a9cf20e33d566cf72e4bb87b13bbe89742440a7cb5",
+      "checkpoint_8": "d824164473e87f18680bf27f6bebd76a802c1e2ae3200d40a2b5b3e36155c35b"
+    },
+    "seed": "256265f9dcb0837912b5c0c53ed3c7b3adc178730f449328b5d01a977785a295",
+    "grader": "d886559b7529e93c44922004ea42b5587f1c4c80f1ffd879409c087ade9269b6"
+  }
+}

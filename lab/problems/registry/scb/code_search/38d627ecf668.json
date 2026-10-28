@@ -1,0 +1,124 @@
+{
+  "kind": "raidar-problem",
+  "schema_version": 1,
+  "ref": "scb/code_search@38d627ecf668",
+  "mode": "multi_checkpoint",
+  "checkpoints": 5,
+  "steps": [
+    {
+      "name": "checkpoint_1",
+      "checkpoint": "checkpoint_1",
+      "instruction_sha256": "ad957f0ced0f70d6ca1c117bb6d54f509ed101b4fd3a9b9abf764ff6225547a0",
+      "test_files": [
+        "test_checkpoint_1.py"
+      ]
+    },
+    {
+      "name": "checkpoint_2",
+      "checkpoint": "checkpoint_2",
+      "instruction_sha256": "6c878e0bc985d1cced43e82101f60e6215e4451faf4dac72ef7080343d259c4b",
+      "test_files": [
+        "test_checkpoint_1.py",
+        "test_checkpoint_2.py"
+      ]
+    },
+    {
+      "name": "checkpoint_3",
+      "checkpoint": "checkpoint_3",
+      "instruction_sha256": "c386aca70f5b0d20d386f4c2ef5409b1efeb347f5fd055d4e3e95cebcde6fb45",
+      "test_files": [
+        "test_checkpoint_1.py",
+        "test_checkpoint_2.py",
+        "test_checkpoint_3.py"
+      ]
+    },
+    {
+      "name": "checkpoint_4",
+      "checkpoint": "checkpoint_4",
+      "instruction_sha256": "ad8300e65106e233121b63d0d6dce7cb5a17fc01379c92b5dfcd701b8d2e8585",
+      "test_files": [
+        "test_checkpoint_1.py",
+        "test_checkpoint_2.py",
+        "test_checkpoint_3.py",
+        "test_checkpoint_4.py"
+      ]
+    },
+    {
+      "name": "checkpoint_5",
+      "checkpoint": "checkpoint_5",
+      "instruction_sha256": "3135e1737c92fa92957dd4f77251951589bec09404cbe3b99a98e4c43ead9466",
+      "test_files": [
+        "test_checkpoint_1.py",
+        "test_checkpoint_2.py",
+        "test_checkpoint_3.py",
+        "test_checkpoint_4.py",
+        "test_checkpoint_5.py"
+      ]
+    }
+  ],
+  "source": {
+    "dataset": "scb",
+    "url": "https://github.com/gabeorlanski/scb-problems",
+    "commit": "38d627ecf668a88f88f8d260f8df8df6116e9b03",
+    "problem": "code_search",
+    "checkpoint_selection": null,
+    "problem_tree": "a8c551c5c5012f476f6d7f3230e950cf5db60270",
+    "converter_tree": "4475c907ab812bdec61885f24e41f5a634b927ee",
+    "conversion_overrides": "733c1bef9ee8d233639a34439e67232bf5e445e8",
+    "converted_task_sha256": "64fedae633483a25880a5091d67c7b837d307e889b95a5688f3151573c7fe620"
+  },
+  "pack": {
+    "id": "python",
+    "version": 1,
+    "image": "raidar/pack-python:2b91a52663e099f2"
+  },
+  "task_sha256": "16fb5433fa151aa7722ed60f6dc8ff1ac174035784628dcad84f2b9e8b383e69",
+  "bundle_sha256": "beb554cdf81be40fd331826842315a1e03e4cbada01969a918651c82e09145b8",
+  "references_sha256": "cb20c18ab8a5780afd181aefb98b52713169b8b7de63ddd12bf855b80ec08cde",
+  "entry_file": "code_search.py",
+  "entry_command": "uv run --project /app code_search.py",
+  "dependencies": {
+    "policy": "declared-wheels/1",
+    "resolver": "uv@0.10.0",
+    "index": "https://pypi.org/simple",
+    "python": "3.12",
+    "platforms": [
+      "x86_64-manylinux_2_28",
+      "aarch64-manylinux_2_28"
+    ],
+    "exclude_newer": "2026-10-27T21:20:11Z",
+    "sets": {
+      "21a0dc50e266e366e6f8286867d43db0ade4265f9ced0bcdaac920073344b8b0": {
+        "requirements": [
+          "coverage==7.13.4",
+          "pytest-timeout==2.4.0",
+          "pytest==9.0.3",
+          "pyyaml"
+        ],
+        "amd64": "a77dfbf1191afcf1dfbfcb3a80747c3c677192363225f8f03848589e649311f9",
+        "arm64": "53dd33f0cbe0c1afaa43c2f4d66f5d8d84e010cff6b6e2204d4ae1fc1ff837d6"
+      },
+      "85bdadd53a008bd8d9efeefd9d8f271614919f9296f186bb9831d724184d8cec": {
+        "requirements": [
+          "tree_sitter==0.21.3",
+          "tree_sitter_languages==1.10.2"
+        ],
+        "amd64": "1770434e29645aa30f14d2d1286375299c1f5c476c5ca205e383543e48169335",
+        "arm64": "38a7f9a3f14eaf160c5cd52a38aef7171ddf04924e4dcb907f4947c173da4747"
+      },
+      "ebb0e16545c911bd31ec33ace57dedf84c04e673d2dc28c0290868e4adf4db77": {
+        "requirements": [
+          "pyyaml"
+        ],
+        "amd64": "ed3d8a573431b4bb098772f5160a62fa9b193ae63e3776c1fc0b91cb183b7f2b",
+        "arm64": "46c4ebdbacb253ad341e78f7b689b2c3b13184f12621f8092e18d8e71a5177ec"
+      }
+    },
+    "steps": {
+      "checkpoint_4": "85bdadd53a008bd8d9efeefd9d8f271614919f9296f186bb9831d724184d8cec",
+      "checkpoint_5": "85bdadd53a008bd8d9efeefd9d8f271614919f9296f186bb9831d724184d8cec"
+    },
+    "seed": "ebb0e16545c911bd31ec33ace57dedf84c04e673d2dc28c0290868e4adf4db77",
+    "grader": "21a0dc50e266e366e6f8286867d43db0ade4265f9ced0bcdaac920073344b8b0"
+  }
+}

@@ -1,111 +1,107 @@
-"""Third-party packages a submission declares, provided offline to the graded program.
+"""Declared requirements of a snapshot and what the graded program was given of them.
 
-SCB's native runner grades with network: its Python environment
-(``configs/environments/docker-python3.12-uv.yaml`` in the SCB fork) runs
-``uv add -r requirements.txt`` and then ``uv run <entry>``, which also syncs
-whatever the submission's ``pyproject.toml`` declares. The Raidar grader runs
-with ``--network none`` and ``UV_OFFLINE``/``UV_NO_SYNC``, so a declared package
-such as PyYAML was missing and every case failed (fault catalog FCR-007).
-
-Raidar keeps grading offline. The grader image carries a pinned copy of each
-package the problem's own SCB configuration names as a dependency
-(``test_dependencies``, the packages SCB locks into the problem's evaluator
-environment), one ``--target`` directory per package. When a snapshot declares
-one of them (in ``pyproject.toml`` ``[project].dependencies`` or
-``requirements.txt``) with a specifier the pin satisfies, that directory joins
-the graded program's ``PYTHONPATH``. A package the snapshot does not declare
-stays unavailable, as it is under native grading; a declared package Raidar has
-no pin for, or whose specifier the pin does not satisfy, is recorded as
-``unprovided`` (the remaining fidelity gap), never silently substituted.
+Policy ``declared-wheels/1`` (``split-design.md`` §3.2 item 8): the packages a
+snapshot declares (``pyproject.toml`` ``[project].dependencies`` and
+``requirements.txt``) are resolved by uv, wheels only, for Python 3.12 on the
+grader's Linux architecture, from ``pypi.org`` as of the problem's cutoff
+(``raidar.grading.resolver``). The hash-checked closure is installed in a grader
+image layer (``raidar.grading.closure``) and the graded program runs offline
+with it on ``PYTHONPATH``. A requirement the policy cannot provide is recorded
+as ``unprovided`` with a reason, never silently substituted.
 """
 
 from __future__ import annotations
 
 import tomllib
-from collections.abc import Iterable, Mapping
 from pathlib import Path
+from typing import Literal
 
-from packaging.requirements import InvalidRequirement, Requirement
-from packaging.utils import canonicalize_name
-
+from raidar.grading.dependency_pins import Unprovided
 from raidar.grading.models import VerifierModel
 
-# Exact pins, keyed by canonical project name. Raise a pin only with a regrade check.
-SUBMISSION_DEPENDENCY_PINS: Mapping[str, str] = {"pyyaml": "PyYAML==6.0.3"}
 SUBMISSION_DEPS_ROOT = "/opt/raidar-submission-deps"
 _DECLARATION_FILES = ("pyproject.toml", "requirements.txt")
-MARKER_ENVIRONMENT_KEYS = frozenset(
-    {
-        "implementation_name",
-        "implementation_version",
-        "os_name",
-        "platform_machine",
-        "platform_release",
-        "platform_system",
-        "platform_version",
-        "python_full_version",
-        "platform_python_implementation",
-        "python_version",
-        "sys_platform",
-    }
-)
+_CLOSURE_DIR_CHARS = 12
 
 
 class SubmissionDependencies(VerifierModel):
-    """What a snapshot declared and which pinned packages the graded program saw."""
+    """What a snapshot declared and which closure the graded program saw."""
 
     declared: tuple[str, ...] = ()
+    set_sha256: str = ""
+    source: Literal["pin", "resolved"] = "resolved"
+    lock_text: str = ""
+    lock_sha256: str = ""
+    arch: str = ""
     provided: tuple[str, ...] = ()
-    unprovided: tuple[str, ...] = ()
+    unprovided: tuple[Unprovided, ...] = ()
+    resolve_s: float = 0.0
+    build_s: float = 0.0
+    image_id: str = ""
+    arch_divergent: bool = False
+    """The other architecture resolved to different versions (no pooling across architectures)."""
 
 
-def provisioned_pins(test_dependencies: Iterable[str]) -> dict[str, str]:
-    """``{canonical name: exact pin}`` for the problem's dependencies Raidar pins."""
-    pins: dict[str, str] = {}
-    for dependency in test_dependencies:
-        try:
-            name = canonicalize_name(Requirement(dependency).name)
-        except InvalidRequirement:
-            continue
-        if name in SUBMISSION_DEPENDENCY_PINS:
-            pins[name] = SUBMISSION_DEPENDENCY_PINS[name]
-    return dict(sorted(pins.items()))
+def closure_dir(lock_sha: str) -> str:
+    """Where the closure of one lock is installed inside the grader image."""
+    return f"{SUBMISSION_DEPS_ROOT}/{lock_sha[:_CLOSURE_DIR_CHARS]}"
 
 
-def install_dir(name: str) -> str:
-    return f"{SUBMISSION_DEPS_ROOT}/{canonicalize_name(name)}"
-
-
-def dockerfile_layer(pins: Mapping[str, str], python: str) -> str:
-    """One ``RUN`` installing each pin into its own directory (empty when there are none)."""
-    if not pins:
-        return ""
-    installs = " \\\n && ".join(
-        f'uv pip install --no-cache --python {python} --target {install_dir(name)} "{pin}"'
-        for name, pin in pins.items()
-    )
-    return f"RUN {installs} \\\n && chmod -R a+rX {SUBMISSION_DEPS_ROOT}\n"
+def unreadable(name: str) -> str:
+    """The declared-set entry standing for a declaration file Raidar cannot read (an unparseable
+    requirement, so health sees it instead of an empty set)."""
+    return f"{name} (unreadable declaration)"
 
 
 def _pyproject_requirements(path: Path) -> list[str]:
     try:
         document = tomllib.loads(path.read_text())
     except (OSError, UnicodeDecodeError, tomllib.TOMLDecodeError):
-        return []
+        return [unreadable(path.name)]
     project = document.get("project")
     dependencies = project.get("dependencies") if isinstance(project, dict) else None
-    if not isinstance(dependencies, list):
+    if dependencies is None:
         return []
-    return [item for item in dependencies if isinstance(item, str)]
+    if not isinstance(dependencies, list):
+        return [unreadable(path.name)]
+    return [item if isinstance(item, str) else unreadable(path.name) for item in dependencies]
+
+
+# Options that choose where packages come from; the policy fixes the index, so they are dropped.
+_INDEX_OPTIONS = frozenset(
+    {
+        "-i",
+        "--index-url",
+        "--extra-index-url",
+        "--no-index",
+        "-f",
+        "--find-links",
+        "--trusted-host",
+        "--pre",
+        "--prefer-binary",
+        "--no-binary",
+        "--only-binary",
+        "--use-feature",
+    }
+)
+
+
+def _is_index_option(line: str) -> bool:
+    return line.startswith("-") and line.replace("=", " ").split()[0] in _INDEX_OPTIONS
 
 
 def _requirements_txt(path: Path) -> list[str]:
+    """Requirement lines; ``-r``/``-c``/``-e`` and other directives stay as unsupported lines."""
     try:
         lines = path.read_text().splitlines()
     except (OSError, UnicodeDecodeError):
-        return []
+        return [unreadable(path.name)]
     stripped = (line.split(" #", 1)[0].strip() for line in lines)
-    return [line for line in stripped if line and not line.startswith(("#", "-"))]
+    return [
+        line
+        for line in stripped
+        if line and not line.startswith("#") and not _is_index_option(line)
+    ]
 
 
 def declared_requirements(snapshot: Path) -> tuple[str, ...]:
@@ -119,48 +115,17 @@ def declared_requirements(snapshot: Path) -> tuple[str, ...]:
     return tuple(dict.fromkeys(found))
 
 
-def _pin_version(pin: str) -> str:
-    return pin.split("==", 1)[1]
-
-
-def resolve_dependencies(
-    snapshot: Path, pins: Mapping[str, str], *, marker_environment: Mapping[str, str] | None = None
-) -> SubmissionDependencies:
-    """Which declared requirements a pinned package satisfies (``provided``) and which not."""
-    provided: dict[str, str] = {}
-    unprovided: list[str] = []
-    declared = declared_requirements(snapshot)
-    for text in declared:
-        try:
-            requirement = Requirement(text)
-        except InvalidRequirement:
-            unprovided.append(f"{text} (unparseable requirement)")
-            continue
-        if requirement.marker is not None:
-            if marker_environment is None or not MARKER_ENVIRONMENT_KEYS.issubset(
-                marker_environment
-            ):
-                raise ValueError(
-                    "dependency markers require the submission interpreter environment"
-                )
-            if not requirement.marker.evaluate(environment=dict(marker_environment)):
-                continue
-        name = canonicalize_name(requirement.name)
-        pin = pins.get(name)
-        if pin is None:
-            unprovided.append(f"{text} (no pinned offline package)")
-        elif not requirement.specifier.contains(_pin_version(pin), prereleases=True):
-            unprovided.append(f"{text} (pinned {pin} does not satisfy it)")
-        else:
-            provided[name] = pin
-    return SubmissionDependencies(
-        declared=declared,
-        provided=tuple(sorted(provided.values())),
-        unprovided=tuple(unprovided),
-    )
-
-
 def python_path_entries(dependencies: SubmissionDependencies) -> tuple[str, ...]:
-    """Directories the graded program's ``PYTHONPATH`` gains, in a stable order."""
-    names = sorted(canonicalize_name(pin.split("==", 1)[0]) for pin in dependencies.provided)
-    return tuple(install_dir(name) for name in names)
+    """Directories the graded program's ``PYTHONPATH`` gains (the closure, when one exists)."""
+    return (closure_dir(dependencies.lock_sha256),) if dependencies.lock_text else ()
+
+
+__all__ = [
+    "SUBMISSION_DEPS_ROOT",
+    "SubmissionDependencies",
+    "Unprovided",
+    "closure_dir",
+    "declared_requirements",
+    "python_path_entries",
+    "unreadable",
+]

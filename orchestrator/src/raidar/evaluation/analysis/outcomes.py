@@ -82,6 +82,20 @@ class Value(AnalysisModel):
         return self.status == OK
 
 
+class DependencyStep(AnalysisModel):
+    """One attempted step's dependency readings (health ``D1``/``D2``); ``None`` is unmeasured."""
+
+    step: str
+    unprovided: tuple[dict[str, str], ...] | None = None
+    """``{requirement, reason}`` per declared requirement Raidar could not provide."""
+    undeclared_imports: tuple[dict[str, str], ...] | None = None
+    """``{module, basis}`` per non-stdlib, non-local module the grader log failed to import that
+    no declared name matches; ``basis`` is ``confirmed`` or ``heuristic`` (an import name can
+    differ from its distribution's name)."""
+    solvable_solved: bool | None = None
+    """The step's solvable-set verdict; ``None`` when it has none (never read as failed)."""
+
+
 class TrialOutcome(AnalysisModel):
     trial_id: str
     job_id: str
@@ -93,6 +107,8 @@ class TrialOutcome(AnalysisModel):
     infra_reasons: tuple[str, ...] = ()
     metrics: dict[str, Value] = Field(default_factory=dict)
     series: dict[str, tuple[Value, ...]] = Field(default_factory=dict)
+    dependency_steps: tuple[DependencyStep, ...] = ()
+    """Per attempted step, the dependency readings; empty when the trial has no health audit."""
 
     def metric(self, metric_id: str) -> Value:
         return self.metrics.get(metric_id) or Value.missing(

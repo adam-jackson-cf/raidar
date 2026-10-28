@@ -73,6 +73,16 @@ All notable changes to this project are documented in this file.
   `gate-effort@12`, `definition-coverage@2` and `test-coverage@2`; previous releases are archived.
 - Reference validation uses the canonical grader's offline dependency handling instead
   of rejecting every reference with a requirements file.
+- `declared-wheels/1` provisions graded code's declared packages: uv Python 3.12, PyPI-only,
+  wheels-only (no source builds), both manylinux_2_28 arches, UTC import cutoff, caps of 200
+  packages / 1 GiB / 120 s. Source-only and unsupported requirements are refused with reasons;
+  hash-checked offline installs are cached by dependency digest and regrades reuse the
+  recorded lock. Outages are infrastructure failures. Health D1/D2 are descriptive, never
+  invalidating, with a per-arm share warning. The old fixed pins, `provisioned_pins`,
+  per-package directories and `dockerfile_layer` are removed.
+  Released as `correctness@5`, `code-quality@6`, `resource-usage@4`, `process-compliance@9`,
+  `gate-effort@13`, `definition-coverage@3` and `test-coverage@3`; the seven scorer releases are
+  transitive fingerprint changes with unchanged formulas.
 - A halt cannot turn a missing or empty planned solvable set into a measured zero rate.
 - Read startup sandbox environment names with Docker inspect instead of running Python inside
   the container; workflow-owned `.claude` skills are excluded from graded snapshots.

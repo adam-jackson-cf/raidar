@@ -15,9 +15,7 @@ from raidar.subject.environment.python.image import image_lock_hash
 def recipe_digests(plan: ExperimentPlan, problems: Mapping[int, ImportedProblem]) -> dict[str, Any]:
     """The pack image recipe hash and the grader recipe digest of every planned problem."""
     graders = {
-        str(target.ref): grader_image_tag(problems[target.index].bundle.manifest.grader).rsplit(
-            ":", 1
-        )[1]
+        str(target.ref): grader_image_tag(problems[target.index].bundle).rsplit(":", 1)[1]
         for target in plan.problems
         if target.index in problems
     }

@@ -31,7 +31,7 @@ arms:
     workflow: define-build-verify@3
 
 assessment:
-  scorers: [correctness@4, code-quality@5, resource-usage@3, process-compliance@8, definition-coverage@2, test-coverage@2]
+  scorers: [correctness@5, code-quality@6, resource-usage@4, process-compliance@9, definition-coverage@3, test-coverage@3]
   metric: scb-canonical@2
 
 analysis:

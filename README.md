@@ -53,10 +53,10 @@ For Codex CLI the default auth policy is `CODEX_AUTH_MODE=auto`: it prefers file
 | Job | One execution of a locked experiment: its trials, their step results, validity checks and N1 phase timings | `var/jobs/<experiment id>/<job id>/` (`job.json`, `job.lock.json`, `trial-records/`) |
 | Trial and step result | A trial is one arm × attempt × problem through every checkpoint (a Harbor trial, id `bNN-pN-<arm>`, where `bNN` is the attempt index); a step result is one checkpoint of it | `trials/<trial>/`, `trial-records/<trial>.json` |
 | Verifier and reward | The hidden, trusted grader: strict all-cases per checkpoint, run host-side; its per-step output is the reward. Harbor's `oracle` agent is something else (it replays reference solutions) | `orchestrator/src/raidar/grading/` |
-| Scorer and Assessment | A versioned scorer (`correctness@4`, `code-quality@5`, `resource-usage@3`, `process-compliance@8`, `gate-effort@12`) runs offline over stored trials. Correctness reports the lock-pinned solvable-set outcome alongside the raw SCB outcome; missing sets are unavailable, never zero. Process compliance reads the work session's trace, not gate fix sessions, and leaves undecidable checks insufficient. Gate effort reads retained guardrail-gate records (first-pass clean, findings by family, fixes, autofix, costs and pre-fix correctness); arms without that gate are not applicable. Code quality reads the graded snapshots and retained or offline verifier coverage; its regression breadth excludes at most three cases whose outcomes flip between grading and coverage. Each Assessment is keyed by its inputs | an Assessment store directory, outside the job |
+| Scorer and Assessment | A versioned scorer (`correctness@5`, `code-quality@6`, `resource-usage@4`, `process-compliance@9`, `gate-effort@13`) runs offline over stored trials. Correctness reports the lock-pinned solvable-set outcome alongside the raw SCB outcome; missing sets are unavailable, never zero. Process compliance reads the work session's trace, not gate fix sessions, and leaves undecidable checks insufficient. Gate effort reads retained guardrail-gate records (first-pass clean, findings by family, fixes, autofix, costs and pre-fix correctness); arms without that gate are not applicable. Code quality reads the graded snapshots and retained or offline verifier coverage; its regression breadth excludes at most three cases whose outcomes flip between grading and coverage. Each Assessment is keyed by its inputs | an Assessment store directory, outside the job |
 | Headline metric | How quality scores combine into the headline S (`scb-canonical@1/@2`, `scb-canonical-oneshot@1/@2`). The lock pins it | `assessment.metric` |
 | Analysis | Paired deltas, confidence intervals, curves, verdicts, exclusions and a sample-size projection against the baseline arm; a benchmark adds its ranking view | the `make experiment-analyze` output directory |
-| Jev | Host-side model judgement. `define-build-verify@3`, `definition-coverage@2` and `test-coverage@2` use pinned `typesafe/jev-1.13-20260917`, retaining every request, response and interpreted answer without the OpenRouter key. The older offline policy machinery remains parked with both policies `off`; enabling these explicit workflow/scorer capabilities does not promote those policies or add a headline metric. | `raidar/judge/` shared transport; `scoring/judge/` offline policy and calibration |
+| Jev | Host-side model judgement. `define-build-verify@3`, `definition-coverage@3` and `test-coverage@3` use pinned `typesafe/jev-1.13-20260917`, retaining every request, response and interpreted answer without the OpenRouter key. The older offline policy machinery remains parked with both policies `off`; enabling these explicit workflow/scorer capabilities does not promote those policies or add a headline metric. | `raidar/judge/` shared transport; `scoring/judge/` offline policy and calibration |
 
 Inside each Harbor trial directory the verifier keeps its original evidence names (`raidar-oracle/steps/<step>/record.json`, reward key `oracle_leak`): they are wire names that released scorers and `make assess-regrade` read the same way for every job. For the same reason released scorers keep the observation subject `trajectory`, the evidence input `oracle.cases` and their `@1` descriptions (all hashed into Assessment keys), and the problem store keeps each problem's `oracle/` bundle directory (inside the problem's pinned digest).
 
@@ -94,7 +94,7 @@ integrity violations invalid trials, not merely unmeasured outcomes. An unusable
 definition stays unusable for its checkpoint; zero criteria cannot yield `verified`.
 
 The two coverage scorers run only at assessment time over retained define/build artifacts:
-`definition-coverage@2` reads each required unit's citing criteria; `test-coverage@2`
+`definition-coverage@3` reads each required unit's citing criteria; `test-coverage@3`
 reads each criterion's final mapped tests, including regression criteria. Their raw
 `readings.json` retains level probabilities, expected levels (0–2), gaps and call evidence.
 These are uncalibrated readings, not pass/fail thresholds or headline scores. Arms without
@@ -115,10 +115,41 @@ Objectives are separate from kinds: either an ab-test or a benchmark can explore
 
 Each task instruction is the pinned SCB `checkpoint_N.md`, including its canary, with only the entry-command and entry-file tokens substituted. `instruction_sha256` is the hash of this rendered checkpoint spec; the pin records the grader's exact entry command. Validation with `REPEATS=3` records each step's **solvable set**: the cases passed by the reference in every repeat, including regression cases. Varying cases are listed as nondeterministic and excluded; empty sets have step verdict `excluded`. Missing evidence is not a failed case.
 
-Reference validation uses the same offline dependency provisioning as trial grading;
-declaring a requirements file does not invoke a separate network installer.
+**Declared dependencies (`declared-wheels/1`).** Import resolves each reference step's declared
+set (`requirements.txt` plus `pyproject`) with uv targeting Python 3.12, PyPI only
+(`https://pypi.org/simple`), wheels only (`--only-binary :all:`, so no source build can run),
+for both `x86_64-manylinux_2_28` and `aarch64-manylinux_2_28`, with `exclude-newer` set to the
+problem's UTC import time. A closure is capped at 200 packages, 1 GiB of wheels and 120 s of
+resolution. A source-only package is refused (`no-wheel`); other unsupported requirements are
+`after-cutoff`, `unresolvable`, `direct-reference`, `unparseable` or `cap-exceeded`. A set that
+does not resolve, or whose architectures diverge, excludes the problem
+(`dependency_unresolvable`). The manifest's `dependencies` block is part of the problem pin
+and the lock's `dependencies_sha256`, so changing it forces revalidation.
 
-The default primary outcome is `solve_rate_solvable`: checkpoints passing every case in their lock-pinned solvable set, divided by the task's checkpoint count. `correctness@4` always reports raw SCB outcomes beside the solvable outcomes. A missing or empty set makes the solvable trajectory unavailable, never zero. Optional **errata** remain pre-registered policy: the audit flags specification-undetermined assertions; `make problem-errata-draft` drafts their optional record. Errata-applied outcomes become primary only through explicit `analysis.primary_outcome`, never by default. Optional sensitivities are explanatory notes, not outcome adjustments.
+Acquisition is a trusted, networked host step that never sees hidden tests or reference
+code. Wheels are verified against recorded hashes and installed wheel-only, offline, with
+`--require-hashes --no-deps` into a grader-image layer keyed by base image and lock digest;
+`.pth` files and namespace packages are handled. Materialization is immutable and keyed by
+dependency digest, so earlier content is retained. The grader stays offline (`--network none`),
+non-root and capability-dropped.
+Grading reuses the pin's lock when the declared set digest matches, else resolves under the
+pin's policy and caps. Regrades reinstall the recorded lock and never re-resolve; a resolver
+or PyPI outage is an infrastructure failure, never `unprovided` or a score. Reference
+validation uses this same provisioning.
+
+The grader's `test_dependencies` venv has its own pin, separate from the agent seed, which
+resolves `test_dependencies` only and never the reference's sets. The grader pin covers
+`test_dependencies` plus the grader tools. The seeded `pyproject.toml` carries
+`[tool.uv] exclude-newer` and `no-build = true`; the agent user's uv and pip configuration
+carry the same cutoff and wheels-only rule (hash-pinned pip 26.1.2 tooling upgrade, with no
+change to the pack's bytes). Agents keep PyPI access, constrained to this policy.
+
+Health readings D1 (`unprovided`) and D2 (`undeclared_import`) are descriptive and never
+invalidate a trial. Analysis prints each arm's affected-step share beside the primary outcome
+and warns when arms differ materially; an `undeclared_import` is a heuristic (a module-name
+to package alias may be missed).
+
+The default primary outcome is `solve_rate_solvable`: checkpoints passing every case in their lock-pinned solvable set, divided by the task's checkpoint count. `correctness@5` always reports raw SCB outcomes beside the solvable outcomes. A missing or empty set makes the solvable trajectory unavailable, never zero. Optional **errata** remain pre-registered policy: the audit flags specification-undetermined assertions; `make problem-errata-draft` drafts their optional record. Errata-applied outcomes become primary only through explicit `analysis.primary_outcome`, never by default. Optional sensitivities are explanatory notes, not outcome adjustments.
 
 ```bash
 make problem-list SOURCE=scb@38d627ecf668
@@ -165,7 +196,7 @@ arms:
     workflow: one-shot@1     # the workflow release under test (lab/workflows/<name>/)
 
 assessment:
-  scorers: [correctness@4, code-quality@5, resource-usage@3]
+  scorers: [correctness@5, code-quality@6, resource-usage@4]
   metric: scb-canonical-oneshot@1
 
 analysis:
@@ -211,11 +242,11 @@ make experiment-status JOB=var/jobs/python__circuit_eval-cp1__review-trial/secon
 
 If a job is stopped mid-trial, `make harbor-cleanup JOB=var/jobs/python__circuit_eval-cp1__review-trial/first` removes the trial environments it left behind.
 
-**5. Assess.** Scorers run offline over the stored trials. They write to an Assessment store outside the job and use the assessment settings of the job's lock: `LOCK=` names it, else the experiment's current lock when its `lock_sha256` is the job's (so an assessment-only relock applies); with neither the command refuses, and the job's own `job.lock.json` is never a substitute. Scorers given on the command line must cover the job's runtime, and a `--bundle` must be the verifier bundle of a problem the lock binds (`AS1`). `REPLAY=1` reruns existing Assessments and requires byte-identical output. With `gate-effort@12`, assessment first grades every not-yet-graded `guardrail-gate` pre-fix snapshot into the store with the step's own verifier bundle, on the Docker target; `make assess-regrade ... STORE=` regrades them beside the final snapshots. With `code-quality@5`, assessment first makes the coverage run of every step whose trial deferred it into the store, on the Docker target; `make assess-regrade ... COVERAGE_CHECK=1` makes the runs again and compares them with the trial's own coverage pass or the stored run. `CONCURRENCY=N` makes the pre-fix grades and coverage runs of N trials at once (each trial's steps in order; default 1). `process-compliance@8` (the declared default) never asks a model. Everything under `var/` (jobs, stores, analysis) is git-ignored.
+**5. Assess.** Scorers run offline over the stored trials. They write to an Assessment store outside the job and use the assessment settings of the job's lock: `LOCK=` names it, else the experiment's current lock when its `lock_sha256` is the job's (so an assessment-only relock applies); with neither the command refuses, and the job's own `job.lock.json` is never a substitute. Scorers given on the command line must cover the job's runtime, and a `--bundle` must be the verifier bundle of a problem the lock binds (`AS1`). `REPLAY=1` reruns existing Assessments and requires byte-identical output. With `gate-effort@13`, assessment first grades every not-yet-graded `guardrail-gate` pre-fix snapshot into the store with the step's own verifier bundle, on the Docker target; `make assess-regrade ... STORE=` regrades them beside the final snapshots. With `code-quality@6`, assessment first makes the coverage run of every step whose trial deferred it into the store, on the Docker target; `make assess-regrade ... COVERAGE_CHECK=1` makes the runs again and compares them with the trial's own coverage pass or the stored run. `CONCURRENCY=N` makes the pre-fix grades and coverage runs of N trials at once (each trial's steps in order; default 1). `process-compliance@9` (the declared default) never asks a model. Everything under `var/` (jobs, stores, analysis) is git-ignored.
 
 ```bash
 make experiment-assess JOB=var/jobs/python__circuit_eval-cp1__review-trial/first STORE=var/stores/review-trial \
-  SCORERS="correctness@4 code-quality@5 resource-usage@3"
+  SCORERS="correctness@5 code-quality@6 resource-usage@4"
 ```
 
 **6. Analyze.** The verdict thresholds and the assessment settings come from the lock. The report labels any command-line override. A trial whose inputs cannot be loaded is refused, never read as unassessed; a verifier bundle missing at its recorded root is read from the problem store (`lab/problems` with `var/problems`) by the trial's pinned problem reference, and refused unless its digest is the recorded one. A benchmark's report adds the ranking view; a smoke report says it is not citable.

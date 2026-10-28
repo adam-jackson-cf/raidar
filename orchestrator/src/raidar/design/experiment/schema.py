@@ -130,7 +130,7 @@ class AgentEntry(SpecModel):
 
 class ProtocolSpec(SpecModel):
     # Also scorer config: raidar.engine.job.assessment writes it for every scorer
-    # that declares ``progression`` (correctness@4), so scoring follows the job.
+    # that declares ``progression`` (correctness@5), so scoring follows the job.
     progression: Literal["continue", "halt_on_failure"] = "continue"
     min_reward: float | None = Field(default=None, gt=0.0, le=1.0)
     agent_timeout_sec: int = Field(default=1800, gt=0)
@@ -140,7 +140,7 @@ class ProtocolSpec(SpecModel):
     # Where the verifier's per-test coverage pass (G's evidence) runs: ``trial`` after each
     # step's grading run, on the trial's critical path; ``offline`` from the stored step
     # snapshots when an assessment needs it (raidar.grading.coverage.offline, read by
-    # code-quality@5). Left at ``trial`` it is omitted from every dump, so the locks, plans
+    # code-quality@6). Left at ``trial`` it is omitted from every dump, so the locks, plans
     # and hashes of experiments that do not set it keep their bytes.
     verifier_coverage: Literal["trial", "offline"] = "trial"
 

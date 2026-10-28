@@ -18,7 +18,11 @@ import hashlib
 import shutil
 import subprocess
 import textwrap
+from collections.abc import Sequence
 from pathlib import Path
+
+from packaging.requirements import Requirement
+from packaging.utils import canonicalize_name
 
 from raidar.design.problem.content import content_digest
 from raidar.design.problem.models import (
@@ -28,11 +32,20 @@ from raidar.design.problem.models import (
     ProblemMode,
     ProblemSource,
     ProblemStep,
+    dependency_content_key,
 )
 from raidar.design.problem.store import ProblemStore
 from raidar.design.problem.validation import ValidationReport
 from raidar.design.problem.validator import ValidateOptions, validate_problem, write_report
-from raidar.grading.bundle import BundleManifest, GraderSpec, VerifierStepSpec, write_bundle
+from raidar.grading.bundle import (
+    BundleManifest,
+    GraderSpec,
+    VerifierStepSpec,
+    write_bundle,
+    write_bundle_dependencies,
+)
+from raidar.grading.dependency_pins import DependencyLocks, Unprovided
+from raidar.grading.resolver import Resolution, Resolver, resolve_pins
 from tests.verifier_support import LocalProcessSandbox, write_app, write_tests
 
 FIXTURE_COMMIT = "fe" * 20
@@ -78,11 +91,39 @@ def _step(name: str, files: list[str]) -> VerifierStepSpec:
     )
 
 
-def _write_problem(store: ProblemStore, name: str, *, ref_one_has_mul: bool, oneshot: bool) -> None:
+FIXTURE_CUTOFF = "2026-10-01T00:00:00Z"
+
+
+class FakeResolver:
+    """An offline, deterministic resolver: every requirement resolves to version 1.0.
+
+    ``unprovided`` is returned for every set; ``cutoffs`` records the cutoffs it was asked for.
+    """
+
+    identity = "fake-uv@0"
+
+    def __init__(self, unprovided: tuple[Unprovided, ...] = ()) -> None:
+        self.unprovided = unprovided
+        self.cutoffs: list[str] = []
+
+    def __call__(self, requirements: Sequence[str], *, arch: str, exclude_newer: str) -> Resolution:
+        self.cutoffs.append(exclude_newer)
+        names = sorted({canonicalize_name(Requirement(text).name) for text in requirements})
+        packages = "".join(f'\n[[packages]]\nname = "{name}"\nversion = "1.0"\n' for name in names)
+        lock = f'lock-version = "1.0"\ncreated-by = "fake"\n{packages}'
+        return Resolution(lock, tuple(f"{name}==1.0" for name in names), self.unprovided, 0.0)
+
+
+def _write_problem(
+    store: ProblemStore, name: str, *, ref_one_has_mul: bool, oneshot: bool, resolver: Resolver
+) -> None:
     ref = f"{name}@{FIXTURE_VERSION}"
-    content = store.content_dir(ProblemId.parse(ref))
-    work = content.parent / "work"
     steps = ["checkpoint_1"] if oneshot else ["checkpoint_1", "checkpoint_2"]
+    pins, locks = resolve_pins(
+        dict.fromkeys(steps, ()), (), exclude_newer=FIXTURE_CUTOFF, resolver=resolver
+    )
+    content = store.content_dir(ProblemId.parse(ref), dependency_content_key(pins))
+    work = content.parent / "work"
     step_specs = {
         "checkpoint_1": _step("checkpoint_1", ["test_checkpoint_1.py"]),
         "checkpoint_2": _step("checkpoint_2", ["test_checkpoint_1.py", "test_checkpoint_2.py"]),
@@ -101,6 +142,8 @@ def _write_problem(store: ProblemStore, name: str, *, ref_one_has_mul: bool, one
     write_app(content / "references" / "checkpoint_1", mul=ref_one_has_mul)
     if not oneshot:
         write_app(content / "references" / "checkpoint_2", mul=True)
+    bundle = write_bundle_dependencies(bundle.root, pins, locks)
+    DependencyLocks(store.deps_dir(ProblemId.parse(ref))).write_all(locks)
     task = content / "task"
     (task / "tests").mkdir(parents=True)
     (task / "tests" / "test.sh").write_text("#!/bin/bash\nexit 1\n")
@@ -141,18 +184,26 @@ def _write_problem(store: ProblemStore, name: str, *, ref_one_has_mul: bool, one
             pack=PackBinding(id="python", version=1, image=FIXTURE_BASE_IMAGE),
             task_sha256=content_digest(task),
             bundle_sha256=content_digest(bundle.root),
+            dependencies=pins,
             references_sha256=content_digest(content / "references"),
         )
     )
 
 
-def build_fixture_store(root: Path, data_root: Path | None = None) -> ProblemStore:
+def build_fixture_store(
+    root: Path, data_root: Path | None = None, *, resolver: Resolver | None = None
+) -> ProblemStore:
     root.mkdir(parents=True, exist_ok=True)
     (root / "sources.yaml").write_text(SOURCES_YAML)
     store = ProblemStore(root, data_root)
-    _write_problem(store, "fixture/adder", ref_one_has_mul=False, oneshot=False)
-    _write_problem(store, "fixture/adder_negative", ref_one_has_mul=True, oneshot=False)
-    _write_problem(store, "fixture/adder.checkpoint_1", ref_one_has_mul=False, oneshot=True)
+    chosen = resolver or FakeResolver()
+    _write_problem(store, "fixture/adder", ref_one_has_mul=False, oneshot=False, resolver=chosen)
+    _write_problem(
+        store, "fixture/adder_negative", ref_one_has_mul=True, oneshot=False, resolver=chosen
+    )
+    _write_problem(
+        store, "fixture/adder.checkpoint_1", ref_one_has_mul=False, oneshot=True, resolver=chosen
+    )
     return store
 
 

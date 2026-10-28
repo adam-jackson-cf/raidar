@@ -188,11 +188,11 @@ help:
 	@echo "                                                        ALLOW_UNSMOKED=1 overrides and records it in job.json (admission)"
 	@echo "  make experiment-status JOB=<job-dir> [LOG_LINES=20]   A job's state (running, finished, failed, died), trials recorded of selected, log tail"
 	@echo "  make health JOB=<job-dir>                             Recompute every trial's health.json (V/H/L/P/T checks) and append fault-candidates.jsonl; exit 1 on a violation"
-	@echo "  make experiment-assess JOB=<job-dir> STORE=<assessment-store> SCORERS=\"correctness@4 ...\" [LOCK=] [ASSESSMENT_CONFIG=] [REPLAY=1] [CONCURRENCY=N] [ASSESS_OUT=report.json]"
+	@echo "  make experiment-assess JOB=<job-dir> STORE=<assessment-store> SCORERS=\"correctness@5 ...\" [LOCK=] [ASSESSMENT_CONFIG=] [REPLAY=1] [CONCURRENCY=N] [ASSESS_OUT=report.json]"
 	@echo "                                                        Score a job's stored trials into an Assessment store (never re-runs agents; AS1-gated)"
-	@echo "                                                        (process-compliance@8 is deterministic only;"
-	@echo "                                                        with gate-effort@12 it first grades pre-fix snapshots into STORE, and with"
-	@echo "                                                        code-quality@5 it first makes deferred coverage runs (verifier_coverage: offline) into STORE: Docker target;"
+	@echo "                                                        (process-compliance@9 is deterministic only;"
+	@echo "                                                        with gate-effort@13 it first grades pre-fix snapshots into STORE, and with"
+	@echo "                                                        code-quality@6 it first makes deferred coverage runs (verifier_coverage: offline) into STORE: Docker target;"
 	@echo "                                                        CONCURRENCY=N works on N trials at once, each trial's steps in order; default 1)"
 	@echo "  make assess-regrade JOB=<trial-or-job-dir> [VERIFIER_BUNDLE=<dir>] [STORE=<assessment-store>] [COVERAGE_CHECK=1 [CONCURRENCY=N]] [REGRADE_OUT=report.json]"
 	@echo "                                                        Rerun the verifier over stored step snapshots (and, with STORE, the stored pre-fix grades); fails if results differ;"
@@ -490,7 +490,7 @@ perf-gate: docker-check
 # The security regressions (no LLM): planted agent code against the verify gate and the
 # protected tool tree, in real containers. Needs Docker, so like perf-gate it is a phase-exit
 # check, not part of make quality; RAIDAR_REQUIRE_DOCKER=1 makes a missing target fail, not skip.
-SECURITY_GATE_TESTS := tests/test_workflow_verify_docker.py tests/test_trial_health_audit_docker.py
+SECURITY_GATE_TESTS := tests/test_workflow_verify_docker.py tests/test_trial_health_audit_docker.py tests/test_declared_wheels_docker.py
 
 security-gate: docker-check
 	@$(TARGET_ENV) $(RAIDAR) pack build python

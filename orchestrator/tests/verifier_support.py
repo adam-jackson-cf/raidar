@@ -18,10 +18,9 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from packaging.markers import default_environment
-
 from raidar.grading import records
 from raidar.grading.bundle import BundleManifest, GraderSpec, VerifierStepSpec, write_bundle
+from raidar.grading.closure import ClosureImage
 from raidar.grading.sandbox import RUNTIME_DIR, SandboxLayout, SandboxResult, SandboxRun
 
 
@@ -194,6 +193,7 @@ class LocalProcessSandbox:
 
     root: Path
     runs: list[SandboxRun] = field(default_factory=list)
+    closures: list[str] = field(default_factory=list)
 
     @property
     def layout(self) -> SandboxLayout:
@@ -209,8 +209,12 @@ class LocalProcessSandbox:
     async def environment_id(self) -> str:
         return f"local:{sys.executable}"
 
-    async def marker_environment(self) -> dict[str, str]:
-        return default_environment()
+    async def target_arch(self) -> str:
+        return "amd64"
+
+    async def closure_image(self, lock_text: str) -> ClosureImage:
+        self.closures.append(lock_text)
+        return ClosureImage(tag="local-closure", image_id="local-closure", built=True, seconds=0.0)
 
     def _stage(self, run: SandboxRun) -> None:
         layout = self.layout
