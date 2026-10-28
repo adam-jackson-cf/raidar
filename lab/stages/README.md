@@ -76,6 +76,8 @@ A gate entry accepts exactly `name`, `run`, `kind`, `before`, `watch`, `timeout_
 
 All four fields are required. `status` is `done`, `resume` or `closed`; `message` is a string; `tokens` maps declared names to strings; `carry` is a JSON object. `resume` needs a nonempty message. Carry is passed unchanged in the next call's context, not automatically inserted into a prompt. `done` requires all declared outputs. `closed` is terminal: a root-owned flag cannot be reopened. A resume beyond the round bound closes instead. One malformed/unusable repair is allowed per package per checkpoint, then closed. The first requested resume in workflow order wins, always resuming the same primary session. Gate fixes, repairs and rework obey the equal checkpoint deadline and the fit rule; a cut records `deadline` and grades what the agent left.
 
+A closed package's `before` checks refuse without invoking its tool, even if a later package resumes the session. Closed flags and canary state belong to one checkpoint, not the entire container.
+
 ## Call protocol and evidence
 
 Setup and stop receive a root-owned JSON context path as their final `--context <path>` argv pair. Context contains `task`, effective `params`, `round`, `carry`, `state` (the watched state directory) and declared `outputs`. `RAIDAR_STAGE_CONTEXT` names that path for every call, including gate commands; conventional gate argv is not extended with tool-specific flags. A call receives no inherited host or harness environment. It runs as UID/GID 1000 under `env -i` with a fixed package/pack `PATH`, `LANG=C.UTF-8`, and fresh `HOME` and `TMPDIR` per call. Calls have no network. Package code never runs on the host, including fixture and replay commands. The judge key never enters a container. Hidden grading stays offline in its separate sandbox.
@@ -102,7 +104,7 @@ Any agent-attributed tool failure is reported per arm and package digest and req
 
 ### Fixtures
 
-Each fixture has a JSON context, a state tree and `expect.yaml` declaring its expected status and output digests. `done` and `closed` are mandatory for stop packages; `resume` is mandatory when `max_rounds > 0`. Command-only packages supply passing and refusing gate fixtures. Every fixture runs twice with byte-identical stdout and output digests. The done result becomes the canary.
+Each fixture has a JSON context, a state tree and `expect.yaml` declaring its expected status and output digests. `done` and `closed` are mandatory for stop packages; `resume` is mandatory when `max_rounds > 0`. Stop fixtures run twice with byte-identical stdout and output digests; the done result becomes the canary. Gate packages supply passing and refusing fixtures, run twice with identical attribution, verdict, check statuses/exit codes and declared output digests. Raw gate diagnostics remain recorded, but are not compared byte-for-byte: conventional tools such as pytest include elapsed time.
 
 Raidar also exercises missing/empty state, zero-byte files, invalid JSON, non-UTF-8 bytes, deeply nested JSON under the cap, semantically wrong state and unreadable files. They must return valid non-done results within a quarter of the call timeout. Bounds fixtures (FIFO, symlink loop and oversized state) prove pre-call rejection without invoking authored code. All cases are offline, UID 1000, clean-environment, pinned-runtime calls. Tool bytes must remain unchanged; writes are confined to declared state and per-call temporary directories.
 
@@ -118,6 +120,8 @@ A criteria output is a strict JSON object with `contract: criteria/1` and `featu
 
 Workflow identity folds in every package release, digest and effective params. Arm locks carry `packages` and `primitive_code` (`python-ast/1` inventories including transitive primitive imports, Harbor and native adapter code); neither field can be overridden in pooling. Trial evidence records installed-tree digests and wheels; a mismatch invalidates the trial. Prompt, tool-byte and param changes each change identity and stale locks are refused.
 
+The lock pins expected installed-tree digests per architecture. Later checkpoints reuse an existing install only after a fresh root-owned, no-follow measurement matches that expectation; a changed or unmeasurable tree invalidates the trial and is never repaired or reinstalled over.
+
 Lock refusals: **ST1** unsupported/invalid package contract; **ST2** unsupported required primitive; **ST3** missing/forward input producer; **ST4** register/digest mismatch; **ST5** stale lock, sdist or missing pack wheel; **ST6** missing/repeated frame slot; **ST7** colliding commands, skills, output paths or tokens.
 
 ## Author commands
@@ -125,7 +129,7 @@ Lock refusals: **ST1** unsupported/invalid package contract; **ST2** unsupported
 Use the repository-root public interface (`env -u AGENT` is required when running from an OMP session):
 
 ```sh
-env -u AGENT make stage-new NAME=my-check                 # complete tier-2 command template
+env -u AGENT make stage-new NAME=my-check FROM=docs-check  # complete tier-2 command template
 env -u AGENT make stage-lock NAME=my-check
 env -u AGENT make stage-check NAME=my-check TARGET=mbp
 env -u AGENT make stage-check NAME=my-check REPLAY=<trial> TARGET=mbp
@@ -135,7 +139,7 @@ env -u AGENT make workflow-new NAME=my-workflow            # FROM=one-shot-verif
 env -u AGENT make experiment-lock EXPERIMENT=<smoke-yaml> DRAFT=1
 ```
 
-Creation refuses overwrites. Fixtures/replay run offline in throwaway pack containers, never on the host. Draft locking is smoke-only, writes under `var/tmp/`, marks jobs as dev, and never admits a measured comparison. Normal locks require registered immutable references. Generated artifacts belong under `var/` or `RAIDAR_VAR`. See `make help` for the exhaustive command catalogue.
+Creation refuses overwrites. The `docs-check` template includes a generated pure-wheel lock, a pinned codespell command and six fixtures. Fixtures/replay run offline in throwaway pack containers, never on the host. Draft locking is smoke-only, writes under `var/tmp/drafts/<experiment-id>/`, marks jobs as dev, and never admits a measured comparison. Normal locks require registered immutable references. Generated artifacts belong under `var/` or `RAIDAR_VAR`. See `make help` for the exhaustive command catalogue.
 
 ## Trust boundary (C4)
 

@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import ast
+import re
 import sys
 from collections.abc import Sequence
 from dataclasses import dataclass
@@ -47,6 +48,24 @@ SCRIPT_NAME_ALLOWLIST = {
     "verify-version-wiring.py",
 }
 
+# V2: only these lab-owned paths may install dependencies. The spike's installer is
+# retained until its phase-5 package port; no new workflow may install independently.
+INSTALL_MODULES = frozenset(
+    {
+        "cli/env_harbor.py",
+        "design/problem/harbor_engine.py",
+        "engine/trial/workspace.py",
+        "grading/closure.py",
+        "subject/environment/python/provisioner.py",
+        "subject/primitive/install.py",
+        "subject/primitive/payload/install_tree.py",
+        "subject/workflow/verify.py",
+    }
+)
+INSTALL_COMMAND = re.compile(r"\b(?:pip\s+install|uv\s+sync)\b")
+PRODUCT_PREFIX = "orchestrator/src/raidar/"
+CALLS_MODULE = "subject/primitive/calls.py"
+
 
 @dataclass(frozen=True)
 class Diagnostic:
@@ -70,7 +89,9 @@ def path_matches_prefix(relpath: str, prefix: str) -> bool:
 
 def is_excluded_relpath(relpath: str) -> bool:
     normalized = relpath.lstrip("./")
-    return normalized.startswith(EXCLUDED_PREFIXES) or "/__pycache__/" in f"/{normalized}/"
+    return (
+        normalized.startswith(EXCLUDED_PREFIXES) or "/__pycache__/" in f"/{normalized}/"
+    )
 
 
 def is_maintained_python_relpath(relpath: str) -> bool:
@@ -162,7 +183,11 @@ def _package_dir_diagnostics(relpath: str) -> list[Diagnostic]:
         "src",
         "tests",
     }
-    for part in Path(relpath).parts[:-1]:
+    parts = Path(relpath).parts[:-1]
+    if relpath.startswith("orchestrator/tests/fixtures/stages/"):
+        # A stage's hyphenated data-folder name is not a Python import package.
+        parts = parts[:4] + parts[5:]
+    for part in parts:
         if part in ignored_parts or _is_snake_case_name(part):
             continue
         diagnostics.append(
@@ -194,15 +219,20 @@ def structure_diagnostics_for_relpath(relpath: str) -> list[Diagnostic]:
 def structure_diagnostics(repo_root: Path, paths: Sequence[Path]) -> list[Diagnostic]:
     diagnostics: list[Diagnostic] = []
     for path in paths:
-        diagnostics.extend(structure_diagnostics_for_relpath(repo_relative_path(repo_root, path)))
+        diagnostics.extend(
+            structure_diagnostics_for_relpath(repo_relative_path(repo_root, path))
+        )
     return diagnostics
 
 
-def _public_methods(class_node: ast.ClassDef) -> list[ast.FunctionDef | ast.AsyncFunctionDef]:
+def _public_methods(
+    class_node: ast.ClassDef,
+) -> list[ast.FunctionDef | ast.AsyncFunctionDef]:
     return [
         node
         for node in class_node.body
-        if isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef) and not node.name.startswith("_")
+        if isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef)
+        and not node.name.startswith("_")
     ]
 
 
@@ -225,7 +255,9 @@ def _self_attributes(class_node: ast.ClassDef) -> set[str]:
     return attributes
 
 
-def _class_shape_diagnostics(class_node: ast.ClassDef, relpath: str) -> list[Diagnostic]:
+def _class_shape_diagnostics(
+    class_node: ast.ClassDef, relpath: str
+) -> list[Diagnostic]:
     diagnostics: list[Diagnostic] = []
     line_count = (
         (getattr(class_node, "end_lineno", class_node.lineno) or class_node.lineno)
@@ -264,7 +296,9 @@ def _class_shape_diagnostics(class_node: ast.ClassDef, relpath: str) -> list[Dia
     return diagnostics
 
 
-def _constructor_diagnostics(class_node: ast.ClassDef, relpath: str) -> list[Diagnostic]:
+def _constructor_diagnostics(
+    class_node: ast.ClassDef, relpath: str
+) -> list[Diagnostic]:
     diagnostics: list[Diagnostic] = []
     for method in class_node.body:
         if not isinstance(method, ast.FunctionDef | ast.AsyncFunctionDef):
@@ -284,7 +318,9 @@ def _constructor_diagnostics(class_node: ast.ClassDef, relpath: str) -> list[Dia
     return diagnostics
 
 
-def class_interface_diagnostics_for_source(source: str, relpath: str) -> list[Diagnostic]:
+def class_interface_diagnostics_for_source(
+    source: str, relpath: str
+) -> list[Diagnostic]:
     diagnostics: list[Diagnostic] = []
     tree = ast.parse(source, filename=relpath)
     for node in ast.walk(tree):
@@ -295,16 +331,86 @@ def class_interface_diagnostics_for_source(source: str, relpath: str) -> list[Di
     return diagnostics
 
 
-def class_interface_diagnostics(repo_root: Path, paths: Sequence[Path]) -> list[Diagnostic]:
+def _command_literals(tree: ast.AST) -> list[tuple[int, str]]:
+    """Inspect executable string/list literals, not prose docstrings."""
+    docstrings = {
+        id(node.value)
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Expr) and isinstance(node.value, ast.Constant)
+    }
+    found: list[tuple[int, str]] = []
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Constant) and isinstance(node.value, str):
+            if id(node) not in docstrings:
+                found.append((node.lineno, node.value))
+        elif isinstance(node, ast.List | ast.Tuple):
+            words = [item.value for item in node.elts if isinstance(item, ast.Constant)]
+            if all(isinstance(word, str) for word in words):
+                found.append((node.lineno, " ".join(words)))
+    return found
+
+
+def execution_boundary_diagnostics_for_source(
+    source: str, relpath: str
+) -> list[Diagnostic]:
+    """Enforce V2 install ownership and V5's single container transport boundary."""
+    if not relpath.startswith(PRODUCT_PREFIX):
+        return []
+    module = relpath.removeprefix(PRODUCT_PREFIX)
+    tree = ast.parse(source, filename=relpath)
+    found = []
+    if module not in INSTALL_MODULES:
+        for line, literal in _command_literals(tree):
+            if INSTALL_COMMAND.search(literal):
+                found.append(
+                    Diagnostic(
+                        "PYQ300", relpath, line, "install outside allowlisted module"
+                    )
+                )
+    if (
+        module.startswith(("subject/primitive/", "subject/workflow/"))
+        and module != CALLS_MODULE
+    ):
+        found.extend(_transport_diagnostics(tree, relpath))
+    return found
+
+
+def _transport_diagnostics(tree: ast.AST, relpath: str) -> list[Diagnostic]:
+    found = []
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call) or not isinstance(node.func, ast.Attribute):
+            continue
+        if node.func.attr not in {"exec", "upload_file"}:
+            continue
+        receiver = node.func.value
+        if isinstance(receiver, ast.Name) and receiver.id == "calls":
+            continue
+        found.append(
+            Diagnostic(
+                "PYQ301",
+                relpath,
+                node.lineno,
+                "container calls must use primitive/calls.py",
+            )
+        )
+    return found
+
+
+def class_interface_diagnostics(
+    repo_root: Path, paths: Sequence[Path]
+) -> list[Diagnostic]:
     diagnostics: list[Diagnostic] = []
     for path in paths:
         relpath = repo_relative_path(repo_root, path)
         try:
             source = path.read_text(encoding="utf-8")
         except UnicodeDecodeError as exc:
-            diagnostics.append(Diagnostic("PYQ299", relpath, 1, f"could not decode source: {exc}"))
+            diagnostics.append(
+                Diagnostic("PYQ299", relpath, 1, f"could not decode source: {exc}")
+            )
             continue
         diagnostics.extend(class_interface_diagnostics_for_source(source, relpath))
+        diagnostics.extend(execution_boundary_diagnostics_for_source(source, relpath))
     return diagnostics
 
 

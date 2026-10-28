@@ -101,10 +101,15 @@ def _canonical_relpath(repo_root: Path, path: Path) -> str:
 
 
 def _is_excluded(relpath: str) -> bool:
-    return relpath.startswith(DEFAULT_EXCLUDED_PREFIXES) or "/__pycache__/" in f"/{relpath}/"
+    return (
+        relpath.startswith(DEFAULT_EXCLUDED_PREFIXES)
+        or "/__pycache__/" in f"/{relpath}/"
+    )
 
 
-def _normalise_source_roots(repo_root: Path, values: list[str]) -> tuple[SourceRoot, ...]:
+def _normalise_source_roots(
+    repo_root: Path, values: list[str]
+) -> tuple[SourceRoot, ...]:
     roots: list[SourceRoot] = []
     for value in values:
         root_path = (repo_root / value).resolve()
@@ -123,7 +128,11 @@ def discover_python_files(
     source_roots: tuple[SourceRoot, ...] | None = None,
 ) -> list[Path]:
     if source_roots is None:
-        default_values = ["orchestrator/src"] if (repo_root / "orchestrator" / "src").is_dir() else ["."]
+        default_values = (
+            ["orchestrator/src"]
+            if (repo_root / "orchestrator" / "src").is_dir()
+            else ["."]
+        )
         source_roots = _normalise_source_roots(repo_root.resolve(), default_values)
     pathspecs = [f"{root.relpath}/**/*.py" for root in source_roots]
     output = _run_git(
@@ -171,7 +180,11 @@ def collect_python_files(
     source_roots: tuple[SourceRoot, ...] | None = None,
 ) -> list[PythonFile]:
     if source_roots is None:
-        default_values = ["orchestrator/src"] if (repo_root / "orchestrator" / "src").is_dir() else ["."]
+        default_values = (
+            ["orchestrator/src"]
+            if (repo_root / "orchestrator" / "src").is_dir()
+            else ["."]
+        )
         source_roots = _normalise_source_roots(repo_root.resolve(), default_values)
     files: list[PythonFile] = []
     for path in discover_python_files(repo_root, source_roots=source_roots):
@@ -193,7 +206,9 @@ def _resolve_relative_import(current: PythonFile, node: ast.ImportFrom) -> str |
     if current.module is None:
         return None
     package_parts = (
-        current.module.split(".") if current.is_package else current.module.split(".")[:-1]
+        current.module.split(".")
+        if current.is_package
+        else current.module.split(".")[:-1]
     )
     if node.level > 1:
         package_parts = package_parts[: -(node.level - 1)]
@@ -393,7 +408,9 @@ def _root_packages(values: list[str]) -> set[str]:
     for value in values:
         package = value.strip()
         if not package or PurePosixPath(package).parts != (package,):
-            raise SystemExit(f"root package must be a single Python package name: {value}")
+            raise SystemExit(
+                f"root package must be a single Python package name: {value}"
+            )
         packages.add(package)
     if not packages:
         raise SystemExit("at least one --root-package is required")
@@ -421,7 +438,9 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     repo_root = args.repo_root.resolve()
-    source_roots = _normalise_source_roots(repo_root, args.source_root or ["orchestrator/src"])
+    source_roots = _normalise_source_roots(
+        repo_root, args.source_root or ["orchestrator/src"]
+    )
     results = analyse_fanout(
         repo_root,
         source_roots=source_roots,

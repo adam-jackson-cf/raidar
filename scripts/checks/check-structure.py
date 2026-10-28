@@ -24,6 +24,9 @@ import subprocess
 import sys
 from pathlib import Path, PurePosixPath
 
+from raidar.subject.package import StagePackageError
+from raidar.subject.package.registry import load_stage_package
+
 ROOT_DIRECTORIES = frozenset(
     {
         "orchestrator",
@@ -55,7 +58,16 @@ ROOT_FILES = frozenset(
 )
 # The data trees the code loads at run time, each at one explicit path (contract/paths.py).
 LAB_DIRECTORIES = frozenset(
-    {"experiments", "problems", "ledger", "agents", "workflows", "stages", "environments", "judge"}
+    {
+        "experiments",
+        "problems",
+        "ledger",
+        "agents",
+        "workflows",
+        "stages",
+        "environments",
+        "judge",
+    }
 )
 # The one data file at the lab root: the agent and workflow release register.
 LAB_FILES = frozenset({"releases.yaml"})
@@ -68,7 +80,7 @@ RAIDAR_PACKAGES: dict[str, frozenset[str]] = {
     "contract": frozenset(),
     "judge": frozenset(),
     "design": frozenset({"experiment", "problem"}),
-    "subject": frozenset({"agent", "workflow", "environment"}),
+    "subject": frozenset({"agent", "workflow", "environment", "package", "primitive"}),
     "engine": frozenset({"target", "job", "trial", "health", "perf"}),
     "grading": frozenset({"runtime", "prefix", "coverage"}),
     "scoring": frozenset(
@@ -97,7 +109,15 @@ VERSION_EXEMPT_PREFIXES = ("docs/",)
 def repo_paths(repo_root: Path) -> list[str]:
     """Tracked files plus untracked, not-ignored files, as repo-relative posix paths."""
     result = subprocess.run(
-        ["git", "-C", str(repo_root), "ls-files", "--cached", "--others", "--exclude-standard"],
+        [
+            "git",
+            "-C",
+            str(repo_root),
+            "ls-files",
+            "--cached",
+            "--others",
+            "--exclude-standard",
+        ],
         capture_output=True,
         text=True,
         check=False,
@@ -167,6 +187,45 @@ def package_violations(paths: list[str]) -> list[str]:
     return sorted(set(found))
 
 
+def _stage_roots(entries: list[PurePosixPath]) -> list[PurePosixPath]:
+    prefix = PurePosixPath("lab/stages")
+    candidates = sorted(
+        {
+            path.parent
+            for path in entries
+            if path.name == "stage.yaml"
+            and len(path.relative_to(prefix).parts) in (2, 3)
+        },
+        key=lambda path: (len(path.parts), str(path)),
+    )
+    roots: list[PurePosixPath] = []
+    for candidate in candidates:
+        if not any(candidate.is_relative_to(root) for root in roots):
+            roots.append(candidate)
+    return roots
+
+
+def stage_violations(paths: list[str], repo_root: Path) -> list[str]:
+    """Check the ``stage/1`` package layout without importing authored code."""
+    entries = [
+        PurePosixPath(path)
+        for path in paths
+        if path.startswith("lab/stages/") and path != "lab/stages/README.md"
+    ]
+    roots = _stage_roots(entries)
+    found = [
+        f"stage file outside a declared package: {path}"
+        for path in entries
+        if not any(path.is_relative_to(root) for root in roots)
+    ]
+    for root in roots:
+        try:
+            load_stage_package(repo_root / str(root))
+        except (StagePackageError, OSError) as exc:
+            found.append(f"invalid stage package {root}: {exc}")
+    return found
+
+
 def violations(paths: list[str]) -> list[str]:
     return [
         *root_violations(paths),
@@ -180,11 +239,15 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--repo-root", default=".", type=Path)
     args = parser.parse_args(argv)
-    found = violations(repo_paths(args.repo_root.resolve()))
+    paths = repo_paths(args.repo_root.resolve())
+    found = [*violations(paths), *stage_violations(paths, args.repo_root)]
     if not found:
         print("structure-check: ok")
         return 0
-    print("structure-check: the repository layout breaks the structure rules:", file=sys.stderr)
+    print(
+        "structure-check: the repository layout breaks the structure rules:",
+        file=sys.stderr,
+    )
     for line in found:
         print(f"  {line}", file=sys.stderr)
     return 1

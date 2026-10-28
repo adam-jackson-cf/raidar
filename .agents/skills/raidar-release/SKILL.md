@@ -1,6 +1,6 @@
 ---
 name: "raidar-release"
-description: "Use when changing a released Raidar agent, workflow, scorer, headline metric or runtime pack, or relocking after toolchain edits."
+description: "Use when changing a released Raidar agent, workflow, stage package, scorer, headline metric or runtime pack, or relocking after toolchain edits."
 ---
 
 # Task
@@ -8,11 +8,12 @@ description: "Use when changing a released Raidar agent, workflow, scorer, headl
 ## Establish release impact
 
 - Identify manifest versions, fingerprint sources and affected experiment locks before editing.
-- Preserve released bytes first with `make release-archive REF=<name>@<N>` for each affected agent, workflow or scorer.
+- Preserve released bytes first with `make release-archive REF=<name>@<N>` for each affected agent, workflow, stage package or scorer.
   Edit its single implementation in place and bump the manifest @N for behaviour changes.
   Recover old implementations from archive tags, never a parallel module.
-- Treat agent and workflow release fingerprint sources, scorer manifest descriptions, observation subject trajectory,
-  evidence input oracle.cases and problem oracle/ bundles as identity-bearing.
+- Treat agent/workflow fingerprints, stage-tree/1 shipped bytes, primitive_code inventories,
+  scorer manifest descriptions, observation subject trajectory, evidence input oracle.cases
+  and problem oracle/ bundles as identity-bearing.
 - Preserve legacy wire names including Harness CLI ids, raidar_oracle_plugin.py,
   raidar-oracle/, oracle_leak, oracle_bundle and oracle-bundle.json unless deliberately releasing them.
 
@@ -26,6 +27,22 @@ description: "Use when changing a released Raidar agent, workflow, scorer, headl
   `make problem-validate PROBLEM=<ref> ENGINE=harbor NATIVE_RUNNER=<checkout>`.
 - Re-key errata whose manifest changed, complete work held for this pack release, then relock.
   Do not change a deferred-work test's pinned hash instead of completing the work.
+
+## Stage packages
+
+- Follow `lab/stages/README.md` (`stage/1`, `stage-tree/1`, `criteria/1`).
+  Packages live at `lab/stages/[ns/]<name>/`; references are `[ns/]name@N`, never mutable paths.
+- Generate tool dependencies with `make stage-lock NAME=<name>`, never hand-edit `uv.lock`.
+  ST1–ST7 refuse unsupported contracts/primitives, unavailable inputs, changed registered bytes,
+  stale/non-wheel/incomplete closures, missing frame slots and colliding claims.
+- Run `make stage-check NAME=<name> TARGET=mbp`: fixtures and replay execute offline as UID 1000
+  in the pack container, never on the host. Preserve its exact package/pack/primitive check record.
+- Add the next immutable stage release to `lab/releases.yaml` (checks print the line; no writer).
+  Re-release dependent workflows and relock every affected experiment. Fixtures are excluded
+  from stage-tree/1; shipped prompts, source, skills and tool locks are not.
+- `make experiment-lock EXPERIMENT=<smoke-yaml> DRAFT=1` writes development locks under `var/tmp/`;
+  drafts never admit measured comparisons. Run `make security-gate TARGET=mbp` for primitive,
+  runner or `engine/trial` changes, as well as `make quality`.
 
 ## Relock and verify
 

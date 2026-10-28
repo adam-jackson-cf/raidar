@@ -40,11 +40,12 @@ layers =
     raidar.scoring.framework
 
 [importlinter:contract:subject-tiers]
-name = Subject: workflow > agent
+name = Subject: workflow > independent primitives and agents > package data
 type = layers
 layers =
     raidar.subject.workflow
-    raidar.subject.agent
+    raidar.subject.primitive | raidar.subject.agent
+    raidar.subject.package
 
 [importlinter:contract:subject-environment-independent-of-workflow]
 name = Runtime packs (environment) and workflows are independent
@@ -113,6 +114,8 @@ source_modules =
 forbidden_modules =
     raidar.subject.agent
     raidar.subject.workflow
+    raidar.subject.primitive
+    raidar.subject.package
 
 [importlinter:contract:deterministic-process-checks]
 name = process-compliance decides only deterministically: no Jev import, direct or indirect
@@ -143,3 +146,46 @@ source_modules =
     raidar
 forbidden_modules =
     tests
+
+[importlinter:contract:primitives-only-via-runner]
+name = Primitives are used only by workflow execution and experiment contract checks
+type = protected
+protected_modules =
+    raidar.subject.primitive
+allowed_importers =
+    raidar.subject.workflow
+    raidar.design.experiment
+    tests
+
+[importlinter:contract:health-reads-records-only]
+name = Health reads evidence without executing workflow or package code
+type = forbidden
+source_modules =
+    raidar.engine.health
+forbidden_modules =
+    raidar.subject.workflow
+    raidar.subject.primitive
+    raidar.subject.package
+
+[importlinter:contract:environment-independent-of-primitives]
+name = Runtime packs are independent of primitive execution
+type = independence
+modules =
+    raidar.subject.environment
+    raidar.subject.primitive
+
+[importlinter:contract:environment-independent-of-packages]
+name = Runtime packs are independent of package definitions
+type = independence
+modules =
+    raidar.subject.environment
+    raidar.subject.package
+
+[importlinter:contract:agent-adapters-private]
+name = Agent adapters are private to the agent package's public API
+type = protected
+protected_modules =
+    raidar.subject.agent.adapters
+allowed_importers =
+    raidar.subject.agent.native
+    raidar.subject.agent.definition
