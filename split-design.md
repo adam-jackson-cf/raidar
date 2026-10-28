@@ -12,6 +12,12 @@
     - the registry: `stage-registry-opus.md` and `stage-registry-astra.md`;
     - stop-call failures: `stage-stop-failure-opus.md`.
   - **Phase-4 implementation 2026-10-28:** the public contract and generic package path coexist with the spike; Docker phase-exit proof is pending while `mbp` is offline.
+- **2026-10-28: decision rule and voted decisions.** From 2026-10-28 every design or remediation decision is put to Claude Opus 5.5 and GPT-6 Astra as independent read-only votes, and the majority is adopted; GPT-6.1 Sol breaks a tie. The records are in `docs/reboot/evidence/decide-4b-*.md` and `decide-p4-*.md`, and the audits they rest on in `mechanism-audit-{opus,astra}.md`.
+  - **Primary outcome** (Sol broke the tie for Astra): it stays the solvable-set rate, labelled "reference-solvable SCB success", not specification compliance. Determinacy flags and the audit's coverage are reported beside it; zero assertions audited is `unmeasured`, never "0 flagged". Errata stay an optional pre-registered override.
+  - **Flakiness** (Sol for Astra): validation uses 5 repeats, and records say "no variation observed in N runs", never "deterministic". Agent submissions are graded once.
+  - **Audit fixes** (Sol for Astra): all eleven land in phase 4b, before phase 9, with Astra's amendments (section 9).
+  - **Hook broker** (both voters): removed. The hook runs the checks as the agent's user and appends to an agent-writable log, so hook-derived evidence (G1, G2, W5's hook-log condition and hook-log findings in W11) becomes readings. These stay validity checks: G3 (the gate tool-tree digest), the installed-tree digest, watched-path, protected-path and session-log findings, and the seal's own record-channel protection and call supervisor.
+  - **Namespaces** (both voters): stage references require a namespace, and the folder is `lab/stages/<ns>/<name>/`, with upstream packages at `lab/stages/raidar/<name>/` under CODEOWNERS. Agent and workflow references keep their current form.
 - **2026-10-27: enforcement review** ([docs/reboot/evidence/enforcement-review-opus.md](docs/reboot/evidence/enforcement-review-opus.md)). User decisions:
   - this file moves to the repository root, so contributors and coding agents can read it;
   - the branch merges to `main` once the spike is proved and the design approved, and CI then runs through `main`;
@@ -406,7 +412,7 @@ The rule is therefore attribution by control run, from `stage-stop-failure-opus.
 
 ### 5.6 The shared stage registry (decided)
 
-- **Packages live in this repository**, at `lab/stages/<name>/`. Imported third-party packages are committed under `lab/stages/<ns>/<name>/`, so every checkout can reproduce a run and every package passes PR review.
+- **Packages live in this repository**, at `lab/stages/<ns>/<name>/`. Upstream packages are `lab/stages/raidar/<name>/`; imported third-party packages are committed under their own namespace, so every checkout can reproduce a run and every package passes PR review.
 - **Releases** go in a new `stages:` section of `lab/releases.yaml` (`name@N` → digest). The rules are the same as for agents and workflows:
   - a released number is frozen;
   - only the latest release of a name resolves;
@@ -414,7 +420,7 @@ The rule is therefore attribution by control run, from `stage-stop-failure-opus.
   - there is no release writer: `releases-check` prints the line to add.
 
   To compare two versions of a method in one experiment, give the variant its own name.
-- **References** are `[ns/]name@N`. `raidar/` is reserved for upstream packages. Bare names, `latest`, branches, tags and paths are refused when the workflow is parsed.
+- **References** are `ns/name@N`; a stage reference without a namespace is refused. `raidar/` is reserved for upstream packages and protected by CODEOWNERS on `lab/stages/raidar/`. Bare names, `latest`, branches, tags and paths are refused when the workflow is parsed.
 - **The digest does not depend on the transport.** Git, OCI or archive imports can later populate `lab/stages/<ns>/` with no migration, verified against `stage-tree/1`.
 - **Drafts.** `make experiment-lock … DRAFT=1` is allowed only for `smoke` experiments. It resolves unregistered packages from the working tree and writes the lock under `var/tmp/`. Draft jobs are dev jobs, and they never admit a measured run.
 - **Lock-time checks, family ST**, beside RT0–RT6. The lock is refused when:
@@ -451,7 +457,7 @@ The rule is therefore attribution by control run, from `stage-stop-failure-opus.
 ### 5.7 Shipped packages, workflows and authoring tiers
 
 ```text
-lab/stages/
+lab/stages/raidar/
   define/       FXL's define tool (moved out of orchestrator/src), units setup, sealed prerequisite, stop inspection, criteria/1 output
   verify/       Python gate: ruff, mypy, pytest (pytest kind), skills test-per-aspect, pytest-templates
   docs-check/   the smallest example and the stage-new template: one pinned tool as a gate check
@@ -516,14 +522,14 @@ lab/workflows/
 - **Judge failures (D3, decided).**
   - A Jev request is retried up to 3 times. An unanswered aspect is undecided, which counts as open.
   - Test 2 (the replay of 121 requests) found 4.96% of requests changing status across repeats, and none flipping between closed and open.
-- **Tamper (D5, decided).** Gate and package state sit in the agent's container, so G keeps the protected-path part of T4 for those paths. The hook log's root broker (S6) is up for review in phase 4. The seal's host record is authoritative, so the hook log may need to be only a reading.
+- **Tamper (D5, decided 2026-10-28).** Gate and package state sit in the agent's container, so G keeps the protected-path part of T4 for those paths, and G3 (the gate tool-tree digest) stays a validity check. The S6 root hook broker is removed (phase 4b): the seal's host record is authoritative, and hook-derived evidence (G1, G2, the hook-log parts of W5 and W11) is a reading.
 
 ## 7. Measurement and lab validation
 
 ### 7.1 Outcomes and scorers
 
 - **Solved checkpoint, unreached checkpoint and grader failures:** as agreed (unchanged).
-- **Primary outcome: the solvable-set solve rate** (section 3.2). The raw SCB outcome is reported beside it. Errata are a pre-registered option only.
+- **Primary outcome: the solvable-set solve rate, labelled "reference-solvable SCB success"** (section 3.2): it shows how many checkpoints an agent solves on the tests the reference passes, not specification compliance. The raw SCB outcome, the determinacy flags and the determinacy audit's coverage are reported beside it. Errata are a pre-registered option only.
 - **Wilson 95% intervals** for single-arm solve rates (FXL `evaluation/analysis/stats.py:35`).
 - **`process-compliance` stops being a scorer** (phase 6). Its metrics are about the agent's behaviour, not about verify, so they become health readings.
 - **`gate-effort` becomes `verification-effort@1`** (phase 5). It answers the same questions: fix rounds, blocking findings, clean at step end, and the cost of fix turns. It reads `gate/1` records, and is `not_applicable` without a `gate/1` package.
@@ -593,7 +599,8 @@ Migration, in order:
 | 2 | One-shot cutover | Agents, workflows, releases, runner, `one-shot@1`, seeding, lock and admission identity; treatment catalogue deleted | Done 2026-10-26 (`b55b6eb`) |
 | S | Workflow spike (mechanics; not a test of which method is better) | S1 isolation and parity; S2 verify; S3 define; S4 define-build-verify + judge + coverage scorers; S5 agent protocol + `claude-code@1`; S6 record-only seals, agent-user checks, validity rows W1–W11 | S1 `7e5c834`; S2 `155f4f7`; S3 `30a066b`, `0dbe2cf`, `c544323`; S4 `e245949`, `6b11515`; S5 `7c827d7`; S6 `b99048e`. Quality on S6: 2,324 passed, 95.30%. 21 Docker attack regressions pass. Smokes `s6-verify-record-02` and `s6-define-record-02` valid. Judge repeatability: 4.96% (test 2). Claude live runs blocked on Anthropic credit. Warm start at concurrency 3: p95 5.10 s against a 5 s budget |
 | 3 | Problems (Need 1) | Task text from `checkpoint_N.md`; spec hash per checkpoint; solvable sets and nondeterminism at validation; solvable-set primary outcome; bulk import and validate; `checkpoints: k` binding; runtime-pack contract page; forge removed as a default | K4 complete 2026-10-28: all nine problems usable `validated_partial` after three Docker repeats; mocked_http checkpoint 7 and metric_transform_lang checkpoint 1 locally excluded (`no_new_scoreable_tests`); datagate's upload/export flake quarantined at checkpoints 6–7. Quality 2,467 passed, 95.17%. AT-N1 (below) remains unrun: real-model authorization required |
-| 4 | Package contract and primitives (Need 2 core) | Public `stage/1` contract first; generic package runtime with `frame/1`, `install/1`, `setup/1`, `gate/1`, `stop/1`, `outputs/1`; canary attribution and bounded replay; immutable stage registry and `stage-tree/1`; lock `packages`/`primitive_code`; ST1–ST7; stage/workflow authoring targets and smoke-only drafts; private native adapters with credential/state protocol | Local implementation complete 2026-10-28 alongside spike classes. `make quality`: 3,103 passed, 48 skipped, 95.18% coverage; AT4 and public authoring smoke passed. Per-call output copies retained through setup, stop, gate seals and commits. Docker AT3, security-gate, fixture/replay checks and post-change perf-gate pending (`mbp` offline). All 12 S6 broker/client functions byte-identical; broker policy remains an owner decision. Ready for phase-5 port implementation, not cleared for measured runs |
+| 4 | Package contract and primitives (Need 2 core) | Public `stage/1` contract first; generic package runtime with `frame/1`, `install/1`, `setup/1`, `gate/1`, `stop/1`, `outputs/1`; canary attribution and bounded replay; immutable stage registry and `stage-tree/1`; lock `packages`/`primitive_code`; ST1–ST7; stage/workflow authoring targets and smoke-only drafts; private native adapters with credential/state protocol | Local implementation complete 2026-10-28 alongside spike classes. `make quality`: 3,103 passed, 48 skipped, 95.17–95.18% coverage (orchestrator rerun agrees); AT4 and public authoring smoke passed. Docker AT3, security-gate, fixture/replay checks and post-change perf-gate pending (`mbp` offline). Broker kept byte-identical here; removal decided 2026-10-28 for phase 4b. Ready for phase-5 port implementation, not cleared for measured runs |
+| 4b | Measurement fixes and voted decisions | The eleven mechanism-audit fixes with Astra's amendments: exact verdict tests from the declared outcome type, covering aggregates; per-arm exclusion rule with a pre-registered material difference; pinned grader identity with a runtime refusal; a grading canary; bounded resolver retries; halt on the solvable verdict; P8 bound to instruction origin; first-rework estimate from `first_build`; judge spend and one pricing table; V3 renamed and H5 measured; `reformatted_json` skipped when the spec fixes the format. Plus: primary relabelled with determinacy coverage; 5 validation repeats; hook broker removed; namespaced stage folders | `make quality`; `make security-gate` on `mbp`; the usable problems revalidated with 5 repeats under the pinned grader |
 | 5 | Port the shipped stages | `verify` package, then `define` (tool moved out of `orchestrator/src`), then `docs-check`; `acceptance-reply/1` and `jev-judge/1` read `criteria/1`; `verification-effort@1` and pre-fix grading on `gate/1` records (replacing `gate-effort`, `grading/prefix` and their analysis and review consumers); delete `StageType`, the `Define`/`Verify` classes, `factory.py` wiring, `stages.py` inventories and the spike settings models; new releases; relock | AT1, AT2 (including `verification-effort@1` read from the smoke); `make security-gate` |
 | 6 | Health | Full outcome table (section 6) first; health becomes the sole validity producer; L registry; generic W and S families; provider failures classified without retry; per-arm exclusion report; `process-compliance` metrics become health readings, and the scorer is deleted | A forced provider failure is excluded, not retried; each table row covered by a test |
 | 7 | Image split | Toolchain image; per-agent CLI layer keyed by agent hash; stage-tool layer keyed by package digest; profile container start; steadier warm-start measurement | `make perf-gate` within budget, including warm start at concurrency 3 (accepted `mbp` p95 budget 5.5 s from 2026-10-28). Step-0 reading: concurrency 1 failed warm start (5.87 s) and fixed overhead (6.80 s); separately exercised concurrency 3 passed (5.17 s and 6.17 s). No other threshold changed |
