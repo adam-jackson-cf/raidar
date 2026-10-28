@@ -6,6 +6,11 @@ All notable changes to this project are documented in this file.
 
 ### Features
 
+- Published the external-author `stage/1` contract at `lab/stages/README.md` before
+  implementation: strict manifest, primitive call/stop/output protocols, bounded state,
+  canary attribution and fixtures, `criteria/1`, stage identity, releases and author commands.
+  Generic runtime and commands are not yet implemented; shipped spike classes remain.
+
 - Problem onboarding from one pinned SCB source through `problem-list`/`problem-info`,
   bulk `problem-import SOURCE=… PROBLEMS=all|a,b,c`, and target-bounded parallel
   `problem-validate PROBLEMS=… REPEATS=3`. Generated pins require no per-problem source file.
