@@ -36,8 +36,14 @@ from dataclasses import dataclass, field
 
 from raidar.design.problem.sensitivities import known_sensitivities
 from raidar.evaluation.analysis.curves import Curve, problem_curves
+from raidar.evaluation.analysis.dependencies import (
+    ReadingShare,
+    arm_dependencies,
+    dependency_warnings,
+)
 from raidar.evaluation.analysis.effects import (
     Effect,
+    SampleSizeBasis,
     Settings,
     Slot,
     aggregate_effect,
@@ -58,7 +64,6 @@ from raidar.evaluation.analysis.manipulation import (
 )
 from raidar.evaluation.analysis.outcomes import AnalysisModel, PoolingReport, TrialOutcome
 from raidar.evaluation.analysis.ranking import Ranking, ranking
-from raidar.evaluation.analysis.stats import SampleSizeBasis
 from raidar.scoring.catalog.outcomes import (
     COST_METRICS,
     GATE_EFFORT_REF,
@@ -172,6 +177,9 @@ class ArmSummary(AnalysisModel):
     """Per process metric (stall rate); None when the lock declares no process-compliance."""
     verifier_diagnostics: dict[str, GateDescriptive] | None = None
     """Verifier diagnostics (grading-vs-coverage disagreements); None when none was measured."""
+    dependencies: dict[str, ReadingShare] | None = None
+    """Per dependency reading, the share of attempted steps affected (``unprovided``,
+    ``undeclared_import``); None when no valid trial carries per-step readings."""
 
 
 class Comparison(AnalysisModel):
@@ -241,6 +249,9 @@ class AnalysisReport(AnalysisModel):
     (``raidar.design.problem.sensitivities``): spec-determined cases whose verdict can depend on
     timing. A note beside the disagreement counts; it changes no value."""
     sample_size_basis: SampleSizeBasis = SampleSizeBasis.standard()
+    dependency_warnings: tuple[str, ...] = ()
+    """Dependency readings (``unprovided``, ``undeclared_import``) whose affected-step shares
+    differ materially between the baseline and a treatment arm. A warning, never an exclusion."""
 
 
 def _slots(inputs: AnalysisInputs, treatment: str) -> dict[str, list[Slot]]:
@@ -398,6 +409,7 @@ def _arm_summary(arm: str, inputs: AnalysisInputs, settings: Settings) -> ArmSum
             else None
         ),
         verifier_diagnostics=_verifier_diagnostics(arm, valid, settings),
+        dependencies=arm_dependencies(valid),
     )
 
 
@@ -483,6 +495,9 @@ def analyse(inputs: AnalysisInputs, settings: Settings) -> AnalysisReport:
         solvable=_solvable(inputs),
         verifier_sensitivities=_sensitivities(inputs),
         pooling=inputs.pooling,
+        dependency_warnings=dependency_warnings(
+            inputs.baseline_arm, {s.arm: s.dependencies for s in summaries}, treatments
+        ),
     )
 
 

@@ -115,8 +115,41 @@
     "image": "raidar/pack-python:2b91a52663e099f2"
   },
   "task_sha256": "70e93e9882fd776df49d4ae9fe3d9f9cef30c5dba69916db6b398cb942ad55c2",
-  "bundle_sha256": "85f93886a76ff38cc5ef0d1f027c0d3d8a40a1d066df71bad990aa071ccd959d",
+  "bundle_sha256": "fc79461c25dfb1fb4660e9fd3a688a55f6587ff88ed3b3b12d1ec6d804977040",
   "references_sha256": "1451f566df2cdd5e9b9c0550056cbf051eeaa70cde8f91dbbbf7f0b1988aebb8",
   "entry_file": "forge.py",
-  "entry_command": "uv run --project /app forge.py"
+  "entry_command": "uv run --project /app forge.py",
+  "dependencies": {
+    "policy": "declared-wheels/1",
+    "resolver": "uv@0.10.0",
+    "index": "https://pypi.org/simple",
+    "python": "3.12",
+    "platforms": [
+      "x86_64-manylinux_2_28",
+      "aarch64-manylinux_2_28"
+    ],
+    "exclude_newer": "2026-10-27T21:20:01Z",
+    "sets": {
+      "21a0dc50e266e366e6f8286867d43db0ade4265f9ced0bcdaac920073344b8b0": {
+        "requirements": [
+          "coverage==7.13.4",
+          "pytest-timeout==2.4.0",
+          "pytest==9.0.3",
+          "pyyaml"
+        ],
+        "amd64": "a77dfbf1191afcf1dfbfcb3a80747c3c677192363225f8f03848589e649311f9",
+        "arm64": "53dd33f0cbe0c1afaa43c2f4d66f5d8d84e010cff6b6e2204d4ae1fc1ff837d6"
+      },
+      "ebb0e16545c911bd31ec33ace57dedf84c04e673d2dc28c0290868e4adf4db77": {
+        "requirements": [
+          "pyyaml"
+        ],
+        "amd64": "ed3d8a573431b4bb098772f5160a62fa9b193ae63e3776c1fc0b91cb183b7f2b",
+        "arm64": "46c4ebdbacb253ad341e78f7b689b2c3b13184f12621f8092e18d8e71a5177ec"
+      }
+    },
+    "steps": {},
+    "seed": "ebb0e16545c911bd31ec33ace57dedf84c04e673d2dc28c0290868e4adf4db77",
+    "grader": "21a0dc50e266e366e6f8286867d43db0ade4265f9ced0bcdaac920073344b8b0"
+  }
 }

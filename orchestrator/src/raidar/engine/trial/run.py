@@ -29,7 +29,7 @@ from raidar.engine.trial.record import (
     build_record,
     runner_failure_record,
 )
-from raidar.engine.trial.workspace import workspace_seed
+from raidar.engine.trial.workspace import seed_locks, workspace_seed
 
 RUNNER_ERROR_FILE = "raidar-runner-error.txt"
 
@@ -56,9 +56,19 @@ def _planned_steps(ctx: JobContext, trial: PlannedTrial) -> tuple[tuple[str, str
 
 def _provisions(ctx: JobContext, trial: PlannedTrial) -> tuple[TrialProvision, ...]:
     """The lab's per-trial work before checkpoint 1: seeding the workspace project (D2)."""
-    manifest = ctx.problems[trial.problem_index].bundle.manifest
+    problem = ctx.problems[trial.problem_index]
+    manifest = problem.bundle.manifest
+    dependencies = problem.bundle.dependencies
+    if dependencies is None:
+        raise ValueError(f"{manifest.problem} carries no dependency pin: re-import it")
     return (
-        workspace_seed(manifest.problem, manifest.grader.test_dependencies, ctx.plan.pack.python),
+        workspace_seed(
+            manifest.problem,
+            manifest.grader.test_dependencies,
+            ctx.plan.pack.python,
+            dependencies.pins.exclude_newer,
+            seed_locks(dependencies.pins, dependencies.locks),
+        ),
     )
 
 

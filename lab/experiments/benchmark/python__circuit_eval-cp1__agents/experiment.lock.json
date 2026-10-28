@@ -41,11 +41,11 @@
         }
       },
       "scorer": {
-        "correctness@4": {
-          "digest": "6c2f10ca8361488500a32f23214b7867eec81650a86939368b8de4c3efbb43f1",
+        "correctness@5": {
+          "digest": "7521f1118a762ea3718e4408a24a44a40129f2028906031acce88c5f2701775c",
           "metadata": {
             "implementation": "raidar.scoring.correctness:correctness_scorer",
-            "implementation_digest": "35b002328986f6dab40df4f60b2b42a97a9cf848328cb8e15baf5b35ea06887f",
+            "implementation_digest": "1be7308c22b6fb6373bfa774ea1ef6052179e56bc02aec453eb7d0a2473b9f7d",
             "manifest": {
               "description": "Oracle verdicts per checkpoint and trajectory, from the oracle step records.",
               "evidence_required": [
@@ -239,7 +239,7 @@
                 "*"
               ],
               "tools": [],
-              "version": "4"
+              "version": "5"
             },
             "tool_lock": {}
           }
@@ -254,12 +254,12 @@
       "metric": "scb-canonical-oneshot@1",
       "scorer_config": {},
       "scorers": [
-        "correctness@4"
+        "correctness@5"
       ]
     },
     "tools": {}
   },
-  "document_sha256": "0233afb8b67faf850093859b2711c3273f11244ec3c2f1ea93060e22b06c1428",
+  "document_sha256": "00dd6297653f427a244a6f69a312b1e32daa3bae3337f55afc5cdeb093fa7b34",
   "execution": {
     "arms": {
       "codex": {
@@ -336,7 +336,7 @@
     "problems": [
       {
         "checkpoints": 1,
-        "digest": "b089b0d32cbd563738e38880a044074583791709cabd4b40c9b84cca0795a243",
+        "digest": "adc99f373f79469e082faadd058e987dd1dec831a845ff1329d47591d75294ef",
         "label": "scb/circuit_eval.checkpoint_1@38d627ecf668"
       }
     ],
@@ -363,10 +363,11 @@
       },
       "problem": {
         "scb/circuit_eval.checkpoint_1@38d627ecf668": {
-          "digest": "b089b0d32cbd563738e38880a044074583791709cabd4b40c9b84cca0795a243",
+          "digest": "adc99f373f79469e082faadd058e987dd1dec831a845ff1329d47591d75294ef",
           "metadata": {
-            "bundle_sha256": "568bed1216bcb149bad2ca7ce0af1ee66164b4ff6f22a9fffebc9addfcd297b8",
+            "bundle_sha256": "f712d5e4607cb0983df0bc72dd7d5fd35da50e7dc67e867a71e95954e542005e",
             "checkpoints": 1,
+            "dependencies_sha256": "c4c71b394551c34e93d709c5f038f353a9d859fde73a13f6062d0f4d25f456a6",
             "entry_command": "uv run --project /app circopt.py",
             "entry_file": "circopt.py",
             "mode": "one_shot",
@@ -459,10 +460,10 @@
   "experiment": {
     "id": "python__circuit_eval-cp1__agents",
     "source": "experiment.yaml",
-    "source_sha256": "a73a4a93708c9036beb434208cd12447c09ca6d577280ea351a8b0ac4e1d2f1b",
-    "spec_sha256": "12cf345821051b0369da5038808d68680783d7f3d2e26dd75d5d9a7a9c0fe557"
+    "source_sha256": "30f3c6e1de1403911f051142abcae4c7be0b34c6fc37374091fdc8dd205e92c3",
+    "spec_sha256": "db613fd20f0648de6318519ff691fb478307984d9cea8dadbee7dd55bfd863f7"
   },
-  "lock_sha256": "dcf10c7a7dfe36cb16d0b7a2fc4c1991b2067709c1fd03e54b15218f37149f9b",
+  "lock_sha256": "fdff7cb75c0b1ddd5efd28bdfe748a2d3e9aac8c238fa0510c5c7473619790b2",
   "lock_version": 4,
   "overrides": {
     "flags": {},
@@ -470,8 +471,8 @@
   },
   "sections": {
     "analysis": "0a0fb32297e0c3abaad1f91cb80990bf42b3a3f0854246915ae017492003d1bc",
-    "assessment": "63dafc04e039dd0141c6628ac2f0baec5e258d7d5c5272a256b74f7661b56bd6",
-    "execution": "dcf10c7a7dfe36cb16d0b7a2fc4c1991b2067709c1fd03e54b15218f37149f9b",
+    "assessment": "bbb5dbb0b430be70493dbffa4e9c2292a743272d3233f89d3543901120942671",
+    "execution": "fdff7cb75c0b1ddd5efd28bdfe748a2d3e9aac8c238fa0510c5c7473619790b2",
     "toolchain": "b6ef977873154c13b7d03140ffd4cfff64d0cfa32430af9f4e52db26e2a729cc"
   },
   "spec": {
@@ -508,7 +509,7 @@
       "metric": "scb-canonical-oneshot@1",
       "scorer_config": {},
       "scorers": [
-        "correctness@4"
+        "correctness@5"
       ]
     },
     "description": "Every released agent on the smoke problem; a smoke-sized benchmark.",

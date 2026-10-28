@@ -71,7 +71,7 @@ class RegradeOptions:
 
 def docker_sandbox_factory(docker_context: str) -> SandboxFactory:
     async def build(bundle: VerifierBundle) -> GradingSandbox:
-        image = await ensure_grader_image(bundle.manifest.grader, docker_context=docker_context)
+        image = await ensure_grader_image(bundle, docker_context=docker_context)
         return DockerCopySandbox(image=image.tag, docker_context=docker_context)
 
     return build
@@ -118,27 +118,39 @@ def stored_snapshot(trial_dir: Path, record: StepRecord) -> Path:
     return snapshot
 
 
-def compare(record: StepRecord, result: StepGrade, environment_id: str) -> tuple[str, ...]:
-    differences: list[str] = []
-    if record.grader.environment_id != environment_id:
-        differences.append(
-            f"grader_environment: {record.grader.environment_id} -> {environment_id}"
-        )
+def _case_differences(record: StepRecord, result: StepGrade) -> list[str]:
     original = {case.id: case for case in record.grade.cases}
     regraded = {case.id: case for case in result.grade.cases}
-    differences += [f"{k}: missing on regrade" for k in sorted(original.keys() - regraded.keys())]
+    differences = [f"{k}: missing on regrade" for k in sorted(original.keys() - regraded.keys())]
     differences += [f"{k}: new on regrade" for k in sorted(regraded.keys() - original.keys())]
     differences += [
         f"{k}: {original[k].status.value} -> {regraded[k].status.value}"
         for k in sorted(original.keys() & regraded.keys())
         if original[k] != regraded[k]
     ]
+    return differences
+
+
+def compare(record: StepRecord, result: StepGrade, environment_id: str) -> tuple[str, ...]:
+    differences = _case_differences(record, result)
+    if record.grader.environment_id != environment_id:
+        differences.append(
+            f"grader_environment: {record.grader.environment_id} -> {environment_id}"
+        )
     if record.grade.infra_failure != result.grade.infra_failure:
         differences.append(
             f"infra_failure: {record.grade.infra_failure} -> {result.grade.infra_failure}"
         )
     if record.coverage.parity != result.parity:
         differences.append(f"parity: {record.coverage.parity} -> {result.parity}")
+    before, after = record.submission_dependencies, result.grading.dependencies
+    if (
+        before is not None
+        and after is not None
+        and before.lock_text
+        and before.image_id != after.image_id
+    ):
+        differences.append(f"closure_image: {before.image_id} -> {after.image_id}")
     return tuple(differences)
 
 
@@ -157,6 +169,7 @@ async def regrade_step(trial_dir: Path, record_dir: Path, options: RegradeOption
             Path(work),
             coverage=record.coverage.enabled,
             timeout_s=record.grader.timeout_s,
+            recorded=record.submission_dependencies,
         )
     differences = compare(record, result, await sandbox.environment_id())
     return StepRegrade(

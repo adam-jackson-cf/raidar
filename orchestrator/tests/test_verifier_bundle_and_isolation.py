@@ -29,7 +29,6 @@ from raidar.grading.bundle import (
     build_bundle_from_scb_harbor_task,
     load_bundle,
 )
-from raidar.grading.grader_image import GRADER_TOOLS, grader_dockerfile, grader_image_tag
 from raidar.grading.leak import LeakScanError, leak_scan_command, parse_leak_output
 from raidar.grading.sandbox import (
     CONTAINER_LAYOUT,
@@ -130,8 +129,6 @@ def test_scb_task_import_keeps_the_validated_pytest_selection(tmp_path: Path) ->
         environment_dockerfile=AGENT_DOCKERFILE,
         test_dependencies=("pyyaml",),
     )
-    # The grader is the agent's environment plus the verifier tools, not just its base.
-    assert grader_dockerfile(manifest.grader).startswith(AGENT_DOCKERFILE + "USER root\n")
     assert manifest.env == {"TERM": "xterm"}
     assert manifest.source["sha"] == "abc"
     assert not (bundle.tests_dir / "_ctrf_to_reward.py").exists()
@@ -341,16 +338,6 @@ def test_pytest_invocation_isolates_config_and_renders_placeholders() -> None:
     assert graded[:2] == (CONTAINER_LAYOUT.python, "-P")
     assert measured[: 2 + len(measured_prefix)] == (CONTAINER_LAYOUT.python, "-P", *measured_prefix)
     assert graded[-len(args) :] == measured[-len(args) :] == args
-
-
-def test_grader_image_pins_tools_and_is_content_addressed() -> None:
-    spec = GraderSpec(base_image="base:1", test_dependencies=("pyyaml",))
-    dockerfile = grader_dockerfile(spec)
-    assert dockerfile.startswith("FROM base:1\n")
-    assert all(f'"{tool}"' in dockerfile for tool in GRADER_TOOLS)
-    assert all("==" in tool for tool in GRADER_TOOLS)
-    assert grader_image_tag(spec) == grader_image_tag(spec)
-    assert grader_image_tag(spec) != grader_image_tag(GraderSpec(base_image="base:2"))
 
 
 # --------------------------------------------------------------------- leak

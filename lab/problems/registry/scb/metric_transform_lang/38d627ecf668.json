@@ -1,0 +1,139 @@
+{
+  "kind": "raidar-problem",
+  "schema_version": 1,
+  "ref": "scb/metric_transform_lang@38d627ecf668",
+  "mode": "multi_checkpoint",
+  "checkpoints": 5,
+  "steps": [
+    {
+      "name": "checkpoint_1",
+      "checkpoint": "checkpoint_1",
+      "instruction_sha256": "5d9cb79b5e471357fda97cb02565f98ef5284d7414f63ec50b54178493088fff",
+      "test_files": [
+        "test_checkpoint_1.py"
+      ]
+    },
+    {
+      "name": "checkpoint_2",
+      "checkpoint": "checkpoint_2",
+      "instruction_sha256": "059bee0e04ffabf94310dddde5460bd84f464dae892fbd4e2a6c0e4dd475d2ab",
+      "test_files": [
+        "test_checkpoint_1.py",
+        "test_checkpoint_2.py"
+      ]
+    },
+    {
+      "name": "checkpoint_3",
+      "checkpoint": "checkpoint_3",
+      "instruction_sha256": "3ab5a5b12908edb50a7eaf71976d6fe64ddd68d11b9e0c8b4cae6a317fcf7d53",
+      "test_files": [
+        "test_checkpoint_1.py",
+        "test_checkpoint_2.py",
+        "test_checkpoint_3.py"
+      ]
+    },
+    {
+      "name": "checkpoint_4",
+      "checkpoint": "checkpoint_4",
+      "instruction_sha256": "0130eba7df4ca4b77c2b907ef85f52f9e4e77557af895e1730ea2bb5ef7c95f4",
+      "test_files": [
+        "test_checkpoint_1.py",
+        "test_checkpoint_2.py",
+        "test_checkpoint_3.py",
+        "test_checkpoint_4.py"
+      ]
+    },
+    {
+      "name": "checkpoint_5",
+      "checkpoint": "checkpoint_5",
+      "instruction_sha256": "902787feff9da8fcee9bac953c762e7aae7843ee72f1d13b79780702a9fda6ad",
+      "test_files": [
+        "test_checkpoint_5.py"
+      ]
+    }
+  ],
+  "source": {
+    "dataset": "scb",
+    "url": "https://github.com/gabeorlanski/scb-problems",
+    "commit": "38d627ecf668a88f88f8d260f8df8df6116e9b03",
+    "problem": "metric_transform_lang",
+    "checkpoint_selection": null,
+    "problem_tree": "00b8441c3eec7219ffd78d791922226ffc239537",
+    "converter_tree": "4475c907ab812bdec61885f24e41f5a634b927ee",
+    "conversion_overrides": "733c1bef9ee8d233639a34439e67232bf5e445e8",
+    "converted_task_sha256": "e6929412769f500fffff890b1e150b5362544757892a34da5a0b73bc32912746"
+  },
+  "pack": {
+    "id": "python",
+    "version": 1,
+    "image": "raidar/pack-python:2b91a52663e099f2"
+  },
+  "task_sha256": "262ba12dff357d1c48d1189ceb78902e4bae41272deac1640591720d1fb8b99d",
+  "bundle_sha256": "326819ed14a3560b2ce8247f838ae3219762c279edbca33a1f7eca099ac809e3",
+  "references_sha256": "eee76f5b413e59038cca6f92201bbad977a3b54f98a86ca9d94f7c248e457ca6",
+  "entry_file": "mtl.py",
+  "entry_command": "uv run --project /app mtl.py",
+  "dependencies": {
+    "policy": "declared-wheels/1",
+    "resolver": "uv@0.10.0",
+    "index": "https://pypi.org/simple",
+    "python": "3.12",
+    "platforms": [
+      "x86_64-manylinux_2_28",
+      "aarch64-manylinux_2_28"
+    ],
+    "exclude_newer": "2026-10-27T21:20:31Z",
+    "sets": {
+      "21a0dc50e266e366e6f8286867d43db0ade4265f9ced0bcdaac920073344b8b0": {
+        "requirements": [
+          "coverage==7.13.4",
+          "pytest-timeout==2.4.0",
+          "pytest==9.0.3",
+          "pyyaml"
+        ],
+        "amd64": "a77dfbf1191afcf1dfbfcb3a80747c3c677192363225f8f03848589e649311f9",
+        "arm64": "53dd33f0cbe0c1afaa43c2f4d66f5d8d84e010cff6b6e2204d4ae1fc1ff837d6"
+      },
+      "2b01214d32c382dbc73bf6b493bedb7926324af27bad3ee888f66774b9b114c8": {
+        "requirements": [
+          "pytest"
+        ],
+        "amd64": "6a13eeb880a366d0eed7608872604ee3a96579f38243ca5737306e19e8e1a94d",
+        "arm64": "6a13eeb880a366d0eed7608872604ee3a96579f38243ca5737306e19e8e1a94d"
+      },
+      "5ff2b31a34234a8571dd3592afb821bedb94a9942ac20bdddb9d7aee3c3ed0c9": {
+        "requirements": [
+          "pyarrow",
+          "pytest",
+          "pyyaml"
+        ],
+        "amd64": "64bea4c168f91f3f373d9c60c7ee60d3d0e10827e68ed62c23920170674491ff",
+        "arm64": "0767e68ee0cadb9f748f1f53a57f920c63407100d5d0c661284c3958ca6e48a6"
+      },
+      "adb4e227e2c8c84a0b4e8cdc82a73a13d00e22c8a30986aa46d59db4717e000a": {
+        "requirements": [
+          "pyarrow",
+          "pytest"
+        ],
+        "amd64": "15f86224fdcb89373a8fd6f589bc046cabd0cf7600413bffab588aacc3b98f8b",
+        "arm64": "f9f8506475b97bdda8314a572686911bba663590489e030ed886f1419318fe24"
+      },
+      "ebb0e16545c911bd31ec33ace57dedf84c04e673d2dc28c0290868e4adf4db77": {
+        "requirements": [
+          "pyyaml"
+        ],
+        "amd64": "ed3d8a573431b4bb098772f5160a62fa9b193ae63e3776c1fc0b91cb183b7f2b",
+        "arm64": "46c4ebdbacb253ad341e78f7b689b2c3b13184f12621f8092e18d8e71a5177ec"
+      }
+    },
+    "steps": {
+      "checkpoint_1": "2b01214d32c382dbc73bf6b493bedb7926324af27bad3ee888f66774b9b114c8",
+      "checkpoint_2": "2b01214d32c382dbc73bf6b493bedb7926324af27bad3ee888f66774b9b114c8",
+      "checkpoint_3": "adb4e227e2c8c84a0b4e8cdc82a73a13d00e22c8a30986aa46d59db4717e000a",
+      "checkpoint_4": "5ff2b31a34234a8571dd3592afb821bedb94a9942ac20bdddb9d7aee3c3ed0c9",
+      "checkpoint_5": "5ff2b31a34234a8571dd3592afb821bedb94a9942ac20bdddb9d7aee3c3ed0c9"
+    },
+    "seed": "ebb0e16545c911bd31ec33ace57dedf84c04e673d2dc28c0290868e4adf4db77",
+    "grader": "21a0dc50e266e366e6f8286867d43db0ade4265f9ced0bcdaac920073344b8b0"
+  }
+}

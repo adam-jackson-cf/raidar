@@ -1,4 +1,4 @@
-"""``resource-usage@3`` scorer (plan G4) and the ATIF trajectory reader it shares."""
+"""``resource-usage@4`` scorer (plan G4) and the ATIF trajectory reader it shares."""
 
 from raidar.scoring.resource_usage.scorer import ResourceUsageScorer, resource_usage_scorer
 

@@ -75,14 +75,14 @@ CORRECTNESS_METRIC = "correctness"
 SOLVE_RATE = "solve_rate"
 REACHED = "reached"
 FINAL_SOLVED = "final_solved"
-# Errata-applied solve outcomes (``correctness@4`` ``*_errata`` metrics): the same rules
+# Errata-applied solve outcomes (``correctness@5`` ``*_errata`` metrics): the same rules
 # over the cases the problem's pinned errata keeps. Primary only when the experiment
 # pre-registers one (``analysis.primary_outcome``), and then always reported beside its
 # raw counterpart (``RAW_COUNTERPART``); ``not_applicable`` for a problem without an errata.
 SOLVE_RATE_ERRATA = "solve_rate_errata"
 REACHED_ERRATA = "reached_errata"
 FINAL_SOLVED_ERRATA = "final_solved_errata"
-# Solvable-set solve outcomes (``correctness@4`` ``*_solvable`` metrics): the same rules over
+# Solvable-set solve outcomes (``correctness@5`` ``*_solvable`` metrics): the same rules over
 # the cases the reference solution passes in every validation repeat. The default primary;
 # ``unavailable`` (never zero) for a problem whose lock pins no solvable set.
 SOLVE_RATE_SOLVABLE = "solve_rate_solvable"
@@ -347,7 +347,7 @@ _GATE_OUTCOMES: tuple[tuple[str, str, float], ...] = (
         "wall time of the fix sessions whose refusal included the coverage minimum",
         60.0,
     ),
-    # gate-effort@12: the autofix counts each step's own work added (they compare across gate
+    # gate-effort@13: the autofix counts each step's own work added (they compare across gate
     # modes; a shadow gate's total_autofix_* re-count its never-fixed tree at every step).
     (
         "total_new_autofix_lines_changed",
@@ -448,12 +448,12 @@ ALL_METRICS = (*OUTCOME_METRICS, *GATE_METRICS, *PROCESS_METRICS)
 VERIFIER_PREFIX = "verifier."
 """Verifier diagnostics: described per arm, never compared (no verdict, no effect)."""
 VERIFIER_DISAGREEMENTS = f"{VERIFIER_PREFIX}grading_coverage_disagreements"
-VERIFIER_DISAGREEMENT_SOURCE = "code-quality@5"
+VERIFIER_DISAGREEMENT_SOURCE = "code-quality@6"
 VERIFIER_METRICS: tuple[MetricDef, ...] = (
     MetricDef(
         VERIFIER_DISAGREEMENTS,
         "Verifier: grader cases whose outcome differed between the grading run and the "
-        "coverage run, summed over a trial's transitions (code-quality@5 "
+        "coverage run, summed over a trial's transitions (code-quality@6 "
         "regression_parity_excluded_cases; diagnostic, never an outcome)",
         View.QUALITY,
         Direction.NEUTRAL,

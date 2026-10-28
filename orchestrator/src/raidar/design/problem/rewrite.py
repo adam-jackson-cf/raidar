@@ -26,6 +26,7 @@ import shutil
 import stat
 from pathlib import Path
 
+import yaml
 from harbor.models.task.config import ArtifactConfig, TaskConfig, VerifierEnvironmentMode
 from harbor.models.task.task import Task
 
@@ -40,6 +41,7 @@ from raidar.grading.bundle import (
     write_bundle,
 )
 from raidar.grading.sandbox import CONTAINER_LAYOUT
+from raidar.subject.environment.python.image import image_tag
 from raidar.subject.environment.python.pack_definition import PackSpec
 from raidar.subject.environment.python.task import bind_task_environment
 
@@ -123,6 +125,20 @@ def render_spec(markdown: str, *, entry_command: str | None, entry_file: str | N
     return markdown
 
 
+def problem_entry_file(problem_dir: Path, pack: PackSpec) -> str | None:
+    """The problem's ``config.yaml`` ``entry_file`` in the pack's snapshot-file format."""
+    config = yaml.safe_load((problem_dir / "config.yaml").read_text())
+    raw = config.get("entry_file") if isinstance(config, dict) else None
+    if raw is None:
+        return None
+    if not isinstance(raw, str):
+        raise RewriteError(f"{problem_dir.name}/config.yaml: entry_file must be a string")
+    try:
+        return pack.entry_file(raw)
+    except ValueError as exc:
+        raise RewriteError(f"{problem_dir.name}/config.yaml: {exc}") from exc
+
+
 def checkpoint_specs(
     problem_dir: Path, steps: list[str], *, entry_command: str | None, entry_file: str | None
 ) -> dict[str, str]:
@@ -184,7 +200,7 @@ def build_bundle(
     *,
     problem: ProblemId,
     steps: list[str],
-    pack_image: str,
+    pack: PackSpec,
     source: dict[str, str],
     entry_file: str | None = None,
 ) -> VerifierBundle:
@@ -199,7 +215,7 @@ def build_bundle(
             source=derived.source,
             env=derived.env,
             grader=GraderSpec(
-                base_image=pack_image, test_dependencies=derived.grader.test_dependencies
+                base_image=image_tag(pack), test_dependencies=derived.grader.test_dependencies
             ),
             steps=tuple(staged.step(name) for name in steps),
             entry_file=entry_file,

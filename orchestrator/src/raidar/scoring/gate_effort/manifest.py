@@ -31,7 +31,7 @@ from raidar.scoring.gate_effort.metrics import (
 
 GATE_EFFORT = ScorerManifest(
     id="gate-effort",
-    version="12",
+    version="13",
     description=(
         "Effort a guardrail-gate commit gate cost per step, the gate's tests check and "
         "the fix rounds' correctness (a failed tests check counted once, "

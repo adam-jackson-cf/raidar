@@ -83,7 +83,7 @@ def _scorer_resolvers(implementation: str) -> ResolverSet:
     problem, agent, workflow, _ = fixture_resolvers()
     scorer = InMemoryResolver(
         RefKind.SCORER,
-        {"correctness@4": {"implementation_digest": implementation}},
+        {"correctness@5": {"implementation_digest": implementation}},
         tool_versions={"pytest": "8.4.1"},
     )
     return ResolverSet([problem, agent, workflow, scorer, MetricResolver()], entry_point_group=None)
@@ -212,7 +212,7 @@ def test_mixed_k_without_declared_policy_is_rejected(tmp_path: Path) -> None:
 
 def test_every_gap_is_reported_and_nothing_is_skipped(tmp_path: Path) -> None:
     document = experiment_document()
-    document["assessment"]["scorers"] = ["correctness@4", "jev@2"]
+    document["assessment"]["scorers"] = ["correctness@5", "jev@2"]
     path = write_experiment(tmp_path, document)
     _, agent, workflow, _ = fixture_resolvers()
     resolvers = ResolverSet(
@@ -220,7 +220,7 @@ def test_every_gap_is_reported_and_nothing_is_skipped(tmp_path: Path) -> None:
             InMemoryResolver(RefKind.PROBLEM, {"scb/forge@abc123": {"checkpoints": 0}}),
             agent,
             workflow,
-            InMemoryResolver(RefKind.SCORER, {"correctness@4": {}}),
+            InMemoryResolver(RefKind.SCORER, {"correctness@5": {}}),
         ],
         entry_point_group=None,
     )
@@ -330,7 +330,7 @@ def test_entry_point_resolvers_load_lazily_by_kind(monkeypatch: pytest.MonkeyPat
 
     def scorer_factory() -> InMemoryResolver:
         loaded.append("scorer")
-        return InMemoryResolver(RefKind.SCORER, {"correctness@4": {}})
+        return InMemoryResolver(RefKind.SCORER, {"correctness@5": {}})
 
     monkeypatch.setattr(
         "raidar.contract.references.entry_points",

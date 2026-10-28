@@ -110,7 +110,7 @@ def test_composite_is_the_headline_policy_score_over_one_hundred(
         if run.unscored:
             continue
         detail = _detail(projection, run.id)
-        quality = _span(detail, "scorer:code-quality@5")
+        quality = _span(detail, "scorer:code-quality@6")
         scoring = _span(detail, "scoring")
         components = {
             "C": Decimal(str(run.diagnostic_score)),
@@ -484,7 +484,7 @@ def test_following_the_unassessed_hint_stores_the_assessment_the_review_finds(
     config = job_dir / "assessment-config.yaml"
     config.write_text(
         config.read_text().replace(
-            "scorers: {}", "scorers:\n  correctness@4:\n    progression: continue"
+            "scorers: {}", "scorers:\n  correctness@5:\n    progression: continue"
         )
     )
     runs, store = tmp_path / "jobs", tmp_path / "store"
@@ -492,30 +492,30 @@ def test_following_the_unassessed_hint_stores_the_assessment_the_review_finds(
     [hint] = [
         reason
         for reason in _detail(before, PASSING).run.unscored_reasons
-        if "correctness@4" in reason and "raidar assess" in reason
+        if "correctness@5" in reason and "raidar assess" in reason
     ]
     command = hint.split("`")[1].replace("<store>", str(store)).split()
     result = CliRunner().invoke(assess, command[2:])
     assert result.exit_code == 0, result.output
     after = merge_review_projections(job_roots=[runs], stores=[store])
     scoring = _span(_detail(after, PASSING), "scoring")
-    assert "correctness@4" in scoring["assessments"]
-    assert "correctness@4" not in scoring["not_assessed"]
+    assert "correctness@5" in scoring["assessments"]
+    assert "correctness@5" not in scoring["not_assessed"]
 
 
 def test_a_headline_scorer_the_experiment_never_declared_is_named_not_unassessed() -> None:
     from raidar.evaluation.review.projection.assessments import TrialAssessments
     from raidar.evaluation.review.projection.headline import UNDECLARED_MARKER, headline
 
-    missing = TrialAssessments(missing={"correctness@4": "no stored Assessment"})
+    missing = TrialAssessments(missing={"correctness@5": "no stored Assessment"})
     one = ("checkpoint_1",)
-    result = headline("scb-canonical-oneshot@1", one, missing, declared=["correctness@4"])
+    result = headline("scb-canonical-oneshot@1", one, missing, declared=["correctness@5"])
     assert result.composite is None
     (reason,) = result.reasons
-    assert "needs code-quality@5" in reason
+    assert "needs code-quality@6" in reason
     assert UNDECLARED_MARKER in reason
     declared = headline(
-        "scb-canonical-oneshot@1", one, missing, declared=["correctness@4", "code-quality@5"]
+        "scb-canonical-oneshot@1", one, missing, declared=["correctness@5", "code-quality@6"]
     )
     assert all("unassessed" in reason for reason in declared.reasons)
 

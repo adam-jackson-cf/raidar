@@ -5,12 +5,12 @@ from __future__ import annotations
 from collections.abc import Iterable, Sequence
 
 from raidar.evaluation.analysis.curves import Band, Curve
+from raidar.evaluation.analysis.dependencies import READINGS, ReadingShare
 from raidar.evaluation.analysis.effects import Effect, Exclusions, IntervalOut
 from raidar.evaluation.analysis.gate_effort import GateDescriptive
 from raidar.evaluation.analysis.manipulation import ManipulationReport
 from raidar.evaluation.analysis.ranking import Ranking, RankingRow
 from raidar.evaluation.analysis.report import AnalysisReport, ArmSummary, Comparison
-from raidar.evaluation.analysis.stats import confidence_label
 from raidar.scoring.catalog.outcomes import (
     ALL_METRICS,
     CROSS_MODE_CUMULATIVE,
@@ -341,11 +341,57 @@ def _verifier_arms(report: AnalysisReport) -> list[str]:
         "## Verifier sensitivity (diagnostic; never an outcome)",
         "",
         "Grader cases whose outcome differed between the grading run and the coverage run, "
-        "per trial (code-quality@5 regression_parity_excluded_cases, summed). Correctness "
+        "per trial (code-quality@6 regression_parity_excluded_cases, summed). Correctness "
         "and the solve rates read the grading run's verdict; G leaves such cases out.",
         "",
         *_table(("Metric", "Better", *(arm.arm for arm in arms)), rows),
         *_sensitivity_notes(report),
+    ]
+
+
+def _share_cell(share: ReadingShare) -> str:
+    if share.share is None:
+        return f"{MISSING} (0 measured; {share.unmeasured} unmeasured)"
+    cell = f"{share.share:.0%} ({share.affected}/{share.measured})"
+    if share.unmeasured:
+        cell += f"; {share.unmeasured} unmeasured"
+    if share.heuristic:
+        cell += f"; {share.heuristic} by name match only"
+    return cell
+
+
+def _failed_cell(share: ReadingShare) -> str:
+    if not share.affected:
+        return "0 affected" if share.measured else MISSING
+    return f"{share.solvable_failed}/{share.solvable_judged} judged ({share.affected} affected)"
+
+
+def _dependency_arms(report: AnalysisReport) -> list[str]:
+    """Per arm, the share of steps with an unprovided package or an undeclared import."""
+    arms = [arm for arm in report.arms if arm.dependencies is not None]
+    if not arms:
+        return []
+    rows = []
+    for reading in READINGS:
+        shares = [(arm.dependencies or {})[reading] for arm in arms]
+        rows.append([f"{reading}: affected steps", *(_share_cell(s) for s in shares)])
+        rows.append([f"{reading}: solvable failed in them", *(_failed_cell(s) for s in shares)])
+    return [
+        "",
+        "## Dependency readings (instrument; never an outcome)",
+        "",
+        "Share of attempted steps, over each arm's valid trials, in which a declared "
+        "requirement could not be provided to the grader (`unprovided`) or the grader log shows "
+        "a `ModuleNotFoundError` for a non-stdlib, non-local module (`undeclared_import`). "
+        "Raidar has no distribution-to-import metadata, so unless nothing at all was declared "
+        'that match is by name only (counted as "by name match only"): an import name can '
+        "differ from its distribution's name, so the module is reported, not a distribution. "
+        "A step without "
+        "evidence is unmeasured, never unaffected. Solvable failed: affected steps whose "
+        "solvable set did not pass, over affected steps that have that verdict; a failure there "
+        "is not attributed to the reading. Readings never invalidate a trial.",
+        "",
+        *_table(("Reading", *(arm.arm for arm in arms)), rows),
     ]
 
 
@@ -448,7 +494,7 @@ def _primary_lines(comparison: Comparison) -> list[str]:
 def _comparison(comparison: Comparison, confidence: float) -> list[str]:
     header = (
         "Metric", "Better", "View", "Problem", "n", "Baseline", "Treatment", "Δ",
-        f"{confidence_label(confidence)} CI",
+        f"{round(confidence * 100, 4):g}% CI",
         "Verdict", "Excluded", "Cost Δ USD",
     )  # fmt: skip
     lines = [
@@ -679,11 +725,13 @@ def render_markdown(report: AnalysisReport) -> str:
     lines.extend(_solvable_lines(report))
     lines.extend(_errata_lines(report))
     lines.extend(_pooling_lines(report))
+    lines.extend(f"> **Warning:** {warning}" for warning in report.dependency_warnings)
     header = (
         "Arm", "Planned", "Run", "Valid", "Infra error", "Not run",
         "Mean cost USD", "Mean tokens", "Mean agent s",
     )  # fmt: skip
     lines += ["", "## Arms", "", *_table(header, (_arm_row(arm) for arm in report.arms))]
+    lines.extend(_dependency_arms(report))
     lines.extend(_gate_arms(report))
     lines.extend(_process_arms(report))
     lines.extend(_verifier_arms(report))

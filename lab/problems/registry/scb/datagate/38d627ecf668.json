@@ -1,0 +1,171 @@
+{
+  "kind": "raidar-problem",
+  "schema_version": 1,
+  "ref": "scb/datagate@38d627ecf668",
+  "mode": "multi_checkpoint",
+  "checkpoints": 7,
+  "steps": [
+    {
+      "name": "checkpoint_1",
+      "checkpoint": "checkpoint_1",
+      "instruction_sha256": "f27ee26b66850095abdc2ee344ab544210142da33149ded7322ab8080bcac892",
+      "test_files": [
+        "test_checkpoint_1.py"
+      ]
+    },
+    {
+      "name": "checkpoint_2",
+      "checkpoint": "checkpoint_2",
+      "instruction_sha256": "fa0aab9fe0ebfca78c5b6491cda5baf9f44df9a312715c5c9b6495ca31c12b17",
+      "test_files": [
+        "test_checkpoint_1.py",
+        "test_checkpoint_2.py"
+      ]
+    },
+    {
+      "name": "checkpoint_3",
+      "checkpoint": "checkpoint_3",
+      "instruction_sha256": "9a52bcb109ac3488da8862b8a150fcc451495cef7e3f48a5a30580a804db8336",
+      "test_files": [
+        "test_checkpoint_1.py",
+        "test_checkpoint_2.py",
+        "test_checkpoint_3.py"
+      ]
+    },
+    {
+      "name": "checkpoint_4",
+      "checkpoint": "checkpoint_4",
+      "instruction_sha256": "cb8ffc672cadaa9359a2bbf59b2fa343ceba0879a489f01fc3c841baa6d13978",
+      "test_files": [
+        "test_checkpoint_1.py",
+        "test_checkpoint_2.py",
+        "test_checkpoint_3.py",
+        "test_checkpoint_4.py"
+      ]
+    },
+    {
+      "name": "checkpoint_5",
+      "checkpoint": "checkpoint_5",
+      "instruction_sha256": "3d83909b2974bd687790358e60ebfd3745eee6038522ab7bff93e775e11ac2a7",
+      "test_files": [
+        "test_checkpoint_1.py",
+        "test_checkpoint_2.py",
+        "test_checkpoint_3.py",
+        "test_checkpoint_4.py",
+        "test_checkpoint_5.py"
+      ]
+    },
+    {
+      "name": "checkpoint_6",
+      "checkpoint": "checkpoint_6",
+      "instruction_sha256": "b536cfe53787ee3c99084ceadb6150e76d3bfcff88c643598f16dfa46a798a2b",
+      "test_files": [
+        "test_checkpoint_1.py",
+        "test_checkpoint_2.py",
+        "test_checkpoint_3.py",
+        "test_checkpoint_4.py",
+        "test_checkpoint_5.py",
+        "test_checkpoint_6.py"
+      ]
+    },
+    {
+      "name": "checkpoint_7",
+      "checkpoint": "checkpoint_7",
+      "instruction_sha256": "97756dcb8b56f19a2b5a8b98474791559c7370bfc4f1fd1bbcff37f6a27aeef9",
+      "test_files": [
+        "test_checkpoint_1.py",
+        "test_checkpoint_2.py",
+        "test_checkpoint_3.py",
+        "test_checkpoint_4.py",
+        "test_checkpoint_5.py",
+        "test_checkpoint_6.py",
+        "test_checkpoint_7.py"
+      ]
+    }
+  ],
+  "source": {
+    "dataset": "scb",
+    "url": "https://github.com/gabeorlanski/scb-problems",
+    "commit": "38d627ecf668a88f88f8d260f8df8df6116e9b03",
+    "problem": "datagate",
+    "checkpoint_selection": null,
+    "problem_tree": "04d666a1cd3cf6df71ebd3e22b8eed13d8a1555e",
+    "converter_tree": "4475c907ab812bdec61885f24e41f5a634b927ee",
+    "conversion_overrides": "733c1bef9ee8d233639a34439e67232bf5e445e8",
+    "converted_task_sha256": "f17ea86a1da8c015ee5639fdf6acb61e7d9e7d6aac3d4c5c5c304e4e230047ee"
+  },
+  "pack": {
+    "id": "python",
+    "version": 1,
+    "image": "raidar/pack-python:2b91a52663e099f2"
+  },
+  "task_sha256": "a37f0243af42ecda8f186045282e7016ee9f86646be52c107738c63787bd0875",
+  "bundle_sha256": "7a7040749f965436966b5d2052618be1c1ee6e6e30f30a5232788419b3fb3d5b",
+  "references_sha256": "5f05cb33d22ea1dc2949993f3a3d04b504d0b384404bb8a33120429b54773bc9",
+  "entry_file": "datagate.py",
+  "entry_command": "uv run --project /app datagate.py",
+  "dependencies": {
+    "policy": "declared-wheels/1",
+    "resolver": "uv@0.10.0",
+    "index": "https://pypi.org/simple",
+    "python": "3.12",
+    "platforms": [
+      "x86_64-manylinux_2_28",
+      "aarch64-manylinux_2_28"
+    ],
+    "exclude_newer": "2026-10-27T21:20:05Z",
+    "sets": {
+      "02cf5c8c6762470fded9c5da9069ecb6fe34d32c595b77d312eaeb1281c387d9": {
+        "requirements": [
+          "coverage==7.13.4",
+          "httpx",
+          "pytest-timeout==2.4.0",
+          "pytest==9.0.3",
+          "pyyaml"
+        ],
+        "amd64": "3f70d86ed80a299d1570f1e82b1e5118bb81f18e3429c5be0c5ec66725ccadd6",
+        "arm64": "b59014c6818a1cab1c01482eed7bbe08bd0f8674bda3d77987df9bf26a1a6430"
+      },
+      "7304a644b3d72b75c24e6fd0528fa07a9a69b64fc9ee08881cf5ec5c3c48075d": {
+        "requirements": [
+          "httpx",
+          "pyyaml"
+        ],
+        "amd64": "ec280efbf6094423eb0c0dab538f2588c2a751f1493ecf5346b3b8a76cf6901a",
+        "arm64": "411ba9f90dc1dbea5bf4e204f0ae1e500d1be3b49300d03218fc705d77e8b925"
+      },
+      "8d2b2481ed7877df4758559ac0558a0113ffe97e6e92811df56cee6012b13ad1": {
+        "requirements": [
+          "charset-normalizer>=3.3.0",
+          "flask>=3.0.0",
+          "httpx>=0.28.0"
+        ],
+        "amd64": "b998073e18b0a0d578450d7350b59441a99861cb56bbbacd293e84540dd228cd",
+        "arm64": "813cfbf35244b5132698a1832a207ffc90431ed6cfa0be7e335b93f70ded26dd"
+      },
+      "9cf27c5ca314a4435b252617f9997dbab6083f01ae6c6fe04d260b50ab99c516": {
+        "requirements": [
+          "charset-normalizer>=3.3.0",
+          "flask>=3.0.0",
+          "httpx>=0.28.0",
+          "openpyxl>=3.1.0",
+          "pandas>=2.2.0",
+          "xlrd>=2.0.1"
+        ],
+        "amd64": "cae2b186708557e4f3b87c75c708a2769fc7d6f07e55c57d3b70e53b7421f4c1",
+        "arm64": "89600c0a94f0a82eb95528aae104717b6c696a7d377756cf044421fb6a3105de"
+      }
+    },
+    "steps": {
+      "checkpoint_1": "8d2b2481ed7877df4758559ac0558a0113ffe97e6e92811df56cee6012b13ad1",
+      "checkpoint_2": "8d2b2481ed7877df4758559ac0558a0113ffe97e6e92811df56cee6012b13ad1",
+      "checkpoint_3": "8d2b2481ed7877df4758559ac0558a0113ffe97e6e92811df56cee6012b13ad1",
+      "checkpoint_4": "9cf27c5ca314a4435b252617f9997dbab6083f01ae6c6fe04d260b50ab99c516",
+      "checkpoint_5": "9cf27c5ca314a4435b252617f9997dbab6083f01ae6c6fe04d260b50ab99c516",
+      "checkpoint_6": "9cf27c5ca314a4435b252617f9997dbab6083f01ae6c6fe04d260b50ab99c516",
+      "checkpoint_7": "9cf27c5ca314a4435b252617f9997dbab6083f01ae6c6fe04d260b50ab99c516"
+    },
+    "seed": "7304a644b3d72b75c24e6fd0528fa07a9a69b64fc9ee08881cf5ec5c3c48075d",
+    "grader": "02cf5c8c6762470fded9c5da9069ecb6fe34d32c595b77d312eaeb1281c387d9"
+  }
+}

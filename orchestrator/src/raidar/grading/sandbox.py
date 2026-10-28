@@ -41,6 +41,8 @@ from raidar.grading.bundle import (
     VerifierBundle,
     VerifierStepSpec,
 )
+from raidar.grading.closure import ClosureImage, docker_arch, ensure_closure_image
+from raidar.grading.dependency_pins import lock_sha256
 from raidar.judge.secrets import absence_evidence, require_key_absent
 
 RUNTIME_DIR = Path(__file__).resolve().parent / "runtime"
@@ -91,6 +93,7 @@ class SandboxRun:
     timeout_s: float
     cpus: float
     memory_mb: int
+    image: str | None = None
 
 
 @dataclass(frozen=True)
@@ -106,7 +109,9 @@ class GradingSandbox(Protocol):
 
     async def environment_id(self) -> str: ...
 
-    async def marker_environment(self) -> dict[str, str]: ...
+    async def target_arch(self) -> str: ...
+
+    async def closure_image(self, lock_text: str) -> ClosureImage: ...
 
     async def run(self, run: SandboxRun) -> SandboxResult: ...
 
@@ -171,6 +176,7 @@ def sandbox_env(
     env.update(
         {
             "PYTHONPATH": ":".join((layout.runtime, *python_path)),
+            "RAIDAR_SUBMISSION_DEPS": ":".join(python_path),
             "PYTHONDONTWRITEBYTECODE": "1",
             "HOME": f"{layout.scratch}/home",
             "UV_CACHE_DIR": f"{layout.scratch}/uv-cache",
@@ -247,7 +253,7 @@ class DockerCopySandbox:
         argv += ["-w", self.layout.app]
         for key, value in sorted(run.env.items()):
             argv += ["-e", f"{key}={value}"]
-        return [*argv, self.image, *run.argv]
+        return [*argv, run.image or self.image, *run.argv]
 
     async def environment_id(self) -> str:
         code, output = await self._exec(
@@ -258,42 +264,20 @@ class DockerCopySandbox:
             raise RuntimeError(f"grader image {self.image} is not available: {text}")
         return text
 
-    async def marker_environment(self) -> dict[str, str]:
-        """PEP 508 facts from the actual submission interpreter on the Docker target."""
-        probe = (
-            "import json,os,platform,sys; v=sys.implementation.version; "
-            "iv='.'.join(map(str,v[:3])); "
-            "iv+=v.releaselevel[0]+str(v.serial) if v.releaselevel!='final' else ''; "
-            "print(json.dumps(dict(implementation_name=sys.implementation.name,implementation_version=iv,"
-            "os_name=os.name,platform_machine=platform.machine(),platform_release=platform.release(),"
-            "platform_system=platform.system(),platform_version=platform.version(),"
-            "python_full_version=platform.python_version(),platform_python_implementation=platform.python_implementation(),"
-            "python_version='.'.join(platform.python_version_tuple()[:2]),sys_platform=sys.platform)))"
+    async def target_arch(self) -> str:
+        """The Docker target's architecture as a pin arch (``amd64`` or ``arm64``)."""
+        return await docker_arch(self.docker_bin, self.docker_context)
+
+    async def closure_image(self, lock_text: str) -> ClosureImage:
+        """The grader image plus the lock's closure layer (built once per base and lock)."""
+        return await ensure_closure_image(
+            self.image,
+            lock_text,
+            lock_sha256(lock_text),
+            docker_context=self.docker_context,
+            docker_bin=self.docker_bin,
+            python=SUBMISSION_PYTHON,
         )
-        code, output = await self._exec(
-            self._docker(
-                "run",
-                "--rm",
-                "--network",
-                "none",
-                "--user",
-                SANDBOX_USER,
-                "--cap-drop",
-                "ALL",
-                "--security-opt",
-                "no-new-privileges",
-                "--label",
-                GRADER_ROLE_LABEL,
-                self.image,
-                SUBMISSION_PYTHON,
-                SAFE_PATH_FLAG,
-                "-c",
-                probe,
-            )
-        )
-        if code != 0:
-            raise RuntimeError("could not probe the submission interpreter's marker environment")
-        return json.loads(output)
 
     async def _exec(
         self, argv: list[str], *, stdin: IO[bytes] | None = None, stdout: IO[bytes] | None = None

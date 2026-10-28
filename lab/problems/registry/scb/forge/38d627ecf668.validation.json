@@ -39,8 +39,8 @@
   "environment": {
     "docker_context": "raidar-mbp",
     "engine": "direct",
-    "grader_environment_id": "sha256:874d2b90b9adadca5aae0958053763e32c961f56990fcb952b2ed02a015ef9bf",
-    "grader_image": "raidar-oracle-grader:76fabb7fb4f407d7",
+    "grader_environment_id": "sha256:715698bfd52661aa5627a3a9d22ea24db40b3716e5d78c6c8793976055973c06",
+    "grader_image": "raidar-oracle-grader:963c14e63ff5e15d",
     "harbor": "0.23.0",
     "pack_image": "raidar/pack-python:2b91a52663e099f2"
   },
@@ -1266,7 +1266,7 @@
     "selection": "default_by_k"
   },
   "kind": "raidar-problem-validation",
-  "manifest_sha256": "b642041b7e34697a26fdfdb392e5df6c309a9e92784b4ee79eb57df9d6587255",
+  "manifest_sha256": "e710fc7da3e363605e9b0b78cd45eb8bdf6dbe87295a2707b36d013763341dfb",
   "mode": "multi_checkpoint",
   "not_run": [
     "native_parity_positive",

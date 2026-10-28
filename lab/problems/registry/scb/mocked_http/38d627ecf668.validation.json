@@ -1,0 +1,2441 @@
+{
+  "checks": [
+    {
+      "detail": [],
+      "name": "solvable_set",
+      "status": "pass"
+    },
+    {
+      "detail": [
+        "repeat 0 checkpoint_2: 55/55 (expected at least one failure)",
+        "repeat 0 checkpoint_3: 77/77 (expected at least one failure)",
+        "repeat 0 checkpoint_4: 99/99 (expected at least one failure)",
+        "repeat 0 checkpoint_5: 114/114 (expected at least one failure)",
+        "repeat 0 checkpoint_6: 141/141 (expected at least one failure)",
+        "repeat 1 checkpoint_2: 55/55 (expected at least one failure)",
+        "repeat 1 checkpoint_3: 77/77 (expected at least one failure)",
+        "repeat 1 checkpoint_4: 99/99 (expected at least one failure)",
+        "repeat 1 checkpoint_5: 114/114 (expected at least one failure)",
+        "repeat 1 checkpoint_6: 141/141 (expected at least one failure)",
+        "repeat 2 checkpoint_2: 55/55 (expected at least one failure)",
+        "repeat 2 checkpoint_3: 77/77 (expected at least one failure)",
+        "repeat 2 checkpoint_4: 99/99 (expected at least one failure)",
+        "repeat 2 checkpoint_5: 114/114 (expected at least one failure)",
+        "repeat 2 checkpoint_6: 141/141 (expected at least one failure)"
+      ],
+      "name": "reference_k-1_fails_k",
+      "status": "fail"
+    },
+    {
+      "detail": [],
+      "name": "repeat_identical_positive",
+      "status": "pass"
+    },
+    {
+      "detail": [],
+      "name": "repeat_identical_negative",
+      "status": "pass"
+    },
+    {
+      "detail": [
+        "native runner not run"
+      ],
+      "name": "native_parity_positive",
+      "status": "not_run"
+    },
+    {
+      "detail": [
+        "native runner not run"
+      ],
+      "name": "native_parity_negative",
+      "status": "not_run"
+    }
+  ],
+  "engine": "direct",
+  "environment": {
+    "docker_context": "raidar-mbp",
+    "engine": "direct",
+    "grader_environment_id": "sha256:8d2eff839ddd483904c171ccc861f7a6c7c35339936cc7ae870fffaf6cdbaea3",
+    "grader_image": "raidar-oracle-grader:2cf4f359dd32f0b6",
+    "harbor": "0.23.0",
+    "pack_image": "raidar/pack-python:2b91a52663e099f2"
+  },
+  "grades": {
+    "native": null,
+    "oracle": {
+      "negative": [
+        {
+          "checkpoint_1": {
+            "all_pass": false,
+            "groups": {
+              "core": [
+                0,
+                3
+              ],
+              "error": [
+                2,
+                2
+              ],
+              "functionality": [
+                0,
+                24
+              ],
+              "regression": [
+                0,
+                0
+              ]
+            },
+            "infra_failure": null,
+            "passed": 2,
+            "total": 29
+          },
+          "checkpoint_2": {
+            "all_pass": true,
+            "groups": {
+              "core": [
+                8,
+                8
+              ],
+              "error": [
+                3,
+                3
+              ],
+              "functionality": [
+                15,
+                15
+              ],
+              "regression": [
+                29,
+                29
+              ]
+            },
+            "infra_failure": null,
+            "passed": 55,
+            "total": 55
+          },
+          "checkpoint_3": {
+            "all_pass": true,
+            "groups": {
+              "core": [
+                2,
+                2
+              ],
+              "error": [
+                2,
+                2
+              ],
+              "functionality": [
+                18,
+                18
+              ],
+              "regression": [
+                55,
+                55
+              ]
+            },
+            "infra_failure": null,
+            "passed": 77,
+            "total": 77
+          },
+          "checkpoint_4": {
+            "all_pass": true,
+            "groups": {
+              "core": [
+                4,
+                4
+              ],
+              "error": [
+                6,
+                6
+              ],
+              "functionality": [
+                12,
+                12
+              ],
+              "regression": [
+                77,
+                77
+              ]
+            },
+            "infra_failure": null,
+            "passed": 99,
+            "total": 99
+          },
+          "checkpoint_5": {
+            "all_pass": true,
+            "groups": {
+              "core": [
+                4,
+                4
+              ],
+              "error": [
+                5,
+                5
+              ],
+              "functionality": [
+                6,
+                6
+              ],
+              "regression": [
+                99,
+                99
+              ]
+            },
+            "infra_failure": null,
+            "passed": 114,
+            "total": 114
+          },
+          "checkpoint_6": {
+            "all_pass": true,
+            "groups": {
+              "core": [
+                14,
+                14
+              ],
+              "error": [
+                2,
+                2
+              ],
+              "functionality": [
+                11,
+                11
+              ],
+              "regression": [
+                114,
+                114
+              ]
+            },
+            "infra_failure": null,
+            "passed": 141,
+            "total": 141
+          },
+          "checkpoint_7": {
+            "all_pass": false,
+            "groups": {
+              "core": [
+                0,
+                3
+              ],
+              "error": [
+                0,
+                2
+              ],
+              "functionality": [
+                0,
+                13
+              ],
+              "regression": [
+                141,
+                141
+              ]
+            },
+            "infra_failure": null,
+            "passed": 141,
+            "total": 159
+          },
+          "checkpoint_8": {
+            "all_pass": false,
+            "groups": {
+              "core": [
+                2,
+                3
+              ],
+              "error": [
+                9,
+                11
+              ],
+              "functionality": [
+                17,
+                21
+              ],
+              "regression": [
+                141,
+                159
+              ]
+            },
+            "infra_failure": null,
+            "passed": 169,
+            "total": 194
+          }
+        },
+        {
+          "checkpoint_1": {
+            "all_pass": false,
+            "groups": {
+              "core": [
+                0,
+                3
+              ],
+              "error": [
+                2,
+                2
+              ],
+              "functionality": [
+                0,
+                24
+              ],
+              "regression": [
+                0,
+                0
+              ]
+            },
+            "infra_failure": null,
+            "passed": 2,
+            "total": 29
+          },
+          "checkpoint_2": {
+            "all_pass": true,
+            "groups": {
+              "core": [
+                8,
+                8
+              ],
+              "error": [
+                3,
+                3
+              ],
+              "functionality": [
+                15,
+                15
+              ],
+              "regression": [
+                29,
+                29
+              ]
+            },
+            "infra_failure": null,
+            "passed": 55,
+            "total": 55
+          },
+          "checkpoint_3": {
+            "all_pass": true,
+            "groups": {
+              "core": [
+                2,
+                2
+              ],
+              "error": [
+                2,
+                2
+              ],
+              "functionality": [
+                18,
+                18
+              ],
+              "regression": [
+                55,
+                55
+              ]
+            },
+            "infra_failure": null,
+            "passed": 77,
+            "total": 77
+          },
+          "checkpoint_4": {
+            "all_pass": true,
+            "groups": {
+              "core": [
+                4,
+                4
+              ],
+              "error": [
+                6,
+                6
+              ],
+              "functionality": [
+                12,
+                12
+              ],
+              "regression": [
+                77,
+                77
+              ]
+            },
+            "infra_failure": null,
+            "passed": 99,
+            "total": 99
+          },
+          "checkpoint_5": {
+            "all_pass": true,
+            "groups": {
+              "core": [
+                4,
+                4
+              ],
+              "error": [
+                5,
+                5
+              ],
+              "functionality": [
+                6,
+                6
+              ],
+              "regression": [
+                99,
+                99
+              ]
+            },
+            "infra_failure": null,
+            "passed": 114,
+            "total": 114
+          },
+          "checkpoint_6": {
+            "all_pass": true,
+            "groups": {
+              "core": [
+                14,
+                14
+              ],
+              "error": [
+                2,
+                2
+              ],
+              "functionality": [
+                11,
+                11
+              ],
+              "regression": [
+                114,
+                114
+              ]
+            },
+            "infra_failure": null,
+            "passed": 141,
+            "total": 141
+          },
+          "checkpoint_7": {
+            "all_pass": false,
+            "groups": {
+              "core": [
+                0,
+                3
+              ],
+              "error": [
+                0,
+                2
+              ],
+              "functionality": [
+                0,
+                13
+              ],
+              "regression": [
+                141,
+                141
+              ]
+            },
+            "infra_failure": null,
+            "passed": 141,
+            "total": 159
+          },
+          "checkpoint_8": {
+            "all_pass": false,
+            "groups": {
+              "core": [
+                2,
+                3
+              ],
+              "error": [
+                9,
+                11
+              ],
+              "functionality": [
+                17,
+                21
+              ],
+              "regression": [
+                141,
+                159
+              ]
+            },
+            "infra_failure": null,
+            "passed": 169,
+            "total": 194
+          }
+        },
+        {
+          "checkpoint_1": {
+            "all_pass": false,
+            "groups": {
+              "core": [
+                0,
+                3
+              ],
+              "error": [
+                2,
+                2
+              ],
+              "functionality": [
+                0,
+                24
+              ],
+              "regression": [
+                0,
+                0
+              ]
+            },
+            "infra_failure": null,
+            "passed": 2,
+            "total": 29
+          },
+          "checkpoint_2": {
+            "all_pass": true,
+            "groups": {
+              "core": [
+                8,
+                8
+              ],
+              "error": [
+                3,
+                3
+              ],
+              "functionality": [
+                15,
+                15
+              ],
+              "regression": [
+                29,
+                29
+              ]
+            },
+            "infra_failure": null,
+            "passed": 55,
+            "total": 55
+          },
+          "checkpoint_3": {
+            "all_pass": true,
+            "groups": {
+              "core": [
+                2,
+                2
+              ],
+              "error": [
+                2,
+                2
+              ],
+              "functionality": [
+                18,
+                18
+              ],
+              "regression": [
+                55,
+                55
+              ]
+            },
+            "infra_failure": null,
+            "passed": 77,
+            "total": 77
+          },
+          "checkpoint_4": {
+            "all_pass": true,
+            "groups": {
+              "core": [
+                4,
+                4
+              ],
+              "error": [
+                6,
+                6
+              ],
+              "functionality": [
+                12,
+                12
+              ],
+              "regression": [
+                77,
+                77
+              ]
+            },
+            "infra_failure": null,
+            "passed": 99,
+            "total": 99
+          },
+          "checkpoint_5": {
+            "all_pass": true,
+            "groups": {
+              "core": [
+                4,
+                4
+              ],
+              "error": [
+                5,
+                5
+              ],
+              "functionality": [
+                6,
+                6
+              ],
+              "regression": [
+                99,
+                99
+              ]
+            },
+            "infra_failure": null,
+            "passed": 114,
+            "total": 114
+          },
+          "checkpoint_6": {
+            "all_pass": true,
+            "groups": {
+              "core": [
+                14,
+                14
+              ],
+              "error": [
+                2,
+                2
+              ],
+              "functionality": [
+                11,
+                11
+              ],
+              "regression": [
+                114,
+                114
+              ]
+            },
+            "infra_failure": null,
+            "passed": 141,
+            "total": 141
+          },
+          "checkpoint_7": {
+            "all_pass": false,
+            "groups": {
+              "core": [
+                0,
+                3
+              ],
+              "error": [
+                0,
+                2
+              ],
+              "functionality": [
+                0,
+                13
+              ],
+              "regression": [
+                141,
+                141
+              ]
+            },
+            "infra_failure": null,
+            "passed": 141,
+            "total": 159
+          },
+          "checkpoint_8": {
+            "all_pass": false,
+            "groups": {
+              "core": [
+                2,
+                3
+              ],
+              "error": [
+                9,
+                11
+              ],
+              "functionality": [
+                17,
+                21
+              ],
+              "regression": [
+                141,
+                159
+              ]
+            },
+            "infra_failure": null,
+            "passed": 169,
+            "total": 194
+          }
+        }
+      ],
+      "positive": [
+        {
+          "checkpoint_1": {
+            "all_pass": true,
+            "groups": {
+              "core": [
+                3,
+                3
+              ],
+              "error": [
+                2,
+                2
+              ],
+              "functionality": [
+                24,
+                24
+              ],
+              "regression": [
+                0,
+                0
+              ]
+            },
+            "infra_failure": null,
+            "passed": 29,
+            "total": 29
+          },
+          "checkpoint_2": {
+            "all_pass": true,
+            "groups": {
+              "core": [
+                8,
+                8
+              ],
+              "error": [
+                3,
+                3
+              ],
+              "functionality": [
+                15,
+                15
+              ],
+              "regression": [
+                29,
+                29
+              ]
+            },
+            "infra_failure": null,
+            "passed": 55,
+            "total": 55
+          },
+          "checkpoint_3": {
+            "all_pass": true,
+            "groups": {
+              "core": [
+                2,
+                2
+              ],
+              "error": [
+                2,
+                2
+              ],
+              "functionality": [
+                18,
+                18
+              ],
+              "regression": [
+                55,
+                55
+              ]
+            },
+            "infra_failure": null,
+            "passed": 77,
+            "total": 77
+          },
+          "checkpoint_4": {
+            "all_pass": true,
+            "groups": {
+              "core": [
+                4,
+                4
+              ],
+              "error": [
+                6,
+                6
+              ],
+              "functionality": [
+                12,
+                12
+              ],
+              "regression": [
+                77,
+                77
+              ]
+            },
+            "infra_failure": null,
+            "passed": 99,
+            "total": 99
+          },
+          "checkpoint_5": {
+            "all_pass": true,
+            "groups": {
+              "core": [
+                4,
+                4
+              ],
+              "error": [
+                5,
+                5
+              ],
+              "functionality": [
+                6,
+                6
+              ],
+              "regression": [
+                99,
+                99
+              ]
+            },
+            "infra_failure": null,
+            "passed": 114,
+            "total": 114
+          },
+          "checkpoint_6": {
+            "all_pass": true,
+            "groups": {
+              "core": [
+                14,
+                14
+              ],
+              "error": [
+                2,
+                2
+              ],
+              "functionality": [
+                11,
+                11
+              ],
+              "regression": [
+                114,
+                114
+              ]
+            },
+            "infra_failure": null,
+            "passed": 141,
+            "total": 141
+          },
+          "checkpoint_7": {
+            "all_pass": false,
+            "groups": {
+              "core": [
+                0,
+                3
+              ],
+              "error": [
+                0,
+                2
+              ],
+              "functionality": [
+                0,
+                13
+              ],
+              "regression": [
+                141,
+                141
+              ]
+            },
+            "infra_failure": null,
+            "passed": 141,
+            "total": 159
+          },
+          "checkpoint_8": {
+            "all_pass": false,
+            "groups": {
+              "core": [
+                3,
+                3
+              ],
+              "error": [
+                11,
+                11
+              ],
+              "functionality": [
+                20,
+                21
+              ],
+              "regression": [
+                141,
+                159
+              ]
+            },
+            "infra_failure": null,
+            "passed": 175,
+            "total": 194
+          }
+        },
+        {
+          "checkpoint_1": {
+            "all_pass": true,
+            "groups": {
+              "core": [
+                3,
+                3
+              ],
+              "error": [
+                2,
+                2
+              ],
+              "functionality": [
+                24,
+                24
+              ],
+              "regression": [
+                0,
+                0
+              ]
+            },
+            "infra_failure": null,
+            "passed": 29,
+            "total": 29
+          },
+          "checkpoint_2": {
+            "all_pass": true,
+            "groups": {
+              "core": [
+                8,
+                8
+              ],
+              "error": [
+                3,
+                3
+              ],
+              "functionality": [
+                15,
+                15
+              ],
+              "regression": [
+                29,
+                29
+              ]
+            },
+            "infra_failure": null,
+            "passed": 55,
+            "total": 55
+          },
+          "checkpoint_3": {
+            "all_pass": true,
+            "groups": {
+              "core": [
+                2,
+                2
+              ],
+              "error": [
+                2,
+                2
+              ],
+              "functionality": [
+                18,
+                18
+              ],
+              "regression": [
+                55,
+                55
+              ]
+            },
+            "infra_failure": null,
+            "passed": 77,
+            "total": 77
+          },
+          "checkpoint_4": {
+            "all_pass": true,
+            "groups": {
+              "core": [
+                4,
+                4
+              ],
+              "error": [
+                6,
+                6
+              ],
+              "functionality": [
+                12,
+                12
+              ],
+              "regression": [
+                77,
+                77
+              ]
+            },
+            "infra_failure": null,
+            "passed": 99,
+            "total": 99
+          },
+          "checkpoint_5": {
+            "all_pass": true,
+            "groups": {
+              "core": [
+                4,
+                4
+              ],
+              "error": [
+                5,
+                5
+              ],
+              "functionality": [
+                6,
+                6
+              ],
+              "regression": [
+                99,
+                99
+              ]
+            },
+            "infra_failure": null,
+            "passed": 114,
+            "total": 114
+          },
+          "checkpoint_6": {
+            "all_pass": true,
+            "groups": {
+              "core": [
+                14,
+                14
+              ],
+              "error": [
+                2,
+                2
+              ],
+              "functionality": [
+                11,
+                11
+              ],
+              "regression": [
+                114,
+                114
+              ]
+            },
+            "infra_failure": null,
+            "passed": 141,
+            "total": 141
+          },
+          "checkpoint_7": {
+            "all_pass": false,
+            "groups": {
+              "core": [
+                0,
+                3
+              ],
+              "error": [
+                0,
+                2
+              ],
+              "functionality": [
+                0,
+                13
+              ],
+              "regression": [
+                141,
+                141
+              ]
+            },
+            "infra_failure": null,
+            "passed": 141,
+            "total": 159
+          },
+          "checkpoint_8": {
+            "all_pass": false,
+            "groups": {
+              "core": [
+                3,
+                3
+              ],
+              "error": [
+                11,
+                11
+              ],
+              "functionality": [
+                20,
+                21
+              ],
+              "regression": [
+                141,
+                159
+              ]
+            },
+            "infra_failure": null,
+            "passed": 175,
+            "total": 194
+          }
+        },
+        {
+          "checkpoint_1": {
+            "all_pass": true,
+            "groups": {
+              "core": [
+                3,
+                3
+              ],
+              "error": [
+                2,
+                2
+              ],
+              "functionality": [
+                24,
+                24
+              ],
+              "regression": [
+                0,
+                0
+              ]
+            },
+            "infra_failure": null,
+            "passed": 29,
+            "total": 29
+          },
+          "checkpoint_2": {
+            "all_pass": true,
+            "groups": {
+              "core": [
+                8,
+                8
+              ],
+              "error": [
+                3,
+                3
+              ],
+              "functionality": [
+                15,
+                15
+              ],
+              "regression": [
+                29,
+                29
+              ]
+            },
+            "infra_failure": null,
+            "passed": 55,
+            "total": 55
+          },
+          "checkpoint_3": {
+            "all_pass": true,
+            "groups": {
+              "core": [
+                2,
+                2
+              ],
+              "error": [
+                2,
+                2
+              ],
+              "functionality": [
+                18,
+                18
+              ],
+              "regression": [
+                55,
+                55
+              ]
+            },
+            "infra_failure": null,
+            "passed": 77,
+            "total": 77
+          },
+          "checkpoint_4": {
+            "all_pass": true,
+            "groups": {
+              "core": [
+                4,
+                4
+              ],
+              "error": [
+                6,
+                6
+              ],
+              "functionality": [
+                12,
+                12
+              ],
+              "regression": [
+                77,
+                77
+              ]
+            },
+            "infra_failure": null,
+            "passed": 99,
+            "total": 99
+          },
+          "checkpoint_5": {
+            "all_pass": true,
+            "groups": {
+              "core": [
+                4,
+                4
+              ],
+              "error": [
+                5,
+                5
+              ],
+              "functionality": [
+                6,
+                6
+              ],
+              "regression": [
+                99,
+                99
+              ]
+            },
+            "infra_failure": null,
+            "passed": 114,
+            "total": 114
+          },
+          "checkpoint_6": {
+            "all_pass": true,
+            "groups": {
+              "core": [
+                14,
+                14
+              ],
+              "error": [
+                2,
+                2
+              ],
+              "functionality": [
+                11,
+                11
+              ],
+              "regression": [
+                114,
+                114
+              ]
+            },
+            "infra_failure": null,
+            "passed": 141,
+            "total": 141
+          },
+          "checkpoint_7": {
+            "all_pass": false,
+            "groups": {
+              "core": [
+                0,
+                3
+              ],
+              "error": [
+                0,
+                2
+              ],
+              "functionality": [
+                0,
+                13
+              ],
+              "regression": [
+                141,
+                141
+              ]
+            },
+            "infra_failure": null,
+            "passed": 141,
+            "total": 159
+          },
+          "checkpoint_8": {
+            "all_pass": false,
+            "groups": {
+              "core": [
+                3,
+                3
+              ],
+              "error": [
+                11,
+                11
+              ],
+              "functionality": [
+                20,
+                21
+              ],
+              "regression": [
+                141,
+                159
+              ]
+            },
+            "infra_failure": null,
+            "passed": 175,
+            "total": 194
+          }
+        }
+      ]
+    }
+  },
+  "group_order": [
+    "core",
+    "functionality",
+    "error",
+    "regression"
+  ],
+  "headline_policy": {
+    "checkpoints": 8,
+    "components": {
+      "C": "used",
+      "E": "missing",
+      "G": "missing",
+      "H": "missing",
+      "R": "missing",
+      "V": "missing"
+    },
+    "eligible": false,
+    "policy": "scb-canonical@1",
+    "reasons": [
+      {
+        "code": "component_missing",
+        "component": "V",
+        "detail": "scb-canonical@1 requires component V"
+      },
+      {
+        "code": "component_missing",
+        "component": "E",
+        "detail": "scb-canonical@1 requires component E"
+      },
+      {
+        "code": "component_missing",
+        "component": "H",
+        "detail": "scb-canonical@1 requires component H"
+      },
+      {
+        "code": "component_missing",
+        "component": "R",
+        "detail": "scb-canonical@1 requires component R"
+      },
+      {
+        "code": "component_missing",
+        "component": "G",
+        "detail": "scb-canonical@1 requires component G"
+      }
+    ],
+    "reference_correctness": "0.9736067885625364715035985216875",
+    "selection": "default_by_k"
+  },
+  "kind": "raidar-problem-validation",
+  "manifest_sha256": "326d878d158c224b5a85fc115a845cabb0925530faff5a083099e1930900a4e9",
+  "mode": "multi_checkpoint",
+  "not_run": [
+    "native_parity_positive",
+    "native_parity_negative"
+  ],
+  "problem": "scb/mocked_http@38d627ecf668",
+  "repeats": 3,
+  "schema_version": 1,
+  "solvable": {
+    "checkpoint_1": {
+      "digest": "0795430e1598b5e6bb3e302044466a17aaa295ff63c77db791eab8261985c49f",
+      "nondeterministic": [],
+      "nondeterministic_count": 0,
+      "size": 29,
+      "solvable": [
+        "checkpoint_1::test_condition_false_string_does_not_match",
+        "checkpoint_1::test_condition_render_error_fallback",
+        "checkpoint_1::test_condition_requires_exact_true_string",
+        "checkpoint_1::test_content_length_reflects_rendered_template",
+        "checkpoint_1::test_context_includes_path_query_header",
+        "checkpoint_1::test_duplicate_key_override_warns",
+        "checkpoint_1::test_duplicate_keys_use_last_definition",
+        "checkpoint_1::test_empty_condition_renders_httpbody",
+        "checkpoint_1::test_first_matching_condition_wins",
+        "checkpoint_1::test_http_log_required_fields",
+        "checkpoint_1::test_httpbody_empty_for_get_requests",
+        "checkpoint_1::test_kind_defaults_to_behavior",
+        "checkpoint_1::test_loads_yaml_and_yml_files_recursively",
+        "checkpoint_1::test_method_and_path_are_both_required",
+        "checkpoint_1::test_no_match_returns_not_found",
+        "checkpoint_1::test_non_yaml_files_ignored",
+        "checkpoint_1::test_normalizes_whitespace_in_body_template",
+        "checkpoint_1::test_normalizes_whitespace_in_condition",
+        "checkpoint_1::test_rejects_behavior_with_multiple_reply_http",
+        "checkpoint_1::test_rejects_empty_key",
+        "checkpoint_1::test_reply_http_default_headers_and_empty_body",
+        "checkpoint_1::test_sleep_action_delays_response",
+        "checkpoint_1::test_sleep_zero_duration_all_units[0h]",
+        "checkpoint_1::test_sleep_zero_duration_all_units[0m]",
+        "checkpoint_1::test_sleep_zero_duration_all_units[0ms]",
+        "checkpoint_1::test_sleep_zero_duration_all_units[0ns]",
+        "checkpoint_1::test_sleep_zero_duration_all_units[0s]",
+        "checkpoint_1::test_sleep_zero_duration_all_units[0us]",
+        "checkpoint_1::test_template_helpers_registered"
+      ],
+      "verdict": "validated"
+    },
+    "checkpoint_2": {
+      "digest": "a964ca89a6bff022ac8e49aacd42b82165a1b4627d14d503190e2cbde3a6aaa2",
+      "nondeterministic": [],
+      "nondeterministic_count": 0,
+      "size": 55,
+      "solvable": [
+        "checkpoint_1::test_condition_false_string_does_not_match",
+        "checkpoint_1::test_condition_render_error_fallback",
+        "checkpoint_1::test_condition_requires_exact_true_string",
+        "checkpoint_1::test_content_length_reflects_rendered_template",
+        "checkpoint_1::test_context_includes_path_query_header",
+        "checkpoint_1::test_duplicate_key_override_warns",
+        "checkpoint_1::test_duplicate_keys_use_last_definition",
+        "checkpoint_1::test_empty_condition_renders_httpbody",
+        "checkpoint_1::test_first_matching_condition_wins",
+        "checkpoint_1::test_http_log_required_fields",
+        "checkpoint_1::test_httpbody_empty_for_get_requests",
+        "checkpoint_1::test_kind_defaults_to_behavior",
+        "checkpoint_1::test_loads_yaml_and_yml_files_recursively",
+        "checkpoint_1::test_method_and_path_are_both_required",
+        "checkpoint_1::test_no_match_returns_not_found",
+        "checkpoint_1::test_non_yaml_files_ignored",
+        "checkpoint_1::test_normalizes_whitespace_in_body_template",
+        "checkpoint_1::test_normalizes_whitespace_in_condition",
+        "checkpoint_1::test_rejects_behavior_with_multiple_reply_http",
+        "checkpoint_1::test_rejects_empty_key",
+        "checkpoint_1::test_reply_http_default_headers_and_empty_body",
+        "checkpoint_1::test_sleep_action_delays_response",
+        "checkpoint_1::test_sleep_zero_duration_all_units[0h]",
+        "checkpoint_1::test_sleep_zero_duration_all_units[0m]",
+        "checkpoint_1::test_sleep_zero_duration_all_units[0ms]",
+        "checkpoint_1::test_sleep_zero_duration_all_units[0ns]",
+        "checkpoint_1::test_sleep_zero_duration_all_units[0s]",
+        "checkpoint_1::test_sleep_zero_duration_all_units[0us]",
+        "checkpoint_1::test_template_helpers_registered",
+        "checkpoint_2::test_additional_helper_functions",
+        "checkpoint_2::test_body_from_file_cached_across_requests",
+        "checkpoint_2::test_body_from_file_template_rendering",
+        "checkpoint_2::test_body_from_file_with_helper_functions",
+        "checkpoint_2::test_empty_body_falls_back_to_file",
+        "checkpoint_2::test_gjson_array_wildcard",
+        "checkpoint_2::test_gjson_invalid_json_render_error",
+        "checkpoint_2::test_gjson_nested_and_array_access",
+        "checkpoint_2::test_gjson_non_string_raw_json",
+        "checkpoint_2::test_helper_edge_cases",
+        "checkpoint_2::test_helper_functions_gjson_regex_and_hmac",
+        "checkpoint_2::test_hmac_sha256_empty_inputs",
+        "checkpoint_2::test_inline_body_precedence_over_file",
+        "checkpoint_2::test_invalid_json_condition_fallback",
+        "checkpoint_2::test_is_last_index_returns_false",
+        "checkpoint_2::test_jsonpath_empty_body_and_headers",
+        "checkpoint_2::test_jsonpath_recursive_descent",
+        "checkpoint_2::test_jsonpath_value_and_no_match",
+        "checkpoint_2::test_known_deterministic_output[hmac_sha256]",
+        "checkpoint_2::test_known_deterministic_output[uuidv5]",
+        "checkpoint_2::test_missing_body_from_file_rejects_startup",
+        "checkpoint_2::test_regex_find_all_submatch_index_ordering",
+        "checkpoint_2::test_regex_find_all_submatch_no_match",
+        "checkpoint_2::test_templated_headers_with_helpers",
+        "checkpoint_2::test_uuidv5_deterministic_across_requests",
+        "checkpoint_2::test_whitespace_body_takes_precedence"
+      ],
+      "verdict": "validated"
+    },
+    "checkpoint_3": {
+      "digest": "b86099d0dfcfe5b66a582c9e71e6b4518bfb0dcb19cfd25eef4bf4968a77364e",
+      "nondeterministic": [],
+      "nondeterministic_count": 0,
+      "size": 77,
+      "solvable": [
+        "checkpoint_1::test_condition_false_string_does_not_match",
+        "checkpoint_1::test_condition_render_error_fallback",
+        "checkpoint_1::test_condition_requires_exact_true_string",
+        "checkpoint_1::test_content_length_reflects_rendered_template",
+        "checkpoint_1::test_context_includes_path_query_header",
+        "checkpoint_1::test_duplicate_key_override_warns",
+        "checkpoint_1::test_duplicate_keys_use_last_definition",
+        "checkpoint_1::test_empty_condition_renders_httpbody",
+        "checkpoint_1::test_first_matching_condition_wins",
+        "checkpoint_1::test_http_log_required_fields",
+        "checkpoint_1::test_httpbody_empty_for_get_requests",
+        "checkpoint_1::test_kind_defaults_to_behavior",
+        "checkpoint_1::test_loads_yaml_and_yml_files_recursively",
+        "checkpoint_1::test_method_and_path_are_both_required",
+        "checkpoint_1::test_no_match_returns_not_found",
+        "checkpoint_1::test_non_yaml_files_ignored",
+        "checkpoint_1::test_normalizes_whitespace_in_body_template",
+        "checkpoint_1::test_normalizes_whitespace_in_condition",
+        "checkpoint_1::test_rejects_behavior_with_multiple_reply_http",
+        "checkpoint_1::test_rejects_empty_key",
+        "checkpoint_1::test_reply_http_default_headers_and_empty_body",
+        "checkpoint_1::test_sleep_action_delays_response",
+        "checkpoint_1::test_sleep_zero_duration_all_units[0h]",
+        "checkpoint_1::test_sleep_zero_duration_all_units[0m]",
+        "checkpoint_1::test_sleep_zero_duration_all_units[0ms]",
+        "checkpoint_1::test_sleep_zero_duration_all_units[0ns]",
+        "checkpoint_1::test_sleep_zero_duration_all_units[0s]",
+        "checkpoint_1::test_sleep_zero_duration_all_units[0us]",
+        "checkpoint_1::test_template_helpers_registered",
+        "checkpoint_2::test_additional_helper_functions",
+        "checkpoint_2::test_body_from_file_cached_across_requests",
+        "checkpoint_2::test_body_from_file_template_rendering",
+        "checkpoint_2::test_body_from_file_with_helper_functions",
+        "checkpoint_2::test_empty_body_falls_back_to_file",
+        "checkpoint_2::test_gjson_array_wildcard",
+        "checkpoint_2::test_gjson_invalid_json_render_error",
+        "checkpoint_2::test_gjson_nested_and_array_access",
+        "checkpoint_2::test_gjson_non_string_raw_json",
+        "checkpoint_2::test_helper_edge_cases",
+        "checkpoint_2::test_helper_functions_gjson_regex_and_hmac",
+        "checkpoint_2::test_hmac_sha256_empty_inputs",
+        "checkpoint_2::test_inline_body_precedence_over_file",
+        "checkpoint_2::test_invalid_json_condition_fallback",
+        "checkpoint_2::test_is_last_index_returns_false",
+        "checkpoint_2::test_jsonpath_empty_body_and_headers",
+        "checkpoint_2::test_jsonpath_recursive_descent",
+        "checkpoint_2::test_jsonpath_value_and_no_match",
+        "checkpoint_2::test_known_deterministic_output[hmac_sha256]",
+        "checkpoint_2::test_known_deterministic_output[uuidv5]",
+        "checkpoint_2::test_missing_body_from_file_rejects_startup",
+        "checkpoint_2::test_regex_find_all_submatch_index_ordering",
+        "checkpoint_2::test_regex_find_all_submatch_no_match",
+        "checkpoint_2::test_templated_headers_with_helpers",
+        "checkpoint_2::test_uuidv5_deterministic_across_requests",
+        "checkpoint_2::test_whitespace_body_takes_precedence",
+        "checkpoint_3::test_mixed_action_ordering",
+        "checkpoint_3::test_redis_array_semicolon_separator",
+        "checkpoint_3::test_redis_hash_and_list_ops",
+        "checkpoint_3::test_redis_persists_state_across_requests",
+        "checkpoint_3::test_redis_state_lost_on_restart",
+        "checkpoint_3::test_redisdo_condition_stateful_routing",
+        "checkpoint_3::test_redisdo_del_multiple_keys",
+        "checkpoint_3::test_redisdo_empty_hash_and_keys",
+        "checkpoint_3::test_redisdo_empty_list_ops",
+        "checkpoint_3::test_redisdo_hdel",
+        "checkpoint_3::test_redisdo_inside_redis_action_items",
+        "checkpoint_3::test_redisdo_missing_key_returns_empty",
+        "checkpoint_3::test_redisdo_renders_response_headers",
+        "checkpoint_3::test_send_http_body_from_file_templates",
+        "checkpoint_3::test_send_http_error_no_abort",
+        "checkpoint_3::test_send_http_failure_preserves_redis_state",
+        "checkpoint_3::test_send_http_failure_preserves_response",
+        "checkpoint_3::test_send_http_header_templates",
+        "checkpoint_3::test_send_http_inline_body_wins",
+        "checkpoint_3::test_send_http_no_body",
+        "checkpoint_3::test_send_http_posts_to_webhook",
+        "checkpoint_3::test_send_http_url_template_with_redisdo"
+      ],
+      "verdict": "validated"
+    },
+    "checkpoint_4": {
+      "digest": "b2ea99c11cbf612df152f1376053eb18a6b360fcc3b61586fbe1914b2b93d412",
+      "nondeterministic": [],
+      "nondeterministic_count": 0,
+      "size": 99,
+      "solvable": [
+        "checkpoint_1::test_condition_false_string_does_not_match",
+        "checkpoint_1::test_condition_render_error_fallback",
+        "checkpoint_1::test_condition_requires_exact_true_string",
+        "checkpoint_1::test_content_length_reflects_rendered_template",
+        "checkpoint_1::test_context_includes_path_query_header",
+        "checkpoint_1::test_duplicate_key_override_warns",
+        "checkpoint_1::test_duplicate_keys_use_last_definition",
+        "checkpoint_1::test_empty_condition_renders_httpbody",
+        "checkpoint_1::test_first_matching_condition_wins",
+        "checkpoint_1::test_http_log_required_fields",
+        "checkpoint_1::test_httpbody_empty_for_get_requests",
+        "checkpoint_1::test_kind_defaults_to_behavior",
+        "checkpoint_1::test_loads_yaml_and_yml_files_recursively",
+        "checkpoint_1::test_method_and_path_are_both_required",
+        "checkpoint_1::test_no_match_returns_not_found",
+        "checkpoint_1::test_non_yaml_files_ignored",
+        "checkpoint_1::test_normalizes_whitespace_in_body_template",
+        "checkpoint_1::test_normalizes_whitespace_in_condition",
+        "checkpoint_1::test_rejects_behavior_with_multiple_reply_http",
+        "checkpoint_1::test_rejects_empty_key",
+        "checkpoint_1::test_reply_http_default_headers_and_empty_body",
+        "checkpoint_1::test_sleep_action_delays_response",
+        "checkpoint_1::test_sleep_zero_duration_all_units[0h]",
+        "checkpoint_1::test_sleep_zero_duration_all_units[0m]",
+        "checkpoint_1::test_sleep_zero_duration_all_units[0ms]",
+        "checkpoint_1::test_sleep_zero_duration_all_units[0ns]",
+        "checkpoint_1::test_sleep_zero_duration_all_units[0s]",
+        "checkpoint_1::test_sleep_zero_duration_all_units[0us]",
+        "checkpoint_1::test_template_helpers_registered",
+        "checkpoint_2::test_additional_helper_functions",
+        "checkpoint_2::test_body_from_file_cached_across_requests",
+        "checkpoint_2::test_body_from_file_template_rendering",
+        "checkpoint_2::test_body_from_file_with_helper_functions",
+        "checkpoint_2::test_empty_body_falls_back_to_file",
+        "checkpoint_2::test_gjson_array_wildcard",
+        "checkpoint_2::test_gjson_invalid_json_render_error",
+        "checkpoint_2::test_gjson_nested_and_array_access",
+        "checkpoint_2::test_gjson_non_string_raw_json",
+        "checkpoint_2::test_helper_edge_cases",
+        "checkpoint_2::test_helper_functions_gjson_regex_and_hmac",
+        "checkpoint_2::test_hmac_sha256_empty_inputs",
+        "checkpoint_2::test_inline_body_precedence_over_file",
+        "checkpoint_2::test_invalid_json_condition_fallback",
+        "checkpoint_2::test_is_last_index_returns_false",
+        "checkpoint_2::test_jsonpath_empty_body_and_headers",
+        "checkpoint_2::test_jsonpath_recursive_descent",
+        "checkpoint_2::test_jsonpath_value_and_no_match",
+        "checkpoint_2::test_known_deterministic_output[hmac_sha256]",
+        "checkpoint_2::test_known_deterministic_output[uuidv5]",
+        "checkpoint_2::test_missing_body_from_file_rejects_startup",
+        "checkpoint_2::test_regex_find_all_submatch_index_ordering",
+        "checkpoint_2::test_regex_find_all_submatch_no_match",
+        "checkpoint_2::test_templated_headers_with_helpers",
+        "checkpoint_2::test_uuidv5_deterministic_across_requests",
+        "checkpoint_2::test_whitespace_body_takes_precedence",
+        "checkpoint_3::test_mixed_action_ordering",
+        "checkpoint_3::test_redis_array_semicolon_separator",
+        "checkpoint_3::test_redis_hash_and_list_ops",
+        "checkpoint_3::test_redis_persists_state_across_requests",
+        "checkpoint_3::test_redis_state_lost_on_restart",
+        "checkpoint_3::test_redisdo_condition_stateful_routing",
+        "checkpoint_3::test_redisdo_del_multiple_keys",
+        "checkpoint_3::test_redisdo_empty_hash_and_keys",
+        "checkpoint_3::test_redisdo_empty_list_ops",
+        "checkpoint_3::test_redisdo_hdel",
+        "checkpoint_3::test_redisdo_inside_redis_action_items",
+        "checkpoint_3::test_redisdo_missing_key_returns_empty",
+        "checkpoint_3::test_redisdo_renders_response_headers",
+        "checkpoint_3::test_send_http_body_from_file_templates",
+        "checkpoint_3::test_send_http_error_no_abort",
+        "checkpoint_3::test_send_http_failure_preserves_redis_state",
+        "checkpoint_3::test_send_http_failure_preserves_response",
+        "checkpoint_3::test_send_http_header_templates",
+        "checkpoint_3::test_send_http_inline_body_wins",
+        "checkpoint_3::test_send_http_no_body",
+        "checkpoint_3::test_send_http_posts_to_webhook",
+        "checkpoint_3::test_send_http_url_template_with_redisdo",
+        "checkpoint_4::test_abstract_behavior_not_routable",
+        "checkpoint_4::test_action_order_after_inherit",
+        "checkpoint_4::test_behavior_extends_behavior",
+        "checkpoint_4::test_child_expect_overrides_parent",
+        "checkpoint_4::test_equal_order_preserves_relative",
+        "checkpoint_4::test_extend_forward_ref_across_files",
+        "checkpoint_4::test_extend_merges_child_values",
+        "checkpoint_4::test_extend_preserves_parent_values",
+        "checkpoint_4::test_missing_parent_uses_child_only",
+        "checkpoint_4::test_multi_level_inheritance_chain",
+        "checkpoint_4::test_no_order_defaults_to_zero",
+        "checkpoint_4::test_parent_actions_precede_child_at_same_order",
+        "checkpoint_4::test_rejects_abstract_behavior_with_extend",
+        "checkpoint_4::test_rejects_invalid_config[behavior_with_template_field]",
+        "checkpoint_4::test_rejects_invalid_config[empty_key]",
+        "checkpoint_4::test_rejects_invalid_config[invalid_kind]",
+        "checkpoint_4::test_rejects_invalid_config[missing_parent_invalid_child]",
+        "checkpoint_4::test_rejects_invalid_config[template_with_expect_actions]",
+        "checkpoint_4::test_rejects_invalid_config[template_with_values]",
+        "checkpoint_4::test_rejects_merged_multiple_reply_http",
+        "checkpoint_4::test_template_with_request_context",
+        "checkpoint_4::test_values_in_expect_condition"
+      ],
+      "verdict": "validated"
+    },
+    "checkpoint_5": {
+      "digest": "daedcf382ae5aa717bb97bd8790af6bcdfc62715082cc3c17baee09b3c4240e4",
+      "nondeterministic": [],
+      "nondeterministic_count": 0,
+      "size": 114,
+      "solvable": [
+        "checkpoint_1::test_condition_false_string_does_not_match",
+        "checkpoint_1::test_condition_render_error_fallback",
+        "checkpoint_1::test_condition_requires_exact_true_string",
+        "checkpoint_1::test_content_length_reflects_rendered_template",
+        "checkpoint_1::test_context_includes_path_query_header",
+        "checkpoint_1::test_duplicate_key_override_warns",
+        "checkpoint_1::test_duplicate_keys_use_last_definition",
+        "checkpoint_1::test_empty_condition_renders_httpbody",
+        "checkpoint_1::test_first_matching_condition_wins",
+        "checkpoint_1::test_http_log_required_fields",
+        "checkpoint_1::test_httpbody_empty_for_get_requests",
+        "checkpoint_1::test_kind_defaults_to_behavior",
+        "checkpoint_1::test_loads_yaml_and_yml_files_recursively",
+        "checkpoint_1::test_method_and_path_are_both_required",
+        "checkpoint_1::test_no_match_returns_not_found",
+        "checkpoint_1::test_non_yaml_files_ignored",
+        "checkpoint_1::test_normalizes_whitespace_in_body_template",
+        "checkpoint_1::test_normalizes_whitespace_in_condition",
+        "checkpoint_1::test_rejects_behavior_with_multiple_reply_http",
+        "checkpoint_1::test_rejects_empty_key",
+        "checkpoint_1::test_reply_http_default_headers_and_empty_body",
+        "checkpoint_1::test_sleep_action_delays_response",
+        "checkpoint_1::test_sleep_zero_duration_all_units[0h]",
+        "checkpoint_1::test_sleep_zero_duration_all_units[0m]",
+        "checkpoint_1::test_sleep_zero_duration_all_units[0ms]",
+        "checkpoint_1::test_sleep_zero_duration_all_units[0ns]",
+        "checkpoint_1::test_sleep_zero_duration_all_units[0s]",
+        "checkpoint_1::test_sleep_zero_duration_all_units[0us]",
+        "checkpoint_1::test_template_helpers_registered",
+        "checkpoint_2::test_additional_helper_functions",
+        "checkpoint_2::test_body_from_file_cached_across_requests",
+        "checkpoint_2::test_body_from_file_template_rendering",
+        "checkpoint_2::test_body_from_file_with_helper_functions",
+        "checkpoint_2::test_empty_body_falls_back_to_file",
+        "checkpoint_2::test_gjson_array_wildcard",
+        "checkpoint_2::test_gjson_invalid_json_render_error",
+        "checkpoint_2::test_gjson_nested_and_array_access",
+        "checkpoint_2::test_gjson_non_string_raw_json",
+        "checkpoint_2::test_helper_edge_cases",
+        "checkpoint_2::test_helper_functions_gjson_regex_and_hmac",
+        "checkpoint_2::test_hmac_sha256_empty_inputs",
+        "checkpoint_2::test_inline_body_precedence_over_file",
+        "checkpoint_2::test_invalid_json_condition_fallback",
+        "checkpoint_2::test_is_last_index_returns_false",
+        "checkpoint_2::test_jsonpath_empty_body_and_headers",
+        "checkpoint_2::test_jsonpath_recursive_descent",
+        "checkpoint_2::test_jsonpath_value_and_no_match",
+        "checkpoint_2::test_known_deterministic_output[hmac_sha256]",
+        "checkpoint_2::test_known_deterministic_output[uuidv5]",
+        "checkpoint_2::test_missing_body_from_file_rejects_startup",
+        "checkpoint_2::test_regex_find_all_submatch_index_ordering",
+        "checkpoint_2::test_regex_find_all_submatch_no_match",
+        "checkpoint_2::test_templated_headers_with_helpers",
+        "checkpoint_2::test_uuidv5_deterministic_across_requests",
+        "checkpoint_2::test_whitespace_body_takes_precedence",
+        "checkpoint_3::test_mixed_action_ordering",
+        "checkpoint_3::test_redis_array_semicolon_separator",
+        "checkpoint_3::test_redis_hash_and_list_ops",
+        "checkpoint_3::test_redis_persists_state_across_requests",
+        "checkpoint_3::test_redis_state_lost_on_restart",
+        "checkpoint_3::test_redisdo_condition_stateful_routing",
+        "checkpoint_3::test_redisdo_del_multiple_keys",
+        "checkpoint_3::test_redisdo_empty_hash_and_keys",
+        "checkpoint_3::test_redisdo_empty_list_ops",
+        "checkpoint_3::test_redisdo_hdel",
+        "checkpoint_3::test_redisdo_inside_redis_action_items",
+        "checkpoint_3::test_redisdo_missing_key_returns_empty",
+        "checkpoint_3::test_redisdo_renders_response_headers",
+        "checkpoint_3::test_send_http_body_from_file_templates",
+        "checkpoint_3::test_send_http_error_no_abort",
+        "checkpoint_3::test_send_http_failure_preserves_redis_state",
+        "checkpoint_3::test_send_http_failure_preserves_response",
+        "checkpoint_3::test_send_http_header_templates",
+        "checkpoint_3::test_send_http_inline_body_wins",
+        "checkpoint_3::test_send_http_no_body",
+        "checkpoint_3::test_send_http_posts_to_webhook",
+        "checkpoint_3::test_send_http_url_template_with_redisdo",
+        "checkpoint_4::test_abstract_behavior_not_routable",
+        "checkpoint_4::test_action_order_after_inherit",
+        "checkpoint_4::test_behavior_extends_behavior",
+        "checkpoint_4::test_child_expect_overrides_parent",
+        "checkpoint_4::test_equal_order_preserves_relative",
+        "checkpoint_4::test_extend_forward_ref_across_files",
+        "checkpoint_4::test_extend_merges_child_values",
+        "checkpoint_4::test_extend_preserves_parent_values",
+        "checkpoint_4::test_missing_parent_uses_child_only",
+        "checkpoint_4::test_multi_level_inheritance_chain",
+        "checkpoint_4::test_no_order_defaults_to_zero",
+        "checkpoint_4::test_parent_actions_precede_child_at_same_order",
+        "checkpoint_4::test_rejects_abstract_behavior_with_extend",
+        "checkpoint_4::test_rejects_invalid_config[behavior_with_template_field]",
+        "checkpoint_4::test_rejects_invalid_config[empty_key]",
+        "checkpoint_4::test_rejects_invalid_config[invalid_kind]",
+        "checkpoint_4::test_rejects_invalid_config[missing_parent_invalid_child]",
+        "checkpoint_4::test_rejects_invalid_config[template_with_expect_actions]",
+        "checkpoint_4::test_rejects_invalid_config[template_with_values]",
+        "checkpoint_4::test_rejects_merged_multiple_reply_http",
+        "checkpoint_4::test_template_with_request_context",
+        "checkpoint_4::test_values_in_expect_condition",
+        "checkpoint_5::test_admin_server_disabled",
+        "checkpoint_5::test_delete_all_preserves_filesystem",
+        "checkpoint_5::test_delete_fs_only_key_returns_404",
+        "checkpoint_5::test_delete_key_reveals_filesystem_fallback",
+        "checkpoint_5::test_delete_missing_key_returns_404",
+        "checkpoint_5::test_delete_set_isolation",
+        "checkpoint_5::test_get_templates_includes_template_set_mocks",
+        "checkpoint_5::test_post_invalid_payload_returns_400",
+        "checkpoint_5::test_post_templates_updates_existing_key",
+        "checkpoint_5::test_redisdo_blocks_reserved_key_access[read]",
+        "checkpoint_5::test_redisdo_blocks_reserved_key_access[write]",
+        "checkpoint_5::test_redisdo_blocks_template_set_storage_key",
+        "checkpoint_5::test_template_crud_and_reload",
+        "checkpoint_5::test_template_set_lifecycle",
+        "checkpoint_5::test_template_set_replaces_previous"
+      ],
+      "verdict": "validated"
+    },
+    "checkpoint_6": {
+      "digest": "2092d2bd2e713b8bae1aa8bf1c54c3e6c1b7c895754d6b940be5941c39942c29",
+      "nondeterministic": [],
+      "nondeterministic_count": 0,
+      "size": 141,
+      "solvable": [
+        "checkpoint_1::test_condition_false_string_does_not_match",
+        "checkpoint_1::test_condition_render_error_fallback",
+        "checkpoint_1::test_condition_requires_exact_true_string",
+        "checkpoint_1::test_content_length_reflects_rendered_template",
+        "checkpoint_1::test_context_includes_path_query_header",
+        "checkpoint_1::test_duplicate_key_override_warns",
+        "checkpoint_1::test_duplicate_keys_use_last_definition",
+        "checkpoint_1::test_empty_condition_renders_httpbody",
+        "checkpoint_1::test_first_matching_condition_wins",
+        "checkpoint_1::test_http_log_required_fields",
+        "checkpoint_1::test_httpbody_empty_for_get_requests",
+        "checkpoint_1::test_kind_defaults_to_behavior",
+        "checkpoint_1::test_loads_yaml_and_yml_files_recursively",
+        "checkpoint_1::test_method_and_path_are_both_required",
+        "checkpoint_1::test_no_match_returns_not_found",
+        "checkpoint_1::test_non_yaml_files_ignored",
+        "checkpoint_1::test_normalizes_whitespace_in_body_template",
+        "checkpoint_1::test_normalizes_whitespace_in_condition",
+        "checkpoint_1::test_rejects_behavior_with_multiple_reply_http",
+        "checkpoint_1::test_rejects_empty_key",
+        "checkpoint_1::test_reply_http_default_headers_and_empty_body",
+        "checkpoint_1::test_sleep_action_delays_response",
+        "checkpoint_1::test_sleep_zero_duration_all_units[0h]",
+        "checkpoint_1::test_sleep_zero_duration_all_units[0m]",
+        "checkpoint_1::test_sleep_zero_duration_all_units[0ms]",
+        "checkpoint_1::test_sleep_zero_duration_all_units[0ns]",
+        "checkpoint_1::test_sleep_zero_duration_all_units[0s]",
+        "checkpoint_1::test_sleep_zero_duration_all_units[0us]",
+        "checkpoint_1::test_template_helpers_registered",
+        "checkpoint_2::test_additional_helper_functions",
+        "checkpoint_2::test_body_from_file_cached_across_requests",
+        "checkpoint_2::test_body_from_file_template_rendering",
+        "checkpoint_2::test_body_from_file_with_helper_functions",
+        "checkpoint_2::test_empty_body_falls_back_to_file",
+        "checkpoint_2::test_gjson_array_wildcard",
+        "checkpoint_2::test_gjson_invalid_json_render_error",
+        "checkpoint_2::test_gjson_nested_and_array_access",
+        "checkpoint_2::test_gjson_non_string_raw_json",
+        "checkpoint_2::test_helper_edge_cases",
+        "checkpoint_2::test_helper_functions_gjson_regex_and_hmac",
+        "checkpoint_2::test_hmac_sha256_empty_inputs",
+        "checkpoint_2::test_inline_body_precedence_over_file",
+        "checkpoint_2::test_invalid_json_condition_fallback",
+        "checkpoint_2::test_is_last_index_returns_false",
+        "checkpoint_2::test_jsonpath_empty_body_and_headers",
+        "checkpoint_2::test_jsonpath_recursive_descent",
+        "checkpoint_2::test_jsonpath_value_and_no_match",
+        "checkpoint_2::test_known_deterministic_output[hmac_sha256]",
+        "checkpoint_2::test_known_deterministic_output[uuidv5]",
+        "checkpoint_2::test_missing_body_from_file_rejects_startup",
+        "checkpoint_2::test_regex_find_all_submatch_index_ordering",
+        "checkpoint_2::test_regex_find_all_submatch_no_match",
+        "checkpoint_2::test_templated_headers_with_helpers",
+        "checkpoint_2::test_uuidv5_deterministic_across_requests",
+        "checkpoint_2::test_whitespace_body_takes_precedence",
+        "checkpoint_3::test_mixed_action_ordering",
+        "checkpoint_3::test_redis_array_semicolon_separator",
+        "checkpoint_3::test_redis_hash_and_list_ops",
+        "checkpoint_3::test_redis_persists_state_across_requests",
+        "checkpoint_3::test_redis_state_lost_on_restart",
+        "checkpoint_3::test_redisdo_condition_stateful_routing",
+        "checkpoint_3::test_redisdo_del_multiple_keys",
+        "checkpoint_3::test_redisdo_empty_hash_and_keys",
+        "checkpoint_3::test_redisdo_empty_list_ops",
+        "checkpoint_3::test_redisdo_hdel",
+        "checkpoint_3::test_redisdo_inside_redis_action_items",
+        "checkpoint_3::test_redisdo_missing_key_returns_empty",
+        "checkpoint_3::test_redisdo_renders_response_headers",
+        "checkpoint_3::test_send_http_body_from_file_templates",
+        "checkpoint_3::test_send_http_error_no_abort",
+        "checkpoint_3::test_send_http_failure_preserves_redis_state",
+        "checkpoint_3::test_send_http_failure_preserves_response",
+        "checkpoint_3::test_send_http_header_templates",
+        "checkpoint_3::test_send_http_inline_body_wins",
+        "checkpoint_3::test_send_http_no_body",
+        "checkpoint_3::test_send_http_posts_to_webhook",
+        "checkpoint_3::test_send_http_url_template_with_redisdo",
+        "checkpoint_4::test_abstract_behavior_not_routable",
+        "checkpoint_4::test_action_order_after_inherit",
+        "checkpoint_4::test_behavior_extends_behavior",
+        "checkpoint_4::test_child_expect_overrides_parent",
+        "checkpoint_4::test_equal_order_preserves_relative",
+        "checkpoint_4::test_extend_forward_ref_across_files",
+        "checkpoint_4::test_extend_merges_child_values",
+        "checkpoint_4::test_extend_preserves_parent_values",
+        "checkpoint_4::test_missing_parent_uses_child_only",
+        "checkpoint_4::test_multi_level_inheritance_chain",
+        "checkpoint_4::test_no_order_defaults_to_zero",
+        "checkpoint_4::test_parent_actions_precede_child_at_same_order",
+        "checkpoint_4::test_rejects_abstract_behavior_with_extend",
+        "checkpoint_4::test_rejects_invalid_config[behavior_with_template_field]",
+        "checkpoint_4::test_rejects_invalid_config[empty_key]",
+        "checkpoint_4::test_rejects_invalid_config[invalid_kind]",
+        "checkpoint_4::test_rejects_invalid_config[missing_parent_invalid_child]",
+        "checkpoint_4::test_rejects_invalid_config[template_with_expect_actions]",
+        "checkpoint_4::test_rejects_invalid_config[template_with_values]",
+        "checkpoint_4::test_rejects_merged_multiple_reply_http",
+        "checkpoint_4::test_template_with_request_context",
+        "checkpoint_4::test_values_in_expect_condition",
+        "checkpoint_5::test_admin_server_disabled",
+        "checkpoint_5::test_delete_all_preserves_filesystem",
+        "checkpoint_5::test_delete_fs_only_key_returns_404",
+        "checkpoint_5::test_delete_key_reveals_filesystem_fallback",
+        "checkpoint_5::test_delete_missing_key_returns_404",
+        "checkpoint_5::test_delete_set_isolation",
+        "checkpoint_5::test_get_templates_includes_template_set_mocks",
+        "checkpoint_5::test_post_invalid_payload_returns_400",
+        "checkpoint_5::test_post_templates_updates_existing_key",
+        "checkpoint_5::test_redisdo_blocks_reserved_key_access[read]",
+        "checkpoint_5::test_redisdo_blocks_reserved_key_access[write]",
+        "checkpoint_5::test_redisdo_blocks_template_set_storage_key",
+        "checkpoint_5::test_template_crud_and_reload",
+        "checkpoint_5::test_template_set_lifecycle",
+        "checkpoint_5::test_template_set_replaces_previous",
+        "checkpoint_6::test_admin_reload_hot_reload_disabled",
+        "checkpoint_6::test_binary_assets_stable_until_reload",
+        "checkpoint_6::test_binary_file_empty_body",
+        "checkpoint_6::test_binary_raw_and_inline_precedence",
+        "checkpoint_6::test_cors_404_headers",
+        "checkpoint_6::test_cors_explicit_options_mock_wins_over_preflight",
+        "checkpoint_6::test_cors_global_headers[get]",
+        "checkpoint_6::test_cors_global_headers[preflight]",
+        "checkpoint_6::test_cors_headers_disabled",
+        "checkpoint_6::test_cors_headers_on_mock_error_status",
+        "checkpoint_6::test_cors_preflight_empty_body",
+        "checkpoint_6::test_cors_preserves_mock_headers",
+        "checkpoint_6::test_hot_reload_create_delete",
+        "checkpoint_6::test_hot_reload_disabled_ignores_edits",
+        "checkpoint_6::test_hot_reload_modified_file",
+        "checkpoint_6::test_omctl_push_delete_set",
+        "checkpoint_6::test_omctl_push_recursive_no_key",
+        "checkpoint_6::test_omctl_push_reload_disabled",
+        "checkpoint_6::test_reply_binary_content_length",
+        "checkpoint_6::test_reply_binary_file",
+        "checkpoint_6::test_reply_binary_no_disposition_without_name",
+        "checkpoint_6::test_send_binary_non_post_ignores_filename",
+        "checkpoint_6::test_send_binary_non_post_raw",
+        "checkpoint_6::test_send_binary_part_content_type",
+        "checkpoint_6::test_send_binary_post_basename",
+        "checkpoint_6::test_send_binary_post_multipart",
+        "checkpoint_6::test_send_binary_post_nested_basename"
+      ],
+      "verdict": "validated"
+    },
+    "checkpoint_7": {
+      "digest": "2092d2bd2e713b8bae1aa8bf1c54c3e6c1b7c895754d6b940be5941c39942c29",
+      "nondeterministic": [],
+      "nondeterministic_count": 0,
+      "size": 141,
+      "solvable": [
+        "checkpoint_1::test_condition_false_string_does_not_match",
+        "checkpoint_1::test_condition_render_error_fallback",
+        "checkpoint_1::test_condition_requires_exact_true_string",
+        "checkpoint_1::test_content_length_reflects_rendered_template",
+        "checkpoint_1::test_context_includes_path_query_header",
+        "checkpoint_1::test_duplicate_key_override_warns",
+        "checkpoint_1::test_duplicate_keys_use_last_definition",
+        "checkpoint_1::test_empty_condition_renders_httpbody",
+        "checkpoint_1::test_first_matching_condition_wins",
+        "checkpoint_1::test_http_log_required_fields",
+        "checkpoint_1::test_httpbody_empty_for_get_requests",
+        "checkpoint_1::test_kind_defaults_to_behavior",
+        "checkpoint_1::test_loads_yaml_and_yml_files_recursively",
+        "checkpoint_1::test_method_and_path_are_both_required",
+        "checkpoint_1::test_no_match_returns_not_found",
+        "checkpoint_1::test_non_yaml_files_ignored",
+        "checkpoint_1::test_normalizes_whitespace_in_body_template",
+        "checkpoint_1::test_normalizes_whitespace_in_condition",
+        "checkpoint_1::test_rejects_behavior_with_multiple_reply_http",
+        "checkpoint_1::test_rejects_empty_key",
+        "checkpoint_1::test_reply_http_default_headers_and_empty_body",
+        "checkpoint_1::test_sleep_action_delays_response",
+        "checkpoint_1::test_sleep_zero_duration_all_units[0h]",
+        "checkpoint_1::test_sleep_zero_duration_all_units[0m]",
+        "checkpoint_1::test_sleep_zero_duration_all_units[0ms]",
+        "checkpoint_1::test_sleep_zero_duration_all_units[0ns]",
+        "checkpoint_1::test_sleep_zero_duration_all_units[0s]",
+        "checkpoint_1::test_sleep_zero_duration_all_units[0us]",
+        "checkpoint_1::test_template_helpers_registered",
+        "checkpoint_2::test_additional_helper_functions",
+        "checkpoint_2::test_body_from_file_cached_across_requests",
+        "checkpoint_2::test_body_from_file_template_rendering",
+        "checkpoint_2::test_body_from_file_with_helper_functions",
+        "checkpoint_2::test_empty_body_falls_back_to_file",
+        "checkpoint_2::test_gjson_array_wildcard",
+        "checkpoint_2::test_gjson_invalid_json_render_error",
+        "checkpoint_2::test_gjson_nested_and_array_access",
+        "checkpoint_2::test_gjson_non_string_raw_json",
+        "checkpoint_2::test_helper_edge_cases",
+        "checkpoint_2::test_helper_functions_gjson_regex_and_hmac",
+        "checkpoint_2::test_hmac_sha256_empty_inputs",
+        "checkpoint_2::test_inline_body_precedence_over_file",
+        "checkpoint_2::test_invalid_json_condition_fallback",
+        "checkpoint_2::test_is_last_index_returns_false",
+        "checkpoint_2::test_jsonpath_empty_body_and_headers",
+        "checkpoint_2::test_jsonpath_recursive_descent",
+        "checkpoint_2::test_jsonpath_value_and_no_match",
+        "checkpoint_2::test_known_deterministic_output[hmac_sha256]",
+        "checkpoint_2::test_known_deterministic_output[uuidv5]",
+        "checkpoint_2::test_missing_body_from_file_rejects_startup",
+        "checkpoint_2::test_regex_find_all_submatch_index_ordering",
+        "checkpoint_2::test_regex_find_all_submatch_no_match",
+        "checkpoint_2::test_templated_headers_with_helpers",
+        "checkpoint_2::test_uuidv5_deterministic_across_requests",
+        "checkpoint_2::test_whitespace_body_takes_precedence",
+        "checkpoint_3::test_mixed_action_ordering",
+        "checkpoint_3::test_redis_array_semicolon_separator",
+        "checkpoint_3::test_redis_hash_and_list_ops",
+        "checkpoint_3::test_redis_persists_state_across_requests",
+        "checkpoint_3::test_redis_state_lost_on_restart",
+        "checkpoint_3::test_redisdo_condition_stateful_routing",
+        "checkpoint_3::test_redisdo_del_multiple_keys",
+        "checkpoint_3::test_redisdo_empty_hash_and_keys",
+        "checkpoint_3::test_redisdo_empty_list_ops",
+        "checkpoint_3::test_redisdo_hdel",
+        "checkpoint_3::test_redisdo_inside_redis_action_items",
+        "checkpoint_3::test_redisdo_missing_key_returns_empty",
+        "checkpoint_3::test_redisdo_renders_response_headers",
+        "checkpoint_3::test_send_http_body_from_file_templates",
+        "checkpoint_3::test_send_http_error_no_abort",
+        "checkpoint_3::test_send_http_failure_preserves_redis_state",
+        "checkpoint_3::test_send_http_failure_preserves_response",
+        "checkpoint_3::test_send_http_header_templates",
+        "checkpoint_3::test_send_http_inline_body_wins",
+        "checkpoint_3::test_send_http_no_body",
+        "checkpoint_3::test_send_http_posts_to_webhook",
+        "checkpoint_3::test_send_http_url_template_with_redisdo",
+        "checkpoint_4::test_abstract_behavior_not_routable",
+        "checkpoint_4::test_action_order_after_inherit",
+        "checkpoint_4::test_behavior_extends_behavior",
+        "checkpoint_4::test_child_expect_overrides_parent",
+        "checkpoint_4::test_equal_order_preserves_relative",
+        "checkpoint_4::test_extend_forward_ref_across_files",
+        "checkpoint_4::test_extend_merges_child_values",
+        "checkpoint_4::test_extend_preserves_parent_values",
+        "checkpoint_4::test_missing_parent_uses_child_only",
+        "checkpoint_4::test_multi_level_inheritance_chain",
+        "checkpoint_4::test_no_order_defaults_to_zero",
+        "checkpoint_4::test_parent_actions_precede_child_at_same_order",
+        "checkpoint_4::test_rejects_abstract_behavior_with_extend",
+        "checkpoint_4::test_rejects_invalid_config[behavior_with_template_field]",
+        "checkpoint_4::test_rejects_invalid_config[empty_key]",
+        "checkpoint_4::test_rejects_invalid_config[invalid_kind]",
+        "checkpoint_4::test_rejects_invalid_config[missing_parent_invalid_child]",
+        "checkpoint_4::test_rejects_invalid_config[template_with_expect_actions]",
+        "checkpoint_4::test_rejects_invalid_config[template_with_values]",
+        "checkpoint_4::test_rejects_merged_multiple_reply_http",
+        "checkpoint_4::test_template_with_request_context",
+        "checkpoint_4::test_values_in_expect_condition",
+        "checkpoint_5::test_admin_server_disabled",
+        "checkpoint_5::test_delete_all_preserves_filesystem",
+        "checkpoint_5::test_delete_fs_only_key_returns_404",
+        "checkpoint_5::test_delete_key_reveals_filesystem_fallback",
+        "checkpoint_5::test_delete_missing_key_returns_404",
+        "checkpoint_5::test_delete_set_isolation",
+        "checkpoint_5::test_get_templates_includes_template_set_mocks",
+        "checkpoint_5::test_post_invalid_payload_returns_400",
+        "checkpoint_5::test_post_templates_updates_existing_key",
+        "checkpoint_5::test_redisdo_blocks_reserved_key_access[read]",
+        "checkpoint_5::test_redisdo_blocks_reserved_key_access[write]",
+        "checkpoint_5::test_redisdo_blocks_template_set_storage_key",
+        "checkpoint_5::test_template_crud_and_reload",
+        "checkpoint_5::test_template_set_lifecycle",
+        "checkpoint_5::test_template_set_replaces_previous",
+        "checkpoint_6::test_admin_reload_hot_reload_disabled",
+        "checkpoint_6::test_binary_assets_stable_until_reload",
+        "checkpoint_6::test_binary_file_empty_body",
+        "checkpoint_6::test_binary_raw_and_inline_precedence",
+        "checkpoint_6::test_cors_404_headers",
+        "checkpoint_6::test_cors_explicit_options_mock_wins_over_preflight",
+        "checkpoint_6::test_cors_global_headers[get]",
+        "checkpoint_6::test_cors_global_headers[preflight]",
+        "checkpoint_6::test_cors_headers_disabled",
+        "checkpoint_6::test_cors_headers_on_mock_error_status",
+        "checkpoint_6::test_cors_preflight_empty_body",
+        "checkpoint_6::test_cors_preserves_mock_headers",
+        "checkpoint_6::test_hot_reload_create_delete",
+        "checkpoint_6::test_hot_reload_disabled_ignores_edits",
+        "checkpoint_6::test_hot_reload_modified_file",
+        "checkpoint_6::test_omctl_push_delete_set",
+        "checkpoint_6::test_omctl_push_recursive_no_key",
+        "checkpoint_6::test_omctl_push_reload_disabled",
+        "checkpoint_6::test_reply_binary_content_length",
+        "checkpoint_6::test_reply_binary_file",
+        "checkpoint_6::test_reply_binary_no_disposition_without_name",
+        "checkpoint_6::test_send_binary_non_post_ignores_filename",
+        "checkpoint_6::test_send_binary_non_post_raw",
+        "checkpoint_6::test_send_binary_part_content_type",
+        "checkpoint_6::test_send_binary_post_basename",
+        "checkpoint_6::test_send_binary_post_multipart",
+        "checkpoint_6::test_send_binary_post_nested_basename"
+      ],
+      "verdict": "validated"
+    },
+    "checkpoint_8": {
+      "digest": "c8305b2c4e3f361417d6e5db7938463e37e5a80f041e09890cbac8f2949c5c36",
+      "nondeterministic": [],
+      "nondeterministic_count": 0,
+      "size": 175,
+      "solvable": [
+        "checkpoint_1::test_condition_false_string_does_not_match",
+        "checkpoint_1::test_condition_render_error_fallback",
+        "checkpoint_1::test_condition_requires_exact_true_string",
+        "checkpoint_1::test_content_length_reflects_rendered_template",
+        "checkpoint_1::test_context_includes_path_query_header",
+        "checkpoint_1::test_duplicate_key_override_warns",
+        "checkpoint_1::test_duplicate_keys_use_last_definition",
+        "checkpoint_1::test_empty_condition_renders_httpbody",
+        "checkpoint_1::test_first_matching_condition_wins",
+        "checkpoint_1::test_http_log_required_fields",
+        "checkpoint_1::test_httpbody_empty_for_get_requests",
+        "checkpoint_1::test_kind_defaults_to_behavior",
+        "checkpoint_1::test_loads_yaml_and_yml_files_recursively",
+        "checkpoint_1::test_method_and_path_are_both_required",
+        "checkpoint_1::test_no_match_returns_not_found",
+        "checkpoint_1::test_non_yaml_files_ignored",
+        "checkpoint_1::test_normalizes_whitespace_in_body_template",
+        "checkpoint_1::test_normalizes_whitespace_in_condition",
+        "checkpoint_1::test_rejects_behavior_with_multiple_reply_http",
+        "checkpoint_1::test_rejects_empty_key",
+        "checkpoint_1::test_reply_http_default_headers_and_empty_body",
+        "checkpoint_1::test_sleep_action_delays_response",
+        "checkpoint_1::test_sleep_zero_duration_all_units[0h]",
+        "checkpoint_1::test_sleep_zero_duration_all_units[0m]",
+        "checkpoint_1::test_sleep_zero_duration_all_units[0ms]",
+        "checkpoint_1::test_sleep_zero_duration_all_units[0ns]",
+        "checkpoint_1::test_sleep_zero_duration_all_units[0s]",
+        "checkpoint_1::test_sleep_zero_duration_all_units[0us]",
+        "checkpoint_1::test_template_helpers_registered",
+        "checkpoint_2::test_additional_helper_functions",
+        "checkpoint_2::test_body_from_file_cached_across_requests",
+        "checkpoint_2::test_body_from_file_template_rendering",
+        "checkpoint_2::test_body_from_file_with_helper_functions",
+        "checkpoint_2::test_empty_body_falls_back_to_file",
+        "checkpoint_2::test_gjson_array_wildcard",
+        "checkpoint_2::test_gjson_invalid_json_render_error",
+        "checkpoint_2::test_gjson_nested_and_array_access",
+        "checkpoint_2::test_gjson_non_string_raw_json",
+        "checkpoint_2::test_helper_edge_cases",
+        "checkpoint_2::test_helper_functions_gjson_regex_and_hmac",
+        "checkpoint_2::test_hmac_sha256_empty_inputs",
+        "checkpoint_2::test_inline_body_precedence_over_file",
+        "checkpoint_2::test_invalid_json_condition_fallback",
+        "checkpoint_2::test_is_last_index_returns_false",
+        "checkpoint_2::test_jsonpath_empty_body_and_headers",
+        "checkpoint_2::test_jsonpath_recursive_descent",
+        "checkpoint_2::test_jsonpath_value_and_no_match",
+        "checkpoint_2::test_known_deterministic_output[hmac_sha256]",
+        "checkpoint_2::test_known_deterministic_output[uuidv5]",
+        "checkpoint_2::test_missing_body_from_file_rejects_startup",
+        "checkpoint_2::test_regex_find_all_submatch_index_ordering",
+        "checkpoint_2::test_regex_find_all_submatch_no_match",
+        "checkpoint_2::test_templated_headers_with_helpers",
+        "checkpoint_2::test_uuidv5_deterministic_across_requests",
+        "checkpoint_2::test_whitespace_body_takes_precedence",
+        "checkpoint_3::test_mixed_action_ordering",
+        "checkpoint_3::test_redis_array_semicolon_separator",
+        "checkpoint_3::test_redis_hash_and_list_ops",
+        "checkpoint_3::test_redis_persists_state_across_requests",
+        "checkpoint_3::test_redis_state_lost_on_restart",
+        "checkpoint_3::test_redisdo_condition_stateful_routing",
+        "checkpoint_3::test_redisdo_del_multiple_keys",
+        "checkpoint_3::test_redisdo_empty_hash_and_keys",
+        "checkpoint_3::test_redisdo_empty_list_ops",
+        "checkpoint_3::test_redisdo_hdel",
+        "checkpoint_3::test_redisdo_inside_redis_action_items",
+        "checkpoint_3::test_redisdo_missing_key_returns_empty",
+        "checkpoint_3::test_redisdo_renders_response_headers",
+        "checkpoint_3::test_send_http_body_from_file_templates",
+        "checkpoint_3::test_send_http_error_no_abort",
+        "checkpoint_3::test_send_http_failure_preserves_redis_state",
+        "checkpoint_3::test_send_http_failure_preserves_response",
+        "checkpoint_3::test_send_http_header_templates",
+        "checkpoint_3::test_send_http_inline_body_wins",
+        "checkpoint_3::test_send_http_no_body",
+        "checkpoint_3::test_send_http_posts_to_webhook",
+        "checkpoint_3::test_send_http_url_template_with_redisdo",
+        "checkpoint_4::test_abstract_behavior_not_routable",
+        "checkpoint_4::test_action_order_after_inherit",
+        "checkpoint_4::test_behavior_extends_behavior",
+        "checkpoint_4::test_child_expect_overrides_parent",
+        "checkpoint_4::test_equal_order_preserves_relative",
+        "checkpoint_4::test_extend_forward_ref_across_files",
+        "checkpoint_4::test_extend_merges_child_values",
+        "checkpoint_4::test_extend_preserves_parent_values",
+        "checkpoint_4::test_missing_parent_uses_child_only",
+        "checkpoint_4::test_multi_level_inheritance_chain",
+        "checkpoint_4::test_no_order_defaults_to_zero",
+        "checkpoint_4::test_parent_actions_precede_child_at_same_order",
+        "checkpoint_4::test_rejects_abstract_behavior_with_extend",
+        "checkpoint_4::test_rejects_invalid_config[behavior_with_template_field]",
+        "checkpoint_4::test_rejects_invalid_config[empty_key]",
+        "checkpoint_4::test_rejects_invalid_config[invalid_kind]",
+        "checkpoint_4::test_rejects_invalid_config[missing_parent_invalid_child]",
+        "checkpoint_4::test_rejects_invalid_config[template_with_expect_actions]",
+        "checkpoint_4::test_rejects_invalid_config[template_with_values]",
+        "checkpoint_4::test_rejects_merged_multiple_reply_http",
+        "checkpoint_4::test_template_with_request_context",
+        "checkpoint_4::test_values_in_expect_condition",
+        "checkpoint_5::test_admin_server_disabled",
+        "checkpoint_5::test_delete_all_preserves_filesystem",
+        "checkpoint_5::test_delete_fs_only_key_returns_404",
+        "checkpoint_5::test_delete_key_reveals_filesystem_fallback",
+        "checkpoint_5::test_delete_missing_key_returns_404",
+        "checkpoint_5::test_delete_set_isolation",
+        "checkpoint_5::test_get_templates_includes_template_set_mocks",
+        "checkpoint_5::test_post_invalid_payload_returns_400",
+        "checkpoint_5::test_post_templates_updates_existing_key",
+        "checkpoint_5::test_redisdo_blocks_reserved_key_access[read]",
+        "checkpoint_5::test_redisdo_blocks_reserved_key_access[write]",
+        "checkpoint_5::test_redisdo_blocks_template_set_storage_key",
+        "checkpoint_5::test_template_crud_and_reload",
+        "checkpoint_5::test_template_set_lifecycle",
+        "checkpoint_5::test_template_set_replaces_previous",
+        "checkpoint_6::test_admin_reload_hot_reload_disabled",
+        "checkpoint_6::test_binary_assets_stable_until_reload",
+        "checkpoint_6::test_binary_file_empty_body",
+        "checkpoint_6::test_binary_raw_and_inline_precedence",
+        "checkpoint_6::test_cors_404_headers",
+        "checkpoint_6::test_cors_explicit_options_mock_wins_over_preflight",
+        "checkpoint_6::test_cors_global_headers[get]",
+        "checkpoint_6::test_cors_global_headers[preflight]",
+        "checkpoint_6::test_cors_headers_disabled",
+        "checkpoint_6::test_cors_headers_on_mock_error_status",
+        "checkpoint_6::test_cors_preflight_empty_body",
+        "checkpoint_6::test_cors_preserves_mock_headers",
+        "checkpoint_6::test_hot_reload_create_delete",
+        "checkpoint_6::test_hot_reload_disabled_ignores_edits",
+        "checkpoint_6::test_hot_reload_modified_file",
+        "checkpoint_6::test_omctl_push_delete_set",
+        "checkpoint_6::test_omctl_push_recursive_no_key",
+        "checkpoint_6::test_omctl_push_reload_disabled",
+        "checkpoint_6::test_reply_binary_content_length",
+        "checkpoint_6::test_reply_binary_file",
+        "checkpoint_6::test_reply_binary_no_disposition_without_name",
+        "checkpoint_6::test_send_binary_non_post_ignores_filename",
+        "checkpoint_6::test_send_binary_non_post_raw",
+        "checkpoint_6::test_send_binary_part_content_type",
+        "checkpoint_6::test_send_binary_post_basename",
+        "checkpoint_6::test_send_binary_post_multipart",
+        "checkpoint_6::test_send_binary_post_nested_basename",
+        "checkpoint_8::test_dry_run_no_redis_mutation",
+        "checkpoint_8::test_dry_run_no_send_http",
+        "checkpoint_8::test_evaluate_action_ordering",
+        "checkpoint_8::test_evaluate_amqp_context",
+        "checkpoint_8::test_evaluate_amqp_queue_defaults_to_routing_key[None]",
+        "checkpoint_8::test_evaluate_amqp_queue_defaults_to_routing_key[]",
+        "checkpoint_8::test_evaluate_blank_condition_passes",
+        "checkpoint_8::test_evaluate_condition_fail_no_actions",
+        "checkpoint_8::test_evaluate_condition_failure",
+        "checkpoint_8::test_evaluate_expect_mismatch_no_actions",
+        "checkpoint_8::test_evaluate_grpc_context",
+        "checkpoint_8::test_evaluate_http_success",
+        "checkpoint_8::test_evaluate_kafka_context",
+        "checkpoint_8::test_evaluate_merged_contexts",
+        "checkpoint_8::test_evaluate_merged_object_context_values_files",
+        "checkpoint_8::test_evaluate_rejects_empty_key",
+        "checkpoint_8::test_evaluate_rejects_invalid_request",
+        "checkpoint_8::test_evaluate_rejects_missing_channel",
+        "checkpoint_8::test_evaluate_rejects_partial_matchers[amqp-exchange]",
+        "checkpoint_8::test_evaluate_rejects_partial_matchers[grpc-method]",
+        "checkpoint_8::test_evaluate_rejects_partial_matchers[http-path]",
+        "checkpoint_8::test_evaluate_rejects_partial_matchers[kafka-topic]",
+        "checkpoint_8::test_evaluate_reply_http_metadata",
+        "checkpoint_8::test_evaluate_requires_amqp_grpc_context",
+        "checkpoint_8::test_evaluate_requires_kafka_context",
+        "checkpoint_8::test_evaluate_short_circuits_before_condition_render_error",
+        "checkpoint_8::test_grpc_enabled_without_behaviors_does_not_require_descriptors",
+        "checkpoint_8::test_grpc_first_match_wins",
+        "checkpoint_8::test_grpc_port_binds",
+        "checkpoint_8::test_grpc_roundtrip_reply",
+        "checkpoint_8::test_grpc_startup_descriptor_failure[invalid-path]",
+        "checkpoint_8::test_grpc_startup_descriptor_failure[missing-path]",
+        "checkpoint_8::test_reply_grpc_from_file",
+        "checkpoint_8::test_reply_grpc_headers"
+      ],
+      "verdict": "validated"
+    }
+  },
+  "spec_determinacy": {
+    "assertions": {
+      "audited": 0,
+      "by_rule": {}
+    },
+    "audit_version": 1,
+    "dynamic": {
+      "environment": {},
+      "reason": null,
+      "status": "ran"
+    },
+    "flagged": [],
+    "method": "Static: each audited assertion of a test (error-detail/message equality, containment or pattern; byte-level stdout comparison) is classified against the text of its origin checkpoint's specification and every earlier one (rules below). Dynamic: reference k and spec-conformant variants of it (variants below) are graded at step k; a case is sensitive to a variant when it passes on the reference and not on the variant. A case is flagged when its test has an undetermined assertion of the kind a variant it is sensitive to rewrites.",
+    "rules": {
+      "content-stated": "determined: a paragraph states what the category's detail contains",
+      "content-unstated": "undetermined: error text must contain an input value or match a pattern; no paragraph states what the category's detail contains",
+      "exact-stated": "determined: a paragraph states the exact content of the category's detail",
+      "exact-unstated": "undetermined: error text must equal an input value; no paragraph states exact content",
+      "format-stated": "determined: the specification names an output byte format",
+      "format-unstated": "undetermined: stdout compared byte for byte; no byte format stated",
+      "literal-in-spec": "determined: the asserted literal occurs in the specification text",
+      "wording-unstated": "undetermined: an error-text literal in neither the specification nor the test's inputs"
+    },
+    "sensitive_determined": [],
+    "sensitive_unexplained": [
+      {
+        "case": "test_checkpoint_1.py::test_duplicate_key_override_warns",
+        "variants": [
+          "neutral_error_text",
+          "reformatted_json"
+        ]
+      },
+      {
+        "case": "test_checkpoint_1.py::test_http_log_required_fields",
+        "variants": [
+          "neutral_error_text",
+          "reformatted_json"
+        ]
+      }
+    ],
+    "static_undetermined": [],
+    "steps": {
+      "checkpoint_1": {
+        "reference": {
+          "infra_failure": null,
+          "passed": 29,
+          "total": 29
+        },
+        "variants": {
+          "neutral_error_text": {
+            "infra_failure": null,
+            "passed": 27,
+            "sensitive": [
+              "test_checkpoint_1.py::test_duplicate_key_override_warns",
+              "test_checkpoint_1.py::test_http_log_required_fields"
+            ],
+            "total": 29
+          },
+          "reformatted_json": {
+            "infra_failure": null,
+            "passed": 27,
+            "sensitive": [
+              "test_checkpoint_1.py::test_duplicate_key_override_warns",
+              "test_checkpoint_1.py::test_http_log_required_fields"
+            ],
+            "total": 29
+          }
+        }
+      },
+      "checkpoint_2": {
+        "reference": {
+          "infra_failure": null,
+          "passed": 55,
+          "total": 55
+        },
+        "variants": {
+          "neutral_error_text": {
+            "infra_failure": null,
+            "passed": 53,
+            "sensitive": [],
+            "total": 55
+          },
+          "reformatted_json": {
+            "infra_failure": null,
+            "passed": 53,
+            "sensitive": [],
+            "total": 55
+          }
+        }
+      },
+      "checkpoint_3": {
+        "reference": {
+          "infra_failure": null,
+          "passed": 77,
+          "total": 77
+        },
+        "variants": {
+          "neutral_error_text": {
+            "infra_failure": null,
+            "passed": 75,
+            "sensitive": [],
+            "total": 77
+          },
+          "reformatted_json": {
+            "infra_failure": null,
+            "passed": 75,
+            "sensitive": [],
+            "total": 77
+          }
+        }
+      },
+      "checkpoint_4": {
+        "reference": {
+          "infra_failure": null,
+          "passed": 99,
+          "total": 99
+        },
+        "variants": {
+          "neutral_error_text": {
+            "infra_failure": null,
+            "passed": 97,
+            "sensitive": [],
+            "total": 99
+          },
+          "reformatted_json": {
+            "infra_failure": null,
+            "passed": 97,
+            "sensitive": [],
+            "total": 99
+          }
+        }
+      },
+      "checkpoint_5": {
+        "reference": {
+          "infra_failure": null,
+          "passed": 114,
+          "total": 114
+        },
+        "variants": {
+          "neutral_error_text": {
+            "infra_failure": null,
+            "passed": 112,
+            "sensitive": [],
+            "total": 114
+          },
+          "reformatted_json": {
+            "infra_failure": null,
+            "passed": 112,
+            "sensitive": [],
+            "total": 114
+          }
+        }
+      },
+      "checkpoint_6": {
+        "reference": {
+          "infra_failure": null,
+          "passed": 141,
+          "total": 141
+        },
+        "variants": {
+          "neutral_error_text": {
+            "infra_failure": null,
+            "passed": 139,
+            "sensitive": [],
+            "total": 141
+          },
+          "reformatted_json": {
+            "infra_failure": null,
+            "passed": 139,
+            "sensitive": [],
+            "total": 141
+          }
+        }
+      },
+      "checkpoint_7": {
+        "reference": {
+          "infra_failure": null,
+          "passed": 141,
+          "total": 159
+        },
+        "variants": {
+          "neutral_error_text": {
+            "infra_failure": null,
+            "passed": 139,
+            "sensitive": [],
+            "total": 159
+          },
+          "reformatted_json": {
+            "infra_failure": null,
+            "passed": 139,
+            "sensitive": [],
+            "total": 159
+          }
+        }
+      },
+      "checkpoint_8": {
+        "reference": {
+          "infra_failure": null,
+          "passed": 175,
+          "total": 194
+        },
+        "variants": {
+          "neutral_error_text": {
+            "infra_failure": null,
+            "passed": 173,
+            "sensitive": [],
+            "total": 194
+          },
+          "reformatted_json": {
+            "infra_failure": null,
+            "passed": 173,
+            "sensitive": [],
+            "total": 194
+          }
+        }
+      }
+    },
+    "summary": {
+      "flagged": 0,
+      "flagged_by_checkpoint": {},
+      "flagged_by_rule": {},
+      "sensitive_determined": 0,
+      "sensitive_unexplained": 2,
+      "unconfirmed": 0
+    },
+    "unconfirmed": [],
+    "variants": {
+      "neutral_error_text": "every error's human-readable text (an error object's detail or message) replaced by 'request rejected'; category, exit code and format kept",
+      "reformatted_json": "JSON stdout re-serialised with two-space indentation and a trailing newline; value and key order kept"
+    }
+  },
+  "steps": [
+    "checkpoint_1",
+    "checkpoint_2",
+    "checkpoint_3",
+    "checkpoint_4",
+    "checkpoint_5",
+    "checkpoint_6",
+    "checkpoint_7",
+    "checkpoint_8"
+  ],
+  "verdict": "excluded"
+}

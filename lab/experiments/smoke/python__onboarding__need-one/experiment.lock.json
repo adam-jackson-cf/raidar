@@ -41,11 +41,11 @@
         }
       },
       "scorer": {
-        "correctness@4": {
-          "digest": "6c2f10ca8361488500a32f23214b7867eec81650a86939368b8de4c3efbb43f1",
+        "correctness@5": {
+          "digest": "7521f1118a762ea3718e4408a24a44a40129f2028906031acce88c5f2701775c",
           "metadata": {
             "implementation": "raidar.scoring.correctness:correctness_scorer",
-            "implementation_digest": "35b002328986f6dab40df4f60b2b42a97a9cf848328cb8e15baf5b35ea06887f",
+            "implementation_digest": "1be7308c22b6fb6373bfa774ea1ef6052179e56bc02aec453eb7d0a2473b9f7d",
             "manifest": {
               "description": "Oracle verdicts per checkpoint and trajectory, from the oracle step records.",
               "evidence_required": [
@@ -239,7 +239,7 @@
                 "*"
               ],
               "tools": [],
-              "version": "4"
+              "version": "5"
             },
             "tool_lock": {}
           }
@@ -254,12 +254,12 @@
       "metric": "scb-canonical@2",
       "scorer_config": {},
       "scorers": [
-        "correctness@4"
+        "correctness@5"
       ]
     },
     "tools": {}
   },
-  "document_sha256": "118c1d9ada0f1dbe75cae3ea85b3150a7b0c8a10d525a726c4369e24aa754fa2",
+  "document_sha256": "54a56c44b0e0e7bb41b96c00c0c2759117ffb75d96e93bcec65838cbd5c87d5c",
   "execution": {
     "arms": {
       "baseline": {
@@ -341,12 +341,12 @@
     "problems": [
       {
         "checkpoints": 2,
-        "digest": "de50717250a8e95468d934f3f3dcf4157dd67b0f6823da9ce6e6977b2257272a",
+        "digest": "5611aa25b74d8949f3adf02198dd5de4c12d1f26c7127631aedc7aaba811949a",
         "label": "scb/dag_execution@38d627ecf668[:2]"
       },
       {
         "checkpoints": 5,
-        "digest": "8cb10b05b1a04407c6b7846619f8865fe13112d1082bf492d6c73d5349bad20e",
+        "digest": "f6d2020bef274fcff6525baae20d25f93c4d899d9fd4d426674ec5bd83e2e7e9",
         "label": "scb/log_query@38d627ecf668"
       }
     ],
@@ -373,10 +373,11 @@
       },
       "problem": {
         "scb/dag_execution@38d627ecf668": {
-          "digest": "de50717250a8e95468d934f3f3dcf4157dd67b0f6823da9ce6e6977b2257272a",
+          "digest": "5611aa25b74d8949f3adf02198dd5de4c12d1f26c7127631aedc7aaba811949a",
           "metadata": {
-            "bundle_sha256": "7b4c049ae04ae29eb25c4eed0ed0719696a2ea31fafabfc49115827240ac3776",
+            "bundle_sha256": "1970822e505206f8b5fbd6a3ccae83c96a134400a09ef6295f9751307dc3ea98",
             "checkpoints": 3,
+            "dependencies_sha256": "8da5292c8c37ce0dca0fbf5f8e1fd9ed40e0fb62e8137bea3a03cf2aad45ec52",
             "entry_command": "uv run --project /app launch.py",
             "entry_file": "launch.py",
             "mode": "multi_checkpoint",
@@ -539,10 +540,11 @@
           }
         },
         "scb/log_query@38d627ecf668": {
-          "digest": "8cb10b05b1a04407c6b7846619f8865fe13112d1082bf492d6c73d5349bad20e",
+          "digest": "f6d2020bef274fcff6525baae20d25f93c4d899d9fd4d426674ec5bd83e2e7e9",
           "metadata": {
-            "bundle_sha256": "1f75ee5afc2d5e0178b6cb47952d668f55748c143ba8bdc53eb6d1df39f7239a",
+            "bundle_sha256": "b6870d3216884482088753b4371aae54510c6fcc308092e60decd999479f9464",
             "checkpoints": 5,
+            "dependencies_sha256": "cb00f2c6f1d6b7120a7275533084207c0a6991131f84840c86dc533a4d893e85",
             "entry_command": "uv run --project /app logql.py",
             "entry_file": "logql.py",
             "mode": "multi_checkpoint",
@@ -1849,10 +1851,10 @@
   "experiment": {
     "id": "python__onboarding__need-one",
     "source": "experiment.yaml",
-    "source_sha256": "4bf5ebb2e4ecf31ac1103e9d3d66719d54cfbdc11703f24b6e889abadd9f5052",
-    "spec_sha256": "76a47c46f55cba776b3f5863ec7b765de1c193cc4cb688cd9f5d82b946773759"
+    "source_sha256": "db0f91228b15ae799ec63879ce4ab66c41c888b9eea0adad9db52a3ca83b5030",
+    "spec_sha256": "8b6ef1018ad5096ddd1397fcab274f540b4b63085cc3ae81dfd8b65fddf132e2"
   },
-  "lock_sha256": "c6fb3ed896949b8bccf4af7fd31dc2a064ea03d116cc448c99021008fbeaa19b",
+  "lock_sha256": "04088440abb7f36324dc065bd5ef93d5d7cf88808b44f59496b3c128b3a6d3ce",
   "lock_version": 4,
   "overrides": {
     "flags": {},
@@ -1860,8 +1862,8 @@
   },
   "sections": {
     "analysis": "144d50057229f81b6136f89cfe8df3c9cf5dbbbec9a279c66acba88e027528b3",
-    "assessment": "0ab6ae1c44a7cecd75e0376ce955a93bac1c333b31381ba975396d5f47967514",
-    "execution": "c6fb3ed896949b8bccf4af7fd31dc2a064ea03d116cc448c99021008fbeaa19b",
+    "assessment": "dfa34da0dcf5c523ce543d07bdb4913022e1444a9da8f1baded4e7238c9cf27f",
+    "execution": "04088440abb7f36324dc065bd5ef93d5d7cf88808b44f59496b3c128b3a6d3ce",
     "toolchain": "b6ef977873154c13b7d03140ffd4cfff64d0cfa32430af9f4e52db26e2a729cc"
   },
   "spec": {
@@ -1898,7 +1900,7 @@
       "metric": "scb-canonical@2",
       "scorer_config": {},
       "scorers": [
-        "correctness@4"
+        "correctness@5"
       ]
     },
     "description": "AT-N1 onboarding mechanics for two generated SCB bindings; not citable.",

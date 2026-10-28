@@ -1,7 +1,7 @@
 """``raidar analyze`` over stored jobs and a real Assessment store.
 
 Trials are written with host-side verifier records, rescored with the real
-``correctness@4`` and ``resource-usage@3`` scorers, and analysed through the
+``correctness@5`` and ``resource-usage@4`` scorers, and analysed through the
 CLI. The analysis must find each trial's Assessments by recomputing the keys
 ``raidar assess --rescore`` wrote, and must leave jobs and the store untouched.
 """
@@ -105,7 +105,7 @@ def _lock(
 
 
 # Analysis looks Assessments up under the lock's assessment settings.
-LOCKED_SETTINGS = lock_rescore_config(_lock(["correctness@4"]))
+LOCKED_SETTINGS = lock_rescore_config(_lock(["correctness@5"]))
 
 
 def _record(
@@ -195,14 +195,14 @@ def _write_run(
 
 @pytest.fixture
 def pilot(tmp_path: Path) -> tuple[Path, Path, Path]:
-    lock = _lock(["correctness@4", "code-quality@5", "resource-usage@3"])
+    lock = _lock(["correctness@5", "code-quality@6", "resource-usage@4"])
     lock_path = tmp_path / "pilot.lock.json"
     lock_path.write_text(json.dumps(lock))
     job_dir = _write_run(tmp_path, lock)
     store = tmp_path / "store"
     rescore_path(
         job_dir / "trials",
-        ("correctness@4", "resource-usage@3"),
+        ("correctness@5", "resource-usage@4"),
         AssessmentStore(store),
         default_scorer_registry(),
         config=LOCKED_SETTINGS.scorers,
@@ -255,7 +255,7 @@ def test_analyze_reports_stored_assessments_without_touching_inputs(
     assert solve["sample_size"]["recommended_pairs"] == 7  # ceil(7.84 * (0.2236 / 0.25)^2)
     # The default primary of a continue experiment is the solvable-set solve rate; this lock
     # pins no solvable set, so it is unavailable (never zero) with the raw rate beside it.
-    # S is secondary; code-quality@5 was never rescored, so S is unassessed too.
+    # S is secondary; code-quality@6 was never rescored, so S is unassessed too.
     assert report["primary_metric"] == "solve_rate_solvable"
     primary = report["comparisons"][0]["primary"]
     assert (primary["metric"], primary["verdict"]) == ("solve_rate_solvable", "insufficient")
@@ -284,14 +284,14 @@ def test_analyze_reports_stored_assessments_without_touching_inputs(
 def test_floor_policy_scores_c_zero_trials_zero_end_to_end_while_the_base_policy_leaves_unscored(
     tmp_path: Path,
 ) -> None:
-    # S2-SS-2 through rescore and `raidar analyze`: code-quality@5 is never rescored, so every
+    # S2-SS-2 through rescore and `raidar analyze`: code-quality@6 is never rescored, so every
     # trial has a quality gap. Under @2 a trial with C = 0 still scores S = 0 and is
     # paired; one with C > 0 stays unassessed. Under @1 (fork-exact) every S is unassessed.
     outcomes = {
         "baseline": [(FAIL, FAIL)] * 5,
         "guided": [(FAIL, FAIL)] * 2 + [(PASS, FAIL)] * 3,
     }
-    scorers = ["correctness@4", "code-quality@5", "resource-usage@3"]
+    scorers = ["correctness@5", "code-quality@6", "resource-usage@4"]
     for headline, pairs, unassessed in (("scb-canonical@2", 2, 3), ("scb-canonical@1", 0, 5)):
         root = tmp_path / headline
         lock = _lock(scorers, headline=headline)
@@ -302,7 +302,7 @@ def test_floor_policy_scores_c_zero_trials_zero_end_to_end_while_the_base_policy
         store = root / "store"
         rescore_path(
             job_dir / "trials",
-            ("correctness@4", "resource-usage@3"),
+            ("correctness@5", "resource-usage@4"),
             AssessmentStore(store),
             default_scorer_registry(),
             config=lock_rescore_config(lock).scorers,
@@ -329,14 +329,14 @@ PINNED: dict[str, Any] = {
 
 
 def _pinned_pilot(tmp_path: Path) -> tuple[Path, Path, Path]:
-    lock = _lock(["correctness@4", "resource-usage@3"], **PINNED)
+    lock = _lock(["correctness@5", "resource-usage@4"], **PINNED)
     lock_path = tmp_path / "pinned.lock.json"
     lock_path.write_text(json.dumps(lock))
     job_dir = _write_run(tmp_path / "pinned", lock)
     store = tmp_path / "pinned-store"
     rescore_path(
         job_dir / "trials",
-        ("correctness@4", "resource-usage@3"),
+        ("correctness@5", "resource-usage@4"),
         AssessmentStore(store),
         default_scorer_registry(),
         config=LOCKED_SETTINGS.scorers,
@@ -394,12 +394,12 @@ def test_analyze_refuses_to_write_into_a_run_or_to_mix_locks(
     assert inside.exit_code != 0
     assert "outside" in inside.output
     other = tmp_path / "other.lock.json"
-    other.write_text(json.dumps(_lock(["correctness@4"], experiment="other")))
+    other.write_text(json.dumps(_lock(["correctness@5"], experiment="other")))
     mixed = _analyze(job_dir, store, other, tmp_path / "out")
     assert mixed.exit_code != 0
     assert "executed under lock" in mixed.output
     # A relock that only changes the scorers keeps the execution identity the run recorded.
-    rescored = _lock(["correctness@4"])
+    rescored = _lock(["correctness@5"])
     assert rescored["lock_sha256"] == json.loads(lock_path.read_text())["lock_sha256"]
     other.write_text(json.dumps(rescored))
     assert _analyze(job_dir, store, other, tmp_path / "rescored").exit_code == 0
@@ -427,7 +427,7 @@ def test_a_valid_rerun_replaces_an_invalid_trial_but_two_valid_ones_conflict() -
 def test_a_job_resolves_only_the_lock_its_manifest_names_and_otherwise_asks_for_one(
     tmp_path: Path,
 ) -> None:
-    lock = _lock(["correctness@4"])
+    lock = _lock(["correctness@5"])
     experiment_file = tmp_path / "pilot.yaml"
     lock_path = tmp_path / "pilot.lock.json"
     lock_path.write_text(json.dumps(lock))
@@ -442,7 +442,7 @@ def test_a_job_resolves_only_the_lock_its_manifest_names_and_otherwise_asks_for_
     assert default_lock(job(experiment_file=str(experiment_file))) == lock_path
     with pytest.raises(AnalysisInputError, match="names no experiment_file; pass --lock"):
         default_lock(job())
-    lock_path.write_text(json.dumps(_lock(["correctness@4"], experiment="another")))
+    lock_path.write_text(json.dumps(_lock(["correctness@5"], experiment="another")))
     with pytest.raises(AnalysisInputError, match="another experiment.*pass --lock"):
         default_lock(job(experiment_file=str(experiment_file)))
     lock_path.unlink()
@@ -451,14 +451,14 @@ def test_a_job_resolves_only_the_lock_its_manifest_names_and_otherwise_asks_for_
 
 
 def test_truncated_runs_are_refused_unless_labelled_and_never_pooled(tmp_path: Path) -> None:
-    lock = _lock(["correctness@4", "resource-usage@3"])
+    lock = _lock(["correctness@5", "resource-usage@4"])
     lock_path = tmp_path / "pilot.lock.json"
     lock_path.write_text(json.dumps(lock))
     truncated = _write_run(tmp_path, lock, name="dev", max_checkpoints=2)
     store = tmp_path / "store"
     rescore_path(
         truncated / "trials",
-        ("correctness@4", "resource-usage@3"),
+        ("correctness@5", "resource-usage@4"),
         AssessmentStore(store),
         default_scorer_registry(),
         config=LOCKED_SETTINGS.scorers,
@@ -495,7 +495,7 @@ def test_truncated_runs_are_refused_unless_labelled_and_never_pooled(tmp_path: P
 def test_rescore_and_analysis_follow_the_lock_not_the_runs_execution_time_file(
     tmp_path: Path,
 ) -> None:
-    lock = _lock(["correctness@4", "code-quality@5", "resource-usage@3"])
+    lock = _lock(["correctness@5", "code-quality@6", "resource-usage@4"])
     lock_path = tmp_path / "pilot.lock.json"
     lock_path.write_text(json.dumps(lock))
     job_dir = _write_run(tmp_path, lock)  # its assessment-config.yaml says `scorers: {}`
@@ -507,7 +507,7 @@ def test_rescore_and_analysis_follow_the_lock_not_the_runs_execution_time_file(
             "--rescore",
             str(job_dir / "trials"),
             "--scorer",
-            "correctness@4",
+            "correctness@5",
             "--store",
             str(store),
             "--lock",
@@ -526,12 +526,45 @@ def test_rescore_and_analysis_follow_the_lock_not_the_runs_execution_time_file(
 def _move_bundles_into_problem_store(job_dir: Path, tmp_path: Path) -> Path:
     """Take the trials' bundles from their recorded roots; one becomes the store's oracle."""
     problems = tmp_path / "problems"
-    oracle = problems / "store" / "scb" / "toy" / "1" / "oracle"
+    oracle = problems / "store" / "scb" / "toy" / "1" / "unpinned" / "oracle"
     oracle.parent.mkdir(parents=True)
     bundles = sorted((job_dir / "trials").glob("*-bundle"))
     bundles[0].rename(oracle)
     for bundle in bundles[1:]:
         shutil.rmtree(bundle)
+    manifest = problems / "registry" / "scb" / "toy" / "1.json"
+    manifest.parent.mkdir(parents=True)
+    manifest.write_text(
+        json.dumps(
+            {
+                "ref": "scb/toy@1",
+                "mode": "multi_checkpoint",
+                "checkpoints": len(STEPS),
+                "steps": [
+                    {
+                        "name": step,
+                        "checkpoint": step,
+                        "instruction_sha256": "fixture",
+                        "test_files": [f"test_{step}.py"],
+                    }
+                    for step in STEPS
+                ],
+                "source": {
+                    "dataset": "scb",
+                    "url": "https://example.test/scb",
+                    "commit": "1" * 40,
+                    "problem": "toy",
+                    "problem_tree": "fixture",
+                    "converter_tree": "fixture",
+                    "converted_task_sha256": "fixture",
+                },
+                "pack": {"id": "python", "version": 1, "image": "fixture"},
+                "task_sha256": "fixture",
+                "bundle_sha256": "fixture",
+                "references_sha256": "fixture",
+            }
+        )
+    )
     return problems
 
 
@@ -560,7 +593,7 @@ def test_a_problem_store_bundle_with_another_digest_is_refused(
 ) -> None:
     job_dir, store, lock_path = pilot
     problems = _move_bundles_into_problem_store(job_dir, tmp_path)
-    oracle = problems / "store" / "scb" / "toy" / "1" / "oracle"
+    oracle = problems / "store" / "scb" / "toy" / "1" / "unpinned" / "oracle"
     shutil.rmtree(oracle)
     write_toy_bundle(oracle, [*STEPS, "checkpoint_3"])
 
@@ -576,13 +609,13 @@ def test_analyze_has_no_bundle_search_option() -> None:
     assert "--bundle-search" not in result.output
 
 
-@pytest.mark.parametrize("process", ["process-compliance@8", None])
+@pytest.mark.parametrize("process", ["process-compliance@9", None])
 def test_the_manipulation_check_reads_the_declared_process_compliance_version(
     tmp_path: Path, process: str | None
 ) -> None:
     # Jev parked (2026-10-04): the deterministic scorer is the default; a lock declaring
     # no process-compliance version gets no manipulation check.
-    scorers = ["correctness@4", *([process] if process else [])]
+    scorers = ["correctness@5", *([process] if process else [])]
     lock = _lock(scorers)
     lock_path = tmp_path / "lock.json"
     lock_path.write_text(json.dumps(lock))
@@ -645,7 +678,7 @@ def _write_gate_record(agent_dir: Path, *, clean: bool) -> None:
 
 
 def test_gate_effort_and_its_default_gate_check_reach_the_report(tmp_path: Path) -> None:
-    scorers = ["correctness@4", "gate-effort@12"]
+    scorers = ["correctness@5", "gate-effort@13"]
     lock = _lock(scorers)
     lock_path = tmp_path / "lock.json"
     lock_path.write_text(json.dumps(lock))
@@ -683,4 +716,4 @@ def test_gate_effort_and_its_default_gate_check_reach_the_report(tmp_path: Path)
     assert check["check"] == "gate_clean_at_step_end"
     assert (check["guided"]["trials"], check["baseline"]["trials"]) == (5, 0)
     markdown = (output / "analysis.md").read_text()
-    assert "## Gate effort (gate-effort@12, per arm)" in markdown
+    assert "## Gate effort (gate-effort@13, per arm)" in markdown

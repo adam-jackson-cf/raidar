@@ -14,7 +14,6 @@ from raidar.design.problem.catalog import select_problems, source_catalog
 from raidar.design.problem.errata import Disposition, draft_errata, report_entries
 from raidar.design.problem.importer import import_problem
 from raidar.design.problem.models import ProblemId, ProblemManifest
-from raidar.design.problem.source import SourceError
 from raidar.design.problem.store import ProblemStore, ProblemStoreError, open_store
 from raidar.design.problem.validation import (
     Check,
@@ -73,7 +72,7 @@ def _selected(
         for ref in refs:
             _problem_id(ref)
         return select_problems(store, refs, names, source, checkout, importing=importing)
-    except (ProblemStoreError, SourceError, ValueError) as exc:
+    except (ProblemStoreError, RuntimeError, ValueError) as exc:
         raise click.ClickException(str(exc)) from exc
 
 
@@ -128,9 +127,16 @@ def _errata_state(store: ProblemStore, problem_id: ProblemId, manifest: ProblemM
     )
 
 
+def _content_dir(store: ProblemStore, problem_id: ProblemId) -> Path | None:
+    try:
+        return store.content_dir(problem_id, store.load_manifest(problem_id).content_key())
+    except ProblemStoreError:
+        return None
+
+
 def _store_state(store: ProblemStore, problem_id: ProblemId) -> str:
-    content = store.content_dir(problem_id)
-    return "imported" if (content / "task").is_dir() else "not imported"
+    content = _content_dir(store, problem_id)
+    return "imported" if content is not None and (content / "task").is_dir() else "not imported"
 
 
 @problem.command("list")
@@ -152,7 +158,7 @@ def list_command(store_root: Path | None, source: str | None, source_checkout: P
             return
         problems = store.registered()
         rows = [(problem_id, store.load_manifest(problem_id)) for problem_id in problems]
-    except (ProblemStoreError, SourceError, OSError, ValueError) as exc:
+    except (ProblemStoreError, RuntimeError, OSError, ValueError) as exc:
         raise click.ClickException(str(exc)) from exc
     if not rows:
         click.echo(f"No problems registered under {store.root / 'registry'}")
@@ -190,7 +196,7 @@ def info_command(
             click.echo((checkout.root / problem_id.problem / "config.yaml").read_text())
             return
         manifest = store.load_manifest(problem_id)
-    except (ProblemStoreError, SourceError, OSError, ValueError) as exc:
+    except (ProblemStoreError, RuntimeError, OSError, ValueError) as exc:
         raise click.ClickException(str(exc)) from exc
     pin = manifest.source
     click.echo(str(problem_id))
@@ -205,7 +211,7 @@ def info_command(
     _echo_solvable(store, problem_id, manifest)
     click.echo(f"  validation report: {store.validation_path(problem_id)}")
     click.echo(f"  errata: {_errata_state(store, problem_id, manifest)}")
-    click.echo(f"  store: {_store_state(store, problem_id)} ({store.content_dir(problem_id)})")
+    click.echo(f"  store: {_store_state(store, problem_id)} ({_content_dir(store, problem_id)})")
 
 
 @problem.command("import")
@@ -230,7 +236,7 @@ def import_command(
             result = import_problem(
                 store, problem_id, source_checkout=source_checkout, update=update
             )
-        except (ProblemStoreError, SourceError, ValueError) as exc:
+        except (ProblemStoreError, RuntimeError, ValueError) as exc:
             raise click.ClickException(f"{problem_id}: {exc}") from exc
         manifest = result.manifest
         state = "imported" if result.changed else "verified (matches manifest)"
@@ -239,6 +245,15 @@ def import_command(
         click.echo(f"  source: {manifest.source.url}@{manifest.source.commit}")
         click.echo(f"  manifest: {result.manifest_path}  sha256: {manifest.digest()}")
         click.echo(f"  content: {result.content_dir}")
+        if manifest.dependencies is not None:
+            pins = manifest.dependencies
+            click.echo(
+                f"  dependencies: {pins.policy}  sets: {len(pins.sets)}  "
+                f"exclude-newer: {pins.exclude_newer}"
+            )
+        if manifest.dependency_refusal is not None:
+            reason = manifest.dependency_refusal.reason
+            click.echo(f"  excluded: {reason}: {manifest.dependency_refusal.detail}")
 
 
 @problem.command("validate")
@@ -343,7 +358,7 @@ async def _validate_selected(
         async with semaphore:
             try:
                 report = await validate_problem(store, problem_id, per_problem)
-            except (ProblemStoreError, SourceError, RuntimeError, ValueError) as exc:
+            except (ProblemStoreError, RuntimeError, ValueError) as exc:
                 click.echo(f"{problem_id}: INFRA: {exc}", err=True)
                 return str(problem_id), Verdict.INFRA_FAILURE.value, EXIT_INFRA
             path = write_report(report, report_path or default_report_path(store, report))

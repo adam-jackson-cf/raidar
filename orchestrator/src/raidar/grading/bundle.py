@@ -4,6 +4,8 @@ A bundle is a directory that never enters an agent environment::
 
     <bundle>/oracle-bundle.json   manifest (BundleManifest)
     <bundle>/tests/               hidden test corpus (conftest, helpers, test files)
+    <bundle>/deps/                the problem pin's ``declared-wheels/1`` block
+                                  (``dependencies.json``) and its lock files (optional)
 
 Step ``pytest_args`` keep the exact order of the source runner's pytest
 invocation, with two placeholders rendered per sandbox layout: ``{tests}``
@@ -21,6 +23,7 @@ import re
 import shlex
 import shutil
 import tomllib
+from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
@@ -28,11 +31,14 @@ from typing import Literal
 from pydantic import Field, ValidationError, model_validator
 
 from raidar.contract.snapshot import tree_digest
+from raidar.grading.dependency_pins import DependencyLocks, DependencyPins, LockKey
 from raidar.grading.models import VerifierModel
 
 BUNDLE_MANIFEST = "oracle-bundle.json"  # wire name in the problem store (v1 layout)
 TESTS_DIR = "tests"
 TESTS_PLACEHOLDER = "{tests}"
+DEPENDENCIES_DIR = "deps"
+DEPENDENCIES_FILE = "dependencies.json"
 APP_PLACEHOLDER = "{app}"
 # Grader tools Raidar pins itself; converter `--with` pins for these are dropped.
 RUNNER_TOOL_NAMES = frozenset(
@@ -103,9 +109,18 @@ class BundleManifest(VerifierModel):
 
 
 @dataclass(frozen=True)
+class DependencyRecords:
+    """The problem pin's ``dependencies`` block and its lock files, as carried by the bundle."""
+
+    pins: DependencyPins
+    locks: DependencyLocks
+
+
+@dataclass(frozen=True)
 class VerifierBundle:
     root: Path
     manifest: BundleManifest
+    dependencies: DependencyRecords | None = None
 
     @property
     def tests_dir(self) -> Path:
@@ -139,6 +154,17 @@ class VerifierBundle:
         return hashes
 
 
+def _load_dependencies(root: Path) -> DependencyRecords | None:
+    path = root / DEPENDENCIES_DIR / DEPENDENCIES_FILE
+    if not path.is_file():
+        return None
+    try:
+        pins = DependencyPins.model_validate_json(path.read_text())
+    except ValidationError as exc:
+        raise BundleError(f"invalid {path}: {exc}") from exc
+    return DependencyRecords(pins=pins, locks=DependencyLocks(root / DEPENDENCIES_DIR))
+
+
 def load_bundle(root: Path) -> VerifierBundle:
     manifest_path = root / BUNDLE_MANIFEST
     if not manifest_path.is_file():
@@ -147,7 +173,9 @@ def load_bundle(root: Path) -> VerifierBundle:
         manifest = BundleManifest.model_validate_json(manifest_path.read_text())
     except ValidationError as exc:
         raise BundleError(f"invalid {manifest_path}: {exc}") from exc
-    bundle = VerifierBundle(root=root.resolve(), manifest=manifest)
+    bundle = VerifierBundle(
+        root=root.resolve(), manifest=manifest, dependencies=_load_dependencies(root)
+    )
     missing = [
         f"{step.name}:{name}"
         for step in manifest.steps
@@ -157,6 +185,19 @@ def load_bundle(root: Path) -> VerifierBundle:
     if missing:
         raise BundleError(f"bundle test files missing: {missing}")
     return bundle
+
+
+def write_bundle_dependencies(
+    root: Path, pins: DependencyPins, locks: Mapping[LockKey, str]
+) -> VerifierBundle:
+    """Carry the pin and its locks in the bundle (``deps/``); the bundle digest covers them."""
+    directory = root / DEPENDENCIES_DIR
+    if directory.exists():
+        shutil.rmtree(directory)
+    directory.mkdir(parents=True)
+    (directory / DEPENDENCIES_FILE).write_text(pins.model_dump_json(indent=2) + "\n")
+    DependencyLocks(directory).write_all(locks)
+    return load_bundle(root)
 
 
 def write_bundle(root: Path, manifest: BundleManifest, tests_source: Path) -> VerifierBundle:

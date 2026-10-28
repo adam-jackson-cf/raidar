@@ -38,6 +38,7 @@ from raidar.design.problem.validation import (
     ValidationReport,
     ValidationRuns,
     Verdict,
+    check_dependencies,
     read_validation_record,
     run_checks,
 )
@@ -62,7 +63,7 @@ class ValidateOptions:
 async def _docker_sandbox(
     problem: ImportedProblem, docker_context: str
 ) -> tuple[DockerCopySandbox, dict[str, object]]:
-    image = await ensure_grader_image(problem.bundle.manifest.grader, docker_context=docker_context)
+    image = await ensure_grader_image(problem.bundle, docker_context=docker_context)
     sandbox = DockerCopySandbox(image=image.tag, docker_context=docker_context)
     return sandbox, {
         "grader_image": image.tag,
@@ -130,6 +131,22 @@ async def validate_problem(
     if options.engine not in ENGINES:
         raise ValueError(f"engine must be one of {ENGINES}, not {options.engine!r}")
     problem = store.load(problem_id)
+    refusal = problem.manifest.dependency_refusal
+    if refusal is not None:
+        return ValidationReport(
+            problem=str(problem_id),
+            manifest_sha256=problem.manifest.digest(),
+            mode=problem.manifest.mode.value,
+            steps=tuple(step.name for step in problem.manifest.steps),
+            engine=options.engine,
+            repeats=options.repeats,
+            checks=[check_dependencies(refusal)],
+            runs=None,
+            environment={
+                "engine": options.engine,
+                "dependency_exclude_newer": refusal.exclude_newer,
+            },
+        )
     environment: dict[str, object] = {
         "engine": options.engine,
         "harbor": version("harbor"),
@@ -140,7 +157,7 @@ async def validate_problem(
         work = Path(tmp)
         if options.engine == "harbor":
             # The verifier grades in this content-addressed image (built on demand).
-            environment["grader_image"] = grader_image_tag(problem.bundle.manifest.grader)
+            environment["grader_image"] = grader_image_tag(problem.bundle)
             oracle = await _harbor_runs(problem, options, work)
         else:
             if sandbox is None:

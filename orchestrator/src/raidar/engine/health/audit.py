@@ -24,6 +24,9 @@ result can be trusted, and returns one ``HealthReport`` (``health.json``). Famil
   (``raidar.engine.health.definition``): ``E1`` every gate-passed checkpoint holds a sealed,
   passing definition; ``E2`` the recorded ``define`` calls agree with the final draft; ``E3`` an
   unusable definition is recorded and never passed.
+- **D** dependency readings, never validity: ``D1`` declared requirements Raidar could not
+  provide; ``D2`` a ``ModuleNotFoundError`` for an undeclared non-stdlib module
+  (``raidar.engine.health.dependencies``).
 
 A check without evidence is ``unmeasured`` with its reason, never ``pass``.
 """
@@ -38,6 +41,7 @@ from raidar.contract.harbor_result import span_s
 from raidar.contract.snapshot import tree_digest
 from raidar.contract.trial import CheckpointState, StepResult, TrialRecord
 from raidar.engine.health.base import Audit, make_check
+from raidar.engine.health.dependencies import check_d1, check_d2
 from raidar.engine.health.isolation import check_p8
 from raidar.engine.health.model import PASS, UNMEASURED, VIOLATION, HealthCheck, HealthReport
 from raidar.engine.health.signals import (
@@ -274,6 +278,7 @@ CHECKS: tuple[Callable[[Audit], HealthCheck], ...] = (
     check_h1, check_h3, check_h4, check_h5, check_h6, check_h_target,
     check_l1, check_l2,
     check_p2, check_p3, check_p8,
+    check_d1, check_d2,
     check_t1, check_t2, check_t3,
 )  # fmt: skip
 

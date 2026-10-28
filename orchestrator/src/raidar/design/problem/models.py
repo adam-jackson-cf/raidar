@@ -25,12 +25,25 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from raidar.contract.canonical import digest_json
 from raidar.contract.references import RefKind, RegistryRef, RegistryReferenceError
+from raidar.grading.dependency_pins import DependencyPins, DependencyRefusal
 
 VERSION_CHARS = 12
 _COMMIT = re.compile(r"^[0-9a-f]{40}$")
 _PROBLEM_NAME = re.compile(
     r"^(?P<dataset>[a-z0-9-]+)/(?P<problem>[a-z0-9_-]+)(\.(?P<cp>[a-z0-9_]+))?$"
 )
+OPTIONAL_FIELDS = ("entry_file", "entry_command", "dependencies", "dependency_refusal")
+
+
+def dependency_content_key(record: DependencyPins | DependencyRefusal | None) -> str:
+    """Directory name of materialised content under a problem's store: the pin's digest.
+
+    A repin materialises beside the earlier content instead of replacing it, so bundles that
+    recorded trials point at stay where they were.
+    """
+    if record is None:
+        return "unpinned"
+    return digest_json(record.model_dump(mode="json"))[:VERSION_CHARS]
 
 
 class ProblemRefError(RegistryReferenceError):
@@ -159,6 +172,11 @@ class ProblemManifest(ProblemModel):
     # The command Raidar's grader runs the submission with (``uv run --project
     # /app <entry_file>``): the value substituted for ``%%%ENTRYPOINT:entry_command%%%``.
     entry_command: str | None = Field(default=None, min_length=1)
+    # ``declared-wheels/1`` pin: the resolved dependency sets and their cutoff. Part of the pin,
+    # so a change moves the manifest digest and forces revalidation (RT0).
+    dependencies: DependencyPins | None = None
+    # Set when a reference set did not resolve: the problem is excluded (dependency_unresolvable).
+    dependency_refusal: DependencyRefusal | None = None
 
     @model_validator(mode="after")
     def _consistent(self) -> ProblemManifest:
@@ -171,6 +189,8 @@ class ProblemManifest(ProblemModel):
             raise ValueError("a one-shot problem has exactly one checkpoint")
         if not self.source.commit.startswith(problem_id.version):
             raise ValueError(f"reference version {problem_id.version} != source commit")
+        if self.dependencies is not None and self.dependency_refusal is not None:
+            raise ValueError("a manifest has dependencies or a dependency refusal, not both")
         return self
 
     @property
@@ -178,13 +198,16 @@ class ProblemManifest(ProblemModel):
         return ProblemId.parse(self.ref)
 
     def payload(self) -> dict[str, object]:
-        """JSON form; a manifest without ``entry_file`` keeps its earlier bytes and digest."""
+        """JSON form; a manifest without optional fields keeps its earlier bytes and digest."""
         dumped = self.model_dump(mode="json")
-        if self.entry_file is None:
-            dumped.pop("entry_file")
-        if self.entry_command is None:
-            dumped.pop("entry_command")
+        for name in OPTIONAL_FIELDS:
+            if getattr(self, name) is None:
+                dumped.pop(name)
         return dumped
+
+    def content_key(self) -> str:
+        """Directory name of this manifest's materialised content (its dependency pin's key)."""
+        return dependency_content_key(self.dependencies or self.dependency_refusal)
 
     def digest(self) -> str:
         return digest_json(self.payload())
@@ -205,6 +228,8 @@ class ProblemManifest(ProblemModel):
             "task_sha256": self.task_sha256,
             "bundle_sha256": self.bundle_sha256,
         }
+        if self.dependencies is not None:
+            metadata["dependencies_sha256"] = self.dependencies.digest()
         if self.entry_file is not None:
             metadata["entry_file"] = self.entry_file
         if self.entry_command is not None:

@@ -38,9 +38,11 @@ from raidar.scoring.framework.trial_inputs import TrialInputError
 def stored_bundle(problems: ProblemStore, problem: str) -> Path:
     """The problem store's verifier bundle for a trial's pinned problem reference."""
     try:
-        return problems.content_dir(ProblemId.parse(problem)) / "oracle"
-    except ValueError as exc:
-        raise TrialInputError(f"problem {problem!r} is not a store reference: {exc}") from exc
+        problem_id = ProblemId.parse(problem)
+        key = problems.load_manifest(problem_id).content_key()
+        return problems.content_dir(problem_id, key) / "oracle"
+    except ValueError as exc:  # ProblemStoreError is a ValueError
+        raise TrialInputError(f"problem {problem!r} has no materialised bundle: {exc}") from exc
 
 
 class AnalysisInputError(ValueError):

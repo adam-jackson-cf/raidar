@@ -94,8 +94,9 @@ def test_problem_info_reports_a_problem_whose_content_is_not_materialised(
     store: ProblemStore,
 ) -> None:
     problem_id = ProblemId.parse(POSITIVE_REF)
+    content = store.content_dir(problem_id, store.load_manifest(problem_id).content_key())
     for part in ("task", "oracle", "references"):
-        target = store.content_dir(problem_id) / part
+        target = content / part
         target.rename(target.with_name(f"{part}.moved"))
 
     result = CliRunner().invoke(main, ["problem", "info", POSITIVE_REF, "--store", str(store.root)])

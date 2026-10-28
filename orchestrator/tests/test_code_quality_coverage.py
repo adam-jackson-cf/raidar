@@ -208,7 +208,7 @@ def test_rescore_keeps_an_awaiting_assessment_provisional_then_completes_it(
     store = AssessmentStore(tmp_path / "store")
     _defer(produced, None)
     _defer(trial, None)
-    registration = default_scorer_registry().get("code-quality@5")
+    registration = default_scorer_registry().get("code-quality@6")
 
     first = assess(store, registration, _context(trial), trial="trial")
     stored = store.get(first.key)
@@ -401,7 +401,7 @@ def test_reconcile_refuses_more_flips_than_the_cap() -> None:
 
 
 def test_code_quality_is_registered_store_bound_with_the_exclusion_count() -> None:
-    registration = default_scorer_registry().get("code-quality@5")
+    registration = default_scorer_registry().get("code-quality@6")
 
     assert registration.store_implementation is not None
     assert registration.problem_config == ("entry_file",)
