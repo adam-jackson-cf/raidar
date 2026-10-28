@@ -17,6 +17,11 @@ Raidar uses [Harbor's vocabulary](#concepts) wherever Harbor has a term (job, tr
 
 The binding design is [`split-design.md`](split-design.md): arms, workflows and stage packages, problem onboarding, health, measurement and the implementation plan. Earlier design records live under [`docs/reboot/`](docs/reboot/).
 
+The public stage-package authoring contract is [`lab/stages/README.md`](lab/stages/README.md):
+`stage/1`, calls and canaries, `criteria/1`, immutable references and `stage-tree/1` identity.
+The generic implementation is in progress; the shipped workflows still use the spike classes
+until their phase-5 port.
+
 Problem validation scores only repeat-stable reference cases. A checkpoint must add a
 previously uncollected test its own reference passes in every repeat, or that checkpoint
 alone is excluded as `no_new_scoreable_tests`. Identical reference sources pool positive
