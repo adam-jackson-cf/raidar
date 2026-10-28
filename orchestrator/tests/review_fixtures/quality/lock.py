@@ -44,7 +44,7 @@ def write_synthetic_lock(
             "spec": {
                 "id": experiment,
                 "analysis": analysis,
-                "assessment": {"scorers": ["correctness@5", "code-quality@6", "gate-effort@13"]},
+                "assessment": {"scorers": ["correctness@6", "code-quality@7", "gate-effort@14"]},
                 "protocol": {"progression": "continue"},
             },
             "execution": {"design": {"id": experiment}},

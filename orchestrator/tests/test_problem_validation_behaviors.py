@@ -30,10 +30,11 @@ from raidar.design.problem.validation import (
     check_determinism,
     check_parity,
     check_positive_repeats,
-    check_reference_fails,
+    check_reference_reading,
     check_solvable,
     policy_preview,
     read_validation_record,
+    reference_tree_digest,
     run_checks,
     solvable_digest,
     solvable_sets,
@@ -110,14 +111,29 @@ async def test_negative_fixture_is_excluded_and_its_report_is_written(
 ) -> None:
     report = await _validate(store, NEGATIVE_REF, tmp_path)
     failed = [check for check in report.checks if check.status is CheckStatus.FAIL]
-    assert [check.name for check in failed] == ["reference_k-1_fails_k"]
-    assert all("checkpoint_2" in line for line in failed[0].detail)
+    assert [check.name for check in failed] == ["solvable_set"]
+    assert failed[0].detail == (
+        "checkpoint_1: no_new_scoreable_tests",
+        "checkpoint_2: no_new_scoreable_tests",
+    )
     assert report.verdict is Verdict.EXCLUDED
     path = write_report(report, tmp_path / "report.json")
     written = json.loads(path.read_text())
     assert written["verdict"] == "excluded"
     assert written["manifest_sha256"] == store.load_manifest(ProblemId.parse(NEGATIVE_REF)).digest()
-    assert written["grades"]["oracle"]["negative"][0]["checkpoint_2"]["all_pass"] is True
+    assert written["grades"]["oracle"]["positive"][0]["checkpoint_2"]["all_pass"] is False
+    assert written["solvable"]["checkpoint_2"]["exclusion"] == "no_new_scoreable_tests"
+
+
+async def test_validation_records_the_reference_digests_it_pools_by(
+    store: ProblemStore, tmp_path: Path
+) -> None:
+    report = await _validate(store, POSITIVE_REF, tmp_path, repeats=1)
+    digests: Any = report.to_json()["reference_digests"]
+    assert digests[NEGATIVE]["checkpoint_2"] == digests[POSITIVE]["checkpoint_1"]
+    assert digests[POSITIVE]["checkpoint_1"] != digests[POSITIVE]["checkpoint_2"]
+    reading = next(check for check in report.checks if check.name == "reference_k-1_fails_k")
+    assert reading.detail[1].startswith("checkpoint_2: pass")
 
 
 async def test_one_shot_problem_grades_one_step_under_the_one_shot_policy(
@@ -149,54 +165,166 @@ async def test_one_shot_problem_grades_one_step_under_the_one_shot_policy(
     assert multi["headline_policy"]["policy"] == "scb-canonical@1"
 
 
+def _runs(
+    positive: list[dict[str, Grade]],
+    negative: list[dict[str, Grade]] | None = None,
+    references: dict[str, dict[str, str]] | None = None,
+) -> ValidationRuns:
+    return ValidationRuns(
+        oracle={POSITIVE: positive, NEGATIVE: positive if negative is None else negative},
+        references=references or {},
+    )
+
+
 def test_solvable_sets_keep_cases_passed_in_every_repeat() -> None:
     passing = {"s1": _grade("s1", {"c1::a": "passed", "c1::b": "passed", "c1::s": "skipped"})}
     flaky = {"s1": _grade("s1", {"c1::a": "passed", "c1::b": "failed", "c1::n": "passed"})}
     infra = {"s1": _grade("s1", {}, infra="collection_error")}
 
-    sets = solvable_sets([passing, flaky])
+    sets = solvable_sets(_runs([passing, flaky]))
     assert sets["s1"].solvable == ("c1::a",)
     assert sets["s1"].nondeterministic == ("c1::b", "c1::n", "c1::s")
     assert sets["s1"].verdict is Verdict.VALIDATED
     assert sets["s1"].digest == solvable_digest(["c1::a"])
-    assert solvable_sets([passing, passing])["s1"].solvable == ("c1::a", "c1::b")
+    assert solvable_sets(_runs([passing, passing]))["s1"].solvable == ("c1::a", "c1::b")
     # Missing evidence is never an empty set.
-    assert solvable_sets([passing, infra])["s1"].verdict is Verdict.INFRA_FAILURE
+    assert solvable_sets(_runs([passing, infra]))["s1"].verdict is Verdict.INFRA_FAILURE
+    assert check_solvable("x", _runs([passing])).status is CheckStatus.PASS
+    assert check_solvable("x", _runs([passing, infra])).status is CheckStatus.INFRA
 
-    assert check_solvable("x", [passing]).status is CheckStatus.PASS
-    assert check_solvable("x", [passing, infra]).status is CheckStatus.INFRA
+
+def test_a_step_without_new_scoreable_tests_is_excluded_alone() -> None:
+    one = _grade("s1", {"c1::a": "passed", "c1::late": "failed"})
+    # s2 adds only c2::x, which its reference fails, and regrades s1's cases.
+    reused = _grade("s2", {"c1::a": "passed", "c1::late": "failed", "c2::x": "failed"})
+    # s3 adds c3::y, which it passes; s1's failed case is not new at s2 or s3.
+    later = _grade("s3", {"c1::a": "passed", "c1::late": "passed", "c3::y": "passed"})
+    runs = _runs([{"s1": one, "s2": reused, "s3": later}] * 2)
+
+    sets = solvable_sets(runs)
+    assert sets["s2"].verdict is Verdict.EXCLUDED
+    assert sets["s2"].exclusion == "no_new_scoreable_tests"
+    assert sets["s2"].solvable == ()
+    assert sets["s1"].verdict is sets["s3"].verdict is Verdict.VALIDATED
+    assert sets["s3"].solvable == ("c1::a", "c1::late", "c3::y")
+    # Other steps stay usable: the check passes and names the excluded step.
+    check = check_solvable("x", runs)
+    assert check.status is CheckStatus.PASS
+    assert check.detail == ("s2: no_new_scoreable_tests",)
+    assert verdict(run_checks(runs)) is Verdict.VALIDATED_PARTIAL
+
+
+def test_a_new_case_must_pass_in_every_repeat_to_count() -> None:
+    first = {"s1": _grade("s1", {"c1::a": "passed"})}
+    lucky = {**first, "s2": _grade("s2", {"c1::a": "passed", "c2::x": "passed"})}
+    unlucky = {**first, "s2": _grade("s2", {"c1::a": "passed", "c2::x": "failed"})}
+    sets = solvable_sets(_runs([lucky, unlucky]))
+    assert sets["s2"].exclusion == "no_new_scoreable_tests"
+    assert sets["s2"].nondeterministic == ("c2::x",)
+    assert sets["s1"].verdict is Verdict.VALIDATED
+    # No usable step at all fails the check.
     nothing = {"s1": _grade("s1", {"c1::a": "failed"})}
-    assert solvable_sets([nothing])["s1"].verdict is Verdict.EXCLUDED
-    assert check_solvable("x", [nothing]).status is CheckStatus.FAIL
-    # A partly solvable problem stays usable: an empty step is excluded, the check passes.
-    partial = {**passing, "s2": _grade("s2", {"c2::a": "failed"})}
-    assert check_solvable("x", [partial, partial]).status is CheckStatus.PASS
-    assert solvable_sets([partial])["s2"].verdict is Verdict.EXCLUDED
+    assert check_solvable("x", _runs([nothing])).status is CheckStatus.FAIL
 
 
-def test_repeat_and_reference_checks_report_what_differs() -> None:
+def test_repeats_of_identical_reference_code_are_pooled_across_steps_and_variants() -> None:
+    # Reference digest A grades s1 (positive) and s2 (negative); B grades s2 (positive).
+    refs = {
+        POSITIVE: {"s1": "A", "s2": "B", "s3": "C"},
+        NEGATIVE: {"s1": "empty", "s2": "A", "s3": "B"},
+    }
+    cases = {"c1::a": "passed", "c1::x": "passed"}
+    positive = [
+        {
+            "s1": _grade("s1", cases),
+            "s2": _grade("s2", {**cases, "c2::n": "passed"}),
+            "s3": _grade("s3", {**cases, "c2::n": "passed", "c3::m": "passed"}),
+        }
+    ] * 3
+
+    def negative(failing: bool) -> dict[str, Grade]:
+        flip = {**cases, "c1::x": "failed" if failing else "passed", "c2::n": "failed"}
+        return {
+            "s1": _grade("s1", dict.fromkeys(cases, "failed")),
+            "s2": _grade("s2", flip),
+            "s3": _grade("s3", {**cases, "c2::n": "passed", "c3::m": "failed"}),
+        }
+
+    stable = [negative(True)] * 3
+    pooled = _runs(positive, stable, refs)
+    sets = solvable_sets(pooled)
+    # c1::x passes in every positive repeat but fails in reference A's negative runs.
+    for step in ("s1", "s2", "s3"):
+        assert "c1::x" not in sets[step].solvable
+        assert "c1::x" in sets[step].nondeterministic
+    assert sets["s3"].solvable == ("c1::a", "c2::n", "c3::m")
+    assert check_positive_repeats("rep", pooled).detail == (
+        "s1: 1 nondeterministic",
+        "s2: 1 nondeterministic",
+        "s3: 1 nondeterministic",
+    )
+    # Different code is not pooled: without digests the same grades leave c1::x solvable.
+    assert "c1::x" in solvable_sets(_runs(positive, stable))["s1"].solvable
+    # Negative repeats that differ only in a quarantined case still agree.
+    flipping = _runs(positive, [negative(False), negative(True), negative(False)], refs)
+    assert "c1::x" not in solvable_sets(flipping)["s1"].solvable
+    assert check_determinism("rep", flipping).status is CheckStatus.PASS
+
+
+def test_the_reference_reading_never_excludes_and_names_identical_pairs() -> None:
+    cases = {"c1::a": "passed", "c2::b": "passed"}
+    positive = [{"s1": _grade("s1", {"c1::a": "passed"}), "s2": _grade("s2", cases)}] * 2
+    negative = [{"s1": _grade("s1", {"c1::a": "failed"}), "s2": _grade("s2", cases)}] * 2
+    same = {POSITIVE: {"s1": "A", "s2": "A"}, NEGATIVE: {"s1": "empty", "s2": "A"}}
+
+    identical = check_reference_reading("r", _runs(positive, negative, same))
+    assert identical.status is CheckStatus.PASS
+    assert identical.detail == (
+        "s1: pass (empty starter reference on s1 tests)",
+        "s2: not_informative (s1 and s2 references are identical)",
+    )
+    different = {POSITIVE: {"s1": "A", "s2": "B"}, NEGATIVE: {"s1": "empty", "s2": "A"}}
+    reused = check_reference_reading("r", _runs(positive, negative, different))
+    assert reused.status is CheckStatus.PASS  # reference k-1 passes every k case: a reading only
+    assert reused.detail[1] == "s2: fail (s1 reference on s2 tests)"
+    absent = {"s1": _grade("s1", {}, infra="collection_error")}
+    assert check_reference_reading("r", _runs(positive, [absent])).status is CheckStatus.INFRA
+    # Neither reading excludes: both problems stay usable.
+    assert verdict(run_checks(_runs(positive, negative, same))) is Verdict.VALIDATED_PARTIAL
+
+
+def test_reference_digest_ignores_pycache_and_sees_content(tmp_path: Path) -> None:
+    one, two, three = (tmp_path / name for name in ("one", "two", "three"))
+    for root in (one, two, three):
+        (root / "pkg").mkdir(parents=True)
+        (root / "pkg" / "app.py").write_text("print(1)\n")
+    (two / "pkg" / "__pycache__").mkdir()
+    (two / "pkg" / "__pycache__" / "app.pyc").write_bytes(b"\0")
+    (three / "requirements.txt").write_text("x\n")
+    assert reference_tree_digest(one) == reference_tree_digest(two)
+    assert reference_tree_digest(one) != reference_tree_digest(three)
+
+
+def test_repeat_checks_report_what_differs() -> None:
     passing = {"s1": _grade("s1", {"c1::a": "passed", "c1::b": "passed"})}
     flaky = {"s1": _grade("s1", {"c1::a": "passed", "c1::b": "failed"})}
     infra = {"s1": _grade("s1", {}, infra="collection_error")}
 
-    assert check_reference_fails("neg", [flaky]).status is CheckStatus.PASS
-    assert check_reference_fails("neg", [passing, flaky]).detail == (
-        "repeat 0 s1: 2/2 (expected at least one failure)",
-    )
-    assert check_reference_fails("neg", [infra]).status is CheckStatus.INFRA
-
-    listed = check_positive_repeats("rep", [passing, flaky])
+    listed = check_positive_repeats("rep", _runs([passing, flaky]))
     assert listed.status is CheckStatus.PASS
     assert listed.detail == ("s1: 1 nondeterministic",)
-    assert check_positive_repeats("rep", [passing]).status is CheckStatus.NOT_RUN
-    assert check_positive_repeats("rep", [passing, infra]).status is CheckStatus.INFRA
+    assert check_positive_repeats("rep", _runs([passing])).status is CheckStatus.NOT_RUN
+    assert check_positive_repeats("rep", _runs([passing, infra])).status is CheckStatus.INFRA
 
-    drift = check_determinism("rep", [passing, flaky])
+    # A case that varies between negative repeats is quarantined, not a determinism failure.
+    assert check_determinism("rep", _runs([passing], [passing, flaky])).status is CheckStatus.PASS
+    regrouped = {"s1": Grade("oracle", "s1", {"core": (1, 2)}, passing["s1"].outcomes)}
+    drift = check_determinism("rep", _runs([passing], [passing, regrouped]))
     assert drift.status is CheckStatus.FAIL
-    assert "c1::b: oracle=pass oracle=fail" in drift.detail[0]
-    assert check_determinism("rep", [passing]).status is CheckStatus.NOT_RUN
-    assert check_determinism("rep", [passing, infra]).status is CheckStatus.INFRA
-    assert check_determinism("rep", [infra, passing]).status is CheckStatus.INFRA
+    assert drift.detail[0].startswith("repeat 1 vs 0 s1:")
+    assert check_determinism("rep", _runs([passing])).status is CheckStatus.NOT_RUN
+    assert check_determinism("rep", _runs([passing], [passing, infra])).status is CheckStatus.INFRA
+    assert check_determinism("rep", _runs([passing], [infra, passing])).status is CheckStatus.INFRA
 
 
 def test_parity_compares_cases_and_groups_and_verdict_orders_fail_over_not_run() -> None:
@@ -345,7 +473,7 @@ def test_validate_command_exit_codes_follow_the_verdict(
 
     excluded = runner.invoke(main, [*base, NEGATIVE_REF])
     assert excluded.exit_code == 1, excluded.output
-    assert "[FAIL] reference_k-1_fails_k" in excluded.output
+    assert "[FAIL] solvable_set" in excluded.output
     assert "EXCLUDED" in excluded.output
     written = store.validation_path(ProblemId.parse(NEGATIVE_REF))
     assert json.loads(written.read_text())["environment"]["sandbox"] == "local"
@@ -418,7 +546,7 @@ async def test_report_records_solvable_sets_the_lock_pins(
     path = write_report(report, tmp_path / "report.json")
     record = read_validation_record(path)
 
-    for step, one in solvable_sets(report.runs.oracle[POSITIVE]).items():
+    for step, one in solvable_sets(report.runs).items():
         assert record.solvable_cases(step) == one.solvable
         assert record.solvable_size(step) == len(one.solvable) > 0
         assert record.nondeterministic_count(step) == 0

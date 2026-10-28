@@ -40,6 +40,7 @@ from raidar.design.problem.validation import (
     Verdict,
     check_dependencies,
     read_validation_record,
+    reference_tree_digest,
     run_checks,
 )
 from raidar.grading.grader_image import ensure_grader_image, grader_image_tag
@@ -120,6 +121,15 @@ def _native_runs(
     return native
 
 
+def _reference_digests(problem: ImportedProblem, work: Path) -> dict[str, dict[str, str]]:
+    empty = work / "digest-empty"
+    empty.mkdir()
+    return {
+        variant: {step: reference_tree_digest(path) for step, path in by_step.items()}
+        for variant, by_step in direct.variant_snapshots(problem, empty).items()
+    }
+
+
 async def validate_problem(
     store: ProblemStore,
     problem_id: ProblemId,
@@ -171,6 +181,7 @@ async def validate_problem(
                 timeout_s=options.timeout_s,
                 work_root=work,
             )
+        references = _reference_digests(problem, work)
         native = None
         if options.native_runner is not None:
             native = await asyncio.to_thread(_native_runs, store, problem, options, work)
@@ -182,7 +193,7 @@ async def validate_problem(
             if options.audit
             else None
         )
-    runs = ValidationRuns(oracle=oracle, native=native)
+    runs = ValidationRuns(oracle=oracle, native=native, references=references)
     return ValidationReport(
         problem=str(problem_id),
         manifest_sha256=problem.manifest.digest(),

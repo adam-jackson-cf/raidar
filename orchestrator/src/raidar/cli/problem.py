@@ -404,6 +404,7 @@ def _echo_solvable_record(record: ValidationRecord) -> None:
         click.echo(
             f"  {step}: {one.verdict.value} solvable={len(one.cases)}"
             f" nondeterministic={one.nondeterministic_count}"
+            + (f" ({one.exclusion})" if one.exclusion else "")
         )
 
 

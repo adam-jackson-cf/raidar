@@ -32,7 +32,7 @@ arms:
     workflow: one-shot@1
 
 assessment:
-  scorers: [correctness@5]
+  scorers: [correctness@6]
   metric: scb-canonical-oneshot@1
 
 analysis:

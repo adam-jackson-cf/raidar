@@ -6,7 +6,13 @@
       "status": "pass"
     },
     {
-      "detail": [],
+      "detail": [
+        "checkpoint_1: pass (empty starter reference on checkpoint_1 tests)",
+        "checkpoint_2: pass (checkpoint_1 reference on checkpoint_2 tests)",
+        "checkpoint_3: pass (checkpoint_2 reference on checkpoint_3 tests)",
+        "checkpoint_4: pass (checkpoint_3 reference on checkpoint_4 tests)",
+        "checkpoint_5: pass (checkpoint_4 reference on checkpoint_5 tests)"
+      ],
       "name": "reference_k-1_fails_k",
       "status": "pass"
     },
@@ -841,11 +847,28 @@
     "native_parity_negative"
   ],
   "problem": "scb/code_search@38d627ecf668",
+  "reference_digests": {
+    "negative": {
+      "checkpoint_1": "1d2ed42b2c50b3936372a558871e17eb96c66636e686c6b081289c316f23a791",
+      "checkpoint_2": "658bc688643ee52e364df9eaeafabb9c9d44b825ee37a85bff8ed25db7d5d913",
+      "checkpoint_3": "f217c8a10fc53d920720b1cca6b14706ec462c3578342e8586511f2c6502d977",
+      "checkpoint_4": "2f613cca1d3de9911c1d986e01132f350c38ecf2929d124feeab6669a1883129",
+      "checkpoint_5": "1f598367779a3763d16eb10117c32ba2a2dfd3aea9e44af8574fb19f00bc236e"
+    },
+    "positive": {
+      "checkpoint_1": "658bc688643ee52e364df9eaeafabb9c9d44b825ee37a85bff8ed25db7d5d913",
+      "checkpoint_2": "f217c8a10fc53d920720b1cca6b14706ec462c3578342e8586511f2c6502d977",
+      "checkpoint_3": "2f613cca1d3de9911c1d986e01132f350c38ecf2929d124feeab6669a1883129",
+      "checkpoint_4": "1f598367779a3763d16eb10117c32ba2a2dfd3aea9e44af8574fb19f00bc236e",
+      "checkpoint_5": "e411f7f403544c0e52f18d76218431a930a4f941fa7ea49f3f283c41b1159f21"
+    }
+  },
   "repeats": 3,
   "schema_version": 1,
   "solvable": {
     "checkpoint_1": {
       "digest": "7526e139c24bc1d901b2a231cf14049c985cd4c57aa65e26dbc54fdc94d93ecf",
+      "exclusion": null,
       "nondeterministic": [],
       "nondeterministic_count": 0,
       "size": 13,
@@ -868,6 +891,7 @@
     },
     "checkpoint_2": {
       "digest": "a54a3c86593f86e8baf0bae931e9bde3adbdcb90c05fc5174ac142b2a73c1c98",
+      "exclusion": null,
       "nondeterministic": [],
       "nondeterministic_count": 0,
       "size": 25,
@@ -902,6 +926,7 @@
     },
     "checkpoint_3": {
       "digest": "fc61e3b8f25d28b83108cc78433947f1edf978a69ff242f9053fb57a867e8f89",
+      "exclusion": null,
       "nondeterministic": [],
       "nondeterministic_count": 0,
       "size": 47,
@@ -958,6 +983,7 @@
     },
     "checkpoint_4": {
       "digest": "d078b76eb03ab70f947bdc4f4d8f3cd9f4f920c3594f063e0b53b264890632db",
+      "exclusion": null,
       "nondeterministic": [],
       "nondeterministic_count": 0,
       "size": 75,
@@ -1042,6 +1068,7 @@
     },
     "checkpoint_5": {
       "digest": "952c3605cae2eebf2cc32a55611a196c7cf8c81598214d306d4d2b5376d49218",
+      "exclusion": null,
       "nondeterministic": [],
       "nondeterministic_count": 0,
       "size": 104,
@@ -1152,285 +1179,6 @@
         "checkpoint_5::test_unicode_in_new_languages"
       ],
       "verdict": "validated"
-    }
-  },
-  "spec_determinacy": {
-    "assertions": {
-      "audited": 0,
-      "by_rule": {}
-    },
-    "audit_version": 1,
-    "dynamic": {
-      "environment": {},
-      "reason": null,
-      "status": "ran"
-    },
-    "flagged": [],
-    "method": "Static: each audited assertion of a test (error-detail/message equality, containment or pattern; byte-level stdout comparison) is classified against the text of its origin checkpoint's specification and every earlier one (rules below). Dynamic: reference k and spec-conformant variants of it (variants below) are graded at step k; a case is sensitive to a variant when it passes on the reference and not on the variant. A case is flagged when its test has an undetermined assertion of the kind a variant it is sensitive to rewrites.",
-    "rules": {
-      "content-stated": "determined: a paragraph states what the category's detail contains",
-      "content-unstated": "undetermined: error text must contain an input value or match a pattern; no paragraph states what the category's detail contains",
-      "exact-stated": "determined: a paragraph states the exact content of the category's detail",
-      "exact-unstated": "undetermined: error text must equal an input value; no paragraph states exact content",
-      "format-stated": "determined: the specification names an output byte format",
-      "format-unstated": "undetermined: stdout compared byte for byte; no byte format stated",
-      "literal-in-spec": "determined: the asserted literal occurs in the specification text",
-      "wording-unstated": "undetermined: an error-text literal in neither the specification nor the test's inputs"
-    },
-    "sensitive_determined": [],
-    "sensitive_unexplained": [
-      {
-        "case": "test_checkpoint_1.py::test_encoding_option_reads_non_utf8",
-        "variants": [
-          "reformatted_json"
-        ]
-      },
-      {
-        "case": "test_checkpoint_1.py::test_ignore_non_py_files",
-        "variants": [
-          "reformatted_json"
-        ]
-      },
-      {
-        "case": "test_checkpoint_1.py::test_single_match",
-        "variants": [
-          "reformatted_json"
-        ]
-      },
-      {
-        "case": "test_checkpoint_1.py::test_skip_undecodable_file",
-        "variants": [
-          "reformatted_json"
-        ]
-      },
-      {
-        "case": "test_checkpoint_1.py::test_undecodable_file_before_decodable_still_scans",
-        "variants": [
-          "reformatted_json"
-        ]
-      },
-      {
-        "case": "test_checkpoint_2.py::test_language_filter_excludes_others",
-        "variants": [
-          "reformatted_json"
-        ]
-      },
-      {
-        "case": "test_checkpoint_2.py::test_no_language_filter",
-        "variants": [
-          "reformatted_json"
-        ]
-      },
-      {
-        "case": "test_checkpoint_2.py::test_unsupported_extensions_are_ignored",
-        "variants": [
-          "reformatted_json"
-        ]
-      },
-      {
-        "case": "test_checkpoint_3.py::test_captures_key_order",
-        "variants": [
-          "reformatted_json"
-        ]
-      },
-      {
-        "case": "test_checkpoint_3.py::test_literal_dollar_sign",
-        "variants": [
-          "reformatted_json"
-        ]
-      },
-      {
-        "case": "test_checkpoint_3.py::test_sorting_same_start_different_end",
-        "variants": [
-          "reformatted_json"
-        ]
-      },
-      {
-        "case": "test_checkpoint_4.py::test_captures_key_order_raw",
-        "variants": [
-          "reformatted_json"
-        ]
-      },
-      {
-        "case": "test_checkpoint_4.py::test_no_fixes_without_flag",
-        "variants": [
-          "reformatted_json"
-        ]
-      },
-      {
-        "case": "test_checkpoint_5.py::test_exact_match_go",
-        "variants": [
-          "reformatted_json"
-        ]
-      },
-      {
-        "case": "test_checkpoint_5.py::test_exact_match_haskell",
-        "variants": [
-          "reformatted_json"
-        ]
-      },
-      {
-        "case": "test_checkpoint_5.py::test_exact_match_java",
-        "variants": [
-          "reformatted_json"
-        ]
-      },
-      {
-        "case": "test_checkpoint_5.py::test_exact_match_rust",
-        "variants": [
-          "reformatted_json"
-        ]
-      },
-      {
-        "case": "test_checkpoint_5.py::test_pattern_match_go",
-        "variants": [
-          "reformatted_json"
-        ]
-      }
-    ],
-    "static_undetermined": [],
-    "steps": {
-      "checkpoint_1": {
-        "reference": {
-          "infra_failure": null,
-          "passed": 13,
-          "total": 13
-        },
-        "variants": {
-          "neutral_error_text": {
-            "infra_failure": null,
-            "passed": 13,
-            "sensitive": [],
-            "total": 13
-          },
-          "reformatted_json": {
-            "infra_failure": null,
-            "passed": 8,
-            "sensitive": [
-              "test_checkpoint_1.py::test_encoding_option_reads_non_utf8",
-              "test_checkpoint_1.py::test_ignore_non_py_files",
-              "test_checkpoint_1.py::test_single_match",
-              "test_checkpoint_1.py::test_skip_undecodable_file",
-              "test_checkpoint_1.py::test_undecodable_file_before_decodable_still_scans"
-            ],
-            "total": 13
-          }
-        }
-      },
-      "checkpoint_2": {
-        "reference": {
-          "infra_failure": null,
-          "passed": 25,
-          "total": 25
-        },
-        "variants": {
-          "neutral_error_text": {
-            "infra_failure": null,
-            "passed": 25,
-            "sensitive": [],
-            "total": 25
-          },
-          "reformatted_json": {
-            "infra_failure": null,
-            "passed": 17,
-            "sensitive": [
-              "test_checkpoint_2.py::test_language_filter_excludes_others",
-              "test_checkpoint_2.py::test_no_language_filter",
-              "test_checkpoint_2.py::test_unsupported_extensions_are_ignored"
-            ],
-            "total": 25
-          }
-        }
-      },
-      "checkpoint_3": {
-        "reference": {
-          "infra_failure": null,
-          "passed": 47,
-          "total": 47
-        },
-        "variants": {
-          "neutral_error_text": {
-            "infra_failure": null,
-            "passed": 47,
-            "sensitive": [],
-            "total": 47
-          },
-          "reformatted_json": {
-            "infra_failure": null,
-            "passed": 36,
-            "sensitive": [
-              "test_checkpoint_3.py::test_captures_key_order",
-              "test_checkpoint_3.py::test_literal_dollar_sign",
-              "test_checkpoint_3.py::test_sorting_same_start_different_end"
-            ],
-            "total": 47
-          }
-        }
-      },
-      "checkpoint_4": {
-        "reference": {
-          "infra_failure": null,
-          "passed": 75,
-          "total": 75
-        },
-        "variants": {
-          "neutral_error_text": {
-            "infra_failure": null,
-            "passed": 75,
-            "sensitive": [],
-            "total": 75
-          },
-          "reformatted_json": {
-            "infra_failure": null,
-            "passed": 62,
-            "sensitive": [
-              "test_checkpoint_4.py::test_captures_key_order_raw",
-              "test_checkpoint_4.py::test_no_fixes_without_flag"
-            ],
-            "total": 75
-          }
-        }
-      },
-      "checkpoint_5": {
-        "reference": {
-          "infra_failure": null,
-          "passed": 104,
-          "total": 104
-        },
-        "variants": {
-          "neutral_error_text": {
-            "infra_failure": null,
-            "passed": 104,
-            "sensitive": [],
-            "total": 104
-          },
-          "reformatted_json": {
-            "infra_failure": null,
-            "passed": 86,
-            "sensitive": [
-              "test_checkpoint_5.py::test_exact_match_go",
-              "test_checkpoint_5.py::test_exact_match_haskell",
-              "test_checkpoint_5.py::test_exact_match_java",
-              "test_checkpoint_5.py::test_exact_match_rust",
-              "test_checkpoint_5.py::test_pattern_match_go"
-            ],
-            "total": 104
-          }
-        }
-      }
-    },
-    "summary": {
-      "flagged": 0,
-      "flagged_by_checkpoint": {},
-      "flagged_by_rule": {},
-      "sensitive_determined": 0,
-      "sensitive_unexplained": 18,
-      "unconfirmed": 0
-    },
-    "unconfirmed": [],
-    "variants": {
-      "neutral_error_text": "every error's human-readable text (an error object's detail or message) replaced by 'request rejected'; category, exit code and format kept",
-      "reformatted_json": "JSON stdout re-serialised with two-space indentation and a trailing newline; value and key order kept"
     }
   },
   "steps": [

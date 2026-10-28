@@ -18,6 +18,9 @@ from pydantic import Field
 
 from raidar.grading.models import CaseResult, CaseStatus, VerifierGrade, VerifierModel
 
+EXCLUDED_STEP_REASON = "step excluded from the solvable set: it has no new scoreable tests"
+"""Why a step the lock pins with an empty solvable set has no verdict (it is skipped)."""
+
 
 class SolvableRef(VerifierModel):
     """The solvable sets a problem's lock pins: the validation digest and cases per step."""

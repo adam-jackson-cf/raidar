@@ -1,17 +1,30 @@
 {
   "checks": [
     {
-      "detail": [],
+      "detail": [
+        "checkpoint_1: no_new_scoreable_tests"
+      ],
       "name": "solvable_set",
       "status": "pass"
     },
     {
-      "detail": [],
+      "detail": [
+        "checkpoint_1: pass (empty starter reference on checkpoint_1 tests)",
+        "checkpoint_2: pass (checkpoint_1 reference on checkpoint_2 tests)",
+        "checkpoint_3: pass (checkpoint_2 reference on checkpoint_3 tests)",
+        "checkpoint_4: pass (checkpoint_3 reference on checkpoint_4 tests)",
+        "checkpoint_5: pass (checkpoint_4 reference on checkpoint_5 tests)"
+      ],
       "name": "reference_k-1_fails_k",
       "status": "pass"
     },
     {
-      "detail": [],
+      "detail": [
+        "checkpoint_1: 46 nondeterministic",
+        "checkpoint_2: 86 nondeterministic",
+        "checkpoint_3: 86 nondeterministic",
+        "checkpoint_4: 86 nondeterministic"
+      ],
       "name": "repeat_identical_positive",
       "status": "pass"
     },
@@ -841,15 +854,29 @@
     "native_parity_negative"
   ],
   "problem": "scb/metric_transform_lang@38d627ecf668",
+  "reference_digests": {
+    "negative": {
+      "checkpoint_1": "1d2ed42b2c50b3936372a558871e17eb96c66636e686c6b081289c316f23a791",
+      "checkpoint_2": "97780a650c1f8caa3a3a72e425aece27dd54f5d37c51bf8b232c955e392a6f2d",
+      "checkpoint_3": "b2455b26e8240575f2191d88f79cd5c395d84638337f4884563429735533eabd",
+      "checkpoint_4": "90fee8df39fa5d9c591837335695bdce983998387e14175d29cc0a6001bf6280",
+      "checkpoint_5": "09e5eeaeb3f7dca445c47fd35b20784eb60ca5a820fee3d16f48646baa22a459"
+    },
+    "positive": {
+      "checkpoint_1": "97780a650c1f8caa3a3a72e425aece27dd54f5d37c51bf8b232c955e392a6f2d",
+      "checkpoint_2": "b2455b26e8240575f2191d88f79cd5c395d84638337f4884563429735533eabd",
+      "checkpoint_3": "90fee8df39fa5d9c591837335695bdce983998387e14175d29cc0a6001bf6280",
+      "checkpoint_4": "09e5eeaeb3f7dca445c47fd35b20784eb60ca5a820fee3d16f48646baa22a459",
+      "checkpoint_5": "38b8d3ef9dca5225b343ad5c140a8f1468005d3161d74c88f1f2181263431345"
+    }
+  },
   "repeats": 3,
   "schema_version": 1,
   "solvable": {
     "checkpoint_1": {
-      "digest": "6c264fec0ee58fdbff4f054f16d865a84da66ef5f6898c1f4d169b10b0667cec",
-      "nondeterministic": [],
-      "nondeterministic_count": 0,
-      "size": 46,
-      "solvable": [
+      "digest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "exclusion": "no_new_scoreable_tests",
+      "nondeterministic": [
         "checkpoint_1::test_checkpoint_1_cli_format[21_custom_timezone]",
         "checkpoint_1::test_checkpoint_1_cli_format[22_custom_timestamp_fmt]",
         "checkpoint_1::test_checkpoint_1_cli_format[24_extra_csv_columns]",
@@ -897,14 +924,15 @@
         "checkpoint_1::test_checkpoint_1_window_variants[13_window_24h]",
         "checkpoint_1::test_checkpoint_1_window_variants[29_window_7d]"
       ],
-      "verdict": "validated"
+      "nondeterministic_count": 46,
+      "size": 0,
+      "solvable": [],
+      "verdict": "excluded"
     },
     "checkpoint_2": {
-      "digest": "85462a25c60fac4ad435075acda13340d11bc762170f628f3eed2b10dc683cfb",
-      "nondeterministic": [],
-      "nondeterministic_count": 0,
-      "size": 98,
-      "solvable": [
+      "digest": "6b6969cc02c8baa0e727c20f9d6018bc8eff9471dbe43e3c0c2269345553798a",
+      "exclusion": null,
+      "nondeterministic": [
         "checkpoint_1::test_checkpoint_1_cli_format[21_custom_timezone]",
         "checkpoint_1::test_checkpoint_1_cli_format[22_custom_timestamp_fmt]",
         "checkpoint_1::test_checkpoint_1_cli_format[24_extra_csv_columns]",
@@ -969,18 +997,6 @@
         "checkpoint_2::test_checkpoint_2_core_extended[16_regression_filter_apply]",
         "checkpoint_2::test_checkpoint_2_core_extended[17_regression_window_group]",
         "checkpoint_2::test_checkpoint_2_core_extended[18_regression_all_aggregates]",
-        "checkpoint_2::test_checkpoint_2_error[01_illegal_override_narrowing]",
-        "checkpoint_2::test_checkpoint_2_error[02_schema_forward_reference]",
-        "checkpoint_2::test_checkpoint_2_error[03_missing_param_without_default]",
-        "checkpoint_2::test_checkpoint_2_error[04_param_type_parse_failure]",
-        "checkpoint_2::test_checkpoint_2_error[05_pre_stage_calc_uses_agg_alias]",
-        "checkpoint_2::test_checkpoint_2_error[06_circular_inheritance]",
-        "checkpoint_2::test_checkpoint_2_error[07_lag_in_pre_stage]",
-        "checkpoint_2::test_checkpoint_2_error[08_post_calc_type_mismatch]",
-        "checkpoint_2::test_checkpoint_2_error[09_pre_calc_type_mismatch]",
-        "checkpoint_2::test_checkpoint_2_error[10_illegal_override_string_int]",
-        "checkpoint_2::test_checkpoint_2_error[11_lag_non_int_k]",
-        "checkpoint_2::test_checkpoint_2_error[12_duplicate_calc_names]",
         "checkpoint_2::test_checkpoint_2_file_output[01_window_lag_file_out]",
         "checkpoint_2::test_checkpoint_2_file_output[02_complex_output]",
         "checkpoint_2::test_checkpoint_2_hidden[01_empty_input_with_calcs]",
@@ -1004,14 +1020,28 @@
         "checkpoint_2::test_checkpoint_2_regression[11_null_aggregates]",
         "checkpoint_2::test_checkpoint_2_regression[12_cli_timezone]"
       ],
+      "nondeterministic_count": 86,
+      "size": 12,
+      "solvable": [
+        "checkpoint_2::test_checkpoint_2_error[01_illegal_override_narrowing]",
+        "checkpoint_2::test_checkpoint_2_error[02_schema_forward_reference]",
+        "checkpoint_2::test_checkpoint_2_error[03_missing_param_without_default]",
+        "checkpoint_2::test_checkpoint_2_error[04_param_type_parse_failure]",
+        "checkpoint_2::test_checkpoint_2_error[05_pre_stage_calc_uses_agg_alias]",
+        "checkpoint_2::test_checkpoint_2_error[06_circular_inheritance]",
+        "checkpoint_2::test_checkpoint_2_error[07_lag_in_pre_stage]",
+        "checkpoint_2::test_checkpoint_2_error[08_post_calc_type_mismatch]",
+        "checkpoint_2::test_checkpoint_2_error[09_pre_calc_type_mismatch]",
+        "checkpoint_2::test_checkpoint_2_error[10_illegal_override_string_int]",
+        "checkpoint_2::test_checkpoint_2_error[11_lag_non_int_k]",
+        "checkpoint_2::test_checkpoint_2_error[12_duplicate_calc_names]"
+      ],
       "verdict": "validated"
     },
     "checkpoint_3": {
-      "digest": "73f76aeac10dab0efabcebb9e05ce9b48902a48d567e8dd70087e639818442ee",
-      "nondeterministic": [],
-      "nondeterministic_count": 0,
-      "size": 163,
-      "solvable": [
+      "digest": "2a26e1c4ef3decfcac898ec917c9264d6300582112cade45d13260ffd6f1299d",
+      "exclusion": null,
+      "nondeterministic": [
         "checkpoint_1::test_checkpoint_1_cli_format[21_custom_timezone]",
         "checkpoint_1::test_checkpoint_1_cli_format[22_custom_timestamp_fmt]",
         "checkpoint_1::test_checkpoint_1_cli_format[24_extra_csv_columns]",
@@ -1076,18 +1106,6 @@
         "checkpoint_2::test_checkpoint_2_core_extended[16_regression_filter_apply]",
         "checkpoint_2::test_checkpoint_2_core_extended[17_regression_window_group]",
         "checkpoint_2::test_checkpoint_2_core_extended[18_regression_all_aggregates]",
-        "checkpoint_2::test_checkpoint_2_error[01_illegal_override_narrowing]",
-        "checkpoint_2::test_checkpoint_2_error[02_schema_forward_reference]",
-        "checkpoint_2::test_checkpoint_2_error[03_missing_param_without_default]",
-        "checkpoint_2::test_checkpoint_2_error[04_param_type_parse_failure]",
-        "checkpoint_2::test_checkpoint_2_error[05_pre_stage_calc_uses_agg_alias]",
-        "checkpoint_2::test_checkpoint_2_error[06_circular_inheritance]",
-        "checkpoint_2::test_checkpoint_2_error[07_lag_in_pre_stage]",
-        "checkpoint_2::test_checkpoint_2_error[08_post_calc_type_mismatch]",
-        "checkpoint_2::test_checkpoint_2_error[09_pre_calc_type_mismatch]",
-        "checkpoint_2::test_checkpoint_2_error[10_illegal_override_string_int]",
-        "checkpoint_2::test_checkpoint_2_error[11_lag_non_int_k]",
-        "checkpoint_2::test_checkpoint_2_error[12_duplicate_calc_names]",
         "checkpoint_2::test_checkpoint_2_file_output[01_window_lag_file_out]",
         "checkpoint_2::test_checkpoint_2_file_output[02_complex_output]",
         "checkpoint_2::test_checkpoint_2_hidden[01_empty_input_with_calcs]",
@@ -1109,7 +1127,23 @@
         "checkpoint_2::test_checkpoint_2_regression[09_round_function]",
         "checkpoint_2::test_checkpoint_2_regression[10_apply_order]",
         "checkpoint_2::test_checkpoint_2_regression[11_null_aggregates]",
-        "checkpoint_2::test_checkpoint_2_regression[12_cli_timezone]",
+        "checkpoint_2::test_checkpoint_2_regression[12_cli_timezone]"
+      ],
+      "nondeterministic_count": 86,
+      "size": 77,
+      "solvable": [
+        "checkpoint_2::test_checkpoint_2_error[01_illegal_override_narrowing]",
+        "checkpoint_2::test_checkpoint_2_error[02_schema_forward_reference]",
+        "checkpoint_2::test_checkpoint_2_error[03_missing_param_without_default]",
+        "checkpoint_2::test_checkpoint_2_error[04_param_type_parse_failure]",
+        "checkpoint_2::test_checkpoint_2_error[05_pre_stage_calc_uses_agg_alias]",
+        "checkpoint_2::test_checkpoint_2_error[06_circular_inheritance]",
+        "checkpoint_2::test_checkpoint_2_error[07_lag_in_pre_stage]",
+        "checkpoint_2::test_checkpoint_2_error[08_post_calc_type_mismatch]",
+        "checkpoint_2::test_checkpoint_2_error[09_pre_calc_type_mismatch]",
+        "checkpoint_2::test_checkpoint_2_error[10_illegal_override_string_int]",
+        "checkpoint_2::test_checkpoint_2_error[11_lag_non_int_k]",
+        "checkpoint_2::test_checkpoint_2_error[12_duplicate_calc_names]",
         "checkpoint_3::test_checkpoint_3_core[01_multi_input_union]",
         "checkpoint_3::test_checkpoint_3_core[02_tsv_and_format_flag]",
         "checkpoint_3::test_checkpoint_3_core[04_null_markers_and_filter]",
@@ -1179,11 +1213,55 @@
       "verdict": "validated"
     },
     "checkpoint_4": {
-      "digest": "9df39c4deaa5cbd199162297b8b9137a88016bd3e34b3c1f2d75463521deff9c",
-      "nondeterministic": [],
-      "nondeterministic_count": 0,
-      "size": 178,
-      "solvable": [
+      "digest": "705cfcf28deac389dee0c68036595a181269247d2146393413bcddb791509443",
+      "exclusion": null,
+      "nondeterministic": [
+        "checkpoint_1::test_checkpoint_1_cli_format[21_custom_timezone]",
+        "checkpoint_1::test_checkpoint_1_cli_format[22_custom_timestamp_fmt]",
+        "checkpoint_1::test_checkpoint_1_cli_format[24_extra_csv_columns]",
+        "checkpoint_1::test_checkpoint_1_cli_format[28_comments_empty_lines]",
+        "checkpoint_1::test_checkpoint_1_core[01_all_rows_aggregates]",
+        "checkpoint_1::test_checkpoint_1_core[02_group_by_category]",
+        "checkpoint_1::test_checkpoint_1_core[03_window_1h_counts]",
+        "checkpoint_1::test_checkpoint_1_core[05_filter_and_apply]",
+        "checkpoint_1::test_checkpoint_1_core_extended[06_group_by_file_out]",
+        "checkpoint_1::test_checkpoint_1_core_extended[08_median_even_count]",
+        "checkpoint_1::test_checkpoint_1_core_extended[09_timestamp_transforms]",
+        "checkpoint_1::test_checkpoint_1_core_extended[10_round_function]",
+        "checkpoint_1::test_checkpoint_1_core_extended[11_group_by_multi_cols]",
+        "checkpoint_1::test_checkpoint_1_core_extended[25_filter_with_group_by]",
+        "checkpoint_1::test_checkpoint_1_core_extended[27_apply_column_override]",
+        "checkpoint_1::test_checkpoint_1_core_extended[30_all_aggregates]",
+        "checkpoint_1::test_checkpoint_1_error[01_dsl_syntax_error]",
+        "checkpoint_1::test_checkpoint_1_error[02_type_error_numeric_on_string]",
+        "checkpoint_1::test_checkpoint_1_error[03_missing_csv_io_error]",
+        "checkpoint_1::test_checkpoint_1_error[04_multiple_group_by]",
+        "checkpoint_1::test_checkpoint_1_error[05_multiple_window]",
+        "checkpoint_1::test_checkpoint_1_error[06_no_aggregate]",
+        "checkpoint_1::test_checkpoint_1_error[07_duplicate_aliases]",
+        "checkpoint_1::test_checkpoint_1_error[08_invalid_window_duration]",
+        "checkpoint_1::test_checkpoint_1_error[09_len_on_number]",
+        "checkpoint_1::test_checkpoint_1_error[10_day_on_string]",
+        "checkpoint_1::test_checkpoint_1_error[11_string_number_comparison]",
+        "checkpoint_1::test_checkpoint_1_error[12_invalid_in_usage]",
+        "checkpoint_1::test_checkpoint_1_error[13_undefined_column]",
+        "checkpoint_1::test_checkpoint_1_error[15_missing_dsl_file]",
+        "checkpoint_1::test_checkpoint_1_error[16_in_with_two_literals]",
+        "checkpoint_1::test_checkpoint_1_error[17_zero_window_duration]",
+        "checkpoint_1::test_checkpoint_1_error[18_filter_non_boolean]",
+        "checkpoint_1::test_checkpoint_1_expressions[14_all_comparison_ops]",
+        "checkpoint_1::test_checkpoint_1_expressions[15_logical_operators]",
+        "checkpoint_1::test_checkpoint_1_expressions[16_in_operator]",
+        "checkpoint_1::test_checkpoint_1_expressions[17_column_comparison]",
+        "checkpoint_1::test_checkpoint_1_hidden[07_std_var_aggregates]",
+        "checkpoint_1::test_checkpoint_1_hidden[19_single_row]",
+        "checkpoint_1::test_checkpoint_1_hidden[20_null_aggregates]",
+        "checkpoint_1::test_checkpoint_1_hidden[26_apply_then_filter]",
+        "checkpoint_1::test_checkpoint_1_hidden[31_group_by_timestamp]",
+        "checkpoint_1::test_checkpoint_1_window_variants[04_window_and_group_by]",
+        "checkpoint_1::test_checkpoint_1_window_variants[12_window_10m]",
+        "checkpoint_1::test_checkpoint_1_window_variants[13_window_24h]",
+        "checkpoint_1::test_checkpoint_1_window_variants[29_window_7d]",
         "checkpoint_2::test_checkpoint_2_core[01_schema_inheritance_pre_calc]",
         "checkpoint_2::test_checkpoint_2_core[02_params_and_filter]",
         "checkpoint_2::test_checkpoint_2_core[03_post_agg_lag]",
@@ -1202,18 +1280,6 @@
         "checkpoint_2::test_checkpoint_2_core_extended[16_regression_filter_apply]",
         "checkpoint_2::test_checkpoint_2_core_extended[17_regression_window_group]",
         "checkpoint_2::test_checkpoint_2_core_extended[18_regression_all_aggregates]",
-        "checkpoint_2::test_checkpoint_2_error[01_illegal_override_narrowing]",
-        "checkpoint_2::test_checkpoint_2_error[02_schema_forward_reference]",
-        "checkpoint_2::test_checkpoint_2_error[03_missing_param_without_default]",
-        "checkpoint_2::test_checkpoint_2_error[04_param_type_parse_failure]",
-        "checkpoint_2::test_checkpoint_2_error[05_pre_stage_calc_uses_agg_alias]",
-        "checkpoint_2::test_checkpoint_2_error[06_circular_inheritance]",
-        "checkpoint_2::test_checkpoint_2_error[07_lag_in_pre_stage]",
-        "checkpoint_2::test_checkpoint_2_error[08_post_calc_type_mismatch]",
-        "checkpoint_2::test_checkpoint_2_error[09_pre_calc_type_mismatch]",
-        "checkpoint_2::test_checkpoint_2_error[10_illegal_override_string_int]",
-        "checkpoint_2::test_checkpoint_2_error[11_lag_non_int_k]",
-        "checkpoint_2::test_checkpoint_2_error[12_duplicate_calc_names]",
         "checkpoint_2::test_checkpoint_2_file_output[01_window_lag_file_out]",
         "checkpoint_2::test_checkpoint_2_file_output[02_complex_output]",
         "checkpoint_2::test_checkpoint_2_hidden[01_empty_input_with_calcs]",
@@ -1235,7 +1301,23 @@
         "checkpoint_2::test_checkpoint_2_regression[09_round_function]",
         "checkpoint_2::test_checkpoint_2_regression[10_apply_order]",
         "checkpoint_2::test_checkpoint_2_regression[11_null_aggregates]",
-        "checkpoint_2::test_checkpoint_2_regression[12_cli_timezone]",
+        "checkpoint_2::test_checkpoint_2_regression[12_cli_timezone]"
+      ],
+      "nondeterministic_count": 86,
+      "size": 138,
+      "solvable": [
+        "checkpoint_2::test_checkpoint_2_error[01_illegal_override_narrowing]",
+        "checkpoint_2::test_checkpoint_2_error[02_schema_forward_reference]",
+        "checkpoint_2::test_checkpoint_2_error[03_missing_param_without_default]",
+        "checkpoint_2::test_checkpoint_2_error[04_param_type_parse_failure]",
+        "checkpoint_2::test_checkpoint_2_error[05_pre_stage_calc_uses_agg_alias]",
+        "checkpoint_2::test_checkpoint_2_error[06_circular_inheritance]",
+        "checkpoint_2::test_checkpoint_2_error[07_lag_in_pre_stage]",
+        "checkpoint_2::test_checkpoint_2_error[08_post_calc_type_mismatch]",
+        "checkpoint_2::test_checkpoint_2_error[09_pre_calc_type_mismatch]",
+        "checkpoint_2::test_checkpoint_2_error[10_illegal_override_string_int]",
+        "checkpoint_2::test_checkpoint_2_error[11_lag_non_int_k]",
+        "checkpoint_2::test_checkpoint_2_error[12_duplicate_calc_names]",
         "checkpoint_3::test_checkpoint_3_core[01_multi_input_union]",
         "checkpoint_3::test_checkpoint_3_core[02_tsv_and_format_flag]",
         "checkpoint_3::test_checkpoint_3_core[04_null_markers_and_filter]",
@@ -1367,6 +1449,7 @@
     },
     "checkpoint_5": {
       "digest": "5bf21960f0ab9c15154ab41dedf6c1c2845d6c517168aed9afdb957fe9d3ecf0",
+      "exclusion": null,
       "nondeterministic": [],
       "nondeterministic_count": 0,
       "size": 73,
@@ -1446,153 +1529,6 @@
         "checkpoint_5::test_checkpoint_5_spec_error[03_minor_gating_join_requires_14]"
       ],
       "verdict": "validated"
-    }
-  },
-  "spec_determinacy": {
-    "assertions": {
-      "audited": 0,
-      "by_rule": {}
-    },
-    "audit_version": 1,
-    "dynamic": {
-      "environment": {},
-      "reason": null,
-      "status": "ran"
-    },
-    "flagged": [],
-    "method": "Static: each audited assertion of a test (error-detail/message equality, containment or pattern; byte-level stdout comparison) is classified against the text of its origin checkpoint's specification and every earlier one (rules below). Dynamic: reference k and spec-conformant variants of it (variants below) are graded at step k; a case is sensitive to a variant when it passes on the reference and not on the variant. A case is flagged when its test has an undetermined assertion of the kind a variant it is sensitive to rewrites.",
-    "rules": {
-      "content-stated": "determined: a paragraph states what the category's detail contains",
-      "content-unstated": "undetermined: error text must contain an input value or match a pattern; no paragraph states what the category's detail contains",
-      "exact-stated": "determined: a paragraph states the exact content of the category's detail",
-      "exact-unstated": "undetermined: error text must equal an input value; no paragraph states exact content",
-      "format-stated": "determined: the specification names an output byte format",
-      "format-unstated": "undetermined: stdout compared byte for byte; no byte format stated",
-      "literal-in-spec": "determined: the asserted literal occurs in the specification text",
-      "wording-unstated": "undetermined: an error-text literal in neither the specification nor the test's inputs"
-    },
-    "sensitive_determined": [],
-    "sensitive_unexplained": [],
-    "static_undetermined": [],
-    "steps": {
-      "checkpoint_1": {
-        "reference": {
-          "infra_failure": null,
-          "passed": 46,
-          "total": 46
-        },
-        "variants": {
-          "neutral_error_text": {
-            "infra_failure": null,
-            "passed": 46,
-            "sensitive": [],
-            "total": 46
-          },
-          "reformatted_json": {
-            "infra_failure": null,
-            "passed": 46,
-            "sensitive": [],
-            "total": 46
-          }
-        }
-      },
-      "checkpoint_2": {
-        "reference": {
-          "infra_failure": null,
-          "passed": 98,
-          "total": 98
-        },
-        "variants": {
-          "neutral_error_text": {
-            "infra_failure": null,
-            "passed": 98,
-            "sensitive": [],
-            "total": 98
-          },
-          "reformatted_json": {
-            "infra_failure": null,
-            "passed": 98,
-            "sensitive": [],
-            "total": 98
-          }
-        }
-      },
-      "checkpoint_3": {
-        "reference": {
-          "infra_failure": null,
-          "passed": 163,
-          "total": 164
-        },
-        "variants": {
-          "neutral_error_text": {
-            "infra_failure": null,
-            "passed": 163,
-            "sensitive": [],
-            "total": 164
-          },
-          "reformatted_json": {
-            "infra_failure": null,
-            "passed": 163,
-            "sensitive": [],
-            "total": 164
-          }
-        }
-      },
-      "checkpoint_4": {
-        "reference": {
-          "infra_failure": null,
-          "passed": 178,
-          "total": 180
-        },
-        "variants": {
-          "neutral_error_text": {
-            "infra_failure": null,
-            "passed": 178,
-            "sensitive": [],
-            "total": 180
-          },
-          "reformatted_json": {
-            "infra_failure": null,
-            "passed": 178,
-            "sensitive": [],
-            "total": 180
-          }
-        }
-      },
-      "checkpoint_5": {
-        "reference": {
-          "infra_failure": null,
-          "passed": 73,
-          "total": 74
-        },
-        "variants": {
-          "neutral_error_text": {
-            "infra_failure": null,
-            "passed": 73,
-            "sensitive": [],
-            "total": 74
-          },
-          "reformatted_json": {
-            "infra_failure": null,
-            "passed": 73,
-            "sensitive": [],
-            "total": 74
-          }
-        }
-      }
-    },
-    "summary": {
-      "flagged": 0,
-      "flagged_by_checkpoint": {},
-      "flagged_by_rule": {},
-      "sensitive_determined": 0,
-      "sensitive_unexplained": 0,
-      "unconfirmed": 0
-    },
-    "unconfirmed": [],
-    "variants": {
-      "neutral_error_text": "every error's human-readable text (an error object's detail or message) replaced by 'request rejected'; category, exit code and format kept",
-      "reformatted_json": "JSON stdout re-serialised with two-space indentation and a trailing newline; value and key order kept"
     }
   },
   "steps": [

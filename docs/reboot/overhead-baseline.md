@@ -153,7 +153,7 @@ The §5 budgets were measured on the work Mac's OrbStack. They stay the **N1 ref
 
 | Phase | N1 reference | Worst p95 (B, C) | Accepted `mbp` |
 |---|---|---|---|
-| Environment start, warm | 20 s | 3.26 | 5 s |
+| Environment start, warm | 20 s | 3.26 | 5.5 s (raised from 5 s; see below) |
 | Grader image, warm | 1 s | 0.40 | 1 s |
 | Component apply | 2.5 s | 0.05 | 0.5 s |
 | Per-step reset | 2.0 s | 1.56 | 2.5 s |
@@ -167,6 +167,8 @@ The §5 budgets were measured on the work Mac's OrbStack. They stay the **N1 ref
 | Aggregate per-trial fixed overhead (init) | 27 s | 4.04 | 6.5 s |
 
 Budgets with no mbp-specific value keep the N1 reference value on mbp: cold environment start (420 s tripwire), cold grader image (180 s tripwire), snapshot transfer (download) 2 s, teardown + result write (no-init) 15 s and per-trial fixed overhead (no-init) 38 s.
+
+**Amendment: warm environment start 5 → 5.5 s.** Measured spread is ±0.4 s across runs that did not touch container start. Profiling and steadier measurement are deferred to phase 7. No other threshold changed.
 
 **Confirming evidence (2026-10-24, after the spike, with liveness observing and T1 hashing on every trial).**
 - `make perf-gate TARGET=mbp`, p95 at concurrency 1 / 3: per-step overhead 2.85 / 2.99 s, per-trial fixed overhead 2.61 / 2.83 s, per-step reset 1.01 / 1.04 s, artifact collection 1.04 / 1.11 s. All sit inside the set (full numbers in `.tmp/perf-gate-v1.log`).

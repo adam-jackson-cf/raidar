@@ -71,7 +71,28 @@ def test_a_missing_solvable_set_is_unavailable_never_zero(tmp_path: Path) -> Non
 def test_an_empty_solvable_set_has_no_verdict(tmp_path: Path) -> None:
     trial = _trial(tmp_path, [(F,)])
     observed = _observed(trial, {"solvable": _solvable({"checkpoint_1": []})})
-    assert observed["solved_solvable", "checkpoint_1"].status is AssessStatus.UNAVAILABLE
+    assert observed["solved_solvable", "checkpoint_1"].status is AssessStatus.NOT_APPLICABLE
+    assert observed["solved_checkpoints_solvable", TRAJECTORY_SUBJECT].status is (
+        AssessStatus.UNAVAILABLE
+    )
+
+
+def test_an_excluded_step_is_skipped_and_leaves_the_usable_steps_scored(tmp_path: Path) -> None:
+    # Checkpoint 2 is pinned with an empty set (excluded); 1 and 3 are solved.
+    trial = _trial(tmp_path, [(P,), (F,), (P,)])
+    config = _solvable(
+        {
+            "checkpoint_1": ["checkpoint_1::case_0"],
+            "checkpoint_2": [],
+            "checkpoint_3": ["checkpoint_3::case_0"],
+        }
+    )
+    observed = _observed(trial, {"solvable": config})
+    assert observed["solved_solvable", "checkpoint_2"].status is AssessStatus.NOT_APPLICABLE
+    assert observed["solved_solvable", "checkpoint_3"].value == 1.0
+    solved = observed["solved_checkpoints_solvable", TRAJECTORY_SUBJECT]
+    assert solved.value == 2
+    assert observed["reached_solvable", TRAJECTORY_SUBJECT].value == 2
 
 
 def test_a_solvable_case_the_grade_lacks_did_not_pass(tmp_path: Path) -> None:
@@ -99,13 +120,25 @@ def test_halted_trials_leave_unattempted_checkpoints_unsolved(tmp_path: Path) ->
 
 def test_a_halt_cannot_hide_a_missing_planned_solvable_set(tmp_path: Path) -> None:
     trial = _trial(tmp_path, [(F,)], planned=["checkpoint_2"])
-    for remainder in ({}, {"checkpoint_2": []}):
-        config = {
-            "progression": "halt_on_failure",
-            "solvable": _solvable({"checkpoint_1": ["checkpoint_1::case_0"], **remainder}),
-        }
-        observed = _observed(trial, config)
-        trajectory = observed["solved_checkpoints_solvable", TRAJECTORY_SUBJECT]
-        assert trajectory.status is AssessStatus.UNAVAILABLE
-        assert trajectory.value is None
-        assert observed["solved_solvable", "checkpoint_1"].value == 0.0
+    config = {
+        "progression": "halt_on_failure",
+        "solvable": _solvable({"checkpoint_1": ["checkpoint_1::case_0"]}),
+    }
+    observed = _observed(trial, config)
+    trajectory = observed["solved_checkpoints_solvable", TRAJECTORY_SUBJECT]
+    assert trajectory.status is AssessStatus.UNAVAILABLE
+    assert trajectory.value is None
+    assert observed["solved_solvable", "checkpoint_1"].value == 0.0
+
+
+def test_a_halt_before_an_excluded_planned_step_leaves_the_usable_steps_scored(
+    tmp_path: Path,
+) -> None:
+    trial = _trial(tmp_path, [(F,)], planned=["checkpoint_2"])
+    config = {
+        "progression": "halt_on_failure",
+        "solvable": _solvable({"checkpoint_1": ["checkpoint_1::case_0"], "checkpoint_2": []}),
+    }
+    observed = _observed(trial, config)
+    assert observed["solved_checkpoints_solvable", TRAJECTORY_SUBJECT].value == 0
+    assert observed["solved_solvable", "checkpoint_2"].status is AssessStatus.NOT_APPLICABLE

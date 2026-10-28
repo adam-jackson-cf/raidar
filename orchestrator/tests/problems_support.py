@@ -5,8 +5,8 @@ bundle, references) for two problems:
 
 - ``fixture/adder``: reference 1 implements ``add``, reference 2 adds ``mul``;
   it validates.
-- ``fixture/adder_negative``: reference 1 already implements ``mul``, so the
-  checkpoint-2 tests pass on reference k-1 and validation must exclude it.
+- ``fixture/adder_negative``: both references exit 1 on every call, so no step has a
+  scoreable case and validation must exclude it.
 
 Tests build the store into a temporary directory; no copy is committed.
 """
@@ -115,7 +115,7 @@ class FakeResolver:
 
 
 def _write_problem(
-    store: ProblemStore, name: str, *, ref_one_has_mul: bool, oneshot: bool, resolver: Resolver
+    store: ProblemStore, name: str, *, broken: bool, oneshot: bool, resolver: Resolver
 ) -> None:
     ref = f"{name}@{FIXTURE_VERSION}"
     steps = ["checkpoint_1"] if oneshot else ["checkpoint_1", "checkpoint_2"]
@@ -139,9 +139,12 @@ def _write_problem(
         ),
         write_tests(work / "tests"),
     )
-    write_app(content / "references" / "checkpoint_1", mul=ref_one_has_mul)
+    write_app(content / "references" / "checkpoint_1")
     if not oneshot:
         write_app(content / "references" / "checkpoint_2", mul=True)
+    if broken:
+        for app in (content / "references").glob("*/app.py"):
+            app.write_text("import sys\n\nsys.exit(1)\n")
     bundle = write_bundle_dependencies(bundle.root, pins, locks)
     DependencyLocks(store.deps_dir(ProblemId.parse(ref))).write_all(locks)
     task = content / "task"
@@ -197,13 +200,9 @@ def build_fixture_store(
     (root / "sources.yaml").write_text(SOURCES_YAML)
     store = ProblemStore(root, data_root)
     chosen = resolver or FakeResolver()
-    _write_problem(store, "fixture/adder", ref_one_has_mul=False, oneshot=False, resolver=chosen)
-    _write_problem(
-        store, "fixture/adder_negative", ref_one_has_mul=True, oneshot=False, resolver=chosen
-    )
-    _write_problem(
-        store, "fixture/adder.checkpoint_1", ref_one_has_mul=False, oneshot=True, resolver=chosen
-    )
+    _write_problem(store, "fixture/adder", broken=False, oneshot=False, resolver=chosen)
+    _write_problem(store, "fixture/adder_negative", broken=True, oneshot=False, resolver=chosen)
+    _write_problem(store, "fixture/adder.checkpoint_1", broken=False, oneshot=True, resolver=chosen)
     return store
 
 

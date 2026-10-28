@@ -66,6 +66,20 @@ All notable changes to this project are documented in this file.
 
 ### Fixes
 
+- K4 validation replaces the previous-reference exclusion with a step-local
+  `no_new_scoreable_tests` gate. Byte-identical references pool positive and negative
+  repeats; any varying case leaves every solvable set where it appears. Previous-reference
+  novelty is a reading only; source-reuse evidence is committed. A spec-to-test audit is deferred.
+  Generated reports add per-step `exclusion` and `reference_digests`; excluded steps leave
+  the solvable-outcome denominator without changing the raw SCB outcome.
+  Re-released as `correctness@6`, `code-quality@7`, `resource-usage@5`,
+  `process-compliance@10`, `gate-effort@14`, `definition-coverage@4` and `test-coverage@4`;
+  the latter six carry transitive grading-fingerprint changes. Previous releases are archived.
+- Accepted `mbp` warm environment-start p95 budget raised from 5 to 5.5 s on 2026-10-28:
+  measured spread ±0.4 s across runs that did not touch container start; profiling and
+  steadier measurement in phase 7. No other threshold changed.
+- Structure permits `lab/stages/` before the separately committed `stage/1` contract page;
+  package shape and import enforcement follow in phase 4.
 - Locked checkpoint prefixes now govern assessment subjects, solve-rate denominators and
   analysis solvable-set summaries from retained trial plans, rather than the full problem
   bundle. Smoke-only `MAX_CHECKPOINTS` tails remain planned and `not_attempted`.
