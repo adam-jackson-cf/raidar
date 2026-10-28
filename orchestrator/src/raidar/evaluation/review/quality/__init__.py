@@ -1,6 +1,6 @@
 """Quality element projection for the review surface.
 
-Reads job directories and one Assessment store (``code-quality@5`` and
-``correctness@4`` Assessments, plus the Jev audit) and writes the
+Reads job directories and one Assessment store (``code-quality@6`` and
+``correctness@5`` Assessments, plus the Jev audit) and writes the
 ``raidar-quality-projection`` JSON the review surface's Quality route serves.
 """

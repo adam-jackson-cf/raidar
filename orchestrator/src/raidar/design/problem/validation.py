@@ -45,6 +45,7 @@ from enum import StrEnum
 from pathlib import Path
 
 from raidar.contract.canonical import digest_json
+from raidar.grading.dependency_pins import REFUSAL_REASON, DependencyRefusal
 from raidar.grading.models import CaseGroup, CaseStatus, VerifierGrade
 from raidar.grading.solvable import case_key
 from raidar.scoring.framework.metrics import (
@@ -335,6 +336,16 @@ class ValidationRuns:
     native: Mapping[str, StepGrades] | None = None
 
 
+DEPENDENCY_CHECK = "dependency_resolvable"
+
+
+def check_dependencies(refusal: DependencyRefusal) -> Check:
+    """A problem whose declared reference sets did not resolve is excluded."""
+    detail = [f"{REFUSAL_REASON}: {refusal.detail}"]
+    detail += [f"{item.requirement}: {item.reason}" for item in refusal.unprovided]
+    return Check(DEPENDENCY_CHECK, CheckStatus.FAIL, tuple(detail))
+
+
 def run_checks(runs: ValidationRuns) -> list[Check]:
     checks = [
         check_solvable("solvable_set", runs.oracle[POSITIVE]),
@@ -432,7 +443,7 @@ class ValidationReport:
     engine: str
     repeats: int
     checks: list[Check]
-    runs: ValidationRuns
+    runs: ValidationRuns | None
     environment: dict[str, object] = field(default_factory=dict)
     spec_determinacy: dict[str, object] | None = None
 
@@ -441,6 +452,14 @@ class ValidationReport:
         return verdict(self.checks)
 
     def to_json(self) -> dict[str, object]:
+        graded: dict[str, object] = {}
+        if self.runs is not None:
+            positive = self.runs.oracle[POSITIVE]
+            graded = {
+                "grades": _grades_json(self.runs),
+                "solvable": {step: one.to_json() for step, one in solvable_sets(positive).items()},
+                "headline_policy": policy_preview(positive[0], len(self.steps)),
+            }
         return {
             "kind": "raidar-problem-validation",
             "schema_version": 1,
@@ -456,12 +475,7 @@ class ValidationReport:
                 {"name": c.name, "status": c.status.value, "detail": list(c.detail)}
                 for c in self.checks
             ],
-            "grades": _grades_json(self.runs),
-            "solvable": {
-                step: one.to_json()
-                for step, one in solvable_sets(self.runs.oracle[POSITIVE]).items()
-            },
-            "headline_policy": policy_preview(self.runs.oracle[POSITIVE][0], len(self.steps)),
+            **graded,
             "environment": self.environment,
             "group_order": [group.value for group in CaseGroup],
             **(

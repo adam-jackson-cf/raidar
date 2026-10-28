@@ -19,7 +19,7 @@ from raidar.contract.trial import ExecutionModel
 
 HEALTH_FILE = "health.json"
 HealthStatus = Literal["pass", "violation", "unmeasured"]
-HealthFamily = Literal["V", "H", "L", "P", "T", "G", "E", "J", "W"]
+HealthFamily = Literal["V", "H", "L", "P", "T", "G", "E", "J", "W", "D"]
 
 PASS: HealthStatus = "pass"
 VIOLATION: HealthStatus = "violation"

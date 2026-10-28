@@ -1,0 +1,1444 @@
+{
+  "checks": [
+    {
+      "detail": [],
+      "name": "solvable_set",
+      "status": "pass"
+    },
+    {
+      "detail": [],
+      "name": "reference_k-1_fails_k",
+      "status": "pass"
+    },
+    {
+      "detail": [],
+      "name": "repeat_identical_positive",
+      "status": "pass"
+    },
+    {
+      "detail": [],
+      "name": "repeat_identical_negative",
+      "status": "pass"
+    },
+    {
+      "detail": [
+        "native runner not run"
+      ],
+      "name": "native_parity_positive",
+      "status": "not_run"
+    },
+    {
+      "detail": [
+        "native runner not run"
+      ],
+      "name": "native_parity_negative",
+      "status": "not_run"
+    }
+  ],
+  "engine": "direct",
+  "environment": {
+    "docker_context": "raidar-mbp",
+    "engine": "direct",
+    "grader_environment_id": "sha256:715698bfd52661aa5627a3a9d22ea24db40b3716e5d78c6c8793976055973c06",
+    "grader_image": "raidar-oracle-grader:963c14e63ff5e15d",
+    "harbor": "0.23.0",
+    "pack_image": "raidar/pack-python:2b91a52663e099f2"
+  },
+  "grades": {
+    "native": null,
+    "oracle": {
+      "negative": [
+        {
+          "checkpoint_1": {
+            "all_pass": false,
+            "groups": {
+              "core": [
+                0,
+                7
+              ],
+              "error": [
+                0,
+                2
+              ],
+              "functionality": [
+                0,
+                4
+              ],
+              "regression": [
+                0,
+                0
+              ]
+            },
+            "infra_failure": null,
+            "passed": 0,
+            "total": 13
+          },
+          "checkpoint_2": {
+            "all_pass": false,
+            "groups": {
+              "core": [
+                1,
+                5
+              ],
+              "error": [
+                1,
+                2
+              ],
+              "functionality": [
+                0,
+                5
+              ],
+              "regression": [
+                13,
+                13
+              ]
+            },
+            "infra_failure": null,
+            "passed": 15,
+            "total": 25
+          },
+          "checkpoint_3": {
+            "all_pass": false,
+            "groups": {
+              "core": [
+                0,
+                8
+              ],
+              "error": [
+                0,
+                2
+              ],
+              "functionality": [
+                0,
+                12
+              ],
+              "regression": [
+                25,
+                25
+              ]
+            },
+            "infra_failure": null,
+            "passed": 25,
+            "total": 47
+          },
+          "checkpoint_4": {
+            "all_pass": false,
+            "groups": {
+              "core": [
+                0,
+                14
+              ],
+              "error": [
+                1,
+                2
+              ],
+              "functionality": [
+                1,
+                12
+              ],
+              "regression": [
+                47,
+                47
+              ]
+            },
+            "infra_failure": null,
+            "passed": 49,
+            "total": 75
+          },
+          "checkpoint_5": {
+            "all_pass": false,
+            "groups": {
+              "core": [
+                0,
+                13
+              ],
+              "error": [
+                0,
+                2
+              ],
+              "functionality": [
+                0,
+                14
+              ],
+              "regression": [
+                75,
+                75
+              ]
+            },
+            "infra_failure": null,
+            "passed": 75,
+            "total": 104
+          }
+        },
+        {
+          "checkpoint_1": {
+            "all_pass": false,
+            "groups": {
+              "core": [
+                0,
+                7
+              ],
+              "error": [
+                0,
+                2
+              ],
+              "functionality": [
+                0,
+                4
+              ],
+              "regression": [
+                0,
+                0
+              ]
+            },
+            "infra_failure": null,
+            "passed": 0,
+            "total": 13
+          },
+          "checkpoint_2": {
+            "all_pass": false,
+            "groups": {
+              "core": [
+                1,
+                5
+              ],
+              "error": [
+                1,
+                2
+              ],
+              "functionality": [
+                0,
+                5
+              ],
+              "regression": [
+                13,
+                13
+              ]
+            },
+            "infra_failure": null,
+            "passed": 15,
+            "total": 25
+          },
+          "checkpoint_3": {
+            "all_pass": false,
+            "groups": {
+              "core": [
+                0,
+                8
+              ],
+              "error": [
+                0,
+                2
+              ],
+              "functionality": [
+                0,
+                12
+              ],
+              "regression": [
+                25,
+                25
+              ]
+            },
+            "infra_failure": null,
+            "passed": 25,
+            "total": 47
+          },
+          "checkpoint_4": {
+            "all_pass": false,
+            "groups": {
+              "core": [
+                0,
+                14
+              ],
+              "error": [
+                1,
+                2
+              ],
+              "functionality": [
+                1,
+                12
+              ],
+              "regression": [
+                47,
+                47
+              ]
+            },
+            "infra_failure": null,
+            "passed": 49,
+            "total": 75
+          },
+          "checkpoint_5": {
+            "all_pass": false,
+            "groups": {
+              "core": [
+                0,
+                13
+              ],
+              "error": [
+                0,
+                2
+              ],
+              "functionality": [
+                0,
+                14
+              ],
+              "regression": [
+                75,
+                75
+              ]
+            },
+            "infra_failure": null,
+            "passed": 75,
+            "total": 104
+          }
+        },
+        {
+          "checkpoint_1": {
+            "all_pass": false,
+            "groups": {
+              "core": [
+                0,
+                7
+              ],
+              "error": [
+                0,
+                2
+              ],
+              "functionality": [
+                0,
+                4
+              ],
+              "regression": [
+                0,
+                0
+              ]
+            },
+            "infra_failure": null,
+            "passed": 0,
+            "total": 13
+          },
+          "checkpoint_2": {
+            "all_pass": false,
+            "groups": {
+              "core": [
+                1,
+                5
+              ],
+              "error": [
+                1,
+                2
+              ],
+              "functionality": [
+                0,
+                5
+              ],
+              "regression": [
+                13,
+                13
+              ]
+            },
+            "infra_failure": null,
+            "passed": 15,
+            "total": 25
+          },
+          "checkpoint_3": {
+            "all_pass": false,
+            "groups": {
+              "core": [
+                0,
+                8
+              ],
+              "error": [
+                0,
+                2
+              ],
+              "functionality": [
+                0,
+                12
+              ],
+              "regression": [
+                25,
+                25
+              ]
+            },
+            "infra_failure": null,
+            "passed": 25,
+            "total": 47
+          },
+          "checkpoint_4": {
+            "all_pass": false,
+            "groups": {
+              "core": [
+                0,
+                14
+              ],
+              "error": [
+                1,
+                2
+              ],
+              "functionality": [
+                1,
+                12
+              ],
+              "regression": [
+                47,
+                47
+              ]
+            },
+            "infra_failure": null,
+            "passed": 49,
+            "total": 75
+          },
+          "checkpoint_5": {
+            "all_pass": false,
+            "groups": {
+              "core": [
+                0,
+                13
+              ],
+              "error": [
+                0,
+                2
+              ],
+              "functionality": [
+                0,
+                14
+              ],
+              "regression": [
+                75,
+                75
+              ]
+            },
+            "infra_failure": null,
+            "passed": 75,
+            "total": 104
+          }
+        }
+      ],
+      "positive": [
+        {
+          "checkpoint_1": {
+            "all_pass": true,
+            "groups": {
+              "core": [
+                7,
+                7
+              ],
+              "error": [
+                2,
+                2
+              ],
+              "functionality": [
+                4,
+                4
+              ],
+              "regression": [
+                0,
+                0
+              ]
+            },
+            "infra_failure": null,
+            "passed": 13,
+            "total": 13
+          },
+          "checkpoint_2": {
+            "all_pass": true,
+            "groups": {
+              "core": [
+                5,
+                5
+              ],
+              "error": [
+                2,
+                2
+              ],
+              "functionality": [
+                5,
+                5
+              ],
+              "regression": [
+                13,
+                13
+              ]
+            },
+            "infra_failure": null,
+            "passed": 25,
+            "total": 25
+          },
+          "checkpoint_3": {
+            "all_pass": true,
+            "groups": {
+              "core": [
+                8,
+                8
+              ],
+              "error": [
+                2,
+                2
+              ],
+              "functionality": [
+                12,
+                12
+              ],
+              "regression": [
+                25,
+                25
+              ]
+            },
+            "infra_failure": null,
+            "passed": 47,
+            "total": 47
+          },
+          "checkpoint_4": {
+            "all_pass": true,
+            "groups": {
+              "core": [
+                14,
+                14
+              ],
+              "error": [
+                2,
+                2
+              ],
+              "functionality": [
+                12,
+                12
+              ],
+              "regression": [
+                47,
+                47
+              ]
+            },
+            "infra_failure": null,
+            "passed": 75,
+            "total": 75
+          },
+          "checkpoint_5": {
+            "all_pass": true,
+            "groups": {
+              "core": [
+                13,
+                13
+              ],
+              "error": [
+                2,
+                2
+              ],
+              "functionality": [
+                14,
+                14
+              ],
+              "regression": [
+                75,
+                75
+              ]
+            },
+            "infra_failure": null,
+            "passed": 104,
+            "total": 104
+          }
+        },
+        {
+          "checkpoint_1": {
+            "all_pass": true,
+            "groups": {
+              "core": [
+                7,
+                7
+              ],
+              "error": [
+                2,
+                2
+              ],
+              "functionality": [
+                4,
+                4
+              ],
+              "regression": [
+                0,
+                0
+              ]
+            },
+            "infra_failure": null,
+            "passed": 13,
+            "total": 13
+          },
+          "checkpoint_2": {
+            "all_pass": true,
+            "groups": {
+              "core": [
+                5,
+                5
+              ],
+              "error": [
+                2,
+                2
+              ],
+              "functionality": [
+                5,
+                5
+              ],
+              "regression": [
+                13,
+                13
+              ]
+            },
+            "infra_failure": null,
+            "passed": 25,
+            "total": 25
+          },
+          "checkpoint_3": {
+            "all_pass": true,
+            "groups": {
+              "core": [
+                8,
+                8
+              ],
+              "error": [
+                2,
+                2
+              ],
+              "functionality": [
+                12,
+                12
+              ],
+              "regression": [
+                25,
+                25
+              ]
+            },
+            "infra_failure": null,
+            "passed": 47,
+            "total": 47
+          },
+          "checkpoint_4": {
+            "all_pass": true,
+            "groups": {
+              "core": [
+                14,
+                14
+              ],
+              "error": [
+                2,
+                2
+              ],
+              "functionality": [
+                12,
+                12
+              ],
+              "regression": [
+                47,
+                47
+              ]
+            },
+            "infra_failure": null,
+            "passed": 75,
+            "total": 75
+          },
+          "checkpoint_5": {
+            "all_pass": true,
+            "groups": {
+              "core": [
+                13,
+                13
+              ],
+              "error": [
+                2,
+                2
+              ],
+              "functionality": [
+                14,
+                14
+              ],
+              "regression": [
+                75,
+                75
+              ]
+            },
+            "infra_failure": null,
+            "passed": 104,
+            "total": 104
+          }
+        },
+        {
+          "checkpoint_1": {
+            "all_pass": true,
+            "groups": {
+              "core": [
+                7,
+                7
+              ],
+              "error": [
+                2,
+                2
+              ],
+              "functionality": [
+                4,
+                4
+              ],
+              "regression": [
+                0,
+                0
+              ]
+            },
+            "infra_failure": null,
+            "passed": 13,
+            "total": 13
+          },
+          "checkpoint_2": {
+            "all_pass": true,
+            "groups": {
+              "core": [
+                5,
+                5
+              ],
+              "error": [
+                2,
+                2
+              ],
+              "functionality": [
+                5,
+                5
+              ],
+              "regression": [
+                13,
+                13
+              ]
+            },
+            "infra_failure": null,
+            "passed": 25,
+            "total": 25
+          },
+          "checkpoint_3": {
+            "all_pass": true,
+            "groups": {
+              "core": [
+                8,
+                8
+              ],
+              "error": [
+                2,
+                2
+              ],
+              "functionality": [
+                12,
+                12
+              ],
+              "regression": [
+                25,
+                25
+              ]
+            },
+            "infra_failure": null,
+            "passed": 47,
+            "total": 47
+          },
+          "checkpoint_4": {
+            "all_pass": true,
+            "groups": {
+              "core": [
+                14,
+                14
+              ],
+              "error": [
+                2,
+                2
+              ],
+              "functionality": [
+                12,
+                12
+              ],
+              "regression": [
+                47,
+                47
+              ]
+            },
+            "infra_failure": null,
+            "passed": 75,
+            "total": 75
+          },
+          "checkpoint_5": {
+            "all_pass": true,
+            "groups": {
+              "core": [
+                13,
+                13
+              ],
+              "error": [
+                2,
+                2
+              ],
+              "functionality": [
+                14,
+                14
+              ],
+              "regression": [
+                75,
+                75
+              ]
+            },
+            "infra_failure": null,
+            "passed": 104,
+            "total": 104
+          }
+        }
+      ]
+    }
+  },
+  "group_order": [
+    "core",
+    "functionality",
+    "error",
+    "regression"
+  ],
+  "headline_policy": {
+    "checkpoints": 5,
+    "components": {
+      "C": "used",
+      "E": "missing",
+      "G": "missing",
+      "H": "missing",
+      "R": "missing",
+      "V": "missing"
+    },
+    "eligible": false,
+    "policy": "scb-canonical@1",
+    "reasons": [
+      {
+        "code": "component_missing",
+        "component": "V",
+        "detail": "scb-canonical@1 requires component V"
+      },
+      {
+        "code": "component_missing",
+        "component": "E",
+        "detail": "scb-canonical@1 requires component E"
+      },
+      {
+        "code": "component_missing",
+        "component": "H",
+        "detail": "scb-canonical@1 requires component H"
+      },
+      {
+        "code": "component_missing",
+        "component": "R",
+        "detail": "scb-canonical@1 requires component R"
+      },
+      {
+        "code": "component_missing",
+        "component": "G",
+        "detail": "scb-canonical@1 requires component G"
+      }
+    ],
+    "reference_correctness": "1",
+    "selection": "default_by_k"
+  },
+  "kind": "raidar-problem-validation",
+  "manifest_sha256": "1bf7dad26b9abd6cc5169d38d4773e0eaa9822828f2dc65f15b843f2cb3816cb",
+  "mode": "multi_checkpoint",
+  "not_run": [
+    "native_parity_positive",
+    "native_parity_negative"
+  ],
+  "problem": "scb/code_search@38d627ecf668",
+  "repeats": 3,
+  "schema_version": 1,
+  "solvable": {
+    "checkpoint_1": {
+      "digest": "7526e139c24bc1d901b2a231cf14049c985cd4c57aa65e26dbc54fdc94d93ecf",
+      "nondeterministic": [],
+      "nondeterministic_count": 0,
+      "size": 13,
+      "solvable": [
+        "checkpoint_1::test_basic",
+        "checkpoint_1::test_case_insensitive_and_language",
+        "checkpoint_1::test_encoding_option_reads_non_utf8",
+        "checkpoint_1::test_ignore_non_py_files",
+        "checkpoint_1::test_multi_file_ordering",
+        "checkpoint_1::test_no_matches_outputs_nothing",
+        "checkpoint_1::test_output_order_and_format",
+        "checkpoint_1::test_regex_flag_variations",
+        "checkpoint_1::test_single_match",
+        "checkpoint_1::test_skip_undecodable_file",
+        "checkpoint_1::test_spec_example",
+        "checkpoint_1::test_undecodable_file_before_decodable_still_scans",
+        "checkpoint_1::test_unicode_and_ties"
+      ],
+      "verdict": "validated"
+    },
+    "checkpoint_2": {
+      "digest": "a54a3c86593f86e8baf0bae931e9bde3adbdcb90c05fc5174ac142b2a73c1c98",
+      "nondeterministic": [],
+      "nondeterministic_count": 0,
+      "size": 25,
+      "solvable": [
+        "checkpoint_1::test_basic",
+        "checkpoint_1::test_case_insensitive_and_language",
+        "checkpoint_1::test_encoding_option_reads_non_utf8",
+        "checkpoint_1::test_ignore_non_py_files",
+        "checkpoint_1::test_multi_file_ordering",
+        "checkpoint_1::test_no_matches_outputs_nothing",
+        "checkpoint_1::test_output_order_and_format",
+        "checkpoint_1::test_regex_flag_variations",
+        "checkpoint_1::test_single_match",
+        "checkpoint_1::test_skip_undecodable_file",
+        "checkpoint_1::test_spec_example",
+        "checkpoint_1::test_undecodable_file_before_decodable_still_scans",
+        "checkpoint_1::test_unicode_and_ties",
+        "checkpoint_2::test_all_cpp_header_extensions",
+        "checkpoint_2::test_all_cpp_source_extensions",
+        "checkpoint_2::test_all_js_extensions",
+        "checkpoint_2::test_cpp_only",
+        "checkpoint_2::test_javascript_only",
+        "checkpoint_2::test_language_filter_excludes_others",
+        "checkpoint_2::test_multi_language",
+        "checkpoint_2::test_multiple_language_array",
+        "checkpoint_2::test_multiple_languages_no_filter",
+        "checkpoint_2::test_no_language_filter",
+        "checkpoint_2::test_python_regex",
+        "checkpoint_2::test_unsupported_extensions_are_ignored"
+      ],
+      "verdict": "validated"
+    },
+    "checkpoint_3": {
+      "digest": "fc61e3b8f25d28b83108cc78433947f1edf978a69ff242f9053fb57a867e8f89",
+      "nondeterministic": [],
+      "nondeterministic_count": 0,
+      "size": 47,
+      "solvable": [
+        "checkpoint_1::test_basic",
+        "checkpoint_1::test_case_insensitive_and_language",
+        "checkpoint_1::test_encoding_option_reads_non_utf8",
+        "checkpoint_1::test_ignore_non_py_files",
+        "checkpoint_1::test_multi_file_ordering",
+        "checkpoint_1::test_no_matches_outputs_nothing",
+        "checkpoint_1::test_output_order_and_format",
+        "checkpoint_1::test_regex_flag_variations",
+        "checkpoint_1::test_single_match",
+        "checkpoint_1::test_skip_undecodable_file",
+        "checkpoint_1::test_spec_example",
+        "checkpoint_1::test_undecodable_file_before_decodable_still_scans",
+        "checkpoint_1::test_unicode_and_ties",
+        "checkpoint_2::test_all_cpp_header_extensions",
+        "checkpoint_2::test_all_cpp_source_extensions",
+        "checkpoint_2::test_all_js_extensions",
+        "checkpoint_2::test_cpp_only",
+        "checkpoint_2::test_javascript_only",
+        "checkpoint_2::test_language_filter_excludes_others",
+        "checkpoint_2::test_multi_language",
+        "checkpoint_2::test_multiple_language_array",
+        "checkpoint_2::test_multiple_languages_no_filter",
+        "checkpoint_2::test_no_language_filter",
+        "checkpoint_2::test_python_regex",
+        "checkpoint_2::test_unsupported_extensions_are_ignored",
+        "checkpoint_3::test_captures_key_order",
+        "checkpoint_3::test_default_languages_include_cpp",
+        "checkpoint_3::test_language_filtering",
+        "checkpoint_3::test_literal_dollar_sign",
+        "checkpoint_3::test_mixed_rules",
+        "checkpoint_3::test_multiline_cpp_if_blocks",
+        "checkpoint_3::test_multiline_python_if_blocks",
+        "checkpoint_3::test_multiple_files_sorted",
+        "checkpoint_3::test_multiple_metavars",
+        "checkpoint_3::test_no_matches",
+        "checkpoint_3::test_optional_metavar",
+        "checkpoint_3::test_python_list_comprehension",
+        "checkpoint_3::test_repeated_metavar",
+        "checkpoint_3::test_repeated_metavar_mismatch_produces_no_match",
+        "checkpoint_3::test_same_start_ordering",
+        "checkpoint_3::test_simple_pattern_cpp",
+        "checkpoint_3::test_simple_pattern_javascript",
+        "checkpoint_3::test_simple_pattern_python",
+        "checkpoint_3::test_sorting_same_start_different_end",
+        "checkpoint_3::test_special_chars_in_captures",
+        "checkpoint_3::test_triple_metavar_repetition",
+        "checkpoint_3::test_unicode_in_captures"
+      ],
+      "verdict": "validated"
+    },
+    "checkpoint_4": {
+      "digest": "d078b76eb03ab70f947bdc4f4d8f3cd9f4f920c3594f063e0b53b264890632db",
+      "nondeterministic": [],
+      "nondeterministic_count": 0,
+      "size": 75,
+      "solvable": [
+        "checkpoint_1::test_basic",
+        "checkpoint_1::test_case_insensitive_and_language",
+        "checkpoint_1::test_encoding_option_reads_non_utf8",
+        "checkpoint_1::test_ignore_non_py_files",
+        "checkpoint_1::test_multi_file_ordering",
+        "checkpoint_1::test_no_matches_outputs_nothing",
+        "checkpoint_1::test_output_order_and_format",
+        "checkpoint_1::test_regex_flag_variations",
+        "checkpoint_1::test_single_match",
+        "checkpoint_1::test_skip_undecodable_file",
+        "checkpoint_1::test_spec_example",
+        "checkpoint_1::test_undecodable_file_before_decodable_still_scans",
+        "checkpoint_1::test_unicode_and_ties",
+        "checkpoint_2::test_all_cpp_header_extensions",
+        "checkpoint_2::test_all_cpp_source_extensions",
+        "checkpoint_2::test_all_js_extensions",
+        "checkpoint_2::test_cpp_only",
+        "checkpoint_2::test_javascript_only",
+        "checkpoint_2::test_language_filter_excludes_others",
+        "checkpoint_2::test_multi_language",
+        "checkpoint_2::test_multiple_language_array",
+        "checkpoint_2::test_multiple_languages_no_filter",
+        "checkpoint_2::test_no_language_filter",
+        "checkpoint_2::test_python_regex",
+        "checkpoint_2::test_unsupported_extensions_are_ignored",
+        "checkpoint_3::test_captures_key_order",
+        "checkpoint_3::test_default_languages_include_cpp",
+        "checkpoint_3::test_language_filtering",
+        "checkpoint_3::test_literal_dollar_sign",
+        "checkpoint_3::test_mixed_rules",
+        "checkpoint_3::test_multiline_cpp_if_blocks",
+        "checkpoint_3::test_multiline_python_if_blocks",
+        "checkpoint_3::test_multiple_files_sorted",
+        "checkpoint_3::test_multiple_metavars",
+        "checkpoint_3::test_no_matches",
+        "checkpoint_3::test_optional_metavar",
+        "checkpoint_3::test_python_list_comprehension",
+        "checkpoint_3::test_repeated_metavar",
+        "checkpoint_3::test_repeated_metavar_mismatch_produces_no_match",
+        "checkpoint_3::test_same_start_ordering",
+        "checkpoint_3::test_simple_pattern_cpp",
+        "checkpoint_3::test_simple_pattern_javascript",
+        "checkpoint_3::test_simple_pattern_python",
+        "checkpoint_3::test_sorting_same_start_different_end",
+        "checkpoint_3::test_special_chars_in_captures",
+        "checkpoint_3::test_triple_metavar_repetition",
+        "checkpoint_3::test_unicode_in_captures",
+        "checkpoint_4::test_captures_key_order_raw",
+        "checkpoint_4::test_conflict_nested_overlaps",
+        "checkpoint_4::test_conflict_same_position_rule_id_order",
+        "checkpoint_4::test_dry_run_apply_fixes_conflict",
+        "checkpoint_4::test_dry_run_does_not_write",
+        "checkpoint_4::test_empty_template_fix",
+        "checkpoint_4::test_fix_literal_dollar",
+        "checkpoint_4::test_fix_spanning_lines",
+        "checkpoint_4::test_fix_with_match_placeholder",
+        "checkpoint_4::test_fix_with_metavar",
+        "checkpoint_4::test_fix_with_repeated_metavar",
+        "checkpoint_4::test_mixed_rules_with_fixes",
+        "checkpoint_4::test_multiple_fixes_same_file",
+        "checkpoint_4::test_no_fixes_without_flag",
+        "checkpoint_4::test_ordering_match_before_fix",
+        "checkpoint_4::test_output_ordering_raw",
+        "checkpoint_4::test_overlapping_fixes",
+        "checkpoint_4::test_selector_break_continue_throw",
+        "checkpoint_4::test_selector_comments",
+        "checkpoint_4::test_selector_multi_language",
+        "checkpoint_4::test_selector_with_fix",
+        "checkpoint_4::test_simple_fix_apply",
+        "checkpoint_4::test_simple_fix_dry_run",
+        "checkpoint_4::test_simple_selector_cpp",
+        "checkpoint_4::test_simple_selector_javascript",
+        "checkpoint_4::test_simple_selector_python",
+        "checkpoint_4::test_template_match_and_metavars",
+        "checkpoint_4::test_template_with_unicode"
+      ],
+      "verdict": "validated"
+    },
+    "checkpoint_5": {
+      "digest": "952c3605cae2eebf2cc32a55611a196c7cf8c81598214d306d4d2b5376d49218",
+      "nondeterministic": [],
+      "nondeterministic_count": 0,
+      "size": 104,
+      "solvable": [
+        "checkpoint_1::test_basic",
+        "checkpoint_1::test_case_insensitive_and_language",
+        "checkpoint_1::test_encoding_option_reads_non_utf8",
+        "checkpoint_1::test_ignore_non_py_files",
+        "checkpoint_1::test_multi_file_ordering",
+        "checkpoint_1::test_no_matches_outputs_nothing",
+        "checkpoint_1::test_output_order_and_format",
+        "checkpoint_1::test_regex_flag_variations",
+        "checkpoint_1::test_single_match",
+        "checkpoint_1::test_skip_undecodable_file",
+        "checkpoint_1::test_spec_example",
+        "checkpoint_1::test_undecodable_file_before_decodable_still_scans",
+        "checkpoint_1::test_unicode_and_ties",
+        "checkpoint_2::test_all_cpp_header_extensions",
+        "checkpoint_2::test_all_cpp_source_extensions",
+        "checkpoint_2::test_all_js_extensions",
+        "checkpoint_2::test_cpp_only",
+        "checkpoint_2::test_javascript_only",
+        "checkpoint_2::test_language_filter_excludes_others",
+        "checkpoint_2::test_multi_language",
+        "checkpoint_2::test_multiple_language_array",
+        "checkpoint_2::test_multiple_languages_no_filter",
+        "checkpoint_2::test_no_language_filter",
+        "checkpoint_2::test_python_regex",
+        "checkpoint_2::test_unsupported_extensions_are_ignored",
+        "checkpoint_3::test_captures_key_order",
+        "checkpoint_3::test_default_languages_include_cpp",
+        "checkpoint_3::test_language_filtering",
+        "checkpoint_3::test_literal_dollar_sign",
+        "checkpoint_3::test_mixed_rules",
+        "checkpoint_3::test_multiline_cpp_if_blocks",
+        "checkpoint_3::test_multiline_python_if_blocks",
+        "checkpoint_3::test_multiple_files_sorted",
+        "checkpoint_3::test_multiple_metavars",
+        "checkpoint_3::test_no_matches",
+        "checkpoint_3::test_optional_metavar",
+        "checkpoint_3::test_python_list_comprehension",
+        "checkpoint_3::test_repeated_metavar",
+        "checkpoint_3::test_repeated_metavar_mismatch_produces_no_match",
+        "checkpoint_3::test_same_start_ordering",
+        "checkpoint_3::test_simple_pattern_cpp",
+        "checkpoint_3::test_simple_pattern_javascript",
+        "checkpoint_3::test_simple_pattern_python",
+        "checkpoint_3::test_sorting_same_start_different_end",
+        "checkpoint_3::test_special_chars_in_captures",
+        "checkpoint_3::test_triple_metavar_repetition",
+        "checkpoint_3::test_unicode_in_captures",
+        "checkpoint_4::test_captures_key_order_raw",
+        "checkpoint_4::test_conflict_nested_overlaps",
+        "checkpoint_4::test_conflict_same_position_rule_id_order",
+        "checkpoint_4::test_dry_run_apply_fixes_conflict",
+        "checkpoint_4::test_dry_run_does_not_write",
+        "checkpoint_4::test_empty_template_fix",
+        "checkpoint_4::test_fix_literal_dollar",
+        "checkpoint_4::test_fix_spanning_lines",
+        "checkpoint_4::test_fix_with_match_placeholder",
+        "checkpoint_4::test_fix_with_metavar",
+        "checkpoint_4::test_fix_with_repeated_metavar",
+        "checkpoint_4::test_mixed_rules_with_fixes",
+        "checkpoint_4::test_multiple_fixes_same_file",
+        "checkpoint_4::test_no_fixes_without_flag",
+        "checkpoint_4::test_ordering_match_before_fix",
+        "checkpoint_4::test_output_ordering_raw",
+        "checkpoint_4::test_overlapping_fixes",
+        "checkpoint_4::test_selector_break_continue_throw",
+        "checkpoint_4::test_selector_comments",
+        "checkpoint_4::test_selector_multi_language",
+        "checkpoint_4::test_selector_with_fix",
+        "checkpoint_4::test_simple_fix_apply",
+        "checkpoint_4::test_simple_fix_dry_run",
+        "checkpoint_4::test_simple_selector_cpp",
+        "checkpoint_4::test_simple_selector_javascript",
+        "checkpoint_4::test_simple_selector_python",
+        "checkpoint_4::test_template_match_and_metavars",
+        "checkpoint_4::test_template_with_unicode",
+        "checkpoint_5::test_all_new_extensions",
+        "checkpoint_5::test_all_seven_languages_basic",
+        "checkpoint_5::test_checkpoint1_exact_with_new_langs",
+        "checkpoint_5::test_checkpoint3_pattern_regression",
+        "checkpoint_5::test_checkpoint4_selector_fix_regression",
+        "checkpoint_5::test_empty_files_new_extensions",
+        "checkpoint_5::test_exact_match_go",
+        "checkpoint_5::test_exact_match_haskell",
+        "checkpoint_5::test_exact_match_java",
+        "checkpoint_5::test_exact_match_rust",
+        "checkpoint_5::test_filter_new_languages",
+        "checkpoint_5::test_fix_apply_new_languages",
+        "checkpoint_5::test_fix_dry_run_new_languages",
+        "checkpoint_5::test_go_struct_and_interface",
+        "checkpoint_5::test_haskell_literate_extension",
+        "checkpoint_5::test_haskell_type_signatures",
+        "checkpoint_5::test_java_class_method_patterns",
+        "checkpoint_5::test_literal_dollar_escape_new_langs",
+        "checkpoint_5::test_mixed_old_and_new_languages",
+        "checkpoint_5::test_pattern_match_go",
+        "checkpoint_5::test_pattern_match_java",
+        "checkpoint_5::test_regex_match_rust",
+        "checkpoint_5::test_rust_println_macro_pattern",
+        "checkpoint_5::test_selector_match_rust",
+        "checkpoint_5::test_selector_multiple_node_types_new_langs",
+        "checkpoint_5::test_sorting_across_languages",
+        "checkpoint_5::test_sorting_by_extension_order",
+        "checkpoint_5::test_tie_breaking_same_position_seven_langs",
+        "checkpoint_5::test_unicode_in_new_languages"
+      ],
+      "verdict": "validated"
+    }
+  },
+  "spec_determinacy": {
+    "assertions": {
+      "audited": 0,
+      "by_rule": {}
+    },
+    "audit_version": 1,
+    "dynamic": {
+      "environment": {},
+      "reason": null,
+      "status": "ran"
+    },
+    "flagged": [],
+    "method": "Static: each audited assertion of a test (error-detail/message equality, containment or pattern; byte-level stdout comparison) is classified against the text of its origin checkpoint's specification and every earlier one (rules below). Dynamic: reference k and spec-conformant variants of it (variants below) are graded at step k; a case is sensitive to a variant when it passes on the reference and not on the variant. A case is flagged when its test has an undetermined assertion of the kind a variant it is sensitive to rewrites.",
+    "rules": {
+      "content-stated": "determined: a paragraph states what the category's detail contains",
+      "content-unstated": "undetermined: error text must contain an input value or match a pattern; no paragraph states what the category's detail contains",
+      "exact-stated": "determined: a paragraph states the exact content of the category's detail",
+      "exact-unstated": "undetermined: error text must equal an input value; no paragraph states exact content",
+      "format-stated": "determined: the specification names an output byte format",
+      "format-unstated": "undetermined: stdout compared byte for byte; no byte format stated",
+      "literal-in-spec": "determined: the asserted literal occurs in the specification text",
+      "wording-unstated": "undetermined: an error-text literal in neither the specification nor the test's inputs"
+    },
+    "sensitive_determined": [],
+    "sensitive_unexplained": [
+      {
+        "case": "test_checkpoint_1.py::test_encoding_option_reads_non_utf8",
+        "variants": [
+          "reformatted_json"
+        ]
+      },
+      {
+        "case": "test_checkpoint_1.py::test_ignore_non_py_files",
+        "variants": [
+          "reformatted_json"
+        ]
+      },
+      {
+        "case": "test_checkpoint_1.py::test_single_match",
+        "variants": [
+          "reformatted_json"
+        ]
+      },
+      {
+        "case": "test_checkpoint_1.py::test_skip_undecodable_file",
+        "variants": [
+          "reformatted_json"
+        ]
+      },
+      {
+        "case": "test_checkpoint_1.py::test_undecodable_file_before_decodable_still_scans",
+        "variants": [
+          "reformatted_json"
+        ]
+      },
+      {
+        "case": "test_checkpoint_2.py::test_language_filter_excludes_others",
+        "variants": [
+          "reformatted_json"
+        ]
+      },
+      {
+        "case": "test_checkpoint_2.py::test_no_language_filter",
+        "variants": [
+          "reformatted_json"
+        ]
+      },
+      {
+        "case": "test_checkpoint_2.py::test_unsupported_extensions_are_ignored",
+        "variants": [
+          "reformatted_json"
+        ]
+      },
+      {
+        "case": "test_checkpoint_3.py::test_captures_key_order",
+        "variants": [
+          "reformatted_json"
+        ]
+      },
+      {
+        "case": "test_checkpoint_3.py::test_literal_dollar_sign",
+        "variants": [
+          "reformatted_json"
+        ]
+      },
+      {
+        "case": "test_checkpoint_3.py::test_sorting_same_start_different_end",
+        "variants": [
+          "reformatted_json"
+        ]
+      },
+      {
+        "case": "test_checkpoint_4.py::test_captures_key_order_raw",
+        "variants": [
+          "reformatted_json"
+        ]
+      },
+      {
+        "case": "test_checkpoint_4.py::test_no_fixes_without_flag",
+        "variants": [
+          "reformatted_json"
+        ]
+      },
+      {
+        "case": "test_checkpoint_5.py::test_exact_match_go",
+        "variants": [
+          "reformatted_json"
+        ]
+      },
+      {
+        "case": "test_checkpoint_5.py::test_exact_match_haskell",
+        "variants": [
+          "reformatted_json"
+        ]
+      },
+      {
+        "case": "test_checkpoint_5.py::test_exact_match_java",
+        "variants": [
+          "reformatted_json"
+        ]
+      },
+      {
+        "case": "test_checkpoint_5.py::test_exact_match_rust",
+        "variants": [
+          "reformatted_json"
+        ]
+      },
+      {
+        "case": "test_checkpoint_5.py::test_pattern_match_go",
+        "variants": [
+          "reformatted_json"
+        ]
+      }
+    ],
+    "static_undetermined": [],
+    "steps": {
+      "checkpoint_1": {
+        "reference": {
+          "infra_failure": null,
+          "passed": 13,
+          "total": 13
+        },
+        "variants": {
+          "neutral_error_text": {
+            "infra_failure": null,
+            "passed": 13,
+            "sensitive": [],
+            "total": 13
+          },
+          "reformatted_json": {
+            "infra_failure": null,
+            "passed": 8,
+            "sensitive": [
+              "test_checkpoint_1.py::test_encoding_option_reads_non_utf8",
+              "test_checkpoint_1.py::test_ignore_non_py_files",
+              "test_checkpoint_1.py::test_single_match",
+              "test_checkpoint_1.py::test_skip_undecodable_file",
+              "test_checkpoint_1.py::test_undecodable_file_before_decodable_still_scans"
+            ],
+            "total": 13
+          }
+        }
+      },
+      "checkpoint_2": {
+        "reference": {
+          "infra_failure": null,
+          "passed": 25,
+          "total": 25
+        },
+        "variants": {
+          "neutral_error_text": {
+            "infra_failure": null,
+            "passed": 25,
+            "sensitive": [],
+            "total": 25
+          },
+          "reformatted_json": {
+            "infra_failure": null,
+            "passed": 17,
+            "sensitive": [
+              "test_checkpoint_2.py::test_language_filter_excludes_others",
+              "test_checkpoint_2.py::test_no_language_filter",
+              "test_checkpoint_2.py::test_unsupported_extensions_are_ignored"
+            ],
+            "total": 25
+          }
+        }
+      },
+      "checkpoint_3": {
+        "reference": {
+          "infra_failure": null,
+          "passed": 47,
+          "total": 47
+        },
+        "variants": {
+          "neutral_error_text": {
+            "infra_failure": null,
+            "passed": 47,
+            "sensitive": [],
+            "total": 47
+          },
+          "reformatted_json": {
+            "infra_failure": null,
+            "passed": 36,
+            "sensitive": [
+              "test_checkpoint_3.py::test_captures_key_order",
+              "test_checkpoint_3.py::test_literal_dollar_sign",
+              "test_checkpoint_3.py::test_sorting_same_start_different_end"
+            ],
+            "total": 47
+          }
+        }
+      },
+      "checkpoint_4": {
+        "reference": {
+          "infra_failure": null,
+          "passed": 75,
+          "total": 75
+        },
+        "variants": {
+          "neutral_error_text": {
+            "infra_failure": null,
+            "passed": 75,
+            "sensitive": [],
+            "total": 75
+          },
+          "reformatted_json": {
+            "infra_failure": null,
+            "passed": 62,
+            "sensitive": [
+              "test_checkpoint_4.py::test_captures_key_order_raw",
+              "test_checkpoint_4.py::test_no_fixes_without_flag"
+            ],
+            "total": 75
+          }
+        }
+      },
+      "checkpoint_5": {
+        "reference": {
+          "infra_failure": null,
+          "passed": 104,
+          "total": 104
+        },
+        "variants": {
+          "neutral_error_text": {
+            "infra_failure": null,
+            "passed": 104,
+            "sensitive": [],
+            "total": 104
+          },
+          "reformatted_json": {
+            "infra_failure": null,
+            "passed": 86,
+            "sensitive": [
+              "test_checkpoint_5.py::test_exact_match_go",
+              "test_checkpoint_5.py::test_exact_match_haskell",
+              "test_checkpoint_5.py::test_exact_match_java",
+              "test_checkpoint_5.py::test_exact_match_rust",
+              "test_checkpoint_5.py::test_pattern_match_go"
+            ],
+            "total": 104
+          }
+        }
+      }
+    },
+    "summary": {
+      "flagged": 0,
+      "flagged_by_checkpoint": {},
+      "flagged_by_rule": {},
+      "sensitive_determined": 0,
+      "sensitive_unexplained": 18,
+      "unconfirmed": 0
+    },
+    "unconfirmed": [],
+    "variants": {
+      "neutral_error_text": "every error's human-readable text (an error object's detail or message) replaced by 'request rejected'; category, exit code and format kept",
+      "reformatted_json": "JSON stdout re-serialised with two-space indentation and a trailing newline; value and key order kept"
+    }
+  },
+  "steps": [
+    "checkpoint_1",
+    "checkpoint_2",
+    "checkpoint_3",
+    "checkpoint_4",
+    "checkpoint_5"
+  ],
+  "verdict": "validated_partial"
+}

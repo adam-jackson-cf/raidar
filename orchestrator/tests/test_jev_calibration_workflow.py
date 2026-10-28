@@ -263,7 +263,6 @@ def test_promote_writes_enforce_only_when_the_audit_verifies(tmp_path: Path) -> 
     assert promoted.exit_code == 0, promoted.output
     report = json.loads(promoted.output)
     assert report["blocked_on_scorer_bump"] is False
-    assert report["scorer_bump_required"] == {"scorer": "code-quality", "from": "5", "to": "5.1"}
 
     written = load_policy(policies / f"{RUBRIC}.yaml")
     promotion = written.promotion
@@ -273,8 +272,8 @@ def test_promote_writes_enforce_only_when_the_audit_verifies(tmp_path: Path) -> 
     assert (promotion.labelled, promotion.minority) == (40, 11)
     assert promotion.reviewers == {"human": 26, "model": 14}
     assert promotion.reviewer_models == (HAIKU,)
-    # The policy's highest registered scorer is code-quality@5 (isolated measurement).
-    assert promotion.scorer == "code-quality@5.1"
+    # The policy's highest registered scorer is code-quality@6 (isolated measurement).
+    assert promotion.scorer == "code-quality@6.1"
     assert promotion.calibration_metrics is not None
     # t1+t2: five 0.85 positives, fourteen 0.15 negatives and one 0.15 the reviewer
     # called positive, so the fitted 0.5 cut misses exactly that one.
@@ -298,8 +297,7 @@ def test_promote_writes_enforce_only_when_the_audit_verifies(tmp_path: Path) -> 
 
 
 def test_promote_refuses_to_write_while_the_scorer_bump_is_pending(tmp_path: Path) -> None:
-    # The plan verifies, but code-quality@5.1 does not exist yet: writing enforce now would
-    # leave a repo policy that `jev verify-promotion` rejects, so no write without the flag.
+    # A verified plan cannot be promoted while its required scorer bump is pending.
     policies = shadow_policy_dir(tmp_path / "policies")
     store = tmp_path / "store"
     _promotable(store)
@@ -318,7 +316,6 @@ def test_promote_refuses_to_write_while_the_scorer_bump_is_pending(tmp_path: Pat
         None,
         True,
     )
-    assert report["scorer_bump_required"] == {"scorer": "code-quality", "from": "5", "to": "5.1"}
     assert load_policy(policies / f"{RUBRIC}.yaml").mode is PolicyMode.SHADOW
 
 

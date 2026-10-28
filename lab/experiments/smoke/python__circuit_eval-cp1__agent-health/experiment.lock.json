@@ -41,11 +41,11 @@
         }
       },
       "scorer": {
-        "correctness@4": {
-          "digest": "6c2f10ca8361488500a32f23214b7867eec81650a86939368b8de4c3efbb43f1",
+        "correctness@5": {
+          "digest": "7521f1118a762ea3718e4408a24a44a40129f2028906031acce88c5f2701775c",
           "metadata": {
             "implementation": "raidar.scoring.correctness:correctness_scorer",
-            "implementation_digest": "35b002328986f6dab40df4f60b2b42a97a9cf848328cb8e15baf5b35ea06887f",
+            "implementation_digest": "1be7308c22b6fb6373bfa774ea1ef6052179e56bc02aec453eb7d0a2473b9f7d",
             "manifest": {
               "description": "Oracle verdicts per checkpoint and trajectory, from the oracle step records.",
               "evidence_required": [
@@ -239,7 +239,7 @@
                 "*"
               ],
               "tools": [],
-              "version": "4"
+              "version": "5"
             },
             "tool_lock": {}
           }
@@ -254,12 +254,12 @@
       "metric": "scb-canonical-oneshot@1",
       "scorer_config": {},
       "scorers": [
-        "correctness@4"
+        "correctness@5"
       ]
     },
     "tools": {}
   },
-  "document_sha256": "0cad12d7316cb31c2d883d4fca48c88d9e8f810755038e76ee0a967f0cc57a9c",
+  "document_sha256": "2f290a84c4c267a006a09a984910fa90652f8f0ddb44ea5755a23f15b2e54987",
   "execution": {
     "arms": {
       "baseline": {
@@ -336,7 +336,7 @@
     "problems": [
       {
         "checkpoints": 1,
-        "digest": "b089b0d32cbd563738e38880a044074583791709cabd4b40c9b84cca0795a243",
+        "digest": "adc99f373f79469e082faadd058e987dd1dec831a845ff1329d47591d75294ef",
         "label": "scb/circuit_eval.checkpoint_1@38d627ecf668"
       }
     ],
@@ -363,10 +363,11 @@
       },
       "problem": {
         "scb/circuit_eval.checkpoint_1@38d627ecf668": {
-          "digest": "b089b0d32cbd563738e38880a044074583791709cabd4b40c9b84cca0795a243",
+          "digest": "adc99f373f79469e082faadd058e987dd1dec831a845ff1329d47591d75294ef",
           "metadata": {
-            "bundle_sha256": "568bed1216bcb149bad2ca7ce0af1ee66164b4ff6f22a9fffebc9addfcd297b8",
+            "bundle_sha256": "f712d5e4607cb0983df0bc72dd7d5fd35da50e7dc67e867a71e95954e542005e",
             "checkpoints": 1,
+            "dependencies_sha256": "c4c71b394551c34e93d709c5f038f353a9d859fde73a13f6062d0f4d25f456a6",
             "entry_command": "uv run --project /app circopt.py",
             "entry_file": "circopt.py",
             "mode": "one_shot",
@@ -459,10 +460,10 @@
   "experiment": {
     "id": "python__circuit_eval-cp1__agent-health",
     "source": "experiment.yaml",
-    "source_sha256": "2434554b5d26e53370009320467bcd221077f6e0da4a30cfa23cc6c2422a9747",
-    "spec_sha256": "8f9c31e060053559cbf1bfeafe54b13a9b66ba31339d11e0db2d5cc65e6d9ea0"
+    "source_sha256": "49d845724843ff28db31f641691cbab21b7e916c39b5aff044e591d21d34caaf",
+    "spec_sha256": "df33f34bb59c642ab01b25349e64b18e241310d2e66f589b5237a445d54b8b4a"
   },
-  "lock_sha256": "261e6ddfff2af691b69f9a6473717d8a009297709177ac1c92ab60d3fe2e3e82",
+  "lock_sha256": "13119aa05c793e73d37566de048d97374ebd2272529dae25d972ae19a13b55a1",
   "lock_version": 4,
   "overrides": {
     "flags": {},
@@ -470,8 +471,8 @@
   },
   "sections": {
     "analysis": "144d50057229f81b6136f89cfe8df3c9cf5dbbbec9a279c66acba88e027528b3",
-    "assessment": "63dafc04e039dd0141c6628ac2f0baec5e258d7d5c5272a256b74f7661b56bd6",
-    "execution": "261e6ddfff2af691b69f9a6473717d8a009297709177ac1c92ab60d3fe2e3e82",
+    "assessment": "bbb5dbb0b430be70493dbffa4e9c2292a743272d3233f89d3543901120942671",
+    "execution": "13119aa05c793e73d37566de048d97374ebd2272529dae25d972ae19a13b55a1",
     "toolchain": "b6ef977873154c13b7d03140ffd4cfff64d0cfa32430af9f4e52db26e2a729cc"
   },
   "spec": {
@@ -508,7 +509,7 @@
       "metric": "scb-canonical-oneshot@1",
       "scorer_config": {},
       "scorers": [
-        "correctness@4"
+        "correctness@5"
       ]
     },
     "description": "Operational smoke of the experiment path; not citable.",

@@ -17,10 +17,12 @@ from raidar.design.problem.store import ProblemStore, open_store
 from raidar.engine.job.assessment import lock_errata, lock_solvable
 from raidar.evaluation.analysis.assessed import (
     ANALYSED_SCORERS,
+    CORRECTNESS_REF,
     PROCESS_COMPLIANCE_REF,
     build_outcome,
     gate_effort_ref,
 )
+from raidar.evaluation.analysis.dependencies import dependency_steps
 from raidar.evaluation.analysis.lookup import AssessmentLookup, assessment_config
 from raidar.evaluation.analysis.report import AnalysisInputs, DevRun
 from raidar.evaluation.analysis.sources import (
@@ -111,7 +113,17 @@ def _read_trials(
             valid=record.valid,
             problem=record.trial.problem,
         )
-        outcomes.append(build_outcome(record, results, policy=policy))
+        trial_dir = job.trial_dir(record)
+        outcome = build_outcome(record, results, policy=policy)
+        outcomes.append(
+            outcome.model_copy(
+                update={
+                    "dependency_steps": dependency_steps(
+                        record.trial.steps, trial_dir, results.get(CORRECTNESS_REF)
+                    )
+                }
+            )
+        )
         process[trial_id] = results.get(process_ref)
         gate[trial_id] = results.get(gate_ref)
     return outcomes, process, gate

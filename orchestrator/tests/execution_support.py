@@ -47,6 +47,7 @@ from raidar.grading.records import (
     write_pre_agent_leak,
     write_step_record,
 )
+from raidar.grading.resolver import UvResolver
 from raidar.grading.verifier import step_rewards
 from tests.experiment_spec_support import experiment_document, write_experiment
 from tests.problems_support import (
@@ -91,7 +92,7 @@ def imported_pack_fixture(root: Path, docker_context: str) -> ImportedFixture:
     repo, commit = build_fake_scb_repo(root / "src")
     store = fake_store(root / "problems", commit)
     problem = ProblemId.parse(f"scb/adder@{commit[:12]}")
-    import_problem(store, problem, source_checkout=repo)
+    import_problem(store, problem, source_checkout=repo, resolver=UvResolver())
     report = asyncio.run(
         validate_problem(
             store,

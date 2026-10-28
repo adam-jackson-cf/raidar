@@ -154,6 +154,29 @@ flowchart LR
    - New smokes and design examples use problems picked by the discrimination reading (section 7.2): at least one multi-checkpoint problem and `circuit_eval.checkpoint_1`.
    - Budgets such as the 1,800 s per-checkpoint cap are set per experiment. They are sized from the validation record's reference timings and the range audit, never inherited from forge.
 
+8. **Declared dependencies: `declared-wheels/1` (decided 2026-10-27).** The evidence for this decision is in [docs/reboot/evidence/submission-deps-opus.md](docs/reboot/evidence/submission-deps-opus.md) and [submission-deps-astra.md](docs/reboot/evidence/submission-deps-astra.md).
+   - **The gap.** Today the grader gives the graded code only PyYAML (`grading/submission_deps.py:34,62-72`). As a result, 18 of 36 SCB problems' references need packages the offline grader cannot provide. Agents that use libraries also fail where SCB's own grading would pass (fault FCR-004).
+   - **The policy, applied to every graded snapshot alike (reference or agent).** Declared requirements, from `requirements.txt` and `pyproject.toml`, are resolved with uv:
+     - wheels only (no source builds);
+     - Python 3.12, for the pack's Linux architectures;
+     - `pypi.org` only;
+     - an `exclude-newer` cutoff fixed at import time in the problem pin.
+
+     The resolved wheels are installed hash-checked into a grader image layer: the build has network, but runs no package code. Tests then run offline, as today. Regrades reinstall the recorded lock and never re-resolve.
+   - **At import.** Each reference step's declared set is resolved for amd64 and arm64. The result is committed as generated per-problem lock records, plus a `dependencies` block in the manifest: policy, resolver, cutoff, sets and per-step set digests.
+     - A set that doesn't resolve, or whose two architectures resolve to different versions, excludes the problem with reason `dependency_unresolvable`.
+     - Validation grades the references with their sets installed.
+   - **At grading.** An agent's declared set reuses the pinned lock when it is identical, and is otherwise resolved under the pin's policy, within caps. Anything that can't be provided is `unprovided`, with a reason: `no-wheel`, `after-cutoff`, `unresolvable`, `direct-reference`, `unparseable` or `cap-exceeded`. That is a valid agent outcome. A resolver or PyPI outage is an infrastructure failure, never an agent score.
+   - **Agent sandbox.** The workspace seed resolves `test_dependencies` under the same policy. The agent's `uv` and `pip` configuration, and the seeded `pyproject.toml`, carry the same cutoff and the same no-source-build rule. An install during work therefore fails exactly where grading would. PyPI stays reachable within those rules.
+     - The reference's packages are never seeded or cached for the agent, because they would hint at the solution's design.
+   - **Grader test environment.** The grader's own `test_dependencies` venv is pinned under the same policy; today it is unpinned (`grading/grader_image.py:17-21`).
+   - **Identity.** The problem's `dependencies` block forces revalidation, through RT0. The lock adds `dependencies_sha256` per problem. Each trial's step record carries:
+     - the declared set and its digest, and whether it came from the pin or was resolved at grading;
+     - the lock text and digest, and the architecture;
+     - what was provided, and what was unprovided with its reasons.
+   - **Health readings.** Per step: `unprovided`, and `undeclared_import` (a `ModuleNotFoundError` for an undeclared non-stdlib module). Per arm: the share of steps affected, printed beside the primary outcome, with a warning when arms differ materially.
+   - **Shared machinery.** Phase 4's `install/1` uses the same wheels-only, hash-checked install, so it is built once.
+
 ## 4. Agents (R3)
 
 Fields are taken from FXL's harness definition (`config/harness/<cli>/vN.toml`, `docs/references/harnesses.md`). The values are Raidar's own pins, proved rather than copied:
@@ -575,7 +598,7 @@ Migration, in order:
 | 6 | Health | Full outcome table (section 6) first; health becomes the sole validity producer; L registry; generic W and S families; provider failures classified without retry; per-arm exclusion report; `process-compliance` metrics become health readings, and the scorer is deleted | A forced provider failure is excluded, not retried; each table row covered by a test |
 | 7 | Image split | Toolchain image; per-agent CLI layer keyed by agent hash; stage-tool layer keyed by package digest | `make perf-gate` within budget, including warm start at concurrency 3 |
 | 8 | Clean slate | Scorers and metrics to `@1`; formats to 1; archive tags; Wilson intervals; ledger migration (section 8); clear `var/` | Fresh smokes on every experiment; ledger check passes with no run data |
-| 9 | Lab validation | Range audit; margins; A/A and degraded controls; discrimination reading | A/A not `improved`/`worse`; degraded detected `worse`; readings in every report |
+| 9 | Lab validation | Range audit; margins; A/A and degraded controls; discrimination reading; native parity for every validated problem (deferred from phase 3: the SCB fork's runner fails its interpreter-identity check on `mbp`, `slop-code-bench/src/slop_code/evaluation/collection.py:190-198`, so its environment must work there first) | A/A not `improved`/`worse`; degraded detected `worse`; readings in every report; every problem `validated`, not `validated_partial` |
 | 10 | Probes | Golden, then example probes, as new releases of the verify and define packages | Probe records per accepted gate; a failing probe produces a rework turn |
 
 **Acceptance test for Need 1 (AT-N1).** Starting from a clean checkout:

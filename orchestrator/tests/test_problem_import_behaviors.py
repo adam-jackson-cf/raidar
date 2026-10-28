@@ -27,8 +27,9 @@ from raidar.contract.references import (
 from raidar.contract.snapshot import APP_SOURCE
 from raidar.design.experiment.loader import load_experiment
 from raidar.design.experiment.lock import build_lock
+from raidar.design.problem import importer
 from raidar.design.problem.content import content_digest, hidden_content_in_task
-from raidar.design.problem.importer import ProblemDriftError, import_problem
+from raidar.design.problem.importer import ProblemDriftError
 from raidar.design.problem.models import ProblemId, ProblemManifest, ProblemMode
 from raidar.design.problem.resolver import ProblemResolver, resolver_factory
 from raidar.design.problem.rewrite import VERIFIER_IMPORT_PATH, RewriteError, render_spec
@@ -52,6 +53,7 @@ from tests.problems_support import (
     NEGATIVE_REF,
     ONESHOT_REF,
     POSITIVE_REF,
+    FakeResolver,
     build_fake_scb_repo,
     build_fixture_store,
     fake_store,
@@ -63,6 +65,11 @@ from tests.problems_support import (
 def scb(tmp_path: Path) -> tuple[ProblemStore, Path, str]:
     repo, commit = build_fake_scb_repo(tmp_path / "src")
     return fake_store(tmp_path / "problems", commit), repo, commit
+
+
+def import_problem(*args: Any, **kwargs: Any) -> importer.ImportResult:
+    """The real import with an offline deterministic resolver: tests never reach an index."""
+    return importer.import_problem(*args, resolver=FakeResolver(), **kwargs)
 
 
 def _ref(commit: str, name: str = "scb/adder") -> ProblemId:
@@ -299,7 +306,7 @@ def test_loading_refuses_missing_or_drifted_content(tmp_path: Path) -> None:
     (loaded.task_dir / "steps" / "checkpoint_1" / "instruction.md").write_text("tampered\n")
     with pytest.raises(ProblemStoreError, match="task_sha256"):
         store.load(problem)
-    shutil.rmtree(store.content_dir(problem))
+    shutil.rmtree(store.content_dir(problem, store.load_manifest(problem).content_key()))
     with pytest.raises(ProblemStoreError, match="raidar problem import"):
         store.load(problem)
     with pytest.raises(ProblemStoreError, match="not imported"):
@@ -313,7 +320,8 @@ def test_content_digests_cover_directories_a_workspace_snapshot_excludes(
 ) -> None:
     store = build_fixture_store(tmp_path / "store")
     problem = ProblemId.parse(POSITIVE_REF)
-    extra = store.content_dir(problem) / area / excluded_dir / "extra.txt"
+    content = store.content_dir(problem, store.load_manifest(problem).content_key())
+    extra = content / area / excluded_dir / "extra.txt"
     extra.parent.mkdir(parents=True)
     extra.write_text("not in the manifest\n")
     with pytest.raises(ProblemStoreError, match="drifted"):

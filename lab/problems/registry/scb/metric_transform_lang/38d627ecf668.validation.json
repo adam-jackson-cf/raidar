@@ -1,0 +1,1606 @@
+{
+  "checks": [
+    {
+      "detail": [],
+      "name": "solvable_set",
+      "status": "pass"
+    },
+    {
+      "detail": [],
+      "name": "reference_k-1_fails_k",
+      "status": "pass"
+    },
+    {
+      "detail": [],
+      "name": "repeat_identical_positive",
+      "status": "pass"
+    },
+    {
+      "detail": [],
+      "name": "repeat_identical_negative",
+      "status": "pass"
+    },
+    {
+      "detail": [
+        "native runner not run"
+      ],
+      "name": "native_parity_positive",
+      "status": "not_run"
+    },
+    {
+      "detail": [
+        "native runner not run"
+      ],
+      "name": "native_parity_negative",
+      "status": "not_run"
+    }
+  ],
+  "engine": "direct",
+  "environment": {
+    "docker_context": "raidar-mbp",
+    "engine": "direct",
+    "grader_environment_id": "sha256:715698bfd52661aa5627a3a9d22ea24db40b3716e5d78c6c8793976055973c06",
+    "grader_image": "raidar-oracle-grader:963c14e63ff5e15d",
+    "harbor": "0.23.0",
+    "pack_image": "raidar/pack-python:2b91a52663e099f2"
+  },
+  "grades": {
+    "native": null,
+    "oracle": {
+      "negative": [
+        {
+          "checkpoint_1": {
+            "all_pass": false,
+            "groups": {
+              "core": [
+                0,
+                4
+              ],
+              "error": [
+                17,
+                17
+              ],
+              "functionality": [
+                0,
+                25
+              ],
+              "regression": [
+                0,
+                0
+              ]
+            },
+            "infra_failure": null,
+            "passed": 17,
+            "total": 46
+          },
+          "checkpoint_2": {
+            "all_pass": false,
+            "groups": {
+              "core": [
+                0,
+                3
+              ],
+              "error": [
+                12,
+                12
+              ],
+              "functionality": [
+                0,
+                37
+              ],
+              "regression": [
+                46,
+                46
+              ]
+            },
+            "infra_failure": null,
+            "passed": 58,
+            "total": 98
+          },
+          "checkpoint_3": {
+            "all_pass": false,
+            "groups": {
+              "core": [
+                0,
+                3
+              ],
+              "error": [
+                10,
+                11
+              ],
+              "functionality": [
+                0,
+                52
+              ],
+              "regression": [
+                29,
+                98
+              ]
+            },
+            "infra_failure": null,
+            "passed": 39,
+            "total": 164
+          },
+          "checkpoint_4": {
+            "all_pass": false,
+            "groups": {
+              "core": [
+                0,
+                1
+              ],
+              "error": [
+                4,
+                4
+              ],
+              "functionality": [
+                0,
+                57
+              ],
+              "regression": [
+                117,
+                118
+              ]
+            },
+            "infra_failure": null,
+            "passed": 121,
+            "total": 180
+          },
+          "checkpoint_5": {
+            "all_pass": false,
+            "groups": {
+              "core": [
+                0,
+                1
+              ],
+              "error": [
+                4,
+                5
+              ],
+              "functionality": [
+                0,
+                20
+              ],
+              "regression": [
+                0,
+                48
+              ]
+            },
+            "infra_failure": null,
+            "passed": 4,
+            "total": 74
+          }
+        },
+        {
+          "checkpoint_1": {
+            "all_pass": false,
+            "groups": {
+              "core": [
+                0,
+                4
+              ],
+              "error": [
+                17,
+                17
+              ],
+              "functionality": [
+                0,
+                25
+              ],
+              "regression": [
+                0,
+                0
+              ]
+            },
+            "infra_failure": null,
+            "passed": 17,
+            "total": 46
+          },
+          "checkpoint_2": {
+            "all_pass": false,
+            "groups": {
+              "core": [
+                0,
+                3
+              ],
+              "error": [
+                12,
+                12
+              ],
+              "functionality": [
+                0,
+                37
+              ],
+              "regression": [
+                46,
+                46
+              ]
+            },
+            "infra_failure": null,
+            "passed": 58,
+            "total": 98
+          },
+          "checkpoint_3": {
+            "all_pass": false,
+            "groups": {
+              "core": [
+                0,
+                3
+              ],
+              "error": [
+                10,
+                11
+              ],
+              "functionality": [
+                0,
+                52
+              ],
+              "regression": [
+                29,
+                98
+              ]
+            },
+            "infra_failure": null,
+            "passed": 39,
+            "total": 164
+          },
+          "checkpoint_4": {
+            "all_pass": false,
+            "groups": {
+              "core": [
+                0,
+                1
+              ],
+              "error": [
+                4,
+                4
+              ],
+              "functionality": [
+                0,
+                57
+              ],
+              "regression": [
+                117,
+                118
+              ]
+            },
+            "infra_failure": null,
+            "passed": 121,
+            "total": 180
+          },
+          "checkpoint_5": {
+            "all_pass": false,
+            "groups": {
+              "core": [
+                0,
+                1
+              ],
+              "error": [
+                4,
+                5
+              ],
+              "functionality": [
+                0,
+                20
+              ],
+              "regression": [
+                0,
+                48
+              ]
+            },
+            "infra_failure": null,
+            "passed": 4,
+            "total": 74
+          }
+        },
+        {
+          "checkpoint_1": {
+            "all_pass": false,
+            "groups": {
+              "core": [
+                0,
+                4
+              ],
+              "error": [
+                17,
+                17
+              ],
+              "functionality": [
+                0,
+                25
+              ],
+              "regression": [
+                0,
+                0
+              ]
+            },
+            "infra_failure": null,
+            "passed": 17,
+            "total": 46
+          },
+          "checkpoint_2": {
+            "all_pass": false,
+            "groups": {
+              "core": [
+                0,
+                3
+              ],
+              "error": [
+                12,
+                12
+              ],
+              "functionality": [
+                0,
+                37
+              ],
+              "regression": [
+                46,
+                46
+              ]
+            },
+            "infra_failure": null,
+            "passed": 58,
+            "total": 98
+          },
+          "checkpoint_3": {
+            "all_pass": false,
+            "groups": {
+              "core": [
+                0,
+                3
+              ],
+              "error": [
+                10,
+                11
+              ],
+              "functionality": [
+                0,
+                52
+              ],
+              "regression": [
+                29,
+                98
+              ]
+            },
+            "infra_failure": null,
+            "passed": 39,
+            "total": 164
+          },
+          "checkpoint_4": {
+            "all_pass": false,
+            "groups": {
+              "core": [
+                0,
+                1
+              ],
+              "error": [
+                4,
+                4
+              ],
+              "functionality": [
+                0,
+                57
+              ],
+              "regression": [
+                117,
+                118
+              ]
+            },
+            "infra_failure": null,
+            "passed": 121,
+            "total": 180
+          },
+          "checkpoint_5": {
+            "all_pass": false,
+            "groups": {
+              "core": [
+                0,
+                1
+              ],
+              "error": [
+                4,
+                5
+              ],
+              "functionality": [
+                0,
+                20
+              ],
+              "regression": [
+                0,
+                48
+              ]
+            },
+            "infra_failure": null,
+            "passed": 4,
+            "total": 74
+          }
+        }
+      ],
+      "positive": [
+        {
+          "checkpoint_1": {
+            "all_pass": true,
+            "groups": {
+              "core": [
+                4,
+                4
+              ],
+              "error": [
+                17,
+                17
+              ],
+              "functionality": [
+                25,
+                25
+              ],
+              "regression": [
+                0,
+                0
+              ]
+            },
+            "infra_failure": null,
+            "passed": 46,
+            "total": 46
+          },
+          "checkpoint_2": {
+            "all_pass": true,
+            "groups": {
+              "core": [
+                3,
+                3
+              ],
+              "error": [
+                12,
+                12
+              ],
+              "functionality": [
+                37,
+                37
+              ],
+              "regression": [
+                46,
+                46
+              ]
+            },
+            "infra_failure": null,
+            "passed": 98,
+            "total": 98
+          },
+          "checkpoint_3": {
+            "all_pass": false,
+            "groups": {
+              "core": [
+                3,
+                3
+              ],
+              "error": [
+                11,
+                11
+              ],
+              "functionality": [
+                51,
+                52
+              ],
+              "regression": [
+                98,
+                98
+              ]
+            },
+            "infra_failure": null,
+            "passed": 163,
+            "total": 164
+          },
+          "checkpoint_4": {
+            "all_pass": false,
+            "groups": {
+              "core": [
+                1,
+                1
+              ],
+              "error": [
+                4,
+                4
+              ],
+              "functionality": [
+                56,
+                57
+              ],
+              "regression": [
+                117,
+                118
+              ]
+            },
+            "infra_failure": null,
+            "passed": 178,
+            "total": 180
+          },
+          "checkpoint_5": {
+            "all_pass": false,
+            "groups": {
+              "core": [
+                1,
+                1
+              ],
+              "error": [
+                5,
+                5
+              ],
+              "functionality": [
+                20,
+                20
+              ],
+              "regression": [
+                47,
+                48
+              ]
+            },
+            "infra_failure": null,
+            "passed": 73,
+            "total": 74
+          }
+        },
+        {
+          "checkpoint_1": {
+            "all_pass": true,
+            "groups": {
+              "core": [
+                4,
+                4
+              ],
+              "error": [
+                17,
+                17
+              ],
+              "functionality": [
+                25,
+                25
+              ],
+              "regression": [
+                0,
+                0
+              ]
+            },
+            "infra_failure": null,
+            "passed": 46,
+            "total": 46
+          },
+          "checkpoint_2": {
+            "all_pass": true,
+            "groups": {
+              "core": [
+                3,
+                3
+              ],
+              "error": [
+                12,
+                12
+              ],
+              "functionality": [
+                37,
+                37
+              ],
+              "regression": [
+                46,
+                46
+              ]
+            },
+            "infra_failure": null,
+            "passed": 98,
+            "total": 98
+          },
+          "checkpoint_3": {
+            "all_pass": false,
+            "groups": {
+              "core": [
+                3,
+                3
+              ],
+              "error": [
+                11,
+                11
+              ],
+              "functionality": [
+                51,
+                52
+              ],
+              "regression": [
+                98,
+                98
+              ]
+            },
+            "infra_failure": null,
+            "passed": 163,
+            "total": 164
+          },
+          "checkpoint_4": {
+            "all_pass": false,
+            "groups": {
+              "core": [
+                1,
+                1
+              ],
+              "error": [
+                4,
+                4
+              ],
+              "functionality": [
+                56,
+                57
+              ],
+              "regression": [
+                117,
+                118
+              ]
+            },
+            "infra_failure": null,
+            "passed": 178,
+            "total": 180
+          },
+          "checkpoint_5": {
+            "all_pass": false,
+            "groups": {
+              "core": [
+                1,
+                1
+              ],
+              "error": [
+                5,
+                5
+              ],
+              "functionality": [
+                20,
+                20
+              ],
+              "regression": [
+                47,
+                48
+              ]
+            },
+            "infra_failure": null,
+            "passed": 73,
+            "total": 74
+          }
+        },
+        {
+          "checkpoint_1": {
+            "all_pass": true,
+            "groups": {
+              "core": [
+                4,
+                4
+              ],
+              "error": [
+                17,
+                17
+              ],
+              "functionality": [
+                25,
+                25
+              ],
+              "regression": [
+                0,
+                0
+              ]
+            },
+            "infra_failure": null,
+            "passed": 46,
+            "total": 46
+          },
+          "checkpoint_2": {
+            "all_pass": true,
+            "groups": {
+              "core": [
+                3,
+                3
+              ],
+              "error": [
+                12,
+                12
+              ],
+              "functionality": [
+                37,
+                37
+              ],
+              "regression": [
+                46,
+                46
+              ]
+            },
+            "infra_failure": null,
+            "passed": 98,
+            "total": 98
+          },
+          "checkpoint_3": {
+            "all_pass": false,
+            "groups": {
+              "core": [
+                3,
+                3
+              ],
+              "error": [
+                11,
+                11
+              ],
+              "functionality": [
+                51,
+                52
+              ],
+              "regression": [
+                98,
+                98
+              ]
+            },
+            "infra_failure": null,
+            "passed": 163,
+            "total": 164
+          },
+          "checkpoint_4": {
+            "all_pass": false,
+            "groups": {
+              "core": [
+                1,
+                1
+              ],
+              "error": [
+                4,
+                4
+              ],
+              "functionality": [
+                56,
+                57
+              ],
+              "regression": [
+                117,
+                118
+              ]
+            },
+            "infra_failure": null,
+            "passed": 178,
+            "total": 180
+          },
+          "checkpoint_5": {
+            "all_pass": false,
+            "groups": {
+              "core": [
+                1,
+                1
+              ],
+              "error": [
+                5,
+                5
+              ],
+              "functionality": [
+                20,
+                20
+              ],
+              "regression": [
+                47,
+                48
+              ]
+            },
+            "infra_failure": null,
+            "passed": 73,
+            "total": 74
+          }
+        }
+      ]
+    }
+  },
+  "group_order": [
+    "core",
+    "functionality",
+    "error",
+    "regression"
+  ],
+  "headline_policy": {
+    "checkpoints": 5,
+    "components": {
+      "C": "used",
+      "E": "missing",
+      "G": "missing",
+      "H": "missing",
+      "R": "missing",
+      "V": "missing"
+    },
+    "eligible": false,
+    "policy": "scb-canonical@1",
+    "reasons": [
+      {
+        "code": "component_missing",
+        "component": "V",
+        "detail": "scb-canonical@1 requires component V"
+      },
+      {
+        "code": "component_missing",
+        "component": "E",
+        "detail": "scb-canonical@1 requires component E"
+      },
+      {
+        "code": "component_missing",
+        "component": "H",
+        "detail": "scb-canonical@1 requires component H"
+      },
+      {
+        "code": "component_missing",
+        "component": "R",
+        "detail": "scb-canonical@1 requires component R"
+      },
+      {
+        "code": "component_missing",
+        "component": "G",
+        "detail": "scb-canonical@1 requires component G"
+      }
+    ],
+    "reference_correctness": "0.99385556287995312385556287996",
+    "selection": "default_by_k"
+  },
+  "kind": "raidar-problem-validation",
+  "manifest_sha256": "67333f30fda2ed63def5ba705f2001dd39ffed6268f527303aaa189223a27e44",
+  "mode": "multi_checkpoint",
+  "not_run": [
+    "native_parity_positive",
+    "native_parity_negative"
+  ],
+  "problem": "scb/metric_transform_lang@38d627ecf668",
+  "repeats": 3,
+  "schema_version": 1,
+  "solvable": {
+    "checkpoint_1": {
+      "digest": "6c264fec0ee58fdbff4f054f16d865a84da66ef5f6898c1f4d169b10b0667cec",
+      "nondeterministic": [],
+      "nondeterministic_count": 0,
+      "size": 46,
+      "solvable": [
+        "checkpoint_1::test_checkpoint_1_cli_format[21_custom_timezone]",
+        "checkpoint_1::test_checkpoint_1_cli_format[22_custom_timestamp_fmt]",
+        "checkpoint_1::test_checkpoint_1_cli_format[24_extra_csv_columns]",
+        "checkpoint_1::test_checkpoint_1_cli_format[28_comments_empty_lines]",
+        "checkpoint_1::test_checkpoint_1_core[01_all_rows_aggregates]",
+        "checkpoint_1::test_checkpoint_1_core[02_group_by_category]",
+        "checkpoint_1::test_checkpoint_1_core[03_window_1h_counts]",
+        "checkpoint_1::test_checkpoint_1_core[05_filter_and_apply]",
+        "checkpoint_1::test_checkpoint_1_core_extended[06_group_by_file_out]",
+        "checkpoint_1::test_checkpoint_1_core_extended[08_median_even_count]",
+        "checkpoint_1::test_checkpoint_1_core_extended[09_timestamp_transforms]",
+        "checkpoint_1::test_checkpoint_1_core_extended[10_round_function]",
+        "checkpoint_1::test_checkpoint_1_core_extended[11_group_by_multi_cols]",
+        "checkpoint_1::test_checkpoint_1_core_extended[25_filter_with_group_by]",
+        "checkpoint_1::test_checkpoint_1_core_extended[27_apply_column_override]",
+        "checkpoint_1::test_checkpoint_1_core_extended[30_all_aggregates]",
+        "checkpoint_1::test_checkpoint_1_error[01_dsl_syntax_error]",
+        "checkpoint_1::test_checkpoint_1_error[02_type_error_numeric_on_string]",
+        "checkpoint_1::test_checkpoint_1_error[03_missing_csv_io_error]",
+        "checkpoint_1::test_checkpoint_1_error[04_multiple_group_by]",
+        "checkpoint_1::test_checkpoint_1_error[05_multiple_window]",
+        "checkpoint_1::test_checkpoint_1_error[06_no_aggregate]",
+        "checkpoint_1::test_checkpoint_1_error[07_duplicate_aliases]",
+        "checkpoint_1::test_checkpoint_1_error[08_invalid_window_duration]",
+        "checkpoint_1::test_checkpoint_1_error[09_len_on_number]",
+        "checkpoint_1::test_checkpoint_1_error[10_day_on_string]",
+        "checkpoint_1::test_checkpoint_1_error[11_string_number_comparison]",
+        "checkpoint_1::test_checkpoint_1_error[12_invalid_in_usage]",
+        "checkpoint_1::test_checkpoint_1_error[13_undefined_column]",
+        "checkpoint_1::test_checkpoint_1_error[15_missing_dsl_file]",
+        "checkpoint_1::test_checkpoint_1_error[16_in_with_two_literals]",
+        "checkpoint_1::test_checkpoint_1_error[17_zero_window_duration]",
+        "checkpoint_1::test_checkpoint_1_error[18_filter_non_boolean]",
+        "checkpoint_1::test_checkpoint_1_expressions[14_all_comparison_ops]",
+        "checkpoint_1::test_checkpoint_1_expressions[15_logical_operators]",
+        "checkpoint_1::test_checkpoint_1_expressions[16_in_operator]",
+        "checkpoint_1::test_checkpoint_1_expressions[17_column_comparison]",
+        "checkpoint_1::test_checkpoint_1_hidden[07_std_var_aggregates]",
+        "checkpoint_1::test_checkpoint_1_hidden[19_single_row]",
+        "checkpoint_1::test_checkpoint_1_hidden[20_null_aggregates]",
+        "checkpoint_1::test_checkpoint_1_hidden[26_apply_then_filter]",
+        "checkpoint_1::test_checkpoint_1_hidden[31_group_by_timestamp]",
+        "checkpoint_1::test_checkpoint_1_window_variants[04_window_and_group_by]",
+        "checkpoint_1::test_checkpoint_1_window_variants[12_window_10m]",
+        "checkpoint_1::test_checkpoint_1_window_variants[13_window_24h]",
+        "checkpoint_1::test_checkpoint_1_window_variants[29_window_7d]"
+      ],
+      "verdict": "validated"
+    },
+    "checkpoint_2": {
+      "digest": "85462a25c60fac4ad435075acda13340d11bc762170f628f3eed2b10dc683cfb",
+      "nondeterministic": [],
+      "nondeterministic_count": 0,
+      "size": 98,
+      "solvable": [
+        "checkpoint_1::test_checkpoint_1_cli_format[21_custom_timezone]",
+        "checkpoint_1::test_checkpoint_1_cli_format[22_custom_timestamp_fmt]",
+        "checkpoint_1::test_checkpoint_1_cli_format[24_extra_csv_columns]",
+        "checkpoint_1::test_checkpoint_1_cli_format[28_comments_empty_lines]",
+        "checkpoint_1::test_checkpoint_1_core[01_all_rows_aggregates]",
+        "checkpoint_1::test_checkpoint_1_core[02_group_by_category]",
+        "checkpoint_1::test_checkpoint_1_core[03_window_1h_counts]",
+        "checkpoint_1::test_checkpoint_1_core[05_filter_and_apply]",
+        "checkpoint_1::test_checkpoint_1_core_extended[06_group_by_file_out]",
+        "checkpoint_1::test_checkpoint_1_core_extended[08_median_even_count]",
+        "checkpoint_1::test_checkpoint_1_core_extended[09_timestamp_transforms]",
+        "checkpoint_1::test_checkpoint_1_core_extended[10_round_function]",
+        "checkpoint_1::test_checkpoint_1_core_extended[11_group_by_multi_cols]",
+        "checkpoint_1::test_checkpoint_1_core_extended[25_filter_with_group_by]",
+        "checkpoint_1::test_checkpoint_1_core_extended[27_apply_column_override]",
+        "checkpoint_1::test_checkpoint_1_core_extended[30_all_aggregates]",
+        "checkpoint_1::test_checkpoint_1_error[01_dsl_syntax_error]",
+        "checkpoint_1::test_checkpoint_1_error[02_type_error_numeric_on_string]",
+        "checkpoint_1::test_checkpoint_1_error[03_missing_csv_io_error]",
+        "checkpoint_1::test_checkpoint_1_error[04_multiple_group_by]",
+        "checkpoint_1::test_checkpoint_1_error[05_multiple_window]",
+        "checkpoint_1::test_checkpoint_1_error[06_no_aggregate]",
+        "checkpoint_1::test_checkpoint_1_error[07_duplicate_aliases]",
+        "checkpoint_1::test_checkpoint_1_error[08_invalid_window_duration]",
+        "checkpoint_1::test_checkpoint_1_error[09_len_on_number]",
+        "checkpoint_1::test_checkpoint_1_error[10_day_on_string]",
+        "checkpoint_1::test_checkpoint_1_error[11_string_number_comparison]",
+        "checkpoint_1::test_checkpoint_1_error[12_invalid_in_usage]",
+        "checkpoint_1::test_checkpoint_1_error[13_undefined_column]",
+        "checkpoint_1::test_checkpoint_1_error[15_missing_dsl_file]",
+        "checkpoint_1::test_checkpoint_1_error[16_in_with_two_literals]",
+        "checkpoint_1::test_checkpoint_1_error[17_zero_window_duration]",
+        "checkpoint_1::test_checkpoint_1_error[18_filter_non_boolean]",
+        "checkpoint_1::test_checkpoint_1_expressions[14_all_comparison_ops]",
+        "checkpoint_1::test_checkpoint_1_expressions[15_logical_operators]",
+        "checkpoint_1::test_checkpoint_1_expressions[16_in_operator]",
+        "checkpoint_1::test_checkpoint_1_expressions[17_column_comparison]",
+        "checkpoint_1::test_checkpoint_1_hidden[07_std_var_aggregates]",
+        "checkpoint_1::test_checkpoint_1_hidden[19_single_row]",
+        "checkpoint_1::test_checkpoint_1_hidden[20_null_aggregates]",
+        "checkpoint_1::test_checkpoint_1_hidden[26_apply_then_filter]",
+        "checkpoint_1::test_checkpoint_1_hidden[31_group_by_timestamp]",
+        "checkpoint_1::test_checkpoint_1_window_variants[04_window_and_group_by]",
+        "checkpoint_1::test_checkpoint_1_window_variants[12_window_10m]",
+        "checkpoint_1::test_checkpoint_1_window_variants[13_window_24h]",
+        "checkpoint_1::test_checkpoint_1_window_variants[29_window_7d]",
+        "checkpoint_2::test_checkpoint_2_core[01_schema_inheritance_pre_calc]",
+        "checkpoint_2::test_checkpoint_2_core[02_params_and_filter]",
+        "checkpoint_2::test_checkpoint_2_core[03_post_agg_lag]",
+        "checkpoint_2::test_checkpoint_2_core_extended[04_group_by_pre_calc_key]",
+        "checkpoint_2::test_checkpoint_2_core_extended[05_post_agg_lead_param_coalesce]",
+        "checkpoint_2::test_checkpoint_2_core_extended[06_string_ops_basic]",
+        "checkpoint_2::test_checkpoint_2_core_extended[07_string_ops_with_params]",
+        "checkpoint_2::test_checkpoint_2_core_extended[08_multiple_params_various_types]",
+        "checkpoint_2::test_checkpoint_2_core_extended[09_type_widening_override]",
+        "checkpoint_2::test_checkpoint_2_core_extended[10_multiple_pre_calcs]",
+        "checkpoint_2::test_checkpoint_2_core_extended[11_multiple_post_agg_calcs]",
+        "checkpoint_2::test_checkpoint_2_core_extended[12_post_agg_calc_simple]",
+        "checkpoint_2::test_checkpoint_2_core_extended[13_lag_with_group_by_only]",
+        "checkpoint_2::test_checkpoint_2_core_extended[14_window_group_lag_combined]",
+        "checkpoint_2::test_checkpoint_2_core_extended[15_cast_basic]",
+        "checkpoint_2::test_checkpoint_2_core_extended[16_regression_filter_apply]",
+        "checkpoint_2::test_checkpoint_2_core_extended[17_regression_window_group]",
+        "checkpoint_2::test_checkpoint_2_core_extended[18_regression_all_aggregates]",
+        "checkpoint_2::test_checkpoint_2_error[01_illegal_override_narrowing]",
+        "checkpoint_2::test_checkpoint_2_error[02_schema_forward_reference]",
+        "checkpoint_2::test_checkpoint_2_error[03_missing_param_without_default]",
+        "checkpoint_2::test_checkpoint_2_error[04_param_type_parse_failure]",
+        "checkpoint_2::test_checkpoint_2_error[05_pre_stage_calc_uses_agg_alias]",
+        "checkpoint_2::test_checkpoint_2_error[06_circular_inheritance]",
+        "checkpoint_2::test_checkpoint_2_error[07_lag_in_pre_stage]",
+        "checkpoint_2::test_checkpoint_2_error[08_post_calc_type_mismatch]",
+        "checkpoint_2::test_checkpoint_2_error[09_pre_calc_type_mismatch]",
+        "checkpoint_2::test_checkpoint_2_error[10_illegal_override_string_int]",
+        "checkpoint_2::test_checkpoint_2_error[11_lag_non_int_k]",
+        "checkpoint_2::test_checkpoint_2_error[12_duplicate_calc_names]",
+        "checkpoint_2::test_checkpoint_2_file_output[01_window_lag_file_out]",
+        "checkpoint_2::test_checkpoint_2_file_output[02_complex_output]",
+        "checkpoint_2::test_checkpoint_2_hidden[01_empty_input_with_calcs]",
+        "checkpoint_2::test_checkpoint_2_hidden[02_single_row_lag_lead]",
+        "checkpoint_2::test_checkpoint_2_hidden[03_lag_lead_large_k]",
+        "checkpoint_2::test_checkpoint_2_hidden[04_multi_level_inheritance]",
+        "checkpoint_2::test_checkpoint_2_hidden[05_coalesce_non_null]",
+        "checkpoint_2::test_checkpoint_2_hidden[06_params_in_apply]",
+        "checkpoint_2::test_checkpoint_2_hidden[07_same_type_override]",
+        "checkpoint_2::test_checkpoint_2_hidden[08_param_timestamp_type]",
+        "checkpoint_2::test_checkpoint_2_regression[01_group_by_single]",
+        "checkpoint_2::test_checkpoint_2_regression[02_group_by_multi]",
+        "checkpoint_2::test_checkpoint_2_regression[03_window_various]",
+        "checkpoint_2::test_checkpoint_2_regression[04_comparison_ops]",
+        "checkpoint_2::test_checkpoint_2_regression[05_logical_ops]",
+        "checkpoint_2::test_checkpoint_2_regression[06_in_operator]",
+        "checkpoint_2::test_checkpoint_2_regression[07_column_compare]",
+        "checkpoint_2::test_checkpoint_2_regression[08_timestamp_transforms]",
+        "checkpoint_2::test_checkpoint_2_regression[09_round_function]",
+        "checkpoint_2::test_checkpoint_2_regression[10_apply_order]",
+        "checkpoint_2::test_checkpoint_2_regression[11_null_aggregates]",
+        "checkpoint_2::test_checkpoint_2_regression[12_cli_timezone]"
+      ],
+      "verdict": "validated"
+    },
+    "checkpoint_3": {
+      "digest": "73f76aeac10dab0efabcebb9e05ce9b48902a48d567e8dd70087e639818442ee",
+      "nondeterministic": [],
+      "nondeterministic_count": 0,
+      "size": 163,
+      "solvable": [
+        "checkpoint_1::test_checkpoint_1_cli_format[21_custom_timezone]",
+        "checkpoint_1::test_checkpoint_1_cli_format[22_custom_timestamp_fmt]",
+        "checkpoint_1::test_checkpoint_1_cli_format[24_extra_csv_columns]",
+        "checkpoint_1::test_checkpoint_1_cli_format[28_comments_empty_lines]",
+        "checkpoint_1::test_checkpoint_1_core[01_all_rows_aggregates]",
+        "checkpoint_1::test_checkpoint_1_core[02_group_by_category]",
+        "checkpoint_1::test_checkpoint_1_core[03_window_1h_counts]",
+        "checkpoint_1::test_checkpoint_1_core[05_filter_and_apply]",
+        "checkpoint_1::test_checkpoint_1_core_extended[06_group_by_file_out]",
+        "checkpoint_1::test_checkpoint_1_core_extended[08_median_even_count]",
+        "checkpoint_1::test_checkpoint_1_core_extended[09_timestamp_transforms]",
+        "checkpoint_1::test_checkpoint_1_core_extended[10_round_function]",
+        "checkpoint_1::test_checkpoint_1_core_extended[11_group_by_multi_cols]",
+        "checkpoint_1::test_checkpoint_1_core_extended[25_filter_with_group_by]",
+        "checkpoint_1::test_checkpoint_1_core_extended[27_apply_column_override]",
+        "checkpoint_1::test_checkpoint_1_core_extended[30_all_aggregates]",
+        "checkpoint_1::test_checkpoint_1_error[01_dsl_syntax_error]",
+        "checkpoint_1::test_checkpoint_1_error[02_type_error_numeric_on_string]",
+        "checkpoint_1::test_checkpoint_1_error[03_missing_csv_io_error]",
+        "checkpoint_1::test_checkpoint_1_error[04_multiple_group_by]",
+        "checkpoint_1::test_checkpoint_1_error[05_multiple_window]",
+        "checkpoint_1::test_checkpoint_1_error[06_no_aggregate]",
+        "checkpoint_1::test_checkpoint_1_error[07_duplicate_aliases]",
+        "checkpoint_1::test_checkpoint_1_error[08_invalid_window_duration]",
+        "checkpoint_1::test_checkpoint_1_error[09_len_on_number]",
+        "checkpoint_1::test_checkpoint_1_error[10_day_on_string]",
+        "checkpoint_1::test_checkpoint_1_error[11_string_number_comparison]",
+        "checkpoint_1::test_checkpoint_1_error[12_invalid_in_usage]",
+        "checkpoint_1::test_checkpoint_1_error[13_undefined_column]",
+        "checkpoint_1::test_checkpoint_1_error[15_missing_dsl_file]",
+        "checkpoint_1::test_checkpoint_1_error[16_in_with_two_literals]",
+        "checkpoint_1::test_checkpoint_1_error[17_zero_window_duration]",
+        "checkpoint_1::test_checkpoint_1_error[18_filter_non_boolean]",
+        "checkpoint_1::test_checkpoint_1_expressions[14_all_comparison_ops]",
+        "checkpoint_1::test_checkpoint_1_expressions[15_logical_operators]",
+        "checkpoint_1::test_checkpoint_1_expressions[16_in_operator]",
+        "checkpoint_1::test_checkpoint_1_expressions[17_column_comparison]",
+        "checkpoint_1::test_checkpoint_1_hidden[07_std_var_aggregates]",
+        "checkpoint_1::test_checkpoint_1_hidden[19_single_row]",
+        "checkpoint_1::test_checkpoint_1_hidden[20_null_aggregates]",
+        "checkpoint_1::test_checkpoint_1_hidden[26_apply_then_filter]",
+        "checkpoint_1::test_checkpoint_1_hidden[31_group_by_timestamp]",
+        "checkpoint_1::test_checkpoint_1_window_variants[04_window_and_group_by]",
+        "checkpoint_1::test_checkpoint_1_window_variants[12_window_10m]",
+        "checkpoint_1::test_checkpoint_1_window_variants[13_window_24h]",
+        "checkpoint_1::test_checkpoint_1_window_variants[29_window_7d]",
+        "checkpoint_2::test_checkpoint_2_core[01_schema_inheritance_pre_calc]",
+        "checkpoint_2::test_checkpoint_2_core[02_params_and_filter]",
+        "checkpoint_2::test_checkpoint_2_core[03_post_agg_lag]",
+        "checkpoint_2::test_checkpoint_2_core_extended[04_group_by_pre_calc_key]",
+        "checkpoint_2::test_checkpoint_2_core_extended[05_post_agg_lead_param_coalesce]",
+        "checkpoint_2::test_checkpoint_2_core_extended[06_string_ops_basic]",
+        "checkpoint_2::test_checkpoint_2_core_extended[07_string_ops_with_params]",
+        "checkpoint_2::test_checkpoint_2_core_extended[08_multiple_params_various_types]",
+        "checkpoint_2::test_checkpoint_2_core_extended[09_type_widening_override]",
+        "checkpoint_2::test_checkpoint_2_core_extended[10_multiple_pre_calcs]",
+        "checkpoint_2::test_checkpoint_2_core_extended[11_multiple_post_agg_calcs]",
+        "checkpoint_2::test_checkpoint_2_core_extended[12_post_agg_calc_simple]",
+        "checkpoint_2::test_checkpoint_2_core_extended[13_lag_with_group_by_only]",
+        "checkpoint_2::test_checkpoint_2_core_extended[14_window_group_lag_combined]",
+        "checkpoint_2::test_checkpoint_2_core_extended[15_cast_basic]",
+        "checkpoint_2::test_checkpoint_2_core_extended[16_regression_filter_apply]",
+        "checkpoint_2::test_checkpoint_2_core_extended[17_regression_window_group]",
+        "checkpoint_2::test_checkpoint_2_core_extended[18_regression_all_aggregates]",
+        "checkpoint_2::test_checkpoint_2_error[01_illegal_override_narrowing]",
+        "checkpoint_2::test_checkpoint_2_error[02_schema_forward_reference]",
+        "checkpoint_2::test_checkpoint_2_error[03_missing_param_without_default]",
+        "checkpoint_2::test_checkpoint_2_error[04_param_type_parse_failure]",
+        "checkpoint_2::test_checkpoint_2_error[05_pre_stage_calc_uses_agg_alias]",
+        "checkpoint_2::test_checkpoint_2_error[06_circular_inheritance]",
+        "checkpoint_2::test_checkpoint_2_error[07_lag_in_pre_stage]",
+        "checkpoint_2::test_checkpoint_2_error[08_post_calc_type_mismatch]",
+        "checkpoint_2::test_checkpoint_2_error[09_pre_calc_type_mismatch]",
+        "checkpoint_2::test_checkpoint_2_error[10_illegal_override_string_int]",
+        "checkpoint_2::test_checkpoint_2_error[11_lag_non_int_k]",
+        "checkpoint_2::test_checkpoint_2_error[12_duplicate_calc_names]",
+        "checkpoint_2::test_checkpoint_2_file_output[01_window_lag_file_out]",
+        "checkpoint_2::test_checkpoint_2_file_output[02_complex_output]",
+        "checkpoint_2::test_checkpoint_2_hidden[01_empty_input_with_calcs]",
+        "checkpoint_2::test_checkpoint_2_hidden[02_single_row_lag_lead]",
+        "checkpoint_2::test_checkpoint_2_hidden[03_lag_lead_large_k]",
+        "checkpoint_2::test_checkpoint_2_hidden[04_multi_level_inheritance]",
+        "checkpoint_2::test_checkpoint_2_hidden[05_coalesce_non_null]",
+        "checkpoint_2::test_checkpoint_2_hidden[06_params_in_apply]",
+        "checkpoint_2::test_checkpoint_2_hidden[07_same_type_override]",
+        "checkpoint_2::test_checkpoint_2_hidden[08_param_timestamp_type]",
+        "checkpoint_2::test_checkpoint_2_regression[01_group_by_single]",
+        "checkpoint_2::test_checkpoint_2_regression[02_group_by_multi]",
+        "checkpoint_2::test_checkpoint_2_regression[03_window_various]",
+        "checkpoint_2::test_checkpoint_2_regression[04_comparison_ops]",
+        "checkpoint_2::test_checkpoint_2_regression[05_logical_ops]",
+        "checkpoint_2::test_checkpoint_2_regression[06_in_operator]",
+        "checkpoint_2::test_checkpoint_2_regression[07_column_compare]",
+        "checkpoint_2::test_checkpoint_2_regression[08_timestamp_transforms]",
+        "checkpoint_2::test_checkpoint_2_regression[09_round_function]",
+        "checkpoint_2::test_checkpoint_2_regression[10_apply_order]",
+        "checkpoint_2::test_checkpoint_2_regression[11_null_aggregates]",
+        "checkpoint_2::test_checkpoint_2_regression[12_cli_timezone]",
+        "checkpoint_3::test_checkpoint_3_core[01_multi_input_union]",
+        "checkpoint_3::test_checkpoint_3_core[02_tsv_and_format_flag]",
+        "checkpoint_3::test_checkpoint_3_core[04_null_markers_and_filter]",
+        "checkpoint_3::test_checkpoint_3_core_extended[03_recursive_directory]",
+        "checkpoint_3::test_checkpoint_3_core_extended[05_order_independence_window]",
+        "checkpoint_3::test_checkpoint_3_core_extended[09_mixed_formats]",
+        "checkpoint_3::test_checkpoint_3_core_extended[10_glob_pattern]",
+        "checkpoint_3::test_checkpoint_3_core_extended[13_custom_null_markers]",
+        "checkpoint_3::test_checkpoint_3_core_extended[14_regression_multi_file_with_calcs]",
+        "checkpoint_3::test_checkpoint_3_core_extended[15_regression_multi_file_lag_lead]",
+        "checkpoint_3::test_checkpoint_3_core_extended[16_regression_multi_file_params]",
+        "checkpoint_3::test_checkpoint_3_edge_bad_records_out_not_created",
+        "checkpoint_3::test_checkpoint_3_edge_format_auto_ambiguous",
+        "checkpoint_3::test_checkpoint_3_edge_input_union_dedup",
+        "checkpoint_3::test_checkpoint_3_error[01_missing_input_file]",
+        "checkpoint_3::test_checkpoint_3_error[02_absent_physical_field_strict]",
+        "checkpoint_3::test_checkpoint_3_error[03_dsl_syntax_error_calc_stage]",
+        "checkpoint_3::test_checkpoint_3_error[04_type_mismatch_in_calc]",
+        "checkpoint_3::test_checkpoint_3_error[05_timestamp_parse_strict]",
+        "checkpoint_3::test_checkpoint_3_error[06_parse_type_mismatch_strict]",
+        "checkpoint_3::test_checkpoint_3_error[07_runtime_error_strict]",
+        "checkpoint_3::test_checkpoint_3_error[08_type_error_calc_strict]",
+        "checkpoint_3::test_checkpoint_3_error[09_missing_required_field_strict]",
+        "checkpoint_3::test_checkpoint_3_error[10_invalid_glob]",
+        "checkpoint_3::test_checkpoint_3_file_output[01_multi_input_file_out]",
+        "checkpoint_3::test_checkpoint_3_hidden[02_no_data_rows]",
+        "checkpoint_3::test_checkpoint_3_hidden[03_lexicographic_ordering]",
+        "checkpoint_3::test_checkpoint_3_hidden[04_many_files]",
+        "checkpoint_3::test_checkpoint_3_hidden[05_mixed_null_markers_multi_file]",
+        "checkpoint_3::test_checkpoint_3_hidden[06_count_col_with_nulls]",
+        "checkpoint_3::test_checkpoint_3_hidden[06_extreme_out_of_order]",
+        "checkpoint_3::test_checkpoint_3_hidden[07_three_valued_logic_filter]",
+        "checkpoint_3::test_checkpoint_3_hidden[08_null_aware_aggregations]",
+        "checkpoint_3::test_checkpoint_3_hidden[12_non_strict_without_bad_out]",
+        "checkpoint_3::test_checkpoint_3_regression[01_group_by_single]",
+        "checkpoint_3::test_checkpoint_3_regression[02_group_by_multi]",
+        "checkpoint_3::test_checkpoint_3_regression[03_window_various]",
+        "checkpoint_3::test_checkpoint_3_regression[04_comparison_ops]",
+        "checkpoint_3::test_checkpoint_3_regression[05_logical_ops]",
+        "checkpoint_3::test_checkpoint_3_regression[06_in_operator]",
+        "checkpoint_3::test_checkpoint_3_regression[07_column_compare]",
+        "checkpoint_3::test_checkpoint_3_regression[08_timestamp_transforms]",
+        "checkpoint_3::test_checkpoint_3_regression[09_round_function]",
+        "checkpoint_3::test_checkpoint_3_regression[10_apply_order]",
+        "checkpoint_3::test_checkpoint_3_regression[11_null_aggregates]",
+        "checkpoint_3::test_checkpoint_3_regression[12_cli_timezone]",
+        "checkpoint_3::test_checkpoint_3_regression[13_schema_inheritance_pre_calc]",
+        "checkpoint_3::test_checkpoint_3_regression[14_params_and_filter]",
+        "checkpoint_3::test_checkpoint_3_regression[15_post_agg_lag]",
+        "checkpoint_3::test_checkpoint_3_regression[16_group_by_pre_calc_key]",
+        "checkpoint_3::test_checkpoint_3_regression[17_post_agg_lead_param_coalesce]",
+        "checkpoint_3::test_checkpoint_3_regression[18_string_ops_basic]",
+        "checkpoint_3::test_checkpoint_3_regression[19_string_ops_with_params]",
+        "checkpoint_3::test_checkpoint_3_regression[20_multiple_params_various_types]",
+        "checkpoint_3::test_checkpoint_3_regression[21_type_widening_override]",
+        "checkpoint_3::test_checkpoint_3_regression[22_multiple_pre_calcs]",
+        "checkpoint_3::test_checkpoint_3_regression[23_multiple_post_agg_calcs]",
+        "checkpoint_3::test_checkpoint_3_regression[24_post_agg_calc_simple]",
+        "checkpoint_3::test_checkpoint_3_regression[25_lag_with_group_by_only]",
+        "checkpoint_3::test_checkpoint_3_regression[26_window_group_lag_combined]",
+        "checkpoint_3::test_checkpoint_3_regression[27_cast_basic]",
+        "checkpoint_3::test_checkpoint_3_regression[28_regression_filter_apply]",
+        "checkpoint_3::test_checkpoint_3_regression[29_regression_window_group]",
+        "checkpoint_3::test_checkpoint_3_regression[30_regression_all_aggregates]",
+        "checkpoint_3::test_checkpoint_3_regression[31_group_by_timestamp]"
+      ],
+      "verdict": "validated"
+    },
+    "checkpoint_4": {
+      "digest": "9df39c4deaa5cbd199162297b8b9137a88016bd3e34b3c1f2d75463521deff9c",
+      "nondeterministic": [],
+      "nondeterministic_count": 0,
+      "size": 178,
+      "solvable": [
+        "checkpoint_2::test_checkpoint_2_core[01_schema_inheritance_pre_calc]",
+        "checkpoint_2::test_checkpoint_2_core[02_params_and_filter]",
+        "checkpoint_2::test_checkpoint_2_core[03_post_agg_lag]",
+        "checkpoint_2::test_checkpoint_2_core_extended[04_group_by_pre_calc_key]",
+        "checkpoint_2::test_checkpoint_2_core_extended[05_post_agg_lead_param_coalesce]",
+        "checkpoint_2::test_checkpoint_2_core_extended[06_string_ops_basic]",
+        "checkpoint_2::test_checkpoint_2_core_extended[07_string_ops_with_params]",
+        "checkpoint_2::test_checkpoint_2_core_extended[08_multiple_params_various_types]",
+        "checkpoint_2::test_checkpoint_2_core_extended[09_type_widening_override]",
+        "checkpoint_2::test_checkpoint_2_core_extended[10_multiple_pre_calcs]",
+        "checkpoint_2::test_checkpoint_2_core_extended[11_multiple_post_agg_calcs]",
+        "checkpoint_2::test_checkpoint_2_core_extended[12_post_agg_calc_simple]",
+        "checkpoint_2::test_checkpoint_2_core_extended[13_lag_with_group_by_only]",
+        "checkpoint_2::test_checkpoint_2_core_extended[14_window_group_lag_combined]",
+        "checkpoint_2::test_checkpoint_2_core_extended[15_cast_basic]",
+        "checkpoint_2::test_checkpoint_2_core_extended[16_regression_filter_apply]",
+        "checkpoint_2::test_checkpoint_2_core_extended[17_regression_window_group]",
+        "checkpoint_2::test_checkpoint_2_core_extended[18_regression_all_aggregates]",
+        "checkpoint_2::test_checkpoint_2_error[01_illegal_override_narrowing]",
+        "checkpoint_2::test_checkpoint_2_error[02_schema_forward_reference]",
+        "checkpoint_2::test_checkpoint_2_error[03_missing_param_without_default]",
+        "checkpoint_2::test_checkpoint_2_error[04_param_type_parse_failure]",
+        "checkpoint_2::test_checkpoint_2_error[05_pre_stage_calc_uses_agg_alias]",
+        "checkpoint_2::test_checkpoint_2_error[06_circular_inheritance]",
+        "checkpoint_2::test_checkpoint_2_error[07_lag_in_pre_stage]",
+        "checkpoint_2::test_checkpoint_2_error[08_post_calc_type_mismatch]",
+        "checkpoint_2::test_checkpoint_2_error[09_pre_calc_type_mismatch]",
+        "checkpoint_2::test_checkpoint_2_error[10_illegal_override_string_int]",
+        "checkpoint_2::test_checkpoint_2_error[11_lag_non_int_k]",
+        "checkpoint_2::test_checkpoint_2_error[12_duplicate_calc_names]",
+        "checkpoint_2::test_checkpoint_2_file_output[01_window_lag_file_out]",
+        "checkpoint_2::test_checkpoint_2_file_output[02_complex_output]",
+        "checkpoint_2::test_checkpoint_2_hidden[01_empty_input_with_calcs]",
+        "checkpoint_2::test_checkpoint_2_hidden[02_single_row_lag_lead]",
+        "checkpoint_2::test_checkpoint_2_hidden[03_lag_lead_large_k]",
+        "checkpoint_2::test_checkpoint_2_hidden[04_multi_level_inheritance]",
+        "checkpoint_2::test_checkpoint_2_hidden[05_coalesce_non_null]",
+        "checkpoint_2::test_checkpoint_2_hidden[06_params_in_apply]",
+        "checkpoint_2::test_checkpoint_2_hidden[07_same_type_override]",
+        "checkpoint_2::test_checkpoint_2_hidden[08_param_timestamp_type]",
+        "checkpoint_2::test_checkpoint_2_regression[01_group_by_single]",
+        "checkpoint_2::test_checkpoint_2_regression[02_group_by_multi]",
+        "checkpoint_2::test_checkpoint_2_regression[03_window_various]",
+        "checkpoint_2::test_checkpoint_2_regression[04_comparison_ops]",
+        "checkpoint_2::test_checkpoint_2_regression[05_logical_ops]",
+        "checkpoint_2::test_checkpoint_2_regression[06_in_operator]",
+        "checkpoint_2::test_checkpoint_2_regression[07_column_compare]",
+        "checkpoint_2::test_checkpoint_2_regression[08_timestamp_transforms]",
+        "checkpoint_2::test_checkpoint_2_regression[09_round_function]",
+        "checkpoint_2::test_checkpoint_2_regression[10_apply_order]",
+        "checkpoint_2::test_checkpoint_2_regression[11_null_aggregates]",
+        "checkpoint_2::test_checkpoint_2_regression[12_cli_timezone]",
+        "checkpoint_3::test_checkpoint_3_core[01_multi_input_union]",
+        "checkpoint_3::test_checkpoint_3_core[02_tsv_and_format_flag]",
+        "checkpoint_3::test_checkpoint_3_core[04_null_markers_and_filter]",
+        "checkpoint_3::test_checkpoint_3_core_extended[03_recursive_directory]",
+        "checkpoint_3::test_checkpoint_3_core_extended[05_order_independence_window]",
+        "checkpoint_3::test_checkpoint_3_core_extended[09_mixed_formats]",
+        "checkpoint_3::test_checkpoint_3_core_extended[10_glob_pattern]",
+        "checkpoint_3::test_checkpoint_3_core_extended[13_custom_null_markers]",
+        "checkpoint_3::test_checkpoint_3_core_extended[14_regression_multi_file_with_calcs]",
+        "checkpoint_3::test_checkpoint_3_core_extended[15_regression_multi_file_lag_lead]",
+        "checkpoint_3::test_checkpoint_3_core_extended[16_regression_multi_file_params]",
+        "checkpoint_3::test_checkpoint_3_edge_bad_records_out_not_created",
+        "checkpoint_3::test_checkpoint_3_edge_format_auto_ambiguous",
+        "checkpoint_3::test_checkpoint_3_edge_input_union_dedup",
+        "checkpoint_3::test_checkpoint_3_error[01_missing_input_file]",
+        "checkpoint_3::test_checkpoint_3_error[02_absent_physical_field_strict]",
+        "checkpoint_3::test_checkpoint_3_error[03_dsl_syntax_error_calc_stage]",
+        "checkpoint_3::test_checkpoint_3_error[04_type_mismatch_in_calc]",
+        "checkpoint_3::test_checkpoint_3_error[05_timestamp_parse_strict]",
+        "checkpoint_3::test_checkpoint_3_error[06_parse_type_mismatch_strict]",
+        "checkpoint_3::test_checkpoint_3_error[07_runtime_error_strict]",
+        "checkpoint_3::test_checkpoint_3_error[08_type_error_calc_strict]",
+        "checkpoint_3::test_checkpoint_3_error[09_missing_required_field_strict]",
+        "checkpoint_3::test_checkpoint_3_error[10_invalid_glob]",
+        "checkpoint_3::test_checkpoint_3_file_output[01_multi_input_file_out]",
+        "checkpoint_3::test_checkpoint_3_hidden[02_no_data_rows]",
+        "checkpoint_3::test_checkpoint_3_hidden[03_lexicographic_ordering]",
+        "checkpoint_3::test_checkpoint_3_hidden[04_many_files]",
+        "checkpoint_3::test_checkpoint_3_hidden[05_mixed_null_markers_multi_file]",
+        "checkpoint_3::test_checkpoint_3_hidden[06_count_col_with_nulls]",
+        "checkpoint_3::test_checkpoint_3_hidden[06_extreme_out_of_order]",
+        "checkpoint_3::test_checkpoint_3_hidden[07_three_valued_logic_filter]",
+        "checkpoint_3::test_checkpoint_3_hidden[08_null_aware_aggregations]",
+        "checkpoint_3::test_checkpoint_3_hidden[12_non_strict_without_bad_out]",
+        "checkpoint_3::test_checkpoint_3_regression[01_group_by_single]",
+        "checkpoint_3::test_checkpoint_3_regression[02_group_by_multi]",
+        "checkpoint_3::test_checkpoint_3_regression[03_window_various]",
+        "checkpoint_3::test_checkpoint_3_regression[04_comparison_ops]",
+        "checkpoint_3::test_checkpoint_3_regression[05_logical_ops]",
+        "checkpoint_3::test_checkpoint_3_regression[06_in_operator]",
+        "checkpoint_3::test_checkpoint_3_regression[07_column_compare]",
+        "checkpoint_3::test_checkpoint_3_regression[08_timestamp_transforms]",
+        "checkpoint_3::test_checkpoint_3_regression[09_round_function]",
+        "checkpoint_3::test_checkpoint_3_regression[10_apply_order]",
+        "checkpoint_3::test_checkpoint_3_regression[11_null_aggregates]",
+        "checkpoint_3::test_checkpoint_3_regression[12_cli_timezone]",
+        "checkpoint_3::test_checkpoint_3_regression[13_schema_inheritance_pre_calc]",
+        "checkpoint_3::test_checkpoint_3_regression[14_params_and_filter]",
+        "checkpoint_3::test_checkpoint_3_regression[15_post_agg_lag]",
+        "checkpoint_3::test_checkpoint_3_regression[16_group_by_pre_calc_key]",
+        "checkpoint_3::test_checkpoint_3_regression[17_post_agg_lead_param_coalesce]",
+        "checkpoint_3::test_checkpoint_3_regression[18_string_ops_basic]",
+        "checkpoint_3::test_checkpoint_3_regression[19_string_ops_with_params]",
+        "checkpoint_3::test_checkpoint_3_regression[20_multiple_params_various_types]",
+        "checkpoint_3::test_checkpoint_3_regression[21_type_widening_override]",
+        "checkpoint_3::test_checkpoint_3_regression[22_multiple_pre_calcs]",
+        "checkpoint_3::test_checkpoint_3_regression[23_multiple_post_agg_calcs]",
+        "checkpoint_3::test_checkpoint_3_regression[24_post_agg_calc_simple]",
+        "checkpoint_3::test_checkpoint_3_regression[25_lag_with_group_by_only]",
+        "checkpoint_3::test_checkpoint_3_regression[26_window_group_lag_combined]",
+        "checkpoint_3::test_checkpoint_3_regression[27_cast_basic]",
+        "checkpoint_3::test_checkpoint_3_regression[28_regression_filter_apply]",
+        "checkpoint_3::test_checkpoint_3_regression[29_regression_window_group]",
+        "checkpoint_3::test_checkpoint_3_regression[30_regression_all_aggregates]",
+        "checkpoint_3::test_checkpoint_3_regression[31_group_by_timestamp]",
+        "checkpoint_4::test_checkpoint_4_file_output[01_join_file_out]",
+        "checkpoint_4::test_checkpoint_4_hidden[03_join_left_outer]",
+        "checkpoint_4::test_checkpoint_4_hidden[04_join_right_outer]",
+        "checkpoint_4::test_checkpoint_4_hidden[05_join_full_outer]",
+        "checkpoint_4::test_checkpoint_4_hidden[06_with_calcs_filters]",
+        "checkpoint_4::test_checkpoint_4_hidden[07_mapping_comprehensive]",
+        "checkpoint_4::test_checkpoint_4_hidden[08_chained_joins]",
+        "checkpoint_4::test_checkpoint_4_hidden[09_glob_formats]",
+        "checkpoint_4::test_checkpoint_4_hidden[10_precedence_overrides]",
+        "checkpoint_4::test_checkpoint_4_hidden[11_complex_expressions]",
+        "checkpoint_4::test_checkpoint_4_regression[01_group_by_single]",
+        "checkpoint_4::test_checkpoint_4_regression[02_group_by_multi]",
+        "checkpoint_4::test_checkpoint_4_regression[03_window_various]",
+        "checkpoint_4::test_checkpoint_4_regression[04_comparison_ops]",
+        "checkpoint_4::test_checkpoint_4_regression[05_logical_ops]",
+        "checkpoint_4::test_checkpoint_4_regression[06_in_operator]",
+        "checkpoint_4::test_checkpoint_4_regression[07_column_compare]",
+        "checkpoint_4::test_checkpoint_4_regression[08_timestamp_transforms]",
+        "checkpoint_4::test_checkpoint_4_regression[09_round_function]",
+        "checkpoint_4::test_checkpoint_4_regression[10_apply_order]",
+        "checkpoint_4::test_checkpoint_4_regression[11_null_aggregates]",
+        "checkpoint_4::test_checkpoint_4_regression[12_cli_timezone]",
+        "checkpoint_4::test_checkpoint_4_regression[13_schema_inheritance_pre_calc]",
+        "checkpoint_4::test_checkpoint_4_regression[14_params_and_filter]",
+        "checkpoint_4::test_checkpoint_4_regression[15_post_agg_lag]",
+        "checkpoint_4::test_checkpoint_4_regression[16_group_by_pre_calc_key]",
+        "checkpoint_4::test_checkpoint_4_regression[17_post_agg_lead_param_coalesce]",
+        "checkpoint_4::test_checkpoint_4_regression[18_string_ops_basic]",
+        "checkpoint_4::test_checkpoint_4_regression[19_string_ops_with_params]",
+        "checkpoint_4::test_checkpoint_4_regression[20_multiple_params_various_types]",
+        "checkpoint_4::test_checkpoint_4_regression[21_type_widening_override]",
+        "checkpoint_4::test_checkpoint_4_regression[22_multiple_pre_calcs]",
+        "checkpoint_4::test_checkpoint_4_regression[23_multiple_post_agg_calcs]",
+        "checkpoint_4::test_checkpoint_4_regression[24_post_agg_calc_simple]",
+        "checkpoint_4::test_checkpoint_4_regression[25_lag_with_group_by_only]",
+        "checkpoint_4::test_checkpoint_4_regression[26_window_group_lag_combined]",
+        "checkpoint_4::test_checkpoint_4_regression[27_cast_basic]",
+        "checkpoint_4::test_checkpoint_4_regression[28_regression_filter_apply]",
+        "checkpoint_4::test_checkpoint_4_regression[29_regression_window_group]",
+        "checkpoint_4::test_checkpoint_4_regression[30_regression_all_aggregates]",
+        "checkpoint_4::test_checkpoint_4_regression[31_multi_input_union]",
+        "checkpoint_4::test_checkpoint_4_regression[32_tsv_and_format_flag]",
+        "checkpoint_4::test_checkpoint_4_regression[33_recursive_directory]",
+        "checkpoint_4::test_checkpoint_4_regression[34_null_markers_and_filter]",
+        "checkpoint_4::test_checkpoint_4_regression[35_order_independence_window]",
+        "checkpoint_4::test_checkpoint_4_regression[36_count_col_with_nulls]",
+        "checkpoint_4::test_checkpoint_4_regression[37_three_valued_logic_filter]",
+        "checkpoint_4::test_checkpoint_4_regression[38_null_aware_aggregations]",
+        "checkpoint_4::test_checkpoint_4_regression[39_mixed_formats]",
+        "checkpoint_4::test_checkpoint_4_regression[40_glob_pattern]",
+        "checkpoint_4::test_checkpoint_4_regression[42_non_strict_without_bad_out]",
+        "checkpoint_4::test_checkpoint_4_regression[43_custom_null_markers]",
+        "checkpoint_4::test_checkpoint_4_regression[44_regression_multi_file_with_calcs]",
+        "checkpoint_4::test_checkpoint_4_regression[45_regression_multi_file_lag_lead]",
+        "checkpoint_4::test_checkpoint_4_regression[46_regression_multi_file_params]",
+        "checkpoint_4::test_checkpoint_4_spec_correct[01_join_inner_simple]",
+        "checkpoint_4::test_checkpoint_4_spec_correct_extended[02_temporal_within_join]",
+        "checkpoint_4::test_checkpoint_4_spec_error[01_unreadable_ingest_config]",
+        "checkpoint_4::test_checkpoint_4_spec_error[02_overlap_equal_precedence]",
+        "checkpoint_4::test_checkpoint_4_spec_error[03_type_mismatch_in_join]",
+        "checkpoint_4::test_checkpoint_4_spec_error[04_join_without_project]"
+      ],
+      "verdict": "validated"
+    },
+    "checkpoint_5": {
+      "digest": "5bf21960f0ab9c15154ab41dedf6c1c2845d6c517168aed9afdb957fe9d3ecf0",
+      "nondeterministic": [],
+      "nondeterministic_count": 0,
+      "size": 73,
+      "solvable": [
+        "checkpoint_5::test_checkpoint_5_edge_meta_out_omitted",
+        "checkpoint_5::test_checkpoint_5_edge_resume_output_stable",
+        "checkpoint_5::test_checkpoint_5_file_output[01_outputs_and_state]",
+        "checkpoint_5::test_checkpoint_5_hidden[01_join_left_outer]",
+        "checkpoint_5::test_checkpoint_5_hidden[02_join_right_outer]",
+        "checkpoint_5::test_checkpoint_5_hidden[03_join_full_outer]",
+        "checkpoint_5::test_checkpoint_5_hidden[04_with_calcs_filters]",
+        "checkpoint_5::test_checkpoint_5_hidden[05_mapping_comprehensive]",
+        "checkpoint_5::test_checkpoint_5_hidden[06_chained_joins]",
+        "checkpoint_5::test_checkpoint_5_hidden[07_glob_formats]",
+        "checkpoint_5::test_checkpoint_5_hidden[08_temporal_within_delta]",
+        "checkpoint_5::test_checkpoint_5_hidden[09_alias_calc_filter]",
+        "checkpoint_5::test_checkpoint_5_hidden[10_param_threshold]",
+        "checkpoint_5::test_checkpoint_5_hidden[11_mapping_defaults]",
+        "checkpoint_5::test_checkpoint_5_hidden[12_single_source_window_params]",
+        "checkpoint_5::test_checkpoint_5_hidden[13_result_alias_chain]",
+        "checkpoint_5::test_checkpoint_5_hidden[14_multi_file_glob]",
+        "checkpoint_5::test_checkpoint_5_hidden[15_single_source_aggregates]",
+        "checkpoint_5::test_checkpoint_5_hidden[16_multisource_group_only]",
+        "checkpoint_5::test_checkpoint_5_hidden[17_post_agg_lag]",
+        "checkpoint_5::test_checkpoint_5_regression[01_group_by_single]",
+        "checkpoint_5::test_checkpoint_5_regression[02_group_by_multi]",
+        "checkpoint_5::test_checkpoint_5_regression[03_window_various]",
+        "checkpoint_5::test_checkpoint_5_regression[04_comparison_ops]",
+        "checkpoint_5::test_checkpoint_5_regression[05_logical_ops]",
+        "checkpoint_5::test_checkpoint_5_regression[06_in_operator]",
+        "checkpoint_5::test_checkpoint_5_regression[07_column_compare]",
+        "checkpoint_5::test_checkpoint_5_regression[08_timestamp_transforms]",
+        "checkpoint_5::test_checkpoint_5_regression[09_round_function]",
+        "checkpoint_5::test_checkpoint_5_regression[10_apply_order]",
+        "checkpoint_5::test_checkpoint_5_regression[11_null_aggregates]",
+        "checkpoint_5::test_checkpoint_5_regression[12_cli_timezone]",
+        "checkpoint_5::test_checkpoint_5_regression[13_schema_inheritance_pre_calc]",
+        "checkpoint_5::test_checkpoint_5_regression[14_params_and_filter]",
+        "checkpoint_5::test_checkpoint_5_regression[15_post_agg_lag]",
+        "checkpoint_5::test_checkpoint_5_regression[16_group_by_pre_calc_key]",
+        "checkpoint_5::test_checkpoint_5_regression[17_post_agg_lead_param_coalesce]",
+        "checkpoint_5::test_checkpoint_5_regression[18_string_ops_basic]",
+        "checkpoint_5::test_checkpoint_5_regression[19_string_ops_with_params]",
+        "checkpoint_5::test_checkpoint_5_regression[20_multiple_params_various_types]",
+        "checkpoint_5::test_checkpoint_5_regression[21_type_widening_override]",
+        "checkpoint_5::test_checkpoint_5_regression[22_multiple_pre_calcs]",
+        "checkpoint_5::test_checkpoint_5_regression[23_multiple_post_agg_calcs]",
+        "checkpoint_5::test_checkpoint_5_regression[24_post_agg_calc_simple]",
+        "checkpoint_5::test_checkpoint_5_regression[25_lag_with_group_by_only]",
+        "checkpoint_5::test_checkpoint_5_regression[26_window_group_lag_combined]",
+        "checkpoint_5::test_checkpoint_5_regression[27_cast_basic]",
+        "checkpoint_5::test_checkpoint_5_regression[28_regression_filter_apply]",
+        "checkpoint_5::test_checkpoint_5_regression[29_regression_window_group]",
+        "checkpoint_5::test_checkpoint_5_regression[30_regression_all_aggregates]",
+        "checkpoint_5::test_checkpoint_5_regression[31_multi_input_union]",
+        "checkpoint_5::test_checkpoint_5_regression[32_tsv_and_format_flag]",
+        "checkpoint_5::test_checkpoint_5_regression[33_recursive_directory]",
+        "checkpoint_5::test_checkpoint_5_regression[34_null_markers_and_filter]",
+        "checkpoint_5::test_checkpoint_5_regression[35_order_independence_window]",
+        "checkpoint_5::test_checkpoint_5_regression[36_count_col_with_nulls]",
+        "checkpoint_5::test_checkpoint_5_regression[37_three_valued_logic_filter]",
+        "checkpoint_5::test_checkpoint_5_regression[38_null_aware_aggregations]",
+        "checkpoint_5::test_checkpoint_5_regression[39_mixed_formats]",
+        "checkpoint_5::test_checkpoint_5_regression[40_glob_pattern]",
+        "checkpoint_5::test_checkpoint_5_regression[42_non_strict_without_bad_out]",
+        "checkpoint_5::test_checkpoint_5_regression[43_custom_null_markers]",
+        "checkpoint_5::test_checkpoint_5_regression[44_regression_multi_file_with_calcs]",
+        "checkpoint_5::test_checkpoint_5_regression[45_regression_multi_file_lag_lead]",
+        "checkpoint_5::test_checkpoint_5_regression[46_regression_multi_file_params]",
+        "checkpoint_5::test_checkpoint_5_regression[47_join_inner_simple]",
+        "checkpoint_5::test_checkpoint_5_regression[48_temporal_within_join]",
+        "checkpoint_5::test_checkpoint_5_resume_error[01_resume_requires_state_dir]",
+        "checkpoint_5::test_checkpoint_5_resume_error[02_resume_missing_state_file]",
+        "checkpoint_5::test_checkpoint_5_spec_correct[01_fresh_run_basic]",
+        "checkpoint_5::test_checkpoint_5_spec_error[01_missing_version_header]",
+        "checkpoint_5::test_checkpoint_5_spec_error[02_unsupported_major]",
+        "checkpoint_5::test_checkpoint_5_spec_error[03_minor_gating_join_requires_14]"
+      ],
+      "verdict": "validated"
+    }
+  },
+  "spec_determinacy": {
+    "assertions": {
+      "audited": 0,
+      "by_rule": {}
+    },
+    "audit_version": 1,
+    "dynamic": {
+      "environment": {},
+      "reason": null,
+      "status": "ran"
+    },
+    "flagged": [],
+    "method": "Static: each audited assertion of a test (error-detail/message equality, containment or pattern; byte-level stdout comparison) is classified against the text of its origin checkpoint's specification and every earlier one (rules below). Dynamic: reference k and spec-conformant variants of it (variants below) are graded at step k; a case is sensitive to a variant when it passes on the reference and not on the variant. A case is flagged when its test has an undetermined assertion of the kind a variant it is sensitive to rewrites.",
+    "rules": {
+      "content-stated": "determined: a paragraph states what the category's detail contains",
+      "content-unstated": "undetermined: error text must contain an input value or match a pattern; no paragraph states what the category's detail contains",
+      "exact-stated": "determined: a paragraph states the exact content of the category's detail",
+      "exact-unstated": "undetermined: error text must equal an input value; no paragraph states exact content",
+      "format-stated": "determined: the specification names an output byte format",
+      "format-unstated": "undetermined: stdout compared byte for byte; no byte format stated",
+      "literal-in-spec": "determined: the asserted literal occurs in the specification text",
+      "wording-unstated": "undetermined: an error-text literal in neither the specification nor the test's inputs"
+    },
+    "sensitive_determined": [],
+    "sensitive_unexplained": [],
+    "static_undetermined": [],
+    "steps": {
+      "checkpoint_1": {
+        "reference": {
+          "infra_failure": null,
+          "passed": 46,
+          "total": 46
+        },
+        "variants": {
+          "neutral_error_text": {
+            "infra_failure": null,
+            "passed": 46,
+            "sensitive": [],
+            "total": 46
+          },
+          "reformatted_json": {
+            "infra_failure": null,
+            "passed": 46,
+            "sensitive": [],
+            "total": 46
+          }
+        }
+      },
+      "checkpoint_2": {
+        "reference": {
+          "infra_failure": null,
+          "passed": 98,
+          "total": 98
+        },
+        "variants": {
+          "neutral_error_text": {
+            "infra_failure": null,
+            "passed": 98,
+            "sensitive": [],
+            "total": 98
+          },
+          "reformatted_json": {
+            "infra_failure": null,
+            "passed": 98,
+            "sensitive": [],
+            "total": 98
+          }
+        }
+      },
+      "checkpoint_3": {
+        "reference": {
+          "infra_failure": null,
+          "passed": 163,
+          "total": 164
+        },
+        "variants": {
+          "neutral_error_text": {
+            "infra_failure": null,
+            "passed": 163,
+            "sensitive": [],
+            "total": 164
+          },
+          "reformatted_json": {
+            "infra_failure": null,
+            "passed": 163,
+            "sensitive": [],
+            "total": 164
+          }
+        }
+      },
+      "checkpoint_4": {
+        "reference": {
+          "infra_failure": null,
+          "passed": 178,
+          "total": 180
+        },
+        "variants": {
+          "neutral_error_text": {
+            "infra_failure": null,
+            "passed": 178,
+            "sensitive": [],
+            "total": 180
+          },
+          "reformatted_json": {
+            "infra_failure": null,
+            "passed": 178,
+            "sensitive": [],
+            "total": 180
+          }
+        }
+      },
+      "checkpoint_5": {
+        "reference": {
+          "infra_failure": null,
+          "passed": 73,
+          "total": 74
+        },
+        "variants": {
+          "neutral_error_text": {
+            "infra_failure": null,
+            "passed": 73,
+            "sensitive": [],
+            "total": 74
+          },
+          "reformatted_json": {
+            "infra_failure": null,
+            "passed": 73,
+            "sensitive": [],
+            "total": 74
+          }
+        }
+      }
+    },
+    "summary": {
+      "flagged": 0,
+      "flagged_by_checkpoint": {},
+      "flagged_by_rule": {},
+      "sensitive_determined": 0,
+      "sensitive_unexplained": 0,
+      "unconfirmed": 0
+    },
+    "unconfirmed": [],
+    "variants": {
+      "neutral_error_text": "every error's human-readable text (an error object's detail or message) replaced by 'request rejected'; category, exit code and format kept",
+      "reformatted_json": "JSON stdout re-serialised with two-space indentation and a trailing newline; value and key order kept"
+    }
+  },
+  "steps": [
+    "checkpoint_1",
+    "checkpoint_2",
+    "checkpoint_3",
+    "checkpoint_4",
+    "checkpoint_5"
+  ],
+  "verdict": "validated_partial"
+}

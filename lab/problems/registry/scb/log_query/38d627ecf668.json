@@ -73,8 +73,54 @@
     "image": "raidar/pack-python:2b91a52663e099f2"
   },
   "task_sha256": "87bf08fbb0332d2ab4378772a81af8ad771c8d8391641a7592772a6d84979cdc",
-  "bundle_sha256": "1f75ee5afc2d5e0178b6cb47952d668f55748c143ba8bdc53eb6d1df39f7239a",
+  "bundle_sha256": "b6870d3216884482088753b4371aae54510c6fcc308092e60decd999479f9464",
   "references_sha256": "3ebc5353d3e331c3d0721094799b4ed2a491746ae07f6600c86b1cb330004cf8",
   "entry_file": "logql.py",
-  "entry_command": "uv run --project /app logql.py"
+  "entry_command": "uv run --project /app logql.py",
+  "dependencies": {
+    "policy": "declared-wheels/1",
+    "resolver": "uv@0.10.0",
+    "index": "https://pypi.org/simple",
+    "python": "3.12",
+    "platforms": [
+      "x86_64-manylinux_2_28",
+      "aarch64-manylinux_2_28"
+    ],
+    "exclude_newer": "2026-10-27T21:20:03Z",
+    "sets": {
+      "21a0dc50e266e366e6f8286867d43db0ade4265f9ced0bcdaac920073344b8b0": {
+        "requirements": [
+          "coverage==7.13.4",
+          "pytest-timeout==2.4.0",
+          "pytest==9.0.3",
+          "pyyaml"
+        ],
+        "amd64": "a77dfbf1191afcf1dfbfcb3a80747c3c677192363225f8f03848589e649311f9",
+        "arm64": "53dd33f0cbe0c1afaa43c2f4d66f5d8d84e010cff6b6e2204d4ae1fc1ff837d6"
+      },
+      "2b01214d32c382dbc73bf6b493bedb7926324af27bad3ee888f66774b9b114c8": {
+        "requirements": [
+          "pytest"
+        ],
+        "amd64": "6a13eeb880a366d0eed7608872604ee3a96579f38243ca5737306e19e8e1a94d",
+        "arm64": "6a13eeb880a366d0eed7608872604ee3a96579f38243ca5737306e19e8e1a94d"
+      },
+      "ebb0e16545c911bd31ec33ace57dedf84c04e673d2dc28c0290868e4adf4db77": {
+        "requirements": [
+          "pyyaml"
+        ],
+        "amd64": "ed3d8a573431b4bb098772f5160a62fa9b193ae63e3776c1fc0b91cb183b7f2b",
+        "arm64": "46c4ebdbacb253ad341e78f7b689b2c3b13184f12621f8092e18d8e71a5177ec"
+      }
+    },
+    "steps": {
+      "checkpoint_1": "2b01214d32c382dbc73bf6b493bedb7926324af27bad3ee888f66774b9b114c8",
+      "checkpoint_2": "2b01214d32c382dbc73bf6b493bedb7926324af27bad3ee888f66774b9b114c8",
+      "checkpoint_3": "2b01214d32c382dbc73bf6b493bedb7926324af27bad3ee888f66774b9b114c8",
+      "checkpoint_4": "2b01214d32c382dbc73bf6b493bedb7926324af27bad3ee888f66774b9b114c8",
+      "checkpoint_5": "2b01214d32c382dbc73bf6b493bedb7926324af27bad3ee888f66774b9b114c8"
+    },
+    "seed": "ebb0e16545c911bd31ec33ace57dedf84c04e673d2dc28c0290868e4adf4db77",
+    "grader": "21a0dc50e266e366e6f8286867d43db0ade4265f9ced0bcdaac920073344b8b0"
+  }
 }

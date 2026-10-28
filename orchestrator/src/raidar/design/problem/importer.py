@@ -14,9 +14,12 @@ import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 
-import yaml
-
 from raidar.design.problem.content import content_digest, hidden_content_in_task
+from raidar.design.problem.dependencies import (
+    ProblemDependencies,
+    resolve_dependencies,
+    write_locks,
+)
 from raidar.design.problem.models import (
     PackBinding,
     ProblemId,
@@ -30,6 +33,7 @@ from raidar.design.problem.rewrite import (
     converted_steps,
     copy_references,
     grader_entry_command,
+    problem_entry_file,
     render_task,
     select_steps,
 )
@@ -40,9 +44,9 @@ from raidar.design.problem.source import (
     open_checkout,
 )
 from raidar.design.problem.store import ProblemStore, ProblemStoreError
-from raidar.grading.bundle import VerifierBundle
+from raidar.grading.bundle import VerifierBundle, write_bundle_dependencies
+from raidar.grading.resolver import Resolver
 from raidar.subject.environment import UnknownPackError, load_runtime_pack
-from raidar.subject.environment.python.image import image_tag
 from raidar.subject.environment.python.pack_definition import PackSpec
 
 # The converter's README embeds the conversion date; it is not task content.
@@ -111,27 +115,17 @@ def _manifest(
             conversion_overrides=checkout.optional_tree_id(_CONVERSION_OVERRIDES),
             converted_task_sha256=materialised.converted_sha256,
         ),
-        pack=PackBinding(id=pack.id, version=pack.version, image=image_tag(pack)),
+        pack=PackBinding(
+            id=pack.id, version=pack.version, image=materialised.bundle.manifest.grader.base_image
+        ),
         task_sha256=content_digest(content / "task"),
         bundle_sha256=content_digest(content / "oracle"),
         references_sha256=content_digest(content / "references"),
         entry_file=materialised.bundle.manifest.entry_file,
         entry_command=grader_entry_command(materialised.bundle),
+        dependencies=materialised.dependencies.pins,
+        dependency_refusal=materialised.dependencies.refusal,
     )
-
-
-def problem_entry_file(checkout: PinnedCheckout, problem: ProblemId, pack: PackSpec) -> str | None:
-    """The problem's ``config.yaml`` ``entry_file`` in the pack's snapshot-file format."""
-    config = yaml.safe_load((checkout.root / problem.problem / _PROBLEM_CONFIG).read_text())
-    raw = config.get("entry_file") if isinstance(config, dict) else None
-    if raw is None:
-        return None
-    if not isinstance(raw, str):
-        raise ProblemStoreError(f"{problem.problem}/{_PROBLEM_CONFIG}: entry_file must be a string")
-    try:
-        return pack.entry_file(raw)
-    except ValueError as exc:
-        raise ProblemStoreError(f"{problem.problem}/{_PROBLEM_CONFIG}: {exc}") from exc
 
 
 @dataclass(frozen=True)
@@ -139,23 +133,31 @@ class _Materialised:
     content: Path
     bundle: VerifierBundle
     converted_sha256: str
+    dependencies: ProblemDependencies
 
 
 def _materialise(
-    checkout: PinnedCheckout, problem: ProblemId, staging: Path, pack: PackSpec
+    store: ProblemStore,
+    checkout: PinnedCheckout,
+    problem: ProblemId,
+    staging: Path,
+    pack: PackSpec,
+    *,
+    recorded: ProblemManifest | None,
+    resolver: Resolver | None,
 ) -> _Materialised:
     converted = convert_problem(checkout, problem.problem, staging / "converted")
     (converted / _CONVERTER_README).unlink(missing_ok=True)
     converted_sha256 = content_digest(converted)
     steps = select_steps(converted_steps(converted), problem.checkpoint)
     content = staging / "content"
-    entry_file = problem_entry_file(checkout, problem, pack)
+    entry_file = problem_entry_file(checkout.root / problem.problem, pack)
     bundle = build_bundle(
         converted,
         content / "oracle",
         problem=problem,
         steps=steps,
-        pack_image=image_tag(pack),
+        pack=pack,
         source={
             "dataset": problem.dataset,
             "commit": checkout.pin.commit,
@@ -172,7 +174,25 @@ def _materialise(
     leaked = hidden_content_in_task(content / "task", bundle)
     if leaked:
         raise ProblemStoreError(f"hidden verifier content in the agent task: {leaked}")
-    return _Materialised(content=content, bundle=bundle, converted_sha256=converted_sha256)
+    dependencies = resolve_dependencies(
+        store,
+        problem,
+        recorded,
+        content / "references",
+        list(steps),
+        bundle.manifest.grader.test_dependencies,
+        resolver,
+    )
+    if dependencies.pins is not None and dependencies.locks is not None:
+        bundle = write_bundle_dependencies(
+            content / "oracle", dependencies.pins, dependencies.locks
+        )
+    return _Materialised(
+        content=content,
+        bundle=bundle,
+        converted_sha256=converted_sha256,
+        dependencies=dependencies,
+    )
 
 
 def _drift(recorded: ProblemManifest, produced: ProblemManifest) -> list[str]:
@@ -220,6 +240,7 @@ def import_problem(
     source_checkout: Path | None = None,
     update: bool = False,
     pack: PackSpec | None = None,
+    resolver: Resolver | None = None,
 ) -> ImportResult:
     """Import (or re-materialise) one problem into the store."""
     checkout = resolve_checkout(store, problem, source_checkout)
@@ -230,7 +251,9 @@ def import_problem(
     recorded = _recorded(store, problem)
     with tempfile.TemporaryDirectory(prefix="raidar-problem-import-") as tmp:
         staging = Path(tmp)
-        materialised = _materialise(checkout, problem, staging, pack)
+        materialised = _materialise(
+            store, checkout, problem, staging, pack, recorded=recorded, resolver=resolver
+        )
         manifest = _manifest(problem, checkout, materialised, pack)
         drift = _drift(recorded, manifest) if recorded is not None else []
         if drift and not update:
@@ -238,9 +261,10 @@ def import_problem(
                 f"re-import of {problem} differs from its committed manifest in {drift}; "
                 "pass --update to accept the new content"
             )
-        target = store.content_dir(problem)
+        target = store.content_dir(problem, manifest.content_key())
         if recorded is None or drift or not _content_matches(store, problem):
             _replace(target, staging / "content")
+    write_locks(store, problem, materialised.dependencies)
     path = store.write_manifest(manifest)
     return ImportResult(
         manifest=manifest,

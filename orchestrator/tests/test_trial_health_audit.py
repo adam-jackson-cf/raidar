@@ -48,9 +48,11 @@ def test_a_healthy_sealed_trial_passes_every_check(tmp_path: Path) -> None:
     t = healthy_trial(tmp_path)
     t.seal()
     checks = audit(t)
-    assert {c.status for c in checks.values()} == {"pass"}, {
+    # D1/D2 are readings: a ledger without dependency evidence leaves them unmeasured.
+    assert {c.status for k, c in checks.items() if k not in ("D1", "D2")} == {"pass"}, {
         k: (c.status, c.detail) for k, c in checks.items() if c.status != "pass"
     }
+    assert {checks["D1"].status, checks["D2"].status} == {"unmeasured"}
 
 
 def test_v1_a_timed_out_evaluator_is_never_a_pass(tmp_path: Path) -> None:

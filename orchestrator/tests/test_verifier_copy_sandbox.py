@@ -11,6 +11,7 @@ import pytest
 from raidar.design.problem import direct
 from raidar.design.problem.models import ProblemId
 from raidar.grading.grader_image import ensure_grader_image
+from raidar.grading.resolver import UvResolver
 from raidar.grading.sandbox import (
     CONTAINER_LAYOUT,
     GRADER_ROLE_LABEL,
@@ -143,10 +144,10 @@ def test_extract_out_tar_refuses_a_link_that_leaves_the_directory(tmp_path: Path
     reason="builds the grader image: needs a reachable Docker target (make target-status)",
 )
 async def test_copy_sandbox_grades_the_fixture_like_the_local_grader(tmp_path: Path) -> None:
-    problem = build_fixture_store(tmp_path / "problems").load(ProblemId.parse(POSITIVE_REF))
-    image = await ensure_grader_image(
-        problem.bundle.manifest.grader, docker_context=docker_context()
+    problem = build_fixture_store(tmp_path / "problems", resolver=UvResolver()).load(
+        ProblemId.parse(POSITIVE_REF)
     )
+    image = await ensure_grader_image(problem.bundle, docker_context=docker_context())
     local = await direct.grade_references(
         problem, LocalProcessSandbox(tmp_path / "local"), repeats=1, concurrency=1
     )

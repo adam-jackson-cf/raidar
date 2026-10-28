@@ -1,0 +1,13 @@
+lock-version = "1.0"
+created-by = "uv"
+requires-python = ">=3.12"
+
+[[packages]]
+name = "tree-sitter"
+version = "0.21.3"
+wheels = [{ url = "https://files.pythonhosted.org/packages/c2/df/76dbf830126e566c48db0d1bf2bef3f9d8cac938302a9b0f762ded8206c2/tree_sitter-0.21.3-cp312-cp312-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", upload-time = 2024-03-26T10:53:03Z, size = 490092, hashes = { sha256 = "6a3e06ae2a517cf6f1abb682974f76fa760298e6d5a3ecf2cf140c70f898adf0" } }]
+
+[[packages]]
+name = "tree-sitter-languages"
+version = "1.10.2"
+wheels = [{ url = "https://files.pythonhosted.org/packages/20/6c/1855a65c9d6b50600f7a68e0182153db7cb12ff81fdebd93e87851dfdd8f/tree_sitter_languages-1.10.2-cp312-cp312-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", upload-time = 2024-02-04T10:28:44Z, size = 8678682, hashes = { sha256 = "15db3c8510bc39a80147ee7421bf4782c15c09581c1dc2237ea89cefbd95b846" } }]
