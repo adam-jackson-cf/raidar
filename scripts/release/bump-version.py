@@ -120,7 +120,9 @@ def get_commits_since_last_bump() -> list[str]:
         check=True,
     )
 
-    commits = [record.strip() for record in result.stdout.split("\x1e") if record.strip()]
+    commits = [
+        record.strip() for record in result.stdout.split("\x1e") if record.strip()
+    ]
     filtered: list[str] = []
     for commit in commits:
         subject = commit.splitlines()[0]
@@ -182,8 +184,14 @@ def render_pyproject_update(new_version: str) -> str:
         f'version = "{new_version}"', project_block, count=1
     )
     if replacements != 1:
-        raise ValueError(f"Could not replace exactly one [project].version in {PYPROJECT_PATH}")
-    return content[: project_match.start("body")] + updated_block + content[project_match.end("body") :]
+        raise ValueError(
+            f"Could not replace exactly one [project].version in {PYPROJECT_PATH}"
+        )
+    return (
+        content[: project_match.start("body")]
+        + updated_block
+        + content[project_match.end("body") :]
+    )
 
 
 def update_pyproject(new_version: str) -> None:
@@ -277,7 +285,9 @@ def update_changelog(entry: str) -> None:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Bump version and update changelog")
-    parser.add_argument("--dry-run", action="store_true", help="Show changes without writing")
+    parser.add_argument(
+        "--dry-run", action="store_true", help="Show changes without writing"
+    )
     args = parser.parse_args()
 
     current_version = get_current_version()
