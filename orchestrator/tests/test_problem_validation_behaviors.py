@@ -51,6 +51,12 @@ from tests.problems_support import (
 )
 from tests.verifier_support import LocalProcessSandbox
 
+GRADER = {
+    "image": "raidar-oracle-grader:fixture",
+    "environment_id": "sha256:" + "f" * 64,
+    "implementation_sha256": "a" * 64,
+}
+
 
 class DownSandbox(LocalProcessSandbox):
     """A grader whose container runtime is unreachable."""
@@ -104,6 +110,11 @@ async def test_reference_trial_validates_with_oracle_grading(
     assert positive["checkpoint_2"].groups["regression"] == (3, 3)
     assert positive["checkpoint_2"].total == 4
     assert not report.runs.oracle[NEGATIVE][0]["checkpoint_1"].all_pass  # empty starter
+    observations = report.to_json()["reference_observations"]
+    assert observations["positive"]["checkpoint_2"]["observation"] == (
+        "no variation observed in 2 runs for this reference and environment"
+    )
+    assert observations["positive"]["checkpoint_2"]["status"] == "measured"
 
 
 async def test_negative_fixture_is_excluded_and_its_report_is_written(
@@ -432,8 +443,14 @@ def test_harbor_engine_variant_adds_solutions_to_a_copy_only(
     assert store.load(ProblemId.parse(POSITIVE_REF)).manifest == problem.manifest
 
     config = harbor_engine.trial_config(
-        task, tmp_path / "trials", "negative-0", problem.bundle.root, docker_context="orbstack"
+        task,
+        tmp_path / "trials",
+        "negative-0",
+        problem.bundle.root,
+        docker_context="orbstack",
+        grader=GRADER,
     )
+    assert config.verifier.kwargs["pinned"] == {"grader": GRADER}
     assert config.agent.name == "oracle"
     assert config.verifier.import_path == VERIFIER_IMPORT_PATH
     assert config.verifier.kwargs["oracle_bundle"] == str(problem.bundle.root)
@@ -458,7 +475,7 @@ def test_validate_command_exit_codes_follow_the_verdict(
     async def local_sandbox(problem: Any, docker_context: str) -> tuple[Any, dict[str, object]]:
         return LocalProcessSandbox(tmp_path / "sandbox"), {"sandbox": "local"}
 
-    monkeypatch.setattr(validator, "_docker_sandbox", local_sandbox)
+    monkeypatch.setattr(validator.direct, "prepare_grader_sandbox", local_sandbox)
     runner = CliRunner()
     base = [
         "problem",
@@ -489,7 +506,7 @@ def test_validate_command_exit_codes_follow_the_verdict(
     async def down(problem: Any, docker_context: str) -> tuple[Any, dict[str, object]]:
         return DownSandbox(tmp_path / "down"), {"sandbox": "down"}
 
-    monkeypatch.setattr(validator, "_docker_sandbox", down)
+    monkeypatch.setattr(validator.direct, "prepare_grader_sandbox", down)
     outage = runner.invoke(main, [*base, NEGATIVE_REF])
     assert outage.exit_code == 2, outage.output
     assert written.read_bytes() == committed
@@ -536,7 +553,21 @@ def test_lock_metadata_ignores_run_specific_report_bytes(tmp_path: Path) -> None
 
     one, two = read_validation_record(first), read_validation_record(second)
 
-    assert one.lock_metadata() == two.lock_metadata() == {"verdict": "validated", "not_run": []}
+    assert one.lock_metadata() == two.lock_metadata()
+    assert one.lock_metadata()["spec_determinacy"]["status"] == "unmeasured"
+
+    second.write_text(
+        json.dumps(
+            {
+                **base,
+                "spec_determinacy": {
+                    "assertions": {"audited": 1, "total": 3},
+                    "flagged": [{"case": "checkpoint_1::wording"}],
+                },
+            }
+        )
+    )
+    assert read_validation_record(second).lock_metadata() != one.lock_metadata()
 
 
 async def test_report_records_solvable_sets_the_lock_pins(
@@ -650,6 +681,7 @@ async def test_harbor_validation_respects_concurrency_across_all_repeats(
         problem,
         ValidateOptions("test-ctx", engine="harbor", repeats=5, concurrency=limit),
         tmp_path / "harbor",
+        GRADER,
     )
     assert peak == limit
     assert len(completed) == len(set(completed)) == 10
