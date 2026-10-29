@@ -156,8 +156,8 @@ async def test_a_trial_without_pre_fix_snapshots_grades_nothing(tmp_path: Path) 
     ("scorers", "replay", "grades"),
     [
         (("gate-effort@15",), False, True),
-        (("gate-effort@15", "correctness@8"), True, False),
-        (("correctness@8", "code-quality@8"), False, False),
+        (("gate-effort@15", "correctness@9"), True, False),
+        (("correctness@9", "code-quality@8"), False, False),
     ],
 )
 def test_rescore_grades_first_only_for_a_scorer_that_reads_the_grades(

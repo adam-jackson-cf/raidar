@@ -142,3 +142,24 @@ def test_a_halt_before_an_excluded_planned_step_leaves_the_usable_steps_scored(
     observed = _observed(trial, config)
     assert observed["solved_checkpoints_solvable", TRAJECTORY_SUBJECT].value == 0
     assert observed["solved_solvable", "checkpoint_2"].status is AssessStatus.NOT_APPLICABLE
+
+
+def test_a_halt_run_that_executed_an_excluded_step_scores_the_steps_after_it(
+    tmp_path: Path,
+) -> None:
+    """The halt gate clears an excluded step, so the run reaches and scores what follows."""
+    trial = _trial(tmp_path, [(F,), (P,), (P,)])
+    config = {
+        "progression": "halt_on_failure",
+        "solvable": _solvable(
+            {
+                "checkpoint_1": [],
+                "checkpoint_2": ["checkpoint_2::case_0"],
+                "checkpoint_3": ["checkpoint_3::case_0"],
+            }
+        ),
+    }
+    observed = _observed(trial, config)
+    assert observed["solved_solvable", "checkpoint_1"].status is AssessStatus.NOT_APPLICABLE
+    assert observed["solved_checkpoints_solvable", TRAJECTORY_SUBJECT].value == 2
+    assert observed["reached_solvable", TRAJECTORY_SUBJECT].value == 2

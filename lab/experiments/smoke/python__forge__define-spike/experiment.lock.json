@@ -57,10 +57,10 @@
       },
       "scorer": {
         "code-quality@8": {
-          "digest": "ed0c8d3533368446f31994ea727a2a2566651fd465ffe1d7c429d71ff62d60b7",
+          "digest": "1bc7ecbf78975833e4dccd5f18332b3fd2d26e353b7f2b8df3fce258cb40ba8b",
           "metadata": {
             "implementation": "raidar.scoring.code_quality:code_quality_scorer",
-            "implementation_digest": "28426136d0d0725726a02292d253c14d08d3b245bb83b14731f3c38215da0d41",
+            "implementation_digest": "fa08c48766aac85a81dca1d88fad2df96e4be1ffd87e207f57d01b65d19d9fdc",
             "manifest": {
               "description": "SCB-fork code-quality and inertia components over the per-step snapshots; a step graded without the in-trial coverage pass reads G's coverage run from the offline run in the Assessment store, and G leaves out at most 3 cases whose outcome differs between the grading and coverage runs instead of reading the step as ineligible.",
               "evidence_required": [
@@ -278,11 +278,11 @@
             }
           }
         },
-        "correctness@8": {
-          "digest": "32b40d67b210fd565a5b874abd487f6a12951b6d60b44db32c537bd4ab0fc8d1",
+        "correctness@9": {
+          "digest": "67977c94f74de9681ed8c814338b6f869a06c390a00ddfefc59d182aa322a33f",
           "metadata": {
             "implementation": "raidar.scoring.correctness:correctness_scorer",
-            "implementation_digest": "954c50f21fb22a4f3fa66cadacded0f79f473693966bb3c1b7b925724a87e10d",
+            "implementation_digest": "a7eef3f4b43dbd863293c6189dd9255cf9f9683bb1f1ed0fe7686746c250abbf",
             "manifest": {
               "description": "Reference-solvable SCB success and raw SCB verdicts per checkpoint and trajectory.",
               "evidence_required": [
@@ -476,16 +476,16 @@
                 "*"
               ],
               "tools": [],
-              "version": "8"
+              "version": "9"
             },
             "tool_lock": {}
           }
         },
         "definition-coverage@5": {
-          "digest": "63b6541c9514ab617d817f272bf0605268ac7c46e4895609f8c74c947a7ab562",
+          "digest": "e43f370b7a24b7382fe5eaaaed654cf2605b325256b26717a52dbd5ce904a7ff",
           "metadata": {
             "implementation": "raidar.scoring.definition_coverage:definition_coverage_scorer",
-            "implementation_digest": "0ad2729f58b3b4ea303adeb3eb3fef4fe65df9c448141d23b563b3b2adea3739",
+            "implementation_digest": "ae7c62d26b93bb786ae860e674983ad0a6dfeee5117bb1cb9535898a27b69ae1",
             "manifest": {
               "description": "FXL process audit stage A as recorded readings: for each required issue unit of a checkpoint's define stage, Jev scores each criterion citing it (its statement, aspects and examples) on three levels (other behaviour, concerns it, states it). Per-unit and per-criterion level probabilities and every raw Jev call are kept in the Assessment's raw payloads; the observations only count and average them. No cut-off is applied: FXL's own review found its audit cut-offs uncalibrated. Not applicable without a define stage.",
               "evidence_required": [
@@ -592,10 +592,10 @@
           }
         },
         "process-compliance@11": {
-          "digest": "f51472957ad295e4435b6802ef7e2b38e86c9f6f366b2c44ba2833955ed70a1a",
+          "digest": "f0774bd996c6dc88ce107f1b0318c579d6b6baeaa8962e2454a117f67da96d7f",
           "metadata": {
             "implementation": "raidar.scoring.process_checks:deterministic_process_compliance_scorer",
-            "implementation_digest": "39ff93cf0239955c8e7e6c0548849a4f3897bf49bf50d4b4866498dc65376ee3",
+            "implementation_digest": "baeef5bb68e00ed296d480221131cb722bba13c8548fd26302157ad91cedf99a",
             "manifest": {
               "description": "Deterministic trace checks of agent process (stall outcomes, a test command counts only when it ran, the step's work session's own test run after its last edit, a compliance rate without the plan check unless the condition asks for a plan); a check the trace cannot decide is undetermined, never judged by a model. Adds whether the work session ran the tests at all, and whether it ran them after its last edit to a non-test file.",
               "evidence_required": [
@@ -796,10 +796,10 @@
           }
         },
         "resource-usage@7": {
-          "digest": "bfb6b5b5256059fabc0659bf45d2499c1f6e00daa4aa28b7302b0386262723f0",
+          "digest": "bf0c54f42adb6286ed7a349789488ec0b9b58ecde39924a02ff983888636cc19",
           "metadata": {
             "implementation": "raidar.scoring.resource_usage:resource_usage_scorer",
-            "implementation_digest": "0d81c79ad4d10814b8e3bf3c64a61a42715dd64475fcd01626e45e727db50bf3",
+            "implementation_digest": "534804528cf28616c118d9dcfdced18c1b38aa08cc3c18c2440700a0beb739d0",
             "manifest": {
               "description": "Tokens, canonical-table agent cost plus host judge spend, turns and agent wall time.",
               "evidence_required": [
@@ -927,10 +927,10 @@
           }
         },
         "test-coverage@5": {
-          "digest": "4474cf25ced42bda31e2d9595726e4a0eb92dc3cbabb45081f17824d99ea9a99",
+          "digest": "a1e2f365733e1a1e64e10a7bc723f46ec5fb23b115596b09bd6611d1ae2c619d",
           "metadata": {
             "implementation": "raidar.scoring.test_coverage:make_test_coverage_scorer",
-            "implementation_digest": "69194a967cc393f791e641bc76607d819a860541a6f893339e14930c7ba0b860",
+            "implementation_digest": "0e75e88c45a39d32b058c7ab571e04643fb6d5613d9dabacb268e3550ac33fb0",
             "manifest": {
               "description": "FXL process audit stage B as recorded readings: for each criterion of a checkpoint's sealed definition, Jev scores each of the builder's final mapped tests (source and one hop of helpers, from the retained test files) on three levels (never runs the situation, runs it but would still pass, would fail if the behaviour were wrong). A test with no real assertion, or marked skipped, is held to level 1 as FXL does. Per-criterion and per-test probabilities and every raw Jev call are kept in the Assessment's raw payloads; the observations only count and average them. No cut-off is applied. Not applicable without a define stage.",
               "evidence_required": [
@@ -1058,7 +1058,7 @@
       "metric": "scb-canonical@2",
       "scorer_config": {},
       "scorers": [
-        "correctness@8",
+        "correctness@9",
         "code-quality@8",
         "resource-usage@7",
         "process-compliance@11",
@@ -1075,7 +1075,7 @@
       "tree-sitter-language-pack": "0.13.0"
     }
   },
-  "document_sha256": "d964d156b9f49767a7936e28c1271aa61a0b8d75ad8878036aeeea637f9803fd",
+  "document_sha256": "dd4dd39f21d51c7170a1d0169eca88fd5257ae54d26e5b7b8a3e868bd375f7e7",
   "execution": {
     "arms": {
       "define": {
@@ -1899,8 +1899,8 @@
   "experiment": {
     "id": "python__forge__define-spike",
     "source": "experiment.yaml",
-    "source_sha256": "c3b4e312573fdb12789219ed34e78e029c3eb90e99bd0e6f00fde6509b3ffe31",
-    "spec_sha256": "2bd64a3815e8cef4ad270d6cb27c2a52ec5cf2e3555d1d2eda63f649451c5f96"
+    "source_sha256": "256117da1b3857cd2a42d0adb03ee5bb3032606db7244f5e397a8ea413df12b5",
+    "spec_sha256": "b9e283d4a287ed484054c50a04db068633671025e67f12d7d98013fb2649b8f9"
   },
   "lock_sha256": "24d1f2326175492b38d0b019ad3282ded6166c5accf3d819a133f22ae9d2fa83",
   "lock_version": 5,
@@ -1910,7 +1910,7 @@
   },
   "sections": {
     "analysis": "f7f0b52ed6909ba0f3864eb9e7f7d513625da8dc445234304b8aa033c4343cb6",
-    "assessment": "f665825aa5e0f33e21bfb1572df19c70aad4243b94e453db642b930d6f82a8f7",
+    "assessment": "5e1576f0ec24723e51378d7939611a762da3a04ea069c5e690624f0160c2120e",
     "execution": "24d1f2326175492b38d0b019ad3282ded6166c5accf3d819a133f22ae9d2fa83",
     "toolchain": "8aead72e2be8c5327134e6a09c1dc8c37b684f67819ccab4b97875b369c8e5ef"
   },
@@ -1949,7 +1949,7 @@
       "metric": "scb-canonical@2",
       "scorer_config": {},
       "scorers": [
-        "correctness@8",
+        "correctness@9",
         "code-quality@8",
         "resource-usage@7",
         "process-compliance@11",

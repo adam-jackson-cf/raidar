@@ -171,7 +171,7 @@ def _plan(tmp_path: Path, fixture: ImportedFixture, **changes: Any) -> Any:
         fixture.ref,
         environment={"compose_init": False},
         assessment={
-            "scorers": ["correctness@8"],
+            "scorers": ["correctness@9"],
             "inventory_policy": {"generated_globs": ["gen/**"]},
         },
         **changes,
@@ -269,7 +269,7 @@ def test_a_run_materialises_each_trial_and_writes_step_results(
     assert config.agent.kwargs["workflow"] == "one-shot@1"
     task = Path(config.task.path or "")
     toml = tomllib.loads((task / "task.toml").read_text())
-    assert [s["min_reward"] for s in toml["steps"]] == [{"solvable_pass_rate": 1.0}] * 2
+    assert [s["min_reward"] for s in toml["steps"]] == [{"halt_gate": 1.0}] * 2
     assert (task / "steps" / "checkpoint_1" / "workdir" / "setup.sh").is_file()
     assert [[p.slug for p in given] for given in provided] == [[SEED_SLUG]] * len(records)
     record = next(r for r in records if r.trial.arm == "baseline")

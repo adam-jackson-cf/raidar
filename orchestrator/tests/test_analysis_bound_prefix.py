@@ -40,7 +40,7 @@ VERDICTS = {"baseline": (PASS, PASS, PASS), "guided": (PASS, FAIL, PASS)}
 
 def _solvable_lock(bound: int) -> dict[str, Any]:
     """A lock pinning a one-case solvable set for each of the problem's three checkpoints."""
-    lock = _lock(["correctness@8"])
+    lock = _lock(["correctness@9"])
     lock["spec"]["problems"] = [{"ref": PROBLEM, "checkpoints": bound}]
     steps = {step: [f"{step}::case_0"] for step in ALL_STEPS}
     lock["execution"]["references"] = {
@@ -127,7 +127,7 @@ def _assess_and_analyze(
     store = tmp_path / "store"
     records = rescore_path(
         job_dir / "trials",
-        ("correctness@8",),
+        ("correctness@9",),
         AssessmentStore(store),
         default_scorer_registry(),
         config=lock_rescore_config(lock).scorers,

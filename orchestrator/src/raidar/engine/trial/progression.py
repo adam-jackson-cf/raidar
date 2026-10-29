@@ -1,11 +1,15 @@
 """Progression (plan D3; requirements F4): continue by default, halt via ``min_reward``.
 
 Halting is Harbor's native ``[[steps]].min_reward`` gate on the verifier's step reward
-``solvable_pass_rate``: the share of the step's solvable cases (the reference's reliably passing
-set, pinned by the lock) that passed, so ``1.0`` is the solvable verdict "solved". The gate never
-reads the raw ``strict_pass_rate``: a case the reference itself fails or varies on cannot stop a
-trial. The verifier omits the key when the step has no verdict (infrastructure failure, verifier
-leak, no pinned solvable set), and Harbor treats a missing key as -inf, so those steps halt too.
+``halt_gate``: the share of the step's solvable cases (the reference's reliably passing
+set, pinned by the lock) that passed, so ``1.0`` is the solvable verdict "solved". A step the
+lock pins with an empty solvable set (excluded, e.g. ``no_new_scoreable_tests``) has no
+verdict: the verifier reports a clearing ``halt_gate`` plus ``solvable_excluded`` and no
+``solvable_pass_rate``, so the run executes it and advances, as the scorer's continue-mode
+skipping treats it. The gate never reads the raw ``strict_pass_rate``: a case the reference
+itself fails or varies on cannot stop a trial. The verifier omits the key when the step has no
+verdict (infrastructure failure, verifier leak, no pinned entry), and Harbor treats a missing
+key as -inf, so those steps halt too.
 
 Because the agent never sees verifier results (F4), a continue run's first k
 checkpoints are exactly what a halt run would have executed. The strict
@@ -28,9 +32,9 @@ from collections.abc import Mapping, Sequence
 
 from raidar.contract.trial import ProgressionRule
 from raidar.design.experiment.schema import ProtocolSpec
-from raidar.grading.solvable import SOLVABLE_REWARD_KEY
+from raidar.grading.solvable import HALT_GATE_REWARD_KEY
 
-GATE_REWARD_KEY = SOLVABLE_REWARD_KEY
+GATE_REWARD_KEY = HALT_GATE_REWARD_KEY
 STRICT_REWARD_KEY = "strict_pass_rate"
 STRICT_THRESHOLD = 1.0
 

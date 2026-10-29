@@ -70,7 +70,7 @@ For Codex CLI the default auth policy is `CODEX_AUTH_MODE=auto`: it prefers file
 | Job | One execution of a locked experiment: its trials, their step results, validity checks and N1 phase timings | `var/jobs/<experiment id>/<job id>/` (`job.json`, `job.lock.json`, `trial-records/`) |
 | Trial and step result | A trial is one arm × attempt × problem through every checkpoint (a Harbor trial, id `bNN-pN-<arm>`, where `bNN` is the attempt index); a step result is one checkpoint of it | `trials/<trial>/`, `trial-records/<trial>.json` |
 | Verifier and reward | The hidden, trusted grader: strict all-cases per checkpoint, run host-side; its per-step output is the reward. Harbor's `oracle` agent is something else (it replays reference solutions) | `orchestrator/src/raidar/grading/` |
-| Scorer and Assessment | A versioned scorer (`correctness@8`, `code-quality@8`, `resource-usage@7`, `process-compliance@11`, `gate-effort@15`) runs offline over stored trials. Correctness reports the lock-pinned solvable-set outcome alongside the raw SCB outcome; excluded steps leave its denominator, while missing sets are unavailable, never zero. Process compliance reads the work session's trace, not gate fix sessions, and leaves undecidable checks insufficient. Gate effort reads retained guardrail-gate records (first-pass clean, findings by family, fixes, autofix, costs and pre-fix correctness); arms without that gate are not applicable. Code quality reads the graded snapshots and retained or offline verifier coverage; its regression breadth excludes at m…
+| Scorer and Assessment | A versioned scorer (`correctness@9`, `code-quality@8`, `resource-usage@7`, `process-compliance@11`, `gate-effort@15`) runs offline over stored trials. Correctness reports the lock-pinned solvable-set outcome alongside the raw SCB outcome; excluded steps leave its denominator, while missing sets are unavailable, never zero. Process compliance reads the work session's trace, not gate fix sessions, and leaves undecidable checks insufficient. Gate effort reads retained guardrail-gate records (first-pass clean, findings by family, fixes, autofix, costs and pre-fix correctness); arms without that gate are not applicable. Code quality reads the graded snapshots and retained or offline verifier coverage; its regression breadth excludes at m…
 | Headline metric | How quality scores combine into the headline S (`scb-canonical@1/@2`, `scb-canonical-oneshot@1/@2`). The lock pins it | `assessment.metric` |
 | Analysis | Paired deltas, confidence intervals, curves, verdicts, exclusions and a sample-size projection against the baseline arm; a benchmark adds its ranking view | the `make experiment-analyze` output directory |
 | Jev | Host-side model judgement. `define-build-verify@4`, `definition-coverage@5` and `test-coverage@5` use pinned `typesafe/jev-1.13-20260917`, retaining every request, response and interpreted answer without the OpenRouter key. The older offline policy machinery remains parked with both policies `off`; enabling these explicit workflow/scorer capabilities does not promote those policies or add a headline metric. | `raidar/judge/` shared transport; `scoring/judge/` offline policy and calibration |
@@ -164,8 +164,10 @@ until revalidation. Existing three-repeat records are not retroactively certifie
 A grading crash or timeout triggers a starter canary in the same sandbox configuration:
 completion (not solving the task) passes. A passing canary attributes the failed grade to
 the submission; a failing canary remains infrastructure. Each step records the canary status.
-Resolver timeouts are infrastructure, never `cap-exceeded`; bounded retry support records
-attempts, but its production retry bound awaits an explicit decision.
+Resolver timeouts allow one immediate retry: at most two attempts of 120 s per declared set
+and architecture, with identical requirements and pinned policy and recorded attempts.
+A second timeout is infrastructure (`dependency_resolver_unavailable`), never `cap-exceeded`
+and never an agent score.
 
 The grader's `test_dependencies` venv has its own pin, separate from the agent seed, which
 resolves `test_dependencies` only and never the reference's sets. The grader pin covers
@@ -179,7 +181,7 @@ invalidate a trial. Analysis prints each arm's affected-step share beside the pr
 and warns when arms differ materially; an `undeclared_import` is a heuristic (a module-name
 to package alias may be missed).
 
-The default primary outcome is **reference-solvable SCB success** (`solve_rate_solvable`): checkpoints passing every case in their lock-pinned solvable set, divided by the number of non-excluded checkpoints. It is not specification compliance. `correctness@8` always reports raw SCB outcomes beside it. Every analysis shows the spec-determinacy flags and audit coverage (assertion sites audited / total); zero audited is `unmeasured`, never "0 flagged". A step explicitly excluded at validation leaves the denominator; a missing set makes the solvable trajectory unavailable, never zero. Optional **errata** remain pre-registered policy through explicit `analysis.primary_outcome`, never by default; `make problem-errata-draft` drafts their optional record. Optional sensitivities are explanatory notes, not outcome adjustments.
+The default primary outcome is **reference-solvable SCB success** (`solve_rate_solvable`): checkpoints passing every case in their lock-pinned solvable set, divided by the number of non-excluded checkpoints. It is not specification compliance. `correctness@9` always reports raw SCB outcomes beside it. Every analysis shows the spec-determinacy flags and audit coverage (assertion sites audited / total); zero audited is `unmeasured`, never "0 flagged". A step explicitly excluded at validation leaves the denominator; a missing set makes the solvable trajectory unavailable, never zero. Optional **errata** remain pre-registered policy through explicit `analysis.primary_outcome`, never by default; `make problem-errata-draft` drafts their optional record. Optional sensitivities are explanatory notes, not outcome adjustments.
 
 ```bash
 make problem-list SOURCE=scb@38d627ecf668
@@ -226,7 +228,7 @@ arms:
     workflow: one-shot@1     # the workflow release under test (lab/workflows/<name>/)
 
 assessment:
-  scorers: [correctness@8, code-quality@8, resource-usage@7]
+  scorers: [correctness@9, code-quality@8, resource-usage@7]
   metric: scb-canonical-oneshot@1
 
 analysis:
@@ -241,8 +243,11 @@ analysis:
 Comparative verdicts use the outcome type declared in the lock: exact McNemar for binary
 outcomes, exact sign-flip permutation tests otherwise, including aggregate effects.
 Intervals describe uncertainty but never decide a verdict. Pre-register
-`analysis.max_exclusion_difference` (an absolute exclusion-rate difference in 0–1);
-without it, or above it, analysis refuses a verdict. Exclusions are shown per arm and cause;
+`analysis.max_exclusion_difference = d` (an absolute exclusion-rate difference in 0–1; no default).
+An arm's rate is excluded / planned slots across all causes, counting each slot once.
+Refuse comparative verdicts when the largest rate minus the smallest exceeds `d`; equality passes.
+Without a bound, analysis is descriptive-only and the comparative verdict is `insufficient`.
+The independent 20% paired-exclusion cap remains. Exclusions are shown per arm and cause;
 a non-significant difference does not establish acceptable attrition.
 
 Aggregate tests retain the existing equal-problem-weight effect and flip its paired deltas;
@@ -252,8 +257,12 @@ safety bound (`EXACT_STATE_LIMIT`), not an approximation or a scientific thresho
 Resource cost includes native-agent usage priced through LiteLLM's shared table plus recorded
 host judge spend. Claude's self-reported dollar total is not authoritative. Missing prices,
 missing judged-workflow evidence and sent judge attempts with unknown charges remain unavailable.
-The first rework turn uses the recorded `first_build` duration; absent that evidence it is not
-scheduled. A numerical floor and the policy for halting at an excluded solvable step remain open.
+The first rework turn uses the recorded `first_build` duration; with the fit rule enabled,
+absent that evidence it is not scheduled, with no fallback floor.
+Under `halt_on_failure`, a lock-pinned excluded step still executes normally: its workspace
+changes and budget are retained, and it is reported `excluded`, neither passed nor failed.
+Its separate `halt_gate`/`solvable_excluded` signals permit advancement without a fake solvable
+score. Missing validation, grading infrastructure failures and unexplained missing rewards halt.
 
 Validation checks that the design does not contradict its kind (`KIND*`: an ab-test compares arms; a benchmark compares agents under one workflow, warns below 5 attempts and may set `analysis.rank_by`; `research-loop` is reserved) and its name (`NAME1`: a file under `lab/experiments/<kind>/<id>/` sits in the directory of its kind and id; `NAME2`: the id starts with the experiment's runtime).
 
@@ -293,7 +302,7 @@ If a job is stopped mid-trial, `make harbor-cleanup JOB=var/jobs/python__circuit
 
 ```bash
 make experiment-assess JOB=var/jobs/python__circuit_eval-cp1__review-trial/first STORE=var/stores/review-trial \
-  SCORERS="correctness@8 code-quality@8 resource-usage@7"
+  SCORERS="correctness@9 code-quality@8 resource-usage@7"
 ```
 
 **6. Analyze.** The verdict thresholds and the assessment settings come from the lock. The report labels any command-line override. A trial whose inputs cannot be loaded is refused, never read as unassessed; a verifier bundle missing at its recorded root is read from the problem store (`lab/problems` with `var/problems`) by the trial's pinned problem reference, and refused unless its digest is the recorded one. A benchmark's report adds the ranking view; a smoke report says it is not citable.

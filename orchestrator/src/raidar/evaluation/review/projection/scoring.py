@@ -1,7 +1,7 @@
 """Assessments projected as the surface's scorecard (``scorer:*`` and ``metric:*`` spans).
 
 The scorecard is the headline metric's view: ``S = 100·C·(base + inertia·I)``.
-``scorer:correctness@8`` carries C (the base share) with one metric per
+``scorer:correctness@9`` carries C (the base share) with one metric per
 checkpoint, and ``scorer:code-quality@8`` carries I (the inertia share) with one
 metric per inertia component at its policy weight; both shares are read from the
 policy (``policy_shares``). A scorer area is shown only when its
@@ -40,7 +40,11 @@ class ScoringContext:
 
 
 def _checkpoint_payload(step_result: StepResult, assessments: TrialAssessments) -> dict:
-    solved = step_result.checkpoint_state is CheckpointState.SOLVED
+    solved = (
+        None
+        if step_result.checkpoint_state is CheckpointState.EXCLUDED
+        else step_result.checkpoint_state is CheckpointState.SOLVED
+    )
     assessment = assessments.get(CORRECTNESS_REF)
     observations = (
         [
@@ -87,9 +91,9 @@ def _correctness(ctx: ScoringContext, scoring: str) -> None:
                     {
                         "metric_id": step_result.checkpoint,
                         "weight": 1 / len(step_results),
-                        "score": 1.0
-                        if step_result.checkpoint_state is CheckpointState.SOLVED
-                        else 0.0,
+                        "score": step_result.strict_pass_rate
+                        if step_result.checkpoint_state is CheckpointState.EXCLUDED
+                        else float(step_result.checkpoint_state is CheckpointState.SOLVED),
                     }
                     for step_result in step_results
                 ],
@@ -101,7 +105,7 @@ def _correctness(ctx: ScoringContext, scoring: str) -> None:
         ctx.builder.add(
             name=f"metric:{step_result.checkpoint}",
             span_type="INTERNAL",
-            status="OK" if step_result.checkpoint_state is CheckpointState.SOLVED else "ERROR",
+            status=step_result.checkpoint_state.span_status,
             parent=area or scoring,
             start=ctx.start,
             output_value=_checkpoint_payload(step_result, ctx.assessments),
@@ -215,7 +219,7 @@ def _evidence_findings(ctx: ScoringContext) -> list[Finding]:
 
 
 def _regression_findings(ctx: ScoringContext) -> list[Finding]:
-    """Checkpoints where cases carried over from earlier checkpoints fail (correctness@8)."""
+    """Checkpoints where cases carried over from earlier checkpoints fail (correctness@9)."""
     assessment = ctx.assessments.get(CORRECTNESS_REF)
     if assessment is None:
         return []

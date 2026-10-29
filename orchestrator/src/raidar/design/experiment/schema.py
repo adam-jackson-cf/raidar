@@ -144,7 +144,7 @@ class AgentEntry(SpecModel):
 
 class ProtocolSpec(SpecModel):
     # Also scorer config: raidar.engine.job.assessment writes it for every scorer
-    # that declares ``progression`` (correctness@8), so scoring follows the job.
+    # that declares ``progression`` (correctness@9), so scoring follows the job.
     progression: Literal["continue", "halt_on_failure"] = "continue"
     min_reward: float | None = Field(default=None, gt=0.0, le=1.0)
     agent_timeout_sec: int = Field(default=1800, gt=0)

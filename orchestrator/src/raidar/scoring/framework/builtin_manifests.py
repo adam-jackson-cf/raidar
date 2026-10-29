@@ -64,7 +64,7 @@ def _group_rate(group: str) -> MetricSpec:
 
 CORRECTNESS = ScorerManifest(
     id="correctness",
-    version="8",
+    version="9",
     description=(
         "Reference-solvable SCB success and raw SCB verdicts per checkpoint and trajectory."
     ),

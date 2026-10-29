@@ -8,7 +8,7 @@ separate coverage pass on, unless the protocol defers it
 (``verifier_coverage: offline``: assessment makes it from the stored snapshots,
 ``raidar.grading.coverage.offline``). A problem whose lock pins an errata passes it to the
 verifier, which records the errata-applied verdict beside the raw grade. Its solvable sets go too,
-so the verifier reports the ``solvable_pass_rate`` reward a halt run gates on.
+so the verifier reports the separate ``halt_gate`` signal, including pinned exclusions.
 """
 
 from __future__ import annotations

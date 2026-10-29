@@ -371,12 +371,12 @@ def test_committed_scorer_references_resolve_through_the_entry_point(tmp_path: P
         ref: resolver.resolve(RegistryRef.parse(RefKind.SCORER, ref), base_dir=tmp_path)
         for ref in refs
     }
-    assert set(resolved) >= {"correctness@8", "code-quality@8", "resource-usage@7"}
+    assert set(resolved) >= {"correctness@9", "code-quality@8", "resource-usage@7"}
     quality = resolved["code-quality@8"]
     assert quality.tool_versions["ruff"] == "0.8.6"
     assert quality.tool_versions["scb-check"] == "0.1.3"
     assert quality.metadata["manifest"] == CODE_QUALITY.definition()
-    assert resolved["correctness@8"].tool_versions == {}
+    assert resolved["correctness@9"].tool_versions == {}
     again = resolver.resolve(RegistryRef.parse(RefKind.SCORER, "code-quality@8"), base_dir=tmp_path)
     assert again.digest == quality.digest
     with pytest.raises(RegistryReferenceError, match="unknown scorer 'nope@1'"):

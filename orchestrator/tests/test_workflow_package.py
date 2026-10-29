@@ -293,6 +293,12 @@ def test_a_later_rework_is_expected_to_take_as_long_as_the_last_one() -> None:
     assert checkpoint.expected_seconds(GATE_FIX) == 0.0
 
 
-def test_a_rework_with_no_first_build_turn_has_no_estimate_and_is_never_scheduled() -> None:
-    checkpoint = Checkpoint(cast(Any, None), Path("."), "t")
-    assert checkpoint.expected_seconds(REWORK) is None
+async def test_a_rework_with_no_first_build_turn_has_no_estimate_and_is_never_scheduled(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    rig = gated_rig(tmp_path, monkeypatch, time.monotonic() + 10)
+    await rig.runtime.prepare()
+
+    assert rig.checkpoint.expected_seconds(REWORK) is None
+    assert await rig.runtime.check("turn-1") is None
+    assert rig.runtime.record()["endings"] == {"note-state": "deadline"}

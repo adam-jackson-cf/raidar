@@ -13,7 +13,8 @@ each requirement is probed alone and classified from the index's file listing as
 ``no-wheel``, ``after-cutoff`` or ``unresolvable``. Direct references and
 unparseable lines are refused up front. A closure over the caps (200 packages,
 1 GiB of wheels) is ``cap-exceeded``. A resolution that runs past its time cap (120 s) is
-retried up to the configured ``timeout_retries``; when the attempts run out it is
+retried once, identically (``TIMEOUT_RETRIES``); at most two attempts are made per declared
+set and architecture, and the count is recorded. When both time out it is
 ``DependencyInfraError`` (never ``cap-exceeded`` and never a score).
 """
 
@@ -65,6 +66,7 @@ from raidar.grading.dependency_pins import (
 
 MAX_PACKAGES = 200
 TIMEOUT_S = 120.0
+TIMEOUT_RETRIES = 1
 CANARY_TIMEOUT_S = 30.0
 CANARY_REQUIREMENT = "pip==25.0"
 GRADER_TOOLS: tuple[str, ...] = (
@@ -339,9 +341,9 @@ class UvResolver:
 
     uv_bin: str = "uv"
     timeout_s: float = TIMEOUT_S
-    timeout_retries: int | None = None
-    """Extra attempts after a timed-out resolution. ``None``: no bound is configured, so the
-    first timeout is an infrastructure failure."""
+    timeout_retries: int = TIMEOUT_RETRIES
+    """Extra identical attempts after a timed-out resolution; the production bound is one, so
+    at most two attempts of ``timeout_s`` each are made."""
     max_packages: int = MAX_PACKAGES
     max_bytes: int = MAX_WHEEL_BYTES
     compile_args: tuple[str, ...] = ()
@@ -490,9 +492,9 @@ class UvResolver:
                     usable, arch, exclude_newer, work_deadline, deadline
                 )
             except _Exhausted:
-                if self.timeout_retries is not None and attempts <= self.timeout_retries:
+                if attempts <= self.timeout_retries:
                     continue
-                bound = "not configured" if self.timeout_retries is None else self.timeout_retries
+                bound = self.timeout_retries
                 raise DependencyInfraError(
                     f"dependency resolution timed out in {attempts} attempt(s) of "
                     f"{self.timeout_s:g} s each (retry bound: {bound})"
