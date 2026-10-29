@@ -113,7 +113,7 @@ def _agent_spans(builder: SpanBuilder, trial: TrialInput, agent: str) -> None:
         checkpoint = builder.add(
             name=step_result.checkpoint,
             span_type="INTERNAL",
-            status="OK" if step_result.checkpoint_state is CheckpointState.SOLVED else "ERROR",
+            status=step_result.checkpoint_state.span_status,
             parent=agent,
             duration=round(seconds * 1000) if seconds is not None else None,
             input_value={
@@ -228,7 +228,9 @@ def _metric_scores(record: TrialRecord) -> list[dict[str, object]]:
         {
             "metric_id": step_result.checkpoint,
             "score": step_result.strict_pass_rate,
-            "passed": step_result.checkpoint_state is CheckpointState.SOLVED,
+            "passed": None
+            if step_result.checkpoint_state is CheckpointState.EXCLUDED
+            else step_result.checkpoint_state is CheckpointState.SOLVED,
         }
         for step_result in record.step_results
         if step_result.strict_pass_rate is not None

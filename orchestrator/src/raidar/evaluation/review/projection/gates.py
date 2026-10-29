@@ -80,12 +80,14 @@ def _case_detail(step: StepRecord | None, step_result: StepResult) -> str:
 
 def _checkpoint_gate(ctx: GateContext, parent: str, step_result: StepResult) -> Finding | None:
     step = verifier_record(ctx.trial_dir, step_result)
-    solved = step_result.checkpoint_state is CheckpointState.SOLVED
+    state = step_result.checkpoint_state
+    solved = state is CheckpointState.SOLVED
+    excluded = state is CheckpointState.EXCLUDED
     name = f"gate:{step_result.checkpoint}"
     ctx.builder.add(
         name=name,
         span_type="TOOL_CALL",
-        status="OK" if solved else "ERROR",
+        status="OK" if solved or excluded else "ERROR",
         parent=parent,
         start=ctx.start,
         input_value=f"oracle strict all-cases verdict for {step_result.step}",
@@ -97,7 +99,7 @@ def _checkpoint_gate(ctx: GateContext, parent: str, step_result: StepResult) -> 
             **_case_summary(step),
         },
     )
-    if solved or step_result.checkpoint_state is CheckpointState.INFRA_ERROR:
+    if solved or excluded or state is CheckpointState.INFRA_ERROR:
         return None  # an infrastructure error is reported once, by the infra gate
     detail = _case_detail(step, step_result)
     return Finding(
@@ -146,14 +148,23 @@ def _validity_gate(ctx: GateContext, parent: str, gate: str, lab: bool) -> Findi
 
 def _clean(record: TrialRecord) -> Finding | None:
     states = {step_result.checkpoint_state for step_result in record.step_results}
-    if states != {CheckpointState.SOLVED} or not record.valid:
+    if CheckpointState.SOLVED not in states or not record.valid:
         return None
+    if states - {CheckpointState.SOLVED, CheckpointState.EXCLUDED}:
+        return None
+    excluded = sum(
+        step.checkpoint_state is CheckpointState.EXCLUDED for step in record.step_results
+    )
     return Finding(
         id="clean-verification",
         kind="good",
         category="clean-verification",
-        title="Every checkpoint solved",
-        detail=f"all {len(record.step_results)} checkpoints passed the verifier's strict verdict",
+        title="Every non-excluded checkpoint solved" if excluded else "Every checkpoint solved",
+        detail=(
+            f"{len(record.step_results) - excluded} checkpoints solved; {excluded} excluded"
+            if excluded
+            else f"all {len(record.step_results)} checkpoints passed the verifier's strict verdict"
+        ),
         span="verification gates",
     )
 
@@ -161,7 +172,8 @@ def _clean(record: TrialRecord) -> Finding | None:
 def project_gates(ctx: GateContext) -> list[Finding]:
     """Add the gate spans and return the findings they support."""
     step_results = attempted(ctx.record)
-    failing = any(a.checkpoint_state is not CheckpointState.SOLVED for a in step_results)
+    scored = (CheckpointState.SOLVED, CheckpointState.EXCLUDED)
+    failing = any(a.checkpoint_state not in scored for a in step_results)
     parent = ctx.builder.add(
         name="verification gates",
         span_type="INTERNAL",

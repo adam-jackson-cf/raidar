@@ -18,9 +18,10 @@ All notable changes to this project are documented in this file.
   difference or when it is exceeded. Exact-enumeration limits refuse, never approximate.
 - Phase 4b D: pin immutable grader environment and implementation identities; runtime
   refuses incomplete/mismatched evidence. A starter-completion canary attributes submission
-  grading crashes/timeouts in the same sandbox configuration. Bounded resolver retry support
-  records attempts; timeout exhaustion is infrastructure, never `cap-exceeded`.
-  The production retry bound awaits a decision; old records are not retroactively certified.
+  grading crashes/timeouts in the same sandbox configuration. Resolver timeouts allow one
+  immediate identical retry (two 120 s attempts per declared set and architecture), recording
+  attempts; exhaustion is infrastructure, never `cap-exceeded`. Old records are not
+  retroactively certified.
 - Phase 4b E: halt on the solvable verdict; bind P8 instructions to origin and provable
   pre-turn content, leaving unsupported transcripts unmeasured. First rework estimates use
   `first_build`; an unknown estimate refuses scheduling. Include recorded judge spend,
@@ -32,6 +33,16 @@ All notable changes to this project are documented in this file.
   exactly `lab/stages/<ns>/<name>/`; CODEOWNERS protects the upstream `raidar` namespace.
   Release `one-shot-verify@3` and `define-build-verify@4`; regenerate all ten experiment locks.
   Local no-model smoke passed; Docker security/performance checks remain pending offline.
+- Phase 4b voted follow-up: retain the per-experiment exclusion bound with no default;
+  equality passes, and missing bounds leave comparative verdicts `insufficient`. Phase-9
+  controls must declare a bound. Retain refusal of rework without a first-build estimate,
+  with no fallback floor. Execute lock-pinned excluded steps normally under halt progression,
+  preserving workspace and budget; report `excluded` and advance using `halt_gate` plus
+  `solvable_excluded`, never a fabricated solvable score. Unknown pins, infrastructure and
+  missing rewards still halt. Release `correctness@9`, archive `correctness@8`, migrate
+  active consumers and regenerate all ten experiment locks. Preserve the three vote records.
+  Local no-model runtime smoke exercised both excluded checkpoint shapes and fail-closed
+  boundaries; Docker security/performance checks and revalidation remain pending offline.
 
 - Published the external-author `stage/1` contract at `lab/stages/README.md` before
   implementation: strict manifest, primitive call/stop/output protocols, bounded state,

@@ -7,9 +7,7 @@ job, Assessment and Jev shapes:
   (baseline arm and headline metric, as a real lock carries them), and
   ``jobs/<experiment>/<job>/`` job directories (``job.json`` naming the
   lock digest + ``trial-records/*.json`` TrialRecords);
-  ``store/``: ``code-quality@8`` and ``correctness@8`` Assessments whose
-PUT 377.=377:
-        "assessment:\n  scorers: [correctness@8, code-quality@8, gate-effort@15]\n",
+  ``store/``: ``code-quality@8`` and ``correctness@9`` Assessments whose
   inputs carry each trial's snapshot digests (correctness in the real
   scorer's shape: per-checkpoint ``solved`` and ``strict_pass_rate``, and
   trial ``solved_checkpoints`` and ``reached``), plus a Jev audit of
@@ -377,7 +375,7 @@ def generate_quality_fixture(dest: Path) -> Path:
     experiment_file.write_text(
         f"# synthetic fixture: not benchmark evidence\nid: {EXPERIMENT}\n"
         "analysis:\n  baseline_arm: baseline\n  attempts: 6\n  seed: 20260930\n"
-        "assessment:\n  scorers: [correctness@8, code-quality@8, gate-effort@15]\n",
+        "assessment:\n  scorers: [correctness@9, code-quality@8, gate-effort@15]\n",
         encoding="utf-8",
     )
     lock_sha256 = write_synthetic_lock(

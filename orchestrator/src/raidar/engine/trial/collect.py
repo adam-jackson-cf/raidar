@@ -56,6 +56,7 @@ from raidar.engine.health.reaper import load_reap_report, reap_infra_reason
 from raidar.engine.trial.lab_checks import lab_checks, seed_parent
 from raidar.engine.trial.progression import derive_reached, gate_passes
 from raidar.grading.records import RECORD_FILE, StepRecord, load_step_record, step_record_dir
+from raidar.grading.solvable import EXCLUDED_REWARD_KEY
 from raidar.grading.verifier import LEAK_REWARD_KEY
 
 LAB_CHECK = "lab_check"
@@ -201,7 +202,10 @@ def _step_result(
         state = CheckpointState.INFRA_ERROR
     else:
         assert record is not None  # no reasons implies a record
-        state = CheckpointState.SOLVED if record.grade.solved else CheckpointState.FAILED
+        if record.rewards.get(EXCLUDED_REWARD_KEY):
+            state = CheckpointState.EXCLUDED
+        else:
+            state = CheckpointState.SOLVED if record.grade.solved else CheckpointState.FAILED
     return StepResult(
         **base,
         checkpoint_state=state,
@@ -227,7 +231,11 @@ def _step_result(
 
 def _halts(step_result: StepResult, rule: ProgressionRule) -> bool:
     """A graded verdict below the halt gate: later steps are legitimately not run."""
-    graded = step_result.checkpoint_state in (CheckpointState.SOLVED, CheckpointState.FAILED)
+    graded = step_result.checkpoint_state in (
+        CheckpointState.SOLVED,
+        CheckpointState.FAILED,
+        CheckpointState.EXCLUDED,
+    )
     return rule.mode == "halt_on_failure" and graded and not gate_passes(step_result.rewards, rule)
 
 

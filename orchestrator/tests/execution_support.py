@@ -48,7 +48,7 @@ from raidar.grading.records import (
     write_step_record,
 )
 from raidar.grading.resolver import UvResolver
-from raidar.grading.solvable import SOLVABLE_REWARD_KEY, solvable_pass_rate
+from raidar.grading.solvable import SolvableRef
 from raidar.grading.verifier import step_rewards
 from tests.experiment_spec_support import experiment_document, write_experiment
 from tests.problems_support import (
@@ -130,6 +130,7 @@ class StepOutcome:
     infra: str | None = None
     leaked: bool = False
     forgiven: bool = False  # the reference fails case ``a`` too: not in the solvable set
+    excluded: bool = False  # the lock pins an empty solvable set (no new scoreable tests)
     exception: str | None = None
     reset_ok: bool = True
 
@@ -150,15 +151,16 @@ def verifier_grade(step: str, outcome: StepOutcome) -> VerifierGrade:
 
 
 def solvable_cases(step: str, outcome: StepOutcome) -> tuple[str, ...]:
-    """The step's pinned solvable set: every case, or without ``a`` when the reference fails it."""
+    """The step's pinned solvable set: every case, without ``a`` when forgiven, or empty."""
+    if outcome.excluded:
+        return ()
     return (f"{step}::b",) if outcome.forgiven else (f"{step}::a", f"{step}::b")
 
 
 def gate_rewards(step: str, outcome: StepOutcome) -> dict[str, float]:
-    """The rewards the verifier reports for a step: the grade's plus ``solvable_pass_rate``."""
-    grade = verifier_grade(step, outcome)
-    rate = solvable_pass_rate(grade, solvable_cases(step, outcome))
-    return grade.rewards() | ({} if rate is None else {SOLVABLE_REWARD_KEY: rate})
+    """The rewards the verifier reports for a step (``SolvableRef.gate_rewards``)."""
+    pinned = SolvableRef(sha256="s", steps={step: solvable_cases(step, outcome)})
+    return pinned.gate_rewards(step, verifier_grade(step, outcome))
 
 
 def _record(step: str, outcome: StepOutcome, trial_dir: Path) -> StepRecord:
