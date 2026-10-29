@@ -64,8 +64,10 @@ def _group_rate(group: str) -> MetricSpec:
 
 CORRECTNESS = ScorerManifest(
     id="correctness",
-    version="7",
-    description="Oracle verdicts per checkpoint and trajectory, from the oracle step records.",
+    version="8",
+    description=(
+        "Reference-solvable SCB success and raw SCB verdicts per checkpoint and trajectory."
+    ),
     runtimes=("*",),
     evidence_required=(EvidenceInput.ORACLE_CASES,),
     metrics=(
@@ -141,9 +143,9 @@ CORRECTNESS = ScorerManifest(
         ),
         _metric(
             "solved_solvable",
-            "Solvable-set solve: every case in the checkpoint's solvable set (the cases the "
-            "reference passes in every validation repeat) passed; unavailable without a "
-            "solvable set, never zero.",
+            "Reference-solvable SCB success: every case the reference passes in every "
+            "validation repeat passed; unavailable without a solvable set, never zero. "
+            "Not specification compliance.",
             _CHECKPOINT,
             MetricType.BOOLEAN,
             _HIGHER,
@@ -151,7 +153,7 @@ CORRECTNESS = ScorerManifest(
         ),
         _metric(
             "solved_checkpoints_solvable",
-            "Solvable-set solved checkpoints in the trajectory (continue view).",
+            "Reference-solvable SCB successful checkpoints in the trajectory (continue view).",
             _TRAJECTORY,
             MetricType.COUNT,
             _HIGHER,
@@ -159,7 +161,7 @@ CORRECTNESS = ScorerManifest(
         ),
         _metric(
             "reached_solvable",
-            "Solvable-set consecutive checkpoints solved from the first (strict view).",
+            "Reference-solvable SCB consecutive successful checkpoints (strict view).",
             _TRAJECTORY,
             MetricType.COUNT,
             _HIGHER,
@@ -246,20 +248,29 @@ def _usage(metric_id: str, description: str, level: MetricLevel, unit: str) -> M
 
 RESOURCE_USAGE = ScorerManifest(
     id="resource-usage",
-    version="6",
-    description="Tokens, cost, turns and agent wall time from Harbor per-step usage and timing.",
+    version="7",
+    description=(
+        "Tokens, canonical-table agent cost plus host judge spend, turns and agent wall time."
+    ),
     runtimes=("*",),
     evidence_required=(EvidenceInput.TRACE,),
     metrics=(
         _usage("input_tokens", "Input tokens used in the step.", _CHECKPOINT, "tokens"),
         _usage("output_tokens", "Output tokens used in the step.", _CHECKPOINT, "tokens"),
-        _usage("cost_usd", "Model spend in the step.", _CHECKPOINT, "usd"),
+        _usage(
+            "cost_usd", "Agent model spend plus host judge spend in the step.", _CHECKPOINT, "usd"
+        ),
         _usage("turns", "Agent turns in the step.", _CHECKPOINT, "turns"),
         _usage("agent_wall_s", "Agent execution wall time in the step.", _CHECKPOINT, "seconds"),
         _usage(
             "total_tokens", "Input plus output tokens over the trajectory.", _TRAJECTORY, "tokens"
         ),
-        _usage("total_cost_usd", "Model spend over the trajectory.", _TRAJECTORY, "usd"),
+        _usage(
+            "total_cost_usd",
+            "Agent model spend plus host judge spend over the trajectory.",
+            _TRAJECTORY,
+            "usd",
+        ),
         _usage("total_turns", "Agent turns over the trajectory.", _TRAJECTORY, "turns"),
         _usage(
             "total_agent_wall_s",

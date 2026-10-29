@@ -294,6 +294,32 @@ def test_audit_flags_only_cases_a_conforming_variant_breaks_on_undetermined_valu
         steps["checkpoint_1"]["reference"]["passed"] == steps["checkpoint_1"]["reference"]["total"]
     )
     assert report["dynamic"]["status"] == "ran"
+    assert report["assertions"]["audited"] == 4
+    assert report["assertions"]["total"] == 6
+    assert report["summary"]["status"] == "measured"
+
+
+@pytest.mark.parametrize("format_rule", ["JSON Lines", "compact JSON", "NDJSON"])
+def test_fixed_output_format_is_not_treated_as_a_conforming_reformat(
+    kv, tmp_path: Path, format_rule: str
+) -> None:
+    _, problem = kv
+    instruction = problem.task_dir / "steps" / "checkpoint_2" / "instruction.md"
+    instruction.write_text(instruction.read_text() + f"\nOutput must be {format_rule}.\n")
+    report = _audit(kv, tmp_path)
+    assert "reformatted_json" in report["steps"]["checkpoint_1"]["variants"]
+    assert "reformatted_json" not in report["steps"]["checkpoint_2"]["variants"]
+    assert report["summary"]["flagged_by_checkpoint"] == {"checkpoint_1": 2, "checkpoint_2": 2}
+
+
+def test_zero_assertion_coverage_is_unmeasured_not_zero_flags(kv) -> None:
+    _, problem = kv
+    for name in {name for step in problem.manifest.steps for name in step.test_files}:
+        (problem.bundle.tests_dir / name).write_text("def test_plain():\n    assert 1 == 1\n")
+    report = audit_report(problem, DynamicEvidence({}))
+    assert report["assertions"] == {"audited": 0, "total": 2, "by_rule": {}}
+    assert report["summary"]["status"] == "unmeasured"
+    assert report["summary"]["flagged"] is None
 
 
 def test_audit_without_an_entry_file_reports_static_findings_only(kv, tmp_path: Path) -> None:

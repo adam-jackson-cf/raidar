@@ -313,12 +313,12 @@ def test_assess_rescore_cli_config_sets_the_inventory_policy_and_scorer_config(
 def test_assess_rescore_cli_refuses_scorers_that_cannot_run(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    monkeypatch.delitem(BUILTIN_IMPLEMENTATIONS, "correctness@7")
+    monkeypatch.delitem(BUILTIN_IMPLEMENTATIONS, "correctness@8")
     trial = two_step_trial(tmp_path / "trial")
     runner = CliRunner()
     store = str(tmp_path / "store")
     unimplemented = runner.invoke(
-        main, ["assess", "--rescore", str(trial), "--scorer", "correctness@7", "--store", store]
+        main, ["assess", "--rescore", str(trial), "--scorer", "correctness@8", "--store", store]
     )
     assert unimplemented.exit_code == 1
     assert "no implementation" in unimplemented.output

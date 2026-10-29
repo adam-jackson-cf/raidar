@@ -42,6 +42,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 from collections.abc import Mapping, Sequence
 from dataclasses import asdict, dataclass, field
 from decimal import Decimal
@@ -579,6 +580,36 @@ def _grades_json(runs: ValidationRuns) -> dict[str, object]:
     return {"oracle": oracle, "native": native}
 
 
+def _repeat_observation(grades: Sequence[Grade | None]) -> str:
+    measured = len(grades) >= 2 and all(g is not None and g.has_verdict for g in grades)
+    if not measured:
+        return "unmeasured"
+    outcomes = [grade.outcomes for grade in grades if grade is not None]
+    prefix = (
+        "variation observed"
+        if any(outcome != outcomes[0] for outcome in outcomes)
+        else "no variation observed"
+    )
+    return f"{prefix} in {len(grades)} runs for this reference and environment"
+
+
+def _repeat_observations(runs: ValidationRuns) -> dict[str, dict[str, object]]:
+    observations: dict[str, dict[str, object]] = {}
+    for variant, repeats in runs.oracle.items():
+        per_step: dict[str, object] = {}
+        for step in dict.fromkeys(step for run in repeats for step in run):
+            grades = [run.get(step) for run in repeats]
+            observation = _repeat_observation(grades)
+            per_step[step] = {
+                "reference_sha256": runs.references.get(variant, {}).get(step),
+                "runs": len(grades),
+                "status": "unmeasured" if observation == "unmeasured" else "measured",
+                "observation": observation,
+            }
+        observations[variant] = per_step
+    return observations
+
+
 @dataclass
 class ValidationReport:
     problem: str
@@ -606,6 +637,7 @@ class ValidationReport:
                 "reference_digests": {
                     variant: dict(steps) for variant, steps in self.runs.references.items()
                 },
+                "reference_observations": _repeat_observations(self.runs),
                 "headline_policy": policy_preview(positive[0], len(self.steps)),
             }
         return {
@@ -639,6 +671,59 @@ class ValidationRecordError(ValueError):
 
 
 @dataclass(frozen=True)
+class GraderIdentity:
+    """The validated grader: its immutable environment and its implementation.
+
+    ``environment_id`` is the grader image's content id (not its tag); ``implementation_sha256``
+    digests the host grading code and the files shipped into the sandbox. A report validated
+    before the implementation was recorded has ``implementation_sha256=None`` (unmeasured, never
+    reconstructed): such a pin is partial and no trial runs under it.
+    """
+
+    image: str
+    environment_id: str
+    implementation_sha256: str | None = None
+
+    @property
+    def complete(self) -> bool:
+        return self.implementation_sha256 is not None
+
+    def lock(self) -> dict[str, str | None]:
+        return {
+            "image": self.image,
+            "environment_id": self.environment_id,
+            "implementation_sha256": self.implementation_sha256,
+        }
+
+
+_ENVIRONMENT_ID = re.compile(r"sha256:[0-9a-f]{64}")
+_IMPLEMENTATION = re.compile(r"[0-9a-f]{64}")
+
+
+def read_grader_identity(environment: object) -> GraderIdentity | None:
+    """The identity a report's environment records; ``None`` without image and environment id.
+
+    A recorded implementation digest that is not a sha256 hex string makes the record unreadable
+    evidence, so it counts as absent.
+    """
+    if not isinstance(environment, Mapping):
+        return None
+    image = environment.get("grader_image")
+    environment_id = environment.get("grader_environment_id")
+    implementation = environment.get("grader_implementation_sha256")
+    if not (
+        isinstance(image, str)
+        and image
+        and isinstance(environment_id, str)
+        and _ENVIRONMENT_ID.fullmatch(environment_id)
+    ):
+        return None
+    if isinstance(implementation, str) and _IMPLEMENTATION.fullmatch(implementation):
+        return GraderIdentity(image, environment_id, implementation)
+    return GraderIdentity(image, environment_id)
+
+
+@dataclass(frozen=True)
 class ValidationRecord:
     """The verdict a committed ``<version>.validation.json`` records for one manifest."""
 
@@ -646,6 +731,9 @@ class ValidationRecord:
     manifest_sha256: str
     not_run: tuple[str, ...]
     solvable: Mapping[str, StepSolvableRecord] = field(default_factory=dict)
+    grader: GraderIdentity | None = None
+    spec_determinacy: Mapping[str, object] = field(default_factory=dict)
+    reference_observations: Mapping[str, Mapping[str, object]] = field(default_factory=dict)
 
     @property
     def missing_required(self) -> tuple[str, ...]:
@@ -665,7 +753,10 @@ class ValidationRecord:
         every earlier run. The manifest the report is for is the reference's
         own digest.
         """
-        return {"verdict": self.verdict.value, "not_run": list(self.not_run)}
+        metadata: dict[str, object] = {"verdict": self.verdict.value, "not_run": list(self.not_run)}
+        metadata["grader"] = self.grader.lock() if self.grader is not None else None
+        metadata["spec_determinacy"] = dict(self.spec_determinacy)
+        return metadata
 
     def solvable_lock(self) -> dict[str, object]:
         """The solvable sets the lock pins: ``{"sha256", "steps": {step: [sorted case ids]}}``.
@@ -716,6 +807,24 @@ def _read_solvable(data: object) -> dict[str, StepSolvableRecord]:
     return records
 
 
+def determinacy_summary(audit: object) -> dict[str, object]:
+    """Retain audit scope and flags beside the outcome, including missing coverage."""
+    raw = audit if isinstance(audit, Mapping) else {}
+    assertions = raw.get("assertions", {})
+    assertions = assertions if isinstance(assertions, Mapping) else {}
+    audited = int(assertions.get("audited", 0))
+    total = assertions.get("total")
+    flags = raw.get("flagged", [])
+    flags = flags if isinstance(flags, list) else []
+    return {
+        "audit_version": raw.get("audit_version"),
+        "status": "measured" if audited > 0 and total is not None else "unmeasured",
+        "assertions": {"audited": audited, "total": total},
+        "flagged": [str(entry["case"]) for entry in flags if isinstance(entry, Mapping)],
+        "flagged_count": len(flags) if audited > 0 else None,
+    }
+
+
 def read_validation_record(path: Path) -> ValidationRecord:
     try:
         data = json.loads(path.read_bytes())
@@ -724,6 +833,9 @@ def read_validation_record(path: Path) -> ValidationRecord:
             manifest_sha256=str(data["manifest_sha256"]),
             not_run=tuple(str(name) for name in data.get("not_run", ())),
             solvable=_read_solvable(data.get("solvable")),
+            grader=read_grader_identity(data.get("environment")),
+            spec_determinacy=determinacy_summary(data.get("spec_determinacy")),
+            reference_observations=data.get("reference_observations", {}),
         )
     except FileNotFoundError as exc:
         raise ValidationRecordError(f"no validation report at {path}") from exc

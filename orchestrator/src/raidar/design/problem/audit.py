@@ -35,6 +35,7 @@ from raidar.design.problem.determinacy import (
     AuditedAssertion,
     Determination,
     SpecText,
+    assertion_coverage,
     classify,
     scan_tests,
 )
@@ -232,6 +233,20 @@ class _Combiner:
                 )
         return cases
 
+    def case_buckets(self) -> dict[str, list[object]]:
+        buckets: dict[str, list[object]] = {
+            "flagged": [],
+            "unconfirmed": [],
+            "sensitive_determined": [],
+            "sensitive_unexplained": [],
+        }
+        if self.dynamic.not_run is None:
+            for case, variants in sorted(self.case_sensitivity().items()):
+                outcome = self.classify_case(case, variants)
+                if outcome is not None:
+                    buckets[outcome[0]].append(outcome[1])
+        return buckets
+
     def classify_case(self, case: str, variants: list[str]) -> tuple[str, dict[str, object]] | None:
         function = function_of(case)
         undetermined = [
@@ -279,22 +294,16 @@ def _summary(
 def audit_report(problem: ImportedProblem, dynamic: DynamicEvidence) -> dict[str, object]:
     """The ``spec_determinacy`` section of the validation report."""
     findings = static_findings(problem)
+    coverage = assertion_coverage(
+        problem.bundle.tests_dir, list(origins(problem)), [item for item, _, _ in findings]
+    )
     combiner = _Combiner(findings, dynamic)
-    buckets: dict[str, list[object]] = {
-        "flagged": [],
-        "unconfirmed": [],
-        "sensitive_determined": [],
-        "sensitive_unexplained": [],
-    }
-    if dynamic.not_run is None:
-        for case, variants in sorted(combiner.case_sensitivity().items()):
-            outcome = combiner.classify_case(case, variants)
-            if outcome is not None:
-                buckets[outcome[0]].append(outcome[1])
+    buckets = combiner.case_buckets()
     rules: dict[str, int] = {}
     for _, _, verdict in findings:
         rules[verdict.rule] = rules.get(verdict.rule, 0) + 1
     flagged = buckets.pop("flagged")
+    measured = bool(coverage["audited"]) and dynamic.not_run is None
     return {
         "audit_version": AUDIT_VERSION,
         "method": METHOD,
@@ -305,7 +314,7 @@ def audit_report(problem: ImportedProblem, dynamic: DynamicEvidence) -> dict[str
             "reason": dynamic.not_run,
             "environment": dict(dynamic.environment or {}),
         },
-        "assertions": {"audited": len(findings), "by_rule": dict(sorted(rules.items()))},
+        "assertions": {**coverage, "by_rule": dict(sorted(rules.items()))},
         "static_undetermined": [
             _assertion_json(item, step, verdict)
             for item, step, verdict in findings
@@ -314,7 +323,11 @@ def audit_report(problem: ImportedProblem, dynamic: DynamicEvidence) -> dict[str
         "steps": combiner.steps(),
         "flagged": flagged,
         **buckets,
-        "summary": _summary(report_entries(flagged), buckets),
+        "summary": {
+            **_summary(report_entries(flagged), buckets),
+            "status": "measured" if measured else "unmeasured",
+            "flagged": len(flagged) if measured else None,
+        },
     }
 
 
@@ -331,6 +344,7 @@ async def grade_audit_variants(
     if entry is None:
         return DynamicEvidence({}, not_run="the problem records no entry_file to wrap")
     gate = asyncio.Semaphore(concurrency)
+    texts = spec_texts(problem)
     steps = [step.name for step in problem.manifest.steps]
     with tempfile.TemporaryDirectory(prefix="raidar-problem-audit-", dir=work_root) as tmp:
         work = Path(tmp)
@@ -354,7 +368,12 @@ async def grade_audit_variants(
                 )
             return StepGradeSummary.from_grade(result.grade)
 
-        keys = [(variant, step) for variant in (REFERENCE, *VARIANTS) for step in steps]
+        keys = [
+            (variant, step)
+            for variant in (REFERENCE, *VARIANTS)
+            for step in steps
+            if variant != REFORMATTED_JSON or texts[step].names_format() is None
+        ]
         results = await asyncio.gather(*(one(*key) for key in keys))
     grades: dict[str, dict[str, StepGradeSummary]] = {}
     for (variant, step), summary in zip(keys, results, strict=True):
