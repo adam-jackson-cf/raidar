@@ -7,12 +7,12 @@ copy of ``/app`` (accepted N1 decision ``snapshot_source=artifact``) with the
 separate coverage pass on, unless the protocol defers it
 (``verifier_coverage: offline``: assessment makes it from the stored snapshots,
 ``raidar.grading.coverage.offline``). A problem whose lock pins an errata passes it to the
-verifier, which records the errata-applied verdict beside the raw grade.
+verifier, which records the errata-applied verdict beside the raw grade. Its solvable sets go too,
+so the verifier reports the ``solvable_pass_rate`` reward a halt run gates on.
 """
 
 from __future__ import annotations
 
-from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
@@ -36,6 +36,20 @@ def verifier_timeout_s(protocol: ProtocolSpec) -> float:
     return runs * float(protocol.verifier_timeout_sec) + VERIFIER_PHASE_MARGIN_S
 
 
+def _pinned(plan: ExperimentPlan, trial: PlannedTrial) -> dict[str, Any]:
+    """The problem-bound lock evidence the verifier is built with: the validated ``grader``
+    identity, and the pinned ``errata`` and ``solvable`` sets when the lock has them."""
+    target = plan.problems[trial.problem_index]
+    if target.grader is None:
+        raise ValueError(f"problem {trial.problem_index} pins no validated grader identity")
+    pinned: dict[str, Any] = {"grader": dict(target.grader)}
+    if target.errata is not None:
+        pinned["errata"] = dict(target.errata)
+    if target.solvable is not None:
+        pinned["solvable"] = dict(target.solvable)
+    return pinned
+
+
 def harbor_trial_config(
     plan: ExperimentPlan,
     trial: PlannedTrial,
@@ -44,7 +58,6 @@ def harbor_trial_config(
     trials_dir: Path,
     bundle_root: Path,
     docker_context: str,
-    errata: Mapping[str, Any] | None = None,
 ) -> TrialConfig:
     spec = plan.loaded.spec
     harness = plan.arms[trial.arm].arm.agent.harness
@@ -70,7 +83,7 @@ def harbor_trial_config(
                 "snapshot_source": spec.protocol.snapshot_source,
                 "coverage": coverage,
                 "grader_timeout_s": grader_timeout,
-                **({"errata": dict(errata)} if errata is not None else {}),
+                "pinned": _pinned(plan, trial),
             },
         ),
     )

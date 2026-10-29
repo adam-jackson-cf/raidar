@@ -24,6 +24,8 @@ from typing import Any
 from raidar.contract.wheels import DependencyInfraError
 from raidar.grading.bundle import VerifierBundle, VerifierStepSpec
 from raidar.grading.models import (
+    CanaryRecord,
+    CaseStatus,
     CorpusEvidence,
     CoverageContext,
     EnvironmentEvidence,
@@ -226,6 +228,70 @@ def parity_verdict(
     return verdict, tuple(outcome_differences(grading.cases, coverage.cases))
 
 
+SUBMISSION_FAILURE_CODES = frozenset(
+    {
+        "sandbox_timeout",
+        "sandbox_error",
+        "ledger_unreadable",
+        "incomplete_run",
+        "pytest_exit_status",
+        "ledger_exit_mismatch",
+    }
+)
+"""Grading failures a submission can cause: it ran and did not finish, crashed the run, or left
+a ledger the host cannot read or reconcile. Whether one is the submission's or the sandbox's is
+decided by the starter canary. A resolver outage and corpus or collection faults are never here."""
+
+
+async def run_canary(
+    bundle: VerifierBundle,
+    step: VerifierStepSpec,
+    sandbox: GradingSandbox,
+    work: Path,
+    *,
+    grading: RunOutcome,
+    timeout_s: float,
+) -> tuple[CanaryRecord, RunOutcome]:
+    """Grade the empty starter in the submission's own sandbox configuration.
+
+    The starter runs on the submission's recorded dependency closure and image, with the same
+    time limit, CPU and memory. Passing means grading completed (the starter solves nothing and
+    need not); it is attribution evidence only, not proof against an input-dependent grader
+    defect. Failing means the sandbox cannot grade this step, which is infrastructure.
+    """
+    starter = work / "canary-starter"
+    starter.mkdir(parents=True, exist_ok=True)
+    assert grading.infra_failure is not None
+    assert grading.dependencies is not None
+    outcome = await run_oracle(
+        bundle,
+        step,
+        starter,
+        sandbox,
+        work / "canary",
+        coverage=False,
+        timeout_s=timeout_s,
+        recorded=grading.dependencies,
+    )
+    failure = outcome.infra_failure
+    record = CanaryRecord(
+        status="failed" if failure is not None else "passed",
+        trigger=grading.infra_failure.code,
+        detail="" if failure is None else f"{failure.code}: {failure.detail}"[:400],
+        seconds=outcome.seconds,
+    )
+    return record, outcome
+
+
+def attribute_to_submission(grading: RunOutcome, starter: RunOutcome) -> RunOutcome:
+    """A grading crash or timeout the canary says the sandbox does not cause: a failed outcome.
+
+    Every case of the step counts failed (none of the submission's cases ran to a result).
+    """
+    cases = tuple(case.model_copy(update={"status": CaseStatus.FAILED}) for case in starter.cases)
+    return RunOutcome(grading.role, cases, None, None, (), grading.seconds, grading.dependencies)
+
+
 async def grade_step(
     bundle: VerifierBundle,
     step_name: str,
@@ -250,6 +316,18 @@ async def grade_step(
         resolver=resolver,
         recorded=recorded,
     )
+    canary = CanaryRecord()
+    failure = grading.infra_failure
+    if (
+        failure is not None
+        and failure.code in SUBMISSION_FAILURE_CODES
+        and grading.dependencies is not None
+    ):
+        canary, starter = await run_canary(
+            bundle, step, sandbox, work, grading=grading, timeout_s=timeout_s
+        )
+        if canary.status == "passed":
+            grading = attribute_to_submission(grading, starter)
     grade = VerifierGrade(
         step=step.name,
         checkpoint=step.checkpoint,
@@ -257,11 +335,18 @@ async def grade_step(
         infra_failure=grading.infra_failure,
     )
     timings = {"oracle_run_s": grading.seconds}
+    if canary.status != "not_run":
+        timings["canary_run_s"] = canary.seconds
     if not coverage:
-        return StepGrade(grade=grade, grading=grading, coverage=None, parity=None, timings=timings)
+        return StepGrade(
+            grade=grade, grading=grading, coverage=None, parity=None, timings=timings, canary=canary
+        )
+    if canary.status == "passed":
+        verdict = ineligible(f"grading_failed_on_submission:{canary.trigger}")
+        return StepGrade(grade, grading, None, verdict, timings=timings, canary=canary)
     if grading.infra_failure is not None:
         verdict = ineligible(f"grading_infra_failure:{grading.infra_failure.code}")
-        return StepGrade(grade, grading, None, verdict, timings=timings)
+        return StepGrade(grade, grading, None, verdict, timings=timings, canary=canary)
     measured = await run_oracle(
         bundle,
         step,
@@ -274,4 +359,4 @@ async def grade_step(
     )
     timings["coverage_run_s"] = measured.seconds
     verdict, differences = parity_verdict(grading, measured)
-    return StepGrade(grade, grading, measured, verdict, differences, timings)
+    return StepGrade(grade, grading, measured, verdict, differences, timings, canary)

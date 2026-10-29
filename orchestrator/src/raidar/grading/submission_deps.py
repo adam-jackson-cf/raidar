@@ -36,6 +36,8 @@ class SubmissionDependencies(VerifierModel):
     provided: tuple[str, ...] = ()
     unprovided: tuple[Unprovided, ...] = ()
     resolve_s: float = 0.0
+    resolve_attempts: int = 1
+    """Resolver attempts made; more than one means earlier attempts timed out."""
     build_s: float = 0.0
     image_id: str = ""
     arch_divergent: bool = False

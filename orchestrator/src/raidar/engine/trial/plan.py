@@ -28,6 +28,7 @@ from raidar.design.problem.store import ProblemStore, ProblemStoreError
 from raidar.engine.trial.agent_config import AgentOverride, agent_digest
 from raidar.engine.trial.blueprint import ArmBlueprint, arm_blueprints
 from raidar.engine.trial.progression import progression_rule
+from raidar.grading.records import grading_execution_digest
 from raidar.subject.environment.python.pack_definition import PackSpec
 
 
@@ -64,6 +65,12 @@ class ProblemTarget:
     errata: Mapping[str, Any] | None = None
     """The errata the lock pins (``sha256``, ``exclude_from_solved``); the verifier records
     its verdicts."""
+    solvable: Mapping[str, Any] | None = None
+    """The solvable sets the lock pins (``sha256``, ``steps``); the verifier reports the share a
+    step passed, the reward a halt run gates on."""
+    grader: Mapping[str, str] | None = None
+    """The validated grader the lock pins (``image``, ``environment_id``,
+    ``implementation_sha256``); the verifier refuses any other grader."""
 
     def run_steps(self, max_checkpoints: int | None) -> tuple[str, ...]:
         return self.steps[:max_checkpoints] if max_checkpoints else self.steps
@@ -165,35 +172,81 @@ def _lock_field(lock: Mapping[str, Any], *keys: str) -> Any:
     return value
 
 
+def _pinned_grader(index: int, ref: str, references: Mapping[str, Any]) -> Mapping[str, str]:
+    """The lock's complete validated grader identity; no trial runs without it.
+
+    A pin missing its image, environment id or implementation digest (a problem validated before
+    the identity was recorded, or never revalidated) is refused, as is a checkout that grades
+    with another implementation.
+    """
+    validation = ((references.get(ref) or {}).get("metadata") or {}).get("validation") or {}
+    grader = validation.get("grader")
+    parts = ("image", "environment_id", "implementation_sha256")
+    if not isinstance(grader, Mapping) or not all(isinstance(grader.get(p), str) for p in parts):
+        raise PlanError(
+            f"problems.{index}: the lock pins no complete grader identity for {ref}; "
+            "re-validate it and relock"
+        )
+    if grader.get("implementation_sha256") != grading_execution_digest():
+        raise PlanError(
+            f"problems.{index}: {ref} was validated under grading implementation "
+            f"{grader.get('implementation_sha256')}, this checkout grades with "
+            f"{grading_execution_digest()}; re-validate it and relock"
+        )
+    return dict(grader)
+
+
+def _check_halt_solvable(progression: str, solvable: object, index: int, ref: str) -> None:
+    if progression == "halt_on_failure" and not solvable:
+        raise PlanError(
+            f"problems.{index}: {ref} pins no solvable sets, and progression "
+            "'halt_on_failure' gates on the solvable verdict; validate the problem and relock"
+        )
+
+
+def _problem_target(
+    loaded: LoadedExperiment,
+    lock: Mapping[str, Any],
+    store: ProblemStore,
+    index: int,
+    locked: Sequence[Mapping[str, Any]],
+) -> ProblemTarget:
+    entry = loaded.spec.problems[index]
+    if entry.ref is None:
+        raise PlanError(
+            f"problems.{index}: a local task path has no host-only verifier bundle; "
+            "import the problem (`raidar problem import`) and reference it by name"
+        )
+    problem = ProblemId.parse(entry.ref)
+    manifest = store.load_manifest(problem)
+    if manifest.digest() != locked[index]["digest"]:
+        raise PlanError(f"problems.{index}: {entry.ref} changed since the lock; relock")
+    steps = tuple(s.name for s in manifest.steps)[: entry.checkpoints]
+    if len(steps) != locked[index]["checkpoints"]:
+        raise PlanError(
+            f"problems.{index}: the binding selects {len(steps)} checkpoint(s) but the lock "
+            f"pins {locked[index]['checkpoints']}; relock"
+        )
+    references = _lock_field(lock, "execution", "references").get("problem", {})
+    metadata = (references.get(entry.ref) or {}).get("metadata") or {}
+    try:
+        errata = store.pinned_errata(problem, manifest, metadata.get("errata"))
+    except ProblemStoreError as exc:
+        raise PlanError(f"problems.{index}: {exc}") from exc
+    solvable = metadata.get("solvable")
+    _check_halt_solvable(loaded.spec.protocol.progression, solvable, index, entry.ref)
+    grader = _pinned_grader(index, entry.ref, references)
+    return ProblemTarget(index, problem, manifest.digest(), steps, errata, solvable or None, grader)
+
+
 def _problems(
     loaded: LoadedExperiment, lock: Mapping[str, Any], store: ProblemStore
 ) -> tuple[ProblemTarget, ...]:
     locked = _lock_field(lock, "execution", "problems")
-    targets = []
-    for index, entry in enumerate(loaded.spec.problems):
-        if entry.ref is None:
-            raise PlanError(
-                f"problems.{index}: a local task path has no host-only verifier bundle; "
-                "import the problem (`raidar problem import`) and reference it by name"
-            )
-        problem = ProblemId.parse(entry.ref)
-        manifest = store.load_manifest(problem)
-        if manifest.digest() != locked[index]["digest"]:
-            raise PlanError(f"problems.{index}: {entry.ref} changed since the lock; relock")
-        steps = tuple(s.name for s in manifest.steps)[: entry.checkpoints]
-        if len(steps) != locked[index]["checkpoints"]:
-            raise PlanError(
-                f"problems.{index}: the binding selects {len(steps)} checkpoint(s) but the lock "
-                f"pins {locked[index]['checkpoints']}; relock"
-            )
-        references = _lock_field(lock, "execution", "references").get("problem", {})
-        pinned = ((references.get(entry.ref) or {}).get("metadata") or {}).get("errata")
-        try:
-            errata = store.pinned_errata(problem, manifest, pinned)
-        except ProblemStoreError as exc:
-            raise PlanError(f"problems.{index}: {exc}") from exc
-        targets.append(ProblemTarget(index, problem, manifest.digest(), steps, errata))
-    return tuple(targets)
+    return tuple(
+        _problem_target(loaded, lock, store, index, locked)
+        for index in range(len(loaded.spec.problems))
+    )
 
 
 @dataclass(frozen=True)

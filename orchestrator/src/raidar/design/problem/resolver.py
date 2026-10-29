@@ -39,6 +39,7 @@ from raidar.contract.references import (
 )
 from raidar.design.problem.models import ProblemId
 from raidar.design.problem.store import ProblemStoreError, open_store
+from raidar.grading.records import grading_execution_digest
 
 
 @dataclass(frozen=True)
@@ -77,6 +78,7 @@ class ProblemResolver:
                 metadata=manifest.lock_metadata(),
                 binding={**binding, "validated": False, "validation_issue": str(exc)},
             )
+        grader = validation.grader.lock() if validation.grader is not None else None
         metadata = {
             **manifest.lock_metadata(),
             "validation": validation.lock_metadata(),
@@ -88,7 +90,12 @@ class ProblemResolver:
             ref=ref,
             digest=manifest.digest(),
             metadata=metadata,
-            binding={**binding, "validated": True},
+            binding={
+                **binding,
+                "validated": True,
+                "grader": grader,
+                "grader_implementation_sha256": grading_execution_digest(),
+            },
         )
 
 

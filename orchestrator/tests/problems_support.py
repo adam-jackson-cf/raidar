@@ -45,6 +45,7 @@ from raidar.grading.bundle import (
     write_bundle_dependencies,
 )
 from raidar.grading.dependency_pins import DependencyLocks, Unprovided
+from raidar.grading.records import grading_execution_digest
 from raidar.grading.resolver import Resolution, Resolver, resolve_pins
 from tests.verifier_support import LocalProcessSandbox, write_app, write_tests
 
@@ -206,6 +207,14 @@ def build_fixture_store(
     return store
 
 
+FIXTURE_GRADER_ENVIRONMENT: dict[str, object] = {
+    "grader_image": "raidar-oracle-grader:fixture",
+    "grader_environment_id": "sha256:" + "f" * 64,
+    "grader_implementation_sha256": grading_execution_digest(),
+}
+"""The identity a fixture report records for its local grader (the real one needs Docker)."""
+
+
 def record_validation(
     store: ProblemStore, ref: str, work: Path, repeats: int = 2
 ) -> ValidationReport:
@@ -220,6 +229,7 @@ def record_validation(
             work_root=work,
         )
     )
+    report.environment.update(FIXTURE_GRADER_ENVIRONMENT)
     write_report(report, store.validation_path(ProblemId.parse(ref)))
     return report
 

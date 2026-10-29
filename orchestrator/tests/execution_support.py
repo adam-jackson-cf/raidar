@@ -48,6 +48,7 @@ from raidar.grading.records import (
     write_step_record,
 )
 from raidar.grading.resolver import UvResolver
+from raidar.grading.solvable import SOLVABLE_REWARD_KEY, solvable_pass_rate
 from raidar.grading.verifier import step_rewards
 from tests.experiment_spec_support import experiment_document, write_experiment
 from tests.problems_support import (
@@ -128,6 +129,7 @@ class StepOutcome:
     passed: bool | None = True  # None: no verifier record (verifier failed closed)
     infra: str | None = None
     leaked: bool = False
+    forgiven: bool = False  # the reference fails case ``a`` too: not in the solvable set
     exception: str | None = None
     reset_ok: bool = True
 
@@ -147,9 +149,21 @@ def verifier_grade(step: str, outcome: StepOutcome) -> VerifierGrade:
     return VerifierGrade(step=step, checkpoint=step, cases=cases, infra_failure=infra)
 
 
+def solvable_cases(step: str, outcome: StepOutcome) -> tuple[str, ...]:
+    """The step's pinned solvable set: every case, or without ``a`` when the reference fails it."""
+    return (f"{step}::b",) if outcome.forgiven else (f"{step}::a", f"{step}::b")
+
+
+def gate_rewards(step: str, outcome: StepOutcome) -> dict[str, float]:
+    """The rewards the verifier reports for a step: the grade's plus ``solvable_pass_rate``."""
+    grade = verifier_grade(step, outcome)
+    rate = solvable_pass_rate(grade, solvable_cases(step, outcome))
+    return grade.rewards() | ({} if rate is None else {SOLVABLE_REWARD_KEY: rate})
+
+
 def _record(step: str, outcome: StepOutcome, trial_dir: Path) -> StepRecord:
     grade = verifier_grade(step, outcome)
-    rewards = step_rewards(grade.rewards(), leaked=outcome.leaked)
+    rewards = step_rewards(gate_rewards(step, outcome), leaked=outcome.leaked)
     return StepRecord(
         step=step,
         checkpoint=step,
