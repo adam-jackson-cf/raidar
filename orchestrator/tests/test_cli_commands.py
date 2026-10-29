@@ -352,13 +352,13 @@ def test_orchestrator_smoke_locks_and_runs_the_smoke_experiment_with_the_same_ov
 
 
 def test_agent_smoke_replaces_the_agent_release_model_and_reasoning() -> None:
-    result = _make_dry_run("agent-smoke", "RELEASE=codex@2", "MODEL=gpt-6-luna", "TIMEOUT_SEC=300")
+    result = _make_dry_run("agent-smoke", "RELEASE=codex@3", "MODEL=gpt-6-luna", "TIMEOUT_SEC=300")
 
     assert result.returncode == 0, result.stderr
     (lock_args,) = _raidar_lines(result.stdout, "lock")
     (run_args,) = _raidar_lines(result.stdout, "run")
     for assignment in (
-        "agents.0.release=codex@2",
+        "agents.0.release=codex@3",
         "agents.0.model=gpt-6-luna",
         "agents.0.reasoning=low",
         "protocol.agent_timeout_sec=300",
@@ -439,19 +439,19 @@ def test_smoke_dry_run_check_prints_every_public_smoke_shape() -> None:
         ),
         (("stage-new", "NAME=ns/my-check"), "stage", ["new", '"ns/my-check"']),
         (
-            ("stage-new", "NAME=my-check", "FROM=docs-check"),
+            ("stage-new", "NAME=ns/my-check", "FROM=docs-check"),
             "stage",
-            ["new", '"my-check"', "--from", '"docs-check"'],
+            ["new", '"ns/my-check"', "--from", '"docs-check"'],
         ),
-        (("stage-lock", "NAME=my-check"), "stage", ["lock", '"my-check"']),
-        (("stage-info", "NAME=my-check"), "stage", ["info", '"my-check"']),
+        (("stage-lock", "NAME=ns/my-check"), "stage", ["lock", '"ns/my-check"']),
+        (("stage-info", "NAME=ns/my-check"), "stage", ["info", '"ns/my-check"']),
         (("stage-list",), "stage", ["list"]),
         (
-            ("stage-check", "NAME=my-check", "REPLAY=var/jobs/t1"),
+            ("stage-check", "NAME=ns/my-check", "REPLAY=var/jobs/t1"),
             "stage",
-            ["check", '"my-check"', "--replay", '"var/jobs/t1"'],
+            ["check", '"ns/my-check"', "--replay", '"var/jobs/t1"'],
         ),
-        (("stage-check", "NAME=my-check"), "stage", ["check", '"my-check"']),
+        (("stage-check", "NAME=ns/my-check"), "stage", ["check", '"ns/my-check"']),
         (("workflow-new", "NAME=mine"), "workflow", ["new", '"mine"']),
         (
             ("workflow-new", "NAME=mine", "FROM=one-shot"),

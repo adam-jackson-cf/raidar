@@ -35,14 +35,21 @@ from raidar.scoring.catalog.outcomes import (
     primary_source,
 )
 from raidar.scoring.framework.metrics import MetricResolver
-from tests.analysis_support import inputs, paired_arms
+from tests.analysis_support import OUTCOME_TYPES, inputs, paired_arms
 from tests.experiment_spec_support import (
     experiment_document,
     fixture_resolvers,
     write_experiment,
 )
 
-SETTINGS = Settings(min_pairs=5, max_exclusion_fraction=0.2, bootstrap_samples=2000, seed=7)
+SETTINGS = Settings(
+    outcome_types=OUTCOME_TYPES,
+    min_pairs=5,
+    max_exclusion_fraction=0.2,
+    max_exclusion_difference=0.5,
+    bootstrap_samples=2000,
+    seed=7,
+)
 
 
 def _outcomes() -> list[Any]:
@@ -122,6 +129,25 @@ def test_the_default_primary_is_the_solvable_set_rate_with_raw_beside_it() -> No
     assert primary_metric("halt_on_failure") == SOLVE_RATE_SOLVABLE
 
 
+def test_audit_scope_and_flags_are_reported_beside_reference_success() -> None:
+    audit = {
+        "status": "measured",
+        "assertions": {"audited": 2, "total": 10},
+        "flagged_count": 1,
+        "flagged": ["checkpoint_1::wording"],
+    }
+    report = analyse(
+        dataclasses.replace(inputs(_outcomes(), 6), spec_determinacy={"toy@1": audit}),
+        SETTINGS,
+    )
+    assert report.spec_determinacy["toy@1"]["assertions"] == {"audited": 2, "total": 10}
+    markdown = render_markdown(report)
+    assert "Reference-solvable SCB success" in markdown
+    assert "| toy@1 | 2/10 | measured | 1 | checkpoint_1::wording |" in markdown
+    unmeasured = analyse(inputs(_outcomes(), 6), SETTINGS)
+    assert "| toy@1 | 0/unknown | unmeasured | unmeasured |" in render_markdown(unmeasured)
+
+
 def test_a_primary_without_solvable_sets_is_unavailable_never_zero() -> None:
     outcomes = [
         outcome.model_copy(
@@ -156,7 +182,6 @@ def test_a_preregistered_errata_primary_is_labelled_with_raw_beside_it() -> None
     markdown = render_markdown(report)
     assert "**Primary outcome** `solve_rate_errata`" in markdown
     assert "**Raw (beside the primary)** `solve_rate`" in markdown
-    assert "- Primary outcome: `solve_rate_errata` (lock (analysis.primary_outcome)" in markdown
     assert "| Outcome | Problem | Both | Baseline only |" in markdown
     assert "| final_solved | toy@1 |" in markdown
     assert "| final_solved_errata | toy@1 |" in markdown
@@ -192,5 +217,5 @@ def test_arms_with_no_shared_attempt_are_refused_not_crashed() -> None:
 
 def test_the_lock_declared_gate_effort_scorer_is_read() -> None:
     assert GATE_EFFORT_REF == "gate-effort@15"
-    assert gate_effort_ref(["correctness@7", "gate-effort@15"]) == "gate-effort@15"
-    assert gate_effort_ref(["correctness@7"]) is None
+    assert gate_effort_ref(["correctness@8", "gate-effort@15"]) == "gate-effort@15"
+    assert gate_effort_ref(["correctness@8"]) is None

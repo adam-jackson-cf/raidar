@@ -34,7 +34,7 @@ TARGET = {"name": "mbp", "docker": {"ncpu": 4, "server_version": "29"}}
 PRIMITIVE_CODE = {"build": "b" * 64}
 AGENT = {
     "agent": "luna",
-    "agent_release": "codex@2",
+    "agent_release": "codex@3",
     "adapter": "codex",
     "provider": "openai",
     "model": "gpt-6-luna",

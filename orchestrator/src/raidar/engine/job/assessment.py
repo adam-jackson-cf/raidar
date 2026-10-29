@@ -6,14 +6,14 @@
 reads, so scoring a run uses exactly the locked assessor settings.
 
 The protocol the trials ran under reaches the scorers that read it: every
-``protocol_config`` key a scorer's registration declares (``correctness@7``:
+``protocol_config`` key a scorer's registration declares (``correctness@8``:
 ``progression``) is set from ``protocol``. The spec already rejects an
 explicit scorer config that contradicts the protocol. Problem facts
 (``entry_file``) are not written here: they travel with each trial's oracle
 bundle, so a run over several problems still scores each with its own.
 
 Problem errata the lock pins (``execution.references.problem.<ref>.metadata.errata``)
-reach every scorer whose registration takes them (``correctness@7``) as config
+reach every scorer whose registration takes them (``correctness@8``) as config
 key ``errata``, ``{problem ref: ErrataRef}``. A lock that pins no errata adds no
 key, so its config, and the Assessment keys derived from it, are unchanged.
 
