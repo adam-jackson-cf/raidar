@@ -263,7 +263,7 @@ def import_command(
 @_SOURCE_OPTION
 @_PROBLEMS_OPTION
 @click.option("--engine", type=click.Choice(ENGINES), default="direct", show_default=True)
-@click.option("--repeats", type=click.IntRange(min=1), default=3, show_default=True)
+@click.option("--repeats", type=click.IntRange(min=1), default=5, show_default=True)
 @click.option("--concurrency", type=click.IntRange(min=1), default=4, show_default=True)
 @target_option
 @click.option(
@@ -406,6 +406,10 @@ def _echo_solvable_record(record: ValidationRecord) -> None:
             f" nondeterministic={one.nondeterministic_count}"
             + (f" ({one.exclusion})" if one.exclusion else "")
         )
+    for variant, observations in record.reference_observations.items():
+        for step, observation in observations.items():
+            if isinstance(observation, dict):
+                click.echo(f"  {variant} {step}: {observation.get('observation', 'unmeasured')}")
 
 
 def _echo_checks(checks: list[Check]) -> None:
