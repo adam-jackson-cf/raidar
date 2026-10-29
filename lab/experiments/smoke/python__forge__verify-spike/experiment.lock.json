@@ -2,9 +2,25 @@
   "analysis": {
     "alpha": 0.05,
     "baseline_arm": "verify",
+    "max_exclusion_difference": null,
     "max_exclusion_fraction": 0.2,
     "min_effects": {},
-    "min_pairs": 5
+    "min_pairs": 5,
+    "outcome_types": {
+      "aggregate": {
+        "binary": []
+      },
+      "problems": {
+        "scb/forge@38d627ecf668": {
+          "binary": [
+            "final_solved",
+            "final_solved_errata",
+            "final_solved_solvable"
+          ],
+          "checkpoints": 8
+        }
+      }
+    }
   },
   "assessment": {
     "metric": {
@@ -41,10 +57,10 @@
       },
       "scorer": {
         "code-quality@8": {
-          "digest": "9d49cc3079fed7bb4d23ae7c04a58f6481576bfa029b9588078ab9b5b57d5d81",
+          "digest": "ed0c8d3533368446f31994ea727a2a2566651fd465ffe1d7c429d71ff62d60b7",
           "metadata": {
             "implementation": "raidar.scoring.code_quality:code_quality_scorer",
-            "implementation_digest": "e7b5df7cf20e46e6ff5fcfb23cbd93fdf5747788513d1ed65807b5ed7aab8e81",
+            "implementation_digest": "28426136d0d0725726a02292d253c14d08d3b245bb83b14731f3c38215da0d41",
             "manifest": {
               "description": "SCB-fork code-quality and inertia components over the per-step snapshots; a step graded without the in-trial coverage pass reads G's coverage run from the offline run in the Assessment store, and G leaves out at most 3 cases whose outcome differs between the grading and coverage runs instead of reading the step as ineligible.",
               "evidence_required": [
@@ -262,13 +278,13 @@
             }
           }
         },
-        "correctness@7": {
-          "digest": "52c3b299d2ee8aac6197186226b76c79a2ab069fe73932e3d81c9d67ffcdee17",
+        "correctness@8": {
+          "digest": "32b40d67b210fd565a5b874abd487f6a12951b6d60b44db32c537bd4ab0fc8d1",
           "metadata": {
             "implementation": "raidar.scoring.correctness:correctness_scorer",
-            "implementation_digest": "70d2b74c0bcf0a48419f67bbaf7c694009b2ac080263550150edc77496fcf80e",
+            "implementation_digest": "954c50f21fb22a4f3fa66cadacded0f79f473693966bb3c1b7b925724a87e10d",
             "manifest": {
-              "description": "Oracle verdicts per checkpoint and trajectory, from the oracle step records.",
+              "description": "Reference-solvable SCB success and raw SCB verdicts per checkpoint and trajectory.",
               "evidence_required": [
                 "oracle.cases"
               ],
@@ -420,7 +436,7 @@
                   "unit": null
                 },
                 {
-                  "description": "Solvable-set solve: every case in the checkpoint's solvable set (the cases the reference passes in every validation repeat) passed; unavailable without a solvable set, never zero.",
+                  "description": "Reference-solvable SCB success: every case the reference passes in every validation repeat passed; unavailable without a solvable set, never zero. Not specification compliance.",
                   "direction": "higher_better",
                   "exactness": "native",
                   "id": "solved_solvable",
@@ -432,7 +448,7 @@
                   "unit": null
                 },
                 {
-                  "description": "Solvable-set solved checkpoints in the trajectory (continue view).",
+                  "description": "Reference-solvable SCB successful checkpoints in the trajectory (continue view).",
                   "direction": "higher_better",
                   "exactness": "native",
                   "id": "solved_checkpoints_solvable",
@@ -444,7 +460,7 @@
                   "unit": null
                 },
                 {
-                  "description": "Solvable-set consecutive checkpoints solved from the first (strict view).",
+                  "description": "Reference-solvable SCB consecutive successful checkpoints (strict view).",
                   "direction": "higher_better",
                   "exactness": "native",
                   "id": "reached_solvable",
@@ -460,16 +476,16 @@
                 "*"
               ],
               "tools": [],
-              "version": "7"
+              "version": "8"
             },
             "tool_lock": {}
           }
         },
         "process-compliance@11": {
-          "digest": "d67e048d2c5bef3924c60a4738ff28cb3b96daf7ac721d930e2a5411a433873e",
+          "digest": "f51472957ad295e4435b6802ef7e2b38e86c9f6f366b2c44ba2833955ed70a1a",
           "metadata": {
             "implementation": "raidar.scoring.process_checks:deterministic_process_compliance_scorer",
-            "implementation_digest": "3dc6ac3de3962aa33764adaa518b5c471f248f029de81dda18f65972f2b5eb12",
+            "implementation_digest": "39ff93cf0239955c8e7e6c0548849a4f3897bf49bf50d4b4866498dc65376ee3",
             "manifest": {
               "description": "Deterministic trace checks of agent process (stall outcomes, a test command counts only when it ran, the step's work session's own test run after its last edit, a compliance rate without the plan check unless the condition asks for a plan); a check the trace cannot decide is undetermined, never judged by a model. Adds whether the work session ran the tests at all, and whether it ran them after its last edit to a non-test file.",
               "evidence_required": [
@@ -669,13 +685,13 @@
             "tool_lock": {}
           }
         },
-        "resource-usage@6": {
-          "digest": "cccc4689f7c19770ac9dc62b2126c868fff9cb68dd4b11ec6682a73655643b87",
+        "resource-usage@7": {
+          "digest": "bfb6b5b5256059fabc0659bf45d2499c1f6e00daa4aa28b7302b0386262723f0",
           "metadata": {
             "implementation": "raidar.scoring.resource_usage:resource_usage_scorer",
-            "implementation_digest": "70c29c0b0fd0c0a57d12d482561b66a00247975e0447ef74adb14ffd586c3c0c",
+            "implementation_digest": "0d81c79ad4d10814b8e3bf3c64a61a42715dd64475fcd01626e45e727db50bf3",
             "manifest": {
-              "description": "Tokens, cost, turns and agent wall time from Harbor per-step usage and timing.",
+              "description": "Tokens, canonical-table agent cost plus host judge spend, turns and agent wall time.",
               "evidence_required": [
                 "trace"
               ],
@@ -707,7 +723,7 @@
                   "unit": "tokens"
                 },
                 {
-                  "description": "Model spend in the step.",
+                  "description": "Agent model spend plus host judge spend in the step.",
                   "direction": "lower_better",
                   "exactness": "native",
                   "id": "cost_usd",
@@ -755,7 +771,7 @@
                   "unit": "tokens"
                 },
                 {
-                  "description": "Model spend over the trajectory.",
+                  "description": "Agent model spend plus host judge spend over the trajectory.",
                   "direction": "lower_better",
                   "exactness": "native",
                   "id": "total_cost_usd",
@@ -795,7 +811,7 @@
                 "*"
               ],
               "tools": [],
-              "version": "6"
+              "version": "7"
             },
             "tool_lock": {}
           }
@@ -810,9 +826,9 @@
       "metric": "scb-canonical@2",
       "scorer_config": {},
       "scorers": [
-        "correctness@7",
+        "correctness@8",
         "code-quality@8",
-        "resource-usage@6",
+        "resource-usage@7",
         "process-compliance@11"
       ]
     },
@@ -825,13 +841,13 @@
       "tree-sitter-language-pack": "0.13.0"
     }
   },
-  "document_sha256": "107394319590c2a3393643fe5dbe9d7a434ad91179211e922f48aaf2acb3c607",
+  "document_sha256": "266ec07c225624a799dec636b30931d0fdf777d78fd57fad75793cc4f5eb40df",
   "execution": {
     "arms": {
       "verify": {
         "adapter": "codex",
         "agent": "agent",
-        "agent_release": "codex@2",
+        "agent_release": "codex@3",
         "capabilities": {
           "command_output": "command_execution and file_change items of the --json stream and the session rollout",
           "global_instructions": "placement.instructions {home}/AGENTS.md in the run's CODEX_HOME",
@@ -843,12 +859,12 @@
           "version_pin": "0.156.1",
           "workflow_skills": "placement.skills .agents/skills in the workspace /app"
         },
-        "digest": "ed0cf3aeeaf58347fc3af1f1fe002822d623fd5674241891a4154c7cc888b58d",
+        "digest": "43351e75f24accbacd9f56772e8d55d1f6c8d5933ce38d8978dd1bfd7f9e6f18",
         "model": "gpt-6-luna",
         "packages": {},
         "primitive_code": {
-          "build": "b3b52ae87b6244ce6a83f6cb0db3566718415f9972c4c39451952568b530a959",
-          "verify": "b3b52ae87b6244ce6a83f6cb0db3566718415f9972c4c39451952568b530a959"
+          "build": "41fd99f4d719533b380e518d567848f5a5989bb7027c4b8ed613ae5a069e89b3",
+          "verify": "41fd99f4d719533b380e518d567848f5a5989bb7027c4b8ed613ae5a069e89b3"
         },
         "provider": "openai",
         "reasoning": "low",
@@ -857,7 +873,7 @@
           "package": "@openai/codex",
           "version": "0.156.1"
         },
-        "workflow": "one-shot-verify@2",
+        "workflow": "one-shot-verify@3",
         "workflow_sha256": "8ed329ac39a77aa5edac4d0e2373832502342275113c15943d3fb8fa88c70c51"
       }
     },
@@ -867,14 +883,14 @@
           "id": "agent",
           "model": "gpt-6-luna",
           "reasoning": "low",
-          "release": "codex@2"
+          "release": "codex@3"
         }
       ],
       "arms": [
         {
           "agent": "agent",
           "id": "verify",
-          "workflow": "one-shot-verify@2"
+          "workflow": "one-shot-verify@3"
         }
       ],
       "attempts": 1,
@@ -910,7 +926,7 @@
     ],
     "references": {
       "agent": {
-        "codex@2": {
+        "codex@3": {
           "digest": "36bf2bd7d6e482206c62eb4eed7bc06a5e03ce808a8022fae02ef8afc193989b",
           "metadata": {
             "adapter": "codex",
@@ -1597,17 +1613,32 @@
             ],
             "task_sha256": "70e93e9882fd776df49d4ae9fe3d9f9cef30c5dba69916db6b398cb942ad55c2",
             "validation": {
+              "grader": {
+                "environment_id": "sha256:715698bfd52661aa5627a3a9d22ea24db40b3716e5d78c6c8793976055973c06",
+                "image": "raidar-oracle-grader:963c14e63ff5e15d",
+                "implementation_sha256": null
+              },
               "not_run": [
                 "native_parity_positive",
                 "native_parity_negative"
               ],
+              "spec_determinacy": {
+                "assertions": {
+                  "audited": 0,
+                  "total": null
+                },
+                "audit_version": null,
+                "flagged": [],
+                "flagged_count": null,
+                "status": "unmeasured"
+              },
               "verdict": "validated_partial"
             }
           }
         }
       },
       "workflow": {
-        "one-shot-verify@2": {
+        "one-shot-verify@3": {
           "digest": "8ed329ac39a77aa5edac4d0e2373832502342275113c15943d3fb8fa88c70c51",
           "metadata": {
             "stages": [
@@ -1622,7 +1653,7 @@
     "versions": {
       "agents": {
         "agent": {
-          "release": "codex@2",
+          "release": "codex@3",
           "version": "0.156.1"
         }
       },
@@ -1632,20 +1663,20 @@
   "experiment": {
     "id": "python__forge__verify-spike",
     "source": "experiment.yaml",
-    "source_sha256": "6386fe94575e3d223db4340a11bc7dbcd8b3133ee8fe7828b3bf89d643a17cea",
-    "spec_sha256": "0a2e4860d24e5ddbacb271e93f22c65a03424ad1571e943c8068610843b6cb28"
+    "source_sha256": "f922e62574eae227b438d7c87e699dc976bdb903e975bccad66df39539e99fbc",
+    "spec_sha256": "5efc5e1f118cd26fdbe205f7068da8d0749f51e1a0d0b6c096d342124a754b60"
   },
-  "lock_sha256": "e218e4821988272cab7e999f08fcd86c443af597b16f15ec5d47e39a80a1707a",
+  "lock_sha256": "b56001f0ff251adc42ad7743cbb1c6919b7731fa43af447ff321bb07bb300629",
   "lock_version": 5,
   "overrides": {
     "flags": {},
     "set": []
   },
   "sections": {
-    "analysis": "106c4f180e5678e19b2bf6fc3a34aa5ef836ed7199f3b57cf1bffbfe2bfc5ac6",
-    "assessment": "f9e76e6e65fbac03e66268c01e8787b7860e1375c80b6c644a969fe1e72ff477",
-    "execution": "e218e4821988272cab7e999f08fcd86c443af597b16f15ec5d47e39a80a1707a",
-    "toolchain": "df7f62209849294be7fe28203b50c7865e833f912557e05e62948413912ff363"
+    "analysis": "81cdc2d12aacc031bb70595c13973ff647ab49a68bebda4be7a9b65ba3127a78",
+    "assessment": "013f8dbfaf6f4fda66061e870de297bfc43d6d9d43cb077b6ce4c4f480108306",
+    "execution": "b56001f0ff251adc42ad7743cbb1c6919b7731fa43af447ff321bb07bb300629",
+    "toolchain": "8aead72e2be8c5327134e6a09c1dc8c37b684f67819ccab4b97875b369c8e5ef"
   },
   "spec": {
     "agents": [
@@ -1653,7 +1684,7 @@
         "id": "agent",
         "model": "gpt-6-luna",
         "reasoning": "low",
-        "release": "codex@2"
+        "release": "codex@3"
       }
     ],
     "analysis": {
@@ -1661,6 +1692,7 @@
       "attempts": 1,
       "baseline_arm": "verify",
       "concurrency": 1,
+      "max_exclusion_difference": null,
       "max_exclusion_fraction": 0.2,
       "min_effects": {},
       "min_pairs": 5,
@@ -1670,7 +1702,7 @@
       {
         "agent": "agent",
         "id": "verify",
-        "workflow": "one-shot-verify@2"
+        "workflow": "one-shot-verify@3"
       }
     ],
     "assessment": {
@@ -1681,13 +1713,13 @@
       "metric": "scb-canonical@2",
       "scorer_config": {},
       "scorers": [
-        "correctness@7",
+        "correctness@8",
         "code-quality@8",
-        "resource-usage@6",
+        "resource-usage@7",
         "process-compliance@11"
       ]
     },
-    "description": "Verify-stage spike on forge (one-shot-verify@2); not citable.",
+    "description": "Verify-stage spike on forge (one-shot-verify@3); not citable.",
     "environment": {
       "compose_init": true,
       "type": "docker"
@@ -1714,6 +1746,6 @@
     "litellm": "1.102.1",
     "python": "3.13.7",
     "raidar": "0.15.0",
-    "raidar_spec": "955279cceab002f47035eb9e1c07e510f8f242f9303b71399bc6d40f6fb2787c"
+    "raidar_spec": "82712823b9d6a9fe6542194e9e278f88dee40610cee431ce20858a22ab1610cc"
   }
 }

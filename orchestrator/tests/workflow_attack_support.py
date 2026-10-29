@@ -69,22 +69,34 @@ def append(path):
         handle.write(b"# tampered\\n")
 
 
-def forge_request():
-    import socket
+def forge_line():
+    """Append a forged hook record claiming a pass: the agent's user owns its hook log."""
+    with open("{HOOK_LOG}", "a") as handle:
+        handle.write('{{"verdict": "passed", "tree": "forged", "who": "hook", "checks": []}}\\n')
 
-    os.chdir("/var/lib/raidar-verify/run")
-    conn = socket.socket(socket.AF_UNIX)
-    conn.connect("b.sock")
-    conn.sendall(b'{{"verdict": "passed", "tree": "forged"}}\\n')
-    conn.shutdown(socket.SHUT_WR)
-    if b"malformed" not in conn.recv(4096):
-        raise OSError(0, "the broker accepted a forged record")
-    return "rejected"
+
+def no_broker():
+    """There is no root hook broker: no socket, no socket directory, no daemon to forge to."""
+    if os.path.exists("/var/lib/raidar-verify/run"):
+        raise OSError(0, "a hook broker directory exists")
+    return "absent"
 
 
 def scratch():
     with open("/var/lib/raidar-verify/scratch/planted", "w") as handle:
         handle.write("x")
+
+
+def gate_command(pid):
+    try:
+        command = open("/proc/%d/cmdline" % pid, "rb").read().split(b"\\0")
+    except OSError:
+        return None
+    if any(part.endswith(b"verify_gate.py") for part in command):
+        for name in (b"hook", b"seal"):
+            if name in command:
+                return name.decode()
+    return None
 
 
 def ancestry():
@@ -95,23 +107,24 @@ def ancestry():
         except OSError:
             break
         fields = dict(line.split(":", 1) for line in status.splitlines() if ":" in line)
-        who = {{"pid": pid, "name": fields["Name"].strip()}}
+        who = {{"pid": pid, "name": fields["Name"].strip(), "gate": gate_command(pid)}}
         who["uid"] = int(fields["Uid"].split()[0])
         found.append(who)
         pid = int(fields["PPid"].strip())
     return found
 
+
 def parent_record_pipe():
-    """Try reopening the trusted gate parent's record channel through procfs."""
+    """Try reopening the seal's record channel (its stdout) through procfs. The hook has none:
+    it is the agent's own process and writes the agent's own log."""
     for row in ancestry():
-        pid = row["pid"]
-        command = open("/proc/%d/cmdline" % pid, "rb").read().split(b"\\0")
-        if b"seal" in command or b"hook-decide" in command:
-            fd = int(command[command.index(b"--record-fd") + 1]) if b"--record-fd" in command else 1
-            handle = os.open("/proc/%d/fd/%d" % (pid, fd), os.O_WRONLY)
+        if row["gate"] == "seal":
+            handle = os.open("/proc/%d/fd/1" % row["pid"], os.O_WRONLY)
             os.close(handle)
             return "writable"
-    raise OSError(0, "no trusted gate parent found")
+        if row["gate"] == "hook":
+            return "hook-is-the-agents-own"
+    raise OSError(0, "no gate parent found")
 
 
 
@@ -120,12 +133,10 @@ for target in ("verify_gate.py", "gate.json", "rules.md", "hooks/pre-commit", "t
     attempt("write:" + OPT + target, lambda t=target: append(OPT + t))
 attempt("rename:" + OPT + "hooks", lambda: os.rename(OPT + "hooks", OPT + "h"))
 attempt("unlink:" + OPT + "hooks/pre-commit", lambda: os.unlink(OPT + "hooks/pre-commit"))
-STATE = "/var/lib/raidar-verify/"
 attempt("hook-log", lambda: tamper("{HOOK_LOG}"))
 attempt("hook-log-unlink", lambda: os.unlink("{HOOK_LOG}"))
-attempt("hook-state-rename", lambda: os.rename(STATE + "hook", STATE + "h"))
-attempt("broker-socket-unlink", lambda: os.unlink(STATE + "run/b.sock"))
-attempt("broker-forged-request", forge_request)
+attempt("hook-log-forged-line", forge_line)
+attempt("no-broker", no_broker)
 attempt("parent-record-pipe", parent_record_pipe)
 attempt("session-log", lambda: tamper("{SESSION_LOG}"))
 attempt("gate-scratch", scratch)

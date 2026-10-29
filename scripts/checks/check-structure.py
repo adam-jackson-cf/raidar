@@ -194,7 +194,7 @@ def _stage_roots(entries: list[PurePosixPath]) -> list[PurePosixPath]:
             path.parent
             for path in entries
             if path.name == "stage.yaml"
-            and len(path.relative_to(prefix).parts) in (2, 3)
+            and len(path.relative_to(prefix).parts) == 3
         },
         key=lambda path: (len(path.parts), str(path)),
     )

@@ -7,8 +7,15 @@ runner copied to the step's logs (``verify.hook_log``). A trial whose records na
 stage has no ``G`` checks; a verifying step whose evidence is missing makes a check
 ``unmeasured``, never ``pass``.
 
+The hook runs as the agent's user and appends to a log the agent can write, so what it says is a
+reading, not integrity evidence. ``G1`` and ``G2`` are readings: ``pass`` (with their findings
+in the evidence and detail) or ``unmeasured``, never a violation, so neither can invalidate a
+trial (they are absent from ``raidar.engine.trial.collect.HEALTH_VALIDITY``). ``G3`` stays a
+validity check: the tool directory's digest is measured by Raidar, outside the agent's reach.
+
 - ``G1`` hook and seal decisions for the same Git tree, checked workspace and workflow
-  prerequisite inputs agree, and every hook line reads;
+  prerequisite inputs agree, and every hook line reads; the evidence also lists the hook log's
+  own findings (``hook_log_*``: a rewritten or touched log);
 - ``G2`` no bypass: every commit the agent made since the checkpoint's base holds a tree its
   hook passed (a ``--no-verify`` commit, or one made with the hooks pointed elsewhere, has
   none), and ``core.hooksPath`` was the stage's hooks directory at every seal. A base the agent
@@ -31,6 +38,8 @@ from raidar.engine.health.model import PASS, UNMEASURED, VIOLATION, HealthCheck
 WORKFLOW_RECORD = "workflow/workflow.json"
 DECIDED = ("passed", "refused")
 _SHOWN = 3
+HOOK_LOG_PREFIX = "hook_log"
+"""Integrity findings about the hook log (readings, never validity), by name prefix."""
 
 
 @dataclass(frozen=True)
@@ -218,13 +227,15 @@ def _g3(gates: list[StepGate], unread: list[str]) -> HealthCheck:
     return make_check("G3", PASS, f"tool directory {first[:12]} unchanged", sha256=first)
 
 
-def _family(
+def _reading(
     check_id: str,
     gates: list[StepGate],
     unread: list[str],
     per_step: Callable[[StepGate], tuple[list[str], str | None]],
     passed: str,
+    **evidence: Any,
 ) -> HealthCheck:
+    """A reading over the steps' hook evidence: findings are reported, never a violation."""
     findings: list[str] = []
     unmeasured = [f"{step}: no readable verify record" for step in unread]
     for gate in gates:
@@ -233,11 +244,27 @@ def _family(
         unmeasured += [missing] if missing else []
     if findings:
         more = f"; and {len(findings) - _SHOWN} more" if len(findings) > _SHOWN else ""
-        detail = "; ".join(findings[:_SHOWN]) + more
-        return make_check(check_id, VIOLATION, detail, findings=findings, unmeasured=unmeasured)
+        detail = "reading: " + "; ".join(findings[:_SHOWN]) + more
+        return make_check(
+            check_id, PASS, detail, findings=findings, unmeasured=unmeasured, **evidence
+        )
     if unmeasured:
-        return make_check(check_id, UNMEASURED, "; ".join(unmeasured), unmeasured=unmeasured)
-    return make_check(check_id, PASS, passed, steps=[gate.step for gate in gates])
+        return make_check(
+            check_id, UNMEASURED, "; ".join(unmeasured), unmeasured=unmeasured, **evidence
+        )
+    return make_check(
+        check_id, PASS, passed, steps=[gate.step for gate in gates], findings=[], **evidence
+    )
+
+
+def _hook_log_findings(gates: list[StepGate]) -> list[str]:
+    """Findings about the hook log itself that the runner recorded (readings, never validity)."""
+    return [
+        f"{gate.step}: {item['name']} after {item.get('after', '?')}"
+        for gate in gates
+        for item in gate.record.get("integrity") or []
+        if isinstance(item, dict) and str(item.get("name", "")).startswith(HOOK_LOG_PREFIX)
+    ]
 
 
 def gate_family(steps: Sequence[tuple[str, Path]]) -> tuple[HealthCheck, ...]:
@@ -248,8 +275,15 @@ def gate_family(steps: Sequence[tuple[str, Path]]) -> tuple[HealthCheck, ...]:
     gates, unread = read
     hook_runs = sum(len(g.hook_runs or []) for g in gates)
     return (
-        _family("G1", gates, unread, _g1_step, f"{hook_runs} hook run(s) agree with the seals"),
-        _family("G2", gates, unread, _g2_step, "every agent commit ran the hook; hooks unmoved"),
+        _reading(
+            "G1",
+            gates,
+            unread,
+            _g1_step,
+            f"{hook_runs} hook run(s) agree with the seals",
+            hook_log_findings=_hook_log_findings(gates),
+        ),
+        _reading("G2", gates, unread, _g2_step, "every agent commit ran the hook; hooks unmoved"),
         _g3(gates, unread),
     )
 

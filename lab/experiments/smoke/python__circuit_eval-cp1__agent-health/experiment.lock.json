@@ -2,9 +2,31 @@
   "analysis": {
     "alpha": 0.05,
     "baseline_arm": "baseline",
+    "max_exclusion_difference": null,
     "max_exclusion_fraction": 0.2,
     "min_effects": {},
-    "min_pairs": 5
+    "min_pairs": 5,
+    "outcome_types": {
+      "aggregate": {
+        "binary": []
+      },
+      "problems": {
+        "scb/circuit_eval.checkpoint_1@38d627ecf668": {
+          "binary": [
+            "solve_rate",
+            "reached",
+            "final_solved",
+            "solve_rate_errata",
+            "reached_errata",
+            "final_solved_errata",
+            "solve_rate_solvable",
+            "reached_solvable",
+            "final_solved_solvable"
+          ],
+          "checkpoints": 1
+        }
+      }
+    }
   },
   "assessment": {
     "metric": {
@@ -41,13 +63,13 @@
         }
       },
       "scorer": {
-        "correctness@7": {
-          "digest": "52c3b299d2ee8aac6197186226b76c79a2ab069fe73932e3d81c9d67ffcdee17",
+        "correctness@8": {
+          "digest": "32b40d67b210fd565a5b874abd487f6a12951b6d60b44db32c537bd4ab0fc8d1",
           "metadata": {
             "implementation": "raidar.scoring.correctness:correctness_scorer",
-            "implementation_digest": "70d2b74c0bcf0a48419f67bbaf7c694009b2ac080263550150edc77496fcf80e",
+            "implementation_digest": "954c50f21fb22a4f3fa66cadacded0f79f473693966bb3c1b7b925724a87e10d",
             "manifest": {
-              "description": "Oracle verdicts per checkpoint and trajectory, from the oracle step records.",
+              "description": "Reference-solvable SCB success and raw SCB verdicts per checkpoint and trajectory.",
               "evidence_required": [
                 "oracle.cases"
               ],
@@ -199,7 +221,7 @@
                   "unit": null
                 },
                 {
-                  "description": "Solvable-set solve: every case in the checkpoint's solvable set (the cases the reference passes in every validation repeat) passed; unavailable without a solvable set, never zero.",
+                  "description": "Reference-solvable SCB success: every case the reference passes in every validation repeat passed; unavailable without a solvable set, never zero. Not specification compliance.",
                   "direction": "higher_better",
                   "exactness": "native",
                   "id": "solved_solvable",
@@ -211,7 +233,7 @@
                   "unit": null
                 },
                 {
-                  "description": "Solvable-set solved checkpoints in the trajectory (continue view).",
+                  "description": "Reference-solvable SCB successful checkpoints in the trajectory (continue view).",
                   "direction": "higher_better",
                   "exactness": "native",
                   "id": "solved_checkpoints_solvable",
@@ -223,7 +245,7 @@
                   "unit": null
                 },
                 {
-                  "description": "Solvable-set consecutive checkpoints solved from the first (strict view).",
+                  "description": "Reference-solvable SCB consecutive successful checkpoints (strict view).",
                   "direction": "higher_better",
                   "exactness": "native",
                   "id": "reached_solvable",
@@ -239,7 +261,7 @@
                 "*"
               ],
               "tools": [],
-              "version": "7"
+              "version": "8"
             },
             "tool_lock": {}
           }
@@ -254,18 +276,18 @@
       "metric": "scb-canonical-oneshot@1",
       "scorer_config": {},
       "scorers": [
-        "correctness@7"
+        "correctness@8"
       ]
     },
     "tools": {}
   },
-  "document_sha256": "dcc6ed06005012a26e123f6fc690ec815b21b896fd13d40f9992cfee18754b84",
+  "document_sha256": "5f4a1e50a8fb43c44aafec0b9b6abbbf6e4b07ca21aa3cb50c824797207321dd",
   "execution": {
     "arms": {
       "baseline": {
         "adapter": "codex",
         "agent": "agent",
-        "agent_release": "codex@2",
+        "agent_release": "codex@3",
         "capabilities": {
           "command_output": "command_execution and file_change items of the --json stream and the session rollout",
           "global_instructions": "placement.instructions {home}/AGENTS.md in the run's CODEX_HOME",
@@ -277,11 +299,11 @@
           "version_pin": "0.156.1",
           "workflow_skills": "placement.skills .agents/skills in the workspace /app"
         },
-        "digest": "7103ce93d69151ce0bb9a2b76929b51d073f1d179400215330d9c70473a3aa8e",
+        "digest": "6a30376e81af009cd3917a3c87faac16c6ca8ba10787955b4fc7cdb36ffd1e32",
         "model": "gpt-6-luna",
         "packages": {},
         "primitive_code": {
-          "build": "b3b52ae87b6244ce6a83f6cb0db3566718415f9972c4c39451952568b530a959"
+          "build": "41fd99f4d719533b380e518d567848f5a5989bb7027c4b8ed613ae5a069e89b3"
         },
         "provider": "openai",
         "reasoning": "low",
@@ -300,7 +322,7 @@
           "id": "agent",
           "model": "gpt-6-luna",
           "reasoning": "low",
-          "release": "codex@2"
+          "release": "codex@3"
         }
       ],
       "arms": [
@@ -343,7 +365,7 @@
     ],
     "references": {
       "agent": {
-        "codex@2": {
+        "codex@3": {
           "digest": "36bf2bd7d6e482206c62eb4eed7bc06a5e03ce808a8022fae02ef8afc193989b",
           "metadata": {
             "adapter": "codex",
@@ -427,10 +449,25 @@
             ],
             "task_sha256": "0cdda12fb5a2c68270f63581682b7f7e94a0cc8be0641a0ab1b78142cf278938",
             "validation": {
+              "grader": {
+                "environment_id": "sha256:715698bfd52661aa5627a3a9d22ea24db40b3716e5d78c6c8793976055973c06",
+                "image": "raidar-oracle-grader:963c14e63ff5e15d",
+                "implementation_sha256": null
+              },
               "not_run": [
                 "native_parity_positive",
                 "native_parity_negative"
               ],
+              "spec_determinacy": {
+                "assertions": {
+                  "audited": 0,
+                  "total": null
+                },
+                "audit_version": null,
+                "flagged": [],
+                "flagged_count": null,
+                "status": "unmeasured"
+              },
               "verdict": "validated_partial"
             }
           }
@@ -451,7 +488,7 @@
     "versions": {
       "agents": {
         "agent": {
-          "release": "codex@2",
+          "release": "codex@3",
           "version": "0.156.1"
         }
       },
@@ -461,20 +498,20 @@
   "experiment": {
     "id": "python__circuit_eval-cp1__agent-health",
     "source": "experiment.yaml",
-    "source_sha256": "79d2b60e368b0bb2cfb543bd31f39aa52bcd6a3f91375e882bc9d534cbb37b5b",
-    "spec_sha256": "feaaccee8bb81d5a4b871a714ed176af86bc8cfe27fcad083fd18a1b553bf683"
+    "source_sha256": "e952592976f48793bfaa055126d3d6f75ca0141692341c6ad7d1b36fa82695ad",
+    "spec_sha256": "20cd4a1583d893ea7fe26b131da10fbe9e368072c975e26a1c604aedb6570146"
   },
-  "lock_sha256": "9314ba2a9ec0cac89b3db119f40c8338912e5a1ddc4412c42d155e51283ee21f",
+  "lock_sha256": "97e9fa3e0e821b8ee58aa4100283dab49074d2b524502200ed39e607bacef0f8",
   "lock_version": 5,
   "overrides": {
     "flags": {},
     "set": []
   },
   "sections": {
-    "analysis": "144d50057229f81b6136f89cfe8df3c9cf5dbbbec9a279c66acba88e027528b3",
-    "assessment": "c8b1eebaf930e33d0d3db248ac263369e786f535116bc280de053f45c2dbb127",
-    "execution": "9314ba2a9ec0cac89b3db119f40c8338912e5a1ddc4412c42d155e51283ee21f",
-    "toolchain": "df7f62209849294be7fe28203b50c7865e833f912557e05e62948413912ff363"
+    "analysis": "a9e70f16a3d8fde7db8251be753771af765c98ad0c0b01202934c7622c4976f4",
+    "assessment": "71e69b93d905ffd089575c775f29463930fa04ef2b1dce473af168f2042e0cc6",
+    "execution": "97e9fa3e0e821b8ee58aa4100283dab49074d2b524502200ed39e607bacef0f8",
+    "toolchain": "8aead72e2be8c5327134e6a09c1dc8c37b684f67819ccab4b97875b369c8e5ef"
   },
   "spec": {
     "agents": [
@@ -482,7 +519,7 @@
         "id": "agent",
         "model": "gpt-6-luna",
         "reasoning": "low",
-        "release": "codex@2"
+        "release": "codex@3"
       }
     ],
     "analysis": {
@@ -490,6 +527,7 @@
       "attempts": 1,
       "baseline_arm": "baseline",
       "concurrency": 1,
+      "max_exclusion_difference": null,
       "max_exclusion_fraction": 0.2,
       "min_effects": {},
       "min_pairs": 5,
@@ -510,7 +548,7 @@
       "metric": "scb-canonical-oneshot@1",
       "scorer_config": {},
       "scorers": [
-        "correctness@7"
+        "correctness@8"
       ]
     },
     "description": "Operational smoke of the experiment path; not citable.",
@@ -540,6 +578,6 @@
     "litellm": "1.102.1",
     "python": "3.13.7",
     "raidar": "0.15.0",
-    "raidar_spec": "955279cceab002f47035eb9e1c07e510f8f242f9303b71399bc6d40f6fb2787c"
+    "raidar_spec": "82712823b9d6a9fe6542194e9e278f88dee40610cee431ce20858a22ab1610cc"
   }
 }

@@ -73,7 +73,7 @@ flowchart LR
   - The workflow's build prompt carries `%%%TASK%%%` once, plus one slot per enabled package, each used exactly once.
   - Optionally, build asks for a structured reply such as `acceptance-reply/1`.
   - A user testing a new build approach edits only the workflow's build prompt and settings.
-- **Stage package (stage).** A versioned folder, `lab/stages/<name>/`, written to the package contract `stage/1` (section 5.2). It holds:
+- **Stage package (stage).** A versioned folder, `lab/stages/<ns>/<name>/` (exactly two levels; upstream packages use `raidar/`), referenced as `ns/name@N` and written to the package contract `stage/1` (section 5.2). It holds:
   - a manifest;
   - a prompt fragment;
   - skills and instructions;
@@ -84,7 +84,7 @@ flowchart LR
 
   A stage is never a step of its own. It contributes to the checkpoint's primary session (section 5.1). Define and verify are packages like any user's.
 - **Primitive.** Raidar-owned code that a package switches on and configures, but never replaces. Each primitive has a contract version, `name/N`, e.g. `gate/1`, `stop/1`, `jev-judge/1` or `criteria/1`. Primitives are where the lab's guarantees live.
-- **Release.** A frozen `name@N` mapped to a content digest in `lab/releases.yaml`. Agents, workflows and stage packages all use releases. Package names may carry a namespace (`ns/name@N`), and the namespace `raidar/` is reserved.
+- **Release.** A frozen `name@N` mapped to a content digest in `lab/releases.yaml`. Agents, workflows and stage packages all use releases. Stage references require a namespace (`ns/name@N`) and the namespace `raidar/` is reserved for upstream packages; agent and workflow references stay `name@N`.
 - **Session.** One agent conversation with its own context.
   - Each checkpoint has exactly one **primary** session. The work happens there, and its turns are resumed for repairs, fixes and rework.
   - An **isolated** session would be a fresh session of the same agent, started by the runner. It is a future primitive and not part of `stage/1`. Harness-native subagents are never isolated sessions.
@@ -129,7 +129,7 @@ flowchart LR
 **Design:**
 1. **From pin to use, with `make` targets only.**
    ```text
-   make problem-import PROBLEM=…  →  make problem-validate PROBLEM=… REPEATS=3  →  use in an experiment
+   make problem-import PROBLEM=…  →  make problem-validate PROBLEM=… REPEATS=5  →  use in an experiment
    ```
    Both steps write **generated** pin records, which are committed like experiment locks: the lab must reproduce identity without the network. Nothing per problem is hand-written, and errata and sensitivities stay optional additions.
 2. **Solvable sets and the randomness check move to validation time.** They are no longer phase 6, after phases 3–5.
@@ -249,7 +249,7 @@ All of a checkpoint's stages contribute to its one **primary session**. No stage
 ### 5.2 The package contract `stage/1`
 
 ```text
-lab/stages/<name>/                  folder name = manifest name; no version in any path
+lab/stages/<ns>/<name>/             exactly two levels; folder name = manifest name; no version in any path
   stage.yaml                        manifest (contract stage/1)
   prompt.md                         fragment for the build frame's %%%<NAME>%%% slot
   instructions.md                   optional
@@ -260,7 +260,7 @@ lab/stages/<name>/                  folder name = manifest name; no version in a
 ```
 
 ```yaml
-# lab/stages/define/stage.yaml   (illustrative; exact keys fixed in phase 4's contract page)
+# lab/stages/raidar/define/stage.yaml   (illustrative; exact keys fixed in phase 4's contract page)
 contract: stage/1
 name: define
 summary: The builder writes a feature definition with the define tool before building.
@@ -278,7 +278,7 @@ skills: [feature-definition, aspect-writing]
 ```
 
 ```yaml
-# lab/stages/verify/stage.yaml   (the Python gate; language lives in the package)
+# lab/stages/raidar/verify/stage.yaml   (the Python gate; language lives in the package)
 contract: stage/1
 name: verify
 requires: { gate: gate/1 }
@@ -437,11 +437,11 @@ The rule is therefore attribution by control run, from `stage-stop-failure-opus.
 
   | Target | Does |
   |---|---|
-  | `make stage-new NAME=x [FROM=docs-check]` | Copies an example package |
-  | `make stage-lock NAME=x` | Locks the tool's dependencies; wheels only |
-  | `make stage-check NAME=x [REPLAY=<trial>]` | Schema, contracts, digest and closure; runs the fixtures offline in the pack container as the agent's user; prints the release line |
+  | `make stage-new NAME=ns/x [FROM=docs-check]` | Copies an example package |
+  | `make stage-lock NAME=ns/x` | Locks the tool's dependencies; wheels only |
+  | `make stage-check NAME=ns/x [REPLAY=<trial>]` | Schema, contracts, digest and closure; runs the fixtures offline in the pack container as the agent's user; prints the release line |
   | `make stage-list` | Every package, its latest release and digest |
-  | `make stage-info NAME=x` | The expanded manifest: commands, triggers, outputs, resolved params, closure |
+  | `make stage-info NAME=ns/x` | The expanded manifest: commands, triggers, outputs, resolved params, closure |
   | `make workflow-new NAME=x [FROM=one-shot-verify]` | Copies a shipped workflow as a starting point; the default template is `one-shot-verify` |
 
   `releases-check` and `structure-check` are extended to cover packages.
@@ -451,7 +451,7 @@ The rule is therefore attribution by control run, from `stage-stop-failure-opus.
     - a package can mislead the agent;
     - it can read what the agent's user can read, including the harness credential (codex's `CODEX_HOME/auth.json`, `lab/agents/codex.yaml:40`);
     - it can use the trial's network allowlist.
-  - **Mitigation:** for the lab's own and factory-x decisions, only packages merged through a reviewed PR count, with `CODEOWNERS` on `lab/stages/`.
+  - **Mitigation:** for the lab's own and factory-x decisions, only packages merged through a reviewed PR count, with `CODEOWNERS` on `lab/stages/raidar/` for upstream packages.
   - A separate stage-call user is deferred (section 11).
 
 ### 5.7 Shipped packages, workflows and authoring tiers
@@ -610,7 +610,7 @@ Migration, in order:
 
 **Acceptance test for Need 1 (AT-N1).** Starting from a clean checkout:
 1. `make problem-import SOURCE=scb@<commit> PROBLEMS=<two problems not yet imported>`;
-2. `make problem-validate PROBLEMS=… REPEATS=3`;
+2. `make problem-validate PROBLEMS=… REPEATS=5`;
 3. an experiment binding both problems (one of them as `checkpoints: 2`) locks and runs one real smoke.
 
 Throughout, no file is hand-written per problem and no edit is made under `orchestrator/src`. The report shows the solvable-set rate with the raw outcome beside it.
@@ -659,7 +659,7 @@ Throughout, no file is hand-written per problem and no edit is made under `orche
     - option E (packages) adopted;
     - build is a fixed frame;
     - the canary rule, applied to the gate too;
-    - a shared registry from the start, with the K2 choices: committed imports, latest only, `[ns/]name@N`, no release writer, fixtures excluded from the digest;
+    - a shared registry from the start, with the K2 choices: committed imports, latest only, `ns/name@N` (namespace required), no release writer, fixtures excluded from the digest;
     - C4 accepted and documented;
     - the C1 wording;
     - judges and scorers stay Raidar-owned (C3);

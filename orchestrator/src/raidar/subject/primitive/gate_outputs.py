@@ -55,21 +55,25 @@ class CheckOutputs:
             }
 
     async def keep_hook(self, log: str) -> None:
-        """Copies for each commit-hook run in the broker's log not seen before (by ``seq``)."""
+        """Copies for each commit-hook run in the hook's log not seen before.
+
+        The agent's user writes that log, so a run is named by its line number, never by a field
+        a line claims.
+        """
         lines = [line for line in log.splitlines() if line.strip()]
-        for line in lines[self._hook_lines :]:
+        for number, line in enumerate(lines[self._hook_lines :], self._hook_lines + 1):
             run = _json_object(line)
             checks = run.get("checks")
             if not isinstance(checks, list):
                 continue
-            await self.keep(checks, f"hook-{run.get('seq')}")
+            await self.keep(checks, f"hook-{number}")
             kept = [
                 {"name": check.get("name"), "outputs": check["outputs"]}
                 for check in checks
                 if isinstance(check, dict) and "outputs" in check
             ]
             if kept:
-                self.hook_runs.append({"seq": run.get("seq"), "checks": kept})
+                self.hook_runs.append({"seq": number, "checks": kept})
         self._hook_lines = len(lines)
 
     async def _copy(self, name: str, output: Output, captured: object, dest: Path) -> CopiedOutput:

@@ -3,8 +3,9 @@
 Only the version the tree holds resolves: the register's latest version of the name, whose
 registered hash must equal the definition's content hash now. An edited definition with no
 new release, an unregistered name or an archived version is refused, so a lock always names
-exactly the bytes it ran. A reference is always ``[ns/]name@N``: a bare name, ``latest``, a
-branch, a tag or a path never parses.
+exactly the bytes it ran. An agent or workflow reference is ``name@N`` and a stage reference is
+``ns/name@N`` (the namespace is required): a bare name, ``latest``, a branch, a tag or a path
+never parses.
 
 A package workflow's hash folds in each package's release, digest and effective params
 (``subject.stages`` resolves them), so releasing a changed package makes every workflow that uses

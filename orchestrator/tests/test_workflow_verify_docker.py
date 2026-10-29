@@ -3,13 +3,14 @@
 No model runs. A scripted attacker, running as the agent's user exactly as a model's tool calls
 would, plants a ``conftest.py`` and a repository configuration (``core.fsmonitor`` and a clean and
 process filter) that try to write into the gate's trusted files (``/opt/raidar-verify``), the hook
-log and state, the hook broker's socket, the gate scratch, the define state (with the define stage
-really enabled) and the native session logs, with the write-and-restore and the plain-rewrite
-forms. Each attempt must fail (the trusted files, the hook log, the socket) or be detected as a
-named integrity violation (what the agent's user can legitimately write: the session logs and the
-define state), a forged hook record must be refused, and nothing of the agent's may run as root.
-A throwaway negative control runs the archived pre-S6 root seal on the same plant and shows the
-plant executes as root there.
+log, the gate scratch, the define state (with the define stage really enabled) and the native
+session logs, with the write-and-restore and the plain-rewrite forms. The trusted files must stay
+denied and the seal's record channel closed. What the agent's user owns is only a reading or a
+named violation: its hook log (written, rewritten, deleted or forged: ``G1`` reads it, nothing
+invalidates) and the session logs and define state (named integrity violations). No root hook
+broker, socket or directory exists, and nothing of the agent's may run as root. A throwaway
+negative control runs the archived pre-S6 root seal on the same plant and shows the plant
+executes as root there.
 """
 
 from __future__ import annotations
@@ -152,37 +153,39 @@ def test_the_gate_set_up_ran_the_conftest_in_the_hook_and_the_seals(
         assert stage["ending"] == "gate_passed"
 
 
-def test_no_gate_step_and_no_agent_code_ran_as_root_and_the_broker_logged_the_hooks(
+def test_no_gate_step_and_no_agent_code_ran_as_root_and_no_broker_exists(
     attacked: tuple[Path, str, bool],
 ) -> None:
     agent, mode, defining = attacked
     stage = workflow(agent)["verify"]
     seals = [gate["process"] for gate in stage["gates"]]
-    hook_lines = (agent / stage["hook_log"]).read_text().splitlines()
-    hooks = [json.loads(line) for line in hook_lines]
-    assert hooks, "the broker logged no hook run"
-    facts = [stage["setup_check"]["process"], *seals, *(hook["process"] for hook in hooks)]
+    facts = [stage["setup_check"]["process"], *seals]
     assert all(f["uid"] == f["euid"] == AGENT_UID for f in facts), facts
-    assert all(hook["broker"]["uid"] == 0 for hook in hooks)  # only the broker is root
-    assert all(hook["peer_uid"] == AGENT_UID for hook in hooks)  # whoever asked was the agent
-    trusted_ancestors = {1, *(hook["broker"]["pid"] for hook in hooks)}
     for attack in attacks(agent):
         assert attack["uid"] == attack["euid"] == AGENT_UID, attack
         unexpected_root = [
-            parent
-            for parent in attack["ancestry"]
-            if parent["uid"] == 0 and parent["pid"] not in trusted_ancestors
+            parent for parent in attack["ancestry"] if parent["uid"] == 0 and parent["pid"] != 1
         ]
-        assert unexpected_root == [], attack["ancestry"]
-    broker_pids = trusted_ancestors - {1}
-    in_hook = [a for a in attacks(agent) if any(p["pid"] in broker_pids for p in a["ancestry"])]
-    in_seal = [a for a in attacks(agent) if a not in in_hook and a["label"] == "conftest"]
+        assert unexpected_root == [], attack["ancestry"]  # nothing between pid 1 and the agent
+        gates = [p for p in attack["ancestry"] if p["gate"]]
+        assert all(p["uid"] == AGENT_UID for p in gates), gates  # hook and seal run as the agent
+    in_hook = [a for a in attacks(agent) if any(p["gate"] == "hook" for p in a["ancestry"])]
+    in_seal = [a for a in attacks(agent) if any(p["gate"] == "seal" for p in a["ancestry"])]
     assert in_hook, "no attack ran in a hook decision"  # a real attempt, not an incidental count
     if not (defining and mode == "rewrite"):  # a state the hook broke makes the seal stop early
         assert in_seal, "no attack ran in a seal"
+        piped = [
+            r["outcome"]
+            for a in in_seal
+            for r in a["results"]
+            if r["attack"] == "parent-record-pipe"
+        ]
+        assert piped, "no seal record-pipe attack was recorded"
+        assert set(piped) == {"denied"}, piped  # the seal's stdout cannot be reopened
+    assert outcomes(agent, "no-broker") == {"absent"}  # no root hook broker, socket or directory
 
 
-def test_the_root_owned_tools_hook_state_and_broker_cannot_be_written_or_forged(
+def test_the_root_owned_tools_cannot_be_written_and_the_seals_record_channel_stays_closed(
     attacked: tuple[Path, str, bool],
 ) -> None:
     agent, _, _ = attacked
@@ -203,28 +206,28 @@ def test_the_root_owned_tools_hook_state_and_broker_cannot_be_written_or_forged(
         "unlink:/opt/raidar-verify/hooks/pre-commit",
     }
     assert {result["outcome"] for result in trusted} == {"denied"}
-    for name in (
-        "hook-log",
-        "hook-log-unlink",
-        "hook-state-rename",
-        "broker-socket-unlink",
-        "parent-record-pipe",
-    ):
-        assert outcomes(agent, name) == {"denied"}, name
-    assert outcomes(agent, "broker-forged-request") == {"rejected"}
+    assert outcomes(agent, "parent-record-pipe") <= {"denied", "hook-is-the-agents-own"}
     tools = workflow(agent)["verify"]["tools"]
     assert tools["sha256_before"] == tools["sha256_after"]
     assert {c.id: c.status for c in gate_family([(STEP, agent)])}["G3"] == "pass"
 
 
-def test_what_the_agents_user_can_write_is_detected_as_a_named_violation(
+def test_what_the_agents_user_can_write_is_a_reading_or_a_named_violation(
     attacked: tuple[Path, str, bool],
 ) -> None:
     agent, mode, defining = attacked
     record = workflow(agent)
     verify_names = {item["name"] for item in record["verify"]["integrity"]}
     session_names = verify_names | {item["name"] for item in record["integrity"]}
-    assert not {n for n in verify_names if n.startswith("hook_log")}, verify_names  # denied
+    for name in ("hook-log", "hook-log-unlink", "hook-log-forged-line"):
+        assert "denied" not in outcomes(agent, name), name  # the log is the agent's to write
+        assert "wrote" in outcomes(agent, name), name
+    checks = {c.id: c for c in gate_family([(STEP, agent)])}
+    assert checks["G1"].status != "violation"  # a forged or rewritten hook log is a reading
+    assert checks["G2"].status != "violation"
+    if not (defining and mode == "rewrite"):
+        findings = checks["G1"].evidence["hook_log_findings"]
+        assert any("hook_log_rewritten" in found for found in findings), findings
     if mode == "restore":
         assert "session_log_touched" in session_names, session_names
         assert ("define_state_touched" in verify_names) is defining, verify_names

@@ -36,12 +36,12 @@ BASE_EXPERIMENT: dict[str, Any] = {
     "id": "python__fixture__test",
     "problems": [{"ref": "scb/forge@abc123"}],
     "runtime": "python",
-    "agents": [{"id": "luna", "release": "codex@2", "model": "gpt-6-luna", "reasoning": "low"}],
+    "agents": [{"id": "luna", "release": "codex@3", "model": "gpt-6-luna", "reasoning": "low"}],
     "arms": [
         {"id": "baseline", "agent": "luna", "workflow": "one-shot@1"},
         {"id": "guided", "agent": "luna", "workflow": "one-shot@1"},
     ],
-    "assessment": {"scorers": ["correctness@7"]},
+    "assessment": {"scorers": ["correctness@8"]},
     "analysis": {"baseline_arm": "baseline", "attempts": 5, "seed": 7},
 }
 
@@ -102,6 +102,6 @@ def fixture_resolvers(*, checkpoints: int = 8) -> list[RegistryResolver]:
         AgentResolver(),
         WorkflowResolver(),
         InMemoryResolver(
-            RefKind.SCORER, {"correctness@7": {"exact": True}}, tool_versions={"pytest": "8.4.1"}
+            RefKind.SCORER, {"correctness@8": {"exact": True}}, tool_versions={"pytest": "8.4.1"}
         ),
     ]

@@ -62,13 +62,13 @@ def tree(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
                 "schema": 2,
                 "name": "gated",
                 "build": {"prompt": "%%%GATE_CHECK%%% %%%TASK%%%"},
-                "stages": [{"use": "gate-check@1"}],
+                "stages": [{"use": "acme/gate-check@1"}],
             }
         )
     )
     register = yaml.safe_load(releases_file(root).read_text())
     register["stages"] = {
-        "gate-check@1": load_stage_package(stages_root(root) / "gate-check").digest
+        "acme/gate-check@1": load_stage_package(stages_root(root) / "acme" / "gate-check").digest
     }
     register["workflows"]["gated@1"] = released_workflow(
         "gated@1", repo_root=root, draft=True
@@ -112,8 +112,8 @@ def test_a_package_arm_records_packages_and_primitive_code_never_stage_code(tree
     assert "stage_code" not in identity
     assert identity["workflow_sha256"] == workflow.digest
     assert identity["packages"] == {
-        "gate-check": {
-            "release": "gate-check@1",
+        "acme/gate-check": {
+            "release": "acme/gate-check@1",
             "sha256": stage.package.digest,
             "installed": {"arm64": "t" * 64},
         }
@@ -126,9 +126,9 @@ def test_a_package_arm_records_packages_and_primitive_code_never_stage_code(tree
 def test_the_proof_is_part_of_the_arm_digest(tree: Path) -> None:
     (stage,) = released_workflow("gated@1", repo_root=tree).stages
     _write_proof(stage.package.digest, tree_digest="a" * 64)
-    first = _arm(tree, "gated@1", {"gate-check": load_evidence(stage)}).identity()["digest"]
+    first = _arm(tree, "gated@1", {"acme/gate-check": load_evidence(stage)}).identity()["digest"]
     _write_proof(stage.package.digest, tree_digest="b" * 64)
-    second = _arm(tree, "gated@1", {"gate-check": load_evidence(stage)}).identity()["digest"]
+    second = _arm(tree, "gated@1", {"acme/gate-check": load_evidence(stage)}).identity()["digest"]
 
     assert first != second
 
@@ -162,7 +162,7 @@ def test_a_normal_arm_needs_the_stage_check_proof_a_draft_may_lack_it(tree: Path
 
     missing = evidence_issues(stage, load_evidence(stage))
     assert missing
-    assert "make stage-check NAME=gate-check" in missing[0]
+    assert "make stage-check NAME=acme/gate-check" in missing[0]
 
     _write_proof(stage.package.digest)
     assert evidence_issues(stage, load_evidence(stage)) == []
@@ -174,7 +174,9 @@ def test_a_stop_needs_its_check_record_and_the_lock_binds_it(tmp_path: Path) -> 
     from raidar.subject.workflow.package_checks import ResolvedStage
 
     package = load_stage_package(fixture_package("note-state", tmp_path))
-    stage = ResolvedStage(Release.parse("note-state@1"), package, package.effective_params())
+    stage = ResolvedStage(
+        Release.parse_stage("acme/note-state@1"), package, package.effective_params()
+    )
     root = tmp_path / "proof"
     root.mkdir()
     assert load_evidence(stage, root).check is None
@@ -192,10 +194,10 @@ def test_a_stop_needs_its_check_record_and_the_lock_binds_it(tmp_path: Path) -> 
 def test_a_normal_arm_without_proof_is_refused_and_a_draft_records_it_absent(tree: Path) -> None:
     workflow = released_workflow("gated@1", repo_root=tree)
 
-    with pytest.raises(ArmResolutionError, match="make stage-check NAME=gate-check"):
+    with pytest.raises(ArmResolutionError, match="make stage-check NAME=acme/gate-check"):
         workflow_evidence(workflow)
     with draft_resolution():
-        assert workflow_evidence(workflow)["gate-check"].installed == {}
+        assert workflow_evidence(workflow)["acme/gate-check"].installed == {}
 
 
 # ---- trial integrity: installed tree and check record against the lock ------------------------

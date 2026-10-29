@@ -18,7 +18,7 @@ runtime: python
 
 agents:
   - id: agent
-    release: codex@2
+    release: codex@3
     model: gpt-6-luna
     reasoning: low
 
@@ -34,7 +34,7 @@ arms:
     workflow: one-shot@1
 
 assessment:
-  scorers: [correctness@7, code-quality@8, resource-usage@6, process-compliance@11]
+  scorers: [correctness@8, code-quality@8, resource-usage@7, process-compliance@11]
   metric: scb-canonical@2
 
 analysis:

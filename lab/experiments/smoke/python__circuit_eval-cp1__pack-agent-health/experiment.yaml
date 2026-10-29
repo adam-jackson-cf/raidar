@@ -1,5 +1,5 @@
 # Operational smoke: one trial per released agent, not citable. Today the only agent release
-# is codex@2 (lab/releases.yaml); add an agent and an arm here when another agent is released.
+# is codex@3 (lab/releases.yaml); add an agent and an arm here when another agent is released.
 # The agent benchmark remains a separate experiment under lab/experiments/benchmark/.
 schema_version: 3
 kind: smoke
@@ -13,7 +13,7 @@ runtime: python
 
 agents:
   - id: codex
-    release: codex@2
+    release: codex@3
     model: gpt-6-luna
     reasoning: low
 
@@ -26,7 +26,7 @@ arms:
     workflow: one-shot@1
 
 assessment:
-  scorers: [correctness@7]
+  scorers: [correctness@8]
   metric: scb-canonical-oneshot@1
 
 analysis:

@@ -39,7 +39,7 @@ def stage() -> None:
     help=f"Template to copy (one of: {', '.join(TEMPLATES)}).",
 )
 def stage_new(name: str, template: str) -> None:
-    """Write the complete tier-2 command package NAME under lab/stages/ (never overwrites)."""
+    """Write the tier-2 command package NAME (<ns>/<name>) under lab/stages/ (never overwrites)."""
     root = stage_package.stages_root() / stage_package.valid_name(name)
     if root.exists():
         raise click.ClickException(f"refusing to overwrite {root}")

@@ -58,7 +58,7 @@ class PackageSite:
     logs_dir: Path
     package: StagePackage
     reference: str
-    """The package's ``[ns/]name`` as released."""
+    """The package's ``<ns>/<name>`` as released."""
     installed: InstalledPackage
     task: str
     params: Mapping[str, JsonValue] = field(default_factory=dict)

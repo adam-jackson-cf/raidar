@@ -23,7 +23,7 @@ LOCKED_TREE = "t" * 64
 def _setup(tmp_path: Path) -> tuple[Release, Any, dict[str, Any]]:
     package = load_stage_package(fixture_package("gate-check", tmp_path))
     locked = {"installed": {"arm64": LOCKED_TREE}}
-    return Release.parse("gate-check@1"), package, locked
+    return Release.parse_stage("acme/gate-check@1"), package, locked
 
 
 def _installed(digest: str) -> Any:
@@ -51,7 +51,7 @@ async def test_the_second_checkpoint_reuses_the_install_and_is_checked_against_t
     present.append(_installed(LOCKED_TREE))  # the container now holds the install
     second = await install_locked(object(), tmp_path, release, package, locked)
 
-    assert installs == ["gate-check"]  # installed once
+    assert installs == ["acme/gate-check"]  # installed once
     assert first.digest == second.digest == LOCKED_TREE
 
 
@@ -81,15 +81,17 @@ async def test_an_unmeasurable_existing_install_is_an_integrity_failure(
     monkeypatch.setattr(package_trial, "reuse_installed", reuse)
     release, package, locked = _setup(tmp_path)
 
-    with pytest.raises(TrialInvalid, match="integrity: gate-check@1: installed tree"):
+    with pytest.raises(TrialInvalid, match="integrity: acme/gate-check@1: installed tree"):
         await install_locked(object(), tmp_path, release, package, locked)
 
 
 def test_a_package_that_is_not_the_locked_bytes_is_invalid(tmp_path: Path) -> None:
     fixture_package("gate-check", stages_root(tmp_path))
-    release = Release.parse("gate-check@1")
+    release = Release.parse_stage("acme/gate-check@1")
 
     with pytest.raises(TrialInvalid, match="is not in the lock's packages"):
         package_trial.load_locked_package(release, {}, tmp_path)
     with pytest.raises(TrialInvalid, match="the lock holds"):
-        package_trial.load_locked_package(release, {"gate-check": {"sha256": "f" * 64}}, tmp_path)
+        package_trial.load_locked_package(
+            release, {"acme/gate-check": {"sha256": "f" * 64}}, tmp_path
+        )

@@ -11,13 +11,12 @@ subcommand prints says which user ran it (``process``: uid, gid, pid). The gate 
 reads from the agent's repository configuration and never changes the agent's work (index, HEAD,
 work tree). Subcommands:
 
-- ``hook``: the workspace's ``pre-commit`` hook, run by the agent's own ``git commit``. It is a
-  client of the root-owned broker (``broker``): it names no verdict or tree, prints what the
-  broker relays and exits as the broker's record says (0 passed, 1 refused, 126 the gate could
-  not run). ``hook-decide`` is the decision, run by the broker as the agent's user: it checks the
-  work tree and returns its record (verdict, checked workspace digest, index and raw trees, per-
-  check results) on a pipe; the broker is the only writer of the hash-chained, root-owned hook
-  log. The hook decides nothing for the runner: the seal does.
+- ``hook``: the workspace's ``pre-commit`` hook, run by the agent's own ``git commit`` as the
+  agent's user. It checks the work tree, prints the decision, appends its record (verdict,
+  checked workspace digest, index and raw trees, per-check results) to the hook log and exits as
+  the verdict says (0 passed, 1 refused, 126 the gate could not run). The agent's user owns the
+  log, so its lines are readings, never trusted evidence. The hook decides nothing for the
+  runner: the seal does.
 - ``seal``: the runner's record of the work after a turn (the authoritative verdict). It always
   runs the checks over the work tree as the agent left it and prints one JSON record: the
   verdict, the tree it judged (a Git tree built from the work tree with raw bytes in a private
@@ -58,13 +57,10 @@ import os
 import shutil
 import signal
 import site
-import socket
 import stat
-import struct
 import subprocess
 import sys
 import tempfile
-import threading
 import time
 from collections.abc import Callable, Generator, Sequence
 from contextlib import suppress
@@ -78,9 +74,6 @@ PASSED, REFUSED, ERROR = "passed", "refused", "error"
 EXITS = {PASSED: 0, REFUSED: 1, ERROR: 126}
 HOOK_RUNS = "hook-runs.jsonl"
 CHECK_TIMEOUT_S = 600
-BROKER_TIMEOUT_S = CHECK_TIMEOUT_S * 6
-BROKER_REQUEST_LIMIT = 65536
-BROKER_PID = "broker.pid"
 TEST_OUTCOMES = "tests.json"
 OUTPUT_CHARS = 20_000
 RULES_BEGIN = "<!-- raidar verify rules: begin -->"
@@ -603,66 +596,29 @@ def _verdict(checks: list[CheckResult], seconds: float) -> Decision:
     return Decision(REFUSED if refused else PASSED, seconds, checks)
 
 
-def _chain_of(previous: str, record: dict[str, Any]) -> str:
-    body = {k: v for k, v in record.items() if k != "chain"}
-    return hashlib.sha256((previous + json.dumps(body, sort_keys=True)).encode()).hexdigest()
-
-
-def chain_problem(text: str) -> str | None:
-    """Why a hook log is not the log the broker wrote: a line that does not parse, is out of order
-    or does not chain to the one before it (``None``: it chains). The log is root-owned and the
-    broker its only writer, so the agent's user cannot rewrite it; the stage still checks it, as
-    defence in depth where the file's permissions are the test's own."""
-    previous = ""
-    for number, line in enumerate(filter(str.strip, text.splitlines()), 1):
-        try:
-            record = json.loads(line)
-        except ValueError:
-            return f"line {number} is not JSON"
-        if not isinstance(record, dict) or record.get("seq") != number:
-            return f"line {number} is out of sequence"
-        if record.get("chain") != _chain_of(previous, record):
-            return f"line {number} does not chain to the line before it"
-        previous = str(record["chain"])
-    return None
-
-
 def _append_line(path: Path, record: dict[str, Any]) -> None:
-    """Append one chained JSON line (the broker, the log's only writer)."""
-    lines = path.read_text(encoding="utf-8").splitlines() if path.exists() else []
-    previous = ""
-    if lines:
-        with suppress(ValueError):
-            previous = str(json.loads(lines[-1]).get("chain", ""))
-    record = {**record, "seq": len(lines) + 1}
-    record["chain"] = _chain_of(previous, record)
+    """Append one JSON line to the hook log (the agent's user owns it: a reading)."""
     with path.open("a", encoding="utf-8") as handle:
         handle.write(json.dumps(record, sort_keys=True) + "\n")
 
 
 def hook(config: dict[str, Any]) -> int:
-    """The pre-commit hook, run by the agent's own ``git commit``: a client of the broker.
+    """The pre-commit hook, run by the agent's own ``git commit``, as the agent's user.
 
-    It asks the root-owned broker to run the gate's decision (as the agent's user), prints what the
-    broker relays and exits as the broker's record says. It writes nothing itself: the hook log
-    is the broker's, so the agent's user can neither forge nor rewrite it.
+    It runs the gate's decision over the work tree, prints it, appends its record to the hook log
+    and exits as the verdict says. The log is the agent's to write, so the stage reads it as
+    telemetry; the seal is the authoritative run.
     """
-    request = {"env": {k: os.environ[k] for k in GIT_KEPT if k in os.environ}}
+    os.chdir(config["root"])
+    decision, record = _hook_decision(config)
+    sys.stdout.write(decision.text())
+    record.update(who="hook", at=_now(), exit=EXITS[decision.verdict])
     try:
-        with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as conn:
-            conn.settimeout(BROKER_TIMEOUT_S)
-            socket_path = Path(config["broker_socket"])
-            os.chdir(socket_path.parent)  # a unix socket's path is short: connect by name
-            conn.connect(socket_path.name)
-            conn.sendall(json.dumps(request).encode() + b"\n")
-            conn.shutdown(socket.SHUT_WR)
-            data = b"".join(iter(lambda: conn.recv(65536), b""))
-        reply = json.loads(data)
-    except (OSError, ValueError) as exc:
-        sys.stdout.write(f"verify-gate: ERROR, the hook broker could not be reached: {exc}\n")
+        _append_line(Path(config["hook_state"]) / HOOK_RUNS, record)
+    except OSError as exc:
+        sys.stdout.write(f"verify-gate: ERROR, the hook log could not be written: {exc}\n")
         return EXITS[ERROR]
-    sys.stdout.write(str(reply.get("output", "")))
-    return int(reply.get("exit", EXITS[ERROR]))
+    return EXITS[decision.verdict]
 
 
 def _raw_tree(config: dict[str, Any], scratch: Path) -> str:
@@ -674,13 +630,12 @@ def _raw_tree(config: dict[str, Any], scratch: Path) -> str:
             shutil.rmtree(private, ignore_errors=True)
 
 
-def hook_decide(config: dict[str, Any], record_fd: int) -> int:
-    """The hook's decision, run by the broker as the agent's user (never root).
+def _hook_decision(config: dict[str, Any]) -> tuple[Decision, dict[str, Any]]:
+    """The hook's decision and its record.
 
     The index tree is the commit's own (inherited ``GIT_INDEX_FILE``); the checks judge the work
     tree, so the record's ``tree`` is the commit's only when it is exactly the raw work tree that
-    was checked (a commit of anything else was not gated). The record goes to the broker's pipe,
-    out of reach of the checks' processes.
+    was checked (a commit of anything else was not gated).
     """
     root, scratch = Path(config["root"]), Path(config["scratch"])
     scratch.mkdir(parents=True, exist_ok=True)
@@ -706,7 +661,6 @@ def hook_decide(config: dict[str, Any], record_fd: int) -> int:
             integrity += witness_findings(label, was, now, allowed, "the hook run")
     except Exception as exc:  # noqa: BLE001 - a gate that cannot run is an error, never a pass
         decision = Decision(ERROR, 0.0, error=f"{type(exc).__name__}: {exc}")
-    sys.stdout.write(decision.text())
     record = {
         "verdict": decision.verdict,
         "tree": tree,
@@ -719,134 +673,7 @@ def hook_decide(config: dict[str, Any], record_fd: int) -> int:
         "integrity": integrity,
         "process": process_facts(),
     }
-    with os.fdopen(record_fd, "w", encoding="utf-8") as pipe:
-        pipe.write(json.dumps(record))
-    return EXITS[decision.verdict]
-
-
-def _peer_uid(conn: socket.socket) -> int | None:
-    with suppress(OSError, AttributeError):
-        peercred = getattr(socket, "SO_PEERCRED", None)
-        if peercred is None:
-            return None
-        creds = conn.getsockopt(socket.SOL_SOCKET, peercred, struct.calcsize("3i"))
-        return int(struct.unpack("3i", creds)[1])
-    return None
-
-
-def _read_all(descriptor: int) -> bytes:
-    with os.fdopen(descriptor, "rb") as stream:
-        return stream.read()
-
-
-def _hook_child(config: dict[str, Any], config_path: Path, env: dict[str, str]) -> tuple[str, Any]:
-    """Run ``hook-decide`` as the agent's user; its printed text and its record."""
-    uid, gid = int(config["agent_uid"]), int(config["agent_gid"])
-    drop: dict[str, Any] = {}
-    if os.getuid() == 0:
-        drop = {"user": uid, "group": gid, "extra_groups": []}
-    reader, writer = os.pipe()
-    child_env = {
-        "PATH": "/usr/local/bin:/usr/bin:/bin", "HOME": config["agent_home"],
-        "USER": config["agent_name"], "LOGNAME": config["agent_name"], "LANG": "C.UTF-8",
-        **env,
-    }  # fmt: skip
-    command = [
-        sys.executable, "-B", str(Path(__file__).resolve()), "hook-decide",
-        "--config", str(config_path), "--record-fd", str(writer),
-    ]  # fmt: skip
-    collected: list[bytes] = []
-    proc = subprocess.Popen(
-        command, cwd=config["root"], env=child_env, stdin=subprocess.DEVNULL,
-        stdout=subprocess.PIPE, stderr=subprocess.STDOUT, pass_fds=(writer,), **drop,
-    )  # fmt: skip
-    os.close(writer)
-    thread = threading.Thread(target=lambda: collected.append(_read_all(reader)))
-    thread.start()
-    try:
-        out, _ = proc.communicate(timeout=BROKER_TIMEOUT_S)
-    except subprocess.TimeoutExpired:
-        proc.kill()
-        out, _ = proc.communicate()
-    thread.join(timeout=5)
-    text = out.decode("utf-8", errors="replace")
-    try:
-        record = json.loads(b"".join(collected))
-    except ValueError:
-        record = None
-    return text, record
-
-
-def _handle(conn: socket.socket, config: dict[str, Any], config_path: Path, lock: Any) -> None:
-    with conn:
-        conn.settimeout(30)
-        raw = b""
-        with suppress(OSError):
-            while not raw.endswith(b"\n") and len(raw) < BROKER_REQUEST_LIMIT:
-                chunk = conn.recv(65536)
-                if not chunk:
-                    break
-                raw += chunk
-        try:
-            asked = json.loads(raw)
-            env = {k: v for k, v in asked["env"].items() if k in GIT_KEPT and isinstance(v, str)}
-        except (ValueError, KeyError, AttributeError, TypeError):
-            conn.sendall(json.dumps({"error": "malformed request", "exit": 126}).encode())
-            return
-        text, record = _hook_child(config, config_path, env)
-        verdict = record.get("verdict") if isinstance(record, dict) else None
-        if verdict not in EXITS:
-            record = {"verdict": ERROR, "error": "the hook decision produced no record"}
-            verdict = ERROR
-        record.update(who="hook", at=_now(), exit=EXITS[verdict], peer_uid=_peer_uid(conn))
-        record["broker"] = process_facts()
-        with lock:
-            _append_line(Path(config["hook_state"]) / HOOK_RUNS, record)
-        with suppress(OSError):
-            conn.sendall(json.dumps({"output": text, "exit": EXITS[verdict]}).encode())
-
-
-def broker(config: dict[str, Any], config_path: Path) -> dict[str, Any]:
-    """Start the hook broker as a daemon and return once it listens.
-
-    Started by the stage as root, from root-owned files: it runs no agent code itself. For each
-    request it runs the gate's decision as the agent's user (uid and gid dropped before exec) and
-    is the only writer of the hook log, which stays root-owned and read-only to the agent.
-    """
-    socket_path = Path(config["broker_socket"])
-    socket_path.parent.mkdir(parents=True, exist_ok=True)
-    socket_path.unlink(missing_ok=True)
-    pid = os.fork()
-    if pid:
-        for _ in range(100):
-            if socket_path.exists():
-                return {"pid": pid, "socket": str(socket_path), "process": process_facts()}
-            time.sleep(0.1)
-        return {"error": "the broker did not start", "process": process_facts()}
-    os.setsid()
-    null = os.open(os.devnull, os.O_RDWR)
-    for descriptor in (0, 1, 2):
-        os.dup2(null, descriptor)
-    (socket_path.parent / BROKER_PID).write_text(str(os.getpid()))
-    lock = threading.Lock()
-    server = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-    os.chdir(socket_path.parent)
-    server.bind(socket_path.name)
-    socket_path.chmod(0o666)  # any user may ask; only the broker writes the log
-    server.listen(8)
-    while True:
-        conn, _ = server.accept()
-        threading.Thread(target=_handle, args=(conn, config, config_path, lock)).start()
-
-
-def broker_stop(config: dict[str, Any]) -> dict[str, Any]:
-    pid_file = Path(config["broker_socket"]).parent / BROKER_PID
-    stopped = False
-    with suppress(OSError, ValueError, ProcessLookupError):
-        os.kill(int(pid_file.read_text()), signal.SIGKILL)
-        stopped = True
-    Path(config["broker_socket"]).unlink(missing_ok=True)
-    return {"stopped": stopped, "process": process_facts()}
+    return decision, record
 
 
 def snapshot(directory: Path) -> dict[str, Any]:
@@ -1312,15 +1139,11 @@ def _check_scratch(config: dict[str, Any]) -> str:
     return "scratch writable"
 
 
-def _check_broker(config: dict[str, Any]) -> str:
-    socket_path, trusted = Path(config["broker_socket"]), int(config["trusted_uid"])
+def _check_hook_log(config: dict[str, Any]) -> str:
     log = Path(config["hook_state"]) / HOOK_RUNS
-    if not socket_path.is_socket():
-        raise GateError(f"no hook broker listens at {socket_path}")
-    info = log.stat()
-    if info.st_uid != trusted or info.st_mode & 0o022:
-        raise GateError(f"{log} is not the broker's: uid {info.st_uid}, mode {info.st_mode:o}")
-    return f"hook broker at {socket_path}; hook log owned by uid {trusted}, no one else writes it"
+    if not log.is_file() or not os.access(log, os.W_OK):
+        raise GateError(f"{log} is missing or not writable by the hook's user")
+    return f"hook log {log} writable by uid {os.getuid()}"
 
 
 def _check_git(config: dict[str, Any]) -> str:
@@ -1348,7 +1171,7 @@ SETUP_TAIL: tuple[tuple[str, SetupCheck], ...] = (
     ("hook_installed", _check_hook),
     ("rules_block", _check_rules),
     ("state_writable", _check_scratch),
-    ("hook_broker", _check_broker),
+    ("hook_log", _check_hook_log),
     ("git", _check_git),
 )
 
@@ -1500,13 +1323,10 @@ def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="verify-gate")
     commands = parser.add_subparsers(dest="command", required=True)
     names = ("hook", "seal", "baseline", "canary", "setup-check", "workspace-setup", "reap")
-    for name in (*names, "broker", "broker-stop"):
+    for name in names:
         command = commands.add_parser(name)
         if name != "reap":
             command.add_argument("--config", type=Path, required=True)
-    deciding = commands.add_parser("hook-decide")
-    deciding.add_argument("--config", type=Path, required=True)
-    deciding.add_argument("--record-fd", type=int, required=True)
     snapshotting = commands.add_parser("snapshot")
     snapshotting.add_argument("--dir", type=Path, required=True)
     sealing = commands.choices["seal"]
@@ -1548,9 +1368,6 @@ STANDALONE: dict[str, Callable[[argparse.Namespace], int]] = {
 """Subcommands that read no gate configuration."""
 CONFIGURED: dict[str, Callable[[dict[str, Any], argparse.Namespace], int]] = {
     "hook": lambda c, a: hook(c),
-    "hook-decide": lambda c, a: hook_decide(c, a.record_fd),
-    "broker": lambda c, a: _emit(broker(c, a.config)),
-    "broker-stop": lambda c, a: _emit(broker_stop(c)),
     "baseline": lambda c, a: _emit(baseline(c)),
     "canary": lambda c, a: _emit(canary(c)),
     "setup-check": lambda c, a: _emit(setup_check(c)),
@@ -1564,7 +1381,7 @@ def _protect_record_channel() -> None:
     """A check must not reopen the trusted parent's stdout or record pipe through procfs.
 
     Linux resets dumpability on exec, so every gate process sets it before spawning checks.
-    The hook's pipe is additionally created and owned by the root broker.
+    A hook's checks run in the hook's own process tree, so they are covered the same way.
     """
     if sys.platform != "linux":
         return

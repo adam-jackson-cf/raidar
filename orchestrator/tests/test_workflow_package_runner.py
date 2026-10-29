@@ -57,13 +57,13 @@ BUILD = "Build:\n%%%NOTE_STATE%%%\nTask: %%%TASK%%%"
 TASK = "Write the note."
 TREE = "t" * 64
 ARCH = "arm64"
-RELEASE = Release.parse("note-state@1")
+RELEASE = Release.parse_stage("acme/note-state@1")
 PLACEMENT = ".agents/skills"
 WATCH = "/app/.raidar/note-state"
 
 
 def definition_json(params: dict[str, Any] | None = None, fix_rounds: int = 0) -> dict[str, Any]:
-    use: dict[str, Any] = {"use": "note-state@1"}
+    use: dict[str, Any] = {"use": "acme/note-state@1"}
     if params:
         use["params"] = params
     return {
@@ -181,7 +181,7 @@ class Lab:
         entry.update(overrides)
         for key in drop:
             entry.pop(key)
-        return {"note-state": entry}
+        return {"acme/note-state": entry}
 
     def without_instructions(self) -> None:
         (stage_folder(RELEASE, self.repo) / "instructions.md").unlink()
