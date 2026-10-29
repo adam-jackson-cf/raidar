@@ -109,6 +109,7 @@ async def _resolved(
         provided=resolution.provided,
         unprovided=resolution.unprovided,
         resolve_s=resolution.resolve_s,
+        resolve_attempts=resolution.attempts,
         arch_divergent=_divergent(resolution, counterpart),
     )
 

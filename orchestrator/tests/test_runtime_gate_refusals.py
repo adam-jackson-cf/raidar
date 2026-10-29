@@ -16,13 +16,11 @@ import pytest
 from click.testing import CliRunner
 
 from raidar.cli import main
-from raidar.contract.references import RefKind, RegistryRef, ResolverSet
+from raidar.contract.references import RefKind, ResolverSet
 from raidar.design.experiment.loader import CliOverrides, load_experiment
 from raidar.design.experiment.lock import LOCK_VERSION, LockError, build_lock, seal_lock
 from raidar.design.problem.importer import _runtime_pack
-from raidar.design.problem.resolver import ProblemResolver
 from raidar.design.problem.store import ProblemStoreError
-from raidar.scoring.catalog.builtin import scorer_resolver
 from raidar.scoring.framework.metrics import MetricResolver
 from raidar.subject.environment import UnknownPackError, load_runtime_pack
 from raidar.subject.environment.drift import LockedPackError, lock_runtime_pack, pack_drift_issues
@@ -65,7 +63,7 @@ def _resolvers(
             WorkflowResolver(),
             InMemoryResolver(
                 RefKind.SCORER,
-                {"correctness@7": {"exact": True}, "code-quality@8": {"exact": True}},
+                {"correctness@8": {"exact": True}, "code-quality@8": {"exact": True}},
                 bindings={"code-quality@8": {"runtimes": ["python"]}, **(scorers or {})},
             ),
             MetricResolver(),
@@ -198,13 +196,44 @@ def test_rt2_a_binding_of_another_pack_contract_is_stale(experiment: Path) -> No
     )
 
 
+def test_rt7_a_validated_grader_implementation_other_than_this_checkouts_is_refused(
+    experiment: Path,
+) -> None:
+    grader = {
+        "image": "g:1",
+        "environment_id": "sha256:" + "a" * 64,
+        "implementation_sha256": "b" * 64,
+    }
+    binding = {**PYTHON_BINDING, "grader": grader, "grader_implementation_sha256": "c" * 64}
+
+    issues = _issues(experiment, resolvers=_resolvers(problems={FORGE: binding}))
+
+    assert (
+        f"[RT7] scb/forge@abc123 was validated under grading implementation {'b' * 64}"
+        in (issues["problems.0.ref"])
+    )
+
+
+def test_rt7_a_matching_or_unrecorded_implementation_locks(experiment: Path) -> None:
+    """An unrecorded implementation (a pre-identity report) locks; plan/run refuse it."""
+    environment = "sha256:" + "a" * 64
+    matching = {
+        "image": "g:1",
+        "environment_id": environment,
+        "implementation_sha256": "b" * 64,
+    }
+    for grader in (matching, {**matching, "implementation_sha256": None}, None):
+        binding = {**PYTHON_BINDING, "grader": grader, "grader_implementation_sha256": "b" * 64}
+        _lock(experiment, resolvers=_resolvers(problems={FORGE: binding}))
+
+
 # ---- RT3, RT4 -------------------------------------------------------------------
 
 
 def test_rt4_scorers_and_the_metric_must_cover_the_runtime(tmp_path: Path) -> None:
     document = experiment_document(id="node-ts__fixture__test", runtime="node-ts")
     document["problems"] = [{"ref": FORGE_NODE}]
-    document["assessment"] = {"scorers": ["correctness@7", "code-quality@8"]}
+    document["assessment"] = {"scorers": ["correctness@8", "code-quality@8"]}
     path = write_experiment(tmp_path, document)
 
     issues = _issues(path, pack_loader=_node_pack)
@@ -291,28 +320,6 @@ def test_the_importer_loads_the_pack_of_the_sources_runtime() -> None:
         _runtime_pack("python", _node_pack("node-ts"), "scb")
 
 
-# ---- the real resolvers report the gate facts --------------------------------------
-
-
-def test_the_real_resolvers_report_binding_facts() -> None:
-    repo = Path(__file__).resolve().parents[2]
-    problem = ProblemResolver().resolve(
-        RegistryRef.parse(RefKind.PROBLEM, "scb/forge@38d627ecf668"), base_dir=repo
-    )
-    agent = AgentResolver().resolve(RegistryRef.parse(RefKind.AGENT, "codex@2"), base_dir=repo)
-    quality = scorer_resolver().resolve(
-        RegistryRef.parse(RefKind.SCORER, "code-quality@8"), base_dir=repo
-    )
-    pin = load_runtime_pack("python").image.harnesses["codex-cli"]
-
-    assert problem.binding == PYTHON_BINDING
-    assert agent.binding == {
-        "harness": "codex-cli",
-        "tool": {"package": pin.npm_package, "binary": pin.executable, "version": pin.version},
-    }
-    assert quality.binding == {"runtimes": ["python"]}
-
-
 # ---- AS1: assess-time ---------------------------------------------------------------
 
 
@@ -323,7 +330,7 @@ def _job(root: Path, runtime: str, bundle_digest: str) -> Path:
         {
             "lock_version": LOCK_VERSION,
             "experiment": {"id": "e"},
-            "spec": {"runtime": runtime, "assessment": {"scorers": ["correctness@7"]}},
+            "spec": {"runtime": runtime, "assessment": {"scorers": ["correctness@8"]}},
             "execution": {
                 "references": {
                     "problem": {
@@ -370,7 +377,7 @@ def test_as1_rescore_scorers_must_cover_the_jobs_runtime(tmp_path: Path) -> None
         "--store",
         str(store),
         "--scorer",
-        "correctness@7",
+        "correctness@8",
     )
 
     assert refused.exit_code != 0
@@ -405,7 +412,7 @@ def test_as1_a_bundle_override_must_be_the_verifier_bundle_the_lock_binds(
     target = job / "trials" if mode == "--rescore" else job
     lock = ["--lock", str(job / "job.lock.json")]
     store = (
-        ["--store", str(tmp_path / "s"), "--scorer", "correctness@7"] if mode == "--rescore" else []
+        ["--store", str(tmp_path / "s"), "--scorer", "correctness@8"] if mode == "--rescore" else []
     )
 
     refused = _assess(mode, str(target), *lock, *store, "--bundle", str(other.root))

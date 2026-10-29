@@ -159,6 +159,11 @@ async def run_offline_coverage(
     environment = await sandbox.environment_id()
     if environment != record.grader.environment_id:
         raise RegradeError("offline coverage grader environment differs from the trial")
+    if record.canary.status == "passed":
+        # As in the trial: the submission's grading failed and the starter canary graded, so
+        # there is no grading evidence to hold a coverage run against.
+        verdict = ineligible(f"grading_failed_on_submission:{record.canary.trigger}")
+        return CoverageRun(verdict, (), None, environment, 0.0, None)
     if grading.infra_failure is not None:
         # As in the trial: a failed grading run gets no coverage run.
         verdict = ineligible(f"grading_infra_failure:{grading.infra_failure.code}")

@@ -12,7 +12,9 @@ fails too, the index or uv is unreachable and ``DependencyInfraError`` is raised
 each requirement is probed alone and classified from the index's file listing as
 ``no-wheel``, ``after-cutoff`` or ``unresolvable``. Direct references and
 unparseable lines are refused up front. A closure over the caps (200 packages,
-1 GiB of wheels, 120 s) is ``cap-exceeded``.
+1 GiB of wheels) is ``cap-exceeded``. A resolution that runs past its time cap (120 s) is
+retried up to the configured ``timeout_retries``; when the attempts run out it is
+``DependencyInfraError`` (never ``cap-exceeded`` and never a score).
 """
 
 from __future__ import annotations
@@ -150,6 +152,8 @@ class Resolution:
     provided: tuple[str, ...]
     unprovided: tuple[Unprovided, ...]
     resolve_s: float
+    attempts: int = 1
+    """Resolution attempts made: more than one means earlier attempts timed out."""
     packages: int = 0
     wheel_bytes: int = 0
 
@@ -335,6 +339,9 @@ class UvResolver:
 
     uv_bin: str = "uv"
     timeout_s: float = TIMEOUT_S
+    timeout_retries: int | None = None
+    """Extra attempts after a timed-out resolution. ``None``: no bound is configured, so the
+    first timeout is an infrastructure failure."""
     max_packages: int = MAX_PACKAGES
     max_bytes: int = MAX_WHEEL_BYTES
     compile_args: tuple[str, ...] = ()
@@ -438,7 +445,6 @@ class UvResolver:
 
     def __call__(self, requirements: Sequence[str], *, arch: str, exclude_newer: str) -> Resolution:
         started = time.perf_counter()
-        deadline = time.monotonic() + self.timeout_s
         refused: list[Unprovided] = []
         usable: list[str] = []
         for text in dict.fromkeys(requirements):
@@ -451,11 +457,7 @@ class UvResolver:
                 refused.append(Unprovided(requirement=text, reason="direct-reference"))
             else:
                 usable.append(text)
-        # Reserve availability diagnosis inside, not beyond, the 120-second total cap.
-        work_deadline = deadline - min(CANARY_TIMEOUT_S, self.timeout_s / 4)
-        lock, unprovided = self._resolve_usable(
-            usable, arch, exclude_newer, work_deadline, deadline
-        )
+        lock, unprovided, attempts = self._resolve_with_retries(usable, arch, exclude_newer)
         elapsed = time.perf_counter() - started
         provided = provided_by_lock(usable, lock) if lock else ()
         return Resolution(
@@ -465,7 +467,37 @@ class UvResolver:
             resolve_s=elapsed,
             packages=len(pylock_packages(lock)) if lock else 0,
             wheel_bytes=_closure_bytes(lock) if lock else 0,
+            attempts=attempts,
         )
+
+    def _resolve_with_retries(
+        self, usable: list[str], arch: str, exclude_newer: str
+    ) -> tuple[str, list[Unprovided], int]:
+        """Resolve within the time cap, retrying a timed-out attempt up to ``timeout_retries``.
+
+        A timeout is never a verdict about the packages: when the attempts run out it is a
+        ``DependencyInfraError`` that says how many were made. ``cap-exceeded`` stays for the
+        deterministic package-count and byte caps only.
+        """
+        attempts = 0
+        while True:
+            attempts += 1
+            deadline = time.monotonic() + self.timeout_s
+            # Reserve availability diagnosis inside, not beyond, the total cap.
+            work_deadline = deadline - min(CANARY_TIMEOUT_S, self.timeout_s / 4)
+            try:
+                lock, unprovided = self._resolve_usable(
+                    usable, arch, exclude_newer, work_deadline, deadline
+                )
+            except _Exhausted:
+                if self.timeout_retries is not None and attempts <= self.timeout_retries:
+                    continue
+                bound = "not configured" if self.timeout_retries is None else self.timeout_retries
+                raise DependencyInfraError(
+                    f"dependency resolution timed out in {attempts} attempt(s) of "
+                    f"{self.timeout_s:g} s each (retry bound: {bound})"
+                ) from None
+            return lock, unprovided, attempts
 
     def _resolve_usable(
         self,
@@ -475,18 +507,17 @@ class UvResolver:
         deadline: float,
         total_deadline: float,
     ) -> tuple[str, list[Unprovided]]:
-        """Bound package resolution and its availability diagnosis by one total deadline."""
+        """Bound package resolution and its availability diagnosis by one total deadline.
+
+        Raises ``_Exhausted`` when the deadline passes: the caller retries or fails as infra.
+        """
         if not usable:
             return "", []
-        try:
-            code, stdout, stderr = self._compile(usable, arch, exclude_newer, deadline)
-            if code == 0:
-                return self._within_caps(stdout, usable)
-            self._infra(arch, exclude_newer, stderr, total_deadline)
-            return self._diagnose(usable, arch, exclude_newer, deadline, total_deadline)
-        except _Exhausted:
-            self._infra(arch, exclude_newer, "", total_deadline)
-            return "", [Unprovided(requirement=text, reason="cap-exceeded") for text in usable]
+        code, stdout, stderr = self._compile(usable, arch, exclude_newer, deadline)
+        if code == 0:
+            return self._within_caps(stdout, usable)
+        self._infra(arch, exclude_newer, stderr, total_deadline)
+        return self._diagnose(usable, arch, exclude_newer, deadline, total_deadline)
 
     def _prefixes(self) -> tuple[str, ...]:
         if self.wheel_url_prefixes is not None:

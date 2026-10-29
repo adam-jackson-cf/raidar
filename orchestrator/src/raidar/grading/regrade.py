@@ -143,6 +143,12 @@ def compare(record: StepRecord, result: StepGrade, environment_id: str) -> tuple
         )
     if record.coverage.parity != result.parity:
         differences.append(f"parity: {record.coverage.parity} -> {result.parity}")
+    before_canary = (record.canary.status, record.canary.trigger)
+    if before_canary != (result.canary.status, result.canary.trigger):
+        differences.append(
+            f"canary: {record.canary.status}/{record.canary.trigger} -> "
+            f"{result.canary.status}/{result.canary.trigger}"
+        )
     before, after = record.submission_dependencies, result.grading.dependencies
     if (
         before is not None

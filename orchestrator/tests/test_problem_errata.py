@@ -161,9 +161,8 @@ def test_the_lock_pins_the_errata_in_the_execution_identity(
         trials_dir=tmp_path / "trials",
         bundle_root=tmp_path / "bundle",
         docker_context="orbstack",
-        errata=plan.problems[0].errata,
     )
-    assert config.verifier.kwargs["errata"] == {
+    assert config.verifier.kwargs["pinned"]["errata"] == {
         "sha256": metadata["errata"]["sha256"],
         "exclude_from_solved": [EXCLUDED],
     }
@@ -186,7 +185,7 @@ def test_errata_reach_correctness_config_from_the_lock_only(
     loaded, lock, _ = locked_experiment(
         tmp_path / "exp", fixture.ref, environment={"compose_init": False}
     )
-    config = lock_rescore_config(lock).scorers["correctness@7"]
+    config = lock_rescore_config(lock).scorers["correctness@8"]
     assert config["errata"] == {
         fixture.ref: {
             "sha256": lock_errata(lock)[fixture.ref].sha256,
@@ -197,13 +196,13 @@ def test_errata_reach_correctness_config_from_the_lock_only(
     explicit = loaded.spec.model_copy(
         update={
             "assessment": loaded.spec.assessment.model_copy(
-                update={"scorer_config": {"correctness@7": {"errata": {}}}}
+                update={"scorer_config": {"correctness@8": {"errata": {}}}}
             )
         }
     )
     issues = [issue.render() for issue in semantic_issues(explicit)]
     assert any(
-        issue.startswith("assessment.scorer_config.correctness@7.errata:") for issue in issues
+        issue.startswith("assessment.scorer_config.correctness@8.errata:") for issue in issues
     )
 
 
@@ -214,7 +213,10 @@ async def test_the_verifier_records_raw_and_errata_applied_verdicts(tmp_path: Pa
     place_step_artifact(tmp_path, "checkpoint_2", mul=False)
     errata = {"sha256": "e" * 64, "exclude_from_solved": [EXCLUDED]}
     verifier = await make_verifier(
-        tmp_path, FakeAgentEnvironment(), step="checkpoint_2", errata=errata
+        tmp_path,
+        FakeAgentEnvironment(),
+        step="checkpoint_2",
+        pinned={"errata": errata},
     )
     result = await verifier.verify()
     record = load_step_record(step_record_dir(tmp_path / "trial", "checkpoint_2"))

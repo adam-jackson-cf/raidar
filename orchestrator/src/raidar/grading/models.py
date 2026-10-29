@@ -15,6 +15,7 @@ run (see ``raidar.grading.parity``).
 from __future__ import annotations
 
 from enum import StrEnum
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -56,6 +57,22 @@ class InfraFailure(VerifierModel):
 
     code: str = Field(min_length=1)
     detail: str = ""
+
+
+class CanaryRecord(VerifierModel):
+    """Whether the same sandbox configuration can grade the starter to completion.
+
+    A passing canary means grading *completed* on the starter; it does not mean the starter
+    solves anything, and it cannot rule out a grader defect that depends on the submission's
+    input. It is run only when the submission's grading crashed or timed out
+    (``trigger`` is that failure's code): ``passed`` attributes the failure to the submission
+    (a failed agent outcome), ``failed`` leaves it infrastructure.
+    """
+
+    status: Literal["not_run", "passed", "failed"] = "not_run"
+    trigger: str = ""
+    detail: str = ""
+    seconds: float = 0.0
 
 
 class VerifierGrade(VerifierModel):
