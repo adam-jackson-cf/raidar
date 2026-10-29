@@ -19,6 +19,7 @@ from __future__ import annotations
 import asyncio
 import json
 import tempfile
+from collections.abc import Mapping
 from dataclasses import dataclass
 from importlib.metadata import version
 from pathlib import Path
@@ -43,8 +44,7 @@ from raidar.design.problem.validation import (
     reference_tree_digest,
     run_checks,
 )
-from raidar.grading.grader_image import ensure_grader_image, grader_image_tag
-from raidar.grading.sandbox import DockerCopySandbox, GradingSandbox
+from raidar.grading.sandbox import GradingSandbox
 
 ENGINES = ("direct", "harbor")
 
@@ -53,7 +53,7 @@ ENGINES = ("direct", "harbor")
 class ValidateOptions:
     docker_context: str
     engine: str = "direct"
-    repeats: int = 3
+    repeats: int = 5
     concurrency: int = direct.DEFAULT_CONCURRENCY
     timeout_s: float = direct.DEFAULT_RUN_TIMEOUT_S
     native_runner: Path | None = None
@@ -61,20 +61,17 @@ class ValidateOptions:
     audit: bool = True
 
 
-async def _docker_sandbox(
-    problem: ImportedProblem, docker_context: str
-) -> tuple[DockerCopySandbox, dict[str, object]]:
-    image = await ensure_grader_image(problem.bundle, docker_context=docker_context)
-    sandbox = DockerCopySandbox(image=image.tag, docker_context=docker_context)
-    return sandbox, {
-        "grader_image": image.tag,
-        "grader_environment_id": await sandbox.environment_id(),
-        "docker_context": docker_context,
+def _grader_identity(details: Mapping[str, object]) -> dict[str, str]:
+    """The identity ``direct.prepare_grader_sandbox`` recorded, as the verifier's pin."""
+    return {
+        "image": str(details["grader_image"]),
+        "environment_id": str(details["grader_environment_id"]),
+        "implementation_sha256": str(details["grader_implementation_sha256"]),
     }
 
 
 async def _harbor_runs(
-    problem: ImportedProblem, options: ValidateOptions, work: Path
+    problem: ImportedProblem, options: ValidateOptions, work: Path, grader: Mapping[str, str]
 ) -> dict[str, list[StepGrades]]:
     empty = work / "empty-starter"
     empty.mkdir(parents=True, exist_ok=True)
@@ -89,6 +86,7 @@ async def _harbor_runs(
             repeats=options.repeats,
             concurrency=options.concurrency,
             docker_context=options.docker_context,
+            grader=grader,
         )
     return runs
 
@@ -167,11 +165,14 @@ async def validate_problem(
         work = Path(tmp)
         if options.engine == "harbor":
             # The verifier grades in this content-addressed image (built on demand).
-            environment["grader_image"] = grader_image_tag(problem.bundle)
-            oracle = await _harbor_runs(problem, options, work)
+            _, details = await direct.prepare_grader_sandbox(problem, options.docker_context)
+            environment.update(details)
+            oracle = await _harbor_runs(problem, options, work, _grader_identity(details))
         else:
             if sandbox is None:
-                sandbox, details = await _docker_sandbox(problem, options.docker_context)
+                sandbox, details = await direct.prepare_grader_sandbox(
+                    problem, options.docker_context
+                )
                 environment.update(details)
             oracle = await direct.grade_references(
                 problem,
@@ -217,7 +218,7 @@ async def _audit(
 ) -> dict[str, object]:
     details: dict[str, object] = {}
     if sandbox is None:
-        sandbox, details = await _docker_sandbox(problem, options.docker_context)
+        sandbox, details = await direct.prepare_grader_sandbox(problem, options.docker_context)
     dynamic = await grade_audit_variants(
         problem,
         sandbox,
@@ -264,7 +265,7 @@ def default_report_path(store: ProblemStore, report: ValidationReport) -> Path:
     A real failure replaces earlier evidence even when other checks were skipped.
     An infra failure never replaces the committed report, and neither does a
     passing report for the same manifest that skipped a check the committed one ran
-    (e.g. ``--repeats 1`` over a full three-repeat validation): both go to the
+    (e.g. ``--repeats 1`` over a full five-repeat validation): both go to the
     uncommitted attempt path.
     """
     problem_id = ProblemId.parse(report.problem)

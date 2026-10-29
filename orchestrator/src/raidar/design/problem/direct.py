@@ -20,9 +20,24 @@ from raidar.design.problem.models import ProblemMode
 from raidar.design.problem.store import ImportedProblem
 from raidar.design.problem.validation import NEGATIVE, POSITIVE, Grade, StepGrades
 from raidar.grading.grader import DEFAULT_RUN_TIMEOUT_S, grade_step
-from raidar.grading.sandbox import GradingSandbox
+from raidar.grading.grader_image import ensure_grader_image
+from raidar.grading.records import grading_execution_digest
+from raidar.grading.sandbox import DockerCopySandbox, GradingSandbox
 
 DEFAULT_CONCURRENCY = 4
+
+
+async def prepare_grader_sandbox(
+    problem: ImportedProblem, docker_context: str
+) -> tuple[DockerCopySandbox, dict[str, object]]:
+    image = await ensure_grader_image(problem.bundle, docker_context=docker_context)
+    sandbox = DockerCopySandbox(image=image.tag, docker_context=docker_context)
+    return sandbox, {
+        "grader_image": image.tag,
+        "grader_environment_id": await sandbox.environment_id(),
+        "grader_implementation_sha256": grading_execution_digest(),
+        "docker_context": docker_context,
+    }
 
 
 def variant_snapshots(problem: ImportedProblem, empty: Path) -> dict[str, dict[str, Path]]:

@@ -63,8 +63,15 @@ def variant_task(problem: ImportedProblem, payloads: Mapping[str, Path], dest: P
 
 
 def trial_config(
-    task: Path, trials_dir: Path, name: str, bundle_root: Path, *, docker_context: str
+    task: Path,
+    trials_dir: Path,
+    name: str,
+    bundle_root: Path,
+    *,
+    docker_context: str,
+    grader: Mapping[str, str],
 ) -> TrialConfig:
+    """The validation trial; ``grader`` is the identity under validation (it pins itself)."""
     return TrialConfig(
         task=TaskConfig(path=task),
         trial_name=name,
@@ -79,6 +86,7 @@ def trial_config(
                 # Validation tasks collect no /app artifact; the snapshot is downloaded.
                 "snapshot_source": "download",
                 "coverage": False,
+                "pinned": {"grader": dict(grader)},
             },
         ),
     )
@@ -121,6 +129,7 @@ async def run_variant(
     repeats: int,
     docker_context: str,
     concurrency: int,
+    grader: Mapping[str, str],
 ) -> list[StepGrades]:
     """Run one variant's repeats within the selected target's concurrency limit."""
     if concurrency < 1:
@@ -129,7 +138,12 @@ async def run_variant(
     bundle_root = problem.bundle.root
     configs = [
         trial_config(
-            task, work / "trials", f"{variant}-{index}", bundle_root, docker_context=docker_context
+            task,
+            work / "trials",
+            f"{variant}-{index}",
+            bundle_root,
+            docker_context=docker_context,
+            grader=grader,
         )
         for index in range(repeats)
     ]

@@ -10,7 +10,7 @@ import pytest
 from click.testing import CliRunner
 
 from raidar.cli import main
-from raidar.design.problem import validator
+from raidar.design.problem import direct
 from raidar.design.problem.catalog import select_problems, source_catalog
 from raidar.design.problem.models import ProblemId
 from raidar.design.problem.store import ProblemStoreError
@@ -74,7 +74,7 @@ def test_bulk_validation_preserves_each_verdict_and_report(
         root = tmp_path / "sandbox" / problem.manifest.problem_id.problem
         return LocalProcessSandbox(root), {"sandbox": "local"}
 
-    monkeypatch.setattr(validator, "_docker_sandbox", sandbox)
+    monkeypatch.setattr(direct, "prepare_grader_sandbox", sandbox)
     runner = CliRunner()
     result = runner.invoke(
         main,
