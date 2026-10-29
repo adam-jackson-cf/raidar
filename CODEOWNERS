@@ -6,6 +6,7 @@
 /orchestrator/tests/ @adamjackson
 /scripts/ @adamjackson
 /lab/ @adamjackson
+/lab/stages/raidar/ @adamjackson
 /review-surface/ @adamjackson
 /docs/reboot/ @adamjackson
 /Makefile @adamjackson

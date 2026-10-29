@@ -184,8 +184,6 @@ ROW_CASES: list[tuple[str, Mutation]] = [
     ("W3", _remove("workflow/verify/gate.json")),
     ("W3", _set("verify", "gates", value=[])),
     ("W4", _set("verify", "ending", value="gate_error")),
-    ("W5", _remove("workflow/verify/hook-runs.jsonl")),
-    ("W5", _set("verify", "hook_log_sha256", value="0" * 64)),
     ("W6", _drop("verify", "setup_check")),
     ("W7", _set("verify", "setup_check", value={"status": "failed", "checks": []})),
     ("W8", _drop("define", "checks")),
@@ -201,7 +199,6 @@ ROW_CASES: list[tuple[str, Mutation]] = [
     ("W10", _remove("workflow/judge/call-0.result.json")),
     ("W10", _remove("workflow/verify/base-tests.json")),
     ("W10", _drop("verify", "judge_calls")),
-    ("W11", _set("verify", "integrity", value=[{"name": "hook_log_rewritten", "detail": "x"}])),
     ("W11", _set("integrity", value=[{"name": "session_log_removed", "detail": "x", "turn": 1}])),
 ]
 
@@ -229,6 +226,45 @@ def test_a_missing_required_artifact_of_an_enabled_stage_invalidates_the_trial(
     assert row in evidence.detail
 
 
+READINGS: list[tuple[str, Mutation]] = [
+    ("W5", _remove("workflow/verify/hook-runs.jsonl")),
+    ("W5", _set("verify", "hook_log_sha256", value="0" * 64)),
+]
+
+
+@pytest.mark.parametrize(("row", "change"), READINGS)
+def test_a_missing_or_altered_hook_log_is_a_reading_that_never_invalidates(
+    tmp_path: Path, row: str, change: Mutation
+) -> None:
+    t = healthy_trial(tmp_path)
+    agent = _materialise(t, define=True, verify=True, judge=True)
+    _mutate(agent, change)
+
+    checks = _checks(t)
+    assert checks[row].status == "unmeasured", checks[row].detail
+    report = audit_trial(t.job_dir, t.trial_dir, t.record, t.job())
+    assert all(c.passed for c in health_validity(report))
+
+
+def test_hook_log_findings_are_readings_but_session_log_findings_still_invalidate(
+    tmp_path: Path,
+) -> None:
+    t = healthy_trial(tmp_path)
+    agent = _materialise(t, define=True, verify=True, judge=True)
+    forged = [{"name": "hook_log_rewritten", "detail": "x"}]
+    _mutate(agent, _set("verify", "integrity", value=forged))
+
+    assert _checks(t)["W11"].status == "pass"
+    report = audit_trial(t.job_dir, t.trial_dir, t.record, t.job())
+    assert all(c.passed for c in health_validity(report))
+    g1 = next(c for c in report.checks if c.id == "G1")
+    assert g1.status != "violation"
+    assert g1.evidence["hook_log_findings"] == [f"{STEP}: hook_log_rewritten after ?"]
+
+    _mutate(agent, _set("verify", "integrity", value=[*forged, {"name": "session_log_removed"}]))
+    assert _checks(t)["W11"].status == "violation"
+
+
 def test_deleting_every_record_is_invalid_because_the_trial_config_still_expects_them(
     tmp_path: Path,
 ) -> None:
@@ -241,7 +277,7 @@ def test_deleting_every_record_is_invalid_because_the_trial_config_still_expects
             path.rmdir()
 
     violated = {i for i, c in _checks(t).items() if c.status == "violation"}
-    assert violated == {"W1", "W3", "W5", "W6", "W8", "W10"}
+    assert violated == {"W1", "W3", "W6", "W8", "W10"}
 
 
 def test_stages_the_config_does_not_enable_owe_nothing(tmp_path: Path) -> None:
@@ -274,7 +310,10 @@ def test_a_real_agent_run_without_a_readable_config_is_invalid_not_a_fallback(
     (t.trial_dir / "config.json").unlink()
 
     checks = _checks(t)
-    assert {c.status for c in checks.values()} == {"violation"}
+    assert {i: c.status for i, c in checks.items() if i != "W5"} == dict.fromkeys(
+        (i for i in checks if i != "W5"), "violation"
+    )
+    assert checks["W5"].status == "unmeasured"  # a reading, never a violation
     assert "applicability unknown" in checks["W1"].detail
 
 

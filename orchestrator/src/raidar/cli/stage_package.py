@@ -13,7 +13,7 @@ from raidar.subject.package import StagePackageError
 from raidar.subject.package.manifest import StagePackage
 from raidar.subject.package.registry import MANIFEST_FILE, STAGES_DIR, load_stage_package
 
-_NAME = re.compile(r"^([a-z0-9][a-z0-9-]*/)?[a-z0-9][a-z0-9-]*$")
+_NAME = re.compile(r"^[a-z0-9][a-z0-9-]*/[a-z0-9][a-z0-9-]*$")
 
 
 def stages_root() -> Path:
@@ -21,10 +21,10 @@ def stages_root() -> Path:
 
 
 def valid_name(value: str) -> str:
-    """``[<ns>/]<name>``; anything else is a bad parameter."""
+    """``<ns>/<name>``; anything else (including a bare name) is a bad parameter."""
     if not _NAME.fullmatch(value):
         raise click.BadParameter(
-            f"{value!r} is not a package name: [<ns>/]<name>, lowercase letters, digits, '-'",
+            f"{value!r} is not a package name: <ns>/<name>, lowercase letters, digits, '-'",
             param_hint="NAME",
         )
     return value
@@ -42,11 +42,11 @@ def load_named(name: str) -> tuple[Path, StagePackage]:
 
 
 def package_folders() -> list[Path]:
-    """Every folder under ``lab/stages/`` holding a ``stage.yaml`` (at most one namespace deep)."""
+    """Every folder ``lab/stages/<ns>/<name>/`` holding a ``stage.yaml``."""
     root = stages_root()
     if not root.is_dir():
         return []
-    found = [item for item in root.rglob(MANIFEST_FILE) if len(item.relative_to(root).parts) <= 3]
+    found = [item for item in root.rglob(MANIFEST_FILE) if len(item.relative_to(root).parts) == 3]
     return sorted(item.parent for item in found)
 
 

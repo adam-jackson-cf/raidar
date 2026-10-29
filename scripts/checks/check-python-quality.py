@@ -185,8 +185,8 @@ def _package_dir_diagnostics(relpath: str) -> list[Diagnostic]:
     }
     parts = Path(relpath).parts[:-1]
     if relpath.startswith("orchestrator/tests/fixtures/stages/"):
-        # A stage's hyphenated data-folder name is not a Python import package.
-        parts = parts[:4] + parts[5:]
+        # A stage's hyphenated namespace and name folders are not Python import packages.
+        parts = parts[:4] + parts[6:]
     for part in parts:
         if part in ignored_parts or _is_snake_case_name(part):
             continue

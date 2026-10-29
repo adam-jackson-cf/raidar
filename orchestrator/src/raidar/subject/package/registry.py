@@ -37,7 +37,7 @@ _TOP_DIRS = frozenset({SKILLS_DIR, TOOL_DIR})
 
 
 def stage_folder(release: Release, repo_root: Path = REPO_ROOT) -> Path:
-    """The folder ``lab/stages/[ns/]name`` a release reference names."""
+    """The folder ``lab/stages/<ns>/<name>`` a release reference names."""
     return lab_root(repo_root) / STAGES_DIR / release.name
 
 
@@ -116,15 +116,16 @@ def _check_tool(manifest: StageManifest, files: dict[str, StageFile]) -> None:
 
 
 def _check_location(root: Path) -> None:
-    """Refuse a symlinked package root or ancestor below ``stages``, and bad name components."""
+    """Refuse a symlinked package root or ancestor below ``stages``, and a path that is not
+    exactly ``stages/<namespace>/<name>`` with valid components."""
     if root.is_symlink():
         raise StagePackageError(f"{root}: a package root is never a symlink")
     if STAGES_DIR not in root.parts:
         return
     index = len(root.parts) - 1 - root.parts[::-1].index(STAGES_DIR)
     below = root.parts[index + 1 :]
-    if not 1 <= len(below) <= 2 or not all(NAME_RE.fullmatch(part) for part in below):
-        raise StagePackageError(f"{root}: expected {STAGES_DIR}/[namespace/]name")
+    if len(below) != 2 or not all(NAME_RE.fullmatch(part) for part in below):
+        raise StagePackageError(f"{root}: expected {STAGES_DIR}/<namespace>/<name>")
     for ancestor in root.parents:
         if ancestor.is_symlink():
             raise StagePackageError(f"{ancestor}: symlinked ancestors are refused")

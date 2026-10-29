@@ -931,7 +931,9 @@ async def test_an_expect_file_that_is_not_yaml_is_a_static_refusal_not_a_crash(
 
 
 def test_the_canonical_note_state_fixtures_meet_the_contract_for_its_stop_and_gate() -> None:
-    package = load_stage_package(Path(__file__).parent / "fixtures" / "stages" / "note-state")
+    package = load_stage_package(
+        Path(__file__).parent / "fixtures" / "stages" / "acme" / "note-state"
+    )
 
     assert set(required_cases(package)) == {"done", "closed", "resume", "pass", "refuse"}
     assert static_problems(package) == []

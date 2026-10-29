@@ -79,7 +79,7 @@ def test_call_boundary_and_its_consumers_are_allowed() -> None:
 
 
 def test_stage_data_names_do_not_relax_python_module_names() -> None:
-    prefix = "orchestrator/tests/fixtures/stages/third-party-check/tool/src/"
+    prefix = "orchestrator/tests/fixtures/stages/acme/third-party-check/tool/src/"
     assert rules.structure_diagnostics_for_relpath(prefix + "checker/main.py") == []
     found = rules.structure_diagnostics_for_relpath(prefix + "bad-module/main.py")
     assert [item.code for item in found] == ["PYQ105"]

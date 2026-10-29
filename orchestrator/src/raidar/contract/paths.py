@@ -42,7 +42,7 @@ def stage_checks_root() -> Path:
 
 
 def stages_root(repo_root: Path = REPO_ROOT) -> Path:
-    """Stage packages: ``lab/stages/[<ns>/]<name>/``."""
+    """Stage packages: ``lab/stages/<ns>/<name>/``."""
     return lab_root(repo_root) / "stages"
 
 

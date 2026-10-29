@@ -8,14 +8,15 @@ from typing import Any
 
 import yaml
 
-STAGE_FIXTURES = Path(__file__).parent / "fixtures" / "stages"
+NAMESPACE = "acme"
+STAGE_FIXTURES = Path(__file__).parent / "fixtures" / "stages" / NAMESPACE
 
 BASE_MANIFEST: dict[str, Any] = {"contract": "stage/1", "name": "demo", "summary": "A demo."}
 
 
 def fixture_package(name: str, destination: Path) -> Path:
-    """A copy of the fixture package ``name`` under ``destination`` (so tests may mutate it)."""
-    target = destination / name
+    """A mutable copy of fixture package ``name`` at ``destination/acme/name``."""
+    target = destination / NAMESPACE / name
     shutil.copytree(STAGE_FIXTURES / name, target)
     return target
 

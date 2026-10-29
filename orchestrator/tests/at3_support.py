@@ -31,7 +31,7 @@ from raidar.subject.workflow.package import PackageCheckpoint
 from raidar.subject.workflow.package_member import PackageSpec
 from raidar.subject.workflow.stage import Checkpoint
 
-FIXTURES = Path(__file__).parent / "fixtures" / "stages"
+FIXTURES = Path(__file__).parent / "fixtures" / "stages" / "acme"
 PACK = "at3-pack"
 PRIMITIVES = {"stop/1": "p" * 64}
 AGENT_UID = 1000

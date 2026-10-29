@@ -1,7 +1,7 @@
 """The release register: ``lab/releases.yaml`` maps ``name@N`` to a content hash.
 
 Agents and workflows are edited in place under ``lab/agents/`` and ``lab/workflows/``; stage
-packages live under ``lab/stages/[<ns>/]<name>/``. The version is data, never part of a file
+packages live under ``lab/stages/<ns>/<name>/``. The version is data, never part of a file
 name. Releasing a definition records its content hash under the next integer version of its
 name::
 
@@ -30,7 +30,9 @@ import yaml
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 RELEASE_PATTERN = r"^(?:[a-z0-9][a-z0-9-]*/)?[a-z0-9][a-z0-9-]*@[1-9][0-9]*$"
+STAGE_RELEASE_PATTERN = r"^[a-z0-9][a-z0-9-]*/[a-z0-9][a-z0-9-]*@[1-9][0-9]*$"
 _RELEASE_RE = re.compile(RELEASE_PATTERN)
+_STAGE_RELEASE_RE = re.compile(STAGE_RELEASE_PATTERN)
 Sha256 = Annotated[str, Field(pattern=r"^[0-9a-f]{64}$")]
 
 
@@ -46,7 +48,7 @@ class ReleaseError(ValueError):
 
 @dataclass(frozen=True, order=True)
 class Release:
-    """A parsed ``[namespace/]name@N`` immutable release reference."""
+    """A parsed immutable release reference: ``name@N``, or ``ns/name@N`` for a stage."""
 
     name: str
     version: int
@@ -54,9 +56,19 @@ class Release:
     @classmethod
     def parse(cls, text: str) -> Release:
         if not _RELEASE_RE.fullmatch(text):
-            raise ReleaseError(f"invalid release {text!r}: expected [<ns>/]<name>@<N> (N from 1)")
+            raise ReleaseError(f"invalid release {text!r}: expected <name>@<N> (N from 1)")
         name, version = text.split("@", 1)
         return cls(name, int(version))
+
+    @classmethod
+    def parse_stage(cls, text: str) -> Release:
+        """A stage reference: the namespace is required (``<ns>/<name>@<N>``)."""
+        if not _STAGE_RELEASE_RE.fullmatch(text):
+            raise ReleaseError(
+                f"invalid stage release {text!r}: expected <ns>/<name>@<N> "
+                "(a namespace is required; N from 1)"
+            )
+        return cls.parse(text)
 
     @property
     def leaf(self) -> str:
@@ -104,7 +116,9 @@ def parse_register(text: str, source: str) -> ReleaseRegister:
         ReleaseKind.WORKFLOW: {
             Release.parse(ref): digest for ref, digest in register.workflows.items()
         },
-        ReleaseKind.STAGE: {Release.parse(ref): digest for ref, digest in register.stages.items()},
+        ReleaseKind.STAGE: {
+            Release.parse_stage(ref): digest for ref, digest in register.stages.items()
+        },
     }
     return ReleaseRegister(entries)
 
@@ -126,7 +140,7 @@ def resolve_registered(
     Only the register's latest version of a name resolves. A ``draft`` (smoke experiments only)
     may name an unregistered or older release: its hash is ``None`` or whatever is registered.
     """
-    release = Release.parse(text)
+    release = Release.parse_stage(text) if kind is ReleaseKind.STAGE else Release.parse(text)
     registered = register.of(kind).get(release)
     if registered is None:
         if draft:

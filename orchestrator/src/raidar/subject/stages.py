@@ -1,4 +1,4 @@
-"""Released stage packages: ``[ns/]name@N`` resolved against ``lab/releases.yaml``.
+"""Released stage packages: ``ns/name@N`` resolved against ``lab/releases.yaml``.
 
 A package's hash is its ``stage-tree/1`` digest. Only the register's latest version of a name
 resolves. ``ST1`` refuses an invalid package or an unsupported contract; ``ST4`` refuses bytes
@@ -86,17 +86,14 @@ def resolve_stages(
 
 
 def stage_names(repo_root: Path = REPO_ROOT) -> list[str]:
-    """Every package folder below ``lab/stages``: ``name`` or ``ns/name`` (sorted)."""
+    """Every package folder below ``lab/stages``: ``ns/name`` (sorted)."""
     root = stages_root(repo_root)
     if not root.is_dir():
         return []
-    names = []
-    for entry in sorted(root.iterdir()):
-        if not entry.is_dir():
-            continue
-        if (entry / MANIFEST_FILE).is_file():
-            names.append(entry.name)
-            continue
-        nested = [child for child in sorted(entry.iterdir()) if (child / MANIFEST_FILE).is_file()]
-        names += [f"{entry.name}/{child.name}" for child in nested] or [entry.name]
-    return names
+    return sorted(
+        f"{space.name}/{child.name}"
+        for space in root.iterdir()
+        if space.is_dir()
+        for child in space.iterdir()
+        if (child / MANIFEST_FILE).is_file()
+    )

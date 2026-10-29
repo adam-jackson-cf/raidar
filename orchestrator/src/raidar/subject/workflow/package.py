@@ -198,12 +198,16 @@ class PackageCheckpoint:
         return Resume(decision.message, kind)
 
     def _fits(self, kind: str) -> bool:
-        """A resume turn starts only if the last turn of its kind and the gate run that follows
-        it (the last gate's seconds) fit in the time left."""
+        """A resume turn starts only if the turn expected of its kind (``Checkpoint.
+        expected_seconds``) and the gate run that follows it (the last gate's seconds) fit in the
+        time left."""
         left = self.checkpoint.remaining()
         if left is None:
             return True
-        return left > 0 and left >= self.checkpoint.last_seconds(kind) + self._gate_seconds()
+        expected = self.checkpoint.expected_seconds(kind)
+        if expected is None:
+            return False  # no estimate (no first build turn): never scheduled on an invented one
+        return left > 0 and left >= expected + self._gate_seconds()
 
     def _gate_seconds(self) -> float:
         if self.gate is None:

@@ -140,9 +140,11 @@ def render_template(name: str, template: str = DEFAULT_TEMPLATE) -> dict[str, by
     """Every file of the new package from ``template`` (only ``docs-check`` exists)."""
     if template not in TEMPLATES:
         raise ValueError(f"no stage template {template!r}; available: {', '.join(TEMPLATES)}")
-    leaf = name.rsplit("/", 1)[-1]
-    if not NAME_RE.fullmatch(leaf):
-        raise ValueError(f"{name!r} is not a valid package name (lowercase letters, digits, '-')")
+    space, _, leaf = name.partition("/")
+    if not NAME_RE.fullmatch(space) or not NAME_RE.fullmatch(leaf):
+        raise ValueError(
+            f"{name!r} is not a valid package name: <ns>/<name>, lowercase letters, digits, '-'"
+        )
     files: dict[str, bytes] = {
         "stage.yaml": _manifest(leaf).encode(),
         "prompt.md": PROMPT.encode(),

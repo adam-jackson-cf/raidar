@@ -266,13 +266,13 @@ def install_rig(
 
 
 def _note_state() -> Path:
-    return Path(__file__).parent / "fixtures" / "stages" / "note-state"
+    return Path(__file__).parent / "fixtures" / "stages" / "acme" / "note-state"
 
 
 def copy_package(name: str, destination: Path) -> Path:
     """A mutable copy of the fixture package ``name``."""
     target = destination / name
-    shutil.copytree(Path(__file__).parent / "fixtures" / "stages" / name, target)
+    shutil.copytree(Path(__file__).parent / "fixtures" / "stages" / "acme" / name, target)
     return target
 
 

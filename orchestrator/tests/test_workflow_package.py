@@ -6,7 +6,7 @@ import time
 from collections.abc import Sequence
 from dataclasses import replace
 from pathlib import Path
-from typing import Any, ClassVar
+from typing import Any, ClassVar, cast
 
 import pytest
 
@@ -17,7 +17,7 @@ from raidar.subject.primitive.site import TrialInvalid
 from raidar.subject.workflow import package as package_module
 from raidar.subject.workflow.package import PackageCheckpoint
 from raidar.subject.workflow.package_member import PackageSpec
-from raidar.subject.workflow.stage import REPAIR, REWORK, Checkpoint, Spent
+from raidar.subject.workflow.stage import FIRST_BUILD, GATE_FIX, REPAIR, REWORK, Checkpoint, Spent
 from tests.lifecycle_support import (
     NOTE_STATE,
     PACK,
@@ -270,3 +270,29 @@ async def test_a_resume_turn_that_fits_alone_resumes_when_the_gate_is_quick(
 
     assert resume is not None
     assert resume.kind == REWORK
+
+
+async def test_the_first_rework_is_expected_to_take_as_long_as_the_first_build_turn(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """No rework has run yet, so the estimate was 0 and a rework the deadline would cut started."""
+    rig = gated_rig(tmp_path, monkeypatch, time.monotonic() + 10)
+    rig.checkpoint.turns.append(Spent(FIRST_BUILD, 60.0))
+    await rig.runtime.prepare()
+
+    assert rig.checkpoint.expected_seconds(REWORK) == 60.0
+    assert await rig.runtime.check("turn-1") is None
+    assert rig.runtime.record()["endings"] == {"note-state": "deadline"}
+
+
+def test_a_later_rework_is_expected_to_take_as_long_as_the_last_one() -> None:
+    checkpoint = Checkpoint(cast(Any, None), Path("."), "t")
+    checkpoint.turns.extend([Spent(FIRST_BUILD, 60.0), Spent(REWORK, 8.0), Spent(REPAIR, 2.0)])
+
+    assert checkpoint.expected_seconds(REWORK) == 10.0  # the last rework and its repair
+    assert checkpoint.expected_seconds(GATE_FIX) == 0.0
+
+
+def test_a_rework_with_no_first_build_turn_has_no_estimate_and_is_never_scheduled() -> None:
+    checkpoint = Checkpoint(cast(Any, None), Path("."), "t")
+    assert checkpoint.expected_seconds(REWORK) is None

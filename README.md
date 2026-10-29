@@ -59,21 +59,21 @@ For Codex CLI the default auth policy is `CODEX_AUTH_MODE=auto`: it prefers file
 | Lock | Content hashes and pinned versions of everything the experiment resolves to, in `execution`, `assessment`, `analysis` and `toolchain` sections. Its `lock_sha256` covers the execution section only, and every job records it. A job refuses a lock that is out of date, and no lock is written for a design its runtime cannot run (`RT0`-`RT6`) | `experiment.lock.json` next to the experiment |
 | Runtime and pack | A runtime is a language toolchain and equals a runtime pack id (`python`; `node-ts`, `go`, `rust`, `java`, `dotnet` later). The pack is the agent image (toolchain and pinned agent CLIs, no scorer tools) plus the scorer tool lock | `runtime:`; `orchestrator/src/raidar/subject/environment/<runtime>/` (code), `lab/environments/<runtime>/` (recipe: `pack.yaml`, `tools.lock.yaml`, `image/`) |
 | Problem (binding) | A pinned, verifier-validated task (one-shot or multi-checkpoint) imported against one runtime pack: `scb/<problem>` is the python binding, another runtime's binding would be `scb-<runtime>/<problem>`. Its verifier bundle stays on the host and the agent never sees it | `lab/problems/registry/`, imported into `var/problems/store/` |
-| Stage package | An author-owned prompt, optional skills/tool, setup/gate/stop calls and declared outputs under the strict `stage/1` contract. Packages contribute to the checkpoint's primary session, never a host plugin or scorer. | `lab/stages/[ns/]<name>/`; `lab/stages/README.md` |
+| Stage package | An author-owned prompt, optional skills/tool, setup/gate/stop calls and declared outputs under the strict `stage/1` contract. Packages contribute to the checkpoint's primary session, never a host plugin or scorer. | `lab/stages/<ns>/<name>/`; `lab/stages/README.md` |
 | Primitive | Raidar-owned execution guarantees, named by contract id: `frame/1`, `install/1`, `setup/1`, `gate/1`, `stop/1`, `outputs/1`. Their code identities and package identities cannot be overridden when pooling. | `subject/primitive/`; lock `primitive_code` and `packages` |
 | Build frame | The workflow's prompt, with `%%%TASK%%%` and one slot per enabled package, each once. | Workflow `build.prompt` |
 | Primary session | The checkpoint's one agent conversation; fixes, repairs and rework resume it. | Host-written workflow turn/session records |
-| Agent release | A pinned agent: an adapter (`codex@2` or `claude-code@1`), provider, tool pin, and the runtimes it covers, defined in `lab/agents/<name>.yaml` and registered in `lab/releases.yaml` as `name@N`. An experiment's `agents:` entry names a release and sets the `model` and `reasoning` | `lab/agents/<name>.yaml`; `lab/releases.yaml`; `agents:` |
-| Workflow release | A Harbor workflow runner defined in data: enabled stages share one primary agent session, resumed for repairs, gate fixes and rework. `build` frames the prompt and structured reply; `define` supplies the pinned FXL definition tools and skills; `verify` gates commits, records the final workspace and optionally judges mapped tests host-side. `define-build-verify@3` retains aspect judging, two gate fixes and at most three passes; archived `@1` has one pass and no judge. Workflow tools, skills and `.raidar/` state are excluded from graded snapshots and commits. The default is `one-shot@1`; `one-shot-verify@2` adds verify with no fix turns. Earlier releases remain registered and archived. | `lab/workflows/<name>/workflow.yaml`; `lab/releases.yaml`; `workflow:` on an arm |
+| Agent release | A pinned agent: an adapter (`codex@3` or `claude-code@2`), provider, tool pin, and the runtimes it covers, defined in `lab/agents/<name>.yaml` and registered in `lab/releases.yaml` as `name@N`. An experiment's `agents:` entry names a release and sets the `model` and `reasoning` | `lab/agents/<name>.yaml`; `lab/releases.yaml`; `agents:` |
+| Workflow release | A Harbor workflow runner defined in data: enabled stages share one primary agent session, resumed for repairs, gate fixes and rework. `build` frames the prompt and structured reply; `define` supplies the pinned FXL definition tools and skills; `verify` gates commits, records the final workspace and optionally judges mapped tests host-side. `define-build-verify@4` retains aspect judging, two gate fixes and at most three passes; archived `@1` has one pass and no judge. Workflow tools, skills and `.raidar/` state are excluded from graded snapshots and commits. The default is `one-shot@1`; `one-shot-verify@3` adds verify with no fix turns. Earlier releases remain registered and archived. | `lab/workflows/<name>/workflow.yaml`; `lab/releases.…
 | Arm | One agent on one workflow release: `{id, agent, workflow}`, where `workflow: <name>@N` is optional and defaults to `one-shot@1`. Arms are paired against the `baseline_arm` | `arms:` |
 | Attempts | The replicates of every arm: each attempt runs every arm once per problem, in a seeded, counterbalanced order. Analysis pairs arms by attempt index | `analysis.attempts` |
 | Job | One execution of a locked experiment: its trials, their step results, validity checks and N1 phase timings | `var/jobs/<experiment id>/<job id>/` (`job.json`, `job.lock.json`, `trial-records/`) |
 | Trial and step result | A trial is one arm × attempt × problem through every checkpoint (a Harbor trial, id `bNN-pN-<arm>`, where `bNN` is the attempt index); a step result is one checkpoint of it | `trials/<trial>/`, `trial-records/<trial>.json` |
 | Verifier and reward | The hidden, trusted grader: strict all-cases per checkpoint, run host-side; its per-step output is the reward. Harbor's `oracle` agent is something else (it replays reference solutions) | `orchestrator/src/raidar/grading/` |
-| Scorer and Assessment | A versioned scorer (`correctness@7`, `code-quality@8`, `resource-usage@6`, `process-compliance@11`, `gate-effort@15`) runs offline over stored trials. Correctness reports the lock-pinned solvable-set outcome alongside the raw SCB outcome; excluded steps leave its denominator, while missing sets are unavailable, never zero. Process compliance reads the work session's trace, not gate fix sessions, and leaves undecidable checks insufficient. Gate effort reads retained guardrail-gate records (first-pass clean, findings by family, fixes, autofix, costs and pre-fix correctness); arms without that gate are not applicable. Code quality reads the graded snapshots and retained or offline verifier coverage; its regression breadth excludes at most three cases whose outcomes flip between grading and coverage. Each Assessment is keyed by its inputs | an Assessment store directory, outside the job |
+| Scorer and Assessment | A versioned scorer (`correctness@8`, `code-quality@8`, `resource-usage@7`, `process-compliance@11`, `gate-effort@15`) runs offline over stored trials. Correctness reports the lock-pinned solvable-set outcome alongside the raw SCB outcome; excluded steps leave its denominator, while missing sets are unavailable, never zero. Process compliance reads the work session's trace, not gate fix sessions, and leaves undecidable checks insufficient. Gate effort reads retained guardrail-gate records (first-pass clean, findings by family, fixes, autofix, costs and pre-fix correctness); arms without that gate are not applicable. Code quality reads the graded snapshots and retained or offline verifier coverage; its regression breadth excludes at m…
 | Headline metric | How quality scores combine into the headline S (`scb-canonical@1/@2`, `scb-canonical-oneshot@1/@2`). The lock pins it | `assessment.metric` |
 | Analysis | Paired deltas, confidence intervals, curves, verdicts, exclusions and a sample-size projection against the baseline arm; a benchmark adds its ranking view | the `make experiment-analyze` output directory |
-| Jev | Host-side model judgement. `define-build-verify@3`, `definition-coverage@5` and `test-coverage@5` use pinned `typesafe/jev-1.13-20260917`, retaining every request, response and interpreted answer without the OpenRouter key. The older offline policy machinery remains parked with both policies `off`; enabling these explicit workflow/scorer capabilities does not promote those policies or add a headline metric. | `raidar/judge/` shared transport; `scoring/judge/` offline policy and calibration |
+| Jev | Host-side model judgement. `define-build-verify@4`, `definition-coverage@5` and `test-coverage@5` use pinned `typesafe/jev-1.13-20260917`, retaining every request, response and interpreted answer without the OpenRouter key. The older offline policy machinery remains parked with both policies `off`; enabling these explicit workflow/scorer capabilities does not promote those policies or add a headline metric. | `raidar/judge/` shared transport; `scoring/judge/` offline policy and calibration |
 
 Inside each Harbor trial directory the verifier keeps its original evidence names (`raidar-oracle/steps/<step>/record.json`, reward key `oracle_leak`): they are wire names that released scorers and `make assess-regrade` read the same way for every job. For the same reason released scorers keep the observation subject `trajectory`, the evidence input `oracle.cases` and their `@1` descriptions (all hashed into Assessment keys), and the problem store keeps each problem's `oracle/` bundle directory (inside the problem's pinned digest).
 
@@ -89,7 +89,7 @@ native bundled plugins are not host plugins. The three `python__forge__claude-*`
 experiments mirror the Codex workflows; they are operational checks, not effectiveness evidence.
 
 
-`define-build-verify@3` requires `{account, ac_tests, adrs}` replies, allows one syntax
+`define-build-verify@4` requires `{account, ac_tests, adrs}` replies, allows one syntax
 and one semantic repair, and merges criterion-to-test mappings across turns. Its judge
 sees mapped tests plus one hop of test helpers, never production code. Aspects close at
 probability ≥0.8, open at ≤0.3, and otherwise remain undecided. Open/undecided criteria
@@ -103,9 +103,12 @@ never commits, restores or stages the agent's work. A refusal with no fix turns 
 `gate_refused`, and the hidden verifier grades the workspace the agent left, including
 after a deadline or cancellation. `max_fix_rounds` defaults to zero. Baseline checks
 also run as the agent; the separate deterministic setup check executes no task code.
-Root installs immutable tools and supervises the hook broker, whose checks drop privilege.
-Gate processes disable Linux dumpability before checks so checks cannot reopen record
-pipes through `/proc`; the hook record pipe is also root-owned.
+Root installs immutable tools; there is no root hook broker. Hooks run as the agent's
+user and append to an agent-writable log. G1, G2, W5's hook-log condition and W11's
+`hook_log_*` findings are readings, never validity. G3 and independently measured tool,
+installed-tree, watched-path, protected-path and session-log integrity remain validity.
+The seal keeps its protected record channel and call supervisor; it disables Linux
+dumpability so checks cannot reopen its record pipes through `/proc`.
 Authoritative workflow, setup, baseline, seal and session-audit records are retained
 host-side. Health W1–W11 make missing enabled-stage evidence, setup failure and recorded
 integrity violations invalid trials, not merely unmeasured outcomes. An unusable
@@ -131,7 +134,7 @@ Objectives are separate from kinds: either an ab-test or a benchmark can explore
 
 **1. Provide the problem and the pack.** Import and validate a pinned source with Make targets only; no hand-written per-problem definition is needed. Generated manifests and validation records are committed under `lab/problems/registry/`; materialized content stays under `var/`. `make problem-list SOURCE=scb@<commit>` lists source candidates, and `make problem-info SOURCE=scb@<commit> PROBLEM=<ref>` inspects one before import. Without `SOURCE`, listing shows registered verdicts and per-step solvable-set sizes and nondeterministic counts.
 
-Each task instruction is the pinned SCB `checkpoint_N.md`, including its canary, with only the entry-command and entry-file tokens substituted. `instruction_sha256` is the hash of this rendered checkpoint spec; the pin records the grader's exact entry command. Validation with `REPEATS=3` records each step's **solvable set**: the cases passed by the reference in every repeat, including regression cases. Varying cases are listed as nondeterministic and excluded; empty sets have step verdict `excluded`. Missing evidence is not a failed case.
+Each task instruction is the pinned SCB `checkpoint_N.md`, including its canary, with only the entry-command and entry-file tokens substituted. `instruction_sha256` is the hash of this rendered checkpoint spec; the pin records the grader's exact entry command. Validation defaults to `REPEATS=5` and records each step's **solvable set**: the cases passed by the reference in every repeat, including regression cases. Records say "no variation observed in N runs" for that reference and environment, not that a case is deterministic; submissions are graded once. Varying cases are excluded; empty sets have step verdict `excluded`. Missing evidence is not a failed case.
 
 **Declared dependencies (`declared-wheels/1`).** Import resolves each reference step's declared
 set (`requirements.txt` plus `pyproject`) with uv targeting Python 3.12, PyPI only
@@ -155,6 +158,15 @@ pin's policy and caps. Regrades reinstall the recorded lock and never re-resolve
 or PyPI outage is an infrastructure failure, never `unprovided` or a score. Reference
 validation uses this same provisioning.
 
+Validation pins the grader's immutable image content ID and implementation digest.
+RT7 and the grading runtime refuse a mismatch; missing identity evidence prevents execution
+until revalidation. Existing three-repeat records are not retroactively certified.
+A grading crash or timeout triggers a starter canary in the same sandbox configuration:
+completion (not solving the task) passes. A passing canary attributes the failed grade to
+the submission; a failing canary remains infrastructure. Each step records the canary status.
+Resolver timeouts are infrastructure, never `cap-exceeded`; bounded retry support records
+attempts, but its production retry bound awaits an explicit decision.
+
 The grader's `test_dependencies` venv has its own pin, separate from the agent seed, which
 resolves `test_dependencies` only and never the reference's sets. The grader pin covers
 `test_dependencies` plus the grader tools. The seeded `pyproject.toml` carries
@@ -167,12 +179,12 @@ invalidate a trial. Analysis prints each arm's affected-step share beside the pr
 and warns when arms differ materially; an `undeclared_import` is a heuristic (a module-name
 to package alias may be missed).
 
-The default primary outcome is `solve_rate_solvable`: checkpoints passing every case in their lock-pinned solvable set, divided by the number of non-excluded checkpoints. `correctness@7` always reports raw SCB outcomes beside the solvable outcomes. A step explicitly excluded at validation leaves the denominator; a missing set makes the solvable trajectory unavailable, never zero. Optional **errata** remain pre-registered policy: the audit flags specification-undetermined assertions; `make problem-errata-draft` drafts their optional record. Errata-applied outcomes become primary only through explicit `analysis.primary_outcome`, never by default. Optional sensitivities are explanatory notes, not outcome adjustments.
+The default primary outcome is **reference-solvable SCB success** (`solve_rate_solvable`): checkpoints passing every case in their lock-pinned solvable set, divided by the number of non-excluded checkpoints. It is not specification compliance. `correctness@8` always reports raw SCB outcomes beside it. Every analysis shows the spec-determinacy flags and audit coverage (assertion sites audited / total); zero audited is `unmeasured`, never "0 flagged". A step explicitly excluded at validation leaves the denominator; a missing set makes the solvable trajectory unavailable, never zero. Optional **errata** remain pre-registered policy through explicit `analysis.primary_outcome`, never by default; `make problem-errata-draft` drafts their optional record. Optional sensitivities are explanatory notes, not outcome adjustments.
 
 ```bash
 make problem-list SOURCE=scb@38d627ecf668
 make problem-import SOURCE=scb@38d627ecf668 PROBLEMS=dag_execution,log_query
-make problem-validate PROBLEMS=dag_execution,log_query REPEATS=3 TARGET=mbp
+make problem-validate PROBLEMS=dag_execution,log_query REPEATS=5 TARGET=mbp
 make problem-list
 make pack-build
 ```
@@ -202,7 +214,7 @@ runtime: python              # one runtime pack per experiment
 
 agents:
   - id: codex
-    release: codex@2         # lab/agents/codex.yaml, registered in lab/releases.yaml
+    release: codex@3         # lab/agents/codex.yaml, registered in lab/releases.yaml
     model: gpt-6-luna
     reasoning: low
 
@@ -214,7 +226,7 @@ arms:
     workflow: one-shot@1     # the workflow release under test (lab/workflows/<name>/)
 
 assessment:
-  scorers: [correctness@7, code-quality@8, resource-usage@6]
+  scorers: [correctness@8, code-quality@8, resource-usage@7]
   metric: scb-canonical-oneshot@1
 
 analysis:
@@ -225,6 +237,23 @@ analysis:
   max_exclusion_fraction: 0.2
   alpha: 0.05
 ```
+
+Comparative verdicts use the outcome type declared in the lock: exact McNemar for binary
+outcomes, exact sign-flip permutation tests otherwise, including aggregate effects.
+Intervals describe uncertainty but never decide a verdict. Pre-register
+`analysis.max_exclusion_difference` (an absolute exclusion-rate difference in 0–1);
+without it, or above it, analysis refuses a verdict. Exclusions are shown per arm and cause;
+a non-significant difference does not establish acceptable attrition.
+
+Aggregate tests retain the existing equal-problem-weight effect and flip its paired deltas;
+the interval is not the decision rule. The exact-enumeration state limit is a visible execution
+safety bound (`EXACT_STATE_LIMIT`), not an approximation or a scientific threshold.
+
+Resource cost includes native-agent usage priced through LiteLLM's shared table plus recorded
+host judge spend. Claude's self-reported dollar total is not authoritative. Missing prices,
+missing judged-workflow evidence and sent judge attempts with unknown charges remain unavailable.
+The first rework turn uses the recorded `first_build` duration; absent that evidence it is not
+scheduled. A numerical floor and the policy for halting at an excluded solvable step remain open.
 
 Validation checks that the design does not contradict its kind (`KIND*`: an ab-test compares arms; a benchmark compares agents under one workflow, warns below 5 attempts and may set `analysis.rank_by`; `research-loop` is reserved) and its name (`NAME1`: a file under `lab/experiments/<kind>/<id>/` sits in the directory of its kind and id; `NAME2`: the id starts with the experiment's runtime).
 
@@ -264,7 +293,7 @@ If a job is stopped mid-trial, `make harbor-cleanup JOB=var/jobs/python__circuit
 
 ```bash
 make experiment-assess JOB=var/jobs/python__circuit_eval-cp1__review-trial/first STORE=var/stores/review-trial \
-  SCORERS="correctness@7 code-quality@8 resource-usage@6"
+  SCORERS="correctness@8 code-quality@8 resource-usage@7"
 ```
 
 **6. Analyze.** The verdict thresholds and the assessment settings come from the lock. The report labels any command-line override. A trial whose inputs cannot be loaded is refused, never read as unassessed; a verifier bundle missing at its recorded root is read from the problem store (`lab/problems` with `var/problems`) by the trial's pinned problem reference, and refused unless its digest is the recorded one. A benchmark's report adds the ranking view; a smoke report says it is not citable.
@@ -282,11 +311,11 @@ make review-surface-serve REVIEW_JOBS_ROOT=var/jobs/python__circuit_eval-cp1__re
 
 ## Smoke checks
 
-The smoke targets run real agent trials through the same experiment path: `lab/experiments/smoke/python__circuit_eval-cp1__agent-health/` for a single agent and `lab/experiments/smoke/python__circuit_eval-cp1__pack-agent-health/` for one arm per released agent (today `codex@2` only). Both have kind `smoke`. The separate `lab/experiments/benchmark/python__circuit_eval-cp1__agents/` compares agents; it is not an operational smoke. Each smoke target locks its experiment under `var/tmp/smoke/` with its own overrides and writes jobs under `var/jobs/`.
+The smoke targets run real agent trials through the same experiment path: `lab/experiments/smoke/python__circuit_eval-cp1__agent-health/` for a single agent and `lab/experiments/smoke/python__circuit_eval-cp1__pack-agent-health/` for one arm per released agent (today `codex@3` only). Both have kind `smoke`. The separate `lab/experiments/benchmark/python__circuit_eval-cp1__agents/` compares agents; it is not an operational smoke. Each smoke target locks its experiment under `var/tmp/smoke/` with its own overrides and writes jobs under `var/jobs/`.
 
 ```bash
 make orchestrator-smoke                                   # codex + gpt-6-luna (low), one trial
-make agent-smoke RELEASE=codex@2 MODEL=gpt-6-luna         # the same smoke with its agent release replaced
+make agent-smoke RELEASE=codex@3 MODEL=gpt-6-luna         # the same smoke with its agent release replaced
 make smoke-agents                                         # one trial per released agent (arm codex)
 make smoke-agents SMOKE_ARM=codex                         # one arm only
 ```
@@ -303,7 +332,7 @@ The historical forge mechanics smoke uses `scb/forge@38d627ecf668` through all 8
 
 Every trial writes `health.json`: verdict, record, limit, liveness, contention, isolation and tamper checks, each `pass`, `violation` or `unmeasured`. A verdict, record/limit, isolation or tamper violation invalidates the trial; `make health JOB=<job dir>` recomputes it, and violations land as provisional lines in `<job>/fault-candidates.jsonl`. A host-side liveness monitor (`RAIDAR_LIVENESS=enforce` by default; `observe` and `off` opt out) watches each agent phase for output, CPU or network: an agent quiet for 600 s is killed and the step is verified and graded on what exists, like an agent timeout, so the trial stays valid and the kill is a provisional fault candidate (calibration: ADR-002 A.9).
 
-Health identifiers group verifier checks (`V1`–`V3`), records/limits (`H1`, `H3`–`H6`), liveness (`L1`–`L2`), contention (`P2`–`P3`), isolation (`P8`: every skill root and instruction file each codex session loaded lies in the workspace, or is text the workflow placed there and recorded; codex-home, bundled, plugin or host content is a violation, a missing rollout `unmeasured`), integrity (`T1` tool tree, `T2` records manifest, `T3` reaper residuals) and, for a workflow with the verify stage, the gate (`G1` the hook's records agree with the runner's seals, `G2` every agent commit ran the hook and the hooks stayed put, `G3` the gate's tools unchanged across the trial; a `G` violation invalidates the trial). `T2` is unmeasured in-run and verified by `make health`; `unmeasured` is neither a pass nor an invalidation. Liveness samples every 15 s by default (`RAIDAR_LIVENESS_INTERVAL_S`); `RAIDAR_LIVENESS_IDLE_S` sets the idle window. Findings distinguish `idle_killed` from observe-only `idle_observed`. Harness and workflow time limits take precedence; Raidar does not retry trials automatically.
+Health identifiers group verifier checks (`V1`–`V3`; V3 compares the ledger digest with the stored snapshot digest, not a live workspace), records/limits (`H1`, `H3`–`H6`; H5 reads the recorded agent setup limit), liveness (`L1`–`L2`), contention (`P2`–`P3`), isolation (`P8`: instructions must match their recorded origin and content permitted before the turn; incompletely parsed transcripts are `unmeasured`), integrity (`T1` tool tree, `T2` records manifest, `T3` reaper residuals) and gate readings (`G1`, `G2`) plus tool validity (`G3`). Hook-log evidence never invalidates a trial. `T2` is unmeasured in-run and verified by `make health`. Liveness samples every 15 s by default (`RAIDAR_LIVENESS_INTERVAL_S`); `RAIDAR_LIVENESS_IDLE_S` sets the idle window. Findings distinguish `idle_killed` from observe-only `idle_observed`. Harness and workflow time limits take precedence; Raidar does not retry trials automatically.
 
 Defining workflows also get `E1` (every accepted seal has a sealed, passing definition),
 `E2` (call records agree with the final draft and inputs), and `E3` (an unusable definition
@@ -330,7 +359,7 @@ Make variables follow the vocabulary: `JOB`, `JOBS`, `JOB_ID`, `JOBS_DIR`, `AGEN
 ## Repository layout
 
 - `orchestrator/`: the `raidar` CLI and library, grouped into tiers (`orchestrator/src/raidar/`), highest first; a group imports only groups below it, and import-linter enforces it: `cli` (commands), `evaluation` (`review/` with `projection/` and `quality/` above `analysis/`, and `ledger/`), `engine` (running a locked experiment: `job/` above `trial/` above `health/` above `perf/` above `target/`), `design` (`experiment/`: schema, lock, compatibility gate, arm resolution; `problem/`: registry, import, store), `scoring` (`catalog/` above one package per scorer and the offline `judge/`, above `framework/`; it never imports subject execution or package definitions), `grading` (the hidden verifier), `subject` (`workflow/` above independent `primitive/` and `agent/`, above pure `package/` data; `environment/` runtime packs independent of all four), `judge` (shared host-side transport, protocol, recording and secret isolation) and `contract` (shared records and mechanics: job layout, Harbor result reading, trial records, canonical hashing, registry references, repository paths). Health reads records, not workflow, primitive or package code. Folder names are singular unless the folder is a catalogue of same-kind items.
-- `lab/`: everything tracked that defines experiments. `lab/experiments/<kind>/<id>/` holds experiment definitions with their locks (the smoke experiments and the agent benchmark), `lab/problems/` the pinned problem registry (`sources.yaml`, `registry/`, `fixtures/`), and `lab/ledger/` the fault and remedy ledger. The data the code loads at run time sits beside them, each tree at one explicit path from `raidar/contract/paths.py`: `lab/agents/<name>.yaml` (agent releases), `lab/workflows/<name>/workflow.yaml` (workflow releases), `lab/stages/[ns/]<name>/` (stage packages), `lab/releases.yaml` (the registry of `name@N` releases), `lab/environments/<runtime>/` (the runtime pack recipe: `pack.yaml`, `tools.lock.yaml`, `image/`) and `lab/judge/` (judge policies and question sets). `make structure-check` allows only these second-level entries.
+- `lab/`: everything tracked that defines experiments. `lab/experiments/<kind>/<id>/` holds experiment definitions with their locks (the smoke experiments and the agent benchmark), `lab/problems/` the pinned problem registry (`sources.yaml`, `registry/`, `fixtures/`), and `lab/ledger/` the fault and remedy ledger. The data the code loads at run time sits beside them, each tree at one explicit path from `raidar/contract/paths.py`: `lab/agents/<name>.yaml` (agent releases), `lab/workflows/<name>/workflow.yaml` (workflow releases), `lab/stages/<ns>/<name>/` (stage packages), `lab/releases.yaml` (the registry of `name@N` releases), `lab/environments/<runtime>/` (the runtime pack recipe: `pack.yaml`, `tools.lock.yaml`, `image/`) and `lab/judge/` (judge policies a…
 - `var/`: generated data, ignored by git; `RAIDAR_VAR=<dir>` relocates it. `var/jobs/`, `var/stores/` and `var/analysis/` hold job directories, Assessment stores and analysis output, `var/problems/store/` and `var/problems/cache/` the imported problem content and source checkouts, `var/tmp/` scratch (smoke locks, review fixtures), `var/cache/tools/` the host-provisioned scorer tools (`RAIDAR_TOOL_CACHE=<dir>` overrides), and `var/archive/` local data from before the restructure.
 - `review-surface/`: the review UI, its frozen projection contract and its Playwright suite.
 - `docs/reboot/`: the requirements, plan, ADR, overhead baseline, design memo, the Phase 1 gate packet, and the tracked Phase 0 spike evidence (`evidence/`).

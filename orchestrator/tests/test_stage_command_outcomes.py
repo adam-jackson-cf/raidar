@@ -41,7 +41,7 @@ def stages(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     return root
 
 
-def _new(name: str = "my-check") -> None:
+def _new(name: str = "acme/my-check") -> None:
     result = CliRunner().invoke(main, ["stage", "new", name])
     assert result.exit_code == 0, result.output
 
@@ -56,7 +56,9 @@ def _write(root: Path, files: dict[str, bytes]) -> None:
 # ---- stage_package: names, loading, release state --------------------------------------------
 
 
-@pytest.mark.parametrize("name", ["A", "-a", "a_b", "a/", "/a", "a/b/c", "a b", ""])
+@pytest.mark.parametrize(
+    "name", ["A", "-a", "a_b", "a/", "/a", "a/b/c", "a b", "", "bare-name", "acme/Bad"]
+)
 def test_invalid_package_names_are_refused(name: str) -> None:
     with pytest.raises(click.BadParameter):
         stage_package.valid_name(name)
@@ -64,27 +66,27 @@ def test_invalid_package_names_are_refused(name: str) -> None:
 
 def test_load_named_refuses_a_missing_package_and_names_the_broken_one(stages: Path) -> None:
     with pytest.raises(click.ClickException, match="no stage package at"):
-        stage_package.load_named("absent")
-    (stages / "broken").mkdir(parents=True)
-    (stages / "broken" / "stage.yaml").write_text("this: [is not a manifest\n")
+        stage_package.load_named("acme/absent")
+    (stages / "acme" / "broken").mkdir(parents=True)
+    (stages / "acme" / "broken" / "stage.yaml").write_text("this: [is not a manifest\n")
 
     with pytest.raises(click.ClickException) as raised:
-        stage_package.load_named("broken")
+        stage_package.load_named("acme/broken")
 
-    assert raised.value.message.startswith("broken: ")
+    assert raised.value.message.startswith("acme/broken: ")
 
 
-def test_package_folders_finds_manifests_at_most_one_namespace_deep_in_sorted_order(
+def test_package_folders_finds_only_two_level_manifests_in_sorted_order(
     stages: Path,
 ) -> None:
-    for relative in ["zeta", "acme/inner", "acme/deep/too-deep", "alpha"]:
+    for relative in ["zeta/one", "acme/inner", "acme/deep/too-deep", "alpha", "beta/one"]:
         (stages / relative).mkdir(parents=True)
         (stages / relative / "stage.yaml").write_text("x: 1\n")
     (stages / "no-manifest").mkdir()
 
     found = [path.relative_to(stages).as_posix() for path in stage_package.package_folders()]
 
-    assert found == ["acme/inner", "alpha", "zeta"]
+    assert found == ["acme/inner", "beta/one", "zeta/one"]
 
 
 def test_package_folders_is_empty_without_a_stages_root(stages: Path) -> None:
@@ -102,24 +104,31 @@ def test_release_state_distinguishes_unreleased_released_and_changed(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     old, new = "a" * 64, "b" * 64
-    _register(tmp_path, monkeypatch, {"seen@1": old, "moved@1": old, "moved@2": new})
+    _register(
+        tmp_path,
+        monkeypatch,
+        {"acme/seen@1": old, "acme/moved@1": old, "acme/moved@2": new},
+    )
     register = stage_package.register()
 
-    assert stage_package.release_state("fresh", new, register) == (
+    assert stage_package.release_state("acme/fresh", new, register) == (
         "unreleased",
-        f"register stages: fresh@1: {new}",
+        f"register stages: acme/fresh@1: {new}",
     )
-    assert stage_package.release_state("seen", old, register) == ("released as seen@1", None)
-    assert stage_package.release_state("seen", new, register) == (
-        "changed since seen@1",
-        f"register stages: seen@2: {new}",
+    assert stage_package.release_state("acme/seen", old, register) == (
+        "released as acme/seen@1",
+        None,
+    )
+    assert stage_package.release_state("acme/seen", new, register) == (
+        "changed since acme/seen@1",
+        f"register stages: acme/seen@2: {new}",
     )
     # only the highest registered version is "the one the tree must hold"
-    assert stage_package.release_state("moved", old, register) == (
-        "changed since moved@2",
-        f"register stages: moved@3: {old}",
+    assert stage_package.release_state("acme/moved", old, register) == (
+        "changed since acme/moved@2",
+        f"register stages: acme/moved@3: {old}",
     )
-    assert stage_package.release_state("moved", new, register)[1] is None
+    assert stage_package.release_state("acme/moved", new, register)[1] is None
 
 
 # ---- stage_lock ------------------------------------------------------------------------------
@@ -127,7 +136,7 @@ def test_release_state_distinguishes_unreleased_released_and_changed(
 
 def _package_with_tool(tmp_path: Path) -> Path:
     root = tmp_path / "pkg"
-    _write(root, render_template("pkg"))
+    _write(root, render_template("acme/pkg"))
     return root
 
 
@@ -268,20 +277,20 @@ def test_stage_lock_command_reports_a_refusal_as_a_failed_command(
     stages: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     _new()
-    before = (stages / "my-check" / "tool" / "uv.lock").read_text()
+    before = (stages / "acme" / "my-check" / "tool" / "uv.lock").read_text()
     monkeypatch.setattr(stage_lock, "_uv", lambda *a: _done(1, "boom"))
 
-    result = CliRunner().invoke(main, ["stage", "lock", "my-check"])
+    result = CliRunner().invoke(main, ["stage", "lock", "acme/my-check"])
 
     assert result.exit_code != 0
     assert "uv lock failed: boom" in result.output
-    assert (stages / "my-check" / "tool" / "uv.lock").read_text() == before
+    assert (stages / "acme" / "my-check" / "tool" / "uv.lock").read_text() == before
 
 
 # ---- stage check: refusals before any container ----------------------------------------------
 
 
-def _record(package: str = "my-check") -> StageCheckRecord:
+def _record(package: str = "acme/my-check") -> StageCheckRecord:
     return StageCheckRecord(
         package=package,
         pack="pack",
@@ -299,7 +308,7 @@ def _installed(arch: str, tree: str) -> dict[str, Any]:
 
 def _passing(**overrides: Any) -> CheckReport:
     base: dict[str, Any] = {
-        "reference": "my-check",
+        "reference": "acme/my-check",
         "digest": "d",
         "pack": "pack",
         "primitives": {},
@@ -314,7 +323,7 @@ def _passing(**overrides: Any) -> CheckReport:
 def rig(stages: Path, monkeypatch: pytest.MonkeyPatch) -> SimpleNamespace:
     """A new package, the pack and lock gates open, and ``check_package`` returning ``report``."""
     _new()
-    package = load_stage_package(stages / "my-check")
+    package = load_stage_package(stages / "acme" / "my-check")
     state = SimpleNamespace(report=_passing(), calls=[], digest=package.digest)
 
     async def fake_check(*args: Any, **kwargs: Any) -> CheckReport:
@@ -330,7 +339,7 @@ def rig(stages: Path, monkeypatch: pytest.MonkeyPatch) -> SimpleNamespace:
 
 
 def _check(*extra: str) -> Any:
-    return CliRunner().invoke(main, ["stage", "check", "my-check", *extra])
+    return CliRunner().invoke(main, ["stage", "check", "acme/my-check", *extra])
 
 
 def test_check_refuses_a_stale_lock_before_touching_the_pack(
@@ -352,7 +361,7 @@ def test_check_refuses_a_stale_lock_before_touching_the_pack(
 def test_check_refuses_an_unknown_package_and_a_missing_pack_image(
     stages: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    unknown = CliRunner().invoke(main, ["stage", "check", "nope"])
+    unknown = CliRunner().invoke(main, ["stage", "check", "acme/nope"])
     assert unknown.exit_code != 0
     assert "no stage package at" in unknown.output
 
@@ -491,14 +500,14 @@ def test_check_logs_go_under_a_per_package_directory_in_the_generated_tree(
     _check()
 
     (logs,) = rig.calls
-    assert logs.parent == tmp_path / "var" / "tmp" / "stage-check" / "my-check"
+    assert logs.parent == tmp_path / "var" / "tmp" / "stage-check" / "acme--my-check"
     assert logs.name.startswith("check-")
 
 
 # ---- stage check --replay --------------------------------------------------------------------
 
 
-def _trial(tmp_path: Path, *, with_context: bool, key: str = "my-check") -> Path:
+def _trial(tmp_path: Path, *, with_context: bool, key: str = "acme_my-check") -> Path:
     folder = tmp_path / "trial" / "stages" / key
     (folder / "stop-0-before").mkdir(parents=True)
     (folder / "stop-0-before" / "note.md").write_text("hello")
@@ -516,7 +525,7 @@ def test_replay_of_a_trial_holding_no_captured_state_is_refused(
     result = _check("--replay", str(empty))
 
     assert result.exit_code != 0
-    assert "holds no captured state for my-check" in result.output
+    assert "holds no captured state for acme/my-check" in result.output
 
 
 def test_replay_of_a_package_that_declares_no_stop_cannot_complete(

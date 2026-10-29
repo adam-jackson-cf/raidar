@@ -90,7 +90,7 @@ endif
 # registered in lab/releases.yaml (lab/agents/<name>.yaml); its tool pin must equal the Python
 # pack's (the lock refuses others: RT5). Model and reasoning default to codex's gpt-6-luna at
 # low; REASONING_EFFORT given (even empty: `REASONING_EFFORT=`) wins; empty means unset.
-RELEASE ?= codex@2
+RELEASE ?= codex@3
 AGENT_SMOKE_MODEL := gpt-6-luna
 AGENT_SMOKE_REASONING := low
 AGENT_SMOKE_EFFECTIVE_MODEL = $(or $(MODEL),$(AGENT_SMOKE_MODEL))
@@ -156,7 +156,7 @@ help:
 	@echo "  make problem-import PROBLEM=scb/<problem>@<version> [SOURCE_CHECKOUT=path] [UPDATE=1]"
 	@echo "  make problem-import SOURCE=scb@<commit> PROBLEMS=all|a,b,c"
 	@echo "                                                        Generate task content and committed pins from one source pin"
-	@echo "  make problem-validate PROBLEM=<ref>|PROBLEMS=all|a,b,c [TARGET=name] [REPEATS=3] [CONCURRENCY=4]"
+	@echo "  make problem-validate PROBLEM=<ref>|PROBLEMS=all|a,b,c [TARGET=name] [REPEATS=5] [CONCURRENCY=4]"
 	@echo "                                                        Validate references in parallel; record solvable sets and one verdict table"
 	@echo "                                                        [ENGINE=direct|harbor] [NATIVE_RUNNER=path] [AUDIT=0] [AUDIT_ONLY=1]"
 	@echo "  make problem-errata-draft PROBLEM=scb/<problem>@<version> OUT=<path> REGISTERED=<yyyy-mm-dd>"
@@ -175,13 +175,13 @@ help:
 	@echo "  make experiment-lock EXPERIMENT=... [LOCK_CHECK=1]     Write (or check, naming stale sections) <experiment>.lock.json; refuses runtime"
 	@echo "                                                        incompatibilities (RT0-RT6); lock_sha256 covers execution inputs only"
 	@echo "                                                        DRAFT=1: smoke experiments only; writes under var/tmp/, jobs are dev, never admitted to a measured comparison"
-	@echo "  make stage-new NAME=[<ns>/]<name> [FROM=docs-check]   Write the complete tier-2 command package (pinned codespell gate, uv.lock, fixtures) under lab/stages/ (never overwrites)"
-	@echo "  make stage-lock NAME=[<ns>/]<name>                    Generate the package's wheels-only tool/uv.lock (resolution only; no package code runs on the host)"
-	@echo "  make stage-check NAME=[<ns>/]<name> [REPLAY=<trial-dir>] [TARGET=name]"
+	@echo "  make stage-new NAME=<ns>/<name> [FROM=docs-check]     Write the complete tier-2 command package (pinned codespell gate, uv.lock, fixtures) at lab/stages/<ns>/<name>/ (never overwrites; upstream packages use ns raidar)"
+	@echo "  make stage-lock NAME=<ns>/<name>                      Generate the package's wheels-only tool/uv.lock (resolution only; no package code runs on the host)"
+	@echo "  make stage-check NAME=<ns>/<name> [REPLAY=<trial-dir>] [TARGET=name]"
 	@echo "                                                        Run fixtures twice, offline as UID 1000 in a throwaway pack container (never on the host), validate the static"
 	@echo "                                                        contract and publish the canary record; REPLAY runs a trial's captured state through the package"
 	@echo "  make stage-list                                       List stage packages with digest and release state"
-	@echo "  make stage-info NAME=[<ns>/]<name>                    Show a package's manifest facts, digest, next register line, lock state and canary record"
+	@echo "  make stage-info NAME=<ns>/<name>                      Show a package's manifest facts, digest, next register line, lock state and canary record"
 	@echo "  make workflow-new NAME=<name> [FROM=one-shot-verify]  Copy a workflow template to lab/workflows/<name> (never overwrites)"
 	@echo "  make releases-check [RELEASES_BASE=<commit>]          Fail unless lab/releases.yaml registers each agent, workflow and stage at its current hash, agent pins equal the pack's, and no release in the base commit (default: merge base with main, or HEAD's parent on main) was removed or re-hashed; part of make quality"
 	@echo "  make experiment-locks-check                           Fail unless every lab/experiments/*/*/*.lock.json is current (host Python patch aside); part of make quality"
@@ -207,7 +207,7 @@ help:
 	@echo "  make assess-regrade JOB=<trial-or-job-dir> [VERIFIER_BUNDLE=<dir>] [STORE=<assessment-store>] [COVERAGE_CHECK=1 [CONCURRENCY=N]] [REGRADE_OUT=report.json]"
 	@echo "                                                        Rerun the verifier over stored step snapshots (and, with STORE, the stored pre-fix grades); fails if results differ;"
 	@echo "                                                        COVERAGE_CHECK=1 instead makes each step's coverage run offline and compares it with the trial's own (or STORE's)"
-	@echo "  make experiment-analyze JOBS=\"<job-dir> ...\" STORE=<assessment-store> ANALYSIS_OUT=<dir> [LOCK=] [ASSESSMENT_CONFIG=] [MIN_PAIRS=] [MAX_EXCLUSION_FRACTION=] [ALPHA=] [BOOTSTRAP_SAMPLES=10000] [MIN_EFFECTS=\"metric=delta ...\"] [ALLOW_DEV_JOBS=1] [POOL_OVERRIDE=<field>[,<field>]]"
+	@echo "  make experiment-analyze JOBS=\"<job-dir> ...\" STORE=<assessment-store> ANALYSIS_OUT=<dir> [LOCK=] [ASSESSMENT_CONFIG=] [MIN_PAIRS=] [MAX_EXCLUSION_FRACTION=] [MAX_EXCLUSION_DIFFERENCE=] [ALPHA=] [BOOTSTRAP_SAMPLES=10000] [EXACT_STATE_LIMIT=250000] [MIN_EFFECTS=\"metric=delta ...\"] [ALLOW_DEV_JOBS=1] [POOL_OVERRIDE=<field>[,<field>]]"
 	@echo "                                                        Paired deltas, CIs, curves, verdicts and sample size vs the baseline arm (thresholds from the lock;"
 	@echo "                                                        overrides are labelled); benchmarks add a ranking view, smoke reports are stamped not citable;"
 	@echo "                                                        2+ jobs pool only when provenance matches (POOL_OVERRIDE lifts named refusals, recorded; a records-manifest violation never lifts)"
@@ -242,7 +242,7 @@ help:
 	@echo "Smoke (real agent trials of lab/experiments/smoke and the agent benchmark; locks under var/tmp/smoke, jobs under var/jobs/):"
 	@echo "  make orchestrator-smoke [SMOKE_ATTEMPTS=1] [SMOKE_CONCURRENCY=1] [TIMEOUT_SEC=]"
 	@echo "                                                        One one-shot trial with codex + gpt-6-luna (low), correctness only"
-	@echo "  make agent-smoke [RELEASE=codex@2 MODEL=gpt-6-luna REASONING_EFFORT=low] [TIMEOUT_SEC=]"
+	@echo "  make agent-smoke [RELEASE=codex@3 MODEL=gpt-6-luna REASONING_EFFORT=low] [TIMEOUT_SEC=]"
 	@echo "                                                        The same smoke with its agent replaced (a release from lab/releases.yaml;"
 	@echo "                                                        REASONING_EFFORT= unsets)"
 	@echo "  make smoke-agents [SMOKE_ARM=codex]                    One trial per released agent (codex: gpt-6-luna low)"
@@ -586,7 +586,7 @@ experiment-analyze:
 	$(call require_var,JOBS)
 	$(call require_var,STORE)
 	$(call require_var,ANALYSIS_OUT)
-	@$(RAIDAR) analyze $(foreach job,$(JOBS),"$(job)") --store "$(STORE)" --output "$(ANALYSIS_OUT)" $(if $(LOCK),--lock "$(LOCK)",) $(if $(ASSESSMENT_CONFIG),--assessment-config "$(ASSESSMENT_CONFIG)",) $(if $(MIN_PAIRS),--min-pairs "$(MIN_PAIRS)",) $(if $(MAX_EXCLUSION_FRACTION),--max-exclusion-fraction "$(MAX_EXCLUSION_FRACTION)",) $(if $(ALPHA),--alpha "$(ALPHA)",) $(if $(BOOTSTRAP_SAMPLES),--bootstrap-samples "$(BOOTSTRAP_SAMPLES)",) $(foreach effect,$(MIN_EFFECTS),--min-effect "$(effect)") $(if $(ALLOW_DEV_JOBS),--allow-dev-jobs,) $(foreach field,$(subst $(comma), ,$(POOL_OVERRIDE)),--pool-override "$(field)")
+	@$(RAIDAR) analyze $(foreach job,$(JOBS),"$(job)") --store "$(STORE)" --output "$(ANALYSIS_OUT)" $(if $(LOCK),--lock "$(LOCK)",) $(if $(ASSESSMENT_CONFIG),--assessment-config "$(ASSESSMENT_CONFIG)",) $(if $(MIN_PAIRS),--min-pairs "$(MIN_PAIRS)",) $(if $(MAX_EXCLUSION_FRACTION),--max-exclusion-fraction "$(MAX_EXCLUSION_FRACTION)",) $(if $(MAX_EXCLUSION_DIFFERENCE),--max-exclusion-difference "$(MAX_EXCLUSION_DIFFERENCE)",) $(if $(ALPHA),--alpha "$(ALPHA)",) $(if $(BOOTSTRAP_SAMPLES),--bootstrap-samples "$(BOOTSTRAP_SAMPLES)",) $(if $(EXACT_STATE_LIMIT),--exact-state-limit "$(EXACT_STATE_LIMIT)",) $(foreach effect,$(MIN_EFFECTS),--min-effect "$(effect)") $(if $(ALLOW_DEV_JOBS),--allow-dev-jobs,) $(foreach field,$(subst $(comma), ,$(POOL_OVERRIDE)),--pool-override "$(field)")
 
 jev-export-labels:
 	$(call require_var,POLICY)
@@ -663,14 +663,14 @@ smoke-dry-run-check:
 	@$(MAKE) --no-print-directory -n smoke-agents SMOKE_ARM="codex"
 	@! $(MAKE) --no-print-directory -n smoke-agents SMOKE_ARM="unknown" \
 		>/dev/null 2>&1
-	@$(MAKE) --no-print-directory -n agent-smoke RELEASE="codex@2" MODEL="gpt-6-luna" \
-		| grep -q -- '--set "agents.0.release=codex@2" --set "agents.0.model=gpt-6-luna"'
+	@$(MAKE) --no-print-directory -n agent-smoke RELEASE="codex@3" MODEL="gpt-6-luna" \
+		| grep -q -- '--set "agents.0.release=codex@3" --set "agents.0.model=gpt-6-luna"'
 	@$(MAKE) --no-print-directory -n agent-smoke REASONING_EFFORT= \
 		| grep -q -- '--set "agents.0.reasoning="'
 	@$(MAKE) --no-print-directory -n agent-smoke \
 		| grep -q -- '--set "agents.0.reasoning=low"'
 	@$(MAKE) --no-print-directory -n agent-smoke \
-		RELEASE="codex@2" MODEL="gpt-6-luna" REASONING_EFFORT="low" TIMEOUT_SEC="300"
+		RELEASE="codex@3" MODEL="gpt-6-luna" REASONING_EFFORT="low" TIMEOUT_SEC="300"
 
 # Smoke and execute targets build the pack image first: trials bind the prebuilt
 # pack tag and Harbor cannot build it. pack-build is a no-op when the tag exists.
@@ -693,8 +693,8 @@ REF ?=
 
 release-archive:
 	$(call require_var,REF)
-	@echo "$(REF)" | grep -Eq '^[a-z0-9][a-z0-9._-]*@[0-9]+$$' \
-		|| { echo "REF must be <name>@<N> (for example code-quality@3), got '$(REF)'"; exit 1; }
+	@echo "$(REF)" | grep -Eq '^[a-z0-9][a-z0-9._-]*(/[a-z0-9][a-z0-9._-]*)?@[0-9]+$$' \
+		|| { echo "REF must be <name>@<N> or <ns>/<name>@<N>, got '$(REF)'"; exit 1; }
 	@if git rev-parse -q --verify "refs/tags/archive/$(REF)" >/dev/null; then \
 		echo "tag archive/$(REF) already exists; it is never moved"; exit 1; fi
 	@git tag -a "archive/$(REF)" -m "Archive of $(REF) before an in-place edit" HEAD \

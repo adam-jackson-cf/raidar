@@ -40,10 +40,10 @@ from raidar.subject.primitive.gate import (
 from raidar.subject.primitive.payload import walk
 from tests.workflow_support import LocalEnvironment
 
-FIXTURE = Path(__file__).parent / "fixtures" / "stages" / "gate-check"
+FIXTURE = Path(__file__).parent / "fixtures" / "stages" / "acme" / "gate-check"
 PASS = FIXTURE / "fixtures" / "pass" / "state"
 REFUSE = FIXTURE / "fixtures" / "refuse" / "state"
-FACTS = AgentFacts(owner="agent", uid=1000, gid=1000, home="/home/agent", trusted_uid=0)
+FACTS = AgentFacts(owner="agent", trusted_uid=0)
 CONTEXT = {"task": "t", "params": {"marker": "FIXME"}, "round": 0, "carry": {}}
 
 SCAN = """\
@@ -616,15 +616,38 @@ async def test_a_rewritten_hook_log_and_changed_watched_state_are_integrity_find
     )  # fmt: skip
     run = await open_gate(rig, gate_env, [watched])
     try:
-        await run.seal("turn-1")
         log = Path(rig.paths.hook_state) / gate_tool.HOOK_RUNS
-        log.write_text(log.read_text() + '{"forged": true}\n')
+        log.write_text('{"first": true}\n')
+        await run.seal("turn-1")
+        log.write_text('{"second": true}\n')  # the agent's user may rewrite its own log
         await run.seal("turn-2")
         found = {item["name"] for item in run.record()["integrity"]}
     finally:
         await run.close()
-    assert "hook_log_chain_broken" in found
+    assert "hook_log_rewritten" in found  # a reading; health never invalidates on it
+    assert "hook_log_chain_broken" not in found  # there is no chain: nothing root-written to chain
     assert any(name.startswith("gate-check_state_") for name in found)  # the watched state moved
+
+
+async def test_the_hook_log_is_the_agents_and_a_forged_line_changes_no_attribution(
+    tmp_path: Path, gate_env: dict[str, str]
+) -> None:
+    rig = make_rig(tmp_path, REFUSE)
+    run = await open_gate(rig, gate_env, fixture_checks(rig))
+    try:
+        log = Path(rig.paths.hook_state) / gate_tool.HOOK_RUNS
+        assert log.stat().st_uid == os.getuid()  # no root-owned log, no broker beside it
+        assert os.access(log, os.W_OK)
+        assert not Path(rig.paths.state, "run").exists()
+        forged = {"verdict": "passed", "tree": "0" * 40, "who": "hook", "checks": []}
+        log.write_text(json.dumps(forged) + "\n")
+        outcome = await run.seal("turn-1")
+        errors = run.record()["errors"]
+    finally:
+        await run.close()
+    assert outcome.attribution is Attribution.REFUSED  # the seal decides, whatever the log says
+    assert errors == []
+    assert "0" * 40 in (tmp_path / "logs" / "turn-1" / "hook-runs.jsonl").read_text()
 
 
 WRITER = "import sys\nfrom pathlib import Path\nPath(sys.argv[1]).write_text(sys.argv[2])\n"
@@ -780,11 +803,12 @@ async def test_commit_hook_runs_keep_each_checks_output_copy(
     assert copies == {"gate-check.first": "one", "gate-check.second": "two"}
 
 
-async def test_closing_stops_the_broker_and_records_no_error(opened: tuple[Rig, GateRun]) -> None:
+async def test_closing_leaves_no_privileged_service_and_records_no_error(
+    opened: tuple[Rig, GateRun],
+) -> None:
     rig, run = opened
-    assert Path(rig.paths.broker_socket).exists()
+    assert not Path(rig.paths.state, "run").exists()  # no broker socket directory is created
     await run.close()
-    assert not Path(rig.paths.broker_socket).exists()
     assert run.record()["errors"] == []
 
 

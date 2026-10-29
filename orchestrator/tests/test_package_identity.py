@@ -42,7 +42,7 @@ def _no_uv(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def _workflow_document(params: dict[str, Any] | None = None, build: str = BUILD) -> dict[str, Any]:
-    use: dict[str, Any] = {"use": "gate-check@1"}
+    use: dict[str, Any] = {"use": "acme/gate-check@1"}
     if params:
         use["params"] = params
     return {"schema": 2, "name": "gated", "build": {"prompt": build}, "stages": [use]}
@@ -55,7 +55,7 @@ def _write_workflow(root: Path, document: dict[str, Any]) -> None:
 
 
 def _register(root: Path, *, workflow: bool = True) -> None:
-    """Register codex, one-shot, gate-check@1 and (optionally) gated@1 at the tree's hashes."""
+    """Register codex, one-shot, acme/gate-check@1 and optionally gated@1 at the tree's hashes."""
     from raidar.subject.workflow.definition import load_workflow
 
     stages = {
@@ -85,7 +85,7 @@ def tree(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
 
 
 def _package_file(root: Path, relative: str) -> Path:
-    return stages_root(root) / "gate-check" / relative
+    return stages_root(root) / "acme" / "gate-check" / relative
 
 
 # ---- the register and the reference grammar ------------------------------------------------
@@ -94,21 +94,22 @@ def _package_file(root: Path, relative: str) -> Path:
 def test_the_register_holds_stage_releases_and_history_is_append_only() -> None:
     digest = "a" * 64
     earlier = parse_register(
-        f"stages:\n  gate-check@1: {digest}\n  acme/docs@1: {digest}\n", "base"
+        f"stages:\n  acme/gate-check@1: {digest}\n  acme/docs@1: {digest}\n", "base"
     )
-    assert {str(r) for r in earlier.of(ReleaseKind.STAGE)} == {"gate-check@1", "acme/docs@1"}
+    assert {str(r) for r in earlier.of(ReleaseKind.STAGE)} == {"acme/gate-check@1", "acme/docs@1"}
     assert earlier.latest(ReleaseKind.STAGE, "acme/docs") == Release("acme/docs", 1)
 
     grown = parse_register(
-        f"stages:\n  gate-check@1: {digest}\n  acme/docs@1: {digest}\n  gate-check@2: {'b' * 64}\n",
+        f"stages:\n  acme/gate-check@1: {digest}\n  acme/docs@1: {digest}\n"
+        f"  acme/gate-check@2: {'b' * 64}\n",
         "now",
     )
     assert rewritten_releases(earlier, grown) == []
 
     rehashed = parse_register(
-        f"stages:\n  gate-check@1: {'c' * 64}\n  acme/docs@1: {digest}\n", "x"
+        f"stages:\n  acme/gate-check@1: {'c' * 64}\n  acme/docs@1: {digest}\n", "x"
     )
-    removed = parse_register(f"stages:\n  gate-check@1: {digest}\n", "x")
+    removed = parse_register(f"stages:\n  acme/gate-check@1: {digest}\n", "x")
     assert "re-hashed" in rewritten_releases(earlier, rehashed)[0]
     assert "removed" in rewritten_releases(earlier, removed)[0]
 
@@ -117,38 +118,71 @@ def test_the_register_holds_stage_releases_and_history_is_append_only() -> None:
     "text",
     [
         "gate-check",
-        "gate-check@latest",
-        "gate-check@main",
-        "gate-check@0",
+        "gate-check@1",
+        "acme/gate-check",
+        "acme/gate-check@latest",
+        "acme/gate-check@main",
+        "acme/gate-check@0",
         "a/b/c@1",
         "../x@1",
         "/abs@1",
         "Gate@1",
-        "gate-check@1.0",
+        "acme/gate-check@1.0",
     ],
 )
-def test_mutable_or_unnamespaced_references_never_parse(text: str) -> None:
+def test_mutable_or_unnamespaced_stage_references_never_parse(text: str) -> None:
     with pytest.raises(ReleaseError):
-        Release.parse(text)
+        Release.parse_stage(text)
 
 
-def test_a_workflow_refuses_a_mutable_package_reference(tree: Path) -> None:
+def test_only_stage_references_require_a_namespace() -> None:
+    assert Release.parse("one-shot@1") == Release("one-shot", 1)
+    assert Release.parse_stage("acme/gate-check@1") == Release("acme/gate-check", 1)
+
+
+@pytest.mark.parametrize("use", ["gate-check@1", "acme/gate-check@latest"])
+def test_a_workflow_refuses_a_mutable_or_unnamespaced_package_reference(
+    tree: Path, use: str
+) -> None:
     document = _workflow_document()
-    document["stages"] = [{"use": "gate-check@latest"}]
+    document["stages"] = [{"use": use}]
     _write_workflow(tree, document)
 
     with pytest.raises(ReleaseError, match="invalid workflow definition"):
         released_workflow("gated@1", repo_root=tree, draft=True)
 
 
+def test_a_register_with_an_unnamespaced_stage_is_unreadable() -> None:
+    with pytest.raises(ReleaseError, match="namespace is required"):
+        parse_register(f"stages:\n  gate-check@1: {'a' * 64}\n", "base")
+
+
+def test_a_bare_stage_reference_is_refused_even_when_a_flat_folder_exists(tree: Path) -> None:
+    flat = stages_root(tree) / "gate-check"
+    shutil.copytree(_package_file(tree, ""), flat)
+
+    with pytest.raises(ReleaseError, match="namespace is required"):
+        released_stage("gate-check@1", repo_root=tree, draft=True)
+    with pytest.raises(StagePackageError, match="expected stages/<namespace>/<name>"):
+        load_stage_package(flat)
+
+
+def test_a_package_deeper_than_namespace_and_name_is_refused(tmp_path: Path) -> None:
+    folder = write_package(tmp_path / "lab" / "stages" / "acme" / "group", {"name": "docs"})
+
+    with pytest.raises(StagePackageError, match="expected stages/<namespace>/<name>"):
+        load_stage_package(folder)
+    assert stage_names(tmp_path) == []
+
+
 def test_only_the_latest_stage_release_resolves(tree: Path) -> None:
     register = yaml.safe_load(releases_file(tree).read_text())
-    register["stages"]["gate-check@2"] = register["stages"]["gate-check@1"]
+    register["stages"]["acme/gate-check@2"] = register["stages"]["acme/gate-check@1"]
     releases_file(tree).write_text(yaml.safe_dump(register))
 
     with pytest.raises(ReleaseError, match="not the stages release the tree holds"):
-        released_stage("gate-check@1", repo_root=tree)
-    assert released_stage("gate-check@2", repo_root=tree).ref == "gate-check@2"
+        released_stage("acme/gate-check@1", repo_root=tree)
+    assert released_stage("acme/gate-check@2", repo_root=tree).ref == "acme/gate-check@2"
 
 
 def test_a_namespaced_package_lives_below_its_namespace(tmp_path: Path) -> None:
@@ -168,7 +202,9 @@ def test_release_issues_name_an_unreleased_or_edited_package(tree: Path) -> None
 
     issues = release_issues(tree)
     assert any(
-        i.startswith("stages/gate-check changed since gate-check@1: register gate-check@2:")
+        i.startswith(
+            "stages/acme/gate-check changed since acme/gate-check@1: register acme/gate-check@2:"
+        )
         for i in issues
     )
     assert any("workflows/gated changed since gated@1" in i for i in issues)
@@ -253,7 +289,7 @@ def test_each_prompt_tool_or_param_change_alone_moves_identity_and_stales_the_re
     mutate(tree)
 
     assert _identity(tree) != before
-    with pytest.raises(ReleaseError, match=r"(ST4: gate-check|gated) changed since"):
+    with pytest.raises(ReleaseError, match=r"(ST4: acme/gate-check|gated) changed since"):
         released_workflow("gated@1", repo_root=tree)
 
 
@@ -262,7 +298,7 @@ def test_the_fold_carries_release_digest_and_effective_params(tree: Path) -> Non
     (stage,) = workflow.stages
 
     assert stage.entry == {
-        "use": "gate-check@1",
+        "use": "acme/gate-check@1",
         "sha256": load_stage_package(_package_file(tree, "")).digest,
         "params": {"marker": "FIXME"},
     }
@@ -287,9 +323,9 @@ def _resolved(root: Path, name: str, release: str | None = None) -> ResolvedStag
 
 
 def _own(tmp_path: Path, manifest: dict[str, Any], **kw: Any) -> ResolvedStage:
-    folder = write_package(tmp_path / "lab" / "stages", manifest, **kw)
+    folder = write_package(tmp_path / "lab" / "stages" / "acme", manifest, **kw)
     package = load_stage_package(folder)
-    return ResolvedStage(Release.parse(f"{package.name}@1"), package, {})
+    return ResolvedStage(Release.parse_stage(f"acme/{package.name}@1"), package, {})
 
 
 def test_st1_an_unsupported_contract_or_invalid_package_is_refused(tree: Path) -> None:
@@ -297,7 +333,7 @@ def test_st1_an_unsupported_contract_or_invalid_package_is_refused(tree: Path) -
     manifest.write_text(manifest.read_text().replace("stage/1", "stage/2"))
 
     with pytest.raises(ReleaseError, match=r"^ST1:"):
-        released_stage("gate-check@1", repo_root=tree, draft=True)
+        released_stage("acme/gate-check@1", repo_root=tree, draft=True)
 
 
 def test_st1_a_prompt_naming_an_undefined_token_is_refused(tmp_path: Path) -> None:
@@ -342,13 +378,15 @@ def test_st3_an_input_without_an_earlier_producer_is_refused(tmp_path: Path) -> 
 def test_st4_a_package_that_differs_from_the_register_is_refused(tree: Path) -> None:
     _mutate_prompt(tree)
 
-    with pytest.raises(ReleaseError, match=r"ST4: gate-check changed since gate-check@1"):
-        released_stage("gate-check@1", repo_root=tree)
-    assert released_stage("gate-check@1", repo_root=tree, draft=True).ref == "gate-check@1"
+    pattern = r"ST4: acme/gate-check changed since acme/gate-check@1"
+    with pytest.raises(ReleaseError, match=pattern):
+        released_stage("acme/gate-check@1", repo_root=tree)
+    drafted = released_stage("acme/gate-check@1", repo_root=tree, draft=True)
+    assert drafted.ref == "acme/gate-check@1"
 
 
 def test_st5_a_missing_or_sdist_or_stale_lock_is_refused(tree: Path, tmp_path: Path) -> None:
-    stage = _resolved(tree, "gate-check")
+    stage = _resolved(tree, "acme/gate-check")
     build = "%%%GATE_CHECK%%% %%%TASK%%%"
     assert package_issues(build, [stage]) == []
 
@@ -396,7 +434,7 @@ def test_st5_a_missing_or_sdist_or_stale_lock_is_refused(tree: Path, tmp_path: P
     ],
 )
 def test_st6_a_missing_repeated_or_unknown_frame_slot_is_refused(tree: Path, build: str) -> None:
-    issues = package_issues(build, [_resolved(tree, "gate-check")])
+    issues = package_issues(build, [_resolved(tree, "acme/gate-check")])
 
     assert any(i.startswith("ST6:") for i in issues), issues
 

@@ -14,13 +14,11 @@ pytest, conftest and project configuration), the witness snapshots and the reapi
 agent's leftover processes. Each record the gate prints names the uid it ran as (``process``).
 The tools stay root-owned and read-only to the agent (G3 hashes them).
 
-**The hook broker.** The agent's own ``git commit`` runs the root-owned ``hooks/pre-commit``,
-a client of a small daemon (``verify_gate.py broker``) that root starts from root-owned files.
-It runs no agent code: for each request it spawns the gate's decision with the uid and gid
-dropped to the agent's, takes the record from a pipe the checks' processes do not inherit and is
-the only writer of the hook log, root-owned and read-only to the agent (the log's directory, the
-broker's socket and its directory are too). A request names no verdict or tree; the record's
-tree is the commit's only when it equals the raw work tree that was checked.
+**The hook.** The agent's own ``git commit`` runs the root-installed ``hooks/pre-commit``, which
+runs the gate's decision as the agent's user (``verify_gate.py hook``) and appends its record to
+the hook log, which the agent's user owns. There is no privileged broker: the log is a reading
+(the agent can forge or rewrite it), never validity, and the seal below is the authoritative run.
+The record's tree is the commit's only when it equals the raw work tree that was checked.
 
 **Where evidence lives.** The runner keeps every record host-side outside the mounted
 ``/logs/agent`` (``Checkpoint.logs_dir`` is a staging directory) and publishes them after the
@@ -42,8 +40,8 @@ is put back.
   (``uv pip freeze``) is recorded with its sha256;
 - the gate (``verify_gate.py``), its configuration (``gate.json``), the rules record and the
   hooks directory (``hooks/pre-commit``) and the empty hooks directory the gate's git calls use
-  beside it, root-owned; the hook log's directory (root's, with the broker's socket directory)
-  and the gate's scratch directory (caches only, the agent's), freshly created;
+  beside it, root-owned; the hook log's directory and the gate's scratch directory (the agent's,
+  freshly created);
 - ``/app`` as a git repository, set up as the agent user: initialised and the seeded tree
   committed as the base when it is not one; ``core.hooksPath`` pointing at the hooks directory;
   ``.git/info/exclude`` leaving out the workspace caches and the workflow's own files
@@ -230,21 +228,8 @@ class VerifyPaths:
         return f"{self.state}/scratch"
 
     @property
-    def run(self) -> str:
-        return f"{self.state}/run"
-
-    @property
-    def broker_socket(self) -> str:
-        return f"{self.run}/b.sock"
-
-    @property
     def empty_hooks(self) -> str:
         return f"{self.home}/nohooks"
-
-    @property
-    def root_gate(self) -> str:
-        """The gate as root runs its two trusted subcommands (the broker): isolated interpreter."""
-        return shlex.join([self.python, "-I", "-B", self.gate])
 
 
 PATHS = VerifyPaths()
@@ -302,7 +287,6 @@ def gate_config(settings: VerifySettings, paths: VerifyPaths) -> dict[str, Any]:
         ],
         "hook_state": paths.hook_state,
         "scratch": paths.scratch,
-        "broker_socket": paths.broker_socket,
         "empty_hooks": paths.empty_hooks,
         "rules_file": settings.rules_file,
         "hooks": paths.hooks,
@@ -496,18 +480,12 @@ class Verify(Stage):
         hook = f"#!/bin/sh\nexec {shlex.join(paths.gate_command)} hook --config {q(paths.config)}\n"
         block = rules_block(self.settings)
         configuration = gate_config(self.settings, paths)
-        reading = await self._exec(checkpoint, "echo $(id -u) $(id -g) $HOME", root=False)
-        uid, gid, home = reading.split()
         configuration.update(
             prerequisites=self.facts["prerequisites"],
             rules_owned=self.facts["rules_owned"],
             hook_sha256=_sha256(hook),
             payload_sha256=hashlib.sha256(PAYLOAD.read_bytes()).hexdigest(),
             trusted_uid=int((await self._exec(checkpoint, "id -u")).strip()),
-            agent_name=self.owner,
-            agent_uid=int(uid),
-            agent_gid=int(gid),
-            agent_home=home,
             session_paths=list(checkpoint.session_paths),
         )
         config = json.dumps(configuration, indent=2, sort_keys=True) + "\n"
@@ -529,11 +507,6 @@ class Verify(Stage):
         runs = q(f"{paths.hook_state}/{gate_tool.HOOK_RUNS}")
         await self._exec(
             checkpoint,
-            f"cd / && {paths.root_gate} broker-stop --config {q(paths.config)} >/dev/null 2>&1 "
-            "|| true",
-        )
-        await self._exec(
-            checkpoint,
             "\n".join(
                 [
                     "set -eu",
@@ -543,21 +516,17 @@ class Verify(Stage):
                     f"{q(paths.empty_hooks)} {hook_path}",
                     f"chmod 644 {q(paths.gate)} {q(paths.config)} {q(paths.rules_record)}",
                     # fresh directories each checkpoint: nothing the agent left is ever chowned
-                    f"rm -rf {q(paths.hook_state)} {q(paths.scratch)} {q(paths.run)}",
-                    f"mkdir -p {q(paths.hook_state)} {q(paths.scratch)} {q(paths.run)}",
-                    f"chown {owner} {q(paths.scratch)}",
-                    f"chmod 755 {q(paths.state)} {q(paths.hook_state)} {q(paths.run)}",
-                    # the hook log is the broker's: root-owned, readable, written by no one else
+                    f"rm -rf {q(paths.hook_state)} {q(paths.scratch)}",
+                    f"mkdir -p {q(paths.hook_state)} {q(paths.scratch)}",
+                    f"chown {owner} {q(paths.scratch)} {q(paths.hook_state)}",
+                    f"chmod 755 {q(paths.state)} {q(paths.hook_state)}",
+                    # the hook log is the agent's: its user appends to it, so it is a reading
                     f": > {runs}",
+                    f"chown {owner} {runs}",
                     f"chmod 644 {runs}",
                 ]
             ),
         )
-        command = f"cd / && {paths.root_gate} broker --config {q(paths.config)}"
-        started = _last_json(await self._exec(checkpoint, command))
-        if started is None or "pid" not in started:
-            raise VerifySetupError(f"the hook broker did not start: {started}")
-        self.facts["broker"] = started
 
     # prompt fragment --------------------------------------------------------------------------
 
@@ -687,10 +656,6 @@ class Verify(Stage):
         try:
             await self._reap(checkpoint)
             await self._copy_hook_log(checkpoint, f"{RECORD_DIR}/{gate_tool.HOOK_RUNS}", "close")
-            config = q(self.paths.config)
-            await self._exec(
-                checkpoint, f"cd / && {self.paths.root_gate} broker-stop --config {config}"
-            )
             rules = q(f"{self.paths.workspace}/{self.settings.rules_file}")
             remove = " --remove-empty" if self.facts.get("rules_owned") else ""
             stripped = await self._exec(
@@ -704,14 +669,11 @@ class Verify(Stage):
             self.evidence.errors.append(f"{type(exc).__name__}: {exc}")
 
     async def _copy_hook_log(self, checkpoint: Checkpoint, relative: str, after: str) -> None:
-        """Copy the hook's run log host-side and check it was only ever appended to.
+        """Copy the hook's run log host-side and note whether it was only ever appended to.
 
-        The log is the broker's: root-owned, readable, written by no one else, so the agent's user
-        cannot rewrite, remove or forge a line (the Docker attacks show these attempts denied).
-        The checks here are defence in depth where a deployment's file permissions are weaker (a
-        test's own user): lines changed or removed (the earlier copy is no longer its prefix, or
-        the chain breaks) and a write that restored the same bytes (a later ``ctime`` on equal
-        content).
+        The agent's user owns the log, so it can rewrite, remove or forge a line: what this
+        notes (lines changed or removed, or a write that restored the same bytes: a later
+        ``ctime`` on equal content) is a reading, never a validity finding.
         """
         runs = q(f"{self.paths.hook_state}/{gate_tool.HOOK_RUNS}")
         environment = checkpoint.environment
@@ -729,11 +691,6 @@ class Verify(Stage):
         self.facts["hook_log_sha256"] = _sha256(text)
 
     def _observe_hook_log(self, text: str, ctime: str | None, after: str) -> None:
-        problem = gate_tool.chain_problem(text)
-        if problem is not None:
-            self.evidence.integrity.append(
-                {"name": "hook_log_chain_broken", "after": after, "detail": problem}
-            )
         if self.evidence.hook_seen and not text.startswith(self.evidence.hook_seen):
             self.evidence.integrity.append(
                 {
@@ -762,9 +719,9 @@ class Verify(Stage):
         self._ingest_hook_integrity(text, after)
 
     def _ingest_hook_integrity(self, text: str, after: str) -> None:
-        """Findings the hook runs themselves recorded (they ran in the broker's decision, which
-        watched the workflow's state directories before and after the checks): the broker's log is
-        root-owned, so they are trusted as a hook run's own observations."""
+        """Findings the hook runs themselves recorded (their decision watched the workflow's state
+        directories and the session store before and after the checks). The agent's user wrote the
+        log, so a missing finding proves nothing; the seal's own witnesses stay authoritative."""
         lines = [line for line in text.splitlines() if line.strip()]
         for line in lines[self.evidence.hook_integrity_seen :]:
             try:

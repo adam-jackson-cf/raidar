@@ -6,7 +6,8 @@ outcome and passes only with at least one collected test and none failed), ``bef
 prerequisites that run first and prevent every other check while they refuse, and a ``watch``
 directory of stage state the gate proves it left alone. The checks run in the trusted gate payload
 (:mod:`raidar.subject.primitive.gate_tool`) as the agent's user, never root: from the agent's own
-``git commit`` through the root-owned hook broker, and at the seal, the authoritative run after
+``git commit`` (the hook; the agent can write its log, so what it records is a reading) and at the
+seal, the authoritative run after
 each turn. The seal only records the verdict, the work tree it judged and the workspace digest: it
 never stages, commits, restores or repairs the agent's work. With ``max_fix_rounds`` above zero the
 workspace is snapshotted host-side before each fix turn (the pre-fix tree).
@@ -118,22 +119,9 @@ class GatePaths:
         return f"{self.state}/scratch"
 
     @property
-    def run(self) -> str:
-        return f"{self.state}/run"
-
-    @property
-    def broker_socket(self) -> str:
-        return f"{self.run}/b.sock"
-
-    @property
     def command(self) -> list[str]:
         """The payload as the agent's user runs it."""
         return [self.system_python, "-B", self.payload]
-
-    @property
-    def root_command(self) -> str:
-        """The payload as root runs its two trusted subcommands (the broker): isolated."""
-        return shlex.join([self.system_python, "-I", "-B", self.payload])
 
 
 @dataclass(frozen=True)
@@ -162,9 +150,6 @@ class AgentFacts:
     """Who the gate's user is and who owns the trusted files (read in the container)."""
 
     owner: str
-    uid: int
-    gid: int
-    home: str
     trusted_uid: int
 
 
@@ -260,7 +245,6 @@ def gate_config(
         "prerequisites": watched_state(packages),
         "hook_state": paths.hook_state,
         "scratch": paths.scratch,
-        "broker_socket": paths.broker_socket,
         "empty_hooks": paths.empty_hooks,
         "hooks": paths.hooks,
         "session_paths": list(session_paths),
@@ -268,10 +252,6 @@ def gate_config(
         "payload_sha256": hashlib.sha256(PAYLOAD.read_bytes()).hexdigest(),
         "payload_name": PAYLOAD.name,
         "trusted_uid": facts.trusted_uid,
-        "agent_name": facts.owner,
-        "agent_uid": facts.uid,
-        "agent_gid": facts.gid,
-        "agent_home": facts.home,
     }
 
 
@@ -330,18 +310,16 @@ def attribute(record: Mapping[str, Any], *, tools_intact: bool = True) -> tuple[
 
 @dataclass
 class HookLog:
-    """The broker's hash-chained run log as copied host-side: only ever appended to."""
+    """The hook's run log as copied host-side. The agent's user writes it: what it holds, and
+    what its findings say, are readings."""
 
     seen: str = ""
     ctime: str | None = None
     integrity_seen: int = 0
 
     def observe(self, text: str, ctime: str | None, after: str) -> list[dict[str, str]]:
-        """Findings for a rewritten, broken or silently touched log, and the hook's own."""
+        """Readings for a rewritten or silently touched log, and the hook's own findings."""
         found: list[dict[str, str]] = []
-        problem = gate_tool.chain_problem(text)
-        if problem is not None:
-            found.append({"name": "hook_log_chain_broken", "after": after, "detail": problem})
         if self.seen and not text.startswith(self.seen):
             found.append(
                 {
@@ -421,7 +399,7 @@ class GateRun:
     # before the agent starts ---------------------------------------------------------------
 
     async def prepare(self, session_paths: Sequence[str] = ()) -> None:
-        """Install the gate, start its broker, check it and run the canary (``GateInvalid``)."""
+        """Install the gate, check it and run the canary (``GateInvalid``)."""
         self.records.mkdir(parents=True, exist_ok=True)
         if self.paths.trusted_root == calls.TRUSTED_ROOT:
             await calls.ensure_trusted(self.environment)  # the supervisor every check runs under
@@ -431,24 +409,19 @@ class GateRun:
         configuration = gate_config(
             self.paths, self.packages, facts, hook_sha256=_sha256(hook), session_paths=session_paths
         )
-        try:
-            await self._install(facts, hook, configuration)
-            found = last_json(await self._agent(shlex.join(self._argv("workspace-setup"))))
-            if found is None or "base" not in found:
-                raise GateInvalid("integrity", f"no base commit from the workspace setup: {found}")
-            self.base = str(found["base"])
-            await self._check_setup()
-            await self._run_canary()
-            await self._verify_tools("before the agent started")
-        except (GateInvalid, calls.TransportError):
-            await self._stop_broker()  # nothing may keep listening for a trial that cannot start
-            raise
+        await self._install(facts, hook, configuration)
+        found = last_json(await self._agent(shlex.join(self._argv("workspace-setup"))))
+        if found is None or "base" not in found:
+            raise GateInvalid("integrity", f"no base commit from the workspace setup: {found}")
+        self.base = str(found["base"])
+        await self._check_setup()
+        await self._run_canary()
+        await self._verify_tools("before the agent started")
 
     async def _facts(self) -> AgentFacts:
         owner = (await self._agent("id -un")).strip()
-        uid, gid, home = (await self._agent("echo $(id -u) $(id -g) $HOME")).split()
         trusted = int((await self._root("id -u")).strip())
-        return AgentFacts(owner, int(uid), int(gid), home, trusted)
+        return AgentFacts(owner, trusted)
 
     async def _install(self, facts: AgentFacts, hook: str, configuration: dict[str, Any]) -> None:
         """Root's whole job: put the trusted files in place, set modes, make fresh state."""
@@ -469,10 +442,6 @@ class GateRun:
             await calls.upload_file(environment, kept, context_path(paths, package))
         runs = _q(f"{paths.hook_state}/{gate_tool.HOOK_RUNS}")
         await self._root(
-            f"cd / && {paths.root_command} broker-stop --config {_q(paths.config)} "
-            ">/dev/null 2>&1 || true"
-        )
-        await self._root(
             "\n".join(
                 [
                     "set -eu",
@@ -483,20 +452,17 @@ class GateRun:
                     f"chmod 644 {_q(paths.payload)} {_q(paths.config)}",
                     f"chmod 644 {_q(paths.contexts)}/*.json 2>/dev/null || true",
                     # fresh directories each checkpoint: nothing the agent left is ever chowned
-                    f"rm -rf {_q(paths.hook_state)} {_q(paths.scratch)} {_q(paths.run)}",
-                    f"mkdir -p {_q(paths.hook_state)} {_q(paths.scratch)} {_q(paths.run)}",
-                    f"chown {_q(facts.owner + ':')} {_q(paths.scratch)}",
-                    f"chmod 755 {_q(paths.state)} {_q(paths.hook_state)} {_q(paths.run)}",
-                    # the hook log is the broker's: root-owned, readable, written by no one else
+                    f"rm -rf {_q(paths.hook_state)} {_q(paths.scratch)}",
+                    f"mkdir -p {_q(paths.hook_state)} {_q(paths.scratch)}",
+                    f"chown {_q(facts.owner + ':')} {_q(paths.scratch)} {_q(paths.hook_state)}",
+                    f"chmod 755 {_q(paths.state)} {_q(paths.hook_state)}",
+                    # the hook log is the agent's: its user appends to it, so it is a reading
                     f": > {runs}",
+                    f"chown {_q(facts.owner + ':')} {runs}",
                     f"chmod 644 {runs}",
                 ]
             )
         )
-        command = f"cd / && {paths.root_command} broker --config {_q(paths.config)}"
-        started = last_json(await self._root(command))
-        if started is None or "pid" not in started:
-            raise GateInvalid("integrity", f"the hook broker did not start: {started}")
 
     def _argv(self, command: str, *extra: str) -> list[str]:
         return [*self.paths.command, command, "--config", self.paths.config, *extra]
@@ -625,7 +591,7 @@ class GateRun:
         )
 
     async def _copy_hook_log(self, relative: str, after: str) -> None:
-        """Copy the broker's log host-side and check it was only ever appended to."""
+        """Copy the hook's log host-side and note whether it was only ever appended to."""
         runs = _q(f"{self.paths.hook_state}/{gate_tool.HOOK_RUNS}")
         environment = self.environment
         read = await calls.trusted_exec(environment, f"cat {runs} 2>/dev/null || true")
@@ -671,21 +637,16 @@ class GateRun:
     # end of the checkpoint -------------------------------------------------------------------
 
     async def close(self) -> None:
-        """Reap, copy the log one last time, stop the broker; failures are recorded."""
+        """Reap, copy the log one last time; failures are recorded."""
         if self.base is None:
             self.evidence.errors.append("the gate was not set up before the agent started")
             return
         try:
             await self._reap()
             await self._copy_hook_log(f"{RECORD_DIR}/hook-runs.jsonl", "close")
-            await self._stop_broker()
             await self._tools_intact("at close")
         except (calls.TransportError, GateInvalid) as exc:
             self.evidence.errors.append(f"{type(exc).__name__}: {exc}")
-
-    async def _stop_broker(self) -> None:
-        config = _q(self.paths.config)
-        await self._root(f"cd / && {self.paths.root_command} broker-stop --config {config}")
 
     def record(self) -> dict[str, Any]:
         """Host-written evidence of this gate (no check output or per-test records)."""
