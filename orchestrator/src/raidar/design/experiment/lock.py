@@ -40,7 +40,7 @@ import json
 import os
 import platform
 import tomllib
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
@@ -63,7 +63,13 @@ from raidar.contract.source_digest import SOURCE_DIGEST_SCHEME, python_source_di
 from raidar.design.experiment.arm import ArmResolutionError, resolve_arm
 from raidar.design.experiment.loader import LoadedExperiment
 from raidar.design.experiment.runtime_gate import GateInputs, PackLoader, runtime_gate_issues
-from raidar.design.experiment.schema import ExperimentSpec, FieldIssue, ProblemEntry
+from raidar.design.experiment.schema import (
+    EXECUTION_ANALYSIS_FIELDS,
+    ExperimentSpec,
+    FieldIssue,
+    ProblemEntry,
+    analysis_section,
+)
 from raidar.scoring.framework.metrics import (
     DEFAULT_METRIC_REGISTRY,
     MetricRegistry,
@@ -92,8 +98,6 @@ EXECUTION_SPEC_FIELDS = (
     "arms",
     "varies",
 )
-EXECUTION_ANALYSIS_FIELDS = ("attempts", "seed")
-"""The analysis fields that shape the plan; ``concurrency`` is per machine (PlanOptions)."""
 STALE_CONSEQUENCES = {
     "execution": "execution inputs changed; jobs under the old lock_sha256 are another experiment",
     "assessment": "scorers or the headline metric changed; rescore jobs (they still match)",
@@ -509,10 +513,22 @@ def _build_lock(
             "references": assessment_refs,
             "tools": assessment_tools,
         },
-        "analysis": analysis_section(spec_json),
+        "analysis": analysis_section(spec_json, _bound_checkpoint_counts(spec, resolved_problems)),
         "toolchain": toolchain_versions(),
     }
     return seal_lock(body)
+
+
+def _bound_checkpoint_counts(
+    spec: ExperimentSpec, problems: Sequence[Mapping[str, object]]
+) -> dict[str, int]:
+    """Bound checkpoint counts, keyed exactly as trials name their problem."""
+    return {
+        (entry.ref if entry.ref is not None else f"path:{entry.path}"): int(
+            str(problem["checkpoints"])
+        )
+        for entry, problem in zip(spec.problems, problems, strict=True)
+    }
 
 
 def execution_section(
@@ -539,12 +555,6 @@ def execution_section(
         "versions": versions,
         "tools": tools,
     }
-
-
-def analysis_section(spec_json: Mapping[str, Any]) -> dict[str, object]:
-    """Baseline arm and verdict thresholds: ``spec.analysis`` minus the plan-shaping fields."""
-    excluded = {*EXECUTION_ANALYSIS_FIELDS, "concurrency"}
-    return {key: value for key, value in spec_json["analysis"].items() if key not in excluded}
 
 
 def seal_lock(body: Mapping[str, Any]) -> dict[str, Any]:

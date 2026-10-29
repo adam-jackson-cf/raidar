@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import math
+from fractions import Fraction
 
 import pytest
 
@@ -11,6 +12,7 @@ from raidar.evaluation.analysis.stats import (
     IntervalMethod,
     mcnemar_exact,
     pairs_for_power,
+    sign_flip_exact,
     summarise,
     t_cdf,
     t_quantile,
@@ -71,6 +73,28 @@ def test_exact_mcnemar_counts_only_discordant_pairs() -> None:
     assert mcnemar_exact(512, 512) == mcnemar_exact(2048, 2048) == 1.0
     assert mcnemar_exact(0, 1024) == math.ldexp(1.0, -1023)
     assert mcnemar_exact(1, 1023) == math.ldexp(1025.0, -1023)
+
+
+def test_exact_sign_flip_enumerates_every_sign_assignment() -> None:
+    ones = [Fraction(1)]
+    assert sign_flip_exact([]) == 1.0
+    assert sign_flip_exact([Fraction(0), Fraction(0)]) == 1.0  # zeros carry no weight
+    assert sign_flip_exact(ones * 5) == pytest.approx(0.0625)
+    assert sign_flip_exact(ones * 6) == pytest.approx(0.03125)
+    assert sign_flip_exact([-term for term in ones * 6]) == pytest.approx(0.03125)
+    assert sign_flip_exact([*ones * 6, Fraction(0)]) == pytest.approx(0.03125)
+    # {1, 2, 3} all positive: only +6 and -6 reach |sum| >= 6 of the eight assignments.
+    assert sign_flip_exact([Fraction(1), Fraction(2), Fraction(3)]) == pytest.approx(0.25)
+    # A balanced set cannot be extreme: |sum| >= 0 for every assignment.
+    assert sign_flip_exact([Fraction(1), Fraction(-1)]) == 1.0
+    # Weighted (equal-weight aggregate) terms are exact rationals.
+    third = Fraction(1, 3)
+    assert sign_flip_exact([third] * 3 + [Fraction(1, 2)] * 4) == pytest.approx(2 / 128)
+
+
+def test_sign_flip_gives_up_rather_than_approximating() -> None:
+    terms = [Fraction(2**index) for index in range(30)]  # every assignment is a distinct sum
+    assert sign_flip_exact(terms) is None
 
 
 @pytest.mark.parametrize(

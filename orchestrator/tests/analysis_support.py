@@ -7,10 +7,15 @@ from collections.abc import Mapping, Sequence
 from raidar.evaluation.analysis.gate_effort import GateDescriptive
 from raidar.evaluation.analysis.outcomes import TrialOutcome, Value
 from raidar.evaluation.analysis.report import AnalysisInputs, ArmSummary, PlannedTrial
+from raidar.scoring.catalog.outcomes import declared_outcome_types
 
 BASELINE = "baseline"
 GUIDED = "guided"
 STEPS = ("checkpoint_1", "checkpoint_2", "checkpoint_3", "checkpoint_4")
+OUTCOME_TYPES = declared_outcome_types(
+    dict.fromkeys(("toy@1", "a@1", "b@1", "oneshot@1", "multi@1"), len(STEPS))
+)
+"""What a lock declares for the synthetic problems: four checkpoints each."""
 
 
 def gap(status: str = "ineligible", reason: str = "synthetic gap") -> Value:

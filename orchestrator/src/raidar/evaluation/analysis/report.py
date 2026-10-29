@@ -126,6 +126,7 @@ class AnalysisInputs:
     attempts: int = 1
     errata: Mapping[str, Mapping[str, object]] | None = None
     solvable: Mapping[str, Mapping[str, object]] | None = None
+    spec_determinacy: Mapping[str, Mapping[str, object]] = field(default_factory=dict)
     primary_outcome: str | None = None
     """The lock's pre-registered ``analysis.primary_outcome`` (None: the progression's)."""
     pooling: PoolingReport | None = None
@@ -204,6 +205,14 @@ class ReportSettings(AnalysisModel):
     changed_from_defaults: tuple[str, ...] = ()
     min_pairs: int
     max_exclusion_fraction: float
+    max_exclusion_difference: float | None = None
+    """The lock's pre-registered material per-arm exclusion-rate difference; None: unpinned, so
+    every comparative verdict is refused."""
+    outcome_types_declared: bool = False
+    """Whether the lock declares outcome types; without them every comparative verdict is
+    refused."""
+    exact_state_limit: int
+    """Execution safety limit on the exact sign-flip enumeration (never changes a p-value)."""
     alpha: float
     confidence: float = 0.95
     bootstrap_min_pairs: int = 10
@@ -242,6 +251,8 @@ class AnalysisReport(AnalysisModel):
     solvable: dict[str, dict[str, object]] | None = None
     """``{problem ref: {sha256, cases: {step: solvable case count}}}`` the lock pins; the
     solvable-set outcomes (the default primary) apply it. Absent when the lock pins none."""
+    spec_determinacy: dict[str, dict[str, object]] = {}
+    """Per-problem audited assertion coverage and flags, not specification compliance."""
     pooling: PoolingReport | None = None
     """The pooling gate's outcome: unmeasured jobs, lifted refusals, timing/cost comparability."""
     verifier_sensitivities: dict[str, list[dict[str, object]]] | None = None
@@ -268,6 +279,8 @@ def _slots(inputs: AnalysisInputs, treatment: str) -> dict[str, list[Slot]]:
             Slot(
                 problem=problem,
                 attempt=attempt,
+                baseline_arm=inputs.baseline_arm,
+                treatment_arm=treatment,
                 baseline=by_key.get((inputs.baseline_arm, problem, attempt)),
                 treatment=by_key.get((treatment, problem, attempt)),
             )
@@ -437,11 +450,14 @@ def _settings_out(settings: Settings) -> ReportSettings:
         changed_from_defaults=settings.changed_from_defaults(),
         min_pairs=settings.min_pairs,
         max_exclusion_fraction=settings.max_exclusion_fraction,
+        max_exclusion_difference=settings.max_exclusion_difference,
         alpha=settings.alpha,
         confidence=1.0 - settings.alpha,
         bootstrap_samples=settings.bootstrap_samples,
         seed=settings.seed,
         min_effects=dict(sorted(settings.min_effects.items())),
+        outcome_types_declared=bool(settings.outcome_types),
+        exact_state_limit=settings.sign_flip_state_limit,
     )
 
 
@@ -462,15 +478,20 @@ def check_steps(outcomes: Sequence[TrialOutcome]) -> None:
         )
 
 
-def analyse(inputs: AnalysisInputs, settings: Settings) -> AnalysisReport:
-    """Paired comparisons of every treatment arm against the baseline arm."""
-    check_steps(inputs.outcomes)
-    arms = arms_of(inputs.planned)
+def _treatment_arms(inputs: AnalysisInputs, arms: Sequence[str]) -> list[str]:
     if inputs.baseline_arm not in arms:
         raise ValueError(f"baseline arm {inputs.baseline_arm!r} is not in the plan ({arms})")
     treatments = [arm for arm in arms if arm != inputs.baseline_arm]
     if not treatments and inputs.kind != "smoke":
         raise ValueError("the plan has no treatment arm to compare with the baseline")
+    return treatments
+
+
+def analyse(inputs: AnalysisInputs, settings: Settings) -> AnalysisReport:
+    """Paired comparisons of every treatment arm against the baseline arm."""
+    check_steps(inputs.outcomes)
+    arms = arms_of(inputs.planned)
+    treatments = _treatment_arms(inputs, arms)
     summaries = tuple(_arm_summary(arm, inputs, settings) for arm in arms)
     return AnalysisReport(
         experiment=inputs.experiment,
@@ -493,6 +514,7 @@ def analyse(inputs: AnalysisInputs, settings: Settings) -> AnalysisReport:
         ranking=_ranking(inputs, settings, summaries),
         errata=_errata(inputs),
         solvable=_solvable(inputs),
+        spec_determinacy={ref: dict(audit) for ref, audit in inputs.spec_determinacy.items()},
         verifier_sensitivities=_sensitivities(inputs),
         pooling=inputs.pooling,
         dependency_warnings=dependency_warnings(

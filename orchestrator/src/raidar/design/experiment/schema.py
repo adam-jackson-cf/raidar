@@ -10,7 +10,7 @@ Vocabulary (Harbor's): an experiment has a ``kind`` (``ab-test``, ``benchmark``,
 ``smoke``; ``research-loop`` is reserved), one ``runtime`` (a runtime pack id), a Harbor
 ``environment`` (``type: docker``), a headline ``metric`` and ``analysis.attempts``: the
 paired, counterbalanced replicates of every arm. An **arm** is an agent plus a workflow:
-``agents`` name an agent release (``codex@2``, ``lab/agents/``) with one of its models and
+``agents`` name an agent release (``codex@3``, ``lab/agents/``) with one of its models and
 that model's reasoning level; ``arms`` name an agent id and a workflow release
 (``lab/workflows/``), ``one-shot@1`` when omitted.
 """
@@ -18,6 +18,7 @@ that model's reasoning level; ``arms`` name an agent id and a workflow release
 from __future__ import annotations
 
 import math
+from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import PurePosixPath
 from typing import Annotated, Any, Literal
@@ -34,6 +35,7 @@ from pydantic import (
 )
 
 from raidar.contract.references import REFERENCE_PATTERN
+from raidar.scoring.catalog.outcomes import declared_outcome_types
 
 DEFAULT_WORKFLOW = "one-shot@1"
 """The workflow an arm runs when it names none (design section 2)."""
@@ -142,7 +144,7 @@ class AgentEntry(SpecModel):
 
 class ProtocolSpec(SpecModel):
     # Also scorer config: raidar.engine.job.assessment writes it for every scorer
-    # that declares ``progression`` (correctness@7), so scoring follows the job.
+    # that declares ``progression`` (correctness@8), so scoring follows the job.
     progression: Literal["continue", "halt_on_failure"] = "continue"
     min_reward: float | None = Field(default=None, gt=0.0, le=1.0)
     agent_timeout_sec: int = Field(default=1800, gt=0)
@@ -210,6 +212,8 @@ BENCHMARK_MIN_ATTEMPTS = 5
 """Terminal-Bench's convention; a benchmark below it validates with a warning."""
 VERDICT_THRESHOLDS = ("min_pairs", "max_exclusion_fraction", "alpha", "min_effects")
 """The ``analysis`` fields the lock pins before any data is seen (memo §2.3)."""
+EXECUTION_ANALYSIS_FIELDS = ("attempts", "seed")
+"""The analysis fields that shape the plan; ``concurrency`` is per machine (PlanOptions)."""
 
 PositiveFiniteFloat = Annotated[float, Field(gt=0.0, allow_inf_nan=False)]
 
@@ -239,6 +243,10 @@ class AnalysisSpec(SpecModel):
     min_pairs: int = Field(default=DEFAULT_MIN_PAIRS, ge=2)
     max_exclusion_fraction: float = Field(default=DEFAULT_MAX_EXCLUSION_FRACTION, ge=0.0, le=1.0)
     alpha: float = Field(default=DEFAULT_ALPHA, gt=0.0, lt=1.0)
+    max_exclusion_difference: float | None = Field(default=None, ge=0.0, le=1.0)
+    """The largest difference in per-arm exclusion rates the experiment accepts, pre-registered.
+    Unset, analysis refuses every comparative verdict (a non-significant difference never
+    establishes acceptable attrition); Raidar supplies no default value."""
     min_effects: dict[str, PositiveFiniteFloat] = Field(default_factory=dict)
     rank_by: str | None = None
     primary_outcome: str | None = None
@@ -305,3 +313,18 @@ class ExperimentSpec(SpecModel):
             for problem in dump["problems"]
         ]
         return dump
+
+
+def analysis_section(
+    spec_json: Mapping[str, Any], checkpoints: Mapping[str, int]
+) -> dict[str, object]:
+    """Baseline arm, verdict thresholds and declared outcome types.
+
+    ``spec.analysis`` minus the plan-shaping fields, plus ``outcome_types``: per problem the
+    bound checkpoint count and the outcomes declared binary there, and the aggregate's
+    declaration (``declared_outcome_types``). Analysis picks its exact test from these
+    declarations, never from observed values.
+    """
+    excluded = {*EXECUTION_ANALYSIS_FIELDS, "concurrency"}
+    kept = {key: value for key, value in spec_json["analysis"].items() if key not in excluded}
+    return {**kept, "outcome_types": declared_outcome_types(checkpoints)}

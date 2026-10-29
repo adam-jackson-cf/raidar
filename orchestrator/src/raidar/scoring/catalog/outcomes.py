@@ -16,6 +16,7 @@ the SCB fork's ``C_p``) and is reported as its own metric.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
 from enum import StrEnum
 
@@ -75,14 +76,14 @@ CORRECTNESS_METRIC = "correctness"
 SOLVE_RATE = "solve_rate"
 REACHED = "reached"
 FINAL_SOLVED = "final_solved"
-# Errata-applied solve outcomes (``correctness@7`` ``*_errata`` metrics): the same rules
+# Errata-applied solve outcomes (``correctness@8`` ``*_errata`` metrics): the same rules
 # over the cases the problem's pinned errata keeps. Primary only when the experiment
 # pre-registers one (``analysis.primary_outcome``), and then always reported beside its
 # raw counterpart (``RAW_COUNTERPART``); ``not_applicable`` for a problem without an errata.
 SOLVE_RATE_ERRATA = "solve_rate_errata"
 REACHED_ERRATA = "reached_errata"
 FINAL_SOLVED_ERRATA = "final_solved_errata"
-# Solvable-set solve outcomes (``correctness@7`` ``*_solvable`` metrics): the same rules over
+# Solvable-set solve outcomes (``correctness@8`` ``*_solvable`` metrics): the same rules over
 # the cases the reference solution passes in every validation repeat. The default primary;
 # ``unavailable`` (never zero) for a problem whose lock pins no solvable set.
 SOLVE_RATE_SOLVABLE = "solve_rate_solvable"
@@ -158,21 +159,21 @@ OUTCOME_METRICS: tuple[MetricDef, ...] = (
     ),
     MetricDef(
         SOLVE_RATE_SOLVABLE,
-        "Checkpoint solve rate over the solvable set (primary; the raw SCB grade is beside it)",
+        "Reference-solvable SCB success (primary; raw SCB success reported beside it)",
         View.CONTINUE,
         declared_direction(CORRECTNESS, "solved_checkpoints_solvable"),
         0.125,
     ),
     MetricDef(
         REACHED_SOLVABLE,
-        "Checkpoints reached over the solvable set (strict)",
+        "Reference-solvable SCB checkpoints reached (strict)",
         View.STRICT,
         declared_direction(CORRECTNESS, REACHED_SOLVABLE),
         1.0,
     ),
     MetricDef(
         FINAL_SOLVED_SOLVABLE,
-        "Final checkpoint solved over the solvable set",
+        "Reference-solvable SCB final checkpoint success",
         View.CONTINUE,
         declared_direction(CORRECTNESS, "solved_solvable"),
         0.25,
@@ -444,6 +445,55 @@ PROCESS_METRICS: tuple[MetricDef, ...] = (
 """Process outcomes: compared only when the lock declares ``process-compliance``."""
 
 ALL_METRICS = (*OUTCOME_METRICS, *GATE_METRICS, *PROCESS_METRICS)
+
+K_VALUED = frozenset(
+    {
+        SOLVE_RATE,
+        REACHED,
+        SOLVE_RATE_ERRATA,
+        REACHED_ERRATA,
+        SOLVE_RATE_SOLVABLE,
+        REACHED_SOLVABLE,
+    }
+)
+"""Outcomes counted over the K bound checkpoints: their support is {0, 1/K, ..., 1} (or
+{0..K}), so it is binary exactly when K is 1."""
+
+
+def declared_kind(metric: MetricDef, checkpoints: int) -> Kind:
+    """The outcome's declared type on a problem bound to ``checkpoints`` checkpoints.
+
+    From the metric's definition and the bound checkpoint count only, never from observed
+    values: final-checkpoint outcomes are binary, K-counted outcomes are binary when K is 1,
+    everything else is continuous.
+    """
+    if metric.kind is Kind.BINARY or (metric.id in K_VALUED and checkpoints == 1):
+        return Kind.BINARY
+    return Kind.CONTINUOUS
+
+
+def declared_outcome_types(bound: Mapping[str, int]) -> dict[str, object]:
+    """The lock's ``analysis.outcome_types`` for problems bound to ``{ref: checkpoints}``.
+
+    Per problem, the bound checkpoint count and the outcomes declared binary there (every
+    other compared outcome is declared continuous). The cross-problem aggregate is the mean
+    of per-problem means, whose support is never {0, 1}, so no outcome is binary there.
+    """
+    return {
+        "problems": {
+            ref: {
+                "checkpoints": count,
+                "binary": [
+                    metric.id
+                    for metric in ALL_METRICS
+                    if declared_kind(metric, count) is Kind.BINARY
+                ],
+            }
+            for ref, count in sorted(bound.items())
+        },
+        "aggregate": {"binary": []},
+    }
+
 
 VERIFIER_PREFIX = "verifier."
 """Verifier diagnostics: described per arm, never compared (no verdict, no effect)."""

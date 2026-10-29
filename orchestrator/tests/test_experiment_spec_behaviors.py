@@ -180,7 +180,7 @@ def test_validate_command_exits_nonzero_with_field_errors(tmp_path: Path) -> Non
         ({"problems": [{"ref": "scb/forge@abc123", "path": "tasks/forge"}]}, "problems.0"),
         ({"problems": [{"ref": "scb/forge@abc123"}] * 2}, "problems.1"),
         ({"protocol": {"min_reward": 0.5}}, "protocol"),
-        ({"assessment": {"scorers": ["correctness@7", "correctness@7"]}}, "assessment.scorers.1"),
+        ({"assessment": {"scorers": ["correctness@8", "correctness@8"]}}, "assessment.scorers.1"),
     ],
     ids=["problem-two-sources", "duplicate-problem", "min-reward-in-continue", "dup-scorer"],
 )
@@ -229,6 +229,13 @@ def test_verdict_thresholds_are_pinned_in_the_analysis_block(tmp_path: Path) -> 
         0.1,
         {"solve_rate": 0.2},
     )
+    # The pre-registered material exclusion-rate difference has no default.
+    assert analysis.max_exclusion_difference is None
+    document["analysis"]["max_exclusion_difference"] = 1.5
+    assert "analysis.max_exclusion_difference" in _issues(write_experiment(tmp_path, document))
+    document["analysis"]["max_exclusion_difference"] = 0.15
+    pinned = load_experiment(write_experiment(tmp_path, document)).spec.analysis
+    assert pinned.max_exclusion_difference == 0.15
 
 
 def test_set_overrides_change_only_the_addressed_yaml_alias(tmp_path: Path) -> None:
@@ -249,7 +256,7 @@ def test_set_overrides_change_only_the_addressed_yaml_alias(tmp_path: Path) -> N
         ({"model": "claude-opus-4-7"}, "agents.0.model"),
         ({"reasoning": "xhigh"}, "agents.0.reasoning"),
         ({"reasoning": None}, "agents.0.reasoning"),
-        ({"release": "codex@3"}, "agents.0.release"),
+        ({"release": "codex@999"}, "agents.0.release"),
         ({"release": "ghost@1"}, "agents.0.release"),
     ],
     ids=["model", "reasoning", "reasoning-required", "unregistered-version", "unknown-agent"],

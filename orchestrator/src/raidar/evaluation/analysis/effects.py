@@ -13,15 +13,18 @@ every exclusion is counted by cause:
 
 Verdicts (memo §2.3), in precedence order:
 
-1. ``insufficient``: fewer pairs than the minimum, or the excluded share of
-   planned slots above the limit (memo §2.3: both are pre-registered, pinned
-   by the lock's ``analysis`` section; ``Settings.origin`` says whether a value
-   came from the lock, a command-line override or the default);
-2. ``inconclusive``: the ``1 - alpha`` CI (95% at the default alpha) spans 0
-   (per-problem binary outcomes: exact McNemar p > alpha; equal-weight
-   cross-problem aggregates use their equal-weight CI);
-3. ``improved`` / ``worse``: the CI excludes 0, read through the metric's
-   direction.
+1. ``insufficient``: fewer pairs than the minimum, the excluded share of planned slots above
+   the limit, or per-arm exclusion rates (each arm's excluded slots over planned slots, by
+   cause) differing by more than the lock's pre-registered ``max_exclusion_difference``, or
+   that difference being unpinned (a non-significant difference never establishes acceptable
+   attrition). ``Settings.origin`` says whether a value came from the lock, a command-line
+   override or the default;
+2. ``inconclusive``: the exact test's p-value exceeds alpha. The test follows the outcome's
+   *declared* type, never its observed values: McNemar for binary outcomes, an exact
+   sign-flip permutation test on the paired deltas otherwise. Aggregates test across problems
+   (see ``aggregate_effect``). The ``1 - alpha`` interval only describes the estimate. There is
+   no zero-spread rule: five one-way binary pairs give p = 0.0625, six give 0.03125;
+3. ``improved`` / ``worse``: p <= alpha, read through the metric's direction.
 
 Cost is estimated on the same pairs and shown beside every effect; it never
 gets a verdict of its own. The J2 projection ``n = 7.84·(SD/δ)²`` uses the
@@ -36,6 +39,8 @@ import math
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 from enum import StrEnum
+from fractions import Fraction
+from typing import Any
 
 from pydantic import Field
 
@@ -49,14 +54,15 @@ from raidar.evaluation.analysis.stats import (
     BOOTSTRAP_SAMPLES,
     CONFIDENCE,
     POWER_CONSTANT,
+    SIGN_FLIP_STATE_LIMIT,
     Interval,
     IntervalMethod,
     Summary,
-    confidence_label,
     mcnemar_exact,
     mean,
     pairs_for_power,
     seed_for,
+    sign_flip_exact,
     summarise,
     t_interval,
 )
@@ -91,6 +97,15 @@ class Settings:
     bootstrap_samples: int = BOOTSTRAP_SAMPLES
     seed: int = 0
     min_effects: Mapping[str, float] = field(default_factory=dict)
+    max_exclusion_difference: float | None = None
+    """Pre-registered largest difference in per-arm exclusion rates; None: unpinned, so no
+    comparative verdict is possible."""
+    outcome_types: Mapping[str, Any] | None = None
+    """The lock's ``analysis.outcome_types`` declarations; None: undeclared, so no comparative
+    verdict is possible."""
+    sign_flip_state_limit: int = SIGN_FLIP_STATE_LIMIT
+    """Execution safety limit on the exact sign-flip enumeration (distinct partial sums); above
+    it the verdict is refused as not computable. It never changes a computed p-value."""
     source: str = "caller"
     pinned_by_lock: bool = False
     overridden: tuple[str, ...] = ()
@@ -115,17 +130,28 @@ class Settings:
         return tuple(changed)
 
     def __post_init__(self) -> None:
-        if self.min_pairs < 2:
-            raise ValueError("min_pairs must be at least 2 (a CI needs two pairs)")
-        if not 0.0 <= self.max_exclusion_fraction <= 1.0:
-            raise ValueError("max_exclusion_fraction must be in [0, 1]")
-        if not 0.0 < self.alpha < 1.0:
-            raise ValueError("alpha must be in (0, 1)")
-        if self.bootstrap_samples < 100:
-            raise ValueError("bootstrap_samples must be at least 100")
+        self._validate_counts()
+        self._validate_fractions()
         bad = {name: value for name, value in self.min_effects.items() if value <= 0}
         if bad:
             raise ValueError(f"effects of interest must be positive: {bad}")
+
+    def _validate_counts(self) -> None:
+        if self.min_pairs < 2:
+            raise ValueError("min_pairs must be at least 2 (a CI needs two pairs)")
+        if self.sign_flip_state_limit < 1:
+            raise ValueError("sign_flip_state_limit must be at least 1")
+        if self.bootstrap_samples < 100:
+            raise ValueError("bootstrap_samples must be at least 100")
+
+    def _validate_fractions(self) -> None:
+        if not 0.0 <= self.max_exclusion_fraction <= 1.0:
+            raise ValueError("max_exclusion_fraction must be in [0, 1]")
+        difference = self.max_exclusion_difference
+        if difference is not None and not 0.0 <= difference <= 1.0:
+            raise ValueError("max_exclusion_difference must be in [0, 1]")
+        if not 0.0 < self.alpha < 1.0:
+            raise ValueError("alpha must be in (0, 1)")
 
 
 class IntervalOut(AnalysisModel):
@@ -143,6 +169,32 @@ def interval_out(interval: Interval | None) -> IntervalOut | None:
     )
 
 
+class ArmExclusions(AnalysisModel):
+    arm: str
+    planned: int = Field(ge=0)
+    excluded: int = Field(ge=0)
+    """Planned slots lost to this arm's own trial."""
+    causes: dict[str, int] = Field(default_factory=dict)
+    """``not_run``, ``infra_error:<recorded reason>`` (each validity check, infra checkpoint or
+    exception), ``unassessed`` or ``ineligible:<status>`` -> slots. A trial with several
+    recorded reasons counts under each, so the causes can sum to more than ``excluded``."""
+
+    @property
+    def rate(self) -> float:
+        return self.excluded / self.planned if self.planned else 0.0
+
+    def plus(self, other: ArmExclusions) -> ArmExclusions:
+        causes = dict(self.causes)
+        for cause, count in other.causes.items():
+            causes[cause] = causes.get(cause, 0) + count
+        return ArmExclusions(
+            arm=self.arm,
+            planned=self.planned + other.planned,
+            excluded=self.excluded + other.excluded,
+            causes=dict(sorted(causes.items())),
+        )
+
+
 class Exclusions(AnalysisModel):
     planned: int = Field(ge=0)
     paired: int = Field(ge=0)
@@ -153,6 +205,9 @@ class Exclusions(AnalysisModel):
     ineligible_statuses: dict[str, int] = Field(default_factory=dict)
     not_applicable: int = 0
     """Slots where the metric is undefined in both arms (e.g. R/G at K=1): not planned."""
+    arms: tuple[ArmExclusions, ...] = ()
+    """Per arm, per cause: slots excluded because of that arm's trial (a slot excluded for both
+    arms is counted in both)."""
 
     @property
     def excluded(self) -> int:
@@ -173,6 +228,29 @@ class Pair(AnalysisModel):
     delta: float
 
 
+class ExactTestName(StrEnum):
+    MCNEMAR = "mcnemar-exact"
+    SIGN_FLIP = "sign-flip-exact"
+
+
+class ExactTest(AnalysisModel):
+    """The verdict's test, chosen from the outcome's declared type (binary: McNemar)."""
+
+    name: ExactTestName
+    p_value: float | None
+    """None when the exact enumeration is not computable (``note`` says why)."""
+    statistic: float
+    """Signed: treatment-only minus baseline-only discordant pairs (McNemar) or the
+    (weighted) sum of deltas (sign-flip); it orients an improved/worse verdict."""
+    informative: int
+    """Discordant pairs (McNemar) or non-zero deltas (sign-flip); zero ones carry no weight."""
+    note: str | None = None
+
+    @property
+    def label(self) -> str:
+        return "exact McNemar" if self.name is ExactTestName.MCNEMAR else "exact sign-flip"
+
+
 class McNemar(AnalysisModel):
     both_solved: int
     baseline_only: int
@@ -182,7 +260,7 @@ class McNemar(AnalysisModel):
 
 
 class CostBeside(AnalysisModel):
-    """Resource usage on the effect's own pairs (descriptive; ``resource-usage@6``)."""
+    """Resource usage on the effect's own pairs (descriptive; ``resource-usage@7``)."""
 
     metric: str = TOTAL_COST
     n: int
@@ -233,7 +311,9 @@ class Effect(AnalysisModel):
     label: str
     view: str
     direction: Direction
-    kind: Kind
+    kind: Kind | None
+    """The lock's declared type for this outcome and problem; None when it declares none (the
+    verdict is then refused)."""
     problem: str
     n_pairs: int
     baseline_mean: float | None
@@ -245,6 +325,7 @@ class Effect(AnalysisModel):
     verdict_reason: str
     exclusions: Exclusions
     mcnemar: McNemar | None = None
+    test: ExactTest | None = None
     cost: CostBeside
     sample_size: SampleSize | None = None
     pairs: tuple[Pair, ...] = ()
@@ -254,6 +335,8 @@ class Effect(AnalysisModel):
 class Slot:
     problem: str
     attempt: int
+    baseline_arm: str
+    treatment_arm: str
     baseline: TrialOutcome | None
     treatment: TrialOutcome | None
 
@@ -263,12 +346,21 @@ ValueOf = Callable[[TrialOutcome], Value]
 
 @dataclass
 class _Tally:
+    arms: tuple[str, ...] = ()
     planned: int = 0
     not_run: int = 0
     infra_error: int = 0
     unassessed: int = 0
     not_applicable: int = 0
     statuses: dict[str, int] = field(default_factory=dict)
+    excluded: dict[int, int] = field(default_factory=dict)
+    causes: dict[tuple[int, str], int] = field(default_factory=dict)
+
+    def charge(self, side: int, causes: Sequence[str]) -> None:
+        """Count a slot excluded in the arm on ``side`` (0 baseline), under each of its causes."""
+        self.excluded[side] = self.excluded.get(side, 0) + 1
+        for cause in causes:
+            self.causes[(side, cause)] = self.causes.get((side, cause), 0) + 1
 
     def exclusions(self, paired: int) -> Exclusions:
         return Exclusions(
@@ -280,6 +372,19 @@ class _Tally:
             ineligible=sum(self.statuses.values()),
             ineligible_statuses=dict(sorted(self.statuses.items())),
             not_applicable=self.not_applicable,
+            arms=tuple(
+                ArmExclusions(
+                    arm=arm,
+                    planned=self.planned,
+                    excluded=self.excluded.get(index, 0),
+                    causes={
+                        cause: count
+                        for (side, cause), count in sorted(self.causes.items())
+                        if side == index
+                    },
+                )
+                for index, arm in enumerate(self.arms)
+            ),
         )
 
 
@@ -305,17 +410,36 @@ def _gap_excluded(left: Value, right: Value, tally: _Tally) -> bool:
         tally.unassessed += 1
     else:
         tally.statuses[gap.status] = tally.statuses.get(gap.status, 0) + 1
+    for side, value in enumerate((left, right)):
+        if value.value is None:
+            cause = "unassessed" if value.status == UNASSESSED else f"ineligible:{value.status}"
+            tally.charge(side, (cause,))
     return True
+
+
+def _charge_missing_outcomes(slot: Slot, tally: _Tally) -> None:
+    tally.not_run += 1
+    for side, outcome in enumerate((slot.baseline, slot.treatment)):
+        if outcome is None:
+            tally.charge(side, ("not_run",))
+
+
+def _charge_infra_errors(baseline: Any, treatment: Any, tally: _Tally) -> None:
+    tally.infra_error += 1
+    for side, outcome in enumerate((baseline, treatment)):
+        if outcome.infra_error:
+            reasons = outcome.infra_reasons or ("unrecorded",)
+            tally.charge(side, tuple(f"infra_error:{reason}" for reason in reasons))
 
 
 def _pair_or_exclude(slot: Slot, value_of: ValueOf, tally: _Tally) -> Pair | None:
     tally.planned += 1
     baseline, treatment = slot.baseline, slot.treatment
     if baseline is None or treatment is None:
-        tally.not_run += 1
+        _charge_missing_outcomes(slot, tally)
         return None
     if baseline.infra_error or treatment.infra_error:
-        tally.infra_error += 1
+        _charge_infra_errors(baseline, treatment, tally)
         return None
     left, right = value_of(baseline), value_of(treatment)
     if _gap_excluded(left, right, tally) or left.value is None or right.value is None:
@@ -332,11 +456,36 @@ def _pair_or_exclude(slot: Slot, value_of: ValueOf, tally: _Tally) -> Pair | Non
 
 
 def collect_pairs(slots: Sequence[Slot], value_of: ValueOf) -> tuple[tuple[Pair, ...], Exclusions]:
-    tally = _Tally()
+    tally = _Tally(arms=(slots[0].baseline_arm, slots[0].treatment_arm) if slots else ())
     pairs = tuple(
         pair for slot in slots if (pair := _pair_or_exclude(slot, value_of, tally)) is not None
     )
     return pairs, tally.exclusions(len(pairs))
+
+
+def mcnemar_test(table: McNemar) -> ExactTest:
+    return ExactTest(
+        name=ExactTestName.MCNEMAR,
+        p_value=table.p_value,
+        statistic=float(table.treatment_only - table.baseline_only),
+        informative=table.baseline_only + table.treatment_only,
+    )
+
+
+def sign_flip_test(terms: Sequence[Fraction], state_limit: int) -> ExactTest:
+    p_value = sign_flip_exact(terms, state_limit)
+    return ExactTest(
+        name=ExactTestName.SIGN_FLIP,
+        p_value=p_value,
+        statistic=float(sum(terms, Fraction(0))),
+        informative=sum(1 for term in terms if term != 0),
+        note=None
+        if p_value is not None
+        else (
+            f"more than {state_limit} distinct partial sums to enumerate (the execution safety "
+            "limit, --exact-state-limit; no approximation is substituted)"
+        ),
+    )
 
 
 def mcnemar_table(pairs: Sequence[Pair]) -> McNemar:
@@ -364,40 +513,86 @@ def _directed(direction: Direction, delta: float, reason: str) -> tuple[Verdict,
     return (Verdict.IMPROVED if _better(direction, delta) else Verdict.WORSE), reason
 
 
+def exclusion_refusal(exclusions: Exclusions, settings: Settings) -> str | None:
+    """Why the per-arm exclusion rates forbid a verdict, or None when they allow one.
+
+    The material difference is pre-registered by the lock; without it no rate difference can
+    be called acceptable, and a non-significant difference never does.
+    """
+    if exclusions.fraction > settings.max_exclusion_fraction:
+        return (
+            f"{exclusions.excluded}/{exclusions.planned} planned pairs excluded "
+            f"> limit {settings.max_exclusion_fraction:.0%}"
+        )
+    limit = settings.max_exclusion_difference
+    if limit is None:
+        return (
+            "no pre-registered material difference in per-arm exclusion rates "
+            "(analysis.max_exclusion_difference is unset)"
+        )
+    if len(exclusions.arms) < 2:
+        return "per-arm exclusion rates are unavailable"
+    low = min(exclusions.arms, key=lambda arm: arm.rate)
+    high = max(exclusions.arms, key=lambda arm: arm.rate)
+    if high.rate - low.rate > limit:
+        return (
+            f"exclusion rates differ materially between arms: {high.arm} {high.rate:.1%} "
+            f"({high.excluded}/{high.planned}) vs {low.arm} {low.rate:.1%} "
+            f"({low.excluded}/{low.planned}) > limit {limit:.1%} "
+            f"({settings.origin('max_exclusion_difference')})"
+        )
+    return None
+
+
+def declared_type(settings: Settings, problem: str, metric_id: str) -> Kind | str:
+    """The lock's declared type of ``metric_id`` on ``problem`` (or the aggregate ``*``).
+
+    Declarations are written at lock time from the bound checkpoint count and the metric's
+    definition (``declared_outcome_types``); a missing one is a refusal reason (a string),
+    never a guess from the observed values.
+    """
+    declared = settings.outcome_types
+    if not declared:
+        return "the lock declares no outcome types (analysis.outcome_types); relock"
+    entry = (
+        declared.get("aggregate")
+        if problem == AGGREGATE
+        else (declared.get("problems") or {}).get(problem)
+    )
+    binary = entry.get("binary") if isinstance(entry, Mapping) else None
+    if not isinstance(binary, list):
+        return f"the lock declares no outcome types for {problem}"
+    return Kind.BINARY if metric_id in binary else Kind.CONTINUOUS
+
+
 def decide(
     metric: MetricDef,
     summary: Summary,
     exclusions: Exclusions,
     settings: Settings,
-    mcnemar: McNemar | None = None,
+    test: ExactTest | str,
 ) -> tuple[Verdict, str]:
-    """The verdict and why, in the documented precedence."""
+    """The verdict and why, in the documented precedence.
+
+    The test comes from the outcome's declared type, never from the observed values; the
+    interval in ``summary`` is not consulted. ``test`` is a refusal reason when the lock
+    declares no usable type.
+    """
     if summary.n < settings.min_pairs:
         return Verdict.INSUFFICIENT, (
             f"{summary.n} pairs < minimum {settings.min_pairs} ({settings.origin('min_pairs')})"
         )
-    if exclusions.fraction > settings.max_exclusion_fraction:
-        return Verdict.INSUFFICIENT, (
-            f"{exclusions.excluded}/{exclusions.planned} planned pairs excluded "
-            f"> limit {settings.max_exclusion_fraction:.0%}"
-        )
-    if mcnemar is not None:
-        if mcnemar.p_value > settings.alpha:
-            return Verdict.INCONCLUSIVE, f"exact McNemar p={mcnemar.p_value:.4g} > {settings.alpha}"
-        delta = float(mcnemar.treatment_only - mcnemar.baseline_only)
-        reason = f"exact McNemar p={mcnemar.p_value:.4g} <= {settings.alpha}"
-    else:
-        interval = summary.interval
-        if interval is None or summary.mean is None:
-            return Verdict.INCONCLUSIVE, "no interval"
-        level = confidence_label(interval.confidence)
-        if interval.contains_zero():
-            return Verdict.INCONCLUSIVE, (
-                f"{level} CI [{interval.low:.4g}, {interval.high:.4g}] spans 0"
-            )
-        delta = summary.mean
-        reason = f"{level} CI [{interval.low:.4g}, {interval.high:.4g}] excludes 0"
-    return _directed(metric.direction, delta, reason)
+    refusal = exclusion_refusal(exclusions, settings)
+    if refusal is not None:
+        return Verdict.INSUFFICIENT, refusal
+    if isinstance(test, str):
+        return Verdict.INSUFFICIENT, test
+    if test.p_value is None:
+        return Verdict.INSUFFICIENT, f"{test.label} is not computable: {test.note}"
+    if test.p_value > settings.alpha:
+        return Verdict.INCONCLUSIVE, f"{test.label} p={test.p_value:.4g} > {settings.alpha}"
+    reason = f"{test.label} p={test.p_value:.4g} <= {settings.alpha}"
+    return _directed(metric.direction, test.statistic, reason)
 
 
 def mean_or_none(values: Sequence[float]) -> float | None:
@@ -497,15 +692,25 @@ def problem_effect(
         bootstrap_samples=settings.bootstrap_samples,
         confidence=1.0 - settings.alpha,
     )
-    mcnemar = mcnemar_table(pairs) if metric.kind is Kind.BINARY else None
-    verdict, reason = decide(metric, summary, exclusions, settings, mcnemar)
+    kind = declared_type(settings, problem, metric.id)
+    mcnemar = mcnemar_table(pairs) if kind is Kind.BINARY else None
+    test: ExactTest | str
+    if mcnemar is not None:
+        test = mcnemar_test(mcnemar)
+    elif kind is Kind.CONTINUOUS:
+        test = sign_flip_test(
+            [Fraction(pair.delta) for pair in pairs], settings.sign_flip_state_limit
+        )
+    else:
+        test = kind
+    verdict, reason = decide(metric, summary, exclusions, settings, test)
     cost = cost_beside(pairs, slots, settings, label=f"{label}:{problem}:{metric.id}")
     return Effect(
         metric=metric.id,
         label=metric.label,
         view=metric.view.value,
         direction=metric.direction,
-        kind=metric.kind,
+        kind=kind if isinstance(kind, Kind) else None,
         problem=problem,
         n_pairs=len(pairs),
         baseline_mean=mean_or_none([p.baseline for p in pairs]),
@@ -517,17 +722,33 @@ def problem_effect(
         verdict_reason=reason,
         exclusions=exclusions,
         mcnemar=mcnemar,
+        test=test if isinstance(test, ExactTest) else None,
         cost=cost,
         sample_size=sample_size(metric, summary, _per_pair_cost(cost), settings),
         pairs=pairs,
     )
 
 
-def _summed_exclusions(effects: Sequence[Effect]) -> Exclusions:
+def _merge_arm_exclusions(effects: Sequence[Effect]) -> dict[str, ArmExclusions]:
+    arms: dict[str, ArmExclusions] = {}
+    for effect in effects:
+        for arm in effect.exclusions.arms:
+            seen = arms.get(arm.arm)
+            arms[arm.arm] = arm if seen is None else seen.plus(arm)
+    return arms
+
+
+def _merge_status_counts(effects: Sequence[Effect]) -> dict[str, int]:
     statuses: dict[str, int] = {}
     for effect in effects:
         for status, count in effect.exclusions.ineligible_statuses.items():
             statuses[status] = statuses.get(status, 0) + count
+    return statuses
+
+
+def _summed_exclusions(effects: Sequence[Effect]) -> Exclusions:
+    statuses = _merge_status_counts(effects)
+    arms = _merge_arm_exclusions(effects)
     return Exclusions(
         planned=sum(e.exclusions.planned for e in effects),
         paired=sum(e.exclusions.paired for e in effects),
@@ -537,6 +758,7 @@ def _summed_exclusions(effects: Sequence[Effect]) -> Exclusions:
         ineligible=sum(e.exclusions.ineligible for e in effects),
         ineligible_statuses=dict(sorted(statuses.items())),
         not_applicable=sum(e.exclusions.not_applicable for e in effects),
+        arms=tuple(arms[name] for name in sorted(arms)),
     )
 
 
@@ -605,24 +827,45 @@ def _aggregate_cost(costs: Sequence[CostBeside]) -> CostBeside:
     )
 
 
+def _equal_weight_terms(effects: Sequence[Effect]) -> list[Fraction]:
+    """Every pair's delta weighted ``1 / n_pairs`` of its problem: the equal-weight mean's terms."""
+    return [
+        Fraction(pair.delta) / effect.n_pairs
+        for effect in effects
+        if effect.n_pairs
+        for pair in effect.pairs
+    ]
+
+
 def aggregate_effect(metric: MetricDef, effects: Sequence[Effect], settings: Settings) -> Effect:
     """Across problems: estimate within each problem, then weight problems equally.
 
     ``n_pairs`` is the smallest problem's pair count, so ``insufficient``
-    applies when any problem is short; exclusions are summed.
-    Binary outcomes use this same equal-weight interval for their aggregate
-    verdict. McNemar tables belong to individual problems: pooling their counts
-    would weight problems by retained sample size and test a different effect.
+    applies when any problem is short; exclusions are summed per arm and cause.
+    The test is chosen from the lock's declared type of the aggregate, which is continuous
+    (a mean over problems never has {0, 1} support): the exact sign-flip test on every pair's
+    delta weighted by 1 / its problem's pair count, i.e. on the equal-weight mean's own terms,
+    so the verdict and the mean beside it estimate one thing. The pair (problem, attempt) is
+    the exchangeable unit. The equal-weight interval stays a description. A missing
+    declaration, or one that declares the aggregate binary, refuses the verdict.
     """
     summary = _equal_weight_summary(effects, 1.0 - settings.alpha)
     exclusions = _summed_exclusions(effects)
-    verdict, reason = decide(metric, summary, exclusions, settings)
+    kind = declared_type(settings, AGGREGATE, metric.id)
+    test: ExactTest | str
+    if kind is Kind.CONTINUOUS:
+        test = sign_flip_test(_equal_weight_terms(effects), settings.sign_flip_state_limit)
+    elif kind is Kind.BINARY:
+        test = "the lock declares the aggregate binary, which has no defined test"
+    else:
+        test = kind
+    verdict, reason = decide(metric, summary, exclusions, settings, test)
     return Effect(
         metric=metric.id,
         label=metric.label,
         view=metric.view.value,
         direction=metric.direction,
-        kind=metric.kind,
+        kind=kind if isinstance(kind, Kind) else None,
         problem=AGGREGATE,
         n_pairs=summary.n,
         baseline_mean=mean_if_complete([effect.baseline_mean for effect in effects]),
@@ -633,6 +876,7 @@ def aggregate_effect(metric: MetricDef, effects: Sequence[Effect], settings: Set
         verdict=verdict,
         verdict_reason=reason,
         exclusions=exclusions,
+        test=test if isinstance(test, ExactTest) else None,
         cost=_aggregate_cost([effect.cost for effect in effects]),
         sample_size=_aggregate_sample_size(metric, effects, settings),
     )
