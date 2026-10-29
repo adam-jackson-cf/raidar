@@ -28,10 +28,23 @@ class SolvableRef(VerifierModel):
     sha256: str = Field(min_length=1)
     steps: dict[str, tuple[str, ...]] = {}
 
+    def gate_rewards(self, step: str, grade: VerifierGrade) -> dict[str, float]:
+        """Raw rewards plus the pinned solvable gate; omit it without a trustworthy verdict."""
+        rewards = grade.rewards()
+        rate = solvable_pass_rate(grade, self.steps.get(step, ()))
+        return rewards if rate is None else rewards | {SOLVABLE_REWARD_KEY: rate}
+
 
 def case_key(case: CaseResult) -> str:
     """The solvable-set id of a case: ``<checkpoint_origin>::<test name without its file>``."""
     return f"{case.checkpoint_origin}::{case.id.split('::', 1)[-1]}"
+
+
+def _solvable_passed(grade: VerifierGrade, cases: tuple[str, ...]) -> list[bool] | None:
+    if grade.infra_failure is not None or not cases:
+        return None
+    passed = {case_key(case) for case in grade.cases if case.status == CaseStatus.PASSED}
+    return [case in passed for case in cases]
 
 
 def solvable_solved(grade: VerifierGrade, cases: tuple[str, ...]) -> bool | None:
@@ -39,10 +52,22 @@ def solvable_solved(grade: VerifierGrade, cases: tuple[str, ...]) -> bool | None
 
     A solvable case the grade did not run or skipped did not pass.
     """
-    if grade.infra_failure is not None or not cases:
-        return None
-    passed = {case_key(case) for case in grade.cases if case.status == CaseStatus.PASSED}
-    return all(case in passed for case in cases)
+    outcomes = _solvable_passed(grade, cases)
+    return None if outcomes is None else all(outcomes)
+
+
+SOLVABLE_REWARD_KEY = "solvable_pass_rate"
+"""The step reward a halt run gates on: the share of the step's solvable cases that passed."""
+
+
+def solvable_pass_rate(grade: VerifierGrade, cases: tuple[str, ...]) -> float | None:
+    """Share of the solvable cases that passed; None exactly when ``solvable_solved`` is None.
+
+    ``1.0`` is the solvable verdict "solved"; an unavailable value is omitted, never zero, so
+    Harbor's ``min_reward`` halts on a step without a verdict.
+    """
+    outcomes = _solvable_passed(grade, cases)
+    return None if outcomes is None else sum(outcomes) / len(outcomes)
 
 
 def solvable_ref_from_metadata(metadata: object) -> SolvableRef | None:

@@ -20,7 +20,14 @@ from collections.abc import Iterator
 from pathlib import Path, PurePosixPath
 from typing import Any, cast
 
-from raidar.subject.agent.protocol import Tokens, digest, session_audit_record, source_record
+from raidar.subject.agent.pricing import price_tokens
+from raidar.subject.agent.protocol import (
+    Tokens,
+    digest,
+    session_audit_record,
+    source_record,
+    unread_json_lines,
+)
 
 HARNESS = "claude-code"
 STREAM_FILE = "claude-code.txt"
@@ -31,6 +38,38 @@ INSTRUCTION_BLOCK = re.compile(
     re.DOTALL,
 )
 SKILL_BASE = re.compile(r"Base directory for this skill: (?P<dir>\S+)")
+TRANSCRIPT_TYPES = frozenset(
+    {"user", "assistant", "system", "summary", "attachment", "file-history-snapshot"}
+    | {"queue-operation", "progress"}
+)
+STREAM_TYPES = frozenset(
+    {"system", "assistant", "user", "result", "stream_event", "rate_limit_event"}
+)
+
+
+def _understood_event(event: dict[str, Any]) -> bool:
+    """A transcript event of a known type with the container this audit reads its text from.
+
+    ``user``/``assistant`` events carry a ``message`` object whose content is text or a list of
+    objects, ``attachment`` events an ``attachment`` object and ``system`` events text content;
+    any other shape, or a type from a newer version, could hold instructions and is unread.
+    """
+    kind = event.get("type")
+    if kind in ("user", "assistant"):
+        message = event.get("message")
+        content = message.get("content") if isinstance(message, dict) else None
+        return isinstance(content, str) or (
+            isinstance(content, list) and all(isinstance(part, dict) for part in content)
+        )
+    if kind == "attachment":
+        return isinstance(event.get("attachment"), dict)
+    if kind == "system":
+        return isinstance(event.get("content"), str)
+    return kind in TRANSCRIPT_TYPES
+
+
+def _understood_stream_event(event: dict[str, Any]) -> bool:
+    return event.get("type") in STREAM_TYPES
 
 
 def _events(path: Path) -> Iterator[dict[str, Any]]:
@@ -76,6 +115,34 @@ def claude_last_message(turn_dir: Path) -> str | None:
     return text if isinstance(text, str) else None
 
 
+def _priced(envelope: dict[str, Any]) -> float | None:
+    """The envelope's spend from the shared pricing table, per model of its ``modelUsage``.
+
+    The CLI's own ``total_cost_usd`` is a different table's figure and is never read. A missing
+    or incomplete ``modelUsage``, or an unpriced model, gives ``None`` (unavailable).
+    """
+    models = envelope.get("modelUsage")
+    if not isinstance(models, dict) or not models:
+        return None
+    fields = ("inputTokens", "outputTokens", "cacheReadInputTokens", "cacheCreationInputTokens")
+    total = 0.0
+    for model, usage in models.items():
+        if not isinstance(usage, dict) or not all(isinstance(usage.get(k), int) for k in fields):
+            return None
+        read, written = usage["cacheReadInputTokens"], usage["cacheCreationInputTokens"]
+        cost = price_tokens(
+            str(model),
+            prompt=usage["inputTokens"] + read + written,
+            completion=usage["outputTokens"],
+            cache_read=read,
+            cache_write=written,
+        )
+        if cost is None:
+            return None
+        total += cost
+    return total
+
+
 def _usage_tokens(envelope: dict[str, Any]) -> Tokens | None:
     usage = envelope.get("usage")
     if not isinstance(usage, dict):
@@ -84,12 +151,11 @@ def _usage_tokens(envelope: dict[str, Any]) -> Tokens | None:
         return None
     read = usage.get("cache_read_input_tokens") or 0
     written = usage.get("cache_creation_input_tokens") or 0
-    cost = envelope.get("total_cost_usd")
     return Tokens(
         usage["input_tokens"] + read + written,
         read,
         usage["output_tokens"],
-        float(cost) if isinstance(cost, int | float) else None,
+        _priced(envelope),
     )
 
 
@@ -148,9 +214,22 @@ def claude_session_audit(turn_dir: Path) -> dict[str, Any]:
         unmeasured.append("no system init event in the claude stream")
     else:
         _init_findings(init, violations, unmeasured)
+    stream_path = turn_dir / STREAM_FILE
+    skipped = unread_json_lines(stream_path, _understood_stream_event) if stream is not None else 0
+    if skipped:
+        unmeasured.append(
+            f"{skipped} line(s) of the claude stream are not JSON objects of a shape this audit "
+            "reads: anything in them is unread"
+        )
     if not transcripts:
         unmeasured.append("no session transcript recorded")
     for transcript in transcripts:
+        unread = unread_json_lines(transcript, _understood_event)
+        if unread:
+            unmeasured.append(
+                f"{unread} line(s) of the session transcript {transcript.name} are not JSON "
+                "objects of a shape this audit reads: any instruction in them is unread"
+            )
         for event in _events(transcript):
             records += 1
             version = version or _event_version(event)

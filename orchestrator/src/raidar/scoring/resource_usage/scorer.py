@@ -1,4 +1,4 @@
-"""``resource-usage@6``: tokens, cost, turns and agent wall time (plan G4).
+"""``resource-usage@7``: tokens, cost, turns and agent wall time (plan G4).
 
 Per checkpoint, the values come from Harbor as it recorded the step:
 
@@ -6,7 +6,9 @@ Per checkpoint, the values come from Harbor as it recorded the step:
   ``agent_result`` (``n_input_tokens``, which includes cached input,
   ``n_output_tokens`` and ``cost_usd``). They already cover every session the
   agent ran in the step, so a review loop's reviewer sessions count for the
-  arm that ran them.
+  arm that ran them. ``cost_usd`` also counts the step's judge calls (``workflow.json``
+  ``verify.judge_calls``, successful attempts' ``cost_usd``), so a judged arm is not cheaper
+  for its judge's spend.
 - ``turns`` counts agent-sourced steps over every session in the step's ATIF
   trajectory, including embedded sub-agent sessions.
 - ``agent_wall_s`` is the duration of Harbor's ``agent_execution`` phase.
@@ -21,8 +23,10 @@ reconcile exactly with the sum of the steps' ``agent_result``; a total is
 from __future__ import annotations
 
 import hashlib
+import json
 from collections.abc import Sequence
 from dataclasses import dataclass
+from typing import Any
 
 from raidar.scoring.framework.atif import Trajectory, TrajectoryError, load_trajectory
 from raidar.scoring.framework.builtin_manifests import RESOURCE_USAGE
@@ -100,12 +104,91 @@ def _wall(inputs: StepInputs) -> Measured:
     return Measured(inputs.agent_execution_s)
 
 
+def _judge_calls(inputs: StepInputs) -> list[Any] | Measured:
+    """The step's recorded judge calls, or why they cannot be read.
+
+    No ``workflow.json`` means no workflow ran, unless Harbor's record of the step shows a judged
+    verify stage (``StepInputs.judged``): then the missing or unreadable evidence leaves the spend
+    unknown, never zero.
+    """
+    path = inputs.trace_dir / "workflow" / "workflow.json" if inputs.trace_dir else None
+    if path is None or not path.is_file():
+        if inputs.judged:
+            return _unavailable("the judged step's workflow record is missing: judge spend unknown")
+        return []
+    try:
+        record = json.loads(path.read_text())
+    except (OSError, ValueError):
+        return _unavailable("the step's workflow record is unreadable: judge spend is unknown")
+    return _recorded_judge_calls(record, inputs.judged)
+
+
+def _recorded_judge_calls(record: object, judged: bool) -> list[Any] | Measured:
+    verify = record.get("verify") if isinstance(record, dict) else None
+    if not isinstance(record, dict) or (verify is not None and not isinstance(verify, dict)):
+        return _unavailable("the step's workflow record is malformed: judge spend is unknown")
+    if not isinstance(verify, dict):
+        if judged:
+            return _unavailable("a judged step has no verify record: judge spend is unknown")
+        return []
+    if not judged and not _has_judge(verify):
+        return []
+    calls = verify.get("judge_calls")
+    if not isinstance(calls, list):
+        return _unavailable("the verify record lists no judge calls: judge spend is unknown")
+    return calls
+
+
+def _has_judge(verify: dict[str, Any]) -> bool:
+    return "judge" in verify or "judge_calls" in verify
+
+
+def _call_cost(call: Any) -> float | None | Measured:
+    """Recorded spend, including charged failures; an unsent request costs zero."""
+    result = call.get("result") if isinstance(call, dict) else None
+    if not isinstance(result, dict):
+        return _unavailable("a judge call has no result record")
+    cost = result.get("cost_usd")
+    if not isinstance(cost, bool) and isinstance(cost, int | float):
+        return float(cost)
+    if not result.get("ok") and all(
+        field in call and call[field] is None for field in ("request_file", "response_file")
+    ):
+        return 0.0
+    return None
+
+
+def _judge_spend(inputs: StepInputs) -> Measured:
+    """Recorded judge spend; sent attempts with unknown billed cost remain unavailable."""
+    calls = _judge_calls(inputs)
+    if isinstance(calls, Measured):
+        return calls
+    costs = [_call_cost(call) for call in calls]
+    unreadable = next((cost for cost in costs if isinstance(cost, Measured)), None)
+    if unreadable is not None:
+        return unreadable
+    if any(cost is None for cost in costs):
+        return _unavailable("a judge call reported no cost")
+    return Measured(sum(cost for cost in costs if isinstance(cost, float)))
+
+
+def _with_judge_spend(inputs: StepInputs, agent: Measured) -> Measured:
+    """The step's model spend: the agent's plus its judge calls'."""
+    judge = _judge_spend(inputs)
+    if agent.value is None:
+        return agent
+    if judge.value is None:
+        return judge
+    return Measured(agent.value + judge.value)
+
+
 def checkpoint_values(inputs: StepInputs, trajectory: Trajectory | Measured) -> dict[str, Measured]:
     """Every checkpoint metric of one step, keyed by metric id."""
     if not inputs.reached:
         skipped = Measured(None, AssessStatus.NOT_APPLICABLE, "checkpoint not reached")
         return dict.fromkeys((*_USAGE_FIELDS, "turns", "agent_wall_s"), skipped)
     values = {metric: _usage(inputs, field) for metric, field in _USAGE_FIELDS.items()}
+    values["cost_usd"] = _with_judge_spend(inputs, values["cost_usd"])
     values["turns"] = _turns(trajectory)
     values["agent_wall_s"] = _wall(inputs)
     return values
@@ -198,5 +281,5 @@ class ResourceUsageScorer:
 
 
 def resource_usage_scorer() -> ResourceUsageScorer:
-    """Registry factory for ``resource-usage@6``."""
+    """Registry factory for ``resource-usage@7``."""
     return ResourceUsageScorer()

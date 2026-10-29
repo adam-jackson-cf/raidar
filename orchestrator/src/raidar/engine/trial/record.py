@@ -26,7 +26,7 @@ from raidar.engine.trial.collect import (
 )
 from raidar.engine.trial.materialise import MaterialisedTask, compose_init
 from raidar.engine.trial.parity import harness_isolation, parity_record
-from raidar.engine.trial.progression import derive_reached, strict_rule
+from raidar.engine.trial.progression import STRICT_RULE, derive_reached
 from raidar.engine.trial.workspace import seed_duration
 
 
@@ -57,7 +57,7 @@ def reached(
     ``min_reward`` gate (``collect._halt_check``).
     """
     rewards = [a.rewards for a in step_results]
-    vector = derive_reached(rewards, strict_rule(rule), runnable=max_checkpoints)
+    vector = derive_reached(rewards, STRICT_RULE, runnable=max_checkpoints)
     return vector, "executed" if rule.mode == "halt_on_failure" else "derived"
 
 

@@ -83,13 +83,17 @@ class JudgeLoop:
     def fits(self, checkpoint: Checkpoint, kind: str, gates: Sequence[dict[str, Any]]) -> bool:
         """Whether a ``kind`` turn, its gate and a judge pass fit the time left (design D4).
 
-        Each is expected to take as long as the last of its kind (none yet: none), so a turn
-        the deadline would cut is not started and the checkpoint ends on a gated, judged tree.
+        Each is expected to take as long as the last of its kind (the first rework: as long as
+        the first build turn), so a turn the deadline would cut is not started and the checkpoint
+        ends on a gated, judged tree.
         """
         left = checkpoint.remaining()
         if not self.judge.fit_rework or left is None:
             return True
-        return left >= checkpoint.last_seconds(kind) + gate_seconds(gates) + self.seconds
+        expected = checkpoint.expected_seconds(kind)
+        if expected is None:
+            return False  # no estimate (no first build turn): never scheduled on an invented one
+        return left >= expected + gate_seconds(gates) + self.seconds
 
     async def judge_if_fits(
         self, checkpoint: Checkpoint, gates: Sequence[dict[str, Any]], gate: dict[str, Any]

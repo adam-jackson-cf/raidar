@@ -171,7 +171,7 @@ def run(
         environment_logs_dir=PurePosixPath(logs),
         model_name="openai/gpt-6-luna",
         inner_agent={"name": "codex"},
-        workflow="define-build-verify@3",
+        workflow="define-build-verify@4",
         definition=definition,
         phase_timeout_s=timeout_s,
     )

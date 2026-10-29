@@ -1,4 +1,4 @@
-"""correctness@7 behaviour: values equal the verifier step records, gaps are statused."""
+"""correctness@8 behaviour: values equal the verifier step records, gaps are statused."""
 
 from __future__ import annotations
 
@@ -177,6 +177,41 @@ def test_trajectory_counts_follow_the_progression(
         assert "stopped after failed checkpoint checkpoint_2" in (count.reason or "")
 
 
+def test_a_halt_run_gated_on_the_solvable_verdict_scores_the_checkpoints_past_a_raw_failure(
+    tmp_path: Path,
+) -> None:
+    """Checkpoint 2 fails raw but passes its solvable set, so the run went on and solved 3."""
+    trial = write_trial(
+        tmp_path / "trial",
+        [
+            StepFixture("checkpoint_1", APP_V1, (P,)),
+            StepFixture("checkpoint_2", APP_V1, (P,)),
+            StepFixture("checkpoint_3", APP_V1, (P,)),
+            StepFixture("checkpoint_4", APP_V1, (P,)),
+        ],
+        planned=["checkpoint_5"],
+    )
+    core = CaseGroup.CORE
+    _set_grade(trial, "checkpoint_1", _grade("checkpoint_1", {core: (P,)}))
+    _set_grade(trial, "checkpoint_2", _grade("checkpoint_2", {core: (P, F)}))  # raw: failed
+    _set_grade(trial, "checkpoint_3", _grade("checkpoint_3", {core: (P,)}))
+    _set_grade(trial, "checkpoint_4", _grade("checkpoint_4", {core: (F,)}))  # solvable: failed
+    problem = load_trial_context(trial).problem
+    solvable = {
+        "sha256": "s",
+        "steps": {f"checkpoint_{k}": [f"checkpoint_{k}::0"] for k in range(1, 6)},
+    }
+    config = {"progression": "halt_on_failure", "solvable": {problem: solvable}}
+
+    observed = _by_key(_assess(load_trial_context(trial, config=config)))
+
+    assert observed["solved_checkpoints_solvable", "trajectory"].value == 3
+    assert observed["reached_solvable", "trajectory"].value == 3
+    assert observed["solved_solvable", "checkpoint_3"].value == 1.0  # past the raw failure
+    # Raw solved count: the stop is the solvable one, so the executed prefix is counted.
+    assert observed["solved_checkpoints", "trajectory"].value == 2
+
+
 def test_trajectory_counts_on_complete_runs(tmp_path: Path) -> None:
     trial = write_trial(
         tmp_path / "trial",
@@ -214,6 +249,6 @@ def test_ungraded_trials_and_bad_config_produce_statused_results(tmp_path: Path)
 
 
 def test_correctness_is_bound_in_the_default_registry() -> None:
-    registration = default_scorer_registry().get("correctness@7")
+    registration = default_scorer_registry().get("correctness@8")
     assert registration.load().manifest == registration.manifest
     assert registration.implementation_digest() is not None

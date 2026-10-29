@@ -147,6 +147,19 @@ def agent_execution_seconds(timing: Any) -> float | None:
     return (finished - started).total_seconds()
 
 
+def ran_judge(agent_result: Any) -> bool:
+    """Whether Harbor's own record of the step shows a judged verify stage.
+
+    The workflow runner stores its record in ``agent_result.metadata.workflow``; a ``verify``
+    stage with judge settings there means the step's spend includes judge calls, whatever the
+    trace directory still holds.
+    """
+    metadata = agent_result.get("metadata") if isinstance(agent_result, Mapping) else None
+    workflow = metadata.get("workflow") if isinstance(metadata, Mapping) else None
+    verify = workflow.get("verify") if isinstance(workflow, Mapping) else None
+    return isinstance(verify, Mapping) and "judge" in verify
+
+
 def blind_agent_result(raw: Any) -> dict[str, Any] | None:
     """Harbor ``agent_result`` without arm or model labels.
 
@@ -293,6 +306,7 @@ def _step_inputs(
         trace_digest=trace_digest,
         agent_result=blind_agent_result(executed.agent_result),
         agent_execution_s=agent_execution_seconds(executed.agent_execution),
+        judged=ran_judge(executed.agent_result),
     )
 
 
