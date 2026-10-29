@@ -26,9 +26,16 @@ from raidar.scoring.framework.result import (
     AssessStatus,
     Observation,
 )
-from tests.analysis_support import BASELINE, GUIDED, inputs, trial
+from tests.analysis_support import BASELINE, GUIDED, OUTCOME_TYPES, inputs, trial
 
-SETTINGS = Settings(min_pairs=5, max_exclusion_fraction=0.2, bootstrap_samples=2000, seed=7)
+SETTINGS = Settings(
+    outcome_types=OUTCOME_TYPES,
+    min_pairs=5,
+    max_exclusion_fraction=0.2,
+    max_exclusion_difference=0.5,
+    bootstrap_samples=2000,
+    seed=7,
+)
 NO_GATE = Value.missing("not_applicable", "no guardrail-gate record")
 FIRST_PASS = "gate.first_pass_clean_rate"
 UNRESOLVED = "gate.unresolved_rate"
@@ -43,9 +50,9 @@ def _ungated() -> dict[str, float | Value]:
     return {metric.id: NO_GATE for metric in GATE_METRICS} | {"solve_rate": 0.5}
 
 
-def _outcomes(baseline_gated: bool) -> list[TrialOutcome]:
+def _outcomes(baseline_gated: bool, attempts: int = 5) -> list[TrialOutcome]:
     outcomes = []
-    for attempt in range(5):
+    for attempt in range(attempts):
         base = _gated(0.25) if baseline_gated else _ungated()
         outcomes.append(trial(BASELINE, attempt, base))
         outcomes.append(trial(GUIDED, attempt, _gated(0.75 + 0.05 * attempt, 0.1)))
@@ -75,9 +82,9 @@ def _signal(values: list[float | None]) -> AssessResult:
     )
 
 
-def _analyse(outcomes: list[TrialOutcome], **changes: object) -> AnalysisReport:
+def _analyse(outcomes: list[TrialOutcome], attempts: int = 5, **changes: object) -> AnalysisReport:
     gate = {outcome.trial_id: None for outcome in outcomes}
-    base = dataclasses.replace(inputs(outcomes, 5), gate_results=gate)
+    base = dataclasses.replace(inputs(outcomes, attempts), gate_results=gate)
     return analyse(dataclasses.replace(base, **changes), SETTINGS)
 
 
@@ -102,7 +109,8 @@ def test_a_baseline_without_the_gate_is_described_not_paired() -> None:
 
 
 def test_two_gated_arms_get_paired_gate_effects_with_verdicts() -> None:
-    report = _analyse(_outcomes(baseline_gated=True))
+    # Six pairs: five one-way pairs cannot reach p < 0.05 under the exact sign-flip test.
+    report = _analyse(_outcomes(baseline_gated=True, attempts=6), attempts=6)
 
     (comparison,) = report.comparisons
     effects = {effect.metric: effect for effect in comparison.gate_effects}
@@ -110,7 +118,7 @@ def test_two_gated_arms_get_paired_gate_effects_with_verdicts() -> None:
     # The lock declares gate-effort (the default label): exactly the outcomes it reports.
     assert set(effects) == {metric.id for metric in GATE_METRICS}
     first_pass = effects[FIRST_PASS]
-    assert (first_pass.n_pairs, first_pass.verdict.value) == (5, "improved")
+    assert (first_pass.n_pairs, first_pass.verdict.value) == (6, "improved")
     assert effects[UNRESOLVED].verdict.value == "worse"
     assert "| gate.first_pass_clean_rate | ↑ higher | gate |" in render_markdown(report)
 

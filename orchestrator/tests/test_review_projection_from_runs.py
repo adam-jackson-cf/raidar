@@ -484,7 +484,7 @@ def test_following_the_unassessed_hint_stores_the_assessment_the_review_finds(
     config = job_dir / "assessment-config.yaml"
     config.write_text(
         config.read_text().replace(
-            "scorers: {}", "scorers:\n  correctness@7:\n    progression: continue"
+            "scorers: {}", "scorers:\n  correctness@8:\n    progression: continue"
         )
     )
     runs, store = tmp_path / "jobs", tmp_path / "store"
@@ -492,29 +492,29 @@ def test_following_the_unassessed_hint_stores_the_assessment_the_review_finds(
     [hint] = [
         reason
         for reason in _detail(before, PASSING).run.unscored_reasons
-        if "correctness@7" in reason and "raidar assess" in reason
+        if "correctness@8" in reason and "raidar assess" in reason
     ]
     command = hint.split("`")[1].replace("<store>", str(store)).split()
     result = CliRunner().invoke(assess, command[2:])
     assert result.exit_code == 0, result.output
     after = merge_review_projections(job_roots=[runs], stores=[store])
     scoring = _span(_detail(after, PASSING), "scoring")
-    assert "correctness@7" in scoring["assessments"]
-    assert "correctness@7" not in scoring["not_assessed"]
+    assert "correctness@8" in scoring["assessments"]
+    assert "correctness@8" not in scoring["not_assessed"]
 
 
 def test_a_headline_scorer_the_experiment_never_declared_is_named_not_unassessed() -> None:
     from raidar.evaluation.review.projection.assessments import TrialAssessments
     from raidar.evaluation.review.projection.headline import UNDECLARED_MARKER, headline
 
-    missing = TrialAssessments(missing={"correctness@7": "no stored Assessment"})
+    missing = TrialAssessments(missing={"correctness@8": "no stored Assessment"})
     one = ("checkpoint_1",)
-    result = headline("scb-canonical-oneshot@1", one, missing, declared=["correctness@7"])
+    result = headline("scb-canonical-oneshot@1", one, missing, declared=["correctness@8"])
     assert result.composite is None
     (reason,) = result.reasons
     assert UNDECLARED_MARKER in reason
     declared = headline(
-        "scb-canonical-oneshot@1", one, missing, declared=["correctness@7", "code-quality@8"]
+        "scb-canonical-oneshot@1", one, missing, declared=["correctness@8", "code-quality@8"]
     )
     assert all("unassessed" in reason for reason in declared.reasons)
 

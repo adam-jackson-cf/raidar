@@ -5,7 +5,8 @@ Everything here is deterministic and stdlib-only:
 - a 95% interval for a mean: paired t below ``BOOTSTRAP_MIN_PAIRS`` pairs, a
   percentile bootstrap over whole pairs from that size on, drawn from a
   ``random.Random`` seeded per estimate so a report replays byte-identically;
-- the exact two-sided McNemar test for a paired binary outcome;
+- the exact two-sided McNemar test for a paired binary outcome and the exact sign-flip
+  permutation test for any other paired delta (the verdict tests);
 - the pairs needed for 80% power at alpha = 0.05, ``n = 7.84·(SD/δ)²``.
 
 Student-t quantiles come from the regularized incomplete beta function
@@ -20,6 +21,7 @@ import random
 from collections.abc import Sequence
 from dataclasses import dataclass
 from enum import StrEnum
+from fractions import Fraction
 
 CONFIDENCE = 0.95
 BOOTSTRAP_MIN_PAIRS = 10
@@ -202,6 +204,50 @@ def mcnemar_exact(baseline_only: int, treatment_only: int) -> float:
     # Divide integers before converting their ratio to float. Neither the
     # binomial tail nor 2**discordant needs to fit in a floating-point value.
     return min(1.0, (2 * tail) / (1 << discordant))
+
+
+SIGN_FLIP_STATE_LIMIT = 250_000
+"""Most distinct partial sums the exact sign-flip enumeration keeps before it gives up."""
+
+
+def _sign_flip_sums(whole: Sequence[int], state_limit: int) -> dict[int, int] | None:
+    """Count of sign assignments per distinct partial sum; None past ``state_limit`` sums."""
+    sums: dict[int, int] = {0: 1}
+    for step in whole:
+        grown: dict[int, int] = {}
+        for total, count in sums.items():
+            for moved in (total + step, total - step):
+                grown[moved] = grown.get(moved, 0) + count
+        if len(grown) > state_limit:
+            return None
+        sums = grown
+    return sums
+
+
+def sign_flip_exact(
+    terms: Sequence[Fraction], state_limit: int = SIGN_FLIP_STATE_LIMIT
+) -> float | None:
+    """Exact two-sided sign-flip permutation p-value of ``sum(terms)``.
+
+    Every sign assignment of the non-zero terms is equally likely under the null; the p-value is
+    the share of assignments whose ``|sum|`` is at least the observed ``|sum|``. Terms are exact
+    rationals, so the enumeration (a count per distinct partial sum) involves no rounding, and
+    outcomes on a coarse grid (k/K rates, counts) stay small however many pairs there are. It
+    returns ``None`` when more than ``state_limit`` distinct sums arise: the exact test is then
+    not computable within that execution safety limit, and no approximation is substituted.
+    No non-zero term gives 1.
+    """
+    magnitudes = [abs(term) for term in terms if term != 0]
+    if not magnitudes:
+        return 1.0
+    scale = math.lcm(*(m.denominator for m in magnitudes))
+    whole = [int(m * scale) for m in magnitudes]
+    observed = abs(int(sum(terms) * scale))
+    sums = _sign_flip_sums(whole, state_limit)
+    if sums is None:
+        return None
+    tail = sum(count for total, count in sums.items() if abs(total) >= observed)
+    return min(1.0, tail / (1 << len(whole)))
 
 
 def pairs_for_power(sd: float, delta: float) -> int:

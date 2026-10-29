@@ -68,7 +68,7 @@ def test_relocking_unchanged_inputs_is_byte_identical(tmp_path: Path) -> None:
     assert list(lock) == sorted(lock)
     execution, assessment = lock["execution"], lock["assessment"]
     assert execution["versions"]["harbor"] == "0.23.0"
-    assert execution["versions"]["agents"] == {"luna": {"release": "codex@2", "version": "0.156.1"}}
+    assert execution["versions"]["agents"] == {"luna": {"release": "codex@3", "version": "0.156.1"}}
     assert set(execution["references"]) == {"problem", "agent", "workflow"}
     assert set(assessment["references"]) == {"scorer", "metric"}
     # Tools are recorded with the section whose reference pins them.
@@ -106,7 +106,7 @@ def _scorer_resolvers(implementation: str) -> ResolverSet:
     problem, agent, workflow, _ = fixture_resolvers()
     scorer = InMemoryResolver(
         RefKind.SCORER,
-        {"correctness@7": {"implementation_digest": implementation}},
+        {"correctness@8": {"implementation_digest": implementation}},
         tool_versions={"pytest": "8.4.1"},
     )
     return ResolverSet([problem, agent, workflow, scorer, MetricResolver()], entry_point_group=None)
@@ -135,6 +135,25 @@ def test_assessment_and_analysis_changes_keep_the_run_identity(tmp_path: Path) -
     # concurrency is per machine: it is part of the document, not of any section.
     assert stale_sections(base, reanalysed) == ("analysis", "document")
     assert "rescore" in describe_staleness(("assessment",))
+
+
+def test_the_lock_declares_outcome_types_from_the_bound_checkpoints(tmp_path: Path) -> None:
+    document = experiment_document()
+    path = write_experiment(tmp_path, document)
+    lock_path = path.with_name("experiment.lock.json")
+    loaded = load_experiment(path)
+    lock = json.loads(
+        render_lock(build_lock(loaded, lock_path=lock_path, resolvers=_scorer_resolvers("a" * 64)))
+    )
+
+    declared = lock["analysis"]["outcome_types"]
+    assert declared["aggregate"] == {"binary": []}
+    for entry, bound in zip(document["problems"], lock["execution"]["problems"], strict=True):
+        types = declared["problems"][entry["ref"]]
+        assert types["checkpoints"] == bound["checkpoints"]
+        assert "final_solved" in types["binary"]
+        assert ("solve_rate_solvable" in types["binary"]) == (bound["checkpoints"] == 1)
+        assert "headline_score" not in types["binary"]
 
 
 def test_overrides_are_recorded_and_change_the_lock(tmp_path: Path) -> None:
@@ -235,7 +254,7 @@ def test_mixed_k_without_declared_policy_is_rejected(tmp_path: Path) -> None:
 
 def test_every_gap_is_reported_and_nothing_is_skipped(tmp_path: Path) -> None:
     document = experiment_document()
-    document["assessment"]["scorers"] = ["correctness@7", "jev@2"]
+    document["assessment"]["scorers"] = ["correctness@8", "jev@2"]
     path = write_experiment(tmp_path, document)
     _, agent, workflow, _ = fixture_resolvers()
     resolvers = ResolverSet(
@@ -243,7 +262,7 @@ def test_every_gap_is_reported_and_nothing_is_skipped(tmp_path: Path) -> None:
             InMemoryResolver(RefKind.PROBLEM, {"scb/forge@abc123": {"checkpoints": 0}}),
             agent,
             workflow,
-            InMemoryResolver(RefKind.SCORER, {"correctness@7": {}}),
+            InMemoryResolver(RefKind.SCORER, {"correctness@8": {}}),
         ],
         entry_point_group=None,
     )
@@ -378,7 +397,7 @@ def test_entry_point_resolvers_load_lazily_by_kind(monkeypatch: pytest.MonkeyPat
 
     def scorer_factory() -> InMemoryResolver:
         loaded.append("scorer")
-        return InMemoryResolver(RefKind.SCORER, {"correctness@7": {}})
+        return InMemoryResolver(RefKind.SCORER, {"correctness@8": {}})
 
     monkeypatch.setattr(
         "raidar.contract.references.entry_points",

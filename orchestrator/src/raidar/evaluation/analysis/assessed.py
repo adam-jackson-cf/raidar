@@ -3,8 +3,8 @@
 Inputs are the job's ``TrialRecord`` (validity and identity) and the
 stored ``AssessResult`` of each scorer (``None`` when the store has no
 Assessment for this trial). Nothing is recomputed from raw run files:
-correctness comes from ``correctness@7``, quality from ``code-quality@8``,
-cost from ``resource-usage@6``, and the headline score from the experiment's
+correctness comes from ``correctness@8``, quality from ``code-quality@8``,
+cost from ``resource-usage@7``, and the headline score from the experiment's
 Metric applied to those components.
 
 The score component C (``correctness``) is the policy's definition
@@ -18,10 +18,10 @@ Two derivations are analysis-owned:
   before the last checkpoint (``not_attempted`` counts as unsolved, memo §10.1);
 - ``strict_solved[k]`` is 1 exactly when ``k`` lies in the reached prefix;
 - the ``*_solvable`` outcomes (the default primary) repeat ``solve_rate``, ``reached`` and
-  ``final_solved`` over the solvable-set metrics of ``correctness@7``; they are
+  ``final_solved`` over the solvable-set metrics of ``correctness@8``; they are
   ``unavailable`` for a problem whose lock pins no solvable set, and never replace the raw ones;
 - the ``*_errata`` outcomes repeat ``solve_rate``, ``reached`` and
-  ``final_solved`` over ``correctness@7``'s errata-applied metrics (the problem's
+  ``final_solved`` over ``correctness@8``'s errata-applied metrics (the problem's
   pinned errata); they are labelled as such and never replace the raw ones;
 - the ``gate.*`` outcomes (a gate-effort scorer, only when the lock declares
   one) are the scorer's trajectory metrics as stored: an arm without the commit

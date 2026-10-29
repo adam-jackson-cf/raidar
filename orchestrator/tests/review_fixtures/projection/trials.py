@@ -42,7 +42,7 @@ from raidar.contract.trial import (
     Usage,
     ValidityCheck,
 )
-from raidar.engine.trial.progression import derive_reached, strict_rule
+from raidar.engine.trial.progression import STRICT_RULE, derive_reached
 from raidar.grading.bundle import BundleManifest, GraderSpec, VerifierStepSpec, load_bundle
 from raidar.grading.models import CaseGroup, CaseResult, CaseStatus, VerifierGrade
 from raidar.grading.records import (
@@ -458,7 +458,7 @@ def write_trial(plan: TrialPlan, script: TrialScript) -> TrialRecord:
         trial_dir=f"trials/{script.trial_id}",
         progression=_CONTINUE,
         step_results=step_results,
-        reached=derive_reached(rewards, strict_rule(_CONTINUE)),
+        reached=derive_reached(rewards, STRICT_RULE),
         reached_source="derived",
         validity=_validity(script, step_results),
         phases=(

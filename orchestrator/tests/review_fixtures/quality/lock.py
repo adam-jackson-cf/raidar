@@ -16,6 +16,7 @@ from raidar.design.experiment.schema import (
     DEFAULT_MAX_EXCLUSION_FRACTION,
     DEFAULT_MIN_PAIRS,
 )
+from raidar.scoring.catalog.outcomes import declared_outcome_types
 from raidar.scoring.framework.metrics import DEFAULT_METRIC_REGISTRY
 
 PINNED_THRESHOLDS = {
@@ -23,8 +24,10 @@ PINNED_THRESHOLDS = {
     "max_exclusion_fraction": DEFAULT_MAX_EXCLUSION_FRACTION,
     "alpha": DEFAULT_ALPHA,
     "min_effects": {},
+    "max_exclusion_difference": 0.5,
 }
-"""The verdict thresholds a real lock pins (``AnalysisSpec`` defaults)."""
+"""The verdict thresholds a real lock pins (``AnalysisSpec`` defaults, plus an arbitrary test
+value for the pre-registered exclusion-rate difference, which has no default)."""
 
 
 def default_metric(checkpoints: int) -> str:
@@ -32,10 +35,20 @@ def default_metric(checkpoints: int) -> str:
 
 
 def write_synthetic_lock(
-    experiment_file: Path, *, experiment: str, baseline_arm: str, metric: str
+    experiment_file: Path,
+    *,
+    experiment: str,
+    baseline_arm: str,
+    metric: str,
+    problem: str,
+    checkpoints: int,
 ) -> str:
     """Write the lock beside ``experiment_file`` and return its ``lock_sha256``."""
-    analysis = {"baseline_arm": baseline_arm, **PINNED_THRESHOLDS}
+    analysis = {
+        "baseline_arm": baseline_arm,
+        **PINNED_THRESHOLDS,
+        "outcome_types": declared_outcome_types({problem: checkpoints}),
+    }
     lock = seal_lock(
         {
             "lock_version": LOCK_VERSION,
@@ -44,7 +57,7 @@ def write_synthetic_lock(
             "spec": {
                 "id": experiment,
                 "analysis": analysis,
-                "assessment": {"scorers": ["correctness@7", "code-quality@8", "gate-effort@15"]},
+                "assessment": {"scorers": ["correctness@8", "code-quality@8", "gate-effort@15"]},
                 "protocol": {"progression": "continue"},
             },
             "execution": {"design": {"id": experiment}},

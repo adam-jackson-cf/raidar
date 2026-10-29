@@ -1,7 +1,7 @@
 """``raidar analyze`` over stored jobs and a real Assessment store.
 
 Trials are written with host-side verifier records, rescored with the real
-``correctness@7`` and ``resource-usage@6`` scorers, and analysed through the
+``correctness@8`` and ``resource-usage@7`` scorers, and analysed through the
 CLI. The analysis must find each trial's Assessments by recomputing the keys
 ``raidar assess --rescore`` wrote, and must leave jobs and the store untouched.
 """
@@ -38,6 +38,7 @@ from raidar.evaluation.analysis.sources import (
 )
 from raidar.grading.models import CaseStatus
 from raidar.scoring.catalog.builtin import default_scorer_registry
+from raidar.scoring.catalog.outcomes import declared_outcome_types
 from raidar.scoring.framework.rescore import rescore_path
 from raidar.scoring.framework.store import AssessmentStore
 from tests.scorer_support import (
@@ -99,14 +100,14 @@ def _lock(
                     "checkpoints": [2],
                 },
             },
-            "analysis": analysis,
+            "analysis": {**analysis, "outcome_types": declared_outcome_types({"scb/toy@1": 2})},
             "toolchain": {},
         }
     )
 
 
 # Analysis looks Assessments up under the lock's assessment settings.
-LOCKED_SETTINGS = lock_rescore_config(_lock(["correctness@7"]))
+LOCKED_SETTINGS = lock_rescore_config(_lock(["correctness@8"]))
 
 
 def _record(
@@ -196,14 +197,14 @@ def _write_run(
 
 @pytest.fixture
 def pilot(tmp_path: Path) -> tuple[Path, Path, Path]:
-    lock = _lock(["correctness@7", "code-quality@8", "resource-usage@6"])
+    lock = _lock(["correctness@8", "code-quality@8", "resource-usage@7"])
     lock_path = tmp_path / "pilot.lock.json"
     lock_path.write_text(json.dumps(lock))
     job_dir = _write_run(tmp_path, lock)
     store = tmp_path / "store"
     rescore_path(
         job_dir / "trials",
-        ("correctness@7", "resource-usage@6"),
+        ("correctness@8", "resource-usage@7"),
         AssessmentStore(store),
         default_scorer_registry(),
         config=LOCKED_SETTINGS.scorers,
@@ -242,14 +243,23 @@ def test_analyze_reports_stored_assessments_without_touching_inputs(
     job_dir, store, lock_path = pilot
     before = (tree_state(job_dir), tree_state(store))
     output = tmp_path / "analysis"
-    result = _analyze(job_dir, store, lock_path, output, "--min-effect", "solve_rate=0.25")
+    result = _analyze(
+        job_dir,
+        store,
+        lock_path,
+        output,
+        "--min-effect",
+        "solve_rate=0.25",
+        "--max-exclusion-difference",
+        "0.5",
+    )
     assert result.exit_code == 0, result.output
     assert (tree_state(job_dir), tree_state(store)) == before
     report = json.loads((output / "analysis.json").read_text())
     assert report["baseline_arm"] == "baseline"
     assert report["settings"]["seed"] == 11
     solve = _effect(report, "solve_rate")
-    assert (solve["n_pairs"], solve["verdict"]) == (5, "improved")
+    assert (solve["n_pairs"], solve["verdict"]) == (5, "inconclusive")
     assert solve["mean_delta"] == pytest.approx(0.4)
     assert solve["cost"]["delta_mean"] == pytest.approx(0.04)  # two steps x 0.02 USD
     assert solve["sample_size"]["delta_source"] == "configured"
@@ -262,7 +272,7 @@ def test_analyze_reports_stored_assessments_without_touching_inputs(
     assert (primary["metric"], primary["verdict"]) == ("solve_rate_solvable", "insufficient")
     assert report["comparisons"][0]["primary_raw"]["metric"] == "solve_rate"
     assert "primary solve_rate_solvable insufficient" in result.output
-    assert "raw solve_rate beside it: improved" in result.output
+    assert "raw solve_rate beside it: inconclusive" in result.output
     composite = _effect(report, "headline_score")
     assert composite["exclusions"]["unassessed"] == 5
     assert composite["verdict"] == "insufficient"
@@ -270,9 +280,10 @@ def test_analyze_reports_stored_assessments_without_touching_inputs(
     settings = report["settings"]
     assert settings["pinned_by_lock"] is False
     assert settings["source"] == (
-        "defaults (lock does not pin thresholds); command line overrides min_effect.solve_rate"
+        "defaults (lock does not pin thresholds); command line overrides "
+        "max_exclusion_difference, min_effect.solve_rate"
     )
-    assert settings["overridden"] == ["min_effect.solve_rate"]
+    assert settings["overridden"] == ["max_exclusion_difference", "min_effect.solve_rate"]
     assert settings["changed_from_defaults"] == ["bootstrap_samples", "min_effect.solve_rate"]
     assert "the lock does not pin verdict thresholds" in result.output
     assert "verdict settings changed from defaults" in result.output
@@ -292,7 +303,7 @@ def test_floor_policy_scores_c_zero_trials_zero_end_to_end_while_the_base_policy
         "baseline": [(FAIL, FAIL)] * 5,
         "guided": [(FAIL, FAIL)] * 2 + [(PASS, FAIL)] * 3,
     }
-    scorers = ["correctness@7", "code-quality@8", "resource-usage@6"]
+    scorers = ["correctness@8", "code-quality@8", "resource-usage@7"]
     for headline, pairs, unassessed in (("scb-canonical@2", 2, 3), ("scb-canonical@1", 0, 5)):
         root = tmp_path / headline
         lock = _lock(scorers, headline=headline)
@@ -303,7 +314,7 @@ def test_floor_policy_scores_c_zero_trials_zero_end_to_end_while_the_base_policy
         store = root / "store"
         rescore_path(
             job_dir / "trials",
-            ("correctness@7", "resource-usage@6"),
+            ("correctness@8", "resource-usage@7"),
             AssessmentStore(store),
             default_scorer_registry(),
             config=lock_rescore_config(lock).scorers,
@@ -324,20 +335,21 @@ def test_floor_policy_scores_c_zero_trials_zero_end_to_end_while_the_base_policy
 PINNED: dict[str, Any] = {
     "min_pairs": 6,
     "max_exclusion_fraction": 0.2,
+    "max_exclusion_difference": 0.5,
     "alpha": 0.05,
     "min_effects": {"solve_rate": 0.25},
 }
 
 
 def _pinned_pilot(tmp_path: Path) -> tuple[Path, Path, Path]:
-    lock = _lock(["correctness@7", "resource-usage@6"], **PINNED)
+    lock = _lock(["correctness@8", "resource-usage@7"], **PINNED)
     lock_path = tmp_path / "pinned.lock.json"
     lock_path.write_text(json.dumps(lock))
     job_dir = _write_run(tmp_path / "pinned", lock)
     store = tmp_path / "pinned-store"
     rescore_path(
         job_dir / "trials",
-        ("correctness@7", "resource-usage@6"),
+        ("correctness@8", "resource-usage@7"),
         AssessmentStore(store),
         default_scorer_registry(),
         config=LOCKED_SETTINGS.scorers,
@@ -368,7 +380,8 @@ def test_the_lock_pins_verdict_thresholds_and_overrides_are_labelled(tmp_path: P
     report = json.loads((tmp_path / "override" / "analysis.json").read_text())
     assert report["settings"]["source"] == "lock; command line overrides min_pairs"
     assert report["settings"]["overridden"] == ["min_pairs"]
-    assert _effect(report, "solve_rate")["verdict"] == "improved"
+    # Five one-way pairs: the exact test's smallest possible p is 0.0625, above alpha.
+    assert _effect(report, "solve_rate")["verdict"] == "inconclusive"
     assert _effect(report, "headline_score")["verdict_reason"].endswith(
         "(command-line override of the lock)"
     )
@@ -395,12 +408,12 @@ def test_analyze_refuses_to_write_into_a_run_or_to_mix_locks(
     assert inside.exit_code != 0
     assert "outside" in inside.output
     other = tmp_path / "other.lock.json"
-    other.write_text(json.dumps(_lock(["correctness@7"], experiment="other")))
+    other.write_text(json.dumps(_lock(["correctness@8"], experiment="other")))
     mixed = _analyze(job_dir, store, other, tmp_path / "out")
     assert mixed.exit_code != 0
     assert "executed under lock" in mixed.output
     # A relock that only changes the scorers keeps the execution identity the run recorded.
-    rescored = _lock(["correctness@7"])
+    rescored = _lock(["correctness@8"])
     assert rescored["lock_sha256"] == json.loads(lock_path.read_text())["lock_sha256"]
     other.write_text(json.dumps(rescored))
     assert _analyze(job_dir, store, other, tmp_path / "rescored").exit_code == 0
@@ -428,7 +441,7 @@ def test_a_valid_rerun_replaces_an_invalid_trial_but_two_valid_ones_conflict() -
 def test_a_job_resolves_only_the_lock_its_manifest_names_and_otherwise_asks_for_one(
     tmp_path: Path,
 ) -> None:
-    lock = _lock(["correctness@7"])
+    lock = _lock(["correctness@8"])
     experiment_file = tmp_path / "pilot.yaml"
     lock_path = tmp_path / "pilot.lock.json"
     lock_path.write_text(json.dumps(lock))
@@ -443,7 +456,7 @@ def test_a_job_resolves_only_the_lock_its_manifest_names_and_otherwise_asks_for_
     assert default_lock(job(experiment_file=str(experiment_file))) == lock_path
     with pytest.raises(AnalysisInputError, match="names no experiment_file; pass --lock"):
         default_lock(job())
-    lock_path.write_text(json.dumps(_lock(["correctness@7"], experiment="another")))
+    lock_path.write_text(json.dumps(_lock(["correctness@8"], experiment="another")))
     with pytest.raises(AnalysisInputError, match="another experiment.*pass --lock"):
         default_lock(job(experiment_file=str(experiment_file)))
     lock_path.unlink()
@@ -452,14 +465,14 @@ def test_a_job_resolves_only_the_lock_its_manifest_names_and_otherwise_asks_for_
 
 
 def test_truncated_runs_are_refused_unless_labelled_and_never_pooled(tmp_path: Path) -> None:
-    lock = _lock(["correctness@7", "resource-usage@6"])
+    lock = _lock(["correctness@8", "resource-usage@7"])
     lock_path = tmp_path / "pilot.lock.json"
     lock_path.write_text(json.dumps(lock))
     truncated = _write_run(tmp_path, lock, name="dev", max_checkpoints=2)
     store = tmp_path / "store"
     rescore_path(
         truncated / "trials",
-        ("correctness@7", "resource-usage@6"),
+        ("correctness@8", "resource-usage@7"),
         AssessmentStore(store),
         default_scorer_registry(),
         config=LOCKED_SETTINGS.scorers,
@@ -496,7 +509,7 @@ def test_truncated_runs_are_refused_unless_labelled_and_never_pooled(tmp_path: P
 def test_rescore_and_analysis_follow_the_lock_not_the_runs_execution_time_file(
     tmp_path: Path,
 ) -> None:
-    lock = _lock(["correctness@7", "code-quality@8", "resource-usage@6"])
+    lock = _lock(["correctness@8", "code-quality@8", "resource-usage@7"])
     lock_path = tmp_path / "pilot.lock.json"
     lock_path.write_text(json.dumps(lock))
     job_dir = _write_run(tmp_path, lock)  # its assessment-config.yaml says `scorers: {}`
@@ -508,7 +521,7 @@ def test_rescore_and_analysis_follow_the_lock_not_the_runs_execution_time_file(
             "--rescore",
             str(job_dir / "trials"),
             "--scorer",
-            "correctness@7",
+            "correctness@8",
             "--store",
             str(store),
             "--lock",
@@ -616,7 +629,7 @@ def test_the_manipulation_check_reads_the_declared_process_compliance_version(
 ) -> None:
     # Jev parked (2026-10-04): the deterministic scorer is the default; a lock declaring
     # no process-compliance version gets no manipulation check.
-    scorers = ["correctness@7", *([process] if process else [])]
+    scorers = ["correctness@8", *([process] if process else [])]
     lock = _lock(scorers)
     lock_path = tmp_path / "lock.json"
     lock_path.write_text(json.dumps(lock))
@@ -679,7 +692,7 @@ def _write_gate_record(agent_dir: Path, *, clean: bool) -> None:
 
 
 def test_gate_effort_and_its_default_gate_check_reach_the_report(tmp_path: Path) -> None:
-    scorers = ["correctness@7", "gate-effort@15"]
+    scorers = ["correctness@8", "gate-effort@15"]
     lock = _lock(scorers)
     lock_path = tmp_path / "lock.json"
     lock_path.write_text(json.dumps(lock))
