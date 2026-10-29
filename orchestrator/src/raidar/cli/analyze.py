@@ -114,10 +114,16 @@ def _echo_pooling(report: AnalysisReport) -> None:
     "'insufficient'; labelled as an override.",
 )
 @click.option(
+    "--max-exclusion-difference",
+    type=click.FloatRange(0.0, 1.0),
+    help="Override the lock's pre-registered largest difference between the arms' exclusion "
+    "rates, above which a verdict is refused; labelled as an override.",
+)
+@click.option(
     "--alpha",
     type=click.FloatRange(0.0, 1.0, min_open=True, max_open=True),
-    help="Override the lock's significance level for the exact McNemar test of "
-    "final-checkpoint solves; labelled as an override.",
+    help="Override the lock's significance level for the exact verdict tests (McNemar for "
+    "binary outcomes, sign-flip otherwise); labelled as an override.",
 )
 @click.option(
     "--bootstrap-samples",
@@ -125,6 +131,12 @@ def _echo_pooling(report: AnalysisReport) -> None:
     default=10_000,
     show_default=True,
     help="Resamples for bootstrap CIs (used from 10 pairs on; seeded by analysis.seed).",
+)
+@click.option(
+    "--exact-state-limit",
+    type=click.IntRange(min=1),
+    help="Execution safety limit on the exact sign-flip enumeration (distinct partial sums); "
+    "above it a verdict is refused as not computable, never approximated.",
 )
 @click.option(
     "--min-effect",
@@ -156,8 +168,10 @@ def analyze(
     assessment_config: Path | None,
     min_pairs: int | None,
     max_exclusion_fraction: float | None,
+    max_exclusion_difference: float | None,
     alpha: float | None,
     bootstrap_samples: int,
+    exact_state_limit: int | None,
     min_effects: tuple[str, ...],
     allow_dev_jobs: bool,
     pool_overrides: tuple[str, ...],
@@ -177,14 +191,16 @@ def analyze(
     try:
         inputs, lock = load_inputs(request)
         settings = settings_from_lock(
-            lock["spec"]["analysis"],
+            {**lock["spec"]["analysis"], **lock.get("analysis", {})},
             overrides={
                 "min_pairs": min_pairs,
                 "max_exclusion_fraction": max_exclusion_fraction,
+                "max_exclusion_difference": max_exclusion_difference,
                 "alpha": alpha,
                 "min_effects": effects,
             },
             bootstrap_samples=bootstrap_samples,
+            exact_state_limit=exact_state_limit,
         )
         report = analyse(inputs, settings)
     except (AnalysisInputError, RegistryReferenceError, ValueError) as exc:

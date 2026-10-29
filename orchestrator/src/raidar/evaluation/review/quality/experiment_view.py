@@ -33,9 +33,18 @@ from collections import defaultdict
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from decimal import Decimal
+from fractions import Fraction
 from itertools import combinations
 
-from raidar.evaluation.analysis.effects import Exclusions, Settings, decide
+from raidar.evaluation.analysis.effects import (
+    ArmExclusions,
+    ExactTest,
+    Exclusions,
+    Settings,
+    decide,
+    declared_type,
+    sign_flip_test,
+)
 from raidar.evaluation.analysis.stats import seed_for, summarise
 from raidar.evaluation.analysis.thresholds import settings_from_lock
 from raidar.evaluation.review.quality import stats
@@ -61,6 +70,7 @@ from raidar.scoring.catalog.outcomes import (
     OUTCOME_METRICS,
     QUALITY_COMPONENTS,
     RAW_COUNTERPART,
+    Kind,
     MetricDef,
     View,
     primary_metric,
@@ -174,39 +184,81 @@ def _metric(component: str) -> MetricDef:
     return MetricDef(component, f"Quality {component}", View.QUALITY, Direction.HIGHER_BETTER, 0.05)
 
 
+def _absence_cause(arm: str, attempt: int, infra: set[tuple[str, int]]) -> str:
+    return "infra_error" if (arm, attempt) in infra else "not_run"
+
+
 def _pair_component(
     component: str,
     pairs: Sequence[tuple[int, ReviewedTrial | None, ReviewedTrial | None]],
     infra: set[tuple[str, int]],
     arms: tuple[str, str],
 ) -> tuple[list[float], Exclusions, list[str]]:
-    """Within-attempt differences, tallied the way WS-J tallies exclusions."""
+    """Within-attempt differences, tallied the way WS-J tallies exclusions, per arm and cause."""
     differences: list[float] = []
     reasons: list[str] = []
     tally = {"not_run": 0, "infra_error": 0, "ineligible": 0}
     statuses: dict[str, int] = defaultdict(int)
+    causes: dict[str, dict[str, int]] = {arm: defaultdict(int) for arm in arms}
+    excluded = dict.fromkeys(arms, 0)
     for attempt, base, other in pairs:
         if base is None or other is None:
             missing = arms[0] if base is None else arms[1]
-            cause = "infra_error" if (missing, attempt) in infra else "not_run"
+            cause = _absence_cause(missing, attempt, infra)
             tally[cause] += 1
+            causes[missing][cause] += 1
+            excluded[missing] += 1
             reasons.append(f"attempt {attempt}: {missing} {cause.replace('_', ' ')}")
             continue
         base_cell, other_cell = base.detail.problem[component], other.detail.problem[component]
-        if base_cell.value is None or other_cell.value is None:
-            gap = base_cell if base_cell.value is None else other_cell
-            tally["ineligible"] += 1
-            statuses[gap.status] += 1
-            reasons.append(f"attempt {attempt}: {gap.status}")
+        if base_cell.value is None:
+            gap = base_cell
+        elif other_cell.value is None:
+            gap = other_cell
+        else:
+            differences.append(other_cell.value - base_cell.value)
             continue
-        differences.append(other_cell.value - base_cell.value)
-    exclusions = Exclusions(
-        planned=len(pairs), paired=len(differences), ineligible_statuses=dict(statuses), **tally
+        tally["ineligible"] += 1
+        statuses[gap.status] += 1
+        for arm, cell in zip(arms, (base_cell, other_cell), strict=True):
+            if cell.value is None:
+                causes[arm][f"ineligible:{cell.status}"] += 1
+                excluded[arm] += 1
+        reasons.append(f"attempt {attempt}: {gap.status}")
+    exclusions = _component_exclusions(
+        len(pairs), len(differences), arms, tally, statuses, causes, excluded
     )
     return differences, exclusions, reasons
 
 
+def _component_exclusions(
+    planned: int,
+    paired: int,
+    arms: tuple[str, str],
+    tally: dict[str, int],
+    statuses: dict[str, int],
+    causes: dict[str, dict[str, int]],
+    excluded: dict[str, int],
+) -> Exclusions:
+    return Exclusions(
+        planned=planned,
+        paired=paired,
+        ineligible_statuses=dict(statuses),
+        arms=tuple(
+            ArmExclusions(
+                arm=arm,
+                planned=planned,
+                excluded=excluded[arm],
+                causes=dict(sorted(causes[arm].items())),
+            )
+            for arm in arms
+        ),
+        **tally,
+    )
+
+
 def _delta(
+    problem: str,
     component: str,
     arm: str,
     compared: tuple[list[float], Exclusions, list[str]],
@@ -218,7 +270,18 @@ def _delta(
         seed=seed_for(settings.seed, f"quality:{arm}:{component}"),
         bootstrap_samples=settings.bootstrap_samples,
     )
-    verdict, why = decide(_metric(component), summary, exclusions, settings)
+    metric = _metric(component)
+    kind = declared_type(settings, problem, metric.id)
+    test: ExactTest | str
+    if kind is Kind.CONTINUOUS:
+        test = sign_flip_test(
+            [Fraction(difference) for difference in differences], settings.sign_flip_state_limit
+        )
+    elif kind is Kind.BINARY:
+        test = f"{component} is declared binary, which the quality view does not pair"
+    else:
+        test = kind
+    verdict, why = decide(metric, summary, exclusions, settings, test)
     interval = summary.interval
     return PairedDelta(
         component=component,
@@ -235,6 +298,7 @@ def _delta(
 
 
 def _paired(
+    problem: str,
     trials: Sequence[ReviewedTrial],
     arms: Sequence[str],
     baseline: str | None,
@@ -255,7 +319,11 @@ def _paired(
         ]
         deltas.extend(
             _delta(
-                component, arm, _pair_component(component, pairs, infra, (baseline, arm)), settings
+                problem,
+                component,
+                arm,
+                _pair_component(component, pairs, infra, (baseline, arm)),
+                settings,
             )
             for component in COMPONENTS
         )
@@ -507,7 +575,7 @@ def _problem_quality(
         arms=arms,
         run_ids=tuple(sorted(trial.detail.run.id for trial in trials)),
         curves=_curves(counted, arms, checkpoints, settings),
-        paired=_paired(counted, arms, baseline, infra, settings),
+        paired=_paired(problem, counted, arms, baseline, infra, settings),
         distributions=_distributions(counted, arms),
         head_to_head=_head_to_head(counted, arms, baseline, checkpoints),
         sensitivity=_sensitivity(counted, reference.detail.policy.inertia_weights),

@@ -6,7 +6,7 @@ from collections.abc import Iterable, Sequence
 
 from raidar.evaluation.analysis.curves import Band, Curve
 from raidar.evaluation.analysis.dependencies import READINGS, ReadingShare
-from raidar.evaluation.analysis.effects import Effect, Exclusions, IntervalOut
+from raidar.evaluation.analysis.effects import ArmExclusions, Effect, Exclusions, IntervalOut
 from raidar.evaluation.analysis.gate_effort import GateDescriptive
 from raidar.evaluation.analysis.manipulation import ManipulationReport
 from raidar.evaluation.analysis.ranking import Ranking, RankingRow
@@ -20,6 +20,7 @@ from raidar.scoring.catalog.outcomes import (
     PROCESS_COMPLIANCE_REF,
     VERIFIER_DISAGREEMENTS,
     VERIFIER_METRICS,
+    outcome_metric,
 )
 from raidar.scoring.framework.manifest import Direction
 from raidar.scoring.gate_effort.families import FAMILIES
@@ -78,11 +79,17 @@ def _table(header: Sequence[str], rows: Iterable[Sequence[str]]) -> list[str]:
     return [*lines, ""]
 
 
+def _arm_causes(arm: ArmExclusions) -> str:
+    causes = ", ".join(f"{cause} {n}" for cause, n in arm.causes.items())
+    return f"{arm.arm} {arm.excluded}/{arm.planned}" + (f" ({causes})" if causes else "")
+
+
 def _excluded(exclusions: Exclusions) -> str:
+    arms = "; ".join(_arm_causes(arm) for arm in exclusions.arms)
     return (
         f"{exclusions.excluded}/{exclusions.planned} (infra {exclusions.infra_error}, "
         f"ineligible {exclusions.ineligible}, unassessed {exclusions.unassessed}, "
-        f"not run {exclusions.not_run})"
+        f"not run {exclusions.not_run})" + (f"; by arm: {arms}" if arms else "")
     )
 
 
@@ -472,7 +479,28 @@ def _mcnemar(effects: Sequence[Effect]) -> list[str]:
     if not rows:
         return []
     header = ("Outcome", "Problem", "Both", "Baseline only", "Treatment only", "Neither", "Exact p")
-    return ["### Final checkpoint solved (paired 2×2, exact McNemar)", "", *_table(header, rows)]
+    return [
+        "### Outcomes declared binary (paired 2×2, exact McNemar)",
+        "",
+        *_table(header, rows),
+    ]
+
+
+def _sign_flip(effects: Sequence[Effect]) -> list[str]:
+    rows = [
+        [
+            effect.metric,
+            effect.problem,
+            str(t.informative),
+            "not computable" if t.p_value is None else _num(t.p_value),
+        ]
+        for effect in effects
+        if (t := effect.test) is not None
+    ]
+    if not rows:
+        return []
+    header = ("Outcome", "Problem", "Non-zero deltas", "Exact p")
+    return ["### Other outcomes (exact sign-flip on paired deltas)", "", *_table(header, rows)]
 
 
 def _headline_effect(label: str, effect: Effect) -> str:
@@ -508,6 +536,7 @@ def _comparison(comparison: Comparison, confidence: float) -> list[str]:
         "",
         *_table(header, (_effect_row(effect) for effect in comparison.effects)),
         *_mcnemar([e for e in comparison.effects if e.mcnemar is not None]),
+        *_sign_flip([e for e in comparison.effects if e.mcnemar is None]),
         *_manipulation(comparison.manipulation),
         *_gate_effects(comparison),
         *_process_effects(comparison),
@@ -609,13 +638,23 @@ def _settings_line(report: AnalysisReport) -> str:
     pinned = "pinned by the lock" if settings.pinned_by_lock else "not pinned by the lock"
     changed = ", ".join(settings.changed_from_defaults) or "none"
     overridden = ", ".join(settings.overridden) or "none"
+    difference = (
+        "unpinned (every comparative verdict refused)"
+        if settings.max_exclusion_difference is None
+        else f"{settings.max_exclusion_difference:.1%}"
+    )
     return (
         f"- Verdict thresholds ({settings.source}; {pinned}; overridden on the command line: "
         f"{overridden}; changed from defaults: {changed}): "
         f"min pairs {settings.min_pairs}, max excluded share "
-        f"{settings.max_exclusion_fraction:.0%}, alpha {settings.alpha}; intervals are "
-        f"paired t below {settings.bootstrap_min_pairs} pairs, bootstrap "
-        f"({settings.bootstrap_samples} resamples, seed {settings.seed}) from there"
+        f"{settings.max_exclusion_fraction:.0%}, max difference between arms' exclusion rates "
+        f"{difference}, alpha {settings.alpha}; verdicts use an exact test chosen from the "
+        "outcome type the lock declares ("
+        + ("declared" if settings.outcome_types_declared else "NOT declared: verdicts refused")
+        + "; McNemar for binary, sign-flip on paired deltas otherwise; enumeration safety limit "
+        f"{settings.exact_state_limit} partial sums); "
+        f"intervals only describe: paired t below {settings.bootstrap_min_pairs} pairs, "
+        f"bootstrap ({settings.bootstrap_samples} resamples, seed {settings.seed}) from there"
     )
 
 
@@ -695,6 +734,45 @@ def _pooling_lines(report: AnalysisReport) -> list[str]:
     return lines
 
 
+def _flagged_cases(value: object) -> str:
+    return ", ".join(str(case) for case in value) if isinstance(value, list) else MISSING
+
+
+def _determinacy_lines(report: AnalysisReport) -> list[str]:
+    rows = []
+    problems = {
+        *(report.solvable or {}),
+        *report.spec_determinacy,
+        *(effect.problem for comparison in report.comparisons for effect in comparison.effects),
+    } - {"aggregate"}
+    for problem in sorted(problems):
+        audit = report.spec_determinacy.get(problem, {})
+        assertions = audit.get("assertions", {})
+        assertions = assertions if isinstance(assertions, dict) else {}
+        audited = assertions.get("audited", 0)
+        total = assertions.get("total")
+        status = audit.get("status", "unmeasured")
+        flag_count = str(audit.get("flagged_count")) if audited else "unmeasured"
+        rows.append(
+            [
+                problem,
+                f"{audited}/{total if total is not None else 'unknown'}",
+                str(status),
+                flag_count,
+                _flagged_cases(audit.get("flagged", [])),
+            ]
+        )
+    return [
+        "",
+        "## Spec-determinacy audit beside the primary",
+        "",
+        "Syntactic assertion-site coverage is not a specification-compliance guarantee. "
+        "Flags do not change reference-solvable SCB success; zero audited is unmeasured.",
+        "",
+        *_table(("Problem", "Assertions audited / total", "Status", "Flagged", "Cases"), rows),
+    ]
+
+
 def render_markdown(report: AnalysisReport) -> str:
     metric = report.metric
     lines = [f"# Analysis: {report.experiment}", ""]
@@ -715,11 +793,14 @@ def render_markdown(report: AnalysisReport) -> str:
     lines += [
         f"- Kind: `{report.experiment_kind}`; lock: `{report.lock_sha256[:12]}`; "
         f"jobs: {', '.join(report.jobs)}",
-        f"- Primary outcome: `{report.primary_metric}` ({report.primary_source}; progression "
-        f"`{report.progression}`); baseline arm: `{report.baseline_arm}`",
+        f"- Primary outcome: `{report.primary_metric}` — "
+        f"{outcome_metric(report.primary_metric).label} "
+        f"({report.primary_source}; progression `{report.progression}`); "
+        f"baseline arm: `{report.baseline_arm}`",
         f"- Composite S: headline metric `{metric.get('ref')}` ({metric.get('selection')})",
         _settings_line(report),
     ]
+    lines.extend(_determinacy_lines(report))
     if report.replaced_trials:
         lines.append(f"- Replaced invalid trials: {', '.join(report.replaced_trials)}")
     lines.extend(_solvable_lines(report))

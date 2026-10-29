@@ -158,6 +158,14 @@ def _solvable_summary(lock: Mapping[str, Any], planned: Mapping[str, set[str]]) 
     return summary
 
 
+def _determinacy_summary(lock: Mapping[str, Any]) -> dict[str, dict[str, object]]:
+    problems = lock.get("execution", {}).get("references", {}).get("problem", {})
+    return {
+        ref: dict(entry.get("metadata", {}).get("validation", {}).get("spec_determinacy", {}))
+        for ref, entry in problems.items()
+    }
+
+
 def load_inputs(request: LoadRequest) -> tuple[AnalysisInputs, Mapping[str, Any]]:
     """The analysis inputs and the lock they were checked against."""
     if not request.job_dirs:
@@ -182,6 +190,7 @@ def load_inputs(request: LoadRequest) -> tuple[AnalysisInputs, Mapping[str, Any]
         lock_sha256=str(lock["lock_sha256"]),
         errata={ref: errata.model_dump(mode="json") for ref, errata in lock_errata(lock).items()},
         solvable=_solvable_summary(lock, _planned_by_problem(chosen)),
+        spec_determinacy=_determinacy_summary(lock),
         jobs=tuple(job.job_id for job in jobs),
         kind=str(spec.get("kind", "ab-test")),
         rank_by=spec["analysis"].get("rank_by"),

@@ -13,7 +13,8 @@ from collections.abc import Mapping
 from typing import Any
 
 from raidar.contract.canonical import digest_json
-from raidar.design.experiment.lock import LOCK_VERSION, analysis_section, seal_lock
+from raidar.design.experiment.lock import LOCK_VERSION, seal_lock
+from raidar.design.experiment.schema import analysis_section
 from raidar.scoring.framework.metrics import DEFAULT_METRIC_REGISTRY
 
 
@@ -42,7 +43,7 @@ def fixture_lock(
                     "checkpoints": [checkpoints],
                 },
             },
-            "analysis": analysis_section(spec_json),
+            "analysis": analysis_section(spec_json, {problem: checkpoints}),
             "toolchain": {},
         }
     )
