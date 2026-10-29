@@ -240,8 +240,8 @@ async def test_a_changed_snapshot_is_an_error_never_a_run(tmp_path: Path) -> Non
     ("scorers", "replay", "makes"),
     [
         (("code-quality@8",), False, True),
-        (("code-quality@8", "correctness@8"), True, False),
-        (("correctness@8", "resource-usage@7"), False, False),
+        (("code-quality@8", "correctness@9"), True, False),
+        (("correctness@9", "resource-usage@7"), False, False),
     ],
 )
 def test_rescore_makes_coverage_first_only_for_a_scorer_that_reads_it(

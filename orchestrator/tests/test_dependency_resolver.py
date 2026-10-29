@@ -218,11 +218,13 @@ def test_a_resolution_over_its_time_cap_is_infrastructure_never_cap_exceeded(
         f"print({_LOCK!r})\n",
     )
     resolver = UvResolver(uv_bin=uv, timeout_s=1.0, canary="fast==1.0")
-    with pytest.raises(DependencyInfraError, match=r"timed out in 1 attempt.*not configured"):
+    with pytest.raises(DependencyInfraError, match=r"timed out in 2 attempt.*retry bound: 1"):
         resolver(["slow"], arch="amd64", exclude_newer=CUTOFF)
 
 
-def _timing_out_run(monkeypatch: pytest.MonkeyPatch, calls: list[float]) -> UvResolver:
+def _timing_out_run(
+    monkeypatch: pytest.MonkeyPatch, calls: list[float], **kwargs: int
+) -> UvResolver:
     clock = [0.0]
 
     def run(
@@ -234,25 +236,43 @@ def _timing_out_run(monkeypatch: pytest.MonkeyPatch, calls: list[float]) -> UvRe
 
     monkeypatch.setattr(resolver_module.time, "monotonic", lambda: clock[0])
     monkeypatch.setattr(resolver_module.subprocess, "run", run)
-    return UvResolver(canary="fast==1.0", timeout_retries=2)
+    return UvResolver(canary="fast==1.0", **kwargs)
 
 
 def test_timeouts_are_retried_up_to_the_bound_then_fail_as_infrastructure(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     calls: list[float] = []
-    resolver = _timing_out_run(monkeypatch, calls)
+    resolver = _timing_out_run(monkeypatch, calls, timeout_retries=2)
     with pytest.raises(DependencyInfraError, match=r"timed out in 3 attempt.*retry bound: 2"):
         resolver(["slow"], arch="amd64", exclude_newer=CUTOFF)
     assert len(calls) == 3
     assert all(call <= resolver.timeout_s for call in calls)
 
 
-def test_a_retry_that_succeeds_records_its_attempts(tmp_path: Path) -> None:
+def test_production_resolver_makes_at_most_two_attempts_then_reports_infrastructure(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[float] = []
+    resolver = _timing_out_run(monkeypatch, calls)
+    assert UvResolver().timeout_retries == 1
+    assert UvResolver().timeout_s == 120.0
+    with pytest.raises(DependencyInfraError, match=r"timed out in 2 attempt.*120 s each"):
+        resolver(["slow"], arch="amd64", exclude_newer=CUTOFF)
+    assert len(calls) == 2
+    assert all(call <= 120.0 for call in calls)
+
+
+def test_default_resolver_recovers_from_one_timeout_with_an_identical_retry(
+    tmp_path: Path,
+) -> None:
     state = tmp_path / "state"
+    log = tmp_path / "log"
     uv = _stub_uv(
         tmp_path,
         f"import os\nflag = {str(state)!r}\n"
+        f"open({str(log)!r}, 'a').write("
+        "repr(sys.argv[1:3] + sys.argv[4:]) + repr(open(sys.argv[3]).read()) + '\\n')\n"
         "if not os.path.exists(flag):\n    open(flag, 'w').close()\n    time.sleep(30)\n"
         f"print({_LOCK!r})\n",
     )
@@ -260,12 +280,15 @@ def test_a_retry_that_succeeds_records_its_attempts(tmp_path: Path) -> None:
         uv_bin=uv,
         timeout_s=1.0,
         canary="fast==1.0",
-        timeout_retries=1,
         wheel_url_prefixes=("https://files.example/",),
     )
     result = resolver(["slow"], arch="amd64", exclude_newer=CUTOFF)
     assert result.attempts == 2
     assert not result.unprovided
+    requests = log.read_text().splitlines()
+    assert len(requests) == 2
+    assert requests[0] == requests[1]
+    assert "--exclude-newer" in requests[0]
 
 
 def test_an_unreachable_index_is_an_infrastructure_failure_never_unprovided(

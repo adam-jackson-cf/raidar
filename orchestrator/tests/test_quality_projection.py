@@ -136,7 +136,7 @@ def test_problem_row_is_the_analysis_outcome_of_the_same_assessments(
         outcome = build_outcome(record, results, policy=SCB_CANONICAL)
         rates = {
             item.subject: item.value or 0.0
-            for item in results["correctness@8"].observations
+            for item in results["correctness@9"].observations
             if item.metric == "strict_pass_rate" and item.status is AssessStatus.OK
         }
         steps = record.trial.steps
@@ -309,7 +309,7 @@ def test_assessments_are_matched_by_snapshot_content_not_trial_name(
 
     result = build_quality_projection(target / "jobs", target / "store")
     unmatched = result.run_details[f"{EXPERIMENT}.synthetic-run-2.b00-p0-baseline"]
-    assert unmatched.run.sources == {"code-quality@8": None, "correctness@8": None}
+    assert unmatched.run.sources == {"code-quality@8": None, "correctness@9": None}
     assert unmatched.rows[0].cells["V"].status == "unavailable"
     matched = result.run_details[f"{RUN_PREFIX}b00-p0-baseline"]
     assert matched.run.sources["code-quality@8"] is not None
@@ -325,7 +325,7 @@ def test_only_the_locked_exact_assessment_is_used_even_when_a_newer_one_has_the_
     store = AssessmentStore(target / "store")
     job_id = f"{RUN_PREFIX}b00-p0-baseline"
     before = build_quality_projection(target / "jobs", target / "store").run_details[job_id]
-    original = store.get(before.run.sources["correctness@8"] or "")
+    original = store.get(before.run.sources["correctness@9"] or "")
     assert original is not None
     updates: dict[str, object] = {}
     if changed == "config":
@@ -373,16 +373,16 @@ def test_only_the_locked_exact_assessment_is_used_even_when_a_newer_one_has_the_
     store.log(
         trial="b00-p0-baseline",
         key=replacement.key,
-        scorer="correctness@8",
+        scorer="correctness@9",
         outcome="added",
         stats=RunStats(duration_s=0),
     )
     after = build_quality_projection(target / "jobs", target / "store").run_details[job_id]
-    assert after.run.sources["correctness@8"] == original.key
+    assert after.run.sources["correctness@9"] == original.key
     assert after.problem["C"] == before.problem["C"]
     store.path_for(original.key).unlink()
     missing = build_quality_projection(target / "jobs", target / "store").run_details[job_id]
-    assert missing.run.sources["correctness@8"] is None
+    assert missing.run.sources["correctness@9"] is None
     assert missing.problem["C"].value is None
 
 
@@ -424,7 +424,7 @@ def test_relocking_assessment_settings_requires_the_new_exact_assessment(
     run_id = f"{RUN_PREFIX}b00-p0-baseline"
     before = build_quality_projection(target / "jobs", target / "store").run_details[run_id]
     store = AssessmentStore(target / "store")
-    original = store.get(before.run.sources["correctness@8"] or "")
+    original = store.get(before.run.sources["correctness@9"] or "")
     assert original is not None
     lock_path = target / "experiment.lock.json"
     lock = json.loads(lock_path.read_text())
@@ -434,14 +434,14 @@ def test_relocking_assessment_settings_requires_the_new_exact_assessment(
     lock = seal_lock(lock)
     lock_path.write_text(json.dumps(lock))
     unassessed = build_quality_projection(target / "jobs", target / "store").run_details[run_id]
-    assert unassessed.run.sources["correctness@8"] is None
+    assert unassessed.run.sources["correctness@9"] is None
     trial = target / "jobs" / EXPERIMENT / RUN_ID / "trials" / "b00-p0-baseline"
     exact = FixtureAssessments(lock_rescore_config(lock)).assessment(
-        "correctness@8", trial, original.result
+        "correctness@9", trial, original.result
     )
     store.put(exact)
     assessed = build_quality_projection(target / "jobs", target / "store").run_details[run_id]
-    assert assessed.run.sources["correctness@8"] == exact.key
+    assert assessed.run.sources["correctness@9"] == exact.key
 
 
 @pytest.mark.parametrize("change", ["missing", "relocked"])
@@ -762,7 +762,7 @@ def test_zero_correctness_remains_scored_when_sensitivity_components_are_unmeasu
             path.unlink()
             continue
         for observation in payload["result"]["observations"]:
-            if ref == "correctness@8" and observation["metric"] == "strict_pass_rate":
+            if ref == "correctness@9" and observation["metric"] == "strict_pass_rate":
                 observation["value"] = 0
             elif ref == "code-quality@8" and observation["metric"] == "problem_architecture":
                 observation.update(

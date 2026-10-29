@@ -17,9 +17,11 @@ from raidar.contract.trial import CheckpointState, PlannedTrial, ProgressionRule
 from raidar.design.experiment.schema import ProtocolSpec
 from raidar.engine.health.liveness import LIVENESS_REPORT, idle_killed_steps
 from raidar.engine.trial.collect import TrialContext, classify_trial, execution_validity
-from raidar.engine.trial.progression import derive_reached, progression_rule
+from raidar.engine.trial.progression import derive_reached, gate_passes, progression_rule
 from raidar.engine.trial.record import reached
-from tests.execution_support import StepOutcome, gate_rewards, write_trial
+from raidar.grading.solvable import SolvableRef
+from raidar.grading.verifier import step_rewards
+from tests.execution_support import StepOutcome, gate_rewards, verifier_grade, write_trial
 
 STEPS = tuple(f"checkpoint_{k}" for k in range(1, 9))
 HALT = progression_rule(ProtocolSpec(progression="halt_on_failure", min_reward=1.0))
@@ -184,22 +186,30 @@ def test_the_harness_check_reads_what_harbor_installed(
     assert detail in harness.detail
 
 
-def _halt_run(passes: list[bool | None], rule: ProgressionRule) -> list[StepOutcome]:
+def _executed_under_gate(outcomes: list[StepOutcome], rule: ProgressionRule) -> list[StepOutcome]:
     """What Harbor executes in halt mode: its own min_reward gate on the verifier rewards."""
     executed = []
-    for step, passed in zip(STEPS, passes, strict=True):
-        outcome = StepOutcome(
-            step,
-            passed=passed if passed is not None else False,
-            infra="sandbox_error" if passed is None else None,
-        )
+    for outcome in outcomes:
         executed.append(outcome)
-        rewards = gate_rewards(step, outcome)
         min_reward = rule.harbor_min_reward()
         assert min_reward is not None
-        if MultiStepTrial._min_reward_failure(rewards, min_reward) is not None:
+        if MultiStepTrial._min_reward_failure(gate_rewards(outcome.name, outcome), min_reward):
             break
     return executed
+
+
+def _halt_run(passes: list[bool | None], rule: ProgressionRule) -> list[StepOutcome]:
+    return _executed_under_gate(
+        [
+            StepOutcome(
+                step,
+                passed=passed if passed is not None else False,
+                infra="sandbox_error" if passed is None else None,
+            )
+            for step, passed in zip(STEPS, passes, strict=True)
+        ],
+        rule,
+    )
 
 
 @pytest.mark.parametrize(
@@ -272,13 +282,13 @@ def test_reached_is_strict_whatever_the_halt_threshold(tmp_path: Path) -> None:
 
 def test_progression_rule_maps_to_harbor_min_reward() -> None:
     assert CONTINUE.harbor_min_reward() is None
-    assert HALT.harbor_min_reward() == {"solvable_pass_rate": 1.0}
+    assert HALT.harbor_min_reward() == {"halt_gate": 1.0}
     partial = progression_rule(ProtocolSpec(progression="halt_on_failure", min_reward=0.5))
-    assert partial.harbor_min_reward() == {"solvable_pass_rate": 0.5}
+    assert partial.harbor_min_reward() == {"halt_gate": 0.5}
     rewards = [
-        {"solvable_pass_rate": 0.6},
-        {"solvable_pass_rate": 0.4},
-        {"solvable_pass_rate": 1.0},
+        {"halt_gate": 0.6},
+        {"halt_gate": 0.4},
+        {"halt_gate": 1.0},
     ]
     # The gate replay honours the rule's own threshold (what Harbor executes) ...
     assert derive_reached(rewards, partial) == (True, True, False)
@@ -313,3 +323,75 @@ def test_halt_gates_on_the_solvable_verdict_not_the_raw_grade(tmp_path: Path) ->
 def test_halt_stops_where_the_solvable_set_fails(tmp_path: Path) -> None:
     outcomes = _halt_run([True, False, True, True, True, True, True, True], HALT)
     assert [o.name for o in outcomes] == ["checkpoint_1", "checkpoint_2"]
+
+
+# Lock-pinned excluded steps (empty solvable set): metric_transform_lang checkpoint_1 and
+# mocked_http checkpoint_7 are pinned ``no_new_scoreable_tests``.
+@pytest.mark.parametrize("at", [0, 6], ids=["mtl-checkpoint_1", "mocked_http-checkpoint_7"])
+@pytest.mark.parametrize("raw_passed", [True, False], ids=["raw-pass", "raw-fail"])
+def test_a_pinned_excluded_step_runs_without_gating_and_is_reported_excluded(
+    tmp_path: Path, at: int, raw_passed: bool
+) -> None:
+    outcomes = [
+        StepOutcome(step, passed=raw_passed if k == at else True, excluded=k == at)
+        for k, step in enumerate(STEPS)
+    ]
+    rewards = gate_rewards(STEPS[at], outcomes[at])
+    # A separate gate signal, never a solvable verdict analysis could read as solved.
+    assert "solvable_pass_rate" not in rewards
+    assert rewards["solvable_excluded"] == 1.0
+    assert HALT.harbor_min_reward() == {"halt_gate": 1.0}
+    assert _executed_under_gate(outcomes, HALT) == outcomes  # Harbor's gate lets the run on
+
+    halt_run = write_trial(tmp_path / "halt", outcomes, seeded=True)
+    halted = classify_trial(halt_run, _context(tmp_path, rule=HALT))
+    expected = ["solved"] * 8
+    expected[at] = "excluded"
+    assert _states(halted) == expected  # neither solved nor failed, and every step ran
+    assert execution_validity(halt_run, halted, "0.156.1", HALT).passed
+    # The agent's workspace carries on from the excluded step.
+    snapshot = halted[at].snapshot
+    assert snapshot is not None
+    if at < 7:
+        assert halted[at + 1].parent_snapshot_digest == snapshot.digest
+    # Raw strict ``reached`` keeps the excluded step's raw verdict.
+    strict, source = reached(HALT, halted, None)
+    assert source == "executed"
+    assert strict == tuple(raw_passed or k <= at for k in range(8))
+
+    continued = classify_trial(write_trial(tmp_path / "cont", outcomes), _context(tmp_path))
+    assert _states(continued) == expected  # continue mode reports the same exclusion
+    assert reached(CONTINUE, continued, None)[0] == strict
+
+
+@pytest.mark.parametrize("failing", ["failed", "infra", "unpinned", "leaked"])
+def test_halt_still_stops_where_there_is_no_pinned_exclusion(tmp_path: Path, failing: str) -> None:
+    """Fail closed: only an explicit empty pin clears the gate; everything else halts."""
+    stop = {
+        "failed": StepOutcome(STEPS[1], passed=False),
+        "infra": StepOutcome(STEPS[1], infra="sandbox_error", excluded=True),
+        "unpinned": StepOutcome(STEPS[1]),
+        "leaked": StepOutcome(STEPS[1], leaked=True, excluded=True),
+    }[failing]
+    if failing == "unpinned":
+        grade = verifier_grade(STEPS[1], stop)
+        rewards = SolvableRef(sha256="s", steps={}).gate_rewards(STEPS[1], grade)
+        assert "halt_gate" not in rewards  # missing validation is not an exclusion
+        assert MultiStepTrial._min_reward_failure(rewards, {"halt_gate": 1.0}) is not None
+        assert not gate_passes(rewards, HALT)
+        return
+    if failing == "leaked":
+        leaked = step_rewards(gate_rewards(STEPS[1], stop), leaked=True)
+        assert MultiStepTrial._min_reward_failure(leaked, {"halt_gate": 1.0}) is not None
+        return
+    outcomes = [StepOutcome(STEPS[0], excluded=True), stop, *(StepOutcome(s) for s in STEPS[2:])]
+    executed = _executed_under_gate(outcomes, HALT)
+    assert [o.name for o in executed] == list(STEPS[:2])
+    halt_run = write_trial(tmp_path / "halt", executed)
+    halted = classify_trial(halt_run, _context(tmp_path, rule=HALT))
+    assert halted[0].checkpoint_state is CheckpointState.EXCLUDED
+    assert halted[1].checkpoint_state is (
+        CheckpointState.FAILED if failing == "failed" else CheckpointState.INFRA_ERROR
+    )
+    expected = CheckpointState.NOT_ATTEMPTED if failing == "failed" else CheckpointState.INFRA_ERROR
+    assert all(a.checkpoint_state is expected for a in halted[2:])

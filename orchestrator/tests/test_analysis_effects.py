@@ -550,6 +550,31 @@ def test_uneven_attrition_between_arms_refuses_the_verdict_and_names_arm_and_cau
     assert _effect(_run(outcomes, 11, lenient), "solve_rate").verdict is Verdict.IMPROVED
 
 
+@pytest.mark.parametrize(
+    ("bound", "verdict"),
+    [(None, Verdict.INSUFFICIENT), (0.1, Verdict.INSUFFICIENT), (0.2, Verdict.IMPROVED)],
+)
+def test_exclusion_difference_equality_passes_with_the_independent_paired_cap(
+    bound: float | None, verdict: Verdict
+) -> None:
+    outcomes = paired_arms("solve_rate", [0.0] * 10, [1.0] * 10)
+    for attempt in (0, 1):
+        outcomes[2 * attempt + 1] = trial(GUIDED, attempt, {"solve_rate": 1.0}, infra=True)
+    settings = dataclasses.replace(SETTINGS, max_exclusion_difference=bound)
+
+    effect = _effect(_run(outcomes, 10, settings), "solve_rate")
+
+    assert effect.verdict is verdict
+    assert effect.exclusions.fraction == 0.2
+    assert {arm.arm: arm.rate for arm in effect.exclusions.arms} == {
+        BASELINE: 0.0,
+        GUIDED: 0.2,
+    }
+    # A bound permitting this rate gap cannot override the independent paired cap.
+    capped = dataclasses.replace(settings, max_exclusion_difference=1.0, max_exclusion_fraction=0.1)
+    assert _effect(_run(outcomes, 10, capped), "solve_rate").verdict is Verdict.INSUFFICIENT
+
+
 def test_exclusions_are_counted_per_arm_in_the_aggregate_too() -> None:
     outcomes = paired_arms("solve_rate", [0.0] * 8, [1.0] * 8, problem="a@1")
     outcomes += paired_arms("solve_rate", [0.0] * 8, [1.0] * 8, problem="b@1")

@@ -76,14 +76,14 @@ CORRECTNESS_METRIC = "correctness"
 SOLVE_RATE = "solve_rate"
 REACHED = "reached"
 FINAL_SOLVED = "final_solved"
-# Errata-applied solve outcomes (``correctness@8`` ``*_errata`` metrics): the same rules
+# Errata-applied solve outcomes (``correctness@9`` ``*_errata`` metrics): the same rules
 # over the cases the problem's pinned errata keeps. Primary only when the experiment
 # pre-registers one (``analysis.primary_outcome``), and then always reported beside its
 # raw counterpart (``RAW_COUNTERPART``); ``not_applicable`` for a problem without an errata.
 SOLVE_RATE_ERRATA = "solve_rate_errata"
 REACHED_ERRATA = "reached_errata"
 FINAL_SOLVED_ERRATA = "final_solved_errata"
-# Solvable-set solve outcomes (``correctness@8`` ``*_solvable`` metrics): the same rules over
+# Solvable-set solve outcomes (``correctness@9`` ``*_solvable`` metrics): the same rules over
 # the cases the reference solution passes in every validation repeat. The default primary;
 # ``unavailable`` (never zero) for a problem whose lock pins no solvable set.
 SOLVE_RATE_SOLVABLE = "solve_rate_solvable"

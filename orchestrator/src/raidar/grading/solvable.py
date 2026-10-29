@@ -29,10 +29,24 @@ class SolvableRef(VerifierModel):
     steps: dict[str, tuple[str, ...]] = {}
 
     def gate_rewards(self, step: str, grade: VerifierGrade) -> dict[str, float]:
-        """Raw rewards plus the pinned solvable gate; omit it without a trustworthy verdict."""
+        """Raw rewards plus the pinned solvable and halt-gate rewards.
+
+        A trustworthy grade of a step with a non-empty set adds ``solvable_pass_rate`` and the
+        same value as ``halt_gate``. A step the lock pins with an empty set (excluded) adds
+        ``solvable_excluded`` and a clearing ``halt_gate`` but no ``solvable_pass_rate``: it is
+        neither solved nor failed, so the halt gate lets the run advance without reporting a
+        solvable verdict. A step with no pinned entry or an untrustworthy grade adds nothing,
+        so Harbor's ``min_reward`` halts on it (fail closed).
+        """
         rewards = grade.rewards()
-        rate = solvable_pass_rate(grade, self.steps.get(step, ()))
-        return rewards if rate is None else rewards | {SOLVABLE_REWARD_KEY: rate}
+        cases = self.steps.get(step)
+        if cases is None or grade.infra_failure is not None:
+            return rewards
+        if not cases:
+            return rewards | {EXCLUDED_REWARD_KEY: 1.0, HALT_GATE_REWARD_KEY: 1.0}
+        rate = solvable_pass_rate(grade, cases)
+        assert rate is not None  # a non-empty set and a trustworthy grade
+        return rewards | {SOLVABLE_REWARD_KEY: rate, HALT_GATE_REWARD_KEY: rate}
 
 
 def case_key(case: CaseResult) -> str:
@@ -57,14 +71,21 @@ def solvable_solved(grade: VerifierGrade, cases: tuple[str, ...]) -> bool | None
 
 
 SOLVABLE_REWARD_KEY = "solvable_pass_rate"
-"""The step reward a halt run gates on: the share of the step's solvable cases that passed."""
+"""The step's solvable verdict: the share of its solvable cases that passed (never for excluded)."""
+
+HALT_GATE_REWARD_KEY = "halt_gate"
+"""The step reward a halt run gates on: the solvable rate, or a clearing value for an excluded
+step. It is a gate signal, never a verdict an analysis may read as solved."""
+
+EXCLUDED_REWARD_KEY = "solvable_excluded"
+"""Present (1.0) exactly when the lock pins the step with an empty solvable set."""
 
 
 def solvable_pass_rate(grade: VerifierGrade, cases: tuple[str, ...]) -> float | None:
     """Share of the solvable cases that passed; None exactly when ``solvable_solved`` is None.
 
-    ``1.0`` is the solvable verdict "solved"; an unavailable value is omitted, never zero, so
-    Harbor's ``min_reward`` halts on a step without a verdict.
+    ``1.0`` is the solvable verdict "solved"; an unavailable value is omitted, never zero.
+    The separate ``halt_gate`` clears only an explicitly pinned exclusion.
     """
     outcomes = _solvable_passed(grade, cases)
     return None if outcomes is None else sum(outcomes) / len(outcomes)

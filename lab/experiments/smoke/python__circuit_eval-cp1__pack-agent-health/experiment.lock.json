@@ -63,11 +63,11 @@
         }
       },
       "scorer": {
-        "correctness@8": {
-          "digest": "32b40d67b210fd565a5b874abd487f6a12951b6d60b44db32c537bd4ab0fc8d1",
+        "correctness@9": {
+          "digest": "67977c94f74de9681ed8c814338b6f869a06c390a00ddfefc59d182aa322a33f",
           "metadata": {
             "implementation": "raidar.scoring.correctness:correctness_scorer",
-            "implementation_digest": "954c50f21fb22a4f3fa66cadacded0f79f473693966bb3c1b7b925724a87e10d",
+            "implementation_digest": "a7eef3f4b43dbd863293c6189dd9255cf9f9683bb1f1ed0fe7686746c250abbf",
             "manifest": {
               "description": "Reference-solvable SCB success and raw SCB verdicts per checkpoint and trajectory.",
               "evidence_required": [
@@ -261,7 +261,7 @@
                 "*"
               ],
               "tools": [],
-              "version": "8"
+              "version": "9"
             },
             "tool_lock": {}
           }
@@ -276,12 +276,12 @@
       "metric": "scb-canonical-oneshot@1",
       "scorer_config": {},
       "scorers": [
-        "correctness@8"
+        "correctness@9"
       ]
     },
     "tools": {}
   },
-  "document_sha256": "707cdd80f4a51f9d06d3e7ccef7e4135c0a88e7451c5ea37ffdc9b0235ade38b",
+  "document_sha256": "dc9747de651cd153c1c83074bb87cae4bc47f1f382c471bf6a46f12b7b7c41f2",
   "execution": {
     "arms": {
       "codex": {
@@ -498,8 +498,8 @@
   "experiment": {
     "id": "python__circuit_eval-cp1__pack-agent-health",
     "source": "experiment.yaml",
-    "source_sha256": "4e9a746f1f1d88a437a39fcd6f07d9434b9efa390b6e44a6d5d125e78271aaee",
-    "spec_sha256": "e92aa71ef6702c6f7a08156abfe3508722ec20279af184cc0301bc009c70c727"
+    "source_sha256": "08f562a5c157699d394401263363bdd1acf21aefc4bca0158d9dda0b8b6b61fa",
+    "spec_sha256": "0d4d454912c55e881d77799dcd4c331f0a04e8b22810eb690e2dcf9531c3f2bc"
   },
   "lock_sha256": "5effe92042079d2eb74b4110e51dd20da6986c63700b490699391e5e8b2ba30a",
   "lock_version": 5,
@@ -509,7 +509,7 @@
   },
   "sections": {
     "analysis": "33aede75abee4373a36e88c3e4bad96deaadffcf5db85e1efadee2a8414fd67b",
-    "assessment": "71e69b93d905ffd089575c775f29463930fa04ef2b1dce473af168f2042e0cc6",
+    "assessment": "1a03b6026846c2bcdea82d56358bedf4f0ba6dd156ed5724657e53aa469877ba",
     "execution": "5effe92042079d2eb74b4110e51dd20da6986c63700b490699391e5e8b2ba30a",
     "toolchain": "8aead72e2be8c5327134e6a09c1dc8c37b684f67819ccab4b97875b369c8e5ef"
   },
@@ -548,7 +548,7 @@
       "metric": "scb-canonical-oneshot@1",
       "scorer_config": {},
       "scorers": [
-        "correctness@8"
+        "correctness@9"
       ]
     },
     "description": "Operational health of every released agent; not citable.",

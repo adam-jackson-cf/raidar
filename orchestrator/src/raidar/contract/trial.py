@@ -32,8 +32,14 @@ class ExecutionModel(BaseModel):
 class CheckpointState(StrEnum):
     SOLVED = "solved"
     FAILED = "failed"
+    EXCLUDED = "excluded"
     NOT_ATTEMPTED = "not_attempted"
     INFRA_ERROR = "infra_error"
+
+    @property
+    def span_status(self) -> Literal["OK", "ERROR"]:
+        """Review-span status: only failed, unstarted and infrastructure steps are errors."""
+        return "OK" if self in (CheckpointState.SOLVED, CheckpointState.EXCLUDED) else "ERROR"
 
 
 class TrialHashes(ExecutionModel):

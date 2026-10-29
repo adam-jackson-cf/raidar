@@ -63,11 +63,11 @@
         }
       },
       "scorer": {
-        "correctness@8": {
-          "digest": "32b40d67b210fd565a5b874abd487f6a12951b6d60b44db32c537bd4ab0fc8d1",
+        "correctness@9": {
+          "digest": "67977c94f74de9681ed8c814338b6f869a06c390a00ddfefc59d182aa322a33f",
           "metadata": {
             "implementation": "raidar.scoring.correctness:correctness_scorer",
-            "implementation_digest": "954c50f21fb22a4f3fa66cadacded0f79f473693966bb3c1b7b925724a87e10d",
+            "implementation_digest": "a7eef3f4b43dbd863293c6189dd9255cf9f9683bb1f1ed0fe7686746c250abbf",
             "manifest": {
               "description": "Reference-solvable SCB success and raw SCB verdicts per checkpoint and trajectory.",
               "evidence_required": [
@@ -261,7 +261,7 @@
                 "*"
               ],
               "tools": [],
-              "version": "8"
+              "version": "9"
             },
             "tool_lock": {}
           }
@@ -276,12 +276,12 @@
       "metric": "scb-canonical-oneshot@1",
       "scorer_config": {},
       "scorers": [
-        "correctness@8"
+        "correctness@9"
       ]
     },
     "tools": {}
   },
-  "document_sha256": "5f4a1e50a8fb43c44aafec0b9b6abbbf6e4b07ca21aa3cb50c824797207321dd",
+  "document_sha256": "c61a0c11881705e17f98439d49e78ff97e1b86a267239e8a7f5f07e1c7c354e5",
   "execution": {
     "arms": {
       "baseline": {
@@ -498,8 +498,8 @@
   "experiment": {
     "id": "python__circuit_eval-cp1__agent-health",
     "source": "experiment.yaml",
-    "source_sha256": "e952592976f48793bfaa055126d3d6f75ca0141692341c6ad7d1b36fa82695ad",
-    "spec_sha256": "20cd4a1583d893ea7fe26b131da10fbe9e368072c975e26a1c604aedb6570146"
+    "source_sha256": "d5b43b3f61d83800e21bce84ea068a742782d9c9928a2fa4f6d0dd5154344f48",
+    "spec_sha256": "4ecb77b15575200e12b679ad39d4c8cd0bef56e7129fd846ae92f7f2f0f0718e"
   },
   "lock_sha256": "97e9fa3e0e821b8ee58aa4100283dab49074d2b524502200ed39e607bacef0f8",
   "lock_version": 5,
@@ -509,7 +509,7 @@
   },
   "sections": {
     "analysis": "a9e70f16a3d8fde7db8251be753771af765c98ad0c0b01202934c7622c4976f4",
-    "assessment": "71e69b93d905ffd089575c775f29463930fa04ef2b1dce473af168f2042e0cc6",
+    "assessment": "1a03b6026846c2bcdea82d56358bedf4f0ba6dd156ed5724657e53aa469877ba",
     "execution": "97e9fa3e0e821b8ee58aa4100283dab49074d2b524502200ed39e607bacef0f8",
     "toolchain": "8aead72e2be8c5327134e6a09c1dc8c37b684f67819ccab4b97875b369c8e5ef"
   },
@@ -548,7 +548,7 @@
       "metric": "scb-canonical-oneshot@1",
       "scorer_config": {},
       "scorers": [
-        "correctness@8"
+        "correctness@9"
       ]
     },
     "description": "Operational smoke of the experiment path; not citable.",

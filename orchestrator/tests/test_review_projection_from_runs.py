@@ -363,6 +363,31 @@ def _edit_records(run: Path, edit: Any, pattern: str = "*.json") -> None:
         path.write_text(json.dumps(record))
 
 
+def test_an_excluded_checkpoint_is_neutral_in_review_and_keeps_its_raw_diagnostic(
+    fixture_root: Path, tmp_path: Path
+) -> None:
+    run = _copy_run(fixture_root, tmp_path, "synthetic-bugfix")
+
+    def exclude_first(record: dict[str, Any]) -> None:
+        record["step_results"][0]["checkpoint_state"] = "excluded"
+        record["step_results"][0]["rewards"].update(halt_gate=1.0, solvable_excluded=1.0)
+
+    _edit_records(run, exclude_first, "gpt-5.5-medium-01.json")
+    projected = merge_review_projections(
+        job_roots=[tmp_path / "jobs"], stores=[fixture_root / "store"]
+    )
+    detail = _detail(projected, PASSING)
+    gate = _span(detail, "gate:checkpoint_1")
+    assert gate["checkpoint_state"] == "excluded"
+    assert "gate:checkpoint_1" not in detail.run.failed_gates
+    assert _span(detail, "metric:checkpoint_1")["passed"] is None
+    metric = next(item for item in detail.run.metric_scores if item["metric_id"] == "checkpoint_1")
+    assert metric["passed"] is None
+    assert metric["score"] == 1.0
+    contribution = _span(detail, "scorer:correctness@9")["metric_contributions"][0]
+    assert contribution["score"] == 1.0
+
+
 def test_unassessed_hint_names_the_lock_whose_settings_key_the_assessment(
     fixture_root: Path, tmp_path: Path
 ) -> None:
@@ -484,7 +509,7 @@ def test_following_the_unassessed_hint_stores_the_assessment_the_review_finds(
     config = job_dir / "assessment-config.yaml"
     config.write_text(
         config.read_text().replace(
-            "scorers: {}", "scorers:\n  correctness@8:\n    progression: continue"
+            "scorers: {}", "scorers:\n  correctness@9:\n    progression: continue"
         )
     )
     runs, store = tmp_path / "jobs", tmp_path / "store"
@@ -492,29 +517,29 @@ def test_following_the_unassessed_hint_stores_the_assessment_the_review_finds(
     [hint] = [
         reason
         for reason in _detail(before, PASSING).run.unscored_reasons
-        if "correctness@8" in reason and "raidar assess" in reason
+        if "correctness@9" in reason and "raidar assess" in reason
     ]
     command = hint.split("`")[1].replace("<store>", str(store)).split()
     result = CliRunner().invoke(assess, command[2:])
     assert result.exit_code == 0, result.output
     after = merge_review_projections(job_roots=[runs], stores=[store])
     scoring = _span(_detail(after, PASSING), "scoring")
-    assert "correctness@8" in scoring["assessments"]
-    assert "correctness@8" not in scoring["not_assessed"]
+    assert "correctness@9" in scoring["assessments"]
+    assert "correctness@9" not in scoring["not_assessed"]
 
 
 def test_a_headline_scorer_the_experiment_never_declared_is_named_not_unassessed() -> None:
     from raidar.evaluation.review.projection.assessments import TrialAssessments
     from raidar.evaluation.review.projection.headline import UNDECLARED_MARKER, headline
 
-    missing = TrialAssessments(missing={"correctness@8": "no stored Assessment"})
+    missing = TrialAssessments(missing={"correctness@9": "no stored Assessment"})
     one = ("checkpoint_1",)
-    result = headline("scb-canonical-oneshot@1", one, missing, declared=["correctness@8"])
+    result = headline("scb-canonical-oneshot@1", one, missing, declared=["correctness@9"])
     assert result.composite is None
     (reason,) = result.reasons
     assert UNDECLARED_MARKER in reason
     declared = headline(
-        "scb-canonical-oneshot@1", one, missing, declared=["correctness@8", "code-quality@8"]
+        "scb-canonical-oneshot@1", one, missing, declared=["correctness@9", "code-quality@8"]
     )
     assert all("unassessed" in reason for reason in declared.reasons)
 
