@@ -86,7 +86,16 @@ def _result(text: str, *, tokens: tuple[int, int, int, int], cost: float | None)
         },
     }
     if cost is not None:
+        # ``total_cost_usd`` is the CLI's own table: it must never be read.
         envelope["total_cost_usd"] = cost
+        envelope["modelUsage"] = {
+            "claude-x": {
+                "inputTokens": fresh,
+                "outputTokens": output,
+                "cacheReadInputTokens": read,
+                "cacheCreationInputTokens": written,
+            }
+        }
     return envelope
 
 
@@ -130,9 +139,38 @@ def test_a_claude_turn_is_metered_from_its_own_stream(tmp_path: Path) -> None:
         )
     )
 
-    assert _usage(first) == Tokens(18, 5, 7, 0.5)
-    assert _usage(second) == Tokens(22, 20, 5, 0.5)
+    # Priced per token from the one table (stubbed 0.01 USD per prompt+completion token),
+    # not from the self-reported total_cost_usd (0.5, 0.25).
+    first_usage, second_usage = _usage(first), _usage(second)
+    assert first_usage is not None
+    assert second_usage is not None
+    assert (first_usage.input, first_usage.cached, first_usage.output) == (18, 5, 7)
+    assert first_usage.cost_usd == pytest.approx(0.25)
+    assert (second_usage.input, second_usage.cached, second_usage.output) == (22, 20, 5)
+    assert second_usage.cost_usd == pytest.approx(0.27)  # 25 + 2 tokens
     assert _usage(tmp_path / "missing") is None
+
+
+@pytest.fixture(autouse=True)
+def _stub_price_table(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The shared table, stubbed to 0.01 USD per prompt+completion token."""
+
+    def price(model: str, *, prompt: int, completion: int, **cache: int) -> float:
+        return 0.01 * (prompt + completion)
+
+    monkeypatch.setattr("raidar.subject.agent.adapters.claude_audit.price_tokens", price)
+
+
+def test_a_model_the_table_does_not_price_makes_the_cost_unavailable(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    unpriced = "raidar.subject.agent.adapters.claude_audit.price_tokens"
+    monkeypatch.setattr(unpriced, lambda *args, **kwargs: None)
+    (tmp_path / "claude-code.txt").write_text(
+        _lines(INIT, _result("one", tokens=(10, 5, 3, 7), cost=0.5))
+    )
+
+    assert _usage(tmp_path) == Tokens(18, 5, 7, None)  # never the self-reported 0.5
 
 
 @pytest.mark.parametrize(

@@ -5,8 +5,8 @@
 
 - ``<digest>.json``: the ``StageCheckRecord`` of the passing ``done`` fixture (canary baseline);
 - ``<digest>.installed.json``: ``{arch: {tree_digest, wheels}}``, the installed tree
-  (``install/1``'s digest of ``/opt/raidar/stages/<name>/``) that install produced per container
-  architecture.
+  (``install/1``'s digest of ``/opt/raidar/stages/<ns>/<name>/``) that install produced
+  per container architecture.
 
 The lock folds in what those files say (``arm packages``): the expected installed-tree digest per
 architecture and the digest of the check record. A trial then re-installs the package, and the

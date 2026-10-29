@@ -317,6 +317,8 @@ def test_violations_map_to_validity_checks_and_nothing_else_invalidates() -> Non
             ("T1", "unmeasured"),
             ("E2", "unmeasured"),
             ("J2", "unmeasured"),
+            ("G1", "violation"),  # readings of the agent-writable hook log never invalidate
+            ("G2", "violation"),
             ("H-target", "violation"),
         )
     )
@@ -330,7 +332,7 @@ def test_violations_map_to_validity_checks_and_nothing_else_invalidates() -> Non
                 ("T3", "violation"),
                 ("L2", "violation"),
                 ("P8", "violation"),
-                ("G2", "violation"),
+                ("G3", "violation"),
                 ("E1", "violation"),
                 ("J2", "violation"),
                 ("W2", "violation"),
@@ -341,7 +343,7 @@ def test_violations_map_to_validity_checks_and_nothing_else_invalidates() -> Non
     assert "V2: V2 violation" in failed["health_verdicts"].detail
     assert "H4" in failed["health_budgets"].detail
     assert "T3" in failed["health_tamper"].detail
-    assert "G2" in failed["health_gate"].detail
+    assert "G3" in failed["health_gate"].detail
     assert "E1" in failed["health_define"].detail
     assert "J2" in failed["health_judge"].detail
     assert "W2" in failed["health_evidence"].detail

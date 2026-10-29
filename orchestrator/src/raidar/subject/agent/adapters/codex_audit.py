@@ -16,7 +16,12 @@ from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
 
-from raidar.subject.agent.protocol import digest, session_audit_record, source_record
+from raidar.subject.agent.protocol import (
+    digest,
+    session_audit_record,
+    source_record,
+    unread_json_lines,
+)
 
 HARNESS = "codex"
 STREAM_FILE = "codex.txt"
@@ -27,6 +32,46 @@ SKILLS_BLOCK = "<skills_instructions>"
 PLUGINS_BLOCK = "<recommended_plugins>"
 AGENTS_BLOCK = "# AGENTS.md instructions for "
 DIGESTED_ROLES = frozenset({"developer", "system"})
+
+
+ROW_TYPES = frozenset({"session_meta", "response_item", "event_msg", "turn_context", "compacted"})
+ITEM_TYPES = frozenset(
+    {
+        "message",
+        "reasoning",
+        "function_call",
+        "function_call_output",
+        "custom_tool_call",
+        "custom_tool_call_output",
+        "local_shell_call",
+        "web_search_call",
+    }
+)
+MESSAGE_ROLES = frozenset({"user", "assistant", "developer", "system"})
+
+
+def _understood_message(payload: dict[str, Any]) -> bool:
+    """A message whose role is known and whose every content part is text this audit reads."""
+    parts = payload.get("content")
+    return (
+        payload.get("role") in MESSAGE_ROLES
+        and isinstance(parts, list)
+        and all(isinstance(part, dict) and isinstance(part.get("text"), str) for part in parts)
+    )
+
+
+def _understood_row(row: dict[str, Any]) -> bool:
+    """A rollout row of a known type. A ``response_item`` must be a known item kind, and a
+    message must be complete (known role, text-only parts): a message variant this audit cannot
+    read could hold instructions, so it is unread, never skipped."""
+    payload = row.get("payload")
+    if row.get("type") not in ROW_TYPES or not isinstance(payload, dict):
+        return False
+    if row["type"] != "response_item":
+        return True
+    if payload.get("type") not in ITEM_TYPES:
+        return False
+    return payload["type"] != "message" or _understood_message(payload)
 
 
 def _rows(path: Path) -> Iterator[dict[str, Any]]:
@@ -77,6 +122,12 @@ def codex_session_audit(turn_dir: Path) -> dict[str, Any]:
     if not rollouts:
         unmeasured.append("no rollout recorded")
     for rollout in rollouts:
+        unread = unread_json_lines(rollout, _understood_row)
+        if unread:
+            unmeasured.append(
+                f"{unread} line(s) of the rollout {rollout.name} are not JSON objects of a "
+                "shape this audit reads: any instruction in them is unread"
+            )
         for row in _rows(rollout):
             records += 1
             version = version or _row_version(row)

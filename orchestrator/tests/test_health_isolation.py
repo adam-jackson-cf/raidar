@@ -5,7 +5,9 @@ from __future__ import annotations
 import hashlib
 import json
 import shutil
+from collections.abc import Callable
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -13,6 +15,7 @@ from raidar.engine.health.audit import audit_trial
 from raidar.engine.health.model import HealthCheck
 from raidar.engine.trial.collect import health_validity
 from raidar.subject.agent.config import Harness
+from tests.execution_support import StepOutcome
 from tests.health_support import STEP, HealthyTrial, healthy_trial, write_agent_session
 from tests.native_support import session_audit
 
@@ -57,20 +60,110 @@ def test_recommended_plugins_are_a_violation_and_invalidate_the_trial(tmp_path: 
     assert "P8" in isolation.detail
 
 
-def test_agents_lines_must_be_the_workspaces_own(tmp_path: Path) -> None:
+SECOND = "checkpoint_2"
+
+
+def second_step(tmp_path: Path, *rows: str) -> HealthyTrial:
+    """A two-step trial whose second step ran ``rows``; step one's snapshot is its start state."""
+    t = healthy_trial(tmp_path, [StepOutcome(STEP), StepOutcome(SECOND)])
+    write_agent_session(t.trial_dir, SECOND, list(rows))
+    return t
+
+
+def snapshot(t: HealthyTrial, step: str) -> Path:
+    return t.trial_dir / "steps" / step / "artifacts" / "app"
+
+
+def test_agents_lines_must_be_the_workspaces_own_before_the_turn(tmp_path: Path) -> None:
     prompt = AGENTS.format(body="be terse\n--- project-doc ---\n\nuse uv\nhost secret rule")
-    t = session(tmp_path, prompt)
-    app = t.trial_dir / "steps" / STEP / "artifacts" / "app"
-    (app / "AGENTS.md").write_text("be terse\nuse uv\n")
+    t = second_step(tmp_path, prompt)
+    (snapshot(t, STEP) / "AGENTS.md").write_text("be terse\nuse uv\n")
     found = p8(t)
     assert found.status == "violation"
     assert "host secret rule" in found.detail
-    (app / "AGENTS.override.md").write_text("host secret rule\n")
+    (snapshot(t, STEP) / "AGENTS.override.md").write_text("host secret rule\n")
     assert p8(t).status == "pass"
 
 
-def place_component(t: HealthyTrial, path: str, text: str, sha256: str | None = None) -> None:
-    agent = t.trial_dir / "steps" / STEP / "agent"
+def test_text_only_the_end_of_the_step_holds_is_not_permitted_before_its_first_turn(
+    tmp_path: Path,
+) -> None:
+    t = second_step(tmp_path, AGENTS.format(body="be terse\nlate rule"))
+    (snapshot(t, STEP) / "AGENTS.md").write_text("be terse\n")
+    (snapshot(t, SECOND) / "AGENTS.md").write_text("be terse\nlate rule\n")
+    found = p8(t)
+    assert found.status == "violation"
+    assert "late rule" in found.detail
+
+
+def test_text_written_after_a_resumed_turn_is_not_vouched_for_by_the_final_snapshot(
+    tmp_path: Path,
+) -> None:
+    """Turn 2 merged ``late rule``; the step's final snapshot holds it, but that proves no order."""
+    t = second_step(tmp_path, AGENTS.format(body="be terse\nlate rule"))
+    (snapshot(t, STEP) / "AGENTS.md").write_text("be terse\n")
+    (snapshot(t, SECOND) / "AGENTS.md").write_text("be terse\nlate rule\n")
+    flow_path = t.trial_dir / "steps" / SECOND / "agent" / "workflow" / "workflow.json"
+    flow = json.loads(flow_path.read_text())
+    first = json.loads(json.dumps(flow["turns"][0]))
+    first["session_audit"]["instructions"] = []
+    flow["turns"] = [first, {**flow["turns"][0], "turn": 2}]
+    flow_path.write_text(json.dumps(flow))
+    check = p8(t)
+    assert check.status == "unmeasured"
+    assert "resumed turn" in check.detail
+
+
+def test_the_first_step_cannot_check_unplaced_text_and_is_unmeasured(tmp_path: Path) -> None:
+    t = session(tmp_path, AGENTS.format(body="be terse"))
+    (snapshot(t, STEP) / "AGENTS.md").write_text("be terse\n")  # only the end of the step
+    check = p8(t)
+    assert check.status == "unmeasured"
+    assert "before the first step" in check.detail
+
+
+def rewrite_audits(t: HealthyTrial, change: Callable[[dict[str, Any]], None]) -> None:
+    """Apply ``change`` to every turn's recorded ``session_audit`` (as another adapter would)."""
+    for flow in t.trial_dir.rglob("workflow.json"):
+        document = json.loads(flow.read_text())
+        for turn in document["turns"]:
+            change(turn["session_audit"])
+        flow.write_text(json.dumps(document))
+
+
+def test_an_instruction_with_no_recorded_origin_is_unmeasured(tmp_path: Path) -> None:
+    t = second_step(tmp_path, AGENTS.format(body="be terse"))
+    (snapshot(t, STEP) / "AGENTS.md").write_text("be terse\n")
+    assert p8(t).status == "pass"
+
+    def forget(audit: dict[str, Any]) -> None:
+        for instruction in audit["instructions"]:
+            instruction["path"] = None
+
+    rewrite_audits(t, forget)
+    check = p8(t)
+    assert check.status == "unmeasured"
+    assert "origin" in check.detail
+
+
+def test_an_instruction_from_outside_the_workspace_is_a_violation(tmp_path: Path) -> None:
+    t = second_step(tmp_path, AGENTS.format(body="be terse"))
+    (snapshot(t, STEP) / "AGENTS.md").write_text("be terse\n")
+
+    def move(audit: dict[str, Any]) -> None:
+        for instruction in audit["instructions"]:
+            instruction["path"] = "/root/.codex"
+
+    rewrite_audits(t, move)
+    found = p8(t)
+    assert found.status == "violation"
+    assert "/root/.codex" in found.detail
+
+
+def place_component(
+    t: HealthyTrial, path: str, text: str, sha256: str | None = None, step: str = STEP
+) -> None:
+    agent = t.trial_dir / "steps" / step / "agent"
     record = agent / "workflow" / "components" / "rules.md"
     record.parent.mkdir(parents=True, exist_ok=True)
     record.write_text(text)
@@ -83,11 +176,40 @@ def place_component(t: HealthyTrial, path: str, text: str, sha256: str | None = 
 
 
 def test_a_recorded_agents_component_allows_exactly_its_own_lines(tmp_path: Path) -> None:
-    t = session(tmp_path, AGENTS.format(body="be terse\nplaced rule"))
-    (t.trial_dir / "steps" / STEP / "artifacts" / "app" / "AGENTS.md").write_text("be terse\n")
+    t = second_step(tmp_path, AGENTS.format(body="be terse\nplaced rule"))
+    (snapshot(t, STEP) / "AGENTS.md").write_text("be terse\n")
     assert p8(t).status == "violation"
+    place_component(t, "AGENTS.md", "placed rule\n", step=SECOND)
+    assert p8(t).status == "pass"
+
+
+def test_a_component_placed_in_another_file_does_not_vouch_for_this_one(tmp_path: Path) -> None:
+    t = second_step(tmp_path, AGENTS.format(body="be terse\nplaced rule"))
+    (snapshot(t, STEP) / "AGENTS.md").write_text("be terse\n")
+    place_component(t, "docs/NOTES.md", "placed rule\n", step=SECOND)
+    assert p8(t).status == "violation"
+
+
+def test_placed_text_vouches_on_the_first_step(tmp_path: Path) -> None:
+    t = session(tmp_path, AGENTS.format(body="placed rule"))
     place_component(t, "AGENTS.md", "placed rule\n")
     assert p8(t).status == "pass"
+
+
+def test_a_stage_instruction_record_is_bound_to_its_own_rules_file(tmp_path: Path) -> None:
+    t = session(tmp_path, AGENTS.format(body="the gate rule"))
+    agent = t.trial_dir / "steps" / STEP / "agent"
+    (agent / "workflow" / "records").mkdir()
+    (agent / "workflow" / "records" / "rules.md").write_text("the gate rule\n")
+    flow_path = agent / "workflow" / "workflow.json"
+    flow = json.loads(flow_path.read_text())
+    flow["instructions"] = ["workflow/records/rules.md"]
+    flow["verify"] = {"rules_record": "workflow/records/rules.md", "rules_file": "AGENTS.md"}
+    flow_path.write_text(json.dumps(flow))
+    assert p8(t).status == "pass"
+    flow["verify"]["rules_file"] = "docs/OTHER.md"
+    flow_path.write_text(json.dumps(flow))
+    assert p8(t).status == "unmeasured"  # the first step cannot check a line no file vouches for
 
 
 def test_a_component_whose_record_is_not_its_digest_is_a_violation(tmp_path: Path) -> None:
@@ -99,11 +221,11 @@ def test_a_component_whose_record_is_not_its_digest_is_a_violation(tmp_path: Pat
 
 
 def test_agents_text_without_a_stored_snapshot_is_unmeasured(tmp_path: Path) -> None:
-    t = session(tmp_path, AGENTS.format(body="be terse"))
+    t = second_step(tmp_path, AGENTS.format(body="be terse"))
     shutil.rmtree(t.trial_dir / "steps" / STEP / "artifacts")
     check = p8(t)
     assert check.status == "unmeasured"
-    assert "snapshot" in check.detail
+    assert "before the first step" in check.detail
 
 
 def test_an_instructions_message_without_a_block_is_unmeasured(tmp_path: Path) -> None:
@@ -158,19 +280,17 @@ def test_an_agent_override_runs_no_native_session_and_is_unmeasured(tmp_path: Pa
     assert "oracle" in check.detail
 
 
-@pytest.mark.parametrize(
-    ("rule", "skills", "status"),
-    [
-        ("use uv", [], "pass"),
-        ("unrecorded host rule", [], "violation"),
-        ("use uv", ["unknown-origin"], "unmeasured"),
-    ],
-)
-def test_claude_native_audit_feeds_p8(
-    tmp_path: Path, rule: str, skills: list[str], status: str
-) -> None:
-    trial = healthy_trial(tmp_path)
-    agent = trial.trial_dir / "steps" / STEP / "agent"
+def claude_trial(
+    tmp_path: Path,
+    rule: str,
+    skills: list[str],
+    *,
+    origin: str = "/app/CLAUDE.md",
+    transcript_tail: str = "",
+) -> HealthyTrial:
+    """A two-step trial whose second step ran claude; step one ended with CLAUDE.md = use uv."""
+    trial = healthy_trial(tmp_path, [StepOutcome(STEP), StepOutcome(SECOND)])
+    agent = trial.trial_dir / "steps" / SECOND / "agent"
     turn_dir = agent / "workflow" / "build-1"
     stream = {
         "type": "system",
@@ -185,11 +305,11 @@ def test_claude_native_audit_feeds_p8(
     transcript.parent.mkdir(parents=True)
     message = {
         "type": "user",
-        "message": {"content": f"Contents of /app/CLAUDE.md (project instructions):\n\n{rule}"},
+        "message": {"content": f"Contents of {origin} (project instructions):\n\n{rule}"},
     }
     system = {"type": "system", "content": "native harness instructions"}
-    transcript.write_text(json.dumps(message) + "\n" + json.dumps(system) + "\n")
-    (trial.trial_dir / "steps" / STEP / "artifacts" / "app" / "CLAUDE.md").write_text("use uv\n")
+    transcript.write_text(json.dumps(message) + "\n" + json.dumps(system) + "\n" + transcript_tail)
+    (snapshot(trial, STEP) / "CLAUDE.md").write_text("use uv\n")
     workflow = {
         "turns": [
             {
@@ -201,6 +321,21 @@ def test_claude_native_audit_feeds_p8(
         ]
     }
     (agent / "workflow" / "workflow.json").write_text(json.dumps(workflow))
+    return trial
+
+
+@pytest.mark.parametrize(
+    ("rule", "skills", "status"),
+    [
+        ("use uv", [], "pass"),
+        ("unrecorded host rule", [], "violation"),
+        ("use uv", ["unknown-origin"], "unmeasured"),
+    ],
+)
+def test_claude_native_audit_feeds_p8(
+    tmp_path: Path, rule: str, skills: list[str], status: str
+) -> None:
+    trial = claude_trial(tmp_path, rule, skills)
 
     check = p8(trial)
 
@@ -208,6 +343,107 @@ def test_claude_native_audit_feeds_p8(
     assert check.evidence["messages"]["claude-code@2.1.285"] == [
         {"role": "system", "sha256": hashlib.sha256(b"native harness instructions").hexdigest()}
     ]
+
+
+def test_claude_instructions_are_checked_against_their_own_file(tmp_path: Path) -> None:
+    """A line a different workspace file holds does not vouch for CLAUDE.md (one pooled set did)."""
+    trial = claude_trial(tmp_path, "use uv\nonly the agents file has this", [])
+    (snapshot(trial, STEP) / "AGENTS.md").write_text("only the agents file has this\n")
+    check = p8(trial)
+    assert check.status == "violation"
+    assert "only the agents file has this" in check.detail
+
+
+def test_a_claude_instruction_file_outside_the_workspace_is_a_violation(tmp_path: Path) -> None:
+    check = p8(claude_trial(tmp_path, "use uv", [], origin="/root/.claude/CLAUDE.md"))
+    assert check.status == "violation"
+    assert "/root/.claude/CLAUDE.md" in check.detail
+
+
+def test_a_transcript_line_that_is_not_parsed_leaves_p8_unmeasured(tmp_path: Path) -> None:
+    check = p8(claude_trial(tmp_path, "use uv", [], transcript_tail="{truncated\n"))
+    assert check.status == "unmeasured"
+    assert "not JSON objects" in check.detail
+
+
+@pytest.mark.parametrize(
+    "tail",
+    [
+        '{"type": "future_instruction_schema", "message": {"content": "a rule"}}\n',
+        '{"type": "user", "message": {"content": 7}}\n',
+        '{"type": "attachment", "attachment": "text"}\n',
+    ],
+)
+def test_a_claude_event_of_an_unknown_type_or_shape_leaves_p8_unmeasured(
+    tmp_path: Path, tail: str
+) -> None:
+    check = p8(claude_trial(tmp_path, "use uv", [], transcript_tail=tail))
+    assert check.status == "unmeasured"
+    assert "not JSON objects" in check.detail
+
+
+@pytest.mark.parametrize("tail", ['{"type": "future_event"}\n', "unparsed instruction text\n"])
+def test_a_malformed_claude_stream_line_leaves_p8_unmeasured(tmp_path: Path, tail: str) -> None:
+    trial = claude_trial(tmp_path, "use uv", [])
+    turn_dir = trial.trial_dir / "steps" / SECOND / "agent" / "workflow" / "build-1"
+    stream = turn_dir / "claude-code.txt"
+    stream.write_text(stream.read_text() + tail)
+    flow_path = stream.parents[1] / "workflow.json"
+    flow = json.loads(flow_path.read_text())
+    flow["turns"][0]["session_audit"] = session_audit(Harness.CLAUDE_CODE, stream.parent)
+    flow_path.write_text(json.dumps(flow))
+    check = p8(trial)
+    assert check.status == "unmeasured"
+    assert "claude stream" in check.detail
+
+
+@pytest.mark.parametrize(
+    "row",
+    [
+        {"type": "future_instruction_schema", "payload": {"text": "a rule"}},
+        {"type": "response_item", "payload": {"type": "future_item", "text": "a rule"}},
+        {
+            "type": "response_item",
+            "payload": {"type": "message", "role": "user", "content": [{"image": "x"}]},
+        },
+    ],
+)
+def test_a_rollout_row_of_an_unknown_type_or_message_variant_leaves_p8_unmeasured(
+    tmp_path: Path, row: dict[str, Any]
+) -> None:
+    trial = session(tmp_path, "solve the task")
+    agent = trial.trial_dir / "steps" / STEP / "agent"
+    rollout = next(trial.trial_dir.rglob("rollout-*.jsonl"))
+    rollout.write_text(rollout.read_text() + json.dumps(row) + "\n")
+    flow_path = agent / "workflow" / "workflow.json"
+    flow = json.loads(flow_path.read_text())
+    turn_dir = agent / "workflow" / "build-1"
+    flow["turns"][0]["session_audit"] = session_audit(Harness.CODEX_CLI, turn_dir)
+    flow_path.write_text(json.dumps(flow))
+    check = p8(trial)
+    assert check.status == "unmeasured"
+    assert "not JSON objects" in check.detail
+
+
+def test_a_valid_json_line_of_an_unsupported_shape_leaves_p8_unmeasured(tmp_path: Path) -> None:
+    check = p8(claude_trial(tmp_path, "use uv", [], transcript_tail='{"foo": "bar"}\n'))
+    assert check.status == "unmeasured"
+    assert "not JSON objects" in check.detail
+
+
+def test_a_rollout_line_that_is_not_parsed_leaves_p8_unmeasured(tmp_path: Path) -> None:
+    trial = session(tmp_path, "solve the task")
+    agent = trial.trial_dir / "steps" / STEP / "agent"
+    rollout = next(trial.trial_dir.rglob("rollout-*.jsonl"))
+    rollout.write_text(rollout.read_text() + "[1, 2]\n")
+    flow_path = agent / "workflow" / "workflow.json"
+    flow = json.loads(flow_path.read_text())
+    turn_dir = agent / "workflow" / "build-1"
+    flow["turns"][0]["session_audit"] = session_audit(Harness.CODEX_CLI, turn_dir)
+    flow_path.write_text(json.dumps(flow))
+    check = p8(trial)
+    assert check.status == "unmeasured"
+    assert "not JSON objects" in check.detail
 
 
 def test_changed_native_audit_source_invalidates_retained_evidence(tmp_path: Path) -> None:
