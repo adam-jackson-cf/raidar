@@ -56,7 +56,7 @@ from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
 
-AUDIT_VERSION = 1
+AUDIT_VERSION = 2
 TEXT_KEYWORDS = {
     "detail": "error_text_equals",
     "detail_contains": "error_text_contains",
@@ -89,6 +89,11 @@ FORMAT_TERMS = (
     "no newline",
     "indent",
     "separators",
+    "json lines",
+    "jsonl",
+    "newline-delimited json",
+    "newline delimited json",
+    "ndjson",
 )
 _MARKUP = re.compile(r"[`*_]")
 _SPACE = re.compile(r"\s+")
@@ -441,6 +446,27 @@ def scan_tests(tests_dir: Path, test_files: Sequence[str]) -> list[AuditedAssert
     for name in test_files:
         found.extend(scan_test_file(name, (tests_dir / name).read_text(), helpers))
     return found
+
+
+def assertion_coverage(
+    tests_dir: Path, test_files: Sequence[str], findings: Sequence[AuditedAssertion]
+) -> dict[str, int]:
+    """Coverage of syntactic assertion sites, not semantic specification coverage.
+
+    A site is a Python assert or an assert-prefixed helper call in a test module.
+    Multiple audited values at one site count once; helper bodies are not expanded.
+    """
+    audited = {(item.test_file, item.line, item.source) for item in findings}
+    total = 0
+    for name in test_files:
+        tree = ast.parse((tests_dir / name).read_text())
+        total += sum(
+            isinstance(node, ast.Assert)
+            or isinstance(node, ast.Call)
+            and _call_name(node).startswith("assert")
+            for node in ast.walk(tree)
+        )
+    return {"audited": len(audited), "total": total}
 
 
 # ---- classification -----------------------------------------------------------------

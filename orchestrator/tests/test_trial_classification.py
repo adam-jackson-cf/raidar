@@ -19,7 +19,7 @@ from raidar.engine.health.liveness import LIVENESS_REPORT, idle_killed_steps
 from raidar.engine.trial.collect import TrialContext, classify_trial, execution_validity
 from raidar.engine.trial.progression import derive_reached, progression_rule
 from raidar.engine.trial.record import reached
-from tests.execution_support import StepOutcome, verifier_grade, write_trial
+from tests.execution_support import StepOutcome, gate_rewards, write_trial
 
 STEPS = tuple(f"checkpoint_{k}" for k in range(1, 9))
 HALT = progression_rule(ProtocolSpec(progression="halt_on_failure", min_reward=1.0))
@@ -194,7 +194,7 @@ def _halt_run(passes: list[bool | None], rule: ProgressionRule) -> list[StepOutc
             infra="sandbox_error" if passed is None else None,
         )
         executed.append(outcome)
-        rewards = verifier_grade(step, outcome).rewards()
+        rewards = gate_rewards(step, outcome)
         min_reward = rule.harbor_min_reward()
         assert min_reward is not None
         if MultiStepTrial._min_reward_failure(rewards, min_reward) is not None:
@@ -272,16 +272,44 @@ def test_reached_is_strict_whatever_the_halt_threshold(tmp_path: Path) -> None:
 
 def test_progression_rule_maps_to_harbor_min_reward() -> None:
     assert CONTINUE.harbor_min_reward() is None
-    assert HALT.harbor_min_reward() == {"strict_pass_rate": 1.0}
+    assert HALT.harbor_min_reward() == {"solvable_pass_rate": 1.0}
     partial = progression_rule(ProtocolSpec(progression="halt_on_failure", min_reward=0.5))
-    assert partial.harbor_min_reward() == {"strict_pass_rate": 0.5}
-    rewards = [{"strict_pass_rate": 0.6}, {"strict_pass_rate": 0.4}, {"strict_pass_rate": 1.0}]
+    assert partial.harbor_min_reward() == {"solvable_pass_rate": 0.5}
+    rewards = [
+        {"solvable_pass_rate": 0.6},
+        {"solvable_pass_rate": 0.4},
+        {"solvable_pass_rate": 1.0},
+    ]
     # The gate replay honours the rule's own threshold (what Harbor executes) ...
     assert derive_reached(rewards, partial) == (True, True, False)
-    assert derive_reached(rewards, CONTINUE) == (True, False, False)
+    strict = [{"strict_pass_rate": 0.6}, {"strict_pass_rate": 0.4}, {"strict_pass_rate": 1.0}]
+    assert derive_reached(strict, CONTINUE) == (True, False, False)
     # A truncated run reaches no checkpoint past its cut, in either mode.
     assert derive_reached([{"strict_pass_rate": 1.0}] * 3, CONTINUE, runnable=2) == (
         True,
         True,
         False,
     )
+
+
+def test_halt_gates_on_the_solvable_verdict_not_the_raw_grade(tmp_path: Path) -> None:
+    """A case the reference itself fails cannot stop a trial (a raw failure the set forgives)."""
+    steps = [
+        StepOutcome(step, passed=step != "checkpoint_2", forgiven=step == "checkpoint_2")
+        for step in STEPS
+    ]
+    # Raw grade fails checkpoint_2, but its solvable set (case b only) passes: the gate holds.
+    assert gate_rewards("checkpoint_2", steps[1])["strict_pass_rate"] == 0.5
+    assert gate_rewards("checkpoint_2", steps[1])["solvable_pass_rate"] == 1.0
+    halt_run = write_trial(tmp_path / "halt", steps)
+    halted = classify_trial(halt_run, _context(tmp_path, rule=HALT))
+    assert all(a.checkpoint_state is not CheckpointState.NOT_ATTEMPTED for a in halted)
+    assert halted[1].checkpoint_state is CheckpointState.FAILED
+    assert execution_validity(halt_run, halted, "0.156.1", HALT).passed
+    # Strict ``reached`` still stops at the raw failure.
+    assert reached(HALT, halted, None)[0] == (True, True) + (False,) * 6
+
+
+def test_halt_stops_where_the_solvable_set_fails(tmp_path: Path) -> None:
+    outcomes = _halt_run([True, False, True, True, True, True, True, True], HALT)
+    assert [o.name for o in outcomes] == ["checkpoint_1", "checkpoint_2"]
