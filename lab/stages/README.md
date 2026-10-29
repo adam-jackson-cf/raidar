@@ -5,7 +5,7 @@ A stage package contributes to a checkpoint's one primary agent session. It is n
 ## Folder and names
 
 ```text
-lab/stages/[ns/]<name>/
+lab/stages/<ns>/<name>/
   stage.yaml
   prompt.md
   instructions.md                 # optional
@@ -18,7 +18,7 @@ lab/stages/[ns/]<name>/
   fixtures/<case>/expect.yaml
 ```
 
-Names are lowercase letters/digits and hyphens, starting with a letter/digit. The manifest `name` equals the folder's leaf name. An optional single namespace is part of the reference, not the leaf name. `raidar/` is reserved for reviewed upstream packages. No version appears in a file, module, class or directory name. Paths are relative to their owner, without `..`, symlinks or special files.
+Names are lowercase letters/digits and hyphens, starting with a letter/digit. A package folder is exactly two levels below `lab/stages/`: its namespace `<ns>` and its name `<name>`. A shallower package (no namespace), a deeper one and loose files are refused by `make structure-check` and the loader. The manifest `name` equals the folder's leaf name; the namespace is part of the reference, not the leaf name. `raidar/` is reserved for reviewed upstream packages (`lab/stages/raidar/<name>/`, protected by `CODEOWNERS`); imported third-party packages are committed under their own namespace. No version appears in a file, module, class or directory name. Paths are relative to their owner, without `..`, symlinks or special files.
 
 ## Strict manifest
 
@@ -54,13 +54,13 @@ skills: []
 
 `requires` maps local capability labels to supported primitive contract ids. Declaring a trigger requires its corresponding primitive; install and frame are implicit. Unsupported contracts are refused, never imported as plugins. `inputs` names earlier producers and exact contracts; forward references and missing producers are refused. An output's only keys are `path` and optional `contract`; the supported structured output contract is `criteria/1`. Output paths must be below `/app/.raidar/`, never solution files. Skills are leaf names under `skills/` and each needs `SKILL.md`.
 
-`tool.project` is exactly `tool`. Its uv project declares dependencies, not a build backend or editable project. `tool.commands` maps free command names to nonempty argv lists. Own source lives under `tool/src`; dependencies must have hash-pinned Linux Python 3.12 wheels for both supported pack architectures. Source builds, sdists, direct references and install-time downloads are refused. `stage-lock` generates `uv.lock`; ST5 verifies it is current with `uv lock --check --offline`. Root copies verified bytes and installs wheels offline under `/opt/raidar/stages/[ns/]<name>/`; it never runs authored code. Commands are on the agent's `PATH` and the installed tree and wheel inventory are recorded host-side.
+`tool.project` is exactly `tool`. Its uv project declares dependencies, not a build backend or editable project. `tool.commands` maps free command names to nonempty argv lists. Own source lives under `tool/src`; dependencies must have hash-pinned Linux Python 3.12 wheels for both supported pack architectures. Source builds, sdists, direct references and install-time downloads are refused. `stage-lock` generates `uv.lock`; ST5 verifies it is current with `uv lock --check --offline`. Root copies verified bytes and installs wheels offline under `/opt/raidar/stages/<ns>/<name>/`; it never runs authored code. Commands are on the agent's `PATH` and the installed tree and wheel inventory are recorded host-side.
 
 ### Params, tokens and frame
 
 `params` declares JSON scalar defaults. A workflow can override only declared keys, retaining their JSON type; effective params enter workflow identity. A parameter `test_timeout` supplies `%%%TEST_TIMEOUT%%%`; hyphens become underscores and names uppercase. `tokens` declares additional string tokens returned by setup/stop; names are uppercase letters, digits and underscores. Params and returned tokens cannot collide. Setup must return every declared token. Undeclared tokens and unresolved placeholders are refused. Substitution is one pass: token-looking text inside a value or task is not interpreted again.
 
-A schema-2 workflow declares `build: {prompt: ...}` and ordered `stages: [{use: '[ns/]name@N', params: {...}}]`. Build's prompt contains `%%%TASK%%%` exactly once and exactly one slot for every enabled package: leaf name uppercased with hyphens changed to underscores (for example `%%%REVIEW_NOTES%%%`). No absent-package or unknown slots are allowed. Package fragments fill their slots; task text is inserted verbatim. Package slots must not collide, including across namespaces. Instructions are joined in workflow order at the native agent's instruction placement, never over the task's own `AGENTS.md`. Disabled packages leave no sandbox files.
+A schema-2 workflow declares `build: {prompt: ...}` and ordered `stages: [{use: '<ns>/<name>@N', params: {...}}]`. Build's prompt contains `%%%TASK%%%` exactly once and exactly one slot for every enabled package: leaf name uppercased with hyphens changed to underscores (for example `%%%REVIEW_NOTES%%%`). No absent-package or unknown slots are allowed. Package fragments fill their slots; task text is inserted verbatim. Package slots must not collide, including across namespaces. Instructions are joined in workflow order at the native agent's instruction placement, never over the task's own `AGENTS.md`. Disabled packages leave no sandbox files.
 
 ### Setup, gate and stop
 
@@ -116,7 +116,7 @@ A criteria output is a strict JSON object with `contract: criteria/1` and `featu
 
 `stage-tree/1` is `digest_json({scheme: 'stage-tree/1', files: [[path, sha256, exec], ...]})`: sorted package-relative POSIX paths, exact file bytes, executable-bit boolean. Fixtures do not ship and are excluded; `.git`, `__pycache__` and `.DS_Store` are ignored. Symlinks (including in excluded fixture trees), traversal, absolute paths and special files are refused. Dependency lock bytes, prompts, skills, instructions and own tool bytes are included. Transport and checkout location are not identity.
 
-`lab/releases.yaml` has a `stages:` mapping from `[ns/]name@N` to its digest. N starts at 1. Releases are append-only against main's history; only the latest release's current bytes resolve. Older bytes live in archive tags. No release writer exists: checks print the next line to add. Bare names, paths, branches, tags and `latest` are refused. A changed package requires a new package release and dependent workflow release, then relocking.
+`lab/releases.yaml` has a `stages:` mapping from `<ns>/<name>@N` to its digest. N starts at 1. Releases are append-only against main's history; only the latest release's current bytes resolve. Older bytes live in archive tags. No release writer exists: checks print the next line to add. A stage reference requires its namespace: a bare `name@N`, paths, branches, tags and `latest` are refused when the workflow is parsed or the register is read, with no alias. Agent and workflow references keep their `name@N` form. A changed package requires a new package release and dependent workflow release, then relocking.
 
 Workflow identity folds in every package release, digest and effective params. Arm locks carry `packages` and `primitive_code` (`python-ast/1` inventories including transitive primitive imports, Harbor and native adapter code); neither field can be overridden in pooling. Trial evidence records installed-tree digests and wheels; a mismatch invalidates the trial. Prompt, tool-byte and param changes each change identity and stale locks are refused.
 
@@ -129,12 +129,12 @@ Lock refusals: **ST1** unsupported/invalid package contract; **ST2** unsupported
 Use the repository-root public interface (`env -u AGENT` is required when running from an OMP session):
 
 ```sh
-env -u AGENT make stage-new NAME=my-check FROM=docs-check  # complete tier-2 command template
-env -u AGENT make stage-lock NAME=my-check
-env -u AGENT make stage-check NAME=my-check TARGET=mbp
-env -u AGENT make stage-check NAME=my-check REPLAY=<trial> TARGET=mbp
+env -u AGENT make stage-new NAME=acme/my-check FROM=docs-check  # complete tier-2 command template
+env -u AGENT make stage-lock NAME=acme/my-check
+env -u AGENT make stage-check NAME=acme/my-check TARGET=mbp
+env -u AGENT make stage-check NAME=acme/my-check REPLAY=<trial> TARGET=mbp
 env -u AGENT make stage-list
-env -u AGENT make stage-info NAME=my-check
+env -u AGENT make stage-info NAME=acme/my-check
 env -u AGENT make workflow-new NAME=my-workflow            # FROM=one-shot-verify by default
 env -u AGENT make experiment-lock EXPERIMENT=<smoke-yaml> DRAFT=1
 ```
@@ -150,3 +150,4 @@ Not guaranteed: truthful prompts/checks or useful methods. Same-user tools can r
 ## Contract history
 
 - 2026-10-28: `stage/1`, `stage-tree/1` and `criteria/1` specified before the generic package implementation. Spike stage classes remain until the phase-5 port; they are not the author API.
+- 2026-10-29: stage references and folders require a namespace (`<ns>/<name>@N`, `lab/stages/<ns>/<name>/`, exactly two levels); upstream packages live in `lab/stages/raidar/`. `stage-new`, `stage-lock`, `stage-check` and `stage-info` take `NAME=<ns>/<name>`. Agent and workflow references are unchanged; there are no aliases.

@@ -2,13 +2,13 @@
 schema_version: 3
 kind: smoke
 id: python__forge__claude-define-spike
-description: Claude Code define-build-verify@3 mechanics on forge; not citable.
+description: Claude Code define-build-verify@4 mechanics on forge; not citable.
 problems:
   - ref: scb/forge@38d627ecf668
 runtime: python
 agents:
   - id: agent
-    release: claude-code@1
+    release: claude-code@2
     model: claude-sonnet-4-6
     reasoning: low
 protocol:
@@ -19,9 +19,9 @@ protocol:
 arms:
   - id: define
     agent: agent
-    workflow: define-build-verify@3
+    workflow: define-build-verify@4
 assessment:
-  scorers: [correctness@7, code-quality@8, resource-usage@6, process-compliance@11, definition-coverage@5, test-coverage@5]
+  scorers: [correctness@8, code-quality@8, resource-usage@7, process-compliance@11, definition-coverage@5, test-coverage@5]
   metric: scb-canonical@2
 analysis:
   baseline_arm: define

@@ -233,7 +233,7 @@ async def install_package(
 ) -> InstalledPackage:
     """Install ``files`` (the package's shipped bytes) as ``/opt/raidar/stages/<reference>``.
 
-    ``reference`` is ``[ns/]name``. Refuses (``InstallError``) a tool without a ``uv.lock``, any
+    ``reference`` is ``<ns>/<name>``. Refuses (``InstallError``) a tool without a ``uv.lock``, any
     sdist/source/direct reference or missing wheel for the container's architecture, and a
     tree that is not root-owned afterwards. A missing index with a cold wheel cache raises
     ``DependencyInfraError``; container failures raise ``calls.TransportError``.

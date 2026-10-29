@@ -1,6 +1,6 @@
 # Agent benchmark: the one-shot problem once per released agent, every arm on one workflow
 # (one-shot@1): the agent is what varies, and codex is the reference agent; analysis gives
-# paired verdicts against it plus a ranking view. Today the only agent release is codex@2
+# paired verdicts against it plus a ranking view. Today the only agent release is codex@3
 # (lab/releases.yaml), so the benchmark has one arm; add an agent and an arm when another
 # agent is released. One attempt is a smoke-sized benchmark: validate warns below 5 attempts.
 # Formerly examples/smoke/agents.experiment.yaml (id smoke-agents).
@@ -16,7 +16,7 @@ runtime: python
 
 agents:
   - id: codex
-    release: codex@2
+    release: codex@3
     model: gpt-6-luna
     reasoning: low
 
@@ -29,7 +29,7 @@ arms:
     workflow: one-shot@1
 
 assessment:
-  scorers: [correctness@7]
+  scorers: [correctness@8]
   metric: scb-canonical-oneshot@1
 
 analysis:

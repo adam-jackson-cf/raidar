@@ -46,10 +46,10 @@ def _write(root: Path, files: dict[str, bytes]) -> None:
 def test_stage_new_writes_a_command_only_package_that_meets_the_fixture_contract(
     stages: Path,
 ) -> None:
-    result = CliRunner().invoke(main, ["stage", "new", "my-check"])
+    result = CliRunner().invoke(main, ["stage", "new", "acme/my-check"])
 
     assert result.exit_code == 0, result.output
-    package = load_stage_package(stages / "my-check")
+    package = load_stage_package(stages / "acme" / "my-check")
     manifest = package.manifest
     assert static_problems(package) == []
     assert set(required_cases(package)) == {"pass", "refuse"}
@@ -60,16 +60,16 @@ def test_stage_new_writes_a_command_only_package_that_meets_the_fixture_contract
     assert manifest.tool.commands
     assert [item.path for item in package.files if item.path.startswith("tool/src")] == []
     assert not any(item.path.endswith(".py") for item in package.files)
-    assert (stages / "my-check" / "tool" / "uv.lock").is_file()
+    assert (stages / "acme" / "my-check" / "tool" / "uv.lock").is_file()
 
 
 def test_the_template_pins_one_third_party_command_and_ships_adversarial_gate_fixtures(
     stages: Path,
 ) -> None:
-    CliRunner().invoke(main, ["stage", "new", "my-check"])
-    package = load_stage_package(stages / "my-check")
+    CliRunner().invoke(main, ["stage", "new", "acme/my-check"])
+    package = load_stage_package(stages / "acme" / "my-check")
 
-    pyproject = (stages / "my-check" / "tool" / "pyproject.toml").read_text()
+    pyproject = (stages / "acme" / "my-check" / "tool" / "pyproject.toml").read_text()
     statuses = {
         case: yaml.safe_load((package.fixture_dir(case) / "expect.yaml").read_text())["status"]
         for case in package.fixture_cases()
@@ -82,17 +82,19 @@ def test_the_template_pins_one_third_party_command_and_ships_adversarial_gate_fi
     assert statuses["pass"] == "pass"
     assert statuses["refuse"] == "refuse"
     assert set(statuses.values()) == {"pass", "refuse"}
-    assert any("fixtures/" in str(path) for path in (stages / "my-check").rglob("expect.yaml"))
+    assert any(
+        "fixtures/" in str(path) for path in (stages / "acme" / "my-check").rglob("expect.yaml")
+    )
     assert all("fixtures/" not in item.path for item in package.files)
 
 
 def test_every_new_package_carries_the_same_wheels_only_lock_unchanged(stages: Path) -> None:
-    CliRunner().invoke(main, ["stage", "new", "first-check"])
+    CliRunner().invoke(main, ["stage", "new", "acme/first-check"])
     CliRunner().invoke(main, ["stage", "new", "acme/second-check"])
 
     locks = [
         (stages / name / "tool" / "uv.lock").read_bytes()
-        for name in ("first-check", "acme/second-check")
+        for name in ("acme/first-check", "acme/second-check")
     ]
 
     assert locks[0] == locks[1] == TEMPLATE_LOCK.encode()
@@ -104,18 +106,18 @@ def test_every_new_package_carries_the_same_wheels_only_lock_unchanged(stages: P
 def test_stage_new_copies_the_docs_check_template(stages: Path, template: str | None) -> None:
     extra = [] if template is None else ["--from", template]
 
-    result = CliRunner().invoke(main, ["stage", "new", "my-check", *extra])
+    result = CliRunner().invoke(main, ["stage", "new", "acme/my-check", *extra])
 
     assert result.exit_code == 0, result.output
     assert "from docs-check" in result.output
 
 
 def test_stage_new_refuses_an_unknown_template_and_writes_nothing(stages: Path) -> None:
-    result = CliRunner().invoke(main, ["stage", "new", "my-check", "--from", "nope"])
+    result = CliRunner().invoke(main, ["stage", "new", "acme/my-check", "--from", "nope"])
 
     assert result.exit_code != 0
     assert "available: docs-check" in result.output
-    assert not (stages / "my-check").exists()
+    assert not (stages / "acme" / "my-check").exists()
 
 
 def test_stage_new_supports_a_namespace_and_refuses_to_overwrite(stages: Path) -> None:
@@ -128,7 +130,7 @@ def test_stage_new_supports_a_namespace_and_refuses_to_overwrite(stages: Path) -
     assert "refusing to overwrite" in again.output
 
 
-@pytest.mark.parametrize("name", ["Bad", "-x", "a b", "a/b/c", ""])
+@pytest.mark.parametrize("name", ["Bad", "-x", "a b", "a/b/c", "", "my-check", "acme/"])
 def test_stage_new_refuses_a_bad_name(stages: Path, name: str) -> None:
     result = CliRunner().invoke(main, ["stage", "new", name])
 
@@ -136,12 +138,24 @@ def test_stage_new_refuses_a_bad_name(stages: Path, name: str) -> None:
     assert not stages.exists()
 
 
+@pytest.mark.parametrize("command", ["lock", "info", "check"])
+def test_every_package_command_refuses_a_name_without_a_namespace(
+    stages: Path, command: str
+) -> None:
+    CliRunner().invoke(main, ["stage", "new", "acme/my-check"])
+
+    result = CliRunner().invoke(main, ["stage", command, "my-check"])
+
+    assert result.exit_code != 0
+    assert "<ns>/<name>" in result.output
+
+
 @pytest.mark.parametrize("case", ["pass", "refuse"])
 def test_a_missing_mandatory_fixture_is_a_static_problem(stages: Path, case: str) -> None:
-    CliRunner().invoke(main, ["stage", "new", "my-check"])
-    shutil.rmtree(stages / "my-check" / "fixtures" / case)
+    CliRunner().invoke(main, ["stage", "new", "acme/my-check"])
+    shutil.rmtree(stages / "acme" / "my-check" / "fixtures" / case)
 
-    problems = static_problems(load_stage_package(stages / "my-check"))
+    problems = static_problems(load_stage_package(stages / "acme" / "my-check"))
 
     assert any(f"missing mandatory fixture {case!r}" in problem for problem in problems)
 
@@ -149,19 +163,21 @@ def test_a_missing_mandatory_fixture_is_a_static_problem(stages: Path, case: str
 def test_a_wrong_expected_status_for_a_mandatory_fixture_is_a_static_problem(
     stages: Path,
 ) -> None:
-    CliRunner().invoke(main, ["stage", "new", "my-check"])
-    (stages / "my-check" / "fixtures" / "refuse" / "expect.yaml").write_text("status: pass\n")
+    CliRunner().invoke(main, ["stage", "new", "acme/my-check"])
+    expect = stages / "acme" / "my-check" / "fixtures" / "refuse" / "expect.yaml"
+    expect.write_text("status: pass\n")
 
-    problems = static_problems(load_stage_package(stages / "my-check"))
+    problems = static_problems(load_stage_package(stages / "acme" / "my-check"))
 
     assert any("'refuse' must expect status 'refuse'" in problem for problem in problems)
 
 
 def test_a_stop_result_fixture_needs_a_stop(stages: Path) -> None:
-    CliRunner().invoke(main, ["stage", "new", "my-check"])
-    (stages / "my-check" / "fixtures" / "binary-file" / "expect.yaml").write_text("status: done\n")
+    CliRunner().invoke(main, ["stage", "new", "acme/my-check"])
+    expect = stages / "acme" / "my-check" / "fixtures" / "binary-file" / "expect.yaml"
+    expect.write_text("status: done\n")
 
-    problems = static_problems(load_stage_package(stages / "my-check"))
+    problems = static_problems(load_stage_package(stages / "acme" / "my-check"))
 
     assert any("expects a stop result but the package has no stop" in item for item in problems)
 
@@ -170,18 +186,18 @@ def test_stage_list_and_info_show_the_package_and_its_next_register_line(
     stages: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.setattr(stage, "lock_problems", lambda root: [])
-    CliRunner().invoke(main, ["stage", "new", "my-check"])
-    package = load_stage_package(stages / "my-check")
+    CliRunner().invoke(main, ["stage", "new", "acme/my-check"])
+    package = load_stage_package(stages / "acme" / "my-check")
 
     listed = CliRunner().invoke(main, ["stage", "list"])
-    info = CliRunner().invoke(main, ["stage", "info", "my-check"])
+    info = CliRunner().invoke(main, ["stage", "info", "acme/my-check"])
 
     assert listed.exit_code == 0, listed.output
-    assert "my-check" in listed.output
+    assert "acme/my-check" in listed.output
     assert "unreleased" in listed.output
     document: dict[str, Any] = json.loads(info.output.replace("\r", ""))
     assert document["digest"] == package.digest
-    assert document["register"] == f"register stages: my-check@1: {package.digest}"
+    assert document["register"] == f"register stages: acme/my-check@1: {package.digest}"
     assert document["fixtures"] == sorted(package.fixture_cases())
 
 
@@ -215,8 +231,8 @@ def test_workflow_new_refuses_an_unknown_template(
 
 
 def test_a_lock_with_an_sdist_is_a_lock_problem(tmp_path: Path) -> None:
-    root = tmp_path / "pkg"
-    _write(root, render_template("pkg"))
+    root = tmp_path / "acme" / "pkg"
+    _write(root, render_template("acme/pkg"))
     (root / "tool" / "uv.lock").write_text(LOCK)
 
     problems = stage_lock.lock_problems(root)
@@ -228,7 +244,7 @@ def test_stage_check_never_runs_package_code_on_the_host(
     stages: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """V4: with no container, nothing at all executes."""
-    CliRunner().invoke(main, ["stage", "new", "my-check"])
+    CliRunner().invoke(main, ["stage", "new", "acme/my-check"])
     executed: list[Any] = []
 
     def forbidden(*args: Any, **kwargs: Any) -> Any:
@@ -252,7 +268,7 @@ def test_stage_check_never_runs_package_code_on_the_host(
     monkeypatch.setattr(stage_fixtures, "_pack", lambda target: ("image", "context", "pack"))
     monkeypatch.setattr(stage_check, "PackContainer", NoDocker)
 
-    result = CliRunner().invoke(main, ["stage", "check", "my-check"])
+    result = CliRunner().invoke(main, ["stage", "check", "acme/my-check"])
 
     assert result.exit_code != 0
     assert "stage-check could not complete" in result.output
@@ -262,8 +278,9 @@ def test_stage_check_never_runs_package_code_on_the_host(
 def test_stage_check_with_a_static_problem_never_creates_a_container(
     stages: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    CliRunner().invoke(main, ["stage", "new", "my-check"])
-    (stages / "my-check" / "fixtures" / "refuse" / "expect.yaml").write_text("status: pass\n")
+    CliRunner().invoke(main, ["stage", "new", "acme/my-check"])
+    expect = stages / "acme" / "my-check" / "fixtures" / "refuse" / "expect.yaml"
+    expect.write_text("status: pass\n")
     created: list[str] = []
 
     class Recording:
@@ -274,7 +291,7 @@ def test_stage_check_with_a_static_problem_never_creates_a_container(
     monkeypatch.setattr(stage_fixtures, "_pack", lambda target: ("image", "context", "pack"))
     monkeypatch.setattr(stage_check, "PackContainer", Recording)
 
-    result = CliRunner().invoke(main, ["stage", "check", "my-check"])
+    result = CliRunner().invoke(main, ["stage", "check", "acme/my-check"])
 
     assert result.exit_code != 0
     assert "must expect status" in result.output
@@ -307,7 +324,7 @@ def test_no_authoring_path_runs_package_code_on_the_host(
     stages: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """V4: new, list, info, lock (resolution only) and static checks start no host process."""
-    CliRunner().invoke(main, ["stage", "new", "my-check"])
+    CliRunner().invoke(main, ["stage", "new", "acme/my-check"])
     attempts = _tripwire(monkeypatch)
     resolved: list[Any] = []
 
@@ -318,10 +335,10 @@ def test_no_authoring_path_runs_package_code_on_the_host(
 
     monkeypatch.setattr(stage_lock, "_uv", uv)
 
-    locked = CliRunner().invoke(main, ["stage", "lock", "my-check"])
+    locked = CliRunner().invoke(main, ["stage", "lock", "acme/my-check"])
     listed = CliRunner().invoke(main, ["stage", "list"])
-    info = CliRunner().invoke(main, ["stage", "info", "my-check"])
-    package = load_stage_package(stages / "my-check")
+    info = CliRunner().invoke(main, ["stage", "info", "acme/my-check"])
+    package = load_stage_package(stages / "acme" / "my-check")
 
     assert locked.exit_code == 0, locked.output
     assert listed.exit_code == 0, listed.output
@@ -333,7 +350,7 @@ def test_no_authoring_path_runs_package_code_on_the_host(
 
 
 def test_a_replay_snapshot_without_a_recorded_context_is_refused(tmp_path: Path) -> None:
-    key = "my-check"
+    key = "acme_my-check"
     folder = tmp_path / "trial" / "stages" / key
     (folder / "stop-0-before").mkdir(parents=True)
     (folder / "stop-1-before").mkdir()
@@ -341,7 +358,9 @@ def test_a_replay_snapshot_without_a_recorded_context_is_refused(tmp_path: Path)
     captured = stage_check.captured_states(tmp_path / "trial", key)
 
     assert [item.context is not None for item in captured] == [False, True]
-    stop_package = load_stage_package(Path(__file__).parent / "fixtures" / "stages" / "note-state")
+    stop_package = load_stage_package(
+        Path(__file__).parent / "fixtures" / "stages" / "acme" / "note-state"
+    )
     refused = asyncio.run(
         stage_check.replay_trial(
             stop_package,

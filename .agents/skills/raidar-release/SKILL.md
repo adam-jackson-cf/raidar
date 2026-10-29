@@ -31,11 +31,11 @@ description: "Use when changing a released Raidar agent, workflow, stage package
 ## Stage packages
 
 - Follow `lab/stages/README.md` (`stage/1`, `stage-tree/1`, `criteria/1`).
-  Packages live at `lab/stages/[ns/]<name>/`; references are `[ns/]name@N`, never mutable paths.
-- Generate tool dependencies with `make stage-lock NAME=<name>`, never hand-edit `uv.lock`.
+  Packages live at `lab/stages/<ns>/<name>/`; references require `ns/name@N`, never mutable paths.
+- Generate tool dependencies with `make stage-lock NAME=<ns>/<name>`, never hand-edit `uv.lock`.
   ST1–ST7 refuse unsupported contracts/primitives, unavailable inputs, changed registered bytes,
   stale/non-wheel/incomplete closures, missing frame slots and colliding claims.
-- Run `make stage-check NAME=<name> TARGET=mbp`: fixtures and replay execute offline as UID 1000
+- Run `make stage-check NAME=<ns>/<name> TARGET=mbp`: fixtures and replay execute offline as UID 1000
   in the pack container, never on the host. Preserve its exact package/pack/primitive check record.
 - Add the next immutable stage release to `lab/releases.yaml` (checks print the line; no writer).
   Re-release dependent workflows and relock every affected experiment. Fixtures are excluded

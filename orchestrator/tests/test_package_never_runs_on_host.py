@@ -26,7 +26,7 @@ from tests.health_support import healthy_trial
 from tests.scorer_support import fake_registry, two_step_trial
 from tests.test_trial_health_audit import audit
 
-FIXTURE = Path(__file__).parent / "fixtures" / "stages" / "marker-tool"
+FIXTURE = Path(__file__).parent / "fixtures" / "stages" / "acme" / "marker-tool"
 MODULE = "marker_tool"
 
 
@@ -63,7 +63,7 @@ def test_static_loading_the_lock_check_and_a_containerless_check_never_import_th
     tmp_path: Path, marker: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     root = tmp_path / "stages"
-    package_root = _plant(root / "marker-tool")
+    package_root = _plant(root / "acme" / "marker-tool")
     monkeypatch.setattr(stage_package, "stages_root", lambda: root)
     monkeypatch.setattr(stage_fixtures, "_pack", lambda target: ("image", "context", "pack"))
     monkeypatch.setattr(stage_check, "PackContainer", NoDocker)
@@ -76,10 +76,10 @@ def test_static_loading_the_lock_check_and_a_containerless_check_never_import_th
 
     package = load_stage_package(package_root)
     problems = stage_lock.lock_problems(package_root)
-    locked = CliRunner().invoke(main, ["stage", "lock", "marker-tool"])
-    info = CliRunner().invoke(main, ["stage", "info", "marker-tool"])
+    locked = CliRunner().invoke(main, ["stage", "lock", "acme/marker-tool"])
+    info = CliRunner().invoke(main, ["stage", "info", "acme/marker-tool"])
     listed = CliRunner().invoke(main, ["stage", "list"])
-    checked = CliRunner().invoke(main, ["stage", "check", "marker-tool"])
+    checked = CliRunner().invoke(main, ["stage", "check", "acme/marker-tool"])
 
     assert package.name == "marker-tool"
     assert problems == [] or all("marker" not in item for item in problems)

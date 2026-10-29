@@ -19,7 +19,7 @@ class PackageSpec:
     """A resolved, installed package with effective params and its trusted check record."""
 
     reference: str
-    """The released ``[ns/]name``."""
+    """The released ``<ns>/<name>``."""
     package: StagePackage
     installed: InstalledPackage
     params: Mapping[str, Scalar]

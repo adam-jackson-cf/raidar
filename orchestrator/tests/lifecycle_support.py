@@ -39,7 +39,7 @@ from raidar.subject.primitive.canary import Canary, StageCheckRecord
 from raidar.subject.primitive.install import InstalledPackage
 from raidar.subject.primitive.site import PackageSite
 
-FIXTURES = Path(__file__).parent / "fixtures" / "stages"
+FIXTURES = Path(__file__).parent / "fixtures" / "stages" / "acme"
 NOTE_STATE = FIXTURES / "note-state"
 WATCH = "/app/.raidar/note-state"
 NOTE = f"{WATCH}/note.md"

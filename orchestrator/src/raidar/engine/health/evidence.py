@@ -36,7 +36,8 @@ W3      verify     the gate configuration file at its recorded digest; a gate re
                    and its ``gate-<n>.json`` sidecar (readable, same verdict), unless the
                    phase was cut
 W4      verify     the gate ran: ending is not ``gate_error`` (an instrument failure)
-W5      verify     the hook run log, readable, at its recorded digest
+W5      verify     the hook run log, readable, at its recorded digest; a reading: a gap is
+                   ``unmeasured``, never a violation (the agent's user writes that log)
 W6      verify     the ``setup_check`` record of ``prepare``
 W7      verify     the setup check passed (a failed one is an instrument failure)
 W8      define     the define record and its inputs file; for a ``definition_ready`` ending
@@ -44,8 +45,9 @@ W8      define     the define record and its inputs file; for a ``definition_rea
 W9      define     an ``definition_unusable`` ending carries the lab's closed-state record
 W10     judge      the baseline record file; unless cut or ``definition_unusable``: a final
                    judge pass and every raw request, response and result file of every call
-W11     workflow   any ``integrity`` finding the lab recorded (hook or session log rewritten,
-                   touched or removed), on the workflow, verify or a turn
+W11     workflow   any ``integrity`` finding the lab recorded (a session log or watched state
+                   rewritten, touched or removed), on the workflow, verify or a turn; the hook
+                   log's own findings (``hook_log_*``) are readings, listed under ``G1``
 ======  =========  ==========================================================================
 """
 
@@ -60,10 +62,10 @@ from typing import Any
 
 from raidar.contract.harbor_result import RESULT_FILE
 from raidar.engine.health.base import Audit, make_check
-from raidar.engine.health.gate import WORKFLOW_RECORD, _hook_runs
+from raidar.engine.health.gate import HOOK_LOG_PREFIX, WORKFLOW_RECORD, _hook_runs
 from raidar.engine.health.isolation import _source_findings
 from raidar.engine.health.judge import JudgeStep, _call_evidence, _closure, _undecided
-from raidar.engine.health.model import PASS, VIOLATION, HealthCheck
+from raidar.engine.health.model import PASS, UNMEASURED, VIOLATION, HealthCheck
 
 CONFIG_FILE = "config.json"
 OVERRIDES = ("oracle", "nop")
@@ -124,12 +126,15 @@ Reader = Callable[[Step], str | None]
 
 @dataclass(frozen=True)
 class Row:
-    """One evidence row: its check id, the stage that owes it and the reader that finds a gap."""
+    """One evidence row: its check id, the stage that owes it and the reader that finds a gap.
+
+    A ``reading`` row reports a gap as ``unmeasured`` and never as a violation."""
 
     id: str
     stage: str
     evidence: str
     gap: Reader
+    reading: bool = False
 
 
 def _json(path: Path) -> Any:
@@ -291,14 +296,24 @@ def _integrity_names(source: Mapping[str, Any]) -> list[str]:
     return names
 
 
-def _gap_integrity(step: Step) -> str | None:
-    """Any integrity finding the lab recorded (a rewritten hook or session log) is a violation."""
-    found: list[str] = []
-    sources = [step.workflow or {}, step.record("verify") or {}]
-    turns = (step.workflow or {}).get("turns")
+def _integrity_sources(step: Step) -> list[Mapping[str, Any]]:
+    """The workflow record, the verify record and every turn record that may carry findings."""
+    workflow = step.workflow or {}
+    turns = workflow.get("turns")
+    sources: list[Mapping[str, Any]] = [workflow, step.record("verify") or {}]
     sources += [t for t in turns if isinstance(t, dict)] if isinstance(turns, list) else []
-    for source in sources:
-        found += _integrity_names(source)
+    return sources
+
+
+def _validity_findings(source: Mapping[str, Any]) -> list[str]:
+    """Findings that invalidate: everything except readings of the agent-writable hook log."""
+    return [n for n in _integrity_names(source) if not n.startswith(HOOK_LOG_PREFIX)]
+
+
+def _gap_integrity(step: Step) -> str | None:
+    """Any integrity finding the lab recorded (a rewritten session log or watched state) is a
+    violation; findings about the agent-writable hook log are readings and do not count."""
+    found = [n for source in _integrity_sources(step) for n in _validity_findings(source)]
     return f"integrity finding(s): {', '.join(dict.fromkeys(found))}" if found else None
 
 
@@ -334,7 +349,7 @@ ROWS: tuple[Row, ...] = (
     Row("W2", "workflow", "session audit of every turn and its native source files", _gap_session),
     Row("W3", "verify", "gate configuration and per-seal records", _gap_gates),
     Row("W4", "verify", "the gate ran", _gap_gate_error),
-    Row("W5", "verify", "hook run log", _gap_hook),
+    Row("W5", "verify", "hook run log", _gap_hook, reading=True),
     Row("W6", "verify", "deterministic setup check record", _gap_setup_recorded),
     Row("W7", "verify", "the setup check passed", _gap_setup_passed),
     Row("W8", "define", "define records", _gap_define),
@@ -397,20 +412,29 @@ def _step(audit: Audit, name: str, expected: Expected) -> Step:
     return Step(name, agent, raw if isinstance(raw, dict) else None, expected)
 
 
+def _gap_report(row: Row, ruled: Sequence[Step]) -> str | None:
+    gaps = [f"{s.name}: {why}" for s in ruled if (why := row.gap(s)) is not None]
+    if not gaps:
+        return None
+    shown = "; ".join(gaps[:_SHOWN]) + (" ..." if len(gaps) > _SHOWN else "")
+    kind = "unread" if row.reading else "missing lab"
+    return f"{kind} evidence ({row.evidence}): {shown}"
+
+
 def _check(row: Row, steps: Sequence[Step], expected: Expected) -> HealthCheck:
+    gap_status = UNMEASURED if row.reading else VIOLATION
     if expected.kind == "unknown":
         return make_check(
             row.id,
-            VIOLATION,
+            gap_status,
             "applicability unknown: no readable trial configuration for a real agent run",
         )
     ruled = [s for s in steps if _applies(row, s.expected)]
     if not ruled:
         return make_check(row.id, PASS, f"not applicable: {row.stage} owes no {row.evidence}")
-    gaps = [f"{s.name}: {why}" for s in ruled if (why := row.gap(s)) is not None]
-    if gaps:
-        shown = "; ".join(gaps[:_SHOWN]) + (" ..." if len(gaps) > _SHOWN else "")
-        return make_check(row.id, VIOLATION, f"missing lab evidence ({row.evidence}): {shown}")
+    report = _gap_report(row, ruled)
+    if report is not None:
+        return make_check(row.id, gap_status, report)
     return make_check(row.id, PASS, f"{row.evidence}: present", steps=[s.name for s in ruled])
 
 

@@ -437,7 +437,7 @@ async def check_package(
     logs_dir: Path,
     cache_root: Path | None = None,
 ) -> CheckReport:
-    """Check ``package`` (``reference`` is ``[ns/]name``) offline in a throwaway pack container."""
+    """Check ``package`` (``reference`` is ``<ns>/<name>``) offline in a pack container."""
     primitives = package_primitives([package])
     report = CheckReport(reference, package.digest, pack, primitives)
     report.static = static_problems(package)

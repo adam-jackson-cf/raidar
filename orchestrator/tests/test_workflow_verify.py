@@ -16,7 +16,6 @@ import json
 import os
 import re
 import subprocess
-import sys
 import time
 from pathlib import Path, PurePosixPath
 from typing import Any
@@ -25,6 +24,7 @@ import pytest
 from harbor.models.agent.context import AgentContext
 
 from raidar.engine.health.gate import gate_family
+from raidar.engine.trial.collect import HEALTH_VALIDITY
 from raidar.subject.primitive.gate_tool import RULES_BEGIN, witness_findings
 from raidar.subject.workflow import verify
 from raidar.subject.workflow.definition import load_workflow
@@ -89,7 +89,7 @@ def run(
         environment_logs_dir=PurePosixPath(logs),
         model_name="openai/gpt-6-luna",
         inner_agent={"name": "codex"},
-        workflow="one-shot-verify@2",
+        workflow="one-shot-verify@3",
         definition=definition(fix_rounds, **lint),
     )
     asyncio.run(runner.run(TASK, LocalEnvironment(env), AgentContext()))  # type: ignore[arg-type]
@@ -387,8 +387,10 @@ def test_a_commit_made_around_the_hook_is_found_as_a_bypass(
     assert record["verify"]["ending"] == "gate_passed"  # the seal itself passes the tree
     assert hook_verdicts(tmp_path, record) == []
     checks = {c.id: c for c in gate_family([("checkpoint_1", tmp_path / "logs")])}
-    assert checks["G2"].status == "violation"
+    assert checks["G2"].status == "pass"  # a reading of the agent-writable hook log ...
+    assert "reading: " in checks["G2"].detail
     assert "no hook run passed" in checks["G2"].detail
+    assert "G2" not in {i for ids in HEALTH_VALIDITY.values() for i in ids}  # ... never validity
 
 
 def test_the_repository_configuration_the_agent_plants_is_never_run_by_the_seal(
@@ -436,7 +438,7 @@ def test_the_seal_builds_the_same_raw_tree_for_the_same_work_and_changes_nothing
     assert "calc.py" in after  # still untracked: the seal staged and committed nothing
 
 
-def test_a_rewritten_hook_log_is_a_named_integrity_violation(
+def test_a_rewritten_hook_log_is_a_named_reading_never_a_validity_finding(
     tmp_path: Path, workspace: Path, agent_env: dict[str, str]
 ) -> None:
     log = Path(verify.PATHS.hook_state) / "hook-runs.jsonl"
@@ -453,10 +455,14 @@ def test_a_rewritten_hook_log_is_a_named_integrity_violation(
     record = run(tmp_path, agent_env, [build, rewrite])
 
     names = {item["name"] for item in record["verify"]["integrity"]}
-    assert {"hook_log_rewritten", "hook_log_chain_broken"} <= names
+    assert "hook_log_rewritten" in names
+    assert "hook_log_chain_broken" not in names  # no chain: the log is the agent's own
+    checks = {c.id: c for c in gate_family([("checkpoint_1", tmp_path / "logs")])}
+    assert checks["G1"].status != "violation"
+    assert checks["G1"].evidence["hook_log_findings"]
 
 
-def test_a_deleted_hook_log_is_a_named_integrity_violation(
+def test_a_deleted_hook_log_is_a_named_reading_never_a_validity_finding(
     tmp_path: Path, workspace: Path, agent_env: dict[str, str]
 ) -> None:
     log = Path(verify.PATHS.hook_state) / "hook-runs.jsonl"
@@ -570,46 +576,29 @@ def test_a_link_planted_in_the_agents_logs_is_named_and_never_copied(
     assert not (published / "sessions" / "deep.txt").is_symlink()
 
 
-def test_a_forged_hook_request_writes_no_record_and_names_no_tree(
+def test_a_forged_hook_log_line_is_only_read_and_a_crafted_index_names_no_tree(
     tmp_path: Path, workspace: Path, agent_env: dict[str, str]
 ) -> None:
     log = Path(verify.PATHS.hook_state) / "hook-runs.jsonl"
-    forged = (
-        "import socket\n"
-        "s = socket.socket(socket.AF_UNIX)\ns.connect('b.sock')\n"
-        's.sendall(b\'{"verdict": "passed", "tree": "x"}\\n\')\n'
-        "s.shutdown(socket.SHUT_WR)\nprint(s.recv(1000).decode())\n"
-    )
-    replies: list[str] = []
-    lines: list[int] = []
+    forged = {"verdict": "passed", "tree": "x", "who": "hook", "checks": []}
 
     def build(ws: Path, prompt: str) -> None:
         write(ws, calc=CODE, test_calc=PASSING)
-        lines.append(len(log.read_text().splitlines()))
-        done = subprocess.run(
-            [sys.executable, "-c", forged],
-            cwd=verify.PATHS.run,
-            capture_output=True,
-            text=True,
-            check=True,
-        )
-        replies.append(done.stdout)
-        lines.append(len(log.read_text().splitlines()))
+        log.write_text(log.read_text() + json.dumps(forged) + "\n")  # the agent's user owns it
         env = {**agent_env, "GIT_INDEX_FILE": str(tmp_path / "crafted-index")}
         subprocess.run(["git", "add", "-A"], cwd=ws, check=True, env=agent_env)
         hook = Path(verify.PATHS.hooks) / "pre-commit"
         subprocess.run([str(hook)], cwd=ws, env=env, check=False)  # an index that is not the tree
-        lines.append(len(log.read_text().splitlines()))
 
     record = run(tmp_path, agent_env, [build])
 
-    assert "malformed request" in replies[0]
-    assert lines[:2] == [0, 0]  # the forged request left no record
-    assert lines[2] == 1  # a request that runs the decision does: the broker's own record
-    first = json.loads(log.read_text().splitlines()[0])
-    assert first["tree"] is None  # the crafted index is not the work tree that was checked
-    assert first["peer_uid"] in (os.getuid(), None)
-    assert record["verify"]["ending"] == "gate_passed"
+    forged_line, hook_line = map(json.loads, log.read_text().splitlines())
+    assert forged_line == forged  # nothing validates it, and nothing needs to
+    assert hook_line["tree"] is None  # the crafted index is not the work tree that was checked
+    assert "peer_uid" not in hook_line
+    assert "broker" not in hook_line
+    assert record["verify"]["ending"] == "gate_passed"  # the seal decides, whatever the log says
+    assert health(tmp_path)["G1"] == "unmeasured"  # the forged line holds no checked workspace
 
 
 def test_the_checks_changing_the_work_tree_are_named_and_nothing_is_put_back(

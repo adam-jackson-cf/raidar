@@ -94,6 +94,20 @@ class Checkpoint:
                 total = 0.0
         return 0.0
 
+    def expected_seconds(self, kind: str) -> float | None:
+        """How long the next turn of ``kind`` is expected to take, for a turn that must fit.
+
+        The last turn of its kind. The first rework has none, so it is expected to take as long as
+        the checkpoint's first build turn (the same agent, resumed, on the same task), never 0.
+        ``None`` means the estimate is unavailable (no first build turn recorded): the caller
+        must not schedule the turn, and no number is invented.
+        """
+        if kind == REWORK and not any(spent.kind == REWORK for spent in self.turns):
+            if not any(spent.kind == FIRST_BUILD for spent in self.turns):
+                return None
+            return self.last_seconds(FIRST_BUILD)
+        return self.last_seconds(kind)
+
 
 class Stage(ABC):
     """One enabled stage type with the workflow's settings for it (module docstring)."""

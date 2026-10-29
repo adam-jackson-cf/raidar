@@ -8,7 +8,7 @@ problems:
 runtime: python
 agents:
   - id: agent
-    release: claude-code@1
+    release: claude-code@2
     model: claude-sonnet-4-6
     reasoning: low
 protocol:
@@ -21,7 +21,7 @@ arms:
     agent: agent
     workflow: one-shot@1
 assessment:
-  scorers: [correctness@7, code-quality@8, resource-usage@6, process-compliance@11]
+  scorers: [correctness@8, code-quality@8, resource-usage@7, process-compliance@11]
   metric: scb-canonical@2
 analysis:
   baseline_arm: baseline

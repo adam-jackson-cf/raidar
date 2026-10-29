@@ -204,7 +204,7 @@ def test_this_repository_has_no_legacy_top_level_directories() -> None:
 
 def _stage_package(tmp_path: Path) -> Path:
     package = tmp_path / "lab" / "stages" / "team" / "note-state"
-    shutil.copytree(Path(__file__).parent / "fixtures" / "stages" / "note-state", package)
+    shutil.copytree(Path(__file__).parent / "fixtures" / "stages" / "acme" / "note-state", package)
     return package
 
 
@@ -221,6 +221,20 @@ def test_stage_structure_refuses_files_outside_a_declared_package(tmp_path: Path
     assert structure.stage_violations(["lab/stages/loose.py"], tmp_path) == [
         "stage file outside a declared package: lab/stages/loose.py"
     ]
+
+
+@pytest.mark.parametrize("layout", ["flat", "too-deep"], ids=["no-namespace", "three-levels"])
+def test_stage_structure_refuses_packages_that_are_not_exactly_two_levels(
+    tmp_path: Path, layout: str
+) -> None:
+    source = Path(__file__).parent / "fixtures" / "stages" / "acme" / "note-state"
+    relative = "note-state" if layout == "flat" else "team/inner/note-state"
+    shutil.copytree(source, tmp_path / "lab" / "stages" / relative)
+
+    issues = structure.stage_violations(_stage_paths(tmp_path), tmp_path)
+
+    assert issues
+    assert all(issue.startswith("stage file outside a declared package:") for issue in issues)
 
 
 @pytest.mark.parametrize("mutation", ["extra", "missing_prompt", "symlink"])

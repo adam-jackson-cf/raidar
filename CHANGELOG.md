@@ -6,6 +6,33 @@ All notable changes to this project are documented in this file.
 
 ### Features
 
+- Phase 4b A: label the primary reference-solvable SCB success; pin/report determinacy
+  flags and assertion coverage, with zero coverage unmeasured. Skip JSON reformat probes
+  when the spec fixes the format. Release `correctness@8`.
+- Phase 4b B: default to five reference repeats and retain reference/environment-scoped
+  "no variation observed in N runs" observations. Agent submissions remain single-graded.
+  Five-repeat problem revalidation is pending while `mbp` is offline.
+- Phase 4b C: pin outcome support from bound checkpoint counts; use exact McNemar or
+  sign-flip tests for verdicts, including aggregates. Intervals stay descriptive.
+  Report exclusions per arm/cause; refuse without a pre-registered material attrition
+  difference or when it is exceeded. Exact-enumeration limits refuse, never approximate.
+- Phase 4b D: pin immutable grader environment and implementation identities; runtime
+  refuses incomplete/mismatched evidence. A starter-completion canary attributes submission
+  grading crashes/timeouts in the same sandbox configuration. Bounded resolver retry support
+  records attempts; timeout exhaustion is infrastructure, never `cap-exceeded`.
+  The production retry bound awaits a decision; old records are not retroactively certified.
+- Phase 4b E: halt on the solvable verdict; bind P8 instructions to origin and provable
+  pre-turn content, leaving unsupported transcripts unmeasured. First rework estimates use
+  `first_build`; an unknown estimate refuses scheduling. Include recorded judge spend,
+  leaving sent attempts with unknown charges unavailable, and price native agent tokens
+  through the shared LiteLLM table. Narrow V3 to ledger/stored-snapshot consistency; record
+  H5's setup limit. Release `resource-usage@7`, `codex@3` and `claude-code@2`.
+- Phase 4b F: remove the root hook broker. Hook-log findings become readings; independent
+  tool/seal/session integrity remains validity. Stage references require `ns/name@N` and
+  exactly `lab/stages/<ns>/<name>/`; CODEOWNERS protects the upstream `raidar` namespace.
+  Release `one-shot-verify@3` and `define-build-verify@4`; regenerate all ten experiment locks.
+  Local no-model smoke passed; Docker security/performance checks remain pending offline.
+
 - Published the external-author `stage/1` contract at `lab/stages/README.md` before
   implementation: strict manifest, primitive call/stop/output protocols, bounded state,
   canary attribution and fixtures, `criteria/1`, stage identity, releases and author commands.
@@ -19,7 +46,7 @@ All notable changes to this project are documented in this file.
   Declared outputs retain immutable per-call snapshots, including intermediate setup/stop results
   and individual gate checks at seals and commits. Transport loss stays integrity-invalid even
   below resource floors; output absence alone does not invalidate setup, resume or closed.
-- Added the `stages:` release register, strict `[ns/]name@N` references, workflow package/param
+- Added the `stages:` release register, strict `ns/name@N` references, workflow package/param
   identity, ST1–ST7 refusals, and `packages`/`primitive_code` execution identity and pooling.
   Expected installed trees are pinned rather than trusted from a new trial's self-baseline.
   Immutable installs are measured and reused across checkpoints; terminal package prerequisites
@@ -40,7 +67,7 @@ All notable changes to this project are documented in this file.
 
 - Problem onboarding from one pinned SCB source through `problem-list`/`problem-info`,
   bulk `problem-import SOURCE=… PROBLEMS=all|a,b,c`, and target-bounded parallel
-  `problem-validate PROBLEMS=… REPEATS=3`. Generated pins require no per-problem source file.
+  `problem-validate PROBLEMS=… REPEATS=5`. Generated pins require no per-problem source file.
 - Task instructions now preserve each upstream checkpoint spec byte-for-byte except its
   two entrypoint substitutions, including canaries; pins record the grader entry command
   and `instruction_sha256` remains the rendered per-checkpoint spec hash.
