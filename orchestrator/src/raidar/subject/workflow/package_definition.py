@@ -10,8 +10,9 @@
       - {use: raidar/verify@1, params: {test_timeout: 90}}
     gate: {max_fix_rounds: 0}
 
-``use`` is a released ``[ns/]name@N`` (a bare name, ``latest``, a branch or a path is refused
-here, when the workflow is parsed). The file is the whole workflow: skills, tools and prompts
+``use`` is a released ``<ns>/<name>@N`` (a bare name, a name without a namespace, ``latest``, a
+branch or a path is refused here, when the workflow is parsed). The file is the whole workflow:
+skills, tools and prompts
 belong to the packages. The definition's own digest covers this resolved file; the workflow's
 identity (``package_workflow_digest``) also folds in each package's release, digest and effective
 params, so a package edit or a param change moves the identity of every workflow that uses it.
@@ -27,7 +28,7 @@ import yaml
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
 
 from raidar.contract.canonical import digest_json
-from raidar.contract.releases import RELEASE_PATTERN, Release
+from raidar.contract.releases import STAGE_RELEASE_PATTERN, Release
 from raidar.subject.package.manifest import ParamValue
 from raidar.subject.workflow.definition import NAME_PATTERN, TASK_TOKEN, WORKFLOW_FILE
 
@@ -46,12 +47,12 @@ class _Model(BaseModel):
 class StageUse(_Model):
     """One package the workflow runs: its release reference and its param overrides."""
 
-    use: Annotated[str, Field(pattern=RELEASE_PATTERN)]
+    use: Annotated[str, Field(pattern=STAGE_RELEASE_PATTERN)]
     params: dict[str, ParamValue] = Field(default_factory=dict)
 
     @property
     def release(self) -> Release:
-        return Release.parse(self.use)
+        return Release.parse_stage(self.use)
 
 
 class PackageBuild(_Model):

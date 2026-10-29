@@ -63,6 +63,8 @@ class StepInputs:
     trace_digest: str | None
     agent_result: Mapping[str, Any] | None
     agent_execution_s: float | None = None
+    judged: bool = False
+    """Harbor's record of the step shows a judged verify stage: its spend includes judge calls."""
 
 
 @dataclass

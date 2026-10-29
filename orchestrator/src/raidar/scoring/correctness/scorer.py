@@ -1,4 +1,4 @@
-"""``correctness@7``: oracle verdicts per checkpoint and over the trajectory (plan G1).
+"""``correctness@8``: oracle verdicts per checkpoint and over the trajectory (plan G1).
 
 Every value is read from the oracle's host-side step record
 (``raidar-oracle/steps/<step>/record.json``), never from Harbor's trial-level
@@ -40,8 +40,9 @@ its solvable set (the cases the reference solution passes in every validation re
 ``raidar.grading.solvable``) passes. The sets arrive as config ``solvable``
 (``{problem ref: SolvableRef}``, set from the lock only). A checkpoint without a pinned
 set is ``unavailable``, never zero, and so is every trajectory metric over it.
-Under ``halt_on_failure`` the stop is the raw verdict's (Harbor's gate), so
-checkpoints after it stay unattempted under errata too.
+Under ``halt_on_failure`` the pinned solvable verdict determines the stop. Raw SCB
+outcomes remain diagnostics over the executed prefix; a raw failure alone cannot
+discard later checkpoints the solvable gate allowed the agent to reach.
 """
 
 from __future__ import annotations
@@ -205,12 +206,15 @@ def reached_count(verdicts: list[bool | None]) -> int | None:
     return len(verdicts)
 
 
-def _halted_verdicts(steps: tuple[StepInputs, ...]) -> list[bool | None] | None:
+def _halted_verdicts(
+    steps: tuple[StepInputs, ...], gate: Verdict = raw_verdict
+) -> list[bool | None] | None:
     """Verdicts up to a ``halt_on_failure`` stop, or None if the stop was not a halt.
 
-    A halt stops after a checkpoint that failed the gate; later ones were never tried.
+    A halt stops after a checkpoint that failed the gate (``gate``: the verdict Harbor halted
+    on, the solvable one when the lock pins it); later ones were never tried.
     """
-    verdicts = _verdicts(steps)
+    verdicts = _verdicts(steps, gate)
     reached = [step.reached for step in steps]
     if all(reached):
         return None
@@ -219,16 +223,20 @@ def _halted_verdicts(steps: tuple[StepInputs, ...]) -> list[bool | None] | None:
 
 
 def solved_count(
-    steps: tuple[StepInputs, ...], progression: str, verdict: Verdict = raw_verdict
+    steps: tuple[StepInputs, ...],
+    progression: str,
+    verdict: Verdict = raw_verdict,
+    gate: Verdict = raw_verdict,
 ) -> int | None:
     """Solved checkpoints over the plan; None when some checkpoint's verdict is unknown.
 
-    A ``halt_on_failure`` stop is found from the raw verdicts (the gate Harbor
-    applied); ``verdict`` then decides which attempted checkpoints count as solved.
+    A ``halt_on_failure`` stop is found from the ``gate`` verdicts (the solvable verdict under a
+    pinned solvable set, never a raw failure the set forgives); ``verdict`` then decides which
+    attempted checkpoints count as solved.
     """
     attempted: tuple[StepInputs, ...] | None = steps
     if not all(step.reached for step in steps) and progression == "halt_on_failure":
-        halted = _halted_verdicts(steps)
+        halted = _halted_verdicts(steps, gate)
         attempted = steps[: len(halted)] if halted is not None else None
     counted = _verdicts(attempted, verdict) if attempted is not None else [None]
     if None in counted:
@@ -236,14 +244,14 @@ def solved_count(
     return sum(1 for solved in counted if solved)
 
 
-def solved_gap(steps: tuple[StepInputs, ...], progression: str) -> str:
+def solved_gap(steps: tuple[StepInputs, ...], progression: str, gate: Verdict = raw_verdict) -> str:
     """Why ``solved_checkpoints`` is unknown, naming a stop that looks like a halt.
 
     The scorer cannot see the gate the trial ran under; the experiment spec's
     ``protocol.progression`` must arrive as scorer config.
     """
     reason = "a planned checkpoint has no oracle verdict"
-    if progression == "continue" and _halted_verdicts(steps) is not None:
+    if progression == "continue" and _halted_verdicts(steps, gate) is not None:
         last = [step.step for step in steps if step.reached][-1]
         reason += (
             f"; the trial stopped after failed checkpoint {last}. If it ran under "
@@ -299,6 +307,12 @@ def solvable_verdict(solvable: SolvableRef) -> Verdict:
     return verdict
 
 
+def halt_gate(ctx: AssessContext, config: CorrectnessConfig) -> Verdict:
+    """The verdict a halt run stopped on: the solvable one when the lock pins this problem's."""
+    solvable = config.solvable.get(ctx.problem)
+    return solvable_verdict(solvable) if solvable is not None else raw_verdict
+
+
 def _errata_mismatch(steps: Iterable[StepInputs], errata: ErrataRef) -> str | None:
     """Why the records contradict the pinned errata (a verifier ran under another one)."""
     for step in steps:
@@ -329,6 +343,7 @@ def _applied_observations(
     applied: AppliedMetrics,
     verdict: Verdict,
     no_verdict: Callable[[StepInputs], str],
+    gate: Verdict = raw_verdict,
 ) -> list[Observation]:
     observations = []
     for step in steps:
@@ -346,8 +361,8 @@ def _applied_observations(
     observations.append(
         _trajectory(
             applied.solved_checkpoints,
-            solved_count(steps, progression, verdict),
-            solved_gap(steps, progression),
+            solved_count(steps, progression, verdict, gate),
+            solved_gap(steps, progression, gate),
         )
     )
     observations.append(
@@ -373,6 +388,7 @@ def errata_observations(ctx: AssessContext, config: CorrectnessConfig) -> list[O
         ERRATA,
         errata_verdict(errata),
         lambda step: "no oracle verdict",
+        halt_gate(ctx, config),
     )
 
 
@@ -409,8 +425,8 @@ def _skip_excluded(
     usable = tuple(step for step in steps if solvable.steps.get(step.step))
     excluded = {step.step for step in steps} - {step.step for step in usable}
     verdict = solvable_verdict(solvable)
-    solved = solved_count(usable, config.progression, verdict) if usable else None
-    reason = solved_gap(usable, config.progression) if usable else EXCLUDED_STEP_REASON
+    solved = solved_count(usable, config.progression, verdict, verdict) if usable else None
+    reason = solved_gap(usable, config.progression, verdict) if usable else EXCLUDED_STEP_REASON
     kept = _excluded_checkpoint_observations(observations, excluded)
     kept.append(_trajectory(SOLVABLE.solved_checkpoints, solved, reason))
     reached = reached_count(_verdicts(usable, verdict)) if usable else None
@@ -430,6 +446,7 @@ def solvable_observations(ctx: AssessContext, config: CorrectnessConfig) -> list
         SOLVABLE,
         solvable_verdict(solvable),
         lambda step: f"no solvable set is pinned for {ctx.problem} {step.step}",
+        solvable_verdict(solvable),
     )
     unpinned = [step.step for step in ctx.steps if step.step not in solvable.steps]
     if not unpinned:
@@ -463,8 +480,8 @@ class CorrectnessScorer:
         observations.append(
             _trajectory(
                 "solved_checkpoints",
-                solved_count(ctx.steps, config.progression),
-                solved_gap(ctx.steps, config.progression),
+                solved_count(ctx.steps, config.progression, raw_verdict, halt_gate(ctx, config)),
+                solved_gap(ctx.steps, config.progression, halt_gate(ctx, config)),
             )
         )
         observations.append(
@@ -485,5 +502,5 @@ class CorrectnessScorer:
 
 
 def correctness_scorer() -> CorrectnessScorer:
-    """Registry factory for ``correctness@7``."""
+    """Registry factory for ``correctness@8``."""
     return CorrectnessScorer()

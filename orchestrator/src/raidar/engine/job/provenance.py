@@ -13,6 +13,7 @@ from typing import Any
 
 from harbor.models.task.config import EnvironmentConfig as TaskEnvironmentConfig
 from harbor.models.trial.config import TrialConfig
+from harbor.trial.trial import Trial
 
 from raidar.contract.canonical import digest_json
 from raidar.contract.source_digest import SOURCE_DIGEST_SCHEME, python_source_digest
@@ -55,6 +56,12 @@ def runner_provenance() -> dict[str, Any]:
     }
 
 
+def setup_limit(override: float | None) -> float:
+    """The agent-setup limit a trial runs with before multipliers: the arm's override, else
+    Harbor's own default, so H5 always has a limit to measure against."""
+    return float(Trial._AGENT_SETUP_TIMEOUT_SEC if override is None else override)  # noqa: SLF001
+
+
 def effective_limits(plan: ExperimentPlan) -> dict[str, Any]:
     """The per-phase timeouts (seconds) trials run with: as configured, before multipliers."""
     defaults = TrialConfig.model_fields
@@ -71,7 +78,9 @@ def effective_limits(plan: ExperimentPlan) -> dict[str, Any]:
     arms = {arm: blueprint.agent_config for arm, blueprint in plan.arms.items()}
     return {
         "agent_s": {arm: config.override_timeout_sec for arm, config in arms.items()},
-        "agent_setup_s": {arm: config.override_setup_timeout_sec for arm, config in arms.items()},
+        "agent_setup_s": {
+            arm: setup_limit(config.override_setup_timeout_sec) for arm, config in arms.items()
+        },
         "verifier_s": verifier_timeout_s(plan.loaded.spec.protocol),
         "environment_build_s": TaskEnvironmentConfig().build_timeout_sec,
         "multipliers": multipliers,

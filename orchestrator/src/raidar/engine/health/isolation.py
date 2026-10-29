@@ -3,12 +3,21 @@
 Harness adapters parse their own records. This check knows only loaded skill roots,
 instruction text, audit completeness and versioned developer/system message digests.
 Missing native evidence is unmeasured, never a passing isolation default.
+
+Each instruction the harness merged names the file it came from, and its lines must be lines that
+file could hold *before the turn*: the previous step's stored snapshot of that file and the text
+the workflow placed there. No snapshot is retained from before a turn of the step's own, so the
+step's final snapshot never vouches for anything: the first step has none from before it, and a
+resumed turn follows turns in which the agent could have written the file, so a line the workflow
+did not place there cannot be checked and is ``unmeasured``, as is an instruction whose origin the
+harness did not record. A line another file could vouch for does not.
 """
 
 from __future__ import annotations
 
 import hashlib
 import json
+from dataclasses import dataclass, field
 from pathlib import Path, PurePosixPath
 from typing import Any
 
@@ -28,14 +37,20 @@ def _json(path: Path) -> Any:
         return None
 
 
-def _snapshot_roots(a: Audit, step: str) -> list[Path]:
-    """The stored ``/app`` snapshots of ``step`` and of the step before it, on the host."""
+def _stored_snapshot(a: Audit, step: str) -> Path | None:
+    """The stored ``/app`` snapshot of ``step`` on the host, or None."""
+    for result in a.record.step_results:
+        if result.step == step and result.snapshot is not None:
+            root = a.trial_dir / result.snapshot.path
+            return root if root.is_dir() else None
+    return None
+
+
+def _before_snapshot(a: Audit, step: str) -> Path | None:
+    """The workspace as the step began: the previous step's stored snapshot (None for the first)."""
     order = [r.step for r in a.record.step_results]
-    snapshots = {r.step: r.snapshot for r in a.record.step_results if r.snapshot is not None}
-    index = order.index(step) if step in order else None
-    names = [step] if index is None else order[max(index - 1, 0) : index + 1]
-    roots = [a.trial_dir / snapshots[n].path for n in names if n in snapshots]
-    return [root for root in roots if root.is_dir()]
+    index = order.index(step) if step in order else 0
+    return _stored_snapshot(a, order[index - 1]) if index > 0 else None
 
 
 def _file_lines(path: Path) -> set[str]:
@@ -45,18 +60,64 @@ def _file_lines(path: Path) -> set[str]:
     return {line.strip() for line in lines if line.strip()}
 
 
-def _workspace_lines(a: Audit, step: str) -> set[str] | None:
-    """Lines of the workspace's AGENTS files in the step's snapshot and its predecessor's, and
-    of the text the step's workflow placed in them (its records)."""
-    roots = _snapshot_roots(a, step)
-    if not roots:
-        return None
-    agent = a.trial_dir / "steps" / step / "agent"
-    workflow = _json(agent / WORKFLOW_FILE)
-    placed = workflow.get("instructions") if isinstance(workflow, dict) else None
-    records = [agent / path for path in placed or [] if isinstance(path, str)]
-    files = [root / name for root in roots for name in AGENTS_FILES] + records
-    return {line for path in files for line in _file_lines(path)} | _component_lines(agent)
+def _relative(path: PurePosixPath) -> bool:
+    return not path.is_absolute() and ".." not in path.parts
+
+
+def _component_placements(workflow: dict[str, Any]) -> list[tuple[PurePosixPath, Any]]:
+    components = workflow.get("components")
+    return [
+        (PurePosixPath(entry["path"]), entry["record"])
+        for entry in (components if isinstance(components, list) else [])
+        if isinstance(entry, dict)
+        and isinstance(entry.get("path"), str)
+        and isinstance(entry.get("record"), str)
+    ]
+
+
+def _instruction_placements(workflow: dict[str, Any]) -> list[tuple[PurePosixPath, Any]]:
+    instructions = workflow.get("instructions")
+    stages = [stage for stage in workflow.values() if isinstance(stage, dict)]
+    return [
+        (PurePosixPath(stage["rules_file"]), record)
+        for record in (instructions if isinstance(instructions, list) else [])
+        for stage in stages
+        if stage.get("rules_record") == record and isinstance(stage.get("rules_file"), str)
+    ]
+
+
+def _placements(agent: Path, workflow: Any) -> list[tuple[PurePosixPath, Path]]:
+    """``(workspace file, step record)`` for each text the workflow placed in the workspace.
+
+    A component names its file. A stage's instruction record is bound to the ``rules_file`` its
+    own stage record names; one with no recorded file vouches for no file.
+    """
+    if not isinstance(workflow, dict):
+        return []
+    placed = _component_placements(workflow) + _instruction_placements(workflow)
+    return [
+        (path, agent / PurePosixPath(record))
+        for path, record in placed
+        if isinstance(record, str) and _relative(path) and _relative(PurePosixPath(record))
+    ]
+
+
+@dataclass(frozen=True)
+class _PreTurn:
+    """What the workspace's instruction files could hold before one turn."""
+
+    placed: dict[PurePosixPath, set[str]] = field(default_factory=dict)
+    before: Path | None = None
+    """The step's starting workspace; None for the first step (nothing was stored before it)."""
+    resumed: bool = False
+    """A later turn of the step: no snapshot was retained from before it, and the agent may have
+    written instruction files earlier in the step, so unplaced text there cannot be checked."""
+
+    def lines(self, file: PurePosixPath) -> set[str]:
+        found = set(self.placed.get(file, ()))
+        if self.before is not None:
+            found |= _file_lines(self.before / file)
+        return found
 
 
 def _broken_components(agent: Path) -> list[tuple[PurePosixPath, str]]:
@@ -64,15 +125,13 @@ def _broken_components(agent: Path) -> list[tuple[PurePosixPath, str]]:
     path leaves the workspace."""
     workflow = _json(agent / WORKFLOW_FILE)
     entries = workflow.get("components") if isinstance(workflow, dict) else None
-    broken: list[tuple[PurePosixPath, str]] = []
-    for entry in entries if isinstance(entries, list) else []:
-        if not isinstance(entry, dict) or not isinstance(entry.get("path"), str):
-            continue
-        path = PurePosixPath(entry["path"])
-        reason = _component_fault(agent, entry, path)
-        if reason is not None:
-            broken.append((path, reason))
-    return broken
+    paths = [
+        (PurePosixPath(entry["path"]), entry)
+        for entry in (entries if isinstance(entries, list) else [])
+        if isinstance(entry, dict) and isinstance(entry.get("path"), str)
+    ]
+    faults = [(path, _component_fault(agent, entry, path)) for path, entry in paths]
+    return [(path, reason) for path, reason in faults if reason is not None]
 
 
 def _component_fault(agent: Path, entry: dict[str, object], path: PurePosixPath) -> str | None:
@@ -91,36 +150,54 @@ def _component_fault(agent: Path, entry: dict[str, object], path: PurePosixPath)
     return None
 
 
-def _component_lines(agent: Path) -> set[str]:
-    """Lines of the recorded instruction files (``AGENTS.md`` components)."""
-    workflow = _json(agent / WORKFLOW_FILE)
-    entries = workflow.get("components") if isinstance(workflow, dict) else None
-    lines: set[str] = set()
-    for entry in entries if isinstance(entries, list) else []:
-        is_file = isinstance(entry, dict) and isinstance(entry.get("path"), str)
-        if is_file and PurePosixPath(entry["path"]).name in AGENTS_FILES:
-            record = entry.get("record")
-            if isinstance(record, str):
-                lines |= _file_lines(agent / record)
-    return lines
+def _origin_files(origin: str) -> list[PurePosixPath] | None:
+    """The workspace files an instruction from ``origin`` can be made of; None if outside ``/app``.
+
+    A harness names either the file (claude) or the folder whose files it merged, with the folders
+    above it up to the workspace root (codex).
+    """
+    path = PurePosixPath(origin)
+    if not path.is_absolute() or ".." in path.parts or not path.is_relative_to(APP_SOURCE):
+        return None
+    relative = path.relative_to(APP_SOURCE)
+    if relative.name in AGENTS_FILES:
+        return [relative]
+    return [folder / name for folder in (relative, *relative.parents) for name in AGENTS_FILES]
 
 
-def _instructions(text: str, allowed: set[str] | None) -> tuple[list[str], list[str]]:
-    if allowed is None:
-        return [], ["no stored /app snapshot to read workspace instructions from"]
+def _instruction_findings(
+    instruction: dict[str, Any], pre: _PreTurn
+) -> tuple[list[str], list[str]]:
+    origin = instruction.get("path")
+    if not isinstance(origin, str) or not origin:
+        return [], ["an instruction's origin file is not recorded"]
+    files = _origin_files(origin)
+    if files is None:
+        return [f"instructions from outside the workspace: {origin}"], []
+    allowed = set().union(*(pre.lines(file) for file in files))
     foreign = [
-        line.strip() for line in text.splitlines() if line.strip() and line.strip() not in allowed
+        line.strip()
+        for line in str(instruction.get("text", "")).splitlines()
+        if line.strip() and line.strip() not in allowed
     ]
-    if not foreign:
-        return [], []
+    return _foreign_findings(origin, foreign, pre) if foreign else ([], [])
+
+
+def _foreign_findings(
+    origin: str, foreign: list[str], pre: _PreTurn
+) -> tuple[list[str], list[str]]:
+    if pre.before is None:
+        return [], [f"no workspace snapshot from before the first step to check {origin} against"]
+    if pre.resumed:
+        return [], [f"no workspace snapshot from before this resumed turn to check {origin}"]
     return [
-        f"instructions from outside the workspace: {foreign[0][:60]!r} "
+        f"instructions from outside {origin}: {foreign[0][:60]!r} "
         f"and {len(foreign) - 1} more line(s)"
     ], []
 
 
 def _audit_findings(
-    audit: dict[str, Any], allowed: set[str] | None, turn_dir: Path
+    audit: dict[str, Any], pre: _PreTurn, turn_dir: Path
 ) -> tuple[list[str], list[str]]:
     bad, missing = _source_findings(audit.get("sources") or [], turn_dir)
     bad += list(audit.get("violations") or [])
@@ -133,7 +210,7 @@ def _audit_findings(
         if not PurePosixPath(root).is_relative_to(APP_SOURCE)
     )
     for instruction in audit.get("instructions") or []:
-        found, absent = _instructions(instruction["text"], allowed)
+        found, absent = _instruction_findings(instruction, pre)
         bad += found
         missing += absent
     return bad, missing
@@ -160,7 +237,7 @@ def _source_findings(sources: list[dict[str, str]], turn_dir: Path) -> tuple[lis
 
 
 def _turn_findings(
-    agent: Path, turn: dict[str, Any], allowed: set[str] | None
+    agent: Path, turn: dict[str, Any], pre: _PreTurn
 ) -> tuple[int, list[str], list[str]]:
     audit = turn.get("session_audit")
     if not isinstance(audit, dict):
@@ -169,7 +246,7 @@ def _turn_findings(
     relative = PurePosixPath(log_dir) if isinstance(log_dir, str) else None
     if relative is None or relative.is_absolute() or ".." in relative.parts:
         return 0, [], ["no valid turn log directory"]
-    bad, missing = _audit_findings(audit, allowed, agent / str(relative))
+    bad, missing = _audit_findings(audit, pre, agent / str(relative))
     return int(audit.get("records") or 0), bad, missing
 
 
@@ -196,13 +273,17 @@ def _step_findings(
     if not isinstance(turns, list) or not turns:
         unmeasured.append(f"{step}: no readable {WORKFLOW_FILE}")
         return 0
-    allowed = _workspace_lines(a, step)
+    placed: dict[PurePosixPath, set[str]] = {}
+    for file, record in _placements(agent, workflow):
+        placed.setdefault(file, set()).update(_file_lines(record))
+    before = _before_snapshot(a, step)
     for path, why in _broken_components(agent):
         violations.setdefault(f"component {path}: {why}", f"component {path}: {why} ({step})")
     checked = 0
-    for turn in turns:
+    for index, turn in enumerate(turns):
         label = f"{step}/{turn.get('stage')}/{turn.get('turn')}"
-        records, bad, missing = _turn_findings(agent, turn, allowed)
+        pre = _PreTurn(placed, before, resumed=index > 0)
+        records, bad, missing = _turn_findings(agent, turn, pre)
         checked += records
         for finding in bad:
             violations.setdefault(finding, f"{finding} ({label})")

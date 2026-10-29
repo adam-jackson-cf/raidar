@@ -1,4 +1,4 @@
-"""resource-usage@6 behaviour: Harbor usage and timing, reconciled; unreported stays None."""
+"""resource-usage@7 behaviour: Harbor usage and timing, reconciled; unreported stays None."""
 
 from __future__ import annotations
 

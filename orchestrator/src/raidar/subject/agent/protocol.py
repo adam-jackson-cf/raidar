@@ -30,7 +30,8 @@ callers reach a native agent through ``raidar.subject.agent.native``).
 from __future__ import annotations
 
 import hashlib
-from collections.abc import Mapping
+import json
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Literal, Protocol, cast
@@ -174,6 +175,26 @@ def per_turn_accounting(
 
 def digest(text: str) -> str:
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+
+def unread_json_lines(path: Path, understood: Callable[[dict[str, Any]], bool]) -> int:
+    """Non-blank lines of a JSON-lines record that are not JSON objects the adapter understands.
+
+    ``understood`` accepts only the record shapes the adapter's parser reads. An audit that skips
+    a line (not JSON, or valid JSON in an unsupported shape such as ``{"foo": "bar"}``) never saw
+    what it held, so it reports the count as ``unmeasured``, never as a clean record.
+    """
+    unread = 0
+    for line in path.read_text(encoding="utf-8", errors="replace").splitlines():
+        if not line.strip():
+            continue
+        try:
+            record = json.loads(line)
+        except ValueError:
+            unread += 1
+            continue
+        unread += not (isinstance(record, dict) and understood(record))
+    return unread
 
 
 def source_record(turn_dir: Path, path: Path) -> dict[str, str]:

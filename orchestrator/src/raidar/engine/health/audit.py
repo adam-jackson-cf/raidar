@@ -4,8 +4,9 @@
 result can be trusted, and returns one ``HealthReport`` (``health.json``). Families:
 
 - **V** verdict integrity: ``V1`` a timed-out evaluator is never a pass; ``V2`` graded case
-  counts agree between the verifier ledger and the trial record; ``V3`` the evaluated tree
-  digest equals the step's final ``/app`` snapshot.
+  counts agree between the verifier ledger and the trial record; ``V3`` the ledger's snapshot
+  digest equals the digest of the stored ``/app`` snapshot (it does not compare against a live
+  ``/app``).
 - **H** limits and records: ``H1`` every expected record file is present; ``H3`` effective
   limits are recorded; ``H4``-``H6`` agent, agent-setup and verifier wall times stay within
   them; ``H-target`` the Docker target stayed reachable (step 1's ``target_reachable``).
@@ -18,8 +19,9 @@ result can be trusted, and returns one ``HealthReport`` (``health.json``). Famil
 - **T** tamper: ``T1`` the tool tree is unchanged since the first hash; ``T2`` the records
   manifest verifies; ``T3`` the reaper left no residual process.
 - **G** the verify gate, only when the workflow records show a verify stage
-  (``raidar.engine.health.gate``): ``G1`` the hook's records agree with the seals'; ``G2`` no
-  bypass; ``G3`` the gate's tools unchanged.
+  (``raidar.engine.health.gate``): ``G1`` the hook's records agree with the seals' and ``G2`` no
+  bypass are readings of the agent-writable hook log, never validity; ``G3`` the gate's tools
+  unchanged is a validity check.
 - **E** the define stage, only when the workflow records show one
   (``raidar.engine.health.definition``): ``E1`` every gate-passed checkpoint holds a sealed,
   passing definition; ``E2`` the recorded ``define`` calls agree with the final draft; ``E3`` an
@@ -130,7 +132,7 @@ def _digest_findings(a: Audit, step: StepResult, ledger: StepRecord) -> tuple[st
     """(mismatch, verified): ``verified`` is False when the stored tree is not there to hash."""
     digest = ledger.snapshot.digest
     if step.snapshot is None or step.snapshot.digest != digest:
-        return f"{step.step}: record snapshot differs from the ledger's evaluated digest", True
+        return f"{step.step}: record snapshot differs from the ledger's snapshot digest", True
     stored = a.trial_dir / ledger.snapshot.stored_path
     if not stored.is_dir():
         return None, False
@@ -145,7 +147,7 @@ def _v3_complete(results: list[tuple[StepResult, str | None, bool]]) -> HealthCh
     if unchecked:
         detail = f"stored /app snapshot not on the host for {unchecked}"
         return make_check("V3", UNMEASURED, detail, steps=unchecked)
-    detail = f"evaluated digest equals the stored /app snapshot for {len(results)} step(s)"
+    detail = f"ledger snapshot digest equals the stored /app snapshot for {len(results)} step(s)"
     return make_check("V3", PASS, detail)
 
 
