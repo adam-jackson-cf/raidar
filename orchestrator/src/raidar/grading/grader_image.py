@@ -27,6 +27,7 @@ import asyncio
 import hashlib
 import tempfile
 import time
+from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -45,11 +46,36 @@ from raidar.grading.sandbox import CONTAINER_LAYOUT, SUBMISSION_PYTHON
 GRADER_VENV = CONTAINER_LAYOUT.python.removesuffix("/bin/python")
 GRADER_REPOSITORY = "raidar-oracle-grader"
 __all__ = [
+    "GraderIdentityError",
     "GraderImage",
     "ensure_grader_image",
     "grader_dockerfile",
     "grader_image_tag",
+    "refuse_grader_mismatch",
 ]
+
+
+class GraderIdentityError(RuntimeError):
+    """The grader at hand is not the one the lock pinned: an infrastructure failure, never a
+    verdict about the submission."""
+
+
+def refuse_grader_mismatch(
+    pinned: Mapping[str, str], *, image: str, environment_id: str, implementation_sha256: str
+) -> None:
+    """Refuse grading with any grader other than the validated one the lock pins."""
+    found = {
+        "image": image,
+        "environment_id": environment_id,
+        "implementation_sha256": implementation_sha256,
+    }
+    differing = [
+        f"{key}: pinned {pinned.get(key)!r}, grading with {found[key]!r}"
+        for key in found
+        if pinned.get(key) != found[key]
+    ]
+    if differing:
+        raise GraderIdentityError("grader differs from the validated one: " + "; ".join(differing))
 
 
 def _grader_set(bundle: VerifierBundle) -> str:

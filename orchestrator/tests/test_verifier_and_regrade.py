@@ -86,6 +86,7 @@ async def make_verifier(
     bundle = bundle_root or make_bundle(tmp_path / "fixture").root
     if guarded:
         await start_agent_behind_guard(tmp_path, FakeAgentEnvironment(), bundle, step)
+    pinned = {"grader": {}, **kwargs.pop("pinned", {})}
     verifier = LocalVerifier(
         oracle_bundle=str(bundle),
         docker_context="test-ctx",
@@ -93,6 +94,7 @@ async def make_verifier(
         trial_paths=TrialPaths(trial_dir=tmp_path / "trial"),
         environment=cast(Any, env),
         step_name=step,
+        pinned=pinned,
         **kwargs,
     )
     verifier.sandbox = LocalProcessSandbox(tmp_path / "sandbox")
@@ -234,6 +236,51 @@ async def test_a_leaked_hidden_test_forces_a_failing_reward(tmp_path: Path) -> N
     assert record.grade.solved  # the evidence is kept; only the reward is withheld
     assert record.leak_check is not None
     assert not record.leak_check.clean
+
+
+async def test_a_canary_attributed_grading_crash_is_a_valid_failed_outcome_end_to_end(
+    tmp_path: Path,
+) -> None:
+    """Verify, regrade and offline coverage keep a hung submission a failed step, not infra."""
+    from raidar.grading.coverage.offline import (  # noqa: PLC0415
+        CoverageTarget,
+        run_offline_coverage,
+    )
+    from tests.test_grader_identity_and_canary import HangingSandbox  # noqa: PLC0415
+
+    artifact = place_step_artifact(tmp_path, "checkpoint_1")
+    (artifact / "hang").write_text("")
+    verifier = await make_verifier(tmp_path, FakeAgentEnvironment())
+    verifier.sandbox = HangingSandbox(tmp_path / "sandbox")
+
+    result = await verifier.verify()
+
+    # The infrastructure flag collect.py excludes on is absent; the step scores as a failure.
+    assert result.rewards is not None
+    assert result.rewards["infrastructure_failure"] == 0.0
+    assert result.rewards["solved"] == 0.0
+    record_dir = step_record_dir(tmp_path / "trial", "checkpoint_1")
+    record = load_step_record(record_dir)
+    assert record.grade.infra_failure is None
+    assert record.canary.status == "passed"
+    assert record.canary.trigger == "sandbox_timeout"
+    assert record.coverage.parity is not None
+    assert not record.coverage.parity.eligible
+    assert record.rewards == result.rewards
+    assert record.summary == record.grade.summary()  # health V2 reads this
+
+    async def hanging(bundle: Any) -> GradingSandbox:
+        return HangingSandbox(tmp_path / "regrade-sandbox")
+
+    options = RegradeOptions(docker_context="test-ctx", sandbox_factory=hanging)
+    report = await regrade_path(tmp_path / "trial", options)
+    assert report["match"] is True
+
+    run = await run_offline_coverage(
+        CoverageTarget(tmp_path / "trial", record_dir, record), options
+    )
+    assert not run.parity.eligible
+    assert run.infra_failure is None
 
 
 async def test_hidden_tests_seen_before_the_agent_started_leak_the_step(tmp_path: Path) -> None:

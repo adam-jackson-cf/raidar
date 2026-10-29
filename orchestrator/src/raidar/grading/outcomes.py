@@ -9,6 +9,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 from raidar.grading.models import (
+    CanaryRecord,
     CaseResult,
     InfraFailure,
     ParityVerdict,
@@ -37,3 +38,4 @@ class StepGrade:
     parity: ParityVerdict | None
     parity_differences: tuple[str, ...] = ()
     timings: dict[str, float] = field(default_factory=dict)
+    canary: CanaryRecord = field(default_factory=CanaryRecord)

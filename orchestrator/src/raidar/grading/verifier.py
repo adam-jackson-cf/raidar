@@ -28,6 +28,7 @@ import json
 import shutil
 import tempfile
 import time
+from collections.abc import Mapping
 from pathlib import Path
 from typing import Any, Literal
 
@@ -42,7 +43,7 @@ from raidar.contract.snapshot import (
 )
 from raidar.grading.bundle import VerifierBundle, load_bundle
 from raidar.grading.grader import DEFAULT_RUN_TIMEOUT_S, grade_step
-from raidar.grading.grader_image import ensure_grader_image
+from raidar.grading.grader_image import ensure_grader_image, refuse_grader_mismatch
 from raidar.grading.leak import LeakReport, LeakScanError, scan_agent_environment
 from raidar.grading.models import INFRA_REWARD_KEY
 from raidar.grading.records import (
@@ -50,8 +51,10 @@ from raidar.grading.records import (
     GraderRef,
     SnapshotRef,
     build_step_record,
+    grading_execution_digest,
     load_pre_agent_leak,
     parse_errata,
+    parse_solvable,
     step_record_dir,
     stored_snapshot_path,
     write_step_evidence,
@@ -119,9 +122,12 @@ class RaidarVerifier(BaseVerifier):
         grader_timeout_s: float = DEFAULT_RUN_TIMEOUT_S,
         work_root: str | None = None,
         require_pre_agent_check: bool = True,
-        errata: dict[str, Any] | None = None,
+        pinned: Mapping[str, Any],
         **kwargs: Any,
     ) -> None:
+        """``pinned`` is the problem-bound lock evidence: ``grader`` (the validated identity, as
+        ``refuse_grader_mismatch`` reads it; required) and, when the lock pins them, ``errata``
+        and ``solvable``."""
         super().__init__(**kwargs)
         if snapshot_source not in ("artifact", "download"):
             raise ValueError(f"snapshot_source must be artifact or download, not {snapshot_source}")
@@ -132,7 +138,9 @@ class RaidarVerifier(BaseVerifier):
         self.grader_timeout_s = grader_timeout_s
         self.work_root = Path(work_root) if work_root else None
         self.require_pre_agent_check = require_pre_agent_check
-        self.errata = parse_errata(errata)
+        self.pinned_grader = dict(pinned["grader"])
+        self.errata = parse_errata(pinned.get("errata"))
+        self.solvable = parse_solvable(pinned.get("solvable"))
 
     # --------------------------------------------------------------- hooks
     async def prepare_sandbox(self) -> tuple[GradingSandbox, GraderRef]:
@@ -144,6 +152,12 @@ class RaidarVerifier(BaseVerifier):
             run_scope=getattr(self.environment, "run_scope", ""),
         )
         environment_id = await sandbox.environment_id()
+        refuse_grader_mismatch(
+            self.pinned_grader,
+            image=image.tag,
+            environment_id=environment_id,
+            implementation_sha256=grading_execution_digest(),
+        )
         return sandbox, GraderRef(
             image=image.tag,
             environment_id=environment_id,
@@ -248,7 +262,12 @@ class RaidarVerifier(BaseVerifier):
         finally:
             shutil.rmtree(work, ignore_errors=True)  # cleanup: counted as plumbing
         leaked = not leak.clean or (pre_agent is not None and not pre_agent.clean)
-        rewards = step_rewards(result.grade.rewards(), leaked=leaked)
+        gate_rewards = (
+            result.grade.rewards()
+            if self.solvable is None
+            else self.solvable.gate_rewards(step, result.grade)
+        )
+        rewards = step_rewards(gate_rewards, leaked=leaked)
         record = build_step_record(
             result,
             bundle=BundleRef(

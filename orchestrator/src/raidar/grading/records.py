@@ -24,9 +24,16 @@ from raidar.contract.canonical import digest_json
 from raidar.contract.source_digest import SOURCE_DIGEST_SCHEME, python_source_digest
 from raidar.grading.errata import ErrataOutcome, ErrataRef, errata_outcome
 from raidar.grading.leak import LeakReport
-from raidar.grading.models import CaseResult, ParityVerdict, VerifierGrade, VerifierModel
+from raidar.grading.models import (
+    CanaryRecord,
+    CaseResult,
+    ParityVerdict,
+    VerifierGrade,
+    VerifierModel,
+)
 from raidar.grading.outcomes import RunOutcome, StepGrade
 from raidar.grading.parity import fork_regression_run_evidence
+from raidar.grading.solvable import SolvableRef
 from raidar.grading.submission_deps import SubmissionDependencies
 
 VERIFIER_RECORD_DIR = "raidar-oracle"
@@ -91,6 +98,8 @@ class StepRecord(VerifierModel):
     """The errata-applied verdict when the trial ran under a pinned errata; ``grade``
     and ``rewards`` stay the raw SCB verdict either way."""
     submission_dependencies: SubmissionDependencies | None = None
+    canary: CanaryRecord = Field(default_factory=CanaryRecord)
+    """The starter-grading canary: run when the submission's grading crashed or timed out."""
 
 
 @lru_cache(maxsize=256)
@@ -180,6 +189,11 @@ def parse_errata(errata: Mapping[str, Any] | None) -> ErrataRef | None:
     return ErrataRef.model_validate(dict(errata)) if errata is not None else None
 
 
+def parse_solvable(solvable: Mapping[str, Any] | None) -> SolvableRef | None:
+    """The verifier's lock-pinned solvable sets, validated at the record boundary."""
+    return SolvableRef.model_validate(dict(solvable)) if solvable is not None else None
+
+
 def errata_for(grade: VerifierGrade, errata: ErrataRef | None) -> ErrataOutcome | None:
     """The record's errata section: the errata-applied verdict, when an errata is pinned."""
     return errata_outcome(grade, errata) if errata is not None else None
@@ -215,6 +229,7 @@ def build_step_record(
         rewards=rewards,
         timings=dict(timings),
         errata=errata_for(result.grade, errata),
+        canary=result.canary,
         submission_dependencies=result.grading.dependencies,
     )
 

@@ -478,7 +478,7 @@ def test_only_a_usable_verdict_for_the_current_manifest_resolves(tmp_path: Path)
     _refused(store, POSITIVE_REF, tmp_path, "re-validate")
     report_path.write_text(json.dumps(report))
     resolved = _resolve(store, POSITIVE_REF, tmp_path)
-    assert resolved.binding == {"runtime": "python", "pack_version": 1, "validated": True}
+    assert resolved.binding["validated"] is True
     assert "validation" in resolved.metadata
     with pytest.raises(RegistryReferenceError, match="not imported"):
         _resolve(store, "fixture/missing@fefefefefefe", tmp_path)

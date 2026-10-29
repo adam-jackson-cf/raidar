@@ -15,6 +15,9 @@ every issue at once as field-level errors with a stable code:
 - ``RT4``: a scorer, or the headline metric, does not cover the runtime.
 - ``RT5``: an agent release's CLI pin (package, executable, version) is not the pack's
   pin for that harness (or the pack bakes no such harness): the agent pin is the source.
+- ``RT7``: a problem's validated grader implementation differs from the implementation this
+  checkout would grade with (the grader's immutable environment id is pinned in the lock and
+  checked by the verifier when it grades).
 - ``RT6``: no runtime pack is registered for the runtime. ``plan``/``run`` also
   load the pack from the lock's runtime and refuse pack drift (a built image
   other than the locked one; ``raidar.subject.environment.drift.lock_runtime_pack``), and
@@ -101,6 +104,41 @@ def _path_problem_issues(inputs: GateInputs, index: int, relative: str) -> list[
     return []
 
 
+def _binding_runtime_issues(
+    loc: str, ref: str, binding: Mapping[str, object], runtime: str
+) -> list[FieldIssue]:
+    bound = binding.get("runtime")
+    if not isinstance(bound, str):
+        return [FieldIssue(loc, f"[RT1] {ref} reports no binding runtime (pack id)")]
+    if bound != runtime:
+        return [
+            FieldIssue(
+                loc, f"[RT1] {ref} is bound to pack {bound}; experiment runtime is {runtime}"
+            )
+        ]
+    return []
+
+
+def _binding_validation_issues(
+    loc: str, ref: str, binding: Mapping[str, object]
+) -> list[FieldIssue]:
+    if binding.get("validated") is not True:
+        detail = binding.get("validation_issue") or "no validation report"
+        return [FieldIssue(loc, f"[RT0] {ref} has no passing verifier validation: {detail}")]
+    pinned = binding.get("grader")
+    implementation = pinned.get("implementation_sha256") if isinstance(pinned, Mapping) else None
+    if implementation is None or implementation == binding.get("grader_implementation_sha256"):
+        return []
+    return [
+        FieldIssue(
+            loc,
+            f"[RT7] {ref} was validated under grading implementation {implementation}; this "
+            f"checkout grades with {binding.get('grader_implementation_sha256')}; "
+            "re-validate it",
+        )
+    ]
+
+
 def _ref_problem_issues(
     inputs: GateInputs, index: int, ref: str, pack: PackSpec | None
 ) -> list[FieldIssue]:
@@ -109,20 +147,9 @@ def _ref_problem_issues(
     if resolved is None:
         return []
     binding, runtime = resolved.binding, inputs.spec.runtime
-    issues = []
-    bound = binding.get("runtime")
-    if not isinstance(bound, str):
-        issues.append(FieldIssue(loc, f"[RT1] {ref} reports no binding runtime (pack id)"))
-    elif bound != runtime:
-        issues.append(
-            FieldIssue(
-                loc, f"[RT1] {ref} is bound to pack {bound}; experiment runtime is {runtime}"
-            )
-        )
-    if binding.get("validated") is not True:
-        detail = binding.get("validation_issue") or "no validation report"
-        issues.append(FieldIssue(loc, f"[RT0] {ref} has no passing verifier validation: {detail}"))
-    version = binding.get("pack_version")
+    issues = _binding_runtime_issues(loc, ref, binding, runtime)
+    issues += _binding_validation_issues(loc, ref, binding)
+    bound, version = binding.get("runtime"), binding.get("pack_version")
     if pack is not None and bound == runtime and version != pack.version:
         issues.append(
             FieldIssue(
