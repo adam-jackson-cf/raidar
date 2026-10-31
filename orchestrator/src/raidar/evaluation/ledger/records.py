@@ -17,9 +17,14 @@ from pydantic import (
     field_validator,
 )
 
-FAULT_ID = re.compile(r"^FCR-\d{3,}$")
-REMEDY_ID = re.compile(r"^M-\d{3,}$")
-_REF_LINE = re.compile(r"^(?P<path>[^\s:#]+)(?::\d+(?:-\d+)?)?(?:#\S+)?$")
+FAULT_ID = re.compile(r"^(?:FXL-)?FCR-\d{3,}$")
+REMEDY_ID = re.compile(r"^(?:FXL-)?M-\d{3,}$")
+# FXL journal records (experiments and questions) are cited by id; they are not ledger records.
+JOURNAL_ID = re.compile(r"^FXL-[EQ]-\d{3,}$")
+# `[<repo>@<tag-or-commit>:]<path>[:line[-line]][#anchor]`; a prefix names another repo.
+_REF_LINE = re.compile(
+    r"^(?:(?P<source>[\w.-]+@[\w./-]+):)?(?P<path>[^\s:#]+)(?::\d+(?:-\d+)?)?(?:#\S+)?$"
+)
 
 FaultStatus = Literal[
     "open", "targeted", "mitigated", "resolved", "reopened", "not-reproducible", "routed"
@@ -70,6 +75,8 @@ Text = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
 
 def ref_problem(ref: str) -> str | None:
     """Return why an evidence reference is malformed, or None when it is a relative path."""
+    if JOURNAL_ID.fullmatch(ref):
+        return None
     match = _REF_LINE.fullmatch(ref)
     if match is None:
         return "contains whitespace or is not `path[:line[-line]][#anchor]`"

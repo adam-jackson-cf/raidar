@@ -147,6 +147,23 @@ def test_malformed_evidence_ref_refused(ledger: Path, ref: str) -> None:
     assert "evidence ref" in _problems(ledger)
 
 
+@pytest.mark.parametrize(
+    "ref",
+    ["factory-x-loops@lab-final-2026-10-31:docs/x.md:3-9", "FXL-E-011", "FXL-Q-009"],
+)
+def test_fxl_source_and_journal_refs_accepted(ledger: Path, ref: str) -> None:
+    _write(ledger, "faults", "FCR-001", _fault(evidence=[ref]))
+    _index(ledger)
+    assert check_ledger(ledger) == []
+
+
+def test_fxl_prefixed_records_accepted(ledger: Path) -> None:
+    _write(ledger, "faults", "FXL-FCR-007", _fault(id="FXL-FCR-007"))
+    _write(ledger, "remedies", "FXL-M-002", _remedy(id="FXL-M-002", faults=["FXL-FCR-007"]))
+    _index(ledger)
+    assert check_ledger(ledger) == []
+
+
 def test_jobs_refs_need_not_exist(ledger: Path) -> None:
     assert not (ledger / "jobs").exists()
     assert check_ledger(ledger) == []
