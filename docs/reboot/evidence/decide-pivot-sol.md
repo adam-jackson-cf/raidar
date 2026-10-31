@@ -1,0 +1,14 @@
+T1: opus (high) — Separate `raidar/test-evidence`, built in phase 10; phase 5 adds only root-owned `base` to gate context. M-001 is **proposed**, with no experiment or outcome—not established baseline policy. Preserve released spike-parity verify as the control; later comparisons freeze identities and vary only the intended lever. Restate M-001’s contrast: today’s control has **no coverage minimum**, not 85%.
+Facts checked: `lab/ledger/remedies/M-001.md:1–27`; `lab/workflows/one-shot-verify/workflow.yaml:54–60`; `subject/primitive/gate.py:398–438`. FXL `ac5db0f`: `src/factory_x_loops/capability/verify/packs/python/guardrails/{changed_lines,hollow_tests}.py` and `gate.py:603–628` confirm base-relative enforcement.
+
+T2: astra (high) — Publish immutable wheel/sdist artefacts under `contract/vX.Y.Z`, with exact-version and hash pins. A tag alone does not pin installed artefact bytes or avoid rebuilding from source.
+Facts checked: `orchestrator/pyproject.toml:1–23,53–58` currently packages the Harbor-dependent orchestrator; `split-design.md` §5.4 makes identity byte-based and transport-independent. This is a proposed publication mechanism, not an existing release.
+
+T3: astra (high) — Record subscription support per provider/pinned adapter in documentation and credential-preflight evidence; assess SDKs in phase 7, adopting only after conformance proof. Avoid imposing a new binary authentication field on agent identity.
+Facts checked: `subject/agent/definition.py:111–163` has no sign-in field; `adapters/codex_auth.py:68–126` already resolves API/session alternatives, and `adapters/isolated_codex.py:226–241` exposes credential readiness. CLI support does not establish SDK permission or functionality.
+
+T4: astra (high) — Require held-out independent labels, blind to arm and judge verdict; changing scorer model alone cannot establish validity. Keep calibration and `jev-actions` Raidar-owned; coverage outputs remain readings until validated.
+Facts checked: `split-design.md` §§5.1, 7.1; `scoring/coverage_inputs/scorer.py:1–10`; `scoring/judge/blind.py:1–26,55–64`. Existing blind export removes verdicts but retains trial/subject identifiers: arm blindness still needs explicit assurance.
+
+T5: astra (high) — Adopt its full nine-step ordered phase-5 plan, including acceptance checks and prerequisites. **Only T1 adjustments:** step 3 adds root-owned gate-context `base`; step 4 ports verify at spike parity and removes changed-line/hollow-test enforcement from its acceptance check. Build that separate package in phase 10.
+Facts checked: `split-design.md:594–619` requires verify → define → docs-check, releases/relocking and smoke/security exits; `subject/workflow/package_definition.py:47–97` still lacks reply/judge configuration. Astra preserves that order without making outstanding runtime evidence a blanket blocker on port implementation.

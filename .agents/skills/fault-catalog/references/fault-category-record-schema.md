@@ -10,6 +10,10 @@ action uses.
 - The catalogue is the tracked `lab/ledger/` directory: `lab/ledger/faults/FCR-NNN.md`
   (fault categories), `lab/ledger/remedies/M-NNN.md` (remedies) and a generated
   `lab/ledger/README.md` index. One file per record; never reuse an identifier.
+  Records adopted from factory-x-loops keep an `FXL-` prefix (`FXL-FCR-NNN`,
+  `FXL-M-NNN`), are never renumbered and keep their FXL status history verbatim;
+  `FXL-E-NNN` and `FXL-Q-NNN` are cited by id, and a source in that repository is
+  written `factory-x-loops@<tag>:<path>`.
 - After every edit run `make ledger-index && make ledger-check`. The check fails
   on unknown keys, missing fields, id/filename mismatch, broken remedy→fault
   links, illegal status transitions, backwards dates and a stale index. Never

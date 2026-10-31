@@ -2,12 +2,15 @@
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 from raidar.evaluation.ledger import index
 from raidar.evaluation.ledger.records import (
+    FAULT_ID,
     FAULT_INITIAL,
     FAULT_TRANSITIONS,
+    REMEDY_ID,
     REMEDY_INITIAL,
     REMEDY_TRANSITIONS,
     FaultRecord,
@@ -50,15 +53,20 @@ def _history_problems(
 
 
 def _load_dir(
-    root: Path, sub: str, prefix: str, model: type[FaultRecord] | type[RemedyRecord]
+    root: Path,
+    sub: str,
+    id_pattern: re.Pattern[str],
+    model: type[FaultRecord] | type[RemedyRecord],
 ) -> tuple[dict[str, FaultRecord | RemedyRecord], list[str]]:
     records: dict[str, FaultRecord | RemedyRecord] = {}
     problems: list[str] = []
     directory = root / sub
     for path in sorted(directory.iterdir()) if directory.is_dir() else []:
         name = f"{sub}/{path.name}"
-        if path.suffix != ".md" or not path.stem.startswith(f"{prefix}-"):
-            problems.append(f"{name}: unexpected file (records are `{prefix}-NNN.md`)")
+        if path.suffix != ".md" or not id_pattern.fullmatch(path.stem):
+            problems.append(
+                f"{name}: unexpected file (records are `[FXL-]FCR-NNN.md` or `[FXL-]M-NNN.md`)"
+            )
             continue
         try:
             record = parse_record(path, model)
@@ -75,8 +83,8 @@ def _load_dir(
 def load_ledger(
     root: Path,
 ) -> tuple[dict[str, FaultRecord], dict[str, RemedyRecord], list[str]]:
-    faults, fault_problems = _load_dir(root, FAULTS_DIR, "FCR", FaultRecord)
-    remedies, remedy_problems = _load_dir(root, REMEDIES_DIR, "M", RemedyRecord)
+    faults, fault_problems = _load_dir(root, FAULTS_DIR, FAULT_ID, FaultRecord)
+    remedies, remedy_problems = _load_dir(root, REMEDIES_DIR, REMEDY_ID, RemedyRecord)
     return (
         {k: v for k, v in faults.items() if isinstance(v, FaultRecord)},
         {k: v for k, v in remedies.items() if isinstance(v, RemedyRecord)},
