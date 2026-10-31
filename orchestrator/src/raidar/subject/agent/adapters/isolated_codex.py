@@ -38,6 +38,7 @@ from harbor.agents.installed.codex import Codex, CodexOptions
 from harbor.environments.base import BaseEnvironment
 from harbor.models.agent.context import AgentContext
 from pydantic import Field
+from raidar_contract.agent_records import Credentials, StatePath, Tokens
 
 from raidar.subject.agent.adapters.codex_audit import (
     SESSIONS_DIR,
@@ -56,13 +57,7 @@ from raidar.subject.agent.adapters.instructions import (
     place_instructions_command,
 )
 from raidar.subject.agent.adapters.probe import parse_probe, probe_command
-from raidar.subject.agent.protocol import (
-    Credentials,
-    IsolationError,
-    StatePath,
-    Tokens,
-    cumulative_accounting,
-)
+from raidar.subject.agent.protocol import IsolationError, cumulative_accounting
 
 MANAGED_CONFIGS = ("/etc/codex/config.toml", "/etc/codex/requirements.toml")
 SYSTEM_SKILLS = "/etc/codex/skills"

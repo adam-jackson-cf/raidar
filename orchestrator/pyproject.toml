@@ -21,6 +21,8 @@ dependencies = [
     # known-safe pin (never 1.82.7 or 1.82.8).
     "litellm==1.102.1",
     "jsonschema>=4.0",
+    # The portable contract (one implementation: a path dependency, never published from here).
+    "raidar-contract",
 ]
 
 [project.optional-dependencies]
@@ -49,6 +51,9 @@ raidar = "raidar.cli:main"
 [project.entry-points."raidar.contract.resolvers"]
 problem = "raidar.design.problem.resolver:resolver_factory"
 scorer = "raidar.scoring.catalog.builtin:scorer_resolver"
+
+[tool.uv.sources]
+raidar-contract = { path = "../contract", editable = true }
 
 [build-system]
 requires = ["hatchling"]

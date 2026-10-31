@@ -45,8 +45,6 @@ import tempfile
 import time
 from collections.abc import Sequence
 from contextlib import suppress
-from dataclasses import dataclass, field
-from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, cast
 
@@ -54,7 +52,6 @@ from harbor.agents.base import BaseAgent
 from harbor.environments.base import BaseEnvironment
 from harbor.models.agent.context import AgentContext
 
-from raidar.subject.agent.protocol import ZERO, NativeAgent, Tokens
 from raidar.subject.primitive import calls
 from raidar.subject.primitive.site import TrialInvalid
 from raidar.subject.workflow.factory import checkpoint_stages, place_components
@@ -70,13 +67,24 @@ from raidar.subject.workflow.stage import (
     Stage,
     compose,
 )
+from raidar.subject.workflow.turns import (
+    TRAJECTORY_FILE,
+    WORKFLOW_DIR,
+    Run,
+    Turn,
+    native_account,
+    native_audit,
+    native_last_message,
+    native_observe,
+    native_session_store,
+    now,
+    session_id,
+)
 
 RUNNER_NAME = "raidar-workflow"
-WORKFLOW_DIR = "workflow"
 RECORD_FILE = "workflow.json"
 RECORD_KIND = "raidar-workflow"
 PROMPT_FILE = "prompt.txt"
-TRAJECTORY_FILE = "trajectory.json"
 CTIME_SCRIPT = """\
 import json, os, sys
 root, found = sys.argv[1], {}
@@ -96,99 +104,6 @@ STEP_RECORD_PREFIX = "raidar-"
 """Step-level lab records in ``/logs/agent`` (reset report, provision records): not a turn's."""
 INVALID = "invalid"
 """Why a checkpoint was cut when a package's instrument failed (``TrialInvalid``)."""
-
-
-@dataclass
-class Turn:
-    stage: str
-    kind: str
-    index: int
-    resumed: bool
-    prompt_sha256: str
-    started_at: str
-    started: float
-    finished_at: str | None = None
-    seconds: float | None = None
-    error: str | None = None
-    settle_error: str | None = None
-    session_id: str | None = None
-    session_total: Tokens | None = None
-    tokens: Tokens | None = None
-    harness_isolation: dict[str, Any] | None = None
-    agent_process: dict[str, str | None] | None = None
-    session_audit: dict[str, Any] | None = None
-    session_store: tuple[str, ...] = ()
-    integrity: list[dict[str, str]] = field(default_factory=list)
-
-    @property
-    def log_dir(self) -> str:
-        return f"{WORKFLOW_DIR}/{self.stage}-{self.index}"
-
-    def stop(self, error: str | None = None) -> None:
-        self.finished_at = _now()
-        self.seconds = round(time.monotonic() - self.started, 3)
-        self.error = error
-
-    def record(self) -> dict[str, Any]:
-        return {
-            "stage": self.stage,
-            "kind": self.kind,
-            "turn": self.index,
-            "log_dir": self.log_dir,
-            "session_id": self.session_id,
-            "resumed": self.resumed,
-            "prompt_sha256": self.prompt_sha256,
-            "started_at": self.started_at,
-            "finished_at": self.finished_at,
-            "seconds": self.seconds,
-            "error": self.error,
-            "settle_error": self.settle_error,
-            "session_total": self.session_total.record() if self.session_total else None,
-            "tokens": self.tokens.record() if self.tokens else None,
-            "harness_isolation": self.harness_isolation,
-            "agent_process": self.agent_process,
-            "session_audit": self.session_audit,
-            "session_store": list(self.session_store),
-            "integrity": self.integrity,
-        }
-
-
-@dataclass
-class _Run:
-    turns: list[Turn] = field(default_factory=list)
-
-    def previous(self, turn: Turn) -> Tokens | None:
-        """The preceding normalized total of this session, if one was measured."""
-        return next(
-            (
-                item.session_total
-                for item in reversed(self.turns)
-                if item is not turn and item.session_id == turn.session_id
-            ),
-            None,
-        )
-
-    def usage(self) -> Tokens | None:
-        """The phase's tokens (sum of turn deltas); ``None`` when any turn's is unknown."""
-        total = ZERO
-        for turn in self.turns:
-            if turn.tokens is None:
-                return None
-            total = total.plus(turn.tokens)
-        return total if self.turns else None
-
-
-def _now() -> str:
-    return datetime.now(UTC).isoformat(timespec="milliseconds")
-
-
-def _session_id(turn_dir: Path) -> str | None:
-    path = turn_dir / TRAJECTORY_FILE
-    try:
-        value = json.loads(path.read_text()).get("session_id")
-    except (OSError, ValueError, AttributeError):
-        return None
-    return value if isinstance(value, str) and value else None
 
 
 class SessionWatch:
@@ -311,7 +226,7 @@ class WorkflowRunner(BaseAgent):
     async def run(
         self, instruction: str, environment: BaseEnvironment, context: AgentContext
     ) -> None:
-        state = _Run()
+        state = Run()
         options = self.runner_options
         self.components: list[dict[str, str]] = []
         self.watch = SessionWatch()
@@ -333,7 +248,7 @@ class WorkflowRunner(BaseAgent):
             if self.package_stage:
                 self.package_stage.load()
                 self.instructions_text = self.package_stage.instructions_text
-            store = cast(NativeAgent, self._inner(self.logs_dir)).session_store()
+            store = native_session_store(self._inner(self.logs_dir))
             paths = tuple(f"{self.environment_logs_dir}/{name}" for name in store)
             checkpoint = Checkpoint(
                 environment, self.staging, instruction, deadline, session_paths=paths
@@ -369,7 +284,7 @@ class WorkflowRunner(BaseAgent):
             await calls.trusted_exec(environment, command, user="root")
 
     async def _work(
-        self, checkpoint: Checkpoint, state: _Run, stages: list[Stage], instruction: str
+        self, checkpoint: Checkpoint, state: Run, stages: list[Stage], instruction: str
     ) -> None:
         """Prepare every stage, run the one prompt, then resume while a stage's checks ask."""
         await place_components(
@@ -455,7 +370,7 @@ class WorkflowRunner(BaseAgent):
     async def _turn(
         self,
         checkpoint: Checkpoint,
-        state: _Run,
+        state: Run,
         stages: list[Stage],
         stage: str,
         kind: str,
@@ -472,7 +387,7 @@ class WorkflowRunner(BaseAgent):
             index=len(state.turns) + 1,
             resumed=resume,
             prompt_sha256=hashlib.sha256(prompt.encode()).hexdigest(),
-            started_at=_now(),
+            started_at=now(),
             started=time.monotonic(),
         )
         state.turns.append(turn)
@@ -501,16 +416,13 @@ class WorkflowRunner(BaseAgent):
     async def _settle(
         self,
         environment: BaseEnvironment,
-        state: _Run,
+        state: Run,
         turn: Turn,
         inner: BaseAgent,
         context: AgentContext,
     ) -> None:
         """Copy the turn's logs into its directory and read its isolation, session and usage."""
-        native = cast(NativeAgent, inner)
-        turn.harness_isolation = native.harness_isolation
-        turn.agent_process = native.process_facts()
-        turn.session_store = native.session_store()
+        native_observe(turn, inner)
         turn_dir = self.staging / turn.log_dir
         try:
             links = await self._copy_turn_logs(environment, turn, turn_dir)
@@ -524,18 +436,16 @@ class WorkflowRunner(BaseAgent):
                 inner.populate_context_post_run(context)
             finally:
                 inner.logs_dir = original
-        turn.session_id = _session_id(turn_dir)
-        previous = state.previous(turn)
-        if not turn.resumed or previous is not None:
-            turn.tokens, turn.session_total = native.accounting(context, previous)
-        turn.session_audit = native.session_audit(turn_dir)
+        turn.session_id = session_id(turn_dir)
+        native_account(turn, state, inner, context)
+        native_audit(turn, inner, turn_dir)
         ctimes = await self._remote_ctimes(environment, turn, turn.log_dir)
         seen = self.watch.observe(
             turn_dir, ctimes, turn.session_store, grew_expected=turn.error is None
         )
         turn.integrity += seen
         self.integrity += [{**item, "turn": turn.log_dir} for item in seen]
-        text = native.last_message(turn_dir)
+        text = native_last_message(inner, turn_dir)
         if text is not None:
             (turn_dir / LAST_MESSAGE_FILE).write_text(text, encoding="utf-8")
 
@@ -579,8 +489,9 @@ class WorkflowRunner(BaseAgent):
             shutil.copytree(own, staged, ignore=ignore, dirs_exist_ok=True)
         return links
 
-    def _record(self, state: _Run, stages: list[Stage], usage: Tokens | None) -> dict[str, Any]:
+    def _record(self, state: Run, stages: list[Stage]) -> dict[str, Any]:
         """``workflow.json``: the stages, the turns, the phase's tokens and each stage's record."""
+        usage = state.usage()
         record: dict[str, Any] = {
             "kind": RECORD_KIND,
             "workflow": self.runner_options.workflow,
@@ -607,14 +518,14 @@ class WorkflowRunner(BaseAgent):
             found["invalid"] = self.invalid
         return found
 
-    def _finish(self, context: AgentContext, state: _Run, stages: list[Stage]) -> None:
+    def _finish(self, context: AgentContext, state: Run, stages: list[Stage]) -> None:
         usage = state.usage()
         if usage is not None:
             context.n_input_tokens = usage.input
             context.n_cache_tokens = usage.cached
             context.n_output_tokens = usage.output
             context.cost_usd = usage.cost_usd
-        record = self._record(state, stages, usage)
+        record = self._record(state, stages)
         context.metadata = {**(context.metadata or {}), "workflow": record}
         workflow_dir = self.staging / WORKFLOW_DIR
         workflow_dir.mkdir(parents=True, exist_ok=True)

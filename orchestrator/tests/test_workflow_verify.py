@@ -31,10 +31,10 @@ from raidar.subject.workflow.definition import load_workflow
 from raidar.subject.workflow.runner import (
     PROMPT_FILE,
     RECORD_FILE,
-    WORKFLOW_DIR,
     SessionWatch,
     WorkflowRunner,
 )
+from raidar.subject.workflow.turns import WORKFLOW_DIR
 from tests.release_support import REAL_LAB
 from tests.workflow_support import (
     CODE,

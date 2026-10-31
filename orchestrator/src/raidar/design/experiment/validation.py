@@ -19,10 +19,10 @@ from collections.abc import Iterable, Mapping, Sequence
 from pathlib import Path
 
 from pydantic import ValidationError
+from raidar_contract.releases import ReleaseError
 
 from raidar.contract.references import RegistryReferenceError
-from raidar.contract.releases import ReleaseError
-from raidar.design.experiment.arm import entry_issues
+from raidar.design.experiment.agent import entry_issues
 from raidar.design.experiment.schema import (
     BENCHMARK_MIN_ATTEMPTS,
     EXPERIMENT_KINDS,

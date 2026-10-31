@@ -19,9 +19,13 @@ from pathlib import Path
 from typing import Any, Literal
 
 from pydantic import Field
+from raidar_contract.canonical import digest_json
 
-from raidar.contract.canonical import digest_json
-from raidar.contract.source_digest import SOURCE_DIGEST_SCHEME, python_source_digest
+from raidar.contract.source_digest import (
+    SOURCE_DIGEST_SCHEME,
+    contract_sources,
+    python_source_digest,
+)
 from raidar.grading.errata import ErrataOutcome, ErrataRef, errata_outcome
 from raidar.grading.leak import LeakReport
 from raidar.grading.models import (
@@ -118,6 +122,10 @@ def grading_execution_digest() -> str:
         facts = path.stat()
         key = (facts.st_mtime_ns, facts.st_ctime_ns, facts.st_size)
         digests[path.relative_to(root).as_posix()] = _grading_source_digest(path, key)
+    for name, path in contract_sources().items():
+        facts = path.stat()
+        key = (facts.st_mtime_ns, facts.st_ctime_ns, facts.st_size)
+        digests[name] = _grading_source_digest(path, key)
     runtime = root / "grading" / "runtime"
     payloads = {
         name: hashlib.sha256((runtime / name).read_bytes()).hexdigest()

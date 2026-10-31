@@ -10,8 +10,9 @@ import os
 import subprocess
 
 import click
+from raidar_contract.agent import AgentName
 
-from raidar.subject.agent.config import AgentName, AgentSpec, Harness, ModelTarget, agent_cli
+from raidar.subject.agent.config import AgentSpec, Harness, ModelTarget, agent_cli
 from raidar.subject.agent.definition import harbor_adapter
 from raidar.subject.agent.executables import resolve_cli_executable
 from raidar.subject.agent.harness import harness_definition

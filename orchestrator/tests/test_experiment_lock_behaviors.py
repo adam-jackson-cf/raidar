@@ -8,9 +8,9 @@ from typing import Any
 
 import pytest
 from click.testing import CliRunner
+from raidar_contract.canonical import digest_json
 
 from raidar.cli import main
-from raidar.contract.canonical import digest_json
 from raidar.contract.references import (
     RefKind,
     RegistryRef,

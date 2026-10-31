@@ -12,6 +12,7 @@ import time
 from pathlib import Path
 
 import click
+from raidar_contract.package.manifest import StagePackage
 
 from raidar.cli.stage_lock import lock_problems
 from raidar.cli.stage_package import load_named
@@ -19,7 +20,7 @@ from raidar.cli.target_options import docker_selection, target_option
 from raidar.contract.paths import stage_checks_root, tmp_root
 from raidar.subject.environment import load_runtime_pack
 from raidar.subject.environment.python.image import image_lock_hash, image_tag, inspect_image
-from raidar.subject.package.manifest import StagePackage
+from raidar.subject.workflow.identity import package_primitives
 from raidar.subject.workflow.stage_check import (
     CaseResult,
     captured_states,
@@ -105,7 +106,13 @@ def check_command(name: str, replay: Path | None, target_name: str | None) -> No
     try:
         report = asyncio.run(
             check_package(
-                package, name, image=image, docker_context=context, pack=pack, logs_dir=logs
+                package,
+                name,
+                image=image,
+                docker_context=context,
+                pack=pack,
+                primitives=package_primitives([package]),
+                logs_dir=logs,
             )
         )
     except Exception as error:

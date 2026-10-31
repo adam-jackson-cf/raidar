@@ -5,9 +5,10 @@ from __future__ import annotations
 from collections.abc import Mapping
 from dataclasses import dataclass
 
-from raidar.subject.package.manifest import StagePackage
+from raidar_contract.package.manifest import StagePackage
+from raidar_contract.package.tokens import Scalar
+
 from raidar.subject.primitive.canary import Canary, StageCheckRecord
-from raidar.subject.primitive.frame import Scalar
 from raidar.subject.primitive.install import InstalledPackage
 from raidar.subject.primitive.setup import SetupResult
 from raidar.subject.primitive.site import PackageSite

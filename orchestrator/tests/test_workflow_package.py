@@ -9,9 +9,9 @@ from pathlib import Path
 from typing import Any, ClassVar, cast
 
 import pytest
+from raidar_contract.package.manifest import Output, StagePackage
+from raidar_contract.package.registry import load_stage_package
 
-from raidar.subject.package.manifest import Output, StagePackage
-from raidar.subject.package.registry import load_stage_package
 from raidar.subject.primitive.gate import Attribution, GateOutcome
 from raidar.subject.primitive.site import TrialInvalid
 from raidar.subject.workflow import package as package_module

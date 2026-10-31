@@ -1,11 +1,17 @@
 """Load a workflow of either schema: ``schema: 1`` (the spike's stage types) or ``schema: 2``
-(released packages, ``package_definition``). The phase-5 port retires schema 1."""
+(released packages, ``raidar_contract.workflow``). The phase-5 port retires schema 1."""
 
 from __future__ import annotations
 
 from pathlib import Path
 
 import yaml
+from raidar_contract.workflow import (
+    PACKAGE_SCHEMA,
+    PackageWorkflowDefinition,
+    PackageWorkflowError,
+    load_package_workflow,
+)
 
 from raidar.subject.workflow.definition import (
     WORKFLOW_FILE,
@@ -13,12 +19,6 @@ from raidar.subject.workflow.definition import (
     WorkflowDefinitionError,
     load_workflow,
     workflow_dir,
-)
-from raidar.subject.workflow.package_definition import (
-    PACKAGE_SCHEMA,
-    PackageWorkflowDefinition,
-    PackageWorkflowError,
-    load_package_workflow,
 )
 
 AnyWorkflow = WorkflowDefinition | PackageWorkflowDefinition

@@ -14,86 +14,21 @@ from collections.abc import Mapping
 from dataclasses import dataclass, field
 from functools import cached_property
 
-from raidar.contract.canonical import digest_json
-from raidar.contract.releases import ReleaseError
-from raidar.design.experiment.schema import AgentEntry, ExperimentSpec
-from raidar.subject.agent.config import AgentName, Harness
+from raidar_contract.canonical import digest_json
+from raidar_contract.releases import ReleaseError
+from raidar_contract.workflow import PackageWorkflowDefinition
+
+from raidar.design.experiment.agent import AgentResolutionError, ResolvedAgent, resolve_agent
+from raidar.design.experiment.schema import ExperimentSpec
 from raidar.subject.draft import drafting
-from raidar.subject.releases import (
-    ReleasedAgent,
-    ReleasedWorkflow,
-    released_agent,
-    released_workflow,
-)
+from raidar.subject.releases import ReleasedWorkflow, released_workflow
 from raidar.subject.workflow.identity import package_contracts, primitive_code, spike_code
 from raidar.subject.workflow.loading import AnyWorkflow
-from raidar.subject.workflow.package_definition import PackageWorkflowDefinition
 from raidar.subject.workflow.package_runtime import (
     PackageEvidence,
     evidence_issues,
     load_evidence,
 )
-
-
-def entry_issues(agent: AgentEntry, released: ReleasedAgent) -> list[tuple[str, str]]:
-    """``(field, message)`` for a model or reasoning level the agent definition does not offer."""
-    definition = released.definition
-    model = definition.models.get(agent.model)
-    if model is None:
-        offered = ", ".join(sorted(definition.models))
-        return [("model", f"{released.ref} offers models {offered}; got {agent.model!r}")]
-    if agent.reasoning is None:
-        if model.reasoning:
-            return [
-                (
-                    "reasoning",
-                    f"{agent.model} on {released.ref} needs one of {list(model.reasoning)}",
-                )
-            ]
-        return []
-    if agent.reasoning not in model.reasoning:
-        allowed = list(model.reasoning) or "none"
-        return [
-            (
-                "reasoning",
-                f"{agent.model} on {released.ref} allows reasoning {allowed}; "
-                f"got {agent.reasoning!r}",
-            )
-        ]
-    return []
-
-
-@dataclass(frozen=True)
-class ResolvedAgent:
-    entry: AgentEntry
-    released: ReleasedAgent
-
-    @property
-    def name(self) -> AgentName:
-        """The Harbor agent the adapter drives (``codex``)."""
-        return self.released.definition.adapter
-
-    @property
-    def harness(self) -> Harness:
-        return self.released.definition.harness
-
-    @property
-    def provider(self) -> str:
-        return self.released.definition.provider
-
-    @property
-    def model(self) -> str:
-        """The model id passed to the CLI."""
-        return self.released.definition.models[self.entry.model].canonical
-
-    @property
-    def reasoning(self) -> str | None:
-        return self.entry.reasoning
-
-    @property
-    def version(self) -> str:
-        """The agent CLI pin."""
-        return self.released.definition.tool.version
 
 
 @dataclass(frozen=True)
@@ -158,17 +93,6 @@ class ArmResolutionError(ValueError):
     """An arm's releases cannot be resolved, or its agent entry does not fit its release."""
 
 
-def resolve_agent(entry: AgentEntry) -> ResolvedAgent:
-    try:
-        released = released_agent(entry.release)
-    except ReleaseError as exc:
-        raise ArmResolutionError(f"agent {entry.id!r}: {exc}") from exc
-    issues = entry_issues(entry, released)
-    if issues:
-        raise ArmResolutionError(f"agent {entry.id!r}: {'; '.join(m for _, m in issues)}")
-    return ResolvedAgent(entry, released)
-
-
 def workflow_evidence(workflow: ReleasedWorkflow) -> dict[str, PackageEvidence]:
     """The stage-check proof of each package; a normal arm lacking it is refused (a draft's
     missing proof is recorded as absent)."""
@@ -191,7 +115,10 @@ def resolve_arm(spec: ExperimentSpec, arm_id: str) -> ResolvedArm:
     the working tree resolves and missing proof is recorded as absent.
     """
     arm = spec.arm(arm_id)
-    agent = resolve_agent(spec.agent(arm.agent))
+    try:
+        agent = resolve_agent(spec.agent(arm.agent))
+    except AgentResolutionError as exc:
+        raise ArmResolutionError(str(exc)) from exc
     try:
         workflow = released_workflow(arm.workflow)
         evidence = workflow_evidence(workflow)

@@ -20,14 +20,10 @@ from collections.abc import Iterator
 from pathlib import Path, PurePosixPath
 from typing import Any, cast
 
+from raidar_contract.agent_records import Tokens, session_audit_record, source_record
+
 from raidar.subject.agent.pricing import price_tokens
-from raidar.subject.agent.protocol import (
-    Tokens,
-    digest,
-    session_audit_record,
-    source_record,
-    unread_json_lines,
-)
+from raidar.subject.agent.protocol import digest, unread_json_lines
 
 HARNESS = "claude-code"
 STREAM_FILE = "claude-code.txt"

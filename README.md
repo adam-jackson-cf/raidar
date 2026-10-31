@@ -19,6 +19,11 @@ The binding design is [`split-design.md`](split-design.md): arms, workflows and 
 
 The public stage-package authoring contract is [`lab/stages/README.md`](lab/stages/README.md):
 `stage/1`, calls and canaries, `criteria/1`, immutable references and `stage-tree/1` identity.
+The portable schemas and digests have one implementation in [`contract/`](contract/),
+distribution `raidar-contract` (import `raidar_contract`), with only pydantic and PyYAML
+runtime dependencies. `make contract-build` builds a wheel and sdist under `var/contract-dist/`
+and prints their SHA-256 hashes; it publishes nothing. The orchestrator uses this package
+through a local path dependency; Harbor execution remains in the orchestrator.
 The generic package runtime, immutable registry/lock identity and authoring commands are
 implemented alongside the spike classes. Local quality: 3,103 passed, 48 skipped, 95.18% coverage.
 Docker fixture/AT3, security and post-change performance proof remain pending while `mbp` is

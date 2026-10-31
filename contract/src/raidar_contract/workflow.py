@@ -27,11 +27,13 @@ from typing import Annotated, Any, Literal, Self
 import yaml
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
 
-from raidar.contract.canonical import digest_json
-from raidar.contract.releases import STAGE_RELEASE_PATTERN, Release
-from raidar.subject.package.manifest import ParamValue
-from raidar.subject.workflow.definition import NAME_PATTERN, TASK_TOKEN, WORKFLOW_FILE
+from raidar_contract.canonical import digest_json
+from raidar_contract.package.manifest import ParamValue
+from raidar_contract.releases import STAGE_RELEASE_PATTERN, Release
 
+WORKFLOW_FILE = "workflow.yaml"
+NAME_PATTERN = r"^[a-z0-9][a-z0-9-]*$"
+TASK_TOKEN = "%%%TASK%%%"
 PACKAGE_SCHEMA = 2
 FOLD_SCHEME = "workflow-packages/1"
 

@@ -9,8 +9,8 @@ from pathlib import Path
 from typing import Any
 
 import yaml
+from raidar_contract.canonical import digest_json
 
-from raidar.contract.canonical import digest_json
 from raidar.contract.references import (
     RefKind,
     RegistryRef,

@@ -13,8 +13,8 @@ from dataclasses import dataclass, field
 from operator import attrgetter
 from pathlib import Path
 
-from raidar.contract.canonical import IGNORED_TREE_NAMES, digest_json, sha256_hex
-from raidar.subject.package import StagePackageError
+from raidar_contract.canonical import IGNORED_TREE_NAMES, digest_json, sha256_hex
+from raidar_contract.package import StagePackageError
 
 TREE_SCHEME = "stage-tree/1"
 FIXTURES_DIR = "fixtures"

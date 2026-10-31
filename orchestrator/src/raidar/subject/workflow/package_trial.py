@@ -15,10 +15,12 @@ from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
-from raidar.contract.releases import Release
-from raidar.subject.package import StagePackageError
-from raidar.subject.package.manifest import StagePackage
-from raidar.subject.package.registry import load_stage_package, stage_folder
+from raidar_contract.package import StagePackageError
+from raidar_contract.package.manifest import StagePackage
+from raidar_contract.package.registry import load_stage_package, stage_folder
+from raidar_contract.releases import Release
+
+from raidar.contract.paths import REPO_ROOT
 from raidar.subject.primitive.canary import StageCheckRecord
 from raidar.subject.primitive.install import (
     InstalledPackage,
@@ -41,7 +43,7 @@ def load_locked_package(
     entry = locked.get(release.name)
     if entry is None:
         raise TrialInvalid("integrity", f"{release} is not in the lock's packages")
-    folder = stage_folder(release, repo_root) if repo_root else stage_folder(release)
+    folder = stage_folder(release, repo_root or REPO_ROOT)
     try:
         package = load_stage_package(folder)
     except (StagePackageError, OSError) as error:

@@ -27,7 +27,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from raidar.contract.canonical import digest_json
+from raidar_contract.canonical import digest_json
+
 from raidar.contract.references import (
     RegistryReferenceError,
 )
@@ -45,7 +46,7 @@ class ScorerUnavailableError(RuntimeError):
     """The scorer is registered but cannot run (no implementation, or it failed to load)."""
 
 
-_DIGEST_ROOTS = frozenset({"raidar"})
+_DIGEST_ROOTS = frozenset({"raidar", "raidar_contract"})
 
 
 def _descend(directory: Path, part: str) -> tuple[Path | None, Path | None] | None:

@@ -25,8 +25,8 @@ from pathlib import Path
 from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
+from raidar_contract.canonical import digest_json, pretty_canonical_json_bytes
 
-from raidar.contract.canonical import digest_json, pretty_canonical_json_bytes
 from raidar.judge.client import JevSuccess
 from raidar.judge.protocol import (
     JEV_PINNED_MODEL,

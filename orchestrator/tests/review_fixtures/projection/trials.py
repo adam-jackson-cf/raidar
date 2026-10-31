@@ -25,8 +25,8 @@ from harbor.models.trajectories import (
     ToolCall,
     Trajectory,
 )
+from raidar_contract.canonical import digest_json
 
-from raidar.contract.canonical import digest_json
 from raidar.contract.snapshot import tree_digest
 from raidar.contract.trial import (
     NOT_STARTED,

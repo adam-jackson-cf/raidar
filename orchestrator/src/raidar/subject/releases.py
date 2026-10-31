@@ -19,14 +19,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
-from raidar.contract.paths import REPO_ROOT, agents_root, releases_file, workflows_root
-from raidar.contract.references import (
-    RefKind,
-    RegistryRef,
-    RegistryReferenceError,
-    ResolvedReference,
-)
-from raidar.contract.releases import (
+from raidar_contract.agent import AgentDefinition, AgentDefinitionError
+from raidar_contract.releases import (
     Release,
     ReleaseError,
     ReleaseKind,
@@ -35,15 +29,23 @@ from raidar.contract.releases import (
     load_register,
     resolve_registered,
 )
-from raidar.subject.agent.definition import AgentDefinition, AgentDefinitionError, load_agent
+from raidar_contract.workflow import (
+    PackageWorkflowDefinition,
+    package_workflow_digest,
+)
+
+from raidar.contract.paths import REPO_ROOT, agents_root, releases_file, workflows_root
+from raidar.contract.references import (
+    RefKind,
+    RegistryRef,
+    RegistryReferenceError,
+    ResolvedReference,
+)
+from raidar.subject.agent.definition import harness_of, load_agent
 from raidar.subject.draft import drafting
 from raidar.subject.stages import resolve_stages
 from raidar.subject.workflow.loading import WORKFLOW_ERRORS, AnyWorkflow, load_any_workflow
 from raidar.subject.workflow.package_checks import ResolvedStage
-from raidar.subject.workflow.package_definition import (
-    PackageWorkflowDefinition,
-    package_workflow_digest,
-)
 
 DEFINITION_ERRORS = (AgentDefinitionError, *WORKFLOW_ERRORS)
 
@@ -158,7 +160,7 @@ class AgentResolver:
                 "tool_version": definition.tool.version,
                 "capabilities": definition.capabilities.model_dump(),
             },
-            binding={"harness": definition.harness.value, "tool": definition.tool.model_dump()},
+            binding={"harness": harness_of(definition).value, "tool": definition.tool.model_dump()},
         )
 
 

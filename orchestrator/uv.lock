@@ -1940,6 +1940,7 @@ dependencies = [
     { name = "pydantic-settings" },
     { name = "python-dotenv" },
     { name = "pyyaml" },
+    { name = "raidar-contract" },
     { name = "requests" },
     { name = "urllib3" },
 ]
@@ -1981,6 +1982,7 @@ requires-dist = [
     { name = "python-dotenv", specifier = ">=1.2.2" },
     { name = "pyyaml", specifier = ">=6.0" },
     { name = "radon", marker = "extra == 'dev'", specifier = "==6.0.1" },
+    { name = "raidar-contract", editable = "../contract" },
     { name = "requests", specifier = ">=2.33.0" },
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.1" },
     { name = "tree-sitter", marker = "extra == 'dev'", specifier = "==0.25.2" },
@@ -1988,6 +1990,20 @@ requires-dist = [
     { name = "urllib3", specifier = ">=2.7.0" },
 ]
 provides-extras = ["dev"]
+
+[[package]]
+name = "raidar-contract"
+source = { editable = "../contract" }
+dependencies = [
+    { name = "pydantic" },
+    { name = "pyyaml" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "pydantic", specifier = ">=2.0" },
+    { name = "pyyaml", specifier = ">=6.0" },
+]
 
 [[package]]
 name = "realtime"

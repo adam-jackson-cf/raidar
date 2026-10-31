@@ -111,6 +111,7 @@ def render_frame(build: str, task: str, parts: Sequence[FramePart]) -> Frame:
     _check_slots(build, slots)
     fragments = {slot: render_fragment(part) for slot, part in zip(slots, parts, strict=True)}
     prompt = PLACEHOLDER.sub(
-        lambda found: task if found.group(1) == TASK_SLOT else fragments[found.group(1)], build
+        lambda found: task if found.group(1) == TASK_SLOT else fragments[found.group(1)],
+        build,
     )
     return Frame(prompt, _instructions(parts), fragments)

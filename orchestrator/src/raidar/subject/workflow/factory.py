@@ -5,6 +5,8 @@ from __future__ import annotations
 import hashlib
 from typing import Any
 
+from raidar_contract.workflow import PackageWorkflowDefinition
+
 from raidar.subject.primitive import calls
 from raidar.subject.workflow import verify
 from raidar.subject.workflow.acceptance import Acceptance
@@ -12,7 +14,6 @@ from raidar.subject.workflow.build import Build
 from raidar.subject.workflow.components import skill_files
 from raidar.subject.workflow.define import Define
 from raidar.subject.workflow.definition import WorkflowDefinition
-from raidar.subject.workflow.package_definition import PackageWorkflowDefinition
 from raidar.subject.workflow.package_stage import PackageStage
 from raidar.subject.workflow.stage import Checkpoint, Stage
 

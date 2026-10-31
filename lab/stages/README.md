@@ -2,6 +2,12 @@
 
 A stage package contributes to a checkpoint's one primary agent session. It is not an agent, host plugin, separate step, scorer or judge. Raidar owns execution, limits, evidence, attribution and grading. Authors own their method's text, tools and rules. This page is the public contract; `split-design.md` is the binding design.
 
+The portable implementation is `contract/`, distribution `raidar-contract`, import
+`raidar_contract`; it depends only on pydantic and PyYAML. Raidar uses that same
+implementation. `make contract-build` builds unpublished wheel/sdist artifacts under
+`var/contract-dist/` and prints their SHA-256 hashes. The contract remains prerelease
+until the phase-5 exit; runtime primitives and Harbor integration stay in the orchestrator.
+
 ## Folder and names
 
 ```text

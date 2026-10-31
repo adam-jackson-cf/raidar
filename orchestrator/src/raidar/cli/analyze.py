@@ -21,8 +21,8 @@ from __future__ import annotations
 from pathlib import Path
 
 import click
+from raidar_contract.canonical import pretty_canonical_json_bytes
 
-from raidar.contract.canonical import pretty_canonical_json_bytes
 from raidar.contract.references import RegistryReferenceError
 from raidar.evaluation.analysis.load import LoadRequest, load_inputs
 from raidar.evaluation.analysis.markdown import render_markdown

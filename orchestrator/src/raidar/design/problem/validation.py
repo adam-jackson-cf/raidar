@@ -49,7 +49,8 @@ from decimal import Decimal
 from enum import StrEnum
 from pathlib import Path
 
-from raidar.contract.canonical import digest_json
+from raidar_contract.canonical import digest_json
+
 from raidar.grading.dependency_pins import REFUSAL_REASON, DependencyRefusal
 from raidar.grading.models import CaseGroup, CaseStatus, VerifierGrade
 from raidar.grading.solvable import case_key

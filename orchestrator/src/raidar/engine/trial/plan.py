@@ -20,7 +20,8 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import Any
 
-from raidar.contract.canonical import digest_json
+from raidar_contract.canonical import digest_json
+
 from raidar.contract.trial import PlannedTrial, ProgressionRule, TrialHashes
 from raidar.design.experiment.loader import LoadedExperiment
 from raidar.design.problem.models import ProblemId
