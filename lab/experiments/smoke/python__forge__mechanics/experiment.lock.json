@@ -841,7 +841,7 @@
       "tree-sitter-language-pack": "0.13.0"
     }
   },
-  "document_sha256": "041333cc4ab8c950f36ac17df9c596fee9c78596808c158e3e5e56cfe29fa2dc",
+  "document_sha256": "3a72899f8014cdb8596dd9558a8ead23d188c91ab78f7c3816cdf70cfdc16817",
   "execution": {
     "arms": {
       "baseline": {
@@ -859,11 +859,11 @@
           "version_pin": "0.156.1",
           "workflow_skills": "placement.skills .agents/skills in the workspace /app"
         },
-        "digest": "6a30376e81af009cd3917a3c87faac16c6ca8ba10787955b4fc7cdb36ffd1e32",
+        "digest": "0b3bbbfaf666910fce30101be65ed0e0e3d734daac5b6f303c05f26bf990c516",
         "model": "gpt-6-luna",
         "packages": {},
         "primitive_code": {
-          "build": "41fd99f4d719533b380e518d567848f5a5989bb7027c4b8ed613ae5a069e89b3"
+          "build": "488e6951e59d8354315326f2258379371d7ed7eaaa9d1fd49087fc3d9a660d22"
         },
         "provider": "openai",
         "reasoning": "low",
@@ -1664,7 +1664,7 @@
     "source_sha256": "6423eace58216ab8c14fc08f214faea05b28972081220184acaec66d9c7a61e8",
     "spec_sha256": "a78ed2ce1861720ac48f2e6e80632b1b5acaad4524862d1bf13314e20d940324"
   },
-  "lock_sha256": "17fe3c04cc2cc679c3ef9556f14e02a4d2f140d1bb4b713ffe7fa51b4f6ba9a5",
+  "lock_sha256": "3e8ec188b30ecb59c1a85024437de6325421418fba007abda38b7fa230ec5929",
   "lock_version": 5,
   "overrides": {
     "flags": {},
@@ -1673,7 +1673,7 @@
   "sections": {
     "analysis": "1b12d4c79118b1962282a0c33350352b893d39995117c241bba045eff2a1d044",
     "assessment": "52e2eff27d4fff81e930b83be25d071a74769e3e3d9ade509b0be7ab3ee912f6",
-    "execution": "17fe3c04cc2cc679c3ef9556f14e02a4d2f140d1bb4b713ffe7fa51b4f6ba9a5",
+    "execution": "3e8ec188b30ecb59c1a85024437de6325421418fba007abda38b7fa230ec5929",
     "toolchain": "8aead72e2be8c5327134e6a09c1dc8c37b684f67819ccab4b97875b369c8e5ef"
   },
   "spec": {

@@ -116,10 +116,11 @@ class PackageDriveAgent(BaseAgent):
             manifest = manifest.model_copy(update={"gate": ()})
             package = replace(package, manifest=manifest)
         tool = manifest.tool
+        reference = f"{FIXTURES.name}/{package.name}"
         installed = await install_package(
             environment,
             self.logs_dir,
-            reference=package.name,
+            reference=reference,
             package_digest=package.digest,
             files=package.files,
             commands={} if tool is None else dict(tool.commands),
@@ -138,7 +139,7 @@ class PackageDriveAgent(BaseAgent):
                 memory_available=None,
             )
         spec = PackageSpec(
-            package.name, package, installed, package.effective_params(scenario.params), expected
+            reference, package, installed, package.effective_params(scenario.params), expected
         )
         await write_as_agent(environment, scenario.seed)
         checkpoint = Checkpoint(environment, self.logs_dir, "the task")

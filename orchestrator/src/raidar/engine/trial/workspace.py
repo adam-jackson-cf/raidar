@@ -121,7 +121,7 @@ def _install(python: str, arches: Sequence[str]) -> str:
         f'install -m 0644 {stage}/{UV_FILE} "$home/.config/uv/uv.toml"',
         f'install -m 0644 {stage}/{PIP_FILE} "$home/.config/pip/pip.conf"',
         f"if ! {_PIP_ENFORCES}; then",
-        "  uv pip install --system --break-system-packages --no-config --require-hashes "
+        "  uv pip install --no-cache --system --break-system-packages --no-config --require-hashes "
         '--no-deps --only-binary :all: --python "$(command -v python3)" '
         f"-r {pin} 2>&1",
         f'  {_PIP_ENFORCES} || {{ echo "pip {PIP_VERSION} lacks the cutoff option"; exit 1; }}',

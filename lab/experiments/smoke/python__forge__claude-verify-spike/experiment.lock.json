@@ -841,7 +841,7 @@
       "tree-sitter-language-pack": "0.13.0"
     }
   },
-  "document_sha256": "8fb38a079b0b4104c0ab269feb24f12d6c9e56605efb06a498e46faa30d60364",
+  "document_sha256": "eaa3224b8af826602081da0c459d69ffa24bd3a4d1ac246ac05b5b2c1293f830",
   "execution": {
     "arms": {
       "verify": {
@@ -859,12 +859,12 @@
           "version_pin": "2.1.285",
           "workflow_skills": "placement.skills .claude/skills in the workspace /app"
         },
-        "digest": "3ca48f52df4842ae256706b49e06600145a84c03e96a3a57ad0a39c7f510b96b",
+        "digest": "93ea906609cabd4a7682a38b10ccaf4393725fa9a884534bcac827b1c40c489b",
         "model": "claude-sonnet-4-6",
         "packages": {},
         "primitive_code": {
-          "build": "d0ba5923207ee79108c3382a982abdec1a673b97fc3f985741c3d6858edf32ef",
-          "verify": "d0ba5923207ee79108c3382a982abdec1a673b97fc3f985741c3d6858edf32ef"
+          "build": "73bab8e4e4742389653195f6e9eee795ef023ad9056a2742f21e530efad6aebe",
+          "verify": "73bab8e4e4742389653195f6e9eee795ef023ad9056a2742f21e530efad6aebe"
         },
         "provider": "anthropic",
         "reasoning": "low",
@@ -1666,7 +1666,7 @@
     "source_sha256": "2a97edbc4c182da0b0cb981286c841a46ebf5fafb9f7ce00823df277e7a2bdf8",
     "spec_sha256": "6af3c535c561454b2ede836e77df4fab17285a4850b8c80e86b94cae916c89b0"
   },
-  "lock_sha256": "660c60b009285bbbd36676b43dc0685f044fce1f5b1fd455319cd87274e04cb2",
+  "lock_sha256": "f81e8784af0b39343d8219c6d66781f9cccc61a3e89db0f749cd7a4c8528311d",
   "lock_version": 5,
   "overrides": {
     "flags": {},
@@ -1675,7 +1675,7 @@
   "sections": {
     "analysis": "81cdc2d12aacc031bb70595c13973ff647ab49a68bebda4be7a9b65ba3127a78",
     "assessment": "52e2eff27d4fff81e930b83be25d071a74769e3e3d9ade509b0be7ab3ee912f6",
-    "execution": "660c60b009285bbbd36676b43dc0685f044fce1f5b1fd455319cd87274e04cb2",
+    "execution": "f81e8784af0b39343d8219c6d66781f9cccc61a3e89db0f749cd7a4c8528311d",
     "toolchain": "8aead72e2be8c5327134e6a09c1dc8c37b684f67819ccab4b97875b369c8e5ef"
   },
   "spec": {

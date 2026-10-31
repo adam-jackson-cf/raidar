@@ -841,7 +841,7 @@
       "tree-sitter-language-pack": "0.13.0"
     }
   },
-  "document_sha256": "2284d7e89b7fc56ba956ca15ccfa2af27c1a36b3301db4fc64cb98ae4e94933b",
+  "document_sha256": "66d3910b5991b101c9d7b6b35310a2714d2efc83868c77f644d03c20c58cab25",
   "execution": {
     "arms": {
       "verify": {
@@ -859,12 +859,12 @@
           "version_pin": "0.156.1",
           "workflow_skills": "placement.skills .agents/skills in the workspace /app"
         },
-        "digest": "43351e75f24accbacd9f56772e8d55d1f6c8d5933ce38d8978dd1bfd7f9e6f18",
+        "digest": "1dd547c076535c850f9c95343f8a667af3338e725db1c244f69f425d9e26c3b1",
         "model": "gpt-6-luna",
         "packages": {},
         "primitive_code": {
-          "build": "41fd99f4d719533b380e518d567848f5a5989bb7027c4b8ed613ae5a069e89b3",
-          "verify": "41fd99f4d719533b380e518d567848f5a5989bb7027c4b8ed613ae5a069e89b3"
+          "build": "488e6951e59d8354315326f2258379371d7ed7eaaa9d1fd49087fc3d9a660d22",
+          "verify": "488e6951e59d8354315326f2258379371d7ed7eaaa9d1fd49087fc3d9a660d22"
         },
         "provider": "openai",
         "reasoning": "low",
@@ -1666,7 +1666,7 @@
     "source_sha256": "94b81aa695cad72df818fab82d776ca2f6d5a96d615ed7de8a5d4859337a5d70",
     "spec_sha256": "80ebd448a2407fd78dcc90237a9769833ef89ddfef02f2492326eba147990400"
   },
-  "lock_sha256": "b56001f0ff251adc42ad7743cbb1c6919b7731fa43af447ff321bb07bb300629",
+  "lock_sha256": "6b44015a52f47c532d139c65b783f1397e3c88b4bd7f129dc8c3b71ffbf04067",
   "lock_version": 5,
   "overrides": {
     "flags": {},
@@ -1675,7 +1675,7 @@
   "sections": {
     "analysis": "81cdc2d12aacc031bb70595c13973ff647ab49a68bebda4be7a9b65ba3127a78",
     "assessment": "52e2eff27d4fff81e930b83be25d071a74769e3e3d9ade509b0be7ab3ee912f6",
-    "execution": "b56001f0ff251adc42ad7743cbb1c6919b7731fa43af447ff321bb07bb300629",
+    "execution": "6b44015a52f47c532d139c65b783f1397e3c88b4bd7f129dc8c3b71ffbf04067",
     "toolchain": "8aead72e2be8c5327134e6a09c1dc8c37b684f67819ccab4b97875b369c8e5ef"
   },
   "spec": {
