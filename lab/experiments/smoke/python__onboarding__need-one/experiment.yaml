@@ -19,7 +19,7 @@ protocol:
 arms:
   - id: baseline
     agent: codex-luna
-    workflow: one-shot@1
+    workflow: raidar/one-shot@1
 assessment:
   scorers: [correctness@9]
   metric: scb-canonical@2

@@ -171,6 +171,29 @@ def lab_violations(paths: list[str]) -> list[str]:
     return sorted(found)
 
 
+def workflow_violations(paths: list[str]) -> list[str]:
+    """Workflows live at ``lab/workflows/<ns>/<name>/``: nothing sits at the data root or a
+    namespace folder, and each workflow folder holds a ``workflow.yaml``."""
+    found = set()
+    folders: set[tuple[str, ...]] = set()
+    defined: set[tuple[str, ...]] = set()
+    for path in paths:
+        parts = PurePosixPath(path).parts
+        if parts[:2] != ("lab", "workflows"):
+            continue
+        if len(parts) < 5:
+            found.add(f"workflow outside lab/workflows/<ns>/<name>/: {path}")
+            continue
+        folders.add(parts[:4])
+        if len(parts) == 5 and parts[4] == "workflow.yaml":
+            defined.add(parts[:4])
+    found.update(
+        f"workflow folder without workflow.yaml: {'/'.join(folder)}"
+        for folder in sorted(folders - defined)
+    )
+    return sorted(found)
+
+
 def package_violations(paths: list[str]) -> list[str]:
     found = []
     prefix = RAIDAR_PACKAGE_DIR + "/"
@@ -255,6 +278,7 @@ def violations(paths: list[str]) -> list[str]:
         *root_violations(paths),
         *lab_violations(paths),
         *package_violations(paths),
+        *workflow_violations(paths),
         *version_violations(paths),
     ]
 

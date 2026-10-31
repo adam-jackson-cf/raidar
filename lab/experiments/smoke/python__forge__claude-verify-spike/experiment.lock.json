@@ -841,7 +841,7 @@
       "tree-sitter-language-pack": "0.13.0"
     }
   },
-  "document_sha256": "992b02b97027a92bfe6edf0d3e3be5eb41c7912c40415129fbba219d76d323a5",
+  "document_sha256": "f5eb8f6db49ff5f2229a7310b0514d8db46e5f8f3473ee2577ce585c6fb784a5",
   "execution": {
     "arms": {
       "verify": {
@@ -859,12 +859,12 @@
           "version_pin": "2.1.285",
           "workflow_skills": "placement.skills .claude/skills in the workspace /app"
         },
-        "digest": "eefc0a14267f74c5ccbd0a1090517ef1434d327172e9966801abb6119f280d86",
+        "digest": "50e464ef3295c76b7d46e8105d121615a97bb70fa5bd80fefd9d282670a83b24",
         "model": "claude-sonnet-4-6",
         "packages": {},
         "primitive_code": {
-          "build": "3bb1b7738f7183a1acae8967b0d67e0639f18bc8622ee7c979dc8947346590a5",
-          "verify": "3bb1b7738f7183a1acae8967b0d67e0639f18bc8622ee7c979dc8947346590a5"
+          "build": "6fec511a9f104e27f0f0e739ab7d6992ccee19ae7b39b6ab151b8b2f7446bfdd",
+          "verify": "6fec511a9f104e27f0f0e739ab7d6992ccee19ae7b39b6ab151b8b2f7446bfdd"
         },
         "provider": "anthropic",
         "reasoning": "low",
@@ -873,7 +873,7 @@
           "package": "@anthropic-ai/claude-code",
           "version": "2.1.285"
         },
-        "workflow": "one-shot-verify@3",
+        "workflow": "raidar/one-shot-verify@1",
         "workflow_sha256": "8ed329ac39a77aa5edac4d0e2373832502342275113c15943d3fb8fa88c70c51"
       }
     },
@@ -890,7 +890,7 @@
         {
           "agent": "agent",
           "id": "verify",
-          "workflow": "one-shot-verify@3"
+          "workflow": "raidar/one-shot-verify@1"
         }
       ],
       "attempts": 1,
@@ -1616,7 +1616,7 @@
               "grader": {
                 "environment_id": "sha256:1989940cc347e516b774a3833071b60dbfae6a730e55462cdf38a095e23d8765",
                 "image": "raidar-oracle-grader:963c14e63ff5e15d",
-                "implementation_sha256": "e303c3eec724d679320539fe59a9ab3417abe2c173bba86c6523b42da91188fe"
+                "implementation_sha256": "3a363b442127b5226098cd18e038b64e3f958e9d8054f8eddac7987267851687"
               },
               "not_run": [
                 "native_parity_positive",
@@ -1664,7 +1664,7 @@
         }
       },
       "workflow": {
-        "one-shot-verify@3": {
+        "raidar/one-shot-verify@1": {
           "digest": "8ed329ac39a77aa5edac4d0e2373832502342275113c15943d3fb8fa88c70c51",
           "metadata": {
             "stages": [
@@ -1689,10 +1689,10 @@
   "experiment": {
     "id": "python__forge__claude-verify-spike",
     "source": "experiment.yaml",
-    "source_sha256": "2a97edbc4c182da0b0cb981286c841a46ebf5fafb9f7ce00823df277e7a2bdf8",
-    "spec_sha256": "6af3c535c561454b2ede836e77df4fab17285a4850b8c80e86b94cae916c89b0"
+    "source_sha256": "a1280caf52c8b3980474c05576a49d5f1785a8d9d7a2b2e553c911574cafbd01",
+    "spec_sha256": "408eb487f5523af03227aa1930ededf5682e6e38861d724c648b211df11e2f56"
   },
-  "lock_sha256": "5e28e99784dd835c8283c7a6d7f892b34a1b96957fbe643051f8cf343e06ea8f",
+  "lock_sha256": "5cd77c3af785534d0859ee07b7943d317e217f75890e0af5738165f3cc559de0",
   "lock_version": 5,
   "overrides": {
     "flags": {},
@@ -1701,8 +1701,8 @@
   "sections": {
     "analysis": "81cdc2d12aacc031bb70595c13973ff647ab49a68bebda4be7a9b65ba3127a78",
     "assessment": "dce26b7322a34e10c22c380fff0f675581046b9df217d283beaef5d6a55efb37",
-    "execution": "5e28e99784dd835c8283c7a6d7f892b34a1b96957fbe643051f8cf343e06ea8f",
-    "toolchain": "b47bfa2d2d96479725c7443c4c09feaef38d394859133b82e684052a6b60dc56"
+    "execution": "5cd77c3af785534d0859ee07b7943d317e217f75890e0af5738165f3cc559de0",
+    "toolchain": "9a32fba5858fad219ac72112d73a8896da8790e53180ce35ddc3f94710a30cbc"
   },
   "spec": {
     "agents": [
@@ -1728,7 +1728,7 @@
       {
         "agent": "agent",
         "id": "verify",
-        "workflow": "one-shot-verify@3"
+        "workflow": "raidar/one-shot-verify@1"
       }
     ],
     "assessment": {
@@ -1772,6 +1772,6 @@
     "litellm": "1.102.1",
     "python": "3.13.7",
     "raidar": "0.15.0",
-    "raidar_spec": "509c06f1f05680fb656d04d98f84b95728200d8fe025457e84d3b32311e3928e"
+    "raidar_spec": "056509cc54665388e077fca119c297b6b58f6b60db29b63cc181aed67159023d"
   }
 }

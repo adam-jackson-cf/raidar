@@ -32,8 +32,8 @@ def _benchmark(**changes: Any) -> dict[str, Any]:
     document = experiment_document(kind="benchmark", **changes)
     document["agents"].append({**document["agents"][0], "id": "second"})
     document["arms"] = [
-        {"id": "first", "agent": "luna", "workflow": "one-shot@1"},
-        {"id": "second", "agent": "second", "workflow": "one-shot@1"},
+        {"id": "first", "agent": "luna", "workflow": "raidar/one-shot@1"},
+        {"id": "second", "agent": "second", "workflow": "raidar/one-shot@1"},
     ]
     document["analysis"]["baseline_arm"] = "first"
     return document
@@ -71,9 +71,16 @@ def test_a_benchmark_compares_agents_under_one_workflow(tmp_path: Path) -> None:
     # The tree holds one workflow, so a second one is refused as unreleased (KIND2 itself is
     # pinned on the parsed spec in test_experiment_spec_behaviors).
     two_workflows = _benchmark()
-    two_workflows["arms"][1]["workflow"] = "other@1"
+    two_workflows["arms"][1]["workflow"] = "acme/other@1"
 
     assert "arms.1.workflow" in _issues(write_experiment(tmp_path / "2", two_workflows))
+
+
+def test_an_arm_refuses_a_bare_workflow_during_schema_validation(tmp_path: Path) -> None:
+    document = _benchmark()
+    document["arms"][0]["workflow"] = "one-shot@1"
+
+    assert "arms.0.workflow" in _issues(write_experiment(tmp_path / "bare", document))
 
 
 def test_rank_by_is_a_benchmark_setting_naming_an_outcome_metric(tmp_path: Path) -> None:

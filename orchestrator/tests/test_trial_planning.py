@@ -227,7 +227,7 @@ def test_agent_runs_the_pack_pinned_harness_as_a_workflow_runner_around_the_nati
     config = plan.arms["guided"].agent_config
     assert config.import_path == WorkflowRunner.import_path()
     assert config.model_name == "openai/gpt-6-luna"
-    assert config.kwargs["workflow"] == "one-shot@1"
+    assert config.kwargs["workflow"] == "raidar/one-shot@1"
     native = config.kwargs["inner_agent"]
     assert (native["name"], native["kwargs"]["version"]) == ("codex", "0.156.1")
     assert native["kwargs"]["reasoning_effort"] == "low"

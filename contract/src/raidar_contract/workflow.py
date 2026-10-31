@@ -21,7 +21,7 @@ params, so a package edit or a param change moves the identity of every workflow
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Annotated, Any, Literal, Self
 
 import yaml
@@ -29,6 +29,7 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_valida
 
 from raidar_contract.canonical import digest_json
 from raidar_contract.package.manifest import ParamValue
+from raidar_contract.package.tokens import PLACEHOLDER
 from raidar_contract.releases import STAGE_RELEASE_PATTERN, Release
 
 WORKFLOW_FILE = "workflow.yaml"
@@ -59,6 +60,7 @@ class StageUse(_Model):
 
 class PackageBuild(_Model):
     prompt: str = Field(min_length=1)
+    reply: Literal["acceptance-reply/1"] | None = None
 
     @model_validator(mode="after")
     def _one_task_token(self) -> Self:
@@ -72,18 +74,40 @@ class PackageGate(_Model):
     max_fix_rounds: int = Field(default=0, ge=0)
 
 
+class PackageJudge(_Model):
+    """``jev-judge/1`` inputs; execution policy belongs to the primitive."""
+
+    criteria: str = Field(pattern=r"^[a-z0-9][a-z0-9-]*\.[A-Za-z0-9_-]+$")
+    model: str = Field(min_length=1)
+    closed_at: float = Field(gt=0, le=1)
+    open_at: float = Field(ge=0, lt=1)
+    max_passes: int = Field(ge=1)
+    rework: str = Field(min_length=1)
+
+    @model_validator(mode="after")
+    def _valid_judge(self) -> Self:
+        if self.open_at >= self.closed_at:
+            raise ValueError("judge.open_at must be below judge.closed_at")
+        if sorted(PLACEHOLDER.findall(self.rework)) != ["GATE", "PUSHBACK"]:
+            raise ValueError("judge.rework needs %%%GATE%%% and %%%PUSHBACK%%% exactly once each")
+        return self
+
+
 class PackageWorkflowDefinition(_Model):
     schema_: Literal[2] = Field(alias="schema")
     name: str = Field(pattern=NAME_PATTERN)
     build: PackageBuild
     stages: tuple[StageUse, ...] = ()
     gate: PackageGate = Field(default_factory=PackageGate)
+    judge: PackageJudge | None = None
 
     @model_validator(mode="after")
     def _each_package_once(self) -> Self:
         names = [use.release.name for use in self.stages]
         if len(set(names)) != len(names):
             raise ValueError(f"a package is listed twice: {sorted(names)}")
+        if self.judge is not None and self.build.reply != "acceptance-reply/1":
+            raise ValueError("ST3: judge requires build.reply: acceptance-reply/1")
         return self
 
     @property
@@ -129,6 +153,6 @@ def load_package_workflow(folder: Path, name: str) -> PackageWorkflowDefinition:
         raise PackageWorkflowError(f"{path}: unreadable workflow definition: {exc}") from exc
     except ValidationError as exc:
         raise PackageWorkflowError(f"{path}: invalid workflow definition: {exc}") from exc
-    if definition.name != name:
+    if definition.name != PurePosixPath(name).name:
         raise PackageWorkflowError(f"{path}: name {definition.name!r} must equal its directory")
     return definition

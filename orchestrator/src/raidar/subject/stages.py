@@ -80,7 +80,7 @@ def resolve_stages(
         except StagePackageError as exc:
             raise ReleaseError(f"ST1: {use.use}: {exc}") from exc
         resolved.append(ResolvedStage(stage.release, stage.package, params))
-    issues = package_issues(definition.build.prompt, resolved)
+    issues = package_issues(definition.build.prompt, resolved, judge=definition.judge)
     if issues:
         raise ReleaseError(f"{definition.name}: " + "; ".join(issues))
     return tuple(resolved)

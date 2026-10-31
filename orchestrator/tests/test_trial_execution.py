@@ -266,7 +266,7 @@ def test_a_run_materialises_each_trial_and_writes_step_results(
     assert set(kwargs) <= set(inspect.signature(RaidarVerifier.__init__).parameters)
     assert config.agent.import_path == WorkflowRunner.import_path()
     assert config.agent.kwargs["inner_agent"]["kwargs"]["version"] == "0.156.1"
-    assert config.agent.kwargs["workflow"] == "one-shot@1"
+    assert config.agent.kwargs["workflow"] == "raidar/one-shot@1"
     task = Path(config.task.path or "")
     toml = tomllib.loads((task / "task.toml").read_text())
     assert [s["min_reward"] for s in toml["steps"]] == [{"halt_gate": 1.0}] * 2

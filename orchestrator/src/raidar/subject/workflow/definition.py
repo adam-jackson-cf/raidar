@@ -1,4 +1,4 @@
-"""Workflow definitions: ``lab/workflows/<name>/workflow.yaml``, released as ``<name>@N``.
+"""Workflow definitions: ``lab/workflows/<ns>/<name>/workflow.yaml``, released ``<ns>/<name>@N``.
 
 A workflow names the stages a checkpoint runs through. There are three stage types
 (``define``, ``build``, ``verify``), each with one implementation in Raidar; a workflow holds
@@ -44,7 +44,7 @@ from __future__ import annotations
 
 import re
 import shlex
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Annotated, Any, Literal, Self
 
 import yaml
@@ -380,7 +380,8 @@ def _folder_files(folder: Path, definition_file: Path) -> dict[str, str]:
 
 
 def load_workflow(root: Path, name: str) -> WorkflowDefinition:
-    """Load and validate ``<root>/<name>/workflow.yaml`` and its files; ``name`` equals the dir."""
+    """Load and validate ``<root>/<ns>/<name>/workflow.yaml`` and its files; the manifest's
+    ``name`` is the leaf and equals the directory name."""
     folder = workflow_dir(root, name)
     path = folder / WORKFLOW_FILE
     try:
@@ -396,11 +397,14 @@ def load_workflow(root: Path, name: str) -> WorkflowDefinition:
         raise WorkflowDefinitionError(f"{path}: unreadable workflow definition: {exc}") from exc
     except ValidationError as exc:
         raise WorkflowDefinitionError(f"{path}: invalid workflow definition: {exc}") from exc
-    if definition.name != name:
+    if definition.name != PurePosixPath(name).name:
         raise WorkflowDefinitionError(f"{path}: name {definition.name!r} must equal its directory")
     return definition
 
 
 def workflow_names(root: Path) -> list[str]:
-    """Every workflow defined under ``root``."""
-    return sorted(path.parent.name for path in root.glob(f"*/{WORKFLOW_FILE}"))
+    """Every workflow defined under ``root``, as ``<ns>/<name>``."""
+    return sorted(
+        f"{path.parent.parent.name}/{path.parent.name}"
+        for path in root.glob(f"*/*/{WORKFLOW_FILE}")
+    )

@@ -60,7 +60,7 @@ SCENARIOS = [
 def definition(defining: bool) -> tuple[str, dict[str, Any]]:
     """The workflow's reference and resolved definition: one-shot-verify, or define-build-verify
     without its judge (the define stage really enabled), with the tests check and two fixes."""
-    name = "define-build-verify" if defining else "one-shot-verify"
+    name = "raidar/define-build-verify" if defining else "raidar/one-shot-verify"
     resolved: Any = load_workflow(REAL_LAB / "workflows", name).to_json()
     stages = resolved["stages"]
     stages["verify"]["checks"] = [TESTS_CHECK]

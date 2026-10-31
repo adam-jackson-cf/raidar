@@ -54,8 +54,8 @@ def tree(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     monkeypatch.setattr(package_checks, "uv_lock_stale", lambda tool: None)
     root = release_tree(tmp_path / "repo")
     fixture_package("gate-check", stages_root(root))
-    folder = workflows_root(root) / "gated"
-    folder.mkdir()
+    folder = workflows_root(root) / "acme" / "gated"
+    folder.mkdir(parents=True)
     (folder / "workflow.yaml").write_text(
         yaml.safe_dump(
             {
@@ -70,8 +70,8 @@ def tree(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     register["stages"] = {
         "acme/gate-check@1": load_stage_package(stages_root(root) / "acme" / "gate-check").digest
     }
-    register["workflows"]["gated@1"] = released_workflow(
-        "gated@1", repo_root=root, draft=True
+    register["workflows"]["acme/gated@1"] = released_workflow(
+        "acme/gated@1", repo_root=root, draft=True
     ).digest
     releases_file(root).write_text(yaml.safe_dump(register))
     return root
@@ -102,12 +102,12 @@ def _write_proof(digest: str, *, arch: str = "arm64", tree_digest: str = "t" * 6
 
 
 def test_a_package_arm_records_packages_and_primitive_code_never_stage_code(tree: Path) -> None:
-    workflow = released_workflow("gated@1", repo_root=tree)
+    workflow = released_workflow("acme/gated@1", repo_root=tree)
     (stage,) = workflow.stages
     _write_proof(stage.package.digest)
     evidence = {stage.release.name: load_evidence(stage)}
 
-    identity = _arm(tree, "gated@1", evidence).identity()
+    identity = _arm(tree, "acme/gated@1", evidence).identity()
 
     assert "stage_code" not in identity
     assert identity["workflow_sha256"] == workflow.digest
@@ -124,24 +124,28 @@ def test_a_package_arm_records_packages_and_primitive_code_never_stage_code(tree
 
 
 def test_the_proof_is_part_of_the_arm_digest(tree: Path) -> None:
-    (stage,) = released_workflow("gated@1", repo_root=tree).stages
+    (stage,) = released_workflow("acme/gated@1", repo_root=tree).stages
     _write_proof(stage.package.digest, tree_digest="a" * 64)
-    first = _arm(tree, "gated@1", {"acme/gate-check": load_evidence(stage)}).identity()["digest"]
+    first = _arm(tree, "acme/gated@1", {"acme/gate-check": load_evidence(stage)}).identity()[
+        "digest"
+    ]
     _write_proof(stage.package.digest, tree_digest="b" * 64)
-    second = _arm(tree, "gated@1", {"acme/gate-check": load_evidence(stage)}).identity()["digest"]
+    second = _arm(tree, "acme/gated@1", {"acme/gate-check": load_evidence(stage)}).identity()[
+        "digest"
+    ]
 
     assert first != second
 
 
 def test_a_spike_arm_has_no_packages_and_is_identified_by_stage_type(tree: Path) -> None:
-    identity = _arm(tree, "one-shot@1").identity()
+    identity = _arm(tree, "raidar/one-shot@1").identity()
 
     assert identity["packages"] == {}
     assert set(identity["primitive_code"]) == {"build"}  # type: ignore[arg-type]
 
 
 def test_primitive_code_is_deterministic_adapter_bound_and_core_is_adapter_free(tree: Path) -> None:
-    (stage,) = released_workflow("gated@1", repo_root=tree).stages
+    (stage,) = released_workflow("acme/gated@1", repo_root=tree).stages
     contracts = {"gate/1"}
 
     codex = primitive_code(contracts, AgentName.CODEX)
@@ -158,7 +162,7 @@ def test_primitive_code_is_deterministic_adapter_bound_and_core_is_adapter_free(
 
 
 def test_a_normal_arm_needs_the_stage_check_proof_a_draft_may_lack_it(tree: Path) -> None:
-    (stage,) = released_workflow("gated@1", repo_root=tree).stages
+    (stage,) = released_workflow("acme/gated@1", repo_root=tree).stages
 
     missing = evidence_issues(stage, load_evidence(stage))
     assert missing
@@ -193,7 +197,7 @@ def test_a_stop_needs_its_check_record_and_the_lock_binds_it(tmp_path: Path) -> 
 
 
 def test_a_normal_arm_without_proof_is_refused_and_a_draft_records_it_absent(tree: Path) -> None:
-    workflow = released_workflow("gated@1", repo_root=tree)
+    workflow = released_workflow("acme/gated@1", repo_root=tree)
 
     with pytest.raises(ArmResolutionError, match="make stage-check NAME=acme/gate-check"):
         workflow_evidence(workflow)

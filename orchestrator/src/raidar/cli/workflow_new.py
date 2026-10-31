@@ -1,8 +1,9 @@
 """``raidar workflow new``: start a workflow definition from an existing one.
 
-The new workflow is a copy of ``lab/workflows/<from>/`` (default ``one-shot-verify``) under its
-own name; nothing is released until its register line is added (``make releases-check`` prints
-it). An existing folder is never overwritten.
+The new workflow ``<ns>/<name>`` is a copy of ``lab/workflows/<from>/`` (default
+``raidar/one-shot-verify``) under its own name; its manifest ``name`` is the leaf. Nothing is
+released until its register line is added (``make releases-check`` prints it). An existing
+folder is never overwritten.
 """
 
 from __future__ import annotations
@@ -15,9 +16,9 @@ import yaml
 
 from raidar.contract.paths import workflows_root
 
-DEFAULT_TEMPLATE = "one-shot-verify"
+DEFAULT_TEMPLATE = "raidar/one-shot-verify"
 WORKFLOW_FILE = "workflow.yaml"
-_NAME = re.compile(r"^[a-z0-9][a-z0-9-]*$")
+_NAME = re.compile(r"^[a-z0-9][a-z0-9-]*/[a-z0-9][a-z0-9-]*$")
 
 
 def register(main: click.Group) -> None:
@@ -32,7 +33,8 @@ def workflow() -> None:
 def _name(value: str, hint: str) -> str:
     if not _NAME.fullmatch(value):
         raise click.BadParameter(
-            f"{value!r} is not a workflow name: lowercase letters, digits, '-'", param_hint=hint
+            f"{value!r} is not a workflow name: <ns>/<name> of lowercase letters, digits, '-'",
+            param_hint=hint,
         )
     return value
 
@@ -60,7 +62,8 @@ def workflow_new(name: str, template: str) -> None:
     if not isinstance(document, dict) or "name" not in document:
         shutil.rmtree(target)
         raise click.ClickException(f"{source / WORKFLOW_FILE} is not a workflow definition")
-    renamed = re.sub(r"(?m)^name:.*$", f"name: {name}", path.read_text(encoding="utf-8"), count=1)
+    leaf = name.rsplit("/", 1)[-1]
+    renamed = re.sub(r"(?m)^name:.*$", f"name: {leaf}", path.read_text(encoding="utf-8"), count=1)
     path.write_text(renamed, encoding="utf-8")
     click.echo(f"Wrote {target} (from {template})")
     click.echo("Next: edit it, then make releases-check prints the register line to add")

@@ -841,7 +841,7 @@
       "tree-sitter-language-pack": "0.13.0"
     }
   },
-  "document_sha256": "0bb21d00a5d7f7177de57a4348f3ac6f34d23a312344e5b8a9e45f06e7909d5a",
+  "document_sha256": "5644ed85daf90d3f048c6388a9aa25083883046a2100a7e1c956db16701e8f2d",
   "execution": {
     "arms": {
       "verify": {
@@ -859,12 +859,12 @@
           "version_pin": "0.156.1",
           "workflow_skills": "placement.skills .agents/skills in the workspace /app"
         },
-        "digest": "a38bcae0347b2dff27ccd5a771f5695103e3a39a78db0bd48865e18af945c065",
+        "digest": "c6f3983f39f9a15cabc71274871de104f0123df66c7e25b98c502defc9e0e77b",
         "model": "gpt-6-luna",
         "packages": {},
         "primitive_code": {
-          "build": "964bb196c098bf22534ed75b15b844056ed072cc714ce71d41a427d095282b8c",
-          "verify": "964bb196c098bf22534ed75b15b844056ed072cc714ce71d41a427d095282b8c"
+          "build": "e83e549a04207d34cf285c911431baa81e2dc9da1166e164109ee609caca9da1",
+          "verify": "e83e549a04207d34cf285c911431baa81e2dc9da1166e164109ee609caca9da1"
         },
         "provider": "openai",
         "reasoning": "low",
@@ -873,7 +873,7 @@
           "package": "@openai/codex",
           "version": "0.156.1"
         },
-        "workflow": "one-shot-verify@3",
+        "workflow": "raidar/one-shot-verify@1",
         "workflow_sha256": "8ed329ac39a77aa5edac4d0e2373832502342275113c15943d3fb8fa88c70c51"
       }
     },
@@ -890,7 +890,7 @@
         {
           "agent": "agent",
           "id": "verify",
-          "workflow": "one-shot-verify@3"
+          "workflow": "raidar/one-shot-verify@1"
         }
       ],
       "attempts": 1,
@@ -1616,7 +1616,7 @@
               "grader": {
                 "environment_id": "sha256:1989940cc347e516b774a3833071b60dbfae6a730e55462cdf38a095e23d8765",
                 "image": "raidar-oracle-grader:963c14e63ff5e15d",
-                "implementation_sha256": "e303c3eec724d679320539fe59a9ab3417abe2c173bba86c6523b42da91188fe"
+                "implementation_sha256": "3a363b442127b5226098cd18e038b64e3f958e9d8054f8eddac7987267851687"
               },
               "not_run": [
                 "native_parity_positive",
@@ -1664,7 +1664,7 @@
         }
       },
       "workflow": {
-        "one-shot-verify@3": {
+        "raidar/one-shot-verify@1": {
           "digest": "8ed329ac39a77aa5edac4d0e2373832502342275113c15943d3fb8fa88c70c51",
           "metadata": {
             "stages": [
@@ -1689,10 +1689,10 @@
   "experiment": {
     "id": "python__forge__verify-spike",
     "source": "experiment.yaml",
-    "source_sha256": "94b81aa695cad72df818fab82d776ca2f6d5a96d615ed7de8a5d4859337a5d70",
-    "spec_sha256": "80ebd448a2407fd78dcc90237a9769833ef89ddfef02f2492326eba147990400"
+    "source_sha256": "78f0e83fff735556e691a7ba0f565412b51c7039472c10cfd88b7d85ef5c1571",
+    "spec_sha256": "39f79facfa1ff583aa5beacf24512b6666c9723158651d37c0e9932ff29be1f7"
   },
-  "lock_sha256": "f7bf5b9efaa513f12f67c63457d0e4ea401dcdb96b026640a7dab95a40a00857",
+  "lock_sha256": "9faf8af08c6666e33c1c5f5a075cb1fff279ba51cad9b5a8239bfb79444e462f",
   "lock_version": 5,
   "overrides": {
     "flags": {},
@@ -1701,8 +1701,8 @@
   "sections": {
     "analysis": "81cdc2d12aacc031bb70595c13973ff647ab49a68bebda4be7a9b65ba3127a78",
     "assessment": "dce26b7322a34e10c22c380fff0f675581046b9df217d283beaef5d6a55efb37",
-    "execution": "f7bf5b9efaa513f12f67c63457d0e4ea401dcdb96b026640a7dab95a40a00857",
-    "toolchain": "b47bfa2d2d96479725c7443c4c09feaef38d394859133b82e684052a6b60dc56"
+    "execution": "9faf8af08c6666e33c1c5f5a075cb1fff279ba51cad9b5a8239bfb79444e462f",
+    "toolchain": "9a32fba5858fad219ac72112d73a8896da8790e53180ce35ddc3f94710a30cbc"
   },
   "spec": {
     "agents": [
@@ -1728,7 +1728,7 @@
       {
         "agent": "agent",
         "id": "verify",
-        "workflow": "one-shot-verify@3"
+        "workflow": "raidar/one-shot-verify@1"
       }
     ],
     "assessment": {
@@ -1745,7 +1745,7 @@
         "process-compliance@11"
       ]
     },
-    "description": "Verify-stage spike on forge (one-shot-verify@3); not citable.",
+    "description": "Verify-stage spike on forge (raidar/one-shot-verify@1); not citable.",
     "environment": {
       "compose_init": true,
       "type": "docker"
@@ -1772,6 +1772,6 @@
     "litellm": "1.102.1",
     "python": "3.13.7",
     "raidar": "0.15.0",
-    "raidar_spec": "509c06f1f05680fb656d04d98f84b95728200d8fe025457e84d3b32311e3928e"
+    "raidar_spec": "056509cc54665388e077fca119c297b6b58f6b60db29b63cc181aed67159023d"
   }
 }

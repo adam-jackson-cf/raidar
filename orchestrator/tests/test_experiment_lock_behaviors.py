@@ -280,7 +280,7 @@ def test_conflicting_tool_pins_are_rejected(tmp_path: Path) -> None:
     path = write_experiment(tmp_path, experiment_document())
     problem, agent, _, scorer = fixture_resolvers()
     workflow = InMemoryResolver(
-        RefKind.WORKFLOW, {"one-shot@1": {}}, tool_versions={"pytest": "7.0.0"}
+        RefKind.WORKFLOW, {"raidar/one-shot@1": {}}, tool_versions={"pytest": "7.0.0"}
     )
     resolvers = ResolverSet(
         [problem, agent, workflow, scorer, MetricResolver()], entry_point_group=None
