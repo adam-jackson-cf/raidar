@@ -11,6 +11,7 @@ import os
 import shutil
 import subprocess
 import sys
+import venv
 from argparse import Namespace
 from collections.abc import AsyncIterator, Iterator
 from dataclasses import dataclass, field
@@ -37,7 +38,7 @@ from raidar.subject.primitive.gate import (
     context_path,
     gate_config,
 )
-from raidar.subject.primitive.payload import walk
+from raidar.subject.primitive.payload import install_tree, walk
 from tests.workflow_support import LocalEnvironment
 
 FIXTURE = Path(__file__).parent / "fixtures" / "stages" / "acme" / "gate-check"
@@ -154,7 +155,7 @@ def make_rig(tmp_path: Path, source: Path | None = None) -> Rig:
 def fixture_checks(rig: Rig) -> tuple[GateCheck, ...]:
     """The gate-check package's checks; its ``gate-check`` command is a test-authored stand-in."""
     manifest = parse_manifest((FIXTURE / "stage.yaml").read_text(encoding="utf-8"))
-    rig.installed.commands = {"gate-check": [str(rig.script("gate-check-scan", SCAN))]}
+    rig.script("gate-check", SCAN)
     return tuple(manifest.gate)
 
 
@@ -195,13 +196,30 @@ def test_a_fresh_command_name_runs_unmodified_in_a_clean_environment(
     assert not Path(homes[0]).exists()  # fresh per call, gone after
 
 
-def test_a_tool_command_name_expands_to_the_installed_argv(tmp_path: Path) -> None:
+def test_a_tool_command_runs_the_installed_wrapper_and_its_venv(tmp_path: Path) -> None:
     rig = make_rig(tmp_path, PASS)
+    root = Path(rig.installed.root)
+    tool_venv = root / "venv"
+    venv.EnvBuilder(symlinks=True).create(tool_venv)
+    site = next((tool_venv / "lib").glob("python*/site-packages"))
+    (site / "zorp_probe.py").write_text(
+        "import json, sys\nfrom pathlib import Path\n"
+        "Path(sys.argv[1]).write_text(json.dumps("
+        "{'argv': sys.argv[1:], 'prefix': sys.prefix}))\n"
+    )
+    links = tmp_path / "links"
+    links.mkdir()
+    rig.installed.commands = {"zorp": ["python", "-I", "-B", "-m", "zorp_probe"]}
+    install_tree._wrap(root, rig.installed.commands, str(links))
+    rig.installed.path = f"{root}/bin:{rig.installed.path}"
     seen = tmp_path / "seen.json"
-    rig.installed.commands = {"zorp": [str(rig.script("zorp-real", PROBE)), str(seen)]}
-    decision = rig.decide([command("lint", "zorp", "--all")])
+
+    decision = rig.decide([command("lint", "zorp", str(seen), "--all")])
+
     assert decision.verdict == "passed"
-    assert json.loads(seen.read_text())["argv"] == [str(seen), "--all"]
+    facts = json.loads(seen.read_text())
+    assert facts["argv"] == [str(seen), "--all"]
+    assert Path(facts["prefix"]) == tool_venv
 
 
 def test_watched_state_runs_nothing_but_is_witnessed(tmp_path: Path) -> None:

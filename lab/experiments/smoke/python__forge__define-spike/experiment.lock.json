@@ -1075,7 +1075,7 @@
       "tree-sitter-language-pack": "0.13.0"
     }
   },
-  "document_sha256": "dd4dd39f21d51c7170a1d0169eca88fd5257ae54d26e5b7b8a3e868bd375f7e7",
+  "document_sha256": "531df01302e47e6b322fd4f38f6dc9e8b6ac1ce2371955bc4ba4378ab67b26ba",
   "execution": {
     "arms": {
       "define": {
@@ -1093,13 +1093,13 @@
           "version_pin": "0.156.1",
           "workflow_skills": "placement.skills .agents/skills in the workspace /app"
         },
-        "digest": "14900e6eb6341eac558604e4e93af1aeaa7b0d01489416e2c2bccd3a9197aadb",
+        "digest": "806911982f8226b773294e34e429f3ca3c7ae18573f494bf63271939a354408a",
         "model": "gpt-6-luna",
         "packages": {},
         "primitive_code": {
-          "build": "41fd99f4d719533b380e518d567848f5a5989bb7027c4b8ed613ae5a069e89b3",
-          "define": "41fd99f4d719533b380e518d567848f5a5989bb7027c4b8ed613ae5a069e89b3",
-          "verify": "41fd99f4d719533b380e518d567848f5a5989bb7027c4b8ed613ae5a069e89b3"
+          "build": "488e6951e59d8354315326f2258379371d7ed7eaaa9d1fd49087fc3d9a660d22",
+          "define": "488e6951e59d8354315326f2258379371d7ed7eaaa9d1fd49087fc3d9a660d22",
+          "verify": "488e6951e59d8354315326f2258379371d7ed7eaaa9d1fd49087fc3d9a660d22"
         },
         "provider": "openai",
         "reasoning": "low",
@@ -1902,7 +1902,7 @@
     "source_sha256": "256117da1b3857cd2a42d0adb03ee5bb3032606db7244f5e397a8ea413df12b5",
     "spec_sha256": "b9e283d4a287ed484054c50a04db068633671025e67f12d7d98013fb2649b8f9"
   },
-  "lock_sha256": "24d1f2326175492b38d0b019ad3282ded6166c5accf3d819a133f22ae9d2fa83",
+  "lock_sha256": "2c95ec5bb3ce71dca8425e03250398bce63f011da00d0147a110d8c12be20100",
   "lock_version": 5,
   "overrides": {
     "flags": {},
@@ -1911,7 +1911,7 @@
   "sections": {
     "analysis": "f7f0b52ed6909ba0f3864eb9e7f7d513625da8dc445234304b8aa033c4343cb6",
     "assessment": "5e1576f0ec24723e51378d7939611a762da3a04ea069c5e690624f0160c2120e",
-    "execution": "24d1f2326175492b38d0b019ad3282ded6166c5accf3d819a133f22ae9d2fa83",
+    "execution": "2c95ec5bb3ce71dca8425e03250398bce63f011da00d0147a110d8c12be20100",
     "toolchain": "8aead72e2be8c5327134e6a09c1dc8c37b684f67819ccab4b97875b369c8e5ef"
   },
   "spec": {

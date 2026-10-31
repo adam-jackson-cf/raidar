@@ -108,7 +108,7 @@ def test_planted_test_code_exiting_126_under_a_passing_canary_is_an_agent_outcom
     outcome = outcomes["planted_exit_126"]
     assert outcome["invalid"] is None
     gate = outcome["record"]["gate/1"]
-    assert gate["canary"]["verdict"] in ("passed", "refused")  # the starting workspace decided
+    assert gate["canary"]["verdict"] == "passed"
     assert gate["gates"][-1]["verdict"] == "error"  # the planted conftest killed pytest
 
 
@@ -117,5 +117,7 @@ def test_planted_test_code_running_past_the_timeout_is_an_agent_outcome(
 ) -> None:
     outcome = outcomes["planted_timeout"]
     assert outcome["invalid"] is None
-    checks = outcome["record"]["gate/1"]["gates"][-1]["checks"]
+    gate = outcome["record"]["gate/1"]
+    assert gate["canary"]["verdict"] == "passed"
+    checks = gate["gates"][-1]["checks"]
     assert {c["cause"] for c in checks if c["status"] == "error"} == {"timeout"}

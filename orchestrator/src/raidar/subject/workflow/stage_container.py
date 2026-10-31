@@ -30,10 +30,18 @@ class ContainerError(RuntimeError):
 class PackContainer:
     """One offline container of ``image`` on ``docker_context``; use as ``async with``."""
 
-    def __init__(self, image: str, docker_context: str, docker_bin: str = "docker") -> None:
+    def __init__(
+        self,
+        image: str,
+        docker_context: str,
+        docker_bin: str = "docker",
+        *,
+        default_user: str | int = 1000,
+    ) -> None:
         self.image = image
         self.docker_context = docker_context
         self.docker_bin = docker_bin
+        self.default_user = default_user
         self.name = f"raidar-stage-check-{uuid.uuid4().hex[:12]}"
 
     def _docker(self, *args: str) -> list[str]:
@@ -99,10 +107,8 @@ class PackContainer:
         timeout_sec: int | None = None,
         user: str | int | None = None,
     ) -> ExecResult:
-        """Run ``command`` through ``bash -c``; a failure to exec raises ``ContainerError``."""
-        argv = self._docker("exec")
-        if user is not None:
-            argv += ["--user", str(user)]
+        """Run as the default agent user unless explicitly overridden (including root)."""
+        argv = self._docker("exec", "--user", str(self.default_user if user is None else user))
         if cwd:
             argv += ["--workdir", cwd]
         for key, value in sorted((env or {}).items()):

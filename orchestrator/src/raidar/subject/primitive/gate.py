@@ -171,13 +171,9 @@ class GateOutcome:
         return self.attribution in (Attribution.REFUSED, Attribution.AGENT_ERROR)
 
 
-def check_argv(package: GatePackage, check: GateCheck) -> list[str]:
-    """A check's argv: ``run`` unmodified, its first word expanded when it names a tool command."""
-    run = list(check.run or ())
-    commands = package.installed.commands
-    if check.kind != "pytest" and run and run[0] in commands:
-        return [*commands[run[0]], *run[1:]]
-    return run
+def check_argv(check: GateCheck) -> list[str]:
+    """Return the declared argv; tool commands resolve through the package's own PATH."""
+    return list(check.run or ())
 
 
 def context_path(paths: GatePaths, package: GatePackage) -> str:
@@ -189,7 +185,7 @@ def _check_entries(paths: GatePaths, packages: Sequence[GatePackage]) -> list[di
         {
             "name": f"{package.name}.{check.name}",
             "kind": check.kind,
-            "argv": check_argv(package, check),
+            "argv": check_argv(check),
             "before": check.before,
             "closed_flag": package.closed_flag,
             "timeout_s": check.timeout_s,

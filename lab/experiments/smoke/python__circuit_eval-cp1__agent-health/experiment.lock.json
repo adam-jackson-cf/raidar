@@ -281,7 +281,7 @@
     },
     "tools": {}
   },
-  "document_sha256": "c61a0c11881705e17f98439d49e78ff97e1b86a267239e8a7f5f07e1c7c354e5",
+  "document_sha256": "e4cd1582adcda918c3858f22e1f7082ebc0387a65e58c73442220c63f5fd244e",
   "execution": {
     "arms": {
       "baseline": {
@@ -299,11 +299,11 @@
           "version_pin": "0.156.1",
           "workflow_skills": "placement.skills .agents/skills in the workspace /app"
         },
-        "digest": "6a30376e81af009cd3917a3c87faac16c6ca8ba10787955b4fc7cdb36ffd1e32",
+        "digest": "0b3bbbfaf666910fce30101be65ed0e0e3d734daac5b6f303c05f26bf990c516",
         "model": "gpt-6-luna",
         "packages": {},
         "primitive_code": {
-          "build": "41fd99f4d719533b380e518d567848f5a5989bb7027c4b8ed613ae5a069e89b3"
+          "build": "488e6951e59d8354315326f2258379371d7ed7eaaa9d1fd49087fc3d9a660d22"
         },
         "provider": "openai",
         "reasoning": "low",
@@ -450,9 +450,9 @@
             "task_sha256": "0cdda12fb5a2c68270f63581682b7f7e94a0cc8be0641a0ab1b78142cf278938",
             "validation": {
               "grader": {
-                "environment_id": "sha256:715698bfd52661aa5627a3a9d22ea24db40b3716e5d78c6c8793976055973c06",
+                "environment_id": "sha256:1989940cc347e516b774a3833071b60dbfae6a730e55462cdf38a095e23d8765",
                 "image": "raidar-oracle-grader:963c14e63ff5e15d",
-                "implementation_sha256": null
+                "implementation_sha256": "4520a3d16ca56fd6d838293b9b9e71e9e493441d74c97982fd6c0ed9ee95cec2"
               },
               "not_run": [
                 "native_parity_positive",
@@ -460,13 +460,13 @@
               ],
               "spec_determinacy": {
                 "assertions": {
-                  "audited": 0,
-                  "total": null
+                  "audited": 2,
+                  "total": 80
                 },
-                "audit_version": null,
+                "audit_version": 2,
                 "flagged": [],
-                "flagged_count": null,
-                "status": "unmeasured"
+                "flagged_count": 0,
+                "status": "measured"
               },
               "verdict": "validated_partial"
             }
@@ -501,7 +501,7 @@
     "source_sha256": "d5b43b3f61d83800e21bce84ea068a742782d9c9928a2fa4f6d0dd5154344f48",
     "spec_sha256": "4ecb77b15575200e12b679ad39d4c8cd0bef56e7129fd846ae92f7f2f0f0718e"
   },
-  "lock_sha256": "97e9fa3e0e821b8ee58aa4100283dab49074d2b524502200ed39e607bacef0f8",
+  "lock_sha256": "971642b154f48501685e68dd2e031070e44553d9f338edb77a51b7dae2b77975",
   "lock_version": 5,
   "overrides": {
     "flags": {},
@@ -510,7 +510,7 @@
   "sections": {
     "analysis": "a9e70f16a3d8fde7db8251be753771af765c98ad0c0b01202934c7622c4976f4",
     "assessment": "1a03b6026846c2bcdea82d56358bedf4f0ba6dd156ed5724657e53aa469877ba",
-    "execution": "97e9fa3e0e821b8ee58aa4100283dab49074d2b524502200ed39e607bacef0f8",
+    "execution": "971642b154f48501685e68dd2e031070e44553d9f338edb77a51b7dae2b77975",
     "toolchain": "8aead72e2be8c5327134e6a09c1dc8c37b684f67819ccab4b97875b369c8e5ef"
   },
   "spec": {
