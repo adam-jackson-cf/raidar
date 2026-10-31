@@ -34,8 +34,8 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import yaml
+from raidar_contract.canonical import digest_json
 
-from raidar.contract.canonical import digest_json
 from raidar.design.experiment.lock import default_lock_path
 from raidar.design.experiment.schema import ExperimentSpec
 from raidar.engine.job.assessment import rescore_config

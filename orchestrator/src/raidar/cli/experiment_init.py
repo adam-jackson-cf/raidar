@@ -16,9 +16,9 @@ import re
 from pathlib import Path
 
 import click
+from raidar_contract.releases import ReleaseKind, load_register
 
 from raidar.contract.paths import releases_file
-from raidar.contract.releases import ReleaseKind, load_register
 
 DEFAULT_PROBLEM = "scb/circuit_eval.checkpoint_1@38d627ecf668"
 _EXPERIMENT_ID = re.compile(r"^python__[a-z0-9][a-z0-9_.-]*__[a-z0-9][a-z0-9_-]*$")

@@ -7,9 +7,9 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+from raidar_contract.package import StagePackageError
+from raidar_contract.package.registry import load_stage_package
 
-from raidar.subject.package import StagePackageError
-from raidar.subject.package.registry import load_stage_package
 from tests.package_support import fixture_package, write_package
 
 

@@ -10,7 +10,7 @@ import importlib
 from types import ModuleType
 
 PRIMITIVE_MODULES: dict[str, str] = {
-    "frame/1": "raidar.subject.primitive.frame",
+    "frame/1": "raidar_contract.package.tokens",
     "install/1": "raidar.subject.primitive.install",
     "setup/1": "raidar.subject.primitive.setup",
     "gate/1": "raidar.subject.primitive.gate",

@@ -13,8 +13,9 @@ import json
 from dataclasses import dataclass, field
 from pathlib import Path, PurePosixPath
 
-from raidar.contract.criteria import validate_criteria
-from raidar.subject.package.manifest import Output
+from raidar_contract.criteria import validate_criteria
+from raidar_contract.package.manifest import Output
+
 from raidar.subject.primitive.calls import TransportError, TreeManifest, snapshot_state
 from raidar.subject.primitive.site import PackageSite, TrialInvalid
 

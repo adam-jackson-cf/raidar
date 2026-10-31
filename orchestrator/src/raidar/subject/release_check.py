@@ -14,8 +14,10 @@ import subprocess
 from collections.abc import Callable
 from pathlib import Path
 
-from raidar.contract.paths import REPO_ROOT, agents_root, releases_file, stages_root, workflows_root
-from raidar.contract.releases import (
+from raidar_contract.agent import AgentDefinition, agent_names
+from raidar_contract.package import StagePackageError
+from raidar_contract.package.registry import load_stage_package
+from raidar_contract.releases import (
     ReleaseError,
     ReleaseKind,
     ReleaseRegister,
@@ -23,10 +25,10 @@ from raidar.contract.releases import (
     parse_register,
     rewritten_releases,
 )
-from raidar.subject.agent.definition import AgentDefinition, agent_names, load_agent
+
+from raidar.contract.paths import REPO_ROOT, agents_root, releases_file, stages_root, workflows_root
+from raidar.subject.agent.definition import harness_of, load_agent
 from raidar.subject.environment import available_runtimes, load_runtime_pack
-from raidar.subject.package import StagePackageError
-from raidar.subject.package.registry import load_stage_package
 from raidar.subject.releases import DEFINITION_ERRORS, tree_workflow_digest
 from raidar.subject.stages import stage_names
 from raidar.subject.workflow.definition import workflow_names
@@ -67,7 +69,8 @@ def _pin_issues(agents: list[AgentDefinition]) -> list[str]:
     for runtime in available_runtimes():
         pack = load_runtime_pack(runtime)
         for agent in agents:
-            pin = pack.image.harnesses.get(agent.harness.value)
+            harness = harness_of(agent)
+            pin = pack.image.harnesses.get(harness.value)
             if pin is None:
                 continue
             baked = (pin.npm_package, pin.executable, pin.version)
@@ -75,7 +78,7 @@ def _pin_issues(agents: list[AgentDefinition]) -> list[str]:
             if baked != pinned:
                 issues.append(
                     f"agents/{agent.name}: tool {pinned} differs from pack {pack.id} "
-                    f"image.harnesses.{agent.harness.value} {baked}; the agent pin is the source"
+                    f"image.harnesses.{harness.value} {baked}; the agent pin is the source"
                 )
     return issues
 

@@ -14,9 +14,13 @@ from typing import Any
 from harbor.models.task.config import EnvironmentConfig as TaskEnvironmentConfig
 from harbor.models.trial.config import TrialConfig
 from harbor.trial.trial import Trial
+from raidar_contract.canonical import digest_json
 
-from raidar.contract.canonical import digest_json
-from raidar.contract.source_digest import SOURCE_DIGEST_SCHEME, python_source_digest
+from raidar.contract.source_digest import (
+    SOURCE_DIGEST_SCHEME,
+    contract_sources,
+    python_source_digest,
+)
 from raidar.design.experiment.lock import spec_source_digest
 from raidar.engine.job.detach import git_state
 from raidar.engine.trial.config import verifier_timeout_s
@@ -42,6 +46,7 @@ def execution_source_digest(source_root: Path | None = None) -> str:
     }
     if not modules:
         raise ValueError(f"no Raidar Python source found under {root}")
+    modules.update({key: python_source_digest(path) for key, path in contract_sources().items()})
     return digest_json({"scheme": SOURCE_DIGEST_SCHEME, "modules": modules})
 
 

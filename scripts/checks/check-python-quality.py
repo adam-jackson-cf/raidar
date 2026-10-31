@@ -17,6 +17,7 @@ CLASS_MAX_INIT_ARGS = 8
 CLASS_MAX_INSTANCE_ATTRIBUTES = 12
 
 MAINTAINED_ROOTS = (
+    "contract/src/raidar_contract/",
     "orchestrator/src/raidar/",
     "orchestrator/tests/",
     "scripts/checks/",

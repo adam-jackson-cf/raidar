@@ -8,10 +8,10 @@ from pathlib import Path
 
 import pytest
 from click.testing import CliRunner
+from raidar_contract.releases import Release, ReleaseError
 
 from raidar.cli import main
 from raidar.contract.paths import agents_root
-from raidar.contract.releases import Release, ReleaseError
 from raidar.subject.agent.definition import load_agent
 from raidar.subject.release_check import release_base, release_issues
 from raidar.subject.releases import released_agent, released_workflow

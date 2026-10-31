@@ -9,18 +9,18 @@ from pathlib import Path
 
 import pytest
 import yaml
+from raidar_contract.agent import AgentName
+from raidar_contract.package.registry import load_stage_package
 
 from raidar.contract.paths import releases_file, stage_checks_root, stages_root, workflows_root
+from raidar.design.experiment.agent import ResolvedAgent
 from raidar.design.experiment.arm import (
     ArmResolutionError,
-    ResolvedAgent,
     ResolvedArm,
     workflow_evidence,
 )
 from raidar.design.experiment.schema import AgentEntry
-from raidar.subject.agent.config import AgentName
 from raidar.subject.draft import draft_resolution
-from raidar.subject.package.registry import load_stage_package
 from raidar.subject.primitive.registry import PRIMITIVE_MODULES
 from raidar.subject.releases import ReleasedAgent, released_agent, released_workflow
 from raidar.subject.workflow import package_checks
@@ -170,7 +170,8 @@ def test_a_normal_arm_needs_the_stage_check_proof_a_draft_may_lack_it(tree: Path
 
 
 def test_a_stop_needs_its_check_record_and_the_lock_binds_it(tmp_path: Path) -> None:
-    from raidar.contract.releases import Release
+    from raidar_contract.releases import Release
+
     from raidar.subject.workflow.package_checks import ResolvedStage
 
     package = load_stage_package(fixture_package("note-state", tmp_path))

@@ -33,8 +33,9 @@ from enum import StrEnum
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal
 
+from raidar_contract.package.manifest import GateCheck, Output
+
 from raidar.contract.snapshot import SNAPSHOT_EXCLUDES, tree_digest
-from raidar.subject.package.manifest import GateCheck, Output
 from raidar.subject.primitive import calls, gate_tool
 from raidar.subject.primitive.gate_outputs import CheckOutputs
 

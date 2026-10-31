@@ -11,7 +11,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
-from raidar.contract.canonical import digest_json
+from raidar_contract.canonical import digest_json
+
 from raidar.contract.references import RefKind, RegistryRef, ResolvedReference
 from raidar.scoring.definition_coverage.manifest import DEFINITION_COVERAGE
 from raidar.scoring.framework.builtin_manifests import BUILTIN_MANIFESTS

@@ -10,9 +10,9 @@ from typing import Any
 import pytest
 from click.testing import CliRunner
 from pydantic import ValidationError
+from raidar_contract.canonical import digest_json
 
 from raidar.cli import main
-from raidar.contract.canonical import digest_json
 from raidar.design.experiment.loader import load_experiment
 from raidar.design.experiment.lock import LockError
 from raidar.design.experiment.schema import ProblemEntry

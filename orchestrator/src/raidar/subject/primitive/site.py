@@ -18,8 +18,8 @@ from pathlib import Path
 from typing import Any, Literal
 
 from pydantic import JsonValue
+from raidar_contract.package.manifest import StagePackage
 
-from raidar.subject.package.manifest import StagePackage
 from raidar.subject.primitive.calls import (
     CallResult,
     CallRunner,

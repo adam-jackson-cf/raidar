@@ -47,8 +47,8 @@ from enum import StrEnum
 from pathlib import Path, PurePosixPath
 
 from pydantic import Field
+from raidar_contract.canonical import digest_json
 
-from raidar.contract.canonical import digest_json
 from raidar.contract.snapshot import SNAPSHOT_EXCLUDES
 from raidar.scoring.framework.manifest import SdkModel
 

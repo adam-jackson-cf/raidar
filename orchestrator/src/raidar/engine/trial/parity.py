@@ -24,7 +24,8 @@ from typing import Any
 from raidar.contract.trial import AgentProcess, ParityRecord
 from raidar.engine.health.liveness import LivenessConfig
 from raidar.engine.trial.workspace import seeded_digest
-from raidar.subject.workflow.runner import RECORD_FILE, WORKFLOW_DIR
+from raidar.subject.workflow.runner import RECORD_FILE
+from raidar.subject.workflow.turns import WORKFLOW_DIR
 
 
 def agent_network(task_dir: Path) -> tuple[dict[str, Any], ...]:

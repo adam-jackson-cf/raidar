@@ -18,14 +18,15 @@ from typing import Any
 
 import pytest
 import yaml
+from raidar_contract.package.manifest import StagePackage
+from raidar_contract.package.registry import load_stage_package
 
-from raidar.subject.package.manifest import StagePackage
-from raidar.subject.package.registry import load_stage_package
 from raidar.subject.primitive import calls
 from raidar.subject.primitive.calls import ResourceFloors, TreeManifest
 from raidar.subject.primitive.gate import Attribution, GateOutcome
 from raidar.subject.primitive.outputs import OutputsResult
 from raidar.subject.workflow import stage_check
+from raidar.subject.workflow.identity import package_primitives
 from tests.lifecycle_support import (
     FakeContainer,
     ScriptedRunner,
@@ -185,6 +186,7 @@ class CheckRig:
             image="image",
             docker_context="context",
             pack="pack-recipe-1",
+            primitives=package_primitives([self.package]),
             logs_dir=logs or self.root / "logs",
         )
 

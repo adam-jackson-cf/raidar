@@ -13,8 +13,8 @@ from typing import Any
 import pytest
 import yaml
 from harbor.models.task.task import Task
+from raidar_contract.canonical import digest_json
 
-from raidar.contract.canonical import digest_json
 from raidar.contract.paths import VAR_ENV, problems_root
 from raidar.contract.references import (
     RESOLVER_ENTRY_POINT_GROUP,

@@ -15,7 +15,8 @@ from dataclasses import dataclass
 from statistics import fmean, median, pstdev
 from typing import Any
 
-from raidar.contract.canonical import digest_json
+from raidar_contract.canonical import digest_json
+
 from raidar.contract.references import RegistryReferenceError
 from raidar.contract.review import (
     ArmComparableConfig,

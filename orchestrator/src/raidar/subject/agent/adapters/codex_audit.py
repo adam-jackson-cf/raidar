@@ -16,12 +16,9 @@ from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
 
-from raidar.subject.agent.protocol import (
-    digest,
-    session_audit_record,
-    source_record,
-    unread_json_lines,
-)
+from raidar_contract.agent_records import session_audit_record, source_record
+
+from raidar.subject.agent.protocol import digest, unread_json_lines
 
 HARNESS = "codex"
 STREAM_FILE = "codex.txt"

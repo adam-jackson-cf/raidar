@@ -10,10 +10,11 @@ from typing import Any
 
 import pytest
 from harbor.models.agent.context import AgentContext
+from raidar_contract.agent_records import Tokens
 
 from raidar.subject.agent.config import Harness
 from raidar.subject.agent.native import adapter_class_for_harness
-from raidar.subject.agent.protocol import IsolationError, Tokens
+from raidar.subject.agent.protocol import IsolationError
 from tests.native_support import native_agent
 
 AUDIT_KEYS = {

@@ -19,6 +19,7 @@ PYTHON_QUALITY_CHECK_SCRIPT = REPO_ROOT / "scripts" / "checks" / "check-python-q
 IMPORT_LINTER_CONFIG = ORCHESTRATOR_ROOT / ".importlinter"
 TYPECHECK_TARGETS = [
     "src/raidar",
+    "../contract/src",
     "tests/test_codex_cli_adapter.py",
     "tests/test_claude_code_cli_adapter.py",
     "tests/at3_support.py",
@@ -54,19 +55,65 @@ def assert_quality_gate_requirements() -> None:
 
 def run_ruff_quality_gates(*, fix: bool) -> None:
     if fix:
-        run_or_raise([PYTHON, "-m", "ruff", "format", "--force-exclude"], ORCHESTRATOR_ROOT)
         run_or_raise(
-            [PYTHON, "-m", "ruff", "check", ".", "--fix", "--force-exclude"],
+            [
+                PYTHON,
+                "-m",
+                "ruff",
+                "format",
+                ".",
+                "../contract/src",
+                "--config",
+                "pyproject.toml",
+                "--force-exclude",
+            ],
+            ORCHESTRATOR_ROOT,
+        )
+        run_or_raise(
+            [
+                PYTHON,
+                "-m",
+                "ruff",
+                "check",
+                ".",
+                "../contract/src",
+                "--config",
+                "pyproject.toml",
+                "--fix",
+                "--force-exclude",
+            ],
             ORCHESTRATOR_ROOT,
         )
         return
 
     run_or_raise(
-        [PYTHON, "-m", "ruff", "format", "--check", "--force-exclude"],
+        [
+            PYTHON,
+            "-m",
+            "ruff",
+            "format",
+            ".",
+            "../contract/src",
+            "--config",
+            "pyproject.toml",
+            "--check",
+            "--force-exclude",
+        ],
         ORCHESTRATOR_ROOT,
     )
     run_or_raise(
-        [PYTHON, "-m", "ruff", "check", ".", "--no-fix", "--force-exclude"],
+        [
+            PYTHON,
+            "-m",
+            "ruff",
+            "check",
+            ".",
+            "../contract/src",
+            "--config",
+            "pyproject.toml",
+            "--no-fix",
+            "--force-exclude",
+        ],
         ORCHESTRATOR_ROOT,
     )
 
@@ -88,8 +135,12 @@ def run_orchestrator_quality_gates() -> None:
             str(REPO_ROOT),
             "--source-root",
             "orchestrator/src",
+            "--source-root",
+            "contract/src",
             "--root-package",
             "raidar",
+            "--root-package",
+            "raidar_contract",
         ],
         REPO_ROOT,
     )
@@ -98,7 +149,9 @@ def run_orchestrator_quality_gates() -> None:
         REPO_ROOT,
     )
     run_or_raise(["lint-imports", "--config", str(IMPORT_LINTER_CONFIG)], ORCHESTRATOR_ROOT)
-    run_or_raise(["lizard", "-C", "10", "-l", "python", "src"], ORCHESTRATOR_ROOT)
+    run_or_raise(
+        ["lizard", "-C", "10", "-l", "python", "src", "../contract/src"], ORCHESTRATOR_ROOT
+    )
     run_or_raise(
         [PYTHON, "-m", "mypy", "--follow-imports=skip", *TYPECHECK_TARGETS],
         ORCHESTRATOR_ROOT,
@@ -110,6 +163,7 @@ def run_orchestrator_quality_gates() -> None:
             "pytest",
             "tests",
             "--cov=src",
+            "--cov=../contract/src",
             "--cov-report=term-missing:skip-covered",
             f"--cov-fail-under={COVERAGE_FAIL_UNDER}",
             "-x",

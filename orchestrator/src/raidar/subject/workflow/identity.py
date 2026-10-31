@@ -24,14 +24,18 @@ from functools import cache
 from importlib.metadata import version
 from pathlib import Path
 
-from raidar.contract.canonical import digest_json
+import raidar_contract
+from raidar_contract.agent import AgentName
+from raidar_contract.canonical import digest_json
+from raidar_contract.package.manifest import StagePackage
+
 from raidar.contract.source_digest import SOURCE_DIGEST_SCHEME, python_source_digest
-from raidar.subject.agent.config import AgentName
-from raidar.subject.package.manifest import StagePackage
 from raidar.subject.primitive.registry import PRIMITIVE_MODULES
 
 RAIDAR_DIR = Path(__file__).resolve().parents[2]
+CONTRACT_DIR = Path(raidar_contract.__file__).resolve().parent
 ROOT_PACKAGE = "raidar"
+CONTRACT_PACKAGE = "raidar_contract"
 PAYLOAD_DIR = "subject/primitive/payload"
 RUNNER_ID = "runner/1"
 IMPLICIT_CONTRACTS = ("frame/1", "install/1")
@@ -69,8 +73,14 @@ SPIKE_STAGE_ENTRIES: Mapping[str, str] = {
 
 
 def _source(module: str) -> Path | None:
-    """The file of ``raidar`` module ``module`` (a package's ``__init__``), if it is one."""
-    base = RAIDAR_DIR.parent / module.replace(".", "/")
+    """The file of ``raidar`` or ``raidar_contract`` module ``module`` (a package ``__init__``)."""
+    root, _, rest = module.partition(".")
+    if root == ROOT_PACKAGE:
+        base = RAIDAR_DIR.parent / module.replace(".", "/")
+    elif root == CONTRACT_PACKAGE:
+        base = CONTRACT_DIR / rest.replace(".", "/") if rest else CONTRACT_DIR / "__init__"
+    else:
+        return None
     if base.with_suffix(".py").is_file():
         return base.with_suffix(".py")
     init = base / "__init__.py"
@@ -99,7 +109,7 @@ def _imported(module: str, path: Path) -> set[str]:
     names: set[str] = set()
     for node in ast.walk(ast.parse(path.read_bytes(), filename=str(path))):
         names |= _statement_names(node, package)
-    return {name for name in names if name == ROOT_PACKAGE or name.startswith(f"{ROOT_PACKAGE}.")}
+    return {name for name in names if name.split(".")[0] in (ROOT_PACKAGE, CONTRACT_PACKAGE)}
 
 
 @cache
@@ -127,10 +137,17 @@ def _files(modules: Iterable[str]) -> dict[str, Path]:
     for module in modules:
         path = _source(module)
         if path is not None:
-            files[path.relative_to(RAIDAR_DIR).as_posix()] = path
+            files[_inventory_key(path)] = path
     for path in (RAIDAR_DIR / PAYLOAD_DIR).rglob("*.py"):
-        files[path.relative_to(RAIDAR_DIR).as_posix()] = path
+        files[_inventory_key(path)] = path
     return files
+
+
+def _inventory_key(path: Path) -> str:
+    """``subject/...`` below ``raidar/``, or ``raidar_contract/...`` for contract modules."""
+    if path.is_relative_to(CONTRACT_DIR):
+        return f"{CONTRACT_PACKAGE}/{path.relative_to(CONTRACT_DIR).as_posix()}"
+    return path.relative_to(RAIDAR_DIR).as_posix()
 
 
 def _inventory(roots: tuple[str, ...], adapter: AgentName | None) -> dict[str, Path]:

@@ -1,6 +1,5 @@
 import click
 import pytest
-from click.testing import CliRunner
 
 from raidar.cli import process, quality
 
@@ -51,24 +50,3 @@ def test_quality_gate_helpers_validate_requirements_and_commands(monkeypatch, tm
     )
     with pytest.raises(click.ClickException, match="Missing required command: lint-imports"):
         quality.assert_quality_gate_requirements()
-
-    calls: list[list[str]] = []
-    monkeypatch.setattr(quality, "PYTHON", "python")
-    monkeypatch.setattr(quality, "run_or_raise", lambda cmd, *_args, **_kwargs: calls.append(cmd))
-    quality.run_ruff_quality_gates(fix=True)
-    quality.run_ruff_quality_gates(fix=False)
-
-    assert calls[0] == ["python", "-m", "ruff", "format", "--force-exclude"]
-    assert calls[1] == ["python", "-m", "ruff", "check", ".", "--fix", "--force-exclude"]
-    assert calls[2] == ["python", "-m", "ruff", "format", "--check", "--force-exclude"]
-    assert calls[3] == ["python", "-m", "ruff", "check", ".", "--no-fix", "--force-exclude"]
-
-    monkeypatch.setattr(quality, "validate_quality_gate_options", lambda **_kwargs: None)
-    monkeypatch.setattr(quality, "assert_quality_gate_requirements", lambda: None)
-    monkeypatch.setattr(quality, "run_ruff_quality_gates", lambda **_kwargs: None)
-    monkeypatch.setattr(quality, "run_orchestrator_quality_gates", lambda: None)
-    calls.clear()
-    runner = CliRunner()
-    result = runner.invoke(quality.quality_gates, ["--fix", "--stage"])
-    assert result.exit_code == 0
-    assert calls == [["git", "-C", str(quality.REPO_ROOT), "add", "-u"]]

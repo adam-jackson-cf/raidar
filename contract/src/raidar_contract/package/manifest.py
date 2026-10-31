@@ -27,8 +27,8 @@ from pydantic import (
     model_validator,
 )
 
-from raidar.subject.package import StagePackageError
-from raidar.subject.package.digest import FIXTURES_DIR, StageFile
+from raidar_contract.package import StagePackageError
+from raidar_contract.package.digest import FIXTURES_DIR, StageFile
 
 STAGE_CONTRACT = "stage/1"
 STATE_ROOT = "/app/.raidar"
@@ -53,7 +53,8 @@ def _finite_scalar(value: ParamScalar) -> ParamScalar:
 
 
 ParamValue = Annotated[
-    StrictBool | StrictInt | StrictFloat | StrictStr | None, AfterValidator(_finite_scalar)
+    StrictBool | StrictInt | StrictFloat | StrictStr | None,
+    AfterValidator(_finite_scalar),
 ]
 
 

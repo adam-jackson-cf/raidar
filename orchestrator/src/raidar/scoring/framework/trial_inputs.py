@@ -28,7 +28,8 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from raidar.contract.canonical import digest_json
+from raidar_contract.canonical import digest_json
+
 from raidar.contract.job_layout import TRIAL_RECORDS_DIR
 from raidar.contract.snapshot import tree_digest
 from raidar.contract.trial import TrialRecord

@@ -21,9 +21,9 @@ from typing import Any
 
 import coverage
 import pytest
+from raidar_contract.package.manifest import GateCheck, Output, parse_manifest
 
 from raidar.contract.snapshot import tree_digest
-from raidar.subject.package.manifest import GateCheck, Output, parse_manifest
 from raidar.subject.primitive import calls, gate_tool
 from raidar.subject.primitive.gate import (
     AgentFacts,

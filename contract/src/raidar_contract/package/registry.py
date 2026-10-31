@@ -10,18 +10,23 @@ import ast
 import tomllib
 from pathlib import Path
 
-from raidar.contract.canonical import IGNORED_TREE_NAMES
-from raidar.contract.paths import REPO_ROOT, lab_root
-from raidar.contract.releases import Release
-from raidar.subject.package import StagePackageError
-from raidar.subject.package.digest import (
+from raidar_contract.canonical import IGNORED_TREE_NAMES
+from raidar_contract.package import StagePackageError
+from raidar_contract.package.digest import (
     FIXTURES_DIR,
     StageFile,
     read_stage_tree,
     stage_tree_digest,
 )
-from raidar.subject.package.manifest import NAME_RE, StageManifest, StagePackage, parse_manifest
+from raidar_contract.package.manifest import (
+    NAME_RE,
+    StageManifest,
+    StagePackage,
+    parse_manifest,
+)
+from raidar_contract.releases import Release
 
+LAB_DIR = "lab"
 STAGES_DIR = "stages"
 MANIFEST_FILE = "stage.yaml"
 PROMPT_FILE = "prompt.md"
@@ -36,9 +41,9 @@ _TOP_FILES = frozenset({MANIFEST_FILE, PROMPT_FILE, INSTRUCTIONS_FILE})
 _TOP_DIRS = frozenset({SKILLS_DIR, TOOL_DIR})
 
 
-def stage_folder(release: Release, repo_root: Path = REPO_ROOT) -> Path:
-    """The folder ``lab/stages/<ns>/<name>`` a release reference names."""
-    return lab_root(repo_root) / STAGES_DIR / release.name
+def stage_folder(release: Release, repo_root: Path) -> Path:
+    """The folder ``lab/stages/<ns>/<name>`` a release reference names below ``repo_root``."""
+    return repo_root / LAB_DIR / STAGES_DIR / release.name
 
 
 def _text(files: dict[str, StageFile], path: str) -> str:

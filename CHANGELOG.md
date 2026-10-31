@@ -24,6 +24,13 @@ All notable changes to this project are documented in this file.
 
 ### Features
 
+- Extract the portable stage, workflow, criteria, release and agent contracts into
+  `raidar-contract` (`1.0.0rc1`), with no Raidar or Harbor imports. Migrate every
+  orchestrator consumer to that implementation and include the distribution in
+  source inventories and quality gates. `make contract-build` writes wheel/sdist
+  artifacts and SHA-256 hashes under `var/`, without publishing. Frozen release
+  register digests remain unchanged; execution and grader source identities change.
+
 - Record the adopted 2026-10-31 FXL pivot decisions and phase-5 scope in
   `split-design.md`, with the three vote records preserved as evidence. Accept
   `FXL-` fault/remedy IDs and FXL experiment/question citations, including tagged

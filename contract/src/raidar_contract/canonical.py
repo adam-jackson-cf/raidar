@@ -16,7 +16,11 @@ IGNORED_TREE_NAMES = frozenset({".DS_Store", "__pycache__", ".git"})
 def canonical_json_bytes(value: object) -> bytes:
     """Compact, key-sorted UTF-8 JSON used for every digest."""
     return json.dumps(
-        value, sort_keys=True, separators=(",", ":"), ensure_ascii=False, allow_nan=False
+        value,
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=False,
+        allow_nan=False,
     ).encode("utf-8")
 
 

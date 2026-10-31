@@ -48,12 +48,12 @@ from pathlib import Path
 from typing import Annotated, Any, Literal
 
 from pydantic import Field, field_validator
-
-from raidar.contract.canonical import (
+from raidar_contract.canonical import (
     canonical_json_bytes,
     digest_json,
     pretty_canonical_json_bytes,
 )
+
 from raidar.scoring.framework.manifest import SdkModel
 from raidar.scoring.framework.result import AssessResult, RunStats
 

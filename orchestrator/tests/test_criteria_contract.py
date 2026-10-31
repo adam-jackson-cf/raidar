@@ -6,8 +6,7 @@ import copy
 from typing import Any
 
 import pytest
-
-from raidar.contract.criteria import CriteriaError, validate_criteria
+from raidar_contract.criteria import CriteriaError, validate_criteria
 
 
 def _criterion(identifier: str = "C1") -> dict[str, Any]:

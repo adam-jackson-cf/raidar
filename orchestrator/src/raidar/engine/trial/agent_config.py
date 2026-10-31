@@ -17,8 +17,8 @@ from __future__ import annotations
 from typing import Literal
 
 from harbor.models.trial.config import AgentConfig, TrialConfig
+from raidar_contract.canonical import digest_json
 
-from raidar.contract.canonical import digest_json
 from raidar.design.experiment.arm import ResolvedArm
 from raidar.subject.agent.config import HARBOR_AGENT_NAMES
 from raidar.subject.agent.definition import harbor_adapter

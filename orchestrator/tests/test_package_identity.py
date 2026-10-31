@@ -11,19 +11,19 @@ from typing import Any
 
 import pytest
 import yaml
-
-from raidar.contract.paths import agents_root, releases_file, stages_root, workflows_root
-from raidar.contract.releases import (
+from raidar_contract.package import StagePackageError
+from raidar_contract.package.digest import read_stage_tree, stage_tree_digest
+from raidar_contract.package.registry import load_stage_package
+from raidar_contract.releases import (
     Release,
     ReleaseError,
     ReleaseKind,
     parse_register,
     rewritten_releases,
 )
+
+from raidar.contract.paths import agents_root, releases_file, stages_root, workflows_root
 from raidar.subject.agent.definition import load_agent
-from raidar.subject.package import StagePackageError
-from raidar.subject.package.digest import read_stage_tree, stage_tree_digest
-from raidar.subject.package.registry import load_stage_package
 from raidar.subject.release_check import release_issues
 from raidar.subject.releases import released_workflow
 from raidar.subject.stages import released_stage, stage_names
