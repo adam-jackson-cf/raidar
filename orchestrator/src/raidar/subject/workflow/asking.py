@@ -5,9 +5,9 @@ The judge runs in the Raidar process, never in the sandbox: ``RecordedJev``
 sandbox is never given it. Up to ``WORKERS`` requests run at once, each on its own
 ``RecordedJev`` (so each attempt's raw request and response are the files its own record names);
 an attempt that fails for a transient reason (a timeout, a network error, a malformed answer, HTTP
-408, 429 or 5xx) is asked again after a backoff, at most ``retries`` times, then the aspect has no
+408, 429 or 5xx) is asked again after a backoff, at most ``RETRIES`` times, then the aspect has no
 answer and is undecided (design D3: a judge never ends a run). Each attempt runs inside a
-``request.judge`` host window of the setting's timeout, so the liveness monitor does not read the
+``request.judge`` host window of the primitive's ``TIMEOUT_S``, so liveness does not read the
 wait as the agent being idle.
 """
 
@@ -24,6 +24,7 @@ from raidar.contract.activity import host_window
 from raidar.judge.client import FailureReason, JevFailure, JevSuccess
 from raidar.judge.live import LIVE_MODEL, RecordedJev
 from raidar.judge.protocol import NoulAnswer
+from raidar.subject.primitive.judge import RETRIES, TIMEOUT_S
 from raidar.subject.workflow.definition import JudgeSettings
 from raidar.subject.workflow.judging import ASPECT_ASSERTED, Request, questions
 
@@ -74,13 +75,12 @@ class Asker:
     ) -> None:
         if settings.model != LIVE_MODEL:
             raise ValueError(f"judge.model {settings.model!r} is not the pinned {LIVE_MODEL!r}")
-        self.settings = settings
         self.environment = environment
         self.calls: list[dict[str, Any]] = []
         self._free: asyncio.Queue[tuple[str, RecordedJev]] = asyncio.Queue()
         for number in range(1, workers + 1):
             relative = f"{JUDGE_DIR}/w{number}"
-            self._free.put_nowait((relative, new_jev(logs_dir / relative, settings.timeout_s)))
+            self._free.put_nowait((relative, new_jev(logs_dir / relative, TIMEOUT_S)))
 
     async def ask(self, number: int, asked: Sequence[tuple[str, Request]]) -> Answers:
         """Ask every ``(criterion id, request)``; each aspect's probability and its call indices."""
@@ -92,7 +92,7 @@ class Asker:
     ) -> tuple[float | None, tuple[int, ...]]:
         indices: list[int] = []
         probability: float | None = None
-        for attempt in range(1, self.settings.retries + 2):
+        for attempt in range(1, RETRIES + 2):
             probability, failure, record = await self._attempt(request)
             indices.append(len(self.calls))
             self.calls.append(
@@ -106,7 +106,7 @@ class Asker:
                     **record,
                 }
             )
-            if failure is None or not retryable(failure) or attempt > self.settings.retries:
+            if failure is None or not retryable(failure) or attempt > RETRIES:
                 break
             await asyncio.sleep(BACKOFF_S * 2 ** (attempt - 1))
         return probability, tuple(indices)
@@ -116,7 +116,7 @@ class Asker:
     ) -> tuple[float | None, JevFailure | None, dict[str, Any]]:
         relative, jev = await self._free.get()
         try:
-            with host_window(self.environment, HOST_WINDOW, self.settings.timeout_s):
+            with host_window(self.environment, HOST_WINDOW, TIMEOUT_S):
                 result = await asyncio.to_thread(jev.decide, request.state, questions())
             kept = jev.calls[-1]
         finally:

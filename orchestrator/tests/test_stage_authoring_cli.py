@@ -205,16 +205,16 @@ def test_workflow_new_defaults_to_one_shot_verify_and_refuses_overwrite(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     root = tmp_path / "workflows"
-    template = root / "one-shot-verify"
+    template = root / "raidar" / "one-shot-verify"
     template.mkdir(parents=True)
     (template / "workflow.yaml").write_text("schema: 1\nname: one-shot-verify\nstages: {}\n")
     monkeypatch.setattr(workflow_new, "workflows_root", lambda: root)
 
-    first = CliRunner().invoke(main, ["workflow", "new", "mine"])
-    again = CliRunner().invoke(main, ["workflow", "new", "mine"])
+    first = CliRunner().invoke(main, ["workflow", "new", "acme/mine"])
+    again = CliRunner().invoke(main, ["workflow", "new", "acme/mine"])
 
     assert first.exit_code == 0, first.output
-    assert yaml.safe_load((root / "mine" / "workflow.yaml").read_text())["name"] == "mine"
+    assert yaml.safe_load((root / "acme" / "mine" / "workflow.yaml").read_text())["name"] == "mine"
     assert again.exit_code != 0
     assert "refusing to overwrite" in again.output
 
@@ -224,7 +224,7 @@ def test_workflow_new_refuses_an_unknown_template(
 ) -> None:
     monkeypatch.setattr(workflow_new, "workflows_root", lambda: tmp_path)
 
-    result = CliRunner().invoke(main, ["workflow", "new", "mine", "--from", "missing"])
+    result = CliRunner().invoke(main, ["workflow", "new", "acme/mine", "--from", "acme/missing"])
 
     assert result.exit_code != 0
     assert "no workflow template" in result.output

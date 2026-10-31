@@ -69,8 +69,8 @@ For Codex CLI the default auth policy is `CODEX_AUTH_MODE=auto`: it prefers file
 | Build frame | The workflow's prompt, with `%%%TASK%%%` and one slot per enabled package, each once. | Workflow `build.prompt` |
 | Primary session | The checkpoint's one agent conversation; fixes, repairs and rework resume it. | Host-written workflow turn/session records |
 | Agent release | A pinned agent: an adapter (`codex@3` or `claude-code@2`), provider, tool pin, and the runtimes it covers, defined in `lab/agents/<name>.yaml` and registered in `lab/releases.yaml` as `name@N`. An experiment's `agents:` entry names a release and sets the `model` and `reasoning` | `lab/agents/<name>.yaml`; `lab/releases.yaml`; `agents:` |
-| Workflow release | A Harbor workflow runner defined in data: enabled stages share one primary agent session, resumed for repairs, gate fixes and rework. `build` frames the prompt and structured reply; `define` supplies the pinned FXL definition tools and skills; `verify` gates commits, records the final workspace and optionally judges mapped tests host-side. `define-build-verify@4` retains aspect judging, two gate fixes and at most three passes; archived `@1` has one pass and no judge. Workflow tools, skills and `.raidar/` state are excluded from graded snapshots and commits. The default is `one-shot@1`; `one-shot-verify@3` adds verify with no fix turns. Earlier releases remain registered and archived. | `lab/workflows/<name>/workflow.yaml`; `lab/releases.…
-| Arm | One agent on one workflow release: `{id, agent, workflow}`, where `workflow: <name>@N` is optional and defaults to `one-shot@1`. Arms are paired against the `baseline_arm` | `arms:` |
+| Workflow release | A Harbor workflow runner defined in data: enabled stages share one primary agent session, resumed for repairs, gate fixes and rework. `build` frames the prompt and structured reply; `define` supplies the pinned FXL definition tools and skills; `verify` gates commits, records the final workspace and optionally judges mapped tests host-side. `raidar/define-build-verify@1` retains aspect judging, two gate fixes and at most three passes. Workflow tools, skills and `.raidar/` state are excluded from graded snapshots and commits. References require a namespace (`ns/name@N`); the default is `raidar/one-shot@1` and `raidar/one-shot-verify@1` adds verify with no fix turns. The pre-namespace bare register entries stay as frozen history and never resolve. | `lab/workflows/<ns>/<name>/workflow.yaml`; `lab/releases.yaml`; `workflow:` |
+| Arm | One agent on one workflow release: `{id, agent, workflow}`, where `workflow: <ns>/<name>@N` is optional and defaults to `raidar/one-shot@1`. Arms are paired against the `baseline_arm` | `arms:` |
 | Attempts | The replicates of every arm: each attempt runs every arm once per problem, in a seeded, counterbalanced order. Analysis pairs arms by attempt index | `analysis.attempts` |
 | Job | One execution of a locked experiment: its trials, their step results, validity checks and N1 phase timings | `var/jobs/<experiment id>/<job id>/` (`job.json`, `job.lock.json`, `trial-records/`) |
 | Trial and step result | A trial is one arm × attempt × problem through every checkpoint (a Harbor trial, id `bNN-pN-<arm>`, where `bNN` is the attempt index); a step result is one checkpoint of it | `trials/<trial>/`, `trial-records/<trial>.json` |
@@ -78,7 +78,7 @@ For Codex CLI the default auth policy is `CODEX_AUTH_MODE=auto`: it prefers file
 | Scorer and Assessment | A versioned scorer (`correctness@9`, `code-quality@8`, `resource-usage@7`, `process-compliance@11`, `gate-effort@15`) runs offline over stored trials. Correctness reports the lock-pinned solvable-set outcome alongside the raw SCB outcome; excluded steps leave its denominator, while missing sets are unavailable, never zero. Process compliance reads the work session's trace, not gate fix sessions, and leaves undecidable checks insufficient. Gate effort reads retained guardrail-gate records (first-pass clean, findings by family, fixes, autofix, costs and pre-fix correctness); arms without that gate are not applicable. Code quality reads the graded snapshots and retained or offline verifier coverage; its regression breadth excludes at m…
 | Headline metric | How quality scores combine into the headline S (`scb-canonical@1/@2`, `scb-canonical-oneshot@1/@2`). The lock pins it | `assessment.metric` |
 | Analysis | Paired deltas, confidence intervals, curves, verdicts, exclusions and a sample-size projection against the baseline arm; a benchmark adds its ranking view | the `make experiment-analyze` output directory |
-| Jev | Host-side model judgement. `define-build-verify@4`, `definition-coverage@5` and `test-coverage@5` use pinned `typesafe/jev-1.13-20260917`, retaining every request, response and interpreted answer without the OpenRouter key. The older offline policy machinery remains parked with both policies `off`; enabling these explicit workflow/scorer capabilities does not promote those policies or add a headline metric. | `raidar/judge/` shared transport; `scoring/judge/` offline policy and calibration |
+| Jev | Host-side model judgement. `raidar/define-build-verify@1`, `definition-coverage@5` and `test-coverage@5` use pinned `typesafe/jev-1.13-20260917`, retaining every request, response and interpreted answer without the OpenRouter key. The older offline policy machinery remains parked with both policies `off`; enabling these explicit workflow/scorer capabilities does not promote those policies or add a headline metric. | `raidar/judge/` shared transport; `scoring/judge/` offline policy and calibration |
 
 Inside each Harbor trial directory the verifier keeps its original evidence names (`raidar-oracle/steps/<step>/record.json`, reward key `oracle_leak`): they are wire names that released scorers and `make assess-regrade` read the same way for every job. For the same reason released scorers keep the observation subject `trajectory`, the evidence input `oracle.cases` and their `@1` descriptions (all hashed into Assessment keys), and the problem store keeps each problem's `oracle/` bundle directory (inside the problem's pinned digest).
 
@@ -94,7 +94,7 @@ native bundled plugins are not host plugins. The three `python__forge__claude-*`
 experiments mirror the Codex workflows; they are operational checks, not effectiveness evidence.
 
 
-`define-build-verify@4` requires `{account, ac_tests, adrs}` replies, allows one syntax
+`raidar/define-build-verify@1` requires `{account, ac_tests, adrs}` replies, allows one syntax
 and one semantic repair, and merges criterion-to-test mappings across turns. Its judge
 sees mapped tests plus one hop of test helpers, never production code. Aspects close at
 probability ≥0.8, open at ≤0.3, and otherwise remain undecided. Open/undecided criteria
@@ -227,10 +227,10 @@ agents:
 
 arms:
   - id: baseline
-    agent: codex             # workflow defaults to one-shot@1
+    agent: codex             # workflow defaults to raidar/one-shot@1
   - id: treatment
     agent: codex
-    workflow: one-shot@1     # the workflow release under test (lab/workflows/<name>/)
+    workflow: raidar/one-shot@1     # the workflow release under test (lab/workflows/<ns>/<name>/)
 
 assessment:
   scorers: [correctness@9, code-quality@8, resource-usage@7]

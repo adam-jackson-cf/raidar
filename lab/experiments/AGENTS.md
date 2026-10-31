@@ -2,8 +2,8 @@
 
 - Author one schema_version=3 experiment.yaml under `<kind>/<runtime>__<subject>__<intent>/`.
 - An arm is an agent release plus a workflow release: `agents[]` names registered agent releases
-  (`lab/agents/<name>.yaml`) and `arms[]` pairs an agent with an optional `workflow: <name>@N`
-  (default `one-shot@1`; workflows live in `lab/workflows/<name>/workflow.yaml`).
+  (`lab/agents/<name>.yaml`) and `arms[]` pairs an agent with an optional `workflow: <ns>/<name>@N`
+  (default `raidar/one-shot@1`; workflows live in `lab/workflows/<ns>/<name>/workflow.yaml`).
 - Add variants as arms in the existing experiment.
   Create a new experiment only for a new question: different problems, baseline arm or analysis plan.
 - Keep arms different only in their agent or workflow release.

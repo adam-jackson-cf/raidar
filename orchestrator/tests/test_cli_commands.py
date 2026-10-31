@@ -452,11 +452,11 @@ def test_smoke_dry_run_check_prints_every_public_smoke_shape() -> None:
             ["check", '"ns/my-check"', "--replay", '"var/jobs/t1"'],
         ),
         (("stage-check", "NAME=ns/my-check"), "stage", ["check", '"ns/my-check"']),
-        (("workflow-new", "NAME=mine"), "workflow", ["new", '"mine"']),
+        (("workflow-new", "NAME=acme/mine"), "workflow", ["new", '"acme/mine"']),
         (
-            ("workflow-new", "NAME=mine", "FROM=one-shot"),
+            ("workflow-new", "NAME=acme/mine", "FROM=raidar/one-shot"),
             "workflow",
-            ["new", '"mine"', "--from", '"one-shot"'],
+            ["new", '"acme/mine"', "--from", '"raidar/one-shot"'],
         ),
         (
             ("experiment-lock", "EXPERIMENT=e/experiment.yaml", "DRAFT=1"),

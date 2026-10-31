@@ -2,7 +2,7 @@
 
 The starter is the README walkthrough's shape: an ``ab-test`` with one pinned problem, the
 current codex agent release, and two arms, ``baseline`` and ``treatment``, both on the default
-workflow (``one-shot``) until the author points ``treatment`` at the workflow (or agent)
+workflow (``raidar/one-shot``) until the author points ``treatment`` at the workflow (or agent)
 release under test; then the paired analysis plan. It validates as written. Another variant
 of an existing experiment is a new arm inside that experiment, not a new file, so ``init``
 refuses a path that already exists. The id follows the ``<runtime>__<subject>__<intent>``
@@ -80,9 +80,9 @@ def render_starter(experiment_id: str, problem: str) -> str:
     """The starter experiment.yaml text, on the tree's current codex and one-shot releases."""
     register = load_register(releases_file())
     agent = register.latest(ReleaseKind.AGENT, "codex")
-    workflow = register.latest(ReleaseKind.WORKFLOW, "one-shot")
+    workflow = register.latest(ReleaseKind.WORKFLOW, "raidar/one-shot")
     if agent is None or workflow is None:
-        raise click.ClickException("lab/releases.yaml must register codex and one-shot")
+        raise click.ClickException("lab/releases.yaml must register codex and raidar/one-shot")
     return _STARTER.format(
         experiment_id=experiment_id, problem=problem, agent=agent, workflow=workflow
     )

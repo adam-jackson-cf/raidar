@@ -29,6 +29,7 @@ from pathlib import Path
 from raidar_contract.package.manifest import StagePackage
 from raidar_contract.package.tokens import PLACEHOLDER, TASK_SLOT, token_name
 from raidar_contract.releases import Release
+from raidar_contract.workflow import PackageJudge
 
 from raidar.contract.wheels import uv_lock_refusals
 from raidar.subject.primitive.registry import SUPPORTED_CONTRACTS
@@ -176,6 +177,25 @@ def _prompt_issues(stage: ResolvedStage) -> list[str]:
     ]
 
 
+def _judge_issues(judge: PackageJudge, stages: Sequence[ResolvedStage]) -> list[str]:
+    producer, _, output = judge.criteria.partition(".")
+    declared = next(
+        (stage.package.manifest.outputs.get(output) for stage in stages if stage.leaf == producer),
+        None,
+    )
+    issues = []
+    if declared is None or declared.contract != "criteria/1":
+        issues.append(
+            f"ST3: judge needs criteria/1 from {judge.criteria}, which no package produces"
+        )
+    if (
+        sum(check.kind == "pytest" for stage in stages for check in stage.package.manifest.gate)
+        != 1
+    ):
+        issues.append("ST3: judge requires exactly one pytest-kind gate check")
+    return issues
+
+
 @cache
 def _cached_lock_stale(tool: Path) -> str | None:
     return uv_lock_stale(tool)
@@ -186,6 +206,7 @@ def package_issues(
     stages: Sequence[ResolvedStage],
     *,
     lock_check: LockCheck | None = None,
+    judge: PackageJudge | None = None,
 ) -> list[str]:
     """Every ST2, ST3, ST5, ST6, ST7 (and prompt-token ST1) refusal of one workflow's packages."""
     issues: list[str] = []
@@ -194,6 +215,8 @@ def package_issues(
         issues += _prompt_issues(stage)
         issues += _lock_issues(stage, lock_check or _cached_lock_stale)
     issues += _input_issues(stages)
+    if judge is not None:
+        issues += _judge_issues(judge, stages)
     issues += _slot_issues(build_prompt, stages)
     issues += _collision_issues(stages)
     return issues

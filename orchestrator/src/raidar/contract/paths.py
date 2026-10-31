@@ -56,7 +56,7 @@ def agents_root(repo_root: Path = REPO_ROOT) -> Path:
 
 
 def workflows_root(repo_root: Path = REPO_ROOT) -> Path:
-    """Workflow definitions: ``lab/workflows/<name>/workflow.yaml``."""
+    """Workflow definitions: ``lab/workflows/<ns>/<name>/workflow.yaml``."""
     return lab_root(repo_root) / "workflows"
 
 

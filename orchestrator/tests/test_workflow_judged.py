@@ -160,7 +160,7 @@ def run(
     ScriptedAgent.turns = list(turns)
     logs = tmp_path / "logs"
     logs.mkdir(exist_ok=True)
-    definition: Any = load_workflow(REAL_LAB / "workflows", "define-build-verify").to_json()
+    definition: Any = load_workflow(REAL_LAB / "workflows", "raidar/define-build-verify").to_json()
     definition.pop("components")
     for stage in definition["stages"].values():
         stage.pop("skills", None)
@@ -171,7 +171,7 @@ def run(
         environment_logs_dir=PurePosixPath(logs),
         model_name="openai/gpt-6-luna",
         inner_agent={"name": "codex"},
-        workflow="define-build-verify@4",
+        workflow="raidar/define-build-verify@1",
         definition=definition,
         phase_timeout_s=timeout_s,
     )

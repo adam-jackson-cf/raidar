@@ -1,7 +1,8 @@
 # Release register: name@N -> sha256 of the resolved definition (raidar.contract.releases).
-# Definitions are edited in place under lab/agents/ and lab/workflows/; releasing a change
-# adds the next version here with the new hash (`make releases-check` names it). Only each
-# name's latest version resolves; earlier versions stay as history.
+# Definitions are edited in place under lab/agents/ and lab/workflows/<ns>/<name>/; releasing a
+# change adds the next version here with the new hash (`make releases-check` names it). Only each
+# name's latest version resolves; earlier versions stay as history. Bare (pre-namespace)
+# workflow entries are frozen history: they never resolve.
 agents:
   codex@1: a2770e3282bcc6e3d1b16dd6d3a4f81e8fccc9a0dd0447a4dd288ce23a00fd43
   codex@2: 36bf2bd7d6e482206c62eb4eed7bc06a5e03ce808a8022fae02ef8afc193989b
@@ -17,3 +18,6 @@ workflows:
   define-build-verify@2: dc7d72a744c4e0a487534c9a5227d8be3a3443e11f4ee40829fcb0d2511b15aa
   define-build-verify@3: 52190a8da774cd846bb283dc71363ca2e9cb7dbd6bda140d1eccc9ff95fb3d91
   define-build-verify@4: 52190a8da774cd846bb283dc71363ca2e9cb7dbd6bda140d1eccc9ff95fb3d91
+  raidar/one-shot@1: 7041679bb89e24a756cbcdd84ebf8260f960baf44c77ec48bdb26d43a86a1113
+  raidar/one-shot-verify@1: 8ed329ac39a77aa5edac4d0e2373832502342275113c15943d3fb8fa88c70c51
+  raidar/define-build-verify@1: 52190a8da774cd846bb283dc71363ca2e9cb7dbd6bda140d1eccc9ff95fb3d91

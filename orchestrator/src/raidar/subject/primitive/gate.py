@@ -411,6 +411,7 @@ class GateRun:
         if found is None or "base" not in found:
             raise GateInvalid("integrity", f"no base commit from the workspace setup: {found}")
         self.base = str(found["base"])
+        await self._contexts()
         await self._check_setup()
         await self._run_canary()
         await self._verify_tools("before the agent started")
@@ -432,11 +433,6 @@ class GateRun:
         await calls.upload_file(environment, self.records / "gate.json", paths.config)
         hook_target = f"{paths.hooks}/pre-commit"
         await calls.upload_file(environment, self.records / "pre-commit", hook_target)
-        for package in self.packages:
-            kept = self.records / CONTEXT_SUBDIR / f"{package.name}.json"
-            kept.parent.mkdir(parents=True, exist_ok=True)
-            kept.write_text(json.dumps(package.context, sort_keys=True), encoding="utf-8")
-            await calls.upload_file(environment, kept, context_path(paths, package))
         runs = _q(f"{paths.hook_state}/{gate_tool.HOOK_RUNS}")
         await self._root(
             "\n".join(
@@ -447,7 +443,6 @@ class GateRun:
                     f"chmod 755 {_q(paths.home)} {_q(paths.hooks)} {_q(paths.empty_hooks)} "
                     f"{_q(paths.contexts)} {_q(paths.hooks)}/pre-commit",
                     f"chmod 644 {_q(paths.payload)} {_q(paths.config)}",
-                    f"chmod 644 {_q(paths.contexts)}/*.json 2>/dev/null || true",
                     # fresh directories each checkpoint: nothing the agent left is ever chowned
                     f"rm -rf {_q(paths.hook_state)} {_q(paths.scratch)}",
                     f"mkdir -p {_q(paths.hook_state)} {_q(paths.scratch)}",
@@ -460,6 +455,22 @@ class GateRun:
                 ]
             )
         )
+
+    async def _contexts(self) -> None:
+        """Publish the root-owned base commit after workspace setup, before any check."""
+        for package in self.packages:
+            kept = self.records / CONTEXT_SUBDIR / f"{package.name}.json"
+            kept.parent.mkdir(parents=True, exist_ok=True)
+            kept.write_text(
+                json.dumps({**package.context, "base": self.base}, sort_keys=True),
+                encoding="utf-8",
+            )
+            target = context_path(self.paths, package)
+            await calls.upload_file(self.environment, kept, target)
+            await self._root(
+                f'if [ "$(id -u)" = 0 ]; then chown root:root {_q(target)}; fi\n'
+                f"chmod 644 {_q(target)}"
+            )
 
     def _argv(self, command: str, *extra: str) -> list[str]:
         return [*self.paths.command, command, "--config", self.paths.config, *extra]

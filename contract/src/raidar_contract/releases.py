@@ -1,20 +1,24 @@
 """The release register: ``lab/releases.yaml`` maps ``name@N`` to a content hash.
 
-Agents and workflows are edited in place under ``lab/agents/`` and ``lab/workflows/``; stage
-packages live under ``lab/stages/<ns>/<name>/``. The version is data, never part of a file
+Agents live under ``lab/agents/``, workflows under ``lab/workflows/<ns>/<name>/`` and stage
+packages under ``lab/stages/<ns>/<name>/``. The version is data, never part of a file
 name. Releasing a definition records its content hash under the next integer version of its
 name::
 
     agents:
       codex@1: <sha256 of the resolved definition>
     workflows:
-      one-shot@1: <sha256 of the resolved definition>
+      raidar/one-shot@1: <sha256 of the resolved definition>
     stages:
       docs-check@1: <sha256 stage-tree/1 digest of the package>
 
 Earlier versions stay in the register as history; the tree holds only the definition of each
 name's latest version, so only that version resolves (older ones live in archive tags). The
 register is append-only: a released ``name@N`` keeps its hash forever (``rewritten_releases``).
+
+Workflow and stage references require a namespace (``<ns>/<name>@<N>``). Bare workflow entries
+of the pre-namespace register stay as frozen history: they parse, never resolve (active
+references always use ``Release.parse_workflow``) and name no tree definition.
 """
 
 from __future__ import annotations
@@ -31,8 +35,10 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 RELEASE_PATTERN = r"^(?:[a-z0-9][a-z0-9-]*/)?[a-z0-9][a-z0-9-]*@[1-9][0-9]*$"
 STAGE_RELEASE_PATTERN = r"^[a-z0-9][a-z0-9-]*/[a-z0-9][a-z0-9-]*@[1-9][0-9]*$"
+WORKFLOW_RELEASE_PATTERN = STAGE_RELEASE_PATTERN
 _RELEASE_RE = re.compile(RELEASE_PATTERN)
 _STAGE_RELEASE_RE = re.compile(STAGE_RELEASE_PATTERN)
+_WORKFLOW_RELEASE_RE = re.compile(WORKFLOW_RELEASE_PATTERN)
 Sha256 = Annotated[str, Field(pattern=r"^[0-9a-f]{64}$")]
 
 
@@ -70,6 +76,16 @@ class Release:
             )
         return cls.parse(text)
 
+    @classmethod
+    def parse_workflow(cls, text: str) -> Release:
+        """A workflow reference: the namespace is required (``<ns>/<name>@<N>``)."""
+        if not _WORKFLOW_RELEASE_RE.fullmatch(text):
+            raise ReleaseError(
+                f"invalid workflow release {text!r}: expected <ns>/<name>@<N> "
+                "(a namespace is required; N from 1)"
+            )
+        return cls.parse(text)
+
     @property
     def leaf(self) -> str:
         return self.name.rsplit("/", 1)[-1]
@@ -101,7 +117,12 @@ class ReleaseRegister:
         return max(versions, default=None)
 
     def names(self, kind: ReleaseKind) -> frozenset[str]:
-        return frozenset(release.name for release in self.of(kind))
+        """The names that must have a definition in the tree (a bare workflow is history)."""
+        return frozenset(
+            release.name
+            for release in self.of(kind)
+            if kind is not ReleaseKind.WORKFLOW or "/" in release.name
+        )
 
 
 def parse_register(text: str, source: str) -> ReleaseRegister:
@@ -123,6 +144,15 @@ def parse_register(text: str, source: str) -> ReleaseRegister:
     return ReleaseRegister(entries)
 
 
+def _parse_reference(kind: ReleaseKind, text: str) -> Release:
+    """An active reference: stages and workflows need their namespace."""
+    if kind is ReleaseKind.STAGE:
+        return Release.parse_stage(text)
+    if kind is ReleaseKind.WORKFLOW:
+        return Release.parse_workflow(text)
+    return Release.parse(text)
+
+
 def load_register(path: Path) -> ReleaseRegister:
     """Parse the register file; raise ``ReleaseError`` naming the first malformed entry."""
     try:
@@ -140,7 +170,7 @@ def resolve_registered(
     Only the register's latest version of a name resolves. A ``draft`` (smoke experiments only)
     may name an unregistered or older release: its hash is ``None`` or whatever is registered.
     """
-    release = Release.parse_stage(text) if kind is ReleaseKind.STAGE else Release.parse(text)
+    release = _parse_reference(kind, text)
     registered = register.of(kind).get(release)
     if registered is None:
         if draft:

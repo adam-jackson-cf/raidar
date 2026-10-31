@@ -182,7 +182,7 @@ help:
 	@echo "                                                        contract and publish the canary record; REPLAY runs a trial's captured state through the package"
 	@echo "  make stage-list                                       List stage packages with digest and release state"
 	@echo "  make stage-info NAME=<ns>/<name>                      Show a package's manifest facts, digest, next register line, lock state and canary record"
-	@echo "  make workflow-new NAME=<name> [FROM=one-shot-verify]  Copy a workflow template to lab/workflows/<name> (never overwrites)"
+	@echo "  make workflow-new NAME=<ns>/<name> [FROM=raidar/one-shot-verify]  Copy a workflow template to lab/workflows/<ns>/<name> (never overwrites)"
 	@echo "  make contract-build                                    Build the raidar-contract wheel and sdist into var/contract-dist and print their sha256 (publishes nothing)"
 	@echo "  make releases-check [RELEASES_BASE=<commit>]          Fail unless lab/releases.yaml registers each agent, workflow and stage at its current hash, agent pins equal the pack's, and no release in the base commit (default: merge base with main, or HEAD's parent on main) was removed or re-hashed; part of make quality"
 	@echo "  make experiment-locks-check                           Fail unless every lab/experiments/*/*/*.lock.json is current (host Python patch aside); part of make quality"

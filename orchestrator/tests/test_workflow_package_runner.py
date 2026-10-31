@@ -658,7 +658,7 @@ async def run_workflow(
         environment_logs_dir=PurePosixPath(logs),
         model_name="openai/gpt-6-luna",
         inner_agent={"name": "codex"},
-        workflow="note-flow@1",
+        workflow="acme/note-flow@1",
         definition=definition_json(params, fix_rounds),
         locked_packages=lab.lock() if locked is None else locked,
         primitives=PRIMITIVES,
@@ -816,7 +816,7 @@ def test_a_schema_2_definition_selects_the_one_package_stage_and_the_spike_does_
     stages, stage = checkpoint_stages(
         package, locked=lab.lock(), primitives=PRIMITIVES, pack=PACK, skills_placement=PLACEMENT
     )
-    spike = load_workflow(workflows_root(REPO_ROOT), "one-shot")
+    spike = load_workflow(workflows_root(REPO_ROOT), "raidar/one-shot")
     spike_stages, spike_stage = checkpoint_stages(
         spike, locked={}, primitives={}, pack="", skills_placement=PLACEMENT
     )

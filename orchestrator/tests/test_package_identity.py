@@ -49,13 +49,13 @@ def _workflow_document(params: dict[str, Any] | None = None, build: str = BUILD)
 
 
 def _write_workflow(root: Path, document: dict[str, Any]) -> None:
-    folder = workflows_root(root) / "gated"
+    folder = workflows_root(root) / "acme" / "gated"
     folder.mkdir(parents=True, exist_ok=True)
     (folder / "workflow.yaml").write_text(yaml.safe_dump(document), encoding="utf-8")
 
 
 def _register(root: Path, *, workflow: bool = True) -> None:
-    """Register codex, one-shot, acme/gate-check@1 and optionally gated@1 at the tree's hashes."""
+    """Register codex, raidar/one-shot, acme/gate-check@1 and optionally acme/gated@1."""
     from raidar.subject.workflow.definition import load_workflow
 
     stages = {
@@ -64,13 +64,15 @@ def _register(root: Path, *, workflow: bool = True) -> None:
     }
     document: dict[str, Any] = {
         "agents": {"codex@1": load_agent(agents_root(root), "codex").digest},
-        "workflows": {"one-shot@1": load_workflow(workflows_root(root), "one-shot").digest},
+        "workflows": {
+            "raidar/one-shot@1": load_workflow(workflows_root(root), "raidar/one-shot").digest
+        },
         "stages": stages,
     }
     releases_file(root).write_text(yaml.safe_dump(document), encoding="utf-8")
     if workflow:
-        gated = released_workflow("gated@1", repo_root=root, draft=True).digest
-        document["workflows"]["gated@1"] = gated
+        gated = released_workflow("acme/gated@1", repo_root=root, draft=True).digest
+        document["workflows"]["acme/gated@1"] = gated
         releases_file(root).write_text(yaml.safe_dump(document), encoding="utf-8")
 
 
@@ -137,6 +139,7 @@ def test_mutable_or_unnamespaced_stage_references_never_parse(text: str) -> None
 
 def test_only_stage_references_require_a_namespace() -> None:
     assert Release.parse("one-shot@1") == Release("one-shot", 1)
+    assert Release.parse_workflow("raidar/one-shot@1") == Release("raidar/one-shot", 1)
     assert Release.parse_stage("acme/gate-check@1") == Release("acme/gate-check", 1)
 
 
@@ -149,7 +152,7 @@ def test_a_workflow_refuses_a_mutable_or_unnamespaced_package_reference(
     _write_workflow(tree, document)
 
     with pytest.raises(ReleaseError, match="invalid workflow definition"):
-        released_workflow("gated@1", repo_root=tree, draft=True)
+        released_workflow("acme/gated@1", repo_root=tree, draft=True)
 
 
 def test_a_register_with_an_unnamespaced_stage_is_unreadable() -> None:
@@ -207,7 +210,7 @@ def test_release_issues_name_an_unreleased_or_edited_package(tree: Path) -> None
         )
         for i in issues
     )
-    assert any("workflows/gated changed since gated@1" in i for i in issues)
+    assert any("workflows/acme/gated changed since acme/gated@1" in i for i in issues)
 
     shutil.rmtree(_package_file(tree, ""))
     assert any("registered but not defined" in i for i in release_issues(tree))
@@ -263,7 +266,7 @@ def test_stage_tree_refuses_symlinks_everywhere(tmp_path: Path, where: str) -> N
 
 
 def _identity(root: Path) -> str:
-    return released_workflow("gated@1", repo_root=root, draft=True).digest
+    return released_workflow("acme/gated@1", repo_root=root, draft=True).digest
 
 
 def _mutate_prompt(root: Path) -> None:
@@ -284,17 +287,17 @@ def test_each_prompt_tool_or_param_change_alone_moves_identity_and_stales_the_re
     tree: Path, mutate: Callable[[Path], None]
 ) -> None:
     before = _identity(tree)
-    assert released_workflow("gated@1", repo_root=tree).digest == before
+    assert released_workflow("acme/gated@1", repo_root=tree).digest == before
 
     mutate(tree)
 
     assert _identity(tree) != before
     with pytest.raises(ReleaseError, match=r"(ST4: acme/gate-check|gated) changed since"):
-        released_workflow("gated@1", repo_root=tree)
+        released_workflow("acme/gated@1", repo_root=tree)
 
 
 def test_the_fold_carries_release_digest_and_effective_params(tree: Path) -> None:
-    workflow = released_workflow("gated@1", repo_root=tree)
+    workflow = released_workflow("acme/gated@1", repo_root=tree)
     (stage,) = workflow.stages
 
     assert stage.entry == {
@@ -311,7 +314,7 @@ def test_an_undeclared_or_retyped_param_is_refused(tree: Path) -> None:
     for params in ({"nope": "x"}, {"marker": 3}):
         _write_workflow(tree, _workflow_document(params))
         with pytest.raises(ReleaseError, match="ST1"):
-            released_workflow("gated@1", repo_root=tree, draft=True)
+            released_workflow("acme/gated@1", repo_root=tree, draft=True)
 
 
 # ---- ST1 .. ST7 ----------------------------------------------------------------------------

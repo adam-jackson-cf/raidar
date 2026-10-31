@@ -60,7 +60,7 @@ def test_a_version_segment_is_refused_even_with_data_below_it() -> None:
 
 
 def test_a_version_folder_in_lab_data_is_refused() -> None:
-    path = "lab/workflows/one-shot/v2"
+    path = "lab/workflows/raidar/one-shot/v2"
     assert structure.version_violations([path]) == [f"version in path name: {path}"]
 
 
@@ -156,7 +156,7 @@ def test_lab_holds_only_the_allowlisted_data_trees_and_the_release_register() ->
         "lab/problems/sources.yaml",
         "lab/ledger/faults/FCR-001.md",
         "lab/agents/codex.yaml",
-        "lab/workflows/one-shot/workflow.yaml",
+        "lab/workflows/raidar/one-shot/workflow.yaml",
         "lab/environments/python/pack.yaml",
         "lab/judge/policies/code-quality.rubric-smells.yaml",
     ]
@@ -167,6 +167,26 @@ def test_lab_holds_only_the_allowlisted_data_trees_and_the_release_register() ->
         "unexpected lab entry: lab/components",
         "unexpected lab entry: lab/notes.md",
         "unexpected lab entry: lab/releases.yaml",
+    ]
+
+
+def test_a_workflow_lives_at_namespace_name_and_holds_its_definition() -> None:
+    allowed = [
+        "lab/workflows/raidar/one-shot/workflow.yaml",
+        "lab/workflows/raidar/define-build-verify/skills/a/SKILL.md",
+        "lab/workflows/raidar/define-build-verify/workflow.yaml",
+    ]
+    refused = [
+        "lab/workflows/one-shot/workflow.yaml",
+        "lab/workflows/raidar/stray.md",
+        "lab/workflows/acme/empty/notes.md",
+    ]
+
+    assert structure.workflow_violations(allowed) == []
+    assert structure.workflow_violations(refused) == [
+        "workflow folder without workflow.yaml: lab/workflows/acme/empty",
+        "workflow outside lab/workflows/<ns>/<name>/: lab/workflows/one-shot/workflow.yaml",
+        "workflow outside lab/workflows/<ns>/<name>/: lab/workflows/raidar/stray.md",
     ]
 
 
