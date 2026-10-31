@@ -4,6 +4,22 @@ All notable changes to this project are documented in this file.
 
 ## Unreleased
 
+### Fixes
+
+- Phase 4/4b Docker gate follow-up: run `stage-check` gate calls as UID 1000 by
+  default while preserving explicit root installs and the gate's not-root check.
+  Resolve declared gate commands through the installed wrappers and their package
+  venvs, matching setup and stop. Require passing controls for planted exit/timeout
+  tests; exercise wrapper/venv resolution. Use `acme/<name>` consistently in AT3
+  installations and replay captures, and disable caching for root-only seed pip
+  upgrades so agent-owned uv caches stay untouched. Regenerate all ten experiment
+  locks for the changed primitive identities; released definitions remain frozen.
+  Local OrbStack security passed all 38 tests; gate-check, note-state replay and
+  fresh docs-check fixtures passed. Note-state's generated `wrong-state` case still
+  fails: its four words satisfy the fixture's three-word minimum, but stage-check
+  requires a non-`done` result. No check was weakened. The `mbp` re-run remains
+  pending; problem revalidation and performance checks run separately.
+
 ### Features
 
 - Phase 4b A: label the primary reference-solvable SCB success; pin/report determinacy
