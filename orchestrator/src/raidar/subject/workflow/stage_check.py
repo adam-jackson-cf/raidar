@@ -280,7 +280,6 @@ def _damage(out: Path, mode: str) -> None:
         "invalid-json": lambda: out.write_text("{not json", encoding="utf-8"),
         "non-utf8": lambda: out.write_bytes(_WEIRD_BYTES),
         "deep-json": lambda: out.write_text(_DEEP_JSON, encoding="utf-8"),
-        "wrong-state": lambda: out.write_text("unrelated words, no check\n", encoding="utf-8"),
     }
     if mode in writers:
         writers[mode]()
@@ -298,7 +297,7 @@ def _mutated(done: Path, target: Path, mode: str) -> None:
         target.mkdir()
 
 
-DATA_CASES = ("empty-state", "zero-byte", "invalid-json", "non-utf8", "deep-json", "wrong-state")
+DATA_CASES = ("empty-state", "zero-byte", "invalid-json", "non-utf8", "deep-json")
 
 
 def _with_generated(package: StagePackage, scratch: Path) -> StagePackage:

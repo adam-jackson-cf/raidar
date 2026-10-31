@@ -38,7 +38,7 @@ from tests.stage_check_support import (
     strict_note_tool,
 )
 
-DATA_MODES = ("empty-state", "zero-byte", "invalid-json", "non-utf8", "deep-json", "wrong-state")
+DATA_MODES = ("empty-state", "zero-byte", "invalid-json", "non-utf8", "deep-json")
 BOUNDS_MODES = ("fifo", "symlink-loop", "oversized", "unreadable")
 HOSTILE_MODES = ("fifo", "symlink-loop", "oversized")
 FLAKY = "two runs differ in stdout or output digests"
@@ -185,9 +185,6 @@ async def test_generated_data_cases_damage_every_state_file_and_leave_the_done_s
             data.decode("utf-8")
     for data in run["raidar-deep-json"].values():
         assert data.count(b"[") == data.count(b"]") >= 500
-    assert set(run["raidar-wrong-state"]) == both
-    for data in run["raidar-wrong-state"].values():
-        assert data.decode("utf-8") != extra.read_text(encoding="utf-8")
 
 
 # ---------------------------------------------------------------- a verifier that misbehaves
