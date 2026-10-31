@@ -19,16 +19,18 @@ Paths are the tracked files plus untracked files that are not git-ignored.
 from __future__ import annotations
 
 import argparse
+import ast
 import re
 import subprocess
 import sys
 from pathlib import Path, PurePosixPath
 
-from raidar.subject.package import StagePackageError
-from raidar.subject.package.registry import load_stage_package
+from raidar_contract.package import StagePackageError
+from raidar_contract.package.registry import load_stage_package
 
 ROOT_DIRECTORIES = frozenset(
     {
+        "contract",
         "orchestrator",
         "review-surface",
         "lab",
@@ -100,6 +102,7 @@ RAIDAR_PACKAGES: dict[str, frozenset[str]] = {
     ),
     "evaluation": frozenset({"analysis", "review", "ledger"}),
 }
+CONTRACT_FORBIDDEN_IMPORTS = frozenset({"raidar", "harbor"})
 MAX_PACKAGE_DEPTH = 3
 VERSION_TOKEN = re.compile(r"(?<![A-Za-z0-9])v\d+(?![A-Za-z0-9])")
 # Dated design records keep their historical file names (the docs tree is not product layout).
@@ -193,8 +196,7 @@ def _stage_roots(entries: list[PurePosixPath]) -> list[PurePosixPath]:
         {
             path.parent
             for path in entries
-            if path.name == "stage.yaml"
-            and len(path.relative_to(prefix).parts) == 3
+            if path.name == "stage.yaml" and len(path.relative_to(prefix).parts) == 3
         },
         key=lambda path: (len(path.parts), str(path)),
     )
@@ -226,6 +228,28 @@ def stage_violations(paths: list[str], repo_root: Path) -> list[str]:
     return found
 
 
+def contract_violations(paths: list[str], repo_root: Path) -> list[str]:
+    """``raidar_contract`` imports neither ``raidar`` nor Harbor (it ships on its own)."""
+    found = []
+    for path in paths:
+        if not (path.startswith("contract/src/") and path.endswith(".py")):
+            continue
+        tree = ast.parse((repo_root / path).read_bytes(), filename=path)
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Import):
+                names = [alias.name for alias in node.names]
+            elif isinstance(node, ast.ImportFrom) and node.level == 0 and node.module:
+                names = [node.module]
+            else:
+                continue
+            found.extend(
+                f"{path}:{node.lineno}: the contract never imports {name}"
+                for name in names
+                if name.split(".")[0] in CONTRACT_FORBIDDEN_IMPORTS
+            )
+    return found
+
+
 def violations(paths: list[str]) -> list[str]:
     return [
         *root_violations(paths),
@@ -240,7 +264,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--repo-root", default=".", type=Path)
     args = parser.parse_args(argv)
     paths = repo_paths(args.repo_root.resolve())
-    found = [*violations(paths), *stage_violations(paths, args.repo_root)]
+    found = [
+        *violations(paths),
+        *stage_violations(paths, args.repo_root),
+        *contract_violations(paths, args.repo_root.resolve()),
+    ]
     if not found:
         print("structure-check: ok")
         return 0

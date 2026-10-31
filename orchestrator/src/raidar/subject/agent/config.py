@@ -11,13 +11,7 @@ from collections.abc import Mapping
 from enum import StrEnum
 
 from pydantic import BaseModel, Field
-
-
-class AgentName(StrEnum):
-    """Harbor ``AgentName`` ids an experiment's agent entry may use."""
-
-    CODEX = "codex"
-    CLAUDE_CODE = "claude-code"
+from raidar_contract.agent import AgentName
 
 
 class Harness(StrEnum):

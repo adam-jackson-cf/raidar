@@ -8,9 +8,10 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+from raidar_contract.agent import AgentDefinitionError
 
 from raidar.contract.paths import agents_root, workflows_root
-from raidar.subject.agent.definition import AgentDefinitionError, load_agent
+from raidar.subject.agent.definition import load_agent
 from raidar.subject.workflow.components import PlacementError, skill_files
 from raidar.subject.workflow.definition import (
     TASK_TOKEN,

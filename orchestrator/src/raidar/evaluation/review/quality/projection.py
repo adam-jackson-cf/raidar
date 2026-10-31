@@ -11,7 +11,8 @@ from collections.abc import Sequence
 from dataclasses import replace
 from pathlib import Path
 
-from raidar.contract.canonical import pretty_canonical_json_bytes
+from raidar_contract.canonical import pretty_canonical_json_bytes
+
 from raidar.evaluation.review.integrity import check_review_jobs
 from raidar.evaluation.review.quality.experiment_view import ReviewedTrial, build_experiments
 from raidar.evaluation.review.quality.gate_view import GATE_EFFORT_REF

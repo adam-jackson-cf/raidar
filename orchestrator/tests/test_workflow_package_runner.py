@@ -19,12 +19,13 @@ from typing import Any, ClassVar
 
 import pytest
 from harbor.models.agent.context import AgentContext
+from raidar_contract.canonical import digest_json
+from raidar_contract.package.manifest import StagePackage
+from raidar_contract.package.registry import load_stage_package, stage_folder
+from raidar_contract.releases import Release
+from raidar_contract.workflow import PackageWorkflowDefinition
 
-from raidar.contract.canonical import digest_json
 from raidar.contract.paths import workflows_root
-from raidar.contract.releases import Release
-from raidar.subject.package.manifest import StagePackage
-from raidar.subject.package.registry import load_stage_package, stage_folder
 from raidar.subject.primitive import calls
 from raidar.subject.primitive.calls import TransportError, TreeManifest
 from raidar.subject.primitive.gate import Attribution, GateInvalid, GateOutcome
@@ -34,10 +35,10 @@ from raidar.subject.workflow import package as package_module
 from raidar.subject.workflow import package_trial
 from raidar.subject.workflow.definition import load_workflow
 from raidar.subject.workflow.factory import checkpoint_stages, place_components
-from raidar.subject.workflow.package_definition import PackageWorkflowDefinition
 from raidar.subject.workflow.package_stage import PackageStage
-from raidar.subject.workflow.runner import RECORD_FILE, WORKFLOW_DIR, WorkflowRunner
+from raidar.subject.workflow.runner import RECORD_FILE, WorkflowRunner
 from raidar.subject.workflow.stage import GATE_FIX, REPAIR, REWORK, Checkpoint, Spent
+from raidar.subject.workflow.turns import WORKFLOW_DIR
 from tests.experiment_spec_support import REPO_ROOT
 from tests.lifecycle_support import (
     NOTE_STATE,

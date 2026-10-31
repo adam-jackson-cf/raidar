@@ -19,7 +19,14 @@ from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Any
 
-from raidar.subject.package.manifest import StagePackage
+from raidar_contract.package.fixtures import (
+    GATE_STATUSES,
+    Expectation,
+    read_expectation,
+    static_problems,
+)
+from raidar_contract.package.manifest import StagePackage
+
 from raidar.subject.primitive.calls import (
     CallResult,
     CallRunner,
@@ -42,15 +49,7 @@ from raidar.subject.primitive.gate import GateInvalid, GateOutcome, GatePackage,
 from raidar.subject.primitive.install import InstalledPackage, install_package
 from raidar.subject.primitive.outputs import collect_outputs
 from raidar.subject.primitive.site import PackageSite, TrialInvalid
-from raidar.subject.workflow.identity import package_primitives
-from raidar.subject.workflow.stage_cases import (
-    GATE_STATUSES,
-    Expectation,
-    read_expectation,
-    result_status,
-    static_problems,
-    stop_status,
-)
+from raidar.subject.workflow.stage_cases import result_status, stop_status
 from raidar.subject.workflow.stage_container import PackContainer
 
 GATE_WORKSPACE = "/app"
@@ -433,12 +432,12 @@ async def check_package(
     image: str,
     docker_context: str,
     pack: str,
+    primitives: Mapping[str, str],
     logs_dir: Path,
     cache_root: Path | None = None,
 ) -> CheckReport:
     """Check ``package`` (``reference`` is ``<ns>/<name>``) offline in a pack container."""
-    primitives = package_primitives([package])
-    report = CheckReport(reference, package.digest, pack, primitives)
+    report = CheckReport(reference, package.digest, pack, dict(primitives))
     report.static = static_problems(package)
     if report.static:
         return report

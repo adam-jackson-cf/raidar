@@ -49,8 +49,7 @@ from typing import Annotated, Any, Literal, Self
 
 import yaml
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
-
-from raidar.contract.canonical import IGNORED_TREE_NAMES, digest_json
+from raidar_contract.canonical import IGNORED_TREE_NAMES, digest_json
 
 WORKFLOW_FILE = "workflow.yaml"
 SKILLS_DIR = "skills"

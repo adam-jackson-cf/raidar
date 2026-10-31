@@ -17,13 +17,13 @@ import click
 import pytest
 import yaml
 from click.testing import CliRunner
+from raidar_contract.package.registry import load_stage_package
 
 from raidar.cli import main, stage_fixtures, stage_lock, stage_package, workflow_new
 from raidar.cli.stage_template import LOCK as TEMPLATE_LOCK
 from raidar.cli.stage_template import render_template
 from raidar.contract.paths import stage_checks_root
 from raidar.contract.wheels import uv_lock_refusals
-from raidar.subject.package.registry import load_stage_package
 from raidar.subject.primitive.canary import StageCheckRecord
 from raidar.subject.workflow.stage_check import CaseResult, CheckReport, ReplayRun
 

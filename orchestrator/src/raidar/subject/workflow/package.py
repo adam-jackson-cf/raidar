@@ -20,8 +20,9 @@ from collections.abc import Iterator, Mapping, Sequence
 from contextlib import contextmanager
 from typing import Any
 
+from raidar_contract.package.tokens import Frame, FramePart, render_frame
+
 from raidar.subject.primitive.calls import CallRunner, TransportError
-from raidar.subject.primitive.frame import Frame, FramePart, render_frame
 from raidar.subject.primitive.gate import (
     Attribution,
     GateInvalid,

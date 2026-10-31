@@ -13,14 +13,14 @@ from typing import Any
 import pytest
 import yaml
 from click.testing import CliRunner
+from raidar_contract.package.fixtures import required_cases, static_problems
+from raidar_contract.package.registry import load_stage_package
 
 from raidar.cli import main, stage, stage_fixtures, stage_lock, stage_package, workflow_new
 from raidar.cli.stage_template import LOCK as TEMPLATE_LOCK
 from raidar.cli.stage_template import render_template
 from raidar.contract.wheels import uv_lock_refusals
-from raidar.subject.package.registry import load_stage_package
 from raidar.subject.workflow import stage_check
-from raidar.subject.workflow.stage_cases import required_cases, static_problems
 
 # Model uv's sdist metadata as well as the generated template's pinned wheel.
 SDIST = (

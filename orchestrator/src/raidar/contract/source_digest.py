@@ -19,7 +19,8 @@ from __future__ import annotations
 import ast
 from pathlib import Path
 
-from raidar.contract.canonical import digest_json
+import raidar_contract
+from raidar_contract.canonical import digest_json
 
 SOURCE_DIGEST_SCHEME = "python-ast/1"
 """Recorded beside every source digest; bump it when the normalisation changes."""
@@ -93,3 +94,12 @@ def python_source_digest(path: Path) -> str:
             "tree": normalised_source(path.read_bytes(), filename=str(path)),
         }
     )
+
+
+def contract_sources() -> dict[str, Path]:
+    """Installed contract Python sources under transport-independent identity paths."""
+    root = Path(raidar_contract.__file__).resolve().parent
+    return {
+        f"raidar_contract/{path.relative_to(root).as_posix()}": path
+        for path in sorted(root.rglob("*.py"))
+    }

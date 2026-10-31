@@ -35,8 +35,8 @@ from typing import Literal, Self
 
 import yaml
 from pydantic import BaseModel, ConfigDict, Field, model_validator
+from raidar_contract.canonical import digest_json
 
-from raidar.contract.canonical import digest_json
 from raidar.contract.paths import judge_root
 
 POLICY_DIR = judge_root() / "policies"

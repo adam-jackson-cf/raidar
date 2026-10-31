@@ -7,10 +7,10 @@ from types import SimpleNamespace
 from typing import Any
 
 import pytest
+from raidar_contract.package.registry import load_stage_package
+from raidar_contract.releases import Release
 
 from raidar.contract.paths import stages_root
-from raidar.contract.releases import Release
-from raidar.subject.package.registry import load_stage_package
 from raidar.subject.primitive.install import InstallError
 from raidar.subject.primitive.site import TrialInvalid
 from raidar.subject.workflow import package_trial

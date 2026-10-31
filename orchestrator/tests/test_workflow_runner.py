@@ -16,10 +16,9 @@ from raidar.subject.workflow.definition import load_workflow
 from raidar.subject.workflow.runner import (
     PROMPT_FILE,
     RECORD_FILE,
-    TRAJECTORY_FILE,
-    WORKFLOW_DIR,
     WorkflowRunner,
 )
+from raidar.subject.workflow.turns import TRAJECTORY_FILE, WORKFLOW_DIR
 from tests.experiment_spec_support import REPO_ROOT
 from tests.native_support import CodexNative
 

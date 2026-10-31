@@ -20,9 +20,9 @@ from harbor.agents.factory import AgentFactory
 from harbor.agents.options import AgentOptions
 from harbor.models.trial.config import AgentConfig
 from pydantic import BaseModel, ConfigDict, Field
+from raidar_contract.workflow import PackageWorkflowDefinition
 
 from raidar.subject.workflow.definition import WorkflowDefinition
-from raidar.subject.workflow.package_definition import PackageWorkflowDefinition
 
 INNER_KWARG = "inner_agent"
 

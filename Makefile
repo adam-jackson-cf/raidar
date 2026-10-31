@@ -103,7 +103,7 @@ AGENT_SMOKE_EFFECTIVE_REASONING = $(if $(filter command line environment,$(origi
 	experiment-plan experiment-execute experiment-status \
 	perf-check perf-fixture perf-gate security-gate health \
 	stage-new stage-lock stage-check stage-list stage-info workflow-new \
-	ledger-check ledger-index releases-check \
+	ledger-check ledger-index releases-check contract-build \
 	problem-list problem-info problem-import problem-validate problem-errata-draft \
 	experiment-assess assess-regrade experiment-analyze jev-shadow-rubric \
 	jev-export-labels jev-import-labels jev-export-blind jev-import-blind \
@@ -183,6 +183,7 @@ help:
 	@echo "  make stage-list                                       List stage packages with digest and release state"
 	@echo "  make stage-info NAME=<ns>/<name>                      Show a package's manifest facts, digest, next register line, lock state and canary record"
 	@echo "  make workflow-new NAME=<name> [FROM=one-shot-verify]  Copy a workflow template to lab/workflows/<name> (never overwrites)"
+	@echo "  make contract-build                                    Build the raidar-contract wheel and sdist into var/contract-dist and print their sha256 (publishes nothing)"
 	@echo "  make releases-check [RELEASES_BASE=<commit>]          Fail unless lab/releases.yaml registers each agent, workflow and stage at its current hash, agent pins equal the pack's, and no release in the base commit (default: merge base with main, or HEAD's parent on main) was removed or re-hashed; part of make quality"
 	@echo "  make experiment-locks-check                           Fail unless every lab/experiments/*/*/*.lock.json is current (host Python patch aside); part of make quality"
 	@echo "  make ledger-check                                     Check lab/ledger/ (fault and remedy records, links, status transitions, README index); part of make quality"
@@ -686,6 +687,11 @@ smoke-agents: docker-check pack-build
 # Repository structure rules (no version in names, root and package allowlists, depth limit).
 structure-check:
 	@$(REPO_RUNTIME_ENV) uv run --project orchestrator python scripts/checks/check-structure.py --repo-root "$(CURDIR)"
+
+# Build the portable contract's wheel and sdist into var/ and print their sha256 (nothing is published).
+CONTRACT_DIST_DIR ?= $(RAIDAR_VAR)/contract-dist
+contract-build:
+	@$(REPO_RUNTIME_ENV) sh -c 'rm -rf "$(CONTRACT_DIST_DIR)" && uv build contract --wheel --sdist --out-dir "$(CONTRACT_DIST_DIR)" && cd "$(CONTRACT_DIST_DIR)" && shasum -a 256 *.whl *.tar.gz'
 
 # The step before editing a released scorer in place: pin the current state as
 # an annotated tag so its old behaviour stays recoverable (REF=<name>@<N>, e.g. code-quality@3).

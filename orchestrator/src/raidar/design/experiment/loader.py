@@ -19,8 +19,8 @@ from typing import Any
 
 import yaml
 from pydantic import ValidationError
+from raidar_contract.canonical import sha256_hex
 
-from raidar.contract.canonical import sha256_hex
 from raidar.design.experiment.schema import ExperimentSpec, FieldIssue
 from raidar.design.experiment.validation import (
     SpecValidationError,

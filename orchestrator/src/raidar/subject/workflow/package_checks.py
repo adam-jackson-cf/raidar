@@ -26,10 +26,11 @@ from dataclasses import dataclass
 from functools import cache
 from pathlib import Path
 
-from raidar.contract.releases import Release
+from raidar_contract.package.manifest import StagePackage
+from raidar_contract.package.tokens import PLACEHOLDER, TASK_SLOT, token_name
+from raidar_contract.releases import Release
+
 from raidar.contract.wheels import uv_lock_refusals
-from raidar.subject.package.manifest import StagePackage
-from raidar.subject.primitive.frame import PLACEHOLDER, TASK_SLOT, token_name
 from raidar.subject.primitive.registry import SUPPORTED_CONTRACTS
 
 LOCK_PATH = "tool/uv.lock"

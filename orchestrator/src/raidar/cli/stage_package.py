@@ -6,12 +6,12 @@ import re
 from pathlib import Path
 
 import click
+from raidar_contract.package import StagePackageError
+from raidar_contract.package.manifest import StagePackage
+from raidar_contract.package.registry import MANIFEST_FILE, STAGES_DIR, load_stage_package
+from raidar_contract.releases import ReleaseKind, ReleaseRegister, load_register
 
 from raidar.contract.paths import lab_root, releases_file
-from raidar.contract.releases import ReleaseKind, ReleaseRegister, load_register
-from raidar.subject.package import StagePackageError
-from raidar.subject.package.manifest import StagePackage
-from raidar.subject.package.registry import MANIFEST_FILE, STAGES_DIR, load_stage_package
 
 _NAME = re.compile(r"^[a-z0-9][a-z0-9-]*/[a-z0-9][a-z0-9-]*$")
 

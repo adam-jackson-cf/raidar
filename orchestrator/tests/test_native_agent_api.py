@@ -4,10 +4,11 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from raidar_contract.agent_records import StatePath
+
 from raidar.engine.health.setup_script import render_setup_script
 from raidar.subject.agent.config import Harness
 from raidar.subject.agent.native import credentials, native_agent_class, state_paths
-from raidar.subject.agent.protocol import StatePath
 
 KEY = "test-key"
 

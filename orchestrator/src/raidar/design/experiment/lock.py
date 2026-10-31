@@ -46,12 +46,13 @@ from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 from typing import Any
 
-from raidar.contract.canonical import (
+from raidar_contract.canonical import (
     IGNORED_TREE_NAMES,
     digest_json,
     pretty_canonical_json_bytes,
     sha256_file,
 )
+
 from raidar.contract.references import (
     RefKind,
     RegistryRef,
@@ -59,7 +60,11 @@ from raidar.contract.references import (
     ResolvedReference,
     ResolverSet,
 )
-from raidar.contract.source_digest import SOURCE_DIGEST_SCHEME, python_source_digest
+from raidar.contract.source_digest import (
+    SOURCE_DIGEST_SCHEME,
+    contract_sources,
+    python_source_digest,
+)
 from raidar.design.experiment.arm import ArmResolutionError, resolve_arm
 from raidar.design.experiment.loader import LoadedExperiment
 from raidar.design.experiment.runtime_gate import GateInputs, PackLoader, runtime_gate_issues
@@ -142,17 +147,18 @@ def default_resolvers(metrics: MetricRegistry = DEFAULT_METRIC_REGISTRY) -> Reso
 
 
 SPEC_EXTERNAL_MODULES = (
-    "contract/canonical.py",
     "contract/references.py",
     "contract/source_digest.py",
     "scoring/framework/metrics.py",
 )
-"""Modules outside this package that are part of the spec/metric/lock rules (below ``raidar/``)."""
+"""Modules outside this package that are part of the spec/metric/lock rules (below ``raidar/``).
+The whole ``raidar_contract`` distribution (canonical digests, releases, workflow schema, ...) is
+covered too, under ``raidar_contract/<path>`` keys."""
 
 
 def spec_source_digest() -> str:
-    """Digest of this package's code and ``SPEC_EXTERNAL_MODULES``, so a change to the
-    spec/metric/lock rules relocks.
+    """Digest of this package's code, ``SPEC_EXTERNAL_MODULES`` and the contract distribution,
+    so a change to the spec/metric/lock rules relocks.
 
     The installed ``raidar`` version is static between releases; this digest is
     what ties a lock to the exact validation, metric and lock rules used. Each
@@ -168,6 +174,7 @@ def spec_source_digest() -> str:
             for relative in SPEC_EXTERNAL_MODULES
         }
     )
+    modules.update({key: python_source_digest(path) for key, path in contract_sources().items()})
     return digest_json({"scheme": SOURCE_DIGEST_SCHEME, "modules": modules})
 
 

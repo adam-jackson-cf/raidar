@@ -13,13 +13,14 @@ from collections.abc import Mapping
 from pathlib import Path, PurePosixPath
 from typing import Any
 
-from raidar.subject.package.manifest import StagePackage
+from raidar_contract.package.manifest import StagePackage
+from raidar_contract.package.tokens import Frame
+from raidar_contract.workflow import PackageWorkflowDefinition, StageUse
+
 from raidar.subject.primitive import calls
-from raidar.subject.primitive.frame import Frame
 from raidar.subject.primitive.install import InstalledPackage
 from raidar.subject.primitive.site import TrialInvalid
 from raidar.subject.workflow.package import PackageCheckpoint
-from raidar.subject.workflow.package_definition import PackageWorkflowDefinition, StageUse
 from raidar.subject.workflow.package_member import PackageSpec
 from raidar.subject.workflow.package_trial import (
     install_locked,

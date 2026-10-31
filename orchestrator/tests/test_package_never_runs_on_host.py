@@ -16,11 +16,11 @@ from typing import Any
 
 import pytest
 from click.testing import CliRunner
+from raidar_contract.package.registry import load_stage_package
 
 from raidar.cli import main, stage_fixtures, stage_lock, stage_package
 from raidar.scoring.framework.rescore import rescore_path
 from raidar.scoring.framework.store import AssessmentStore
-from raidar.subject.package.registry import load_stage_package
 from raidar.subject.workflow import stage_check
 from tests.health_support import healthy_trial
 from tests.scorer_support import fake_registry, two_step_trial
