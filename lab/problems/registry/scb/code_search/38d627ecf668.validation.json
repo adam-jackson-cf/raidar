@@ -43,10 +43,11 @@
   ],
   "engine": "direct",
   "environment": {
-    "docker_context": "raidar-mbp",
+    "docker_context": "orbstack",
     "engine": "direct",
-    "grader_environment_id": "sha256:715698bfd52661aa5627a3a9d22ea24db40b3716e5d78c6c8793976055973c06",
+    "grader_environment_id": "sha256:1989940cc347e516b774a3833071b60dbfae6a730e55462cdf38a095e23d8765",
     "grader_image": "raidar-oracle-grader:963c14e63ff5e15d",
+    "grader_implementation_sha256": "4520a3d16ca56fd6d838293b9b9e71e9e493441d74c97982fd6c0ed9ee95cec2",
     "harbor": "0.23.0",
     "pack_image": "raidar/pack-python:2b91a52663e099f2"
   },
@@ -54,6 +55,250 @@
     "native": null,
     "oracle": {
       "negative": [
+        {
+          "checkpoint_1": {
+            "all_pass": false,
+            "groups": {
+              "core": [
+                0,
+                7
+              ],
+              "error": [
+                0,
+                2
+              ],
+              "functionality": [
+                0,
+                4
+              ],
+              "regression": [
+                0,
+                0
+              ]
+            },
+            "infra_failure": null,
+            "passed": 0,
+            "total": 13
+          },
+          "checkpoint_2": {
+            "all_pass": false,
+            "groups": {
+              "core": [
+                1,
+                5
+              ],
+              "error": [
+                1,
+                2
+              ],
+              "functionality": [
+                0,
+                5
+              ],
+              "regression": [
+                13,
+                13
+              ]
+            },
+            "infra_failure": null,
+            "passed": 15,
+            "total": 25
+          },
+          "checkpoint_3": {
+            "all_pass": false,
+            "groups": {
+              "core": [
+                0,
+                8
+              ],
+              "error": [
+                0,
+                2
+              ],
+              "functionality": [
+                0,
+                12
+              ],
+              "regression": [
+                25,
+                25
+              ]
+            },
+            "infra_failure": null,
+            "passed": 25,
+            "total": 47
+          },
+          "checkpoint_4": {
+            "all_pass": false,
+            "groups": {
+              "core": [
+                0,
+                14
+              ],
+              "error": [
+                1,
+                2
+              ],
+              "functionality": [
+                1,
+                12
+              ],
+              "regression": [
+                47,
+                47
+              ]
+            },
+            "infra_failure": null,
+            "passed": 49,
+            "total": 75
+          },
+          "checkpoint_5": {
+            "all_pass": false,
+            "groups": {
+              "core": [
+                0,
+                13
+              ],
+              "error": [
+                0,
+                2
+              ],
+              "functionality": [
+                0,
+                14
+              ],
+              "regression": [
+                75,
+                75
+              ]
+            },
+            "infra_failure": null,
+            "passed": 75,
+            "total": 104
+          }
+        },
+        {
+          "checkpoint_1": {
+            "all_pass": false,
+            "groups": {
+              "core": [
+                0,
+                7
+              ],
+              "error": [
+                0,
+                2
+              ],
+              "functionality": [
+                0,
+                4
+              ],
+              "regression": [
+                0,
+                0
+              ]
+            },
+            "infra_failure": null,
+            "passed": 0,
+            "total": 13
+          },
+          "checkpoint_2": {
+            "all_pass": false,
+            "groups": {
+              "core": [
+                1,
+                5
+              ],
+              "error": [
+                1,
+                2
+              ],
+              "functionality": [
+                0,
+                5
+              ],
+              "regression": [
+                13,
+                13
+              ]
+            },
+            "infra_failure": null,
+            "passed": 15,
+            "total": 25
+          },
+          "checkpoint_3": {
+            "all_pass": false,
+            "groups": {
+              "core": [
+                0,
+                8
+              ],
+              "error": [
+                0,
+                2
+              ],
+              "functionality": [
+                0,
+                12
+              ],
+              "regression": [
+                25,
+                25
+              ]
+            },
+            "infra_failure": null,
+            "passed": 25,
+            "total": 47
+          },
+          "checkpoint_4": {
+            "all_pass": false,
+            "groups": {
+              "core": [
+                0,
+                14
+              ],
+              "error": [
+                1,
+                2
+              ],
+              "functionality": [
+                1,
+                12
+              ],
+              "regression": [
+                47,
+                47
+              ]
+            },
+            "infra_failure": null,
+            "passed": 49,
+            "total": 75
+          },
+          "checkpoint_5": {
+            "all_pass": false,
+            "groups": {
+              "core": [
+                0,
+                13
+              ],
+              "error": [
+                0,
+                2
+              ],
+              "functionality": [
+                0,
+                14
+              ],
+              "regression": [
+                75,
+                75
+              ]
+            },
+            "infra_failure": null,
+            "passed": 75,
+            "total": 104
+          }
+        },
         {
           "checkpoint_1": {
             "all_pass": false,
@@ -787,6 +1032,250 @@
             "passed": 104,
             "total": 104
           }
+        },
+        {
+          "checkpoint_1": {
+            "all_pass": true,
+            "groups": {
+              "core": [
+                7,
+                7
+              ],
+              "error": [
+                2,
+                2
+              ],
+              "functionality": [
+                4,
+                4
+              ],
+              "regression": [
+                0,
+                0
+              ]
+            },
+            "infra_failure": null,
+            "passed": 13,
+            "total": 13
+          },
+          "checkpoint_2": {
+            "all_pass": true,
+            "groups": {
+              "core": [
+                5,
+                5
+              ],
+              "error": [
+                2,
+                2
+              ],
+              "functionality": [
+                5,
+                5
+              ],
+              "regression": [
+                13,
+                13
+              ]
+            },
+            "infra_failure": null,
+            "passed": 25,
+            "total": 25
+          },
+          "checkpoint_3": {
+            "all_pass": true,
+            "groups": {
+              "core": [
+                8,
+                8
+              ],
+              "error": [
+                2,
+                2
+              ],
+              "functionality": [
+                12,
+                12
+              ],
+              "regression": [
+                25,
+                25
+              ]
+            },
+            "infra_failure": null,
+            "passed": 47,
+            "total": 47
+          },
+          "checkpoint_4": {
+            "all_pass": true,
+            "groups": {
+              "core": [
+                14,
+                14
+              ],
+              "error": [
+                2,
+                2
+              ],
+              "functionality": [
+                12,
+                12
+              ],
+              "regression": [
+                47,
+                47
+              ]
+            },
+            "infra_failure": null,
+            "passed": 75,
+            "total": 75
+          },
+          "checkpoint_5": {
+            "all_pass": true,
+            "groups": {
+              "core": [
+                13,
+                13
+              ],
+              "error": [
+                2,
+                2
+              ],
+              "functionality": [
+                14,
+                14
+              ],
+              "regression": [
+                75,
+                75
+              ]
+            },
+            "infra_failure": null,
+            "passed": 104,
+            "total": 104
+          }
+        },
+        {
+          "checkpoint_1": {
+            "all_pass": true,
+            "groups": {
+              "core": [
+                7,
+                7
+              ],
+              "error": [
+                2,
+                2
+              ],
+              "functionality": [
+                4,
+                4
+              ],
+              "regression": [
+                0,
+                0
+              ]
+            },
+            "infra_failure": null,
+            "passed": 13,
+            "total": 13
+          },
+          "checkpoint_2": {
+            "all_pass": true,
+            "groups": {
+              "core": [
+                5,
+                5
+              ],
+              "error": [
+                2,
+                2
+              ],
+              "functionality": [
+                5,
+                5
+              ],
+              "regression": [
+                13,
+                13
+              ]
+            },
+            "infra_failure": null,
+            "passed": 25,
+            "total": 25
+          },
+          "checkpoint_3": {
+            "all_pass": true,
+            "groups": {
+              "core": [
+                8,
+                8
+              ],
+              "error": [
+                2,
+                2
+              ],
+              "functionality": [
+                12,
+                12
+              ],
+              "regression": [
+                25,
+                25
+              ]
+            },
+            "infra_failure": null,
+            "passed": 47,
+            "total": 47
+          },
+          "checkpoint_4": {
+            "all_pass": true,
+            "groups": {
+              "core": [
+                14,
+                14
+              ],
+              "error": [
+                2,
+                2
+              ],
+              "functionality": [
+                12,
+                12
+              ],
+              "regression": [
+                47,
+                47
+              ]
+            },
+            "infra_failure": null,
+            "passed": 75,
+            "total": 75
+          },
+          "checkpoint_5": {
+            "all_pass": true,
+            "groups": {
+              "core": [
+                13,
+                13
+              ],
+              "error": [
+                2,
+                2
+              ],
+              "functionality": [
+                14,
+                14
+              ],
+              "regression": [
+                75,
+                75
+              ]
+            },
+            "infra_failure": null,
+            "passed": 104,
+            "total": 104
+          }
         }
       ]
     }
@@ -863,7 +1352,73 @@
       "checkpoint_5": "e411f7f403544c0e52f18d76218431a930a4f941fa7ea49f3f283c41b1159f21"
     }
   },
-  "repeats": 3,
+  "reference_observations": {
+    "negative": {
+      "checkpoint_1": {
+        "observation": "no variation observed in 5 runs for this reference and environment",
+        "reference_sha256": "1d2ed42b2c50b3936372a558871e17eb96c66636e686c6b081289c316f23a791",
+        "runs": 5,
+        "status": "measured"
+      },
+      "checkpoint_2": {
+        "observation": "no variation observed in 5 runs for this reference and environment",
+        "reference_sha256": "658bc688643ee52e364df9eaeafabb9c9d44b825ee37a85bff8ed25db7d5d913",
+        "runs": 5,
+        "status": "measured"
+      },
+      "checkpoint_3": {
+        "observation": "no variation observed in 5 runs for this reference and environment",
+        "reference_sha256": "f217c8a10fc53d920720b1cca6b14706ec462c3578342e8586511f2c6502d977",
+        "runs": 5,
+        "status": "measured"
+      },
+      "checkpoint_4": {
+        "observation": "no variation observed in 5 runs for this reference and environment",
+        "reference_sha256": "2f613cca1d3de9911c1d986e01132f350c38ecf2929d124feeab6669a1883129",
+        "runs": 5,
+        "status": "measured"
+      },
+      "checkpoint_5": {
+        "observation": "no variation observed in 5 runs for this reference and environment",
+        "reference_sha256": "1f598367779a3763d16eb10117c32ba2a2dfd3aea9e44af8574fb19f00bc236e",
+        "runs": 5,
+        "status": "measured"
+      }
+    },
+    "positive": {
+      "checkpoint_1": {
+        "observation": "no variation observed in 5 runs for this reference and environment",
+        "reference_sha256": "658bc688643ee52e364df9eaeafabb9c9d44b825ee37a85bff8ed25db7d5d913",
+        "runs": 5,
+        "status": "measured"
+      },
+      "checkpoint_2": {
+        "observation": "no variation observed in 5 runs for this reference and environment",
+        "reference_sha256": "f217c8a10fc53d920720b1cca6b14706ec462c3578342e8586511f2c6502d977",
+        "runs": 5,
+        "status": "measured"
+      },
+      "checkpoint_3": {
+        "observation": "no variation observed in 5 runs for this reference and environment",
+        "reference_sha256": "2f613cca1d3de9911c1d986e01132f350c38ecf2929d124feeab6669a1883129",
+        "runs": 5,
+        "status": "measured"
+      },
+      "checkpoint_4": {
+        "observation": "no variation observed in 5 runs for this reference and environment",
+        "reference_sha256": "1f598367779a3763d16eb10117c32ba2a2dfd3aea9e44af8574fb19f00bc236e",
+        "runs": 5,
+        "status": "measured"
+      },
+      "checkpoint_5": {
+        "observation": "no variation observed in 5 runs for this reference and environment",
+        "reference_sha256": "e411f7f403544c0e52f18d76218431a930a4f941fa7ea49f3f283c41b1159f21",
+        "runs": 5,
+        "status": "measured"
+      }
+    }
+  },
+  "repeats": 5,
   "schema_version": 1,
   "solvable": {
     "checkpoint_1": {
@@ -1179,6 +1734,125 @@
         "checkpoint_5::test_unicode_in_new_languages"
       ],
       "verdict": "validated"
+    }
+  },
+  "spec_determinacy": {
+    "assertions": {
+      "audited": 0,
+      "by_rule": {},
+      "total": 128
+    },
+    "audit_version": 2,
+    "dynamic": {
+      "environment": {},
+      "reason": null,
+      "status": "ran"
+    },
+    "flagged": [],
+    "method": "Static: each audited assertion of a test (error-detail/message equality, containment or pattern; byte-level stdout comparison) is classified against the text of its origin checkpoint's specification and every earlier one (rules below). Dynamic: reference k and spec-conformant variants of it (variants below) are graded at step k; a case is sensitive to a variant when it passes on the reference and not on the variant. A case is flagged when its test has an undetermined assertion of the kind a variant it is sensitive to rewrites.",
+    "rules": {
+      "content-stated": "determined: a paragraph states what the category's detail contains",
+      "content-unstated": "undetermined: error text must contain an input value or match a pattern; no paragraph states what the category's detail contains",
+      "exact-stated": "determined: a paragraph states the exact content of the category's detail",
+      "exact-unstated": "undetermined: error text must equal an input value; no paragraph states exact content",
+      "format-stated": "determined: the specification names an output byte format",
+      "format-unstated": "undetermined: stdout compared byte for byte; no byte format stated",
+      "literal-in-spec": "determined: the asserted literal occurs in the specification text",
+      "wording-unstated": "undetermined: an error-text literal in neither the specification nor the test's inputs"
+    },
+    "sensitive_determined": [],
+    "sensitive_unexplained": [],
+    "static_undetermined": [],
+    "steps": {
+      "checkpoint_1": {
+        "reference": {
+          "infra_failure": null,
+          "passed": 13,
+          "total": 13
+        },
+        "variants": {
+          "neutral_error_text": {
+            "infra_failure": null,
+            "passed": 13,
+            "sensitive": [],
+            "total": 13
+          }
+        }
+      },
+      "checkpoint_2": {
+        "reference": {
+          "infra_failure": null,
+          "passed": 25,
+          "total": 25
+        },
+        "variants": {
+          "neutral_error_text": {
+            "infra_failure": null,
+            "passed": 25,
+            "sensitive": [],
+            "total": 25
+          }
+        }
+      },
+      "checkpoint_3": {
+        "reference": {
+          "infra_failure": null,
+          "passed": 47,
+          "total": 47
+        },
+        "variants": {
+          "neutral_error_text": {
+            "infra_failure": null,
+            "passed": 47,
+            "sensitive": [],
+            "total": 47
+          }
+        }
+      },
+      "checkpoint_4": {
+        "reference": {
+          "infra_failure": null,
+          "passed": 75,
+          "total": 75
+        },
+        "variants": {
+          "neutral_error_text": {
+            "infra_failure": null,
+            "passed": 75,
+            "sensitive": [],
+            "total": 75
+          }
+        }
+      },
+      "checkpoint_5": {
+        "reference": {
+          "infra_failure": null,
+          "passed": 104,
+          "total": 104
+        },
+        "variants": {
+          "neutral_error_text": {
+            "infra_failure": null,
+            "passed": 104,
+            "sensitive": [],
+            "total": 104
+          }
+        }
+      }
+    },
+    "summary": {
+      "flagged": null,
+      "flagged_by_checkpoint": {},
+      "flagged_by_rule": {},
+      "sensitive_determined": 0,
+      "sensitive_unexplained": 0,
+      "status": "unmeasured",
+      "unconfirmed": 0
+    },
+    "unconfirmed": [],
+    "variants": {
+      "neutral_error_text": "every error's human-readable text (an error object's detail or message) replaced by 'request rejected'; category, exit code and format kept",
+      "reformatted_json": "JSON stdout re-serialised with two-space indentation and a trailing newline; value and key order kept"
     }
   },
   "steps": [
