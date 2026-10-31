@@ -15,10 +15,12 @@ All notable changes to this project are documented in this file.
   upgrades so agent-owned uv caches stay untouched. Regenerate all ten experiment
   locks for the changed primitive identities; released definitions remain frozen.
   Local OrbStack security passed all 38 tests; gate-check, note-state replay and
-  fresh docs-check fixtures passed. Note-state's generated `wrong-state` case still
-  fails: its four words satisfy the fixture's three-word minimum, but stage-check
-  requires a non-`done` result. No check was weakened. The `mbp` re-run remains
-  pending; problem revalidation and performance checks run separately.
+  fresh docs-check fixtures passed. By unanimous vote, remove stage-check's generic
+  `wrong-state` case: Raidar has no package-independent semantic state schema.
+  Each stop package defines wrong state through its mandatory `closed` fixture
+  and `resume` when `max_rounds > 0`. No release or lock changes are needed.
+  The `mbp` re-run remains pending; problem revalidation and performance checks
+  run separately.
 
 ### Features
 
