@@ -4,6 +4,23 @@ All notable changes to this project are documented in this file.
 
 ## Unreleased
 
+### Schema-2 admission and workflow namespaces (phase 5A step 2)
+
+- Workflow references now require a namespace (`ns/name@N`; folders `lab/workflows/<ns>/<name>/`).
+  The three schema-1 workflows move unchanged to `lab/workflows/raidar/` (manifest names stay the
+  leaf, so definition digests are unchanged) and start new series `raidar/one-shot@1`,
+  `raidar/one-shot-verify@1` and `raidar/define-build-verify@1` at the digests of the former bare
+  `one-shot@1`, `one-shot-verify@3` and `define-build-verify@4`. The bare register entries stay
+  as frozen history and never resolve. The default workflow is `raidar/one-shot@1`;
+  `workflow-new` defaults to `raidar/one-shot-verify` and takes `<ns>/<name>`; `check-structure`
+  refuses workflows outside `lab/workflows/<ns>/<name>/`.
+- Validate `build.reply` and judge criteria/model/threshold/pass/rework configuration.
+  Refuse missing structured replies or `criteria/1` producers and ambiguous pytest
+  evidence as ST3; reply/judge execution is refused until the 5B wiring, not omitted. Primitive-owned judge
+  constants pin three retries, the question-set id and the 60-second request window.
+  Gate contexts publish a root-owned starting `base` before checks, override authored
+  values, and retain that base after the agent commits.
+
 ### Fixes
 
 - Phase 4/4b Docker gate follow-up: run `stage-check` gate calls as UID 1000 by

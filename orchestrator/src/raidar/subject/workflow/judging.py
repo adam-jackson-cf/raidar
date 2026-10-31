@@ -34,7 +34,6 @@ from raidar.subject.workflow.define_tool.featuredef import Criterion, Feature
 from raidar.subject.workflow.definition import JudgeSettings
 
 ASPECT_ASSERTED = "aspect_asserted"
-QUESTION_SET = "dbv5-aspect/1"
 INSTRUCTIONS = (
     "Does a test in `tests` set up the situation in `aspect.situation` and contain "
     "an assertion that checks the outcome in `aspect.outcome`?"

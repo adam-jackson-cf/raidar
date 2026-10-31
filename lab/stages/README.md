@@ -68,6 +68,14 @@ skills: []
 
 A schema-2 workflow declares `build: {prompt: ...}` and ordered `stages: [{use: '<ns>/<name>@N', params: {...}}]`. Build's prompt contains `%%%TASK%%%` exactly once and exactly one slot for every enabled package: leaf name uppercased with hyphens changed to underscores (for example `%%%REVIEW_NOTES%%%`). No absent-package or unknown slots are allowed. Package fragments fill their slots; task text is inserted verbatim. Package slots must not collide, including across namespaces. Instructions are joined in workflow order at the native agent's instruction placement, never over the task's own `AGENTS.md`. Disabled packages leave no sandbox files.
 
+`build.reply: acceptance-reply/1` declares structured acceptance replies. A `judge` requires
+that reply, `criteria: <package-leaf>.<output>` declaring `criteria/1`, exactly one pytest-kind
+gate, a model, `0 <= open_at < closed_at <= 1`, positive `max_passes`, and a rework frame with
+exactly one `%%%PUSHBACK%%%` and `%%%GATE%%%`. Missing producers or reply are ST3 refusals.
+`jev-judge/1` owns the question-set id, three retries and 60-second request timeout; packages
+and workflow judge configuration cannot override them. Admission is implemented in 5A.
+Schema-2 reply/judge execution is refused until the 5B wiring, never silently omitted.
+
 ### Setup, gate and stop
 
 Calls use argv lists, never shell text. `run` is nonempty. `timeout_s` defaults to 60 seconds and is positive, at most 300. Setup runs before the agent on lab-owned inputs and prints exactly `{"tokens": {"GUIDANCE": "..."}}` as JSON; logging belongs on stderr. Nonzero exit, timeout, invalid JSON or missing tokens invalidates the trial.
@@ -87,6 +95,10 @@ A closed package's `before` checks refuse without invoking its tool, even if a l
 ## Call protocol and evidence
 
 Setup and stop receive a root-owned JSON context path as their final `--context <path>` argv pair. Context contains `task`, effective `params`, `round`, `carry`, `state` (the watched state directory) and declared `outputs`. `RAIDAR_STAGE_CONTEXT` names that path for every call, including gate commands; conventional gate argv is not extended with tool-specific flags. A call receives no inherited host or harness environment. It runs as UID/GID 1000 under `env -i` with a fixed package/pack `PATH`, `LANG=C.UTF-8`, and fresh `HOME` and `TMPDIR` per call. Calls have no network. Package code never runs on the host, including fixture and replay commands. The judge key never enters a container. Hidden grading stays offline in its separate sandbox.
+
+Gate contexts additionally contain the lab's `base` commit, published root-owned (0644)
+after workspace setup and before any check. An authored `base` is overwritten; the value
+remains the checkpoint's starting commit even after the agent creates later commits.
 
 Every call is recorded host-side with package/primitive identity, argv, user, environment digest/names, timeout, duration, exit/signal, stdout digest and capped stdout, and the last 8 KiB of stderr. Stdout is capped at 1 MiB; overflow is an unusable result. Container exec failure, missing call evidence or changed installed tool bytes is an integrity failure, not an agent score. Outputs are copied and hashed host-side after each call and at close; they are method evidence, never graded solution files. `workflow.json` groups evidence by primitive contract id, not shipped package names.
 
@@ -122,7 +134,7 @@ A criteria output is a strict JSON object with `contract: criteria/1` and `featu
 
 `stage-tree/1` is `digest_json({scheme: 'stage-tree/1', files: [[path, sha256, exec], ...]})`: sorted package-relative POSIX paths, exact file bytes, executable-bit boolean. Fixtures do not ship and are excluded; `.git`, `__pycache__` and `.DS_Store` are ignored. Symlinks (including in excluded fixture trees), traversal, absolute paths and special files are refused. Dependency lock bytes, prompts, skills, instructions and own tool bytes are included. Transport and checkout location are not identity.
 
-`lab/releases.yaml` has a `stages:` mapping from `<ns>/<name>@N` to its digest. N starts at 1. Releases are append-only against main's history; only the latest release's current bytes resolve. Older bytes live in archive tags. No release writer exists: checks print the next line to add. A stage reference requires its namespace: a bare `name@N`, paths, branches, tags and `latest` are refused when the workflow is parsed or the register is read, with no alias. Agent and workflow references keep their `name@N` form. A changed package requires a new package release and dependent workflow release, then relocking.
+`lab/releases.yaml` has a `stages:` mapping from `<ns>/<name>@N` to its digest. N starts at 1. Releases are append-only against main's history; only the latest release's current bytes resolve. Older bytes live in archive tags. No release writer exists: checks print the next line to add. Stage and workflow references require their namespace; bare references, paths, branches, tags and `latest` do not resolve, with no alias. Bare workflow register entries remain frozen history only. Agent references retain `name@N`. A changed package requires a new package release and dependent workflow release, then relocking.
 
 Workflow identity folds in every package release, digest and effective params. Arm locks carry `packages` and `primitive_code` (`python-ast/1` inventories including transitive primitive imports, Harbor and native adapter code); neither field can be overridden in pooling. Trial evidence records installed-tree digests and wheels; a mismatch invalidates the trial. Prompt, tool-byte and param changes each change identity and stale locks are refused.
 
@@ -141,7 +153,7 @@ env -u AGENT make stage-check NAME=acme/my-check TARGET=mbp
 env -u AGENT make stage-check NAME=acme/my-check REPLAY=<trial> TARGET=mbp
 env -u AGENT make stage-list
 env -u AGENT make stage-info NAME=acme/my-check
-env -u AGENT make workflow-new NAME=my-workflow            # FROM=one-shot-verify by default
+env -u AGENT make workflow-new NAME=acme/my-workflow            # FROM=raidar/one-shot-verify by default
 env -u AGENT make experiment-lock EXPERIMENT=<smoke-yaml> DRAFT=1
 ```
 

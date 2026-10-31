@@ -57,7 +57,7 @@ def definition(fix_rounds: int | None = 2, **lint: str) -> dict[str, Any]:
 
     ``fix_rounds`` ``None`` leaves ``max_fix_rounds`` out, so the schema's own default applies.
     """
-    resolved = load_workflow(REAL_LAB / "workflows", "one-shot-verify").to_json()
+    resolved = load_workflow(REAL_LAB / "workflows", "raidar/one-shot-verify").to_json()
     stages: Any = resolved["stages"]
     lint_check = {"name": "lint", "category": "lint", "tool": "ruff==0.8.6", "run": "ruff check"}
     tests_check = {"name": "tests", "category": "tests", "tool": "pytest==9.1.1"}
@@ -89,7 +89,7 @@ def run(
         environment_logs_dir=PurePosixPath(logs),
         model_name="openai/gpt-6-luna",
         inner_agent={"name": "codex"},
-        workflow="one-shot-verify@3",
+        workflow="raidar/one-shot-verify@1",
         definition=definition(fix_rounds, **lint),
     )
     asyncio.run(runner.run(TASK, LocalEnvironment(env), AgentContext()))  # type: ignore[arg-type]

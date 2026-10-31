@@ -114,6 +114,10 @@ class PackageStage(Stage):
         )
 
     async def prepare(self, checkpoint: Checkpoint) -> None:
+        if self.definition.build.reply is not None or self.definition.judge is not None:
+            raise TrialInvalid(
+                "instrument", "acceptance-reply/1 and jev-judge/1 execution require phase 5B"
+            )
         if not self.loaded:
             self.load()
         specs = [await self._spec(checkpoint, use, package) for use, package in self.loaded]

@@ -841,7 +841,7 @@
       "tree-sitter-language-pack": "0.13.0"
     }
   },
-  "document_sha256": "cbb6554b0c262e8862cc96e77b05161ae6d5ef376da4fd0b2d42dc8b7110e7dd",
+  "document_sha256": "c4cf9860ff6d0ba4d1ebebcc6badc20a0e475fad2f89f4e621e572c9a3cfb0c7",
   "execution": {
     "arms": {
       "baseline": {
@@ -859,11 +859,11 @@
           "version_pin": "0.156.1",
           "workflow_skills": "placement.skills .agents/skills in the workspace /app"
         },
-        "digest": "d2d46713cefbb49e55a66349bbe4860cc257bf7ac76fc46e9e30c35f109ebbc0",
+        "digest": "a98ba7f682501d0b815c2023e266dd006b590937b52ce77205817b4ba0d17b4f",
         "model": "gpt-6-luna",
         "packages": {},
         "primitive_code": {
-          "build": "964bb196c098bf22534ed75b15b844056ed072cc714ce71d41a427d095282b8c"
+          "build": "e83e549a04207d34cf285c911431baa81e2dc9da1166e164109ee609caca9da1"
         },
         "provider": "openai",
         "reasoning": "low",
@@ -872,7 +872,7 @@
           "package": "@openai/codex",
           "version": "0.156.1"
         },
-        "workflow": "one-shot@1",
+        "workflow": "raidar/one-shot@1",
         "workflow_sha256": "7041679bb89e24a756cbcdd84ebf8260f960baf44c77ec48bdb26d43a86a1113"
       }
     },
@@ -889,7 +889,7 @@
         {
           "agent": "agent",
           "id": "baseline",
-          "workflow": "one-shot@1"
+          "workflow": "raidar/one-shot@1"
         }
       ],
       "attempts": 1,
@@ -1615,7 +1615,7 @@
               "grader": {
                 "environment_id": "sha256:1989940cc347e516b774a3833071b60dbfae6a730e55462cdf38a095e23d8765",
                 "image": "raidar-oracle-grader:963c14e63ff5e15d",
-                "implementation_sha256": "e303c3eec724d679320539fe59a9ab3417abe2c173bba86c6523b42da91188fe"
+                "implementation_sha256": "3a363b442127b5226098cd18e038b64e3f958e9d8054f8eddac7987267851687"
               },
               "not_run": [
                 "native_parity_positive",
@@ -1663,7 +1663,7 @@
         }
       },
       "workflow": {
-        "one-shot@1": {
+        "raidar/one-shot@1": {
           "digest": "7041679bb89e24a756cbcdd84ebf8260f960baf44c77ec48bdb26d43a86a1113",
           "metadata": {
             "stages": [
@@ -1687,10 +1687,10 @@
   "experiment": {
     "id": "python__forge__mechanics",
     "source": "experiment.yaml",
-    "source_sha256": "6423eace58216ab8c14fc08f214faea05b28972081220184acaec66d9c7a61e8",
-    "spec_sha256": "a78ed2ce1861720ac48f2e6e80632b1b5acaad4524862d1bf13314e20d940324"
+    "source_sha256": "c7730fcac3d4f27347588ad81d0517e82432579b8c0291b53e9e438c27528dd9",
+    "spec_sha256": "1d59e8a665961d1d978a7ce6ab57f3b01e24aa2c2131d46503a1a492d2d84cf7"
   },
-  "lock_sha256": "59dad3c0809b4d9d615e2e841a63fe82237cd60164c6f191aa2cf14eb002dc8b",
+  "lock_sha256": "7feaeae917ce85e686385cec6ea21658015a7bd1d12741b7411e6620d66eeba4",
   "lock_version": 5,
   "overrides": {
     "flags": {},
@@ -1699,8 +1699,8 @@
   "sections": {
     "analysis": "1b12d4c79118b1962282a0c33350352b893d39995117c241bba045eff2a1d044",
     "assessment": "dce26b7322a34e10c22c380fff0f675581046b9df217d283beaef5d6a55efb37",
-    "execution": "59dad3c0809b4d9d615e2e841a63fe82237cd60164c6f191aa2cf14eb002dc8b",
-    "toolchain": "b47bfa2d2d96479725c7443c4c09feaef38d394859133b82e684052a6b60dc56"
+    "execution": "7feaeae917ce85e686385cec6ea21658015a7bd1d12741b7411e6620d66eeba4",
+    "toolchain": "9a32fba5858fad219ac72112d73a8896da8790e53180ce35ddc3f94710a30cbc"
   },
   "spec": {
     "agents": [
@@ -1726,7 +1726,7 @@
       {
         "agent": "agent",
         "id": "baseline",
-        "workflow": "one-shot@1"
+        "workflow": "raidar/one-shot@1"
       }
     ],
     "assessment": {
@@ -1770,6 +1770,6 @@
     "litellm": "1.102.1",
     "python": "3.13.7",
     "raidar": "0.15.0",
-    "raidar_spec": "509c06f1f05680fb656d04d98f84b95728200d8fe025457e84d3b32311e3928e"
+    "raidar_spec": "056509cc54665388e077fca119c297b6b58f6b60db29b63cc181aed67159023d"
   }
 }

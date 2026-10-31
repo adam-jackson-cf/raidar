@@ -270,17 +270,6 @@ def test_each_aspect_of_a_criterion_is_its_own_request_over_the_same_tests() -> 
     assert context.requests[0].state["tests"] == context.requests[1].state["tests"]
 
 
-def test_the_question_words_the_aspect_and_asks_nothing_of_production_code() -> None:
-    ((name, asked),) = judging.questions().items()
-
-    assert name == "aspect_asserted"
-    wire = asked.model_dump(exclude_none=True)
-    assert wire["type"] == "noul"
-    assert wire["instructions"].startswith("Does a test in `tests` set up the situation in")
-    assert set(wire["criteria"]) == {"true", "false"}
-    assert judging.QUESTION_SET == "dbv5-aspect/1"
-
-
 @pytest.mark.parametrize(
     ("record", "why"),
     [

@@ -608,19 +608,19 @@ def _new_workflow(*args: str) -> Any:
 def test_workflow_new_copies_the_template_folder_and_renames_only_the_declared_name(
     workflows: Path,
 ) -> None:
-    template = workflows / "base"
+    template = workflows / "acme" / "base"
     (template / "prompts").mkdir(parents=True)
     (template / "prompts" / "build.md").write_text("build it")
     (template / "workflow.yaml").write_text(
         "# name: not-this\nname: base\nstages: []\nnotes:\n  name: nested-stays\n"
     )
 
-    result = _new_workflow("mine", "--from", "base")
+    result = _new_workflow("acme/mine", "--from", "acme/base")
 
     assert result.exit_code == 0, result.output
-    text = (workflows / "mine" / "workflow.yaml").read_text()
+    text = (workflows / "acme" / "mine" / "workflow.yaml").read_text()
     assert text == "# name: not-this\nname: mine\nstages: []\nnotes:\n  name: nested-stays\n"
-    assert (workflows / "mine" / "prompts" / "build.md").read_text() == "build it"
+    assert (workflows / "acme" / "mine" / "prompts" / "build.md").read_text() == "build it"
     assert (template / "workflow.yaml").read_text().count("name: base") == 1
 
 
@@ -628,20 +628,29 @@ def test_workflow_new_copies_the_template_folder_and_renames_only_the_declared_n
 def test_a_template_that_is_not_a_workflow_definition_is_refused_and_leaves_no_copy(
     workflows: Path, content: str
 ) -> None:
-    (workflows / "bad").mkdir(parents=True)
-    (workflows / "bad" / "workflow.yaml").write_text(content)
+    (workflows / "acme" / "bad").mkdir(parents=True)
+    (workflows / "acme" / "bad" / "workflow.yaml").write_text(content)
 
-    result = _new_workflow("mine", "--from", "bad")
+    result = _new_workflow("acme/mine", "--from", "acme/bad")
 
     assert result.exit_code != 0
     assert "is not a workflow definition" in result.output
-    assert not (workflows / "mine").exists()
-    assert (workflows / "bad" / "workflow.yaml").read_text() == content
+    assert not (workflows / "acme" / "mine").exists()
+    assert (workflows / "acme" / "bad" / "workflow.yaml").read_text() == content
 
 
 @pytest.mark.parametrize(
     "args",
-    [["Bad"], ["-x"], ["a/b"], ["ok", "--from", "../x"], ["ok", "--from", "Up"]],
+    [
+        ["Bad"],
+        ["mine"],
+        ["-x"],
+        ["a/b/c"],
+        ["acme/Bad"],
+        ["acme/ok", "--from", "../x"],
+        ["acme/ok", "--from", "base"],
+        ["acme/ok", "--from", "acme/Up"],
+    ],
 )
 def test_workflow_new_refuses_names_that_could_escape_or_are_malformed(
     workflows: Path, args: list[str]

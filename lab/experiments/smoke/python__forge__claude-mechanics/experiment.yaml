@@ -19,7 +19,7 @@ protocol:
 arms:
   - id: baseline
     agent: agent
-    workflow: one-shot@1
+    workflow: raidar/one-shot@1
 assessment:
   scorers: [correctness@9, code-quality@8, resource-usage@7, process-compliance@11]
   metric: scb-canonical@2

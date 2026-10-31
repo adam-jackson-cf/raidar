@@ -272,7 +272,7 @@ def test_agent_entries_are_checked_against_their_release(
 
 def test_an_arm_workflow_must_be_a_released_workflow(tmp_path: Path) -> None:
     document = experiment_document()
-    document["arms"][1]["workflow"] = "ghost@1"
+    document["arms"][1]["workflow"] = "acme/ghost@1"
 
     assert set(_issues(write_experiment(tmp_path, document))) == {"arms.1.workflow"}
 
@@ -285,10 +285,10 @@ def test_a_single_arm_smoke_is_accepted(tmp_path: Path) -> None:
 
 def test_a_benchmark_may_not_compare_workflows() -> None:
     document = experiment_document(kind="benchmark")
-    document["arms"][1]["workflow"] = "other@1"
+    document["arms"][1]["workflow"] = "acme/other@1"
 
     assert [issue.loc for issue in kind_issues(ExperimentSpec.model_validate(document))] == ["arms"]
-    document["arms"][1]["workflow"] = "one-shot@1"
+    document["arms"][1]["workflow"] = "raidar/one-shot@1"
     assert kind_issues(ExperimentSpec.model_validate(document)) == []
 
 

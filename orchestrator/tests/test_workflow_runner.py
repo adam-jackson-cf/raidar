@@ -86,12 +86,12 @@ def inner(monkeypatch: pytest.MonkeyPatch) -> type[FakeInner]:
 
 
 def _runner(logs_dir: Path) -> WorkflowRunner:
-    definition = load_workflow(workflows_root(REPO_ROOT), "one-shot")
+    definition = load_workflow(workflows_root(REPO_ROOT), "raidar/one-shot")
     return WorkflowRunner(
         logs_dir=logs_dir,
         model_name="openai/gpt-6-luna",
         inner_agent={"name": "codex", "kwargs": {"version": "0.156.1"}},
-        workflow="one-shot@1",
+        workflow="raidar/one-shot@1",
         definition=definition.to_json(),
     )
 
@@ -112,7 +112,7 @@ def test_a_one_shot_checkpoint_is_one_build_turn_sent_the_workflow_prompt(tmp_pa
 
     record = json.loads((tmp_path / WORKFLOW_DIR / RECORD_FILE).read_text())
     assert record["kind"] == "raidar-workflow"
-    assert record["workflow"] == "one-shot@1"
+    assert record["workflow"] == "raidar/one-shot@1"
     (turn,) = record["turns"]
     assert (turn["stage"], turn["turn"], turn["log_dir"]) == ("build", 1, "workflow/build-1")
     assert (turn["session_id"], turn["resumed"], turn["error"]) == (SESSION, False, None)
