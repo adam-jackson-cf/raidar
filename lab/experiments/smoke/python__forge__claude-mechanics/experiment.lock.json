@@ -841,7 +841,7 @@
       "tree-sitter-language-pack": "0.13.0"
     }
   },
-  "document_sha256": "e671ed57e930d3332e1b4a88fb4dda8061f16f25f4a56ab53fab7ff2fb3dc874",
+  "document_sha256": "b8067b3e2b01673fbd1e5a4c1d4aee48957ebce6e9cb8f89a34df9ccdb095f5e",
   "execution": {
     "arms": {
       "baseline": {
@@ -1613,9 +1613,9 @@
             "task_sha256": "70e93e9882fd776df49d4ae9fe3d9f9cef30c5dba69916db6b398cb942ad55c2",
             "validation": {
               "grader": {
-                "environment_id": "sha256:715698bfd52661aa5627a3a9d22ea24db40b3716e5d78c6c8793976055973c06",
+                "environment_id": "sha256:1989940cc347e516b774a3833071b60dbfae6a730e55462cdf38a095e23d8765",
                 "image": "raidar-oracle-grader:963c14e63ff5e15d",
-                "implementation_sha256": null
+                "implementation_sha256": "4520a3d16ca56fd6d838293b9b9e71e9e493441d74c97982fd6c0ed9ee95cec2"
               },
               "not_run": [
                 "native_parity_positive",
@@ -1623,13 +1623,39 @@
               ],
               "spec_determinacy": {
                 "assertions": {
-                  "audited": 0,
-                  "total": null
+                  "audited": 95,
+                  "total": 769
                 },
-                "audit_version": null,
-                "flagged": [],
-                "flagged_count": null,
-                "status": "unmeasured"
+                "audit_version": 2,
+                "flagged": [
+                  "test_checkpoint_1.py::test_create_rejects_empty_name_string",
+                  "test_checkpoint_1.py::test_create_rejects_empty_requirement_sets",
+                  "test_checkpoint_3.py::test_bind_duplicate_assignment_guard",
+                  "test_checkpoint_3.py::test_bind_invalid_op_precedes_not_found",
+                  "test_checkpoint_3.py::test_bind_invalid_op_reports_bad_value",
+                  "test_checkpoint_3.py::test_duplicate_guard_blocks_mixed_ops",
+                  "test_checkpoint_3.py::test_invalid_op_no_remove_side_effects",
+                  "test_checkpoint_3.py::test_invalid_op_precedes_duplicate",
+                  "test_checkpoint_6.py::test_create_invalid_firmware_image",
+                  "test_checkpoint_6.py::test_create_unknown_unit_not_found",
+                  "test_checkpoint_6.py::test_flash_bad_image[invalid-format]",
+                  "test_checkpoint_6.py::test_flash_bad_image[unknown-image]",
+                  "test_checkpoint_6.py::test_flash_bad_image[uppercase-uuid]",
+                  "test_checkpoint_6.py::test_flash_invalid_image_precedes_not_found",
+                  "test_checkpoint_6.py::test_flash_requires_stored_image",
+                  "test_checkpoint_6.py::test_flash_unknown_image_rejected_consistently",
+                  "test_checkpoint_6.py::test_get_flash_nonexistent_not_found",
+                  "test_checkpoint_6.py::test_tag_create_requires_module",
+                  "test_checkpoint_6.py::test_tag_delete_removes_from_get_and_list",
+                  "test_checkpoint_6.py::test_tag_get_delete_nonexistent[delete]",
+                  "test_checkpoint_6.py::test_tag_get_delete_nonexistent[get]",
+                  "test_checkpoint_7.py::test_blueprint_get_uuid_shaped_name_uses_uuid_lookup",
+                  "test_checkpoint_7.py::test_revision_preserves_compact_json",
+                  "test_checkpoint_7.py::test_unit_missing_parent_not_found[1.1]",
+                  "test_checkpoint_7.py::test_unit_missing_parent_not_found[1.2]"
+                ],
+                "flagged_count": 25,
+                "status": "measured"
               },
               "verdict": "validated_partial"
             }
@@ -1664,7 +1690,7 @@
     "source_sha256": "5043dcc9bb9521083820ad01c8f3f83a06bd80074f382c4f661d949b50827ccb",
     "spec_sha256": "c1e0df863328328869a7591ea8773aed45bfc8401ecd55b35ad49e9f754d0302"
   },
-  "lock_sha256": "1d8570c26cb00481585d8c146b41b77fb62088f33cd8655d1526341831ec1355",
+  "lock_sha256": "5b1e864632258938914e76381f9cab2b4927b9a99b0eb24fa03639c0dd576fe9",
   "lock_version": 5,
   "overrides": {
     "flags": {},
@@ -1673,7 +1699,7 @@
   "sections": {
     "analysis": "1b12d4c79118b1962282a0c33350352b893d39995117c241bba045eff2a1d044",
     "assessment": "52e2eff27d4fff81e930b83be25d071a74769e3e3d9ade509b0be7ab3ee912f6",
-    "execution": "1d8570c26cb00481585d8c146b41b77fb62088f33cd8655d1526341831ec1355",
+    "execution": "5b1e864632258938914e76381f9cab2b4927b9a99b0eb24fa03639c0dd576fe9",
     "toolchain": "8aead72e2be8c5327134e6a09c1dc8c37b684f67819ccab4b97875b369c8e5ef"
   },
   "spec": {
