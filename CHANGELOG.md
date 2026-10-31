@@ -24,6 +24,12 @@ All notable changes to this project are documented in this file.
 
 ### Features
 
+- Record the adopted 2026-10-31 FXL pivot decisions and phase-5 scope in
+  `split-design.md`, with the three vote records preserved as evidence. Accept
+  `FXL-` fault/remedy IDs and FXL experiment/question citations, including tagged
+  cross-repository evidence references. Historical record import remains phase 8;
+  the phase-5 package cutover is not implemented by this change.
+
 - Phase 4b A: label the primary reference-solvable SCB success; pin/report determinacy
   flags and assertion coverage, with zero coverage unmeasured. Skip JSON reformat probes
   when the spec fixes the format. Release `correctness@8`.

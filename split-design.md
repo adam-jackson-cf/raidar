@@ -17,12 +17,25 @@
   - **Flakiness** (Sol for Astra): validation uses 5 repeats, and records say "no variation observed in N runs", never "deterministic". Agent submissions are graded once.
   - **Audit fixes** (Sol for Astra): all eleven land in phase 4b, before phase 9, with Astra's amendments (section 9).
   - **Hook broker** (both voters): removed. The hook runs the checks as the agent's user and appends to an agent-writable log, so hook-derived evidence (G1, G2, W5's hook-log condition and hook-log findings in W11) becomes readings. These stay validity checks: G3 (the gate tool-tree digest), the installed-tree digest, watched-path, protected-path and session-log findings, and the seal's own record-channel protection and call supervisor.
-  - **Namespaces** (both voters): stage references require a namespace, and the folder is `lab/stages/<ns>/<name>/`, with upstream packages at `lab/stages/raidar/<name>/` under CODEOWNERS. Agent and workflow references keep their current form.
+  - **Namespaces** (both voters): stage references require a namespace, and the folder is `lab/stages/<ns>/<name>/`, with upstream packages at `lab/stages/raidar/<name>/` under CODEOWNERS. Agent and workflow references keep their current form. The workflow half was reversed on 2026-10-31 (R5 below).
 - **2026-10-28 voted decisions: phase-4b follow-up.** Records: `docs/reboot/evidence/decide-4b2-{opus,astra,sol}.md`.
   - **Per-arm exclusion bound** (Astra, tie-break by Sol): no default. Each experiment pre-registers `analysis.max_exclusion_difference = d` in its lock; an unset bound makes analysis descriptive-only, with comparative verdict `insufficient`. Refuse only when the largest arm exclusion rate minus the smallest exceeds `d`; equality passes. The independent 20% paired-exclusion cap remains.
   - **Resolver retries** (both voters): one immediate retry, at most two 120 s attempts per declared set and architecture, using identical requirements and the same pinned policy; record attempts. A second timeout is infrastructure (`dependency_resolver_unavailable`), never `cap-exceeded` or an agent score.
   - **First rework estimate** (both voters): retain refusal when `first_build` duration is unavailable; no fallback floor.
   - **Pinned-excluded halt steps** (both voters): execute normally, retain workspace changes and budget, then advance without treating exclusion as a pass or fail. Use a separate halt-gate signal, never a fabricated solvable score; missing validation, grading infrastructure failures and unexplained missing rewards still halt.
+- **2026-10-31: FXL pivot decisions.** Records: `docs/reboot/evidence/decide-pivot-{opus,astra,sol}.md`. The votes cover the factory-x-loops pivot (R1–R10, C7) and the phase-5 plan. Where both voters agreed, the shared decision stands; where they differed, the tie-breaks T1–T5 (Sol) name the voter, and for the details of agreed items Opus's vote is the more specific. Phase 5 scope is in section 9; the contract package is section 5.8.
+  - **Contract package, R1** (both; publication Astra by T2): `contract/` at the repository root, its own uv project: distribution `raidar-contract`, import `raidar_contract`, dependencies pydantic and pyyaml only. It is the single implementation of `stage/1`, schema 2, `criteria/1`, `stage-tree/1`, release references and the agent schema, and the orchestrator depends on it. Publication is immutable wheel and sdist artefacts under `contract/vX.Y.Z`, with exact-version and hash pins; a tag alone does not pin the installed bytes. Done in phase 5, step 1.
+  - **Shipped defaults on schema 2, R2** (both): all three workflows, `one-shot` included (no stages, prompt byte-identical), move to schema 2 under `raidar/`, and the schema-1 loader is deleted. `docs-check` becomes the real package `raidar/docs-check`; `stage-new FROM=<ns>/<name>` copies package bytes. Schema 2 gains `build.reply` and `judge`.
+  - **Enforcement homes, R3** (Opus by T1): changed-line coverage and hollow-test refusal are a separate package, `raidar/test-evidence`, built in phase 10. `raidar/verify` stays at spike parity as the control, so a later comparison varies only that lever. Phase 5 adds only a root-owned `base` to the `gate/1` context. M-001 is `proposed`, with no experiment or outcome; its contrast is with a gate that has no coverage rule, not 85%. `LIST.item-untested`, golden probes and example probes are `fxl/*` forks.
+  - **Ownership, R4** (both): `raidar/*` are Raidar's baselines and controls; methods are developed in FXL as `fxl/*` and imported byte-identical. This resolves C1 and C2.
+  - **Importing and namespaces, R5** (both): `make stage-import` and `make workflow-import` verify an exported folder against its digest, with provenance in `lab/imports.yaml`. Workflow references require a namespace (`ns/name@N`, folder `lab/workflows/<ns>/<name>/`), reversing the workflow half of the 2026-10-28 namespace vote. Shipped workflows start new series (`raidar/one-shot@1` and so on), and the bare entries stay as frozen history that never resolves.
+  - **SDKs and CLIs, R6** (both; subscription by Astra, T3): measured runs stay on pinned CLI adapters in containers. Subscription support is recorded per provider and pinned adapter in documentation and credential-preflight evidence, with no new identity field. The SDK assessment is phase 7; an SDK adapter needs its own conformance evidence, and every imported release needs a Raidar smoke before a result counts (C4).
+  - **Isolated sessions, R7** (both): not in this cutover. A Raidar-owned primitive comes in a later phase 11, on a `stage/2` cutover.
+  - **Judges, R8** (Astra by T4): the arm judge is part of the treatment, not evidence that the treatment succeeded. Coverage scorers stay readings until validated on held-out independent labels, blind to arm and judge verdict. Calibration and `jev-actions` stay Raidar-owned.
+  - **FXL lab history, R9** (both): FXL's records are adopted under `FXL-` identifiers, never renumbered (section 8).
+  - **Agent pairing, R10** (both): each model runs on its maker's harness by default; cross-harness runs are declared `varies` robustness checks (section 4).
+  - **Contract bumps, C7** (both; freeze detail Opus): `stage/1` freezes at contract `1.0.0` at phase 5 exit; later bumps follow section 5.6.
+  - **Phase-5 plan** (Astra's nine steps, with the T1 adjustments, T5): section 9.
 - **2026-10-27: enforcement review** ([docs/reboot/evidence/enforcement-review-opus.md](docs/reboot/evidence/enforcement-review-opus.md)). User decisions:
   - this file moves to the repository root, so contributors and coding agents can read it;
   - the branch merges to `main` once the spike is proved and the design approved, and CI then runs through `main`;
@@ -70,7 +83,7 @@ flowchart LR
 ## 2. Terms
 
 - **Agent.** A harness (an agent CLI Raidar has an adapter for) at a pinned version, plus a model and its configuration (reasoning level). Raidar defines agents.
-- **Workflow.** A versioned, user-authored definition, `lab/workflows/<name>/`. It holds:
+- **Workflow.** A versioned, user-authored definition, `lab/workflows/<ns>/<name>/`. It holds:
   - the build prompt and its settings;
   - the ordered list of stage packages, by release;
   - each package's parameter overrides.
@@ -89,13 +102,13 @@ flowchart LR
 
   A stage is never a step of its own. It contributes to the checkpoint's primary session (section 5.1). Define and verify are packages like any user's.
 - **Primitive.** Raidar-owned code that a package switches on and configures, but never replaces. Each primitive has a contract version, `name/N`, e.g. `gate/1`, `stop/1`, `jev-judge/1` or `criteria/1`. Primitives are where the lab's guarantees live.
-- **Release.** A frozen `name@N` mapped to a content digest in `lab/releases.yaml`. Agents, workflows and stage packages all use releases. Stage references require a namespace (`ns/name@N`) and the namespace `raidar/` is reserved for upstream packages; agent and workflow references stay `name@N`.
+- **Release.** A frozen `name@N` mapped to a content digest in `lab/releases.yaml`. Agents, workflows and stage packages all use releases. Stage and workflow references require a namespace (`ns/name@N`) and the namespace `raidar/` is reserved for upstream packages; agent references stay `name@N`.
 - **Session.** One agent conversation with its own context.
   - Each checkpoint has exactly one **primary** session. The work happens there, and its turns are resumed for repairs, fixes and rework.
   - An **isolated** session would be a fresh session of the same agent, started by the runner. It is a future primitive and not part of `stage/1`. Harness-native subagents are never isolated sessions.
 - **Turn.** One prompt and response inside a session. The first turn is fresh; later turns resume it.
 - **Component.** A file the agent reads. The only kinds are **skill** and **instructions**. A component belongs to the build frame or to one stage package.
-- **Arm.** An agent plus a workflow, as used in one experiment. An arm that names no workflow runs the default, `one-shot`.
+- **Arm.** An agent plus a workflow, as used in one experiment. An arm that names no workflow runs the default, `raidar/one-shot`.
 
 ## 3. Problems, task text and workspace setup (R1, Need 1)
 
@@ -216,6 +229,10 @@ models:
   - Switching harness needs only another agent release.
   - Admission refuses arms on different harnesses unless the experiment declares that it varies them (`varies`).
 
+- **Agent pairing (R10).** Each model runs on its maker's harness by default: GPT models on `codex`, Claude models on `claude-code`. Comparisons across makers declare `varies: [harness, model]` (`design/experiment/schema.py` already enforces declaring the model with the harness); a same-model run on another harness is an explicit `varies: [harness]` robustness check, and F5 supports the cost choice, not a claim that harnesses are equivalent. Raidar has no opencode adapter, so a same-model robustness check needs a new adapter first. Claude arms need `claude-code`'s isolation proof raised from `partial` to `full` before measured use.
+- **CLIs and SDKs (R6).** Measured runs stay on CLIs in containers. The protocol is driver-neutral, so an SDK driver can arrive later as an adapter and agent release run inside the container, never on the host. An SDK adapter counts only with the same harness pin, a full P8 isolation proof, per-turn accounting that reconciles, resume parity, health parity on smokes, then a `varies` comparison of CLI against SDK that reports `equivalent` or `inconclusive`. An FXL smoke proves mechanics only; every imported package needs a Raidar smoke before a result counts (C4).
+- **Subscription sign-in (R6, T3).** Support is recorded as allowed, unsupported or unverified per provider and pinned adapter, in the agent documentation and the credential-preflight evidence: a dated provider-policy reference, the redacted sign-in result and the authentication mode, never credentials. There is no new agent-identity field. Neither SDK's subscription support is established; the assessment is phase 7, and adoption depends on proof.
+
 ## 5. Workflows and stage packages (Need 2)
 
 ### 5.1 Stages are packages; the guarantees are primitives
@@ -229,17 +246,18 @@ All of a checkpoint's stages contribute to its one **primary session**. No stage
 | `frame/1`: the build frame | One prompt: build's text, one slot per enabled package (each exactly once), then `%%%TASK%%%`; the optional structured reply | The build prompt and settings (in the workflow) |
 | `install/1` | Pinned tools copied root-owned to `/opt/raidar/stages/<name>/`; wheels installed offline and hash-checked; commands on `PATH`; installed-tree digest recorded | `tool/` (`pyproject.toml` + generated `uv.lock`), commands |
 | `setup/1` | Runs before the agent starts, as the agent's user, on lab-owned inputs; its JSON supplies prompt tokens | argv; tokens it returns |
-| `gate/1` | One pre-commit hook; checks run as the agent's user; a record-only seal when the agent stops; bounded fix rounds; reserved check kind `pytest` (per-test outcomes) | Checks: name, argv, `before` (prerequisite); `max_fix_rounds` |
+| `gate/1` | One pre-commit hook; checks run as the agent's user; a record-only seal when the agent stops; bounded fix rounds; reserved check kind `pytest` (per-test outcomes); a root-owned `base` in the context | Checks: name, argv, `before` (prerequisite); `max_fix_rounds` |
 | `stop/1` | Runs after each turn, once the agent's leftover processes are killed; protocol `{status: done\|resume\|closed, message, tokens, carry}`; bounded rounds; a root-owned closed flag that can never be reopened | argv; `max_rounds`; messages |
 | `outputs/1` | Declared files copied host-side after each call and at close, hashed, never graded | Paths, and the contract of each (`criteria/1`) |
 | `acceptance-reply/1` | Parsing and repair of the build reply (`account`, `ac_tests`, `adrs`), merged across turns | Switched on in the build frame |
-| `jev-judge/1` | A host-side judge over `criteria/1` plus mapped tests plus the gate's test outcomes; the key never enters the container; rework passes | Model, `closed_at`, `open_at`, `max_passes`, rework prompt |
+| `jev-judge/1` | A host-side judge over `criteria/1` plus mapped tests plus the gate's test outcomes; the key never enters the container; rework passes; its retries (D3), question set and 60 s timeout are primitive constants with the `request.judge` limit | Model, `closed_at`, `open_at`, `max_passes`, rework prompt |
 | Calls and evidence | Every call's argv, user, timeout, exit code and stdout digest recorded host-side; the canary rule (5.3) | Fixtures |
 
 **Rules that apply whatever a package declares:**
 - **No agent-written code runs as root.** Root only copies bytes and installs wheels, and installing a wheel runs no code. Every package call, check, seal and baseline runs as the agent's user (UID 1000). The S6 regressions are in section 9, row S.
 - **Package code never runs on the host.** This includes `make stage-check`, which runs fixtures in a throwaway pack container with no network.
 - **Judges and scorers are Raidar's opinionated part.** A package can switch a named judge on and configure it, but never supply one. Anyone who wants different judges forks Raidar.
+- **Judge validity (R8, T4).** The arm judge is a treatment component and its verdicts are never cited as evidence of correctness; the arm's primary outcome (hidden tests) can be cited without validating it. Before a quality claim, each judge role is validated against held-out independent labels, blind to arm and judge verdict (a different scorer model alone is not validation), and shared-error risk is reported. Raidar owns calibration (`lab/judge/calibration/`) and the `jev-actions` skill (`.agents/skills/jev-actions/`), outside method packages; FXL may invoke its copy of `jev-judge/1` for mechanical smokes only.
 - **A workflow's own files are never graded (C1, decided).** The build frame's and the packages' prompts, skills, tools, `/app/.raidar/` state and outputs are excluded from all of these:
   - the graded snapshot (`contract/snapshot.py` `SNAPSHOT_EXCLUDES`);
   - every diff;
@@ -250,6 +268,7 @@ All of a checkpoint's stages contribute to its one **primary session**. No stage
 - **Grade what the agent left.** Nothing is ever restored. A refusal, a deadline or a cancellation grades the workspace as the agent left it (S6).
 - **Instructions.** The build frame's instructions and each enabled package's instructions are joined, in order, into one file at the agent's `placement.instructions`. They are never written over the task's own `AGENTS.md`.
 - **Disabled stages leave no trace.** A package the workflow does not list never reaches the sandbox.
+- **Isolated sessions are a later phase (R7).** Phase 11 adds a Raidar-owned `isolated-session/1` primitive only after context, workspace, budget, accounting, provenance and failure semantics are specified and proved. `stage/1`'s manifest keys are closed, so it arrives with a `stage/2` cutover and only when a registered Raidar question needs it. A review package on it gets no hidden grading access and no unaccounted time; primary-only packages remain the phase-5 contract.
 
 ### 5.2 The package contract `stage/1`
 
@@ -298,7 +317,7 @@ skills: [test-per-aspect, pytest-templates]
 ```
 
 ```yaml
-# lab/workflows/define-build-verify/workflow.yaml
+# lab/workflows/raidar/define-build-verify/workflow.yaml
 schema: 2
 name: define-build-verify
 build:
@@ -346,6 +365,7 @@ judge:                                           # jev-judge/1; host-side
 | `CheckCategory` closed set (:71), exactly one blocking tests check (:212-214) | Free check names, plus the reserved `pytest` kind; the judge requires one `pytest` check, checked at lock time |
 | "Judge needs define and structured build" (:274-284) | Declared inputs (`criteria/1`, `acceptance-reply/1`), refused at lock time when missing |
 | `factory.py:15-35` hand-wiring (shared `Acceptance`, `define.unsealed` prerequisite) | `before` gate checks and declared outputs |
+| Settings spread across the spike (R2) | Gate pins → the `raidar/verify` tool lock; the 60 s test timeout → the `test_timeout` param; 3 passes → `judge.max_passes`; the 3 retries (D3), question set and 60 s judge timeout → `jev-judge/1` constants plus the `request.judge` limit; the unit-rules version → a `raidar/define` param |
 
 ### 5.3 When a stage's call fails: the canary rule (decided)
 
@@ -428,6 +448,7 @@ The rule is therefore attribution by control run, from `stage-stop-failure-opus.
   To compare two versions of a method in one experiment, give the variant its own name.
 - **References** are `ns/name@N`; a stage reference without a namespace is refused. `raidar/` is reserved for upstream packages and protected by CODEOWNERS on `lab/stages/raidar/`. Bare names, `latest`, branches, tags and paths are refused when the workflow is parsed.
 - **The digest does not depend on the transport.** Git, OCI or archive imports can later populate `lab/stages/<ns>/` with no migration, verified against `stage-tree/1`.
+- **Workflow namespaces and local imports (R5).** Workflow references are `ns/name@N` with folders at `lab/workflows/<ns>/<name>/`; a bare workflow reference is refused. The earlier bare releases stay in the register as frozen history and never resolve. `make stage-import` and `make workflow-import` copy an exported folder (fixtures included) after reading bytes only, with the existing symlink, special-file and traversal refusals, and verify it against the supplied digest (`stage-tree/1`, or the definition digest). They refuse the `raidar/` namespace, a digest mismatch and different bytes under an existing release, print the release line, and neither release nor authorize the package. `workflow-import` also refuses any `use:` not registered with an identical digest, so packages are imported first. Provenance, `{sha256, source: <repo>@<commit>:<path>}`, goes in `lab/imports.yaml`, which `releases-check` verifies. `stage-check` stays required for imported packages. Remote transports stay deferred.
 - **Drafts.** `make experiment-lock … DRAFT=1` is allowed only for `smoke` experiments. It resolves unregistered packages from the working tree and writes the lock under `var/tmp/`. Draft jobs are dev jobs, and they never admit a measured run.
 - **Lock-time checks, family ST**, beside RT0–RT6. The lock is refused when:
   - **ST1:** the package contract is unsupported;
@@ -439,18 +460,25 @@ The rule is therefore attribution by control run, from `stage-stop-failure-opus.
   - **ST7:** two packages claim the same command, skill, output or token.
 
   A contract bump is one clean cutover: migrate the in-tree packages, re-release them and relock. Old-contract packages are refused, with the needed version named.
+
+  **Governing a bump (C7).** `stage/1` freezes at contract `1.0.0` at phase 5 exit; phase 5 is the last chance to amend it without a bump.
+  - A clarification that changes no package's acceptance, behaviour or digest gets a contract-history note and a PATCH.
+  - A change to manifest keys, the call protocol, the context, the digest or the refusals becomes `stage/2` with a MAJOR bump. It needs two votes and an `rc` tag with migration notes before the cutover.
+  - Raidar approves, and FXL supplies a consumer-impact review. A bump migrates all active in-tree packages and active imported `fxl/*` forks together, re-releases dependent workflows and relocks in the same cutover; no two contracts are supported at once, with no aliases or dual-contract runtime. ST1 refuses old-contract packages explicitly, so an imported `fxl/*` package stops resolving until FXL re-exports it, and its past results keep their old identity. Frozen historical bytes and archived runtimes stay untouched. Additive changes still need compatibility evidence; fixtures alone do not establish agent-runtime equivalence.
 - **Make targets:**
 
   | Target | Does |
   |---|---|
-  | `make stage-new NAME=ns/x [FROM=docs-check]` | Copies an example package |
+  | `make stage-new NAME=ns/x [FROM=raidar/docs-check]` | Copies any in-tree package's real bytes |
   | `make stage-lock NAME=ns/x` | Locks the tool's dependencies; wheels only |
   | `make stage-check NAME=ns/x [REPLAY=<trial>]` | Schema, contracts, digest and closure; runs the fixtures offline in the pack container as the agent's user; prints the release line |
   | `make stage-list` | Every package, its latest release and digest |
   | `make stage-info NAME=ns/x` | The expanded manifest: commands, triggers, outputs, resolved params, closure |
-  | `make workflow-new NAME=x [FROM=one-shot-verify]` | Copies a shipped workflow as a starting point; the default template is `one-shot-verify` |
+  | `make workflow-new NAME=ns/x [FROM=raidar/one-shot-verify]` | Copies a shipped workflow as a starting point; the default template is `raidar/one-shot-verify` |
+  | `make stage-import SRC=<dir> NAME=ns/x SHA256=<stage-tree/1>` | Imports an exported package verified against its digest; prints the release line; records `lab/imports.yaml` |
+  | `make workflow-import SRC=<dir> NAME=ns/x SHA256=<digest>` | The same for a workflow; refuses a `use:` that is not registered with an identical digest |
 
-  `releases-check` and `structure-check` are extended to cover packages.
+  `releases-check` and `structure-check` are extended to cover packages; `releases-check` also verifies `lab/imports.yaml`.
 - **Trust (C4, accepted for the first version, documented).**
   - **Guaranteed:** a package runs as the agent's user inside the trial container. It cannot reach host secrets, the judge key, the hidden verifier bundle or the evidence store.
   - **Not guaranteed:**
@@ -464,11 +492,12 @@ The rule is therefore attribution by control run, from `stage-stop-failure-opus.
 
 ```text
 lab/stages/raidar/
-  define/       FXL's define tool (moved out of orchestrator/src), units setup, sealed prerequisite, stop inspection, criteria/1 output
-  verify/       Python gate: ruff, mypy, pytest (pytest kind), skills test-per-aspect, pytest-templates
-  docs-check/   the smallest example and the stage-new template: one pinned tool as a gate check
-lab/workflows/
-  one-shot/              build frame only (the default workflow of an arm that names none)
+  define/         FXL's define tool (moved out of orchestrator/src), units setup, sealed prerequisite, stop inspection, criteria/1 output
+  verify/         Python gate at spike parity: ruff, ruff format, mypy, pytest (pytest kind), skills test-per-aspect, pytest-templates; `test_timeout` param
+  docs-check/     the smallest example and the stage-new default template: one pinned tool as a gate check
+  test-evidence/  phase 10, not phase 5: changed-line coverage and hollow-test refusal (checks `changed-lines`, `hollow-tests`), listed after verify
+lab/workflows/raidar/
+  one-shot/              build frame only, schema 2 with no stages (the default workflow of an arm that names none)
   one-shot-verify/       build + verify (max_fix_rounds 0)
   define-build-verify/   build (acceptance-reply/1) + define + verify + jev-judge/1
 ```
@@ -477,8 +506,9 @@ lab/workflows/
 - **Build is a frame** because a run can't exist without a prompt.
 - **Verify is a method choice.** "Does a gate help?" is an experiment, its tools are runtime-specific, and the hidden tests and code-quality scoring measure the outcome either way.
 - **No default-on verify.** A default-on verify would silently make every unmarked arm a gated arm, and `one-shot` would stop being the agent as shipped. So `one-shot` stays the default workflow.
-- **Authors start from verify.** `make workflow-new` copies `one-shot-verify` unless told otherwise, so authors begin with verify included and remove it if they don't want it.
-- **`raidar/verify` is maintained** and released by Raidar like any shipped package.
+- **Authors start from verify.** `make workflow-new` copies `raidar/one-shot-verify` unless told otherwise, so authors begin with verify included and remove it if they don't want it.
+- **`raidar/*` are baselines and controls (R4).** Raidar changes them only to follow the contract, fix a recorded `tool_bug` disposition or restore port parity, each as a new release. Methods are developed in FXL as `fxl/*` and imported byte-identical for measurement; FXL never edits imported namespaces (D9) and Raidar touches `lab/stages/fxl/` and `lab/workflows/fxl/` only by import. User namespaces stay open. Primitives, judges, scorers, the fit rule and the frame stay Raidar-only. A winning `fxl/*` method becomes a baseline only by two votes, under a new name, and the old release stays.
+- **Enforcement lever (R3, T1).** `raidar/test-evidence`, never `raidar/verify`, carries changed-line coverage and hollow-test refusal (M-001's lever), ported from FXL `ac5db0f` (`guardrails/changed_lines.py`, `hollow_tests.py`). It runs its own coverage pytest, needs the root-owned `base` in the `gate/1` context, and keeps `raidar/verify` the control. The list rule, golden probes and example probes are `fxl/*` forks. M-001's home changes to `raidar/test-evidence@1`, and its proof restates the contrast: `raidar/verify` has no coverage minimum.
 
 **Authoring tiers** (counts are estimates from the design sessions):
 1. **Tweak.** Change a build prompt or a package param in `workflow.yaml`: one file, about 2 concepts.
@@ -501,6 +531,12 @@ lab/workflows/
   - exhausted rounds end closed;
   - planted test code exiting 126 under a passing canary is an agent outcome.
 - **AT4 (identity).** Changing a prompt, the tool bytes or a param on its own changes the identity, and stale locks are refused. A mutable reference is refused.
+
+### 5.8 The contract package `raidar-contract` (decided 2026-10-31)
+
+- **Single implementation.** `contract/` (`raidar-contract`, import `raidar_contract`; pydantic and pyyaml only) is the single implementation of `stage/1`, schema 2, `criteria/1`, `stage-tree/1`, release references and the agent schema; Raidar and FXL pin it. It holds `digest_json`; the manifest, params, tokens and frame-slot rules; the fixture and `expect.yaml` schema; `stage-tree/1`; workflow schema 2; `criteria/1`; release references and the register parser; and the agent YAML schema with the protocol names and record shapes. Runtime implementations and credential/state methods stay outside it, and the Harbor-typed protocol (`protocol.py` imports Harbor) stays in `orchestrator`.
+- **Couplings cut during extraction.** `package_definition.py` imports the spike `definition.py` (`NAME_PATTERN`, `TASK_TOKEN`), and `registry.py` imports `REPO_ROOT`. The orchestrator depends on the package through a uv path source; the old modules are deleted, with no re-exports.
+- **Publication and versions (T2).** Immutable wheel and sdist artefacts under `contract/vX.Y.Z`, consumed by exact-version and hash pins; nothing is built from a tag at install time. SemVer: MAJOR when any contract id changes (`stage/N`, schema N, `criteria/N`, `stage-tree/N`, agent schema N); MINOR for new API that leaves accepted inputs, refusals and digests unchanged; PATCH for bug fixes on the same terms. The package exposes a `CONTRACTS` map. Version `1.0.0` is released at phase 5 exit, and FXL may pin `rc` versions before then.
 
 ## 6. Health (R2)
 
@@ -549,6 +585,7 @@ lab/workflows/
   - They read `criteria/1` outputs and `ac_tests`.
   - They are uncalibrated **readings** until they are validated against labels (FXL `docs/design/jev-review.md`).
   - Like every scorer, they are Raidar-owned (C3).
+- **Validation (R8, T4).** A coverage scorer stays a reading until validated on held-out labels from independent adjudicators, blind to arm and judge verdict, with a pre-registered agreement threshold. Agreement is reported separately for arms with and without the judge. Comparing judge arms with non-judge arms needs no material gap between those groups; otherwise a non-Jev scorer model is required. J health and repeatability (4.96%) are reported. The blind export removes verdicts but keeps trial and subject identifiers, so arm blindness needs explicit assurance.
 - **Naming and versioning (R8):**
   - names are lowercase and hyphenated, at most three words;
   - a scorer's package directory equals its name;
@@ -569,6 +606,7 @@ lab/workflows/
 - **Gating.** Both controls run before the lab's first comparative result is cited, and again whenever the analysis code or a primitive changes.
 - **Attrition pre-registration.** Every comparison, including phase 9's A/A and degraded controls, must declare `analysis.max_exclusion_difference = d` in its lock before collection. Apply the per-arm rate rule in section 6 alongside the independent 20% paired-exclusion cap. An unset bound permits descriptive reporting only, returns comparative verdict `insufficient`, and cannot satisfy the controls' acceptance criteria.
 - **Discrimination reading per problem and agent.** The share of checkpoints whose solve rate lies strictly between 10% and 90%, reported with each experiment. Problems at the ceiling or at the wall are flagged. Example: forge checkpoints 1–2 are near the ceiling, and checkpoints 3 onward are a wall for `gpt-6-luna` at low effort.
+- **Changed factors (R10).** Every comparison names each factor it changes: cross-maker comparisons vary harness and model, not "model only", and historical harness comparisons are descriptive unless their design supports inference.
 
 ## 8. Ledger (R9)
 
@@ -588,6 +626,11 @@ Migration, in order:
    - Hidden tests are cited by upstream location (`scb-problems@<commit>:<path>`).
 3. The ledger check verifies the migration is complete: every citation resolves to an excerpt, an archive ref or an upstream ref.
 4. Only then is `var/` cleared. Runs whose data is deleted are marked `gone`.
+
+**FXL history (R9, decided 2026-10-31).** FXL's records keep their identity through a namespace instead of renumbering, so citations to FXL's tag keep working: `FXL-FCR-007`, `FXL-M-002`, `FXL-E-011`, `FXL-Q-009`. The ledger's ID patterns accept the `FXL-` prefix, and references of the form `factory-x-loops@lab-final-2026-10-31:<path>` are valid sources; the tag is verified before use, and the archive is taken against `ac5db0f`. Importing the records is phase 8; the rule alone lands first.
+- **Adopted:** `FXL-FCR-002`, `-003`, `-004` and `-007`, and `FXL-M-001` (rejected) and `FXL-M-002` (adopted), each with its FXL status history verbatim and its original ID, commit, digests and availability. Their statuses are historical, not Raidar efficacy findings, and Raidar changes one only on Raidar evidence. Historical results are never reinterpreted as Raidar trials.
+- **Journal records:** `FXL-Q-004`…`009` and `FXL-E-002`…`011`, with cited runs and occurrences, are cited by tag and become journal records in phase 8. FXL run data held outside git is handed over as a digested archive before FXL's phase 1, or is marked `gone`.
+- **Iteration 2** (`FXL-E-011`, `FXL-Q-009`; unrun) is re-registered as new Raidar experiments, each with a new rationale and lock, a TOST margin and `analysis.max_exclusion_difference`, on imported `fxl/*` packages after phase 9 (phase 10). FXL's pre-registration is cited as its origin.
 
 ## 9. Implementation plan
 
@@ -611,12 +654,13 @@ Migration, in order:
 | 3 | Problems (Need 1) | Task text from `checkpoint_N.md`; spec hash per checkpoint; solvable sets and nondeterminism at validation; solvable-set primary outcome; bulk import and validate; `checkpoints: k` binding; runtime-pack contract page; forge removed as a default | K4 complete 2026-10-28: all nine problems usable `validated_partial` after three Docker repeats; mocked_http checkpoint 7 and metric_transform_lang checkpoint 1 locally excluded (`no_new_scoreable_tests`); datagate's upload/export flake quarantined at checkpoints 6–7. Quality 2,467 passed, 95.17%. AT-N1 (below) remains unrun: real-model authorization required |
 | 4 | Package contract and primitives (Need 2 core) | Public `stage/1` contract first; generic package runtime with `frame/1`, `install/1`, `setup/1`, `gate/1`, `stop/1`, `outputs/1`; canary attribution and bounded replay; immutable stage registry and `stage-tree/1`; lock `packages`/`primitive_code`; ST1–ST7; stage/workflow authoring targets and smoke-only drafts; private native adapters with credential/state protocol | Complete 2026-10-31, alongside the spike classes that phase 5 removes. Docker checks ran on local OrbStack, standing in for the offline `mbp` (user decision 2026-10-31; `mbp` re-run pending). The first run found three phase 4 defects, fixed in `82a77f0`: `stage-check` ran gates as root; `check_argv` ran package tools outside the package venv; the seed shared the uv cache across users. A further vote removed the generic `wrong-state` case (`e3bba05`). Afterwards `make security-gate` passed 38/38, and `stage-check` passed on `acme/gate-check`, `acme/note-state`, the AT3 replay and a fresh `docs-check` package. Perf gate (report-only locally): 11 of 12 budgets pass; warm environment start p95 22.8 s against 20 s on a freshly built data directory |
 | 4b | Measurement fixes and voted decisions | The eleven mechanism-audit fixes with Astra's amendments: exact verdict tests from the declared outcome type, covering aggregates; per-arm exclusion rule with a pre-registered material difference; pinned grader identity with a runtime refusal; a grading canary; bounded resolver retries; halt on the solvable verdict; P8 bound to instruction origin; first-rework estimate from `first_build`; judge spend and one pricing table; V3 renamed and H5 measured; `reformatted_json` skipped when the spec fixes the format. Plus: primary relabelled with determinacy coverage; 5 validation repeats; hook broker removed; namespaced stage folders. Follow-up settings voted 2026-10-28: no default exclusion bound (phase 9 controls must declare one); one immediate 120 s resolver retry; no missing-estimate rework floor; execute and advance past pinned-excluded halt steps with a separate gate signal | Complete 2026-10-31 (`964cfa4`..`26cb23e`, `2df25b5`, `531c0e4`). Security gate as in phase 4. All nine problems revalidated with 5 repeats under the pinned grader on local OrbStack: all `validated_partial`, now recording the grader implementation digest. Eight match the 3-repeat results; mocked_http shows 7 newly variable tests, one per checkpoint except 7. `make quality`: 3,212 passed, 48 skipped, 95.47%. `mbp` re-run pending; no real-model trials authorized |
-| 5 | Port the shipped stages | `verify` package, then `define` (tool moved out of `orchestrator/src`), then `docs-check`; `acceptance-reply/1` and `jev-judge/1` read `criteria/1`; `verification-effort@1` and pre-fix grading on `gate/1` records (replacing `gate-effort`, `grading/prefix` and their analysis and review consumers); delete `StageType`, the `Define`/`Verify` classes, `factory.py` wiring, `stages.py` inventories and the spike settings models; new releases; relock | AT1, AT2 (including `verification-effort@1` read from the smoke); `make security-gate` |
+| 5 | Port the shipped defaults to packages | In order: extract `contract/` (section 5.8); finish schema 2 (`build.reply`, `judge` with criteria, model, thresholds, `max_passes` and rework; namespaced workflow references and folders; root-owned `base` in the `gate/1` context; judge constants into `jev-judge/1`; refusal tests); `stage-import`/`workflow-import` with `lab/imports.yaml`; `raidar/verify` at spike parity (same checks and pins, `test_timeout` param), then `raidar/define` (tool moved out of `orchestrator/src`), then `raidar/docs-check` with `stage-new FROM=<ns>/<name>` copying package bytes (`cli/stage_template.py` deleted); all three workflows on schema 2 under `raidar/`, `one-shot` with no stages; `acceptance-reply/1` and `jev-judge/1` read `criteria/1`; `verification-effort@1` and pre-fix grading on `gate/1` records (replacing `gate-effort`, `grading/prefix` and their analysis and review consumers); delete `StageType`, the `Define`/`Verify` classes, `verify.py`, `define.py`, the closed stage and settings models, the schema-1 loader, `factory.py` wiring, `stages.py` inventories and code-rendered templates; re-key health rows W3–W10 by primitive id; release every new `raidar/*` package and workflow, archive the superseded releases, relock. `stage/1` freezes at contract `1.0.0` | AT1, AT2 (including `verification-effort@1` read from the smoke), AT3, AT4; a clean venv imports `raidar_contract` without Harbor and every existing release digest is unchanged; an `fxl/<name>` fork imports, releases and locks without `DRAFT` and is refused after one changed byte; `stage-check` for every `raidar/*` package; `make security-gate`; `make quality` |
 | 6 | Health | Full outcome table (section 6) first; health becomes the sole validity producer; L registry; generic W and S families; provider failures classified without retry; per-arm exclusion report; `process-compliance` metrics become health readings, and the scorer is deleted | A forced provider failure is excluded, not retried; each table row covered by a test |
-| 7 | Image split | Toolchain image; per-agent CLI layer keyed by agent hash; stage-tool layer keyed by package digest; profile container start; steadier warm-start measurement | `make perf-gate` within budget, including warm start at concurrency 3 (accepted `mbp` p95 budget 5.5 s from 2026-10-28). Step-0 reading: concurrency 1 failed warm start (5.87 s) and fixed overhead (6.80 s); separately exercised concurrency 3 passed (5.17 s and 6.17 s). No other threshold changed |
-| 8 | Clean slate | Scorers and metrics to `@1`; formats to 1; archive tags; Wilson intervals; ledger migration (section 8); clear `var/` | Fresh smokes on every experiment; ledger check passes with no run data |
-| 9 | Lab validation | Range audit; margins; A/A and degraded controls; discrimination reading; native parity for every validated problem (deferred from phase 3: the SCB fork's runner fails its interpreter-identity check on `mbp`, `slop-code-bench/src/slop_code/evaluation/collection.py:190-198`, so its environment must work there first) | A/A not `improved`/`worse`; degraded detected `worse`; readings in every report; every problem `validated`, not `validated_partial` |
-| 10 | Probes | Golden, then example probes, as new releases of the verify and define packages | Probe records per accepted gate; a failing probe produces a rework turn |
+| 7 | Image split | Toolchain image; per-agent CLI layer keyed by agent hash; stage-tool layer keyed by package digest; profile container start; steadier warm-start measurement; SDK assessment against the CLI adapters (isolation, resume, accounting, audit completeness, cancellation and reaping, authentication, overhead) and the subscription findings per provider and adapter (R6, T3) | `make perf-gate` within budget, including warm start at concurrency 3 (accepted `mbp` p95 budget 5.5 s from 2026-10-28). Step-0 reading: concurrency 1 failed warm start (5.87 s) and fixed overhead (6.80 s); separately exercised concurrency 3 passed (5.17 s and 6.17 s). No other threshold changed |
+| 8 | Clean slate | Scorers and metrics to `@1`; formats to 1; archive tags; Wilson intervals; ledger migration (section 8), including FXL's adopted records and journal records under `FXL-` IDs; clear `var/` | Fresh smokes on every experiment; ledger check passes with no run data |
+| 9 | Lab validation | Range audit; margins; A/A and degraded controls; discrimination reading; judge calibration against held-out independent labels (R8, T4; before any judge-quality claim is cited); a cross-harness robustness assessment (R10); native parity for every validated problem (deferred from phase 3: the SCB fork's runner fails its interpreter-identity check on `mbp`, `slop-code-bench/src/slop_code/evaluation/collection.py:190-198`, so its environment must work there first) | A/A not `improved`/`worse`; degraded detected `worse`; readings in every report; every problem `validated`, not `validated_partial` |
+| 10 | Test evidence and probes | Build `raidar/test-evidence` (changed-line coverage and hollow-test refusal) from FXL `ac5db0f`; measure imported `fxl/*` probe and list packages and `raidar/test-evidence` against the released `raidar/verify` control, with identities frozen and only the intended lever varied; re-register FXL's iteration 2 as new Raidar experiments (section 8). No new `raidar/verify` or `raidar/define` release | Test-evidence package passes `stage-check`; probe records per accepted gate; a failing probe produces a rework turn |
+| 11 | Isolated sessions | A Raidar-owned `isolated-session/1` primitive with a `stage/2` cutover, only after its context, workspace, budget, accounting, provenance and failure semantics are specified and proved, and only when a registered Raidar question needs it | Not yet specified; the exit is set when the semantics are |
 
 **Acceptance test for Need 1 (AT-N1).** Starting from a clean checkout:
 1. `make problem-import SOURCE=scb@<commit> PROBLEMS=<two problems not yet imported>`;
@@ -626,7 +670,7 @@ Migration, in order:
 Throughout, no file is hand-written per problem and no edit is made under `orchestrator/src`. The report shows the solvable-set rate with the raw outcome beside it.
 
 **Deferred:**
-- an isolated-session primitive, and a review package on it;
+- an isolated-session primitive, and a review package on it (phase 11, section 5.1);
 - remote package transports: git, OCI, a separate registry repo;
 - package signing;
 - a separate stage-call user (C4);
