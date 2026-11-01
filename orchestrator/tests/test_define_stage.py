@@ -1,9 +1,6 @@
-"""The ``raidar/define`` package: its setup, stop and gate calls, and parity with the spike stage.
+"""The ``raidar/define`` package's setup, bounded stop and gate behavior.
 
-The fixtures under ``lab/stages/raidar/define/fixtures`` are run through the package's own
-``define_tool.stage`` module on copies of their state, as the container would run them, and the
-calls are compared with the spike ``Define`` stage's behaviour: the units, the repair message, the
-accepted-question round, the endings and the criteria a judge reads.
+Package fixtures exercise units, repair, accepted-question rounds, closure and sealed state.
 """
 
 from __future__ import annotations
@@ -18,12 +15,10 @@ from typing import Any
 
 import pytest
 import yaml
-from raidar_contract.criteria import validate_criteria
 
 from define_tool import compact, stage, tool
 from define_tool.unitrules import VERSIONS
 from raidar.contract.paths import stages_root
-from raidar.subject.workflow.acceptance import Acceptance
 from tests import define_support as dbv
 
 PACKAGE = stages_root() / "raidar" / "define"
@@ -237,19 +232,6 @@ def test_more_rounds_of_questions_than_the_params_allow_close_the_stage(tmp_path
     assert json.loads(out)["status"] == "closed"
 
 
-def test_a_ready_draft_is_done_and_writes_both_outputs(tmp_path: Path) -> None:
-    state = draft(tmp_path, dbv.ready(), "ready")
-    document = context(tmp_path, state)
-
-    _, out = call(tmp_path, document, "inspect")
-
-    assert json.loads(out)["status"] == "done"
-    rendered = Path(document["outputs"]["definition"]).read_text(encoding="utf-8")
-    written = json.loads((state / "criteria.json").read_text(encoding="utf-8"))
-    assert written == stage.criteria_document(rendered)
-    assert written["contract"] == "criteria/1"
-
-
 # --- gate: the seal ------------------------------------------------------------------------------
 
 
@@ -270,48 +252,3 @@ def test_a_sealed_ready_draft_passes_the_prerequisite(tmp_path: Path) -> None:
     code, out = call(tmp_path, context(tmp_path, state), "sealed")
 
     assert (code, out) == (0, "")
-
-
-# --- criteria/1: what the judge reads ------------------------------------------------------------
-
-
-def judge_view(acceptance: Acceptance) -> list[dict[str, Any]]:
-    """What the spike judge reads of each criterion, as ``criteria/1`` fields."""
-    return [
-        {
-            "id": item.id,
-            "criterion": item.text,
-            "verification": item.verification,
-            "sources": list(item.sources),
-            "kind": "regression" if item.id in acceptance.optional else "new",
-            "aspects": [
-                {"situation": probe.situation, "outcome": probe.outcome} for probe in item.aspects
-            ],
-            "examples": [
-                {"situation": probe.given, "outcome": probe.expected} for probe in item.examples
-            ],
-        }
-        for item in acceptance.criteria
-    ]
-
-
-@pytest.mark.parametrize("regression", [False, True])
-def test_criteria_hold_exactly_what_the_spike_judge_reads(tmp_path: Path, regression: bool) -> None:
-    criteria = [dbv.criterion(i) for i in dbv.AC]
-    if regression:
-        criteria[-1] = dbv.regressed(dbv.AC[-1])
-    state = draft(tmp_path, dbv.ready(definition=dbv.body(criteria)), "ready")
-    document = context(tmp_path, state)
-    call(tmp_path, document, "inspect")
-    rendered = Path(document["outputs"]["definition"]).read_text(encoding="utf-8")
-    acceptance = Acceptance()
-    acceptance.load(rendered)
-
-    written = json.loads((state / "criteria.json").read_text(encoding="utf-8"))
-
-    checked = validate_criteria(written)
-    flat = [item.model_dump(mode="json") for item in checked.all_criteria()]
-    assert flat == judge_view(acceptance)
-    assert [item["kind"] for item in flat].count("regression") == int(regression)
-    assert all(not item["aspects"] for item in flat if item["kind"] == "regression")
-    assert {f["id"] for f in written["features"]} == {f.id for f in acceptance.features}

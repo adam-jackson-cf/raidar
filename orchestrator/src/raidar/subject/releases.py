@@ -31,6 +31,8 @@ from raidar_contract.releases import (
 )
 from raidar_contract.workflow import (
     PackageWorkflowDefinition,
+    PackageWorkflowError,
+    load_package_workflow,
     package_workflow_digest,
 )
 
@@ -44,10 +46,9 @@ from raidar.contract.references import (
 from raidar.subject.agent.definition import harness_of, load_agent
 from raidar.subject.draft import drafting
 from raidar.subject.stages import resolve_stages
-from raidar.subject.workflow.loading import WORKFLOW_ERRORS, AnyWorkflow, load_any_workflow
 from raidar.subject.workflow.package_checks import ResolvedStage
 
-DEFINITION_ERRORS = (AgentDefinitionError, *WORKFLOW_ERRORS)
+DEFINITION_ERRORS = (AgentDefinitionError, PackageWorkflowError)
 
 
 @dataclass(frozen=True)
@@ -65,7 +66,7 @@ class ReleasedWorkflow:
     """A workflow release with resolved packages folded into its identity."""
 
     release: Release
-    definition: AnyWorkflow
+    definition: PackageWorkflowDefinition
     stages: tuple[ResolvedStage, ...] = ()
     draft: bool = False
 
@@ -79,11 +80,11 @@ class ReleasedWorkflow:
         return workflow_digest(self.definition, self.stages)
 
 
-def workflow_digest(definition: AnyWorkflow, stages: tuple[ResolvedStage, ...]) -> str:
-    """The definition's content hash, folding packages for ``schema: 2``."""
-    if isinstance(definition, PackageWorkflowDefinition):
-        return package_workflow_digest(definition, [stage.entry for stage in stages])
-    return definition.digest
+def workflow_digest(
+    definition: PackageWorkflowDefinition, stages: tuple[ResolvedStage, ...]
+) -> str:
+    """The definition's content hash, folding each package's identity in."""
+    return package_workflow_digest(definition, [stage.entry for stage in stages])
 
 
 def released_agent(text: str, *, repo_root: Path = REPO_ROOT) -> ReleasedAgent:
@@ -101,13 +102,11 @@ def released_agent(text: str, *, repo_root: Path = REPO_ROOT) -> ReleasedAgent:
 
 def _workflow(
     name: str, repo_root: Path, register: ReleaseRegister, *, draft: bool
-) -> tuple[AnyWorkflow, tuple[ResolvedStage, ...]]:
+) -> tuple[PackageWorkflowDefinition, tuple[ResolvedStage, ...]]:
     try:
-        definition = load_any_workflow(workflows_root(repo_root), name)
-    except WORKFLOW_ERRORS as exc:
+        definition = load_package_workflow(workflows_root(repo_root) / name, name)
+    except (PackageWorkflowError, OSError) as exc:
         raise ReleaseError(str(exc)) from exc
-    if not isinstance(definition, PackageWorkflowDefinition):
-        return definition, ()
     return definition, resolve_stages(definition, repo_root, register, draft=draft)
 
 
@@ -166,7 +165,7 @@ class AgentResolver:
 
 @dataclass(frozen=True)
 class WorkflowResolver:
-    """The lock's ``workflow`` resolver: digest and the enabled stages (types or packages)."""
+    """The lock's ``workflow`` resolver: digest and the enabled packages."""
 
     repo_root: Path = REPO_ROOT
 

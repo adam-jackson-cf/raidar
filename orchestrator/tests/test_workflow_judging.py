@@ -7,10 +7,9 @@ from typing import Any
 
 import pytest
 
-from define_tool.aspects import Aspect, Example
-from define_tool.featuredef import Criterion, Feature
+from raidar.subject.primitive.judge import JudgeConfig
 from raidar.subject.workflow import judging, pysource
-from raidar.subject.workflow.definition import JudgeSettings
+from raidar.subject.workflow.acceptance import Aspect, Criterion, Example, Feature
 
 TESTS = """\
 import pytest
@@ -57,18 +56,7 @@ METHOD = "tests/test_app.py::TestGroup::test_method"
 COLLECTED = [OBJECT, REJECTS, WRAPPER, METHOD]
 PASSING = {"collected": COLLECTED, "outcomes": dict.fromkeys(COLLECTED, "passed")}
 FILES = {"tests/test_app.py": TESTS}
-SETTINGS = JudgeSettings(
-    model="typesafe/jev-1.13-20260917",
-    question_set="dbv5-aspect/1",
-    closed_at=0.8,
-    open_at=0.3,
-    regression_needs_baseline=True,
-    retries=3,
-    timeout_s=60,
-    context_tokens=32_000,
-    stall_repeats=2,
-    fit_rework=True,
-)
+SETTINGS = JudgeConfig(model="typesafe/jev-1.13-20260917", closed_at=0.8, open_at=0.3)
 
 
 def criterion(
@@ -78,16 +66,13 @@ def criterion(
     examples: tuple[Example, ...] = (),
 ) -> Criterion:
     aspects = tuple(
-        Aspect(f"{ident}.A{number}", f"{situation} -> {outcome}", situation, outcome)
+        Aspect(f"{ident}.A{number}", situation, outcome)
         for number, (situation, outcome) in enumerate(pairs, start=1)
     )
     return Criterion(
         ident,
         "parse rejects a JSON value that is not an object",
-        "",
-        anchored=True,
         sources=("Reject any document that is not a JSON object",),
-        aspected=True,
         aspects=aspects,
         examples=examples,
         kind=kind,
@@ -291,11 +276,9 @@ def test_a_mapped_test_that_did_not_pass_opens_the_criterion_before_any_question
 
 
 def test_an_example_value_no_mapped_test_states_opens_the_criterion() -> None:
-    example = Example("`[]` -> `ValueError`", "`[]`", "`ValueError`", ("ValueError",))
+    example = Example("`[]`", "`ValueError`", ("ValueError",))
     stated = criterion("F1.AC1", ("s", "o"), examples=(example,))
-    missing = criterion(
-        "F1.AC2", ("s", "o"), examples=(Example("`9999`", "x", "`9999`", ("9999",)),)
-    )
+    missing = criterion("F1.AC2", ("s", "o"), examples=(Example("x", "`9999`", ("9999",)),))
 
     assert judging.assemble(subject(stated, REJECTS), PASSING, FILES.get, 32_000).opened == ()
     opened = judging.assemble(subject(missing, REJECTS), PASSING, FILES.get, 32_000).opened
@@ -546,9 +529,7 @@ def test_an_undecided_criterion_is_pushed_back_saying_it_counts_as_open() -> Non
 
 
 def test_a_criterion_without_quotes_is_pushed_back_with_its_own_text() -> None:
-    bare = Criterion(
-        "F1.AC1", "text of it", "", aspected=True, aspects=(Aspect("a", "s -> o", "s", "o"),)
-    )
+    bare = Criterion("F1.AC1", "text of it", aspects=(Aspect("a", "s", "o"),))
     chosen = judging.Subject(bare, "F1", "", (OBJECT,))
     context = judging.assemble(chosen, PASSING, FILES.get, 32_000)
     found = judging.outcome_of(chosen, context, {"a": (0.1, ())}, SETTINGS, True, None)
@@ -560,8 +541,8 @@ def test_a_criterion_without_quotes_is_pushed_back_with_its_own_text() -> None:
 
 def test_subjects_pair_every_criterion_with_its_mapped_tests_in_definition_order() -> None:
     features = (
-        Feature("F1", "A", "", (), traced=(criterion("F1.AC1"), criterion("F1.AC2"))),
-        Feature("F2", "B", "", (), traced=(criterion("F2.AC1"),)),
+        Feature("F1", "A", traced=(criterion("F1.AC1"), criterion("F1.AC2"))),
+        Feature("F2", "B", traced=(criterion("F2.AC1"),)),
     )
 
     found = judging.subjects(features, {"F2.AC1": [OBJECT], "F1.AC2": [REJECTS, WRAPPER]})

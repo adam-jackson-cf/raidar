@@ -137,11 +137,15 @@ def test_the_proof_is_part_of_the_arm_digest(tree: Path) -> None:
     assert first != second
 
 
-def test_a_spike_arm_has_no_packages_and_is_identified_by_stage_type(tree: Path) -> None:
+def test_an_arm_without_packages_is_identified_by_the_runtime_primitives_alone(tree: Path) -> None:
     identity = _arm(tree, "raidar/one-shot@1").identity()
 
     assert identity["packages"] == {}
-    assert set(identity["primitive_code"]) == {"build"}  # type: ignore[arg-type]
+    assert set(identity["primitive_code"]) == {  # type: ignore[arg-type]
+        "frame/1",
+        "install/1",
+        "runner/1",
+    }
 
 
 def test_primitive_code_is_deterministic_adapter_bound_and_core_is_adapter_free(tree: Path) -> None:

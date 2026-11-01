@@ -18,6 +18,13 @@ PRIMITIVE_MODULES: dict[str, str] = {
     "outputs/1": "raidar.subject.primitive.outputs",
 }
 
+WORKFLOW_PRIMITIVE_MODULES: dict[str, str] = {
+    "acceptance-reply/1": "raidar.subject.workflow.acceptance_reply",
+    "jev-judge/1": "raidar.subject.workflow.package_judge",
+}
+"""Raidar-owned primitives a *workflow* opts into (``build.reply``, ``judge``): no package may
+require them, so they are not in ``SUPPORTED_CONTRACTS``; their code identity is still locked."""
+
 SUPPORTED_CONTRACTS = frozenset(PRIMITIVE_MODULES)
 
 

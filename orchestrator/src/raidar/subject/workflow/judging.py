@@ -6,7 +6,7 @@ wording ``dbv5-aspect/1``), ``capability/judge/context.py`` (the state each aspe
 ``capability/verify/collected.py`` (which tests a gate run collected),
 ``engine/workflow/criteria.py`` (statuses, stop rules and the pushback). Nothing here touches the
 sandbox, the network or the
-clock: ``raidar.subject.workflow.verify`` asks, this module decides.
+clock: ``raidar.subject.workflow.package_judge`` asks, this module decides.
 
 The judge is asked one question per ``Aspect:`` of a criterion: does a mapped test set up this
 situation and assert this outcome. The state it sees is the criterion's id and text, the aspect
@@ -27,11 +27,10 @@ from collections.abc import Callable, Collection, Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import Any
 
-from define_tool.aspects import REGRESSION, appears
-from define_tool.featuredef import Criterion, Feature
 from raidar.judge.protocol import NoulCriteria, NoulQuestion
+from raidar.subject.primitive.judge import JudgeConfig
 from raidar.subject.workflow import pysource
-from raidar.subject.workflow.definition import JudgeSettings
+from raidar.subject.workflow.acceptance import REGRESSION, Criterion, Feature, appears
 
 ASPECT_ASSERTED = "aspect_asserted"
 INSTRUCTIONS = (
@@ -385,7 +384,7 @@ def assemble(
 # Statuses --------------------------------------------------------------------------------
 
 
-def aspect_status(p: float | None, settings: JudgeSettings, cut: bool) -> str:
+def aspect_status(p: float | None, settings: JudgeConfig, cut: bool) -> str:
     """One aspect's status from its probability (a low answer on cut tests opens nothing)."""
     if p is None:
         return UNDECIDED
@@ -395,7 +394,7 @@ def aspect_status(p: float | None, settings: JudgeSettings, cut: bool) -> str:
 
 
 def decide_aspects(
-    probabilities: Mapping[str, float | None], settings: JudgeSettings, tests_ok: bool, cut: bool
+    probabilities: Mapping[str, float | None], settings: JudgeConfig, tests_ok: bool, cut: bool
 ) -> tuple[str, tuple[str, ...]]:
     """A criterion's status and the aspects keeping it from closing."""
     statuses = {ident: aspect_status(p, settings, cut) for ident, p in probabilities.items()}
@@ -517,7 +516,7 @@ def outcome_of(
     subject: Subject,
     context: Context,
     answers: Mapping[str, tuple[float | None, tuple[int, ...]]],
-    settings: JudgeSettings,
+    settings: JudgeConfig,
     gate_passed: bool,
     baseline: Collection[str] | None,
 ) -> Outcome:
@@ -577,7 +576,7 @@ def _remapped(previous: PassResult, last: PassResult) -> bool:
 
 
 def stalled(
-    history: Sequence[PassResult], settings: JudgeSettings, changed: Collection[str] | None
+    history: Sequence[PassResult], settings: JudgeConfig, changed: Collection[str] | None
 ) -> bool:
     """No progress: nothing closed, nothing changed and no remap, or the same failures again."""
     if len(history) < STALL_PASSES:
@@ -595,7 +594,7 @@ def stalled(
 
 def stop_reason(
     history: Sequence[PassResult],
-    settings: JudgeSettings,
+    settings: JudgeConfig,
     max_passes: int,
     changed: Collection[str] | None,
     gate_passed: bool,

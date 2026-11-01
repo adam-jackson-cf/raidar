@@ -144,6 +144,10 @@ class GatePackage:
 @dataclass(frozen=True)
 class GateSettings:
     max_fix_rounds: int = 0
+    baseline: bool = False
+    """Run the package's ``pytest`` check over the starting workspace once, before the agent
+    (``baseline`` payload command): the tests that pass on the base, for ``jev-judge/1``'s
+    regression criteria. Its failure is recorded, never invalidity."""
 
 
 @dataclass(frozen=True)
@@ -376,6 +380,7 @@ class GateEvidence:
     integrity: list[dict[str, str]] = field(default_factory=list)
     reaps: list[dict[str, Any]] = field(default_factory=list)
     errors: list[str] = field(default_factory=list)
+    baseline: dict[str, Any] | None = None
 
 
 def _q(value: str) -> str:
@@ -427,6 +432,8 @@ class GateRun:
         await self._contexts()
         await self._check_setup()
         await self._run_canary()
+        if self.settings.baseline:
+            await self._run_baseline()
         await self._verify_tools("before the agent started")
 
     async def _facts(self) -> AgentFacts:
@@ -517,6 +524,16 @@ class GateRun:
         self.evidence.canary = found
         self._write("canary.json", found)
         check_canary(found)
+
+    async def _run_baseline(self) -> None:
+        """The package ``pytest`` check over the starting workspace (an error is evidence)."""
+        result = await calls.trusted_exec(self.environment, shlex.join(self._argv("baseline")))
+        found = last_json(result.stdout or "") or {
+            "status": ERROR, "exit": None, "tests": None,
+            "error": f"the baseline printed no record (exit {result.return_code})",
+        }  # fmt: skip
+        self.evidence.baseline = found
+        self._write("baseline.json", found)
 
     # after each turn -------------------------------------------------------------------------
 
@@ -682,18 +699,29 @@ class GateRun:
             "reaps": ev.reaps,
             "pre_fix_snapshots": ev.pre_fix,
             "hook_outputs": self.outputs.hook_runs,
-            "gates": [
-                {
-                    **{k: v for k, v in gate.items() if k not in ("output", "files")},
-                    "checks": [
-                        {k: v for k, v in check.items() if k != "tests"}
-                        for check in gate.get("checks", [])
-                    ],
-                }
-                for gate in ev.gates
-            ],
+            "gates": self._recorded_gates(),
             "errors": ev.errors,
+            **({"baseline": self._baseline_summary()} if self.settings.baseline else {}),
         }
+
+    def _recorded_gates(self) -> list[dict[str, Any]]:
+        return [
+            {
+                **{k: v for k, v in gate.items() if k not in ("output", "files")},
+                "checks": [
+                    {k: v for k, v in check.items() if k != "tests"}
+                    for check in gate.get("checks", [])
+                ],
+            }
+            for gate in self.evidence.gates
+        ]
+
+    def _baseline_summary(self) -> dict[str, Any] | None:
+        found = self.evidence.baseline
+        if found is None:
+            return None
+        kept = {k: v for k, v in found.items() if k not in ("output", "tests")}
+        return {**kept, "record": f"{RECORD_DIR}/baseline.json"}
 
     # container commands ------------------------------------------------------------------------
 

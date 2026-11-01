@@ -1,25 +1,33 @@
-"""The workflow runner: one build turn per checkpoint, its logs, record and context totals."""
+"""The workflow runner: one build turn per checkpoint, its logs, record and context totals.
+
+The runner-level evidence guarantees live here too: what the agent writes into its mounted logs is
+replaced by the host-kept records, links are named and never copied, and a rewritten session
+store is a named integrity violation. A workflow with no package is the smallest real runtime.
+"""
 
 from __future__ import annotations
 
 import asyncio
 import json
+import time
+from collections.abc import Callable
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
 
 import pytest
 from harbor.models.agent.context import AgentContext
+from raidar_contract.workflow import load_package_workflow
 
-from raidar.subject.workflow.definition import load_workflow
 from raidar.subject.workflow.runner import (
     PROMPT_FILE,
     RECORD_FILE,
+    SessionWatch,
     WorkflowRunner,
 )
 from raidar.subject.workflow.turns import TRAJECTORY_FILE, WORKFLOW_DIR
 from tests.native_support import CodexNative
-from tests.release_support import SPIKE_WORKFLOWS
+from tests.release_support import REAL_LAB
 
 INSTRUCTION = "Add a function `add(a, b)` to main.py."
 ONE_SHOT_PROMPT = f"Work the issue below per the repository's own rules.\n\n{INSTRUCTION}"
@@ -32,6 +40,7 @@ class FakeInner(CodexNative):
     prompts: list[str] = []
     tokens: tuple[int, int, int, float] | None = (120, 20, 30, 0.02)
     failure: Exception | None = None
+    on_run: Callable[[], None] | None = None
 
     @staticmethod
     def name() -> str:
@@ -45,6 +54,8 @@ class FakeInner(CodexNative):
 
     async def run(self, instruction: str, environment: Any, context: AgentContext) -> None:
         type(self).prompts.append(instruction)
+        if type(self).on_run is not None:
+            type(self).on_run()
         (self.logs_dir / TRAJECTORY_FILE).write_text(
             json.dumps({"session_id": SESSION, "steps": [{"message": "done"}]})
         )
@@ -76,6 +87,7 @@ def inner(monkeypatch: pytest.MonkeyPatch) -> type[FakeInner]:
     FakeInner.prompts = []
     FakeInner.tokens = (120, 20, 30, 0.02)
     FakeInner.failure = None
+    FakeInner.on_run = None
 
     def create(runner: Any, spec: Any, logs_dir: Path, *, model_name: str | None) -> FakeInner:
         return FakeInner(logs_dir=logs_dir, model_name=model_name)
@@ -85,7 +97,9 @@ def inner(monkeypatch: pytest.MonkeyPatch) -> type[FakeInner]:
 
 
 def _runner(logs_dir: Path) -> WorkflowRunner:
-    definition = load_workflow(SPIKE_WORKFLOWS, "raidar/one-shot")
+    definition = load_package_workflow(
+        REAL_LAB / "workflows" / "raidar" / "one-shot", "raidar/one-shot"
+    )
     return WorkflowRunner(
         logs_dir=logs_dir,
         model_name="openai/gpt-6-luna",
@@ -159,3 +173,75 @@ def test_a_failing_turn_is_recorded_and_the_error_still_reaches_harbor(tmp_path:
     assert record["turns"][0]["error"] == "RuntimeError: agent crashed"
     assert (tmp_path / TRAJECTORY_FILE).is_file()
     assert context.n_input_tokens is None
+
+
+def test_records_the_agent_wrote_into_the_mounted_logs_are_replaced_by_the_host_kept_ones(
+    tmp_path: Path,
+) -> None:
+    forged = tmp_path / WORKFLOW_DIR / "forged"
+
+    def plant() -> None:
+        forged.mkdir(parents=True)
+        (forged / "extra.json").write_text("{}")
+        (tmp_path / WORKFLOW_DIR / RECORD_FILE).write_text('{"kind": "forged"}')
+
+    FakeInner.on_run = plant
+
+    _run(tmp_path)
+
+    record = json.loads((tmp_path / WORKFLOW_DIR / RECORD_FILE).read_text())
+    assert record["kind"] == "raidar-workflow"
+    assert not forged.exists()
+
+
+def test_a_link_planted_in_the_agents_logs_is_named_and_never_copied(tmp_path: Path) -> None:
+    secret = tmp_path / "host-secret.txt"
+    secret.write_text("host secret")
+
+    def plant() -> None:
+        (tmp_path / "planted.txt").symlink_to(secret)
+        (tmp_path / "sessions").mkdir(exist_ok=True)
+        (tmp_path / "sessions" / "deep.txt").symlink_to(secret)
+
+    FakeInner.on_run = plant
+
+    _run(tmp_path)
+
+    record = json.loads((tmp_path / WORKFLOW_DIR / RECORD_FILE).read_text())
+    names = [item["name"] for item in record["integrity"]]
+    assert names.count("source_symlink") >= 2
+    published = tmp_path / WORKFLOW_DIR / "build-1"
+    assert not (published / "planted.txt").exists()
+    assert not (published / "planted.txt").is_symlink()
+    assert not (published / "sessions" / "deep.txt").is_symlink()
+
+
+def test_a_session_log_only_appended_to_is_clean_and_a_write_then_restore_is_seen(
+    tmp_path: Path,
+) -> None:
+    source, staged = tmp_path / "source", tmp_path / "staged"
+    (source / "sessions").mkdir(parents=True)
+    (staged / "sessions").mkdir(parents=True)
+    original = b'{"a": 1}\n'
+    watch = SessionWatch()
+
+    def remote() -> dict[str, int]:  # what the container reports for the file's ctime
+        return {"sessions/r.jsonl": (source / "sessions" / "r.jsonl").stat().st_ctime_ns}
+
+    def keep(text: bytes, *, grew: bool = True) -> list[dict[str, str]]:
+        (source / "sessions" / "r.jsonl").write_bytes(text)
+        (staged / "sessions" / "r.jsonl").write_bytes(text)
+        return watch.observe(staged, remote(), ("sessions",), grew_expected=grew)
+
+    assert keep(original) == []
+    assert keep(original + b'{"a": 2}\n') == []  # appended
+    appended = original + b'{"a": 2}\n'
+    time.sleep(0.05)  # a file system's ctime is coarse
+    (source / "sessions" / "r.jsonl").write_bytes(b"tampered\n")  # a write ...
+    (source / "sessions" / "r.jsonl").write_bytes(appended)  # ... and a restore
+    (staged / "sessions" / "r.jsonl").write_bytes(appended)
+    found = watch.observe(staged, remote(), ("sessions",), grew_expected=True)
+    assert [item["name"] for item in found] == ["session_log_touched"]
+    (staged / "sessions" / "r.jsonl").unlink()
+    removed = watch.observe(staged, remote(), ("sessions",), grew_expected=True)
+    assert [item["name"] for item in removed] == ["session_log_removed"]

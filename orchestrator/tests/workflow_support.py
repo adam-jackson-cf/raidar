@@ -7,18 +7,14 @@ import json
 import os
 import shutil
 import subprocess
-import sys
-from collections.abc import Callable, Iterator
+from collections.abc import Callable
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any, ClassVar
 
-import coverage
 import pytest
-from harbor.agents.base import BaseAgent
 from harbor.models.agent.context import AgentContext
 
-from raidar.subject.workflow import verify
 from tests.native_support import CodexNative
 
 CODE = "def add(a: int, b: int) -> int:\n    return a + b\n"
@@ -100,53 +96,9 @@ class ScriptedAgent(CodexNative):
 
 
 @pytest.fixture
-def agent_env(tmp_path: Path) -> Iterator[dict[str, str]]:
-    """The agent's and the container's environment. Under coverage, the uploaded gate measures
-    itself in every process that runs it, and its lines count for its source file."""
-    env = dict(os.environ)
-    current = coverage.Coverage.current()
-    if current is None:
-        yield env
-        return
-    uploaded, data = tmp_path / "opt", tmp_path / "coverage"
-    data.mkdir()
-    rc = tmp_path / "coveragerc"
-    rc.write_text(f"[run]\nsource = {uploaded}\nparallel = true\ndata_file = {data}/.coverage\n")
-    env["COVERAGE_PROCESS_START"] = str(rc)
-    env.pop("COVERAGE_FILE", None)  # it would beat the rc's data_file and skip the path mapping
-    yield env
-    copy, source = str(uploaded / "verify_gate.py"), str(verify.PAYLOAD.resolve())
-    collected = current.get_data()
-    for path in data.glob(".coverage.*"):
-        child = coverage.CoverageData(basename=str(path))
-        child.read()
-        collected.update(child, map_path=lambda name: source if name == copy else name)
-
-
-@pytest.fixture
-def workspace(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, agent_env: dict[str, str]) -> Path:
-    paths = verify.VerifyPaths(
-        workspace=str(tmp_path / "app"),
-        home=str(tmp_path / "opt"),
-        state=str(tmp_path / "state"),
-        system_python=sys.executable,
-        reap=False,  # the agent's user is the test's own: reaping would kill the test run
-    )
-    monkeypatch.setattr(verify, "PATHS", paths)
-    monkeypatch.setattr(
-        verify,
-        "tools_install_command",
-        lambda p, pins: f"mkdir -p {p.home} && ln -sfn {sys.prefix} {p.tools}",
-    )
-
-    def create(runner: Any, spec: Any, logs_dir: Path, *, model_name: str | None) -> BaseAgent:
-        return ScriptedAgent(logs_dir=logs_dir, model_name=model_name)
-
-    monkeypatch.setattr("raidar.subject.workflow.runner.create_inner", create)
-    ScriptedAgent.prompts = []
-    ScriptedAgent.workspace = tmp_path / "app"
-    ScriptedAgent.workspace.mkdir()
-    return ScriptedAgent.workspace
+def agent_env() -> dict[str, str]:
+    """The agent's and the container's environment: the test's own."""
+    return dict(os.environ)
 
 
 def write(workspace: Path, **files: str) -> None:

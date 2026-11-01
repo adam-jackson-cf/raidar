@@ -4,9 +4,11 @@
 the primitives in the contract's order and holds no branch for a named package:
 
 1. ``prepare`` (before the agent): each package's ``setup/1`` in workflow order, the ``frame/1``
-   prompt with its tokens, the ``gate/1`` start-up and the package canary;
+   prompt with its tokens, the ``gate/1`` start-up and the package canary (and, for a workflow
+   with ``jev-judge/1``, the gate's baseline run);
 2. ``check`` (after each agent turn): the gate seal, then each package's ``stop/1`` in workflow
-   order; the first resume wins and resumes the same primary session;
+   order; the first resume wins and resumes the same primary session. ``sealed`` and
+   ``gate_stand`` say how the seal stood, for a workflow primitive that judges it;
 3. ``close`` (once the checkpoint ends, cut or not): the ``outputs/1`` copy;
 4. ``record``: host-written evidence grouped by primitive contract id, never by package name.
 
@@ -16,8 +18,9 @@ The invalidity of the instrument, in any primitive, surfaces as ``TrialInvalid``
 
 from __future__ import annotations
 
-from collections.abc import Iterator, Mapping, Sequence
+from collections.abc import Callable, Iterator, Mapping, Sequence
 from contextlib import contextmanager
+from dataclasses import dataclass
 from typing import Any
 
 from raidar_contract.package.tokens import Frame, FramePart, render_frame
@@ -38,6 +41,30 @@ from raidar.subject.primitive.stop import closed_flag_path, final_decision_recor
 from raidar.subject.workflow.package_member import PackageMember, PackageSpec
 from raidar.subject.workflow.stage import DEADLINE, GATE_FIX, REPAIR, REWORK, Checkpoint, Resume
 
+GATE_PASSED = "gate_passed"
+GATE_REFUSED = "gate_refused"
+"""The fix rounds ran out on a refused seal."""
+GATE_BUDGET = "gate_budget"
+"""A refused seal whose fix turn did not fit the time left."""
+GATE_ERROR = "gate_error"
+"""A seal that neither passed nor refused, and no fix turn followed."""
+
+
+@dataclass(frozen=True)
+class CheckpointPlan:
+    """What one checkpoint runs on, fixed before the agent starts (never lifecycle state)."""
+
+    build: str
+    """The workflow's build prompt, with its package slots and the task token."""
+    pack: str
+    primitives: Mapping[str, str]
+    """The arm's locked code identity per primitive (the canary compares it)."""
+    max_fix_rounds: int = 0
+    baseline: bool = False
+    """Run the gate's baseline over the starting workspace (``jev-judge/1`` regressions)."""
+    reserve_seconds: Callable[[], float] | None = None
+    """Seconds a workflow primitive needs after every turn (the judge's last pass)."""
+
 
 @contextmanager
 def _invalidity() -> Iterator[None]:
@@ -57,18 +84,11 @@ class PackageCheckpoint:
         self,
         checkpoint: Checkpoint,
         specs: Sequence[PackageSpec],
-        *,
-        build: str,
-        pack: str,
-        primitives: Mapping[str, str],
-        max_fix_rounds: int = 0,
+        plan: CheckpointPlan,
         runner: CallRunner | None = None,
     ) -> None:
         self.checkpoint = checkpoint
-        self.build = build
-        self.pack = pack
-        self.primitives = dict(primitives)
-        self.max_fix_rounds = max_fix_rounds
+        self.plan = plan
         runner = runner or CallRunner(checkpoint.environment, checkpoint.logs_dir)
         self.members = [
             PackageMember(
@@ -88,8 +108,16 @@ class PackageCheckpoint:
         ]
         self.gate: GateRun | None = None
         self.fix_rounds = 0
+        """Gate fix turns since the last ``new_pass`` (what ``max_fix_rounds`` bounds)."""
+        self.fixes = 0
+        """Every gate fix turn of the checkpoint; names each retained pre-fix snapshot."""
         self.endings: dict[str, str] = {}
         self.frame: Frame | None = None
+        self.sealed: GateOutcome | None = None
+        """The latest seal, set by ``check``."""
+        self.gate_stand: str | None = None
+        """How the latest seal stood after ``check``: one of the ``GATE_*`` names, or ``None``
+        when a fix turn was ordered for it (or no gate is enabled)."""
 
     # before the agent starts ---------------------------------------------------------------
 
@@ -102,11 +130,11 @@ class PackageCheckpoint:
         with _invalidity():
             for member in self.members:
                 member.setup = await run_setup(member.site)
-            self.frame = render_frame(self.build, self.checkpoint.task, self._parts())
+            self.frame = render_frame(self.plan.build, self.checkpoint.task, self._parts())
             for member in self.members:
                 if member.canary is not None:
                     await member.canary.require(
-                        member.spec.package.digest, self.pack, self.primitives
+                        member.spec.package.digest, self.plan.pack, self.plan.primitives
                     )
             await self._start_gate()
         return self.frame
@@ -138,7 +166,7 @@ class PackageCheckpoint:
         ]
         if not gated:
             return
-        settings = GateSettings(self.max_fix_rounds)
+        settings = GateSettings(self.plan.max_fix_rounds, self.plan.baseline)
         self.gate = GateRun(self.checkpoint.environment, self.checkpoint.logs_dir, gated, settings)
         await self.gate.prepare(self.checkpoint.session_paths)
 
@@ -151,6 +179,7 @@ class PackageCheckpoint:
         resume wins; later packages are checked after the next turn. ``None`` lets the
         checkpoint end as far as packages are concerned.
         """
+        self.sealed, self.gate_stand = None, None
         with _invalidity():
             if self.gate is not None:
                 resume = await self._gate_fix(self.gate, await self.gate.seal(after))
@@ -164,19 +193,67 @@ class PackageCheckpoint:
                     break  # a deadline cut ends the checkpoint: later packages are not asked
         return None
 
+    def new_pass(self) -> None:
+        """A judged pass sent the work back: its gate fix rounds are counted afresh."""
+        self.fix_rounds = 0
+
+    def output_copy(self, package: str, name: str) -> Mapping[str, Any] | None:
+        """The newest valid host copy of ``package``'s declared output ``name``.
+
+        Taken by a ``done`` stop, validated against its output contract and hashed host-side
+        (``outputs/1``: ``path``, ``contract``, ``sha256``, ``bytes``, ``host_path``, ``error``).
+        """
+        for member in self.members:
+            if member.name != package:
+                continue
+            for decision in reversed(member.stop.decisions):
+                if decision.get("action") != "done":
+                    continue
+                outputs = decision.get("outputs")
+                copy = outputs.get(name) if isinstance(outputs, dict) else None
+                if isinstance(copy, dict) and copy.get("error") is None and copy.get("host_path"):
+                    return copy
+        return None
+
+    def reported_done(self, package: str) -> bool:
+        """Whether ``package``'s stop ever answered ``done`` (it then owes its outputs)."""
+        return any(
+            decision.get("action") == "done"
+            for member in self.members
+            if member.name == package
+            for decision in member.stop.decisions
+        )
+
+    def producer_closed(self, package: str) -> bool:
+        """Whether ``package``'s stop closed for good (a legitimate agent outcome: it owes no
+        outputs)."""
+        return any(member.stop.closed for member in self.members if member.name == package)
+
     async def _gate_fix(self, gate: GateRun, outcome: GateOutcome) -> Resume | None:
+        self.sealed = outcome
         if outcome.attribution in (Attribution.INSTRUMENT, Attribution.INTEGRITY):
             raise TrialInvalid(
                 "integrity" if outcome.attribution is Attribution.INTEGRITY else "instrument",
                 outcome.reason,
                 outcome.record,
             )
-        if not outcome.resumable or self.fix_rounds >= self.max_fix_rounds:
+        if outcome.passed:
+            self.gate_stand = GATE_PASSED
+            return None
+        refused = outcome.attribution is Attribution.REFUSED
+        if not outcome.resumable or self.fix_rounds >= self.plan.max_fix_rounds:
+            self.gate_stand = GATE_REFUSED if refused else GATE_ERROR
             return None
         if not self._fits(GATE_FIX):
+            self.gate_stand = GATE_BUDGET if refused else GATE_ERROR
             return None
         self.fix_rounds += 1
-        await gate.retain_prefix(self.fix_rounds)
+        self.fixes += 1
+        await gate.retain_prefix(self.fixes)
+        return self._fix_resume(outcome)
+
+    @staticmethod
+    def _fix_resume(outcome: GateOutcome) -> Resume:
         failed = [
             str(check.get("name"))
             for check in outcome.record.get("checks", [])
@@ -200,15 +277,17 @@ class PackageCheckpoint:
 
     def _fits(self, kind: str) -> bool:
         """A resume turn starts only if the turn expected of its kind (``Checkpoint.
-        expected_seconds``) and the gate run that follows it (the last gate's seconds) fit in the
-        time left."""
+        expected_seconds``), the gate run that follows it (the last gate's seconds) and the
+        workflow's judge pass (``reserve_seconds``) fit in the time left."""
         left = self.checkpoint.remaining()
         if left is None:
             return True
         expected = self.checkpoint.expected_seconds(kind)
         if expected is None:
             return False  # no estimate (no first build turn): never scheduled on an invented one
-        return left > 0 and left >= expected + self._gate_seconds()
+        reserve = self.plan.reserve_seconds
+        reserved = 0.0 if reserve is None else reserve()
+        return left > 0 and left >= expected + self._gate_seconds() + reserved
 
     def _gate_seconds(self) -> float:
         if self.gate is None:
@@ -219,7 +298,13 @@ class PackageCheckpoint:
     # when the checkpoint ends --------------------------------------------------------------
 
     async def close(self, cut: str | None) -> None:
-        """Copy every declared output host-side (``cut`` names why the checkpoint was cut)."""
+        """Copy every declared output host-side (``cut`` names why the checkpoint was cut).
+
+        A cut is kept as ``endings["checkpoint"]`` (a host-owned key: member keys are package
+        names), so a legitimate timeout is on the record even when no stop ever hit the clock.
+        """
+        if cut is not None:
+            self.endings["checkpoint"] = cut
         with _invalidity():
             for member in self.members:
                 if member.spec.package.manifest.outputs:

@@ -16,7 +16,7 @@ import os
 import shlex
 import shutil
 import stat
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -281,7 +281,11 @@ def note_digest(container: FakeContainer, case: str = "done") -> dict[str, str]:
     return {"note": hashlib.sha256(note.read_bytes()).hexdigest()}
 
 
-def stage_check_record(package: StagePackage, container: FakeContainer) -> StageCheckRecord:
+def stage_check_record(
+    package: StagePackage,
+    container: FakeContainer,
+    primitives: Mapping[str, str] = PRIMITIVES,
+) -> StageCheckRecord:
     """The passing stage-check record of the note-state ``done`` fixture."""
     state = NOTE_STATE / "fixtures" / "done" / "state"
     words = len((state / "note.md").read_text().split())
@@ -289,7 +293,7 @@ def stage_check_record(package: StagePackage, container: FakeContainer) -> Stage
     return StageCheckRecord(
         package=package.digest,
         pack=PACK,
-        primitives=PRIMITIVES,
+        primitives=primitives,
         stdout_sha256=hashlib.sha256(stdout).hexdigest(),
         outputs=note_digest(container),
         disk_free=1_000,

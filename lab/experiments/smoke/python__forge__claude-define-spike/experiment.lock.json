@@ -1075,7 +1075,7 @@
       "tree-sitter-language-pack": "0.13.0"
     }
   },
-  "document_sha256": "a5b6b6f8ae30f5504652183e1ceadfc20c97f108dbb76dfb3a68f76d2b53c76d",
+  "document_sha256": "b6e27c3ac8fa593a29a72f550a87a2ffcc0293194d3502a8915784dfafc6d31d",
   "execution": {
     "arms": {
       "define": {
@@ -1093,11 +1093,11 @@
           "version_pin": "2.1.285",
           "workflow_skills": "placement.skills .claude/skills in the workspace /app"
         },
-        "digest": "3b91994b286f58118cc28b41a62dae57ec2d9e1687a6e2e18477bcf0b8157531",
+        "digest": "75d1cf970fad8769b6ebf4f98b2067f6aaab760f0f988a8b450d891115361668",
         "model": "claude-sonnet-4-6",
         "packages": {
           "raidar/define": {
-            "check": "89056adad45932e6e3c117e38c21a06cd73c5745928926a81b7aa0c938857e8f",
+            "check": "2d02236ecfb2161e1b7e856261caa120cd1ca499ae381b832a52011ce94c12d1",
             "installed": {
               "arm64": "d28105d3a2c568160a2726192e3157427f0bf12bcab322ba436b35c5ca8d3b4d"
             },
@@ -1113,11 +1113,13 @@
           }
         },
         "primitive_code": {
+          "acceptance-reply/1": "16c56fbbc7eaa3c92fe6e32196a44c7271ba3702e230f6d124b187331560d20a",
           "frame/1": "b0cd981a275a0f25f6e1cec75f882f9eeb773bda33ec4d9d04de0cc20efafbab",
-          "gate/1": "f24e44c3aab5f6eb619fdc05786b3105aea0f5b0ee3364eeb6dec2e4d15f1f40",
+          "gate/1": "ca7bd3c36bee679d619c2efcc7161c2006e1d2ecec5f2b401f295c2a03b4375e",
           "install/1": "e3181fe8d2a4cf86d776b4a88bd31aec726ccd818e4484b56be66ec4e627ce8e",
+          "jev-judge/1": "51bd061ec3e9963f49aed00c5c8482e9ef9a4fd885d4ef3362d6e07906dac056",
           "outputs/1": "0586c92750f3a7cb24e9dd9381f6bdde0e7fc6c4ef333746f5823b2026186b6a",
-          "runner/1": "ce6eb5ce138d7c802e72d0d35ae220a09169c3c5b29ab42ca558c44069f5efc9",
+          "runner/1": "340879a05ae33cafebfb7922ebacfa80c848da2076687d46438d5541e7d91b78",
           "setup/1": "55439984004f73bd2bd5bcb3cc3adc048acb93b24043712e2148b9c76ebd4015",
           "stop/1": "9ba58a816b9915a2910aa2a35878dfefa813605968a1900c7786d7a2e57577e8"
         },
@@ -1947,7 +1949,7 @@
     "source_sha256": "2f8e3eb751090e3a57b89f7dcf0c7c3dfcf5e2bed90ca7b8b7c1547f9bff625d",
     "spec_sha256": "b1b9c3a56c32300ea4a00a540dd8b5b6b4068ad5d41c1ac55c906dcd28cc48dc"
   },
-  "lock_sha256": "e06833dc5a019d602913d797afed2bb34346a1f3531efa8ae82ca5430da83e09",
+  "lock_sha256": "4d5c5e46f692ec5bf1bcbece8a3461288c282a9f64bd8b369438ed6fc2b1b334",
   "lock_version": 5,
   "overrides": {
     "flags": {},
@@ -1956,8 +1958,8 @@
   "sections": {
     "analysis": "f7f0b52ed6909ba0f3864eb9e7f7d513625da8dc445234304b8aa033c4343cb6",
     "assessment": "d62fbb3e311c0de90c2a9b809818c0b33eaffd3c85f0757955d0614572b14292",
-    "execution": "e06833dc5a019d602913d797afed2bb34346a1f3531efa8ae82ca5430da83e09",
-    "toolchain": "f659222273077d164b616b044b099482329257b8242be3400bb8174638133474"
+    "execution": "4d5c5e46f692ec5bf1bcbece8a3461288c282a9f64bd8b369438ed6fc2b1b334",
+    "toolchain": "6256053eb5ce8c39f8bf92cd11a70df1ddd8a4a0b880f514605f4aecbd9774ae"
   },
   "spec": {
     "agents": [
@@ -2029,6 +2031,6 @@
     "litellm": "1.102.1",
     "python": "3.13.7",
     "raidar": "0.15.0",
-    "raidar_spec": "c05fb465122b93838e790d70bf993f25de457615e2393bfbec74b0abecbbf87a"
+    "raidar_spec": "29df8c63188e8a71be7894d3d05e9fc3d5a2f56cc3052c65099bcc7bb70516eb"
   }
 }

@@ -15,7 +15,7 @@ from raidar_contract.package.registry import load_stage_package
 from raidar.subject.primitive.gate import Attribution, GateOutcome
 from raidar.subject.primitive.site import TrialInvalid
 from raidar.subject.workflow import package as package_module
-from raidar.subject.workflow.package import PackageCheckpoint
+from raidar.subject.workflow.package import CheckpointPlan, PackageCheckpoint
 from raidar.subject.workflow.package_member import PackageSpec
 from raidar.subject.workflow.stage import FIRST_BUILD, GATE_FIX, REPAIR, REWORK, Checkpoint, Spent
 from tests.lifecycle_support import (
@@ -77,9 +77,7 @@ class Rig:
         self.runtime = PackageCheckpoint(
             self.checkpoint,
             specs,
-            build=BUILD,
-            pack=PACK,
-            primitives=PRIMITIVES,
+            CheckpointPlan(BUILD, PACK, PRIMITIVES),
             runner=ScriptedRunner(self.container, tmp_path / "logs"),
         )
 
@@ -195,7 +193,7 @@ async def test_a_stop_without_its_stage_check_record_is_refused(
     spec = PackageSpec(p.name, p, installed(p, rig.container), p.effective_params())
 
     with pytest.raises(ValueError, match="stage-check record"):
-        PackageCheckpoint(rig.checkpoint, [spec], build=BUILD, pack=PACK, primitives=PRIMITIVES)
+        PackageCheckpoint(rig.checkpoint, [spec], CheckpointPlan(BUILD, PACK, PRIMITIVES))
 
 
 class StubGate:
