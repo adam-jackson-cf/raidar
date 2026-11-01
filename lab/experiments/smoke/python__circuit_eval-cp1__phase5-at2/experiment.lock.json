@@ -668,7 +668,7 @@
     },
     "tools": {}
   },
-  "document_sha256": "ba2f9a03e84bd643c3f5000217c8413126d6791feaefac638daf7469e0eb932c",
+  "document_sha256": "02867dfed2c77ace1628bb3fb6517642528192236a212d4aeba5664803530c0d",
   "execution": {
     "arms": {
       "define-build-verify": {
@@ -686,7 +686,7 @@
           "version_pin": "0.156.1",
           "workflow_skills": "placement.skills .agents/skills in the workspace /app"
         },
-        "digest": "d5746eb6742ec250dbff8d37a51414168551ac56eed480c1a72883c84dc84bc5",
+        "digest": "f1f0b2a0b7bc6c8671e4a377508207e70625f7c1c729e2d7010baf319b06d107",
         "model": "gpt-6-luna",
         "packages": {
           "raidar/define": {
@@ -706,15 +706,15 @@
           }
         },
         "primitive_code": {
-          "acceptance-reply/1": "acf37e8dd9f93fda2b0989d15f6aae880dc6c1753772ad13f6959e9179c5638e",
-          "frame/1": "f28dbc86cd61736c45d725e009251bd8831ad91ba81f144b7c7a3c8c03f1a68c",
-          "gate/1": "b0f58b2acaa667bc1476ed991898f8dc44753ef1a0199038d8a00f790ec8bfd5",
-          "install/1": "2a556be119deb5e7c67eac5f42f62fe51083a97bdb40a064fada91083cd608d4",
-          "jev-judge/1": "4dbbc993c357a2d857e0448dd06a49f6583f4c2886a52184668386f98223ddcd",
-          "outputs/1": "d67b8a34d0a90b7397ca55b60d2c81ada7dfa3dd5514f03434ebf7a207983dfb",
-          "runner/1": "1d3e719ff5afbf9c1130a67ab3a662fd5a9b4eaf938b66ad109da08d1505717e",
-          "setup/1": "ff871e138f875c9fa8f5a64c38087a8b37381d417f6875388640e8698c03270f",
-          "stop/1": "393c8f83dadef3588a7ea68f7b3f50485b2d2ba845b1efc3909d04f66fedbc5d"
+          "acceptance-reply/1": "6673e010bf0de624ffd6be75a12e05c5081900ceff77f4e513e38dc558a65b1f",
+          "frame/1": "9018cc5beb0c225b5212587b6fa6888eee8655ebaac2e7a385ec59e6f5854a12",
+          "gate/1": "b9035fe1c22b8d196dc7d8e73cd4fff66f16912cefd8adfd9e3901029909692f",
+          "install/1": "dd974f370d2d409f3815868f7fd7e799145be26a379b7d516d7adf32a225a309",
+          "jev-judge/1": "63fb7939235fae7c0e9a79f352453e314f8e91fdd5aed05acd3e3165b92a55ad",
+          "outputs/1": "1fce76f61308946f60f1a8401e88cfa2ac2d4f9328fa100eaf7f6c0add369913",
+          "runner/1": "00bbe835f0be20ef676cd4ab8c8ea411a5a81eebf49535d6acada028d6f0b317",
+          "setup/1": "48253b74ba4f1c25d5052ed51d9970885cb820d102f26f1d07e5153cdba9ed57",
+          "stop/1": "102b358f3c407b2b3f1f85a421a9591e25d739e915d1a75c093634acd09fba4a"
         },
         "provider": "openai",
         "reasoning": "low",
@@ -913,7 +913,7 @@
     "source_sha256": "696ee945a66e8b5f3a2f48deddaf768d66dcce2be503a867d8fa8eb51d9cdec8",
     "spec_sha256": "adb2e3e8535f4de6250f69daa8250a24f7d20808648ce74367c2e14cfd94a326"
   },
-  "lock_sha256": "9ff3909d5fac31ed08101c487e45a735450d4df90228044b8bcb41bebea7baa4",
+  "lock_sha256": "10f1d4a886a2fa34c8acee8f9234ef784aa4c3223c2cf921566fdda8972f052b",
   "lock_version": 5,
   "overrides": {
     "flags": {},
@@ -922,7 +922,7 @@
   "sections": {
     "analysis": "21588ee2b7c9012065b4b874f8e6323a59a870ccdec3ddfdd44dbcb87796da8f",
     "assessment": "08e01286f865117bd8d1c56f61b3087e33654521d27e4035e69a32d1a7fe7b8c",
-    "execution": "9ff3909d5fac31ed08101c487e45a735450d4df90228044b8bcb41bebea7baa4",
+    "execution": "10f1d4a886a2fa34c8acee8f9234ef784aa4c3223c2cf921566fdda8972f052b",
     "toolchain": "58e193ae81834a67258b1957b54f082d26664061f19dcbb4c30d40271018516b"
   },
   "spec": {

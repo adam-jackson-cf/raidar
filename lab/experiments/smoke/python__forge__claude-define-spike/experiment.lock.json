@@ -1075,7 +1075,7 @@
       "tree-sitter-language-pack": "0.13.0"
     }
   },
-  "document_sha256": "27184680a584d7f69f626a18d4606a95c859f23917daf7f874aaf97ac4502d8b",
+  "document_sha256": "3e0a19321db8bd6b6297fd0a86b6544012c558190a0018094a10626c2c370ba2",
   "execution": {
     "arms": {
       "define": {
@@ -1093,7 +1093,7 @@
           "version_pin": "2.1.285",
           "workflow_skills": "placement.skills .claude/skills in the workspace /app"
         },
-        "digest": "dd4c16a3ad67af245a0b13cd8a0eff8c6818d8cee2b9cc1da38b7fdfeaeea254",
+        "digest": "33333741c62732e866bc37d09faf1e1f6abcd9817f3ff47d61ab95ef308c05fc",
         "model": "claude-sonnet-4-6",
         "packages": {
           "raidar/define": {
@@ -1113,15 +1113,15 @@
           }
         },
         "primitive_code": {
-          "acceptance-reply/1": "d47d3f1f9495a09cd49ababd9424a9de63b876e5f1ee677602872deb014ae4f0",
-          "frame/1": "9be08c28598ad3b2416c7de07232874a57447172b9eadbff2f3b6644c701a968",
-          "gate/1": "cf6166c35196ad53e81350c7857cc44f1354a0b9474e19f54632fa36526f1837",
-          "install/1": "58d3d15370d9351db4e00d56e288b11fa6c2c02be36448fc9611591923d1e041",
-          "jev-judge/1": "2f3ad093c5150e989b83030f6b0d6615f0b07315006a7ec930aaca3d3c76730e",
-          "outputs/1": "a90d9c20fe663f86bdf9e10ef4df7f3e8f8ee419e18f551d28d27cd891fe62ee",
-          "runner/1": "ed9b8831cf751127327b7ea5981467c2489864ede0a215d714acb774800e0bb6",
-          "setup/1": "b2a4b4bc1b8f072cf5e3d08a1dd42ed1e858fb39b7e8cceaf755fcc1184d283a",
-          "stop/1": "c91dabf849c8793544e90514411eb9dd840d78ac0cf096ce3a998ddb214d5cff"
+          "acceptance-reply/1": "97c9687e783103880573a44c2e9e7e742b853e129dcc5e74ed85485a5d7b4d5a",
+          "frame/1": "a26a4d0e5756889bdae94f7468e68946597389a99d535bc12ce0d01594ffa644",
+          "gate/1": "63a898b9a0c044ffbf33c2d146ec14c0b9f72fd36ae089e09c1a46b62f9c2f80",
+          "install/1": "99787c49e822e3d5eea980199262c33667aad82934a387af874eacba15bd6bfc",
+          "jev-judge/1": "b8a047714dc605c44dd70145f3e930897cca28172d130fb3b891ce44ab1c5bb1",
+          "outputs/1": "39d1f997d2430691d19c4cd9ba790d74bf53392d7eb496f5cc31994fe1d6fd2d",
+          "runner/1": "ce9dacabaf8bf558f5ee261d574fe152ce67b3821e4cffa434f9be87e46fa633",
+          "setup/1": "be70915e9bb540c906a94a80168f46fe4a5556fb9cb44552c26cc1db1c9b80f2",
+          "stop/1": "7698e597693270e2d68caea1e881b7166024da82259b3a443410b362df9cce82"
         },
         "provider": "anthropic",
         "reasoning": "low",
@@ -1949,7 +1949,7 @@
     "source_sha256": "cc62bbedff428013bb5c8211b91601642dfeeaef46159a4063c09aedb9fefbc7",
     "spec_sha256": "06aac1e03107800b8e8c668be7b5c394fddfdb942bd62f53ea7932231538977d"
   },
-  "lock_sha256": "14e8f62c250c7b0be0058c87403da75418a76d7d2b6eee82c6801a7f0dda9a30",
+  "lock_sha256": "80435e45f9325137c1edb1803ec2d83bbdf7c59196745cb2350823ef521266a4",
   "lock_version": 5,
   "overrides": {
     "flags": {},
@@ -1958,7 +1958,7 @@
   "sections": {
     "analysis": "f7f0b52ed6909ba0f3864eb9e7f7d513625da8dc445234304b8aa033c4343cb6",
     "assessment": "87ef5b2d6327daa12329a5fd14c0165579d5f6611b9cdafe164a48f4648fcd22",
-    "execution": "14e8f62c250c7b0be0058c87403da75418a76d7d2b6eee82c6801a7f0dda9a30",
+    "execution": "80435e45f9325137c1edb1803ec2d83bbdf7c59196745cb2350823ef521266a4",
     "toolchain": "58e193ae81834a67258b1957b54f082d26664061f19dcbb4c30d40271018516b"
   },
   "spec": {

@@ -668,7 +668,7 @@
     },
     "tools": {}
   },
-  "document_sha256": "10ac96df98a2f5a2d375c8a6c43cd0085a44f3659a8a88f63aa481fd7a158701",
+  "document_sha256": "7ce83087d1725f577a9c7b149f75c1b3abbbe0753e18f2c96ed1633f3ce149f6",
   "execution": {
     "arms": {
       "docs-fix": {
@@ -686,7 +686,7 @@
           "version_pin": "0.156.1",
           "workflow_skills": "placement.skills .agents/skills in the workspace /app"
         },
-        "digest": "1f02efacca136b2ecbf7e6e000caaba7e0358778bbf840f14c9f134cd91b0fc5",
+        "digest": "095f24880f03e13e7c35e59cb62d08531f78aacbf773236c96418b4a7253775f",
         "model": "gpt-6-luna",
         "packages": {
           "raidar/docs-check": {
@@ -705,10 +705,10 @@
           }
         },
         "primitive_code": {
-          "frame/1": "f28dbc86cd61736c45d725e009251bd8831ad91ba81f144b7c7a3c8c03f1a68c",
-          "gate/1": "b0f58b2acaa667bc1476ed991898f8dc44753ef1a0199038d8a00f790ec8bfd5",
-          "install/1": "2a556be119deb5e7c67eac5f42f62fe51083a97bdb40a064fada91083cd608d4",
-          "runner/1": "1d3e719ff5afbf9c1130a67ab3a662fd5a9b4eaf938b66ad109da08d1505717e"
+          "frame/1": "9018cc5beb0c225b5212587b6fa6888eee8655ebaac2e7a385ec59e6f5854a12",
+          "gate/1": "b9035fe1c22b8d196dc7d8e73cd4fff66f16912cefd8adfd9e3901029909692f",
+          "install/1": "dd974f370d2d409f3815868f7fd7e799145be26a379b7d516d7adf32a225a309",
+          "runner/1": "00bbe835f0be20ef676cd4ab8c8ea411a5a81eebf49535d6acada028d6f0b317"
         },
         "provider": "openai",
         "reasoning": "low",
@@ -907,7 +907,7 @@
     "source_sha256": "ee4771b997a090438d3611fe5cd2fc09fb6e1a6cc7b9b6e4feb44db1c2656736",
     "spec_sha256": "0e03d713fd6942f8f1fb6f91b6e8106f1d270d3d6fd4cca7edf65bcfe66e4ba8"
   },
-  "lock_sha256": "7a1efd33ee47c3a78f92b98410c4b0da841854862f9b5939ecb9fc7b8f3d05cd",
+  "lock_sha256": "a3777f6fa2a8b8f1593ba7626c7ac5f4234eefa38afed7926f4d2d7f8c7fc293",
   "lock_version": 5,
   "overrides": {
     "flags": {},
@@ -916,7 +916,7 @@
   "sections": {
     "analysis": "2165078bb3edf1fd89313bb7b0fdb121366bd76e9a351568321984d79da72faa",
     "assessment": "08e01286f865117bd8d1c56f61b3087e33654521d27e4035e69a32d1a7fe7b8c",
-    "execution": "7a1efd33ee47c3a78f92b98410c4b0da841854862f9b5939ecb9fc7b8f3d05cd",
+    "execution": "a3777f6fa2a8b8f1593ba7626c7ac5f4234eefa38afed7926f4d2d7f8c7fc293",
     "toolchain": "58e193ae81834a67258b1957b54f082d26664061f19dcbb4c30d40271018516b"
   },
   "spec": {
