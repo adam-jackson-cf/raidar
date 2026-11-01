@@ -74,6 +74,13 @@ def _register(root: Path, *, workflow: bool = True) -> None:
         gated = released_workflow("acme/gated@1", repo_root=root, draft=True).digest
         document["workflows"]["acme/gated@1"] = gated
         releases_file(root).write_text(yaml.safe_dump(document), encoding="utf-8")
+    imports = [
+        {"name": ref.rsplit("@", 1)[0], "sha256": digest, "source": "local identity fixture"}
+        for kind in ("stages", "workflows")
+        for ref, digest in document.get(kind, {}).items()
+        if not ref.startswith("raidar/")
+    ]
+    (root / "lab/imports.yaml").write_text(yaml.safe_dump(imports), encoding="utf-8")
 
 
 @pytest.fixture

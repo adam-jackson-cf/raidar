@@ -71,8 +71,8 @@ LAB_DIRECTORIES = frozenset(
         "judge",
     }
 )
-# The one data file at the lab root: the agent and workflow release register.
-LAB_FILES = frozenset({"releases.yaml"})
+# Release register and identity-free, unverified import provenance.
+LAB_FILES = frozenset({"releases.yaml", "imports.yaml"})
 RAIDAR_PACKAGE_DIR = "orchestrator/src/raidar"
 # Top-level packages (the stages of an evaluation, plus the CLI and the shared contracts), each with
 # the subpackages its group may hold (docs/reboot/repo-structure-design.md §8). Modules sit freely

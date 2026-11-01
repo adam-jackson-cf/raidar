@@ -160,6 +160,8 @@ env -u AGENT make stage-list
 env -u AGENT make stage-info NAME=acme/my-check
 env -u AGENT make workflow-new NAME=acme/my-workflow            # FROM=raidar/one-shot-verify by default
 env -u AGENT make experiment-lock EXPERIMENT=<smoke-yaml> DRAFT=1
+env -u AGENT make stage-import SRC=<dir> NAME=acme/my-check SHA256=<digest> SOURCE='<repo>@<commit>:<path>'
+env -u AGENT make workflow-import SRC=<dir> NAME=acme/my-workflow SHA256=<digest> SOURCE='<repo>@<commit>:<path>'
 ```
 
 Creation copies a real `FROM=<ns>/<name>` package, defaulting to `raidar/docs-check`, and refuses
@@ -172,6 +174,16 @@ Draft locking is smoke-only, writes under `var/tmp/drafts/<experiment-id>/`, mar
 and never admits a measured comparison. Normal locks require registered immutable references.
 Generated artifacts belong under `var/` or `RAIDAR_VAR`. See `make help` for the exhaustive
 command catalogue.
+
+Imports preserve exported bytes and fixtures; the manifest leaf must match `NAME`. They
+refuse `raidar/`, unsafe trees, digest mismatches, different existing bytes and workflow
+dependencies not registered with identical bytes. They print a release line, never release
+or authorize code. `lab/imports.yaml` stores `{name, sha256, source}`, one entry per digest.
+`SOURCE` is required, verbatim, one non-empty line, and **unverified**: Raidar never checks
+its truth or repository availability. A recorded digest cannot acquire another name/source.
+Non-Git and dirty exports are accepted. Identity is digest-only: source enters no release,
+lock, pooling or admission. `releases-check` requires entries for every non-`raidar` folder
+and every historical release of each imported name.
 
 ## Trust boundary (C4)
 

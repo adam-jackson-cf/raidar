@@ -19,7 +19,7 @@ from raidar_contract.canonical import IGNORED_TREE_NAMES
 from raidar_contract.package import StagePackageError
 from raidar_contract.package.registry import MANIFEST_FILE, load_stage_package
 
-from raidar.cli import stage_fixtures, stage_package, workflow_new
+from raidar.cli import imports, stage_fixtures, stage_package
 from raidar.cli.stage_lock import StageLockError, generate_lock, lock_problems
 from raidar.contract.paths import stage_checks_root
 
@@ -29,7 +29,7 @@ IGNORED = tuple(sorted(IGNORED_TREE_NAMES))
 
 def register(main: click.Group) -> None:
     main.add_command(stage)
-    workflow_new.register(main)
+    imports.register(main, stage)
 
 
 @click.group()

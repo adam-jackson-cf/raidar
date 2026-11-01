@@ -102,7 +102,7 @@ AGENT_SMOKE_EFFECTIVE_REASONING = $(if $(filter command line environment,$(origi
 	experiment-init experiment-validate experiment-lock experiment-locks-check \
 	experiment-plan experiment-execute experiment-status \
 	perf-check perf-fixture perf-gate security-gate health \
-	stage-new stage-lock stage-check stage-list stage-info workflow-new \
+	stage-new stage-import stage-lock stage-check stage-list stage-info workflow-new workflow-import \
 	ledger-check ledger-index releases-check contract-build \
 	problem-list problem-info problem-import problem-validate problem-errata-draft \
 	experiment-assess assess-regrade experiment-analyze jev-shadow-rubric \
@@ -176,6 +176,7 @@ help:
 	@echo "                                                        incompatibilities (RT0-RT6); lock_sha256 covers execution inputs only"
 	@echo "                                                        DRAFT=1: smoke experiments only; writes under var/tmp/, jobs are dev, never admitted to a measured comparison"
 	@echo "  make stage-new NAME=<ns>/<name> [FROM=<ns>/<name>]     Copy a real package (default raidar/docs-check), preserving bytes/modes except its manifest name; refuses overwrites and unsafe trees"
+	@echo "  make stage-import SRC=<dir> NAME=<ns>/<name> SHA256=<digest> SOURCE=<line>  Import exact package bytes; record unverified provenance"
 	@echo "  make stage-lock NAME=<ns>/<name>                      Generate the package's wheels-only tool/uv.lock (resolution only; no package code runs on the host)"
 	@echo "  make stage-check NAME=<ns>/<name> [REPLAY=<trial-dir>] [TARGET=name]"
 	@echo "                                                        Run fixtures twice, offline as UID 1000 in a throwaway pack container (never on the host), validate the static"
@@ -183,6 +184,7 @@ help:
 	@echo "  make stage-list                                       List stage packages with digest and release state"
 	@echo "  make stage-info NAME=<ns>/<name>                      Show a package's manifest facts, digest, next register line, lock state and canary record"
 	@echo "  make workflow-new NAME=<ns>/<name> [FROM=raidar/one-shot-verify]  Copy a workflow template to lab/workflows/<ns>/<name> (never overwrites)"
+	@echo "  make workflow-import SRC=<dir> NAME=<ns>/<name> SHA256=<digest> SOURCE=<line>  Import exact workflow bytes and registered dependencies"
 	@echo "  make contract-build                                    Build the raidar-contract wheel and sdist into var/contract-dist and print their sha256 (publishes nothing)"
 	@echo "  make releases-check [RELEASES_BASE=<commit>]          Fail unless lab/releases.yaml registers each agent, workflow and stage at its current hash, agent pins equal the pack's, and no release in the base commit (default: merge base with main, or HEAD's parent on main) was removed or re-hashed; part of make quality"
 	@echo "  make experiment-locks-check                           Fail unless every lab/experiments/*/*/*.lock.json is current (host Python patch aside); part of make quality"
@@ -421,6 +423,13 @@ experiment-lock:
 stage-new:
 	$(call require_var,NAME)
 	@$(RAIDAR) stage new "$(NAME)" $(if $(FROM),--from "$(FROM)",)
+
+export SOURCE
+stage-import workflow-import:
+	$(call require_var,SRC)
+	$(call require_var,NAME)
+	$(call require_var,SHA256)
+	@$(RAIDAR) $(if $(filter stage-import,$@),stage,workflow) import "$(NAME)" --src "$(SRC)" --sha256 "$(SHA256)" --source "$$SOURCE"
 
 stage-lock:
 	$(call require_var,NAME)

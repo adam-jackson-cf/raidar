@@ -29,9 +29,9 @@ from raidar_contract.releases import (
 from raidar.contract.paths import REPO_ROOT, agents_root, releases_file, stages_root, workflows_root
 from raidar.subject.agent.definition import harness_of, load_agent
 from raidar.subject.environment import available_runtimes, load_runtime_pack
+from raidar.subject.imports import import_issues
 from raidar.subject.releases import DEFINITION_ERRORS, tree_workflow_digest
 from raidar.subject.stages import stage_names
-from raidar.subject.workflow.definition import workflow_names
 
 MAIN_REFS = ("main", "origin/main")
 
@@ -145,11 +145,15 @@ def release_issues(repo_root: Path = REPO_ROOT, *, base: str | None = None) -> l
     )
     issues += _registration_issues(
         ReleaseKind.WORKFLOW,
-        workflow_names(workflows_root(repo_root)),
+        sorted(
+            path.parent.relative_to(workflows_root(repo_root)).as_posix()
+            for path in workflows_root(repo_root).glob("*/*/workflow.yaml")
+        ),
         lambda name: tree_workflow_digest(name, repo_root, register),
         register,
     )
     issues += _pin_issues(_loadable_agents(a_root))
+    issues += import_issues(repo_root)
     if base is not None:
         issues += history_issues(base, repo_root)
     return issues

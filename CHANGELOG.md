@@ -4,6 +4,15 @@ All notable changes to this project are documented in this file.
 
 ## Unreleased
 
+### Verified local imports (phase 5B step 1)
+
+- Add `stage-import` and `workflow-import`: preserve exported bytes, verify the supplied
+  digest, require registered byte-identical workflow dependencies and refuse unsafe trees,
+  `raidar/`, and divergent existing folders/releases.
+- Record verbatim, unverified single-line provenance in `lab/imports.yaml`, one entry per
+  digest. Provenance is outside release, lock, pooling and admission identity.
+- Extend release checks to every imported folder and historical release digest.
+
 ### Shipped workflows on schema 2 (phase 5A step 6)
 
 - Archive the three namespaced schema-1 `@1` workflows immutably, then register schema-2
