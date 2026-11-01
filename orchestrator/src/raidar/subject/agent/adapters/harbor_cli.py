@@ -26,6 +26,7 @@ class HarborCliAdapter(HarnessAdapter):
     SUPPORTED_MODELS: dict[str, SupportedModelProfile] = {}
     REQUIRED_PROVIDER: str = ""
     ADAPTER_LABEL: str = ""
+    REASONING_UNSUPPORTED_MESSAGE: str | None = None
 
     @classmethod
     def native_agent_class(cls) -> type[BaseAgent]:
@@ -70,6 +71,8 @@ class HarborCliAdapter(HarnessAdapter):
         reasoning_effort = self.config.model.reasoning_effort
         if reasoning_effort is None:
             return
+        if self.REASONING_UNSUPPORTED_MESSAGE is not None:
+            raise ValueError(self.REASONING_UNSUPPORTED_MESSAGE)
         allowed = model_profile.reasoning_levels
         if reasoning_effort not in allowed:
             allowed_rendered = ", ".join(allowed) if allowed else "(none)"

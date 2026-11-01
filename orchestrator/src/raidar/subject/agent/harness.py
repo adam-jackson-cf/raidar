@@ -171,6 +171,11 @@ def validate_harness_registry() -> None:
                 raise HarnessDefinitionError(
                     f"Harness {harness_id!r} credential {credential.id!r} has no transport"
                 )
+            redacted_names = set(credential.redaction.assignment_names)
+            if not set(credential.accepted_names).issubset(redacted_names):
+                raise HarnessDefinitionError(
+                    f"Harness {harness_id!r} credential {credential.id!r} is not redacted"
+                )
 
 
 validate_harness_registry()

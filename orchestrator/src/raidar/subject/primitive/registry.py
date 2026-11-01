@@ -1,8 +1,13 @@
-"""Primitive entry modules included in execution identity.
+"""Which primitive implements each supported contract id (``frame/1``, ``stop/1`` ...).
 
-Packages may require only ``SUPPORTED_CONTRACTS``; workflow-selected reply and judge contracts
-have their own inventory. Package validation refuses unsupported ids before execution.
+A package's ``requires`` names contract ids; only ids listed here are supported. A package never
+selects code: an unsupported id is refused, not imported.
 """
+
+from __future__ import annotations
+
+import importlib
+from types import ModuleType
 
 PRIMITIVE_MODULES: dict[str, str] = {
     "frame/1": "raidar_contract.package.tokens",
@@ -21,3 +26,12 @@ WORKFLOW_PRIMITIVE_MODULES: dict[str, str] = {
 require them, so they are not in ``SUPPORTED_CONTRACTS``; their code identity is still locked."""
 
 SUPPORTED_CONTRACTS = frozenset(PRIMITIVE_MODULES)
+
+
+def primitive_module(contract_id: str) -> ModuleType:
+    """The module implementing ``contract_id``; unsupported ids raise ``ValueError``."""
+    try:
+        module = PRIMITIVE_MODULES[contract_id]
+    except KeyError:
+        raise ValueError(f"unsupported primitive contract {contract_id!r}") from None
+    return importlib.import_module(module)
