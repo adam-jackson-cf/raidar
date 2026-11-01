@@ -4,13 +4,18 @@ from __future__ import annotations
 
 import copy
 import json
+from pathlib import Path
+from types import SimpleNamespace
 from typing import Any
 
 import pytest
 from raidar_contract.criteria import validate_criteria
 
-from raidar.subject.primitive.judge import JudgeConfig
-from raidar.subject.workflow import judging, pysource
+from raidar.judge.client import TransportResponse
+from raidar.judge.live import LIVE_MODEL, RecordedJev
+from raidar.judge.protocol import JEV_PINNED_MODEL
+from raidar.subject.primitive.judge import RETRIES, JudgeConfig
+from raidar.subject.workflow import asking, judgeloop, judging, pysource, stage
 from raidar.subject.workflow.acceptance import (
     Acceptance,
     Aspect,
@@ -24,7 +29,14 @@ from raidar.subject.workflow.acceptance import (
     literals,
     rows,
 )
-from tests.criteria_support import CRITERIA, acceptance
+from raidar.subject.workflow.stage import FIRST_BUILD, REWORK, Checkpoint, Spent
+from tests.criteria_support import (
+    CRITERIA,
+    ScriptShell,
+    acceptance,
+    gate_record,
+    write_workspace,
+)
 
 TESTS = """\
 import pytest
@@ -682,3 +694,385 @@ def test_tests_in_missing_files_are_listed_by_criterion_and_rows_keep_objects_on
     assert rows({"k": [{"a": 1}, 3, "x"]}, "k") == [{"a": 1}]
     assert rows({"k": "no"}, "k") == []
     assert file_of(" a/b.py::Class::test_t ") == "a/b.py"
+
+
+# --- generated tests, cutting to fit, and the pushback's edges ---------------------
+
+
+@pytest.mark.parametrize(
+    "namer",
+    ["'test_%s' % n", "'test_{}'.format(n)", "'test_' + str(n)", "f'test_{n}'"],
+)
+def test_a_test_whose_name_a_loop_builds_from_a_template_is_found_by_the_name_it_makes(
+    namer: str,
+) -> None:
+    module = f"for n in range(3):\n    globals()[{namer}] = lambda: None\n"
+
+    found = pysource.extract(module, "tests/test_gen.py::test_2")
+
+    assert found is not None
+    assert found.generated
+    assert pysource.extract(module, "tests/test_gen.py::other_2") is None
+
+
+def test_a_name_built_only_from_unknown_pieces_matches_no_generated_test() -> None:
+    module = "for n in range(3):\n    globals()[prefix + suffix] = lambda: None\n"
+
+    assert pysource.extract(module, "tests/test_gen.py::test_2") is None
+
+
+def test_a_node_id_naming_only_a_file_has_no_test_source() -> None:
+    assert pysource.extract(TESTS, "tests/test_app.py") is None
+
+
+def test_an_import_time_scan_ignores_statements_that_make_no_tests() -> None:
+    module = "import os\nLIMIT = 3\n\ndef helper():\n    globals()['test_x'] = 1\n"
+
+    assert pysource.extract(module, "tests/test_gen.py::test_x", at_import=True) is None
+
+
+def test_only_numbered_lines_are_read_back_from_a_shown_source() -> None:
+    shown = "   12  def test_a():\n   13+     assert 1\n(cut to fit)\nplain text\n"
+
+    assert pysource.numbered_lines(shown) == {12: "def test_a():", 13: "    assert 1"}
+
+
+def test_a_generated_test_is_marked_in_its_state_entry() -> None:
+    module = "for n in range(2):\n    globals()[f'test_{n}'] = lambda: None\n"
+
+    found = judging.mapped_test("tests/t.py::test_1", "passed", lambda _: module)
+
+    assert found.entry["generated"] is True
+    assert found.entry["gate_result"] == "passed"
+
+
+def test_tests_too_short_to_halve_are_dropped_from_the_end_until_the_rest_fit() -> None:
+    entries = [{"id": f"t{n}", "source": "x" * 150} for n in range(5)]
+    state: dict[str, Any] = {"tests": entries}
+    tests = [judging.MappedTest(entry, "t.py") for entry in entries]
+
+    cut = judging.fit_tests(state, entries, tests, 150)
+
+    assert cut
+    assert 0 < len(entries) < 5
+    assert [entry["id"] for entry in entries] == [f"t{n}" for n in range(len(entries))]
+    assert judging.estimate_tokens(json.dumps(state)) <= 150
+
+
+def test_a_helper_that_does_not_fit_is_left_out_and_the_next_that_does_is_kept() -> None:
+    entry = {"id": "t", "source": "def test_t():\n    pass"}
+    state: dict[str, Any] = {"tests": [entry]}
+    big = {"name": "big", "source": "y" * 3_000}
+    small = {"name": "small", "source": "z"}
+    test = judging.MappedTest(entry, "t.py", [big, small])
+
+    cut = judging.fit_tests(state, [entry], [test], 200)
+
+    assert cut
+    assert entry["helpers"] == [small]
+
+
+def test_a_pushback_lists_only_the_aspects_not_closed_and_groups_criteria_by_feature() -> None:
+    first = criterion("F1.AC1", ("s1", "o1"), ("s2", "o2"))
+    second = criterion("F1.AC2")
+    outcomes = (
+        outcome_for(first, (OBJECT,), {"F1.AC1.A1": 0.95, "F1.AC1.A2": 0.1}),
+        outcome_for(second, (), {}),
+    )
+
+    text = judging.pushback_text(judging.PassResult(1, outcomes))
+
+    assert text.count("## F1 Parsing") == 1
+    assert "F1.AC1.A1" not in text
+    assert "F1.AC1.A2" in text
+    assert "### F1.AC2:" in text
+    assert text.count("Mapped tests:") == 1
+
+
+# --- the judge loop: the fit rule, the gates it judges and the sources it reads ------
+
+NOW = 1000.0
+
+
+@pytest.fixture(autouse=True)
+def clock(monkeypatch: pytest.MonkeyPatch) -> None:
+    frozen = SimpleNamespace(monotonic=lambda: NOW)
+    monkeypatch.setattr(stage, "time", frozen)
+    monkeypatch.setattr(judgeloop, "time", frozen)
+
+
+class Answering:
+    """The host-side asker: every aspect it is asked comes back answered high."""
+
+    def __init__(self) -> None:
+        self.calls: list[dict[str, Any]] = []
+        self.asked = 0
+
+    async def ask(self, number: int, asked: Any) -> dict[str, tuple[float | None, tuple[int, ...]]]:
+        self.asked += 1
+        return {request.aspect: (0.95, ()) for _, request in asked}
+
+
+def started_loop(
+    workspace: Path, mapping: dict[str, list[str]] | None = None, *, fit_rework: bool = True
+) -> tuple[judgeloop.JudgeLoop, Answering]:
+    config = JudgeConfig(
+        model="typesafe/jev-1.13-20260917", closed_at=0.8, open_at=0.3, fit_rework=fit_rework
+    )
+    prompt = "Fix:\n%%%PUSHBACK%%%\n%%%GATE%%%"
+    held = judgeloop.JudgeLoop(config, 3, prompt, acceptance(mapping), str(workspace))
+    asker = Answering()
+    held.asker = asker  # type: ignore[assignment]
+    return held, asker
+
+
+def at(tmp_path: Path, deadline: float | None, *turns: Spent) -> Checkpoint:
+    return Checkpoint(ScriptShell(), tmp_path / "logs", "task", deadline, list(turns))
+
+
+@pytest.mark.usefixtures("clock")
+def test_a_turn_is_scheduled_only_when_it_its_gate_and_a_judge_pass_fit_the_time_left(
+    tmp_path: Path,
+) -> None:
+    held, _ = started_loop(tmp_path)
+    held.seconds = 2.0
+    gates = [{"seconds": 5.0}, {"seconds": None}]
+    built = Spent(FIRST_BUILD, 10.0)
+
+    assert held.fits(at(tmp_path, NOW + 17.0, built), REWORK, gates)
+    assert not held.fits(at(tmp_path, NOW + 16.9, built), REWORK, gates)
+    assert judgeloop.gate_seconds([]) == 0.0
+    assert judgeloop.gate_seconds([{"seconds": None}]) == 0.0
+
+
+@pytest.mark.usefixtures("clock")
+def test_no_first_build_turn_means_no_estimate_and_no_rework_is_scheduled(tmp_path: Path) -> None:
+    held, _ = started_loop(tmp_path)
+
+    assert not held.fits(at(tmp_path, NOW + 10_000.0), REWORK, [])
+
+
+@pytest.mark.usefixtures("clock")
+def test_without_the_fit_rule_or_a_deadline_every_turn_is_scheduled(tmp_path: Path) -> None:
+    unfit, _ = started_loop(tmp_path, fit_rework=False)
+    held, _ = started_loop(tmp_path)
+
+    assert unfit.fits(at(tmp_path, NOW + 1.0), REWORK, [])
+    assert held.fits(at(tmp_path, None), REWORK, [])
+
+
+@pytest.mark.usefixtures("clock")
+async def test_an_ending_judges_the_gate_left_unjudged_when_time_allows(tmp_path: Path) -> None:
+    held, asker = started_loop(tmp_path)
+    gate = gate_record(1, {})
+
+    await held.judge_if_fits(at(tmp_path, NOW + 5.0), [gate], gate)
+    await held.judge_if_fits(at(tmp_path, NOW + 5.0), [gate], gate)
+
+    assert asker.asked == 1
+    assert [item["gate"] for item in held.judged] == [1]
+    assert held.record()["passes"] == 1
+
+
+@pytest.mark.usefixtures("clock")
+async def test_an_ending_does_not_judge_when_a_pass_would_outlast_the_time_left(
+    tmp_path: Path,
+) -> None:
+    held, asker = started_loop(tmp_path)
+    held.seconds = 30.0
+    gate = gate_record(1, {})
+
+    await held.judge_if_fits(at(tmp_path, NOW + 29.0), [gate], gate)
+
+    assert asker.asked == 0
+    assert held.judged == []
+
+
+async def test_a_judge_that_was_not_started_before_the_agent_refuses_to_judge(
+    tmp_path: Path,
+) -> None:
+    held, _ = started_loop(tmp_path)
+    held.asker = None
+    gate = gate_record(1, {})
+
+    with pytest.raises(RuntimeError, match="not started"):
+        await held.judge_pass(at(tmp_path, None), [gate], gate)
+
+
+async def test_each_pass_names_the_files_that_changed_since_the_pass_before(
+    tmp_path: Path,
+) -> None:
+    held, _ = started_loop(tmp_path)
+    first, second = gate_record(1, {"a.py": "1"}), gate_record(2, {"a.py": "2", "b.py": "x"})
+
+    _, before = await held.judge_pass(at(tmp_path, None), [first], first)
+    _, after = await held.judge_pass(at(tmp_path, None), [first, second], second)
+
+    assert before is None
+    assert after == ["a.py", "b.py"]
+    assert [item["pass"] for item in held.judged] == [1, 2]
+    assert held.judged[1]["calls"] == []
+
+
+async def test_the_sources_the_judge_reads_are_the_sealed_trees_files_and_no_others(
+    tmp_path: Path,
+) -> None:
+    workspace = tmp_path / "work"
+    write_workspace(workspace, {"tests/test_app.py": TESTS, "tests/changed.py": "new\n"})
+    named = [REJECTS, "../outside.py::t", "/abs.py::t", "tests/unsealed.py::t"]
+    named += ["tests/absent.py::t", "tests/changed.py::t"]
+    held, _ = started_loop(workspace, {"F1.AC1": named})
+    sealed = {
+        "tests/test_app.py": TESTS,
+        "../outside.py": "x",
+        "/abs.py": "x",
+        "tests/absent.py": "x",
+        "tests/changed.py": "old\n",
+    }
+    gate = gate_record(1, sealed)
+    checkpoint = at(tmp_path, None)
+
+    await held.judge_pass(checkpoint, [gate], gate)
+
+    logs = checkpoint.logs_dir / "workflow" / "sources"
+    assert held.judged[0]["source_mismatch"] == ["tests/changed.py"]
+    assert (logs / "pass-1" / "tests" / "test_app.py").read_text() == TESTS
+    assert (logs / "final" / "tests" / "test_app.py").read_text() == TESTS
+    assert not (logs / "pass-1" / "tests" / "changed.py").exists()
+    assert not (logs / "pass-1" / "tests" / "absent.py").exists()
+    assert held.acceptance.sources == "workflow/sources/final"
+    assert len(checkpoint.environment.commands) == 3  # type: ignore[attr-defined]
+    assert gate["verdict"] == "passed"
+
+
+def test_the_open_criteria_go_back_to_the_builder_with_the_gate_text(tmp_path: Path) -> None:
+    held, _ = started_loop(tmp_path)
+    found = outcome_for(criterion("F1.AC1", ("s", "o")), (OBJECT,), {"F1.AC1.A1": 0.1})
+
+    resume = held.rework(judging.PassResult(1, (found,)), "GATE TEXT")
+
+    assert resume.kind == REWORK
+    assert resume.message.startswith("Fix:\n## F1 Parsing")
+    assert resume.message.endswith("\nGATE TEXT")
+
+
+# --- the asker: one question per aspect, retried only when another try may succeed --------
+
+
+class Provider:
+    """A scripted Jev transport: each call takes the next status (200: a high answer)."""
+
+    def __init__(self, *statuses: int | str) -> None:
+        self.statuses = list(statuses)
+        self.sent = 0
+
+    def post(self, url: str, *, headers: Any, body: bytes, timeout_s: float) -> TransportResponse:
+        self.sent += 1
+        status = self.statuses.pop(0) if self.statuses else 200
+        if status == "garbage":
+            return TransportResponse(200, b"not json")
+        if status != 200:
+            return TransportResponse(int(status), b'{"error": "boom"}')
+        asked = json.loads(body)["questions"]
+        answers = {name: {"type": "noul", "noul": 0.9} for name in asked}
+        document = {
+            "id": f"gen-{self.sent}",
+            "model": JEV_PINNED_MODEL,
+            "provider": "TypeSafe",
+            "answers": answers,
+            "usage": {"input_tokens": 1, "output_tokens": 1, "cost": 0.0},
+        }
+        return TransportResponse(200, json.dumps(document).encode())
+
+
+ASPECT = judging.Request("F1.AC1.A1", {"aspect": {"situation": "s", "outcome": "o"}})
+
+
+def asker_over(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, provider: Provider) -> asking.Asker:
+    async def no_wait(seconds: float) -> None:
+        return None
+
+    monkeypatch.setattr(asking.asyncio, "sleep", no_wait)
+    monkeypatch.setattr(
+        asking,
+        "new_jev",
+        lambda directory, timeout_s: RecordedJev(
+            directory,
+            timeout_s=timeout_s,
+            transport=provider,
+            environ={"OPENROUTER_API_KEY": "sk-or-test"},
+        ),
+    )
+    config = JudgeConfig(model=LIVE_MODEL, closed_at=0.8, open_at=0.3)
+    return asking.Asker(config, tmp_path, object(), workers=2)
+
+
+async def test_an_aspect_failing_for_a_transient_reason_is_asked_again_until_answered(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    provider = Provider(503, 429, "garbage", 200)
+    asker = asker_over(monkeypatch, tmp_path, provider)
+
+    answers = await asker.ask(1, [("F1.AC1", ASPECT)])
+
+    assert answers == {"F1.AC1.A1": (0.9, (0, 1, 2, 3))}
+    assert [call["attempt"] for call in asker.calls] == [1, 2, 3, 4]
+    assert [call["probability"] for call in asker.calls] == [None, None, None, 0.9]
+
+
+async def test_an_aspect_that_keeps_failing_is_undecided_after_the_retries(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    provider = Provider(*[500] * (RETRIES + 5))
+    asker = asker_over(monkeypatch, tmp_path, provider)
+
+    answers = await asker.ask(1, [("F1.AC1", ASPECT)])
+
+    assert answers["F1.AC1.A1"][0] is None
+    assert provider.sent == RETRIES + 1
+    assert len(answers["F1.AC1.A1"][1]) == RETRIES + 1
+
+
+async def test_a_refusal_the_provider_will_repeat_is_not_asked_again(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    provider = Provider(400)
+    asker = asker_over(monkeypatch, tmp_path, provider)
+
+    answers = await asker.ask(1, [("F1.AC1", ASPECT)])
+
+    assert answers == {"F1.AC1.A1": (None, (0,))}
+    assert provider.sent == 1
+    assert asker.calls[0]["http_status"] == 400
+
+
+async def test_asking_nothing_makes_no_call(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    provider = Provider()
+    asker = asker_over(monkeypatch, tmp_path, provider)
+
+    assert await asker.ask(1, []) == {}
+    assert provider.sent == 0
+    assert asker.calls == []
+
+
+async def test_without_the_hosts_key_the_aspect_has_no_answer_and_nothing_is_sent(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
+    config = JudgeConfig(model=LIVE_MODEL, closed_at=0.8, open_at=0.3)
+    asker = asking.Asker(config, tmp_path, object(), workers=1)
+
+    answers = await asker.ask(1, [("F1.AC1", ASPECT)])
+
+    assert answers == {"F1.AC1.A1": (None, (0,))}
+    assert asker.calls[0]["result"]["reason"] == "missing_key"
+    assert asker.calls[0]["request_file"] is None
+
+
+def test_a_judge_model_other_than_the_pinned_one_is_refused(tmp_path: Path) -> None:
+    config = JudgeConfig(model="some/other-model", closed_at=0.8, open_at=0.3)
+
+    with pytest.raises(ValueError, match="not the pinned"):
+        asking.Asker(config, tmp_path, object())

@@ -24,6 +24,7 @@ from raidar.subject.primitive.calls import ResourceFloors, TransportError
 from raidar.subject.primitive.canary import StageCheckRecord
 from raidar.subject.primitive.gate import Attribution, GateInvalid, GateOutcome
 from raidar.subject.primitive.site import TrialInvalid
+from raidar.subject.workflow import stage_check
 from raidar.subject.workflow.stage_check import captured_states, record_json, replay_trial
 from raidar.subject.workflow.stage_container import ContainerError, PackContainer
 from tests.lifecycle_support import FakeContainer, ToolOutcome, note_digest, stop_json
@@ -414,6 +415,27 @@ async def test_a_fifo_symlink_loop_and_oversized_file_never_reach_the_tool(
         assert f"raidar-{mode}/state" not in ran_on
     # a merely unreadable file is the verifier's to handle, so it is called
     assert "raidar-unreadable/state" in ran_on
+
+
+async def test_tool_tampering_on_unreadable_state_fails_the_bounds_case(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def tamper_on_unreadable(
+        container: FakeContainer, argv: Sequence[str], context: dict[str, Any]
+    ) -> ToolOutcome:
+        if "raidar-unreadable/state" in context["state"]:
+            container.tampered = True
+        return strict_note_tool(container, argv, context)
+
+    rig = install_rig(tmp_path / "rig", monkeypatch, tool=tamper_on_unreadable)
+    logs = rig.root / "logs"
+    installed = await stage_check._install(rig.container, logs, rig.package, rig.package.name, None)
+    site = stage_check._site(rig.container, logs, rig.package, rig.package.name, installed)
+
+    case = await stage_check._bounds_case(site, rig.container, "unreadable")
+    assert not case.ok
+    assert case.status is None
+    assert case.problems == ("installed tree changed during the call",)
 
 
 async def test_a_container_that_cannot_build_hostile_state_is_a_transport_error(
