@@ -234,6 +234,10 @@ The package invokes the pinned dependency directly; there is no generated placeh
   `acceptance-reply/1`, `define.criteria` and the pinned aspect judge (at most three passes).
   Reply parsing, repair and judging consume portable `criteria/1` data. A judge verdict is
   method evidence, not the hidden verifier's correctness result.
+- `raidar/docs-fix-smoke@1`: operational AT1 fixture, not a default. Verify and docs-check run
+  together with one bounded gate fix; the first-turn prompt deliberately retains a spelling
+  error after a refused commit, then corrects it on the fix turn. AT1/AT2 are normally locked
+  codex `gpt-6-luna`/low experiments, prepared but not executed with a model.
 
 The schema-1 namespaced `@1` releases are preserved by immutable `archive/raidar/<name>@1`
 tags. All three build prompt strings and the judge rework string remain byte-identical.
@@ -246,3 +250,6 @@ timestamps cannot stale installed-tree locks, and every file actually installed 
 - 2026-10-28: `stage/1`, `stage-tree/1` and `criteria/1` specified before the generic package implementation. Spike stage classes remain until the phase-5 port; they are not the author API.
 - 2026-10-29: stage references and folders require a namespace (`<ns>/<name>@N`, `lab/stages/<ns>/<name>/`, exactly two levels); upstream packages live in `lab/stages/raidar/`. `stage-new`, `stage-lock`, `stage-check` and `stage-info` take `NAME=<ns>/<name>`. Agent and workflow references are unchanged; there are no aliases.
 - 2026-10-31: remove the generic `wrong-state` stage-check case; semantic wrong state is defined by each stop package's mandatory `closed` fixture and its `resume` fixture when `max_rounds > 0`. No package, primitive, release or lock identity changes.
+- 2026-11-01: package-only reply/judge execution and primitive-keyed required health complete;
+  private contract `1.0.0` artifacts have exact-version/hash pins. Provenance remains unverified.
+  The freeze tag requires the non-model exit checks; real-model AT1/AT2 require approval.

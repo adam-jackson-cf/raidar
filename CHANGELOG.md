@@ -4,6 +4,21 @@ All notable changes to this project are documented in this file.
 
 ## Unreleased
 
+### Phase-5 local exit evidence (phase 5B step 7)
+
+- Local OrbStack security: 38 cases passed, including all seven AT3 cases; AT4 passed 46
+  identity/refusal cases. All three package fixture suites passed.
+- Repeat no-model define/build/judge mechanics on the final locks: verified, rework, reply repair
+  and refused-gate outcomes; positive/refused real verify and docs commits; primitive health
+  evidence deletion checks and gate-record effort readings. Scripted agents omit build/session
+  audit evidence, so their W1/W2 violations remain an explicit harness limit.
+- Keep normally locked ChatGPT-authenticated codex AT1/AT2 commands for later authorization;
+  no real-model trial or external publication was performed. Remove throwaway execution scripts,
+  retaining records, reports and review screenshots under `var/`.
+- Strict local `perf-gate` passed unchanged N1 reference budgets at concurrency 1 and 3, ten
+  trials each: warm-start p95 4.07/4.70 seconds, fixed-overhead p95 5.01/5.65 seconds.
+  This checks run plumbing; assessment/scorer orchestration is not measured by that gate.
+
 ### Final contract artifacts and phase-5 release pins (phase 5B step 6)
 
 - Prepare `raidar-contract==1.0.0` with the public supported-version `CONTRACTS` map and exact
