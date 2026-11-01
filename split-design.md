@@ -545,6 +545,7 @@ lab/workflows/raidar/
 - **Single implementation.** `contract/` (`raidar-contract`, import `raidar_contract`; pydantic and pyyaml only) is the single implementation of `stage/1`, schema 2, `criteria/1`, `stage-tree/1`, release references and the agent schema; Raidar and FXL pin it. It holds `digest_json`; the manifest, params, tokens and frame-slot rules; the fixture and `expect.yaml` schema; `stage-tree/1`; workflow schema 2; `criteria/1`; release references and the register parser; and the agent YAML schema with the protocol names and record shapes. Runtime implementations and credential/state methods stay outside it, and the Harbor-typed protocol (`protocol.py` imports Harbor) stays in `orchestrator`.
 - **Couplings cut during extraction.** `package_definition.py` imports the spike `definition.py` (`NAME_PATTERN`, `TASK_TOKEN`), and `registry.py` imports `REPO_ROOT`. The orchestrator depends on the package through a uv path source; the old modules are deleted, with no re-exports.
 - **Publication and versions (T2).** Immutable wheel and sdist artefacts under `contract/vX.Y.Z`, consumed by exact-version and hash pins; nothing is built from a tag at install time. SemVer: MAJOR when any contract id changes (`stage/N`, schema N, `criteria/N`, `stage-tree/N`, agent schema N); MINOR for new API that leaves accepted inputs, refusals and digests unchanged; PATCH for bug fixes on the same terms. The package exposes a `CONTRACTS` map. Version `1.0.0` is released at phase 5 exit, and FXL may pin `rc` versions before then.
+- **Private phase-5 artifacts.** `var/contract/v1.0.0/` is the local storage for logical `contract/v1.0.0`; exact-version/hash pins are `contract/releases/1.0.0.requirements.txt`. The public build target atomically claims a new output directory and never overwrites one. No external publication is performed. `CONTRACTS` maps unversioned names to supported integer versions; the orchestrator's editable path also pins `raidar-contract==1.0.0`.
 
 ## 6. Health (R2)
 
@@ -554,6 +555,7 @@ lab/workflows/raidar/
 - One health report per trial is the **only** producer of validity. Today's execution checks (`engine/trial/collect.py:336-381`, `finish.py:50-59`) move into it.
 - **Validity rows (S6).** Missing evidence for an enabled package or primitive invalidates the trial. Instrument failures and agent outcomes follow section 5.3.
 - **Phase-5 W rows.** W3–W7 read locked `gate/1`; W8 reads declared `setup/1`, `stop/1` and `outputs/1`; W9 reads `stop/1`; W10 reads `acceptance-reply/1` and `jev-judge/1`. Applicability comes from host-written schema-2 config and locked primitive ids, never stage names or agent-writable records. Package manifest declarations are copied into trial config only, outside package/lock identity; missing or inconsistent declarations fail closed. A refused canary with no instrument error is healthy evidence. The generic family cutover remains phase 6.
+- The table below is the phase-6 target. Phase 5 removes the stage-keyed G/E readers; W owns required primitive evidence and J reads only `jev-judge/1`. Historical G/E labels remain readable in stored reports, without a live compatibility reader.
 
 | Family | Checks | Generic or tied to a primitive |
 |---|---|---|
@@ -574,7 +576,7 @@ lab/workflows/raidar/
 - **Judge failures (D3, decided).**
   - A Jev request is retried up to 3 times. An unanswered aspect is undecided, which counts as open.
   - Test 2 (the replay of 121 requests) found 4.96% of requests changing status across repeats, and none flipping between closed and open.
-- **Tamper (D5, decided 2026-10-28).** Gate and package state sit in the agent's container, so G keeps the protected-path part of T4 for those paths, and G3 (the gate tool-tree digest) stays a validity check. The S6 root hook broker is removed (phase 4b): the seal's host record is authoritative, and hook-derived evidence (G1, G2, the hook-log parts of W5 and W11) is a reading.
+- **Tamper (D5, decided 2026-10-28).** Gate and package state sit in the agent's container; independently measured tool-tree and protected-path integrity remain validity through primitive evidence. The stage-keyed G/E readers are deleted in phase 5; the table's generic G family is phase 6 work. The S6 root hook broker is removed (phase 4b): the seal's host record is authoritative, and agent-writable hook-log evidence (W5 and W11's `hook_log_*` findings) is a reading.
 
 ## 7. Measurement and lab validation
 

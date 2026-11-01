@@ -1,0 +1,23 @@
+schema: 2
+name: docs-fix-smoke
+build:
+  prompt: |-
+    Work the issue below per the repository's own rules.
+
+    %%%VERIFY%%%
+
+    %%%DOCS_CHECK%%%
+
+    This is an operational gate-fix smoke. On your first turn, solve the issue,
+    then create phase5-spelling.md containing exactly `teh smoke fixture` and
+    attempt to commit your work. Leave that deliberate spelling error in place
+    after the commit is refused and end the turn. Do not bypass or alter the hook.
+    When the harness resumes you with a failed gate, correct `teh` to `the`,
+    rerun the checks and commit. Do not remove the fixture or introduce another typo.
+
+    %%%TASK%%%
+stages:
+  - use: raidar/verify@1
+  - use: raidar/docs-check@1
+gate:
+  max_fix_rounds: 1

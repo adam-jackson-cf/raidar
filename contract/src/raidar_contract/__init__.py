@@ -5,4 +5,7 @@ Pure data and validation: this distribution depends on pydantic and PyYAML only 
 imports ``raidar`` or Harbor.
 """
 
-__version__ = "1.0.0rc1"
+__version__ = "1.0.0"
+
+CONTRACTS = {"stage": 1, "workflow": 2, "criteria": 1, "stage-tree": 1, "agent": 1}
+"""Supported contract/schema versions, keyed by their unversioned names."""

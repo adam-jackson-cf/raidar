@@ -4,6 +4,16 @@ All notable changes to this project are documented in this file.
 
 ## Unreleased
 
+### Final contract artifacts and phase-5 release pins (phase 5B step 6)
+
+- Prepare `raidar-contract==1.0.0` with the public supported-version `CONTRACTS` map and exact
+  wheel/sdist hashes in `contract/releases/1.0.0.requirements.txt`. Private artifacts live under
+  `var/contract/v1.0.0/`; nothing is published externally. Contract builds refuse existing output.
+- Finalize the new phase-5 scorer closures against the contract package; preserve archived
+  superseded releases and unchanged stage-package bytes.
+- Add `raidar/docs-fix-smoke@1` and the AT1/AT2 smoke definitions for codex `gpt-6-luna`, low
+  reasoning. These real-model experiments are prepared only, not executed.
+
 ### Complete spike health consumer deletion (phase 5B step 5)
 
 - Remove the stage-keyed definition health reader and validity entry; required package outputs,

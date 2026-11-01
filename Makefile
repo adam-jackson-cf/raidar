@@ -185,7 +185,7 @@ help:
 	@echo "  make stage-info NAME=<ns>/<name>                      Show a package's manifest facts, digest, next register line, lock state and canary record"
 	@echo "  make workflow-new NAME=<ns>/<name> [FROM=raidar/one-shot-verify]  Copy a workflow template to lab/workflows/<ns>/<name> (never overwrites)"
 	@echo "  make workflow-import SRC=<dir> NAME=<ns>/<name> SHA256=<digest> SOURCE=<line>  Import exact workflow bytes and registered dependencies"
-	@echo "  make contract-build                                    Build the raidar-contract wheel and sdist into var/contract-dist and print their sha256 (publishes nothing)"
+	@echo "  make contract-build [CONTRACT_DIST_DIR=<new-dir>]       Build unpublished wheel/sdist artifacts and print SHA-256 hashes; refuse an existing output directory"
 	@echo "  make releases-check [RELEASES_BASE=<commit>]          Fail unless lab/releases.yaml registers each agent, workflow and stage at its current hash, agent pins equal the pack's, and no release in the base commit (default: merge base with main, or HEAD's parent on main) was removed or re-hashed; part of make quality"
 	@echo "  make experiment-locks-check                           Fail unless every lab/experiments/*/*/*.lock.json is current (host Python patch aside); part of make quality"
 	@echo "  make ledger-check                                     Check lab/ledger/ (fault and remedy records, links, status transitions, README index); part of make quality"
@@ -204,7 +204,7 @@ help:
 	@echo "  make experiment-assess JOB=<job-dir> STORE=<assessment-store> SCORERS=\"correctness@5 ...\" [LOCK=] [ASSESSMENT_CONFIG=] [REPLAY=1] [CONCURRENCY=N] [ASSESS_OUT=report.json]"
 	@echo "                                                        Score a job's stored trials into an Assessment store (never re-runs agents; AS1-gated)"
 	@echo "                                                        (process-compliance@9 is deterministic only;"
-	@echo "                                                        with gate-effort@13 it first grades pre-fix snapshots into STORE, and with"
+	@echo "                                                        with verification-effort@1 it first grades retained pre-fix trees into STORE, and with"
 	@echo "                                                        code-quality@6 it first makes deferred coverage runs (verifier_coverage: offline) into STORE: Docker target;"
 	@echo "                                                        CONCURRENCY=N works on N trials at once, each trial's steps in order; default 1)"
 	@echo "  make assess-regrade JOB=<trial-or-job-dir> [VERIFIER_BUNDLE=<dir>] [STORE=<assessment-store>] [COVERAGE_CHECK=1 [CONCURRENCY=N]] [REGRADE_OUT=report.json]"
@@ -700,7 +700,9 @@ structure-check:
 # Build the portable contract's wheel and sdist into var/ and print their sha256 (nothing is published).
 CONTRACT_DIST_DIR ?= $(RAIDAR_VAR)/contract-dist
 contract-build:
-	@$(REPO_RUNTIME_ENV) sh -c 'rm -rf "$(CONTRACT_DIST_DIR)" && uv build contract --wheel --sdist --out-dir "$(CONTRACT_DIST_DIR)" && cd "$(CONTRACT_DIST_DIR)" && shasum -a 256 *.whl *.tar.gz'
+	@mkdir -p "$$(dirname "$(CONTRACT_DIST_DIR)")"
+	@mkdir "$(CONTRACT_DIST_DIR)"
+	@$(REPO_RUNTIME_ENV) sh -c 'uv build contract --wheel --sdist --out-dir "$(CONTRACT_DIST_DIR)" && cd "$(CONTRACT_DIST_DIR)" && shasum -a 256 *.whl *.tar.gz'
 
 # The step before editing a released scorer in place: pin the current state as
 # an annotated tag so its old behaviour stays recoverable (REF=<name>@<N>, e.g. code-quality@3).
