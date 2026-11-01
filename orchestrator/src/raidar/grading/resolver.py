@@ -28,7 +28,7 @@ import time
 import tomllib
 import urllib.error
 import urllib.request
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
@@ -63,8 +63,6 @@ from raidar.grading.dependency_pins import (
     lock_sha256,
     set_sha256,
 )
-
-Runner = Callable[..., subprocess.CompletedProcess[str]]
 
 MAX_PACKAGES = 200
 TIMEOUT_S = 120.0
@@ -353,15 +351,13 @@ class UvResolver:
     index: IndexClient | None = None
     index_url: str = INDEX
     wheel_url_prefixes: tuple[str, ...] | None = None
-    run: Runner = subprocess.run
-    """Shell seam: ``subprocess.run`` in production, a scripted runner in fast tests."""
     _version: list[str] = field(default_factory=list, compare=False, repr=False)
 
     @property
     def identity(self) -> str:
         if not self._version:
             try:
-                done = self.run(  # noqa: S603
+                done = subprocess.run(  # noqa: S603
                     [self.uv_bin, "--version"],
                     capture_output=True,
                     text=True,
@@ -371,11 +367,7 @@ class UvResolver:
                 )
             except (OSError, subprocess.SubprocessError) as error:
                 raise DependencyInfraError(f"uv is unavailable: {error}") from error
-            words = done.stdout.split()
-            if len(words) < 2:
-                reported = done.stdout.strip()[:200]
-                raise DependencyInfraError(f"uv reported no version: {reported!r}")
-            self._version.append(words[1])
+            self._version.append(done.stdout.split()[1])
         return f"uv@{self._version[0]}"
 
     def _index_client(self, deadline: float) -> IndexClient:
@@ -417,7 +409,7 @@ class UvResolver:
                 *self.compile_args,
             ]
             try:
-                done = self.run(  # noqa: S603
+                done = subprocess.run(  # noqa: S603
                     argv,
                     capture_output=True,
                     text=True,
@@ -535,20 +527,11 @@ class UvResolver:
         return ("file://",) if "--no-index" in self.compile_args else WHEEL_URL_PREFIXES
 
     def _within_caps(self, lock: str, usable: list[str]) -> tuple[str, list[Unprovided]]:
-        """The lock if it is within the caps and index-sourced wheels only, else why not.
-
-        A lock that uv printed but that does not parse is an infrastructure failure, not a verdict.
-        """
-        try:
-            sources_ok = lock_sources_ok(lock, self._prefixes())
-            packages = len(pylock_packages(lock))
-            wheel_bytes = _closure_bytes(lock)
-        except (tomllib.TOMLDecodeError, KeyError) as error:
-            raise DependencyInfraError(f"uv produced an unreadable lock: {error!r}") from error
-        if not sources_ok:
+        """The lock if it is within the caps and index-sourced wheels only, else why not."""
+        if not lock_sources_ok(lock, self._prefixes()):
             # A transitive direct reference, vcs, path or sdist entry: nothing is fetched from it.
             return "", [Unprovided(requirement=text, reason="direct-reference") for text in usable]
-        if packages > self.max_packages or wheel_bytes > self.max_bytes:
+        if len(pylock_packages(lock)) > self.max_packages or _closure_bytes(lock) > self.max_bytes:
             return "", [Unprovided(requirement=text, reason="cap-exceeded") for text in usable]
         return lock, []
 
