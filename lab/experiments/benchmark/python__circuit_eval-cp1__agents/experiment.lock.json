@@ -63,11 +63,11 @@
         }
       },
       "scorer": {
-        "correctness@9": {
-          "digest": "ff57a482d926dbb37e46e5e1a1756ffaf2943c85b20a150b47f5e46a81124e2c",
+        "correctness@10": {
+          "digest": "2f47b5e342998f9cf6f874be4466c6149eb97ef89fdbf8451db61ee94f25a31f",
           "metadata": {
             "implementation": "raidar.scoring.correctness:correctness_scorer",
-            "implementation_digest": "a394d488959c5189eb91e305605d2dc4192ede7131ade03badb3c2da43a8289f",
+            "implementation_digest": "af2102738f2fa3f6a16de4a3575e0df5095b9e62215207e4d98ad7ba55b40fac",
             "manifest": {
               "description": "Reference-solvable SCB success and raw SCB verdicts per checkpoint and trajectory.",
               "evidence_required": [
@@ -261,7 +261,7 @@
                 "*"
               ],
               "tools": [],
-              "version": "9"
+              "version": "10"
             },
             "tool_lock": {}
           }
@@ -276,12 +276,12 @@
       "metric": "scb-canonical-oneshot@1",
       "scorer_config": {},
       "scorers": [
-        "correctness@9"
+        "correctness@10"
       ]
     },
     "tools": {}
   },
-  "document_sha256": "820749fcedc2c4e40059f4e5929d3fd00c1755a128030ea47c2ac246eb870b07",
+  "document_sha256": "1020d4106791a7d1e0cbda66ac2ac5c86e69a8c6a9be3681d4c8718ee2290894",
   "execution": {
     "arms": {
       "codex": {
@@ -454,7 +454,7 @@
               "grader": {
                 "environment_id": "sha256:1989940cc347e516b774a3833071b60dbfae6a730e55462cdf38a095e23d8765",
                 "image": "raidar-oracle-grader:963c14e63ff5e15d",
-                "implementation_sha256": "3a363b442127b5226098cd18e038b64e3f958e9d8054f8eddac7987267851687"
+                "implementation_sha256": "8ec19265f72d6f0de11214f53f7c3a962b6c290e7ce7e959759f1afe8a3642aa"
               },
               "not_run": [
                 "native_parity_positive",
@@ -498,10 +498,10 @@
   "experiment": {
     "id": "python__circuit_eval-cp1__agents",
     "source": "experiment.yaml",
-    "source_sha256": "d731d338a9cccfe212f9d5292c13737f32d4206d50157140bfc3255fe8046d2d",
-    "spec_sha256": "dd40a7be32019dc08bec7cde5562c9733f948492c38ddbde08de4c90f882c086"
+    "source_sha256": "5e40cab21cd7f98b921e27158f36f98ea08446be7ad4bdf40b949318b8abd237",
+    "spec_sha256": "6c116ee9ce80cbb364a937a5622305ec77288bd348e4aa6f0909ce1d8753df75"
   },
-  "lock_sha256": "040168bb9c2b8e496f14433c04f99fde1b7e951d6cfd916c910861c6d670a8a0",
+  "lock_sha256": "ecde2542fdf448d6593471f97c48b40aede225bac23b0bdbf628b5a1c53d8a90",
   "lock_version": 5,
   "overrides": {
     "flags": {},
@@ -509,8 +509,8 @@
   },
   "sections": {
     "analysis": "33aede75abee4373a36e88c3e4bad96deaadffcf5db85e1efadee2a8414fd67b",
-    "assessment": "b7258a0f7f20f232400525fd93c98f17bc493e7fc955255c22a99cfb968e0745",
-    "execution": "040168bb9c2b8e496f14433c04f99fde1b7e951d6cfd916c910861c6d670a8a0",
+    "assessment": "3328bcca91116fa724ccb6065cadc4d179afa245ad95ef961cc56702e0c97c4a",
+    "execution": "ecde2542fdf448d6593471f97c48b40aede225bac23b0bdbf628b5a1c53d8a90",
     "toolchain": "6256053eb5ce8c39f8bf92cd11a70df1ddd8a4a0b880f514605f4aecbd9774ae"
   },
   "spec": {
@@ -548,7 +548,7 @@
       "metric": "scb-canonical-oneshot@1",
       "scorer_config": {},
       "scorers": [
-        "correctness@9"
+        "correctness@10"
       ]
     },
     "description": "Every released agent on the smoke problem; a smoke-sized benchmark.",

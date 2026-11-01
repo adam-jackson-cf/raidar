@@ -63,11 +63,11 @@
         }
       },
       "scorer": {
-        "correctness@9": {
-          "digest": "ff57a482d926dbb37e46e5e1a1756ffaf2943c85b20a150b47f5e46a81124e2c",
+        "correctness@10": {
+          "digest": "2f47b5e342998f9cf6f874be4466c6149eb97ef89fdbf8451db61ee94f25a31f",
           "metadata": {
             "implementation": "raidar.scoring.correctness:correctness_scorer",
-            "implementation_digest": "a394d488959c5189eb91e305605d2dc4192ede7131ade03badb3c2da43a8289f",
+            "implementation_digest": "af2102738f2fa3f6a16de4a3575e0df5095b9e62215207e4d98ad7ba55b40fac",
             "manifest": {
               "description": "Reference-solvable SCB success and raw SCB verdicts per checkpoint and trajectory.",
               "evidence_required": [
@@ -261,7 +261,7 @@
                 "*"
               ],
               "tools": [],
-              "version": "9"
+              "version": "10"
             },
             "tool_lock": {}
           }
@@ -276,12 +276,12 @@
       "metric": "scb-canonical-oneshot@1",
       "scorer_config": {},
       "scorers": [
-        "correctness@9"
+        "correctness@10"
       ]
     },
     "tools": {}
   },
-  "document_sha256": "01ce7241e5d3f3d1a1b1bb84092021963b8a63e502dbec41541f82a4f5e72bb8",
+  "document_sha256": "8ba483e333d89f1c671ce52f3d1f61900f2d2aa0c6ecd6c7fb406153eebbd7d1",
   "execution": {
     "arms": {
       "baseline": {
@@ -454,7 +454,7 @@
               "grader": {
                 "environment_id": "sha256:1989940cc347e516b774a3833071b60dbfae6a730e55462cdf38a095e23d8765",
                 "image": "raidar-oracle-grader:963c14e63ff5e15d",
-                "implementation_sha256": "3a363b442127b5226098cd18e038b64e3f958e9d8054f8eddac7987267851687"
+                "implementation_sha256": "8ec19265f72d6f0de11214f53f7c3a962b6c290e7ce7e959759f1afe8a3642aa"
               },
               "not_run": [
                 "native_parity_positive",
@@ -498,10 +498,10 @@
   "experiment": {
     "id": "python__circuit_eval-cp1__agent-health",
     "source": "experiment.yaml",
-    "source_sha256": "3edf1709455e71d74d999a57ed91d65c5fa485c2db07e7d409b09c6a91d94c58",
-    "spec_sha256": "b1b60796d07d920f1e8906ff132475c995f0115a10acc9e3007647ac9d382188"
+    "source_sha256": "0bff2a286fca5ecd28d140558aaa645381aaeb1c4eef5a53196aa3434b8bef42",
+    "spec_sha256": "76f0308dd2c40ac3bf2b4c8a31ef3c3b8c4b2cc8f5edc338f7958d470215d27c"
   },
-  "lock_sha256": "c1a073df0b582e09fdc8f5b1b4c1e81d37bab39ad87dc496d045b9bf6be5379d",
+  "lock_sha256": "9a23ddbef5746c8d86ad0a65b7b92ef8bfe8e89fde4c25827d328d98104b9c66",
   "lock_version": 5,
   "overrides": {
     "flags": {},
@@ -509,8 +509,8 @@
   },
   "sections": {
     "analysis": "a9e70f16a3d8fde7db8251be753771af765c98ad0c0b01202934c7622c4976f4",
-    "assessment": "b7258a0f7f20f232400525fd93c98f17bc493e7fc955255c22a99cfb968e0745",
-    "execution": "c1a073df0b582e09fdc8f5b1b4c1e81d37bab39ad87dc496d045b9bf6be5379d",
+    "assessment": "3328bcca91116fa724ccb6065cadc4d179afa245ad95ef961cc56702e0c97c4a",
+    "execution": "9a23ddbef5746c8d86ad0a65b7b92ef8bfe8e89fde4c25827d328d98104b9c66",
     "toolchain": "6256053eb5ce8c39f8bf92cd11a70df1ddd8a4a0b880f514605f4aecbd9774ae"
   },
   "spec": {
@@ -548,7 +548,7 @@
       "metric": "scb-canonical-oneshot@1",
       "scorer_config": {},
       "scorers": [
-        "correctness@9"
+        "correctness@10"
       ]
     },
     "description": "Operational smoke of the experiment path; not citable.",

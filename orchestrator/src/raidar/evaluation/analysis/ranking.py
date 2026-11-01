@@ -13,9 +13,9 @@ per arm:
   measured trials, ``c`` of which solved the final checkpoint
   (``final_solved``), averaged over the problems with ``n >= k``;
 - the mean cost, tokens, turns and agent seconds of its valid trials;
-- when the lock declares ``gate-effort``, the arm's gate-effort means
+- when the lock declares ``verification-effort``, the arm's verification-effort means
   (rounds to clean, first-pass clean, unresolved and gate-error rates, blocking
-  findings by family, fix-session cost): ``None`` for an arm without the gate.
+  checks, fix-turn cost): ``None`` for an arm without the gate.
 
 Rows are ordered by the metric's declared direction; arms without a measured
 value sort last. Invalid (infra-excluded) trials never count, and an

@@ -63,8 +63,8 @@ def _resolvers(
             WorkflowResolver(),
             InMemoryResolver(
                 RefKind.SCORER,
-                {"correctness@9": {"exact": True}, "code-quality@8": {"exact": True}},
-                bindings={"code-quality@8": {"runtimes": ["python"]}, **(scorers or {})},
+                {"correctness@10": {"exact": True}, "code-quality@9": {"exact": True}},
+                bindings={"code-quality@9": {"runtimes": ["python"]}, **(scorers or {})},
             ),
             MetricResolver(),
         ],
@@ -233,7 +233,7 @@ def test_rt7_a_matching_or_unrecorded_implementation_locks(experiment: Path) -> 
 def test_rt4_scorers_and_the_metric_must_cover_the_runtime(tmp_path: Path) -> None:
     document = experiment_document(id="node-ts__fixture__test", runtime="node-ts")
     document["problems"] = [{"ref": FORGE_NODE}]
-    document["assessment"] = {"scorers": ["correctness@9", "code-quality@8"]}
+    document["assessment"] = {"scorers": ["correctness@10", "code-quality@9"]}
     path = write_experiment(tmp_path, document)
 
     issues = _issues(path, pack_loader=_node_pack)
@@ -330,7 +330,7 @@ def _job(root: Path, runtime: str, bundle_digest: str) -> Path:
         {
             "lock_version": LOCK_VERSION,
             "experiment": {"id": "e"},
-            "spec": {"runtime": runtime, "assessment": {"scorers": ["correctness@9"]}},
+            "spec": {"runtime": runtime, "assessment": {"scorers": ["correctness@10"]}},
             "execution": {
                 "references": {
                     "problem": {
@@ -367,7 +367,7 @@ def test_as1_rescore_scorers_must_cover_the_jobs_runtime(tmp_path: Path) -> None
         "--store",
         str(store),
         "--scorer",
-        "code-quality@8",
+        "code-quality@9",
     )
     allowed = _assess(
         "--rescore",
@@ -377,7 +377,7 @@ def test_as1_rescore_scorers_must_cover_the_jobs_runtime(tmp_path: Path) -> None
         "--store",
         str(store),
         "--scorer",
-        "correctness@9",
+        "correctness@10",
     )
 
     assert refused.exit_code != 0
@@ -392,7 +392,7 @@ def test_as1_a_trial_outside_any_job_accepts_only_runtime_agnostic_scorers(
     trial.mkdir(parents=True)
 
     refused = _assess(
-        "--rescore", str(trial), "--store", str(tmp_path / "s"), "--scorer", "code-quality@8"
+        "--rescore", str(trial), "--store", str(tmp_path / "s"), "--scorer", "code-quality@9"
     )
 
     assert refused.exit_code != 0
@@ -412,7 +412,9 @@ def test_as1_a_bundle_override_must_be_the_verifier_bundle_the_lock_binds(
     target = job / "trials" if mode == "--rescore" else job
     lock = ["--lock", str(job / "job.lock.json")]
     store = (
-        ["--store", str(tmp_path / "s"), "--scorer", "correctness@9"] if mode == "--rescore" else []
+        ["--store", str(tmp_path / "s"), "--scorer", "correctness@10"]
+        if mode == "--rescore"
+        else []
     )
 
     refused = _assess(mode, str(target), *lock, *store, "--bundle", str(other.root))

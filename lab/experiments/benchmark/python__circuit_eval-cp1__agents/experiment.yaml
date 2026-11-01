@@ -29,7 +29,7 @@ arms:
     workflow: raidar/one-shot@2
 
 assessment:
-  scorers: [correctness@9]
+  scorers: [correctness@10]
   metric: scb-canonical-oneshot@1
 
 analysis:

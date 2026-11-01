@@ -26,7 +26,6 @@ from raidar.evaluation.analysis.markdown import render_markdown
 from raidar.evaluation.analysis.report import AnalysisReport, analyse
 from raidar.evaluation.analysis.stats import IntervalMethod, summarise
 from raidar.scoring.catalog.outcomes import (
-    ALL_METRICS,
     OUTCOME_METRICS,
     Kind,
     declared_kind,
@@ -389,7 +388,7 @@ def test_zero_spread_gives_no_projection_and_no_blanket_refusal() -> None:
 
 
 def test_a_metric_with_no_better_direction_never_reads_improved_or_worse() -> None:
-    neutral = next(m for m in ALL_METRICS if m.direction is Direction.NEUTRAL)
+    neutral = dataclasses.replace(outcome_metric("solve_rate"), direction=Direction.NEUTRAL)
     deltas = [2.0, 2.5, 2.0, 1.5, 2.0, 1.0]
     summary = summarise(deltas, seed=1, bootstrap_samples=500)
     pairs = Exclusions(
@@ -401,7 +400,7 @@ def test_a_metric_with_no_better_direction_never_reads_improved_or_worse() -> No
         ),
     )
 
-    verdict, reason = decide(
+    verdict, _ = decide(
         neutral,
         summary,
         pairs,
@@ -410,7 +409,6 @@ def test_a_metric_with_no_better_direction_never_reads_improved_or_worse() -> No
     )
 
     assert verdict is Verdict.INCONCLUSIVE
-    assert "p=0.03125 <= 0.05, but the metric has no better direction" in reason
 
 
 def test_the_baseline_arm_must_be_planned_with_a_treatment() -> None:

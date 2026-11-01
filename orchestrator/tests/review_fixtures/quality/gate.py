@@ -1,12 +1,12 @@
-"""Synthetic commit-gate records for the Quality fixture's gated arm (labelled synthetic).
+"""Synthetic gate/1 records for the Quality fixture's gated arm (labelled synthetic).
 
-The gated arm's trials get, per checkpoint, the files ``guardrail-gate@1``
-leaves in a step's agent log dir: the gate record, each gate run's output in
-``guardrail-check``'s printed format and its JSON report. The real
-``gate-effort`` scorer then assesses every trial of the fixture (an ungated
-trial is ``not_applicable``), so the Quality view reads them exactly as it
-reads a real run. Each trial draws from its own seeded generator, so the rest
-of the fixture's values are unchanged.
+The gated arm's trials get, per checkpoint, the ``workflow/workflow.json`` the
+host leaves in a step's agent log dir: a ``gate/1`` record (gate runs with their
+checks) and the step's turns (fix turns are ``gate_fix``). The real
+``verification-effort`` scorer then assesses every trial of the fixture (a trial
+without a gate/1 record is ``not_applicable``), so the Quality view reads them
+exactly as it reads a real run. Each trial draws from its own seeded generator,
+so the rest of the fixture's values are unchanged.
 """
 
 from __future__ import annotations
@@ -19,99 +19,97 @@ from pathlib import Path
 from raidar.scoring.framework.context import AssessContext, StepInputs
 from raidar.scoring.framework.result import AssessResult
 from raidar.scoring.framework.validation import validate_result
-from raidar.scoring.gate_effort import GATE_EFFORT, gate_effort_scorer
-from raidar.scoring.gate_effort.records import RECORD_PATH, REPORT_SCHEMA
+from raidar.scoring.verification_effort.manifest import VERIFICATION_EFFORT
+from raidar.scoring.verification_effort.scorer import verification_effort_scorer
 
-__all__ = ["GATE_EFFORT", "gate_result", "write_step_gate"]
+__all__ = ["VERIFICATION_EFFORT", "gate_result", "write_step_gate"]
 
+RECORD_PATH = Path("workflow") / "workflow.json"
 MAX_ROUNDS = 3
-# Refused runs before the gate passes; MAX_ROUNDS + 1 means the step ends unresolved.
-_REFUSALS = (0, 0, 1, 1, 2, 4)
-_CODES = (
-    ("C901", "`handle` is too complex (12 > 10)"),
-    ("PLR0912", "Too many branches (14 > 12)"),
-    ("MYPY.no-untyped-def", "Function is missing a type annotation"),
-    ("MYPY.arg-type", 'Argument 1 has incompatible type "str"; expected "int"'),
-    ("F841", "Local variable `total` is assigned to but never used"),
-    ("PLR0904", "Too many public methods (22 > 20)"),
-    ("I001", "Import block is un-sorted or un-formatted"),
-    ("N802", "Function name `Total` should be lowercase"),
-    ("TST001", "subprocess.run in a test needs timeout="),
-    ("SUPPRESS", "lint/type suppression comments are not allowed"),
+# Refused runs before the gate passes per checkpoint; MAX_ROUNDS + 1 leaves the step
+# unresolved. Fixed per position so the fixture's fourth checkpoint is always unresolved.
+_REFUSALS = (0, 1, 2, MAX_ROUNDS + 1, 0)
+_CHECKS = (
+    ("python.ruff", "lint"),
+    ("python.mypy", "types"),
+    ("python.complexity", "complexity"),
+    ("python.pytest", "tests"),
 )
 
 
-def _findings(rng: random.Random, count: int) -> list[tuple[str, str, int]]:
-    return [(*rng.choice(_CODES), 10 + 7 * index) for index in range(count)]
-
-
-def _output(findings: Sequence[tuple[str, str, int]]) -> str:
-    if not findings:
-        return "guardrail-check: PASSED (0 blocking, 0 warnings, 3 Python files)\n"
-    lines = [
-        f"guardrail-check: REFUSED ({len(findings)} blocking, 0 warnings, 3 Python files)",
-        f"Blocking (fix these; the change is refused until they pass) ({len(findings)}):",
-        *(f"  ledger/core.py:{line}:1: {code} {message}" for code, message, line in findings),
-        "Re-run `guardrail-check` to confirm.",
-    ]
-    return "\n".join(lines) + "\n"
-
-
-def _stage(index: int, role: str, rng: random.Random) -> dict[str, object]:
+def _check(rng: random.Random, name: str, kind: str, *, failed: bool) -> dict[str, object]:
     return {
-        "index": index,
-        "stage": role,
-        "round": index - 1,
-        "error": None,
-        "n_input_tokens": rng.randint(20_000, 60_000),
-        "n_output_tokens": rng.randint(800, 3_000),
-        "cost_usd": round(rng.uniform(0.004, 0.02), 6),
-        "duration_sec": round(rng.uniform(20.0, 120.0), 3),
+        "name": name,
+        "category": kind,
+        "blocking": True,
+        "status": "failed" if failed else "passed",
+        "exit": 1 if failed else 0,
+        "seconds": round(rng.uniform(0.1, 0.6), 3),
+        "cause": "exit 1" if failed else None,
     }
 
 
-def write_step_gate(agent_dir: Path, rng: random.Random) -> None:
-    """One step's gate record, run logs and reports under ``agent_dir``."""
-    gate_dir = agent_dir / "guardrail-gate"
-    refusals = rng.choice(_REFUSALS)
+def _gate_run(rng: random.Random, run: int, *, refused: bool) -> dict[str, object]:
+    failing = {name for name, _ in rng.sample(_CHECKS, rng.randint(1, 3))} if refused else set()
+    return {
+        "who": "seal",
+        "run": run,
+        "after": "stage_1_work" if run == 1 else f"stage_{run}_fix",
+        "verdict": "refused" if refused else "passed",
+        "exit": 1 if refused else 0,
+        "seconds": round(rng.uniform(0.8, 3.0), 3),
+        "error": None,
+        "record": f"gate/gate-{run}.json",
+        "attribution": "refused" if refused else "passed",
+        "attribution_reason": "blocking checks failed" if refused else "all checks passed",
+        "changed_during_gate": [],
+        "checks": [_check(rng, name, kind, failed=name in failing) for name, kind in _CHECKS],
+    }
+
+
+def _turn(index: int, kind: str, rng: random.Random) -> dict[str, object]:
+    return {
+        "stage": "work" if kind == "agent" else "fix",
+        "kind": kind,
+        "turn": index,
+        "log_dir": f"turns/{index}",
+        "seconds": round(rng.uniform(20.0, 120.0), 3),
+        "tokens": {
+            "input": rng.randint(20_000, 60_000),
+            "cached": rng.randint(0, 10_000),
+            "output": rng.randint(800, 3_000),
+            "cost_usd": round(rng.uniform(0.004, 0.02), 6),
+        },
+    }
+
+
+def write_step_gate(agent_dir: Path, rng: random.Random, position: int) -> None:
+    """One step's ``workflow/workflow.json`` under ``agent_dir`` (``position``: 0-based step)."""
+    refusals = _REFUSALS[position % len(_REFUSALS)]
     runs = min(refusals, MAX_ROUNDS) + 1
-    clean = refusals <= MAX_ROUNDS
-    count = rng.randint(4, 14)
-    records = []
-    for run in range(1, runs + 1):
-        refused = run <= refusals
-        findings = _findings(rng, max(1, count // run)) if refused else []
-        report_dir = gate_dir / f"gate_run_{run}"
-        report_dir.mkdir(parents=True, exist_ok=True)
-        (gate_dir / f"gate_run_{run}.log").write_text(_output(findings), encoding="utf-8")
-        report = {
-            "schema": REPORT_SCHEMA,
-            "verdict": "refused" if refused else "passed",
-            "findings": [{"code": code, "tier": "block"} for code, _, _ in findings],
-        }
-        (report_dir / "gate-1.json").write_text(json.dumps(report), encoding="utf-8")
-        records.append(
-            {
-                "run": run,
-                "after": "stage_1_work" if run == 1 else f"stage_{run}_fix",
-                "passed": not refused,
-                "error": None,
-                "timed_out": False,
-                "log": f"guardrail-gate/gate_run_{run}.log",
-                "report_dir": f"guardrail-gate/gate_run_{run}",
-                "duration_sec": round(rng.uniform(0.2, 0.9), 3),
-            }
-        )
-    stages = [_stage(index, "work" if index == 1 else "fix", rng) for index in range(1, runs + 1)]
+    gates = [_gate_run(rng, run, refused=run <= refusals) for run in range(1, runs + 1)]
+    turns = [
+        _turn(1, "agent", rng),
+        *(_turn(index, "gate_fix", rng) for index in range(2, runs + 1)),
+    ]
     record = {
-        "termination_reason": "gate_clean" if clean else "rounds_exhausted",
-        "error": None,
-        "rounds_configured": MAX_ROUNDS,
-        "gate_runs": records,
-        "stages": stages,
-        "gate_clean_at_step_end": clean,
+        "gate/1": {
+            "max_fix_rounds": MAX_ROUNDS,
+            "base": {},
+            "canary": {},
+            "setup_check": {},
+            "integrity": [],
+            "reaps": [],
+            "hook_outputs": [],
+            "errors": [],
+            "pre_fix_snapshots": [],
+            "gates": gates,
+        },
+        "turns": turns,
     }
-    (agent_dir / RECORD_PATH).write_text(json.dumps(record, indent=2), encoding="utf-8")
+    target = agent_dir / RECORD_PATH
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(json.dumps(record, indent=2), encoding="utf-8")
 
 
 def _step(trial_dir: Path, checkpoint: str) -> StepInputs:
@@ -133,14 +131,14 @@ def _step(trial_dir: Path, checkpoint: str) -> StepInputs:
 def gate_result(
     trial_dir: Path, checkpoints: Sequence[str], *, gated: bool, seed: str, problem: str
 ) -> AssessResult:
-    """Write the trial's gate records (gated arm only) and assess them with gate-effort."""
+    """Write the trial's gate records (gated arm only) and assess them with verification-effort."""
     if gated:
         rng = random.Random(seed)
-        for checkpoint in checkpoints:
+        for position, checkpoint in enumerate(checkpoints):
             agent_dir = trial_dir / "steps" / checkpoint / "agent"
             agent_dir.mkdir(parents=True, exist_ok=True)
-            write_step_gate(agent_dir, rng)
+            write_step_gate(agent_dir, rng, position)
     ctx = AssessContext(
         problem=problem, steps=tuple(_step(trial_dir, checkpoint) for checkpoint in checkpoints)
     )
-    return validate_result(GATE_EFFORT, ctx, gate_effort_scorer().assess(ctx))
+    return validate_result(VERIFICATION_EFFORT, ctx, verification_effort_scorer().assess(ctx))

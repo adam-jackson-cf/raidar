@@ -58,7 +58,7 @@ JOBS_DIR = "jobs"
 REVIEW_ONLY_DIR = "review-only"
 POLICY_MIX_PROBLEM = "synthetic/policy-mix@1"
 _STARTED = datetime(2026, 1, 1, tzinfo=UTC)
-_SCORERS = ["correctness@9", "code-quality@8", "resource-usage@7"]
+_SCORERS = ["correctness@10", "code-quality@9", "resource-usage@8"]
 _LEDGER = (
     "import os\n\n\n"
     "def balance(entries):\n"

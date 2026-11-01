@@ -22,16 +22,14 @@ from enum import StrEnum
 
 from raidar.scoring.framework.builtin_manifests import CODE_QUALITY, CORRECTNESS, RESOURCE_USAGE
 from raidar.scoring.framework.manifest import Direction, ScorerManifest
-from raidar.scoring.gate_effort.autofix.metrics import REFUSAL_KINDS
-from raidar.scoring.gate_effort.families import FAMILIES
-from raidar.scoring.gate_effort.manifest import GATE_EFFORT
 from raidar.scoring.process_checks.manifest import PROCESS_COMPLIANCE
+from raidar.scoring.verification_effort.manifest import VERIFICATION_EFFORT
 
 CORRECTNESS_REF = CORRECTNESS.ref
 CODE_QUALITY_REF = CODE_QUALITY.ref
 RESOURCE_USAGE_REF = RESOURCE_USAGE.ref
 PROCESS_COMPLIANCE_REF = PROCESS_COMPLIANCE.ref
-GATE_EFFORT_REF = GATE_EFFORT.ref
+VERIFICATION_EFFORT_REF = VERIFICATION_EFFORT.ref
 """The scorer refs analysis reads; each is its manifest's ``name@version``."""
 
 
@@ -76,14 +74,14 @@ CORRECTNESS_METRIC = "correctness"
 SOLVE_RATE = "solve_rate"
 REACHED = "reached"
 FINAL_SOLVED = "final_solved"
-# Errata-applied solve outcomes (``correctness@9`` ``*_errata`` metrics): the same rules
+# Errata-applied solve outcomes (``correctness@10`` ``*_errata`` metrics): the same rules
 # over the cases the problem's pinned errata keeps. Primary only when the experiment
 # pre-registers one (``analysis.primary_outcome``), and then always reported beside its
 # raw counterpart (``RAW_COUNTERPART``); ``not_applicable`` for a problem without an errata.
 SOLVE_RATE_ERRATA = "solve_rate_errata"
 REACHED_ERRATA = "reached_errata"
 FINAL_SOLVED_ERRATA = "final_solved_errata"
-# Solvable-set solve outcomes (``correctness@9`` ``*_solvable`` metrics): the same rules over
+# Solvable-set solve outcomes (``correctness@10`` ``*_solvable`` metrics): the same rules over
 # the cases the reference solution passes in every validation repeat. The default primary;
 # ``unavailable`` (never zero) for a problem whose lock pins no solvable set.
 SOLVE_RATE_SOLVABLE = "solve_rate_solvable"
@@ -192,208 +190,38 @@ OUTCOME_METRICS: tuple[MetricDef, ...] = (
 )
 
 GATE_PREFIX = "gate."
-"""Gate-effort outcomes are ``gate.<gate-effort trajectory metric>``."""
+"""Verification-effort outcomes are ``gate.<verification-effort trajectory metric>``."""
 _GATE_OUTCOMES: tuple[tuple[str, str, float], ...] = (
     ("first_pass_clean_rate", "first-pass clean rate (decided steps)", 0.1),
     ("clean_at_step_end_rate", "clean at step end rate (decided steps)", 0.1),
-    ("unresolved_rate", "unresolved rate (fix rounds exhausted)", 0.1),
+    ("unresolved_rate", "unresolved rate (last seal refused)", 0.1),
     ("gate_error_rate", "gate error rate (validity: expected 0)", 0.05),
     ("mean_rounds_to_clean", "mean fix rounds to clean (clean steps)", 0.5),
     ("total_fix_rounds", "fix rounds per trial", 1.0),
-    ("total_first_run_blocking", "first-run blocking findings per trial", 5.0),
-    *(
-        (f"total_first_run_blocking.{family}", f"first-run blocking findings: {family}", 2.0)
-        for family in FAMILIES
-    ),
-    ("total_blocking_findings", "blocking findings over every gate run per trial", 5.0),
-    *(
-        (f"total_blocking_findings.{family}", f"blocking findings over every run: {family}", 2.0)
-        for family in FAMILIES
-    ),
-    ("total_fix_input_tokens", "fix-session input tokens per trial", 10_000.0),
-    ("total_fix_output_tokens", "fix-session output tokens per trial", 1_000.0),
-    ("total_fix_cost_usd", "fix-session cost per trial (USD)", 0.01),
-    ("total_fix_wall_s", "fix-session wall time per trial (s)", 60.0),
-    ("total_gate_wall_s", "gate-run wall time per trial (s)", 5.0),
-    # gate-effort@4: the gate's tests check and the fix rounds' correctness.
-    ("first_run_tests_pass_rate", "first-run tests check pass rate (decided steps)", 0.1),
-    ("tests_missing_rate", "first runs refused for missing tests (decided steps)", 0.1),
-    ("tests_pass_at_step_end_rate", "tests check passed at step end (decided steps)", 0.1),
-    ("mean_first_run_coverage", "owned line coverage of the first run (percent)", 5.0),
-    ("mean_coverage_at_step_end", "owned line coverage at step end (percent)", 5.0),
+    ("total_first_run_blocking", "failed blocking checks of the first seals per trial", 2.0),
+    ("total_blocking_checks", "failed blocking checks over every decided seal per trial", 2.0),
+    ("total_fix_input_tokens", "fix-turn input tokens per trial", 10_000.0),
+    ("total_fix_output_tokens", "fix-turn output tokens per trial", 1_000.0),
+    ("total_fix_cost_usd", "fix-turn cost per trial (USD)", 0.01),
+    ("total_fix_wall_s", "fix-turn wall time per trial (s)", 60.0),
+    ("total_gate_wall_s", "gate-seal wall time per trial (s)", 5.0),
     (
         "fix_round_correctness_delta",
         "fix-round correctness delta: final minus pre-fix case pass rate",
         0.05,
     ),
-    # gate-effort@6: blocking counts that compare across gate modes, the typing cascade
-    # apart, and failing tests and missed coverage as separate first-run outcomes.
-    (
-        "total_new_first_run_blocking",
-        "blocking findings each step's own work added before any fix, per trial",
-        5.0,
-    ),
-    ("final_step_end_blocking", "blocking findings at the end of the last gated step", 5.0),
-    (
-        "total_first_run_untyped_call",
-        "first-run mypy no-untyped-call findings (call-site cascade) per trial",
-        5.0,
-    ),
-    (
-        "final_step_end_untyped_call",
-        "mypy no-untyped-call findings at the end of the last gated step",
-        5.0,
-    ),
-    ("first_run_tests_failed_rate", "first runs whose own tests failed (steps with tests)", 0.1),
-    (
-        "first_run_coverage_met_rate",
-        "first runs meeting the coverage minimum (steps with coverage)",
-        0.1,
-    ),
-    ("total_first_run_failed_tests", "failing tests in first gate runs per trial", 1.0),
-    # gate-effort@7: first-pass clean rates that ignore auto-fixable layout codes, the tests
-    # check, or both, and the cross-mode counts without the no-untyped-call cascade.
-    (
-        "first_pass_clean_except_autofix_rate",
-        "first runs refusing only auto-fixable layout codes, or nothing (decided steps)",
-        0.1,
-    ),
-    (
-        "first_pass_clean_except_tests_rate",
-        "first runs refusing only tests-check codes, or nothing (decided steps)",
-        0.1,
-    ),
-    (
-        "first_pass_clean_except_autofix_tests_rate",
-        "first runs with no code-design finding (decided steps)",
-        0.1,
-    ),
-    (
-        "total_new_first_run_blocking_ex_cascade",
-        "blocking findings each step's own work added, without the no-untyped-call cascade",
-        5.0,
-    ),
-    (
-        "final_step_end_blocking_ex_cascade",
-        "blocking findings at the last gated step's end, without the no-untyped-call cascade",
-        5.0,
-    ),
-    # gate-effort@8: the cross-mode counts without the cascade and with a refused suppression
-    # comment counted once.
-    (
-        "total_new_first_run_blocking_net",
-        "blocking findings each step's own work added, no cascade, a suppression counted once",
-        5.0,
-    ),
-    (
-        "final_step_end_blocking_net",
-        "blocking findings at the last gated step's end, no cascade, a suppression counted once",
-        5.0,
-    ),
-    # gate-effort@9: guardrail-gate@4's autofix step, the counts after and before it, and the
-    # fix sessions' cost and wall time by the kind of refusal that started them.
-    ("total_autofix_rounds", "completed autofix passes per trial", 1.0),
-    ("total_autofix_errors", "autofix passes that failed per trial (validity: expected 0)", 0.5),
-    ("total_autofix_files_changed", "files the autofix passes changed per trial", 1.0),
-    ("total_autofix_lines_changed", "lines the autofix passes changed per trial", 5.0),
-    ("total_autofix_removed_blocking", "block-tier findings autofix fixed per trial", 2.0),
-    *(
-        (
-            f"total_autofix_removed_blocking.{family}",
-            f"block-tier findings autofix fixed: {family}",
-            1.0,
-        )
-        for family in FAMILIES
-    ),
-    (
-        "first_pass_clean_post_autofix_rate",
-        "first checks after autofix that passed (decided steps)",
-        0.1,
-    ),
-    (
-        "total_new_first_run_blocking_post_autofix_net",
-        "blocking findings each step's own work added, after autofix (net)",
-        5.0,
-    ),
-    (
-        "final_step_end_blocking_post_autofix_net",
-        "blocking findings at the last gated step's end, after autofix (net)",
-        5.0,
-    ),
-    (
-        "total_new_first_run_blocking_raw_net",
-        "blocking findings each step's own work added, before autofix (net)",
-        5.0,
-    ),
-    *(
-        (f"total_fix_cost_usd_by_refusal.{kind}", f"fix-session cost: {kind} refusals", 0.01)
-        for kind in REFUSAL_KINDS
-    ),
-    *(
-        (f"total_fix_wall_s_by_refusal.{kind}", f"fix-session wall time: {kind} refusals", 60.0)
-        for kind in REFUSAL_KINDS
-    ),
-    (
-        "total_fix_sessions_with_coverage_minimum",
-        "fix sessions whose refusal included the coverage minimum per trial",
-        1.0,
-    ),
-    (
-        "total_fix_cost_usd_with_coverage_minimum",
-        "cost of the fix sessions whose refusal included the coverage minimum",
-        0.01,
-    ),
-    (
-        "total_fix_wall_s_with_coverage_minimum",
-        "wall time of the fix sessions whose refusal included the coverage minimum",
-        60.0,
-    ),
-    # gate-effort@15: the autofix counts each step's own work added (they compare across gate
-    # modes; a shadow gate's total_autofix_* re-count its never-fixed tree at every step).
-    (
-        "total_new_autofix_lines_changed",
-        "autofix lines each step's own work added per trial (cross-mode)",
-        5.0,
-    ),
-    (
-        "total_new_autofix_removed_blocking",
-        "autofix block-tier findings each step's own work added per trial (cross-mode)",
-        2.0,
-    ),
-    *(
-        (
-            f"total_new_autofix_removed_blocking.{family}",
-            f"autofix block-tier findings each step's own work added: {family}",
-            1.0,
-        )
-        for family in FAMILIES
-    ),
 )
 GATE_METRICS: tuple[MetricDef, ...] = tuple(
     MetricDef(
         f"{GATE_PREFIX}{metric}",
-        f"Gate effort: {label}",
+        f"Verification effort: {label}",
         View.GATE,
-        declared_direction(GATE_EFFORT, metric),
+        declared_direction(VERIFICATION_EFFORT, metric),
         min_effect,
     )
     for metric, label, min_effect in _GATE_OUTCOMES
 )
-"""Gate-effort outcomes: compared only when the lock declares a gate-effort scorer."""
-CROSS_MODE_CUMULATIVE = frozenset(
-    f"{GATE_PREFIX}{metric}"
-    for metric in (
-        "total_first_run_blocking",
-        "total_autofix_rounds",
-        "total_autofix_files_changed",
-        "total_autofix_lines_changed",
-        "total_autofix_removed_blocking",
-        *(f"total_autofix_removed_blocking.{family}" for family in FAMILIES),
-    )
-)
-"""Gate totals a shadow gate sums over its never-fixed tree at every step (an enforced gate's
-over each step's new work), so a shadow arm's value is not comparable with an enforced arm's.
-The analysis keeps them but marks them; the cross-mode forms are ``total_new_*``."""
+"""Verification-effort outcomes: compared only when the lock declares ``verification-effort``."""
 
 
 PROCESS_PREFIX = "process."
@@ -498,12 +326,12 @@ def declared_outcome_types(bound: Mapping[str, int]) -> dict[str, object]:
 VERIFIER_PREFIX = "verifier."
 """Verifier diagnostics: described per arm, never compared (no verdict, no effect)."""
 VERIFIER_DISAGREEMENTS = f"{VERIFIER_PREFIX}grading_coverage_disagreements"
-VERIFIER_DISAGREEMENT_SOURCE = "code-quality@8"
+VERIFIER_DISAGREEMENT_SOURCE = "code-quality@9"
 VERIFIER_METRICS: tuple[MetricDef, ...] = (
     MetricDef(
         VERIFIER_DISAGREEMENTS,
         "Verifier: grader cases whose outcome differed between the grading run and the "
-        "coverage run, summed over a trial's transitions (code-quality@8 "
+        "coverage run, summed over a trial's transitions (code-quality@9 "
         "regression_parity_excluded_cases; diagnostic, never an outcome)",
         View.QUALITY,
         Direction.NEUTRAL,

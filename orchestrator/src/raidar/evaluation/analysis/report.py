@@ -18,9 +18,9 @@ the review surface's score, not the primary outcome).
 The verdict thresholds come from the caller (``Settings``); the report says
 where they came from and which of them differ from the documented defaults.
 
-When the lock declares ``gate-effort``, every arm carries its gate-effort
+When the lock declares ``verification-effort``, every arm carries its verification-effort
 descriptives and every comparison the gate effects both arms measured
-(``raidar.evaluation.analysis.gate_effort``). The manipulation check runs its default
+(``raidar.evaluation.analysis.verification_effort``). The manipulation check runs its default
 checks for each declared process scorer.
 
 The experiment's kind shapes the report, never the verdicts: a ``benchmark``
@@ -51,26 +51,26 @@ from raidar.evaluation.analysis.effects import (
     metric_applies,
     problem_effect,
 )
-from raidar.evaluation.analysis.gate_effort import (
-    NO_PROCESS_NOTE,
-    GateDescriptive,
-    arm_gate_effort,
-    gate_effects,
-    gate_means,
-)
 from raidar.evaluation.analysis.manipulation import (
     ManipulationReport,
     treatment_check_report,
 )
 from raidar.evaluation.analysis.outcomes import AnalysisModel, PoolingReport, TrialOutcome
 from raidar.evaluation.analysis.ranking import Ranking, ranking
+from raidar.evaluation.analysis.verification_effort import (
+    NO_PROCESS_NOTE,
+    GateDescriptive,
+    arm_descriptives,
+    gate_effects,
+    gate_means,
+)
 from raidar.scoring.catalog.outcomes import (
     COST_METRICS,
-    GATE_EFFORT_REF,
     GATE_METRICS,
     OUTCOME_METRICS,
     PROCESS_METRICS,
     RAW_COUNTERPART,
+    VERIFICATION_EFFORT_REF,
     VERIFIER_DISAGREEMENTS,
     VERIFIER_METRICS,
     MetricDef,
@@ -115,9 +115,9 @@ class AnalysisInputs:
     replaced: tuple[str, ...] = ()
     process_results: Mapping[str, AssessResult | None] | None = field(default=None)
     gate_results: Mapping[str, AssessResult | None] | None = field(default=None)
-    """gate-effort results per trial when the lock declares it (else None)."""
+    """verification-effort results per trial when the lock declares it (else None)."""
     gate_scorer: str | None = None
-    """The gate-effort ref the lock declares."""
+    """The verification-effort ref the lock declares."""
     process_scorer: str | None = None
     """The process-compliance ref the lock declares; it adds the process outcomes."""
     dev_job: DevRun | None = None
@@ -137,7 +137,7 @@ class AnalysisInputs:
 
     @property
     def gate_metrics(self) -> tuple[MetricDef, ...]:
-        """The gate outcomes ``gate-effort`` reports."""
+        """The gate outcomes ``verification-effort`` reports."""
         return GATE_METRICS
 
     @property
@@ -157,10 +157,10 @@ class AnalysisInputs:
 
     @property
     def gate_label(self) -> str | None:
-        """The gate-effort version the report names (None: the lock declares none)."""
+        """The verification-effort version the report names (None: the lock declares none)."""
         if self.gate_results is None:
             return None
-        return self.gate_scorer or GATE_EFFORT_REF
+        return self.gate_scorer or VERIFICATION_EFFORT_REF
 
 
 class ArmSummary(AnalysisModel):
@@ -172,8 +172,8 @@ class ArmSummary(AnalysisModel):
     not_run: int
     infra_reasons: dict[str, int]
     cost_means: dict[str, float | None]
-    gate_effort: dict[str, GateDescriptive] | None = None
-    """Per gate metric over the arm's valid trials; None when the lock declares no gate-effort."""
+    verification_effort: dict[str, GateDescriptive] | None = None
+    """Per gate metric over the arm's valid trials; None when the lock declares no scorer."""
     process_outcomes: dict[str, GateDescriptive] | None = None
     """Per process metric (stall rate); None when the lock declares no process-compliance."""
     verifier_diagnostics: dict[str, GateDescriptive] | None = None
@@ -234,7 +234,7 @@ class AnalysisReport(AnalysisModel):
     primary_source: str = "default"
     """``lock (analysis.primary_outcome)`` or the progression default it fell back to."""
     gate_scorer: str | None = None
-    """The gate-effort version the gate outcomes come from, when the lock declares one."""
+    """The verification-effort version the gate outcomes come from, when the lock declares one."""
     process_scorer: str | None = None
     """The process-compliance version the process outcomes come from."""
     baseline_arm: str
@@ -411,13 +411,13 @@ def _arm_summary(arm: str, inputs: AnalysisInputs, settings: Settings) -> ArmSum
         not_run=len(planned) - len(ran),
         infra_reasons=_reason_counts(ran),
         cost_means=_cost_means(valid),
-        gate_effort=(
-            arm_gate_effort(arm, valid, settings, inputs.gate_metrics)
+        verification_effort=(
+            arm_descriptives(arm, valid, settings, inputs.gate_metrics)
             if inputs.gate_results is not None
             else None
         ),
         process_outcomes=(
-            arm_gate_effort(arm, valid, settings, inputs.process_metrics)
+            arm_descriptives(arm, valid, settings, inputs.process_metrics)
             if inputs.process_outcomes
             else None
         ),
@@ -432,7 +432,7 @@ def _verifier_diagnostics(
     """The verifier diagnostics, when some valid trial reports them."""
     if not any(VERIFIER_DISAGREEMENTS in outcome.metrics for outcome in valid):
         return None
-    return arm_gate_effort(arm, valid, settings, VERIFIER_METRICS)
+    return arm_descriptives(arm, valid, settings, VERIFIER_METRICS)
 
 
 def _sensitivities(inputs: AnalysisInputs) -> dict[str, list[dict[str, object]]] | None:
@@ -548,5 +548,5 @@ def _ranking(
         attempts=inputs.attempts,
         settings=settings,
         cost_means={summary.arm: summary.cost_means for summary in summaries},
-        gate_means={summary.arm: gate_means(summary.gate_effort) for summary in summaries},
+        gate_means={summary.arm: gate_means(summary.verification_effort) for summary in summaries},
     )

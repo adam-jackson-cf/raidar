@@ -1,16 +1,17 @@
-"""A trial's commit-gate effort for the Quality run view (``gate-effort`` + gate records).
+"""A trial's verification effort for the Quality run view (``verification-effort`` + gate/1).
 
-Step cells (rounds to clean, first-pass clean, unresolved, gate error,
-blocking findings in total and by rule family, fix-session cost and time) are
-the stored ``gate-effort`` Assessment's observations, so the view and the
-analysis read one source. The per-round rows (each gate run's verdict, its
-blocking findings by family and its output log) come from the step's
-``guardrail-gate`` record through the scorer's own reader
-(``raidar.scoring.gate_effort.records``), so a round's families are counted by
-the same code that scored them.
+Step cells (rounds to clean, first-pass clean, unresolved, gate error, failed
+blocking checks, fix-session cost and time) are the stored
+``verification-effort`` Assessment's observations, so the view and the analysis
+read one source. The per-round rows (each gate run's verdict, attribution,
+duration and failing blocking checks) come from the step's ``gate/1`` record in
+``workflow/workflow.json`` through the scorer's own reader
+(``raidar.scoring.verification_effort.records``), so a round is read by the
+same code that scored it.
 
-A trial without any gate record and without a measured Assessment has no
-gate view: an ungated arm shows nothing rather than zeros.
+A trial without any gate/1 record and without a measured Assessment has no
+gate view: a trial that ran without the gate shows nothing rather than zeros.
+A record that cannot be read is an explicit note on the view, never a zero.
 """
 
 from __future__ import annotations
@@ -24,22 +25,18 @@ from raidar.evaluation.review.quality.models import (
     CellStatus,
     GateRound,
     GateStep,
-    GateVerdict,
     GateView,
 )
 from raidar.evaluation.review.quality.sources import TrialSource
-from raidar.scoring.catalog.outcomes import GATE_EFFORT_REF
+from raidar.scoring.catalog.outcomes import VERIFICATION_EFFORT_REF
 from raidar.scoring.framework.result import TRAJECTORY_SUBJECT, AssessStatus, Observation
 from raidar.scoring.framework.store import Assessment
-from raidar.scoring.gate_effort.evidence import run_summary
-from raidar.scoring.gate_effort.families import FAMILIES, family_counts
-from raidar.scoring.gate_effort.records import (
+from raidar.scoring.verification_effort.records import (
     GateRecordError,
     GateRunView,
     StepGate,
     read_step_gate,
 )
-from raidar.scoring.gate_effort.shadow import SHADOW_MODE, step_mode
 
 STEP_CELLS = (
     "gate_runs",
@@ -50,7 +47,7 @@ STEP_CELLS = (
     "gate_error",
     "rounds_to_clean",
     "first_run_blocking",
-    "blocking_findings",
+    "blocking_checks",
     "fix_input_tokens",
     "fix_output_tokens",
     "fix_cost_usd",
@@ -65,12 +62,12 @@ TOTAL_CELLS = (
     "mean_rounds_to_clean",
     "total_fix_rounds",
     "total_first_run_blocking",
-    "total_blocking_findings",
+    "total_blocking_checks",
     "total_fix_cost_usd",
     "total_fix_wall_s",
     "total_gate_wall_s",
 )
-_UNASSESSED = "no gate-effort assessment matches this trial"
+_UNASSESSED = "no verification-effort assessment matches this trial"
 
 
 class _Cells:
@@ -96,42 +93,42 @@ class _Cells:
         return any(item.status is AssessStatus.OK for item in self._items.values())
 
 
-def _verdict(run: GateRunView) -> GateVerdict:
-    if not run.decided:
-        return "error"
-    if run.passed:
-        return "passed"
-    return "timed_out" if run.timed_out else "refused"
-
-
-def _round(trial: TrialSource, trace_dir: Path, run: GateRunView) -> GateRound:
-    findings = run.findings
-    log = trace_dir / run.log if run.log else None
+def _round(run: GateRunView) -> GateRound:
     return GateRound(
         run=run.run,
         after=run.after,
-        verdict=_verdict(run),
-        blocking=findings.total,
-        listed=findings.listed,
-        families=dict(family_counts(findings.codes)) if findings.codes is not None else None,
-        source=findings.source,
-        summary=run_summary(run),
-        log_path=trial.portable_path(log) if log is not None and log.is_file() else None,
-        duration_s=run.duration_s,
+        verdict=run.verdict,
+        attribution=run.attribution,
+        seconds=run.seconds,
+        error=run.error,
+        failed_checks=tuple(
+            check.name for check in run.checks if check.blocking and check.status != "passed"
+        ),
     )
 
 
-def _trace_dirs(trial: TrialSource, checkpoints: Sequence[str]) -> dict[str, Path]:
+def _trace_dirs(
+    trial: TrialSource, checkpoints: Sequence[str], notes: list[str]
+) -> dict[str, Path | None]:
+    """Each step's agent dir, which must stay inside the trial directory."""
     recorded = {
         result.step: result.trace_dir for result in trial.record.step_results if result.trace_dir
     }
-    return {
-        checkpoint: trial.trial_dir / (recorded.get(checkpoint) or f"steps/{checkpoint}/agent")
-        for checkpoint in checkpoints
-    }
+    root = trial.trial_dir.resolve()
+    found: dict[str, Path | None] = {}
+    for checkpoint in checkpoints:
+        path = trial.trial_dir / (recorded.get(checkpoint) or f"steps/{checkpoint}/agent")
+        if path.resolve().is_relative_to(root):
+            found[checkpoint] = path
+        else:
+            notes.append(f"{checkpoint}: step directory is outside the trial; gate record skipped")
+            found[checkpoint] = None
+    return found
 
 
-def _read(trace_dir: Path, notes: list[str], checkpoint: str) -> StepGate | None:
+def _read(trace_dir: Path | None, notes: list[str], checkpoint: str) -> StepGate | None:
+    if trace_dir is None:
+        return None
     try:
         return read_step_gate(trace_dir if trace_dir.is_dir() else None)
     except GateRecordError as exc:
@@ -139,50 +136,29 @@ def _read(trace_dir: Path, notes: list[str], checkpoint: str) -> StepGate | None
         return None
 
 
-def _step(
-    trial: TrialSource,
-    checkpoint: str,
-    trace_dir: Path,
-    gate: StepGate | None,
-    cells: _Cells,
-) -> GateStep:
+def _step(checkpoint: str, gate: StepGate | None, cells: _Cells) -> GateStep:
     return GateStep(
         checkpoint=checkpoint,
-        termination=gate.termination_reason if gate is not None else None,
         cells={metric: cells.cell(metric, checkpoint) for metric in STEP_CELLS},
-        families={
-            family: cells.cell(f"blocking_findings.{family}", checkpoint) for family in FAMILIES
-        },
-        first_run_families={
-            family: cells.cell(f"first_run_blocking.{family}", checkpoint) for family in FAMILIES
-        },
-        rounds=tuple(_round(trial, trace_dir, run) for run in gate.runs) if gate else (),
-    )
-
-
-def _is_shadow(traces: dict[str, Path], gates: dict[str, StepGate | None]) -> bool:
-    """A step with a gate record names shadow mode (guardrail-gate@2)."""
-    return any(
-        step_mode(traces[checkpoint]) == SHADOW_MODE
-        for checkpoint, gate in gates.items()
-        if gate is not None
+        rounds=tuple(_round(run) for run in gate.runs) if gate else (),
+        errors=tuple(gate.errors) if gate else (),
     )
 
 
 def _assessment_notes(assessment: Assessment | None) -> list[str]:
     """Why the cells are missing."""
     if assessment is None:
-        return [f"{_UNASSESSED}: rescore its job with {GATE_EFFORT_REF}"]
+        return [f"{_UNASSESSED}: rescore its job with {VERIFICATION_EFFORT_REF}"]
     return []
 
 
 def build_gate_view(
     trial: TrialSource, assessment: Assessment | None, checkpoints: Sequence[str]
 ) -> GateView | None:
-    """The trial's gate effort, or None when it ran without the commit gate."""
+    """The trial's verification effort, or None when it ran without a gate/1 record."""
     cells = _Cells(assessment)
     notes: list[str] = []
-    traces = _trace_dirs(trial, checkpoints)
+    traces = _trace_dirs(trial, checkpoints, notes)
     gates = {checkpoint: _read(traces[checkpoint], notes, checkpoint) for checkpoint in checkpoints}
     if not cells.measured() and not notes and all(gate is None for gate in gates.values()):
         return None
@@ -190,11 +166,7 @@ def build_gate_view(
     return GateView(
         source=assessment.key if assessment is not None else None,
         scorer=assessment.scorer.ref if assessment is not None else None,
-        shadow=_is_shadow(traces, gates),
-        steps=tuple(
-            _step(trial, checkpoint, traces[checkpoint], gates[checkpoint], cells)
-            for checkpoint in checkpoints
-        ),
+        steps=tuple(_step(checkpoint, gates[checkpoint], cells) for checkpoint in checkpoints),
         totals={metric: cells.cell(metric, TRAJECTORY_SUBJECT) for metric in TOTAL_CELLS},
         notes=tuple(notes),
     )

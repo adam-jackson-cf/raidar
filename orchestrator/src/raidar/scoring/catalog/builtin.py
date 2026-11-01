@@ -23,53 +23,55 @@ from raidar.scoring.framework.registry import (
     tool_lock_for,
     tool_versions,
 )
-from raidar.scoring.gate_effort.manifest import GATE_EFFORT
 from raidar.scoring.process_checks.manifest import PROCESS_COMPLIANCE
 from raidar.scoring.test_coverage.manifest import TEST_COVERAGE
+from raidar.scoring.verification_effort.manifest import VERIFICATION_EFFORT
 
 REGISTERED_MANIFESTS = (
     *BUILTIN_MANIFESTS,
     PROCESS_COMPLIANCE,
-    GATE_EFFORT,
+    VERIFICATION_EFFORT,
     DEFINITION_COVERAGE,
     TEST_COVERAGE,
 )
 
 BUILTIN_IMPLEMENTATIONS: dict[str, str] = {
-    "correctness@9": "raidar.scoring.correctness:correctness_scorer",
-    "code-quality@8": "raidar.scoring.code_quality:code_quality_scorer",
-    "resource-usage@7": "raidar.scoring.resource_usage:resource_usage_scorer",
-    "process-compliance@11": (
+    "correctness@10": "raidar.scoring.correctness:correctness_scorer",
+    "code-quality@9": "raidar.scoring.code_quality:code_quality_scorer",
+    "resource-usage@8": "raidar.scoring.resource_usage:resource_usage_scorer",
+    "process-compliance@12": (
         "raidar.scoring.process_checks:deterministic_process_compliance_scorer"
     ),
-    "gate-effort@15": "raidar.scoring.gate_effort:gate_effort_scorer",
-    "definition-coverage@5": "raidar.scoring.definition_coverage:definition_coverage_scorer",
-    "test-coverage@5": "raidar.scoring.test_coverage:make_test_coverage_scorer",
+    "verification-effort@1": "raidar.scoring.verification_effort:verification_effort_scorer",
+    "definition-coverage@6": "raidar.scoring.definition_coverage:definition_coverage_scorer",
+    "test-coverage@6": "raidar.scoring.test_coverage:make_test_coverage_scorer",
 }
 # Scorers bound to the assessment store at rescore time.
 BUILTIN_STORE_IMPLEMENTATIONS: dict[str, str] = {
-    # gate-effort reads the offline grades of guardrail-gate's pre-fix snapshots,
-    # which ``raidar assess --rescore`` writes to the store (raidar.grading.prefix.grade).
-    "gate-effort@15": "raidar.scoring.gate_effort:gate_effort_scorer_for_store",
+    # verification-effort reads the offline grades of gate/1's retained pre-fix trees,
+    # which ``raidar assess --rescore`` writes to the store (raidar.grading.pre_fix.grade).
+    "verification-effort@1": (
+        "raidar.scoring.verification_effort:verification_effort_scorer_for_store"
+    ),
     # code-quality reads the offline coverage runs of steps whose trial deferred the
     # coverage pass, which ``raidar assess --rescore`` makes into the store
     # (raidar.grading.coverage.offline).
-    "code-quality@8": "raidar.scoring.code_quality:code_quality_scorer_for_store",
+    "code-quality@9": "raidar.scoring.code_quality:code_quality_scorer_for_store",
 }
 # Config keys a scorer takes from the problem unless the experiment sets them.
 BUILTIN_PROBLEM_CONFIG: dict[str, tuple[str, ...]] = {
-    "code-quality@8": ("entry_file",),
+    "code-quality@9": ("entry_file",),
 }
 # Config keys the experiment's protocol sets (``ProtocolSpec`` field names).
 BUILTIN_PROTOCOL_CONFIG: dict[str, tuple[str, ...]] = {
-    "correctness@9": ("progression",),
+    "correctness@10": ("progression",),
 }
 # Scorers that take the lock's pinned problem errata as config key ``errata``.
 ERRATA_CONFIG_KEY = "errata"
-BUILTIN_ERRATA_CONFIG: frozenset[str] = frozenset({"correctness@9"})
+BUILTIN_ERRATA_CONFIG: frozenset[str] = frozenset({"correctness@10"})
 # Scorers that take the lock's pinned solvable sets as config key ``solvable``.
 SOLVABLE_CONFIG_KEY = "solvable"
-BUILTIN_SOLVABLE_CONFIG: frozenset[str] = frozenset({"correctness@9"})
+BUILTIN_SOLVABLE_CONFIG: frozenset[str] = frozenset({"correctness@10"})
 
 
 def _builtin(manifest: ScorerManifest) -> ScorerRegistration:

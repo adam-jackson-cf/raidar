@@ -30,14 +30,13 @@ The overall verdict is ``separated`` only when every requested check is.
 
 Available checks and the scorer each reads (``CHECK_SCORERS``):
 ``tests_run_before_finish`` and ``plan_written`` (``process-compliance``), and
-``gate_clean_at_step_end`` (``gate-effort``: the step's last
-commit-gate run passed; a shadow gate never decides it, so a baseline arm with a
-shadow gate has no decided checkpoint for it). The checks run by default: the
+``gate_clean_at_step_end`` (``verification-effort``: the step's last
+commit-gate run passed). The checks run by default: the
 process-compliance defaults when that scorer is declared, and the gate check when
-``gate-effort`` is.
+``verification-effort`` is.
 
 Placement: this compares arms, which F6 keeps out of scorers, so it is
-analysis code over stored ``process-compliance`` and ``gate-effort`` results.
+analysis code over stored ``process-compliance`` and ``verification-effort`` results.
 ``raidar analyze`` runs it for every non-baseline arm against the baseline arm.
 """
 

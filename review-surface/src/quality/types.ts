@@ -94,50 +94,30 @@ export interface QualityRunSummary {
   trial_record: string;
 }
 
-/** Rule families of the gate's blocking findings (raidar.scoring.gate_effort.families). */
-export const GATE_FAMILIES = [
-  'complexity',
-  'typing',
-  'defects',
-  'structure',
-  'style',
-  'naming',
-  'tests',
-  'suppressions',
-  'other',
-] as const;
-export type GateFamily = (typeof GATE_FAMILIES)[number];
-
 export interface GateRound {
   run: number;
   after: string;
-  verdict: 'passed' | 'refused' | 'timed_out' | 'error';
-  blocking: number | null;
-  listed: number;
-  /** Blocking findings per family; null when the stored files do not name them all. */
-  families: Record<GateFamily, number> | null;
-  source: string;
-  summary: string;
-  log_path: string | null;
-  duration_s: number | null;
+  verdict: 'passed' | 'refused' | 'error';
+  attribution: string;
+  seconds: number | null;
+  error: string | null;
+  /** Names of the run's blocking checks that did not pass. */
+  failed_checks: string[];
 }
 
 export interface GateStep {
   checkpoint: string;
-  termination: string | null;
   cells: Record<string, Cell>;
-  families: Record<GateFamily, Cell>;
-  first_run_families: Record<GateFamily, Cell>;
   rounds: GateRound[];
+  /** The gate/1 record's own error messages for the step. */
+  errors: string[];
 }
 
-/** A gated trial's commit-gate effort (gate-effort); absent (null) for an ungated trial. */
+/** A gated trial's verification effort (verification-effort@1); absent (null) for a trial without a gate/1 record. */
 export interface GateView {
   source: string | null;
-  /** The gate-effort version the cells come from (null: unassessed). */
+  /** The verification-effort version the cells come from (null: unassessed). */
   scorer?: string | null;
-  /** A shadow gate: recorded at each step's end, never enforced (fix outcomes not applicable). */
-  shadow?: boolean;
   steps: GateStep[];
   totals: Record<string, Cell>;
   notes: string[];

@@ -4,6 +4,29 @@ All notable changes to this project are documented in this file.
 
 ## Unreleased
 
+### `verification-effort@1` and pre-fix grading from `gate/1` records (phase 5B step 3)
+
+- Replace the scorer `gate-effort` with `verification-effort@1` (`raidar.scoring.verification_effort`).
+  It reads the host-written `gate/1` record of each step's `workflow/workflow.json` (seals, their
+  checks, retained pre-fix trees) and the `gate_fix` turns' tokens, cost and time: fix rounds,
+  first-pass and step-end cleanliness, failed blocking checks, fix cost and the fix turns'
+  correctness. A trajectory without a `gate/1` package is `not_applicable`; a malformed record is
+  `unavailable`, never an empty gate. No shadow gate, rule families, autofix or refusal-kind metrics
+  remain: `gate/1` records none of them. Outcome ids stay `gate.<metric>`.
+- Move pre-fix grading from `raidar.grading.prefix` to `raidar.grading.pre_fix`: it grades the trees
+  `gate/1` retained before each fix turn (only when `max_fix_rounds` is above zero) with the step's
+  own bundle, sandbox and timeout into the Assessment store. A retained path outside the agent logs
+  is an error, never a grade. Stored grades use schema 3, so earlier grades are not read.
+- Migrate analysis (`ArmSummary.verification_effort`, descriptive and paired gate effects, the
+  manipulation check's `gate_clean_at_step_end`, the Markdown gate table) and the review surface's
+  Quality gate view (a failed-blocking-checks table with per-seal rounds) to the new records and
+  delete the old families, autofix, refusal and shadow views.
+- Delete `gate-effort@15` and its modules, tests and fixtures.
+- Read coverage inputs from verified `criteria/1`, captured `tokens.UNITS`, reply maps and retained
+  sources, without importing package implementation code; read resource judge calls from `jev-judge/1`.
+- Archive and supersede every changed scorer closure: `correctness@10`, `code-quality@9`,
+  `resource-usage@8`, `process-compliance@12`, `definition-coverage@6` and `test-coverage@6`.
+
 ### Portable reply/judge execution and package-only runtime (phase 5B step 2)
 
 - Wire `acceptance-reply/1` and `jev-judge/1` to validated, digest-checked `criteria/1` data.

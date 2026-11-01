@@ -64,7 +64,7 @@ def _group_rate(group: str) -> MetricSpec:
 
 CORRECTNESS = ScorerManifest(
     id="correctness",
-    version="9",
+    version="10",
     description=(
         "Reference-solvable SCB success and raw SCB verdicts per checkpoint and trajectory."
     ),
@@ -184,7 +184,7 @@ def _component(metric_id: str, name: str, level: MetricLevel) -> MetricSpec:
 
 CODE_QUALITY = ScorerManifest(
     id="code-quality",
-    version="8",
+    version="9",
     description=(
         "SCB-fork code-quality and inertia components over the per-step snapshots; a step "
         "graded without the in-trial coverage pass reads G's coverage run from the offline "
@@ -248,7 +248,7 @@ def _usage(metric_id: str, description: str, level: MetricLevel, unit: str) -> M
 
 RESOURCE_USAGE = ScorerManifest(
     id="resource-usage",
-    version="7",
+    version="8",
     description=(
         "Tokens, canonical-table agent cost plus host judge spend, turns and agent wall time."
     ),
@@ -281,7 +281,7 @@ RESOURCE_USAGE = ScorerManifest(
     ),
 )
 
-# Not registered: the metric base ``process-compliance@11`` derives its deterministic metrics
+# Not registered: the metric base ``process-compliance@12`` derives its deterministic metrics
 # from (``process_checks.manifest``); the Jev-tier metric is the fixture of the Jev gating tests.
 PROCESS_COMPLIANCE = ScorerManifest(
     id="process-compliance",

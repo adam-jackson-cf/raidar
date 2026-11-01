@@ -56,11 +56,11 @@
         }
       },
       "scorer": {
-        "code-quality@8": {
-          "digest": "7bbd31f25d8eb10f99408d57d5353fcfa94dc1d15ef7acaad0f9bde85396ca03",
+        "code-quality@9": {
+          "digest": "c73c551f34b607e2ef714938f4d09be510a6e76eeb8ad52d4f201383c383cce7",
           "metadata": {
             "implementation": "raidar.scoring.code_quality:code_quality_scorer",
-            "implementation_digest": "684c06474ac3621a73b32bf0a023c3a99d04466961345075394d2de45fd0b1d1",
+            "implementation_digest": "f7c95cdfb923d7b8c3e34c939a0664af0fe122424a75860d14fdded9a5467346",
             "manifest": {
               "description": "SCB-fork code-quality and inertia components over the per-step snapshots; a step graded without the in-trial coverage pass reads G's coverage run from the offline run in the Assessment store, and G leaves out at most 3 cases whose outcome differs between the grading and coverage runs instead of reading the step as ineligible.",
               "evidence_required": [
@@ -235,7 +235,7 @@
                 "scb-python-quality",
                 "scb-check"
               ],
-              "version": "8"
+              "version": "9"
             },
             "tool_lock": {
               "python": {
@@ -278,11 +278,11 @@
             }
           }
         },
-        "correctness@9": {
-          "digest": "ff57a482d926dbb37e46e5e1a1756ffaf2943c85b20a150b47f5e46a81124e2c",
+        "correctness@10": {
+          "digest": "2f47b5e342998f9cf6f874be4466c6149eb97ef89fdbf8451db61ee94f25a31f",
           "metadata": {
             "implementation": "raidar.scoring.correctness:correctness_scorer",
-            "implementation_digest": "a394d488959c5189eb91e305605d2dc4192ede7131ade03badb3c2da43a8289f",
+            "implementation_digest": "af2102738f2fa3f6a16de4a3575e0df5095b9e62215207e4d98ad7ba55b40fac",
             "manifest": {
               "description": "Reference-solvable SCB success and raw SCB verdicts per checkpoint and trajectory.",
               "evidence_required": [
@@ -476,16 +476,16 @@
                 "*"
               ],
               "tools": [],
-              "version": "9"
+              "version": "10"
             },
             "tool_lock": {}
           }
         },
-        "process-compliance@11": {
-          "digest": "ed782d2240bd2fc404ffead3c333b3a8b7ed48a0943c72df4b29d4490a4a966e",
+        "process-compliance@12": {
+          "digest": "b8f0b616f64935cb603abaf64a8c06ef67c189c2a92b452034423b7b7de4e818",
           "metadata": {
             "implementation": "raidar.scoring.process_checks:deterministic_process_compliance_scorer",
-            "implementation_digest": "ffa82b5d45a42df0dc8cb77bc170759b759f66a074f610058abc25c9dc51bba7",
+            "implementation_digest": "be9334b3396516cb7765405977bdb577ce21bb7cc05fc0f5d977d913fc15a0e9",
             "manifest": {
               "description": "Deterministic trace checks of agent process (stall outcomes, a test command counts only when it ran, the step's work session's own test run after its last edit, a compliance rate without the plan check unless the condition asks for a plan); a check the trace cannot decide is undetermined, never judged by a model. Adds whether the work session ran the tests at all, and whether it ran them after its last edit to a non-test file.",
               "evidence_required": [
@@ -680,16 +680,16 @@
                 "*"
               ],
               "tools": [],
-              "version": "11"
+              "version": "12"
             },
             "tool_lock": {}
           }
         },
-        "resource-usage@7": {
-          "digest": "60d96eeb9afc2230233b14ae80ce8d2062fc35c711f6acf13ee7435bd7daa4a0",
+        "resource-usage@8": {
+          "digest": "ae7e7ce0ff4d6986556049eea5fd1e432ef45f33d103159b292fc2af0ba53ce8",
           "metadata": {
             "implementation": "raidar.scoring.resource_usage:resource_usage_scorer",
-            "implementation_digest": "19fd228d5bb5fe99c48d0fbc210a31d37b7f98855312c2bb029b6822cac947ae",
+            "implementation_digest": "511a651776fc4e185e36027686b658cce0d0b3055ceab1aa157b0073dd2ca5a5",
             "manifest": {
               "description": "Tokens, canonical-table agent cost plus host judge spend, turns and agent wall time.",
               "evidence_required": [
@@ -811,7 +811,7 @@
                 "*"
               ],
               "tools": [],
-              "version": "7"
+              "version": "8"
             },
             "tool_lock": {}
           }
@@ -826,10 +826,10 @@
       "metric": "scb-canonical@2",
       "scorer_config": {},
       "scorers": [
-        "correctness@9",
-        "code-quality@8",
-        "resource-usage@7",
-        "process-compliance@11"
+        "correctness@10",
+        "code-quality@9",
+        "resource-usage@8",
+        "process-compliance@12"
       ]
     },
     "tools": {
@@ -841,7 +841,7 @@
       "tree-sitter-language-pack": "0.13.0"
     }
   },
-  "document_sha256": "79aaa5f1375b74cda28d12673af24c88ae5da6dc04c1938a5ad5a01e8e29becf",
+  "document_sha256": "bdb130d0af5385b3f4dad32421a5642af6c606e6ed8a4a07f3d85b1dade643fd",
   "execution": {
     "arms": {
       "baseline": {
@@ -1617,7 +1617,7 @@
               "grader": {
                 "environment_id": "sha256:1989940cc347e516b774a3833071b60dbfae6a730e55462cdf38a095e23d8765",
                 "image": "raidar-oracle-grader:963c14e63ff5e15d",
-                "implementation_sha256": "3a363b442127b5226098cd18e038b64e3f958e9d8054f8eddac7987267851687"
+                "implementation_sha256": "8ec19265f72d6f0de11214f53f7c3a962b6c290e7ce7e959759f1afe8a3642aa"
               },
               "not_run": [
                 "native_parity_positive",
@@ -1687,10 +1687,10 @@
   "experiment": {
     "id": "python__forge__claude-mechanics",
     "source": "experiment.yaml",
-    "source_sha256": "013479d450ee1b9dd2f13941ece97f299680b38d7eb30168c71740e0cc7c8c8d",
-    "spec_sha256": "112a149cdc447debede727f61e544d236479047ed630c629ffdf49e5dab1dcf6"
+    "source_sha256": "9c725c156c8c2d9710debb42b0d677212c041015025d71ae9a4cd9bb31f311c3",
+    "spec_sha256": "ae99368e7ab29bb6b6732afa0360c09645230d2124a21f84c72a7b0179236bed"
   },
-  "lock_sha256": "a8ed43286338cd7d92ee77289bb6b06831d3dc06a334298a12afb7dc64cd8e26",
+  "lock_sha256": "c4f95b07b615d819f3d7d112d48f48c8cd5e3a4a6d190e50628adc6cf88f1823",
   "lock_version": 5,
   "overrides": {
     "flags": {},
@@ -1698,8 +1698,8 @@
   },
   "sections": {
     "analysis": "1b12d4c79118b1962282a0c33350352b893d39995117c241bba045eff2a1d044",
-    "assessment": "dce26b7322a34e10c22c380fff0f675581046b9df217d283beaef5d6a55efb37",
-    "execution": "a8ed43286338cd7d92ee77289bb6b06831d3dc06a334298a12afb7dc64cd8e26",
+    "assessment": "7a254819d558f6cd17d80bfa6fc9071c738554caf3ff802802ad58a80c6fcbe2",
+    "execution": "c4f95b07b615d819f3d7d112d48f48c8cd5e3a4a6d190e50628adc6cf88f1823",
     "toolchain": "6256053eb5ce8c39f8bf92cd11a70df1ddd8a4a0b880f514605f4aecbd9774ae"
   },
   "spec": {
@@ -1737,10 +1737,10 @@
       "metric": "scb-canonical@2",
       "scorer_config": {},
       "scorers": [
-        "correctness@9",
-        "code-quality@8",
-        "resource-usage@7",
-        "process-compliance@11"
+        "correctness@10",
+        "code-quality@9",
+        "resource-usage@8",
+        "process-compliance@12"
       ]
     },
     "description": "Claude Code primary-session mechanics on forge; not citable.",

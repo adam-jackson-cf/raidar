@@ -164,7 +164,7 @@ def test_default_checks_are_deterministic_metrics_of_the_default_scorer() -> Non
     assert (PROCESS_COMPLIANCE.ref,) == PROCESS_COMPLIANCE_REFS
 
 
-@pytest.mark.parametrize("ref", ["process-compliance@11"])
+@pytest.mark.parametrize("ref", ["process-compliance@12"])
 def test_arm_results_load_from_the_assessment_store(tmp_path: Path, ref: str) -> None:
     registry = default_scorer_registry()
     store = AssessmentStore(tmp_path / "store")
@@ -184,7 +184,7 @@ def test_arm_results_load_from_the_assessment_store(tmp_path: Path, ref: str) ->
 
     other = assess(
         store,
-        registry.get("correctness@9"),
+        registry.get("correctness@10"),
         traced_context(tmp_path / "c", [TracedStep("checkpoint_1", trace=_trial_trace(True))]),
         trial="c",
     )
