@@ -1,6 +1,6 @@
 [project]
 name = "raidar-contract"
-dynamic = ["version"]
+version = "1.0.0"
 description = "Portable Raidar contract: stage/1, workflow schema 2, criteria/1, stage-tree/1, releases and the agent schema"
 requires-python = ">=3.12"
 dependencies = [
@@ -11,9 +11,6 @@ dependencies = [
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
-
-[tool.hatch.version]
-path = "src/raidar_contract/__init__.py"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/raidar_contract"]

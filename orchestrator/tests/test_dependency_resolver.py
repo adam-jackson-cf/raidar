@@ -261,8 +261,12 @@ def test_the_resolver_identity_is_the_uv_version_and_is_asked_once() -> None:
         (_done(2, stderr="broken"), "uv is unavailable"),
         (FileNotFoundError("no uv"), "uv is unavailable"),
         (_timed_out(), "uv is unavailable"),
+        (_done(stdout=""), "uv returned an invalid version"),
+        (_done(stdout="uv"), "uv returned an invalid version"),
+        (_done(stdout="other 1.2.3"), "uv returned an invalid version"),
+        (_done(stdout="uv unknown"), "uv returned an invalid version"),
     ],
-    ids=["nonzero", "missing", "timeout"],
+    ids=["nonzero", "missing", "timeout", "empty", "incomplete", "wrong-tool", "bad-version"],
 )
 def test_an_unusable_uv_is_an_infrastructure_failure_for_its_identity(
     outcome: Outcome, message: str
@@ -438,6 +442,26 @@ def test_a_closure_over_a_cap_or_from_outside_the_index_provides_nothing(
     assert result.provided == ()
     within = scripted(ScriptedUv(_resolves()), max_packages=2, max_bytes=20)
     assert not within(["pkg", "dep"], arch="amd64", exclude_newer=CUTOFF).unprovided
+
+
+@pytest.mark.parametrize(
+    "lock",
+    [
+        "not TOML",
+        '[[packages]]\nname = "pkg"\n',
+        'packages = "broken"\n',
+        '[[packages]]\nname = "pkg"\nversion = "1.0"\nwheels = ["broken"]\n',
+        '[[packages]]\nname = "pkg"\nversion = "1.0"\n'
+        'wheels = [{url = "https://files.example/pkg.whl", size = "broken"}]\n',
+    ],
+    ids=["syntax", "missing-version", "package-shape", "wheel-shape", "wheel-size"],
+)
+def test_an_unreadable_generated_lock_is_infrastructure_never_a_dependency_refusal(
+    lock: str,
+) -> None:
+    uv = ScriptedUv(_answers(_done(stdout=lock)))
+    with pytest.raises(DependencyInfraError, match="uv returned an unreadable lock"):
+        scripted(uv)(["pkg"], arch="amd64", exclude_newer=CUTOFF)
 
 
 def test_a_find_links_directory_is_its_own_index(tmp_path: Path) -> None:

@@ -4,6 +4,20 @@ All notable changes to this project are documented in this file.
 
 ## Unreleased
 
+### Grading execution identity
+
+- Hash the complete local grading import closure, including package initializers and
+  judge-secret isolation, instead of every contract model. The primitive closure walker
+  now lives in the shared contract layer; implicit namespace packages are accounted for.
+- Inventory name-loaded subprocess/plugin roots and shipped runtime resources explicitly;
+  refuse unaccounted dependencies. Hash exactly the runtime file bytes copied to the sandbox,
+  excluding `__pycache__` from both hashing and transport.
+- Keep distribution versions in non-executed project metadata, not package initialization.
+  Grading identity includes the host Python, packaging and pydantic versions as before.
+- Normalize malformed resolver version output and unreadable generated locks as infrastructure
+  failures, never dependency refusals. This deliberately changes grading identity; all pinned
+  problems require one revalidation after the contract release/distribution batch.
+
 ### Grading and problem fast coverage closure
 
 - Cover retained pre-fix grading, offline coverage reuse and parity, verifier/regrade refusals,
@@ -24,10 +38,8 @@ All notable changes to this project are documented in this file.
   regenerate affected execution locks without changing released package bytes.
 - Ratchet fast-only coverage floors from 85.20% line / 75.86% branch to
   93.64% line / 89.58% branch; both remain below the 95% closure target.
-- Known deferred resolver gap: malformed `uv --version` output and unreadable
-  generated locks can escape as parser/index/key errors instead of
-  `DependencyInfraError`. Error normalization is deferred to a deliberate grading
-  change with revalidation; it is not part of this test-only integration.
+- Resolver version/lock error normalization is included in the deliberate grading-identity
+  batch above, with behavioral refusal tests and revalidation required before new trials.
 - Close engine-and-agent fast-tier coverage gaps with behavioral planning, admission,
   detached-job, trial-failure, provisioning, authentication and image-boundary scenarios.
   Inject runners, clocks and virtual task/job filesystems; preserve production source,
