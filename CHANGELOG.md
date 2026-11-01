@@ -15,6 +15,8 @@ All notable changes to this project are documented in this file.
 - Remove the unused primitive resolver, auth metadata method, unused reasoning
   override and redundant credential-redaction guard as reviewed dead-code cleanup;
   regenerate affected execution locks without changing released package bytes.
+- Ratchet fast-only coverage floors from 85.20% line / 75.86% branch to
+  93.64% line / 89.58% branch; both remain below the 95% closure target.
 - Known deferred resolver gap: malformed `uv --version` output and unreadable
   generated locks can escape as parser/index/key errors instead of
   `DependencyInfraError`. Error normalization is deferred to a deliberate grading
