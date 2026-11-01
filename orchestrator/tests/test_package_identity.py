@@ -79,14 +79,24 @@ def _register(root: Path, *, workflow: bool = True) -> None:
     (root / "lab/imports.yaml").write_text(yaml.safe_dump(imports), encoding="utf-8")
 
 
-@pytest.fixture
-def tree(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
-    monkeypatch.setenv("RAIDAR_VAR", str(tmp_path / "var"))
-    root = release_tree(tmp_path / "repo")
-    fixture_package("gate-check", stages_root(root))
-    _write_workflow(root, _workflow_document())
-    _register(root)
+@pytest.fixture(scope="module")
+def tree_template(tmp_path_factory: pytest.TempPathFactory) -> Path:
+    """The registered tree, built once: tests copy the few small files rather than rebuild it."""
+    base = tmp_path_factory.mktemp("identity-template")
+    with pytest.MonkeyPatch.context() as patch:
+        patch.setenv("RAIDAR_VAR", str(base / "var"))
+        patch.setattr(package_checks, "uv_lock_stale", lambda tool: None)
+        root = release_tree(base / "repo")
+        fixture_package("gate-check", stages_root(root))
+        _write_workflow(root, _workflow_document())
+        _register(root)
     return root
+
+
+@pytest.fixture
+def tree(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, tree_template: Path) -> Path:
+    monkeypatch.setenv("RAIDAR_VAR", str(tmp_path / "var"))
+    return shutil.copytree(tree_template, tmp_path / "repo")
 
 
 def _package_file(root: Path, relative: str) -> Path:
@@ -457,7 +467,7 @@ def test_st7_two_packages_claiming_the_same_name_are_refused(tmp_path: Path, kin
             found.update(requires={"o": "outputs/1"}, outputs={name: {"path": "/app/.raidar/x"}})
         return found
 
-    def files(name: str) -> dict[str, str]:
+    def files(name: str) -> dict[str, str | bytes]:
         if kind == "command":
             return {
                 "tool/pyproject.toml": "[project]\nname = 'x'\nversion = '1'\ndependencies = []\n"

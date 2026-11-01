@@ -1,17 +1,19 @@
-"""The trusted payload's supervisor run for real: real children, timeouts, descendants, pipes."""
+"""The trusted payload's supervisor run for real: real children, timeouts, descendants, pipes.
+
+Its decisions (refusals, outcome decoding, collection, kill rounds) are proven with injected
+pipes, clock and wait status in ``test_primitive_payload_boundaries.py``; these tests keep only
+what needs a forked child: exit/signal/stream capture, the real deadline kill, a flood, a
+descendant holding the pipes, an unstartable command, a tool changed by the running child, and
+the procfs view of adopted children.
+"""
 
 from __future__ import annotations
 
-import ctypes
-import json
 import os
-import signal
-import stat
 import subprocess
 import sys
 import time
 from pathlib import Path
-from types import SimpleNamespace
 from typing import Any
 
 import pytest
@@ -158,113 +160,16 @@ def test_a_child_that_cannot_be_started_is_reported_as_not_run(
     assert result["exit_code"] == 127
 
 
-def test_a_changed_tool_tree_is_refused_before_it_runs_and_flagged_after(
-    tmp_path: Path,
-) -> None:
+def test_a_tool_tree_changed_by_the_running_child_is_flagged_after(tmp_path: Path) -> None:
     tool = _lay(tmp_path / "tool")
-    marker = tmp_path / "ran"
     check = _tree_check(tool)
-    (tool / "a.txt").write_bytes(b"tampered")
-
-    refused = supervise.supervise(_spec(tmp_path, f"open({str(marker)!r}, 'w')", verify=[check]))
-
-    assert refused["ran"] is False
-    assert not marker.exists()
-    assert [t["ok"] for t in refused["tool_before"]] == [False]
-    assert "tool_after" not in refused
-
-    (tool / "a.txt").write_bytes(b"alpha")
     mutate = f"open({str(tool / 'a.txt')!r}, 'w').write('changed')"
+
     after = supervise.supervise(_spec(tmp_path, mutate, verify=[check]))
+
     assert after["ran"]
     assert [t["ok"] for t in after["tool_before"]] == [True]
     assert [t["ok"] for t in after["tool_after"]] == [False]
-
-
-def test_unsafe_or_oversized_watched_state_refuses_the_run_and_missing_state_does_not(
-    tmp_path: Path,
-) -> None:
-    marker = tmp_path / "ran"
-    code = f"open({str(marker)!r}, 'w')"
-    state = _lay(tmp_path / "state")
-    (state / "l").symlink_to(state)
-
-    unsafe = supervise.supervise(_spec(tmp_path, code, state=str(state)))
-    (state / "l").unlink()
-    oversized = supervise.supervise(
-        _spec(
-            tmp_path,
-            code,
-            state=str(state),
-            state_limits={"max_bytes": 1, "max_files": 10, "max_depth": 5},
-        )
-    )
-    absent = supervise.supervise(_spec(tmp_path, "pass", state=str(tmp_path / "absent")))
-
-    assert unsafe["ran"] is False
-    assert unsafe["bounds_violation"] == "symlink: l"
-    assert oversized["ran"] is False
-    assert "too many bytes" in oversized["bounds_violation"]
-    assert not marker.exists()
-    assert absent["ran"]
-    assert absent["bounds_violation"] is None
-
-
-def test_a_supervisor_that_cannot_become_a_subreaper_refuses_to_run_the_child(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    marker = tmp_path / "ran"
-    monkeypatch.setattr(ctypes, "CDLL", lambda *a, **k: SimpleNamespace(prctl=lambda *args: -1))
-
-    result = supervise.supervise(_spec(tmp_path, f"open({str(marker)!r}, 'w')", seccomp=True))
-
-    assert result["ran"] is False
-    assert result["isolation_error"] == "could not become a subreaper"
-    assert not marker.exists()
-    assert "tool_after" not in result
-
-    def unavailable(*a: Any, **k: Any) -> None:
-        raise OSError("no libc")
-
-    monkeypatch.setattr(ctypes, "CDLL", unavailable)
-    assert supervise._subreaper({"seccomp": True}) == "could not become a subreaper"
-    assert supervise._subreaper({"seccomp": False}) is None
-
-
-def test_call_scratch_directories_are_private_to_the_call(tmp_path: Path) -> None:
-    spec = _spec(tmp_path, "pass")
-
-    supervise._prepare_dirs(spec)
-
-    for name in ("home", "tmp"):
-        assert stat.S_IMODE((tmp_path / "call" / name).stat().st_mode) == 0o700
-
-
-def test_the_supervisor_entry_prints_one_result_and_destroys_the_call_directory(
-    tmp_path: Path, capsys: pytest.CaptureFixture[str]
-) -> None:
-    spec = _spec(tmp_path, "print('hi')")
-    path = tmp_path / "spec.json"
-    path.write_text(json.dumps(spec))
-
-    assert supervise.main([str(path)]) == 0
-
-    lines = capsys.readouterr().out.splitlines()
-    assert len(lines) == 1
-    assert json.loads(lines[0])["exit_code"] == 0
-    assert not (tmp_path / "call").exists()
-
-
-def test_stray_adopted_processes_are_killed(monkeypatch: pytest.MonkeyPatch) -> None:
-    stray = subprocess.Popen([PY, "-c", "import time; time.sleep(60)"])  # noqa: S603
-    pending = [[stray.pid], []]
-    monkeypatch.setattr(supervise, "_children", lambda me: pending.pop(0))
-    monkeypatch.setattr(supervise, "_reap_all", lambda: None)  # the Popen below reaps its own
-
-    killed = supervise.kill_descendants(2**22)  # no such process group
-
-    assert killed == 1
-    assert stray.wait(timeout=10) == -signal.SIGKILL
 
 
 @pytest.mark.skipif(not os.path.isdir("/proc/self"), reason="needs procfs")

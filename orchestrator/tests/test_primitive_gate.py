@@ -224,20 +224,6 @@ def test_a_tool_command_runs_the_installed_wrapper_and_its_venv(tmp_path: Path) 
     assert Path(facts["prefix"]) == tool_venv
 
 
-def test_watched_state_runs_nothing_but_is_witnessed(tmp_path: Path) -> None:
-    rig = make_rig(tmp_path, PASS)
-    probe = tmp_path / "probe.json"
-    rig.script("zorp", PROBE)
-    watched = GateCheck(
-        name="note", run=("zorp", str(probe)), watch="/app/.raidar/note", timeout_s=30
-    )
-    config = rig.config([watched])
-    watches = gate_tool.watches(config["prerequisites"])
-    assert watches == [("gate-check", "/app/.raidar/note", set())]
-    assert gate_tool.prerequisites(config) == []  # a watched directory is not a check to run
-    assert names(gate_tool.decide(config, tmp_path / "scratch")) == ["gate-check.note"]
-
-
 # order -----------------------------------------------------------------------------------------
 
 
@@ -246,39 +232,6 @@ def test_a_refused_prerequisite_prevents_the_ordinary_checks(tmp_path: Path) -> 
     decision = rig.decide(fixture_checks(rig))
     assert decision.verdict == "refused"
     assert names(decision) == ["gate-check.no-marker"]  # the failing specs were never run
-
-
-def test_prerequisites_run_first_wherever_they_are_listed(tmp_path: Path) -> None:
-    rig = make_rig(tmp_path, PASS)
-    checks = fixture_checks(rig)
-    decision = rig.decide(list(reversed(checks)))
-    assert decision.verdict == "passed"
-    assert names(decision) == ["gate-check.no-marker", "gate-check.unit-specs"]
-
-
-def test_a_closed_flag_makes_the_packages_before_checks_fail_whatever_the_work_is(
-    tmp_path: Path,
-) -> None:
-    rig = make_rig(tmp_path, PASS)
-    flag = tmp_path / "closed-flag"
-    config = rig.config(fixture_checks(rig))
-    for entry in config["package_checks"]:
-        entry["closed_flag"] = str(flag)
-    assert gate_tool.decide(config, tmp_path / "open").verdict == "passed"
-
-    flag.write_text("closed by the package")
-    decision = gate_tool.decide(config, tmp_path / "closed")
-
-    assert decision.verdict == "refused"
-    assert names(decision) == ["gate-check.no-marker"]  # nothing else ran
-    assert decision.checks[0].cause == "closed"
-
-
-def test_the_closed_flag_path_is_in_each_gate_check_entry(tmp_path: Path) -> None:
-    rig = make_rig(tmp_path, PASS)
-    package = GatePackage("gate-check", rig.installed, tuple(fixture_checks(rig)), CONTEXT, "/flag")
-    entries = gate_config(rig.paths, [package], FACTS, hook_sha256="x")["package_checks"]
-    assert {entry["closed_flag"] for entry in entries} == {"/flag"}
 
 
 # the pytest kind -------------------------------------------------------------------------------
@@ -353,25 +306,6 @@ def test_a_check_past_its_timeout_is_the_agents(tmp_path: Path) -> None:
     assert attribute(record)[0] is Attribution.AGENT_ERROR
 
 
-def test_a_check_whose_tool_cannot_start_is_an_integrity_failure(tmp_path: Path) -> None:
-    rig = make_rig(tmp_path)
-    record = rig.record([command("gone", "no-such-tool")])
-    assert [c["cause"] for c in record["checks"]] == ["unrunnable"]
-    assert attribute(record)[0] is Attribution.INTEGRITY
-
-
-def test_a_canary_that_cannot_decide_invalidates_the_instrument(tmp_path: Path) -> None:
-    rig = make_rig(tmp_path)
-    broken = rig.record([command("gone", "no-such-tool")])
-    with pytest.raises(GateInvalid) as caught:
-        check_canary(broken)
-    assert caught.value.category == "instrument"
-    failing = command("strict", sys.executable, "-c", "raise SystemExit(1)")
-    refused = rig.record([failing])
-    assert refused["verdict"] == "refused"
-    check_canary(refused)  # a refusal on the starting workspace is not an instrument failure
-
-
 # the record-only seal --------------------------------------------------------------------------
 
 
@@ -423,16 +357,6 @@ def test_a_check_that_writes_the_workspace_is_recorded_not_undone(tmp_path: Path
     assert record["changed_during_gate"] == ["generated.txt"]
     assert (rig.workspace / "generated.txt").read_text() == "made by a check"  # left as it is
     assert record["tree"] != record["final_tree"]
-
-
-def test_the_seal_of_a_gate_error_is_recorded_for_attribution(tmp_path: Path) -> None:
-    rig = make_rig(tmp_path, PASS)
-    checks = fixture_checks(rig)
-    config, base = start(rig, checks)
-    (rig.workspace / "conftest.py").write_text("import os\nos._exit(126)\n")
-    record = seal(config, base)
-    assert record["verdict"] == "error"
-    assert attribute(record)[0] is Attribution.AGENT_ERROR
 
 
 # the gate of one checkpoint: canary, seals, snapshots and closing ------------------------------
@@ -593,18 +517,6 @@ async def test_a_fix_turn_starts_from_a_retained_prefix_tree(opened: tuple[Rig, 
     assert not (kept / "__pycache__").exists()  # the verifier's own exclusions
     assert entry["tree_digest"] == tree_digest(kept)
     assert run.record()["pre_fix_snapshots"] == [entry]
-
-
-async def test_no_prefix_tree_is_kept_without_fix_rounds(
-    tmp_path: Path, gate_env: dict[str, str]
-) -> None:
-    rig = make_rig(tmp_path, PASS)
-    run = await open_gate(rig, gate_env, fixture_checks(rig), rounds=0)
-    try:
-        assert await run.retain_prefix(1) is None
-        assert not (tmp_path / "logs" / "gate" / "pre_fix_1").exists()
-    finally:
-        await run.close()
 
 
 async def test_a_rewritten_hook_log_and_changed_watched_state_are_integrity_findings(

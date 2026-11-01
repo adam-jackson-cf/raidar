@@ -9,7 +9,6 @@ spike's ended.
 from __future__ import annotations
 
 import json
-import time
 from collections.abc import Callable, Mapping
 from pathlib import Path
 from types import SimpleNamespace
@@ -23,7 +22,7 @@ from raidar.judge.live import LIVE_MODEL, RecordedJev
 from raidar.judge.protocol import JEV_PINNED_MODEL
 from raidar.subject.primitive.gate import Attribution, GateOutcome
 from raidar.subject.primitive.site import TrialInvalid
-from raidar.subject.workflow import asking
+from raidar.subject.workflow import asking, judgeloop, stage
 from raidar.subject.workflow.acceptance import Acceptance
 from raidar.subject.workflow.package import (
     GATE_BUDGET,
@@ -41,17 +40,25 @@ from tests.criteria_support import (
     OBJECT,
     REJECTS,
     TESTS,
-    Host,
+    ScriptShell,
     file_digest,
     gate_record,
     write_workspace,
 )
 
-pytestmark = pytest.mark.slow
-
 KEY = "sk-or-test-key"
 REWORK_PROMPT = "Fix these.\n\n%%%PUSHBACK%%%\n\nGate:\n%%%GATE%%%"
 OPEN, CLOSED_P = 0.1, 0.95
+NOW = 1000.0
+"""The frozen monotonic clock every deadline here is read against."""
+
+
+@pytest.fixture(autouse=True)
+def frozen_clock(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Time stands still: the fit rule and the deadline are exact, nothing sleeps."""
+    fake = SimpleNamespace(monotonic=lambda: NOW)
+    monkeypatch.setattr(stage, "time", fake)
+    monkeypatch.setattr(judgeloop, "time", fake)
 
 
 class Jev:
@@ -156,7 +163,7 @@ class Rig:
     ) -> None:
         self.workspace = tmp_path / "app"
         write_workspace(self.workspace, {FILE: TESTS})
-        self.checkpoint = Checkpoint(Host(), tmp_path / "logs", "task", deadline=deadline)
+        self.checkpoint = Checkpoint(ScriptShell(), tmp_path / "logs", "task", deadline=deadline)
         self.checkpoint.turns.append(Spent(FIRST_BUILD, 5.0))
         text = json.dumps(CRITERIA) if criteria is None else criteria
         path = tmp_path / "criteria.json"
@@ -184,10 +191,11 @@ class Rig:
         stand: str = GATE_PASSED,
         *,
         text: str = TESTS,
+        on_disk: str | None = None,
         verdict: str = "passed",
     ) -> Resume | None:
         """A turn ended: the gate sealed ``text`` and the judge looks at the seal."""
-        write_workspace(self.workspace, {FILE: text})
+        write_workspace(self.workspace, {FILE: text if on_disk is None else on_disk})
         run = len(self.runtime.evidence.gates) + 1
         self.runtime.seal(gate_record(run, {FILE: text}, verdict=verdict), stand)
         self.judge.load_criteria(cast(Any, self.runtime))
@@ -313,7 +321,7 @@ async def test_a_rework_that_does_not_fit_the_time_left_is_declined_and_the_tree
     tmp_path: Path, jev: Any
 ) -> None:
     jev(lambda call, situation: OPEN)
-    rig = Rig(tmp_path, deadline=time.monotonic() + 5.5)  # the first build took 5 s, then a gate
+    rig = Rig(tmp_path, deadline=NOW + 5.5)  # the first build took 5 s, then a gate of 1 s
 
     resume = await rig.seal()
 
@@ -323,7 +331,7 @@ async def test_a_rework_that_does_not_fit_the_time_left_is_declined_and_the_tree
 
 async def test_no_judge_pass_starts_after_the_deadline(tmp_path: Path, jev: Any) -> None:
     fake = jev(lambda call, situation: CLOSED_P)
-    rig = Rig(tmp_path, deadline=time.monotonic() - 1)
+    rig = Rig(tmp_path, deadline=NOW - 1)
 
     assert await rig.seal() is None
 
@@ -538,7 +546,7 @@ def outcome(attribution: Attribution) -> GateOutcome:
 async def test_gate_fixes_keep_every_pre_fix_snapshot_across_judged_passes(
     tmp_path: Path,
 ) -> None:
-    checkpoint = Checkpoint(Host(), tmp_path, "task")
+    checkpoint = Checkpoint(ScriptShell(), tmp_path, "task")
     runtime = PackageCheckpoint(
         checkpoint,
         [],
@@ -563,3 +571,54 @@ async def test_gate_fixes_keep_every_pre_fix_snapshot_across_judged_passes(
     assert await runtime.check("t5") is None
     assert runtime.gate_stand == GATE_PASSED
     assert gate.retained == [1, 2]  # a later pass never overwrites an earlier pre-fix tree
+
+
+async def test_a_rework_that_exactly_fits_the_time_left_is_asked_for(
+    tmp_path: Path, jev: Any
+) -> None:
+    jev(lambda call, situation: OPEN)
+    rig = Rig(tmp_path, deadline=NOW + 6.0)  # a 5 s build turn, a 1 s gate and a judge pass of 0 s
+
+    resume = await rig.seal()
+
+    assert resume is not None
+    assert resume.kind == REWORK
+    assert rig.judge.ending is None
+
+
+async def test_a_checkpoint_with_no_time_left_at_all_judges_nothing(
+    tmp_path: Path, jev: Any
+) -> None:
+    fake = jev(lambda call, situation: CLOSED_P)
+    rig = Rig(tmp_path, deadline=NOW)
+
+    assert await rig.seal() is None
+
+    assert rig.judge.ending == "deadline"
+    assert fake.requests == []
+
+
+async def test_a_tree_the_fix_budget_left_refused_is_not_judged_once_the_deadline_passed(
+    tmp_path: Path, jev: Any
+) -> None:
+    fake = jev(lambda call, situation: CLOSED_P)
+    rig = Rig(tmp_path, deadline=NOW - 1)
+
+    assert await rig.seal(GATE_BUDGET, verdict="refused") is None
+
+    assert (rig.judge.ending, rig.judge.gate_ending) == ("budget_exhausted", "gate_refused")
+    assert fake.requests == []
+    assert rig.judge.record()["judged"] == []
+
+
+async def test_a_work_tree_that_differs_from_the_seals_digest_is_never_shown_to_the_judge(
+    tmp_path: Path, jev: Any
+) -> None:
+    jev(lambda call, situation: CLOSED_P)
+    rig = Rig(tmp_path)
+
+    await rig.seal(on_disk=changed(9))  # the sealed text is TESTS; the tree now says otherwise
+
+    (judged,) = rig.judge.record()["judged"]
+    assert judged["source_mismatch"] == [FILE]
+    assert not (rig.checkpoint.logs_dir / "workflow/sources/final" / FILE).exists()

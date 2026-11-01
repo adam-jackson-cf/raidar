@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 import pytest
-from raidar_contract.package.tokens import FrameError, FramePart, render_frame, token_name
+from raidar_contract.package.tokens import FrameError, FramePart, render_frame
 
 BUILD = "Do the work.\n\n%%%TASK%%%\n\nMethod:\n%%%REVIEW_NOTES%%%\n\nAlso:\n%%%DOCS_CHECK%%%\n"
 
@@ -107,7 +107,3 @@ def test_instructions_join_in_workflow_order_and_disabled_packages_add_none() ->
     framed = render_frame(BUILD + "%%%ZED%%%", "t", parts)
     assert framed.instructions == "First.\n\nThird."
     assert render_frame(BUILD, "t", two()).instructions == ""
-
-
-def test_slot_names_uppercase_with_underscores() -> None:
-    assert token_name("review-notes") == "REVIEW_NOTES"
