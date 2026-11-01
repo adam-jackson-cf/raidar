@@ -36,7 +36,7 @@ name = Scoring: the catalog imports independent scorers over shared evidence and
 type = layers
 layers =
     raidar.scoring.catalog
-    raidar.scoring.code_quality | raidar.scoring.correctness | raidar.scoring.definition_coverage | raidar.scoring.gate_effort | raidar.scoring.process_checks | raidar.scoring.resource_usage | raidar.scoring.test_coverage
+    raidar.scoring.code_quality | raidar.scoring.correctness | raidar.scoring.definition_coverage | raidar.scoring.process_checks | raidar.scoring.resource_usage | raidar.scoring.test_coverage | raidar.scoring.verification_effort
     raidar.scoring.coverage_inputs | raidar.scoring.judge
     raidar.scoring.framework
 

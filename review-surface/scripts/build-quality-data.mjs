@@ -39,9 +39,7 @@ function validateGate(gate, runId) {
   for (const [metric, cell] of Object.entries(gate.totals ?? {})) validateCell(cell, `${runId}.gate.totals.${metric}`);
   for (const step of gate.steps) {
     const where = `${runId}.gate.${step.checkpoint}`;
-    for (const group of ['cells', 'families', 'first_run_families']) {
-      for (const [metric, cell] of Object.entries(step[group] ?? {})) validateCell(cell, `${where}.${group}.${metric}`);
-    }
+    for (const [metric, cell] of Object.entries(step.cells ?? {})) validateCell(cell, `${where}.cells.${metric}`);
     invariant(Array.isArray(step.rounds), `${where}.rounds must be an array`);
   }
 }
