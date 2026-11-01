@@ -7,17 +7,11 @@ execution identity. ``code-quality`` reads the deferred pass from the store.
 
 from __future__ import annotations
 
-from pathlib import Path
+import pytest
+from pydantic import ValidationError
 
-from raidar.design.experiment.loader import load_experiment
-from raidar.design.experiment.schema import ProtocolSpec
-from tests.experiment_spec_support import (
-    AGENTS_BENCHMARK,
-    MECHANICS_SMOKE,
-    SMOKE_EXPERIMENT,
-    experiment_document,
-    write_experiment,
-)
+from raidar.design.experiment.schema import ExperimentSpec, ProtocolSpec
+from tests.experiment_spec_support import experiment_document
 
 
 def test_the_default_is_omitted_from_every_dump_and_offline_is_kept() -> None:
@@ -27,24 +21,25 @@ def test_the_default_is_omitted_from_every_dump_and_offline_is_kept() -> None:
     assert ProtocolSpec.model_validate(offline.model_dump(mode="json")) == offline
 
 
-def test_committed_experiments_dump_it_only_when_they_set_it(tmp_path: Path) -> None:
-    for path in (MECHANICS_SMOKE, SMOKE_EXPERIMENT, AGENTS_BENCHMARK):
-        assert "verifier_coverage" not in load_experiment(path).spec.to_json()["protocol"]
-
-    document = experiment_document(
-        protocol={"verifier_coverage": "offline"}, assessment={"scorers": ["correctness@10"]}
-    )
-    loaded = load_experiment(write_experiment(tmp_path, document))
-    assert loaded.spec.to_json()["protocol"]["verifier_coverage"] == "offline"
-
-
-def test_a_deferred_pass_loads_with_the_scorer_that_reads_the_offline_run(
-    tmp_path: Path,
+@pytest.mark.parametrize("mode", [None, "trial", "offline"])
+@pytest.mark.parametrize("scorers", [("correctness@10",), ("correctness@10", "code-quality@9")])
+def test_experiment_identity_records_only_deferred_coverage(
+    mode: str | None, scorers: tuple[str, ...]
 ) -> None:
-    document = experiment_document(
-        protocol={"verifier_coverage": "offline"},
-        assessment={"scorers": ["correctness@10", "code-quality@9"]},
+    protocol = {} if mode is None else {"verifier_coverage": mode}
+    spec = ExperimentSpec.model_validate(
+        experiment_document(protocol=protocol, assessment={"scorers": scorers})
     )
-    path = write_experiment(tmp_path, document)
+    serialized = spec.to_json()
+    recorded = serialized["protocol"]
+    if mode == "offline":
+        assert recorded["verifier_coverage"] == "offline"
+    else:
+        assert "verifier_coverage" not in recorded
+    assert ExperimentSpec.model_validate(serialized) == spec
 
-    assert load_experiment(path).spec.protocol.verifier_coverage == "offline"
+
+@pytest.mark.parametrize("mode", ["", "disabled", None, 1])
+def test_unknown_coverage_modes_are_refused(mode: object) -> None:
+    with pytest.raises(ValidationError):
+        ProtocolSpec.model_validate({"verifier_coverage": mode})

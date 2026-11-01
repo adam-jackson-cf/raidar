@@ -12,7 +12,7 @@ from click.testing import CliRunner
 from raidar.cli import main
 from raidar.design.problem import validator
 from raidar.design.problem.models import ProblemId, SourcePin
-from raidar.design.problem.native import grade_from_evaluation, stage_catalog
+from raidar.design.problem.native import stage_catalog
 from raidar.design.problem.source import PinnedCheckout, SourceError
 from raidar.design.problem.store import ProblemStore
 from raidar.design.problem.validation import (
@@ -132,25 +132,7 @@ async def test_one_shot_problem_grades_one_step_under_the_one_shot_policy(
     assert multi["headline_policy"]["policy"] == "scb-canonical@1"
 
 
-def test_native_evaluation_reduces_to_the_same_case_keys_as_the_oracle(tmp_path: Path) -> None:
-    grade = grade_from_evaluation(
-        {
-            "pass_counts": {"Core": 1, "Regression": 1},
-            "total_counts": {"Core": 2, "Regression": 1},
-            "tests": {
-                "checkpoint_2-Core": {"passed": ["test_x[a b]"], "failed": ["test_y"]},
-                "checkpoint_1-Regression": {"passed": ["test_z"]},
-            },
-        },
-        "checkpoint_2",
-    )
-    assert grade.outcomes == {
-        "checkpoint_2::test_x[a b]": "passed",
-        "checkpoint_2::test_y": "failed",
-        "checkpoint_1::test_z": "passed",
-    }
-    assert grade.groups["core"] == (1, 2)
-    assert grade.groups["error"] == (0, 0)
+def test_native_catalog_stages_a_locked_evaluator_project_with_real_uv(tmp_path: Path) -> None:
     problem = tmp_path / "adder"
     problem.mkdir()
     (problem / "config.yaml").write_text("test_dependencies: [pyyaml==6.0.2]\n")

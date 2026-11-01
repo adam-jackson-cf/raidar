@@ -2,12 +2,30 @@
 
 from __future__ import annotations
 
+import hashlib
+import json
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import pytest
 
+from raidar.contract.wheels import DependencyInfraError
+from raidar.grading import grader as grader_module
+from raidar.grading.grader import (
+    BUDGET_MARGIN_S,
+    _coverage_contexts,
+    _environment,
+    _sandbox_infra,
+    _sha256_hex,
+    attribute_to_submission,
+    coverage_skip_verdict,
+    grade_step,
+    grading_budget,
+    needs_canary,
+    parity_verdict,
+)
 from raidar.grading.models import (
+    CanaryRecord,
     CaseGroup,
     CaseResult,
     CaseStatus,
@@ -30,18 +48,17 @@ from raidar.grading.normalise import (
     no_graded_cases,
     timing_sensitive,
 )
-from raidar.grading.parity import check_parity, outcome_differences
-from tests.verifier_support import LocalProcessSandbox, make_bundle
-
-
-@pytest.fixture(name="bundle")
-def bundle_fixture(tmp_path: Path):
-    return make_bundle(tmp_path / "fixture")
-
-
-@pytest.fixture(name="sandbox")
-def sandbox_fixture(tmp_path: Path) -> LocalProcessSandbox:
-    return LocalProcessSandbox(tmp_path / "sandbox")
+from raidar.grading.outcomes import RunOutcome, StepGrade
+from raidar.grading.parity import check_parity, fork_regression_run_evidence, outcome_differences
+from raidar.grading.records import (
+    errata_for,
+    fork_payload,
+    parse_errata,
+    parse_solvable,
+)
+from raidar.grading.sandbox import CONTAINER_LAYOUT, SandboxResult, SandboxRun
+from raidar.grading.submission_deps import SubmissionDependencies
+from tests.verifier_support import make_bundle, step_spec
 
 
 def _case(case_id: str, group: CaseGroup, status: CaseStatus) -> CaseResult:
@@ -161,33 +178,6 @@ def test_case_results_are_sorted_and_normalised() -> None:
     )
 
 
-SHADOW = """
-import json, os
-from pathlib import Path
-Path(os.environ["RAIDAR_ORACLE_LEDGER"]).write_text(json.dumps({"forged": True}))
-raise SystemExit(0)
-"""
-
-
-FORGER = """
-import json, os, stat, sys
-from pathlib import Path
-
-leaked = sorted(key for key in os.environ if key.startswith("RAIDAR_ORACLE_"))
-(Path.cwd().parent / "leaked.json").write_text(json.dumps(leaked))
-ledger = Path.cwd().parent / "out" / "ledger.json"
-ledger.write_text(json.dumps({
-    "leaked": leaked,
-    "exit_status": 0,
-    "collect_errors": [],
-    "nodes": [{"node_id": "test_checkpoint_2.py::test_multiplies", "markers": [],
-               "status": "passed", "ran": True, "duration_s": 0.0}],
-}))
-ledger.chmod(stat.S_IRUSR | stat.S_IRGRP | stat.S_IROTH)
-print("wrong answer")
-"""
-
-
 def _consistency_ledger(status: int, node_status: str) -> dict[str, Any]:
     return {
         "exit_status": status,
@@ -226,19 +216,6 @@ def test_consistent_ledgers_pass_the_host_checks() -> None:
         ledger_consistency_failure(_consistency_ledger(0, "passed"), 0, ["test_checkpoint_1.py"])
         is None
     )
-
-
-SLOW_TESTS = """
-import time
-
-
-def test_first():
-    time.sleep(2)
-
-
-def test_second():
-    pass
-"""
 
 
 # ------------------------------------------------------------ parity rules
@@ -312,3 +289,573 @@ def test_outcome_differences_name_each_diverging_case() -> None:
         "c: only in coverage",
         "b: grading=passed coverage=failed",
     ]
+
+
+# ------------------------------------------------------- grader decisions
+def _outcome(
+    infra: InfraFailure | None = None,
+    *,
+    cases: tuple[CaseResult, ...] = (),
+    evidence: RunEvidence | None = None,
+    dependencies: object | None = None,
+) -> RunOutcome:
+    return RunOutcome("grading", cases, infra, evidence, (), 1.5, cast(Any, dependencies))
+
+
+def test_sandbox_outcomes_classify_success_timeout_nonzero_and_missing_ledger(
+    tmp_path: Path,
+) -> None:
+    ledger = tmp_path / "ledger.json"
+    ledger.write_text("{}")
+    assert _sandbox_infra(SandboxResult(0, False, "ok"), ledger) is None
+    assert _sandbox_infra(SandboxResult(1, False, "pytest failed"), ledger) is None
+
+    timed_out = _sandbox_infra(SandboxResult(None, True, ""), ledger)
+    assert timed_out is not None
+    assert timed_out.code == "sandbox_timeout"
+
+    missing = _sandbox_infra(SandboxResult(137, False, "x" * 5000 + "killed"), tmp_path / "none")
+    assert missing is not None
+    assert missing.code == "sandbox_error"
+    assert missing.detail.startswith("exit=137: ")
+    assert missing.detail.endswith("killed")
+    assert len(missing.detail) < 2100  # the log tail is bounded
+
+
+@pytest.mark.parametrize(
+    ("timeout_s", "case_timeout", "budget"),
+    [(900.0, 30.0, 810.0), (900.0, None, 840.0), (90.0, 30.0, None), (60.0, None, None)],
+)
+def test_grading_budget_leaves_room_for_the_last_case(
+    timeout_s: float, case_timeout: float | None, budget: float | None
+) -> None:
+    step = step_spec("checkpoint_1", ["test_checkpoint_1.py"]).model_copy(
+        update={"timeout_s": case_timeout}
+    )
+    assert grading_budget(step, timeout_s) == budget
+
+
+def test_coverage_rows_merge_into_sorted_per_test_line_sets() -> None:
+    rows = [
+        {"node_id": "t::b", "path": "a.py", "executed_line": 3},
+        {"node_id": "t::a", "path": "b.py", "executed_line": "2"},
+        {"node_id": "t::a", "path": "a.py", "executed_line": 9},
+        {"node_id": "t::a", "path": "a.py", "executed_line": 1},
+        {"node_id": "t::a", "path": "a.py", "executed_line": 9},
+    ]
+    assert _coverage_contexts(rows) == (
+        CoverageContext(node_id="t::a", path="a.py", executed_lines=(1, 9)),
+        CoverageContext(node_id="t::a", path="b.py", executed_lines=(2,)),
+        CoverageContext(node_id="t::b", path="a.py", executed_lines=(3,)),
+    )
+    assert _coverage_contexts([]) == ()
+
+
+def test_environment_evidence_hashes_the_probe_and_defaults_missing_parts() -> None:
+    probed = _environment(
+        {
+            "environment": {
+                "grader_tools": ["pytest", "coverage"],
+                "grader_python_sha256": "g",
+                "submission_python_sha256": "s",
+                "platform": {"b": 1, "a": 2},
+            }
+        },
+        "img",
+    )
+    assert probed.grader_environment_id == "img"
+    assert (probed.grader_interpreter_sha256, probed.submission_interpreter_sha256) == ("g", "s")
+    assert probed.grader_tools_sha256 == _sha256_hex("pytest\ncoverage")
+    assert probed.platform_sha256 == _sha256_hex('{"a": 2, "b": 1}')
+    bare = _environment({}, "img")
+    assert bare.grader_interpreter_sha256 == bare.submission_interpreter_sha256 == ""
+    assert bare.grader_tools_sha256 == _sha256_hex("")
+    assert bare.plugin_sha256 == probed.plugin_sha256
+
+
+def test_parity_verdict_is_ineligible_when_either_run_has_no_evidence() -> None:
+    evidence = _run("grading")
+    case = _case("t::a", CaseGroup.CORE, CaseStatus.PASSED)
+    graded = _outcome(cases=(case,), evidence=evidence)
+
+    crashed = _outcome(InfraFailure(code="sandbox_timeout"))
+    verdict, differences = parity_verdict(graded, crashed)
+    assert verdict.reasons == ("coverage_run_failed:sandbox_timeout",)
+    assert differences == ()
+
+    verdict, _ = parity_verdict(graded, _outcome())
+    assert verdict.reasons == ("coverage_run_failed:missing",)
+
+    verdict, _ = parity_verdict(_outcome(), _outcome(cases=(case,), evidence=_run("coverage")))
+    assert verdict.reasons == ("grading_run_failed",)
+
+    verdict, differences = parity_verdict(
+        graded, _outcome(cases=(case,), evidence=_run("coverage"))
+    )
+    assert verdict.eligible
+    assert differences == ()
+    failed = _case("t::a", CaseGroup.CORE, CaseStatus.FAILED)
+    verdict, differences = parity_verdict(
+        graded, _outcome(cases=(failed,), evidence=_run("coverage"))
+    )
+    assert not verdict.eligible
+    assert differences == ("t::a: grading=passed coverage=failed",)
+
+
+@pytest.mark.parametrize(
+    "code",
+    [
+        "sandbox_timeout",
+        "sandbox_error",
+        "ledger_unreadable",
+        "incomplete_run",
+        "pytest_exit_status",
+        "ledger_exit_mismatch",
+    ],
+)
+def test_only_submission_attributable_failures_on_a_resolved_closure_get_a_canary(
+    code: str,
+) -> None:
+    assert needs_canary(_outcome(InfraFailure(code=code), dependencies=object()))
+    assert not needs_canary(_outcome(InfraFailure(code=code)))  # no resolved closure
+
+
+@pytest.mark.parametrize(
+    "code", ["dependency_resolver_unavailable", "collection_error", "no_tests_collected"]
+)
+def test_resolver_outages_and_corpus_faults_never_get_a_canary(code: str) -> None:
+    assert not needs_canary(_outcome(InfraFailure(code=code), dependencies=object()))
+    assert not needs_canary(_outcome(dependencies=object()))  # a graded run needs none
+
+
+def test_coverage_is_skipped_after_an_attributed_or_unexplained_grading_failure() -> None:
+    crashed = _outcome(InfraFailure(code="sandbox_timeout"))
+    passed = CanaryRecord(status="passed", trigger="sandbox_timeout")
+    attributed = coverage_skip_verdict(passed, _outcome())
+    assert attributed is not None
+    assert attributed.reasons == ("grading_failed_on_submission:sandbox_timeout",)
+
+    for canary in (CanaryRecord(), CanaryRecord(status="failed", trigger="sandbox_timeout")):
+        infra = coverage_skip_verdict(canary, crashed)
+        assert infra is not None
+        assert infra.reasons == ("grading_infra_failure:sandbox_timeout",)
+
+    assert coverage_skip_verdict(CanaryRecord(), _outcome()) is None
+
+
+def test_attributing_a_crash_to_the_submission_fails_every_starter_case() -> None:
+    crashed = _outcome(InfraFailure(code="sandbox_timeout"), dependencies="deps")
+    starter = _outcome(
+        cases=(
+            _case("t::a", CaseGroup.CORE, CaseStatus.PASSED),
+            _case("t::b", CaseGroup.ERROR, CaseStatus.SKIPPED),
+        )
+    )
+    attributed = attribute_to_submission(crashed, starter)
+    assert attributed.infra_failure is None
+    assert attributed.evidence is None
+    assert [c.status for c in attributed.cases] == [CaseStatus.FAILED, CaseStatus.FAILED]
+    assert [c.id for c in attributed.cases] == ["t::a", "t::b"]
+    assert (attributed.seconds, attributed.dependencies) == (1.5, "deps")
+
+
+def test_fork_projection_keeps_graded_nodes_and_hashes_the_environment() -> None:
+    evidence = _run(
+        "grading",
+        ledger=(
+            LedgerEntry(node_id="t::a", phase="call", outcome="passed"),
+            LedgerEntry(node_id="t::unlisted", phase="call", outcome="passed"),
+        ),
+        coverage=(CoverageContext(node_id="t::a", path="a.py", executed_lines=(1,)),),
+    )
+    cases = [
+        _case("t::a", CaseGroup.REGRESSION, CaseStatus.PASSED),
+        _case("t::b", CaseGroup.CORE, CaseStatus.PASSED),
+    ]
+
+    projected = fork_regression_run_evidence(evidence, cases)
+
+    assert set(projected) == {
+        "environment",
+        "corpus",
+        "invocation",
+        "outcomes",
+        "ledger",
+        "coverage",
+        "process_events",
+    }
+    assert projected["environment"] == {
+        "environment_id": hashlib.sha256(b"img").hexdigest(),
+        "project_sha256": hashlib.sha256(b"img:tools").hexdigest(),
+        "lock_sha256": "tools",
+        "platform_sha256": "plat",
+        "plugin_sha256": "plug",
+        "interpreter_sha256": hashlib.sha256(b"pypy").hexdigest(),
+    }
+    assert projected["invocation"] == {"argv": ["-p", "x"], "cwd": "/app"}
+    assert projected["corpus"]["corpus_id"] == "corpus"
+    assert [row["node_id"] for row in projected["ledger"]] == ["t::a"]  # only graded nodes
+    assert [(r["node_id"], r["group_type"]) for r in projected["outcomes"]] == [
+        ("t::a", "Regression")
+    ]
+    assert projected["coverage"][0]["executed_lines"] == (1,)
+    assert len(projected["process_events"]) == 1
+    assert json.dumps(projected)  # serialisable as the fork's JSON input
+
+
+def _step_grade(grading: RunOutcome, coverage: RunOutcome | None) -> StepGrade:
+    case = _case("t::a", CaseGroup.CORE, CaseStatus.PASSED)
+    grade = VerifierGrade(step="checkpoint_1", checkpoint="checkpoint_1", cases=(case,))
+    return StepGrade(grade, grading, coverage, None)
+
+
+def test_the_fork_handoff_needs_evidence_from_both_runs() -> None:
+    case = _case("t::a", CaseGroup.CORE, CaseStatus.PASSED)
+    graded = _outcome(cases=(case,), evidence=_run("grading"))
+    measured = _outcome(cases=(case,), evidence=_run("coverage"))
+
+    payload = fork_payload(_step_grade(graded, measured))
+    assert payload is not None
+    assert payload["transition_step"] == "checkpoint_1"
+    assert set(payload) == {"transition_step", "baseline", "produced"}
+
+    assert fork_payload(_step_grade(graded, None)) is None
+    assert fork_payload(_step_grade(graded, _outcome(cases=(case,)))) is None
+    assert fork_payload(_step_grade(_outcome(cases=(case,)), measured)) is None
+
+
+def test_pinned_errata_and_solvable_arguments_are_optional() -> None:
+    assert parse_errata(None) is None
+    assert parse_solvable(None) is None
+    grade = VerifierGrade(step="s", checkpoint="checkpoint_1", cases=())
+    assert errata_for(grade, None) is None
+
+
+# ------------------------------------------------ grade_step over scripted sandbox runs
+NODE = "test_checkpoint_1.py::test_adds"
+OTHER = "test_checkpoint_1.py::test_subtracts"
+
+
+def _ledger(
+    statuses: dict[str, str], *, coverage_lines: tuple[int, ...] = (), **changes: Any
+) -> dict[str, Any]:
+    failing = any(status in ("failed", "error") for status in statuses.values())
+    ledger: dict[str, Any] = {
+        "exit_status": 1 if failing else 0,
+        "collect_errors": [],
+        "nodes": [
+            {"node_id": node, "markers": [], "status": status, "ran": True, "duration_s": 0.01}
+            for node, status in statuses.items()
+        ],
+        "ledger": [
+            {"node_id": node, "phase": "call", "outcome": "failed" if "fail" in status else status}
+            for node, status in statuses.items()
+        ],
+        "coverage": [
+            {"node_id": NODE, "phase": "call", "path": "app.py", "executed_line": line}
+            for line in coverage_lines
+        ],
+        "process_events": [],
+        "environment": {
+            "grader_tools": ["pytest==9"],
+            "grader_python_sha256": "grader-py",
+            "submission_python_sha256": "submission-py",
+            "platform": {"system": "Linux"},
+        },
+    }
+    return ledger | changes
+
+
+PASSED = {NODE: "passed", OTHER: "passed"}
+TIMED_OUT = (SandboxResult(None, True, ""), None)
+
+
+def _ran(ledger: dict[str, Any] | str) -> tuple[SandboxResult, dict[str, Any] | str]:
+    exit_code = ledger["exit_status"] if isinstance(ledger, dict) else 1
+    return SandboxResult(exit_code, False, "pytest output"), ledger
+
+
+class ScriptedSandbox:
+    """One scripted (result, ledger) per run; the ledger lands where the plugin would write it."""
+
+    layout = CONTAINER_LAYOUT
+
+    def __init__(self, *script: tuple[SandboxResult, dict[str, Any] | str | None]) -> None:
+        self.script = list(script)
+        self.runs: list[SandboxRun] = []
+
+    async def environment_id(self) -> str:
+        return "img"
+
+    async def run(self, run: SandboxRun) -> SandboxResult:
+        self.runs.append(run)
+        result, ledger = self.script[len(self.runs) - 1]
+        if ledger is not None:
+            text = ledger if isinstance(ledger, str) else json.dumps(ledger)
+            (run.out_dir / "ledger.json").write_text(text)
+        return result
+
+
+@pytest.fixture(name="dependency_outage")
+def seams_fixture(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> list[Exception]:
+    """Inject the staging and dependency-provisioning seams; append an error to make it fail."""
+    outage: list[Exception] = []
+    staged: list[Path] = []
+
+    def stage(snapshot: Path, run_dir: Path) -> tuple[Path, Path]:
+        out = tmp_path / "stages" / str(len(staged)) / "out"
+        out.mkdir(parents=True)
+        staged.append(out)
+        return out.parent / "app", out
+
+    async def provision(*args: object, **kwargs: object) -> SubmissionDependencies:
+        if outage:
+            raise outage[0]
+        return SubmissionDependencies()
+
+    monkeypatch.setattr(grader_module, "stage_snapshot", stage)
+    monkeypatch.setattr(grader_module, "prepare_dependencies", provision)
+    return outage
+
+
+async def _grade(
+    tmp_path: Path, sandbox: ScriptedSandbox, *, coverage: bool = False, timeout_s: float = 900.0
+) -> StepGrade:
+    bundle = make_bundle(tmp_path / "fixture")
+    return await grade_step(
+        bundle,
+        "checkpoint_1",
+        tmp_path / "snapshot",
+        cast(Any, sandbox),
+        tmp_path / "work",
+        coverage=coverage,
+        timeout_s=timeout_s,
+    )
+
+
+async def test_a_passing_ledger_solves_the_step_with_normalised_evidence(
+    tmp_path: Path, dependency_outage: list[Exception]
+) -> None:
+    sandbox = ScriptedSandbox(_ran(_ledger(PASSED)))
+
+    result = await _grade(tmp_path, sandbox)
+
+    assert result.grade.solved
+    assert result.grade.infra_failure is None
+    assert [(c.id, c.status) for c in result.grade.cases] == [
+        (NODE, CaseStatus.PASSED),
+        (OTHER, CaseStatus.PASSED),
+    ]
+    assert (result.coverage, result.parity) == (None, None)
+    assert result.canary.status == "not_run"
+    assert list(result.timings) == ["oracle_run_s"]
+    evidence = result.grading.evidence
+    assert evidence is not None
+    assert evidence.environment.grader_environment_id == "img"
+    assert evidence.environment.grader_interpreter_sha256 == "grader-py"
+    assert evidence.environment.submission_interpreter_sha256 == "submission-py"
+    assert [e.node_id for e in evidence.ledger] == [NODE, OTHER]
+    assert evidence.corpus.selected_tests == ("test_checkpoint_1.py",)
+    assert evidence.measurement_prefix == ()
+    assert len(sandbox.runs) == 1
+    assert sandbox.runs[0].env["RAIDAR_ORACLE_COVERAGE"] == "0"
+
+
+async def test_a_failing_case_fails_the_step_without_being_infrastructure(
+    tmp_path: Path, dependency_outage: list[Exception]
+) -> None:
+    sandbox = ScriptedSandbox(_ran(_ledger({NODE: "passed", OTHER: "failed"})))
+
+    result = await _grade(tmp_path, sandbox)
+
+    assert not result.grade.solved
+    assert result.grade.infra_failure is None
+    assert result.grade.rewards()["solved"] == 0.0
+    assert result.grade.rewards()["infrastructure_failure"] == 0.0
+
+
+async def test_the_coverage_pass_measures_the_same_run_and_attributes_lines_per_test(
+    tmp_path: Path, dependency_outage: list[Exception]
+) -> None:
+    sandbox = ScriptedSandbox(
+        _ran(_ledger(PASSED)), _ran(_ledger(PASSED, coverage_lines=(2, 1, 2)))
+    )
+
+    result = await _grade(tmp_path, sandbox, coverage=True)
+
+    assert result.parity is not None
+    assert result.parity.eligible, result.parity
+    assert result.coverage is not None
+    assert result.coverage.evidence is not None
+    assert result.coverage.evidence.coverage == (
+        CoverageContext(node_id=NODE, path="app.py", executed_lines=(1, 2)),
+    )
+    assert result.grading.evidence is not None
+    assert result.grading.evidence.coverage == ()
+    assert result.coverage.evidence.measurement_prefix[:3] == ("-m", "coverage", "run")
+    assert result.grading.evidence.invocation == result.coverage.evidence.invocation
+    assert [run.env["RAIDAR_ORACLE_COVERAGE"] for run in sandbox.runs] == ["0", "1"]
+    assert {"oracle_run_s", "coverage_run_s"} <= set(result.timings)
+
+
+async def test_a_verdict_flipped_by_instrumentation_makes_coverage_ineligible(
+    tmp_path: Path, dependency_outage: list[Exception]
+) -> None:
+    flipped = _ledger({NODE: "failed", OTHER: "passed"})
+    sandbox = ScriptedSandbox(_ran(_ledger(PASSED)), _ran(flipped))
+
+    result = await _grade(tmp_path, sandbox, coverage=True)
+
+    assert result.grade.solved  # the uninstrumented grading run decides the verdict
+    assert result.parity is not None
+    assert not result.parity.eligible
+    assert "outcome_mismatch" in result.parity.reasons
+    assert f"{NODE}: grading=passed coverage=failed" in result.parity_differences
+
+
+async def test_a_failed_coverage_run_never_changes_the_grade(
+    tmp_path: Path, dependency_outage: list[Exception]
+) -> None:
+    sandbox = ScriptedSandbox(_ran(_ledger(PASSED)), TIMED_OUT)
+
+    result = await _grade(tmp_path, sandbox, coverage=True)
+
+    assert result.grade.solved
+    assert result.coverage is not None
+    assert result.coverage.infra_failure is not None
+    assert result.parity is not None
+    assert result.parity.reasons == ("coverage_run_failed:sandbox_timeout",)
+
+
+@pytest.mark.parametrize(
+    ("ledger", "code"),
+    [
+        (_ledger({}, collect_errors=["test_checkpoint_1.py"]), "collection_error"),
+        (_ledger({}), "no_tests_collected"),
+        (_ledger({NODE: "skipped", OTHER: "skipped"}), "no_graded_cases"),
+    ],
+)
+async def test_a_run_that_cannot_give_a_verdict_is_infrastructure_and_skips_coverage(
+    tmp_path: Path, dependency_outage: list[Exception], ledger: dict[str, Any], code: str
+) -> None:
+    sandbox = ScriptedSandbox(_ran(ledger))
+
+    result = await _grade(tmp_path, sandbox, coverage=True)
+
+    assert result.grade.infra_failure is not None
+    assert result.grade.infra_failure.code == code
+    assert not result.grade.solved
+    assert result.grade.rewards() == {"infrastructure_failure": 1.0}
+    assert result.coverage is None
+    assert result.parity is not None
+    assert result.parity.reasons == (f"grading_infra_failure:{code}",)
+    assert result.canary.status == "not_run"  # a corpus fault is never the submission's
+    assert len(sandbox.runs) == 1
+
+
+async def test_a_resolver_outage_is_infrastructure_never_a_verdict_on_the_submission(
+    tmp_path: Path, dependency_outage: list[Exception]
+) -> None:
+    dependency_outage.append(DependencyInfraError("pypi unreachable"))
+    sandbox = ScriptedSandbox()
+
+    result = await _grade(tmp_path, sandbox, coverage=True)
+
+    assert result.grade.infra_failure is not None
+    assert result.grade.infra_failure.code == "dependency_resolver_unavailable"
+    assert result.grade.infra_failure.detail == "pypi unreachable"
+    assert sandbox.runs == []  # nothing was graded, so no canary and no coverage pass
+    assert result.canary.status == "not_run"
+    assert result.parity is not None
+    assert result.parity.reasons == ("grading_infra_failure:dependency_resolver_unavailable",)
+
+
+NODE_WITHOUT_STATUS = json.dumps({"nodes": [{"node_id": NODE}], "exit_status": 0})
+SUBMISSION_CRASHES = [
+    pytest.param(TIMED_OUT, "sandbox_timeout", id="timeout"),
+    pytest.param((SandboxResult(137, False, "killed"), None), "sandbox_error", id="no-ledger"),
+    pytest.param((SandboxResult(1, False, "x"), "{not json"), "ledger_unreadable", id="truncated"),
+    pytest.param(
+        (SandboxResult(1, False, "x"), NODE_WITHOUT_STATUS), "ledger_unreadable", id="no-status"
+    ),
+    pytest.param(
+        (SandboxResult(1, False, "x"), _ledger(PASSED)), "ledger_exit_mismatch", id="exit-mismatch"
+    ),
+    pytest.param(
+        _ran(_ledger(PASSED, nodes=[{"node_id": NODE, "status": "passed", "ran": False}])),
+        "incomplete_run",
+        id="incomplete",
+    ),
+    pytest.param(_ran(_ledger(PASSED, exit_status=3)), "pytest_exit_status", id="exit-status"),
+]
+
+
+@pytest.mark.parametrize(("crash", "code"), SUBMISSION_CRASHES)
+async def test_a_crash_the_starter_canary_clears_is_a_failed_outcome_not_infrastructure(
+    tmp_path: Path,
+    dependency_outage: list[Exception],
+    crash: tuple[SandboxResult, Any],
+    code: str,
+) -> None:
+    starter = _ran(_ledger({NODE: "failed", OTHER: "passed"}))
+    sandbox = ScriptedSandbox(crash, starter)
+
+    result = await _grade(tmp_path, sandbox, coverage=True)
+
+    assert result.canary.status == "passed"
+    assert result.canary.trigger == code
+    assert result.grade.infra_failure is None
+    assert result.grade.rewards()["infrastructure_failure"] == 0.0
+    assert not result.grade.solved
+    assert {c.status for c in result.grade.cases} == {CaseStatus.FAILED}
+    assert result.coverage is None
+    assert result.parity is not None
+    assert result.parity.reasons == (f"grading_failed_on_submission:{code}",)
+    assert len(sandbox.runs) == 2
+    assert "canary_run_s" in result.timings
+
+
+async def test_a_crash_the_starter_canary_reproduces_stays_infrastructure(
+    tmp_path: Path, dependency_outage: list[Exception]
+) -> None:
+    sandbox = ScriptedSandbox(TIMED_OUT, TIMED_OUT)
+
+    result = await _grade(tmp_path, sandbox, coverage=True)
+
+    assert result.canary.status == "failed"
+    assert result.canary.trigger == "sandbox_timeout"
+    assert result.canary.detail.startswith("sandbox_timeout")
+    assert result.grade.infra_failure is not None
+    assert result.grade.infra_failure.code == "sandbox_timeout"
+    assert result.parity is not None
+    assert result.parity.reasons == ("grading_infra_failure:sandbox_timeout",)
+
+
+async def test_the_sandbox_error_names_the_exit_code_and_the_log_tail(
+    tmp_path: Path, dependency_outage: list[Exception]
+) -> None:
+    sandbox = ScriptedSandbox((SandboxResult(137, False, "oom-killed"), None), TIMED_OUT)
+
+    result = await _grade(tmp_path, sandbox)
+
+    assert result.grade.infra_failure is not None
+    assert result.grade.infra_failure.code == "sandbox_error"
+    assert result.grade.infra_failure.detail == "exit=137: oom-killed"
+
+
+async def test_cases_left_when_the_budget_runs_out_fail_and_are_timing_sensitive(
+    tmp_path: Path, dependency_outage: list[Exception]
+) -> None:
+    late = _ledger(
+        {NODE: "passed", OTHER: "error"},
+        budget_exhausted=[OTHER],
+    )
+    sandbox = ScriptedSandbox(_ran(late))
+
+    result = await _grade(tmp_path, sandbox, timeout_s=BUDGET_MARGIN_S + 1.0)
+
+    assert result.grade.infra_failure is None
+    assert not result.grade.solved
+    assert result.grading.timing_sensitive == (OTHER,)
+    assert sandbox.runs[0].env["RAIDAR_ORACLE_BUDGET_S"] == "1"
+    assert sandbox.runs[0].timeout_s == BUDGET_MARGIN_S + 1.0

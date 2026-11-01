@@ -17,7 +17,7 @@ from raidar.design.problem import variant_shim
 from raidar.design.problem.errata import ProblemErrata
 from raidar.design.problem.models import ProblemId
 from raidar.design.problem.validator import ValidateOptions, audit_problem, merge_audit
-from raidar.design.problem.variants import build_variant, original_name, shim_source
+from raidar.design.problem.variants import build_variant, original_name
 from tests.audit_support import KV_REF
 from tests.test_problem_spec_determinacy import (
     _audit as _audit,
@@ -51,10 +51,6 @@ def test_variant_shim_runs_the_reference_unchanged_but_rewrites_stdout(tmp_path:
     )
     assert (proc.returncode, proc.stderr) == (3, "warn")
     assert json.loads(proc.stdout) == {"error": "e", "detail": "request rejected"}
-    with pytest.raises(ValueError, match="unknown variant"):
-        shim_source("app.py", "nope")
-    with pytest.raises(FileNotFoundError):
-        build_variant(reference, "missing.py", "reformatted_json", tmp_path / "v2")
 
 
 def test_shim_main_propagates_exit_code_in_process(

@@ -17,7 +17,6 @@ from harbor.trial.hooks import TrialEvent
 
 from raidar.cli import main
 from raidar.grading import regrade as regrade_module
-from raidar.grading.bundle import BundleError
 from raidar.grading.guard import install_leak_guard
 from raidar.grading.leak import LeakScanError
 from raidar.grading.records import (
@@ -212,17 +211,6 @@ async def test_an_artifact_harbor_marked_unusable_is_never_graded_or_replaced(
     assert not (step_record_dir(tmp_path / "trial", "checkpoint_1") / RECORD_FILE).exists()
 
 
-async def test_an_artifact_harbor_marked_ok_is_graded(tmp_path: Path) -> None:
-    artifact = place_step_artifact(tmp_path, "checkpoint_1")
-    (artifact.parent / "manifest.json").write_text(
-        json.dumps([{"source": "/app", "destination": "artifacts/app", "status": "ok"}])
-    )
-    env = FakeAgentEnvironment()
-    verifier = await make_verifier(tmp_path, env, coverage=False)
-    await verifier.verify()
-    assert env.calls == ["exec"]
-
-
 async def test_a_leaked_hidden_test_forces_a_failing_reward(tmp_path: Path) -> None:
     bundle = make_bundle(tmp_path / "fixture")
     digest = next(iter(bundle.hidden_file_hashes()))
@@ -248,7 +236,7 @@ async def test_a_canary_attributed_grading_crash_is_a_valid_failed_outcome_end_t
         CoverageTarget,
         run_offline_coverage,
     )
-    from tests.test_grader_identity_and_canary import HangingSandbox  # noqa: PLC0415
+    from tests.test_grader_identity_and_canary_slow import HangingSandbox  # noqa: PLC0415
 
     artifact = place_step_artifact(tmp_path, "checkpoint_1")
     (artifact / "hang").write_text("")
@@ -326,12 +314,6 @@ async def test_guard_refuses_to_start_the_agent_when_the_scan_cannot_run(tmp_pat
 async def test_verifier_rejects_unknown_snapshot_sources(tmp_path: Path) -> None:
     with pytest.raises(ValueError, match="snapshot_source"):
         await make_verifier(tmp_path, FakeAgentEnvironment(), snapshot_source="volume")
-
-
-async def test_single_step_verification_needs_a_one_step_bundle(tmp_path: Path) -> None:
-    verifier = await make_verifier(tmp_path, FakeAgentEnvironment(), step=None, guarded=False)
-    with pytest.raises(BundleError, match="one-step"):
-        await verifier.verify()
 
 
 # ------------------------------------------------------------------- regrade
@@ -430,12 +412,6 @@ async def test_regrade_uses_the_recorded_timeout_and_attributes_a_different_grad
         f"grader_environment: local:{sys.executable} -> sha256:rebuilt-elsewhere"
     ]
     assert step["regraded"] == step["original"]  # same cases; only the environment differs
-
-
-def test_regrade_needs_oracle_records(tmp_path: Path) -> None:
-    (tmp_path / "job" / "trial-a").mkdir(parents=True)
-    with pytest.raises(RegradeError, match="records"):
-        regrade_module.trial_dirs(tmp_path / "job")
 
 
 # ----------------------------------------------------------------------- CLI
