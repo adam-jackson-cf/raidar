@@ -140,9 +140,10 @@ def write_agent_session(trial_dir: Path, step: str, rows: list[str] | None = Non
     rollout = sessions / "rollout-2026-10-26T00-00-00-abc.jsonl"
     rollout.write_text("\n".join(lines) + "\n")
     turns[0]["session_audit"] = session_audit(Harness.CODEX_CLI, agent / "workflow" / "build-1")
-    (agent / "workflow" / "workflow.json").write_text(
-        json.dumps({"kind": "raidar-workflow", "stages": ["build"], "turns": turns})
-    )
+    record = {"kind": "raidar-workflow", "stages": ["build"], "turns": turns}
+    # what a no-package schema-2 run's PackageCheckpoint.record emits (empty: no package)
+    record |= {c: {} for c in ("frame/1", "install/1", "setup/1", "stop/1", "outputs/1")}
+    (agent / "workflow" / "workflow.json").write_text(json.dumps(record))
     return rollout
 
 

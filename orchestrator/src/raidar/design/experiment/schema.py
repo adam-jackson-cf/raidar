@@ -12,7 +12,7 @@ Vocabulary (Harbor's): an experiment has a ``kind`` (``ab-test``, ``benchmark``,
 paired, counterbalanced replicates of every arm. An **arm** is an agent plus a workflow:
 ``agents`` name an agent release (``codex@3``, ``lab/agents/``) with one of its models and
 that model's reasoning level; ``arms`` name an agent id and a workflow release
-(``lab/workflows/<ns>/<name>/``, ``ns/name@N``), ``raidar/one-shot@1`` when omitted.
+(``lab/workflows/<ns>/<name>/``, ``ns/name@N``), ``raidar/one-shot@2`` when omitted.
 """
 
 from __future__ import annotations
@@ -38,7 +38,7 @@ from raidar_contract.releases import WORKFLOW_RELEASE_PATTERN
 from raidar.contract.references import REFERENCE_PATTERN
 from raidar.scoring.catalog.outcomes import declared_outcome_types
 
-DEFAULT_WORKFLOW = "raidar/one-shot@1"
+DEFAULT_WORKFLOW = "raidar/one-shot@2"
 """The workflow an arm runs when it names none (design section 2)."""
 
 IDENTIFIER_PATTERN = r"^[a-z0-9][a-z0-9_-]*$"

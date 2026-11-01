@@ -32,8 +32,8 @@ def _benchmark(**changes: Any) -> dict[str, Any]:
     document = experiment_document(kind="benchmark", **changes)
     document["agents"].append({**document["agents"][0], "id": "second"})
     document["arms"] = [
-        {"id": "first", "agent": "luna", "workflow": "raidar/one-shot@1"},
-        {"id": "second", "agent": "second", "workflow": "raidar/one-shot@1"},
+        {"id": "first", "agent": "luna", "workflow": "raidar/one-shot@2"},
+        {"id": "second", "agent": "second", "workflow": "raidar/one-shot@2"},
     ]
     document["analysis"]["baseline_arm"] = "first"
     return document

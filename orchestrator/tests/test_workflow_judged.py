@@ -27,7 +27,7 @@ from raidar.subject.workflow import asking, define
 from raidar.subject.workflow.definition import load_workflow
 from raidar.subject.workflow.runner import WorkflowRunner
 from raidar.subject.workflow.stage import Checkpoint
-from tests.release_support import REAL_LAB
+from tests.release_support import SPIKE_WORKFLOWS
 from tests.workflow_support import (
     CODE,
     FAILING,
@@ -160,7 +160,7 @@ def run(
     ScriptedAgent.turns = list(turns)
     logs = tmp_path / "logs"
     logs.mkdir(exist_ok=True)
-    definition: Any = load_workflow(REAL_LAB / "workflows", "raidar/define-build-verify").to_json()
+    definition: Any = load_workflow(SPIKE_WORKFLOWS, "raidar/define-build-verify").to_json()
     definition.pop("components")
     for stage in definition["stages"].values():
         stage.pop("skills", None)

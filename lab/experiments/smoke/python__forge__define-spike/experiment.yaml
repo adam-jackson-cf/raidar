@@ -6,7 +6,7 @@
 schema_version: 3
 kind: smoke
 id: python__forge__define-spike
-description: End-to-end raidar/define-build-verify@1 spike on forge; not citable.
+description: End-to-end raidar/define-build-verify@2 spike on forge; not citable.
 
 problems:
   - ref: scb/forge@38d627ecf668
@@ -28,7 +28,7 @@ protocol:
 arms:
   - id: define
     agent: agent
-    workflow: raidar/define-build-verify@1
+    workflow: raidar/define-build-verify@2
 
 assessment:
   scorers: [correctness@9, code-quality@8, resource-usage@7, process-compliance@11, definition-coverage@5, test-coverage@5]

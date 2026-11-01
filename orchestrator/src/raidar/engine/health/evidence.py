@@ -60,6 +60,9 @@ from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 from typing import Any
 
+from pydantic import ValidationError
+from raidar_contract.workflow import PACKAGE_SCHEMA, PackageWorkflowDefinition
+
 from raidar.contract.harbor_result import RESULT_FILE
 from raidar.engine.health.base import Audit, make_check
 from raidar.engine.health.gate import HOOK_LOG_PREFIX, WORKFLOW_RECORD, _hook_runs
@@ -68,6 +71,9 @@ from raidar.engine.health.judge import JudgeStep, _call_evidence, _closure, _und
 from raidar.engine.health.model import PASS, UNMEASURED, VIOLATION, HealthCheck
 
 CONFIG_FILE = "config.json"
+RECORD_PRIMITIVES = ("frame/1", "install/1", "setup/1", "stop/1", "outputs/1")
+"""Primitive records ``PackageCheckpoint.record`` emits for every package workflow."""
+GATE_PRIMITIVE = "gate/1"
 OVERRIDES = ("oracle", "nop")
 CUTS = ("deadline", "turn_error")
 """Verify endings of a cut phase: no seal, no judge pass owed."""
@@ -83,6 +89,10 @@ class Expected:
     kind: str  # "workflow" | "override" | "unknown"
     stages: frozenset[str]
     judge: bool
+    packages: tuple[tuple[str, str], ...] | None = None
+    """Schema 2 only: each listed package's ``(leaf, release name)`` (``None`` for schema 1)."""
+    records: frozenset[str] = frozenset()
+    """Schema 2 only: the primitive records the runner owes at the root of ``workflow.json``."""
 
     @property
     def runs_workflow(self) -> bool:
@@ -144,6 +154,38 @@ def _json(path: Path) -> Any:
         return None
 
 
+def _gap_packages(step: Step) -> str | None:
+    """A package workflow's host-written primitive records and each package's install entry."""
+    expected = step.expected
+    if expected.packages is None:
+        return None
+    workflow = step.workflow or {}
+    if workflow.get("invalid") is not None:
+        return "the runner recorded an invalid trial (instrument or integrity failure)"
+    return _gap_records(workflow, expected) or _gap_installs(workflow, expected)
+
+
+def _gap_records(workflow: Mapping[str, Any], expected: Expected) -> str | None:
+    absent = sorted(name for name in expected.records if not isinstance(workflow.get(name), dict))
+    if absent:
+        return f"no record for primitive(s): {', '.join(absent)}"
+    if GATE_PRIMITIVE not in expected.records:
+        return None
+    gate = workflow[GATE_PRIMITIVE]
+    if not isinstance(gate.get("gates"), list) or gate.get("errors") != []:
+        return "the gate/1 record has no gates list or reports errors (an instrument failure)"
+    return None
+
+
+def _gap_installs(workflow: Mapping[str, Any], expected: Expected) -> str | None:
+    installed = workflow["install/1"]
+    for leaf, reference in expected.packages or ():
+        entry = installed.get(leaf)
+        if not isinstance(entry, dict) or entry.get("reference") != reference:
+            return f"no install/1 record of {reference} under {leaf!r}"
+    return None
+
+
 def _gap_stage_records(step: Step, workflow: Mapping[str, Any]) -> str | None:
     listed = workflow.get("stages")
     named = {s for s in listed if isinstance(s, str)} if isinstance(listed, list) else set()
@@ -161,7 +203,7 @@ def _gap_workflow(step: Step) -> str | None:
     turns = workflow.get("turns")
     if not isinstance(turns, list) or not turns:
         return "no turn is recorded"
-    return _gap_stage_records(step, workflow)
+    return _gap_stage_records(step, workflow) or _gap_packages(step)
 
 
 def _turn_gap(step: Step, number: int, turn: Any) -> str | None:
@@ -373,11 +415,59 @@ def _stage_enabled(stages: Mapping[str, Any], name: str) -> bool:
     return isinstance(settings, dict) and settings.get("enabled") is True
 
 
-def _definition_stages(agent: Mapping[str, Any]) -> Mapping[str, Any] | None:
+def _definition(agent: Mapping[str, Any]) -> Any:
     kwargs = agent.get("kwargs")
-    definition = kwargs.get("definition") if isinstance(kwargs, dict) else None
+    return kwargs.get("definition") if isinstance(kwargs, dict) else None
+
+
+def _schema_one(definition: Any) -> Expected | None:
     stages = definition.get("stages") if isinstance(definition, dict) else None
-    return stages if isinstance(stages, dict) else None
+    if not isinstance(stages, dict):
+        return None
+    enabled = {"build"} | {s for s in ("define", "verify") if _stage_enabled(stages, s)}
+    verify = stages.get("verify") if "verify" in enabled else None
+    judge = isinstance(verify, dict) and verify.get("judge") is not None
+    return Expected("workflow", frozenset(enabled), judge)
+
+
+def _kwargs(agent: Mapping[str, Any]) -> Mapping[str, Any]:
+    kwargs = agent.get("kwargs")
+    return kwargs if isinstance(kwargs, dict) else {}
+
+
+def _schema_two(definition: Any, kwargs: Mapping[str, Any]) -> Expected:
+    """A ``schema: 2`` package workflow, read from the lab's own definition and runner kwargs.
+
+    The runner's ``PackageCheckpoint.record`` always emits ``RECORD_PRIMITIVES`` at the root of
+    ``workflow.json`` and adds ``gate/1`` when the arm's ``primitives`` kwarg (the arm's
+    ``primitive_code``: contract id to code digest) lists it. Each listed package must also be
+    locked (``locked_packages``, keyed by release name) and leave an ``install/1`` entry under its
+    leaf name that names that release. A definition the contract rejects, a package workflow
+    whose kwargs omit its locked packages or runner identities, or one asking for a reply or judge
+    (whose evidence this table cannot yet read) has unknown applicability."""
+    try:
+        parsed = PackageWorkflowDefinition.model_validate(definition)
+    except ValidationError:
+        return UNKNOWN
+    if parsed.judge is not None or parsed.build.reply is not None:
+        return UNKNOWN
+    uses = tuple((use.release.leaf, use.release.name) for use in parsed.stages)
+    primitives = kwargs.get("primitives")
+    if uses and not _runner_kwargs(primitives, kwargs.get("locked_packages"), uses):
+        return UNKNOWN
+    records = set(RECORD_PRIMITIVES)
+    if isinstance(primitives, dict) and GATE_PRIMITIVE in primitives:
+        records.add(GATE_PRIMITIVE)
+    return Expected("workflow", frozenset({"build"}), False, uses, frozenset(records))
+
+
+def _runner_kwargs(primitives: Any, locked: Any, uses: tuple[tuple[str, str], ...]) -> bool:
+    """A package arm's kwargs name the runner's primitives and lock every listed package."""
+    if not isinstance(primitives, dict) or not isinstance(locked, dict):
+        return False
+    return {"frame/1", "install/1", "runner/1"} <= set(primitives) and all(
+        reference in locked for _, reference in uses
+    )
 
 
 def configured(trial_dir: Path, override: str | None) -> Expected:
@@ -387,12 +477,12 @@ def configured(trial_dir: Path, override: str | None) -> Expected:
     agent = _agent_config(trial_dir)
     if agent is None:
         return UNKNOWN
-    stages = _definition_stages(agent)
-    if stages is not None:
-        enabled = {"build"} | {s for s in ("define", "verify") if _stage_enabled(stages, s)}
-        verify = stages.get("verify") if "verify" in enabled else None
-        judge = isinstance(verify, dict) and verify.get("judge") is not None
-        return Expected("workflow", frozenset(enabled), judge)
+    definition = _definition(agent)
+    if isinstance(definition, dict) and definition.get("schema") == PACKAGE_SCHEMA:
+        return _schema_two(definition, _kwargs(agent))
+    found = _schema_one(definition)
+    if found is not None:
+        return found
     return OVERRIDE if agent.get("name") in OVERRIDES else UNKNOWN
 
 

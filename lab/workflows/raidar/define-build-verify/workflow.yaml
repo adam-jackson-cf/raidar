@@ -1,276 +1,89 @@
-# Define-build-verify: the define stage, the build and the verify gate in one primary session
-# (design sections 2, 5.1, 5.3), released as define-build-verify@N in lab/releases.yaml. Define
-# is the builder's own first work: it builds the feature definition with the `define` command
-# (the tool ported from factory-x-loops ac5db0f, capability/define), seals it with
-# `define done ready`, and then builds against /app/.raidar/feature-definition.md, which the
-# stage writes from the sealed draft. Questions (`define done ask`) are answered by accepting each
-# proposal, at most max_refinement_rounds times. The define prompt is FXL's
-# workflow/define-build-verify/v2.toml intake prompt adapted to the single session (no mode, no
-# earlier-rounds block: the units carry the accepted answers as A<n>); the verify prompt and gate
-# are one-shot-verify@1's. Every build turn ends with a JSON reply {account, ac_tests, adrs} (the
-# runner appends its shape). After each accepted seal the engine judges every criterion's aspects
-# with Jev host-side (verify.judge: factory-x-loops v2 [judge] thresholds, closure by thresholds,
-# the dated Jev model id) and sends open criteria back as a rework turn, at most max_passes
-# passes (3: the smoke's 1800 s holds a first build, a judge pass and two reworks, each rework
-# started only when the time left fits it). The skills are FXL's components, copied unchanged into
-# skills/ and placed per the agent's placement.skills.
-schema: 1
+# Define-build-verify: raidar/define, the build and raidar/verify in one primary session, with
+# the host-side aspect judge. Released as raidar/define-build-verify@N in lab/releases.yaml.
+# The define intake and the verify gate come from their packages (%%%DEFINE%%% and %%%VERIFY%%%
+# are their prompt fragments); the build prompt, the reply shape and the judge settings below are
+# the spike's define-build-verify@4, unchanged: every build turn ends with a JSON reply
+# {account, ac_tests, adrs} (acceptance-reply/1); after each accepted seal the host judges every
+# criterion of define.criteria (jev-judge/1; closure by thresholds, the dated Jev model id) and
+# sends open criteria back as a rework turn, at most max_passes passes (3: the smoke's 1800 s
+# holds a first build, a judge pass and two reworks, each rework started only when the time left
+# fits it). The question set, retries, timeouts and context limits are jev-judge/1 constants.
+schema: 2
 name: define-build-verify
+build:
+  prompt: |-
+    Build the issue below in the repository you are in, per the repository's own
+    rules, and write the tests that prove it.
+
+    %%%DEFINE%%%
+
+    The feature definition (`/app/.raidar/feature-definition.md`) says what to build:
+    features F1, F2, … with their acceptance criteria, and the decisions already made.
+    Under each criterion:
+    - `Source:` lines are the issue's statements it derives from: they are the
+      requirement where the criterion's wording differs;
+    - each `Aspect:` is a situation a test sets up and the outcome it asserts;
+    - an `Example:` value must appear literally in a test mapped to the criterion;
+    - a `Kind: regression` criterion has no aspects: map to it the repository's
+      earlier tests that cover it, which passed before your change;
+    - `Verification:` is the engine's line, the same for every criterion: a
+      criterion is done only when tests mapped to it in `ac_tests` prove it.
+
+    Keep behaviour earlier requirements accepted, and its tests, passing. Leave
+    `/app/.raidar/` as it is.
+
+    %%%VERIFY%%%
+
+    Once the gate accepts your work, the engine checks each aspect of each
+    criterion against its mapped tests, and every criterion still open comes back
+    to you with what is missing. This session is yours for the whole run.
+
+    Your reply says what you changed and why (`account`), maps every acceptance
+    criterion to the tests that prove it (`ac_tests`) and reports your architecture
+    decisions (`adrs`):
+    - a test is named as the test runner names it (`path::test_name` or
+      `path::Class::test_name`); the engine checks each test's file is in the
+      working tree, and a test the gate does not collect counts as missing. On a
+      later turn, list only the criteria whose tests you added, changed, moved or
+      renamed, or none;
+    - an ADR is an architecture decision the feature definition does not already
+      record (a new component or module boundary, a data format, a dependency, a
+      structural choice): `id` is `ADR1`, … numbered on across your turns and
+      `status` is `accepted` or `superseded`; report each once, and again only when
+      its status changes; none: `[]`.
+
+    The issue:
+
+    %%%TASK%%%
+  reply: acceptance-reply/1
 stages:
-  define:
-    enabled: true
-    unit_rules: 2
-    max_refinement_rounds: 2
-    aspects: true
-    anchored: true
-    audited: true
-    skills: [feature-definition, aspect-writing]
-    prompt: |-
-      ## First, define the feature
+  - use: raidar/define@1
+  - use: raidar/verify@1
+gate:
+  max_fix_rounds: 2
+judge:
+  criteria: define.criteria
+  model: typesafe/jev-1.13-20260917
+  closed_at: 0.8
+  open_at: 0.3
+  max_passes: 3
+  rework: |-
+    The engine's verification left the acceptance criteria below open, each with
+    the issue statements it derives from, what is missing (an aspect no mapped test
+    sets up and asserts, an `Example:` value no mapped test states, a mapped test
+    that did not pass) and its mapped tests with their gate result. Fix every one
+    in this turn, keep every criterion's tests mapped and passing, and do not break
+    what already works. When you stop, the engine records the gate's verdict without
+    changing your work and checks every criterion again.
 
-      Before you change anything, build the feature definition for the issue below with the
-      `define` command, seal it, then build against it. You write no file for the definition
-      and change nothing in the repository while defining: the tool checks the definition and
-      writes `/app/.raidar/feature-definition.md` from it when you stop.
+    Reply as before: `account` says criterion by criterion (by id) what you changed;
+    `ac_tests` lists only the criteria whose tests you added, changed, moved or
+    renamed; `adrs` any new or changed decisions.
 
-      Read the issue and the repository you are in. Brownfield: the repository's code, tests
-      and docs are your evidence. Greenfield: apply the constraints the issue gives and the
-      project's `CLAUDE.md`/`AGENTS.md`. Build what a builder builds from or, only when a
-      feature itself is unclear, ask questions.
+    The open acceptance criteria, by feature:
 
-      ### The issue, numbered
+    %%%PUSHBACK%%%
 
-      Cite the issue by unit id; never copy or reword its words.
+    The gate's result on the work the engine checked:
 
-      %%%UNITS%%%
-
-      - `U<n>`: a statement of the issue, in order. `*` marks a requirement: every
-        `*` unit is cited by at least one criterion. Any other unit may be cited
-        where it helps.
-      - `C<n>`: a line of a fenced code block (a worked example, a sample input or
-        output); cite it with the criterion it illustrates.
-      - `A<n>`: an answer from an earlier round; it counts as the issue.
-
-      The tool writes each cited unit's words verbatim as the criterion's
-      `Source:` lines; where a criterion's text and its units differ, the units win.
-
-      ### What to call, and when
-
-      1. `define put`, once, with everything you decided: the block below on standard
-         input through a quoted heredoc, which the shell passes through untouched, so
-         JSON, quotes, backticks and braces in a value need no escaping:
-
-             define put <<'EOF'
-             title: ...
-             EOF
-
-         (`define put FILE` reads the block from a file instead.) It applies every
-         line it can read, and prints what is wrong, by item: `F2.AC1 line 5: ...`
-         for a line it could not read, and the tool's checks of the definition for
-         the rest.
-      2. `define put` again with only the items to fix. A `put` replaces each item it
-         names by its id (a question's id is the feature it blocks and its `kind`),
-         adds new ones and keeps the rest, so repeating an item is
-         safe and a fix is a few lines, never the whole definition. `define show`
-         prints the definition as it stands, in the same lines; `define check` lists
-         what is wrong with it; `define drop <id>` removes `F2` (with its criteria),
-         `F2.AC1`, `decision 3`, `named <name>` or `question F2 <kind>`; a `drop` that
-         names nothing lists what the draft holds.
-      3. `define done ready` when the definition is complete, or `define done ask`
-         when you ask questions instead. It refuses while anything blocks, and says
-         what. A definition that is not sealed with `define done` when you stop is
-         sent back to you once, then the definition is unusable.
-
-      Define comes first: `define done ready` precedes every `git commit`. Once it is
-      sealed, build the issue from `/app/.raidar/feature-definition.md`.
-
-      ### The block
-
-      One item per line, `key: value`, the value as written to the end of the line:
-      no quotes, no escaping, no indentation. A line that opens an item is followed
-      by the lines that belong to it.
-
-          title: <the end state in a few words>
-          objective: <what the change achieves and why, in a sentence or two>
-          named: <a feature, operation, endpoint, option, control or section the issue names>
-          from: issue U3 U4 | code path:line | tests path:line | none
-          feature F1: <name>
-          outcome: <what it does>
-          risk: requires review              (leave out otherwise)
-          ac F1.AC1: <the criterion, one line in your words>
-          source: U3 U4                      (the ids of the units it derives from)
-          aspect: <situation> -> <outcome>   (one per situation a test sets up)
-          example: <input> -> <expected>     (where the issue gives a value)
-          kind: regression                   (only for earlier behaviour that must keep working: then no aspect or example)
-          decision 1: <a decided detail>
-          rung: 1 to 5
-          source: U3                         (leave out when none)
-          ref: path:line                     (one per line; leave out when none)
-          reverse: <how to reverse an assumption>   (leave out when none)
-          risk: requires review              (leave out otherwise)
-          retire: <test id as the runner names it>
-          source: U3
-          reason: <why it stops passing>
-          question F1: <what blocks the feature>
-          kind: objective_unclear | feature_conflict | missing_input
-          proposal: <one answer>
-          option: <another answer>           (one per line)
-
-      In `aspect:` and `example:` the first `->` outside backticks splits the two
-      sides; text between backticks is literal, so a `->` inside backticks is part of
-      the value. A feature `F<n>` has at least one criterion, ids `F1.AC1`, … under
-      its feature, features in build order.
-
-      ### What to put in it
-
-      List every feature, operation, endpoint, option, control or section the issue
-      names with `named`, with where its behaviour is stated (`issue`, `code`,
-      `tests`, or `none`) and its evidence (unit ids for `issue`, `path:line` for
-      `code` or `tests`, nothing for `none`). The tool checks the evidence; a
-      feature whose evidence fails counts as `none`, and a `none` feature is an
-      `objective_unclear` question about it.
-
-      Ready: `define done ready`, no `question` lines, and the definition: the
-      `title`, the `objective`, the features with their criteria and the decisions and
-      retirements. A decision's `ref` is `path:line`; a retirement's test is as the
-      runner names it.
-
-      Needs input: `define done ask`, one to three `question` lines, each naming the
-      feature it blocks; its `proposal` is one answer and its `option` lines do not
-      restate the question. Leave the definition out. Your questions are answered
-      with their proposals, and you are asked to define again with the answers added
-      to the units as `A<n>`.
-
-      Every value is one line. What you build is judgement only, never a restatement
-      of the issue, the repository or the rules; write no `Verification:` line and no
-      test name.
-
-      `define put` and `define check` list these problems, by item: an id that is not
-      `F<n>` or `<feature id>.AC<n>`, or used twice; a criterion with no unit in
-      `source`, or a unit id not in the list; a criterion that is not `regression`
-      with no aspect; an aspect or example with an empty side, with `->` outside
-      backticks or with unbalanced backticks; an example whose expected side holds no
-      backticked literal; a `regression` criterion with aspects or examples; a field
-      that begins with markdown or a label; and a `*` unit no criterion cites. Fix
-      every one before `define done`; it refuses all but the last, which it lists.
-  build:
-    skills: []
-    structured: true
-    prompt: |-
-      Build the issue below in the repository you are in, per the repository's own
-      rules, and write the tests that prove it.
-
-      %%%DEFINE%%%
-
-      The feature definition (`/app/.raidar/feature-definition.md`) says what to build:
-      features F1, F2, … with their acceptance criteria, and the decisions already made.
-      Under each criterion:
-      - `Source:` lines are the issue's statements it derives from: they are the
-        requirement where the criterion's wording differs;
-      - each `Aspect:` is a situation a test sets up and the outcome it asserts;
-      - an `Example:` value must appear literally in a test mapped to the criterion;
-      - a `Kind: regression` criterion has no aspects: map to it the repository's
-        earlier tests that cover it, which passed before your change;
-      - `Verification:` is the engine's line, the same for every criterion: a
-        criterion is done only when tests mapped to it in `ac_tests` prove it.
-
-      Keep behaviour earlier requirements accepted, and its tests, passing. Leave
-      `/app/.raidar/` as it is.
-
-      %%%VERIFY%%%
-
-      Once the gate accepts your work, the engine checks each aspect of each
-      criterion against its mapped tests, and every criterion still open comes back
-      to you with what is missing. This session is yours for the whole run.
-
-      Your reply says what you changed and why (`account`), maps every acceptance
-      criterion to the tests that prove it (`ac_tests`) and reports your architecture
-      decisions (`adrs`):
-      - a test is named as the test runner names it (`path::test_name` or
-        `path::Class::test_name`); the engine checks each test's file is in the
-        working tree, and a test the gate does not collect counts as missing. On a
-        later turn, list only the criteria whose tests you added, changed, moved or
-        renamed, or none;
-      - an ADR is an architecture decision the feature definition does not already
-        record (a new component or module boundary, a data format, a dependency, a
-        structural choice): `id` is `ADR1`, … numbered on across your turns and
-        `status` is `accepted` or `superseded`; report each once, and again only when
-        its status changes; none: `[]`.
-
-      The issue:
-
-      %%%TASK%%%
-  verify:
-    enabled: true
-    language: python
-    skills: [test-per-aspect, pytest-templates]
-    prompt: |-
-      ## Verification
-
-      Your work is graded from the workspace exactly as you leave it.
-
-      Commit with `git commit` after each logical step, starting as soon as your
-      first test passes. The repository's pre-commit hook is the verify gate: every
-      commit runs it over the whole tree, so it checks your work as you go. A refused
-      commit lists what to fix: fix that and commit again until it passes. Never skip
-      the hook (`--no-verify`, `-n`), change git's hook settings, or run
-      `git reset --hard`, `git clean` or `git restore`. Check `git status` and
-      `git diff` before `git add -A`; use Conventional Commit messages
-      (`feat|fix|refactor|test|docs|chore: <summary>`).
-
-      Implementation work is not complete until a commit passes the gate. Do not end
-      your turn while a commit is refused: a refused commit means the work is
-      unfinished. When you stop, the process that runs you checks whatever is left
-      through the same gate without committing or restoring it; a refusal comes back
-      to you with the gate's output, at most %%%MAX_FIX_ROUNDS%%% times.
-
-      The gate's rules are in `%%%RULES_FILE%%%` at the repository root: what blocks a
-      commit and what only warns. It runs ruff, ruff's formatter check, strict mypy
-      and your tests with pytest: at least one test must exist and none may fail, and
-      a test that takes longer than %%%TEST_TIMEOUT_SECONDS%%% s fails. Keep each test
-      fast, and independent of each other and of shared state. Declare every
-      third-party package your production code imports in the project's dependency
-      manifest. Keep data your code or tests write while running out of the commit:
-      write it to a temporary or configured location, or have the project's
-      `.gitignore` exclude it.
-    gate: { on_commit: true, after_turn: true }
-    max_fix_rounds: 2
-    max_passes: 3
-    test_timeout: 60
-    judge:
-      model: typesafe/jev-1.13-20260917
-      question_set: dbv5-aspect/1
-      closed_at: 0.8
-      open_at: 0.3
-      regression_needs_baseline: true
-      retries: 3
-      timeout_s: 60
-      context_tokens: 32000
-      stall_repeats: 2
-      fit_rework: true
-    rework: |-
-      The engine's verification left the acceptance criteria below open, each with
-      the issue statements it derives from, what is missing (an aspect no mapped test
-      sets up and asserts, an `Example:` value no mapped test states, a mapped test
-      that did not pass) and its mapped tests with their gate result. Fix every one
-      in this turn, keep every criterion's tests mapped and passing, and do not break
-      what already works. When you stop, the engine records the gate's verdict without
-      changing your work and checks every criterion again.
-
-      Reply as before: `account` says criterion by criterion (by id) what you changed;
-      `ac_tests` lists only the criteria whose tests you added, changed, moved or
-      renamed; `adrs` any new or changed decisions.
-
-      The open acceptance criteria, by feature:
-
-      %%%PUSHBACK%%%
-
-      The gate's result on the work the engine checked:
-
-      %%%GATE%%%
-    rules_file: AGENTS.md
-    checks:
-      - { name: lint, category: lint, tool: ruff==0.8.6, run: "ruff check", blocking: true }
-      - { name: format, category: format, tool: ruff==0.8.6, run: "ruff format --check", blocking: true }
-      - { name: types, category: types, tool: mypy==2.3.1, run: "mypy --strict", blocking: true }
-      - { name: tests, category: tests, tool: pytest==9.1.1, blocking: true }
+    %%%GATE%%%

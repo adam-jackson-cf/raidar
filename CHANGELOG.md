@@ -4,6 +4,28 @@ All notable changes to this project are documented in this file.
 
 ## Unreleased
 
+### Shipped workflows on schema 2 (phase 5A step 6)
+
+- Archive the three namespaced schema-1 `@1` workflows immutably, then register schema-2
+  `raidar/one-shot@2`, `raidar/one-shot-verify@2` and `raidar/define-build-verify@2`.
+  Preserve all build prompt strings and judge rework bytes, model, thresholds and round bounds.
+  Unmarked arms retain the no-stage baseline; authoring defaults to the verify workflow.
+  Move active experiment references and regenerate all ten locks through public commands.
+- Keep `define-build-verify@2` registered and lockable, but explicitly refuse its trial
+  execution until phase 5B wires acceptance replies and the judge to `criteria/1`.
+  Retain schema-1 spike fixtures only for parity coverage pending 5B deletion.
+- Teach health to read authoritative schema-2 definitions and require generic primitive
+  records without package-name special cases. Missing evidence, runtime invalidity and gate
+  instrument errors remain invalid; the full W3–W10 primitive-row re-key stays in phase 5B.
+- Fix reproducible installs with uv's `--no-installer-metadata`; varying cache timestamps
+  previously changed installed-tree hashes for identical wheels. All installed files remain
+  integrity-checked. Add a failing-before/passing-after fresh-install timestamp regression;
+  regenerate every shipped package's local installation proof and the define canary.
+- A local draft no-model smoke passed 16 real Harbor-container scenarios through actual
+  package prepare/check/close, including accepted/refused agent commits and unchanged
+  workspace files. The fixture overriding the locked timeout is covered by stage-check,
+  not silently applied to the locked workflow. No native session, model or judge proof claimed.
+
 ### Real docs-check and package copying (phase 5A step 5)
 
 - Ship `raidar/docs-check@1`, invoking pinned codespell 2.4.1 over repository text with six

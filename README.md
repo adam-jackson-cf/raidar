@@ -24,8 +24,11 @@ distribution `raidar-contract` (import `raidar_contract`), with only pydantic an
 runtime dependencies. `make contract-build` builds a wheel and sdist under `var/contract-dist/`
 and prints their SHA-256 hashes; it publishes nothing. The orchestrator uses this package
 through a local path dependency; Harbor execution remains in the orchestrator.
-The generic package runtime, immutable registry/lock identity and authoring commands are
-implemented alongside the spike classes, which the shipped schema-1 workflows still select.
+The three shipped workflows now use schema 2 and the generic package runtime. Unmarked arms run
+`raidar/one-shot@2` (no stages); `workflow-new` copies `raidar/one-shot-verify`, with verify and
+zero fix turns. `raidar/define-build-verify@2` declares its reply and judge, but execution
+deliberately refuses until phase 5B wires those consumers to `criteria/1`. Spike classes remain
+only for parity coverage until that deletion.
 The upstream [`raidar/verify@1`](lab/stages/raidar/verify/) package runs the spike's four checks
 with the same pinned tools: lint, format, strict types and individual pytest outcomes.
 Its `test_timeout` parameter controls the actual per-test deadline (default 60 seconds);
@@ -78,8 +81,8 @@ For Codex CLI the default auth policy is `CODEX_AUTH_MODE=auto`: it prefers file
 | Build frame | The workflow's prompt, with `%%%TASK%%%` and one slot per enabled package, each once. | Workflow `build.prompt` |
 | Primary session | The checkpoint's one agent conversation; fixes, repairs and rework resume it. | Host-written workflow turn/session records |
 | Agent release | A pinned agent: an adapter (`codex@3` or `claude-code@2`), provider, tool pin, and the runtimes it covers, defined in `lab/agents/<name>.yaml` and registered in `lab/releases.yaml` as `name@N`. An experiment's `agents:` entry names a release and sets the `model` and `reasoning` | `lab/agents/<name>.yaml`; `lab/releases.yaml`; `agents:` |
-| Workflow release | A Harbor workflow runner defined in data: enabled stages share one primary agent session, resumed for repairs, gate fixes and rework. `build` frames the prompt and structured reply; `define` supplies the pinned FXL definition tools and skills; `verify` gates commits, records the final workspace and optionally judges mapped tests host-side. `raidar/define-build-verify@1` retains aspect judging, two gate fixes and at most three passes. Workflow tools, skills and `.raidar/` state are excluded from graded snapshots and commits. References require a namespace (`ns/name@N`); the default is `raidar/one-shot@1` and `raidar/one-shot-verify@1` adds verify with no fix turns. The pre-namespace bare register entries stay as frozen history and never resolve. | `lab/workflows/<ns>/<name>/workflow.yaml`; `lab/releases.yaml`; `workflow:` |
-| Arm | One agent on one workflow release: `{id, agent, workflow}`, where `workflow: <ns>/<name>@N` is optional and defaults to `raidar/one-shot@1`. Arms are paired against the `baseline_arm` | `arms:` |
+| Workflow release | A Harbor workflow runner defined in data: schema 2 combines a build prompt with released `stage/1` packages in one primary session. `raidar/one-shot@2` has no stages; `raidar/one-shot-verify@2` adds verify with no fix turns. `raidar/define-build-verify@2` declares define, verify, an acceptance reply and aspect judging, but its execution awaits phase 5B. Tools, skills and `.raidar/` state are excluded from graded snapshots and commits. References require `ns/name@N`; bare register entries remain frozen history and never resolve. | `lab/workflows/<ns>/<name>/workflow.yaml`; `lab/releases.yaml`; `workflow:` |
+| Arm | One agent on one workflow release: `{id, agent, workflow}`, where `workflow: <ns>/<name>@N` is optional and defaults to `raidar/one-shot@2`. Arms are paired against the `baseline_arm` | `arms:` |
 | Attempts | The replicates of every arm: each attempt runs every arm once per problem, in a seeded, counterbalanced order. Analysis pairs arms by attempt index | `analysis.attempts` |
 | Job | One execution of a locked experiment: its trials, their step results, validity checks and N1 phase timings | `var/jobs/<experiment id>/<job id>/` (`job.json`, `job.lock.json`, `trial-records/`) |
 | Trial and step result | A trial is one arm × attempt × problem through every checkpoint (a Harbor trial, id `bNN-pN-<arm>`, where `bNN` is the attempt index); a step result is one checkpoint of it | `trials/<trial>/`, `trial-records/<trial>.json` |
@@ -87,7 +90,7 @@ For Codex CLI the default auth policy is `CODEX_AUTH_MODE=auto`: it prefers file
 | Scorer and Assessment | A versioned scorer (`correctness@9`, `code-quality@8`, `resource-usage@7`, `process-compliance@11`, `gate-effort@15`) runs offline over stored trials. Correctness reports the lock-pinned solvable-set outcome alongside the raw SCB outcome; excluded steps leave its denominator, while missing sets are unavailable, never zero. Process compliance reads the work session's trace, not gate fix sessions, and leaves undecidable checks insufficient. Gate effort reads retained guardrail-gate records (first-pass clean, findings by family, fixes, autofix, costs and pre-fix correctness); arms without that gate are not applicable. Code quality reads the graded snapshots and retained or offline verifier coverage; its regression breadth excludes at m…
 | Headline metric | How quality scores combine into the headline S (`scb-canonical@1/@2`, `scb-canonical-oneshot@1/@2`). The lock pins it | `assessment.metric` |
 | Analysis | Paired deltas, confidence intervals, curves, verdicts, exclusions and a sample-size projection against the baseline arm; a benchmark adds its ranking view | the `make experiment-analyze` output directory |
-| Jev | Host-side model judgement. `raidar/define-build-verify@1`, `definition-coverage@5` and `test-coverage@5` use pinned `typesafe/jev-1.13-20260917`, retaining every request, response and interpreted answer without the OpenRouter key. The older offline policy machinery remains parked with both policies `off`; enabling these explicit workflow/scorer capabilities does not promote those policies or add a headline metric. | `raidar/judge/` shared transport; `scoring/judge/` offline policy and calibration |
+| Jev | Host-side model judgement. `raidar/define-build-verify@2` declares pinned `typesafe/jev-1.13-20260917`, but awaits phase 5B execution wiring. The offline `definition-coverage@5` and `test-coverage@5` scorers already use that model, retaining requests, responses and interpreted answers without the OpenRouter key. The older offline policy machinery remains parked with both policies `off`; these capabilities add no headline metric. | `raidar/judge/` shared transport; `scoring/judge/` offline policy and calibration |
 
 Inside each Harbor trial directory the verifier keeps its original evidence names (`raidar-oracle/steps/<step>/record.json`, reward key `oracle_leak`): they are wire names that released scorers and `make assess-regrade` read the same way for every job. For the same reason released scorers keep the observation subject `trajectory`, the evidence input `oracle.cases` and their `@1` descriptions (all hashed into Assessment keys), and the problem store keeps each problem's `oracle/` bundle directory (inside the problem's pinned digest).
 
@@ -103,8 +106,10 @@ native bundled plugins are not host plugins. The three `python__forge__claude-*`
 experiments mirror the Codex workflows; they are operational checks, not effectiveness evidence.
 
 
-`raidar/define-build-verify@1` requires `{account, ac_tests, adrs}` replies, allows one syntax
-and one semantic repair, and merges criterion-to-test mappings across turns. Its judge
+`raidar/define-build-verify@2` declares `{account, ac_tests, adrs}` replies and its judge
+configuration; it is registered and lockable, not executable until phase 5B.
+The preserved spike policy is the 5B parity target: one syntax and one semantic repair,
+merging criterion-to-test mappings across turns. Its judge
 sees mapped tests plus one hop of test helpers, never production code. Aspects close at
 probability ≥0.8, open at ≤0.3, and otherwise remain undecided. Open/undecided criteria
 produce pushback in the same session; a rework starts only when its predicted turn,
@@ -127,6 +132,9 @@ Authoritative workflow, setup, baseline, seal and session-audit records are reta
 host-side. Health W1–W11 make missing enabled-stage evidence, setup failure and recorded
 integrity violations invalid trials, not merely unmeasured outcomes. An unusable
 definition stays unusable for its checkpoint; zero criteria cannot yield `verified`.
+For schema 2, W1 requires the owed primitive records and package installation references and
+rejects recorded runtime invalidity or gate errors; malformed configuration stays invalid.
+The detailed W3–W10 primitive-specific re-key remains phase 5B work.
 
 The two coverage scorers run only at assessment time over retained define/build artifacts:
 `definition-coverage@5` reads each required unit's citing criteria; `test-coverage@5`
@@ -236,10 +244,10 @@ agents:
 
 arms:
   - id: baseline
-    agent: codex             # workflow defaults to raidar/one-shot@1
+    agent: codex             # workflow defaults to raidar/one-shot@2
   - id: treatment
     agent: codex
-    workflow: raidar/one-shot@1     # the workflow release under test (lab/workflows/<ns>/<name>/)
+    workflow: raidar/one-shot@2     # the workflow release under test (lab/workflows/<ns>/<name>/)
 
 assessment:
   scorers: [correctness@9, code-quality@8, resource-usage@7]

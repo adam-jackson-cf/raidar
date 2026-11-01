@@ -35,7 +35,7 @@ from raidar.subject.workflow.runner import (
     WorkflowRunner,
 )
 from raidar.subject.workflow.turns import WORKFLOW_DIR
-from tests.release_support import REAL_LAB
+from tests.release_support import SPIKE_WORKFLOWS
 from tests.workflow_support import (
     CODE,
     FAILING,
@@ -57,7 +57,7 @@ def definition(fix_rounds: int | None = 2, **lint: str) -> dict[str, Any]:
 
     ``fix_rounds`` ``None`` leaves ``max_fix_rounds`` out, so the schema's own default applies.
     """
-    resolved = load_workflow(REAL_LAB / "workflows", "raidar/one-shot-verify").to_json()
+    resolved = load_workflow(SPIKE_WORKFLOWS, "raidar/one-shot-verify").to_json()
     stages: Any = resolved["stages"]
     lint_check = {"name": "lint", "category": "lint", "tool": "ruff==0.8.6", "run": "ruff check"}
     tests_check = {"name": "tests", "category": "tests", "tool": "pytest==9.1.1"}

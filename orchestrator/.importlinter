@@ -157,6 +157,7 @@ allowed_importers =
     raidar.design.experiment
     tests
 
+# Health validates portable contract data; executable workflows and primitives remain forbidden.
 [importlinter:contract:health-reads-records-only]
 name = Health reads evidence without executing workflow or package code
 type = forbidden
@@ -165,7 +166,6 @@ source_modules =
 forbidden_modules =
     raidar.subject.workflow
     raidar.subject.primitive
-    raidar_contract.package
 
 [importlinter:contract:environment-independent-of-primitives]
 name = Runtime packs are independent of primitive execution

@@ -118,7 +118,6 @@ def test_init_writes_a_validating_two_arm_starter_and_refuses_to_overwrite(
     text = experiment.read_text()
     assert f"id: {experiment_id}" in text
     assert "kind: ab-test" in text
-    assert "workflow: raidar/one-shot@1" in text
     validated = runner.invoke(main, ["validate", str(experiment)])
     assert validated.exit_code == 0, validated.output
 
