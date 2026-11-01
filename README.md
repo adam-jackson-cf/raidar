@@ -32,6 +32,14 @@ The three shipped workflows now use schema 2 and the generic package runtime. Un
 zero fix turns. `raidar/define-build-verify@2` consumes the define package's `criteria/1`
 through `acceptance-reply/1` and `jev-judge/1`. Execution is package-only; archived spike
 classes and schema-1 workflows are not runtime alternatives.
+
+The normally locked AT1 authoring fixture is
+[`python__circuit_eval-cp1__phase5-at1`](lab/experiments/smoke/python__circuit_eval-cp1__phase5-at1/experiment.yaml);
+AT2 is the corresponding [`define/build/judge smoke`](lab/experiments/smoke/python__circuit_eval-cp1__phase5-at2/experiment.yaml).
+Both select codex `gpt-6-luna` with low reasoning. Their real-model execution requires approval
+and `CODEX_AUTH_MODE=chatgpt`; Jev uses its separate API credentials. No-model scripted builders
+and a local Jev transport prove mechanics, not model or judge quality.
+
 The upstream [`raidar/verify@1`](lab/stages/raidar/verify/) package runs the spike's four checks
 with the same pinned tools: lint, format, strict types and individual pytest outcomes.
 Its `test_timeout` parameter controls the actual per-test deadline (default 60 seconds);
