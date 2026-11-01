@@ -11,10 +11,9 @@ from raidar_contract.package.registry import load_stage_package
 from raidar_contract.releases import Release
 from raidar_contract.workflow import PackageJudge, PackageWorkflowDefinition
 
-from raidar.subject.primitive.site import TrialInvalid
 from raidar.subject.workflow.package_checks import ResolvedStage, package_issues
 from raidar.subject.workflow.package_stage import PackageStage
-from raidar.subject.workflow.stage import Checkpoint
+from raidar.subject.workflow.stage import FIRST_BUILD, GATE_FIX, REPAIR, REWORK, Checkpoint
 from tests.package_support import write_package
 from tests.test_primitive_gate import Container
 
@@ -121,20 +120,26 @@ def test_judge_refuses_invalid_bounds_inputs_and_policy_overrides(changes: dict[
         PackageJudge.model_validate(judge_document(**changes))
 
 
-async def test_deferred_reply_execution_refuses_before_starting_tools(tmp_path: Path) -> None:
-    definition = PackageWorkflowDefinition.model_validate(
-        {
-            "schema": 2,
-            "name": "structured",
-            "build": {"prompt": "%%%TASK%%%", "reply": "acceptance-reply/1"},
-        }
-    )
-    runtime = PackageStage(
-        definition, locked={}, primitives={}, pack="python", skills_placement=".agents/skills"
-    )
-
-    with pytest.raises(TrialInvalid) as refused:
+async def test_a_reply_workflow_appends_the_reply_shape_to_builder_turns_only(
+    tmp_path: Path,
+) -> None:
+    plain = {"schema": 2, "name": "structured", "build": {"prompt": "%%%TASK%%%"}}
+    structured = {**plain, "build": {"prompt": "%%%TASK%%%", "reply": "acceptance-reply/1"}}
+    stages = []
+    for document in (plain, structured):
+        runtime = PackageStage(
+            PackageWorkflowDefinition.model_validate(document),
+            locked={},
+            pack="python",
+            skills_placement=".agents/skills",
+        )
         await runtime.prepare(Checkpoint(Container({}), tmp_path, "task"))
+        stages.append(runtime)
+    unstructured, replying = stages
 
-    assert refused.value.kind == "instrument"
-    assert "acceptance-reply/1" in refused.value.detail
+    for kind in (FIRST_BUILD, GATE_FIX, REWORK, REPAIR):
+        assert unstructured.decorate(kind, "go") == "go"
+        assert "ac_tests" in replying.decorate(kind, "go")
+    assert replying.decorate("define", "go") == "go"
+    assert "acceptance-reply/1" not in unstructured.package_record()
+    assert replying.package_record()["acceptance-reply/1"]["replies"] == []

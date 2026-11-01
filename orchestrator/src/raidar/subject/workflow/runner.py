@@ -3,35 +3,42 @@
 Harbor runs one agent phase per checkpoint (one ``run`` per step), so the reaper, the liveness
 monitor and the per-step reset see the same phases they saw for the native agent. Inside the
 phase the runner drives the native agent (``inner_agent``, built by ``create_inner``) through
-the workflow's enabled stages (``raidar.subject.workflow.stage``), host-side, one *turn* at a
-time, all in the checkpoint's one primary session:
+the workflow's one ``PackageStage`` (``raidar.subject.workflow.package_stage``), host-side, one
+*turn* at a time, all in the checkpoint's one primary session:
 
-1. every enabled stage prepares (before the agent starts);
-2. one prompt (``compose``: build's frame, each stage's fragment at its token, the task text at
-   ``%%%TASK%%%``) runs as the first turn, in a fresh session (``run``);
-3. when the agent stops, each enabled stage's checks run in stage order; the first that returns
-   a ``Resume`` resumes the same session with its message (``resume``, a turn of that stage and
-   of the ``Resume``'s kind: ``gate_fix``, ``rework``, ``repair`` or ``define``; the first prompt
-   is ``first_build``) and the checks run again. Each stage bounds its own resumes; when none
-   asks, the checkpoint ends. A stage may add to a turn's prompt (``Stage.decorate``: the build
-   reply's shape); each finished turn's kind and seconds is on ``Checkpoint.turns``, and
-   ``Checkpoint.deadline`` is when the phase is cut (``phase_timeout_s`` from the phase start:
-   the arm's agent timeout as Harbor scales it), so a stage can decline a turn it could not finish;
-4. every stage closes, also when a turn failed (``turn_error``) or the phase was cancelled
-   (``deadline``), and its record goes into ``workflow.json`` under its name.
+1. the package runtime prepares (before the agent starts): lock checks, installs, setup calls,
+   the framed prompt, the gate and the canaries;
+2. the framed prompt (``PackageStage.prompt``) runs as the first turn, in a fresh session
+   (``run``);
+3. when the agent stops, the runtime's checks run; one that returns a ``Resume`` resumes the same
+   session with its message (``resume``, a turn of the ``Resume``'s kind: ``gate_fix``,
+   ``rework`` or ``repair``; the first prompt is ``first_build``) and the checks run again. The
+   runtime bounds its own resumes; when none asks, the checkpoint ends. The runtime may add to a
+   turn's prompt (``PackageStage.decorate``: the build reply's shape); each finished turn's kind
+   and seconds is on ``Checkpoint.turns``, and ``Checkpoint.deadline`` is when the phase is cut
+   (``phase_timeout_s`` from the phase start: the arm's agent timeout as Harbor scales it), so a
+   check can decline a turn it could not finish;
+4. the runtime closes, also when a turn failed (``turn_error``) or the phase was cancelled
+   (``deadline``), and its per-primitive records go into ``workflow.json`` under their
+   contract ids.
 
 Each checkpoint starts a fresh session because Harbor empties ``/logs/agent`` before each step.
 The native-agent protocol owns isolation, process facts, usage normalization, final replies,
 resume storage and session auditing. The runner copies logs without moving the native store,
 records normalized per-turn deltas and session totals, and writes ``last-message.txt`` for
-stage consumers. Unknown usage remains unknown rather than a partial phase total.
+consumers. Unknown usage remains unknown rather than a partial phase total.
 
 **Evidence stays host-side.** ``/logs/agent`` is mounted and the agent's user can write it, so
-the stages' records (``Checkpoint.logs_dir``) are kept in a host staging directory outside it,
+the runtime's records (``Checkpoint.logs_dir``) are kept in a host staging directory outside it,
 each turn's logs are copied by the host (links kept as links) after the turn, and everything is
-published into the step's agent logs (replacing whatever the agent put under ``workflow/``) only
-after the stages closed and reaped the agent's processes. ``SessionWatch`` records a named
-``integrity`` entry when an earlier copy of the native session store was rewritten.
+published into the step's agent logs (replacing whatever the agent put under the published
+names) only after the runtime closed and reaped the agent's processes: ``workflow/`` and the
+primitives' evidence folders (``EVIDENCE_DIRS``: stage outputs and snapshots, gate records,
+call records, install records). A recorded ``host_path`` that names a staging file is rewritten
+before the record is kept to its path below the step's agent logs (``stages/...``), so the
+published evidence stands on its own and an offline reader needs no host path.
+``SessionWatch`` records a named ``integrity`` entry when an earlier copy of the native session
+store was rewritten.
 """
 
 from __future__ import annotations
@@ -39,6 +46,7 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import json
+import os
 import shlex
 import shutil
 import tempfile
@@ -54,7 +62,6 @@ from harbor.models.agent.context import AgentContext
 
 from raidar.subject.primitive import calls
 from raidar.subject.primitive.site import TrialInvalid
-from raidar.subject.workflow.factory import checkpoint_stages, place_components
 from raidar.subject.workflow.inner import WorkflowRunnerOptions, create_inner
 from raidar.subject.workflow.package_stage import PackageStage
 from raidar.subject.workflow.stage import (
@@ -62,10 +69,7 @@ from raidar.subject.workflow.stage import (
     FIRST_BUILD,
     TURN_ERROR,
     Checkpoint,
-    Resume,
     Spent,
-    Stage,
-    compose,
 )
 from raidar.subject.workflow.turns import (
     TRAJECTORY_FILE,
@@ -104,6 +108,13 @@ STEP_RECORD_PREFIX = "raidar-"
 """Step-level lab records in ``/logs/agent`` (reset report, provision records): not a turn's."""
 INVALID = "invalid"
 """Why a checkpoint was cut when a package's instrument failed (``TrialInvalid``)."""
+BUILD = "build"
+"""The stage name every turn carries: a package workflow is one build frame."""
+EVIDENCE_DIRS = ("stages", "gate", "calls", "install")
+"""Host evidence the primitives write beside ``workflow/`` (``site``, ``gate``, ``calls``,
+``install``): published at the same names in the step's agent logs."""
+HOST_PATH = "host_path"
+"""The key of a recorded host file (``outputs/1``)."""
 
 
 class SessionWatch:
@@ -228,32 +239,30 @@ class WorkflowRunner(BaseAgent):
     ) -> None:
         state = Run()
         options = self.runner_options
-        self.components: list[dict[str, str]] = []
         self.watch = SessionWatch()
         self.integrity: list[dict[str, str]] = []
         self.invalid = None
-        stages, self.package_stage = checkpoint_stages(
+        package = PackageStage(
             options.definition,
             locked=options.locked_packages,
-            primitives=options.primitives,
             pack=options.pack,
             skills_placement=options.skills_placement,
         )
+        self.package_stage = package
         self.staging = Path(tempfile.mkdtemp(prefix="raidar-workflow-"))
         timeout = options.phase_timeout_s
         deadline = None if timeout is None else time.monotonic() + timeout
         cut: str | None = None
         checkpoint: Checkpoint | None = None
         try:
-            if self.package_stage:
-                self.package_stage.load()
-                self.instructions_text = self.package_stage.instructions_text
+            package.load()
+            self.instructions_text = package.instructions_text
             store = native_session_store(self._inner(self.logs_dir))
             paths = tuple(f"{self.environment_logs_dir}/{name}" for name in store)
             checkpoint = Checkpoint(
                 environment, self.staging, instruction, deadline, session_paths=paths
             )
-            await self._work(checkpoint, state, stages, instruction)
+            await self._work(checkpoint, state, package)
         except asyncio.CancelledError:
             cut = DEADLINE
             raise
@@ -265,47 +274,36 @@ class WorkflowRunner(BaseAgent):
             raise
         finally:
             if checkpoint is not None:
-                await asyncio.shield(self._close(checkpoint, stages, cut))
+                await asyncio.shield(self._close(checkpoint, package, cut))
             await asyncio.shield(self._lock_logs(environment))
-            self._finish(context, state, stages)
+            self._finish(context, state, package)
 
     async def _lock_logs(self, environment: BaseEnvironment) -> None:
         """A non-mounted ``/logs/agent`` is downloaded by Harbor after the run, over what the
-        runner published. The agent's processes were reaped, so the records' directory in the
+        runner published. The agent's processes were reaped, so each published directory in the
         container is recreated root-owned and empty: nothing the agent left there can overwrite a
         published record."""
         if environment.capabilities.mounted:
             return
-        target = shlex.quote(f"{self.environment_logs_dir}/{WORKFLOW_DIR}")
+        names = (WORKFLOW_DIR, *EVIDENCE_DIRS)
+        targets = " ".join(shlex.quote(f"{self.environment_logs_dir}/{name}") for name in names)
         command = (
-            f"rm -rf {target} && mkdir {target} && chown root:root {target} && chmod 755 {target}"  # noqa: E501
+            f"rm -rf {targets} && mkdir {targets} "
+            f"&& chown root:root {targets} && chmod 755 {targets}"
         )
         with suppress(Exception):
             await calls.trusted_exec(environment, command, user="root")
 
-    async def _work(
-        self, checkpoint: Checkpoint, state: Run, stages: list[Stage], instruction: str
-    ) -> None:
-        """Prepare every stage, run the one prompt, then resume while a stage's checks ask."""
-        await place_components(
-            checkpoint,
-            self.runner_options.definition,
-            self.runner_options.skills_placement,
-            self.components,
-        )
-        for stage in stages:
-            await stage.prepare(checkpoint)
-        prompt = self.package_stage.prompt if self.package_stage else compose(stages, instruction)
-        await self._turn(checkpoint, state, stages, "build", FIRST_BUILD, prompt, resume=False)
+    async def _work(self, checkpoint: Checkpoint, state: Run, package: PackageStage) -> None:
+        """Prepare the package runtime, run the one prompt, then resume while its checks ask."""
+        await package.prepare(checkpoint)
+        await self._turn(checkpoint, state, package, FIRST_BUILD, package.prompt, resume=False)
         while True:
-            followup = await self._checks(checkpoint, stages, state.turns[-1])
+            resume = await package.check(checkpoint, state.turns[-1].log_dir)
             await self._rewatch(checkpoint, state.turns[-1])
-            if followup is None:
+            if resume is None:
                 break
-            stage_type, resume = followup
-            await self._turn(
-                checkpoint, state, stages, stage_type, resume.kind, resume.message, resume=True
-            )
+            await self._turn(checkpoint, state, package, resume.kind, resume.message, resume=True)
 
     async def _rewatch(self, checkpoint: Checkpoint, turn: Turn) -> None:
         """The checks ran the agent's own code after the turn (its pytest and conftest): the
@@ -349,40 +347,26 @@ class WorkflowRunner(BaseAgent):
             return None
         return {str(k): int(v) for k, v in found.items()}
 
-    @staticmethod
-    async def _checks(
-        checkpoint: Checkpoint, stages: list[Stage], turn: Turn
-    ) -> tuple[str, Resume] | None:
-        """The first stage, in stage order, whose checks resume the session, and its ``Resume``."""
-        for stage in stages:
-            resume = await stage.check(checkpoint, turn.log_dir)
-            if resume is not None:
-                return stage.name, resume
-        return None
-
-    async def _close(self, checkpoint: Checkpoint, stages: list[Stage], cut: str | None) -> None:
-        for stage in stages:
-            try:
-                await stage.close(checkpoint, cut)
-            except TrialInvalid as invalid:
-                self._invalid(invalid)
+    async def _close(self, checkpoint: Checkpoint, package: PackageStage, cut: str | None) -> None:
+        try:
+            await package.close(checkpoint, cut)
+        except TrialInvalid as invalid:
+            self._invalid(invalid)
 
     async def _turn(
         self,
         checkpoint: Checkpoint,
         state: Run,
-        stages: list[Stage],
-        stage: str,
+        package: PackageStage,
         kind: str,
         prompt: str,
         *,
         resume: bool,
     ) -> None:
         environment = checkpoint.environment
-        for owner in stages:
-            prompt = owner.decorate(kind, prompt)
+        prompt = package.decorate(kind, prompt)
         turn = Turn(
-            stage=stage,
+            stage=BUILD,
             kind=kind,
             index=len(state.turns) + 1,
             resumed=resume,
@@ -489,43 +473,55 @@ class WorkflowRunner(BaseAgent):
             shutil.copytree(own, staged, ignore=ignore, dirs_exist_ok=True)
         return links
 
-    def _record(self, state: Run, stages: list[Stage]) -> dict[str, Any]:
-        """``workflow.json``: the stages, the turns, the phase's tokens and each stage's record."""
+    def _record(self, state: Run, package: PackageStage) -> dict[str, Any]:
+        """``workflow.json``: the turns, the phase's tokens, the components and each primitive's
+        host-written evidence (keyed by contract id), with staging paths made portable."""
         usage = state.usage()
         record: dict[str, Any] = {
             "kind": RECORD_KIND,
             "workflow": self.runner_options.workflow,
-            "stages": [stage.name for stage in stages],
-            "instructions": [path for stage in stages for path in stage.instructions],
+            "stages": [BUILD],
             "turns": [turn.record() for turn in state.turns],
             "tokens": usage.record() if usage else None,
-            "components": self.components,
+            "components": list(package.components),
             "integrity": self.integrity,
+            **package.package_record(),
         }
-        outputs = {stage.name: stage.record() for stage in stages}
-        found: dict[str, Any] = {**record}
-        found.update({name: value for name, value in outputs.items() if value is not None})
-        found.update(self._package_record())
-        return found
-
-    def _package_record(self) -> dict[str, Any]:
-        """What a package workflow adds: per-primitive evidence, its components and an invalid."""
-        found: dict[str, Any] = {}
-        if self.package_stage is not None:
-            found.update(self.package_stage.package_record())
-            found["components"] = [*self.components, *self.package_stage.components]
         if self.invalid is not None:
-            found["invalid"] = self.invalid
-        return found
+            record["invalid"] = self.invalid
+        portable: dict[str, Any] = self._portable(record)
+        return portable
 
-    def _finish(self, context: AgentContext, state: Run, stages: list[Stage]) -> None:
+    def _portable(self, value: Any) -> Any:
+        """``value`` with each ``host_path`` that names a staging file rewritten to its path below
+        the step's agent logs: staging is deleted at publication, and a recorded path must lead to
+        the published copy, never outside it."""
+        if isinstance(value, dict):
+            return {
+                key: self._published_path(item)
+                if key == HOST_PATH and isinstance(item, str)
+                else self._portable(item)
+                for key, item in value.items()
+            }
+        if isinstance(value, list):
+            return [self._portable(item) for item in value]
+        return value
+
+    def _published_path(self, text: str) -> str:
+        normal = Path(os.path.normpath(text))
+        staging = Path(os.path.normpath(self.staging))
+        if not normal.is_absolute() or normal == staging or not normal.is_relative_to(staging):
+            return text
+        return normal.relative_to(staging).as_posix()
+
+    def _finish(self, context: AgentContext, state: Run, package: PackageStage) -> None:
         usage = state.usage()
         if usage is not None:
             context.n_input_tokens = usage.input
             context.n_cache_tokens = usage.cached
             context.n_output_tokens = usage.output
             context.cost_usd = usage.cost_usd
-        record = self._record(state, stages)
+        record = self._record(state, package)
         context.metadata = {**(context.metadata or {}), "workflow": record}
         workflow_dir = self.staging / WORKFLOW_DIR
         workflow_dir.mkdir(parents=True, exist_ok=True)
@@ -535,11 +531,18 @@ class WorkflowRunner(BaseAgent):
         self._publish(workflow_dir, trajectory)
 
     def _publish(self, workflow_dir: Path, trajectory: Path | None) -> None:
-        """Put the host-kept records in the step's agent logs once the agent's processes were
-        reaped (the stages' ``close``): what the agent wrote there during the run is replaced."""
+        """Put the host-kept records and evidence in the step's agent logs once the agent's
+        processes were reaped (the runtime's ``close``): what the agent wrote under the published
+        names during the run is replaced."""
         target = self.logs_dir / WORKFLOW_DIR
         shutil.rmtree(target, ignore_errors=True)
         shutil.copytree(workflow_dir, target, symlinks=True)
+        for name in EVIDENCE_DIRS:
+            kept = self.staging / name
+            published = self.logs_dir / name
+            shutil.rmtree(published, ignore_errors=True)
+            if kept.is_dir() and not kept.is_symlink():
+                shutil.copytree(kept, published, symlinks=True)
         if trajectory is not None and trajectory.is_file():
             (self.logs_dir / TRAJECTORY_FILE).write_bytes(trajectory.read_bytes())
         shutil.rmtree(self.staging, ignore_errors=True)

@@ -11,9 +11,6 @@ reached only by name at run time is covered by the closure test (``test_package_
 
 Modules are hashed as normalised syntax trees (``raidar.contract.source_digest``): a comment or
 docstring edit leaves a digest unchanged.
-
-``SPIKE_STAGE_ENTRIES`` keeps the spike's three stage types identified until the phase-5 port
-retires their classes; they are keyed by stage type, never by a contract id.
 """
 
 from __future__ import annotations
@@ -28,10 +25,10 @@ import raidar_contract
 from raidar_contract.agent import AgentName
 from raidar_contract.canonical import digest_json
 from raidar_contract.package.manifest import StagePackage
+from raidar_contract.workflow import PackageWorkflowDefinition
 
-from raidar.contract.paths import stages_root
 from raidar.contract.source_digest import SOURCE_DIGEST_SCHEME, python_source_digest
-from raidar.subject.primitive.registry import PRIMITIVE_MODULES
+from raidar.subject.primitive.registry import PRIMITIVE_MODULES, WORKFLOW_PRIMITIVE_MODULES
 
 RAIDAR_DIR = Path(__file__).resolve().parents[2]
 CONTRACT_DIR = Path(raidar_contract.__file__).resolve().parent
@@ -65,12 +62,6 @@ ADAPTER_ENTRIES: Mapping[AgentName, tuple[str, ...]] = {
 }
 """Every module of a harness's native adapter. The isolated native agent is named by an import
 path string (``native_agent_class``), which a source closure cannot follow, so each is a root."""
-SPIKE_STAGE_ENTRIES: Mapping[str, str] = {
-    "define": "raidar.subject.workflow.define",
-    "build": "raidar.subject.workflow.build",
-    "verify": "raidar.subject.workflow.verify",
-}
-"""Entry module of each spike stage type (its closure is the stage type's code identity)."""
 
 
 def _source(module: str) -> Path | None:
@@ -159,17 +150,9 @@ def _inventory(roots: tuple[str, ...], adapter: AgentName | None) -> dict[str, P
     return _files(modules)
 
 
-def spike_payload() -> dict[str, Path]:
-    """Package-owned tool bytes uploaded by the retained spike runtime."""
-    source = stages_root() / "raidar" / "define" / "tool" / "src"
-    return {path.relative_to(source).as_posix(): path for path in sorted(source.rglob("*.py"))}
-
-
 @cache
-def _digest(roots: tuple[str, ...], adapter: AgentName | None, payload: bool = False) -> str:
+def _digest(roots: tuple[str, ...], adapter: AgentName | None) -> str:
     files = _inventory(roots, adapter)
-    if payload:
-        files |= spike_payload()
     return digest_json(
         {
             "scheme": SOURCE_DIGEST_SCHEME,
@@ -188,7 +171,7 @@ def _roots(contract: str) -> tuple[str, ...]:
     if contract == RUNNER_ID:
         return RUNNER_MODULES
     try:
-        return (PRIMITIVE_MODULES[contract],)
+        return ((PRIMITIVE_MODULES | WORKFLOW_PRIMITIVE_MODULES)[contract],)
     except KeyError:
         raise ValueError(f"unsupported primitive contract {contract!r}") from None
 
@@ -205,18 +188,18 @@ def package_contracts(packages: Iterable[StagePackage]) -> set[str]:
     return {contract for package in packages for contract in package.manifest.requires.values()}
 
 
+def workflow_contracts(definition: PackageWorkflowDefinition) -> set[str]:
+    """The workflow-level primitives a package workflow opts into: its reply and judge."""
+    found: set[str] = set()
+    if definition.build.reply is not None:
+        found.add(definition.build.reply)
+    if definition.judge is not None:
+        found.add("jev-judge/1")
+    return found
+
+
 def package_primitives(packages: Iterable[StagePackage]) -> dict[str, str]:
     """The adapter-independent code identity of the primitives ``packages`` exercise: what
     ``stage-check`` records and a trial's canary compares (the packages' fixtures run no agent)."""
     wanted = sorted({*IMPLICIT_CONTRACTS, *package_contracts(packages)})
     return {contract: _digest(_roots(contract), None) for contract in wanted}
-
-
-def spike_code(stages: Iterable[str], adapter: AgentName) -> dict[str, str]:
-    """``{stage type: digest}`` of the spike stage types (its runner and factory included)."""
-    return {
-        stage: _digest(
-            (SPIKE_STAGE_ENTRIES[stage], "raidar.subject.workflow.runner"), adapter, payload=True
-        )
-        for stage in stages
-    }

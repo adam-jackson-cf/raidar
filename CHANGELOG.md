@@ -4,6 +4,35 @@ All notable changes to this project are documented in this file.
 
 ## Unreleased
 
+### Portable reply/judge execution and package-only runtime (phase 5B step 2)
+
+- Wire `acceptance-reply/1` and `jev-judge/1` to validated, digest-checked `criteria/1` data.
+  Preserve closure thresholds, pass limits, rework, regression baselines and the fit rule.
+  The package lifecycle seals before stop/reply processing; a requested gate fix precedes
+  reply repair. A closed producer ends as `no_criteria`; missing or changed evidence after
+  `done` is an invalid instrument, never a zero-criterion success.
+- Lock workflow-selected reply/judge primitive identities. Keep package requirements separate
+  so authored packages cannot implement or override those Raidar-owned consumers.
+- Fix the live canary identity boundary: compare stage-check evidence with the loaded packages'
+  adapter-independent primitive hashes. Locked arm identities still include the native adapter
+  and remain authoritative for pooling, admission and health.
+- Bring the coupled spike deletions and caller migrations into this step: the portable API
+  and legacy classes cannot coexist without forbidden compatibility adapters.
+- Delete `StageType`, the `Define`/`Verify`/`Build` classes, `verify.py`, `define.py`, the closed
+  stage and settings models and the schema-1 workflow loader, `factory.py`, the spike entries of
+  the code-identity inventory (`SPIKE_STAGE_ENTRIES`, `spike_code`, the spike payload) and the
+  schema-1 test fixtures. The runner drives the one `PackageStage` directly, every workflow is
+  `schema: 2`, and an arm's `primitive_code` is the runtime primitives it runs (so each arm
+  relocks). `define_tool` is no longer on the production editable path: its unit tests keep
+  importing the define package's tool source in place.
+- Publish the primitives' evidence with the workflow record. The runner used to delete its
+  staging directory after publishing only `workflow/`, so `outputs/1` recorded absolute host paths
+  to files that no longer existed. It now publishes `stages/`, `gate/`, `calls/` and `install/`
+  beside `workflow/` in the step's agent logs and records each staging-owned `host_path` as its
+  path below those logs, in `workflow.json` and the context metadata, so an offline reader can
+  verify and copy the retained evidence. Behaviour tests cover the path, the hash, and the
+  replacement of anything the agent planted under a published name.
+
 ### Verified local imports (phase 5B step 1)
 
 - Add `stage-import` and `workflow-import`: preserve exported bytes, verify the supplied

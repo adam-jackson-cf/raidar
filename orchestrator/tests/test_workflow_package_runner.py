@@ -7,6 +7,7 @@ gate's in-container run is a scripted double whose sealed outcomes drive the fix
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import shutil
@@ -27,13 +28,13 @@ from raidar_contract.workflow import PackageWorkflowDefinition
 
 from raidar.subject.primitive import calls
 from raidar.subject.primitive.calls import TransportError, TreeManifest
+from raidar.subject.primitive.canary import StageCheckRecord
 from raidar.subject.primitive.gate import Attribution, GateInvalid, GateOutcome
 from raidar.subject.primitive.install import InstalledPackage, InstallError
 from raidar.subject.primitive.site import TrialInvalid
 from raidar.subject.workflow import package as package_module
 from raidar.subject.workflow import package_trial
-from raidar.subject.workflow.definition import load_workflow
-from raidar.subject.workflow.factory import checkpoint_stages, place_components
+from raidar.subject.workflow.identity import package_primitives
 from raidar.subject.workflow.package_stage import PackageStage
 from raidar.subject.workflow.runner import RECORD_FILE, WorkflowRunner
 from raidar.subject.workflow.stage import GATE_FIX, REPAIR, REWORK, Checkpoint, Spent
@@ -50,7 +51,6 @@ from tests.lifecycle_support import (
     stage_check_record,
 )
 from tests.native_support import CodexNative
-from tests.release_support import SPIKE_WORKFLOWS
 from tests.workflow_support import LocalEnvironment
 
 BUILD = "Build:\n%%%NOTE_STATE%%%\nTask: %%%TASK%%%"
@@ -167,16 +167,24 @@ class Lab:
     package: StagePackage
     trees: dict[str, str]
     stored_check: bool = True
+    primitives: dict[str, str] | None = None
+    """The primitives the recorded stage-check carries: ``None`` is the package's own code."""
     installs: Installs = field(init=False)
 
     def __post_init__(self) -> None:
         self.installs = Installs(self)
 
+    def expected_record(self) -> StageCheckRecord:
+        """The stage-check record of the package: its real adapter-independent primitive hashes
+        unless ``primitives`` says the record was taken against other code."""
+        primitives = self.primitives or package_primitives([self.package])
+        return stage_check_record(self.package, self.container, primitives)
+
     def lock(self, drop: Sequence[str] = (), **overrides: Any) -> dict[str, dict[str, Any]]:
         entry: dict[str, Any] = {
             "sha256": self.package.digest,
             "installed": {ARCH: TREE},
-            "check": digest_json(stage_check_record(self.package, self.container).as_json()),
+            "check": digest_json(self.expected_record().as_json()),
         }
         entry.update(overrides)
         for key in drop:
@@ -200,7 +208,6 @@ class Lab:
         stage = PackageStage(
             PackageWorkflowDefinition.model_validate(definition_json(params, fix_rounds)),
             locked=self.lock() if locked is None else locked,
-            primitives=PRIMITIVES,
             pack=PACK,
             skills_placement=PLACEMENT,
             repo_root=self.repo,
@@ -221,7 +228,7 @@ def lab(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Lab:
     def check_record(digest: str, root: Path | None = None) -> dict[str, Any] | None:
         if not found.stored_check or digest != found.package.digest:
             return None
-        return stage_check_record(found.package, container).as_json()  # type: ignore[return-value]
+        return found.expected_record().as_json()  # type: ignore[return-value]
 
     async def upload_file(environment: Any, source: Path, target: str) -> None:
         destination = environment.host(target)
@@ -247,6 +254,35 @@ def lab(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Lab:
     ScriptedGate.retained = []
     ScriptedGate.seconds = 0.0
     return found
+
+
+async def test_an_unusable_judge_invalidates_before_any_package_code_runs(lab: Lab) -> None:
+    body = definition_json()
+    body["build"]["reply"] = "acceptance-reply/1"
+    body["judge"] = {
+        "criteria": "note-state.note",
+        "model": "someone/else-1",
+        "closed_at": 0.8,
+        "open_at": 0.3,
+        "max_passes": 1,
+        "rework": "Fix:\n%%%PUSHBACK%%%\n%%%GATE%%%",
+    }
+    stage = PackageStage(
+        PackageWorkflowDefinition.model_validate(body),
+        locked=lab.lock(),
+        pack=PACK,
+        skills_placement=PLACEMENT,
+        repo_root=lab.repo,
+    )
+    checkpoint = Checkpoint(lab.container, lab.tmp_path / "judge-logs", TASK)
+
+    with pytest.raises(TrialInvalid) as invalid:
+        await stage.prepare(checkpoint)
+
+    assert invalid.value.kind == "instrument"
+    assert lab.installs.count == 0
+    assert lab.container.calls == []
+    assert stage.package_record()["jev-judge/1"]["passes"] == 0
 
 
 # the lock holds the package to its bytes, installed tree and check record ------------------------
@@ -305,14 +341,6 @@ async def test_a_lock_without_this_architecture_is_refused(lab: Lab) -> None:
 
     with pytest.raises(TrialInvalid, match=r"none for arm64"):
         await stage.prepare(checkpoint)
-
-
-async def test_a_draft_lock_without_installed_trees_does_not_compare_the_tree(lab: Lab) -> None:
-    stage, checkpoint = lab.stage(lab.lock(drop=["installed"]))
-
-    await stage.prepare(checkpoint)
-
-    assert stage.installed[0].digest == TREE
 
 
 async def test_an_install_failure_is_an_integrity_failure_naming_the_cause(lab: Lab) -> None:
@@ -422,7 +450,7 @@ async def test_a_stage_that_never_prepared_closes_empty_and_records_nothing(lab:
     await stage.close(checkpoint, "invalid")
 
     assert stage.package_record() == {}
-    assert stage.installed == []
+    assert stage.checkpoint is None
 
 
 # gate fix budget and order -----------------------------------------------------------------------
@@ -499,6 +527,36 @@ async def test_a_refused_gate_is_fixed_before_any_stop_is_asked(lab: Lab) -> Non
     assert resume is not None
     assert resume.kind == GATE_FIX
     assert lab.container.tool_calls("stop/1") == []
+
+
+async def test_the_canary_compares_the_loaded_packages_own_code_not_the_arms_locked_identity(
+    lab: Lab,
+) -> None:
+    """The stage-check record carries ``package_primitives`` (adapter-independent); the arm's
+    locked ``primitive_code`` is adapter-inclusive. A package whose record was taken against other
+    code is refused before the agent starts; the real record runs the stop, and a ``done`` stop
+    keeps its output."""
+    lab.primitives = {"stop/1": "p" * 64}
+    stale, checkpoint = lab.stage()
+    with pytest.raises(TrialInvalid) as refused_:
+        await stale.prepare(checkpoint)
+    assert refused_.value.kind == "instrument"
+
+    lab.primitives = None
+    stage, checkpoint = lab.stage()
+    await stage.prepare(checkpoint)
+    lab.container.write_note("a note of enough words here")
+
+    assert await stage.check(checkpoint, "turn-1") is None
+    await stage.close(checkpoint, None)
+
+    record = stage.package_record()
+    (decision,) = [
+        item for item in record["stop/1"]["note-state"]["decisions"] if item["action"] == "done"
+    ]
+    assert decision["outputs"]["note"]["error"] is None
+    kept = record["outputs/1"]["note-state"]["note"]
+    assert kept["sha256"] == hashlib.sha256(b"a note of enough words here").hexdigest()
 
 
 @pytest.mark.parametrize(
@@ -805,34 +863,98 @@ async def test_a_failing_turn_still_reaches_harbor_and_cuts_the_outputs_as_a_tur
     assert "invalid" not in record
 
 
-# runner selection ---------------------------------------------------------------------------------
+def plant(path: Path, text: str) -> Script:
+    def step(env: Env) -> None:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(text)
+
+    return step
 
 
-def test_a_schema_2_definition_selects_the_one_package_stage_and_the_spike_does_not(
-    lab: Lab,
+def both(*steps: Script) -> Script:
+    def run_all(env: Env) -> None:
+        for step in steps:
+            step(env)
+
+    return run_all
+
+
+async def test_a_native_session_log_rewritten_between_turns_is_a_named_integrity_violation(
+    lab: Lab, inner: type[ScriptedInner]
 ) -> None:
-    package = PackageWorkflowDefinition.model_validate(definition_json())
-    stages, stage = checkpoint_stages(
-        package, locked=lab.lock(), primitives=PRIMITIVES, pack=PACK, skills_placement=PLACEMENT
+    session = lab.tmp_path / "logs" / "sessions" / "rollout.jsonl"
+    inner.script = [
+        both(write("two words"), plant(session, '{"turn": 1}\n')),
+        both(
+            write("now a note of seven words"),
+            plant(session, '{"turn": "rewritten"}\n{"turn": 2}\n'),
+        ),
+    ]
+
+    record, _ = await run_workflow(lab, params={"min_words": 6})
+
+    assert [(i["name"], i["turn"]) for i in record["integrity"]] == [
+        ("session_log_rewritten", "workflow/build-2")
+    ]
+    assert record["turns"][1]["integrity"][0]["name"] == "session_log_rewritten"
+
+
+# published evidence -------------------------------------------------------------------------------
+
+
+async def test_a_published_output_path_leads_to_the_kept_evidence_below_the_step_logs(
+    lab: Lab, inner: type[ScriptedInner]
+) -> None:
+    inner.script = [write("a note of enough words here")]
+
+    record, runner = await run_workflow(lab)
+
+    logs = lab.tmp_path / "logs"
+    copied = record["outputs/1"]["note-state"]["note"]
+    relative = PurePosixPath(copied["host_path"])
+    assert copied["error"] is None
+    assert not relative.is_absolute()
+    assert ".." not in relative.parts
+    assert relative.parts[0] == "stages"
+    kept = logs.joinpath(*relative.parts)
+    assert kept.is_file()
+    assert hashlib.sha256(kept.read_bytes()).hexdigest() == copied["sha256"]
+    assert not runner.staging.exists()  # the record never needed the deleted staging directory
+    assert str(runner.staging) not in json.dumps(record)
+
+
+async def test_the_context_metadata_carries_the_same_portable_record(
+    lab: Lab, inner: type[ScriptedInner]
+) -> None:
+    inner.script = [write("a note of enough words here")]
+    context = AgentContext()
+    logs = lab.tmp_path / "logs"
+    logs.mkdir(exist_ok=True)
+    runner = WorkflowRunner(
+        logs_dir=logs,
+        environment_logs_dir=PurePosixPath(logs),
+        model_name="openai/gpt-6-luna",
+        inner_agent={"name": "codex"},
+        workflow="acme/note-flow@1",
+        definition=definition_json(),
+        locked_packages=lab.lock(),
+        primitives=PRIMITIVES,
+        pack=PACK,
+        skills_placement=PLACEMENT,
     )
-    spike = load_workflow(SPIKE_WORKFLOWS, "raidar/one-shot")
-    spike_stages, spike_stage = checkpoint_stages(
-        spike, locked={}, primitives={}, pack="", skills_placement=PLACEMENT
-    )
 
-    assert stages == [stage]
-    assert stage is not None
-    assert stage.name == "build"
-    assert spike_stage is None
-    assert all(not isinstance(item, PackageStage) for item in spike_stages)
+    await runner.run(TASK, lab.container, context)  # type: ignore[arg-type]
+
+    assert context.metadata is not None
+    assert context.metadata["workflow"] == recorded(lab)
 
 
-async def test_package_workflows_place_no_spike_components(lab: Lab) -> None:
-    package = PackageWorkflowDefinition.model_validate(definition_json())
-    components: list[dict[str, str]] = []
-    checkpoint = Checkpoint(lab.container, lab.tmp_path / "logs", TASK)
+async def test_evidence_the_agent_planted_under_a_published_name_is_replaced(
+    lab: Lab, inner: type[ScriptedInner]
+) -> None:
+    forged = lab.tmp_path / "logs" / "stages" / "forged.txt"
+    inner.script = [both(write("a note of enough words here"), plant(forged, "forged"))]
 
-    await place_components(checkpoint, package, PLACEMENT, components)
+    await run_workflow(lab)
 
-    assert components == []
-    assert not lab.container.host("/app").exists()
+    assert not forged.exists()

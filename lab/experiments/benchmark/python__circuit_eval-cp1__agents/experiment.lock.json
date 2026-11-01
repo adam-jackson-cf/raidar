@@ -281,7 +281,7 @@
     },
     "tools": {}
   },
-  "document_sha256": "7cd14a3f20240c76cfbb14338274cd64d4bd7c1eeda24f7dfc137d0f131fbe4f",
+  "document_sha256": "820749fcedc2c4e40059f4e5929d3fd00c1755a128030ea47c2ac246eb870b07",
   "execution": {
     "arms": {
       "codex": {
@@ -299,13 +299,13 @@
           "version_pin": "0.156.1",
           "workflow_skills": "placement.skills .agents/skills in the workspace /app"
         },
-        "digest": "d22b324f4ce56cf9f1187751998b90dcc3897753d26a253af192fe58cf6d212a",
+        "digest": "54e1dd2fb086c630b09cc3f7d143e07b832623b0f0799a364c16f9c265440664",
         "model": "gpt-6-luna",
         "packages": {},
         "primitive_code": {
           "frame/1": "461bb2b2988ba8a3c081fee5595e8e2014d1cba57e12d3da58d6d695ec444d0d",
           "install/1": "012eb722cf18829167463674f19cf48cd4ccc9da22138baa5600066be6742b3d",
-          "runner/1": "1553c6a55254a624261ee9f2bd26703009ec1b6d9c6c8173e53d9781240b7ec5"
+          "runner/1": "4f997f994a77c1573e5bdee975e12a69f58f065cb74a405db9a36a221db4c5b1"
         },
         "provider": "openai",
         "reasoning": "low",
@@ -501,7 +501,7 @@
     "source_sha256": "d731d338a9cccfe212f9d5292c13737f32d4206d50157140bfc3255fe8046d2d",
     "spec_sha256": "dd40a7be32019dc08bec7cde5562c9733f948492c38ddbde08de4c90f882c086"
   },
-  "lock_sha256": "4f1193e0af7fe15ac430cd126b89846e9753e84e0417597b6a2738b40e5ebbe0",
+  "lock_sha256": "040168bb9c2b8e496f14433c04f99fde1b7e951d6cfd916c910861c6d670a8a0",
   "lock_version": 5,
   "overrides": {
     "flags": {},
@@ -510,8 +510,8 @@
   "sections": {
     "analysis": "33aede75abee4373a36e88c3e4bad96deaadffcf5db85e1efadee2a8414fd67b",
     "assessment": "b7258a0f7f20f232400525fd93c98f17bc493e7fc955255c22a99cfb968e0745",
-    "execution": "4f1193e0af7fe15ac430cd126b89846e9753e84e0417597b6a2738b40e5ebbe0",
-    "toolchain": "f659222273077d164b616b044b099482329257b8242be3400bb8174638133474"
+    "execution": "040168bb9c2b8e496f14433c04f99fde1b7e951d6cfd916c910861c6d670a8a0",
+    "toolchain": "6256053eb5ce8c39f8bf92cd11a70df1ddd8a4a0b880f514605f4aecbd9774ae"
   },
   "spec": {
     "agents": [
@@ -578,6 +578,6 @@
     "litellm": "1.102.1",
     "python": "3.13.7",
     "raidar": "0.15.0",
-    "raidar_spec": "c05fb465122b93838e790d70bf993f25de457615e2393bfbec74b0abecbbf87a"
+    "raidar_spec": "29df8c63188e8a71be7894d3d05e9fc3d5a2f56cc3052c65099bcc7bb70516eb"
   }
 }

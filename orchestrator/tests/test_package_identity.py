@@ -30,7 +30,7 @@ from raidar.subject.stages import released_stage, stage_names
 from raidar.subject.workflow import package_checks
 from raidar.subject.workflow.package_checks import ResolvedStage, package_issues
 from tests.package_support import fixture_package, write_package
-from tests.release_support import release_tree
+from tests.release_support import one_shot_digest, release_tree
 
 BUILD = "Work.\n\n%%%GATE_CHECK%%%\n\n%%%TASK%%%"
 
@@ -56,17 +56,13 @@ def _write_workflow(root: Path, document: dict[str, Any]) -> None:
 
 def _register(root: Path, *, workflow: bool = True) -> None:
     """Register codex, raidar/one-shot, acme/gate-check@1 and optionally acme/gated@1."""
-    from raidar.subject.workflow.definition import load_workflow
-
     stages = {
         f"{name}@1": load_stage_package(stages_root(root) / name).digest
         for name in stage_names(root)
     }
     document: dict[str, Any] = {
         "agents": {"codex@1": load_agent(agents_root(root), "codex").digest},
-        "workflows": {
-            "raidar/one-shot@1": load_workflow(workflows_root(root), "raidar/one-shot").digest
-        },
+        "workflows": {"raidar/one-shot@1": one_shot_digest(root)},
         "stages": stages,
     }
     releases_file(root).write_text(yaml.safe_dump(document), encoding="utf-8")

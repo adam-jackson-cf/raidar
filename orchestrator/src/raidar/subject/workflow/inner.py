@@ -22,8 +22,6 @@ from harbor.models.trial.config import AgentConfig
 from pydantic import BaseModel, ConfigDict, Field
 from raidar_contract.workflow import PackageWorkflowDefinition
 
-from raidar.subject.workflow.definition import WorkflowDefinition
-
 INNER_KWARG = "inner_agent"
 
 
@@ -40,11 +38,13 @@ class InnerAgentSpec(BaseModel):
 class WorkflowRunnerOptions(AgentOptions):
     inner_agent: InnerAgentSpec
     workflow: str
-    definition: WorkflowDefinition | PackageWorkflowDefinition
+    definition: PackageWorkflowDefinition
     skills_placement: str = ".agents/skills"
     phase_timeout_s: float | None = None
     locked_packages: dict[str, dict[str, Any]] = Field(default_factory=dict)
     primitives: dict[str, str] = Field(default_factory=dict)
+    """The arm's locked ``primitive_code`` (adapter-inclusive identity, for health): never what
+    the canary compares, which is computed from the loaded packages' own code."""
     pack: str = ""
 
 

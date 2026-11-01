@@ -82,11 +82,7 @@ def test_a_definition_changed_since_its_release_is_refused(tree: Path) -> None:
 def test_a_workflow_changed_since_its_release_is_refused(tree: Path) -> None:
     write_workflow(
         tree,
-        {
-            "schema": 1,
-            "name": "one-shot",
-            "stages": {"build": {"prompt": "Different %%%TASK%%%"}},
-        },
+        {"schema": 2, "name": "one-shot", "build": {"prompt": "Different %%%TASK%%%"}},
     )
 
     with pytest.raises(ReleaseError, match=r"changed since raidar/one-shot@1 was released"):
@@ -154,11 +150,7 @@ def test_a_definition_with_no_registration_is_reported(tree: Path) -> None:
 def test_hash_drift_is_reported_with_the_next_version(tree: Path) -> None:
     write_workflow(
         tree,
-        {
-            "schema": 1,
-            "name": "one-shot",
-            "stages": {"build": {"prompt": "Different %%%TASK%%%"}},
-        },
+        {"schema": 2, "name": "one-shot", "build": {"prompt": "Different %%%TASK%%%"}},
     )
 
     issues = release_issues(tree)

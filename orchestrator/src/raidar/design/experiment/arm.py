@@ -22,8 +22,11 @@ from raidar.design.experiment.agent import AgentResolutionError, ResolvedAgent, 
 from raidar.design.experiment.schema import ExperimentSpec
 from raidar.subject.draft import drafting
 from raidar.subject.releases import ReleasedWorkflow, released_workflow
-from raidar.subject.workflow.identity import package_contracts, primitive_code, spike_code
-from raidar.subject.workflow.loading import AnyWorkflow
+from raidar.subject.workflow.identity import (
+    package_contracts,
+    primitive_code,
+    workflow_contracts,
+)
 from raidar.subject.workflow.package_runtime import (
     PackageEvidence,
     evidence_issues,
@@ -39,7 +42,7 @@ class ResolvedArm:
     evidence: Mapping[str, PackageEvidence] = field(default_factory=dict)
 
     @property
-    def definition(self) -> AnyWorkflow:
+    def definition(self) -> PackageWorkflowDefinition:
         return self.workflow.definition
 
     @cached_property
@@ -57,11 +60,9 @@ class ResolvedArm:
 
     @cached_property
     def primitive_code(self) -> dict[str, str]:
-        """The code identity of every primitive the arm runs (spike stage types until phase 5)."""
-        stages = self.workflow.stages
-        if not stages and not isinstance(self.definition, PackageWorkflowDefinition):
-            return spike_code(self.definition.enabled_stages, self.agent.name)
-        contracts = package_contracts(stage.package for stage in stages)
+        """The code identity of every primitive the arm runs."""
+        contracts = package_contracts(stage.package for stage in self.workflow.stages)
+        contracts |= workflow_contracts(self.definition)
         return primitive_code(contracts, self.agent.name)
 
     def identity(self) -> dict[str, object]:

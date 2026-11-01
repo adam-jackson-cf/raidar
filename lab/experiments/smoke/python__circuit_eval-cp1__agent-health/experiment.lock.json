@@ -281,7 +281,7 @@
     },
     "tools": {}
   },
-  "document_sha256": "0499f88da7654a2aaf7d6e30ae93f98735c4b434db58fa137ebe07b51e3f54ad",
+  "document_sha256": "01ce7241e5d3f3d1a1b1bb84092021963b8a63e502dbec41541f82a4f5e72bb8",
   "execution": {
     "arms": {
       "baseline": {
@@ -299,13 +299,13 @@
           "version_pin": "0.156.1",
           "workflow_skills": "placement.skills .agents/skills in the workspace /app"
         },
-        "digest": "48d1520eec839fdfffb58e9500516e362a9960af457b66edb8a0b212c9606952",
+        "digest": "99d57243f95660d423406cf9be2a2d838d2c4092f1fc081da1eea3e2fd7aefc2",
         "model": "gpt-6-luna",
         "packages": {},
         "primitive_code": {
           "frame/1": "461bb2b2988ba8a3c081fee5595e8e2014d1cba57e12d3da58d6d695ec444d0d",
           "install/1": "012eb722cf18829167463674f19cf48cd4ccc9da22138baa5600066be6742b3d",
-          "runner/1": "1553c6a55254a624261ee9f2bd26703009ec1b6d9c6c8173e53d9781240b7ec5"
+          "runner/1": "4f997f994a77c1573e5bdee975e12a69f58f065cb74a405db9a36a221db4c5b1"
         },
         "provider": "openai",
         "reasoning": "low",
@@ -501,7 +501,7 @@
     "source_sha256": "3edf1709455e71d74d999a57ed91d65c5fa485c2db07e7d409b09c6a91d94c58",
     "spec_sha256": "b1b60796d07d920f1e8906ff132475c995f0115a10acc9e3007647ac9d382188"
   },
-  "lock_sha256": "a39334c1c048a4bd48b3002d582d09a5f9df0b42468e00b26b5a0fe929fe87cd",
+  "lock_sha256": "c1a073df0b582e09fdc8f5b1b4c1e81d37bab39ad87dc496d045b9bf6be5379d",
   "lock_version": 5,
   "overrides": {
     "flags": {},
@@ -510,8 +510,8 @@
   "sections": {
     "analysis": "a9e70f16a3d8fde7db8251be753771af765c98ad0c0b01202934c7622c4976f4",
     "assessment": "b7258a0f7f20f232400525fd93c98f17bc493e7fc955255c22a99cfb968e0745",
-    "execution": "a39334c1c048a4bd48b3002d582d09a5f9df0b42468e00b26b5a0fe929fe87cd",
-    "toolchain": "f659222273077d164b616b044b099482329257b8242be3400bb8174638133474"
+    "execution": "c1a073df0b582e09fdc8f5b1b4c1e81d37bab39ad87dc496d045b9bf6be5379d",
+    "toolchain": "6256053eb5ce8c39f8bf92cd11a70df1ddd8a4a0b880f514605f4aecbd9774ae"
   },
   "spec": {
     "agents": [
@@ -578,6 +578,6 @@
     "litellm": "1.102.1",
     "python": "3.13.7",
     "raidar": "0.15.0",
-    "raidar_spec": "c05fb465122b93838e790d70bf993f25de457615e2393bfbec74b0abecbbf87a"
+    "raidar_spec": "29df8c63188e8a71be7894d3d05e9fc3d5a2f56cc3052c65099bcc7bb70516eb"
   }
 }

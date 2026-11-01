@@ -841,7 +841,7 @@
       "tree-sitter-language-pack": "0.13.0"
     }
   },
-  "document_sha256": "e091e600dca250148e91fab66f941be3e849b2953e95cffaf27ae101737f4080",
+  "document_sha256": "7d6288b4eb1a932ad83947adb605b35a56155e9c98810e631b22ebfe7ce931e2",
   "execution": {
     "arms": {
       "verify": {
@@ -859,7 +859,7 @@
           "version_pin": "2.1.285",
           "workflow_skills": "placement.skills .claude/skills in the workspace /app"
         },
-        "digest": "994debd065884b2bdf077195167c059582ba83d7ac45ea05a6b36e6ccf14d930",
+        "digest": "0223233514386feb8ee8d2cb2640dd9457c5a73bb7219a0ae579bb4c28a84455",
         "model": "claude-sonnet-4-6",
         "packages": {
           "raidar/verify": {
@@ -872,9 +872,9 @@
         },
         "primitive_code": {
           "frame/1": "b0cd981a275a0f25f6e1cec75f882f9eeb773bda33ec4d9d04de0cc20efafbab",
-          "gate/1": "f24e44c3aab5f6eb619fdc05786b3105aea0f5b0ee3364eeb6dec2e4d15f1f40",
+          "gate/1": "ca7bd3c36bee679d619c2efcc7161c2006e1d2ecec5f2b401f295c2a03b4375e",
           "install/1": "e3181fe8d2a4cf86d776b4a88bd31aec726ccd818e4484b56be66ec4e627ce8e",
-          "runner/1": "ce6eb5ce138d7c802e72d0d35ae220a09169c3c5b29ab42ca558c44069f5efc9"
+          "runner/1": "340879a05ae33cafebfb7922ebacfa80c848da2076687d46438d5541e7d91b78"
         },
         "provider": "anthropic",
         "reasoning": "low",
@@ -1701,7 +1701,7 @@
     "source_sha256": "81b2de49d442b657e9927ce3296163d5934666f946352a220a922f22689ca045",
     "spec_sha256": "b367419f11b39745e9389d60ebbd16c7d03be5d05c6df69dbb381db355cc6192"
   },
-  "lock_sha256": "06f49fc14bf113a151eed236bf6df8b1d06b8529faaab849e9462bbcc68c60a1",
+  "lock_sha256": "e800f753533c9de8fae4404999d89e020226725dca15aba5b7eb5d60eac58afb",
   "lock_version": 5,
   "overrides": {
     "flags": {},
@@ -1710,8 +1710,8 @@
   "sections": {
     "analysis": "81cdc2d12aacc031bb70595c13973ff647ab49a68bebda4be7a9b65ba3127a78",
     "assessment": "dce26b7322a34e10c22c380fff0f675581046b9df217d283beaef5d6a55efb37",
-    "execution": "06f49fc14bf113a151eed236bf6df8b1d06b8529faaab849e9462bbcc68c60a1",
-    "toolchain": "f659222273077d164b616b044b099482329257b8242be3400bb8174638133474"
+    "execution": "e800f753533c9de8fae4404999d89e020226725dca15aba5b7eb5d60eac58afb",
+    "toolchain": "6256053eb5ce8c39f8bf92cd11a70df1ddd8a4a0b880f514605f4aecbd9774ae"
   },
   "spec": {
     "agents": [
@@ -1781,6 +1781,6 @@
     "litellm": "1.102.1",
     "python": "3.13.7",
     "raidar": "0.15.0",
-    "raidar_spec": "c05fb465122b93838e790d70bf993f25de457615e2393bfbec74b0abecbbf87a"
+    "raidar_spec": "29df8c63188e8a71be7894d3d05e9fc3d5a2f56cc3052c65099bcc7bb70516eb"
   }
 }
