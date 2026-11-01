@@ -6,8 +6,11 @@ success, non-zero, malformed and failed-transport outcomes. No check runs, nothi
 
 from __future__ import annotations
 
+import hashlib
+import io
 import json
 import re
+import tarfile
 from dataclasses import dataclass
 from pathlib import Path
 from types import SimpleNamespace
@@ -666,3 +669,99 @@ async def test_each_new_hook_run_is_copied_once_by_its_line_number(tmp_path: Pat
     assert len(copies.hook_runs) == 1
     await copies.keep_hook(log + "\n" + run)
     assert [hook["seq"] for hook in copies.hook_runs] == [5, 6]
+
+
+@pytest.mark.parametrize("tampered", [False, True])
+async def test_captured_output_is_retained_only_when_archive_bytes_match_the_manifest(
+    tmp_path: Path, tampered: bool
+) -> None:
+    data = b"the note\n"
+    rows = [
+        {
+            "path": "note.md",
+            "type": "file",
+            "size": len(data),
+            "sha256": hashlib.sha256(data).hexdigest(),
+            "mode": 0o644,
+        }
+    ]
+    captured = {
+        "path": NOTE.path,
+        "exists": True,
+        "entries": rows,
+        "digest": hashlib.sha256(
+            json.dumps(rows, sort_keys=True, separators=(",", ":")).encode()
+        ).hexdigest(),
+        "files": 1,
+        "bytes": len(data),
+        "violation": None,
+        "tar": "/s/scratch/outputs/note.tar",
+    }
+    stream = io.BytesIO()
+    with tarfile.open(fileobj=stream, mode="w") as archive:
+        member = tarfile.TarInfo("note.md")
+        member.size = len(data)
+        archive.addfile(member, io.BytesIO(b"bad note\n" if tampered else data))
+    bundle = stream.getvalue()
+
+    class Snapshot:
+        async def exec(self, *args: Any, **kw: Any) -> Any:
+            return SimpleNamespace(return_code=0, stdout=str(len(bundle)), stderr="")
+
+        async def download_file(self, source: str, target: Path) -> None:
+            target.write_bytes(bundle)
+
+    copies = CheckOutputs(Snapshot(), "/s/scratch", tmp_path / "out", DECLARED)
+    check = {"name": "pkg.lint", "outputs": {"note": captured}}
+    await copies.keep([check], "seal-1")
+
+    record = kept(check)
+    if tampered:
+        assert "changed while it was copied" in record["error"]
+        assert record["host_path"] is None
+        assert not (tmp_path / "out" / "seal-1" / "pkg.lint" / "note").exists()
+    else:
+        assert record["error"] is None
+        assert record["sha256"] == hashlib.sha256(data).hexdigest()
+        assert record["bytes"] == len(data)
+        assert Path(record["host_path"]).read_bytes() == data
+
+
+async def test_a_prefix_snapshot_retains_the_fix_input_and_its_digest(tmp_path: Path) -> None:
+    class Workspace(Container):
+        async def download_dir_with_exclusions(
+            self, *, source_dir: str, target_dir: Path, exclude: list[str]
+        ) -> None:
+            target_dir.mkdir(parents=True)
+            (target_dir / "main.py").write_text("raise ValueError('not repaired yet')\n")
+
+    run = GateRun(Workspace(), tmp_path, [], GateSettings(max_fix_rounds=2), PATHS)
+    first = await run.retain_prefix(1)
+    second = await run.retain_prefix(2)
+
+    assert first is not None
+    assert second is not None
+    assert first["tree_digest"] == second["tree_digest"]
+    assert first["path"] != second["path"]
+    assert (tmp_path / first["path"] / "main.py").read_text().startswith("raise ValueError")
+    assert run.record()["pre_fix_snapshots"] == [first, second]
+
+
+async def test_an_unverifiable_trusted_payload_prevents_gate_preparation(tmp_path: Path) -> None:
+    class UnverifiablePayload(Container):
+        async def upload_dir(self, source: Path, target: str) -> None:
+            pass
+
+    run = GateRun(UnverifiablePayload(), tmp_path, [], paths=GatePaths())
+
+    with pytest.raises(calls.TransportError, match="trusted payload does not match"):
+        await run.prepare()
+
+    assert run.record()["canary"] is None
+    assert run.record()["gates"] == []
+
+
+def test_a_requested_baseline_is_absent_until_the_instrument_has_run(tmp_path: Path) -> None:
+    run, _ = gate(tmp_path, settings=GateSettings(baseline=True))
+
+    assert run.record()["baseline"] is None

@@ -338,3 +338,11 @@ def test_a_refused_reply_names_the_violations_and_the_misplaced_properties() -> 
 
 def test_an_unreadable_reply_is_a_syntax_error_with_no_dropped_list() -> None:
     assert read_reply("", BUILD_SCHEMA) == (None, "reply holds no JSON object", [])
+
+
+def test_a_refused_reply_that_dropped_nothing_says_nothing_was_ignored() -> None:
+    value, error, dropped = read_reply('{"account": "built", "adrs": []}', BUILD_SCHEMA)
+
+    assert value is None
+    assert dropped == []
+    assert error == "reply violates the schema: (root): 'ac_tests' is a required property"

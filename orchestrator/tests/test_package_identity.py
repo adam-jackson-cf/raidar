@@ -21,6 +21,7 @@ from raidar_contract.releases import (
     parse_register,
     rewritten_releases,
 )
+from raidar_contract.workflow import PackageWorkflowDefinition
 
 from raidar.contract.paths import agents_root, releases_file, stages_root, workflows_root
 from raidar.subject.agent.definition import load_agent
@@ -28,6 +29,7 @@ from raidar.subject.release_check import release_issues
 from raidar.subject.releases import released_workflow
 from raidar.subject.stages import released_stage, stage_names
 from raidar.subject.workflow import package_checks
+from raidar.subject.workflow.identity import workflow_contracts
 from raidar.subject.workflow.package_checks import ResolvedStage, package_issues
 from tests.package_support import fixture_package, write_package
 from tests.release_support import one_shot_digest, release_tree
@@ -517,3 +519,50 @@ def test_st7_two_packages_returning_the_same_token_are_refused(tmp_path: Path) -
         _own(tmp_path / "d2", {"name": "two", "tokens": ["SECOND"]}),
     ]
     assert package_issues(build, distinct, lock_check=lambda tool: None) == []
+
+
+def test_st3_an_input_needing_another_contract_than_the_producer_declares_is_refused(
+    tmp_path: Path,
+) -> None:
+    producer = _own(
+        tmp_path,
+        {
+            "name": "maker",
+            "requires": {"outputs": "outputs/1"},
+            "outputs": {"criteria": {"path": "/app/.raidar/maker/c.json"}},
+        },
+    )
+    consumer = _own(
+        tmp_path,
+        {"name": "taker", "inputs": {"crit": {"from": "maker.criteria", "contract": "criteria/1"}}},
+    )
+
+    issues = package_issues("%%%MAKER%%% %%%TAKER%%% %%%TASK%%%", [producer, consumer])
+
+    assert any(
+        i.startswith("ST3:") and "needs criteria/1 from maker.criteria" in i and "declares" in i
+        for i in issues
+    )
+
+
+def test_a_workflow_opts_into_exactly_the_primitives_it_names() -> None:
+    plain = _workflow_document()
+    replying = _workflow_document()
+    replying["build"]["reply"] = "acceptance-reply/1"
+    judged = _workflow_document()
+    judged["build"]["reply"] = "acceptance-reply/1"
+    judged["judge"] = {
+        "criteria": "gate-check.criteria",
+        "model": "typesafe/jev-1.13-20260917",
+        "closed_at": 0.8,
+        "open_at": 0.3,
+        "max_passes": 1,
+        "rework": "%%%PUSHBACK%%%\n%%%GATE%%%",
+    }
+
+    found = [
+        workflow_contracts(PackageWorkflowDefinition.model_validate(doc))
+        for doc in (plain, replying, judged)
+    ]
+
+    assert found == [set(), {"acceptance-reply/1"}, {"acceptance-reply/1", "jev-judge/1"}]
