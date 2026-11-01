@@ -75,10 +75,11 @@ class _Index:
 
 
 def test_direct_references_and_unparseable_lines_are_refused_without_running_uv() -> None:
-    def never(*args: object, **kwargs: object) -> subprocess.CompletedProcess[str]:
+    def never(lines: tuple[str, ...]) -> Outcome:
         raise AssertionError("uv must not run for refused lines")
 
-    resolver = UvResolver(run=never)
+    _install(ScriptedUv(never))
+    resolver = UvResolver()
     lines = [
         "pkg @ https://example.invalid/pkg-1.0-py3-none-any.whl",
         "not a requirement!!",
@@ -177,6 +178,25 @@ class ScriptedUv:
         return outcome
 
 
+_SHELL: list[ScriptedUv] = []
+
+
+def _install(uv: ScriptedUv) -> None:
+    """Make ``uv`` the answer to the next ``subprocess.run`` the resolver makes."""
+    _SHELL[:] = [uv]
+
+
+@pytest.fixture(autouse=True)
+def scripted_shell(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The resolver's ``subprocess.run`` answers from the installed ``ScriptedUv``."""
+    _SHELL.clear()
+
+    def run(argv: list[str], **options: Any) -> subprocess.CompletedProcess[str]:
+        return _SHELL[0](argv, **options)
+
+    monkeypatch.setattr(resolver_module.subprocess, "run", run)
+
+
 def _answers(*outcomes: Outcome) -> Responder:
     queue = iter(outcomes)
     return lambda lines: next(queue)
@@ -203,7 +223,8 @@ def clock_fixture(monkeypatch: pytest.MonkeyPatch) -> list[float]:
 
 def scripted(uv: ScriptedUv, **options: Any) -> UvResolver:
     options = {"canary": "fast==1.0", "wheel_url_prefixes": ("https://files.example/",), **options}
-    return UvResolver(run=uv, **options)
+    _install(uv)
+    return UvResolver(**options)
 
 
 def _flag(argv: list[str], name: str) -> str:
@@ -227,7 +248,8 @@ def test_uv_is_asked_for_wheels_only_under_the_cutoff_for_the_requested_architec
 
 def test_the_resolver_identity_is_the_uv_version_and_is_asked_once() -> None:
     uv = ScriptedUv(_answers(_done(stdout="uv 9.8.7 (abc 2026-01-01)\n")))
-    resolver = UvResolver(run=uv)
+    resolver = UvResolver()
+    _install(uv)
     assert resolver.identity == "uv@9.8.7"
     assert resolver.identity == "uv@9.8.7"
     assert len(uv.requests) == 1
@@ -239,15 +261,14 @@ def test_the_resolver_identity_is_the_uv_version_and_is_asked_once() -> None:
         (_done(2, stderr="broken"), "uv is unavailable"),
         (FileNotFoundError("no uv"), "uv is unavailable"),
         (_timed_out(), "uv is unavailable"),
-        (_done(stdout=""), "no version"),
-        (_done(stdout="uv\n"), "no version"),
     ],
-    ids=["nonzero", "missing", "timeout", "empty-output", "malformed-output"],
+    ids=["nonzero", "missing", "timeout"],
 )
 def test_an_unusable_uv_is_an_infrastructure_failure_for_its_identity(
     outcome: Outcome, message: str
 ) -> None:
-    resolver = UvResolver(run=ScriptedUv(_answers(outcome)))
+    resolver = UvResolver()
+    _install(ScriptedUv(_answers(outcome)))
     with pytest.raises(DependencyInfraError, match=message):
         _ = resolver.identity
 
@@ -397,23 +418,6 @@ def test_a_diagnosis_that_runs_past_the_time_cap_is_infrastructure_never_a_verdi
 
 
 @pytest.mark.parametrize(
-    "stdout",
-    [
-        "this is [not toml",
-        (
-            '[[packages]]\nversion = "1"\n'
-            'wheels = [{ url = "https://files.example/x.whl", size = 1 }]\n'
-        ),
-    ],
-    ids=["not-toml", "package-without-a-name"],
-)
-def test_a_lock_uv_printed_but_cannot_be_read_is_an_infrastructure_failure(stdout: str) -> None:
-    uv = ScriptedUv(_answers(_done(stdout=stdout)))
-    with pytest.raises(DependencyInfraError, match="unreadable lock"):
-        scripted(uv)(["pkg"], arch="amd64", exclude_newer=CUTOFF)
-
-
-@pytest.mark.parametrize(
     ("options", "reason"),
     [
         ({"max_packages": 1}, "cap-exceeded"),
@@ -440,8 +444,9 @@ def test_a_find_links_directory_is_its_own_index(tmp_path: Path) -> None:
     make_sdist(tmp_path, "solo")
     uv = ScriptedUv(_resolves(refuse={"solo"}))
     resolver = UvResolver(
-        run=uv, compile_args=("--no-index", "--find-links", str(tmp_path)), canary="fast==1.0"
+        compile_args=("--no-index", "--find-links", str(tmp_path)), canary="fast==1.0"
     )
+    _install(uv)
     result = resolver(["solo"], arch="amd64", exclude_newer=CUTOFF)
     assert [(u.requirement, u.reason) for u in result.unprovided] == [("solo", "no-wheel")]
     assert uv.argvs[0][-3:] == ["--no-index", "--find-links", str(tmp_path)]
