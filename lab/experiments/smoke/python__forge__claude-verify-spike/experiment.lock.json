@@ -841,7 +841,7 @@
       "tree-sitter-language-pack": "0.13.0"
     }
   },
-  "document_sha256": "da8c0f42264b64b0a522c2b531ccd306a8e736c972e32abaf6e49757e895e64c",
+  "document_sha256": "5567afa207141caa6c159a9ec355f00f3c8672805bc9baa8825c81d64b9bda29",
   "execution": {
     "arms": {
       "verify": {
@@ -859,7 +859,7 @@
           "version_pin": "2.1.285",
           "workflow_skills": "placement.skills .claude/skills in the workspace /app"
         },
-        "digest": "18dad3e9f13e90b51974f64d53e51afadc4965646746ef38c5370302521212d2",
+        "digest": "0387aa36387d792008500380a8b49e4a9eae282d41a58e12b4b13a8f1f57d055",
         "model": "claude-sonnet-4-6",
         "packages": {
           "raidar/verify": {
@@ -871,10 +871,10 @@
           }
         },
         "primitive_code": {
-          "frame/1": "9be08c28598ad3b2416c7de07232874a57447172b9eadbff2f3b6644c701a968",
-          "gate/1": "cf6166c35196ad53e81350c7857cc44f1354a0b9474e19f54632fa36526f1837",
-          "install/1": "58d3d15370d9351db4e00d56e288b11fa6c2c02be36448fc9611591923d1e041",
-          "runner/1": "ed9b8831cf751127327b7ea5981467c2489864ede0a215d714acb774800e0bb6"
+          "frame/1": "a26a4d0e5756889bdae94f7468e68946597389a99d535bc12ce0d01594ffa644",
+          "gate/1": "63a898b9a0c044ffbf33c2d146ec14c0b9f72fd36ae089e09c1a46b62f9c2f80",
+          "install/1": "99787c49e822e3d5eea980199262c33667aad82934a387af874eacba15bd6bfc",
+          "runner/1": "ce9dacabaf8bf558f5ee261d574fe152ce67b3821e4cffa434f9be87e46fa633"
         },
         "provider": "anthropic",
         "reasoning": "low",
@@ -1701,7 +1701,7 @@
     "source_sha256": "2eccf2ae97f4a2d5cfabca27905f2ef0ee8415a05a32f22fd14fe64f328be14f",
     "spec_sha256": "7d9d7b969cdec469737ba4a3f729040793b1b5845d251585afd7ad997ee999ca"
   },
-  "lock_sha256": "df6333f0569c501b8a766d91f88a5ab6167394360088ce56bf714a478bc267a6",
+  "lock_sha256": "5343ea824367b27ed247beac418fb1113804750daee5e93e6194959903e96e33",
   "lock_version": 5,
   "overrides": {
     "flags": {},
@@ -1710,7 +1710,7 @@
   "sections": {
     "analysis": "81cdc2d12aacc031bb70595c13973ff647ab49a68bebda4be7a9b65ba3127a78",
     "assessment": "543dee1f5d38603a294f89de47690ec5487635e1d86d63eb2427138b5a55f379",
-    "execution": "df6333f0569c501b8a766d91f88a5ab6167394360088ce56bf714a478bc267a6",
+    "execution": "5343ea824367b27ed247beac418fb1113804750daee5e93e6194959903e96e33",
     "toolchain": "58e193ae81834a67258b1957b54f082d26664061f19dcbb4c30d40271018516b"
   },
   "spec": {
