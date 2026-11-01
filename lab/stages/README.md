@@ -73,8 +73,11 @@ that reply, `criteria: <package-leaf>.<output>` declaring `criteria/1`, exactly 
 gate, a model, `0 <= open_at < closed_at <= 1`, positive `max_passes`, and a rework frame with
 exactly one `%%%PUSHBACK%%%` and `%%%GATE%%%`. Missing producers or reply are ST3 refusals.
 `jev-judge/1` owns the question-set id, three retries and 60-second request timeout; packages
-and workflow judge configuration cannot override them. Admission is implemented in 5A.
-Schema-2 reply/judge execution is refused until the 5B wiring, never silently omitted.
+and workflow judge configuration cannot override them. The runtime consumes the copied
+`criteria/1` data without importing package code. After a turn: seal the gate, run stops,
+load criteria, check the acceptance reply, then judge; the first requested resume wins.
+A closed producer ends judging as `no_criteria`, never `verified`. Missing or changed
+criteria after a producer reports `done` invalidates the instrument evidence.
 
 ### Setup, gate and stop
 
@@ -142,6 +145,11 @@ A criteria output is a strict JSON object with `contract: criteria/1` and `featu
 `lab/releases.yaml` has a `stages:` mapping from `<ns>/<name>@N` to its digest. N starts at 1. Releases are append-only against main's history; only the latest release's current bytes resolve. Older bytes live in archive tags. No release writer exists: checks print the next line to add. Stage and workflow references require their namespace; bare references, paths, branches, tags and `latest` do not resolve, with no alias. Bare workflow register entries remain frozen history only. Agent references retain `name@N`. A changed package requires a new package release and dependent workflow release, then relocking.
 
 Workflow identity folds in every package release, digest and effective params. Arm locks carry `packages` and `primitive_code` (`python-ast/1` inventories including transitive primitive imports, Harbor and native adapter code); neither field can be overridden in pooling. Trial evidence records installed-tree digests and wheels; a mismatch invalidates the trial. Prompt, tool-byte and param changes each change identity and stale locks are refused.
+
+Canary records use adapter-independent package primitive identities because `stage-check` runs
+fixtures without a native agent. The trial recomputes those identities from the loaded packages
+and compares them strictly with the locked check record. This is separate from the arm's
+adapter-inclusive `primitive_code`; it does not weaken admission or pooling identity.
 
 The lock pins expected installed-tree digests per architecture. Later checkpoints reuse an existing install only after a fresh root-owned, no-follow measurement matches that expectation; a changed or unmeasurable tree invalidates the trial and is never repaired or reinstalled over.
 
@@ -220,8 +228,8 @@ The package invokes the pinned dependency directly; there is no generated placeh
   `make workflow-new NAME=acme/my-workflow`.
 - `raidar/define-build-verify@2`: `raidar/define@1` then `raidar/verify@1`, two gate fixes,
   `acceptance-reply/1`, `define.criteria` and the pinned aspect judge (at most three passes).
-  Schema validation, registration and locking work; trial execution deliberately refuses
-  until phase 5B wires reply and judge execution to `criteria/1`.
+  Reply parsing, repair and judging consume portable `criteria/1` data. A judge verdict is
+  method evidence, not the hidden verifier's correctness result.
 
 The schema-1 namespaced `@1` releases are preserved by immutable `archive/raidar/<name>@1`
 tags. All three build prompt strings and the judge rework string remain byte-identical.

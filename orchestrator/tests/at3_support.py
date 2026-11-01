@@ -27,7 +27,7 @@ from raidar_contract.package.registry import load_stage_package
 from raidar.subject.primitive.canary import StageCheckRecord
 from raidar.subject.primitive.install import install_package
 from raidar.subject.primitive.site import TrialInvalid
-from raidar.subject.workflow.package import PackageCheckpoint
+from raidar.subject.workflow.package import CheckpointPlan, PackageCheckpoint
 from raidar.subject.workflow.package_member import PackageSpec
 from raidar.subject.workflow.stage import Checkpoint
 
@@ -144,14 +144,13 @@ class PackageDriveAgent(BaseAgent):
         await write_as_agent(environment, scenario.seed)
         checkpoint = Checkpoint(environment, self.logs_dir, "the task")
         slot = package.name.upper().replace("-", "_")
-        runtime = PackageCheckpoint(
-            checkpoint,
-            [spec],
+        plan = CheckpointPlan(
             build=f"%%%{slot}%%%\n%%%TASK%%%",
             pack=PACK,
             primitives=PRIMITIVES,
             max_fix_rounds=scenario.max_fix_rounds,
         )
+        runtime = PackageCheckpoint(checkpoint, [spec], plan)
         outcome: dict[str, Any] = {"invalid": None, "resumes": []}
         try:
             await runtime.prepare()

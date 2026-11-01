@@ -2,26 +2,22 @@
 
 from __future__ import annotations
 
-import copy
-import shutil
 from pathlib import Path
 from typing import Any
 
 import pytest
 from raidar_contract.agent import AgentDefinitionError
+from raidar_contract.workflow import (
+    TASK_TOKEN,
+    PackageWorkflowError,
+    load_package_workflow,
+)
 
 from raidar.contract.paths import agents_root, workflows_root
 from raidar.subject.agent.definition import load_agent
-from raidar.subject.workflow.components import PlacementError, skill_files
-from raidar.subject.workflow.definition import (
-    TASK_TOKEN,
-    UNITS_TOKEN,
-    VERIFY_TOKEN,
-    WorkflowDefinition,
-    WorkflowDefinitionError,
-    load_workflow,
-)
-from tests.release_support import SPIKE_WORKFLOWS, edit_agent, release_tree, write_workflow
+from tests.release_support import REAL_LAB, edit_agent, release_tree, write_workflow
+
+ONE_SHOT = "raidar/one-shot"
 
 
 @pytest.fixture
@@ -29,126 +25,83 @@ def tree(tmp_path: Path) -> Path:
     return release_tree(tmp_path)
 
 
-def _workflow(stages: dict[str, Any], *, name: str = "one-shot") -> dict[str, Any]:
-    return {"schema": 1, "name": name, "stages": stages}
+def _workflow(**over: Any) -> dict[str, Any]:
+    return {"schema": 2, "name": "one-shot", "build": {"prompt": f"do {TASK_TOKEN}"}, **over}
 
 
-def _build(prompt: str) -> dict[str, Any]:
-    return {"build": {"prompt": prompt}}
+def _load(tree: Path) -> Any:
+    return load_package_workflow(workflows_root(tree) / ONE_SHOT, ONE_SHOT)
 
 
 def test_the_real_definitions_load(tree: Path) -> None:
     assert load_agent(agents_root(tree), "codex").name == "codex"
-    assert load_workflow(workflows_root(tree), "raidar/one-shot").enabled_stages == ("build",)
-    verifying = load_workflow(SPIKE_WORKFLOWS, "raidar/one-shot-verify")
-    assert verifying.enabled_stages == ("build", "verify")
-    defining = load_workflow(SPIKE_WORKFLOWS, "raidar/define-build-verify")
-    assert defining.enabled_stages == ("define", "build", "verify")
+    assert _load(tree).enabled_stages == ()
+    shipped = REAL_LAB / "workflows" / "raidar"
+    verifying = load_package_workflow(shipped / "one-shot-verify", "raidar/one-shot-verify")
+    assert verifying.enabled_stages == ("raidar/verify",)
+    defining = load_package_workflow(shipped / "define-build-verify", "raidar/define-build-verify")
+    assert defining.enabled_stages == ("raidar/define", "raidar/verify")
+    assert defining.judge is not None
+    assert defining.build.reply == "acceptance-reply/1"
 
 
 # ---- workflows -----------------------------------------------------------------------
 
 
-def test_a_workflow_with_an_unknown_stage_is_refused(tree: Path) -> None:
-    write_workflow(tree, _workflow({**_build(f"do {TASK_TOKEN}"), "polish": {"prompt": "x"}}))
+def test_a_workflow_that_is_not_schema_2_is_refused(tree: Path) -> None:
+    write_workflow(tree, {"schema": 1, "name": "one-shot", "stages": {}})
 
-    with pytest.raises(WorkflowDefinitionError, match="unknown stage type 'polish'"):
-        load_workflow(workflows_root(tree), "raidar/one-shot")
-
-
-def test_the_define_prompt_needs_the_units_token_once() -> None:
-    real = load_workflow(SPIKE_WORKFLOWS, "raidar/define-build-verify")
-    stages: Any = copy.deepcopy(real.to_json()["stages"])
-    stages["define"]["prompt"] = "no units"
-
-    with pytest.raises(ValueError, match=UNITS_TOKEN):
-        WorkflowDefinition.model_validate(
-            {"schema": 1, "name": "x", "stages": stages, "components": real.components}
-        )
+    with pytest.raises(PackageWorkflowError, match="invalid workflow definition"):
+        _load(tree)
 
 
-@pytest.mark.parametrize("enabled", [True, False])
-def test_the_verify_token_is_in_the_build_prompt_exactly_when_verify_runs(
-    tree: Path, enabled: bool
-) -> None:
-    real = load_workflow(SPIKE_WORKFLOWS, "raidar/one-shot-verify").to_json()
-    stages: Any = real["stages"]
-    stages["verify"]["enabled"] = enabled
-    without = f"do {TASK_TOKEN}"
-    stages["build"]["prompt"] = without if enabled else f"{VERIFY_TOKEN}\n{without}"
-    write_workflow(tree, _workflow(stages))
+def test_a_workflow_with_an_unknown_key_is_refused(tree: Path) -> None:
+    write_workflow(tree, _workflow(polish={"prompt": "x"}))
 
-    with pytest.raises(WorkflowDefinitionError, match=VERIFY_TOKEN):
-        load_workflow(workflows_root(tree), "raidar/one-shot")
+    with pytest.raises(PackageWorkflowError, match="invalid workflow definition"):
+        _load(tree)
 
 
 @pytest.mark.parametrize(
     "prompt", ["no task here", f"{TASK_TOKEN} twice {TASK_TOKEN}"], ids=["zero", "two"]
 )
 def test_a_build_prompt_needs_the_task_token_exactly_once(tree: Path, prompt: str) -> None:
-    write_workflow(tree, _workflow(_build(prompt)))
+    write_workflow(tree, _workflow(build={"prompt": prompt}))
 
-    with pytest.raises(WorkflowDefinitionError, match="exactly once"):
-        load_workflow(workflows_root(tree), "raidar/one-shot")
-
-
-def test_a_workflow_without_a_build_stage_is_refused(tree: Path) -> None:
-    write_workflow(tree, _workflow({}))
-
-    with pytest.raises(WorkflowDefinitionError):
-        load_workflow(workflows_root(tree), "raidar/one-shot")
+    with pytest.raises(PackageWorkflowError, match="exactly once"):
+        _load(tree)
 
 
-def test_a_workflow_file_outside_its_skills_is_refused(tree: Path) -> None:
-    write_workflow(tree, _workflow(_build(f"do {TASK_TOKEN}")))
-    folder = workflows_root(tree) / "raidar" / "one-shot"
-    (folder / "notes.md").write_text("extra\n", encoding="utf-8")
+def test_a_workflow_without_a_build_prompt_is_refused(tree: Path) -> None:
+    document = _workflow()
+    del document["build"]
+    write_workflow(tree, document)
 
-    with pytest.raises(WorkflowDefinitionError, match=r"notes\.md"):
-        load_workflow(workflows_root(tree), "raidar/one-shot")
-
-
-def test_a_skill_no_stage_lists_is_refused(tree: Path) -> None:
-    write_workflow(tree, _workflow(_build(f"do {TASK_TOKEN}")))
-    skill = workflows_root(tree) / "raidar" / "one-shot" / "skills" / "orphan"
-    skill.mkdir(parents=True)
-    (skill / "SKILL.md").write_text("x\n", encoding="utf-8")
-
-    with pytest.raises(WorkflowDefinitionError, match="orphan"):
-        load_workflow(workflows_root(tree), "raidar/one-shot")
+    with pytest.raises(PackageWorkflowError, match="build"):
+        _load(tree)
 
 
-def test_the_skill_bytes_are_part_of_the_workflow_hash(tmp_path: Path) -> None:
-    root = tmp_path / "workflows"
-    shutil.copytree(SPIKE_WORKFLOWS, root)
-    before = load_workflow(root, "raidar/define-build-verify")
-    skill = root / "raidar" / "define-build-verify" / "skills" / "aspect-writing" / "SKILL.md"
-    skill.write_text(skill.read_text(encoding="utf-8") + "\n", encoding="utf-8")
+def test_a_package_listed_twice_is_refused(tree: Path) -> None:
+    use = {"use": "acme/check@1"}
+    write_workflow(tree, _workflow(stages=[use, use]))
 
-    assert load_workflow(root, "raidar/define-build-verify").digest != before.digest
+    with pytest.raises(PackageWorkflowError, match="listed twice"):
+        _load(tree)
 
 
-def test_skills_are_placed_for_the_enabled_stages_only(tmp_path: Path) -> None:
-    definition = load_workflow(SPIKE_WORKFLOWS, "raidar/define-build-verify")
+def test_a_workflow_folder_holds_only_its_definition(tree: Path) -> None:
+    write_workflow(tree, _workflow())
+    (workflows_root(tree) / ONE_SHOT / "notes.md").write_text("x")
 
-    placed = skill_files(definition, ".agents/skills")
-
-    assert sorted(path.split("/")[2] for path in placed) == [
-        "aspect-writing",
-        "feature-definition",
-        "pytest-templates",
-        "test-per-aspect",
-    ]
-    assert all(path.endswith("SKILL.md") for path in placed)
-    with pytest.raises(PlacementError):
-        skill_files(definition, "{home}/skills")
+    with pytest.raises(PackageWorkflowError, match=r"notes\.md"):
+        _load(tree)
 
 
 def test_a_workflow_must_be_named_for_its_directory(tree: Path) -> None:
-    write_workflow(tree, _workflow(_build(f"do {TASK_TOKEN}"), name="other"))
+    write_workflow(tree, _workflow(name="other"))
 
-    with pytest.raises(WorkflowDefinitionError, match="must equal its directory"):
-        load_workflow(workflows_root(tree), "raidar/one-shot")
+    with pytest.raises(PackageWorkflowError, match="must equal its directory"):
+        _load(tree)
 
 
 # ---- agents --------------------------------------------------------------------------

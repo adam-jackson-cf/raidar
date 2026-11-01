@@ -11,8 +11,8 @@ Every difference is an invalid instrument (``TrialInvalid``), never an agent out
 
 from __future__ import annotations
 
-from collections.abc import Mapping
-from pathlib import Path
+from collections.abc import Mapping, Sequence
+from pathlib import Path, PurePosixPath
 from typing import Any
 
 from raidar_contract.package import StagePackageError
@@ -21,6 +21,7 @@ from raidar_contract.package.registry import load_stage_package, stage_folder
 from raidar_contract.releases import Release
 
 from raidar.contract.paths import REPO_ROOT
+from raidar.subject.primitive import calls
 from raidar.subject.primitive.canary import StageCheckRecord
 from raidar.subject.primitive.install import (
     InstalledPackage,
@@ -103,3 +104,33 @@ def locked_check_record(
     if mismatch is not None or record is None:
         raise TrialInvalid("instrument", f"{release}: {mismatch or 'no stage-check record'}")
     return StageCheckRecord.from_json(record)
+
+
+async def place_skills(
+    environment: Any, logs_dir: Path, package: StagePackage, placement: str
+) -> list[dict[str, str]]:
+    """Retain and place the installed package's skill files in the native agent's placement."""
+    components = []
+    for item in package.files:
+        if not item.path.startswith("skills/"):
+            continue
+        relative = f"{placement}/{item.path.removeprefix('skills/')}"
+        record = PurePosixPath("workflow", "components", package.name, relative)
+        path = logs_dir / record
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(item.data)
+        await calls.upload_file(environment, path, f"/app/{relative}")
+        components.append({"path": relative, "sha256": item.sha256, "record": record.as_posix()})
+    return components
+
+
+async def verify_installed(packages: Sequence[InstalledPackage]) -> None:
+    """Measure every installed tree again after the last turn."""
+    for installed in packages:
+        found = await installed.verify()
+        if not found.ok:
+            raise TrialInvalid(
+                "integrity",
+                f"{installed.reference}: the installed tree changed during the trial "
+                f"({found.violation or found.digest[:12]})",
+            )

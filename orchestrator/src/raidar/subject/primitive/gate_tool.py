@@ -1,9 +1,9 @@
-"""``verify-gate``: the verify stage's gate, run inside the trial container as the agent's user.
+"""``verify-gate``: the ``gate/1`` payload, run inside the trial container as the agent's user.
 
-The verify stage (``raidar.subject.workflow.verify``) uploads this file beside its tools
-environment and runs it on that environment's interpreter, so it imports only the standard
+``raidar.subject.primitive.gate`` uploads this file beside the packages' tool trees
+and runs it on the pack's interpreter, so it imports only the standard
 library (and ``pytest`` from the tools environment, in ``pytest-run``). Its configuration is
-one JSON file the stage writes (``root``, ``tools``, ``excludes``, ``test_timeout``,
+one JSON file the gate writes (``root``, ``package_checks``, ``excludes``, ``test_timeout``,
 ``checks``, ``hook_state``, ``scratch``, ...). **Every subcommand runs as the agent's own user,
 never as root**: the checks execute the agent's pytest, conftest and project configuration, and
 no byte the agent wrote is ever run with more privilege than the agent has. Each record a
@@ -1285,15 +1285,19 @@ def pytest_run(
 
 
 def baseline(config: dict[str, Any]) -> dict[str, Any]:
-    """Run the tests check once over the work tree, as the gate does, and report it.
+    """Run the package's ``pytest`` check once over the work tree, as the gate does, and report it.
 
-    The verify stage runs it before the agent starts: the tests that pass on the base are what a
-    ``Kind: regression`` criterion's mapped tests are compared with.
+    ``jev-judge/1`` runs it before the agent starts: the tests that pass on the base are what a
+    regression criterion's mapped tests are compared with. The ``before`` checks are not run (a
+    package's own prerequisite may refuse the starting workspace); without a ``pytest`` check
+    the record is an error.
     """
-    check = next(item for item in config["checks"] if item["category"] == "tests")
     cache = Path(config["scratch"]) / "baseline" / "cache"
     cache.mkdir(parents=True, exist_ok=True)
-    result = asdict(_run_check(config, check, [], cache))
+    check = next((c for c in config.get("package_checks", []) if c["kind"] == "pytest"), None)
+    if check is None:
+        return {"status": ERROR, "exit": None, "tests": None, "error": "no pytest check to run"}
+    result = asdict(_run_package_check(config, check, cache))
     root = Path(config["root"])
     manifest = worktree_manifest(root, config["excludes"])  # the base the tests ran over
     return {

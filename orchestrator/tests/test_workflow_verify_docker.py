@@ -1,13 +1,15 @@
-"""Fake-agent attacks on the verify stage in a real container (a ready Docker target only).
+"""Fake-agent attacks on the ``raidar/verify`` package in a real container (a ready Docker target).
 
 No model runs. A scripted attacker, running as the agent's user exactly as a model's tool calls
-would, plants a ``conftest.py`` and a repository configuration (``core.fsmonitor`` and a clean and
-process filter) that try to write into the gate's trusted files (``/opt/raidar-verify``), the hook
-log, the gate scratch, the define state (with the define stage really enabled) and the native
-session logs, with the write-and-restore and the plain-rewrite forms. The trusted files must stay
-denied and the seal's record channel closed. What the agent's user owns is only a reading or a
-named violation: its hook log (written, rewritten, deleted or forged: ``G1`` reads it, nothing
-invalidates) and the session logs and define state (named integrity violations). No root hook
+would, drives the real package runtime (``PackageCheckpoint``, the ``gate/1`` primitive). It
+plants a ``conftest.py`` and a repository configuration (``core.fsmonitor`` and a clean and
+process filter) that try to write into the gate's trusted files (``/opt/raidar/gate``, the call
+supervisor and the installed tool tree), the hook log, the gate scratch, a watched package state
+directory (a second package enabled beside ``raidar/verify``) and the native session logs, with
+the write-and-restore and the plain-rewrite forms. The trusted files must stay denied and the
+seal's record channel closed. What the agent's user owns is only a reading or a named integrity
+finding: its hook log (written, rewritten, deleted or forged: nothing invalidates and a forged
+pass never decides) and the session logs and watched state (named findings). No root hook
 broker, socket or directory exists, and nothing of the agent's may run as root. A throwaway
 negative control runs the archived pre-S6 root seal on the same plant and shows the plant
 executes as root there.
@@ -16,29 +18,22 @@ executes as root there.
 from __future__ import annotations
 
 import json
-import os
 from pathlib import Path
 from typing import Any
 
 import pytest
 from harbor.models.trial.config import AgentConfig
 
-from raidar.engine.health.gate import gate_family
-from raidar.subject.workflow.definition import load_workflow
-from raidar.subject.workflow.inner import INNER_KWARG, InnerAgentSpec
-from raidar.subject.workflow.runner import WorkflowRunner
+from tests.at3_support import AGENT_UID
 from tests.docker_trial_support import build_task, docker_target_ready, run_trial_sync
-from tests.release_support import SPIKE_WORKFLOWS
 from tests.workflow_attack_support import (
-    ATTACK_DEFINE,
-    ATTACK_MODE,
-    DEFINE_REPLY,
+    ATTACK_OUTCOME,
     PLANTED,
+    TRUSTED_ATTACKS,
     AttackAgent,
     NegativeControlAgent,
     pre_s6_gate,
 )
-from tests.workflow_support import ScriptedAgent
 
 pytestmark = pytest.mark.skipif(
     not docker_target_ready(),
@@ -47,8 +42,8 @@ pytestmark = pytest.mark.skipif(
 
 STEP = "checkpoint_1"
 REPOSITORY = Path(__file__).resolve().parents[2]
-AGENT_UID = 1000
-TESTS_CHECK = {"name": "tests", "category": "tests", "tool": "pytest==9.1.1", "blocking": True}
+AGENT_TIMEOUT_S = 1800
+DECIDED = ("passed", "refused")
 SCENARIOS = [
     ("restore", False),
     ("rewrite", False),
@@ -57,111 +52,86 @@ SCENARIOS = [
 ]
 
 
-def definition(defining: bool) -> tuple[str, dict[str, Any]]:
-    """The workflow's reference and resolved definition: one-shot-verify, or define-build-verify
-    without its judge (the define stage really enabled), with the tests check and two fixes."""
-    name = "raidar/define-build-verify" if defining else "raidar/one-shot-verify"
-    resolved: Any = load_workflow(SPIKE_WORKFLOWS, name).to_json()
-    stages = resolved["stages"]
-    stages["verify"]["checks"] = [TESTS_CHECK]
-    stages["verify"]["max_fix_rounds"] = 2
-    if defining:
-        for key in ("judge", "rework"):
-            stages["verify"].pop(key, None)
-        stages["verify"]["max_passes"] = 1
-    return f"{name}@attack", resolved
+class Attacked:
+    """One real trial's evidence: the step's agent logs directory and the agent's outcome."""
+
+    def __init__(self, agent: Path, mode: str, watched: bool) -> None:
+        self.agent = agent
+        self.mode = mode
+        self.watched = watched
+        self.outcome: dict[str, Any] = json.loads((agent / ATTACK_OUTCOME).read_text())
+
+    @property
+    def gate(self) -> dict[str, Any]:
+        gate: dict[str, Any] = self.outcome["record"]["gate/1"]
+        return gate
+
+    @property
+    def findings(self) -> set[str]:
+        return {item["name"] for item in self.gate["integrity"]}
+
+    def attacks(self) -> list[dict[str, Any]]:
+        lines = (self.agent / "raidar-attacks.jsonl").read_text().splitlines()
+        return [json.loads(line) for line in lines if line.strip()]
+
+    def outcomes(self, name: str) -> set[str]:
+        found = {
+            result["outcome"]
+            for attack in self.attacks()
+            if attack["label"] == "conftest"
+            for result in attack["results"]
+            if result["attack"] == name
+        }
+        assert found, f"no conftest run attempted {name}"
+        return found
 
 
-def attack_config(defining: bool) -> AgentConfig:
-    native = InnerAgentSpec(name="attack", import_path=AttackAgent.import_path())
-    reference, resolved = definition(defining)
+def attack_config(mode: str, watched: bool) -> AgentConfig:
     return AgentConfig(
-        import_path=WorkflowRunner.import_path(),
-        model_name="openai/gpt-6-luna",
-        kwargs={
-            INNER_KWARG: native.model_dump(mode="json"),
-            "workflow": reference,
-            "definition": resolved,
-            "skills_placement": ".agents/skills",
-            "phase_timeout_s": 900.0,
-        },
-        override_timeout_sec=1200.0,
+        import_path=AttackAgent.import_path(),
+        kwargs={"mode": mode, "watched": watched},
+        override_timeout_sec=float(AGENT_TIMEOUT_S),
     )
 
 
-def run_attack(base: Path, mode: str, defining: bool) -> Path:
-    """One real trial with the attacker; the step's agent logs directory."""
+def run_attack(base: Path, mode: str, watched: bool) -> Attacked:
+    """One real trial with the attacker; its evidence."""
     task = base / "task"
-    build_task(task, {STEP: "Implement calc.add"}, agent_timeout_sec=1200)
-
-    def reply(workspace: Path, prompt: str) -> str | None:
-        return DEFINE_REPLY if defining else None
-
-    ScriptedAgent.turns = [reply] * 6
-    ScriptedAgent.prompts = []
-    ScriptedAgent.workspace = Path("/nonexistent")
-    os.environ[ATTACK_MODE] = mode
-    os.environ[ATTACK_DEFINE] = "1" if defining else "0"
-    try:
-        trial = run_trial_sync(task, base / "trials", attack_config(defining), f"attack-{mode}")
-    finally:
-        os.environ.pop(ATTACK_MODE, None)
-        os.environ.pop(ATTACK_DEFINE, None)
-    return trial / "steps" / STEP / "agent"
+    build_task(task, {STEP: "Implement calc.add"}, agent_timeout_sec=AGENT_TIMEOUT_S)
+    trial = run_trial_sync(
+        task, base / "trials", attack_config(mode, watched), f"attack-{mode}-{int(watched)}"
+    )
+    return Attacked(trial / "steps" / STEP / "agent", mode, watched)
 
 
 @pytest.fixture(scope="module", params=SCENARIOS, ids=["-".join(map(str, s)) for s in SCENARIOS])
-def attacked(
-    request: pytest.FixtureRequest, tmp_path_factory: pytest.TempPathFactory
-) -> tuple[Path, str, bool]:
-    mode, defining = request.param
-    base = tmp_path_factory.mktemp(f"attack-{mode}-{int(defining)}")
-    return run_attack(base, mode, defining), mode, defining
+def attacked(request: pytest.FixtureRequest, tmp_path_factory: pytest.TempPathFactory) -> Attacked:
+    mode, watched = request.param
+    return run_attack(tmp_path_factory.mktemp(f"attack-{mode}-{int(watched)}"), mode, watched)
 
 
-def workflow(agent: Path) -> dict[str, Any]:
-    record: dict[str, Any] = json.loads((agent / "workflow" / "workflow.json").read_text())
-    return record
-
-
-def attacks(agent: Path) -> list[dict[str, Any]]:
-    lines = (agent / "raidar-attacks.jsonl").read_text().splitlines()
-    return [json.loads(line) for line in lines if line.strip()]
-
-
-def outcomes(agent: Path, name: str) -> set[str]:
-    found = {
-        result["outcome"]
-        for attack in attacks(agent)
-        if attack["label"] == "conftest"
-        for result in attack["results"]
-        if result["attack"] == name
-    }
-    assert found, f"no conftest run attempted {name}"
-    return found
-
-
-def test_the_gate_set_up_ran_the_conftest_in_the_hook_and_the_seals(
-    attacked: tuple[Path, str, bool],
-) -> None:
-    agent, _, defining = attacked
-    stage = workflow(agent)["verify"]
-    assert stage["setup_check"]["status"] == "passed"
-    assert stage["gates"]
-    if not defining:  # with the define state attacked the fix turn may rightly stay refused
-        assert [g["verdict"] for g in stage["gates"]] == ["refused", "passed"]
-        assert stage["ending"] == "gate_passed"
+def test_the_gate_set_up_ran_the_conftest_in_the_hook_and_the_seals(attacked: Attacked) -> None:
+    gate = attacked.gate
+    assert attacked.outcome["invalid"] is None, attacked.outcome["invalid"]  # no attack invalidates
+    assert gate["setup_check"]["status"] == "passed"
+    assert gate["canary"]["verdict"] in DECIDED
+    verdicts = [g["verdict"] for g in gate["gates"]]
+    assert verdicts, "the seal never ran"
+    assert verdicts[0] == "refused", verdicts  # forged hook logs cannot decide the seal
+    if not attacked.watched:  # with the state attacked the fix turn may rightly stay refused
+        assert verdicts == ["refused", "passed"], verdicts
+        assert gate["gates"][-1]["attribution"] == "passed"
+        assert len(attacked.outcome["resumes"]) == 1  # one gate fix turn, then the tree passed
 
 
 def test_no_gate_step_and_no_agent_code_ran_as_root_and_no_broker_exists(
-    attacked: tuple[Path, str, bool],
+    attacked: Attacked,
 ) -> None:
-    agent, mode, defining = attacked
-    stage = workflow(agent)["verify"]
-    seals = [gate["process"] for gate in stage["gates"]]
-    facts = [stage["setup_check"]["process"], *seals]
+    gate = attacked.gate
+    facts = [gate["setup_check"]["process"], *[g["process"] for g in gate["gates"]]]
     assert all(f["uid"] == f["euid"] == AGENT_UID for f in facts), facts
-    for attack in attacks(agent):
+    attacks = attacked.attacks()
+    for attack in attacks:
         assert attack["uid"] == attack["euid"] == AGENT_UID, attack
         unexpected_root = [
             parent for parent in attack["ancestry"] if parent["uid"] == 0 and parent["pid"] != 1
@@ -169,77 +139,65 @@ def test_no_gate_step_and_no_agent_code_ran_as_root_and_no_broker_exists(
         assert unexpected_root == [], attack["ancestry"]  # nothing between pid 1 and the agent
         gates = [p for p in attack["ancestry"] if p["gate"]]
         assert all(p["uid"] == AGENT_UID for p in gates), gates  # hook and seal run as the agent
-    in_hook = [a for a in attacks(agent) if any(p["gate"] == "hook" for p in a["ancestry"])]
-    in_seal = [a for a in attacks(agent) if any(p["gate"] == "seal" for p in a["ancestry"])]
+    in_hook = [a for a in attacks if any(p["gate"] == "hook" for p in a["ancestry"])]
+    in_seal = [a for a in attacks if any(p["gate"] == "seal" for p in a["ancestry"])]
     assert in_hook, "no attack ran in a hook decision"  # a real attempt, not an incidental count
-    if not (defining and mode == "rewrite"):  # a state the hook broke makes the seal stop early
-        assert in_seal, "no attack ran in a seal"
-        piped = [
-            r["outcome"]
-            for a in in_seal
-            for r in a["results"]
-            if r["attack"] == "parent-record-pipe"
-        ]
-        assert piped, "no seal record-pipe attack was recorded"
-        assert set(piped) == {"denied"}, piped  # the seal's stdout cannot be reopened
-    assert outcomes(agent, "no-broker") == {"absent"}  # no root hook broker, socket or directory
+    assert in_seal, "no attack ran in a seal"
+    piped = [
+        r["outcome"] for a in in_seal for r in a["results"] if r["attack"] == "parent-record-pipe"
+    ]
+    assert piped, "no seal record-pipe attack was recorded"
+    assert set(piped) == {"denied"}, piped  # the seal's stdout cannot be reopened
+    assert attacked.outcomes("no-broker") == {"absent"}  # no root hook broker, socket or directory
 
 
-def test_the_root_owned_tools_cannot_be_written_and_the_seals_record_channel_stays_closed(
-    attacked: tuple[Path, str, bool],
+def test_the_root_owned_files_cannot_be_written_and_the_seals_record_channel_stays_closed(
+    attacked: Attacked,
 ) -> None:
-    agent, _, _ = attacked
     trusted = [
         result
-        for attack in attacks(agent)
+        for attack in attacked.attacks()
         if attack["label"] == "conftest"
         for result in attack["results"]
         if result["attack"].startswith(("write:/opt/", "rename:/opt/", "unlink:/opt/"))
     ]
-    assert {result["attack"] for result in trusted} == {
-        "write:/opt/raidar-verify/verify_gate.py",
-        "write:/opt/raidar-verify/gate.json",
-        "write:/opt/raidar-verify/rules.md",
-        "write:/opt/raidar-verify/hooks/pre-commit",
-        "write:/opt/raidar-verify/tools/bin/python",
-        "rename:/opt/raidar-verify/hooks",
-        "unlink:/opt/raidar-verify/hooks/pre-commit",
-    }
+    assert {result["attack"] for result in trusted} == TRUSTED_ATTACKS
     assert {result["outcome"] for result in trusted} == {"denied"}
-    assert outcomes(agent, "parent-record-pipe") <= {"denied", "hook-is-the-agents-own"}
-    tools = workflow(agent)["verify"]["tools"]
-    assert tools["sha256_before"] == tools["sha256_after"]
-    assert {c.id: c.status for c in gate_family([(STEP, agent)])}["G3"] == "pass"
+    assert attacked.outcomes("parent-record-pipe") <= {"denied", "hook-is-the-agents-own"}
+    outcome = attacked.outcome
+    assert outcome["trusted_before"] == outcome["trusted_after"]  # gate, context, supervisor bytes
+    assert "tool_tree_changed" not in attacked.findings
+    for name, tool in outcome["tools"].items():
+        assert tool["ok"], (name, tool)
+        assert tool["digest"] == tool["expected"], (name, tool)
 
 
-def test_what_the_agents_user_can_write_is_a_reading_or_a_named_violation(
-    attacked: tuple[Path, str, bool],
+def test_what_the_agents_user_can_write_is_a_reading_or_a_named_finding(
+    attacked: Attacked,
 ) -> None:
-    agent, mode, defining = attacked
-    record = workflow(agent)
-    verify_names = {item["name"] for item in record["verify"]["integrity"]}
-    session_names = verify_names | {item["name"] for item in record["integrity"]}
     for name in ("hook-log", "hook-log-unlink", "hook-log-forged-line"):
-        assert "denied" not in outcomes(agent, name), name  # the log is the agent's to write
-        assert "wrote" in outcomes(agent, name), name
-    checks = {c.id: c for c in gate_family([(STEP, agent)])}
-    assert checks["G1"].status != "violation"  # a forged or rewritten hook log is a reading
-    assert checks["G2"].status != "violation"
-    if not (defining and mode == "rewrite"):
-        findings = checks["G1"].evidence["hook_log_findings"]
-        assert any("hook_log_rewritten" in found for found in findings), findings
-    if mode == "restore":
-        assert "session_log_touched" in session_names, session_names
-        assert ("define_state_touched" in verify_names) is defining, verify_names
+        assert "denied" not in attacked.outcomes(name), name  # the log is the agent's to write
+        assert "wrote" in attacked.outcomes(name), name
+    # a forged or rewritten hook log is a reading: nothing invalidates, no seal is attributed to
+    # the integrity of the instrument, and the forged pass line decided nothing
+    assert attacked.outcome["invalid"] is None
+    attributions = {g["attribution"] for g in attacked.gate["gates"]}
+    assert attributions <= {"passed", "refused", "agent_error"}, attributions
+    assert "hook_log_rewritten" in attacked.findings, attacked.findings
+    names = attacked.findings
+    label = "note-state_state"
+    if attacked.mode == "restore":
+        assert "session_log_touched" in names, names
+        assert (f"{label}_touched" in names) is attacked.watched, names
     else:
-        assert "session_log_rewritten" in session_names, session_names
-        assert ("define_state_rewritten" in verify_names) is defining, verify_names
+        assert "session_log_rewritten" in names, names
+        assert (f"{label}_rewritten" in names) is attacked.watched, names
 
 
 def test_the_planted_repository_configuration_is_never_run_by_the_gate(
-    attacked: tuple[Path, str, bool],
+    attacked: Attacked,
 ) -> None:
-    labels = {attack["label"] for attack in attacks(attacked[0])}
+    labels = {attack["label"] for attack in attacked.attacks()}
     assert labels.isdisjoint(PLANTED), labels  # nothing after the plant executed it
 
 

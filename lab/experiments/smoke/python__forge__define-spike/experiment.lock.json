@@ -1075,7 +1075,7 @@
       "tree-sitter-language-pack": "0.13.0"
     }
   },
-  "document_sha256": "c5e5be11bad4bac08e5617234bcb072280860bd512b3ded73fe949650f12ebc1",
+  "document_sha256": "060089694cc6499f5902154c40ef99ddd3fe66161b1c613e04745538f92e2a7e",
   "execution": {
     "arms": {
       "define": {
@@ -1093,11 +1093,11 @@
           "version_pin": "0.156.1",
           "workflow_skills": "placement.skills .agents/skills in the workspace /app"
         },
-        "digest": "2552fb3ac42937289370f01e837a7c4ad39298632104027ec7f1e4f0c9e9039a",
+        "digest": "921617fcb53b9ef58d87ba8103fcf66f48981254e91e001fab12967e0772736b",
         "model": "gpt-6-luna",
         "packages": {
           "raidar/define": {
-            "check": "89056adad45932e6e3c117e38c21a06cd73c5745928926a81b7aa0c938857e8f",
+            "check": "2d02236ecfb2161e1b7e856261caa120cd1ca499ae381b832a52011ce94c12d1",
             "installed": {
               "arm64": "d28105d3a2c568160a2726192e3157427f0bf12bcab322ba436b35c5ca8d3b4d"
             },
@@ -1113,11 +1113,13 @@
           }
         },
         "primitive_code": {
+          "acceptance-reply/1": "cb5437e2b5a0e27971b1180a7739739c589d46174f089f907f1bcf8d8e5c1088",
           "frame/1": "461bb2b2988ba8a3c081fee5595e8e2014d1cba57e12d3da58d6d695ec444d0d",
-          "gate/1": "3068251946a5649ca542d98f36399404819e00b88468cb10375f25ffbe58a7fb",
+          "gate/1": "c53b60684fe7d46c7549f32a966088251f54512b6404522a77dd7047694ae246",
           "install/1": "012eb722cf18829167463674f19cf48cd4ccc9da22138baa5600066be6742b3d",
+          "jev-judge/1": "10d241989e30cd39aefce4d7e78afb2d5ba7aab0d20becbe1ce78cf62a1affeb",
           "outputs/1": "ddb248dd25ef2decac6ec03b812b67f071724b6bf5e0d144b71f739cf43b0cd9",
-          "runner/1": "1553c6a55254a624261ee9f2bd26703009ec1b6d9c6c8173e53d9781240b7ec5",
+          "runner/1": "4f997f994a77c1573e5bdee975e12a69f58f065cb74a405db9a36a221db4c5b1",
           "setup/1": "a0b650ad52188d7626c55ea3ba5f1a904cb0ada1a49af64532c6905aa8c85d8f",
           "stop/1": "07a8bb9692b19cd7c4bd19f487fc9c15241a0457f54246f037e114587806e7e9"
         },
@@ -1947,7 +1949,7 @@
     "source_sha256": "8569d412fd02f83147276d56244b6b8620873b5ff108d912681f319df449c40e",
     "spec_sha256": "459b4c26ac16e9c15d8b1eb0d8b9734db45b5011d11a3384d8509a4bcca0b630"
   },
-  "lock_sha256": "7657273651c0afe71be0ef81211c533fc45af773f4ded4dadf7ae403d81c0e8c",
+  "lock_sha256": "78fa1fba5b9a8843a6958af505448e691b3abe9ea365204c3ab6068eb4fb1eb5",
   "lock_version": 5,
   "overrides": {
     "flags": {},
@@ -1956,8 +1958,8 @@
   "sections": {
     "analysis": "f7f0b52ed6909ba0f3864eb9e7f7d513625da8dc445234304b8aa033c4343cb6",
     "assessment": "d62fbb3e311c0de90c2a9b809818c0b33eaffd3c85f0757955d0614572b14292",
-    "execution": "7657273651c0afe71be0ef81211c533fc45af773f4ded4dadf7ae403d81c0e8c",
-    "toolchain": "f659222273077d164b616b044b099482329257b8242be3400bb8174638133474"
+    "execution": "78fa1fba5b9a8843a6958af505448e691b3abe9ea365204c3ab6068eb4fb1eb5",
+    "toolchain": "6256053eb5ce8c39f8bf92cd11a70df1ddd8a4a0b880f514605f4aecbd9774ae"
   },
   "spec": {
     "agents": [
@@ -2029,6 +2031,6 @@
     "litellm": "1.102.1",
     "python": "3.13.7",
     "raidar": "0.15.0",
-    "raidar_spec": "c05fb465122b93838e790d70bf993f25de457615e2393bfbec74b0abecbbf87a"
+    "raidar_spec": "29df8c63188e8a71be7894d3d05e9fc3d5a2f56cc3052c65099bcc7bb70516eb"
   }
 }

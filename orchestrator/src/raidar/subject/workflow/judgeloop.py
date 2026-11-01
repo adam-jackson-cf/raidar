@@ -1,14 +1,16 @@
-"""The judge loop of the verify stage: the passes, the fit rule and the stop rules.
+"""The judge loop of ``jev-judge/1``: the passes, the fit rule and the stop rules.
 
-``raidar.subject.workflow.verify`` seals each turn through the gate; with ``verify.judge`` this
-loop then judges the sealed tree (``raidar.subject.workflow.judging``), asking Jev host-side
-(``raidar.subject.workflow.asking``), keeps each pass's record and decides whether the open
-criteria go back to the builder. It holds no ending: the stage does, from what it returns.
+``raidar.subject.workflow.package_judge`` seals nothing itself: the checkpoint's ``gate/1`` seals
+each turn. With the judge configured this loop then judges the sealed tree
+(``raidar.subject.workflow.judging``), asking Jev host-side (``raidar.subject.workflow.asking``),
+keeps each pass's record and decides whether the open criteria go back to the builder. It holds no
+ending: the caller does, from what it returns.
 """
 
 from __future__ import annotations
 
 import hashlib
+import re
 import shlex
 import shutil
 import time
@@ -17,12 +19,13 @@ from pathlib import PurePosixPath
 from typing import Any
 
 from raidar.subject.primitive import calls
+from raidar.subject.primitive.judge import JudgeConfig
 from raidar.subject.workflow import judging
 from raidar.subject.workflow.acceptance import Acceptance
 from raidar.subject.workflow.asking import Asker
-from raidar.subject.workflow.definition import TOKEN, JudgeSettings
 from raidar.subject.workflow.stage import REWORK, Checkpoint, Resume
 
+TOKEN = re.compile(r"%%%([A-Z_]+)%%%")
 SOURCES_DIR = "workflow/sources"
 SOURCE_SCRIPT = """\
 import os, sys
@@ -35,6 +38,8 @@ with open(path, "rb") as handle:
 """
 """Reads one workspace file by raw bytes, never through a link that leaves the workspace."""
 ACCEPTED = "passed"
+TESTS_KIND = "pytest"
+"""The ``gate/1`` check kind that records every collected test's outcome."""
 
 
 def gate_seconds(gates: Sequence[dict[str, Any]]) -> float:
@@ -47,7 +52,7 @@ def gate_seconds(gates: Sequence[dict[str, Any]]) -> float:
 
 def _gate_tests(gate: dict[str, Any]) -> dict[str, Any] | None:
     return next(
-        (c.get("tests") for c in gate.get("checks", []) if c.get("category") == "tests"),
+        (c.get("tests") for c in gate.get("checks", []) if c.get("category") == TESTS_KIND),
         None,
     )
 
@@ -57,7 +62,7 @@ class JudgeLoop:
 
     def __init__(
         self,
-        judge: JudgeSettings,
+        judge: JudgeConfig,
         max_passes: int,
         rework: str,
         acceptance: Acceptance,
@@ -214,11 +219,11 @@ class JudgeLoop:
         return sorted(p for p in {*before, *files} if before.get(p) != files.get(p))
 
     def record(self) -> dict[str, Any]:
-        """The judge's part of the stage record."""
+        """The judge's part of ``workflow.json["jev-judge/1"]``."""
         return {
             "passes": len(self.history),
             "max_passes": self.max_passes,
-            "judge": self.judge.model_dump(mode="json"),
+            "judge": self.judge.record(),
             "judged": self.judged,
             "judge_calls": self.asker.calls if self.asker else [],
             "judge_seconds": self.seconds,

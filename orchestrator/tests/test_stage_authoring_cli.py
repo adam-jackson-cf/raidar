@@ -305,7 +305,9 @@ def test_workflow_new_defaults_to_one_shot_verify_and_refuses_overwrite(
     root = tmp_path / "workflows"
     template = root / "raidar" / "one-shot-verify"
     template.mkdir(parents=True)
-    (template / "workflow.yaml").write_text("schema: 1\nname: one-shot-verify\nstages: {}\n")
+    (template / "workflow.yaml").write_text(
+        "schema: 2\nname: one-shot-verify\nbuild:\n  prompt: do %%%TASK%%%\n"
+    )
     monkeypatch.setattr(workflow_new, "workflows_root", lambda: root)
 
     first = CliRunner().invoke(main, ["workflow", "new", "acme/mine"])

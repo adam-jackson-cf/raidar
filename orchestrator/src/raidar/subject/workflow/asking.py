@@ -24,8 +24,7 @@ from raidar.contract.activity import host_window
 from raidar.judge.client import FailureReason, JevFailure, JevSuccess
 from raidar.judge.live import LIVE_MODEL, RecordedJev
 from raidar.judge.protocol import NoulAnswer
-from raidar.subject.primitive.judge import RETRIES, TIMEOUT_S
-from raidar.subject.workflow.definition import JudgeSettings
+from raidar.subject.primitive.judge import RETRIES, TIMEOUT_S, JudgeConfig
 from raidar.subject.workflow.judging import ASPECT_ASSERTED, Request, questions
 
 WORKERS = 8
@@ -68,7 +67,7 @@ class Asker:
 
     def __init__(
         self,
-        settings: JudgeSettings,
+        settings: JudgeConfig,
         logs_dir: Path,
         environment: BaseEnvironment,
         workers: int = WORKERS,

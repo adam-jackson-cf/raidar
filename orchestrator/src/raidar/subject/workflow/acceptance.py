@@ -1,22 +1,153 @@
 """The acceptance criteria of a checkpoint and the tests the builder maps to them.
 
-One ``Acceptance`` is shared by the stages of a checkpoint: the define stage loads it from the
-sealed feature definition, the build stage merges the builder's ``ac_tests`` into it and checks
-the mapping, the verify stage judges it. The mapping rules are factory-x-loops'
-``capability/define/audit.py``
-at ``ac5db0f``: a turn lists the criteria whose tests it set or changed (those take the turn's
-tests, the rest keep theirs); every criterion but a ``Kind: regression`` one needs a mapped test;
-each mapped test's file must be in the working tree.
+One ``Acceptance`` is shared by the checkpoint's ``acceptance-reply/1`` and ``jev-judge/1``
+runtimes. It is loaded from a package's ``criteria/1`` output (``raidar_contract.criteria``, never
+a package's own code), the builder's ``ac_tests`` are merged into it and the mapping is checked,
+and the judge decides each criterion from it. The mapping rules are factory-x-loops'
+``capability/define/audit.py`` at ``ac5db0f``: a turn lists the criteria whose tests it set or
+changed (those take the turn's tests, the rest keep theirs); every criterion but a regression
+one needs a mapped test; each mapped test's file must be in the working tree.
+
+The criterion types here are the judge's reading of ``criteria/1``: an aspect is
+``<criterion id>.A<n>`` in document order, an example's literals are the backticked values of its
+expected side as a test is searched for them.
 """
 
 from __future__ import annotations
 
+import re
 from collections.abc import Callable, Collection, Mapping, Sequence
 from dataclasses import dataclass, field
+from decimal import Decimal
 from typing import Any
 
-from define_tool import featuredef
-from define_tool.aspects import REGRESSION
+from raidar_contract.criteria import Criteria
+
+REGRESSION = "regression"
+_NUMBER = re.compile(r"(?<![\w.])-?\d+(?:\.\d+)?(?![\w])")
+_QUOTE_PAIRS = {'"': '"', "'": "'", "“": "”", "‘": "’"}
+# A markdown code span (CommonMark): a run of backticks, the text, and a closing run of exactly
+# as many. A span that holds a backtick is fenced by a longer run.
+_CODE_SPAN = re.compile(r"(?<!`)(?P<fence>`+)(?!`)(?P<body>[^\n]+?)(?<!`)(?P=fence)(?!`)")
+
+
+def _span_body(body: str) -> str:
+    """A code span's content, without the one space of padding on each side."""
+    if len(body) > 2 and body[0] == body[-1] == " " and body.strip():
+        return body[1:-1]
+    return body
+
+
+def _canonical(said: str) -> str:
+    if not _NUMBER.fullmatch(said):
+        return said
+    number = Decimal(said)
+    if number == number.to_integral_value():
+        return str(int(number))
+    return format(number.normalize(), "f")
+
+
+def literal_value(span: str) -> str:
+    """A literal as a test is searched for it.
+
+    One pair of quote marks and surrounding spacing are set aside, inner spacing is collapsed,
+    and a number takes its canonical form (``2.50`` is ``2.5``).
+    """
+    said = " ".join(span.split())
+    close = _QUOTE_PAIRS.get(said[:1])
+    if close is not None and len(said) >= 2 and said.endswith(close):
+        said = said[1:-1].strip()
+    return _canonical(said)
+
+
+def literals(text: str) -> tuple[str, ...]:
+    """The backticked literals of ``text``, normalised (``literal_value``)."""
+    return tuple(
+        literal_value(_span_body(found.group("body"))) for found in _CODE_SPAN.finditer(text)
+    )
+
+
+def appears(literal: str, text: str) -> bool:
+    """Whether ``literal`` (as ``literal_value`` gives it) is in ``text``.
+
+    Spacing is collapsed on both sides and an escaped quote in the text counts as the quote. A
+    number is a whole number in the text, in any spelling that reads the same (``2.50`` for
+    ``2.5``; ``10`` is not ``1``); anything else is found as a substring.
+    """
+    said = " ".join(text.split())
+    if _NUMBER.fullmatch(literal):
+        return any(_canonical(number) == literal for number in _NUMBER.findall(said))
+    unescaped = said.replace('\\"', '"').replace("\\'", "'")
+    return literal in said or literal in unescaped
+
+
+@dataclass(frozen=True)
+class Aspect:
+    """One aspect: ``id`` (``F3.AC2.A1``) and the situation and outcome a test must show."""
+
+    id: str
+    situation: str
+    outcome: str
+
+    @property
+    def text(self) -> str:
+        return f"{self.situation} -> {self.outcome}"
+
+
+@dataclass(frozen=True)
+class Example:
+    """One example (its input and expected sides) and the expected side's literals."""
+
+    given: str
+    expected: str
+    literals: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
+class Criterion:
+    """One acceptance criterion as the judge reads it (``kind`` is ``""`` or ``regression``)."""
+
+    id: str
+    text: str
+    sources: tuple[str, ...] = ()
+    aspects: tuple[Aspect, ...] = ()
+    examples: tuple[Example, ...] = ()
+    kind: str = ""
+
+
+@dataclass(frozen=True)
+class Feature:
+    id: str
+    name: str
+    traced: tuple[Criterion, ...] = ()
+
+
+def features_of(criteria: Criteria) -> tuple[Feature, ...]:
+    """The judge's reading of a validated ``criteria/1`` document, in document order."""
+    return tuple(
+        Feature(
+            feature.id,
+            feature.name,
+            tuple(
+                Criterion(
+                    item.id,
+                    item.criterion,
+                    item.sources,
+                    tuple(
+                        Aspect(f"{item.id}.A{number}", probe.situation, probe.outcome)
+                        for number, probe in enumerate(item.aspects, start=1)
+                    ),
+                    tuple(
+                        Example(probe.situation, probe.outcome, literals(probe.outcome))
+                        for probe in item.examples
+                    ),
+                    REGRESSION if item.kind == "regression" else "",
+                )
+                for item in feature.criteria
+            ),
+        )
+        for feature in criteria.features
+    )
 
 
 def _names(items: Sequence[str]) -> str:
@@ -46,21 +177,19 @@ def file_of(identifier: str) -> str:
 
 @dataclass
 class Acceptance:
-    """The criteria a sealed feature definition holds and the builder's merged mapping."""
+    """The criteria a package produced and the builder's merged mapping."""
 
-    features: tuple[featuredef.Feature, ...] = ()
+    features: tuple[Feature, ...] = ()
     ac_tests: dict[str, list[str]] = field(default_factory=dict)
     sources: str | None = None
     """Where the host kept the final judged pass's test sources (relative to the agent logs)."""
 
-    def load(self, definition: str) -> None:
-        """Read the criteria from the rendered feature definition."""
-        self.features = featuredef.parse(
-            definition, traced=True, anchored=True, aspects=True
-        ).features
+    def load(self, criteria: Criteria) -> None:
+        """Read the criteria of a validated ``criteria/1`` document."""
+        self.features = features_of(criteria)
 
     @property
-    def criteria(self) -> tuple[featuredef.Criterion, ...]:
+    def criteria(self) -> tuple[Criterion, ...]:
         return tuple(item for feature in self.features for item in feature.traced)
 
     @property
@@ -69,7 +198,7 @@ class Acceptance:
 
     @property
     def optional(self) -> list[str]:
-        """The criteria that may go unmapped: ``Kind: regression`` ones (earlier tests)."""
+        """The criteria that may go unmapped: regression ones (earlier tests)."""
         return [item.id for item in self.criteria if item.kind == REGRESSION]
 
     def merge(self, reported: Sequence[Mapping[str, Any]]) -> None:
