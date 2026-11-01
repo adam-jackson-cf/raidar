@@ -15,7 +15,7 @@ from raidar_contract.references import Release, ReleaseError
 from raidar.cli import main
 from raidar.contract.paths import agents_root
 from raidar.contract.releases import ReleaseKind, parse_register
-from raidar.subject import release_check
+from raidar.subject import agent_checks, release_check
 from raidar.subject.agent.definition import load_agent
 from raidar.subject.release_check import history_issues, release_base, release_issues
 from raidar.subject.releases import released_agent, released_workflow
@@ -186,6 +186,32 @@ def test_an_agent_pin_that_differs_from_the_runtime_pack_is_reported(tree: Path)
     assert "agents/codex" in issues[0]
     assert "differs from pack" in issues[0]
     assert "0.0.1" in issues[0]
+
+
+def test_a_runtime_without_the_agents_harness_has_no_pin_obligation(
+    tree: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    pack = agent_checks.load_runtime_pack("python")
+    unrelated = pack.model_copy(update={"image": pack.image.model_copy(update={"harnesses": {}})})
+    monkeypatch.setattr(agent_checks, "available_runtimes", lambda: ["unrelated"])
+    monkeypatch.setattr(agent_checks, "load_runtime_pack", lambda _runtime: unrelated)
+    assert release_issues(tree) == []
+
+
+def test_an_invalid_agent_does_not_hide_another_agents_pack_pin_mismatch(tree: Path) -> None:
+    def repin(document: dict) -> None:
+        document["tool"]["version"] = "0.0.1"
+        document["capabilities"]["version_pin"] = "0.0.1"
+
+    edit_agent(tree, repin)
+    write_register(tree)
+    document = yaml.safe_load((agents_root(tree) / "codex.yaml").read_text())
+    document.update(name="broken", adapter="not-a-harness")
+    (agents_root(tree) / "broken.yaml").write_text(yaml.safe_dump(document))
+    issues = release_issues(tree)
+    assert any("broken.yaml" in issue for issue in issues)
+    assert any("agents/codex:" in issue and "0.0.1" in issue for issue in issues)
 
 
 def test_an_unreadable_register_is_reported(tree: Path) -> None:

@@ -19,7 +19,6 @@ from typing import Any
 
 import pytest
 
-from raidar.grading import records
 from raidar.grading.coverage import offline as coverage_module
 from raidar.grading.coverage.offline import check_coverage_path, produce_coverage_path
 from raidar.grading.coverage.store import read_offline_coverage
@@ -142,8 +141,7 @@ async def test_host_execution_changes_invalidate_reusable_coverage(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, module: str
 ) -> None:
     trial = await _graded(tmp_path, coverage=False)
-    copied = copy_grading_sources(tmp_path / "implementation")
-    monkeypatch.setattr(records, "__file__", str(copied))
+    copied = copy_grading_sources(tmp_path / "implementation", monkeypatch)
     calls = 0
     original = coverage_module.run_oracle
 

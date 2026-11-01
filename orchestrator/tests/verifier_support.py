@@ -18,20 +18,29 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from raidar.grading import records
+import pytest
+
+from raidar.grading import identity, payload
 from raidar.grading.bundle import BundleManifest, GraderSpec, VerifierStepSpec, write_bundle
 from raidar.grading.closure import ClosureImage
 from raidar.grading.sandbox import RUNTIME_DIR, SandboxLayout, SandboxResult, SandboxRun
 
 
-def copy_grading_sources(root: Path) -> Path:
-    """Isolate grading identity inputs so tests never modify the real implementation."""
-    source = Path(records.__file__).parent.parent
-    shutil.copytree(
-        source / "grading", root / "grading", ignore=shutil.ignore_patterns("__pycache__")
-    )
-    shutil.copytree(
-        source / "contract", root / "contract", ignore=shutil.ignore_patterns("__pycache__")
+def copy_grading_sources(root: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    """Isolate the declared executable closure and exact payload bytes, not module metadata."""
+    copies = {}
+    for name, source in identity.grading_sources().items():
+        target = root / name
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(source, target)
+        copies[name] = target
+    for name, source in payload.runtime_files().items():
+        target = root / "grading" / "runtime" / name
+        if not target.exists():
+            shutil.copy2(source, target)
+    monkeypatch.setattr(identity, "grading_sources", lambda: copies)
+    monkeypatch.setattr(
+        identity, "runtime_files", lambda: payload.runtime_files(root / "grading/runtime")
     )
     return root / "grading" / "records.py"
 

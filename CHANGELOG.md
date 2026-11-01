@@ -25,9 +25,13 @@ All notable changes to this project are documented in this file.
 - Pin immutable 2.0.0 wheel/sdist artifacts separately from frozen 1.0.0 and 1.1.0 artifacts.
   Contract ids, package digests and stage acceptance/refusals stay unchanged; primitive code
   identities change and require experiment relocks after the orchestrator's one revalidation.
-- Fast-only coverage measures 37,951/38,171 lines (99.423646%) and 9,134/9,254 branches
-  (98.703263%); ratchet the separate floors from 99.42/98.69 to 99.423/98.703. Full code
-  quality gates, including those ratcheted floors, pass independently of RT7-blocked locks.
+- Final fast-only coverage measures 37,952/38,169 lines (99.431476%) and 9,134/9,252 branches
+  (98.724600%); ratchet the separate floors from 99.42/98.69 to 99.43/98.72.
+- Migrate cache-invalidation fixtures from obsolete module-file metadata to isolated copies
+  of the declared executable closure and exact runtime resources. Keep real digest computation;
+  host-source and plugin-byte changes invalidate assessment, coverage and pre-fix caches.
+- Cover unrelated-runtime and invalid-agent pin-check boundaries. Bound the lab ancestor check
+  to its two validated components, preserving location refusals without an unreachable loop exit.
 
 ### Portable contract 1.1.0
 

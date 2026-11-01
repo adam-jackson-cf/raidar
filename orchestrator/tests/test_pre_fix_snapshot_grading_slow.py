@@ -17,7 +17,6 @@ from typing import Any
 import pytest
 
 from raidar.contract.snapshot import tree_digest
-from raidar.grading import records
 from raidar.grading.pre_fix.grade import (
     grade_pre_fix_path,
     pre_fix_snapshots,
@@ -117,8 +116,7 @@ async def test_host_execution_changes_invalidate_pre_fix_grades(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     trial = await _graded_trial(tmp_path)
-    copied = copy_grading_sources(tmp_path / "implementation")
-    monkeypatch.setattr(records, "__file__", str(copied))
+    copied = copy_grading_sources(tmp_path / "implementation", monkeypatch)
     store = tmp_path / "store"
     first = await grade_pre_fix_path(trial, store, _options(tmp_path))
     source = copied.parent / "submission_deps.py"

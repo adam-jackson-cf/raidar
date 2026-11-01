@@ -36,8 +36,6 @@ def _check_location(root: Path) -> None:
     below = root.parts[index + 1 :]
     if len(below) != 2 or not all(NAME_RE.fullmatch(part) for part in below):
         raise StagePackageError(f"{root}: expected {STAGES_DIR}/<namespace>/<name>")
-    for ancestor in root.parents:
+    for ancestor in (root.parent, root.parent.parent):
         if ancestor.is_symlink():
             raise StagePackageError(f"{ancestor}: symlinked ancestors are refused")
-        if ancestor.name == STAGES_DIR:
-            break
