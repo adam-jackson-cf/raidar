@@ -74,3 +74,23 @@ def test_ledger_run_records_markers_phases_outcomes_and_process_events(
         }
     ]
     assert ledger["environment"]["grader_python"] == sys.executable
+
+
+def test_collection_errors_are_recorded_for_the_host(
+    plugin: ModuleType, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    tests = tmp_path / "tests"
+    tests.mkdir()
+    (tests / "test_checkpoint_1.py").write_text("import not_a_module_anywhere\n")
+    instance = make_plugin(plugin, tmp_path, coverage=False)
+    monkeypatch.delenv("PYTHONPATH", raising=False)
+
+    pytest.main(
+        [str(tests), "-q", "-p", "no:cacheprovider", "-p", "no:asyncio", "--rootdir", str(tests)],
+        plugins=[instance],
+    )
+
+    ledger = json.loads((tmp_path / "out" / "ledger.json").read_text())
+    assert ledger["collect_errors"] == ["test_checkpoint_1.py"]
+    assert ledger["nodes"] == []
+    assert "PYTHONPATH" not in os.environ

@@ -13,7 +13,8 @@ from __future__ import annotations
 
 import subprocess
 import sys
-from dataclasses import dataclass
+from collections.abc import Callable
+from dataclasses import dataclass, field
 from pathlib import Path, PurePosixPath
 
 from raidar.design.problem.models import SourcePin
@@ -38,10 +39,12 @@ class SourceError(RuntimeError):
     """The pinned source cannot be obtained, is not at its pin, or conversion failed."""
 
 
-def _git(checkout: Path, *args: str) -> str:
-    proc = subprocess.run(
-        ["git", "-C", str(checkout), *args], capture_output=True, text=True, check=False
-    )
+Runner = Callable[..., "subprocess.CompletedProcess[str]"]
+"""``subprocess.run``'s shape: the seam fast tests replace with a scripted runner."""
+
+
+def _git(checkout: Path, *args: str, run: Runner = subprocess.run) -> str:
+    proc = run(["git", "-C", str(checkout), *args], capture_output=True, text=True, check=False)
     if proc.returncode != 0:
         raise SourceError(f"git {' '.join(args)} failed in {checkout}: {proc.stderr.strip()}")
     return proc.stdout.strip()
@@ -53,6 +56,7 @@ class PinnedCheckout:
 
     root: Path
     pin: SourcePin
+    run: Runner = field(default=subprocess.run, compare=False, repr=False)
 
     @property
     def converter_dir(self) -> str:
@@ -60,7 +64,7 @@ class PinnedCheckout:
         return converter_path(self.pin).parent.as_posix()
 
     def tree_id(self, path: str) -> str:
-        return _git(self.root, "rev-parse", f"{self.pin.commit}:{path}")
+        return _git(self.root, "rev-parse", f"{self.pin.commit}:{path}", run=self.run)
 
     def optional_tree_id(self, path: str) -> str | None:
         try:
@@ -76,7 +80,14 @@ class PinnedCheckout:
         the git tree ids still match the pin.
         """
         dirty = _git(
-            self.root, "status", "--porcelain", "--ignored", "--untracked-files=all", "--", *paths
+            self.root,
+            "status",
+            "--porcelain",
+            "--ignored",
+            "--untracked-files=all",
+            "--",
+            *paths,
+            run=self.run,
         )
         if dirty:
             raise SourceError(
@@ -95,19 +106,21 @@ def converter_path(pin: SourcePin) -> PurePosixPath:
     return path
 
 
-def open_checkout(root: Path, pin: SourcePin) -> PinnedCheckout:
-    head = _git(root, "rev-parse", "HEAD")
+def open_checkout(root: Path, pin: SourcePin, *, run: Runner = subprocess.run) -> PinnedCheckout:
+    head = _git(root, "rev-parse", "HEAD", run=run)
     if head != pin.commit:
         raise SourceError(f"{root} is at {head}, expected pinned commit {pin.commit}")
-    return PinnedCheckout(root=root, pin=pin)
+    return PinnedCheckout(root=root, pin=pin, run=run)
 
 
-def ensure_checkout(cache_dir: Path, name: str, pin: SourcePin) -> PinnedCheckout:
+def ensure_checkout(
+    cache_dir: Path, name: str, pin: SourcePin, *, run: Runner = subprocess.run
+) -> PinnedCheckout:
     """Clone ``pin.url`` into the cache once and check out the pinned commit."""
     root = cache_dir / "sources" / f"{name}-{pin.version}"
     if not (root / ".git").exists():
         root.parent.mkdir(parents=True, exist_ok=True)
-        proc = subprocess.run(
+        proc = run(
             ["git", "clone", "--quiet", "--no-checkout", pin.url, str(root)],
             capture_output=True,
             text=True,
@@ -115,8 +128,8 @@ def ensure_checkout(cache_dir: Path, name: str, pin: SourcePin) -> PinnedCheckou
         )
         if proc.returncode != 0:
             raise SourceError(f"clone of {pin.url} failed: {proc.stderr.strip()}")
-        _git(root, "checkout", "--quiet", "--detach", pin.commit)
-    return open_checkout(root, pin)
+        _git(root, "checkout", "--quiet", "--detach", pin.commit, run=run)
+    return open_checkout(root, pin, run=run)
 
 
 def convert_problem(checkout: PinnedCheckout, problem: str, out_dir: Path) -> Path:
@@ -124,13 +137,17 @@ def convert_problem(checkout: PinnedCheckout, problem: str, out_dir: Path) -> Pa
     converter = checkout.root / converter_path(checkout.pin)
     if not converter.is_file():
         raise SourceError(f"pinned converter {checkout.pin.converter} not found in {checkout.root}")
-    proc = subprocess.run(
-        [sys.executable, "-B", "-c", _CONVERTER_DRIVER, str(converter), problem, str(out_dir)],
-        capture_output=True,
-        text=True,
-        check=False,
-        timeout=CONVERTER_TIMEOUT_S,
-    )
+    try:
+        proc = checkout.run(
+            [sys.executable, "-B", "-c", _CONVERTER_DRIVER, str(converter), problem, str(out_dir)],
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=CONVERTER_TIMEOUT_S,
+        )
+    except subprocess.TimeoutExpired as exc:
+        limit = CONVERTER_TIMEOUT_S
+        raise SourceError(f"converter timed out for {problem} after {limit}s") from exc
     task_dir = out_dir / CONVERTER_ORG / problem
     if proc.returncode != 0 or not (task_dir / "task.toml").is_file():
         tail = (proc.stdout + proc.stderr)[-3000:]

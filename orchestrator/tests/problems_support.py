@@ -17,9 +17,11 @@ import asyncio
 import hashlib
 import shutil
 import subprocess
+import sys
 import textwrap
 from collections.abc import Sequence
 from pathlib import Path
+from typing import Any
 
 from packaging.requirements import Requirement
 from packaging.utils import canonicalize_name
@@ -362,8 +364,8 @@ def _git(repo: Path, *args: str) -> str:
     ).stdout.strip()
 
 
-def build_fake_scb_repo(root: Path) -> tuple[Path, str]:
-    """A git repo shaped like scb-problems with a stand-in converter; returns (repo, commit)."""
+def write_fake_scb_tree(root: Path) -> Path:
+    """The scb-problems working tree (no git) with a stand-in converter; returns its root."""
     repo = root / "scb-problems"
     (repo / "adder").mkdir(parents=True)
     (repo / "adder" / "config.yaml").write_text(
@@ -377,10 +379,91 @@ def build_fake_scb_repo(root: Path) -> tuple[Path, str]:
     (lib / "cli.py").write_text(FAKE_CONVERTER_CLI)
     (repo / "scripts" / "scb_to_harbor.py").write_text(FAKE_CONVERTER_ENTRY)
     _write_converted(repo / "fake_converted" / "adder")
+    return repo
+
+
+def build_fake_scb_repo(root: Path) -> tuple[Path, str]:
+    """A git repo shaped like scb-problems with a stand-in converter; returns (repo, commit)."""
+    repo = write_fake_scb_tree(root)
     _git(repo.parent, "init", "-q", str(repo))
     _git(repo, "add", "-A")
     _git(repo, "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q", "-m", "fixture")
     return repo, _git(repo, "rev-parse", "HEAD")
+
+
+def scripted_tree_id(path: str) -> str:
+    """The tree id :class:`ScriptedSource` reports for a checkout-relative path."""
+    return hashlib.sha1(path.encode()).hexdigest()
+
+
+class ScriptedSource:
+    """An injected ``subprocess.run`` standing in for git and the pinned converter.
+
+    It answers the importer's git queries for the tree built by :func:`write_fake_scb_tree`
+    and "runs" the converter by copying that tree's ``fake_converted`` task, so a whole import
+    stays in memory.  ``dirty`` is the ``git status`` output, ``converter_exit`` the converter's
+    exit code, and ``hang`` makes the converter time out.
+    """
+
+    def __init__(
+        self,
+        repo: Path,
+        commit: str,
+        *,
+        head: str | None = None,
+        dirty: str = "",
+        converter_exit: int = 0,
+        hang: bool = False,
+        clone_error: str | None = None,
+    ) -> None:
+        self.repo, self.commit = repo, commit
+        self.head = commit if head is None else head
+        self.dirty, self.converter_exit, self.hang = dirty, converter_exit, hang
+        self.clone_error = clone_error
+        self.calls: list[list[str]] = []
+
+    def __call__(self, argv: Sequence[str], **kwargs: object) -> subprocess.CompletedProcess[str]:
+        args = list(argv)
+        self.calls.append(args)
+        if args[0] == sys.executable:
+            return self._convert(args)
+        if args[1] == "clone":
+            return self._clone(args)
+        return self._git(args[3:])
+
+    def _done(self, args: list[str], code: int = 0, out: str = "", err: str = "") -> Any:
+        return subprocess.CompletedProcess(args, code, out, err)
+
+    def _git(self, args: list[str]) -> subprocess.CompletedProcess[str]:
+        if args[0] == "rev-parse" and args[1] == "HEAD":
+            return self._done(args, out=self.head + "\n")
+        if args[0] == "rev-parse":
+            path = args[1].split(":", 1)[1]
+            if (self.repo / path).exists():
+                return self._done(args, out=scripted_tree_id(path) + "\n")
+            return self._done(args, code=128, err="fatal: path does not exist")
+        if args[0] == "status":
+            return self._done(args, out=self.dirty)
+        return self._done(args)  # checkout
+
+    def _clone(self, args: list[str]) -> subprocess.CompletedProcess[str]:
+        if self.clone_error is not None:
+            return self._done(args, code=128, err=self.clone_error)
+        destination = Path(args[-1])
+        shutil.copytree(self.repo, destination)
+        (destination / ".git").mkdir()
+        return self._done(args)
+
+    def _convert(self, args: list[str]) -> subprocess.CompletedProcess[str]:
+        if self.hang:
+            raise subprocess.TimeoutExpired(args, 600)
+        out, problem = Path(args[-1]), args[-2]
+        if self.converter_exit != 0:
+            return self._done(args, self.converter_exit, "", "converter said no")
+        target = out / "scb" / problem
+        shutil.copytree(self.repo / "fake_converted" / problem, target)
+        (target / "README.md").write_text("converted\n")
+        return self._done(args)
 
 
 def fake_store(root: Path, commit: str) -> ProblemStore:

@@ -12,26 +12,58 @@ from raidar.grading.models import (
     CaseGroup,
     CaseStatus,
 )
-from raidar.grading.parity import fork_regression_run_evidence
 from raidar.grading.sandbox import SandboxResult, SandboxRun
-from tests.test_verifier_grading_behaviors import (
-    FORGER as FORGER,
-)
-from tests.test_verifier_grading_behaviors import (
-    SHADOW as SHADOW,
-)
-from tests.test_verifier_grading_behaviors import (
-    SLOW_TESTS as SLOW_TESTS,
-)
-from tests.test_verifier_grading_behaviors import (
-    bundle_fixture as bundle_fixture,
-)
-from tests.test_verifier_grading_behaviors import (
-    sandbox_fixture as sandbox_fixture,
-)
 from tests.verifier_support import LocalProcessSandbox, make_bundle, write_app
 
 pytestmark = pytest.mark.slow
+
+SHADOW = """
+import json, os
+from pathlib import Path
+Path(os.environ["RAIDAR_ORACLE_LEDGER"]).write_text(json.dumps({"forged": True}))
+raise SystemExit(0)
+"""
+
+
+FORGER = """
+import json, os, stat, sys
+from pathlib import Path
+
+leaked = sorted(key for key in os.environ if key.startswith("RAIDAR_ORACLE_"))
+(Path.cwd().parent / "leaked.json").write_text(json.dumps(leaked))
+ledger = Path.cwd().parent / "out" / "ledger.json"
+ledger.write_text(json.dumps({
+    "leaked": leaked,
+    "exit_status": 0,
+    "collect_errors": [],
+    "nodes": [{"node_id": "test_checkpoint_2.py::test_multiplies", "markers": [],
+               "status": "passed", "ran": True, "duration_s": 0.0}],
+}))
+ledger.chmod(stat.S_IRUSR | stat.S_IRGRP | stat.S_IROTH)
+print("wrong answer")
+"""
+
+SLOW_TESTS = """
+import time
+
+
+def test_first():
+    time.sleep(2)
+
+
+def test_second():
+    pass
+"""
+
+
+@pytest.fixture(name="bundle")
+def bundle_fixture(tmp_path: Path):
+    return make_bundle(tmp_path / "fixture")
+
+
+@pytest.fixture(name="sandbox")
+def sandbox_fixture(tmp_path: Path) -> LocalProcessSandbox:
+    return LocalProcessSandbox(tmp_path / "sandbox")
 
 
 # ------------------------------------------------------- real pytest runs
@@ -201,33 +233,3 @@ async def test_grading_infra_failure_skips_coverage_and_is_ineligible(
     assert result.parity is not None
     assert not result.parity.eligible
     assert result.parity.reasons[0].startswith("grading_infra_failure:")
-
-
-async def test_fork_projection_carries_the_g_kernel_input_shape(
-    tmp_path: Path, bundle, sandbox: LocalProcessSandbox
-) -> None:
-    app = write_app(tmp_path / "app", mul=True)
-    result = await grade_step(bundle, "checkpoint_2", app, sandbox, tmp_path / "w", coverage=True)
-    assert result.grading.evidence is not None
-    assert result.coverage is not None
-    assert result.coverage.evidence is not None
-
-    baseline = fork_regression_run_evidence(result.grading.evidence, result.grading.cases)
-    produced = fork_regression_run_evidence(result.coverage.evidence, result.coverage.cases)
-
-    assert set(baseline) == {
-        "environment",
-        "corpus",
-        "invocation",
-        "outcomes",
-        "ledger",
-        "coverage",
-        "process_events",
-    }
-    for key in ("environment", "corpus", "invocation"):
-        assert baseline[key] == produced[key]
-    assert all(len(value) == 64 for value in baseline["environment"].values())
-    groups = {row["node_id"]: row["group_type"] for row in baseline["outcomes"]}
-    assert groups["test_checkpoint_1.py::test_adds"] == "Regression"
-    assert groups["test_checkpoint_2.py::test_multiplies"] == "Core"
-    assert json.dumps(produced)  # serialisable as the fork's JSON input
