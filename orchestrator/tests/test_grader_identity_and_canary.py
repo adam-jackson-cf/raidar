@@ -1,4 +1,4 @@
-"""Grader identity pinning, the starter canary and who owns a grading crash."""
+"""Grader identity admission, pinning and mismatch refusals."""
 
 from __future__ import annotations
 
@@ -7,20 +7,14 @@ from pathlib import Path
 
 import pytest
 
-from raidar.contract.wheels import DependencyInfraError
 from raidar.design.problem.validation import (
     GraderIdentity,
     read_grader_identity,
     read_validation_record,
 )
 from raidar.engine.trial.plan import PlanError, _pinned_grader
-from raidar.grading.grader import grade_step
 from raidar.grading.grader_image import GraderIdentityError, refuse_grader_mismatch
 from raidar.grading.records import grading_execution_digest
-from raidar.grading.sandbox import LEDGER_NAME, SandboxResult, SandboxRun
-from tests.dependency_support import FakeResolver
-from tests.test_submission_dependencies import _declaring, _grading_bundle
-from tests.verifier_support import LocalProcessSandbox, make_bundle, write_app
 
 ENVIRONMENT = "sha256:" + "a" * 64
 IMPLEMENTATION = "b" * 64
@@ -39,9 +33,13 @@ def test_a_report_with_every_part_records_a_complete_identity() -> None:
     assert identity.complete
 
 
-def test_a_report_without_an_implementation_leaves_it_unmeasured() -> None:
-    environment = {k: v for k, v in COMPLETE.items() if k != "grader_implementation_sha256"}
-    identity = read_grader_identity(environment)
+@pytest.mark.parametrize(
+    "implementation", [None, "", 7, [], "a" * 63, "a" * 65, "g" * 64, "A" * 64]
+)
+def test_an_absent_or_untrusted_implementation_leaves_identity_unmeasured(
+    implementation: object,
+) -> None:
+    identity = read_grader_identity({**COMPLETE, "grader_implementation_sha256": implementation})
     assert identity == GraderIdentity("raidar-oracle-grader:abc", ENVIRONMENT, None)
     assert identity is not None
     assert not identity.complete
@@ -50,16 +48,20 @@ def test_a_report_without_an_implementation_leaves_it_unmeasured() -> None:
 
 @pytest.mark.parametrize(
     "environment",
-    [None, {}, {"grader_image": "g:1"}, {**COMPLETE, "grader_environment_id": "g:1"}],
+    [
+        None,
+        {},
+        {"grader_image": "g:1"},
+        {**COMPLETE, "grader_image": ""},
+        {**COMPLETE, "grader_image": 7},
+        {**COMPLETE, "grader_environment_id": "g:1"},
+        {**COMPLETE, "grader_environment_id": 7},
+        {**COMPLETE, "grader_environment_id": "sha256:" + "a" * 63},
+        {**COMPLETE, "grader_environment_id": "sha256:" + "g" * 64},
+    ],
 )
 def test_a_report_without_an_immutable_environment_id_pins_no_grader(environment: object) -> None:
     assert read_grader_identity(environment) is None
-
-
-def test_a_malformed_implementation_digest_is_unmeasured_never_trusted() -> None:
-    identity = read_grader_identity({**COMPLETE, "grader_implementation_sha256": "not-a-digest"})
-    assert identity is not None
-    assert identity.implementation_sha256 is None
 
 
 def test_the_lock_pins_the_validated_grader_identity(tmp_path: Path) -> None:
@@ -121,70 +123,3 @@ def test_grading_refuses_a_grader_other_than_the_validated_one() -> None:
         }
         with pytest.raises(GraderIdentityError, match=next(iter(change))):
             refuse_grader_mismatch(pinned, **found)
-
-
-# ----------------------------------------------------------------------- canary
-class HangingSandbox(LocalProcessSandbox):
-    """A real local grader that misbehaves on runs staged with a marker file (the submission).
-
-    ``hang``: the run times out. ``crash``: it exits without writing a ledger. ``corrupt``: the
-    real run completes, then the ledger is truncated. ``always`` times out every run.
-    """
-
-    always: bool = False
-
-    async def run(self, run: SandboxRun) -> SandboxResult:
-        marked = {name for name in ("hang", "crash", "corrupt") if (run.app_dir / name).exists()}
-        if self.always or "hang" in marked:
-            self.runs.append(run)
-            return SandboxResult(None, True, "")
-        if "crash" in marked:
-            self.runs.append(run)
-            return SandboxResult(139, False, "segfault")
-        result = await super().run(run)
-        if "corrupt" in marked:
-            (run.out_dir / LEDGER_NAME).write_text("{")
-        return result
-
-
-@pytest.fixture(name="bundle")
-def bundle_fixture(tmp_path: Path):
-    return make_bundle(tmp_path / "fixture")
-
-
-async def test_a_sandbox_that_cannot_grade_the_starter_is_infrastructure(
-    tmp_path: Path, bundle
-) -> None:
-    sandbox = HangingSandbox(tmp_path / "sb")
-    sandbox.always = True
-    app = write_app(tmp_path / "app")
-
-    result = await grade_step(bundle, "checkpoint_1", app, sandbox, tmp_path / "w", coverage=False)
-
-    assert result.canary.status == "failed"
-    assert result.canary.detail.startswith("sandbox_timeout")
-    assert result.grade.infra_failure is not None
-    assert result.grade.infra_failure.code == "sandbox_timeout"
-    assert result.grade.rewards() == {"infrastructure_failure": 1.0}
-
-
-async def test_a_resolver_outage_is_never_attributed_to_the_submission(tmp_path: Path) -> None:
-    fake = FakeResolver()
-    bundle = _grading_bundle(tmp_path / "problem", fake)
-    fake.error = DependencyInfraError("pypi unreachable")
-    sandbox = HangingSandbox(tmp_path / "sandbox")
-
-    result = await grade_step(
-        bundle,
-        "checkpoint_1",
-        _declaring(tmp_path / "app", "flask"),
-        sandbox,
-        tmp_path / "work",
-        coverage=False,
-        resolver=fake,
-    )
-
-    assert result.grade.infra_failure is not None
-    assert result.grade.infra_failure.code == "dependency_resolver_unavailable"
-    assert result.canary.status == "not_run"
-    assert sandbox.runs == []

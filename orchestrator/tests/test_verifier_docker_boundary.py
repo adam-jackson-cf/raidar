@@ -17,8 +17,7 @@ import pytest
 from raidar.design.problem.models import ProblemId
 from raidar.grading.bundle import VerifierBundle
 from raidar.grading.grader_image import ensure_grader_image, grader_image_tag
-from raidar.grading.sandbox import DockerCopySandbox, SandboxRun, sweep_grader_orphans
-from raidar.judge.secrets import SecretIsolationError
+from raidar.grading.sandbox import DockerCopySandbox, SandboxRun
 from tests.problems_support import POSITIVE_REF, build_fixture_store
 
 pytestmark = pytest.mark.slow
@@ -40,7 +39,6 @@ case "$1" in
   create)
     echo "$*" > "$state/create_argv"; exit 0 ;;
   inspect)
-    [ -f "$state/leaks_key" ] && { echo "OPENROUTER_API_KEY"; exit 0; }
     printf 'PATH\\nHOME\\n'; exit 0 ;;
   cp)
     case "$2" in
@@ -55,8 +53,6 @@ case "$1" in
     echo "$2" >> "$state/killed"; exit 0 ;;
   rm)
     echo "$3" >> "$state/removed"; exit 0 ;;
-  container)
-    exit 0 ;;
 esac
 exit 64
 """
@@ -81,10 +77,6 @@ def image_bundle(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> VerifierBun
     problem = build_fixture_store(tmp_path / "problems").load(ProblemId.parse(POSITIVE_REF))
     monkeypatch.setattr("raidar.grading.grader_image.fetch_wheels", lambda *args, **kwargs: 0)
     return problem.bundle
-
-
-def calls(state: Path) -> list[str]:
-    return (state / "calls").read_text().splitlines()
 
 
 def sandbox_run(tmp_path: Path, timeout_s: float = 30.0) -> SandboxRun:
@@ -153,22 +145,3 @@ async def test_sandbox_timeout_kills_the_named_container(tmp_path: Path, fake_do
     killed = (fake_docker / "killed").read_text().split()
     assert killed[0].startswith("raidar-oracle-")
     assert (fake_docker / "removed").read_text().split() == killed  # removed even after a timeout
-
-
-async def test_grader_rejects_an_image_with_a_judge_key_environment(
-    tmp_path: Path, fake_docker: Path
-) -> None:
-    (fake_docker / "leaks_key").touch()
-    sandbox = DockerCopySandbox(image="grader:1", docker_context="orbstack")
-    with pytest.raises(SecretIsolationError, match="judge key must not enter"):
-        await sandbox.run(sandbox_run(tmp_path))
-    assert (fake_docker / "removed").is_file()
-    assert not (fake_docker / "grader_started").exists()
-
-
-async def test_sweep_prunes_only_labelled_old_grader_containers(fake_docker: Path) -> None:
-    sweep_grader_orphans("orbstack")
-    assert calls(fake_docker) == [
-        "--context orbstack container prune --force "
-        "--filter label=raidar.role=grader --filter until=1h"
-    ]

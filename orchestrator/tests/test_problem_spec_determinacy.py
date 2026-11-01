@@ -29,6 +29,7 @@ from raidar.design.problem.determinacy import (
 )
 from raidar.design.problem.models import ProblemId
 from raidar.design.problem.validator import merge_audit
+from raidar.design.problem.variants import build_variant, original_name, shim_source
 from tests.audit_support import KV_REF, build_kv_problem
 from tests.verifier_support import LocalProcessSandbox
 
@@ -300,3 +301,23 @@ def test_merge_refuses_a_report_for_another_manifest(kv) -> None:
     )
     assert result.exit_code != 0
     assert "no spec_determinacy audit" in result.output
+
+
+def test_a_variant_is_a_wrapped_copy_and_the_reference_stays_untouched(tmp_path: Path) -> None:
+    reference = tmp_path / "ref"
+    reference.mkdir()
+    (reference / "app.py").write_text("print(1)\n")
+    (reference / "data.txt").write_text("d")
+    for _ in range(2):  # a stale destination is replaced, not merged
+        variant = build_variant(reference, "app.py", "reformatted_json", tmp_path / "variant")
+    assert (variant / original_name("app.py")).read_text() == "print(1)\n"
+    assert (variant / "data.txt").read_text() == "d"
+    wrapper = (variant / "app.py").read_text()
+    assert original_name("app.py") in wrapper
+    assert "reformatted_json" in wrapper
+    assert (reference / "app.py").read_text() == "print(1)\n"
+    assert not (reference / original_name("app.py")).exists()
+    with pytest.raises(ValueError, match="unknown variant"):
+        shim_source("app.py", "nope")
+    with pytest.raises(FileNotFoundError):
+        build_variant(reference, "missing.py", "reformatted_json", tmp_path / "v2")

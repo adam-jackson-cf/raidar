@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import hashlib
 import shutil
+import subprocess
 import tempfile
 from dataclasses import dataclass
 from pathlib import Path
@@ -39,6 +40,7 @@ from raidar.design.problem.rewrite import (
 )
 from raidar.design.problem.source import (
     PinnedCheckout,
+    Runner,
     convert_problem,
     ensure_checkout,
     open_checkout,
@@ -68,7 +70,11 @@ class ImportResult:
 
 
 def resolve_checkout(
-    store: ProblemStore, problem: ProblemId, source_checkout: Path | None
+    store: ProblemStore,
+    problem: ProblemId,
+    source_checkout: Path | None,
+    *,
+    run: Runner = subprocess.run,
 ) -> PinnedCheckout:
     pin = store.pin(problem.dataset)
     if pin.version != problem.version:
@@ -77,8 +83,8 @@ def resolve_checkout(
             f"(expected version {pin.version})"
         )
     if source_checkout is not None:
-        return open_checkout(source_checkout, pin)
-    return ensure_checkout(store.cache_dir(), problem.dataset, pin)
+        return open_checkout(source_checkout, pin, run=run)
+    return ensure_checkout(store.cache_dir(), problem.dataset, pin, run=run)
 
 
 def _manifest(
@@ -241,9 +247,10 @@ def import_problem(
     update: bool = False,
     pack: PackSpec | None = None,
     resolver: Resolver | None = None,
+    run: Runner = subprocess.run,
 ) -> ImportResult:
     """Import (or re-materialise) one problem into the store."""
-    checkout = resolve_checkout(store, problem, source_checkout)
+    checkout = resolve_checkout(store, problem, source_checkout, run=run)
     pack = _runtime_pack(checkout.pin.runtime, pack, problem.dataset)
     checkout.verify_clean(problem.problem, checkout.converter_dir, _CONVERSION_OVERRIDES)
     if not (checkout.root / problem.problem / _PROBLEM_CONFIG).is_file():

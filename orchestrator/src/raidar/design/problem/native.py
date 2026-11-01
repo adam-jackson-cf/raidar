@@ -15,12 +15,13 @@ import json
 import os
 import shutil
 import subprocess
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
 import yaml
 
+from raidar.design.problem.source import Runner
 from raidar.design.problem.validation import Grade
 from raidar.grading.models import CaseGroup
 
@@ -42,7 +43,7 @@ class NativeRunnerError(RuntimeError):
     """The native runner or its evaluator project could not be prepared."""
 
 
-def stage_catalog(problem_dir: Path, catalog: Path) -> Path:
+def stage_catalog(problem_dir: Path, catalog: Path, *, run: Runner = subprocess.run) -> Path:
     """Copy one problem into ``catalog`` with a locked evaluator project."""
     dest = catalog / problem_dir.name
     shutil.rmtree(dest, ignore_errors=True)
@@ -57,9 +58,7 @@ def stage_catalog(problem_dir: Path, catalog: Path) -> Path:
         'requires-python = ">=3.12"\n'
         f"dependencies = [\n{dep_lines}]\n"
     )
-    proc = subprocess.run(
-        ["uv", "lock", "-q"], cwd=dest, capture_output=True, text=True, check=False
-    )
+    proc = run(["uv", "lock", "-q"], cwd=dest, capture_output=True, text=True, check=False)
     if proc.returncode != 0:
         raise NativeRunnerError(f"uv lock failed for the native evaluator: {proc.stderr[-2000:]}")
     return dest
@@ -84,8 +83,8 @@ def grade_from_evaluation(data: dict[str, Any], step: str) -> Grade:
     return Grade("native", step, groups, outcomes, infra)
 
 
-def _docker_host(context: str) -> str:
-    proc = subprocess.run(
+def _docker_host(context: str, run: Runner) -> str:
+    proc = run(
         ["docker", "context", "inspect", context, "--format", "{{.Endpoints.docker.Host}}"],
         capture_output=True,
         text=True,
@@ -103,6 +102,7 @@ class NativeRunner:
 
     root: Path
     docker_context: str
+    run: Runner = field(default=subprocess.run, compare=False, repr=False)
 
     def revision(self) -> dict[str, object]:
         """The fork's git commit and whether it has local changes (recorded, N3).
@@ -112,7 +112,7 @@ class NativeRunner:
         """
 
         def git(*args: str) -> str | None:
-            proc = subprocess.run(
+            proc = self.run(
                 ["git", "-C", str(self.root), *args], capture_output=True, text=True, check=False
             )
             return proc.stdout.strip() if proc.returncode == 0 else None
@@ -130,7 +130,7 @@ class NativeRunner:
         staged = out / "snapshot"
         shutil.copytree(snapshot, staged)
         env = {k: v for k, v in os.environ.items() if k != "DOCKER_CONTEXT"}
-        env["DOCKER_HOST"] = _docker_host(self.docker_context)  # docker-py reads DOCKER_HOST
+        env["DOCKER_HOST"] = _docker_host(self.docker_context, self.run)  # docker-py reads it
         env["SCBENCH_PROBLEMS_PATH"] = str(catalog)
         argv = [
             str(self.root / ".venv" / "bin" / "slop-code"),
@@ -147,17 +147,24 @@ class NativeRunner:
             str(self.root / NATIVE_ENV_CONFIG),
             "--json",
         ]
-        proc = subprocess.run(
-            argv,
-            cwd=self.root,
-            env=env,
-            capture_output=True,
-            text=True,
-            check=False,
-            timeout=NATIVE_TIMEOUT_S,
-        )
+        try:
+            proc = self.run(
+                argv,
+                cwd=self.root,
+                env=env,
+                capture_output=True,
+                text=True,
+                check=False,
+                timeout=NATIVE_TIMEOUT_S,
+            )
+        except subprocess.TimeoutExpired as exc:
+            (out / "native.log").write_text(f"timed out after {NATIVE_TIMEOUT_S}s\n{exc}\n")
+            return Grade("native", step, {}, {}, "native_timeout")
         (out / "native.log").write_text(proc.stdout + "\n--- stderr\n" + proc.stderr)
         evaluation = out / "eval" / "evaluation.json"
         if not evaluation.is_file():
             return Grade("native", step, {}, {}, "native_no_evaluation")
-        return grade_from_evaluation(json.loads(evaluation.read_text()), step)
+        try:
+            return grade_from_evaluation(json.loads(evaluation.read_text()), step)
+        except (ValueError, KeyError, TypeError, AttributeError):
+            return Grade("native", step, {}, {}, "native_malformed_evaluation")

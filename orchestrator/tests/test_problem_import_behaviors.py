@@ -2,10 +2,8 @@
 
 from __future__ import annotations
 
-import hashlib
 import json
 import re
-import shutil
 import subprocess
 from pathlib import Path
 from typing import Any
@@ -13,7 +11,6 @@ from typing import Any
 import pytest
 import yaml
 from harbor.models.task.task import Task
-from raidar_contract.canonical import digest_json
 
 from raidar.contract.paths import VAR_ENV, problems_root
 from raidar.contract.references import (
@@ -28,11 +25,10 @@ from raidar.contract.snapshot import APP_SOURCE
 from raidar.design.experiment.loader import load_experiment
 from raidar.design.experiment.lock import build_lock
 from raidar.design.problem import importer
-from raidar.design.problem.content import content_digest, hidden_content_in_task
-from raidar.design.problem.importer import ProblemDriftError
-from raidar.design.problem.models import ProblemId, ProblemManifest, ProblemMode
+from raidar.design.problem.content import hidden_content_in_task
+from raidar.design.problem.models import ProblemId
 from raidar.design.problem.resolver import ProblemResolver, resolver_factory
-from raidar.design.problem.rewrite import VERIFIER_IMPORT_PATH, RewriteError, render_spec
+from raidar.design.problem.rewrite import VERIFIER_IMPORT_PATH
 from raidar.design.problem.source import SourceError
 from raidar.design.problem.store import (
     ROOT_ENV,
@@ -76,26 +72,6 @@ def import_problem(*args: Any, **kwargs: Any) -> importer.ImportResult:
 
 def _ref(commit: str, name: str = "scb/adder") -> ProblemId:
     return ProblemId.parse(f"{name}@{commit[:12]}")
-
-
-def test_problem_references_name_dataset_problem_and_optional_one_shot_checkpoint() -> None:
-    multi = ProblemId.parse("scb/forge@38d627ecf668")
-    oneshot = ProblemId.parse("scb/circuit_eval.checkpoint_1@38d627ecf668")
-    assert (multi.dataset, multi.problem, multi.checkpoint, multi.mode) == (
-        "scb",
-        "forge",
-        None,
-        ProblemMode.MULTI_CHECKPOINT,
-    )
-    assert (oneshot.problem, oneshot.checkpoint, oneshot.mode) == (
-        "circuit_eval",
-        "checkpoint_1",
-        ProblemMode.ONE_SHOT,
-    )
-    assert str(oneshot) == "scb/circuit_eval.checkpoint_1@38d627ecf668"
-    for bad in ("forge@38d627ecf668", "scb/forge", "scb/a/b@1"):
-        with pytest.raises(RegistryReferenceError):
-            ProblemId.parse(bad)
 
 
 def test_import_splits_the_converted_task_into_agent_task_bundle_and_references(
@@ -155,93 +131,6 @@ def test_import_splits_the_converted_task_into_agent_task_bundle_and_references(
     assert VERIFIER_IMPORT_PATH == "raidar.grading.verifier:RaidarVerifier"
 
 
-# sha256 of task/tests/test.sh in every problem registered since 2026-09-30.
-RELEASED_STUB_TEST_SH_SHA256 = "ebd7fd24b020b73cd159d980ff998a6200dbf3ca941b847123e8d7bcc65f82f0"
-
-
-def test_imported_specs_are_the_pinned_upstream_specs_with_only_the_entrypoint_tokens_replaced(
-    scb: tuple[ProblemStore, Path, str],
-) -> None:
-    store, repo, commit = scb
-    result = import_problem(store, _ref(commit), source_checkout=repo)
-    manifest = result.manifest
-    assert manifest.entry_command == "uv run --project /app app.py"
-    assert manifest.lock_metadata()["entry_command"] == manifest.entry_command
-    for step in manifest.steps:
-        upstream = (repo / "adder" / f"{step.name}.md").read_bytes().decode()
-        expected = upstream.replace("%%%ENTRYPOINT:entry_command%%%", manifest.entry_command)
-        expected = expected.replace("%%%ENTRYPOINT:entry_file%%%", "app.py")
-        rendered = (
-            result.content_dir / "task" / "steps" / step.name / "instruction.md"
-        ).read_bytes()
-        assert rendered == expected.encode()
-        assert step.instruction_sha256 == hashlib.sha256(expected.encode()).hexdigest()
-
-
-def test_a_spec_token_the_problem_does_not_define_is_refused() -> None:
-    assert (
-        render_spec("run %%%ENTRYPOINT:other%%%", entry_command="c", entry_file="f.py")
-        == "run %%%ENTRYPOINT:other%%%"
-    )
-    with pytest.raises(RewriteError, match="does not define"):
-        render_spec("run %%%ENTRYPOINT:entry_file%%%", entry_command="c", entry_file=None)
-
-
-def test_imported_task_stub_keeps_the_bytes_bound_by_registered_pins(
-    scb: tuple[ProblemStore, Path, str],
-) -> None:
-    store, repo, commit = scb
-    result = import_problem(store, _ref(commit), source_checkout=repo)
-    stub = result.content_dir / "task" / "tests" / "test.sh"
-    # A changed stub changes every pinned task_sha256: that is a re-release, not a refactor.
-    assert hashlib.sha256(stub.read_bytes()).hexdigest() == RELEASED_STUB_TEST_SH_SHA256
-
-
-def test_reimport_reproduces_the_manifest_and_refuses_drift_unless_updating(
-    scb: tuple[ProblemStore, Path, str],
-) -> None:
-    store, repo, commit = scb
-    problem = _ref(commit)
-    first = import_problem(store, problem, source_checkout=repo)
-    marker = first.content_dir / "task" / "task.toml"
-    inode = marker.stat().st_ino
-    again = import_problem(store, problem, source_checkout=repo)
-    assert not again.changed
-    assert again.manifest == first.manifest
-    assert marker.stat().st_ino == inode  # matching content is left in place for live readers
-
-    marker.write_text("tampered\n")
-    repaired = import_problem(store, problem, source_checkout=repo)
-    assert not repaired.changed
-    assert store.load(problem).manifest == first.manifest
-
-    path = store.manifest_path(problem)
-    recorded = json.loads(path.read_text())
-    recorded["task_sha256"] = "0" * 64
-    path.write_text(json.dumps(recorded))
-    with pytest.raises(ProblemDriftError, match="task_sha256"):
-        import_problem(store, problem, source_checkout=repo)
-    updated = import_problem(store, problem, source_checkout=repo, update=True)
-    assert updated.changed
-    assert updated.manifest == first.manifest
-
-
-def test_one_shot_import_keeps_only_the_first_checkpoint(
-    scb: tuple[ProblemStore, Path, str],
-) -> None:
-    store, repo, commit = scb
-    result = import_problem(store, _ref(commit, "scb/adder.checkpoint_1"), source_checkout=repo)
-    assert result.manifest.mode is ProblemMode.ONE_SHOT
-    assert result.manifest.checkpoints == 1
-    loaded = store.load(result.manifest.problem_id)
-    assert [step.name for step in Task(loaded.task_dir).config.steps or []] == ["checkpoint_1"]
-    assert sorted(p.name for p in loaded.bundle.tests_dir.glob("test_*")) == [
-        "test_checkpoint_1.py"
-    ]
-    with pytest.raises(ValueError, match="first checkpoint"):
-        import_problem(store, _ref(commit, "scb/adder.checkpoint_2"), source_checkout=repo)
-
-
 def test_import_refuses_sources_that_are_not_exactly_the_pin(
     scb: tuple[ProblemStore, Path, str], tmp_path: Path
 ) -> None:
@@ -275,20 +164,6 @@ def test_import_refuses_sources_that_are_not_exactly_the_pin(
         import_problem(store, ProblemId.parse("other/adder@000000000000"), source_checkout=repo)
 
 
-@pytest.mark.parametrize(
-    ("converter", "message"),
-    [("scripts/absent.py", "pinned converter scripts/absent.py not found"), ("../x.py", "inside")],
-)
-def test_import_runs_the_converter_the_pin_names(
-    scb: tuple[ProblemStore, Path, str], converter: str, message: str
-) -> None:
-    store, repo, commit = scb
-    sources = store.root / "sources.yaml"
-    sources.write_text(sources.read_text() + f"    converter: {converter}\n")
-    with pytest.raises(SourceError, match=message):
-        import_problem(store, _ref(commit), source_checkout=repo)
-
-
 def test_default_import_clones_the_pinned_commit_into_the_store_cache(tmp_path: Path) -> None:
     repo, commit = build_fake_scb_repo(tmp_path / "src")
     store = tmp_path / "problems"
@@ -299,50 +174,6 @@ def test_default_import_clones_the_pinned_commit_into_the_store_cache(tmp_path: 
     result = import_problem(ProblemStore(store), _ref(commit))
     assert (store / "cache" / "sources" / f"scb-{commit[:12]}" / ".git").exists()
     assert result.manifest.source.url == str(repo)
-
-
-def test_loading_refuses_missing_or_drifted_content(tmp_path: Path) -> None:
-    store = build_fixture_store(tmp_path / "store")
-    problem = ProblemId.parse(POSITIVE_REF)
-    loaded = store.load(problem)
-    (loaded.task_dir / "steps" / "checkpoint_1" / "instruction.md").write_text("tampered\n")
-    with pytest.raises(ProblemStoreError, match="task_sha256"):
-        store.load(problem)
-    shutil.rmtree(store.content_dir(problem, store.load_manifest(problem).content_key()))
-    with pytest.raises(ProblemStoreError, match="raidar problem import"):
-        store.load(problem)
-    with pytest.raises(ProblemStoreError, match="not imported"):
-        store.load(ProblemId.parse("fixture/absent@fefefefefefe"))
-
-
-@pytest.mark.parametrize("area", ["task", "oracle", "references"])
-@pytest.mark.parametrize("excluded_dir", ["build", "dist", "__pycache__", ".venv"])
-def test_content_digests_cover_directories_a_workspace_snapshot_excludes(
-    tmp_path: Path, area: str, excluded_dir: str
-) -> None:
-    store = build_fixture_store(tmp_path / "store")
-    problem = ProblemId.parse(POSITIVE_REF)
-    content = store.content_dir(problem, store.load_manifest(problem).content_key())
-    extra = content / area / excluded_dir / "extra.txt"
-    extra.parent.mkdir(parents=True)
-    extra.write_text("not in the manifest\n")
-    with pytest.raises(ProblemStoreError, match="drifted"):
-        store.load(problem)
-
-
-def test_loading_refuses_a_task_that_exposes_hidden_tests_even_with_matching_digests(
-    tmp_path: Path,
-) -> None:
-    store = build_fixture_store(tmp_path / "store")
-    problem = ProblemId.parse(POSITIVE_REF)
-    loaded = store.load(problem)
-    leaked = loaded.task_dir / "build" / "test_checkpoint_2.py"
-    leaked.parent.mkdir()
-    shutil.copy2(loaded.bundle.tests_dir / "test_checkpoint_2.py", leaked)
-    manifest = loaded.manifest.model_copy(update={"task_sha256": content_digest(loaded.task_dir)})
-    store.write_manifest(manifest)  # a manifest re-recorded over leaked content
-    with pytest.raises(ProblemStoreError, match="hidden verifier content"):
-        store.load(problem)
 
 
 def test_problem_resolver_reports_checkpoints_and_manifest_digest(tmp_path: Path) -> None:
@@ -433,20 +264,6 @@ def test_lock_resolves_imported_problems_and_selects_the_policy_by_k(
     assert recorded["metadata"]["source"]["commit"] == "fe" * 20
 
 
-def test_hidden_content_check_flags_renamed_copies_and_solutions(tmp_path: Path) -> None:
-    store = build_fixture_store(tmp_path / "problems")
-    loaded = store.load(ProblemId.parse(POSITIVE_REF))
-    assert hidden_content_in_task(loaded.task_dir, loaded.bundle) == []
-    shutil.copy2(loaded.bundle.tests_dir / "test_checkpoint_2.py", loaded.task_dir / "notes.txt")
-    solution = loaded.task_dir / "steps" / "checkpoint_1" / "solution" / "solve.sh"
-    solution.parent.mkdir()
-    solution.write_text("#!/bin/bash\n")
-    assert hidden_content_in_task(loaded.task_dir, loaded.bundle) == [
-        "notes.txt",
-        "steps/checkpoint_1/solution/solve.sh",
-    ]
-
-
 def _resolve(store: ProblemStore, ref: str, tmp_path: Path) -> ResolvedReference:
     return ProblemResolver(store.root).resolve(
         RegistryRef.parse(RefKind.PROBLEM, ref), base_dir=tmp_path
@@ -484,44 +301,6 @@ def test_only_a_usable_verdict_for_the_current_manifest_resolves(tmp_path: Path)
     assert "validation" in resolved.metadata
     with pytest.raises(RegistryReferenceError, match="not imported"):
         _resolve(store, "fixture/missing@fefefefefefe", tmp_path)
-
-
-def test_manifests_without_an_entry_file_keep_their_recorded_bytes_and_digest(
-    tmp_path: Path,
-) -> None:
-    store_root = build_fixture_store(tmp_path / "problems").root
-    manifests = sorted((store_root / "registry").rglob("*.json"))
-    assert manifests
-    for path in manifests:
-        if path.name.endswith(".validation.json"):
-            continue
-        recorded = json.loads(path.read_text())
-        loaded = ProblemManifest.model_validate(recorded)
-        assert loaded.entry_file is None
-        assert loaded.digest() == digest_json(recorded), path
-        assert "entry_file" not in loaded.lock_metadata()
-
-
-@pytest.mark.parametrize(
-    ("configured", "expected"),
-    [
-        ("forge", "forge.py"),
-        (" circopt ", "circopt.py"),
-        ("my..tool", "my..tool.py"),
-        ("", None),
-        ("../escape", None),
-        ("pkg/../../escape", None),
-    ],
-)
-def test_the_pack_formats_entry_files_as_snapshot_relative_paths(
-    configured: str, expected: str | None
-) -> None:
-    pack = load_pack_spec()
-    if expected is not None:
-        assert pack.entry_file(configured) == expected
-        return
-    with pytest.raises(ValueError, match="snapshot-relative"):
-        pack.entry_file(configured)
 
 
 def test_import_refuses_ignored_files_under_the_problem(

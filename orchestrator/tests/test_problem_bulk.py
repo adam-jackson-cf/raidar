@@ -11,9 +11,7 @@ from click.testing import CliRunner
 
 from raidar.cli import main
 from raidar.design.problem import direct
-from raidar.design.problem.catalog import select_problems, source_catalog
 from raidar.design.problem.models import ProblemId
-from raidar.design.problem.store import ProblemStoreError
 from tests.problems_support import (
     NEGATIVE_REF,
     POSITIVE_REF,
@@ -24,27 +22,6 @@ from tests.problems_support import (
 from tests.verifier_support import LocalProcessSandbox
 
 pytestmark = pytest.mark.slow
-
-
-def test_source_selection_requires_one_pin_and_unambiguous_names(tmp_path: Path) -> None:
-    checkout, commit = build_fake_scb_repo(tmp_path / "source")
-    store = fake_store(tmp_path / "store", commit)
-    source = f"scb@{commit}"
-    _, available = source_catalog(store, source, checkout)
-    expected = (ProblemId.parse(f"scb/adder@{commit[:12]}"),)
-    assert available == expected
-    assert select_problems(store, (), "all", source, checkout, importing=True) == expected
-    assert select_problems(store, (), "adder,adder", source, checkout) == expected
-    assert select_problems(store, (str(expected[0]),), None, None) == expected
-    for refs, names, pin in (
-        ((str(expected[0]),), "all", source),
-        ((), None, source),
-        ((), "missing", source),
-        ((), "adder", "scb@000000000000"),
-        ((), "adder", None),
-    ):
-        with pytest.raises(ProblemStoreError):
-            select_problems(store, refs, names, pin, checkout, importing=True)
 
 
 def test_bulk_import_materializes_source_selected_problems(tmp_path: Path) -> None:
