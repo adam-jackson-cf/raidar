@@ -5,13 +5,16 @@ from __future__ import annotations
 import contextlib
 import io
 import json
+import runpy
+import sys
+from collections.abc import Callable
 from pathlib import Path
-from typing import cast
+from typing import Any, cast
 
 import pytest
 
-from define_tool import schemas, status, tool
-from define_tool.draft import DraftError
+from define_tool import block, schemas, status, tool
+from define_tool.draft import Draft, DraftError
 from tests import define_support as dbv
 
 
@@ -35,18 +38,33 @@ def run_status(state: Path, *args: str) -> tuple[int, dict[str, object]]:
     return code, json.loads(out.getvalue())
 
 
-def test_a_state_with_no_draft_is_unbuilt_and_checked_as_empty(state: Path) -> None:
-    code, held = run_status(state)
+@pytest.fixture
+def memory(
+    monkeypatch: pytest.MonkeyPatch,
+) -> Callable[[Draft | None, tuple[tool.Call, ...]], tuple[int, dict[str, object]]]:
+    def assess(
+        draft: Draft | None, calls: tuple[tool.Call, ...] = ()
+    ) -> tuple[int, dict[str, object]]:
+        monkeypatch.setattr(status, "_context", lambda _: tool.Context(dbv.BODY, (), "", (), "", 2))
+        monkeypatch.setattr(tool, "read_draft", lambda _: draft)
+        monkeypatch.setattr(tool, "read_calls", lambda _: list(calls))
+        return run_status(Path("/state"))
+
+    return assess
+
+
+def test_a_state_with_no_draft_is_unbuilt_and_checked_as_empty(memory: Callable[..., Any]) -> None:
+    code, held = memory(None)
 
     assert code == tool.FAULT
     assert held["state"] == "unbuilt"
     assert held["blocking"]
 
 
-def test_an_unsealed_draft_reports_the_findings_the_builder_is_to_repair(state: Path) -> None:
-    build(state, dbv.ready(dbv.EMPTY))
-
-    code, held = run_status(state)
+def test_an_unsealed_draft_reports_the_findings_the_builder_is_to_repair(
+    memory: Callable[..., Any],
+) -> None:
+    code, held = memory(Draft(dbv.items(dbv.ready(dbv.EMPTY))))
 
     assert code == tool.FAULT
     assert held["state"] == "unsealed"
@@ -75,42 +93,44 @@ def test_a_sealed_passing_definition_is_ready_and_written_on_request(
     assert held["draft"] == {"present": True, "sealed": "ready"}
 
 
-def test_a_sealed_ask_hands_over_its_questions(state: Path) -> None:
-    build(state, dbv.asks(), "ask")
-
-    code, held = run_status(state)
+def test_a_sealed_ask_hands_over_its_questions(memory: Callable[..., Any]) -> None:
+    code, held = memory(Draft(dbv.items(dbv.asks()), "ask"))
 
     assert (code, held["state"]) == (tool.FAULT, "asking")
     questions = held["reply"]["questions"]  # type: ignore[index]
     assert [item["proposal"] for item in questions] == ["F1 Greeting reports liveness only."]
 
 
-def test_a_draft_changed_after_done_is_no_longer_sealed(state: Path) -> None:
-    build(state, dbv.ready(), "ready")
-    tool.run(state, ["put"], lambda: "title: Another title\n")
-
-    _, held = run_status(state)
+def test_a_draft_changed_after_done_is_no_longer_sealed(memory: Callable[..., Any]) -> None:
+    draft = Draft(dbv.items(dbv.ready()), "ready")
+    draft.put([block.Item(block.TITLE, block.TITLE, {"text": "Another title"})])
+    _, held = memory(draft)
 
     assert held["state"] == "unsealed"
 
 
-def test_an_unreadable_state_is_an_error(state: Path) -> None:
+def test_an_unreadable_state_is_an_error(
+    state: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
     (state / tool.STATE_FILE).write_text("{", encoding="utf-8")
+    monkeypatch.setenv(tool.STATE_ENV, str(state))
+    monkeypatch.setattr("sys.argv", ["define_tool.status"])
+    monkeypatch.delitem(sys.modules, "define_tool.status")
 
-    code, held = run_status(state)
+    with pytest.raises(SystemExit) as stopped:
+        runpy.run_module("define_tool.status", run_name="__main__")
 
-    assert (code, held["state"]) == (tool.BROKEN, "error")
+    held = json.loads(capsys.readouterr().out)
+    assert (stopped.value.code, held["state"]) == (tool.BROKEN, "error")
     with pytest.raises(DraftError):
         status.assess(state)
 
 
-def test_a_tool_failure_is_reported_apart_from_the_findings(state: Path) -> None:
-    (state / tool.STATE_FILE).write_text("{", encoding="utf-8")
-    tool.run(state, ["show"], lambda: "")
+def test_a_tool_failure_is_reported_apart_from_the_findings(memory: Callable[..., Any]) -> None:
+    code, held = memory(None, (tool.Call(tool.ERROR_CALL),))
 
-    assert any(call.command == tool.ERROR_CALL for call in tool.read_calls(state))
-    (state / tool.STATE_FILE).unlink()
-    assert status.assess(state)["tool_failed"] is True
+    assert (code, held["state"], held["tool_failed"]) == (tool.FAULT, "unbuilt", True)
+    assert held["blocking"]
 
 
 def test_the_reply_a_draft_assembles_keeps_to_the_reply_schema() -> None:

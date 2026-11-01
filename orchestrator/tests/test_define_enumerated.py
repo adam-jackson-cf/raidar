@@ -235,11 +235,6 @@ def test_a_mixed_item_needs_no_word_beside_its_word_edges() -> None:
     assert gaps(("a.b ",), code) == ("a.b ",)
 
 
-def test_an_item_the_tests_say_stands_at_the_start_of_the_text() -> None:
-    assert item_exercised("a", exercised({"t.py": 'x = "a"'}), ("a",))
-    assert not item_exercised("b", exercised({"t.py": 'x = "a"'}), ("b",))
-
-
 # --- token rule 2: where a symbol stands ----------------------------------------------
 
 

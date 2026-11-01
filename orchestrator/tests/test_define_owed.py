@@ -7,9 +7,9 @@ from pathlib import Path
 
 import pytest
 
-from define_tool import compact, owed, tool
+from define_tool import block, compact, owed, tool
 from define_tool.core import JsonObject
-from define_tool.draft import SEALS
+from define_tool.draft import SEALS, Draft
 from define_tool.intakecheck import check_reply, with_probes
 from define_tool.kinds import Kind
 from define_tool.owed import (
@@ -257,8 +257,14 @@ def state(tmp_path: Path) -> Path:
     return directory
 
 
-def call(state: Path, *args: str, stdin: str = "") -> tool.Outcome:
-    return tool.run(state, list(args), lambda: stdin)
+@pytest.fixture
+def draft() -> Draft:
+    return Draft()
+
+
+def call(draft: Draft, *args: str, stdin: str = "") -> tool.Outcome:
+    context = tool.Context(ISSUE, (), "(first round)", (), "", 2, owed_by(UNITS))
+    return tool._command(draft, context, args, lambda: stdin)
 
 
 def test_the_context_carries_what_the_definition_owes_through_the_state_file(
@@ -275,10 +281,10 @@ def test_the_context_carries_what_the_definition_owes_through_the_state_file(
 
 
 def test_done_refuses_until_each_arrow_and_list_item_has_an_example(
-    state: Path,
+    draft: Draft,
 ) -> None:
-    put = call(state, "put", stdin=FIRST)
-    refused = call(state, "done", "ready")
+    put = call(draft, "put", stdin=FIRST)
+    refused = call(draft, "done", "ready")
 
     assert refused.code == 1
     assert "not sealed" in refused.output
@@ -290,33 +296,30 @@ def test_done_refuses_until_each_arrow_and_list_item_has_an_example(
     assert "(advisory)" in put.output
     assert Kind.PROBE_UNDERIVABLE in put.call.kinds
 
-    call(state, "put", stdin=FIRST + REST)
-    sealed = call(state, "done", "ready")
+    call(draft, "put", stdin=FIRST + REST)
+    sealed = call(draft, "done", "ready")
 
     assert sealed.code == 0, sealed.output
     assert sealed.output.startswith("done ready: sealed")
 
 
-def test_a_workflow_without_probes_owes_nothing(tmp_path: Path) -> None:
-    directory = tmp_path / "plain"
-    tool.start(directory, tool.Context(ISSUE, (), "(first round)", (), str(tmp_path), 2))
-    call(directory, "put", stdin=FIRST)
+def test_a_workflow_without_probes_owes_nothing(draft: Draft) -> None:
+    context = tool.Context(ISSUE, (), "(first round)", (), "", 2)
+    tool._command(draft, context, ["put"], lambda: FIRST)
 
-    sealed = call(directory, "done", "ready")
+    sealed = tool._command(draft, context, ["done", "ready"], lambda: "")
 
     assert sealed.code == 0
     assert Kind.PROBE_ARROW not in sealed.call.kinds
 
 
-def test_only_a_ready_reply_owes_examples(state: Path) -> None:
-    call(state, "put", stdin=FIRST)
-    draft = tool.read_draft(state)
-    assert draft is not None
-    context = tool.Context.read(json.loads((state / tool.CONTEXT_FILE).read_text(encoding="utf-8")))
+def test_only_a_ready_reply_owes_examples(draft: Draft) -> None:
+    draft.put(block.parse(FIRST).items)
+    context = tool.Context(ISSUE, (), "", (), "", 2, owed_by(UNITS))
     units = compact.units(ISSUE, [], V2)
     asking = draft.reply(SEALS["ask"])
 
-    checked = check_reply(asking, units, ISSUE, Path(context.workdir), ())
+    checked = check_reply(asking, units, ISSUE, None, ())
     owing = with_probes(checked, asking, context.owed)
 
     assert owing.owed == ()
