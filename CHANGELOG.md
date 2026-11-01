@@ -4,6 +4,13 @@ All notable changes to this project are documented in this file.
 
 ## Unreleased
 
+### Grading and problem fast coverage closure
+
+- Cover retained pre-fix grading, offline coverage reuse and parity, verifier/regrade refusals,
+  problem validation, resolution, audit, errata and CLI outcomes with injected fast tests.
+- Remove the unreachable negative-repeat outcome comparison: varying cases are already
+  quarantined before repeats are compared. Grading and primitive identity bytes stay unchanged.
+
 ### Test-suite integration and identity preservation
 
 - Separate fast decisions from slow process seams and quality canaries; keep
