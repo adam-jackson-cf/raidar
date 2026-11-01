@@ -9,10 +9,8 @@ from pathlib import Path
 
 import pytest
 import yaml
-from raidar_contract.agent import AgentName
 from raidar_contract.canonical import digest_json
-from raidar_contract.package.registry import load_stage_package
-from raidar_contract.releases import Release
+from raidar_contract.references import Release
 
 from raidar.contract import source_imports
 from raidar.contract.paths import releases_file, stage_checks_root, stages_root, workflows_root
@@ -24,8 +22,11 @@ from raidar.design.experiment.arm import (
     workflow_evidence,
 )
 from raidar.design.experiment.schema import AgentEntry
+from raidar.subject.agent.definition import ReleasedAgent
+from raidar.subject.agent.schema import AgentName
 from raidar.subject.draft import draft_resolution
-from raidar.subject.releases import ReleasedAgent, released_agent, released_workflow
+from raidar.subject.package.registry import load_stage_package
+from raidar.subject.releases import released_agent, released_workflow
 from raidar.subject.workflow import identity, package_checks
 from raidar.subject.workflow.identity import (
     RUNNER_ID,
@@ -236,7 +237,7 @@ def test_a_normal_arm_needs_the_stage_check_proof_a_draft_may_lack_it(tree: Path
 
 
 def test_a_stop_needs_its_check_record_and_the_lock_binds_it(tmp_path: Path) -> None:
-    from raidar_contract.releases import Release
+    from raidar_contract.references import Release
 
     from raidar.subject.workflow.package_checks import ResolvedStage
 

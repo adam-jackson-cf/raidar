@@ -37,7 +37,9 @@ from typing import Any, Protocol, cast
 
 from harbor.environments.base import BaseEnvironment
 from harbor.models.agent.context import AgentContext
-from raidar_contract.agent_records import Credentials, StatePath, Tokens
+from raidar_contract.agent_records import Tokens
+
+from raidar.subject.agent.records import Credentials, StatePath
 
 
 class IsolationError(RuntimeError):

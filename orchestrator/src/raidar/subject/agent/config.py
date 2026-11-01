@@ -11,7 +11,8 @@ from collections.abc import Mapping
 from enum import StrEnum
 
 from pydantic import BaseModel, Field
-from raidar_contract.agent import AgentName
+
+from raidar.subject.agent.schema import AgentName
 
 
 class Harness(StrEnum):

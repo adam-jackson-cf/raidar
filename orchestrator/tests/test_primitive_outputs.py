@@ -11,8 +11,8 @@ from typing import Any
 
 import pytest
 from raidar_contract.package.manifest import StagePackage
-from raidar_contract.package.registry import load_stage_package
 
+from raidar.subject.package.registry import load_stage_package
 from raidar.subject.primitive import outputs
 from raidar.subject.primitive.calls import TransportError
 from raidar.subject.primitive.outputs import collect_outputs

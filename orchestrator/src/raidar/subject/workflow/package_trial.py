@@ -17,10 +17,10 @@ from typing import Any
 
 from raidar_contract.package import StagePackageError
 from raidar_contract.package.manifest import StagePackage
-from raidar_contract.package.registry import load_stage_package, stage_folder
-from raidar_contract.releases import Release
+from raidar_contract.references import Release
 
 from raidar.contract.paths import REPO_ROOT
+from raidar.subject.package.registry import load_stage_package, stage_folder
 from raidar.subject.primitive import calls
 from raidar.subject.primitive.canary import StageCheckRecord
 from raidar.subject.primitive.install import (

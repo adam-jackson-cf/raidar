@@ -13,8 +13,6 @@ from typing import Any
 
 import pytest
 from click.testing import CliRunner
-from raidar_contract.agent import AgentName
-from raidar_contract.agent_records import Credentials
 
 from raidar.cli import env_harbor, main
 from raidar.cli.target_options import docker_selection, job_target
@@ -22,6 +20,8 @@ from raidar.engine.job.run_checks import RunRefusedError
 from raidar.engine.target.guard import TargetLostError
 from raidar.engine.target.health import TargetUnavailableError
 from raidar.engine.trial.environment import trial_project_name
+from raidar.subject.agent.records import Credentials
+from raidar.subject.agent.schema import AgentName
 
 TARGETS = """
 default = "remote"

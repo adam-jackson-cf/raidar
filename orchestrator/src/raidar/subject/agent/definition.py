@@ -7,19 +7,17 @@ reasoning level it lists; ``load_agent`` refuses any other definition.
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from pathlib import Path
 
-from raidar_contract.agent import (
-    AgentDefinition,
-    AgentDefinitionError,
-    AgentName,
-    agent_path,
-)
-from raidar_contract.agent import load_agent as load_portable_agent
+from raidar_contract.agent import AgentDefinitionError, agent_path
+from raidar_contract.references import Release
 
 from raidar.subject.agent.adapters.harbor_cli import HarborCliAdapter
 from raidar.subject.agent.config import Harness, agent_cli
 from raidar.subject.agent.native import adapter_class_for_harness
+from raidar.subject.agent.schema import AgentDefinition, AgentName
+from raidar.subject.agent.schema import load_agent as load_lab_agent
 
 
 def harbor_adapter(name: AgentName) -> type[HarborCliAdapter]:
@@ -58,8 +56,18 @@ def _unsupported(definition: AgentDefinition) -> str | None:
 
 def load_agent(root: Path, name: str) -> AgentDefinition:
     """The valid ``<root>/<name>.yaml`` whose adapter runs every model it lists."""
-    definition = load_portable_agent(root, name)
+    definition = load_lab_agent(root, name)
     reason = _unsupported(definition)
     if reason is not None:
         raise AgentDefinitionError(f"{agent_path(root, name)}: invalid agent definition: {reason}")
     return definition
+
+
+@dataclass(frozen=True)
+class ReleasedAgent:
+    release: Release
+    definition: AgentDefinition
+
+    @property
+    def ref(self) -> str:
+        return str(self.release)

@@ -19,7 +19,7 @@ from collections.abc import Iterable, Mapping, Sequence
 from pathlib import Path
 
 from pydantic import ValidationError
-from raidar_contract.releases import ReleaseError
+from raidar_contract.references import ReleaseError
 
 from raidar.contract.references import RegistryReferenceError
 from raidar.design.experiment.agent import entry_issues

@@ -22,7 +22,7 @@ dependencies = [
     "litellm==1.102.1",
     "jsonschema>=4.0",
     # The portable contract (one implementation: a path dependency, never published from here).
-    "raidar-contract==1.1.0",
+    "raidar-contract==2.0.0",
 ]
 
 [project.optional-dependencies]
@@ -128,8 +128,8 @@ precision = 2
 # Integrated fast-only measurement after the test-suite refactor, floored to hundredths.
 # Ratchet each floor up after every accepted change; never lower it.
 [tool.raidar.coverage]
-line_floor = 99.42
-branch_floor = 98.69
+line_floor = 99.423
+branch_floor = 98.703
 
 [tool.mypy]
 python_version = "3.12"

@@ -19,16 +19,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
-from raidar_contract.agent import AgentDefinition, AgentDefinitionError
-from raidar_contract.releases import (
-    Release,
-    ReleaseError,
-    ReleaseKind,
-    ReleaseRegister,
-    changed_message,
-    load_register,
-    resolve_registered,
-)
+from raidar_contract.agent import AgentDefinitionError
+from raidar_contract.references import Release, ReleaseError
 from raidar_contract.workflow import (
     PackageWorkflowDefinition,
     PackageWorkflowError,
@@ -43,22 +35,17 @@ from raidar.contract.references import (
     RegistryReferenceError,
     ResolvedReference,
 )
-from raidar.subject.agent.definition import harness_of, load_agent
+from raidar.contract.releases import (
+    ReleaseKind,
+    ReleaseRegister,
+    changed_message,
+    load_register,
+    resolve_registered,
+)
+from raidar.subject.agent.definition import ReleasedAgent, harness_of, load_agent
 from raidar.subject.draft import drafting
 from raidar.subject.stages import resolve_stages
 from raidar.subject.workflow.package_checks import ResolvedStage
-
-DEFINITION_ERRORS = (AgentDefinitionError, PackageWorkflowError)
-
-
-@dataclass(frozen=True)
-class ReleasedAgent:
-    release: Release
-    definition: AgentDefinition
-
-    @property
-    def ref(self) -> str:
-        return str(self.release)
 
 
 @dataclass(frozen=True)

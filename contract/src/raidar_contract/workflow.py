@@ -30,7 +30,7 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_valida
 from raidar_contract.canonical import digest_json
 from raidar_contract.package.manifest import ParamValue
 from raidar_contract.package.tokens import PLACEHOLDER
-from raidar_contract.releases import STAGE_RELEASE_PATTERN, Release
+from raidar_contract.references import STAGE_RELEASE_PATTERN, Release
 
 WORKFLOW_FILE = "workflow.yaml"
 NAME_PATTERN = r"^[a-z0-9][a-z0-9-]*$"
