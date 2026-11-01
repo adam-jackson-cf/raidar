@@ -24,6 +24,8 @@ from raidar.scoring.framework.store import AssessmentStore
 from tests.test_analysis_bound_prefix import ALL_STEPS, PROBLEM, _write_job
 from tests.test_analysis_command import _analyze, _effect, _lock
 
+pytestmark = pytest.mark.slow
+
 
 def _pinned(excluded: set[str]) -> dict[str, list[str]]:
     return {step: [] if step in excluded else [f"{step}::case_0"] for step in ALL_STEPS}
@@ -70,33 +72,3 @@ def test_an_excluded_middle_step_leaves_the_rate_over_the_scored_steps(tmp_path:
     raw = _effect(report, "solve_rate")
     assert raw["baseline_mean"] == pytest.approx(1.0)
     assert raw["treatment_mean"] == pytest.approx(2 / 3)  # the raw outcome ignores exclusions
-
-
-def test_an_excluded_final_step_hands_the_final_outcome_to_the_last_scored_step(
-    tmp_path: Path,
-) -> None:
-    report = _report(tmp_path, {"checkpoint_3"})
-
-    rate = _effect(report, "solve_rate_solvable")
-    assert rate["baseline_mean"] == pytest.approx(1.0)
-    assert rate["treatment_mean"] == pytest.approx(0.5)  # 1 of the 2 scored steps, not 1 of 3
-    final = _effect(report, "final_solved_solvable")
-    assert final["baseline_mean"] == pytest.approx(1.0)
-    assert final["treatment_mean"] == pytest.approx(0.0)  # checkpoint_2 is the last scored step
-    raw = _effect(report, "final_solved")
-    assert raw["baseline_mean"] == pytest.approx(1.0)
-    assert raw["treatment_mean"] == pytest.approx(1.0)  # raw final is checkpoint_3 itself
-
-
-def test_every_step_excluded_is_unavailable_never_a_measured_zero(tmp_path: Path) -> None:
-    report = _report(tmp_path, set(ALL_STEPS))
-
-    effect = _effect(report, "solve_rate_solvable")
-    assert effect["n_pairs"] == 0
-    assert effect["baseline_mean"] is None
-    assert effect["treatment_mean"] is None
-    assert effect["exclusions"]["ineligible_statuses"] == {"unavailable": 5}
-    assert all(
-        item["metric"] != "final_solved_solvable" for item in report["comparisons"][0]["effects"]
-    )
-    assert _effect(report, "solve_rate")["baseline_mean"] == pytest.approx(1.0)

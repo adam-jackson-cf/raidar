@@ -29,6 +29,7 @@ from __future__ import annotations
 
 import json
 import shutil
+from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -39,7 +40,14 @@ from raidar_contract.canonical import digest_json
 from raidar.design.experiment.lock import default_lock_path
 from raidar.design.experiment.schema import ExperimentSpec
 from raidar.engine.job.assessment import rescore_config
-from tests.review_fixtures.projection.assessments import LintFinding, QualityPlan
+from raidar.evaluation.review.projection.assessments import TrialAssessments
+from raidar.evaluation.review.projection.sources import JobSource, lock_from_document
+from raidar.scoring.framework.rescore_config import RescoreConfig
+from tests.review_fixtures.projection.assessments import (
+    LintFinding,
+    QualityPlan,
+    memory_assessments,
+)
 from tests.review_fixtures.projection.lock import fixture_lock
 from tests.review_fixtures.projection.store import FixtureAssessments
 from tests.review_fixtures.projection.trials import (
@@ -47,6 +55,7 @@ from tests.review_fixtures.projection.trials import (
     Outcome,
     TrialPlan,
     TrialScript,
+    memory_trial,
     write_bundle,
     write_trial,
 )
@@ -395,3 +404,106 @@ def generate_review_fixture(dest: Path) -> list[Path]:
     runs = [_run(design, dest, store) for design in designs]
     runs.append(_run(_review_only(), dest, store, REVIEW_ONLY_DIR))
     return runs
+
+
+MEMORY_ROOT = Path("/memory-review-fixture")
+"""Where the in-memory fixture's runs notionally sit (nothing is ever created there)."""
+
+
+@dataclass(frozen=True)
+class MemoryReview:
+    """The fixture's runs as the projection's own inputs, with no run directory behind them."""
+
+    sources: tuple[JobSource, ...]
+    assessments: dict[Path, TrialAssessments]
+    """Each trial directory's stored Assessments."""
+    files: dict[Path, str]
+    """The UTF-8 files a review reads from the runs."""
+    locks: dict[str, dict[str, object]]
+    """Each experiment's sealed lock document."""
+
+    def for_trial(
+        self,
+        trial_dir: Path,
+        scorer_refs: Sequence[str],
+        settings: RescoreConfig,
+        *,
+        config_path: Path | None = None,
+    ) -> TrialAssessments:
+        """The stored Assessments of the trial (the projection's Assessment lookup)."""
+        return self.assessments[trial_dir]
+
+    def read(self, path: Path) -> str:
+        """The projection's file reader over the in-memory runs."""
+        try:
+            return self.files[path]
+        except KeyError:
+            raise FileNotFoundError(path) from None
+
+    def source(self, experiment: str) -> JobSource:
+        return next(source for source in self.sources if source.experiment == experiment)
+
+
+def _memory_run(
+    design: Design,
+    root: str,
+    assessments: dict[Path, TrialAssessments],
+    files: dict[Path, str],
+    locks: dict[str, dict[str, object]],
+) -> JobSource:
+    spec = _spec(design)
+    lock = _lock(design, spec)
+    job_dir = MEMORY_ROOT / root / design.experiment / design.experiment
+    settings = rescore_config(spec.assessment, spec.protocol)
+    records = []
+    for index, trial in enumerate(design.trials):
+        agent = design.arms[trial.arm]
+        plan = TrialPlan(
+            experiment=design.experiment,
+            job_id=design.experiment,
+            job_dir=job_dir,
+            problem=design.problem,
+            problem_title=design.title,
+            bundle=MEMORY_ROOT / "bundles" / design.experiment,
+            lock_sha256=str(lock["lock_sha256"]),
+            workflow_digest=digest_json(_WORKFLOW),
+            packages_digest=digest_json({}),
+            primitive_code_digest=digest_json(["build", _WORKFLOW]),
+            agent_digest=digest_json(_AGENTS[agent]),
+        )
+        memory = memory_trial(plan, _script(design, trial, index))
+        files.update(memory.files)
+        assessments[job_dir / memory.record.trial_dir] = memory_assessments(
+            memory, settings, _quality(trial, len(trial.outcomes))
+        )
+        records.append(memory.record)
+    lock_path = job_dir / "experiment.lock.json"
+    locks[design.experiment] = lock
+    return JobSource(
+        job_dir=job_dir,
+        manifest={
+            "kind": "raidar-job",
+            "experiment": design.experiment,
+            "job_id": design.experiment,
+            "lock_sha256": lock["lock_sha256"],
+            "experiment_file": str(job_dir / "experiment.yaml"),
+            "started_at": _STARTED.isoformat(),
+            SYNTHETIC_MARKER: True,
+        },
+        plan={"kind": "raidar-plan", "options": {"agent_override": None}},
+        lock=lock_from_document(lock, lock_path),
+        assessment=settings,
+        records=tuple(records),
+        assessment_path=lock_path,
+    )
+
+
+def memory_review_fixture() -> MemoryReview:
+    """``generate_review_fixture``'s runs (both run roots) built in memory."""
+    assessments: dict[Path, TrialAssessments] = {}
+    files: dict[Path, str] = {}
+    locks: dict[str, dict[str, object]] = {}
+    designs = (_bugfix(), _skill(), _policy_mix(), _policy_mix_k2())
+    sources = [_memory_run(design, JOBS_DIR, assessments, files, locks) for design in designs]
+    sources.append(_memory_run(_review_only(), REVIEW_ONLY_DIR, assessments, files, locks))
+    return MemoryReview(tuple(sources), assessments, files, locks)

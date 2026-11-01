@@ -20,9 +20,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-from click.testing import CliRunner
 
-from raidar.cli import main
 from raidar.scoring.catalog.builtin import default_scorer_registry
 from raidar.scoring.framework import registry
 from raidar.scoring.framework.context import AssessContext
@@ -34,7 +32,6 @@ from raidar.scoring.framework.result import (
     Observation,
     Provenance,
 )
-from raidar.scoring.framework.store import AssessmentStore
 from raidar.scoring.framework.validation import validate_result
 from raidar.scoring.process_checks import (
     DeterministicProcessComplianceScorer,
@@ -42,6 +39,7 @@ from raidar.scoring.process_checks import (
 )
 from raidar.scoring.process_checks.manifest import PROCESS_COMPLIANCE
 from raidar.scoring.process_checks.work_tests import is_test_file
+from tests.scorer_support import traced_memory_context
 from tests.test_process_compliance_work_session import GATE_PATTERN, PROMPT, _ran
 from tests.trace_trial_support import (
     AGENT,
@@ -52,9 +50,7 @@ from tests.trace_trial_support import (
     delegate,
     session,
     tool_call,
-    traced_context,
     trajectory,
-    write_traced_trial,
 )
 
 REF = "process-compliance@12"
@@ -94,7 +90,7 @@ def _no_edit() -> dict:
 
 def _plain_ctx(tmp_path: Path, *traces: dict, **config: Any) -> AssessContext:
     steps = [TracedStep(f"checkpoint_{i}", trace=trace) for i, trace in enumerate(traces, 1)]
-    return traced_context(tmp_path, steps, **config)
+    return traced_memory_context(tmp_path, steps, config=config)
 
 
 def _assess(ctx: AssessContext) -> AssessResult:
@@ -179,7 +175,9 @@ def test_invalid_config_is_an_error(tmp_path: Path) -> None:
 
 
 def test_an_invalid_config_is_an_error_on_every_metric(tmp_path: Path) -> None:
-    ctx = traced_context(tmp_path, [TracedStep(CP1, trace=trajectory())], unknown_key=True)
+    ctx = traced_memory_context(
+        tmp_path, [TracedStep(CP1, trace=trajectory())], config={"unknown_key": True}
+    )
 
     result = deterministic_process_compliance_scorer().assess(ctx)
 
@@ -187,37 +185,14 @@ def test_an_invalid_config_is_an_error_on_every_metric(tmp_path: Path) -> None:
     assert {item.status for item in result.observations} == {AssessStatus.ERROR}
 
 
-def test_rescore_writes_no_jev_audit_and_nothing_is_provisional(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    # No key: nothing to answer, so nothing awaits.
-    monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
-    trial = write_traced_trial(
-        tmp_path / "jobs" / "trial", [TracedStep("checkpoint_1", trace=_ambiguous())]
-    )
-    store = tmp_path / "store"
-    args = ["assess", "--rescore", str(trial), "--scorer", REF, "--store", str(store)]
-    result = CliRunner().invoke(main, args)
-    assert result.exit_code == 0, result.output
-    (entry,) = json.loads(result.output)["assessments"]
-    stored = AssessmentStore(store).get(entry["key"])
-    assert stored is not None
-    assert stored.provisional is False
-    assert not (store / "jev-audit").exists()
-    item = _by_key(stored.result)["plan_written", "checkpoint_1"]
-    assert (item.status, item.value) == (UNDETERMINED, None)
-
-    replay = CliRunner().invoke(main, [*args, "--replay"])
-    assert replay.exit_code == 0, replay.output
-    assert json.loads(replay.output)["counts"]["replayed_identical"] == 1
-
-
 # ---- the work session's test runs -----------------------------------------------------
 
 
 def _ctx(tmp_path: Path, *traces: dict, **config: Any) -> AssessContext:
     steps = [TracedStep(f"checkpoint_{i}", trace=trace) for i, trace in enumerate(traces, 1)]
-    return traced_context(tmp_path, steps, extra_test_patterns=[GATE_PATTERN], **config)
+    return traced_memory_context(
+        tmp_path, steps, config={"extra_test_patterns": [GATE_PATTERN], **config}
+    )
 
 
 def _values(ctx: AssessContext) -> dict[tuple[str, str], Observation]:

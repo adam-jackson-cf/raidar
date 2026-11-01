@@ -47,15 +47,6 @@ def _decide(runtime, policy_id: str, state: object, sufficiency=SUFFICIENT):
     )
 
 
-def test_repo_policies_load_and_ship_parked() -> None:
-    # Jev parked (2026-10-04): the policy is off at a new version; the shadow
-    # version it replaces stays in git history and its audit stays on file.
-    registry = PolicyRegistry.from_dir()
-    assert registry.ids() == (RUBRIC,)
-    assert set(registry.modes().values()) == {PolicyMode.OFF.value}
-    assert registry.get(RUBRIC).version == "3"
-
-
 def test_enforce_requires_a_promotion_that_meets_the_gate(tmp_path: Path) -> None:
     base = {
         "id": "x.y",

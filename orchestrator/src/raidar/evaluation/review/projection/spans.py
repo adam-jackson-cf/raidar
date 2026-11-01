@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import os
 import re
+from collections.abc import Callable
 from datetime import datetime
 from pathlib import Path
 
@@ -13,6 +14,13 @@ from raidar.contract.review import ReviewSpan, ReviewSpanType, ReviewStatus
 REPO_ROOT = Path(__file__).resolve().parents[6]
 PAYLOAD_CAP = 32_000
 _UNSAFE_ID_CHARS = re.compile(r"[^A-Za-z0-9._-]+")
+
+TextReader = Callable[[Path], str]
+"""Reads one UTF-8 file of a run; raises ``OSError`` when it is absent or unreadable."""
+
+
+def read_disk(path: Path) -> str:
+    return path.read_text(encoding="utf-8")
 
 
 def repo_path(path: Path) -> str:

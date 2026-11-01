@@ -208,23 +208,26 @@ def _cases(checkpoint: CheckpointScript, prior: str | None) -> tuple[CaseResult,
     return tuple(cases)
 
 
-def _record(
-    plan: TrialPlan, trial_dir: Path, checkpoint: CheckpointScript, prior: str | None
+def step_record(
+    plan: TrialPlan,
+    checkpoint: CheckpointScript,
+    prior: str | None,
+    *,
+    bundle_digest: str,
+    snapshot_digest: str,
 ) -> StepRecord:
+    """The verifier's record of one graded checkpoint (identities are the caller's)."""
     cases = _cases(checkpoint, prior)
     grade = VerifierGrade(step=checkpoint.step, checkpoint=checkpoint.step, cases=cases)
-    stored = f"steps/{checkpoint.step}/artifacts/app"
-    record = StepRecord(
+    return StepRecord(
         step=checkpoint.step,
         checkpoint=checkpoint.step,
-        bundle=BundleRef(
-            root=str(plan.bundle), digest=load_bundle(plan.bundle).digest(), problem=plan.problem
-        ),
+        bundle=BundleRef(root=str(plan.bundle), digest=bundle_digest, problem=plan.problem),
         snapshot=SnapshotRef(
             requested="artifact",
             used="artifact",
-            digest=tree_digest(trial_dir / stored),
-            stored_path=stored,
+            digest=snapshot_digest,
+            stored_path=_snapshot_path(checkpoint),
         ),
         grader=GraderRef(
             image="raidar-grader:synthetic",
@@ -237,8 +240,40 @@ def _record(
         coverage=CoverageRef(enabled=False),
         rewards=grade.rewards(),
     )
+
+
+def _snapshot_path(checkpoint: CheckpointScript) -> str:
+    return f"steps/{checkpoint.step}/artifacts/app"
+
+
+def _prior(script: TrialScript, checkpoint: CheckpointScript) -> str | None:
+    steps = [item.step for item in script.checkpoints]
+    index = steps.index(checkpoint.step)
+    return steps[index - 1] if index else None
+
+
+def _record(
+    plan: TrialPlan, trial_dir: Path, checkpoint: CheckpointScript, prior: str | None
+) -> StepRecord:
+    record = step_record(
+        plan,
+        checkpoint,
+        prior,
+        bundle_digest=load_bundle(plan.bundle).digest(),
+        snapshot_digest=tree_digest(trial_dir / _snapshot_path(checkpoint)),
+    )
     write_step_record(trial_dir / "raidar-oracle" / "steps" / checkpoint.step, record)
     return record
+
+
+def _step_timing(checkpoint: CheckpointScript, at: datetime) -> dict[str, object]:
+    """Harbor's per-step usage and agent timing for a step started at ``at``."""
+    finished = at + timedelta(seconds=4 * (_turns(checkpoint) + 1))
+    return {
+        "step_name": checkpoint.step,
+        "agent_result": _usage(checkpoint).model_dump(),
+        "agent_execution": {"started_at": _stamp(at), "finished_at": _stamp(finished)},
+    }
 
 
 def _write_step(
@@ -256,29 +291,25 @@ def _write_step(
     document = _atif(script, checkpoint, at)
     (agent / "trajectory.json").write_text(document.model_dump_json(indent=2, exclude_none=True))
     if checkpoint.outcome != "infra":
-        steps = [item.step for item in script.checkpoints]
-        index = steps.index(checkpoint.step)
-        _record(plan, trial_dir, checkpoint, steps[index - 1] if index else None)
-    finished = at + timedelta(seconds=4 * (_turns(checkpoint) + 1))
-    return {
-        "step_name": checkpoint.step,
-        "agent_result": _usage(checkpoint).model_dump(),
-        "agent_execution": {"started_at": _stamp(at), "finished_at": _stamp(finished)},
-    }
+        _record(plan, trial_dir, checkpoint, _prior(script, checkpoint))
+    return _step_timing(checkpoint, at)
 
 
-def _task(plan: TrialPlan, script: TrialScript) -> None:
-    task = plan.job_dir / "tasks" / script.trial_id
-    task.mkdir(parents=True, exist_ok=True)
-    (task / "task.toml").write_text(
+def _task_toml(plan: TrialPlan) -> str:
+    return (
         "[task]\n"
         f'name = "{plan.problem.split("@", 1)[0]}"\n'
         f'description = "{plan.problem_title}"\n\n'
         "[metadata]\n"
         'difficulty = "medium"\n'
-        'source = "synthetic"\n',
-        encoding="utf-8",
+        'source = "synthetic"\n'
     )
+
+
+def _task(plan: TrialPlan, script: TrialScript) -> None:
+    task = plan.job_dir / "tasks" / script.trial_id
+    task.mkdir(parents=True, exist_ok=True)
+    (task / "task.toml").write_text(_task_toml(plan), encoding="utf-8")
     for checkpoint in script.checkpoints:
         step = task / "steps" / checkpoint.step
         step.mkdir(parents=True, exist_ok=True)
@@ -291,35 +322,47 @@ def _state(checkpoint: CheckpointScript) -> CheckpointState:
     return CheckpointState.SOLVED if checkpoint.outcome == "solved" else CheckpointState.FAILED
 
 
+def _graded_from(checkpoint: CheckpointScript, rewards: dict[str, float]) -> dict[str, object]:
+    """What a verifier record's rewards give the step_result."""
+    return {
+        "strict_pass_rate": rewards.get("strict_pass_rate"),
+        "rewards": rewards,
+        "verifier_record": f"raidar-oracle/steps/{checkpoint.step}/record.json",
+    }
+
+
 def _graded(trial_dir: Path, checkpoint: CheckpointScript) -> dict[str, object]:
     """What the verifier record gives the step_result (nothing when the step has no verdict)."""
     if checkpoint.outcome == "infra":
         return {}
     relative = f"raidar-oracle/steps/{checkpoint.step}/record.json"
-    rewards = json.loads((trial_dir / relative).read_text())["rewards"]
-    return {
-        "strict_pass_rate": rewards.get("strict_pass_rate"),
-        "rewards": rewards,
-        "verifier_record": relative,
-    }
+    return _graded_from(checkpoint, json.loads((trial_dir / relative).read_text())["rewards"])
 
 
-def _executed_step(trial_dir: Path, checkpoint: CheckpointScript) -> dict[str, object]:
+def _executed_from(checkpoint: CheckpointScript, snapshot_digest: str) -> dict[str, object]:
     """The per-step artifacts of a step Harbor ran."""
-    snapshot = f"steps/{checkpoint.step}/artifacts/app"
     return {
-        "snapshot": SnapshotInfo(path=snapshot, digest=tree_digest(trial_dir / snapshot)),
+        "snapshot": SnapshotInfo(path=_snapshot_path(checkpoint), digest=snapshot_digest),
         "trace_dir": f"steps/{checkpoint.step}/agent",
         "usage": _usage(checkpoint),
         "agent_execution_s": 4.0 * (_turns(checkpoint) + 1),
     }
 
 
+def _executed_step(trial_dir: Path, checkpoint: CheckpointScript) -> dict[str, object]:
+    """The per-step artifacts of a step Harbor ran, on disk."""
+    return _executed_from(checkpoint, tree_digest(trial_dir / _snapshot_path(checkpoint)))
+
+
 def _step_result(
-    plan: TrialPlan, script: TrialScript, index: int, checkpoint: CheckpointScript, ran: bool
+    plan: TrialPlan,
+    script: TrialScript,
+    index: int,
+    checkpoint: CheckpointScript,
+    graded: dict[str, object],
+    executed: dict[str, object] | None,
 ) -> StepResult:
-    trial_dir = plan.job_dir / "trials" / script.trial_id
-    graded = _graded(trial_dir, checkpoint)
+    """``executed`` is None for a step Harbor never started."""
     return StepResult.model_validate(
         {
             "trial_id": script.trial_id,
@@ -330,10 +373,10 @@ def _step_result(
             "step": checkpoint.step,
             "checkpoint": checkpoint.step,
             "checkpoint_state": _state(checkpoint),
-            "infra_reasons": () if graded else _infra_reasons(ran),
-            "termination": None if ran else NOT_STARTED,
+            "infra_reasons": () if graded else _infra_reasons(executed is not None),
+            "termination": None if executed is not None else NOT_STARTED,
             **graded,
-            **(_executed_step(trial_dir, checkpoint) if ran else {}),
+            **(executed or {}),
         }
     )
 
@@ -423,35 +466,11 @@ def _executed(script: TrialScript) -> list[CheckpointScript]:
     return executed
 
 
-def write_trial(plan: TrialPlan, script: TrialScript) -> TrialRecord:
-    """Write one synthetic trial (trial dir, task dir, trial record) and return its record."""
-    trial_dir = plan.job_dir / "trials" / script.trial_id
-    steps, at = [], script.started
-    for checkpoint in _executed(script):
-        steps.append(_write_step(plan, script, trial_dir, checkpoint, at))
-        at += timedelta(seconds=4 * (_turns(checkpoint) + 2))
-    (trial_dir / "config.json").write_text(
-        json.dumps({"verifier": {"kwargs": {"oracle_bundle": str(plan.bundle)}}}, indent=2)
-    )
-    (trial_dir / "result.json").write_text(
-        json.dumps(
-            {
-                "started_at": _stamp(script.started),
-                "finished_at": _stamp(at),
-                "step_results": steps,
-                "exception_info": _exception_info(script, at),
-            },
-            indent=2,
-        )
-    )
-    _task(plan, script)
-    ran = len(steps)
-    step_results = tuple(
-        _step_result(plan, script, index, checkpoint, index < ran)
-        for index, checkpoint in enumerate(script.checkpoints)
-    )
+def _trial_record(
+    plan: TrialPlan, script: TrialScript, step_results: tuple[StepResult, ...]
+) -> TrialRecord:
     rewards = [step_result.rewards for step_result in step_results]
-    record = TrialRecord(
+    return TrialRecord(
         experiment=plan.experiment,
         job_id=plan.job_id,
         trial=_planned(plan, script),
@@ -475,7 +494,111 @@ def write_trial(plan: TrialPlan, script: TrialScript) -> TrialRecord:
         ),
         trial_exception=HARNESS_EXIT if script.failure else None,
     )
+
+
+def _result_json(script: TrialScript, steps: list[dict[str, object]], finished: datetime) -> str:
+    """Harbor's ``result.json`` of the trial."""
+    return json.dumps(
+        {
+            "started_at": _stamp(script.started),
+            "finished_at": _stamp(finished),
+            "step_results": steps,
+            "exception_info": _exception_info(script, finished),
+        },
+        indent=2,
+    )
+
+
+def write_trial(plan: TrialPlan, script: TrialScript) -> TrialRecord:
+    """Write one synthetic trial (trial dir, task dir, trial record) and return its record."""
+    trial_dir = plan.job_dir / "trials" / script.trial_id
+    steps, at = [], script.started
+    for checkpoint in _executed(script):
+        steps.append(_write_step(plan, script, trial_dir, checkpoint, at))
+        at += timedelta(seconds=4 * (_turns(checkpoint) + 2))
+    (trial_dir / "config.json").write_text(
+        json.dumps({"verifier": {"kwargs": {"oracle_bundle": str(plan.bundle)}}}, indent=2)
+    )
+    (trial_dir / "result.json").write_text(_result_json(script, steps, at))
+    _task(plan, script)
+    ran = len(steps)
+    step_results = tuple(
+        _step_result(
+            plan,
+            script,
+            index,
+            checkpoint,
+            _graded(trial_dir, checkpoint),
+            _executed_step(trial_dir, checkpoint) if index < ran else None,
+        )
+        for index, checkpoint in enumerate(script.checkpoints)
+    )
+    record = _trial_record(plan, script, step_results)
     path = plan.job_dir / "trial-records" / f"{script.trial_id}.json"
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(record.model_dump_json(indent=2) + "\n")
     return record
+
+
+@dataclass(frozen=True)
+class MemoryTrial:
+    """A synthetic trial held in memory: its record, the files a review reads and its evidence."""
+
+    record: TrialRecord
+    files: dict[Path, str]
+    """UTF-8 files of the run a review reads (Harbor result, ATIF, verifier records, task)."""
+    step_records: dict[str, StepRecord]
+    """The verifier record of each graded checkpoint."""
+    snapshots: dict[str, str]
+    """Each executed checkpoint's snapshot digest."""
+    sources: dict[str, str]
+    """Each executed checkpoint's ``ledger.py`` text."""
+
+
+def memory_trial(plan: TrialPlan, script: TrialScript) -> MemoryTrial:
+    """The trial ``write_trial`` would write, without touching disk (under ``plan.job_dir``)."""
+    trial_dir = plan.job_dir / "trials" / script.trial_id
+    task = plan.job_dir / "tasks" / script.trial_id / "task.toml"
+    files: dict[Path, str] = {task: _task_toml(plan)}
+    steps: list[dict[str, object]] = []
+    records: dict[str, StepRecord] = {}
+    snapshots: dict[str, str] = {}
+    sources: dict[str, str] = {}
+    at = script.started
+    for checkpoint in _executed(script):
+        trace = trial_dir / f"steps/{checkpoint.step}/agent/trajectory.json"
+        files[trace] = _atif(script, checkpoint, at).model_dump_json(indent=2, exclude_none=True)
+        snapshots[checkpoint.step] = digest_json(checkpoint.source)
+        sources[checkpoint.step] = checkpoint.source
+        if checkpoint.outcome != "infra":
+            record = step_record(
+                plan,
+                checkpoint,
+                _prior(script, checkpoint),
+                bundle_digest=digest_json(plan.problem),
+                snapshot_digest=snapshots[checkpoint.step],
+            )
+            records[checkpoint.step] = record
+            files[trial_dir / "raidar-oracle" / "steps" / checkpoint.step / "record.json"] = (
+                record.model_dump_json(indent=2) + "\n"
+            )
+        steps.append(_step_timing(checkpoint, at))
+        at += timedelta(seconds=4 * (_turns(checkpoint) + 2))
+    files[trial_dir / "result.json"] = _result_json(script, steps, at)
+    step_results = tuple(
+        _step_result(
+            plan,
+            script,
+            index,
+            checkpoint,
+            _graded_from(checkpoint, records[checkpoint.step].rewards)
+            if checkpoint.step in records
+            else {},
+            _executed_from(checkpoint, snapshots[checkpoint.step])
+            if checkpoint.step in snapshots
+            else None,
+        )
+        for index, checkpoint in enumerate(script.checkpoints)
+    )
+    record = _trial_record(plan, script, step_results)
+    return MemoryTrial(record, files, records, snapshots, sources)

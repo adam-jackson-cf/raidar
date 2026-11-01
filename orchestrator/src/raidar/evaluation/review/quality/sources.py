@@ -24,7 +24,7 @@ import re
 from collections.abc import Iterator, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, Protocol
 
 from raidar.contract.job_layout import JOB_KIND, JOB_MANIFEST, PLAN_FILE, TRIAL_RECORDS_DIR
 from raidar.contract.trial import TrialRecord
@@ -125,7 +125,7 @@ def _lock_facts(lock: dict[str, Any], executed: str, path: Path) -> ExperimentIn
     )
 
 
-def _lock_candidates(run: dict[str, Any], locks: Sequence[Path]) -> list[Path]:
+def _lock_candidates(run: Mapping[str, Any], locks: Sequence[Path]) -> list[Path]:
     candidates = list(locks)
     experiment_file = run.get("experiment_file")
     if isinstance(experiment_file, str):
@@ -133,7 +133,7 @@ def _lock_candidates(run: dict[str, Any], locks: Sequence[Path]) -> list[Path]:
     return candidates
 
 
-def _experiment_info(run: dict[str, Any], locks: Sequence[Path] = ()) -> ExperimentInfo:
+def _experiment_info(run: Mapping[str, Any], locks: Sequence[Path] = ()) -> ExperimentInfo:
     executed = str(run.get("lock_sha256") or "") or None
     if executed is None:
         return ExperimentInfo(executed, None, None, "job.json names no lock_sha256")
@@ -167,31 +167,36 @@ def _job_dirs(jobs_root: Path) -> Iterator[Path]:
             yield manifest.parent
 
 
+def job_trials(jobs_root: Path, job: JobDir, locks: Sequence[Path] = ()) -> list[TrialSource]:
+    """The trials of one run read from ``job`` (its manifest names the lock it ran under)."""
+    run = job.manifest
+    experiment = _experiment_info(run, locks)
+    return [
+        TrialSource(
+            jobs_root=jobs_root,
+            job_dir=job.path,
+            job_id=str(run.get("job_id") or job.path.name),
+            finished_at=str(run.get("finished_at") or ""),
+            record=record,
+            experiment=experiment,
+            job=job,
+        )
+        for record in job.records
+    ]
+
+
 def discover_trials(jobs_root: Path, locks: Sequence[Path] = ()) -> list[TrialSource]:
     """Every trial of every Raidar run under ``jobs_root``, in path order."""
     trials: list[TrialSource] = []
     for job_dir in _job_dirs(jobs_root):
-        run = json.loads((job_dir / JOB_MANIFEST).read_text(encoding="utf-8"))
-        experiment = _experiment_info(run, locks)
         plan_path = job_dir / PLAN_FILE
         job = JobDir(
             path=job_dir,
-            manifest=run,
+            manifest=json.loads((job_dir / JOB_MANIFEST).read_text(encoding="utf-8")),
             plan=json.loads(plan_path.read_text(encoding="utf-8")) if plan_path.is_file() else {},
             records=read_trial_records(job_dir),
         )
-        trials.extend(
-            TrialSource(
-                jobs_root=jobs_root,
-                job_dir=job_dir,
-                job_id=str(run.get("job_id") or job_dir.name),
-                finished_at=str(run.get("finished_at") or ""),
-                record=record,
-                experiment=experiment,
-                job=job,
-            )
-            for record in job.records
-        )
+        trials.extend(job_trials(jobs_root, job, locks))
     return trials
 
 
@@ -200,16 +205,29 @@ def _assessment_steps(assessment: Assessment) -> dict[str, str | None]:
     return {str(step["step"]): step.get("snapshot") for step in steps}
 
 
+class TrialLookup(Protocol):
+    """What ``StoreIndex`` asks a store: a trial's stored Assessments by scorer."""
+
+    def for_trial(
+        self,
+        trial_dir: Path,
+        scorer_refs: Sequence[str],
+        settings: RescoreConfig,
+        *,
+        config_path: Path | None = None,
+    ) -> TrialAssessments: ...
+
+
 class StoreIndex:
     """Assessments of one store, found under the selected lock's exact keys."""
 
-    def __init__(self, root: Path) -> None:
-        self._lookup = AssessmentLookup([AssessmentStore(root)], default_scorer_registry())
+    def __init__(self, lookup: TrialLookup) -> None:
+        self._lookup = lookup
         self._trials: dict[str, TrialAssessments] = {}
 
     @classmethod
     def open(cls, root: Path) -> StoreIndex:
-        return cls(root)
+        return cls(AssessmentLookup([AssessmentStore(root)], default_scorer_registry()))
 
     def find(self, scorer_ref: str, trial: TrialSource) -> Assessment | None:
         experiment = trial.experiment

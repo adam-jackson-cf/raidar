@@ -5,8 +5,9 @@ from __future__ import annotations
 import hashlib
 import json
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
+from typing import Any
 
 from raidar.contract.snapshot import tree_digest
 from raidar.grading.bundle import (
@@ -27,7 +28,7 @@ from raidar.grading.records import (
     stored_snapshot_path,
     write_step_record,
 )
-from raidar.scoring.framework.context import AssessContext
+from raidar.scoring.framework.context import AssessContext, StepInputs
 from raidar.scoring.framework.inventory import FileRole
 from raidar.scoring.framework.manifest import (
     Direction,
@@ -40,6 +41,7 @@ from raidar.scoring.framework.manifest import (
     Tier,
 )
 from raidar.scoring.framework.registry import ScorerRegistration, ScorerRegistry
+from raidar.scoring.framework.rescore import AssessmentRecord, assess
 from raidar.scoring.framework.result import (
     TRAJECTORY_SUBJECT,
     AssessResult,
@@ -48,6 +50,12 @@ from raidar.scoring.framework.result import (
     Exclusion,
     Observation,
     Span,
+)
+from raidar.scoring.framework.store import AssessmentStore, ScorerIdentity
+from raidar.scoring.framework.trial_inputs import (
+    agent_execution_seconds,
+    blind_agent_result,
+    ran_judge,
 )
 
 APP_V1 = {"app/main.py": "def add(a, b):\n    return a + b\n"}
@@ -86,6 +94,209 @@ class StepFixture:
     files: Mapping[str, str | bytes]
     statuses: tuple[CaseStatus, ...] | None  # None: the verifier never graded this step
     usage: dict[str, int] | None = None
+
+
+@dataclass(frozen=True)
+class MemoryStep:
+    """A checkpoint of an in-memory trajectory: its oracle grade, or None when never graded."""
+
+    name: str
+    grade: VerifierGrade | None
+    rewards: Mapping[str, float] | None = None  # None: the grade's own rewards
+
+
+def memory_step(name: str, statuses: Sequence[CaseStatus] | None) -> MemoryStep:
+    """A checkpoint whose grade has one core case per status (None: not graded)."""
+    return MemoryStep(name, None if statuses is None else _grade(name, statuses))
+
+
+def memory_record(
+    name: str, grade: VerifierGrade, *, rewards: Mapping[str, float] | None = None, problem="toy"
+) -> StepRecord:
+    """An oracle step record built in memory (nothing is stored)."""
+    return StepRecord(
+        step=name,
+        checkpoint=name,
+        bundle=BundleRef(root="bundle", digest="b" * 64, problem=problem),
+        snapshot=SnapshotRef(
+            requested="artifact",
+            used="artifact",
+            digest="s" * 64,
+            stored_path=stored_snapshot_path(name),
+        ),
+        grader=GraderRef(
+            image="grader:x", environment_id="sha256:e", image_built=False, timeout_s=60
+        ),
+        grade=grade,
+        summary=grade.summary(),
+        coverage=CoverageRef(enabled=False),
+        rewards=dict(rewards) if rewards is not None else grade.rewards(),
+    )
+
+
+def memory_context(
+    steps: Sequence[MemoryStep],
+    *,
+    planned: Sequence[str] = (),
+    config: Mapping[str, object] | None = None,
+    problem: str = "toy",
+) -> AssessContext:
+    """A trajectory's scorer inputs without a stored trial: records only, no snapshot or trace.
+
+    ``planned`` adds checkpoints the trial never reached.
+    """
+    inputs = []
+    for step in steps:
+        record = (
+            None
+            if step.grade is None
+            else memory_record(step.name, step.grade, rewards=step.rewards, problem=problem)
+        )
+        inputs.append(
+            StepInputs(
+                step=step.name,
+                reached=True,
+                checkpoint=step.name,
+                snapshot=None,
+                snapshot_digest=None,
+                record=record,
+                record_digest=(
+                    None
+                    if record is None
+                    else hashlib.sha256(record.model_dump_json().encode()).hexdigest()
+                ),
+                trace_dir=None,
+                trace_digest=None,
+                agent_result=None,
+            )
+        )
+    inputs += [
+        StepInputs(
+            step=name,
+            reached=False,
+            checkpoint=name,
+            snapshot=None,
+            snapshot_digest=None,
+            record=None,
+            record_digest=None,
+            trace_dir=None,
+            trace_digest=None,
+            agent_result=None,
+        )
+        for name in planned
+    ]
+    return AssessContext(problem=problem, steps=tuple(inputs), config=dict(config or {}))
+
+
+def fixed_identity(registration: ScorerRegistration) -> ScorerIdentity:
+    """A scorer identity whose implementation digest names the implementation, not its source.
+
+    Store tests exercise keys and outcomes, not the source closure ``scorer_identity`` hashes.
+    """
+    return ScorerIdentity.model_validate(
+        {
+            "ref": registration.manifest.ref,
+            "manifest_digest": registration.manifest.digest(),
+            "implementation_digest": hashlib.sha256(
+                str(registration.implementation).encode()
+            ).hexdigest(),
+        }
+    )
+
+
+def assess_fixed(
+    store: AssessmentStore,
+    registration: ScorerRegistration,
+    ctx: AssessContext,
+    *,
+    trial: str = "trial",
+    replay: bool = False,
+) -> AssessmentRecord:
+    """``rescore.assess`` under ``fixed_identity``."""
+    identity = fixed_identity(registration)
+    return assess(store, registration, ctx, trial=trial, replay=replay, identity=identity)
+
+
+def traced_memory_context(
+    trace_root: Path,
+    steps: Sequence[Any],
+    *,
+    planned: Sequence[str] = (),
+    config: Mapping[str, object] | None = None,
+    problem: str = "toy",
+) -> AssessContext:
+    """Scorer inputs for steps carrying Harbor usage, timing and a trajectory, without a trial.
+
+    Each of ``steps`` has ``name``, ``trace`` (the ATIF document or None), ``usage``,
+    ``execution`` and ``statuses`` (see ``trace_trial_support.TracedStep``). Only a
+    trajectory file is written, under ``trace_root``, for scorers that read it.
+    """
+    base = memory_context(
+        [memory_step(step.name, step.statuses) for step in steps], planned=planned, config=config
+    )
+    inputs = []
+    for step, memory in zip(steps, base.steps, strict=False):
+        trace_dir = None
+        if step.trace is not None:
+            trace_dir = trace_root / step.name
+            trace_dir.mkdir(parents=True, exist_ok=True)
+            (trace_dir / "trajectory.json").write_text(json.dumps(step.trace))
+        inputs.append(
+            replace(
+                memory,
+                trace_dir=trace_dir,
+                trace_digest=hashlib.sha256(
+                    json.dumps([step.trace, step.usage, step.execution], sort_keys=True).encode()
+                ).hexdigest(),
+                agent_result=blind_agent_result(step.usage),
+                agent_execution_s=agent_execution_seconds(step.execution),
+                judged=ran_judge(step.usage),
+            )
+        )
+    return replace(base, steps=(*inputs, *base.steps[len(inputs) :]))
+
+
+def snapshot_context(
+    root: Path,
+    steps: Sequence[StepFixture],
+    *,
+    planned: Sequence[str] = (),
+    config: Mapping[str, object] | None = None,
+) -> AssessContext:
+    """Scorer inputs whose steps carry graded records and a snapshot tree, without a trial.
+
+    Only each step's snapshot files are written, under ``root``.
+    """
+    base = memory_context(
+        [memory_step(step.name, step.statuses) for step in steps], planned=planned, config=config
+    )
+    inputs = []
+    for fixture, memory in zip(steps, base.steps, strict=False):
+        snapshot = root / fixture.name / "snapshot"
+        write_files(snapshot, fixture.files)
+        trace = root / fixture.name / "agent"
+        write_files(trace, {"trajectory.json": "{}\n"})
+        inputs.append(
+            replace(
+                memory,
+                snapshot=snapshot,
+                snapshot_digest=tree_digest(snapshot),
+                trace_dir=trace,
+                trace_digest=f"trace-{fixture.name}",
+            )
+        )
+    return replace(base, steps=(*inputs, *base.steps[len(inputs) :]))
+
+
+def two_step_context(root: Path) -> AssessContext:
+    """The in-memory counterpart of ``two_step_trial``."""
+    return snapshot_context(
+        root,
+        [
+            StepFixture("checkpoint_1", APP_V1, (CaseStatus.PASSED, CaseStatus.PASSED)),
+            StepFixture("checkpoint_2", APP_V2, (CaseStatus.PASSED, CaseStatus.FAILED)),
+        ],
+    )
 
 
 def write_toy_bundle(

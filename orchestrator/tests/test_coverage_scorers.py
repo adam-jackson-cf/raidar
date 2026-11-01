@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import copy
+import functools
 import hashlib
 import json
 import re
@@ -67,6 +69,11 @@ def _step(trace: Path | None, name: str = "checkpoint_1", reached: bool = True) 
     )
 
 
+@functools.cache
+def _criteria(text: str) -> dict[str, Any]:
+    return criteria_document(text)
+
+
 def _trace(
     root: Path,
     *,
@@ -79,7 +86,7 @@ def _trace(
     agent = root / "agent"
     destination = agent / "workflow/package/spec/criteria.json"
     destination.parent.mkdir(parents=True)
-    document = criteria_document(text)
+    document = copy.deepcopy(_criteria(text))
     if regression:
         document["features"].append(
             {

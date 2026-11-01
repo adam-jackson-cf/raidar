@@ -7,7 +7,7 @@ the written JSON; it owns no scoring or status interpretation.
 from __future__ import annotations
 
 import argparse
-from collections.abc import Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import replace
 from pathlib import Path
 
@@ -15,11 +15,13 @@ from raidar_contract.canonical import pretty_canonical_json_bytes
 
 from raidar.evaluation.review.integrity import check_review_jobs
 from raidar.evaluation.review.quality.experiment_view import ReviewedTrial, build_experiments
+from raidar.evaluation.review.quality.gate_view import GateReader, read_gate_from_disk
 from raidar.evaluation.review.quality.labels import JevAudit
 from raidar.evaluation.review.quality.models import QualityProjection
 from raidar.evaluation.review.quality.run_view import build_run_detail
 from raidar.evaluation.review.quality.sources import (
     StoreIndex,
+    TrialSource,
     discover_trials,
 )
 from raidar.scoring.catalog.outcomes import (
@@ -27,6 +29,7 @@ from raidar.scoring.catalog.outcomes import (
     CORRECTNESS_REF,
     VERIFICATION_EFFORT_REF,
 )
+from raidar.scoring.framework.store import Assessment
 
 
 def build_quality_projection(
@@ -38,25 +41,37 @@ def build_quality_projection(
     )
 
 
-def _reviewed(jobs_root: Path, store_root: Path, locks: Sequence[Path]) -> list[ReviewedTrial]:
-    store = StoreIndex.open(store_root)
-    audit = JevAudit.open(store_root)
-    trials = discover_trials(jobs_root, locks)
-    attached = audit.attach(trials)
+def review_trials(
+    trials: Sequence[TrialSource],
+    find: Callable[[str, TrialSource], Assessment | None],
+    audit: JevAudit,
+    gate_reader: GateReader = read_gate_from_disk,
+) -> list[ReviewedTrial]:
+    """Each trial's run detail from the Assessments ``find`` returns and the Jev ``audit``."""
+    attached = audit.attach(list(trials))
     reviewed = []
     for trial in trials:
         jev = attached[trial.review_id]
         detail = build_run_detail(
             trial,
-            store.find(CODE_QUALITY_REF, trial),
-            store.find(CORRECTNESS_REF, trial),
+            find(CODE_QUALITY_REF, trial),
+            find(CORRECTNESS_REF, trial),
             decisions=jev.decisions,
             labels=audit.labels,
             jev_note=jev.note,
-            gate=store.find(VERIFICATION_EFFORT_REF, trial),
+            gate=find(VERIFICATION_EFFORT_REF, trial),
+            gate_reader=gate_reader,
         )
         reviewed.append(ReviewedTrial(source=trial, detail=detail))
     return reviewed
+
+
+def _reviewed(jobs_root: Path, store_root: Path, locks: Sequence[Path]) -> list[ReviewedTrial]:
+    return review_trials(
+        discover_trials(jobs_root, locks),
+        StoreIndex.open(store_root).find,
+        JevAudit.open(store_root),
+    )
 
 
 def build_quality_projection_from(
@@ -70,9 +85,22 @@ def build_quality_projection_from(
     if not sources:
         raise ValueError("at least one jobs root and store are required")
     reviewed = [item for jobs_root, store in sources for item in _reviewed(jobs_root, store, locks)]
-    _require_unique_ids(reviewed)
     integrity = check_review_jobs([item.source.job for item in reviewed if item.source.job])
-    reviewed = [
+    return assemble_projection(
+        reviewed, generated_from=_generated_from(sources), synthetic=synthetic, integrity=integrity
+    )
+
+
+def assemble_projection(
+    reviewed: Sequence[ReviewedTrial],
+    *,
+    generated_from: str,
+    synthetic: bool,
+    integrity: Mapping[Path, str],
+) -> QualityProjection:
+    """The projection of reviewed trials, each run's integrity note (by job dir) appended."""
+    _require_unique_ids(reviewed)
+    noted = [
         replace(
             item,
             detail=item.detail.model_copy(
@@ -84,11 +112,11 @@ def build_quality_projection_from(
         for item in reviewed
     ]
     return QualityProjection(
-        generated_from=_generated_from(sources),
+        generated_from=generated_from,
         synthetic=synthetic,
-        runs=tuple(item.detail.run for item in reviewed),
-        run_details={item.detail.run.id: item.detail for item in reviewed},
-        experiments=build_experiments(reviewed),
+        runs=tuple(item.detail.run for item in noted),
+        run_details={item.detail.run.id: item.detail for item in noted},
+        experiments=build_experiments(noted),
     )
 
 

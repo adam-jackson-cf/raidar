@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
-from pathlib import Path
+from dataclasses import replace
 
 import pytest
 
+from raidar.grading.errata import ErrataOutcome
 from raidar.grading.models import (
     CaseGroup,
     CaseResult,
@@ -13,16 +14,14 @@ from raidar.grading.models import (
     InfraFailure,
     VerifierGrade,
 )
-from raidar.grading.records import load_step_record, step_record_dir, write_step_record
-from raidar.scoring.catalog.builtin import default_scorer_registry
 from raidar.scoring.correctness import correctness_scorer
 from raidar.scoring.framework.context import AssessContext
 from raidar.scoring.framework.result import AssessResult, AssessStatus, Observation
-from raidar.scoring.framework.trial_inputs import load_trial_context
 from raidar.scoring.framework.validation import validate_result
-from tests.scorer_support import APP_V1, StepFixture, write_trial
+from tests.scorer_support import MemoryStep, memory_context, memory_step
 
 P, F, E, S = CaseStatus.PASSED, CaseStatus.FAILED, CaseStatus.ERROR, CaseStatus.SKIPPED
+CLEAN = {"oracle_leak": 0.0}
 
 
 def _case(step: str, index: int, group: CaseGroup, status: CaseStatus) -> CaseResult:
@@ -41,26 +40,9 @@ def _grade(step: str, cases: dict[CaseGroup, tuple[CaseStatus, ...]]) -> Verifie
     return VerifierGrade(step=step, checkpoint=step, cases=results)
 
 
-def _set_grade(
-    trial: Path, step: str, grade: VerifierGrade, rewards: dict[str, float] | None = None
-) -> None:
-    """Replace a stored record's grade the way the verifier writes it."""
-    directory = step_record_dir(trial, step)
-    record = load_step_record(directory)
-    rewards = rewards if rewards is not None else grade.rewards() | {"oracle_leak": 0.0}
-    write_step_record(
-        directory,
-        record.model_copy(update={"grade": grade, "summary": grade.summary(), "rewards": rewards}),
-    )
-
-
-def _trial(tmp_path: Path, steps: list[str], *, graded: bool = True, planned=()) -> Path:
-    statuses = (P,) if graded else None
-    return write_trial(
-        tmp_path / "trial",
-        [StepFixture(name, APP_V1, statuses) for name in steps],
-        planned=planned,
-    )
+def _graded(step: str, grade: VerifierGrade, rewards: dict[str, float] | None = None) -> MemoryStep:
+    """A checkpoint carrying ``grade`` the way the verifier records it."""
+    return MemoryStep(step, grade, rewards if rewards is not None else grade.rewards() | CLEAN)
 
 
 def _assess(ctx: AssessContext) -> AssessResult:
@@ -72,8 +54,7 @@ def _by_key(result: AssessResult) -> dict[tuple[str, str], Observation]:
     return {(item.metric, item.subject): item for item in result.observations}
 
 
-def test_checkpoint_values_equal_the_oracle_record(tmp_path: Path) -> None:
-    trial = _trial(tmp_path, ["checkpoint_1", "checkpoint_2"])
+def test_checkpoint_values_equal_the_oracle_record() -> None:
     grades = {
         "checkpoint_1": _grade(
             "checkpoint_1",
@@ -89,12 +70,12 @@ def test_checkpoint_values_equal_the_oracle_record(tmp_path: Path) -> None:
             },
         ),
     }
-    for step, grade in grades.items():
-        _set_grade(trial, step, grade)
-    observed = _by_key(_assess(load_trial_context(trial)))
+    ctx = memory_context([_graded(step, grade) for step, grade in grades.items()])
+    observed = _by_key(_assess(ctx))
 
     for step in grades:
-        record = load_step_record(step_record_dir(trial, step))
+        record = ctx.step(step).record
+        assert record is not None
         assert observed["solved", step].value == float(record.summary["solved"])
         assert observed["strict_pass_rate", step].value == record.summary["strict_pass_rate"]
         for key in ("strict_pass_rate", "core_pass_rate", "regression_pass_rate"):
@@ -115,27 +96,24 @@ def test_checkpoint_values_equal_the_oracle_record(tmp_path: Path) -> None:
     assert observed["reached", "trajectory"].value == 1
 
 
-def test_missing_verdicts_are_statused_never_zero(tmp_path: Path) -> None:
-    trial = write_trial(
-        tmp_path / "trial",
-        [
-            StepFixture("checkpoint_1", APP_V1, (P,)),
-            StepFixture("checkpoint_2", APP_V1, (P,)),
-            StepFixture("checkpoint_3", APP_V1, (P,)),
-            StepFixture("checkpoint_4", APP_V1, None),
-        ],
-        planned=["checkpoint_5"],
-    )
+def test_missing_verdicts_are_statused_never_zero() -> None:
     infra = VerifierGrade(
         step="checkpoint_2",
         checkpoint="checkpoint_2",
         cases=(),
         infra_failure=InfraFailure(code="sandbox_timeout"),
     )
-    _set_grade(trial, "checkpoint_2", infra)
     leaked = _grade("checkpoint_3", {CaseGroup.CORE: (P,)})
-    _set_grade(trial, "checkpoint_3", leaked, {"infrastructure_failure": 0.0, "oracle_leak": 1.0})
-    observed = _by_key(_assess(load_trial_context(trial)))
+    ctx = memory_context(
+        [
+            memory_step("checkpoint_1", (P,)),
+            _graded("checkpoint_2", infra),
+            _graded("checkpoint_3", leaked, {"infrastructure_failure": 0.0, "oracle_leak": 1.0}),
+            memory_step("checkpoint_4", None),
+        ],
+        planned=["checkpoint_5"],
+    )
+    observed = _by_key(_assess(ctx))
 
     expected = {
         "checkpoint_2": (AssessStatus.UNAVAILABLE, "sandbox_timeout"),
@@ -158,14 +136,14 @@ def test_missing_verdicts_are_statused_never_zero(tmp_path: Path) -> None:
     [("continue", None), ("halt_on_failure", 1)],
 )
 def test_trajectory_counts_follow_the_progression(
-    tmp_path: Path, progression: str, solved_checkpoints: int | None
+    progression: str, solved_checkpoints: int | None
 ) -> None:
-    trial = write_trial(
-        tmp_path / "trial",
-        [StepFixture("checkpoint_1", APP_V1, (P,)), StepFixture("checkpoint_2", APP_V1, (F,))],
+    ctx = memory_context(
+        [memory_step("checkpoint_1", (P,)), memory_step("checkpoint_2", (F,))],
         planned=["checkpoint_3"],
+        config={"progression": progression},
     )
-    observed = _by_key(_assess(load_trial_context(trial, config={"progression": progression})))
+    observed = _by_key(_assess(ctx))
 
     assert observed["reached", "trajectory"].value == 1
     count = observed["solved_checkpoints", "trajectory"]
@@ -177,33 +155,27 @@ def test_trajectory_counts_follow_the_progression(
         assert "stopped after failed checkpoint checkpoint_2" in (count.reason or "")
 
 
-def test_a_halt_run_gated_on_the_solvable_verdict_scores_the_checkpoints_past_a_raw_failure(
-    tmp_path: Path,
-) -> None:
+def test_a_halt_run_gated_on_the_solvable_verdict_scores_the_checkpoints_past_a_raw_failure() -> (
+    None
+):
     """Checkpoint 2 fails raw but passes its solvable set, so the run went on and solved 3."""
-    trial = write_trial(
-        tmp_path / "trial",
-        [
-            StepFixture("checkpoint_1", APP_V1, (P,)),
-            StepFixture("checkpoint_2", APP_V1, (P,)),
-            StepFixture("checkpoint_3", APP_V1, (P,)),
-            StepFixture("checkpoint_4", APP_V1, (P,)),
-        ],
-        planned=["checkpoint_5"],
-    )
     core = CaseGroup.CORE
-    _set_grade(trial, "checkpoint_1", _grade("checkpoint_1", {core: (P,)}))
-    _set_grade(trial, "checkpoint_2", _grade("checkpoint_2", {core: (P, F)}))  # raw: failed
-    _set_grade(trial, "checkpoint_3", _grade("checkpoint_3", {core: (P,)}))
-    _set_grade(trial, "checkpoint_4", _grade("checkpoint_4", {core: (F,)}))  # solvable: failed
-    problem = load_trial_context(trial).problem
     solvable = {
         "sha256": "s",
         "steps": {f"checkpoint_{k}": [f"checkpoint_{k}::0"] for k in range(1, 6)},
     }
-    config = {"progression": "halt_on_failure", "solvable": {problem: solvable}}
+    ctx = memory_context(
+        [
+            _graded("checkpoint_1", _grade("checkpoint_1", {core: (P,)})),
+            _graded("checkpoint_2", _grade("checkpoint_2", {core: (P, F)})),  # raw: failed
+            _graded("checkpoint_3", _grade("checkpoint_3", {core: (P,)})),
+            _graded("checkpoint_4", _grade("checkpoint_4", {core: (F,)})),  # solvable: failed
+        ],
+        planned=["checkpoint_5"],
+        config={"progression": "halt_on_failure", "solvable": {"toy": solvable}},
+    )
 
-    observed = _by_key(_assess(load_trial_context(trial, config=config)))
+    observed = _by_key(_assess(ctx))
 
     assert observed["solved_checkpoints_solvable", "trajectory"].value == 3
     assert observed["reached_solvable", "trajectory"].value == 3
@@ -212,43 +184,75 @@ def test_a_halt_run_gated_on_the_solvable_verdict_scores_the_checkpoints_past_a_
     assert observed["solved_checkpoints", "trajectory"].value == 2
 
 
-def test_trajectory_counts_on_complete_runs(tmp_path: Path) -> None:
-    trial = write_trial(
-        tmp_path / "trial",
+def test_trajectory_counts_on_complete_runs() -> None:
+    ctx = memory_context(
         [
-            StepFixture("checkpoint_1", APP_V1, (P,)),
-            StepFixture("checkpoint_2", APP_V1, (F,)),
-            StepFixture("checkpoint_3", APP_V1, (P,)),
-        ],
+            memory_step("checkpoint_1", (P,)),
+            memory_step("checkpoint_2", (F,)),
+            memory_step("checkpoint_3", (P,)),
+        ]
     )
-    observed = _by_key(_assess(load_trial_context(trial)))
+    observed = _by_key(_assess(ctx))
     assert observed["reached", "trajectory"].value == 1
     assert observed["solved_checkpoints", "trajectory"].value == 2
 
-    all_solved = _by_key(_assess(load_trial_context(_trial(tmp_path / "b", ["checkpoint_1"]))))
+    all_solved = _by_key(_assess(memory_context([memory_step("checkpoint_1", (P,))])))
     assert all_solved["reached", "trajectory"].value == 1
 
 
-def test_ungraded_trials_and_bad_config_produce_statused_results(tmp_path: Path) -> None:
-    trial = write_trial(tmp_path / "trial", [StepFixture("checkpoint_1", APP_V1, (P,))])
-    bad = _assess(load_trial_context(trial, config={"progression": "sometimes"}))
+def test_ungraded_trials_and_bad_config_produce_statused_results() -> None:
+    steps = [memory_step("checkpoint_1", (P,))]
+    bad = _assess(memory_context(steps, config={"progression": "sometimes"}))
     assert bad.status is AssessStatus.ERROR
     assert {item.status for item in bad.observations} == {AssessStatus.ERROR}
 
-    ctx = load_trial_context(trial)
-    ungraded = AssessContext(
-        problem=ctx.problem,
-        steps=tuple(
-            step.__class__(**{**step.__dict__, "record": None, "record_digest": None})
-            for step in ctx.steps
-        ),
-    )
-    result = _assess(ungraded)
+    result = _assess(memory_context([memory_step("checkpoint_1", None)]))
     assert result.status is AssessStatus.UNAVAILABLE
     assert "no checkpoint" in (result.reason or "")
 
 
-def test_correctness_is_bound_in_the_default_registry() -> None:
-    registration = default_scorer_registry().get("correctness@10")
-    assert registration.load().manifest == registration.manifest
-    assert registration.implementation_digest() is not None
+def _errata_config(sha: str = "a" * 64, *excluded: str) -> dict[str, object]:
+    return {"errata": {"toy": {"sha256": sha, "exclude_from_solved": list(excluded)}}}
+
+
+def test_a_pinned_errata_recomputes_the_verdict_beside_the_raw_one() -> None:
+    core = CaseGroup.CORE
+    ctx = memory_context(
+        [
+            _graded("checkpoint_1", _grade("checkpoint_1", {core: (P, F)})),
+            _graded("checkpoint_2", _grade("checkpoint_2", {core: (P,)})),
+            memory_step("checkpoint_3", None),
+        ],
+        config=_errata_config("a" * 64, "core::1"),
+    )
+    observed = _by_key(_assess(ctx))
+
+    assert observed["solved", "checkpoint_1"].value == 0.0
+    assert observed["solved_errata", "checkpoint_1"].value == 1.0
+    assert observed["solved_errata", "checkpoint_2"].value == 1.0
+    ungraded = observed["solved_errata", "checkpoint_3"]
+    assert (ungraded.status, ungraded.value) == (AssessStatus.UNAVAILABLE, None)
+
+
+def test_without_a_pinned_errata_the_errata_metrics_are_not_applicable() -> None:
+    ctx = memory_context([memory_step("checkpoint_1", (F,))])
+    item = _by_key(_assess(ctx))["solved_errata", "checkpoint_1"]
+    assert (item.status, item.value) == (AssessStatus.NOT_APPLICABLE, None)
+
+
+def test_records_graded_under_another_errata_make_the_errata_metrics_ineligible() -> None:
+    ctx = memory_context(
+        [memory_step("checkpoint_1", (P,)), memory_step("checkpoint_2", (P,))],
+        config=_errata_config("a" * 64),
+    )
+    other = ErrataOutcome(sha256="b" * 64, excluded_cases=(), excluded_failing=(), solved=True)
+    first = ctx.steps[0]
+    assert first.record is not None
+    recorded = first.record.model_copy(update={"errata": other})
+    steps = (replace(first, record=recorded), *ctx.steps[1:])
+    observed = _by_key(_assess(replace(ctx, steps=steps)))
+
+    for step in ("checkpoint_1", "checkpoint_2"):
+        item = observed["solved_errata", step]
+        assert (item.status, item.value) == (AssessStatus.INELIGIBLE, None)
+    assert observed["solved", "checkpoint_1"].value == 1.0

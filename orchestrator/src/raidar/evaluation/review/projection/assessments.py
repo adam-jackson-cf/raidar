@@ -15,21 +15,55 @@ none, so it has its own lookup over the same key function.
 
 from __future__ import annotations
 
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Protocol
 
 from raidar.contract.references import RegistryReferenceError
 from raidar.scoring.framework.keys import scorer_identity, store_key
 from raidar.scoring.framework.registry import ScorerRegistry
 from raidar.scoring.framework.rescore_config import RescoreConfig
-from raidar.scoring.framework.store import Assessment, AssessmentStore, ScorerIdentity
+from raidar.scoring.framework.store import Assessment, ScorerIdentity
 from raidar.scoring.framework.trial_inputs import (
     BundleCache,
     TrialInputError,
     context_inputs,
     load_trial_context,
 )
+
+InputsLoader = Callable[[Path, RescoreConfig, BundleCache], Mapping[str, object]]
+"""A trial directory's content identity (the run inputs of its Assessment keys)."""
+
+
+class AssessmentSource(Protocol):
+    """Where Assessments are looked up by key (one store)."""
+
+    def get(self, key: str) -> Assessment | None: ...
+
+
+class TrialAssessmentLookup(Protocol):
+    """What the projection needs of an Assessment lookup."""
+
+    def for_trial(
+        self,
+        trial_dir: Path,
+        scorer_refs: Sequence[str],
+        settings: RescoreConfig,
+        *,
+        config_path: Path | None = None,
+    ) -> TrialAssessments: ...
+
+
+def disk_inputs(
+    trial_dir: Path, settings: RescoreConfig, bundles: BundleCache
+) -> Mapping[str, object]:
+    """The inputs identity of the trial directory on disk (``TrialInputError`` when unreadable)."""
+    return context_inputs(
+        load_trial_context(
+            trial_dir, inventory_policy=settings.inventory_policy, bundle_cache=bundles
+        )
+    )
 
 
 @dataclass(frozen=True)
@@ -52,9 +86,15 @@ def rescore_hint(trial_dir: Path, ref: str, lock_path: Path | None) -> str:
 class AssessmentLookup:
     """Looks up a trial's Assessments across one or more stores."""
 
-    def __init__(self, stores: Sequence[AssessmentStore], registry: ScorerRegistry) -> None:
+    def __init__(
+        self,
+        stores: Sequence[AssessmentSource],
+        registry: ScorerRegistry,
+        load_inputs: InputsLoader = disk_inputs,
+    ) -> None:
         self._stores = tuple(stores)
         self._registry = registry
+        self._load_inputs = load_inputs
         self._bundles = BundleCache()
         self._identities: dict[str, ScorerIdentity] = {}
 
@@ -87,13 +127,7 @@ class AssessmentLookup:
                 missing=dict.fromkeys(scorer_refs, "no assessment store was given")
             )
         try:
-            inputs = context_inputs(
-                load_trial_context(
-                    trial_dir,
-                    inventory_policy=settings.inventory_policy,
-                    bundle_cache=self._bundles,
-                )
-            )
+            inputs = self._load_inputs(trial_dir, settings, self._bundles)
         except TrialInputError as exc:
             reason = f"trial inputs cannot be assessed: {exc}"
             return TrialAssessments(missing=dict.fromkeys(scorer_refs, reason))

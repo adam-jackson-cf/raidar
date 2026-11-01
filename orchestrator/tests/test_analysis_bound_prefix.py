@@ -30,6 +30,8 @@ from tests.test_analysis_command import (
     _record,
 )
 
+pytestmark = pytest.mark.slow
+
 PROBLEM = "scb/toy@1"
 ALL_STEPS = ("checkpoint_1", "checkpoint_2", "checkpoint_3")
 FILES = (APP_V1, APP_V2, APP_V2)

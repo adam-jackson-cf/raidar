@@ -9,16 +9,24 @@ otherwise the arms are described one by one and the comparison says why.
 from __future__ import annotations
 
 import dataclasses
+from pathlib import Path
 
 import pytest
 
+from raidar.evaluation.analysis import manipulation as manipulation_module
 from raidar.evaluation.analysis.assessed import VERIFICATION_EFFORT_REF, gate_metrics
 from raidar.evaluation.analysis.effects import Settings
-from raidar.evaluation.analysis.manipulation import Separation, check_report
+from raidar.evaluation.analysis.manipulation import (
+    Separation,
+    check_report,
+    load_arm_results,
+    manipulation_check,
+    separate,
+)
 from raidar.evaluation.analysis.markdown import render_markdown
 from raidar.evaluation.analysis.outcomes import TrialOutcome, Value
 from raidar.evaluation.analysis.report import AnalysisReport, analyse
-from raidar.scoring.catalog.checks import GATE_CLEAN
+from raidar.scoring.catalog.checks import GATE_CLEAN, PROCESS_COMPLIANCE_REFS
 from raidar.scoring.catalog.outcomes import GATE_METRICS, outcome_metric
 from raidar.scoring.framework.result import (
     TRAJECTORY_SUBJECT,
@@ -282,3 +290,76 @@ def test_a_trial_reads_the_process_outcomes_its_scorer_reports() -> None:
     assert DELTA in gate_metrics(None)
     assert process_metrics(result)[STALL] == Value.ok(0.5)
     assert process_metrics(None)[STALL].status == "unassessed"
+
+
+# ---- how the check decides ----------------------------------------------------------------
+
+
+def test_the_check_distinguishes_too_few_trials_ties_and_real_separation() -> None:
+    small = separate("c", ("g", [1.0, 1.0]), ("b", [0.0]), 0.05)
+    assert small.verdict is Separation.INSUFFICIENT_DATA
+    tied = separate("c", ("g", [1.0] * 5), ("b", [1.0] * 5), 0.05)
+    assert tied.verdict is Separation.NOT_SEPARATED
+    assert tied.min_p_value == 1.0
+    exact = separate("c", ("g", [1.0] * 5), ("b", [0.0] * 5), 0.05)
+    assert (exact.verdict, exact.method) == (Separation.SEPARATED, "exact-permutation")
+    assert exact.p_value == pytest.approx(1 / 252)
+    assert separate("c", ("g", []), ("b", [0.0] * 5), 0.05).guided.mean is None
+
+
+def test_arms_too_large_to_enumerate_are_sampled_not_approximated_silently() -> None:
+    sampled = separate("c", ("g", [1.0] * 13), ("b", [0.0] * 13), 0.05)
+
+    assert sampled.method == "sampled-permutation"
+    assert sampled.verdict is Separation.SEPARATED
+
+
+def test_one_scorers_results_are_checked_from_both_arms_or_refused() -> None:
+    guided = [_signal([1.0, 1.0]) for _ in range(5)]
+    baseline = [_signal([0.0, 0.0]) for _ in range(5)]
+    results = {GUIDED: guided, BASELINE: baseline}
+
+    report = manipulation_check(results, guided=GUIDED, baseline=BASELINE, checks=[GATE_CLEAN])
+    assert report.verdict is Separation.SEPARATED
+    with pytest.raises(ValueError, match="no process-compliance results"):
+        manipulation_check({GUIDED: guided}, guided=GUIDED, baseline=BASELINE)
+    with pytest.raises(ValueError, match="at least one check"):
+        manipulation_check(results, guided=GUIDED, baseline=BASELINE, checks=[])
+    mixed = check_report(
+        {GATE_CLEAN: {GUIDED: guided, BASELINE: guided}, "other": {}},
+        [GATE_CLEAN, "other"],
+        guided=GUIDED,
+        baseline=BASELINE,
+    )
+    assert mixed.verdict is Separation.NOT_SEPARATED
+
+
+def test_arm_results_load_from_assessments_of_a_process_compliance_scorer(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    ours = _signal([1.0])
+
+    def assessment(ref: str) -> object:
+        scorer = type("Scorer", (), {"ref": ref})
+        return type("Assessment", (), {"scorer": scorer, "result": ours})
+
+    stored = {"k1": assessment(PROCESS_COMPLIANCE_REFS[0]), "k2": assessment("correctness@10")}
+
+    class Store:
+        def __init__(self, root: object) -> None:
+            self.root = root
+
+        def get(self, key: str) -> object:
+            return stored.get(key)
+
+    monkeypatch.setattr(manipulation_module, "AssessmentStore", Store)
+    root = Path("store")
+
+    assert load_arm_results(root, {"guided": ["k1"], "baseline": []}) == {
+        "guided": [ours],
+        "baseline": [],
+    }
+    with pytest.raises(ValueError, match="no assessment k0"):
+        load_arm_results(root, {"guided": ["k0"]})
+    with pytest.raises(ValueError, match="not one of"):
+        load_arm_results(root, {"guided": ["k2"]})

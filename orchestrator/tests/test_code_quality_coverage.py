@@ -17,17 +17,26 @@ parity failure stays ``ineligible`` (smoke-3b-4 I1).
 from __future__ import annotations
 
 import copy
-from typing import Any
+import dataclasses
+from pathlib import Path
+from types import SimpleNamespace
+from typing import Any, cast
 
-from raidar.scoring.catalog.builtin import default_scorer_registry
+import pytest
+
+from raidar.grading.models import ParityVerdict
+from raidar.scoring.code_quality import coverage_reader, parity
+from raidar.scoring.code_quality.checkpoint import Gap
+from raidar.scoring.code_quality.coverage_reader import OFFLINE_NOT_PRODUCED, CoverageReader
 from raidar.scoring.code_quality.lineage_models import RegressionRunEvidence
-from raidar.scoring.code_quality.observations import EXCLUDED_METRIC
 from raidar.scoring.code_quality.parity import (
     MAX_EXCLUDED_CASES,
     flipped_cases,
     reconcile,
 )
-from tests.code_quality_support import FLAKY, FLIPPED, flip_run, golden_case
+from raidar.scoring.framework.context import StepInputs
+from raidar.scoring.framework.result import AssessStatus
+from tests.code_quality_support import FLAKY, FLIPPED, flip_run, golden_case, memory_step
 
 
 def _runs(case: dict[str, Any], step: str) -> tuple[RegressionRunEvidence, RegressionRunEvidence]:
@@ -117,9 +126,133 @@ def test_reconcile_refuses_more_flips_than_the_cap() -> None:
     assert reconcile(FLIPPED.reasons, left, right) is None
 
 
-def test_code_quality_is_registered_store_bound_with_the_exclusion_count() -> None:
-    registration = default_scorer_registry().get("code-quality@9")
+_STEP = "checkpoint_2"
 
-    assert registration.store_implementation is not None
-    assert registration.problem_config == ("entry_file",)
-    assert EXCLUDED_METRIC in {metric.id for metric in registration.manifest.metrics}
+
+def _stored(parity: ParityVerdict, fork: dict[str, Any] | None) -> SimpleNamespace:
+    return SimpleNamespace(parity=parity, fork=fork)
+
+
+def _deferred_step(*, enabled: bool = False, parity: ParityVerdict | None = None) -> StepInputs:
+    record = SimpleNamespace(
+        step=_STEP,
+        coverage=SimpleNamespace(enabled=enabled, parity=parity),
+        bundle=SimpleNamespace(digest="bundle"),
+        snapshot=SimpleNamespace(digest="snapshot"),
+    )
+    return dataclasses.replace(memory_step(_STEP, None), record=cast(Any, record))
+
+
+@pytest.fixture(name="offline_store")
+def _offline_store(monkeypatch: pytest.MonkeyPatch) -> dict[str, Any]:
+    """The Assessment store's offline coverage runs, by step (the read boundary is injected)."""
+    runs: dict[str, Any] = {}
+
+    def read(root: Path, bundle: str, step: str, snapshot: str, *, identity: str) -> Any:
+        return runs.get(step)
+
+    for module in (coverage_reader, parity):
+        monkeypatch.setattr(module, "read_offline_coverage", read)
+        monkeypatch.setattr(module, "coverage_identity", lambda record, directory: "identity")
+    return runs
+
+
+def test_an_unproduced_offline_run_is_unavailable_and_awaited(
+    offline_store: dict[str, Any],
+) -> None:
+    for root in (Path("store"), None):
+        reader = CoverageReader(root)
+
+        gap = reader.run_evidence(_deferred_step())
+
+        assert isinstance(gap, Gap)
+        assert gap.status is AssessStatus.UNAVAILABLE
+        assert gap.reason.startswith(OFFLINE_NOT_PRODUCED)
+        assert reader.missing == [_STEP]
+        assert reader.excluded == {}
+
+
+def test_an_eligible_offline_run_is_read_whole(offline_store: dict[str, Any]) -> None:
+    case = golden_case("synthetic_shop")
+    offline_store[_STEP] = _stored(ParityVerdict(eligible=True), case["runs"][_STEP])
+    reader = CoverageReader(Path("store"))
+
+    found = reader.run_evidence(_deferred_step())
+
+    assert found == _runs(case, _STEP)
+    assert reader.excluded == {_STEP: ()}
+    assert reader.missing == []
+
+
+@pytest.mark.parametrize(
+    ("fork", "reason"),
+    [
+        (None, "coverage_parity_unavailable"),
+        ({}, "coverage_parity_unavailable"),
+    ],
+)
+def test_an_eligible_offline_run_without_readable_g_input_is_ineligible(
+    offline_store: dict[str, Any], fork: dict[str, Any] | None, reason: str
+) -> None:
+    offline_store[_STEP] = _stored(ParityVerdict(eligible=True), fork)
+
+    gap = CoverageReader(Path("store")).run_evidence(_deferred_step())
+
+    assert isinstance(gap, Gap)
+    assert gap.status is AssessStatus.INELIGIBLE
+    assert gap.reason.startswith(reason)
+
+
+def test_a_failed_offline_parity_check_is_ineligible_unless_only_a_few_outcomes_flipped(
+    offline_store: dict[str, Any],
+) -> None:
+    case = golden_case("synthetic_shop")
+    flipped = {**case["runs"][_STEP], "produced": flip_run(case["runs"][_STEP]["produced"], FLAKY)}
+    other = ParityVerdict(eligible=False, reasons=("environment_mismatch",))
+    offline_store[_STEP] = _stored(other, flipped)
+    reader = CoverageReader(Path("store"))
+
+    gap = reader.run_evidence(_deferred_step())
+
+    assert isinstance(gap, Gap)
+    assert (gap.status, gap.reason.split(":")[0]) == (
+        AssessStatus.INELIGIBLE,
+        "coverage_parity_failed",
+    )
+    assert reader.excluded == {}
+
+    offline_store[_STEP] = _stored(FLIPPED, flipped)
+    settled = reader.run_evidence(_deferred_step())
+
+    assert not isinstance(settled, Gap)
+    assert reader.excluded == {_STEP: (FLAKY,)}
+    assert FLAKY not in {item.node_id for run in settled for item in run.outcomes}
+
+    offline_store[_STEP] = _stored(FLIPPED, {"baseline": "not a run"})
+    assert isinstance(CoverageReader(Path("store")).run_evidence(_deferred_step()), Gap)
+
+
+def test_a_step_the_oracle_did_not_grade_has_no_run_evidence(offline_store: dict[str, Any]) -> None:
+    ungraded = dataclasses.replace(memory_step(_STEP, None), record=None)
+
+    gap = CoverageReader(Path("store")).run_evidence(ungraded)
+
+    assert isinstance(gap, Gap)
+    assert gap.status is AssessStatus.UNAVAILABLE
+    assert "did not grade" in gap.reason
+
+
+def test_an_in_trial_pass_without_a_parity_verdict_or_g_input_is_ineligible(
+    offline_store: dict[str, Any],
+) -> None:
+    unjudged = CoverageReader(None).run_evidence(_deferred_step(enabled=True))
+    unreadable = CoverageReader(None).run_evidence(
+        _deferred_step(enabled=True, parity=ParityVerdict(eligible=True))
+    )
+
+    assert isinstance(unjudged, Gap)
+    assert unjudged.status is AssessStatus.INELIGIBLE
+    assert unjudged.reason.startswith("coverage_parity_failed")
+    assert isinstance(unreadable, Gap)
+    assert unreadable.status is AssessStatus.INELIGIBLE
+    assert unreadable.reason.startswith("coverage_parity_unavailable")

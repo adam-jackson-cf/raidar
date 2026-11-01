@@ -9,5 +9,7 @@ from raidar.engine.health.model import HealthCheck
 def check_workflow(audit: Audit) -> tuple[HealthCheck, ...]:
     return (
         *check_judge(audit),
-        *evidence_family(audit),
+        *evidence_family(
+            audit.trial_dir, audit.record.agent_override, [s.step for s in audit.attempted]
+        ),
     )
