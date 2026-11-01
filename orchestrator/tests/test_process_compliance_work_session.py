@@ -18,6 +18,7 @@ from raidar.scoring.framework.result import TRAJECTORY_SUBJECT, AssessStatus, Ob
 from raidar.scoring.framework.validation import validate_result
 from raidar.scoring.process_checks import deterministic_process_compliance_scorer
 from raidar.scoring.process_checks.manifest import PROCESS_COMPLIANCE
+from tests.scorer_support import traced_memory_context
 from tests.trace_trial_support import (
     AGENT,
     TracedStep,
@@ -26,7 +27,6 @@ from tests.trace_trial_support import (
     codex_patch,
     delegate,
     session,
-    traced_context,
     trajectory,
 )
 
@@ -73,7 +73,9 @@ def _gated(work_tests: bool) -> dict[str, Any]:
 
 def _ctx(tmp_path: Path, *traces: dict, **config: Any) -> AssessContext:
     steps = [TracedStep(f"checkpoint_{i}", trace=trace) for i, trace in enumerate(traces, 1)]
-    return traced_context(tmp_path, steps, extra_test_patterns=[GATE_PATTERN], **config)
+    return traced_memory_context(
+        tmp_path, steps, config={"extra_test_patterns": [GATE_PATTERN], **config}
+    )
 
 
 def _values(ctx: AssessContext) -> dict[tuple[str, str], Observation]:

@@ -28,7 +28,13 @@ from raidar.evaluation.review.projection.gates import GateContext, failed_gates,
 from raidar.evaluation.review.projection.headline import Headline
 from raidar.evaluation.review.projection.notes import Finding, finding_counts, to_annotations
 from raidar.evaluation.review.projection.scoring import ScoringContext, project_scoring
-from raidar.evaluation.review.projection.spans import SpanBuilder, repo_path, to_ms
+from raidar.evaluation.review.projection.spans import (
+    SpanBuilder,
+    TextReader,
+    read_disk,
+    repo_path,
+    to_ms,
+)
 from raidar.scoring.catalog.outcomes import CODE_QUALITY_REF, CORRECTNESS_REF
 
 _POLICY_SCORERS = frozenset({CORRECTNESS_REF, CODE_QUALITY_REF})
@@ -61,27 +67,25 @@ class TrialInput:
     headline: Headline
     synthetic: bool
     integrity_note: str | None = None
+    read: TextReader = read_disk
 
     @property
     def trial_dir(self) -> Path:
         return self.job_dir / self.record.trial_dir
 
 
-def _harbor_result(trial_dir: Path) -> dict[str, Any]:
+def _harbor_result(trial: TrialInput) -> dict[str, Any]:
     """Harbor's ``result.json`` for the trial; empty when it is absent or was left unparseable."""
-    path = trial_dir / "result.json"
-    if not path.is_file():
-        return {}
     try:
-        loaded = json.loads(path.read_text(encoding="utf-8"))
-    except ValueError:
+        loaded = json.loads(trial.read(trial.trial_dir / "result.json"))
+    except (OSError, ValueError):
         return {}
     return loaded if isinstance(loaded, dict) else {}
 
 
 def _timing(trial: TrialInput) -> tuple[int, int]:
     """Start (epoch ms) and duration of the trial from Harbor's result, else the job manifest."""
-    result = _harbor_result(trial.trial_dir)
+    result = _harbor_result(trial)
     started = to_ms(result.get("started_at")) or to_ms(trial.run_started) or 0
     finished = to_ms(result.get("finished_at"))
     if finished is not None and finished >= started:
@@ -128,6 +132,7 @@ def _agent_spans(builder: SpanBuilder, trial: TrialInput, agent: str) -> None:
                 trial.trial_dir / step_result.trace_dir,
                 checkpoint,
                 first_checkpoint=step_result.index == 0,
+                read=trial.read,
             )
 
 
@@ -215,7 +220,9 @@ def _spans(builder: SpanBuilder, trial: TrialInput, start: int, duration: int) -
         model=labels.model,
     )
     _agent_spans(builder, trial, agent)
-    findings = project_gates(GateContext(builder, root, start, trial.trial_dir, trial.record))
+    findings = project_gates(
+        GateContext(builder, root, start, trial.trial_dir, trial.record, trial.read)
+    )
     findings += project_scoring(
         ScoringContext(builder, root, start, trial.record, trial.headline, trial.assessments)
     )
@@ -297,7 +304,7 @@ def run_detail(trial: TrialInput) -> ReviewRunDetail:
 
 def _exception(trial: TrialInput) -> list[str]:
     """Harbor's own account of a trial exception (type and message), when it recorded one."""
-    info = _harbor_result(trial.trial_dir).get("exception_info")
+    info = _harbor_result(trial).get("exception_info")
     if isinstance(info, dict) and info.get("exception_type"):
         return [f"Trial exception: {info['exception_type']}: {info.get('exception_message', '')}"]
     record = trial.record

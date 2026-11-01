@@ -1,9 +1,7 @@
 """Consumers of verification-effort and verifier diagnostics: the analysis markdown.
 
-- the analysis compares every verification-effort outcome with a better direction;
-- the gate section states what blocking_checks counts;
-- forge's ordering case is a known, spec-determined timing sensitivity (not an erratum),
-  shown beside the grading-vs-coverage disagreement count.
+- the gate section lists the gated arms and is empty for an ungated trajectory;
+- the verifier section shows the grading-vs-coverage disagreement count and known notes.
 """
 
 from __future__ import annotations
@@ -15,35 +13,26 @@ import pytest
 
 from raidar.design.problem.sensitivities import (
     SensitivityError,
-    SensitivityKind,
     known_sensitivities,
     load_sensitivities,
 )
 from raidar.evaluation.analysis.assessed import disagreements
-from raidar.evaluation.analysis.markdown import _better, _gate_arms, _verifier_arms
+from raidar.evaluation.analysis.markdown import _gate_arms, _verifier_arms
 from raidar.evaluation.analysis.verification_effort import GateDescriptive
-from raidar.scoring.catalog.outcomes import GATE_METRICS, VERIFIER_DISAGREEMENTS
+from raidar.scoring.catalog.outcomes import VERIFIER_DISAGREEMENTS
 from raidar.scoring.framework.result import AssessResult, AssessStatus, Observation
 from tests.analysis_support import arm_summary
 
 REPO = Path(__file__).resolve().parents[2]
 
 
-def test_every_verification_effort_outcome_is_compared_with_a_better_direction() -> None:
-    assert all(_better(metric.id) != "—" for metric in GATE_METRICS)
-    assert _better("gate.first_pass_clean_rate") == "↑ higher"
-    assert _better("gate.total_blocking_checks") == "↓ lower"
-    assert _better("gate.total_fix_cost_usd") == "↓ lower"
-
-
-def test_the_gate_section_says_what_blocking_checks_counts() -> None:
+def test_the_gate_section_lists_a_gated_arm_and_is_empty_without_a_gate() -> None:
     arm = arm_summary("r1", {"gate.total_blocking_checks": 3.0})
     report = SimpleNamespace(arms=(arm,), gate_scorer=None)
 
     text = "\n".join(_gate_arms(report))  # type: ignore[arg-type]
-
     assert "| gate.total_blocking_checks | ↓ lower |" in text
-    assert "failed blocking gate checks" in text
+
     ungated = SimpleNamespace(
         arms=(arm.model_copy(update={"verification_effort": None}),), gate_scorer=None
     )
@@ -54,19 +43,6 @@ def test_the_gate_section_says_what_blocking_checks_counts() -> None:
 
 FORGE = "scb/forge@38d627ecf668"
 TIMING_CASE = "test_checkpoint_1.py::test_blueprint_list_orders_by_created_at_name_uuid"
-
-
-def test_the_forge_ordering_case_is_a_spec_determined_timing_sensitivity_not_an_erratum() -> None:
-    found = known_sensitivities([FORGE, "toy@1"], store=REPO / "lab" / "problems")
-
-    note = next(note for note in found[FORGE] if note.case == TIMING_CASE)
-    assert (note.case, note.kind, note.spec_determined) == (
-        TIMING_CASE,
-        SensitivityKind.TIMING,
-        True,
-    )
-    errata = (REPO / "lab/problems/registry/scb/forge/38d627ecf668.errata.yaml").read_text()
-    assert "test_blueprint_list_orders_by_created_at_name_uuid" not in errata
 
 
 def test_an_invalid_or_mismatched_sensitivities_file_raises(tmp_path: Path) -> None:

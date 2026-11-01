@@ -20,12 +20,12 @@ from raidar.scoring.framework.validation import validate_result
 from raidar.scoring.process_checks import deterministic_process_compliance_scorer
 from raidar.scoring.process_checks.manifest import PROCESS_COMPLIANCE
 from raidar.scoring.process_checks.outputs import not_found, runner_of
+from tests.scorer_support import traced_memory_context
 from tests.trace_trial_support import (
     TracedStep,
     agent_step,
     codex_exec,
     codex_patch,
-    traced_context,
     trajectory,
 )
 
@@ -45,7 +45,7 @@ def _ran(step_id: int, call_id: str, cmd: str, output: str | None) -> dict[str, 
 
 def _ctx(tmp_path: Path, *traces: dict, **config: Any) -> AssessContext:
     steps = [TracedStep(f"checkpoint_{i}", trace=trace) for i, trace in enumerate(traces, 1)]
-    return traced_context(tmp_path, steps, **config)
+    return traced_memory_context(tmp_path, steps, config=config)
 
 
 def _values(ctx: AssessContext) -> dict[tuple[str, str], Observation]:

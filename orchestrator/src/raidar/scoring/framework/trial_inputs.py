@@ -22,7 +22,7 @@ from __future__ import annotations
 import hashlib
 import json
 import tomllib
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
@@ -65,12 +65,13 @@ class BundleCache:
     """Loaded bundles and their digests, shared across the trials of one rescore."""
 
     loaded: dict[Path, tuple[VerifierBundle, str]] = field(default_factory=dict)
+    loader: Callable[[Path], VerifierBundle] = load_bundle
 
     def get(self, root: Path) -> tuple[VerifierBundle, str]:
         key = root.resolve()
         if key not in self.loaded:
             try:
-                bundle = load_bundle(key)
+                bundle = self.loader(key)
             except BundleError as exc:
                 raise BundleUnavailableError(f"oracle bundle unusable: {exc}") from exc
             self.loaded[key] = (bundle, bundle.digest())
@@ -104,6 +105,14 @@ def _read_result(trial_dir: Path) -> Mapping[str, Any]:
 
 def _executed_steps(trial_dir: Path, result: Mapping[str, Any]) -> list[_Executed]:
     """The steps Harbor ran, in execution order."""
+    names = sorted(path.name for path in (trial_dir / VERIFIER_RECORD_DIR / "steps").glob("*"))
+    return _executed_from(trial_dir, result, names)
+
+
+def _executed_from(
+    trial_dir: Path, result: Mapping[str, Any], oracle_steps: Sequence[str]
+) -> list[_Executed]:
+    """The executed steps of a result; a one-shot trial's only step is its oracle record's."""
     step_results = result.get("step_results")
     if step_results:
         if not isinstance(step_results, list):
@@ -117,13 +126,14 @@ def _executed_steps(trial_dir: Path, result: Mapping[str, Any]) -> list[_Execute
                 _Executed(name, True, item.get("agent_result"), item.get("agent_execution"))
             )
         return executed
-    records = sorted(path.name for path in (trial_dir / VERIFIER_RECORD_DIR / "steps").glob("*"))
-    if len(records) != 1:
+    if len(oracle_steps) != 1:
         raise TrialInputError(
             f"{trial_dir}: a trial without step_results needs exactly one oracle record, "
-            f"found {records}"
+            f"found {list(oracle_steps)}"
         )
-    return [_Executed(records[0], False, result.get("agent_result"), result.get("agent_execution"))]
+    return [
+        _Executed(oracle_steps[0], False, result.get("agent_result"), result.get("agent_execution"))
+    ]
 
 
 def _timestamp(value: Any) -> datetime | None:
@@ -201,12 +211,36 @@ def _configured_bundle(trial_dir: Path) -> Path | None:
         path = trial_dir / name
         if not path.is_file():
             continue
-        verifier = _read_json(path).get("verifier")
-        kwargs = verifier.get("kwargs") if isinstance(verifier, dict) else None
-        root = kwargs.get("oracle_bundle") if isinstance(kwargs, dict) else None
-        if isinstance(root, str) and root:
-            return Path(root)
+        root = _oracle_bundle_of(_read_json(path))
+        if root is not None:
+            return root
     return None
+
+
+def _oracle_bundle_of(config: Mapping[str, Any]) -> Path | None:
+    verifier = config.get("verifier")
+    kwargs = verifier.get("kwargs") if isinstance(verifier, dict) else None
+    root = kwargs.get("oracle_bundle") if isinstance(kwargs, dict) else None
+    return Path(root) if isinstance(root, str) and root else None
+
+
+def _bundle_root(
+    trial_dir: Path,
+    records: Mapping[str, StepRecord],
+    override: Path | None,
+    configured: Callable[[], Path | None],
+) -> Path:
+    """Where the planned checkpoints' bundle is: override, else the records', else configured."""
+    if len({record.bundle.digest for record in records.values()}) > 1:
+        raise TrialInputError(f"{trial_dir}: oracle records name several bundles")
+    first = next(iter(records.values()), None)
+    root = override or (Path(first.bundle.root) if first else configured())
+    if root is None:
+        raise TrialInputError(
+            f"{trial_dir}: cannot locate the oracle bundle for the planned checkpoints; "
+            "pass --bundle"
+        )
+    return root
 
 
 def _bundle(
@@ -215,18 +249,10 @@ def _bundle(
     override: Path | None,
     cache: BundleCache,
 ) -> VerifierBundle:
-    digests = {record.bundle.digest for record in records.values()}
-    if len(digests) > 1:
-        raise TrialInputError(f"{trial_dir}: oracle records name several bundles")
-    first = next(iter(records.values()), None)
-    root = override or (Path(first.bundle.root) if first else _configured_bundle(trial_dir))
-    if root is None:
-        raise TrialInputError(
-            f"{trial_dir}: cannot locate the oracle bundle for the planned checkpoints; "
-            "pass --bundle"
-        )
+    root = _bundle_root(trial_dir, records, override, lambda: _configured_bundle(trial_dir))
     bundle, digest = cache.get(root)
-    if digests and digest not in digests:
+    recorded = {record.bundle.digest for record in records.values()}
+    if recorded and digest not in recorded:
         raise TrialInputError(
             f"bundle at {root} does not match the digest recorded for {trial_dir}"
         )
@@ -237,11 +263,17 @@ def _snapshot(
     trial_dir: Path, relative: str, expected: str | None
 ) -> tuple[Path | None, str | None]:
     path = trial_dir / relative
-    if not path.is_dir():
+    return _checked_snapshot(path, tree_digest(path) if path.is_dir() else None, expected)
+
+
+def _checked_snapshot(
+    path: Path, digest: str | None, expected: str | None
+) -> tuple[Path | None, str | None]:
+    """The stored snapshot (None when absent and never graded) if it is the one graded."""
+    if digest is None:
         if expected is not None:
             raise TrialInputError(f"graded snapshot missing: {path}")
         return None, None
-    digest = tree_digest(path)
     if expected is not None and digest != expected:
         raise TrialInputError(f"snapshot changed since grading: {path}")
     return path, digest
@@ -333,25 +365,58 @@ def _recorded_steps(trial_dir: Path) -> tuple[str, ...]:
     """
     record_path = trial_dir.parent.parent / TRIAL_RECORDS_DIR / f"{trial_dir.name}.json"
     if record_path.is_file():
-        try:
-            return TrialRecord.model_validate(_read_json(record_path)).planned_steps
-        except ValueError as exc:
-            raise TrialInputError(f"{record_path}: invalid trial record: {exc}") from exc
+        return _trial_record_steps(record_path, _read_json(record_path))
     for name in _VERIFIER_CONFIG_FILES:
         config_path = trial_dir / name
         if not config_path.is_file():
             continue
-        task = _read_json(config_path).get("task")
-        root = task.get("path") if isinstance(task, Mapping) else None
-        if isinstance(root, str) and root:
-            try:
-                document = tomllib.loads((Path(root) / "task.toml").read_text())
-                return tuple(step["name"] for step in document.get("steps", ()))
-            except (OSError, ValueError, KeyError, TypeError) as exc:
-                raise TrialInputError(
-                    f"{trial_dir}: cannot read planned task steps: {exc}"
-                ) from exc
+        planned = _task_plan(trial_dir, _read_json(config_path), Path.read_text)
+        if planned is not None:
+            return planned
     raise TrialInputError(f"{trial_dir}: no retained trial record or configured task plan")
+
+
+def _trial_record_steps(record_path: Path, document: Mapping[str, Any]) -> tuple[str, ...]:
+    try:
+        return TrialRecord.model_validate(document).planned_steps
+    except ValueError as exc:
+        raise TrialInputError(f"{record_path}: invalid trial record: {exc}") from exc
+
+
+def _task_plan(
+    trial_dir: Path, config: Mapping[str, Any], read_text: Callable[[Path], str]
+) -> tuple[str, ...] | None:
+    """The step names of the task a Harbor config points at; None when it names no task."""
+    task = config.get("task")
+    root = task.get("path") if isinstance(task, Mapping) else None
+    if not (isinstance(root, str) and root):
+        return None
+    try:
+        document = tomllib.loads(read_text(Path(root) / "task.toml"))
+        return tuple(step["name"] for step in document.get("steps", ()))
+    except (OSError, ValueError, KeyError, TypeError) as exc:
+        raise TrialInputError(f"{trial_dir}: cannot read planned task steps: {exc}") from exc
+
+
+def _plan(
+    trial_dir: Path,
+    names: Sequence[str],
+    available: Sequence[tuple[str, str]],
+    ran: Sequence[str],
+) -> list[tuple[str, str]]:
+    """The planned (step, checkpoint) pairs; recorded and executed steps must be prefixes."""
+    planned = list(available[: len(names)])
+    if not names or list(names) != [name for name, _ in planned]:
+        raise TrialInputError(
+            f"{trial_dir}: recorded steps {tuple(names)} are not a prefix of the planned "
+            f"checkpoints {[name for name, _ in available]}"
+        )
+    if list(ran) != [name for name, _ in planned[: len(ran)]]:
+        raise TrialInputError(
+            f"{trial_dir}: executed steps {list(ran)} are not a prefix of the planned "
+            f"checkpoints {[name for name, _ in planned]}"
+        )
+    return planned
 
 
 def _planned_steps(
@@ -361,25 +426,20 @@ def _planned_steps(
     bundle: VerifierBundle,
 ) -> tuple[StepInputs, ...]:
     """Every planned checkpoint in order; the executed ones must be a prefix of the plan."""
-    names = _recorded_steps(trial_dir)
     available = [(step.name, step.checkpoint) for step in bundle.manifest.steps]
-    planned = available[: len(names)]
-    if not names or list(names) != [name for name, _ in planned]:
-        raise TrialInputError(
-            f"{trial_dir}: recorded steps {names} are not a prefix of the planned "
-            f"checkpoints {[name for name, _ in available]}"
-        )
     ran = [item.step for item in executed]
-    if ran != [name for name, _ in planned[: len(ran)]]:
-        raise TrialInputError(
-            f"{trial_dir}: executed steps {ran} are not a prefix of the planned "
-            f"checkpoints {[name for name, _ in planned]}"
-        )
+    planned = _plan(trial_dir, _recorded_steps(trial_dir), available, ran)
     reached = tuple(
         _step_inputs(trial_dir, item, checkpoint, records.get(item.step))
         for item, (_, checkpoint) in zip(executed, planned, strict=False)
     )
     return reached + tuple(_unreached(name, checkpoint) for name, checkpoint in planned[len(ran) :])
+
+
+def _check_problems(trial_dir: Path, recorded: set[str], bundle: VerifierBundle) -> None:
+    """Every oracle record must name the bundle's problem."""
+    if recorded - {bundle.manifest.problem}:
+        raise TrialInputError(f"{trial_dir}: oracle records name other problems {recorded}")
 
 
 def load_trial_context(
@@ -394,9 +454,7 @@ def load_trial_context(
     executed = _executed_steps(trial_dir, result)
     records = _load_records(trial_dir, executed)
     bundle = _bundle(trial_dir, records, bundle_override, bundle_cache or BundleCache())
-    problems = {record.bundle.problem for record in records.values()}
-    if problems - {bundle.manifest.problem}:
-        raise TrialInputError(f"{trial_dir}: oracle records name other problems {problems}")
+    _check_problems(trial_dir, {record.bundle.problem for record in records.values()}, bundle)
     return AssessContext(
         problem=bundle.manifest.problem,
         steps=_planned_steps(trial_dir, executed, records, bundle),

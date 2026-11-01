@@ -27,6 +27,10 @@ and is better on E and R;
 attempt 4 of ``guided`` is an invalid trial (infra-excluded); attempt 2 of
 ``baseline`` has an ineligible H at checkpoint 3, so its headline S is
 ineligible with reasons.
+
+``synthetic_quality`` builds the same design in memory (trials, Assessments under made-up
+keys, Jev decisions, gate records) with nothing written; the fast tests read that, and a slow
+seam test shows the on-disk fixture projects to the same Quality view.
 """
 
 from __future__ import annotations
@@ -35,6 +39,7 @@ import hashlib
 import json
 import random
 import shutil
+from collections.abc import Iterator
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -51,6 +56,8 @@ from raidar.contract.trial import (
 )
 from raidar.engine.job.assessment import lock_rescore_config
 from raidar.evaluation.analysis.sources import read_lock
+from raidar.evaluation.review.quality.labels import JevAudit
+from raidar.evaluation.review.quality.sources import ExperimentInfo, TrialSource
 from raidar.scoring.framework.builtin_manifests import CODE_QUALITY, CORRECTNESS
 from raidar.scoring.framework.result import (
     AssessResult,
@@ -60,7 +67,7 @@ from raidar.scoring.framework.result import (
     Span,
     transition_subject,
 )
-from raidar.scoring.framework.store import AssessmentStore
+from raidar.scoring.framework.store import Assessment, AssessmentStore, ScorerIdentity
 from raidar.scoring.judge.audit import (
     AuditLog,
     DecisionRecord,
@@ -70,10 +77,21 @@ from raidar.scoring.judge.audit import (
 )
 from raidar.scoring.judge.policies import PolicyMode
 from raidar.scoring.judge.rubric import RUBRIC_POLICY
+from raidar.scoring.verification_effort.records import StepGate
 from tests.review_fixtures.projection.trials import write_bundle
-from tests.review_fixtures.quality.gate import VERIFICATION_EFFORT, gate_result
+from tests.review_fixtures.quality.gate import (
+    VERIFICATION_EFFORT,
+    gate_records,
+    gate_result,
+    memory_gate_result,
+    parse_gate,
+)
 from tests.review_fixtures.quality.inputs import write_inputs
-from tests.review_fixtures.quality.lock import default_metric, write_synthetic_lock
+from tests.review_fixtures.quality.lock import (
+    default_metric,
+    synthetic_analysis,
+    write_synthetic_lock,
+)
 from tests.review_fixtures.quality.store import FixtureAssessments
 
 EXPERIMENT = "synthetic-quality"
@@ -341,12 +359,13 @@ def _record(trial: _Trial) -> TrialRecord:
     )
 
 
-def _decisions(audit: AuditLog, trial: _Trial) -> None:
+def _decision_records(trial: _Trial) -> list[DecisionRecord]:
     if trial.attempt > 1:
-        return
+        return []
+    records = []
     for number, checkpoint in enumerate(CHECKPOINTS[:3]):
         flagged = (number + trial.attempt) % 2 == 0
-        audit.append(
+        records.append(
             DecisionRecord(
                 timestamp=_TIMESTAMP,
                 request_id=f"jevp_synthetic-{trial.trial_id}-{number}",
@@ -364,6 +383,17 @@ def _decisions(audit: AuditLog, trial: _Trial) -> None:
                 counts_toward_verdicts=False,
             )
         )
+    return records
+
+
+def _designs() -> Iterator[_Trial]:
+    """The design's trials with their measurements drawn, in the order they were run."""
+    rng = random.Random(_SEED)
+    for attempt in range(BLOCKS):
+        for arm in ARMS:
+            trial = _Trial(arm=arm, attempt=attempt, rng=random.Random(rng.random()))
+            _measure(trial)
+            yield trial
 
 
 def generate_quality_fixture(dest: Path) -> Path:
@@ -406,41 +436,144 @@ def generate_quality_fixture(dest: Path) -> Path:
     assessments = FixtureAssessments(settings)
     bundle = write_bundle(dest / "bundle", PROBLEM, CHECKPOINTS)
     audit = AuditLog.for_store(dest / "store")
-    rng = random.Random(_SEED)
-    for attempt in range(BLOCKS):
-        for arm in ARMS:
-            trial = _Trial(arm=arm, attempt=attempt, rng=random.Random(rng.random()))
-            _measure(trial)
-            record = write_inputs(job_dir, _record(trial), bundle)
-            (job_dir / "trial-records" / f"{trial.trial_id}.json").write_text(
-                record.model_dump_json(indent=2), encoding="utf-8"
-            )
-            trial_dir = job_dir / record.trial_dir
-            gate = gate_result(
+    for trial in _designs():
+        record = write_inputs(job_dir, _record(trial), bundle)
+        (job_dir / "trial-records" / f"{trial.trial_id}.json").write_text(
+            record.model_dump_json(indent=2), encoding="utf-8"
+        )
+        trial_dir = job_dir / record.trial_dir
+        gate = gate_result(
+            trial_dir,
+            CHECKPOINTS,
+            gated=trial.arm == GATED_ARM,
+            seed=_digest("gate", trial.trial_id),
+            problem=PROBLEM,
+        )
+        store.put(
+            assessments.assessment(
+                CODE_QUALITY.ref,
                 trial_dir,
-                CHECKPOINTS,
-                gated=arm == GATED_ARM,
-                seed=_digest("gate", trial.trial_id),
-                problem=PROBLEM,
+                AssessResult(
+                    status=AssessStatus.OK,
+                    observations=tuple(trial.observations),
+                    evidence=tuple(trial.evidence),
+                ),
             )
-            store.put(
-                assessments.assessment(
-                    CODE_QUALITY.ref,
-                    trial_dir,
-                    AssessResult(
-                        status=AssessStatus.OK,
-                        observations=tuple(trial.observations),
-                        evidence=tuple(trial.evidence),
-                    ),
-                )
+        )
+        store.put(
+            assessments.assessment(
+                CORRECTNESS.ref,
+                trial_dir,
+                AssessResult(status=AssessStatus.OK, observations=tuple(trial.correctness)),
             )
-            store.put(
-                assessments.assessment(
-                    CORRECTNESS.ref,
-                    trial_dir,
-                    AssessResult(status=AssessStatus.OK, observations=tuple(trial.correctness)),
-                )
-            )
-            store.put(assessments.assessment(VERIFICATION_EFFORT.ref, trial_dir, gate))
-            _decisions(audit, trial)
+        )
+        store.put(assessments.assessment(VERIFICATION_EFFORT.ref, trial_dir, gate))
+        for decision in _decision_records(trial):
+            audit.append(decision)
     return dest
+
+
+SCORERS = (CORRECTNESS.ref, CODE_QUALITY.ref, VERIFICATION_EFFORT.ref)
+JOBS_ROOT = Path("jobs")
+
+
+@dataclass(frozen=True)
+class SyntheticQuality:
+    """The synthetic design as in-memory inputs: no run directory, store or audit log is written.
+
+    ``assessments`` are keyed by ``(review id, scorer ref)``; ``gates`` by each step's agent dir.
+    """
+
+    trials: tuple[TrialSource, ...]
+    assessments: dict[tuple[str, str], Assessment]
+    decisions: tuple[DecisionRecord, ...]
+    gates: dict[Path, StepGate]
+
+    def find(self, ref: str, trial: TrialSource) -> Assessment | None:
+        return self.assessments.get((trial.review_id, ref))
+
+    def audit(self) -> JevAudit:
+        by_trial: dict[str, list[DecisionRecord]] = {}
+        for decision in self.decisions:
+            by_trial.setdefault(str(decision.trial), []).append(decision)
+        return JevAudit(decisions=by_trial, labels={})
+
+    def read_gate(self, trace_dir: Path) -> StepGate | None:
+        return self.gates.get(trace_dir)
+
+
+def experiment_info(*, baseline_arm: str | None = ARMS[0]) -> ExperimentInfo:
+    """What the synthetic lock says (the run's lock is not read from a file)."""
+    return ExperimentInfo(
+        lock_sha256=_digest("lock"),
+        baseline_arm=baseline_arm,
+        metric=default_metric(len(CHECKPOINTS)),
+        analysis=synthetic_analysis(
+            baseline_arm=baseline_arm or "", problem=PROBLEM, checkpoints=len(CHECKPOINTS)
+        ),
+        scorers=SCORERS,
+    )
+
+
+def memory_assessment(ref: str, trial: TrialSource, result: AssessResult) -> Assessment:
+    """An Assessment of ``trial`` under a made-up key (steps carry the trial's snapshots)."""
+    steps = [
+        {"step": step, "snapshot": digest} for step, digest in trial.snapshot_digests().items()
+    ]
+    return Assessment(
+        key=_digest("assessment", ref, trial.review_id),
+        scorer=ScorerIdentity(
+            ref=ref, manifest_digest=_digest("manifest", ref), implementation_digest=None
+        ),
+        config={},
+        tool_lock={},
+        inputs={"steps": steps},
+        result=result,
+    )
+
+
+def memory_trial_source(trial: _Trial, experiment: ExperimentInfo) -> TrialSource:
+    record = _record(trial)
+    return TrialSource(
+        jobs_root=JOBS_ROOT,
+        job_dir=JOBS_ROOT / EXPERIMENT / RUN_ID,
+        job_id=RUN_ID,
+        finished_at=_TIMESTAMP,
+        record=record,
+        experiment=experiment,
+    )
+
+
+def synthetic_quality() -> SyntheticQuality:
+    """The synthetic design's trials, Assessments, Jev decisions and gate records in memory."""
+    experiment = experiment_info()
+    sources: list[TrialSource] = []
+    assessments: dict[tuple[str, str], Assessment] = {}
+    decisions: list[DecisionRecord] = []
+    gates: dict[Path, StepGate] = {}
+    for trial in _designs():
+        source = memory_trial_source(trial, experiment)
+        sources.append(source)
+        found: dict[str, StepGate] | None = None
+        if trial.arm == GATED_ARM:
+            records = gate_records(CHECKPOINTS, _digest("gate", trial.trial_id))
+            found = {checkpoint: parse_gate(record) for checkpoint, record in records.items()}
+            gates |= {
+                source.trial_dir / "steps" / checkpoint / "agent": gate
+                for checkpoint, gate in found.items()
+            }
+        results = {
+            CODE_QUALITY.ref: AssessResult(
+                status=AssessStatus.OK,
+                observations=tuple(trial.observations),
+                evidence=tuple(trial.evidence),
+            ),
+            CORRECTNESS.ref: AssessResult(
+                status=AssessStatus.OK, observations=tuple(trial.correctness)
+            ),
+            VERIFICATION_EFFORT.ref: memory_gate_result(found, CHECKPOINTS),
+        }
+        for ref, result in results.items():
+            assessments[(source.review_id, ref)] = memory_assessment(ref, source, result)
+        decisions.extend(_decision_records(trial))
+    return SyntheticQuality(tuple(sources), assessments, tuple(decisions), gates)

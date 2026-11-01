@@ -29,7 +29,7 @@ from __future__ import annotations
 import json
 import re
 import time
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
 from dataclasses import dataclass, replace
 from enum import StrEnum
 from pathlib import Path
@@ -66,6 +66,18 @@ _JOB_DEPTH = 2
 _UNSAFE_ID = re.compile(r"[^A-Za-z0-9._-]")
 
 
+def review_trial_id(manifest: Mapping[str, Any], job_name: str, trial_name: str) -> str:
+    """The review id of a trial in the job ``manifest`` describes (``job_name`` if it has no id).
+
+    ``<experiment>.<job>.<trial>``, or ``<job>/<trial>`` when the manifest names no experiment.
+    """
+    experiment = manifest.get("experiment")
+    job_id = manifest.get("job_id") or job_name
+    if not experiment:  # the Quality view also attaches ``<job>/<trial>``
+        return f"{job_id}/{trial_name}"
+    return _UNSAFE_ID.sub("-", f"{experiment}.{job_id}.{trial_name}")
+
+
 def qualified_trial_id(trial_dir: Path) -> str:
     """``<experiment>.<job>.<trial>`` for a trial inside a run, else the directory name.
 
@@ -80,11 +92,7 @@ def qualified_trial_id(trial_dir: Path) -> str:
                 run = json.loads(manifest.read_text(encoding="utf-8"))
             except (OSError, json.JSONDecodeError) as exc:
                 raise RescoreError(f"cannot read {manifest}: {exc}") from exc
-            experiment = run.get("experiment")
-            job_id = run.get("job_id") or candidate.name
-            if not experiment:  # the Quality view also attaches ``<job>/<trial>``
-                return f"{job_id}/{trial_dir.name}"
-            return _UNSAFE_ID.sub("-", f"{experiment}.{job_id}.{trial_dir.name}")
+            return review_trial_id(run, candidate.name, trial_dir.name)
         candidate = candidate.parent
     return trial_dir.name
 
@@ -196,6 +204,56 @@ def _registrations(
     return registrations
 
 
+def assess_trials(
+    store: AssessmentStore,
+    registrations: Sequence[ScorerRegistration],
+    trials: Iterable[tuple[str, AssessContext]],
+    *,
+    config: Mapping[str, Mapping[str, Any]] | None = None,
+    replay: bool = False,
+    identity_for: Callable[[ScorerRegistration], ScorerIdentity] = scorer_identity,
+) -> list[AssessmentRecord]:
+    """Assess each loaded trial with every scorer, each under its own scorer config.
+
+    ``trials`` is consumed lazily: a trial is assessed before the next one is loaded. A scorer's
+    identity (it hashes the implementation source) is derived once, when the first trial reaches
+    it, so a run that fails to load its first trial never pays for it.
+    """
+    identities: dict[str, ScorerIdentity] = {}
+    records: list[AssessmentRecord] = []
+    for trial_id, loaded in trials:
+        for registration in registrations:
+            ref = registration.manifest.ref
+            if ref not in identities:
+                identities[ref] = identity_for(registration)
+            ctx = replace(loaded, config=dict((config or {}).get(ref, {})))
+            records.append(
+                assess(
+                    store,
+                    registration,
+                    ctx,
+                    trial=trial_id,
+                    replay=replay,
+                    identity=identities[ref],
+                )
+            )
+    return records
+
+
+def _loaded_trials(
+    trials: Sequence[Path],
+    load: Callable[[Path], AssessContext],
+    trial_id: Callable[[Path], str] = qualified_trial_id,
+) -> Iterator[tuple[str, AssessContext]]:
+    """Each trial's review id and context, loading one trial at a time."""
+    for trial_dir in trials:
+        try:
+            loaded = load(trial_dir)
+        except TrialInputError as exc:
+            raise RescoreError(str(exc)) from exc
+        yield trial_id(trial_dir), loaded
+
+
 def rescore_path(
     target: Path,
     scorer_refs: Sequence[str],
@@ -209,31 +267,21 @@ def rescore_path(
 ) -> list[AssessmentRecord]:
     """Assess every trial under ``target`` (a trial or job dir) with each scorer."""
     registrations = _registrations(scorer_refs, registry, config or {})
-    identities = [(registration, scorer_identity(registration)) for registration in registrations]
     try:
         trials = trial_dirs(target)
     except RegradeError as exc:
         raise RescoreError(str(exc)) from exc
-    records: list[AssessmentRecord] = []
     bundles = BundleCache()
-    for trial_dir in trials:
-        try:
-            loaded = load_trial_context(
-                trial_dir,
-                inventory_policy=inventory_policy,
-                bundle_override=bundle_override,
-                bundle_cache=bundles,
-            )
-        except TrialInputError as exc:
-            raise RescoreError(str(exc)) from exc
-        trial_id = qualified_trial_id(trial_dir)
-        for registration, identity in identities:
-            scorer_config = dict((config or {}).get(registration.manifest.ref, {}))
-            ctx = replace(loaded, config=scorer_config)
-            records.append(
-                assess(store, registration, ctx, trial=trial_id, replay=replay, identity=identity)
-            )
-    return records
+    loaded = _loaded_trials(
+        trials,
+        lambda trial_dir: load_trial_context(
+            trial_dir,
+            inventory_policy=inventory_policy,
+            bundle_override=bundle_override,
+            bundle_cache=bundles,
+        ),
+    )
+    return assess_trials(store, registrations, loaded, config=config, replay=replay)
 
 
 def report_payload(records: Sequence[AssessmentRecord]) -> dict[str, object]:

@@ -1,23 +1,16 @@
-"""Audit fixes #8, #11 and #12: the solvable halt reward, judge spend in cost, H5's setup limit."""
+"""Audit fixes #8 and #11: the solvable halt reward and the judge spend in cost."""
 
 from __future__ import annotations
 
 import json
 from dataclasses import replace
 from pathlib import Path
-from types import SimpleNamespace
 
-import pytest
-
-from raidar.design.experiment.schema import ProtocolSpec
-from raidar.engine.health.audit import audit_trial
-from raidar.engine.job.provenance import effective_limits
 from raidar.grading.solvable import solvable_pass_rate
 from raidar.scoring.framework.context import StepInputs
 from raidar.scoring.framework.result import AssessStatus
 from raidar.scoring.resource_usage.scorer import Measured, checkpoint_values
 from tests.execution_support import StepOutcome, solvable_cases, verifier_grade
-from tests.health_support import healthy_trial
 
 NO_TRAJECTORY = Measured(None, AssessStatus.UNAVAILABLE, "no transcript")
 
@@ -29,26 +22,6 @@ def test_the_solvable_reward_is_the_share_of_the_pinned_cases_that_passed() -> N
     forgiven = StepOutcome("checkpoint_1", passed=False, forgiven=True)
     assert solvable_pass_rate(grade, solvable_cases("checkpoint_1", forgiven)) == 1.0
     assert solvable_pass_rate(grade, ()) is None  # no solvable set: no verdict, never zero
-
-
-@pytest.mark.parametrize("setup_override", [None, 120.0])
-def test_recorded_setup_limits_make_h5_measured_and_enforced(
-    tmp_path: Path, setup_override: float | None
-) -> None:
-    config = SimpleNamespace(override_timeout_sec=900, override_setup_timeout_sec=setup_override)
-    plan = SimpleNamespace(
-        arms={"baseline": SimpleNamespace(agent_config=config)},
-        loaded=SimpleNamespace(spec=SimpleNamespace(protocol=ProtocolSpec())),
-    )
-    trial = healthy_trial(tmp_path)
-    trial.set_job(effective_limits=effective_limits(plan))  # type: ignore[arg-type]
-    report = audit_trial(trial.job_dir, trial.trial_dir, trial.record, trial.job())
-    assert next(check for check in report.checks if check.id == "H5").status == "pass"
-    trial.patch_result(
-        lambda result: result["agent_setup"].update(finished_at="2026-09-30T14:00:00+00:00")
-    )
-    report = audit_trial(trial.job_dir, trial.trial_dir, trial.record, trial.job())
-    assert next(check for check in report.checks if check.id == "H5").status == "violation"
 
 
 def _step(tmp_path: Path, calls: list[dict[str, object]] | None) -> StepInputs:

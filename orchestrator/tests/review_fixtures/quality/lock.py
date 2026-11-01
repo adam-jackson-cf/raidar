@@ -34,6 +34,15 @@ def default_metric(checkpoints: int) -> str:
     return DEFAULT_METRIC_REGISTRY.default_for_checkpoints(checkpoints).ref
 
 
+def synthetic_analysis(*, baseline_arm: str, problem: str, checkpoints: int) -> dict[str, object]:
+    """The lock's ``analysis`` section (what ``ExperimentInfo.analysis`` carries)."""
+    return {
+        "baseline_arm": baseline_arm,
+        **PINNED_THRESHOLDS,
+        "outcome_types": declared_outcome_types({problem: checkpoints}),
+    }
+
+
 def write_synthetic_lock(
     experiment_file: Path,
     *,
@@ -44,11 +53,9 @@ def write_synthetic_lock(
     checkpoints: int,
 ) -> str:
     """Write the lock beside ``experiment_file`` and return its ``lock_sha256``."""
-    analysis = {
-        "baseline_arm": baseline_arm,
-        **PINNED_THRESHOLDS,
-        "outcome_types": declared_outcome_types({problem: checkpoints}),
-    }
+    analysis = synthetic_analysis(
+        baseline_arm=baseline_arm, problem=problem, checkpoints=checkpoints
+    )
     lock = seal_lock(
         {
             "lock_version": LOCK_VERSION,

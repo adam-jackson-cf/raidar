@@ -5,7 +5,7 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
-from raidar.grading.models import CaseStatus
+from raidar.scoring.framework.context import AssessContext
 from raidar.scoring.framework.inventory import (
     GENERATED_MARKER_CLAIM,
     INVALID_EVIDENCE,
@@ -14,9 +14,8 @@ from raidar.scoring.framework.inventory import (
     build_inventory,
     matches_glob,
 )
-from raidar.scoring.framework.rescore import rescore_path
-from raidar.scoring.framework.store import AssessmentStore
-from tests.scorer_support import StepFixture, fake_registry, write_files, write_trial
+from tests.code_quality_support import memory_step
+from tests.scorer_support import FakeScorer, write_files
 
 HIDING_SNAPSHOT = {
     ".gitignore": "app/secret/\n*.py\n",
@@ -129,18 +128,12 @@ def test_assessor_globs_are_anchored_to_the_full_path() -> None:
 
 def test_scorers_see_hidden_code_through_the_context_inventory(tmp_path: Path) -> None:
     files = {k: v for k, v in HIDING_SNAPSHOT.items() if not k.startswith(("__", ".venv"))}
-    trial = write_trial(
-        tmp_path / "trial", [StepFixture("checkpoint_1", files, (CaseStatus.PASSED,))]
-    )
-    store = AssessmentStore(tmp_path / "store")
-    (record,) = rescore_path(trial, ["fake-quality@1"], store, fake_registry())
-    assessment = store.get(record.key)
-    assert assessment is not None
-    counted = {
-        o.subject: o.value for o in assessment.result.observations if o.metric == "production_files"
-    }
+    write_files(tmp_path / "snapshot", files)
+    ctx = AssessContext("p", (memory_step("checkpoint_1", tmp_path / "snapshot"),))
+    result = FakeScorer().assess(ctx)
+    counted = {o.subject: o.value for o in result.observations if o.metric == "production_files"}
     # core, secret/impl, marked, lizard_marked and proto/schema (no assessor glob here).
     assert counted == {"checkpoint_1": 5}
-    evidence = {e.path for e in assessment.result.evidence}
+    evidence = {e.path for e in result.evidence}
     assert {"app/secret/impl.py", "app/marked.py"} <= evidence
-    assert all(loc.endswith(":1") for e in assessment.result.evidence for loc in e.locations())
+    assert all(loc.endswith(":1") for e in result.evidence for loc in e.locations())

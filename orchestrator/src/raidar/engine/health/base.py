@@ -29,37 +29,65 @@ def make_check(check_id: str, status: HealthStatus, detail: str, **evidence: Any
     )
 
 
+def attempted_steps(record: TrialRecord) -> tuple[StepResult, ...]:
+    """The steps that started: the ones a trial's audit holds to its record files."""
+    return tuple(
+        r
+        for r in record.step_results
+        if r.checkpoint_state is not CheckpointState.NOT_ATTEMPTED and r.termination != NOT_STARTED
+    )
+
+
+def read_ledger(trial_dir: Path, step: str) -> StepRecord | None:
+    """A step's verifier ledger, or None when it is absent or unreadable."""
+    record_dir = step_record_dir(trial_dir, step)
+    if not (record_dir / RECORD_FILE).is_file():
+        return None
+    try:
+        return load_step_record(record_dir)
+    except ValueError:
+        return None
+
+
 class Audit:
-    """What one trial left behind, read once: the record, the job manifest and the step ledgers."""
+    """What one trial left behind, read once: the record, the job manifest, Harbor's result and
+    the step ledgers (``None`` for a step the verifier never graded)."""
 
     def __init__(
-        self, job_dir: Path, trial_dir: Path, record: TrialRecord, job: Mapping[str, Any]
+        self,
+        job_dir: Path,
+        trial_dir: Path,
+        record: TrialRecord,
+        job: Mapping[str, Any],
+        *,
+        result: Mapping[str, Any] | None,
+        ledgers: Mapping[str, StepRecord | None],
     ) -> None:
         self.job_dir = job_dir
         self.trial_dir = trial_dir
         self.record = record
         self.job = job
-        self.result = read_result(trial_dir)
-        self.items = step_results(self.result)
-        self.attempted: tuple[StepResult, ...] = tuple(
-            r
-            for r in record.step_results
-            if r.checkpoint_state is not CheckpointState.NOT_ATTEMPTED
-            and r.termination != NOT_STARTED
+        self.result = result
+        self.items = step_results(result)
+        self.attempted = attempted_steps(record)
+        self._ledgers = ledgers
+
+    @classmethod
+    def from_disk(
+        cls, job_dir: Path, trial_dir: Path, record: TrialRecord, job: Mapping[str, Any]
+    ) -> Audit:
+        """Read the trial's ``result.json`` and every attempted step's ledger from ``trial_dir``."""
+        return cls(
+            job_dir,
+            trial_dir,
+            record,
+            job,
+            result=read_result(trial_dir),
+            ledgers={r.step: read_ledger(trial_dir, r.step) for r in attempted_steps(record)},
         )
-        self._ledgers: dict[str, StepRecord | None] = {}
 
     def ledger(self, step: str) -> StepRecord | None:
-        if step not in self._ledgers:
-            record_dir = step_record_dir(self.trial_dir, step)
-            try:
-                loaded = (
-                    load_step_record(record_dir) if (record_dir / RECORD_FILE).is_file() else None
-                )
-            except ValueError:
-                loaded = None
-            self._ledgers[step] = loaded
-        return self._ledgers[step]
+        return self._ledgers.get(step)
 
     def graded(self) -> list[tuple[StepResult, StepRecord]]:
         pairs = ((r, self.ledger(r.step)) for r in self.attempted)

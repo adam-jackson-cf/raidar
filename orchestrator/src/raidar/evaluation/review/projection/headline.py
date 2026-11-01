@@ -23,6 +23,7 @@ from __future__ import annotations
 from collections.abc import Collection, Mapping
 from dataclasses import dataclass, field
 from decimal import Decimal
+from typing import cast
 
 from raidar.contract.references import RegistryReferenceError
 from raidar.contract.trial import CheckpointState, TrialRecord
@@ -235,10 +236,8 @@ def policy_shares(policy: Metric) -> tuple[float, float]:
     k = policy.min_checkpoints
     ones = {CORRECTNESS: 1, **dict.fromkeys(policy.inertia_weights, 1)}
     zeros = {CORRECTNESS: 1, **dict.fromkeys(policy.inertia_weights, 0)}
-    low = policy.score(checkpoints=k, components=zeros).score
-    high = policy.score(checkpoints=k, components=ones).score
-    if low is None or high is None:
-        raise ValueError(f"{policy.ref} does not score a fully measured trial")
+    low = cast(Decimal, policy.score(checkpoints=k, components=zeros).score)
+    high = cast(Decimal, policy.score(checkpoints=k, components=ones).score)
     return float(low / 100), float((high - low) / 100)
 
 

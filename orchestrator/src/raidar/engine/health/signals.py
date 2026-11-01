@@ -8,7 +8,7 @@ the reaper reports. See ``raidar.engine.health.audit`` for the full check list.
 from __future__ import annotations
 
 import json
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from pathlib import Path
 from typing import Any
 
@@ -211,7 +211,11 @@ def check_t1(a: Audit) -> HealthCheck:
     return make_check("T1", status, detail, **evidence)
 
 
-def check_t2(a: Audit) -> HealthCheck:
+def check_t2(
+    a: Audit,
+    *,
+    read_findings: Callable[[Path, Path, Path, str], list[str]] = tamper_findings,
+) -> HealthCheck:
     trial_id = a.record.trial.trial_id
     expected = (a.job.get("records_manifests") or {}).get(trial_id)
     if expected is None:
@@ -223,7 +227,7 @@ def check_t2(a: Audit) -> HealthCheck:
         )
         return make_check("T2", UNMEASURED, f"records manifest not verifiable: {why}")
     record_file = a.job_dir / TRIAL_RECORDS_DIR / f"{trial_id}.json"
-    findings = tamper_findings(a.trial_dir, record_file, a.job_dir, expected)
+    findings = read_findings(a.trial_dir, record_file, a.job_dir, expected)
     if findings:
         return make_check(
             "T2",

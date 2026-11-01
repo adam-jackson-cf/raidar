@@ -67,6 +67,10 @@ def _clean_first_time(tmp_path: Path, name: str = CP2):
     return item
 
 
+def test_a_step_with_no_trace_ran_without_a_gate_record() -> None:
+    assert read_step_gate(None) is None
+
+
 def test_a_trajectory_without_gate_records_is_not_applicable_never_zero(tmp_path: Path) -> None:
     bare = step(tmp_path, CP1)
     ungated = step(tmp_path, CP2)

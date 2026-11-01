@@ -110,9 +110,8 @@ def discover_job_dirs(roots: Iterable[Path]) -> list[Path]:
     return sorted(found)
 
 
-def experiment_lock(path: Path) -> ExperimentLock:
-    """The sealed lock at ``path`` (as ``raidar analyze`` reads it), with what the review needs."""
-    document = read_lock(path)
+def lock_from_document(document: Mapping[str, Any], path: Path | None) -> ExperimentLock:
+    """What the review needs of a sealed lock document (``AnalysisInputError`` when malformed)."""
     try:
         spec = ExperimentSpec.model_validate(document["spec"])
         execution = document["execution"]
@@ -129,6 +128,11 @@ def experiment_lock(path: Path) -> ExperimentLock:
         )
     except (KeyError, TypeError, ValueError) as exc:
         raise AnalysisInputError(f"{path} is not an experiment lock: {exc}") from exc
+
+
+def experiment_lock(path: Path) -> ExperimentLock:
+    """The sealed lock at ``path`` (as ``raidar analyze`` reads it), with what the review needs."""
+    return lock_from_document(read_lock(path), path)
 
 
 class LockIndex:
@@ -177,21 +181,17 @@ def load_job(job_dir: Path, locks: LockIndex) -> JobSource:
     )
 
 
-def load_sources(job_roots: Sequence[Path], locks: Sequence[Path]) -> list[JobSource]:
+def admit_jobs(loaded: Sequence[tuple[Path, JobSource | AnalysisInputError]]) -> list[JobSource]:
     """Collect projectable jobs and admit their evidence under analysis' integrity gate.
 
     Missing locks and empty jobs are diagnosed individually; incompatible
     provenance or changed sealed evidence refuses the collection explicitly.
     """
-    index = LockIndex(locks)
     sources = []
-    for job_dir in discover_job_dirs(job_roots):
-        try:
-            source = load_job(job_dir, index)
-        except AnalysisInputError as exc:
-            print(f"Skipping run, lock unavailable: {job_dir}: {exc}", file=sys.stderr)
-            continue
-        if source.records:
+    for job_dir, source in loaded:
+        if isinstance(source, AnalysisInputError):
+            print(f"Skipping run, lock unavailable: {job_dir}: {source}", file=sys.stderr)
+        elif source.records:
             sources.append(source)
         else:
             print(f"Skipping run without trial records: {job_dir}", file=sys.stderr)
@@ -201,3 +201,15 @@ def load_sources(job_roots: Sequence[Path], locks: Sequence[Path]) -> list[JobSo
     return [
         replace(source, integrity_note=notes.get(source.job_dir.resolve())) for source in sources
     ]
+
+
+def load_sources(job_roots: Sequence[Path], locks: Sequence[Path]) -> list[JobSource]:
+    """The projectable jobs under ``job_roots``, read from disk and admitted (``admit_jobs``)."""
+    index = LockIndex(locks)
+    loaded: list[tuple[Path, JobSource | AnalysisInputError]] = []
+    for job_dir in discover_job_dirs(job_roots):
+        try:
+            loaded.append((job_dir, load_job(job_dir, index)))
+        except AnalysisInputError as exc:
+            loaded.append((job_dir, exc))
+    return admit_jobs(loaded)
