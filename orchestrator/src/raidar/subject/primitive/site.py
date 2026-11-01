@@ -18,6 +18,7 @@ from pathlib import Path
 from typing import Any, Literal
 
 from pydantic import JsonValue
+from raidar_contract.call import CallContext
 from raidar_contract.package.manifest import StagePackage
 
 from raidar.subject.primitive.calls import (
@@ -89,14 +90,14 @@ class PackageSite:
 
     def context(self, *, round_: int, carry: Mapping[str, JsonValue]) -> dict[str, JsonValue]:
         """The call context file's content (public contract: call protocol)."""
-        return {
-            "task": self.task,
-            "params": dict(self.params),
-            "round": round_,
-            "carry": dict(carry),
-            "state": self.watch,
-            "outputs": self.outputs,
-        }
+        return CallContext(
+            task=self.task,
+            params=dict(self.params),
+            round=round_,
+            carry=dict(carry),
+            state=self.watch,
+            outputs=self.outputs,
+        ).document()
 
 
 @dataclass(frozen=True)
