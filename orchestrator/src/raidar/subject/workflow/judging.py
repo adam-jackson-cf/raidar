@@ -27,10 +27,10 @@ from collections.abc import Callable, Collection, Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import Any
 
+from define_tool.aspects import REGRESSION, appears
+from define_tool.featuredef import Criterion, Feature
 from raidar.judge.protocol import NoulCriteria, NoulQuestion
 from raidar.subject.workflow import pysource
-from raidar.subject.workflow.define_tool.aspects import REGRESSION, appears
-from raidar.subject.workflow.define_tool.featuredef import Criterion, Feature
 from raidar.subject.workflow.definition import JudgeSettings
 
 ASPECT_ASSERTED = "aspect_asserted"

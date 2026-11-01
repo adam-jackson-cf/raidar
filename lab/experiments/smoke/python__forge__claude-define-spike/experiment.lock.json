@@ -1075,7 +1075,7 @@
       "tree-sitter-language-pack": "0.13.0"
     }
   },
-  "document_sha256": "79c0c422a83b5d5547f839e009b141ac9efb8412f1c53b065a0e33ea1ee944b7",
+  "document_sha256": "35ca24f6560be7f58569dc49f8891aec602c235b6278d55c4c0296a87fd10522",
   "execution": {
     "arms": {
       "define": {
@@ -1093,13 +1093,13 @@
           "version_pin": "2.1.285",
           "workflow_skills": "placement.skills .claude/skills in the workspace /app"
         },
-        "digest": "2a404520d1df7db117a8e0601d2cd142968188048be64e9000e8301e7e9a2b01",
+        "digest": "38138f438cf24daa8f0b0358f78b0c30241a4b7efad0bde22069dff4c7c6bfab",
         "model": "claude-sonnet-4-6",
         "packages": {},
         "primitive_code": {
-          "build": "b638973b5b83519aabfba68bea01680b6bfa0d97fcdcba0fb716e07638dd8f02",
-          "define": "b638973b5b83519aabfba68bea01680b6bfa0d97fcdcba0fb716e07638dd8f02",
-          "verify": "b638973b5b83519aabfba68bea01680b6bfa0d97fcdcba0fb716e07638dd8f02"
+          "build": "f8a15e14c3b45409a2e2cab025e9e2059b18cb16d6ddb055ea76c13f206284bd",
+          "define": "f8a15e14c3b45409a2e2cab025e9e2059b18cb16d6ddb055ea76c13f206284bd",
+          "verify": "f8a15e14c3b45409a2e2cab025e9e2059b18cb16d6ddb055ea76c13f206284bd"
         },
         "provider": "anthropic",
         "reasoning": "low",
@@ -1928,7 +1928,7 @@
     "source_sha256": "1e2c8625a8376d6c5a1f03cd969e1fd0f9629b19e4f8dce51b0291e3c5af3219",
     "spec_sha256": "35b88b34f8501fef470e7fd80e2bb3ae2cd63e20c91dc51185d76a2bc1e04552"
   },
-  "lock_sha256": "652e7f08eb2fee6cf6acb2315e6a862a9a67021523739bb75c625508dd68f079",
+  "lock_sha256": "71c10c78fb10641f54bdc7891dc465338f2fda5c8f5eb1015a02cc281cc623c6",
   "lock_version": 5,
   "overrides": {
     "flags": {},
@@ -1937,7 +1937,7 @@
   "sections": {
     "analysis": "f7f0b52ed6909ba0f3864eb9e7f7d513625da8dc445234304b8aa033c4343cb6",
     "assessment": "d62fbb3e311c0de90c2a9b809818c0b33eaffd3c85f0757955d0614572b14292",
-    "execution": "652e7f08eb2fee6cf6acb2315e6a862a9a67021523739bb75c625508dd68f079",
+    "execution": "71c10c78fb10641f54bdc7891dc465338f2fda5c8f5eb1015a02cc281cc623c6",
     "toolchain": "9a32fba5858fad219ac72112d73a8896da8790e53180ce35ddc3f94710a30cbc"
   },
   "spec": {

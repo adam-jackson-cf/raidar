@@ -15,8 +15,8 @@ from collections.abc import Callable, Collection, Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import Any
 
-from raidar.subject.workflow.define_tool import featuredef
-from raidar.subject.workflow.define_tool.aspects import REGRESSION
+from define_tool import featuredef
+from define_tool.aspects import REGRESSION
 
 
 def _names(items: Sequence[str]) -> str:

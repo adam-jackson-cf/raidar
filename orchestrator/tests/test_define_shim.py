@@ -11,8 +11,8 @@ from pathlib import Path
 
 import pytest
 
-import raidar.subject.workflow.define_tool as payload
-from raidar.subject.workflow.define_tool import tool
+import define_tool as payload
+from define_tool import tool
 
 ISSUE = (
     "# Greeting\n\nThe greeting is printed when the program runs.\n\n"

@@ -4,17 +4,17 @@ from __future__ import annotations
 
 import pytest
 
-from raidar.subject.workflow.define_tool import labelled, normative
-from raidar.subject.workflow.define_tool.enumerated import (
+from define_tool import labelled, normative
+from define_tool.enumerated import (
     Exercised,
     Listing,
     exercised,
     item_exercised,
     untested,
 )
-from raidar.subject.workflow.define_tool.labelled import labelled_list
-from raidar.subject.workflow.define_tool.normative import enumerations
-from raidar.subject.workflow.define_tool.unitrules import V2
+from define_tool.labelled import labelled_list
+from define_tool.normative import enumerations
+from define_tool.unitrules import V2
 
 # --- what a labelled list is -----------------------------------------------------------
 

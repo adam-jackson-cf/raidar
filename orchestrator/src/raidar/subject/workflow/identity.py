@@ -29,6 +29,7 @@ from raidar_contract.agent import AgentName
 from raidar_contract.canonical import digest_json
 from raidar_contract.package.manifest import StagePackage
 
+from raidar.contract.paths import stages_root
 from raidar.contract.source_digest import SOURCE_DIGEST_SCHEME, python_source_digest
 from raidar.subject.primitive.registry import PRIMITIVE_MODULES
 
@@ -158,9 +159,17 @@ def _inventory(roots: tuple[str, ...], adapter: AgentName | None) -> dict[str, P
     return _files(modules)
 
 
+def spike_payload() -> dict[str, Path]:
+    """Package-owned tool bytes uploaded by the retained spike runtime."""
+    source = stages_root() / "raidar" / "define" / "tool" / "src"
+    return {path.relative_to(source).as_posix(): path for path in sorted(source.rglob("*.py"))}
+
+
 @cache
-def _digest(roots: tuple[str, ...], adapter: AgentName | None) -> str:
+def _digest(roots: tuple[str, ...], adapter: AgentName | None, payload: bool = False) -> str:
     files = _inventory(roots, adapter)
+    if payload:
+        files |= spike_payload()
     return digest_json(
         {
             "scheme": SOURCE_DIGEST_SCHEME,
@@ -206,6 +215,8 @@ def package_primitives(packages: Iterable[StagePackage]) -> dict[str, str]:
 def spike_code(stages: Iterable[str], adapter: AgentName) -> dict[str, str]:
     """``{stage type: digest}`` of the spike stage types (its runner and factory included)."""
     return {
-        stage: _digest((SPIKE_STAGE_ENTRIES[stage], "raidar.subject.workflow.runner"), adapter)
+        stage: _digest(
+            (SPIKE_STAGE_ENTRIES[stage], "raidar.subject.workflow.runner"), adapter, payload=True
+        )
         for stage in stages
     }

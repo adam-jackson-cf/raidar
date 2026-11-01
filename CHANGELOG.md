@@ -4,6 +4,20 @@ All notable changes to this project are documented in this file.
 
 ## Unreleased
 
+### Define stage package (phase 5A step 4)
+
+- Ship `raidar/define@1` with setup, a sealing prerequisite, a bounded stop and `criteria/1`
+  plus definition outputs. Move the 21 existing `define_tool` modules into the package's
+  tool source, migrate every caller and retain their unit-test collection in root quality.
+  There is no old module-path alias or duplicate implementation.
+- Give setup, gate and stop calls 60-second budgets and allow three stop resumes. Preserve
+  unit rules 2 and two accepted clarification rounds. Malformed agent drafts request one
+  repair and then close, while corrupt trusted context remains an instrument failure.
+- Retained spike callers import the package-owned tool through the editable source path.
+  Their identities explicitly inventory those moved bytes, without normalizing them back to
+  old paths; regenerate locks for the real source-identity change. Phase 5B removes this
+  legacy host import along with the spike, and wires reply/judge consumption of `criteria/1`.
+
 ### Verify stage package (phase 5A step 3)
 
 - Ship `raidar/verify@1`: the spike's lint, format, strict-mypy and pytest checks on pinned

@@ -10,8 +10,8 @@ from typing import cast
 
 import pytest
 
-from raidar.subject.workflow.define_tool import schemas, status, tool
-from raidar.subject.workflow.define_tool.draft import DraftError
+from define_tool import schemas, status, tool
+from define_tool.draft import DraftError
 from tests import define_support as dbv
 
 

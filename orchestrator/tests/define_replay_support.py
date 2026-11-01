@@ -9,8 +9,8 @@ from __future__ import annotations
 
 import re
 
-from raidar.subject.workflow.define_tool import compact, featuredef, normative
-from raidar.subject.workflow.define_tool.core import JsonObject
+from define_tool import compact, featuredef, normative
+from define_tool.core import JsonObject
 
 _QUOTED = re.compile(r"[\"“]([^\"“”]+)[\"”]")
 _RUNG = re.compile(r"rung\s*(\d)")

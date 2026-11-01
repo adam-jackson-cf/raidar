@@ -11,11 +11,11 @@ from pathlib import Path
 
 import pytest
 
-from raidar.subject.workflow.define_tool import block, tool
-from raidar.subject.workflow.define_tool.block import Item
-from raidar.subject.workflow.define_tool.core import JsonObject
-from raidar.subject.workflow.define_tool.draft import Draft, DraftError
-from raidar.subject.workflow.define_tool.kinds import Kind
+from define_tool import block, tool
+from define_tool.block import Item
+from define_tool.core import JsonObject
+from define_tool.draft import Draft, DraftError
+from define_tool.kinds import Kind
 from tests import define_support as dbv
 
 
@@ -568,7 +568,7 @@ def test_the_package_runs_as_a_module(state: Path, monkeypatch: pytest.MonkeyPat
     monkeypatch.setenv(tool.STATE_ENV, str(state))
 
     with pytest.raises(SystemExit) as stopped:
-        runpy.run_module("raidar.subject.workflow.define_tool", run_name="__main__")
+        runpy.run_module("define_tool", run_name="__main__")
 
     assert stopped.value.code == 0
 
