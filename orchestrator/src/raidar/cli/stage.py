@@ -59,8 +59,7 @@ def stage_new(name: str, source_name: str) -> None:
     shutil.copytree(source, target, symlinks=False, ignore=shutil.ignore_patterns(*IGNORED))
     try:
         _set_manifest_name(target, target.name)
-        if load_stage_package(target).manifest.name != target.name:
-            raise click.ClickException(f"{source_name}: its manifest name could not be set")
+        load_stage_package(target)
     except (click.ClickException, StagePackageError, OSError, yaml.YAMLError) as error:
         shutil.rmtree(target)
         if isinstance(error, click.ClickException):

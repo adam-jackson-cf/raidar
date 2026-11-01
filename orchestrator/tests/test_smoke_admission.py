@@ -1,14 +1,28 @@
-"""Smoke-before-measure admission: match, each mismatch, unclean smokes and the override."""
+"""Smoke-before-measure admission: match, each mismatch, unclean smokes and the override.
+
+Smoke jobs are small in-memory records written as a few JSON files; no trial is run or audited.
+"""
 
 from __future__ import annotations
 
 import json
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
 import pytest
 
-from raidar.contract.trial import ExecutionValidity, TrialRecord, ValidityCheck
+from raidar.contract.trial import (
+    CheckpointState,
+    ExecutionValidity,
+    PlannedTrial,
+    ProgressionRule,
+    SnapshotInfo,
+    StepResult,
+    TrialHashes,
+    TrialRecord,
+    ValidityCheck,
+)
 from raidar.engine.health.admission import (
     EMPTY_TREE_DIGEST,
     AdmissionError,
@@ -18,10 +32,10 @@ from raidar.engine.health.admission import (
     mismatches,
     smoke_problem,
 )
-from raidar.engine.health.audit import audit_trial
 from raidar.engine.health.model import HealthCheck, HealthReport, write_health
 from tests.capability_support import CAPABILITIES, OTHER_HARNESS
-from tests.health_support import TRIAL_ID, HealthyTrial, healthy_trial
+
+TRIAL_ID = "b00-p0-baseline"
 
 RUNNER = {
     "commit": "abc",
@@ -65,14 +79,86 @@ def wanted(**changes: Any) -> dict[str, Any] | None:
     return identity(parts["lock"], parts["runner"], parts["recipes"], parts["target"])
 
 
-def smoke_job(root: Path, name: str = "smoke-01", **changes: Any) -> HealthyTrial:
+@dataclass
+class SmokeJob:
+    job_dir: Path
+    trial_dir: Path
+    record: TrialRecord
+
+    @property
+    def job_file(self) -> Path:
+        return self.job_dir / "job.json"
+
+    @property
+    def record_file(self) -> Path:
+        return self.job_dir / "trial-records" / f"{TRIAL_ID}.json"
+
+
+def trial_record(arm: str, *snapshots: tuple[str | None, str | None]) -> TrialRecord:
+    """A valid in-memory record: one step per ``(parent, own)`` snapshot digest pair.
+
+    Default is one step whose agent changed ``/app``.
+    """
+    pairs = snapshots or ((None, "a" * 64),)
+    steps = tuple(f"checkpoint_{n}" for n in range(1, len(pairs) + 1))
+    trial = PlannedTrial(
+        trial_id=TRIAL_ID,
+        attempt=0,
+        order=0,
+        sequence=0,
+        arm=arm,
+        problem="scb/adder@fixture",
+        problem_index=0,
+        steps=steps,
+        hashes=TrialHashes(
+            lock="l",
+            problem="p",
+            arm="a",
+            workflow="w",
+            packages="s",
+            primitive_code="s",
+            agent="g",
+            protocol="r",
+            trial="t",
+        ),
+    )
+    results = tuple(
+        StepResult(
+            trial_id=TRIAL_ID,
+            arm=arm,
+            attempt=0,
+            problem="scb/adder@fixture",
+            index=n,
+            step=step,
+            checkpoint=step,
+            checkpoint_state=CheckpointState.SOLVED,
+            snapshot=SnapshotInfo(path=f"steps/{step}/app", digest=own) if own else None,
+            parent_snapshot_digest=parent,
+        )
+        for n, (step, (parent, own)) in enumerate(zip(steps, pairs, strict=True))
+    )
+    return TrialRecord(
+        experiment="exp",
+        job_id="j",
+        trial=trial,
+        trial_dir=f"trials/{TRIAL_ID}",
+        progression=ProgressionRule(mode="continue", reward_key="strict_pass_rate"),
+        step_results=results,
+        reached=tuple(False for _ in steps),
+        reached_source="derived",
+        validity=ExecutionValidity(checks=(ValidityCheck(name="trial_completed", passed=True),)),
+    )
+
+
+def smoke_job(root: Path, name: str = "smoke-01", **changes: Any) -> SmokeJob:
     """A finished smoke job under ``root/<exp>/<name>``, clean unless ``changes`` say otherwise."""
     job_dir = root / "exp" / name
-    t = healthy_trial(root / ".work" / name, job_dir=job_dir)
     smoke_lock = changes.get("lock", lock("smoke"))
     arm = changes.get("executed_arm", next(iter(smoke_lock["execution"]["arms"])))
-    t.record = t.record.model_copy(update={"trial": t.record.trial.model_copy(update={"arm": arm})})
-    (job_dir / "trial-records" / f"{TRIAL_ID}.json").write_text(t.record.model_dump_json())
+    record = trial_record(arm, *changes.get("steps", ()))
+    job = SmokeJob(job_dir, job_dir / "trials" / TRIAL_ID, record)
+    job.record_file.parent.mkdir(parents=True)
+    job.record_file.write_text(job.record.model_dump_json())
     manifest = {
         "runner": changes.get("runner", RUNNER),
         "recipes": changes.get("recipes", RECIPES),
@@ -81,11 +167,11 @@ def smoke_job(root: Path, name: str = "smoke-01", **changes: Any) -> HealthyTria
         "finished_at": "2026-01-01T00:00:00+00:00",
         **changes.get("manifest", {}),
     }
-    t.job_file.write_text(json.dumps(manifest))
+    job.job_file.write_text(json.dumps(manifest))
     (job_dir / "job.lock.json").write_text(json.dumps(smoke_lock))
     if changes.get("health", True):
-        write_health(t.trial_dir, audit_trial(t.job_dir, t.trial_dir, t.record, t.job()))
-    return t
+        write_health(job.trial_dir, HealthReport(trial_id=TRIAL_ID, checks=()))
+    return job
 
 
 def decide(root: Path, **kwargs: Any) -> dict[str, Any]:
@@ -334,41 +420,61 @@ def test_an_invalid_trial_or_a_health_violation_is_not_clean(tmp_path: Path) -> 
     assert "health violation" in str(raised.value)
 
 
-def _steps(t: HealthyTrial, *digests: tuple[str | None, str | None]) -> TrialRecord:
-    """The trial's record with one step per ``(parent, own)`` snapshot digest pair."""
-    template = t.record.step_results[0]
-    assert template.snapshot is not None
-    results = tuple(
-        template.model_copy(
-            update={
-                "step": f"checkpoint_{n}",
-                "snapshot": template.snapshot.model_copy(update={"digest": own}),
-                "parent_snapshot_digest": parent,
-            }
-        )
-        for n, (parent, own) in enumerate(digests, 1)
-    )
-    record = t.record.model_copy(update={"step_results": results})
-    (t.job_dir / "trial-records" / f"{TRIAL_ID}.json").write_text(record.model_dump_json())
-    return record
-
-
 def test_a_smoke_whose_agent_wrote_nothing_in_any_step_is_not_clean(tmp_path: Path) -> None:
     a, b = "a" * 64, "b" * 64
-    for name, digests, why in [
+    for name, steps, why in [
         ("asked", [(None, EMPTY_TREE_DIGEST)], "checkpoint_1: the agent changed nothing"),
         ("stalled", [(None, a), (a, b), (b, b)], "checkpoint_3: the agent changed nothing"),
+        ("unrecorded", [(None, a), (a, None)], "checkpoint_2 recorded no /app snapshot"),
         ("worked", [(None, a), (a, b)], None),
     ]:
-        t = smoke_job(tmp_path, name)
-        _steps(t, *digests)
+        t = smoke_job(tmp_path, name, steps=steps)
         problem = smoke_problem(t.job_dir, json.loads(t.job_file.read_text()))
         assert (problem is None) if why is None else (why in str(problem)), (name, problem)
     assert decide(tmp_path)["smoke_job"] == "exp/worked"
-    only_asked = smoke_job(tmp_path / "other", "asked")
-    _steps(only_asked, (None, EMPTY_TREE_DIGEST))
+    smoke_job(tmp_path / "other", "asked", steps=[(None, EMPTY_TREE_DIGEST)])
     with pytest.raises(AdmissionError, match="exp/asked.*checkpoint_1: the agent changed nothing"):
         decide(tmp_path / "other")
+
+
+def test_a_smoke_with_a_missing_or_unreadable_trial_record_is_not_clean(tmp_path: Path) -> None:
+    missing = smoke_job(tmp_path, "missing")
+    missing.record_file.unlink()
+    garbled = smoke_job(tmp_path, "garbled")
+    garbled.record_file.write_text("{not json")
+
+    with pytest.raises(AdmissionError) as raised:
+        decide(tmp_path)
+
+    assert f"missing: trial {TRIAL_ID} has no record" in str(raised.value)
+    assert f"garbled: trial {TRIAL_ID} has an unreadable record" in str(raised.value)
+
+
+def test_an_aborted_or_trialless_smoke_is_not_clean(tmp_path: Path) -> None:
+    smoke_job(tmp_path, "aborted", manifest={"aborted": "interrupted"})
+    smoke_job(tmp_path, "trialless", manifest={"selected": []})
+
+    with pytest.raises(AdmissionError) as raised:
+        decide(tmp_path)
+
+    assert "aborted: did not finish" in str(raised.value)
+    assert "trialless: ran no trial" in str(raised.value)
+
+
+def test_a_job_with_an_unreadable_manifest_or_lock_is_no_smoke_candidate(tmp_path: Path) -> None:
+    broken = smoke_job(tmp_path, "broken-manifest")
+    broken.job_file.write_text("[1, 2]")
+    unlocked = smoke_job(tmp_path, "broken-lock")
+    (unlocked.job_dir / "job.lock.json").write_text("{not json")
+
+    recorded = decide(tmp_path, allow_unsmoked=True)
+
+    assert recorded["unmet"] == {"": "no smoke job found"}
+
+
+def test_an_identity_naming_an_arm_the_lock_does_not_record_is_unrecorded() -> None:
+    assert identity(lock("smoke"), RUNNER, RECIPES, TARGET, arm_ids={"arm-ghost"}) is None
+    assert identity(lock("smoke"), RUNNER, RECIPES, TARGET, arm_ids=set()) is None
 
 
 def test_no_smoke_refuses_with_the_way_forward_and_the_override_is_recorded(

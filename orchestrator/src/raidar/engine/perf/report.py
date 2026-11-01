@@ -93,8 +93,10 @@ def _split(
     return splits
 
 
-def build_report(job_dirs: Sequence[Path], loaded: JobSamples, *, min_samples: int) -> PerfReport:
-    """Checks, contention and per-contention splits of each breached p95 budget."""
+def report_from_samples(
+    loaded: JobSamples, contention: Contention, *, min_samples: int
+) -> PerfReport:
+    """Judge recorded samples and split breaches by the measured contention."""
     budget_set = loaded.budget_set
     checks = check_budgets(
         loaded.samples,
@@ -102,14 +104,19 @@ def build_report(job_dirs: Sequence[Path], loaded: JobSamples, *, min_samples: i
         min_samples=min_samples,
         multi_step=loaded.multi_step,
     )
-    try:
-        windows, untimed = _windows(loaded)
-        contention = measure_contention(job_dirs, windows, untimed)
-    except ValueError as error:  # malformed job.json / result.json, not a budget breach
-        raise PerfInputError(str(error)) from error
     splits = {
         index: _split(loaded, check, contention.trial_peaks, min_samples)
         for index, check in enumerate(checks)
         if check.verdict is Verdict.FAIL and not check.budget.tripwire
     }
     return PerfReport(checks, contention, splits, budget_set.label)
+
+
+def build_report(job_dirs: Sequence[Path], loaded: JobSamples, *, min_samples: int) -> PerfReport:
+    """Read concurrency windows and build the budget report."""
+    try:
+        windows, untimed = _windows(loaded)
+        contention = measure_contention(job_dirs, windows, untimed)
+    except ValueError as error:
+        raise PerfInputError(str(error)) from error
+    return report_from_samples(loaded, contention, min_samples=min_samples)

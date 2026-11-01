@@ -7,11 +7,13 @@ from pathlib import Path
 
 import pytest
 import yaml
+from click.testing import CliRunner
 from raidar_contract.package import StagePackageError
 from raidar_contract.package.registry import load_stage_package
 from raidar_contract.releases import ReleaseError, ReleaseKind
 from raidar_contract.workflow import load_package_workflow, package_workflow_digest
 
+from raidar.cli import main
 from raidar.subject.imports import PackageImportError, import_folder, import_issues, load_imports
 from raidar.subject.releases import released_workflow
 from tests.package_support import write_package
@@ -159,9 +161,77 @@ def test_release_check_requires_folder_and_every_historical_release_digest(tree)
         "[{}]",
         "[{name: raidar/docs, sha256: x, source: a}]",
         "[{name: fxl/docs, sha256: 1, source: a}]",
+        "[{name: fxl/docs, sha256: abc, source: a}]",
+        "[unterminated",
+        f"[{{name: fxl/docs, sha256: {'a' * 64}, source: a}}, "
+        f"{{name: fxl/other, sha256: {'a' * 64}, source: b}}]",
+    ],
+    ids=[
+        "mapping",
+        "empty-row",
+        "reserved-name",
+        "non-string",
+        "short-digest",
+        "yaml",
+        "duplicate",
     ],
 )
 def test_malformed_ledger_is_a_release_issue(tree, document: str) -> None:
     root = tree[0]
     (root / "lab/imports.yaml").write_text(document)
     assert import_issues(root)
+
+
+def test_a_malformed_digest_argument_is_refused(tree) -> None:
+    root, package, _ = tree
+    with pytest.raises(PackageImportError, match="64 lowercase hexadecimal"):
+        import_folder(ReleaseKind.STAGE, package, "fxl/docs", "ABC", "origin", root)
+
+
+def test_a_symlinked_install_folder_is_refused(tree) -> None:
+    root, package, digest = tree
+    elsewhere = root.parent / "elsewhere"
+    elsewhere.mkdir()
+    (root / "lab/stages").symlink_to(elsewhere, target_is_directory=True)
+    with pytest.raises(PackageImportError, match="symlinked folders are refused"):
+        import_folder(ReleaseKind.STAGE, package, "fxl/docs", digest, "origin", root)
+    assert list(elsewhere.iterdir()) == []
+
+
+def test_the_import_command_reports_what_it_installed_and_what_it_refused(
+    tree, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    root, package, digest = tree
+    monkeypatch.setattr("raidar.cli.imports.REPO_ROOT", root)
+    args = ["stage", "import", "fxl/docs", "--src", str(package), "--source", "origin"]
+
+    refused = CliRunner().invoke(main, [*args, "--sha256", "0" * 64])
+    imported = CliRunner().invoke(main, [*args, "--sha256", digest])
+
+    assert refused.exit_code != 0
+    assert "digest mismatch" in refused.output
+    assert imported.exit_code == 0, imported.output
+    assert "provenance is unverified" in imported.output
+    assert f"fxl/docs@1: {digest}" in imported.output
+    assert [row["name"] for row in load_imports(root)] == ["fxl/docs"]
+
+
+def test_the_workflow_import_command_is_refused_without_its_dependencies(
+    tree, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    root, _, _ = tree
+    monkeypatch.setattr("raidar.cli.imports.REPO_ROOT", root)
+    exported = root.parent / "workflow-export"
+    exported.mkdir()
+    (exported / "workflow.yaml").write_text(
+        "schema: 2\nname: checked\nbuild: {prompt: '%%%TASK%%%'}\nstages: [{use: fxl/docs@1}]\n"
+    )
+
+    result = CliRunner().invoke(
+        main,
+        ["workflow", "import", "fxl/checked", "--src", str(exported), "--sha256", "0" * 64]
+        + ["--source", "origin"],
+    )
+
+    assert result.exit_code != 0
+    assert not (root / "lab/workflows").exists()
