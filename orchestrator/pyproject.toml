@@ -128,8 +128,8 @@ precision = 2
 # Integrated fast-only measurement after the test-suite refactor, floored to hundredths.
 # Ratchet each floor up after every accepted change; never lower it.
 [tool.raidar.coverage]
-line_floor = 99.423
-branch_floor = 98.703
+line_floor = 99.43
+branch_floor = 98.72
 
 [tool.mypy]
 python_version = "3.12"

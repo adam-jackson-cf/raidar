@@ -174,9 +174,8 @@ def test_completed_assessments_are_rekeyed_when_grading_evidence_or_runtime_chan
 def test_completed_assessments_are_rekeyed_when_offline_grading_plugin_bytes_change(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    copied = copy_grading_sources(tmp_path / "implementation")
+    copied = copy_grading_sources(tmp_path / "implementation", monkeypatch)
     plugin = copied.parent / "runtime" / "raidar_oracle_plugin.py"
-    monkeypatch.setattr("raidar.grading.records.__file__", str(copied))
     store = AssessmentStore(tmp_path / "store")
     trial = two_step_trial(tmp_path / "trial")
     (original,) = rescore_path(trial, [V1], store, fake_registry())
