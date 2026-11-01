@@ -1993,6 +1993,7 @@ provides-extras = ["dev"]
 
 [[package]]
 name = "raidar-contract"
+version = "1.1.0"
 source = { editable = "../contract" }
 dependencies = [
     { name = "pydantic" },

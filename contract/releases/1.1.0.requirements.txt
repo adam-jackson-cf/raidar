@@ -1,0 +1,3 @@
+raidar-contract==1.1.0 \
+    --hash=sha256:f78f04e82cab5715d4ed6e3f4fc513eb4a2aed84ace18f6be7337bac11b8cc88 \
+    --hash=sha256:f1d46ed1cbca24832dc58261c4a0b2d4219129244f5f03d12a41c0cb549db471

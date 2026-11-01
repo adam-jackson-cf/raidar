@@ -2,13 +2,14 @@
 
 from __future__ import annotations
 
+from raidar_contract.call import parse_stop_result
+
 from raidar.subject.primitive.canary import FixtureRun
-from raidar.subject.primitive.stop import parse_result
 
 
 def result_status(stdout: bytes, tokens: tuple[str, ...]) -> str:
     """The status of a stop result's ``stdout``; ``ValueError`` names what makes it unusable."""
-    return parse_result(stdout, tokens).status
+    return parse_stop_result(stdout, tokens).status
 
 
 def stop_status(run: FixtureRun, tokens: tuple[str, ...]) -> tuple[str | None, str | None]:

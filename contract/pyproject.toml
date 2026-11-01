@@ -1,6 +1,6 @@
 [project]
 name = "raidar-contract"
-version = "1.0.0"
+version = "1.1.0"
 description = "Portable Raidar contract: stage/1, workflow schema 2, criteria/1, stage-tree/1, releases and the agent schema"
 requires-python = ">=3.12"
 dependencies = [
@@ -15,5 +15,9 @@ build-backend = "hatchling.build"
 [tool.hatch.build.targets.wheel]
 packages = ["src/raidar_contract"]
 
+[tool.hatch.build.targets.wheel.force-include]
+"conformance/check.py" = "raidar_contract/conformance/check.py"
+"conformance/cases.json" = "raidar_contract/conformance/cases.json"
+
 [tool.hatch.build.targets.sdist]
-include = ["src/raidar_contract", "pyproject.toml"]
+include = ["src/raidar_contract", "conformance", "pyproject.toml"]
