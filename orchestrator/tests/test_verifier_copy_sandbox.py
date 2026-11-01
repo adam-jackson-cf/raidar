@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import io
 import json
 import tarfile
@@ -415,3 +416,36 @@ async def test_environment_id_is_the_trimmed_image_id_or_an_error() -> None:
     for reply in (_Reply(code=1, out=b"No such image"), _Reply(out=b"  \n")):
         with pytest.raises(RuntimeError, match="grader image grader:1 is not available"):
             await _sandbox(_docker(image=reply)).environment_id()
+
+
+def test_staging_replaces_stale_submission_and_output_files(tmp_path: Path) -> None:
+    snapshot = tmp_path / "snapshot"
+    snapshot.mkdir()
+    (snapshot / "main.py").write_text("new implementation\n")
+    staging = tmp_path / "staging"
+    staging.mkdir()
+    (staging / "old-result").write_text("untrusted stale evidence")
+    app, out = sandbox_module.stage_snapshot(snapshot, staging)
+    assert (app / "main.py").read_text() == "new implementation\n"
+    assert list(out.iterdir()) == []
+    assert not (staging / "old-result").exists()
+
+
+async def test_cancellation_reaps_the_attached_process_and_removes_the_container(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    communicate = _Proc.communicate
+
+    async def cancelled(self: _Proc) -> tuple[bytes | None, bytes]:
+        if self.reply.out == b"cancelled":
+            raise asyncio.CancelledError
+        return await communicate(self)
+
+    monkeypatch.setattr(_Proc, "communicate", cancelled)
+    docker = _docker(start=_Reply(out=b"cancelled"))
+    with pytest.raises(asyncio.CancelledError):
+        await _sandbox(docker).run(_run(tmp_path))
+    attached = docker.procs[docker.verbs.index("start")]
+    assert attached.killed
+    assert docker.verbs[-1] == "rm"
