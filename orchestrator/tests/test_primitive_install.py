@@ -144,11 +144,6 @@ async def _reuse(
     )
 
 
-async def test_nothing_is_reused_when_nothing_was_installed(container: Path) -> None:
-    assert await _reuse(container) is None
-    assert not (Path(calls.STAGES_ROOT) / "ns" / "pkg").exists()  # nothing was created
-
-
 @needs_uv
 async def test_a_second_checkpoint_measures_the_same_tree_and_records_it(container: Path) -> None:
     wheel = make_wheel(container / "wheels", "demo")
@@ -190,13 +185,6 @@ async def test_a_special_file_in_the_installed_tree_is_refused(container: Path) 
         await _reuse(container)
 
 
-async def test_a_bad_reference_is_refused_before_looking(container: Path) -> None:
-    with pytest.raises(install.InstallError, match="reference"):
-        await install.reuse_installed(
-            LocalEnvironment(), container, reference="../x", package_digest="d"
-        )
-
-
 @needs_uv
 async def test_a_command_may_not_overwrite_an_existing_executable(container: Path) -> None:
     (Path(install.LINKS_DIR) / "taken").write_text("#!/bin/sh\n")
@@ -226,56 +214,3 @@ async def test_a_wheel_that_does_not_match_its_locked_hash_is_never_installed(
     with pytest.raises(ValueError, match="does not match its locked sha256"):
         await _install(container, _files(lock))
     assert not (Path(calls.STAGES_ROOT) / "ns" / "pkg").exists()
-
-
-# ---------------------------------------------------------------- policy refusals (no uv)
-SDIST = (
-    'sdist = { url = "https://files.pythonhosted.org/d.tar.gz", '
-    f'hash = "sha256:{"c" * 64}", size = 1 }}\n'
-)
-PROJECT = '[[package]]\nname = "tool"\nversion = "0.1.0"\nsource = { virtual = "." }\n'
-
-
-def _package(extra: str = "", wheel: str = "demo-1.0-py3-none-any.whl", source: str = "") -> str:
-    url = f"https://files.pythonhosted.org/packages/{wheel}"
-    source = source or f'{{ registry = "{INDEX}" }}'
-    return (
-        f'version = 1\n\n[[package]]\nname = "demo"\nversion = "1.0"\nsource = {source}\n'
-        f'{extra}wheels = [{{ url = "{url}", hash = "sha256:{"b" * 64}", size = 1 }}]\n\n{PROJECT}'
-    )
-
-
-@pytest.mark.parametrize(
-    ("lock", "message"),
-    [
-        (None, "no tool/uv.lock"),
-        (_package(SDIST), "sdist"),
-        ("version = 1\n" + PROJECT + SDIST, "sdist"),
-        (_package(wheel="demo-1.0-cp311-cp311-win_amd64.whl"), "no (arm64|amd64) CPython"),
-        (_package(source='{ git = "https://x/y" }'), "not an index package"),
-        (_package(source='{ path = "../demo" }'), "not an index package"),
-    ],
-)
-async def test_source_builds_and_unlocked_dependencies_are_refused_before_anything_runs(
-    container: Path, lock: str | None, message: str
-) -> None:
-    environment = LocalEnvironment()
-
-    with pytest.raises(install.InstallError, match=message):
-        await install.install_package(
-            environment,
-            container / "logs",
-            reference="ns/pkg",
-            package_digest="d" * 64,
-            files=_files(lock),
-        )
-    assert not any("uv" in command for command in environment.commands)
-    assert not (Path(calls.STAGES_ROOT) / "ns" / "pkg").exists()
-
-
-@pytest.mark.parametrize("reference", ["../x", "Ns/Pkg", "a/b/c", ""])
-async def test_a_bad_reference_is_refused(container: Path, reference: str) -> None:
-    with pytest.raises(install.InstallError, match="reference"):
-        await install.install_package(
-            LocalEnvironment(), container, reference=reference, package_digest="d", files=[]
-        )

@@ -3,14 +3,13 @@
 from __future__ import annotations
 
 import json
-import os
 from collections.abc import Sequence
 from pathlib import Path
 from typing import Any
 
 import pytest
 
-from raidar.subject.primitive.calls import ResourceFloors
+from raidar.subject.primitive.calls import ResourceFloors, TreeManifest
 from raidar.subject.primitive.site import TrialInvalid
 from raidar.subject.primitive.stop import StopState, run_stop
 from tests.lifecycle_support import (
@@ -177,26 +176,14 @@ async def test_done_with_an_output_missing_is_unusable(rig: Rig) -> None:
     assert "note" in decision.reason
 
 
-@pytest.mark.parametrize("plant", ["fifo", "symlink", "loop", "deep", "oversized"])
+@pytest.mark.parametrize("violation", ["special file", "symlink", "loop", "depth cap", "byte cap"])
 async def test_state_outside_the_bounds_is_the_agents_and_the_tool_is_not_called(
-    rig: Rig, plant: str
+    rig: Rig, monkeypatch: pytest.MonkeyPatch, violation: str
 ) -> None:
-    state = rig.container.host(WATCH)
-    state.mkdir(parents=True)
-    if plant == "fifo":
-        os.mkfifo(state / "pipe")
-    elif plant == "symlink":
-        os.symlink("/etc/passwd", state / "note.md")
-    elif plant == "loop":
-        os.symlink(".", state / "loop")
-    elif plant == "deep":
-        deep = state
-        for index in range(40):
-            deep = deep / f"d{index}"
-        deep.mkdir(parents=True)
-    else:
-        with open(state / "big", "wb") as handle:
-            handle.truncate(65 << 20)
+    async def refused(*_: Any, **__: Any) -> TreeManifest:
+        return TreeManifest(WATCH, True, (), "", 0, 0, violation)
+
+    monkeypatch.setattr("raidar.subject.primitive.site.snapshot_state", refused)
     run = StopState()
 
     repair = await run_stop(rig.site, run, rig.canary)

@@ -13,6 +13,7 @@ import pytest
 from raidar_contract.package.manifest import StagePackage
 from raidar_contract.package.registry import load_stage_package
 
+from raidar.subject.primitive import outputs
 from raidar.subject.primitive.calls import TransportError
 from raidar.subject.primitive.outputs import collect_outputs
 from raidar.subject.primitive.site import TrialInvalid
@@ -55,7 +56,9 @@ def write_report(rig: Rig, document: Any) -> None:
     path.write_text(json.dumps(document), encoding="utf-8")
 
 
-async def test_outputs_are_copied_hashed_and_validated_host_side(rig: Rig) -> None:
+async def test_outputs_are_copied_hashed_and_validated_host_side(
+    rig: Rig, monkeypatch: pytest.MonkeyPatch
+) -> None:
     rig.container.write_note("hello there world")
     write_report(rig, CRITERIA)
 
@@ -65,6 +68,23 @@ async def test_outputs_are_copied_hashed_and_validated_host_side(rig: Rig) -> No
     note = result.outputs["note"]
     assert note.sha256 == hashlib.sha256(b"hello there world").hexdigest()
     assert Path(note.host_path or "").read_text() == "hello there world"
+
+    snapshot = outputs.snapshot_state
+
+    async def changed(*args: Any, **kwargs: Any) -> Any:
+        manifest = await snapshot(*args, **kwargs)
+        return replace(
+            manifest,
+            entries=tuple(replace(entry, sha256="0" * 64) for entry in manifest.entries),
+        )
+
+    monkeypatch.setattr(outputs, "snapshot_state", changed)
+    changed_copy = await collect_outputs(rig.site, "changed")
+    assert changed_copy.problems == {
+        "note": "bytes changed during copy",
+        "report": "bytes changed during copy",
+    }
+    assert all(output.host_path is None for output in changed_copy.outputs.values())
 
 
 async def test_a_missing_output_is_reported_not_raised(rig: Rig) -> None:

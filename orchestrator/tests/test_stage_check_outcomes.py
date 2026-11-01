@@ -6,6 +6,7 @@ the gate engine are doubles. Authored fixtures are data; nothing here executes p
 
 from __future__ import annotations
 
+import asyncio
 import dataclasses
 import hashlib
 import json
@@ -23,8 +24,8 @@ from raidar.subject.primitive.calls import ResourceFloors, TransportError
 from raidar.subject.primitive.canary import StageCheckRecord
 from raidar.subject.primitive.gate import Attribution, GateInvalid, GateOutcome
 from raidar.subject.primitive.site import TrialInvalid
-from raidar.subject.workflow.identity import package_primitives
 from raidar.subject.workflow.stage_check import captured_states, record_json, replay_trial
+from raidar.subject.workflow.stage_container import ContainerError, PackContainer
 from tests.lifecycle_support import FakeContainer, ToolOutcome, note_digest, stop_json
 from tests.package_support import write_package
 from tests.stage_check_support import (
@@ -97,7 +98,7 @@ async def test_a_well_behaved_stop_passes_every_case_and_records_its_done_run(
     assert report.record == StageCheckRecord(
         package=rig.package.digest,
         pack="pack-recipe-1",
-        primitives=dict(package_primitives([rig.package])),
+        primitives=rig.primitives,
         stdout_sha256=_sha(done_stdout),
         outputs=note_digest(rig.container),
         disk_free=10**9,
@@ -934,3 +935,176 @@ def test_the_canonical_note_state_fixtures_meet_the_contract_for_its_stop_and_ga
 
     assert set(required_cases(package)) == {"done", "closed", "resume", "pass", "refuse"}
     assert static_problems(package) == []
+
+
+class _Process:
+    def __init__(self, code: int | None, out: bytes, err: bytes, hang: bool = False) -> None:
+        self.returncode = code
+        self._out, self._err, self._hang, self.killed = out, err, hang, False
+
+    async def communicate(self) -> tuple[bytes, bytes]:
+        if self._hang and not self.killed:
+            await asyncio.Event().wait()
+        return self._out, self._err
+
+    def kill(self) -> None:
+        self.killed = True
+
+
+class _Docker:
+    """An in-memory docker CLI: ``reply`` decides each argv's process; ``cp`` can plant files."""
+
+    def __init__(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        self.argvs: list[list[str]] = []
+        self.processes: list[_Process] = []
+        self.reply: Callable[[list[str]], _Process] = lambda argv: _Process(0, b"", b"")
+        self.on_cp: Callable[[list[str]], None] = lambda argv: None
+        monkeypatch.setattr(asyncio, "create_subprocess_exec", self._start)
+
+    async def _start(self, *argv: str, **_: Any) -> _Process:
+        self.argvs.append(list(argv))
+        if argv[3] == "cp":
+            self.on_cp(list(argv))
+        process = self.reply(list(argv))
+        self.processes.append(process)
+        return process
+
+    def verbs(self) -> list[str]:
+        return [argv[3] for argv in self.argvs]
+
+
+@pytest.fixture
+def docker(monkeypatch: pytest.MonkeyPatch) -> _Docker:
+    return _Docker(monkeypatch)
+
+
+def _pack() -> PackContainer:
+    return PackContainer("img", "ctx")
+
+
+async def test_the_pack_container_is_offline_and_always_removed(docker: _Docker) -> None:
+    with pytest.raises(RuntimeError, match="body"):
+        async with _pack() as container:
+            raise RuntimeError("body")
+
+    run = docker.argvs[0]
+    assert run[:3] == ["docker", "--context", "ctx"]
+    assert run[run.index("--network") + 1] == "none"
+    assert docker.verbs() == ["run", "rm"]
+    assert docker.argvs[1][-1] == container.name
+
+
+async def test_a_container_that_cannot_start_names_docker_stderr(docker: _Docker) -> None:
+    docker.reply = lambda argv: _Process(125, b"", b"x" * 600 + b"no such image\n")
+
+    with pytest.raises(ContainerError, match=r"docker run failed \(125\): x+no such image$"):
+        async with _pack():
+            raise AssertionError("never entered")
+
+    assert docker.verbs() == ["run"]  # nothing was created, so nothing is removed
+
+
+async def test_a_failing_removal_never_masks_the_body_or_fails_a_clean_block(
+    docker: _Docker,
+) -> None:
+    def reply(argv: list[str]) -> _Process:
+        if argv[3] == "rm":
+            raise OSError("docker is gone")
+        return _Process(0, b"", b"")
+
+    docker.reply = reply
+    async with _pack():
+        pass
+    with pytest.raises(ValueError, match="body"):
+        async with _pack():
+            raise ValueError("body")
+
+
+async def test_exec_reports_output_exit_code_user_workdir_and_sorted_environment(
+    docker: _Docker,
+) -> None:
+    docker.reply = lambda argv: _Process(7, b"seen\n", b"problem\n")
+
+    result = await _pack().exec("run it", cwd="/w", env={"B": "2", "A": "1"}, user="root")
+
+    assert (result.stdout, result.stderr, result.return_code) == ("seen\n", "problem\n", 7)
+    argv = docker.argvs[0]
+    assert argv[argv.index("--user") + 1] == "root"
+    assert argv[argv.index("--workdir") + 1] == "/w"
+    assert [argv[i + 1] for i, a in enumerate(argv) if a == "--env"] == ["A=1", "B=2"]
+    assert argv[-3:] == ["bash", "-c", "run it"]
+
+
+async def test_exec_defaults_to_the_agent_user_and_undecodable_output_is_replaced(
+    docker: _Docker,
+) -> None:
+    docker.reply = lambda argv: _Process(0, b"\xff ok", b"")
+
+    result = await _pack().exec("x")
+
+    assert result.stdout == "\ufffd ok"
+    argv = docker.argvs[0]
+    assert argv[argv.index("--user") + 1] == "1000"
+    assert "--workdir" not in argv
+
+
+async def test_exec_past_its_timeout_is_killed_and_reported_as_124(docker: _Docker) -> None:
+    docker.reply = lambda argv: _Process(None, b"", b"", hang=True)
+
+    result = await _pack().exec("sleep", timeout_sec=0)
+
+    assert result.return_code == 124
+    assert "timed out" in result.stderr
+    assert docker.processes[0].killed
+
+
+async def test_a_process_with_no_exit_code_counts_as_failed(docker: _Docker) -> None:
+    docker.reply = lambda argv: _Process(None, b"", b"")
+
+    assert (await _pack().exec("x")).return_code == 1
+
+
+async def test_a_failed_copy_raises_a_container_error_for_every_direction(
+    docker: _Docker, tmp_path: Path
+) -> None:
+    docker.reply = lambda argv: _Process(1, b"", b"no such file")
+    box = _pack()
+
+    for call in (
+        box.upload_file(tmp_path / "a", "/t"),
+        box.upload_dir(tmp_path, "/t"),
+        box.download_file("/s", tmp_path / "out" / "f"),
+        box.download_dir("/s", tmp_path / "d"),
+        box.download_dir_with_exclusions("/s", tmp_path / "x", ["junk"]),
+    ):
+        with pytest.raises(ContainerError, match=r"docker cp failed \(1\): no such file"):
+            await call
+
+    assert not (tmp_path / "x").exists()
+
+
+async def test_directory_downloads_copy_contents_and_drop_excluded_names_at_any_depth(
+    docker: _Docker, tmp_path: Path
+) -> None:
+    def plant(argv: list[str]) -> None:
+        scratch = Path(argv[-1])
+        (scratch / "keep").mkdir(parents=True, exist_ok=True)
+        (scratch / "keep" / "a.txt").write_text("a")
+        (scratch / "keep" / "junk").mkdir()
+        (scratch / "keep" / "junk" / "b").write_text("b")
+        (scratch / "junk.log").write_text("log")
+
+    docker.on_cp = plant
+    target = tmp_path / "result"
+    target.mkdir()
+    (target / "existing").write_text("mine")
+
+    box = _pack()
+    await box.download_dir_with_exclusions("/src", target, ["junk", "/junk.log"])
+
+    assert sorted(p.relative_to(target).as_posix() for p in target.rglob("*")) == [
+        "existing",
+        "keep",
+        "keep/a.txt",
+    ]
+    assert docker.argvs[0][-2] == f"{box.name}:/src/."

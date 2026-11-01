@@ -18,9 +18,11 @@ import pytest
 from harbor.models.agent.context import AgentContext
 from raidar_contract.workflow import load_package_workflow
 
+from raidar.subject.primitive.site import TrialInvalid
 from raidar.subject.workflow.runner import (
     PROMPT_FILE,
     RECORD_FILE,
+    SessionWatch,
     WorkflowRunner,
 )
 from raidar.subject.workflow.turns import TRAJECTORY_FILE, WORKFLOW_DIR
@@ -37,7 +39,7 @@ class FakeInner(CodexNative):
 
     prompts: list[str] = []
     tokens: tuple[int, int, int, float] | None = (120, 20, 30, 0.02)
-    failure: Exception | None = None
+    failure: BaseException | None = None
     on_run: Callable[[], None] | None = None
 
     @staticmethod
@@ -52,15 +54,17 @@ class FakeInner(CodexNative):
 
     async def run(self, instruction: str, environment: Any, context: AgentContext) -> None:
         type(self).prompts.append(instruction)
-        if type(self).on_run is not None:
-            type(self).on_run()
+        on_run = type(self).on_run
+        if on_run is not None:
+            on_run()
         (self.logs_dir / TRAJECTORY_FILE).write_text(
             json.dumps({"session_id": SESSION, "steps": [{"message": "done"}]})
         )
-        if type(self).failure is not None:
-            raise type(self).failure
-        if type(self).tokens is not None:
-            n_input, n_cached, n_output, cost = type(self).tokens
+        failure, tokens = type(self).failure, type(self).tokens
+        if failure is not None:
+            raise failure
+        if tokens is not None:
+            n_input, n_cached, n_output, cost = tokens
             context.n_input_tokens = n_input
             context.n_cache_tokens = n_cached
             context.n_output_tokens = n_output
@@ -212,3 +216,159 @@ def test_a_link_planted_in_the_agents_logs_is_named_and_never_copied(tmp_path: P
     assert not (published / "planted.txt").exists()
     assert not (published / "planted.txt").is_symlink()
     assert not (published / "sessions" / "deep.txt").is_symlink()
+
+
+class RemoteEnvironment(FakeEnvironment):
+    """A container whose ``/logs/agent`` is not mounted: Harbor downloads it after the run."""
+
+    capabilities = SimpleNamespace(mounted=False)
+
+    def __init__(self, refuse: str | None = None) -> None:
+        super().__init__()
+        self.refuse = refuse
+        self.downloaded: list[str] = []
+
+    async def exec(self, command: str, **options: Any) -> Any:
+        if self.refuse is not None and command.startswith(self.refuse):
+            raise ConnectionError("container gone")
+        return await super().exec(command, **options)
+
+    async def download_dir(self, source: str, target: Path) -> None:
+        self.downloaded.append(source)
+
+
+def test_a_container_that_cannot_lock_the_logs_does_not_lose_the_record(tmp_path: Path) -> None:
+    environment = RemoteEnvironment(refuse="rm -rf")
+
+    asyncio.run(
+        _runner(tmp_path).run(INSTRUCTION, environment, AgentContext())  # type: ignore[arg-type]
+    )
+
+    record = json.loads((tmp_path / WORKFLOW_DIR / RECORD_FILE).read_text())
+    assert record["turns"][0]["error"] is None
+
+
+def _seen(watch: SessionWatch, staged: Path, ctime: int | None, *, grew: bool = True) -> list[str]:
+    """The violation names of observing ``staged`` with every file's container ``ctime``."""
+    names = [path.relative_to(staged).as_posix() for path in staged.rglob("*") if path.is_file()]
+    ctimes = {name: ctime for name in names if ctime is not None}
+    found = watch.observe(staged, ctimes or None, ("sessions",), grew_expected=grew)
+    return [item["name"] for item in found]
+
+
+def test_a_session_log_that_only_grows_is_clean_and_one_written_without_growing_is_touched(
+    tmp_path: Path,
+) -> None:
+    log = tmp_path / "sessions" / "r.jsonl"
+    log.parent.mkdir()
+    watch = SessionWatch()
+
+    log.write_bytes(b"a\n")
+    assert _seen(watch, tmp_path, 1) == []
+    log.write_bytes(b"a\nb\n")
+    assert _seen(watch, tmp_path, 2) == []  # an append moves the ctime and the size
+    assert _seen(watch, tmp_path, 3) == ["session_log_touched"]  # moved, same bytes
+    assert _seen(watch, tmp_path, 4, grew=False) == []  # a turn that failed was not owed growth
+    assert _seen(watch, tmp_path, 4) == []  # a ctime that did not move is not a touch
+
+
+def test_a_session_log_whose_container_ctime_is_unknown_is_never_called_touched(
+    tmp_path: Path,
+) -> None:
+    log = tmp_path / "sessions" / "r.jsonl"
+    log.parent.mkdir()
+    log.write_bytes(b"a\n")
+    watch = SessionWatch()
+
+    assert _seen(watch, tmp_path, None) == []
+    assert _seen(watch, tmp_path, None) == []  # no ctime now, none before
+    assert _seen(watch, tmp_path, 7) == []  # one now, none before
+    assert _seen(watch, tmp_path, None) == []  # none now, one before
+
+
+@pytest.mark.parametrize(
+    "later",
+    [b"a\n", b"a\nc\n", b"x\nb\nc\n"],
+    ids=["shortened", "same-length-rewritten", "longer-with-altered-prefix"],
+)
+def test_a_session_log_whose_earlier_bytes_changed_is_rewritten(
+    tmp_path: Path, later: bytes
+) -> None:
+    log = tmp_path / "sessions" / "r.jsonl"
+    log.parent.mkdir()
+    log.write_bytes(b"a\nb\n")
+    watch = SessionWatch()
+    assert _seen(watch, tmp_path, 1) == []
+
+    log.write_bytes(later)
+
+    found = watch.observe(tmp_path, {"sessions/r.jsonl": 2}, ("sessions",), grew_expected=True)
+    assert [item["name"] for item in found] == ["session_log_rewritten"]
+    assert "sessions/r.jsonl" in found[0]["detail"]
+
+
+def test_a_removed_session_file_is_named_and_a_link_in_the_store_is_not_part_of_it(
+    tmp_path: Path,
+) -> None:
+    sessions = tmp_path / "sessions"
+    sessions.mkdir()
+    (sessions / "a.jsonl").write_bytes(b"1")
+    (sessions / "b.jsonl").write_bytes(b"2")
+    (tmp_path / "head.json").write_bytes(b"h")
+    (sessions / "link.jsonl").symlink_to(tmp_path / "head.json")
+    store = ("sessions", "head.json", "absent")
+    watch = SessionWatch()
+    assert watch.observe(tmp_path, None, store, grew_expected=True) == []
+
+    for gone in (sessions / "b.jsonl", sessions / "a.jsonl", tmp_path / "head.json"):
+        gone.unlink()
+    found = watch.observe(tmp_path, None, store, grew_expected=True)
+
+    assert [(item["name"], item["detail"].split(":")[0]) for item in found] == [
+        ("session_log_removed", "head.json"),
+        ("session_log_removed", "sessions/a.jsonl"),
+        ("session_log_removed", "sessions/b.jsonl"),
+    ]
+
+
+def test_an_instrument_failure_in_a_turn_is_recorded_invalid_and_not_raised_as_the_agents(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    FakeInner.failure = TrialInvalid("integrity", "the lock moved")
+    original_exec = FakeEnvironment.exec
+
+    async def readable_metadata(self: FakeEnvironment, command: str, **options: Any) -> Any:
+        result = await original_exec(self, command, **options)
+        if command.startswith("python3 "):
+            result.stdout = "{}"
+        return result
+
+    monkeypatch.setattr(FakeEnvironment, "exec", readable_metadata)
+
+    context, _ = _run(tmp_path)  # does not raise: the trial is invalid, not the agent wrong
+
+    record = json.loads((tmp_path / WORKFLOW_DIR / RECORD_FILE).read_text())
+    assert record["invalid"]["kind"] == "integrity"
+    assert record["invalid"]["detail"] == "the lock moved"
+    assert [(item["name"], item["turn"]) for item in record["integrity"]] == [
+        ("package_integrity", "packages")
+    ]
+    assert context.n_input_tokens is None
+
+
+def test_a_cancelled_turn_is_recorded_as_cut_and_the_cancellation_still_propagates(
+    tmp_path: Path,
+) -> None:
+    FakeInner.failure = asyncio.CancelledError()
+
+    with pytest.raises(asyncio.CancelledError):
+        asyncio.run(
+            _runner(tmp_path).run(
+                INSTRUCTION,
+                FakeEnvironment(),  # type: ignore[arg-type]
+                AgentContext(),
+            )
+        )
+
+    record = json.loads((tmp_path / WORKFLOW_DIR / RECORD_FILE).read_text())
+    assert record["turns"][0]["error"].startswith("CancelledError")
