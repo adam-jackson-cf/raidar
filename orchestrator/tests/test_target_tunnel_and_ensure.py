@@ -3,14 +3,19 @@
 from __future__ import annotations
 
 import json
+import os
+import signal
 import subprocess
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from pathlib import Path
+from types import SimpleNamespace
+from typing import Any
 
 import pytest
 from click.testing import CliRunner
 
 from raidar.cli import main
+from raidar.engine.target import transport as transport_module
 from raidar.engine.target.config import Target, parse_targets
 from raidar.engine.target.health import (
     TargetUnavailableError,
@@ -20,9 +25,17 @@ from raidar.engine.target.health import (
 )
 from raidar.engine.target.transport import (
     TransportPaths,
+    bounded_runner,
     docker_healthy,
+    pid_alive,
+    read_pid,
+    run_command,
+    spawn_detached,
     ssh_argv,
+    state_dir,
+    transport_down,
     transport_up,
+    tunnel_running,
 )
 
 TARGETS = """
@@ -402,3 +415,464 @@ def test_status_prints_facts_and_exits_non_zero_when_unreachable(
     assert down.exit_code == 1
     assert json.loads(down.output)["transport"]["host"] == "me@host"
     assert json.loads(down.output)["transport"]["alive"] is False
+
+
+# ---- subprocess seams: success, non-zero, timeout, malformed output ---------------------
+
+
+def test_run_command_reports_a_missing_binary_or_a_timeout_as_a_failed_process(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    outcome: list[Exception | subprocess.CompletedProcess[str]] = []
+
+    def run(argv: list[str], **_: Any) -> subprocess.CompletedProcess[str]:
+        result = outcome.pop(0)
+        if isinstance(result, Exception):
+            raise result
+        return result
+
+    monkeypatch.setattr(transport_module.subprocess, "run", run)
+    ok = subprocess.CompletedProcess(["x"], 0, stdout="fine", stderr="")
+    outcome[:] = [ok, FileNotFoundError("no ssh"), subprocess.TimeoutExpired(["x"], 1)]
+
+    assert run_command(["x"]).stdout == "fine"
+    missing = run_command(["x"])
+    timed_out = run_command(["x"], timeout=1)
+    assert (missing.returncode, timed_out.returncode) == (127, 127)
+    assert "no ssh" in missing.stderr
+    assert "timed out" in timed_out.stderr
+
+
+def test_the_tunnel_is_spawned_detached_into_its_log(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    seen: list[tuple[list[str], dict[str, Any]]] = []
+
+    def popen(argv: list[str], **kwargs: Any) -> SimpleNamespace:
+        seen.append((argv, kwargs))
+        return SimpleNamespace(pid=9)
+
+    monkeypatch.setattr(transport_module.subprocess, "Popen", popen)
+    log = tmp_path / "state" / "mbp.log"
+
+    process = spawn_detached(["ssh", "-N"], log)
+
+    assert process.pid == 9
+    assert log.parent.is_dir()
+    argv, kwargs = seen[0]
+    assert argv == ["ssh", "-N"]
+    assert kwargs["start_new_session"] is True
+    assert kwargs["stdin"] == subprocess.DEVNULL
+
+
+def test_the_state_dir_is_the_override_else_under_home(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setenv("RAIDAR_STATE_DIR", str(tmp_path / "run"))
+    assert state_dir() == tmp_path / "run"
+    monkeypatch.delenv("RAIDAR_STATE_DIR")
+    monkeypatch.setenv("HOME", str(tmp_path))
+    assert state_dir() == tmp_path / ".raidar" / "run"
+
+
+def test_the_ssh_forward_without_an_identity_uses_the_agent(tmp_path: Path) -> None:
+    text = TARGETS.replace('identity = "~/.ssh/key"\n', "")
+    mbp = dict(parse_targets(text, tmp_path / "t.toml").targets)["mbp"]
+    assert mbp.transport is not None
+
+    argv = ssh_argv(mbp.transport, tmp_path / "s.sock")
+
+    assert "-i" not in argv
+    assert "IdentitiesOnly=yes" not in argv
+
+
+def test_a_shared_deadline_bounds_every_subprocess(tmp_path: Path) -> None:
+    now = [0.0]
+    seen: list[float | None] = []
+
+    def runner(argv: Sequence[str], timeout: float | None) -> subprocess.CompletedProcess[str]:
+        seen.append(timeout)
+        return subprocess.CompletedProcess(list(argv), 0, stdout="", stderr="")
+
+    bounded = bounded_runner(runner, deadline=10.0, clock=lambda: now[0])
+    bounded(["a"], None)
+    bounded(["b"], 3.0)
+    bounded(["c"], 99.0)
+    now[0] = 10.0
+
+    assert seen == [10.0, 3.0, 10.0]
+    with pytest.raises(TimeoutError, match="deadline exceeded"):
+        bounded(["d"], 1.0)
+
+
+def test_a_transport_less_target_cannot_be_brought_up(tmp_path: Path) -> None:
+    with pytest.raises(ValueError, match="has no transport"):
+        transport_up(targets(tmp_path)["plain"], base=tmp_path)
+
+
+# ---- pid and tunnel liveness (os seams injected) ---------------------------------------
+
+
+class FakeOs:
+    """``os`` as the transport sees it: a pid that is alive until a signal ends it."""
+
+    WNOHANG = os.WNOHANG
+    environ = os.environ
+
+    def __init__(self, *, alive: bool = True, dies_on: int | None = signal.SIGTERM) -> None:
+        self.alive = alive
+        self.dies_on = dies_on
+        self.signals: list[int] = []
+        self.exited_child: int | None = None
+        self.kill_error: Exception | None = None
+
+    def waitpid(self, pid: int, flags: int) -> tuple[int, int]:
+        if self.exited_child == pid:
+            return pid, 0
+        raise ChildProcessError
+
+    def kill(self, pid: int, sig: int) -> None:
+        self.signals.append(sig)
+        if self.kill_error:
+            raise self.kill_error
+        if sig == 0:
+            if not self.alive:
+                raise ProcessLookupError
+            return
+        if sig in (signal.SIGKILL, self.dies_on):
+            self.alive = False
+
+
+@pytest.mark.parametrize(
+    ("pid", "setup", "alive"),
+    [
+        (None, {}, False),
+        (5, {"alive": True}, True),
+        (5, {"alive": False}, False),
+    ],
+)
+def test_a_pid_is_alive_only_while_it_exists(
+    monkeypatch: pytest.MonkeyPatch, pid: int | None, setup: dict[str, Any], alive: bool
+) -> None:
+    monkeypatch.setattr(transport_module, "os", FakeOs(**setup))
+
+    assert pid_alive(pid) is alive
+
+
+def test_an_exited_child_is_reaped_and_a_foreign_process_still_counts_as_alive(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    fake = FakeOs()
+    fake.exited_child = 5
+    monkeypatch.setattr(transport_module, "os", fake)
+    assert pid_alive(5) is False
+    fake.exited_child = None
+    fake.kill_error = PermissionError()
+    assert pid_alive(5) is True
+
+
+def test_a_tunnel_is_running_only_for_this_targets_ssh_forward(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setattr(transport_module, "os", FakeOs())
+    paths = TransportPaths.of(targets(tmp_path)["mbp"], tmp_path)
+    shown = [subprocess.CompletedProcess([], 0, stdout=f"ssh -L {paths.socket}:/s", stderr="")]
+
+    def runner(argv: Sequence[str], timeout: float | None) -> subprocess.CompletedProcess[str]:
+        return shown[0]
+
+    assert tunnel_running(paths, runner) is False, "no pidfile"
+    paths.pidfile.parent.mkdir(parents=True, exist_ok=True)
+    paths.pidfile.write_text("garbage")
+    assert read_pid(paths) is None
+    paths.pidfile.write_text("77\n")
+    assert read_pid(paths) == 77
+    assert tunnel_running(paths, runner) is True
+    shown[0] = subprocess.CompletedProcess([], 0, stdout="vim other", stderr="")
+    assert tunnel_running(paths, runner) is False, "a recycled pid"
+    shown[0] = subprocess.CompletedProcess([], 1, stdout=str(paths.socket), stderr="")
+    assert tunnel_running(paths, runner) is False, "ps failed"
+
+
+def _running_tunnel(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, fake: FakeOs
+) -> tuple[Target, Callable[..., Any]]:
+    monkeypatch.setattr(transport_module, "os", fake)
+    mbp = targets(tmp_path)["mbp"]
+    paths = TransportPaths.of(mbp, tmp_path)
+    paths.pidfile.write_text("77\n")
+    paths.socket.write_text("")
+
+    def runner(argv: Sequence[str], timeout: float | None) -> subprocess.CompletedProcess[str]:
+        return subprocess.CompletedProcess([], 0, stdout=str(paths.socket), stderr="")
+
+    return mbp, runner
+
+
+def test_down_terminates_a_running_tunnel_and_forgets_it(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    fake = FakeOs(dies_on=signal.SIGTERM)
+    mbp, runner = _running_tunnel(monkeypatch, tmp_path, fake)
+    paths = TransportPaths.of(mbp, tmp_path)
+
+    assert transport_down(mbp, base=tmp_path, runner=runner, sleep=lambda _s: None) is True
+
+    assert signal.SIGTERM in fake.signals
+    assert signal.SIGKILL not in fake.signals
+    assert not paths.pidfile.exists()
+    assert not paths.socket.exists()
+
+
+def test_down_kills_a_tunnel_that_ignores_terminate_once_the_wait_ends(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    fake = FakeOs(dies_on=None)
+    mbp, runner = _running_tunnel(monkeypatch, tmp_path, fake)
+    now = [0.0]
+
+    stopped = transport_down(
+        mbp,
+        base=tmp_path,
+        runner=runner,
+        sleep=lambda seconds: now.__setitem__(0, now[0] + seconds),
+        clock=lambda: now[0],
+        deadline=2.0,
+    )
+
+    assert stopped is True
+    assert fake.signals[-1] == signal.SIGKILL
+    assert now[0] <= 2.0 + 1e-9, "the shared deadline bounds the wait"
+
+
+def test_down_clears_stale_files_and_reports_nothing_was_running(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    fake = FakeOs(alive=False)
+    mbp, runner = _running_tunnel(monkeypatch, tmp_path, fake)
+    paths = TransportPaths.of(mbp, tmp_path)
+
+    assert transport_down(mbp, base=tmp_path, runner=runner) is False
+
+    assert fake.signals == [0]
+    assert not paths.pidfile.exists()
+    assert not paths.socket.exists()
+
+
+def test_down_tolerates_a_tunnel_that_vanishes_before_the_terminate(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    fake = FakeOs()
+    mbp, runner = _running_tunnel(monkeypatch, tmp_path, fake)
+    real_kill = fake.kill
+
+    def kill(pid: int, sig: int) -> None:
+        if sig == signal.SIGTERM:
+            raise ProcessLookupError
+        real_kill(pid, sig)
+
+    monkeypatch.setattr(fake, "kill", kill)
+
+    assert transport_down(mbp, base=tmp_path, runner=runner) is True
+
+
+# ---- health: malformed output and deadlines --------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "info",
+    [
+        "not json",
+        "{}",
+        json.dumps({"ServerVersion": "1", "OperatingSystem": "o", "Architecture": "a"}),
+        json.dumps(
+            {
+                "ServerVersion": "1",
+                "OperatingSystem": "o",
+                "Architecture": "a",
+                "NCPU": "many",
+                "MemTotal": 1,
+            }
+        ),
+        "null",
+    ],
+)
+def test_docker_facts_are_none_for_malformed_daemon_output(tmp_path: Path, info: str) -> None:
+    docker = FakeDocker(healthy=True)
+    docker.info = info
+
+    assert docker_facts(targets(tmp_path)["plain"], docker) is None
+
+
+def test_a_target_without_a_data_check_passes_it(tmp_path: Path) -> None:
+    assert data_check_failure(targets(tmp_path)["mbp"], FakeDocker()) is None
+
+
+def test_a_probe_past_the_deadline_makes_the_target_unavailable(tmp_path: Path) -> None:
+    def runner(argv: Sequence[str], timeout: float | None) -> subprocess.CompletedProcess[str]:
+        raise TimeoutError("target operation deadline exceeded")
+
+    with pytest.raises(TargetUnavailableError, match="target 'plain': .*deadline exceeded"):
+        ensure_target(targets(tmp_path)["plain"], runner=runner)
+
+
+# ---- ``raidar target`` commands ---------------------------------------------------------
+
+
+@pytest.fixture
+def target_cli(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> CliRunner:
+    (tmp_path / "targets.toml").write_text(TARGETS)
+    monkeypatch.setenv("RAIDAR_TARGETS_FILE", str(tmp_path / "targets.toml"))
+    monkeypatch.delenv("RAIDAR_TARGET", raising=False)
+    return CliRunner()
+
+
+def _raise(error: Exception) -> Callable[..., Any]:
+    def fail(*_: Any, **__: Any) -> Any:
+        raise error
+
+    return fail
+
+
+@pytest.mark.parametrize(
+    ("name", "outcome", "exit_code", "text"),
+    [
+        ("up", 41, 0, "mbp: up (ssh pid 41, context raidar-mbp)"),
+        ("up", RuntimeError("ssh tunnel exited"), 1, "ssh tunnel exited"),
+        ("up", OSError("no ssh"), 1, "no ssh"),
+        ("down", True, 0, "mbp: stopped"),
+        ("down", False, 0, "mbp: was not running"),
+    ],
+)
+def test_up_and_down_report_what_happened_to_the_transport(
+    monkeypatch: pytest.MonkeyPatch,
+    target_cli: CliRunner,
+    name: str,
+    outcome: object,
+    exit_code: int,
+    text: str,
+) -> None:
+    action = _raise(outcome) if isinstance(outcome, Exception) else (lambda *_a, **_k: outcome)
+    monkeypatch.setattr(f"raidar.cli.target.transport_{name}", action)
+
+    result = target_cli.invoke(main, ["target", name, "--target", "mbp"])
+
+    assert result.exit_code == exit_code, result.output
+    assert text in result.output
+
+
+@pytest.mark.parametrize("name", ["up", "down"])
+def test_a_target_without_a_transport_has_nothing_to_start_or_stop(
+    target_cli: CliRunner, name: str
+) -> None:
+    result = target_cli.invoke(main, ["target", name, "--target", "plain"])
+
+    assert result.exit_code != 0
+    assert "has no transport" in result.output
+
+
+def test_ensure_reports_ok_or_why_the_target_is_unavailable(
+    monkeypatch: pytest.MonkeyPatch, target_cli: CliRunner
+) -> None:
+    monkeypatch.setattr("raidar.cli.target.ensure_target", lambda chosen: None)
+    ok = target_cli.invoke(main, ["target", "ensure", "--target", "plain"])
+    monkeypatch.setattr(
+        "raidar.cli.target.ensure_target", _raise(TargetUnavailableError("daemon down"))
+    )
+    down = target_cli.invoke(main, ["target", "ensure", "--target", "plain"])
+
+    assert (ok.exit_code, "plain: ok (context plain-ctx)" in ok.output) == (0, True)
+    assert down.exit_code != 0
+    assert "daemon down" in down.output
+
+
+def test_an_unknown_target_is_a_command_error(target_cli: CliRunner) -> None:
+    for argv in (["status", "--target", "nope"], ["ensure", "--target", "nope"]):
+        result = target_cli.invoke(main, ["target", *argv])
+        assert result.exit_code != 0
+        assert "unknown target 'nope'" in result.output
+
+
+def test_a_broken_targets_file_is_a_list_error(tmp_path: Path, target_cli: CliRunner) -> None:
+    (tmp_path / "targets.toml").write_text("[targets.a\n")
+
+    result = target_cli.invoke(main, ["target", "list"])
+
+    assert result.exit_code != 0
+    assert "invalid targets file" in result.output
+
+
+def test_status_exits_non_zero_when_the_data_check_fails(
+    monkeypatch: pytest.MonkeyPatch, target_cli: CliRunner
+) -> None:
+    docker = FakeDocker(healthy=True)
+    docker.data_check = (3, "boom")
+    monkeypatch.setattr("raidar.cli.target.docker_facts", lambda t: docker_facts(t, docker))
+    monkeypatch.setattr(
+        "raidar.cli.target.data_check_failure", lambda t: data_check_failure(t, docker)
+    )
+
+    result = target_cli.invoke(main, ["target", "status", "--target", "plain"])
+
+    report = json.loads(result.output)
+    assert result.exit_code == 1
+    assert (report["reachable"], report["healthy"]) == (True, False)
+    assert "exited 3" in report["problem"]
+
+
+@pytest.mark.parametrize(
+    ("argv", "removed", "text"),
+    [
+        ([], ["b00-p0-baseline__env-0123456789"], "removed: b00-p0-baseline__env-0123456789"),
+        (["--dry-run"], ["a__env-abcdefabcd"], "would remove: a__env-abcdefabcd"),
+        ([], [], "0 stale trial environment(s) removed."),
+    ],
+)
+def test_prune_reports_what_it_removed_or_would_remove(
+    monkeypatch: pytest.MonkeyPatch,
+    target_cli: CliRunner,
+    argv: list[str],
+    removed: list[str],
+    text: str,
+) -> None:
+    seen: list[tuple[object, str, bool]] = []
+
+    def cleanup(job: object, *, docker_context: str, dry_run: bool) -> list[str]:
+        seen.append((job, docker_context, dry_run))
+        return removed
+
+    monkeypatch.setattr("raidar.cli.target.docker_healthy", lambda context: True)
+    monkeypatch.setattr("raidar.cli.target.cleanup_trial_projects", cleanup)
+
+    result = target_cli.invoke(main, ["target", "prune", "--target", "plain", *argv])
+
+    assert result.exit_code == 0, result.output
+    assert text in result.output
+    assert seen == [(None, "plain-ctx", "--dry-run" in argv)]
+
+
+@pytest.mark.parametrize(
+    ("healthy", "failure", "text"),
+    [
+        (False, None, "unreachable; run `raidar target ensure` first"),
+        (True, RuntimeError("docker compose down failed for x"), "down failed for x"),
+        (True, subprocess.TimeoutExpired(["docker"], 60), "timed out"),
+        (True, OSError("transport lost"), "transport lost"),
+    ],
+)
+def test_prune_refuses_an_unreachable_target_and_reports_cleanup_failures(
+    monkeypatch: pytest.MonkeyPatch,
+    target_cli: CliRunner,
+    healthy: bool,
+    failure: Exception | None,
+    text: str,
+) -> None:
+    monkeypatch.setattr("raidar.cli.target.docker_healthy", lambda context: healthy)
+    monkeypatch.setattr(
+        "raidar.cli.target.cleanup_trial_projects", _raise(failure or AssertionError("no docker"))
+    )
+
+    result = target_cli.invoke(main, ["target", "prune", "--target", "plain"])
+
+    assert result.exit_code != 0
+    assert text in result.output

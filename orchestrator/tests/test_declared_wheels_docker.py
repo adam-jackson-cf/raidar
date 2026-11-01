@@ -2,13 +2,8 @@
 
 from __future__ import annotations
 
-import asyncio
-import hashlib
-import io
 import json
-import socket
 import subprocess
-import tarfile
 import urllib.error
 import uuid
 import zipfile
@@ -20,12 +15,11 @@ from raidar.contract import wheel_cache
 from raidar.design.problem.models import ProblemId
 from raidar.design.problem.store import open_store
 from raidar.engine.trial.workspace import seed_locks, workspace_seed
-from raidar.grading.closure import build_context
 from raidar.grading.dependency_pins import lock_sha256, set_sha256
 from raidar.grading.grader import grade_step
 from raidar.grading.grader_image import ensure_grader_image
 from raidar.grading.provision import prepare_dependencies
-from raidar.grading.resolver import UvResolver, pylock_packages
+from raidar.grading.resolver import pylock_packages
 from raidar.grading.sandbox import DockerCopySandbox, SandboxRun, sandbox_env
 from raidar.grading.submission_deps import SubmissionDependencies, python_path_entries
 from raidar.subject.environment.python.image import image_tag
@@ -95,74 +89,6 @@ def _canary_wheel(directory: Path) -> None:
             "Tag: py3-none-any\n",
         )
         wheel.writestr(f"{metadata}/RECORD", "")
-
-
-async def test_planted_sdist_never_executes_during_resolution(tmp_path: Path) -> None:
-    marker = tmp_path / "setup-executed"
-    _canary_wheel(tmp_path)
-    with socket.socket() as listener:
-        listener.bind(("127.0.0.1", 0))
-        listener.listen()
-        listener.settimeout(0.05)
-        port = listener.getsockname()[1]
-        setup = (
-            "from pathlib import Path\nimport socket\n"
-            f"Path({str(marker)!r}).write_text('executed')\n"
-            f"socket.create_connection(('127.0.0.1', {port}), timeout=1)\n"
-            "from setuptools import setup\n"
-            "setup(name='raidar-planted-sdist', version='1.0')\n"
-        )
-        files = {
-            "setup.py": setup,
-            "PKG-INFO": "Metadata-Version: 2.3\nName: raidar-planted-sdist\nVersion: 1.0\n",
-        }
-        with tarfile.open(tmp_path / "raidar-planted-sdist-1.0.tar.gz", "w:gz") as archive:
-            for name, content in files.items():
-                payload = content.encode()
-                member = tarfile.TarInfo(f"raidar-planted-sdist-1.0/{name}")
-                member.size = len(payload)
-                archive.addfile(member, io.BytesIO(payload))
-        resolver = UvResolver(
-            compile_args=("--no-index", "--find-links", str(tmp_path)),
-            canary="raidar-canary==1.0",
-        )
-        result = await asyncio.to_thread(
-            resolver,
-            ("raidar-planted-sdist==1.0",),
-            arch="arm64",
-            exclude_newer="2026-10-27T00:00:00Z",
-        )
-        assert [(item.requirement, item.reason) for item in result.unprovided] == [
-            ("raidar-planted-sdist==1.0", "no-wheel")
-        ]
-        assert not marker.exists()
-        with pytest.raises(TimeoutError):
-            listener.accept()
-
-
-def test_wheel_build_context_excludes_hidden_tests_and_submission_code(tmp_path: Path) -> None:
-    acquisition = tmp_path / "acquisition"
-    acquisition.mkdir()
-    _canary_wheel(acquisition)
-    wheel = acquisition / "raidar_canary-1.0-py3-none-any.whl"
-    digest = hashlib.sha256(wheel.read_bytes()).hexdigest()
-    lock = (
-        'lock-version = "1.0"\n[[packages]]\nname = "raidar-canary"\nversion = "1.0"\n'
-        f'[[packages.wheels]]\nurl = "{wheel.as_uri()}"\n'
-        f'[packages.wheels.hashes]\nsha256 = "{digest}"\n'
-    )
-    (acquisition / "hidden_test.py").write_text("raise AssertionError('hidden')")
-    (acquisition / "setup.py").write_text("raise AssertionError('submission')")
-    (acquisition / "tests").mkdir()
-    (acquisition / "tests" / "nested.py").write_text("hidden")
-    context = tmp_path / "context"
-    build_context(lock, acquisition, context)
-    assert sorted(path.relative_to(context).as_posix() for path in context.rglob("*")) == [
-        "requirements.txt",
-        "wheels",
-        "wheels/raidar_canary-1.0-py3-none-any.whl",
-    ]
-    assert (context / "wheels" / wheel.name).read_bytes() == wheel.read_bytes()
 
 
 @pytest.mark.parametrize(

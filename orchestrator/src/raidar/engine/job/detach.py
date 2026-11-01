@@ -40,7 +40,7 @@ import shutil
 import signal
 import subprocess
 import sys
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -69,16 +69,21 @@ def default_job_id() -> str:
     return datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
 
 
+def experiment_id_of(document: object, source: object) -> str:
+    """The ``id`` of a parsed experiment document."""
+    found = document.get("id") if isinstance(document, dict) else None
+    if not isinstance(found, str) or not found:
+        raise DetachError(f"{source} names no experiment id")
+    return found
+
+
 def experiment_id(experiment: Path) -> str:
     """The experiment's ``id`` (the job directory's parent name)."""
     try:
         document = yaml.safe_load(experiment.read_text(encoding="utf-8"))
     except (OSError, yaml.YAMLError) as exc:
         raise DetachError(f"cannot read {experiment}: {exc}") from exc
-    found = document.get("id") if isinstance(document, dict) else None
-    if not isinstance(found, str) or not found:
-        raise DetachError(f"{experiment} names no experiment id")
-    return found
+    return experiment_id_of(document, experiment)
 
 
 @dataclass(frozen=True)
@@ -89,22 +94,28 @@ class Launched:
     log: Path
 
 
-def git_state(cwd: Path, *, exclude: Sequence[str] = ()) -> dict[str, Any]:
+def git_state(
+    cwd: Path,
+    *,
+    exclude: Sequence[str] = (),
+    which: Callable[[str], str | None] = shutil.which,
+    run: Callable[..., subprocess.CompletedProcess[str]] = subprocess.run,
+) -> dict[str, Any]:
     """The checkout's HEAD commit and whether its tree is dirty (provenance only).
 
     ``exclude`` names repo-root paths whose changes (tracked or untracked) do not
     count as dirty. Never fails a launch: outside a git checkout, or without git,
     the fields are null and ``error`` says why.
     """
-    git = shutil.which("git")
+    git = which("git")
     if git is None:
         return {"commit": None, "dirty": None, "error": "git not found"}
     try:
-        head = subprocess.run(  # noqa: S603 - fixed git arguments
+        head = run(  # noqa: S603 - fixed git arguments
             [git, "rev-parse", "HEAD"], cwd=cwd, capture_output=True, text=True, check=True
         )
         pathspec = [":(top)", *(f":(top,exclude){path}" for path in exclude)]
-        status = subprocess.run(  # noqa: S603 - fixed git arguments
+        status = run(  # noqa: S603 - fixed git arguments
             [git, "status", "--porcelain", "--", *pathspec],
             cwd=cwd,
             capture_output=True,
@@ -118,6 +129,43 @@ def git_state(cwd: Path, *, exclude: Sequence[str] = ()) -> dict[str, Any]:
 
 def _write_json(path: Path, payload: dict[str, Any]) -> None:
     path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+
+
+@dataclass(frozen=True)
+class LaunchPlan:
+    """The launch record and supervisor argv of one detached launch."""
+
+    command: list[str]
+    record: dict[str, Any]
+    supervisor: list[str]
+
+
+def plan_launch(
+    command: Sequence[str],
+    *,
+    experiment: Path,
+    job_dir: Path,
+    job_id: str,
+    workdir: Path,
+    launched_at: str,
+    git: dict[str, Any],
+    python: str,
+) -> LaunchPlan:
+    """The launch record and supervisor argv for absolute ``job_dir`` and ``workdir``; pure."""
+    detach = job_dir / DETACH_DIR
+    full = [*command, f"JOB_ID={job_id}"]
+    record = {
+        "job_id": job_id,
+        "job_dir": str(job_dir),
+        "experiment": str(experiment),
+        "command": full,
+        "cwd": str(workdir),
+        "launched_at": launched_at,
+        "log": str(detach / LOG_FILE),
+        "git": git,
+    }
+    supervisor = [python, "-m", "raidar.engine.job.detach", "supervise", str(detach), "--"]
+    return LaunchPlan(full, record, [*supervisor, *full])
 
 
 def launch(
@@ -137,25 +185,21 @@ def launch(
         raise DetachError(f"{job_dir} already exists; a job directory is never reused")
     detach = job_dir / DETACH_DIR
     detach.mkdir(parents=True)
-    full = [*command, f"JOB_ID={job_id}"]
     workdir = (cwd or Path.cwd()).resolve()
-    _write_json(
-        detach / LAUNCH_FILE,
-        {
-            "job_id": job_id,
-            "job_dir": str(job_dir),
-            "experiment": str(experiment),
-            "command": full,
-            "cwd": str(workdir),
-            "launched_at": _now(),
-            "log": str(detach / LOG_FILE),
-            "git": git_state(workdir),
-        },
+    plan = plan_launch(
+        command,
+        experiment=experiment,
+        job_dir=job_dir,
+        job_id=job_id,
+        workdir=workdir,
+        launched_at=_now(),
+        git=git_state(workdir),
+        python=sys.executable,
     )
-    supervisor = [sys.executable, "-m", "raidar.engine.job.detach", "supervise", str(detach), "--"]
+    _write_json(detach / LAUNCH_FILE, plan.record)
     with open(os.devnull, "rb") as stdin, (detach / LOG_FILE).open("ab") as log:
         process = subprocess.Popen(  # noqa: S603 - the caller's own make command
-            [*supervisor, *full],
+            plan.supervisor,
             cwd=workdir,
             stdin=stdin,
             stdout=log,
@@ -166,33 +210,47 @@ def launch(
     return Launched(job_dir=job_dir, job_id=job_id, pid=process.pid, log=detach / LOG_FILE)
 
 
+def supervisor_command(command: Sequence[str], keep_awake: str | None) -> list[str]:
+    """The command the supervisor runs: under ``caffeinate -i`` where that exists."""
+    return [keep_awake, "-i", *command] if keep_awake else list(command)
+
+
+class SignalForwarder:
+    """Passes a TERM/INT on to the job, or holds it until the job has started."""
+
+    def __init__(self) -> None:
+        self.children: list[subprocess.Popen[bytes]] = []
+        self.early: list[int] = []
+
+    def __call__(self, signum: int, _frame: object = None) -> None:
+        if self.children:
+            self.children[0].send_signal(signum)
+        else:
+            self.early.append(signum)  # arrived before the job started: delivered right after
+
+    def started(self, process: subprocess.Popen[bytes]) -> None:
+        self.children.append(process)
+        for signum in self.early:
+            process.send_signal(signum)
+
+
 def supervise(detach: Path, command: Sequence[str]) -> int:
     """Run ``command`` to completion (kept awake where possible) and record how it ended."""
     (detach / PID_FILE).write_text(f"{os.getpid()}\n", encoding="utf-8")
     keep_awake = shutil.which("caffeinate")
-    full = [keep_awake, "-i", *command] if keep_awake else list(command)
+    full = supervisor_command(command, keep_awake)
     # A hang-up is not the job's concern; a TERM/INT still ends it (forwarded below).
     signal.signal(signal.SIGHUP, signal.SIG_IGN)
     code: int | None = None
     error: str | None = None
-    children: list[subprocess.Popen[bytes]] = []
-    early: list[int] = []
-
-    def forward(signum: int, _frame: object) -> None:
-        if children:
-            children[0].send_signal(signum)
-        else:
-            early.append(signum)  # arrived before the job started: delivered right after
-
+    forwarder = SignalForwarder()
     # Installed before the job starts: a TERM in that window must not kill the supervisor
     # without its exit record.
-    signal.signal(signal.SIGTERM, forward)
-    signal.signal(signal.SIGINT, forward)
+    signal.signal(signal.SIGTERM, forwarder)
+    signal.signal(signal.SIGINT, forwarder)
     try:
         process = subprocess.Popen(full, stdin=subprocess.DEVNULL)  # noqa: S603
-        children.append(process)
-        for signum in early:
-            process.send_signal(signum)
+        forwarder.started(process)
         code = process.wait()
     except OSError as exc:
         error = f"{type(exc).__name__}: {exc}"
@@ -207,39 +265,53 @@ def supervise(detach: Path, command: Sequence[str]) -> int:
                 "kept_awake": bool(keep_awake),
             },
         )
-    return code if code is not None else 1
+    return code
 
 
 # ---- status ----------------------------------------------------------------------------
 
 
-def _read_json(path: Path) -> dict[str, Any] | None:
+def parse_object(text: str) -> dict[str, Any] | None:
+    """A JSON object, or None for anything else (absent, malformed, not an object)."""
     try:
-        payload = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, ValueError):
+        payload = json.loads(text)
+    except ValueError:
         return None
     return payload if isinstance(payload, dict) else None
 
 
-def _alive(pid: int) -> bool:
+def _read_json(path: Path) -> dict[str, Any] | None:
+    try:
+        return parse_object(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+
+
+def _alive(
+    pid: int,
+    *,
+    kill: Callable[[int, int], None] = os.kill,
+    which: Callable[[str], str | None] = shutil.which,
+    run: Callable[..., subprocess.CompletedProcess[str]] = subprocess.run,
+) -> bool:
     """Whether ``pid`` is still this module's supervisor (a recycled pid is not).
 
     After a reboot or a long wait the recorded pid may belong to an unrelated process, so
     a live pid counts only when its command line is the supervisor's.
     """
     try:
-        os.kill(pid, 0)
+        kill(pid, 0)
     except ProcessLookupError:
         return False
     except PermissionError:
         return False  # another user's process cannot be our supervisor
-    ps = shutil.which("ps")
+    ps = which("ps")
     if ps is None:
         return True
     try:
         # -ww: procps cuts output to 80 columns when not on a terminal, which can drop
         # the module name after a long interpreter path.
-        listed = subprocess.run(  # noqa: S603 - fixed ps arguments
+        listed = run(  # noqa: S603 - fixed ps arguments
             [ps, "-ww", "-p", str(pid), "-o", "command="],
             capture_output=True,
             text=True,
@@ -250,18 +322,14 @@ def _alive(pid: int) -> bool:
     return "raidar.engine.job.detach" in listed.stdout
 
 
-def _pid(detach: Path) -> int | None:
+def parse_pid(text: str) -> int | None:
     try:
-        return int((detach / PID_FILE).read_text(encoding="utf-8").strip())
-    except (OSError, ValueError):
+        return int(text.strip())
+    except ValueError:
         return None
 
 
-def _tail(path: Path, lines: int) -> list[str]:
-    try:
-        text = path.read_text(encoding="utf-8", errors="replace")
-    except OSError:
-        return []
+def tail_lines(text: str, lines: int) -> list[str]:
     return text.splitlines()[-lines:] if lines > 0 else []
 
 
@@ -300,9 +368,25 @@ def _job_state(manifest: dict[str, Any] | None) -> tuple[str, str] | None:
     )
 
 
-def _detached_state(detach: Path, manifest: dict[str, Any] | None) -> tuple[str, str]:
-    exit_record = _read_json(detach / EXIT_FILE)
-    pid = _pid(detach)
+@dataclass(frozen=True)
+class JobFiles:
+    """What a job directory holds, read once: the whole input of ``status_of``."""
+
+    manifest: dict[str, Any] | None
+    trial_records: int
+    detached: bool
+    exit_record: dict[str, Any] | None = None
+    pid: int | None = None
+    log_text: str = ""
+
+
+def detached_state(
+    exit_record: dict[str, Any] | None,
+    pid: int | None,
+    alive: bool,
+    manifest: dict[str, Any] | None,
+) -> tuple[str, str]:
+    """The state of a detached job from its exit record, supervisor pid and ``job.json``."""
     if exit_record is not None:
         code = exit_record.get("exit_code")
         ended = _job_state(manifest)
@@ -311,7 +395,7 @@ def _detached_state(detach: Path, manifest: dict[str, Any] | None) -> tuple[str,
         if code == 0:
             return "failed", "the command exited 0 but job.json has no finished_at"
         return "failed", f"the command exited {code} at {exit_record.get('finished_at')}"
-    if pid is not None and _alive(pid):
+    if pid is not None and alive:
         started = (manifest or {}).get("started_at")
         return "running", f"supervisor pid {pid}" + (f"; job started {started}" if started else "")
     if pid is None:
@@ -319,17 +403,13 @@ def _detached_state(detach: Path, manifest: dict[str, Any] | None) -> tuple[str,
     return "died", f"supervisor pid {pid} is gone and left no exit record (killed or rebooted)"
 
 
-def status(job_dir: Path, *, log_lines: int = DEFAULT_LOG_LINES) -> JobStatus:
-    """The job's state from its directory; read-only."""
-    if not job_dir.is_dir():
-        raise DetachError(f"{job_dir} is not a job directory")
-    manifest = _read_json(job_dir / JOB_MANIFEST)
-    detach = job_dir / DETACH_DIR
-    recorded = len(list((job_dir / TRIAL_RECORDS_DIR).glob("*.json")))
+def status_of(job_dir: Path, files: JobFiles, *, alive: bool, log_lines: int) -> JobStatus:
+    """The job's state from what its directory holds and whether its supervisor is alive."""
+    manifest = files.manifest
     selected = manifest.get("selected") if manifest else None
-    if (detach / LAUNCH_FILE).is_file():
-        state, detail = _detached_state(detach, manifest)
-        tail = _tail(detach / LOG_FILE, log_lines)
+    if files.detached:
+        state, detail = detached_state(files.exit_record, files.pid, alive, manifest)
+        tail = tail_lines(files.log_text, log_lines)
     else:
         state, detail = _job_state(manifest) or (
             "unknown",
@@ -341,10 +421,47 @@ def status(job_dir: Path, *, log_lines: int = DEFAULT_LOG_LINES) -> JobStatus:
         job_dir=job_dir,
         state=state,
         detail=detail,
-        trials_recorded=recorded,
+        trials_recorded=files.trial_records,
         trials_selected=len(selected) if isinstance(selected, list) else None,
         log_tail=tuple(tail),
     )
+
+
+def read_job_files(job_dir: Path, *, include_log: bool = True) -> JobFiles:
+    """Read the job directory (read-only); the detach files only when it was launched detached."""
+    detach = job_dir / DETACH_DIR
+    manifest = _read_json(job_dir / JOB_MANIFEST)
+    recorded = len(list((job_dir / TRIAL_RECORDS_DIR).glob("*.json")))
+    if not (detach / LAUNCH_FILE).is_file():
+        return JobFiles(manifest=manifest, trial_records=recorded, detached=False)
+    try:
+        pid_text = (detach / PID_FILE).read_text(encoding="utf-8")
+    except (OSError, ValueError):
+        pid_text = ""
+    log_text = ""
+    if include_log:
+        try:
+            log_text = (detach / LOG_FILE).read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            log_text = ""
+    return JobFiles(
+        manifest=manifest,
+        trial_records=recorded,
+        detached=True,
+        exit_record=_read_json(detach / EXIT_FILE),
+        pid=parse_pid(pid_text),
+        log_text=log_text,
+    )
+
+
+def status(job_dir: Path, *, log_lines: int = DEFAULT_LOG_LINES) -> JobStatus:
+    """The job's state from its directory; read-only."""
+    if not job_dir.is_dir():
+        raise DetachError(f"{job_dir} is not a job directory")
+    files = read_job_files(job_dir, include_log=log_lines > 0)
+    # Only a job with no exit record and a recorded pid needs the supervisor looked up.
+    alive = files.exit_record is None and files.pid is not None and _alive(files.pid)
+    return status_of(job_dir, files, alive=alive, log_lines=log_lines)
 
 
 # ---- command line ----------------------------------------------------------------------

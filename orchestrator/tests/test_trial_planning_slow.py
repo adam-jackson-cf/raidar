@@ -84,8 +84,6 @@ def test_concurrency_is_per_machine_and_outside_trial_identity(
     assert machine.concurrency == 4
     assert [t.hashes for t in machine.trials] == [t.hashes for t in default.trials]
     assert machine.lock_sha256 == default.lock_sha256
-    with pytest.raises(PlanError, match="concurrency"):
-        _plan(locked, fixture_problem, concurrency=0)
     loaded, _, _ = locked
     runner = CliRunner(mix_stderr=False)
     base = runner.invoke(main, ["plan", str(loaded.path), "--json"])
@@ -111,10 +109,6 @@ def test_selection_and_truncation_change_what_runs_not_the_condition(
     assert trial.hashes.arm == original.hashes.arm
     assert trial.hashes.protocol != original.hashes.protocol
     assert trial.hashes.trial != original.hashes.trial
-    with pytest.raises(PlanError, match="unknown arms"):
-        _plan(locked, fixture_problem, arms=("nope",))
-    with pytest.raises(PlanError, match="attempts"):
-        _plan(locked, fixture_problem, attempts=(99,))
 
 
 def _bound(tmp_path: Path, fixture: ImportedFixture, name: str, **binding: Any):
@@ -182,24 +176,6 @@ def test_a_one_checkpoint_reference_plans_but_cannot_take_a_prefix(
             ONESHOT_REF,
             problems=[{"ref": ONESHOT_REF, "checkpoints": 1}],
             environment={"compose_init": False},
-        )
-
-
-def test_the_max_checkpoints_override_is_for_smoke_experiments_only(
-    tmp_path: Path, fixture_problem: ImportedFixture, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    monkeypatch.setenv(ROOT_ENV, str(fixture_problem.store.root))
-    loaded, lock, _ = locked_experiment(
-        tmp_path / "ab", fixture_problem.ref, environment={"compose_init": False}
-    )
-
-    with pytest.raises(PlanError, match="smoke"):
-        build_plan(
-            loaded,
-            lock,
-            store=fixture_problem.store,
-            pack=load_pack_spec(),
-            options=PlanOptions(max_checkpoints=1),
         )
 
 

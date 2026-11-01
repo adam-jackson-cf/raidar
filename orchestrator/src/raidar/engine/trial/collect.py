@@ -32,8 +32,8 @@ from __future__ import annotations
 
 import hashlib
 import re
-from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
+from collections.abc import Iterable, Mapping, Sequence
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
@@ -98,6 +98,27 @@ class TrialContext:
     provisions: tuple[str, ...]  # slugs of the lab provisions every step must record
     pinned_harness_version: str | None  # None for a no-LLM agent override
     rule: ProgressionRule
+
+
+@dataclass(frozen=True)
+class StepEvidence:
+    """What the trial directory holds for one step; the defaults are a step Harbor never ran."""
+
+    instruction_sha256: str | None = None
+    record: StepRecord | None = None
+    record_path: str | None = None
+    probes: ProbeSummary = field(default_factory=lambda: ProbeSummary(passed=True))
+    reap: str | None = None
+    idle_killed: bool = False
+
+
+@dataclass(frozen=True)
+class TrialEvidence:
+    """Everything classification reads from a trial directory, parsed."""
+
+    result: Mapping[str, Any] | None
+    steps: Mapping[str, StepEvidence]
+    seed_parent: str | None
 
 
 def _load_record(trial_dir: Path, step: str) -> StepRecord | None:
@@ -172,9 +193,9 @@ def _not_run(
 
 def _step_result(
     ctx: TrialContext,
-    trial_dir: Path,
     index: int,
     item: Mapping[str, Any] | None,
+    evidence: StepEvidence,
     parent: str | None,
     *,
     halted: bool = False,
@@ -189,15 +210,15 @@ def _step_result(
         "index": index,
         "step": step,
         "checkpoint": checkpoint,
-        "instruction_sha256": _instruction_sha(ctx.task_dir, step),
+        "instruction_sha256": evidence.instruction_sha256,
     }
     if item is None:
         return _not_run(ctx, base, halted, trial_error)
-    record = _load_record(trial_dir, step)
+    record = evidence.record
     exception = _exception_type(item)
-    probes = _lab_checks(ctx, trial_dir, step, index)
-    reap = reap_infra_reason(load_reap_report(step_record_dir(trial_dir, step)))
-    reasons = _infra_reasons(record, exception, probes, reap, step in idle_killed_steps(trial_dir))
+    reasons = _infra_reasons(
+        record, exception, evidence.probes, evidence.reap, evidence.idle_killed
+    )
     if reasons:
         state = CheckpointState.INFRA_ERROR
     else:
@@ -212,11 +233,7 @@ def _step_result(
         infra_reasons=tuple(reasons),
         strict_pass_rate=record.grade.pass_rate() if record else None,
         rewards=dict(record.rewards) if record else None,
-        verifier_record=(
-            step_record_dir(trial_dir, step).relative_to(trial_dir) / RECORD_FILE
-        ).as_posix()
-        if record
-        else None,
+        verifier_record=evidence.record_path,
         snapshot=SnapshotInfo(path=record.snapshot.stored_path, digest=record.snapshot.digest)
         if record
         else None,
@@ -225,7 +242,7 @@ def _step_result(
         usage=_usage(item),
         agent_execution_s=span_s(item.get("agent_execution")),
         termination=exception,
-        probes=probes,
+        probes=evidence.probes,
     )
 
 
@@ -239,19 +256,45 @@ def _halts(step_result: StepResult, rule: ProgressionRule) -> bool:
     return rule.mode == "halt_on_failure" and graded and not gate_passes(step_result.rewards, rule)
 
 
-def classify_trial(trial_dir: Path, ctx: TrialContext) -> tuple[StepResult, ...]:
+def read_evidence(trial_dir: Path, ctx: TrialContext) -> TrialEvidence:
+    """Read what the trial directory holds for every planned step (the file-reading seam)."""
     result = read_result(trial_dir)
     items = step_results(result)
-    trial_error = _exception_type(result) if result is not None else "no_result"
+    idle_killed = idle_killed_steps(trial_dir)
+    steps: dict[str, StepEvidence] = {}
+    for index, (step, _) in enumerate(ctx.planned_steps):
+        sha = _instruction_sha(ctx.task_dir, step)
+        if step not in items:
+            steps[step] = StepEvidence(instruction_sha256=sha)
+            continue
+        record = _load_record(trial_dir, step)
+        record_dir = step_record_dir(trial_dir, step)
+        steps[step] = StepEvidence(
+            instruction_sha256=sha,
+            record=record,
+            record_path=(record_dir.relative_to(trial_dir) / RECORD_FILE).as_posix()
+            if record
+            else None,
+            probes=_lab_checks(ctx, trial_dir, step, index),
+            reap=reap_infra_reason(load_reap_report(record_dir)),
+            idle_killed=step in idle_killed,
+        )
+    return TrialEvidence(result, steps, _seed_parent(trial_dir, ctx))
+
+
+def classify_evidence(ctx: TrialContext, evidence: TrialEvidence) -> tuple[StepResult, ...]:
+    """Decide every planned step's state from the evidence alone (no I/O)."""
+    items = step_results(evidence.result)
+    trial_error = _exception_type(evidence.result) if evidence.result is not None else "no_result"
     results: list[StepResult] = []
-    parent: str | None = _seed_parent(trial_dir, ctx)
+    parent = evidence.seed_parent
     halted = False
     for index, (step, _) in enumerate(ctx.planned_steps):
         step_result = _step_result(
             ctx,
-            trial_dir,
             index,
             items.get(step),
+            evidence.steps.get(step) or StepEvidence(),
             parent,
             halted=halted,
             trial_error=trial_error,
@@ -263,13 +306,14 @@ def classify_trial(trial_dir: Path, ctx: TrialContext) -> tuple[StepResult, ...]
     return tuple(results)
 
 
-def harness_installs(trial_dir: Path) -> list[str]:
-    """Versions Harbor installed the agent CLI at during this trial ("" = unpinned/latest)."""
-    path = trial_dir / TRIAL_LOG
-    if not path.is_file():
-        return []
+def classify_trial(trial_dir: Path, ctx: TrialContext) -> tuple[StepResult, ...]:
+    return classify_evidence(ctx, read_evidence(trial_dir, ctx))
+
+
+def installed_versions(lines: Iterable[str]) -> list[str]:
+    """Versions Harbor installed the agent CLI at, from ``trial.log`` lines ("" = latest)."""
     installs = []
-    for line in path.read_text(errors="replace").splitlines():
+    for line in lines:
         if "Running command:" not in line:
             continue
         for pattern in _HARNESS_INSTALL:
@@ -279,8 +323,16 @@ def harness_installs(trial_dir: Path) -> list[str]:
     return installs
 
 
-def _harness_check(
-    result: Mapping[str, Any] | None, pinned: str | None, trial_dir: Path
+def harness_installs(trial_dir: Path) -> list[str]:
+    """Versions Harbor installed the agent CLI at during this trial ("" = unpinned/latest)."""
+    path = trial_dir / TRIAL_LOG
+    if not path.is_file():
+        return []
+    return installed_versions(path.read_text(errors="replace").splitlines())
+
+
+def agent_version_check(
+    result: Mapping[str, Any] | None, pinned: str | None, installs: Sequence[str]
 ) -> ValidityCheck:
     """The agent CLI ran at the pack pin.
 
@@ -295,7 +347,6 @@ def _harness_check(
             name="agent_version", passed=True, detail="no-LLM agent override: no agent CLI"
         )
     agent_info = (result or {}).get("agent_info") or {}
-    installs = harness_installs(trial_dir)
     off_pin = sorted({version or "latest" for version in installs if version != pinned})
     detail = (
         f"pinned {pinned!r}; agent {agent_info.get('name')!r} reports {agent_info.get('version')!r}"
@@ -335,15 +386,16 @@ def _halt_check(
     )
 
 
-def execution_validity(
-    trial_dir: Path,
+def validity_from_evidence(
+    result: Mapping[str, Any] | None,
+    installs: Sequence[str],
     step_results: Sequence[StepResult],
     pinned: str | None,
     rule: ProgressionRule,
     *,
     runnable: int | None = None,
 ) -> ExecutionValidity:
-    result = read_result(trial_dir)
+    """The execution-validity gate over parsed evidence (no I/O)."""
     trial_exception = _exception_type(result)
     started = any(a.checkpoint_state is not CheckpointState.NOT_ATTEMPTED for a in step_results)
     checks = [
@@ -361,9 +413,27 @@ def execution_validity(
         _reason_check("agent_infra", step_results, "step_exception"),
         _reason_check("lab_checks", step_results, LAB_CHECK),
         _halt_check(step_results, rule, runnable),
-        _harness_check(result, pinned, trial_dir),
+        agent_version_check(result, pinned, installs),
     ]
     return ExecutionValidity(checks=tuple(checks))
+
+
+def execution_validity(
+    trial_dir: Path,
+    step_results: Sequence[StepResult],
+    pinned: str | None,
+    rule: ProgressionRule,
+    *,
+    runnable: int | None = None,
+) -> ExecutionValidity:
+    return validity_from_evidence(
+        read_result(trial_dir),
+        harness_installs(trial_dir) if pinned is not None else (),
+        step_results,
+        pinned,
+        rule,
+        runnable=runnable,
+    )
 
 
 # Health checks that make a trial invalid, grouped under one validity check each. ``H-target``

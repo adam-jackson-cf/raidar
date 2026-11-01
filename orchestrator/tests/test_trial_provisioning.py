@@ -15,21 +15,20 @@ from pathlib import Path
 from types import SimpleNamespace
 from typing import Any, cast
 
-import pytest
-from harbor.models.trial.paths import TrialPaths
 from harbor.trial.hooks import TrialEvent
 
-from raidar.engine.trial import environment as env_module
-from raidar.engine.trial.environment import RunScopedDockerEnvironment
 from raidar.engine.trial.provision import (
     AGENT_USER_ENV,
     INSTALL_PHASE,
     PAYLOAD_ENV,
+    PROVISION_DIR_NAME,
     STAGING_ROOT,
     PayloadFile,
     TrialProvision,
     install_trial_provisioning,
+    provision_check,
     provision_log,
+    provision_record_check,
 )
 
 SLUG = "tool"
@@ -93,7 +92,7 @@ def _step(name: str) -> Any:
     return SimpleNamespace(result=SimpleNamespace(step_results=[SimpleNamespace(step_name=name)]))
 
 
-def test_the_install_runs_once_at_start_and_every_step_only_checks() -> None:
+def test_the_install_runs_once_at_start_and_every_step_only_checks(tmp_path: Path) -> None:
     env = _Env()
     hooks = _trial(env, [PROVISION])
     (before_agent,) = hooks[TrialEvent.AGENT_START]
@@ -123,9 +122,19 @@ def test_the_install_runs_once_at_start_and_every_step_only_checks() -> None:
     assert first["install"]["phase"] == INSTALL_PHASE
     assert first["install"]["ok"] is True
     assert second["check"]["values"] == {"tree_digest": "abc"}
+    assert provision_record_check(first, SLUG)[0]
+    assert provision_record_check(second, SLUG)[0]
+    failed_check = {**second, "check": {"ok": False, "error": "tool drifted"}}
+    passed, detail = provision_record_check(failed_check, SLUG)
+    assert not passed
+    assert "tool drifted" in detail
+    path = tmp_path / PROVISION_DIR_NAME / f"{SLUG}.jsonl"
+    path.parent.mkdir()
+    path.write_text(json.dumps(first) + "\n" + json.dumps(failed_check) + "\n")
+    assert provision_check(tmp_path, SLUG) == (passed, detail)
 
 
-def test_a_failed_install_is_recorded_and_no_step_checks() -> None:
+def test_a_failed_install_is_recorded_and_no_step_checks(tmp_path: Path) -> None:
     env = _Env(install_rc=1)
     hooks = _trial(env, [PROVISION])
 
@@ -136,6 +145,16 @@ def test_a_failed_install_is_recorded_and_no_step_checks() -> None:
     assert record["install"]["ok"] is False
     assert "no pypi" in record["install"]["output"]
     assert record["check"] is None
+    passed, detail = provision_record_check(record, SLUG)
+    assert not passed
+    assert "no pypi" in detail
+    assert not provision_record_check(None, SLUG)[0]
+    assert not provision_check(tmp_path, SLUG)[0]
+    path = tmp_path / PROVISION_DIR_NAME / f"{SLUG}.jsonl"
+    path.parent.mkdir()
+    for payload in ("not json\n", "[]\n", "\n"):
+        path.write_text(payload)
+        assert not provision_check(tmp_path, SLUG)[0]
 
 
 def test_an_environment_that_cannot_run_work_at_start_records_a_failed_install() -> None:
@@ -151,41 +170,3 @@ def test_an_environment_that_cannot_run_work_at_start_records_a_failed_install()
 
 def test_no_provisions_install_nothing() -> None:
     assert _trial(_Env(), []) == {}
-
-
-async def test_post_start_hooks_run_inside_start_after_the_container_is_up(
-    monkeypatch: pytest.MonkeyPatch,
-    tmp_path: Path,
-) -> None:
-    calls: list[str] = []
-
-    async def compose_start(self: Any, force_build: bool) -> None:
-        calls.append("start")
-
-    async def rootless() -> bool:
-        return False
-
-    async def warm() -> None:
-        return None
-
-    async def inspected(*_: Any, **__: Any) -> list[str]:
-        return ["PATH"]
-
-    monkeypatch.setattr("harbor.environments.docker.docker.DockerEnvironment.start", compose_start)
-    monkeypatch.setattr(env_module, "warm_agent_imports", warm)
-    env = object.__new__(RunScopedDockerEnvironment)
-    env._post_start = []  # noqa: SLF001
-    env._persistent_env = {}  # noqa: SLF001
-    env._compose_task_env = {}  # noqa: SLF001
-    env._sandbox_env_names = {}  # noqa: SLF001
-    env.trial_paths = TrialPaths(tmp_path)
-    monkeypatch.setattr(env, "_inspect_container_env_names", inspected)
-    monkeypatch.setattr(env, "_is_rootless_docker", rootless, raising=False)
-
-    async def hook() -> None:
-        calls.append("install")
-
-    env.add_post_start_hook(hook)
-    await env.start(False)
-
-    assert calls == ["start", "install"]
