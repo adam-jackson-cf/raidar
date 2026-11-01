@@ -111,7 +111,9 @@ def _setup_sh_s(trial_dir: Path, step: str) -> float | None:
 
 
 def _step_samples(
-    trial_dir: Path, steps: Sequence[Mapping[str, Any]], agent_setup_end: Any
+    steps: Sequence[Mapping[str, Any]],
+    agent_setup_end: Any,
+    readings: Mapping[str, tuple[float, float | None, list[PhaseSample]]],
 ) -> tuple[list[PhaseSample], Any]:
     samples: list[PhaseSample] = []
     previous_end = parse_ts(agent_setup_end)
@@ -120,21 +122,21 @@ def _step_samples(
         agent, verifier = item.get("agent_execution") or {}, item.get("verifier") or {}
         a_start, a_end = parse_ts(agent.get("started_at")), parse_ts(agent.get("finished_at"))
         v_end = parse_ts(verifier.get("finished_at"))
-        leak_s = _pre_agent_leak_s(trial_dir, name)
+        leak_s, setup_s, recorded = readings[name]
         gap = diff_s(a_start, previous_end)
         samples += _sample("per_step_reset", gap - leak_s if gap is not None else None, name)
         samples += _sample("pre_agent_leak_check", leak_s or None, name)
-        samples += _sample("setup_sh", _setup_sh_s(trial_dir, name), name)
+        samples += _sample("setup_sh", setup_s, name)
         samples += _sample("agent_execution", span_s(agent), name)
         samples += _sample(
             "artifact_collection", diff_s(parse_ts(verifier.get("started_at")), a_end), name
         )
-        samples += _record_samples(trial_dir, name)
+        samples += recorded
         if index + 1 < len(steps):
             following = steps[index + 1]
             next_start = parse_ts((following.get("agent_execution") or {}).get("started_at"))
             archive = diff_s(next_start, v_end)
-            leak_next = _pre_agent_leak_s(trial_dir, following["step_name"])
+            leak_next = readings[following["step_name"]][0]
             samples += _sample(
                 "step_archive_gap", archive - leak_next if archive is not None else None, name
             )
@@ -167,20 +169,16 @@ def _aggregates(samples: Iterable[PhaseSample], condition: dict[str, str]) -> li
     return aggregates
 
 
-def trial_phases(
-    trial_dir: Path,
+def phase_samples(
+    result: Mapping[str, Any],
+    readings: Mapping[str, tuple[float, float | None, list[PhaseSample]]],
     *,
     arm_apply_s: float,
     environment_cold: bool,
     compose_init: bool,
     workspace_seed_s: float | None = None,
 ) -> list[PhaseSample]:
-    """Every N1 phase this trial exposes (raidar_result_write is added by the job).
-
-    ``workspace_seed_s`` is the workspace seed's install duration, when one was recorded
-    (``raidar.engine.trial.workspace.seed_duration``).
-    """
-    result = read_result(trial_dir) or {}
+    """Derive timings from a result and already-read per-step measurements."""
     condition = {"environment": "cold" if environment_cold else "warm"}
     condition["teardown"] = "init" if compose_init else "no-init"
     steps = [item for item in result.get("step_results") or [] if isinstance(item, dict)]
@@ -192,7 +190,7 @@ def trial_phases(
     samples += _sample("agent_setup", span_s(result.get("agent_setup")))
     samples += _sample("arm_apply", arm_apply_s)
     step_samples, last_end = _step_samples(
-        trial_dir, steps, (result.get("agent_setup") or {}).get("finished_at")
+        steps, (result.get("agent_setup") or {}).get("finished_at"), readings
     )
     samples += step_samples
     samples += _sample(
@@ -202,3 +200,32 @@ def trial_phases(
         condition["teardown"],
     )
     return samples + _aggregates(samples, condition)
+
+
+def trial_phases(
+    trial_dir: Path,
+    *,
+    arm_apply_s: float,
+    environment_cold: bool,
+    compose_init: bool,
+    workspace_seed_s: float | None = None,
+) -> list[PhaseSample]:
+    """Read the trial's recorded measurements and derive its N1 phase timings."""
+    result = read_result(trial_dir) or {}
+    readings = {
+        item["step_name"]: (
+            _pre_agent_leak_s(trial_dir, item["step_name"]),
+            _setup_sh_s(trial_dir, item["step_name"]),
+            _record_samples(trial_dir, item["step_name"]),
+        )
+        for item in result.get("step_results") or []
+        if isinstance(item, dict)
+    }
+    return phase_samples(
+        result,
+        readings,
+        arm_apply_s=arm_apply_s,
+        environment_cold=environment_cold,
+        compose_init=compose_init,
+        workspace_seed_s=workspace_seed_s,
+    )

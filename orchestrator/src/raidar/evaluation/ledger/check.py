@@ -92,9 +92,9 @@ def load_ledger(
     )
 
 
-def check_ledger(root: Path) -> list[str]:
-    """Return every integrity problem in the ledger under ``root`` (empty when clean)."""
-    faults, remedies, problems = load_ledger(root)
+def record_problems(faults: dict[str, FaultRecord], remedies: dict[str, RemedyRecord]) -> list[str]:
+    """Validate record histories and links without reading a ledger directory."""
+    problems: list[str] = []
     for fault in faults.values():
         problems += _history_problems(fault.id, fault, FAULT_INITIAL, FAULT_TRANSITIONS)
     for remedy in remedies.values():
@@ -104,8 +104,13 @@ def check_ledger(root: Path) -> list[str]:
             for fid in remedy.faults
             if fid not in faults
         ]
-    problems += _readme_problems(root, faults, remedies)
     return problems
+
+
+def check_ledger(root: Path) -> list[str]:
+    """Return every integrity problem in the ledger under ``root`` (empty when clean)."""
+    faults, remedies, problems = load_ledger(root)
+    return problems + record_problems(faults, remedies) + _readme_problems(root, faults, remedies)
 
 
 def _readme_problems(

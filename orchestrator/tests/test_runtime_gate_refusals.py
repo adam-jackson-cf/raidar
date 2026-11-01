@@ -16,7 +16,8 @@ import pytest
 from click.testing import CliRunner
 
 from raidar.cli import main
-from raidar.contract.references import RefKind, ResolverSet
+from raidar.cli.assess import as1_issues
+from raidar.contract.references import RefKind, RegistryResolver, ResolverSet
 from raidar.design.experiment.loader import CliOverrides, load_experiment
 from raidar.design.experiment.lock import LOCK_VERSION, LockError, build_lock, seal_lock
 from raidar.design.problem.importer import _runtime_pack
@@ -30,9 +31,9 @@ from raidar.subject.releases import AgentResolver, WorkflowResolver
 from tests.experiment_spec_support import (
     InMemoryResolver,
     experiment_document,
+    pin_spec_digest,
     write_experiment,
 )
-from tests.verifier_support import make_bundle
 
 FORGE = "scb/forge@abc123"
 FORGE_NODE = "scb-node-ts/forge@abc123"
@@ -42,10 +43,16 @@ NODE_BINDING = {"runtime": "node-ts", "pack_version": 1, "validated": True}
 PackLoader = Callable[[str], PackSpec]
 
 
+@pytest.fixture(autouse=True)
+def _fixed_spec_digest(monkeypatch: pytest.MonkeyPatch) -> None:
+    pin_spec_digest(monkeypatch)
+
+
 def _resolvers(
     *,
     problems: dict[str, dict[str, object]] | None = None,
     scorers: dict[str, dict[str, object]] | None = None,
+    agents: RegistryResolver | None = None,
 ) -> ResolverSet:
     problem_bindings = {FORGE: PYTHON_BINDING, FORGE_NODE: NODE_BINDING, ONESHOT_NODE: NODE_BINDING}
     return ResolverSet(
@@ -59,7 +66,7 @@ def _resolvers(
                 },
                 bindings={**problem_bindings, **(problems or {})},
             ),
-            AgentResolver(),
+            agents or AgentResolver(),
             WorkflowResolver(),
             InMemoryResolver(
                 RefKind.SCORER,
@@ -273,6 +280,15 @@ def test_rt5_an_agent_the_pack_does_not_bake_in_is_refused(experiment: Path) -> 
     assert "bakes no codex-cli harness" in issues["agents.0.release"]
 
 
+def test_rt5_is_not_judged_for_an_agent_that_did_not_resolve(experiment: Path) -> None:
+    registry_without_codex = InMemoryResolver(RefKind.AGENT, {})
+
+    issues = _issues(experiment, resolvers=_resolvers(agents=registry_without_codex))
+
+    assert "agents.0.release" in issues
+    assert "[RT5]" not in issues["agents.0.release"]
+
+
 # ---- RT6 at lock and at plan/run ---------------------------------------------------
 
 
@@ -323,9 +339,7 @@ def test_the_importer_loads_the_pack_of_the_sources_runtime() -> None:
 # ---- AS1: assess-time ---------------------------------------------------------------
 
 
-def _job(root: Path, runtime: str, bundle_digest: str) -> Path:
-    job = root / "jobs" / "e" / "j1"
-    (job / "trials" / "t1").mkdir(parents=True)
+def _assessment_lock(runtime: str, bundle_digest: str) -> dict:
     lock = seal_lock(
         {
             "lock_version": LOCK_VERSION,
@@ -343,82 +357,69 @@ def _job(root: Path, runtime: str, bundle_digest: str) -> Path:
             "toolchain": {},
         }
     )
-    (job / "job.lock.json").write_text(json.dumps(lock))
-    manifest = {"kind": "raidar-job", "job_id": "j1", "lock_sha256": lock["lock_sha256"]}
-    (job / "job.json").write_text(json.dumps(manifest))
-    return job
+    return lock
 
 
 def _assess(*args: str) -> Any:
     return CliRunner().invoke(main, ["assess", *args])
 
 
-def test_as1_rescore_scorers_must_cover_the_jobs_runtime(tmp_path: Path) -> None:
-    bundle = make_bundle(tmp_path / "b")
-    job = _job(tmp_path, "node-ts", bundle.digest())
-    store = tmp_path / "store"
-
-    lock = str(job / "job.lock.json")
+def test_as1_rescore_scorers_must_cover_the_jobs_runtime(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    lock = _assessment_lock("node-ts", "bound")
+    assert as1_issues(lock, ("correctness@10",), None) == []
+    assert "[AS1]" in "\n".join(as1_issues(lock, ("code-quality@9",), None))
+    monkeypatch.setattr("raidar.cli.assess._job_lock", lambda *_: lock)
     refused = _assess(
         "--rescore",
-        str(job / "trials"),
-        "--lock",
-        lock,
+        str(tmp_path),
         "--store",
-        str(store),
+        str(tmp_path.with_name(tmp_path.name + "-store")),
         "--scorer",
         "code-quality@9",
     )
-    allowed = _assess(
-        "--rescore",
-        str(job / "trials"),
-        "--lock",
-        lock,
-        "--store",
-        str(store),
-        "--scorer",
-        "correctness@10",
-    )
-
-    assert refused.exit_code != 0
+    assert refused.exit_code == 1
     assert "[AS1]" in refused.output
-    assert "[AS1]" not in allowed.output
 
 
 def test_as1_a_trial_outside_any_job_accepts_only_runtime_agnostic_scorers(
-    tmp_path: Path,
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    trial = tmp_path / "loose" / "t1"
-    trial.mkdir(parents=True)
-
+    assert as1_issues(None, ("correctness@10",), None) == []
+    monkeypatch.setattr("raidar.cli.assess._job_lock", lambda *_: None)
     refused = _assess(
-        "--rescore", str(trial), "--store", str(tmp_path / "s"), "--scorer", "code-quality@9"
+        "--rescore",
+        str(tmp_path),
+        "--store",
+        str(tmp_path.with_name(tmp_path.name + "-store")),
+        "--scorer",
+        "code-quality@9",
     )
-
-    assert refused.exit_code != 0
-    assert "the target is outside any job, so its runtime is unknown (pass --lock)" in (
-        refused.output
+    assert refused.exit_code == 1
+    assert (
+        "the target is outside any job, so its runtime is unknown (pass --lock)" in refused.output
     )
 
 
 @pytest.mark.parametrize("mode", ["--rescore", "--regrade"])
 def test_as1_a_bundle_override_must_be_the_verifier_bundle_the_lock_binds(
-    tmp_path: Path, mode: str
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, mode: str
 ) -> None:
-    bound = make_bundle(tmp_path / "bound")
-    other = make_bundle(tmp_path / "other")
-    (other.root / "tests" / "extra.py").write_text("x = 1\n")
-    job = _job(tmp_path, "python", bound.digest())
-    target = job / "trials" if mode == "--rescore" else job
-    lock = ["--lock", str(job / "job.lock.json")]
+    from types import SimpleNamespace
+
+    lock = _assessment_lock("python", "bound")
+    bundle = SimpleNamespace(digest=lambda: "bound")
+    monkeypatch.setattr("raidar.cli.assess.load_bundle", lambda _: bundle)
+    assert as1_issues(lock, ("correctness@10",), tmp_path) == []
+    bundle.digest = lambda: "different"
+    monkeypatch.setattr("raidar.cli.assess._job_lock", lambda *_: lock)
     store = (
-        ["--store", str(tmp_path / "s"), "--scorer", "correctness@10"]
+        ["--store", str(tmp_path.with_name(tmp_path.name + "-store")), "--scorer", "correctness@10"]
         if mode == "--rescore"
         else []
     )
-
-    refused = _assess(mode, str(target), *lock, *store, "--bundle", str(other.root))
-
-    assert refused.exit_code != 0
+    refused = _assess(mode, str(tmp_path), *store, "--bundle", str(tmp_path))
+    assert refused.exit_code == 1
     assert "[AS1] --bundle" in refused.output
     assert "is not the verifier bundle of any problem the job's lock binds" in refused.output
