@@ -12,11 +12,12 @@ from typing import TypedDict
 import yaml
 from raidar_contract.canonical import IGNORED_TREE_NAMES
 from raidar_contract.package.digest import read_stage_tree
-from raidar_contract.package.registry import load_stage_package
-from raidar_contract.releases import Release, ReleaseError, ReleaseKind, load_register
+from raidar_contract.references import Release, ReleaseError
 from raidar_contract.workflow import load_package_workflow, package_workflow_digest
 
 from raidar.contract.paths import releases_file, stages_root, workflows_root
+from raidar.contract.releases import ReleaseKind, load_register
+from raidar.subject.package.registry import load_stage_package
 from raidar.subject.stages import resolve_stages
 
 

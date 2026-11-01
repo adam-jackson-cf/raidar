@@ -29,11 +29,10 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from raidar_contract.agent import Capabilities
-
 from raidar.contract.job_layout import JOB_LOCK_FILE, JOB_MANIFEST, TRIAL_RECORDS_DIR
 from raidar.contract.trial import TrialRecord
 from raidar.engine.health.model import HealthReport, load_health
+from raidar.subject.agent.schema import Capabilities
 
 SMOKE_KIND = "smoke"
 Identity = dict[str, Any]

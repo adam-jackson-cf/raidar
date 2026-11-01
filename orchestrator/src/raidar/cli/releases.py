@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import click
-from raidar_contract.releases import ReleaseError
+from raidar_contract.references import ReleaseError
 
 from raidar.subject.release_check import release_base, release_issues
 

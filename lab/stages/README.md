@@ -4,13 +4,16 @@ A stage package contributes to a checkpoint's one primary agent session. It is n
 
 The portable implementation is `contract/`, distribution `raidar-contract`, import
 `raidar_contract`; it depends only on pydantic and PyYAML. Raidar uses that same
-implementation, pinned to `1.0.0`. `make contract-build CONTRACT_DIST_DIR=<new-dir>` builds
+implementation, pinned to `2.0.0`. `make contract-build CONTRACT_DIST_DIR=<new-dir>` builds
 unpublished wheel/sdist artifacts, prints SHA-256 hashes and atomically refuses existing output.
-The private release artifacts are under `var/contract/v1.0.0/` (logical `contract/v1.0.0`),
-with exact-version/hash pins in `contract/releases/1.0.0.requirements.txt`; consumers install
-artifacts, never build from a tag. `raidar_contract.CONTRACTS` maps unversioned contract/schema
-names to integer supported versions. Runtime primitives and Harbor integration stay in the
-orchestrator; the final `contract-v1.0.0` tag requires the non-model phase-5 exit checks.
+Private artifacts are under `var/contract/v<version>/` (logical `contract/v<version>`), with
+exact-version/hash pins in `contract/releases/<version>.requirements.txt`; consumers install
+artifacts, never build from a tag. `1.0.0` stays frozen; `contract-v1.1.0` and
+`contract-v2.0.0` identify the subsequent distributions. `raidar_contract.CONTRACTS` still maps
+stage, workflow, criteria, stage-tree and agent to `1`, `2`, `1`, `1`, `1` respectively.
+`2.0.0` keeps transport-neutral agent schemas and audit/token records; Harbor ids, isolation
+and capability policy, credentials/reset shell paths, lab registers and stage locations live
+in the orchestrator. Runtime primitives and Harbor integration stay there too.
 
 ## Folder and names
 
@@ -253,3 +256,11 @@ timestamps cannot stale installed-tree locks, and every file actually installed 
 - 2026-11-01: package-only reply/judge execution and primitive-keyed required health complete;
   private contract `1.0.0` artifacts have exact-version/hash pins. Provenance remains unverified.
   The freeze tag requires the non-model exit checks; real-model AT1/AT2 require approval.
+- 2026-11-01: `1.1.0` adds portable stop-result parsing, bounded stop decisions and call contexts,
+  with 63 shared parse/refusal/digest conformance cases. Run an installed artifact with
+  `python -m raidar_contract.conformance.check`.
+- 2026-11-01: `2.0.0` removes lab policy from the distribution, retaining transport-neutral
+  agent schemas and protocol records. Immutable references live in `raidar_contract.references`;
+  lab register policy lives in `raidar.contract.releases`. This distribution MAJOR changes no
+  contract id, accepted `stage/1` input/refusal or package digest. Primitive implementation
+  identities change and experiments must be relocked; grading revalidation follows this batch.

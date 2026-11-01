@@ -10,10 +10,11 @@ from pathlib import Path
 import pytest
 import yaml
 from click.testing import CliRunner
-from raidar_contract.releases import Release, ReleaseError, ReleaseKind, parse_register
+from raidar_contract.references import Release, ReleaseError
 
 from raidar.cli import main
 from raidar.contract.paths import agents_root
+from raidar.contract.releases import ReleaseKind, parse_register
 from raidar.subject import release_check
 from raidar.subject.agent.definition import load_agent
 from raidar.subject.release_check import history_issues, release_base, release_issues

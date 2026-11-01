@@ -9,12 +9,13 @@ import pytest
 import yaml
 from click.testing import CliRunner
 from raidar_contract.package import StagePackageError
-from raidar_contract.package.registry import load_stage_package
-from raidar_contract.releases import ReleaseError, ReleaseKind
+from raidar_contract.references import ReleaseError
 from raidar_contract.workflow import load_package_workflow, package_workflow_digest
 
 from raidar.cli import main
+from raidar.contract.releases import ReleaseKind
 from raidar.subject.imports import PackageImportError, import_folder, import_issues, load_imports
+from raidar.subject.package.registry import load_stage_package
 from raidar.subject.releases import released_workflow
 from tests.package_support import write_package
 

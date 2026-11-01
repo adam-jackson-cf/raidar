@@ -33,7 +33,7 @@ from pydantic import (
     model_serializer,
     model_validator,
 )
-from raidar_contract.releases import WORKFLOW_RELEASE_PATTERN
+from raidar_contract.references import WORKFLOW_RELEASE_PATTERN
 
 from raidar.contract.references import REFERENCE_PATTERN
 from raidar.scoring.catalog.outcomes import declared_outcome_types

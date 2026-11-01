@@ -18,8 +18,8 @@ from typing import Any
 
 import pytest
 from raidar_contract.package.fixtures import required_cases, static_problems
-from raidar_contract.package.registry import load_stage_package
 
+from raidar.subject.package.registry import load_stage_package
 from raidar.subject.primitive.calls import ResourceFloors, TransportError
 from raidar.subject.primitive.canary import StageCheckRecord
 from raidar.subject.primitive.gate import Attribution, GateInvalid, GateOutcome

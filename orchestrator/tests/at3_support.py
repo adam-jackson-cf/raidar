@@ -22,8 +22,8 @@ from harbor.agents.options import AgentOptions
 from harbor.environments.base import BaseEnvironment
 from harbor.models.agent.context import AgentContext
 from raidar_contract.package.manifest import ParamScalar
-from raidar_contract.package.registry import load_stage_package
 
+from raidar.subject.package.registry import load_stage_package
 from raidar.subject.primitive.canary import StageCheckRecord
 from raidar.subject.primitive.install import install_package
 from raidar.subject.primitive.site import TrialInvalid

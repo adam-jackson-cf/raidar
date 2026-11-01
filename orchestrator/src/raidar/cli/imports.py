@@ -6,11 +6,12 @@ from pathlib import Path
 
 import click
 from raidar_contract.package import StagePackageError
-from raidar_contract.releases import ReleaseError, ReleaseKind
+from raidar_contract.references import ReleaseError
 from raidar_contract.workflow import PackageWorkflowError
 
 from raidar.cli import workflow_new
 from raidar.contract.paths import REPO_ROOT
+from raidar.contract.releases import ReleaseKind
 from raidar.subject.imports import PackageImportError, import_folder
 
 

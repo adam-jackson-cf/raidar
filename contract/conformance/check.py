@@ -13,7 +13,7 @@ from raidar_contract.canonical import digest_json
 from raidar_contract.criteria import validate_criteria
 from raidar_contract.package.digest import read_stage_tree, stage_tree_digest
 from raidar_contract.package.manifest import parse_manifest
-from raidar_contract.releases import Release
+from raidar_contract.references import Release
 from raidar_contract.workflow import PackageWorkflowDefinition, package_workflow_digest
 
 
@@ -27,9 +27,7 @@ def _workflow(case: dict[str, Any]) -> dict[str, Any]:
     return {
         "value": definition.to_json(),
         "digest": definition.digest,
-        "packages_digest": package_workflow_digest(
-            definition, case.get("packages", [])
-        ),
+        "packages_digest": package_workflow_digest(definition, case.get("packages", [])),
     }
 
 
@@ -58,9 +56,7 @@ def _stop(case: dict[str, Any]) -> dict[str, Any]:
     from raidar_contract.call import parse_stop_result
 
     raw = (
-        bytes.fromhex(case["raw_hex"])
-        if "raw_hex" in case
-        else json.dumps(case["input"]).encode()
+        bytes.fromhex(case["raw_hex"]) if "raw_hex" in case else json.dumps(case["input"]).encode()
     )
     value = asdict(parse_stop_result(raw, tuple(case.get("declared", []))))
     return {"value": value, "digest": digest_json(value)}
@@ -86,9 +82,7 @@ def _tree(case: dict[str, Any]) -> dict[str, Any]:
         for entry in case["input"]:
             relative = Path(entry["path"])
             if relative.is_absolute() or ".." in relative.parts:
-                raise ValueError(
-                    "conformance file paths must be relative and cannot traverse"
-                )
+                raise ValueError("conformance file paths must be relative and cannot traverse")
             path = root / relative
             path.parent.mkdir(parents=True, exist_ok=True)
             if "symlink" in entry:
@@ -122,9 +116,7 @@ def check_case(case: dict[str, Any]) -> None:
         actual = PARSERS[case["kind"]](case)
     except ValueError as error:
         if "refusal" not in expected or expected["refusal"] not in str(error):
-            raise AssertionError(
-                f"{case['id']}: unexpected refusal: {error}"
-            ) from error
+            raise AssertionError(f"{case['id']}: unexpected refusal: {error}") from error
     else:
         if actual != expected:
             raise AssertionError(f"{case['id']}: expected {expected!r}, got {actual!r}")

@@ -10,13 +10,13 @@ from collections.abc import Mapping
 from typing import cast
 
 from harbor.agents.base import BaseAgent
-from raidar_contract.agent_records import Credentials, StatePath
 
 from raidar.subject.agent.adapters.base import HarnessAdapter
 from raidar.subject.agent.adapters.harbor_cli import HarborCliAdapter
 from raidar.subject.agent.adapters.registry import registry
 from raidar.subject.agent.config import AgentSpec, Harness
 from raidar.subject.agent.protocol import NativeAgent
+from raidar.subject.agent.records import Credentials, StatePath
 
 
 def resolve_adapter(spec: AgentSpec) -> HarnessAdapter:

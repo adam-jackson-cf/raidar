@@ -23,8 +23,7 @@ references always use ``Release.parse_workflow``) and name no tree definition.
 
 from __future__ import annotations
 
-import re
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
@@ -32,13 +31,11 @@ from typing import Annotated
 
 import yaml
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
+from raidar_contract.agent import AgentDefinitionError
+from raidar_contract.package import StagePackageError
+from raidar_contract.references import Release, ReleaseError
+from raidar_contract.workflow import PackageWorkflowError
 
-RELEASE_PATTERN = r"^(?:[a-z0-9][a-z0-9-]*/)?[a-z0-9][a-z0-9-]*@[1-9][0-9]*$"
-STAGE_RELEASE_PATTERN = r"^[a-z0-9][a-z0-9-]*/[a-z0-9][a-z0-9-]*@[1-9][0-9]*$"
-WORKFLOW_RELEASE_PATTERN = STAGE_RELEASE_PATTERN
-_RELEASE_RE = re.compile(RELEASE_PATTERN)
-_STAGE_RELEASE_RE = re.compile(STAGE_RELEASE_PATTERN)
-_WORKFLOW_RELEASE_RE = re.compile(WORKFLOW_RELEASE_PATTERN)
 Sha256 = Annotated[str, Field(pattern=r"^[0-9a-f]{64}$")]
 
 
@@ -46,52 +43,6 @@ class ReleaseKind(StrEnum):
     AGENT = "agents"
     WORKFLOW = "workflows"
     STAGE = "stages"
-
-
-class ReleaseError(ValueError):
-    """A release reference is malformed, unregistered or not the one the tree holds."""
-
-
-@dataclass(frozen=True, order=True)
-class Release:
-    """A parsed immutable release reference: ``name@N``, or ``ns/name@N`` for a stage."""
-
-    name: str
-    version: int
-
-    @classmethod
-    def parse(cls, text: str) -> Release:
-        if not _RELEASE_RE.fullmatch(text):
-            raise ReleaseError(f"invalid release {text!r}: expected <name>@<N> (N from 1)")
-        name, version = text.split("@", 1)
-        return cls(name, int(version))
-
-    @classmethod
-    def parse_stage(cls, text: str) -> Release:
-        """A stage reference: the namespace is required (``<ns>/<name>@<N>``)."""
-        if not _STAGE_RELEASE_RE.fullmatch(text):
-            raise ReleaseError(
-                f"invalid stage release {text!r}: expected <ns>/<name>@<N> "
-                "(a namespace is required; N from 1)"
-            )
-        return cls.parse(text)
-
-    @classmethod
-    def parse_workflow(cls, text: str) -> Release:
-        """A workflow reference: the namespace is required (``<ns>/<name>@<N>``)."""
-        if not _WORKFLOW_RELEASE_RE.fullmatch(text):
-            raise ReleaseError(
-                f"invalid workflow release {text!r}: expected <ns>/<name>@<N> "
-                "(a namespace is required; N from 1)"
-            )
-        return cls.parse(text)
-
-    @property
-    def leaf(self) -> str:
-        return self.name.rsplit("/", 1)[-1]
-
-    def __str__(self) -> str:
-        return f"{self.name}@{self.version}"
 
 
 class _Register(BaseModel):
@@ -207,4 +158,38 @@ def rewritten_releases(earlier: ReleaseRegister, now: ReleaseRegister) -> list[s
                     f"{current[release][:12]}): releases are frozen; register "
                     f"{release.name}@<next> instead"
                 )
+    return issues
+
+
+def registration_issues(
+    kind: ReleaseKind,
+    names: list[str],
+    digest_of: Callable[[str], str],
+    register: ReleaseRegister,
+) -> list[str]:
+    issues = []
+    for name in names:
+        try:
+            digest = digest_of(name)
+        except (
+            AgentDefinitionError,
+            PackageWorkflowError,
+            StagePackageError,
+            ReleaseError,
+            OSError,
+        ) as exc:
+            issues.append(str(exc))
+            continue
+        latest = register.latest(kind, name)
+        if latest is None:
+            issues.append(f"{kind.value}/{name} is not released: register {name}@1: {digest}")
+        elif register.of(kind)[latest] != digest:
+            issues.append(
+                f"{kind.value}/{name} changed since {latest}: register "
+                f"{name}@{latest.version + 1}: {digest}"
+            )
+    issues.extend(
+        f"{kind.value} release name {name!r} is registered but not defined in the tree"
+        for name in sorted(register.names(kind) - set(names))
+    )
     return issues

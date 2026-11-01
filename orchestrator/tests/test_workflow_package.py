@@ -14,10 +14,10 @@ from typing import Any, ClassVar, cast
 
 import pytest
 from raidar_contract.package.manifest import Output, StagePackage
-from raidar_contract.package.registry import stage_folder
 from raidar_contract.workflow import PackageWorkflowDefinition
 
 from raidar.judge.live import LIVE_MODEL, RecordedJev
+from raidar.subject.package.registry import stage_folder
 from raidar.subject.primitive.calls import TransportError
 from raidar.subject.primitive.gate import Attribution, GateInvalid, GateOutcome
 from raidar.subject.primitive.site import TrialInvalid

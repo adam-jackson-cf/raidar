@@ -28,7 +28,7 @@ from pathlib import Path
 
 from raidar_contract.package.manifest import StagePackage
 from raidar_contract.package.tokens import PLACEHOLDER, TASK_SLOT, token_name
-from raidar_contract.releases import Release
+from raidar_contract.references import Release
 from raidar_contract.workflow import PackageJudge
 
 from raidar.contract.wheels import uv_lock_refusals

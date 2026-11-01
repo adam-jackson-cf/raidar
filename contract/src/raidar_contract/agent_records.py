@@ -1,9 +1,6 @@
-"""Record shapes of the native-agent protocol: pure data, no Harbor types.
+"""Transport-neutral native-agent token accounting and normalized audit records.
 
-The orchestrator's ``raidar.subject.agent.protocol`` holds the Harbor-typed boundary (the
-``NativeAgent`` protocol, the accounting functions that read an ``AgentContext``); these are the
-shapes it and the adapters exchange: credentials, reset state paths, token counts and the
-normalized ``session_audit`` of one turn.
+Credential handling and shell-based reset paths belong to each runtime, not this contract.
 """
 
 from __future__ import annotations
@@ -11,38 +8,7 @@ from __future__ import annotations
 import hashlib
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Literal
-
-
-@dataclass(frozen=True, slots=True)
-class Credentials:
-    """Whether a host environment can authenticate a harness.
-
-    ``issue`` is why it cannot (``None`` when it can). ``session_file`` is where a file-backed
-    session login is kept (``None`` for a harness with none), ``session_present`` whether that
-    file holds a login and ``session_used`` whether the harness would authenticate from it.
-    ``mode_env`` names the variable that selects the authentication source, if any.
-    """
-
-    issue: str | None
-    session_file: Path | None = None
-    session_present: bool = False
-    session_used: bool = False
-    mode_env: str | None = None
-
-
-@dataclass(frozen=True, slots=True)
-class StatePath:
-    """One harness-persisted location the per-step reset returns to the harness baseline.
-
-    ``target`` is a shell expression the reset script evaluates (``$HOME_DIR``, ``$LOGS_DIR``),
-    ``baseline`` the entry of the harness baseline it is restored from (removed when the baseline
-    has none) and ``kind`` whether it is a directory or a file.
-    """
-
-    target: str
-    baseline: str
-    kind: Literal["dir", "file"]
+from typing import Any
 
 
 @dataclass(frozen=True)

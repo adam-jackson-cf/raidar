@@ -10,13 +10,13 @@ import os
 import subprocess
 
 import click
-from raidar_contract.agent import AgentName
 
 from raidar.subject.agent.config import AgentSpec, Harness, ModelTarget, agent_cli
 from raidar.subject.agent.definition import harbor_adapter
 from raidar.subject.agent.executables import resolve_cli_executable
 from raidar.subject.agent.harness import harness_definition
 from raidar.subject.agent.native import adapter_class_for_harness, credentials, resolve_adapter
+from raidar.subject.agent.schema import AgentName
 
 _AGENT_CHOICES = click.Choice([name.value for name in AgentName])
 

@@ -15,7 +15,7 @@ from dataclasses import dataclass, field
 from functools import cached_property
 
 from raidar_contract.canonical import digest_json
-from raidar_contract.releases import ReleaseError
+from raidar_contract.references import ReleaseError
 from raidar_contract.workflow import PackageWorkflowDefinition
 
 from raidar.design.experiment.agent import AgentResolutionError, ResolvedAgent, resolve_agent
