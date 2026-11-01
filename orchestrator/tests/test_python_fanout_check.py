@@ -1,3 +1,5 @@
+"""Real-git seam of ``check-python-fanout.py``; its import accounting is tested in the fast tier."""
+
 from __future__ import annotations
 
 import importlib.util
@@ -41,75 +43,3 @@ def test_discovers_unignored_python_files_only(tmp_path: Path) -> None:
     }
 
     assert discovered == {"kept/module.py"}
-
-
-def test_counts_submodule_imports_without_hiding_grouped_imports(tmp_path: Path) -> None:
-    fanout = _load_fanout_module()
-    _git(tmp_path, "init")
-    package_root = tmp_path / "orchestrator" / "src" / "raidar"
-    (package_root / "sample").mkdir(parents=True)
-    (package_root / "__init__.py").write_text("", encoding="utf-8")
-    (package_root / "sample" / "__init__.py").write_text("", encoding="utf-8")
-    (package_root / "sample" / "artifacts.py").write_text("", encoding="utf-8")
-    (package_root / "sample" / "workspace.py").write_text("", encoding="utf-8")
-    current_path = package_root / "sample" / "pipeline.py"
-    current_path.write_text(
-        "from raidar.sample import artifacts, workspace\n",
-        encoding="utf-8",
-    )
-    current = fanout.PythonFile(
-        path=current_path,
-        relpath="orchestrator/src/raidar/sample/pipeline.py",
-        module="raidar.sample.pipeline",
-        is_package=False,
-    )
-    known_modules = {
-        "raidar",
-        "raidar.sample",
-        "raidar.sample.artifacts",
-        "raidar.sample.workspace",
-        "raidar.sample.pipeline",
-    }
-
-    imports = fanout.imported_modules(
-        current_path.read_text(encoding="utf-8"),
-        current,
-        root_package="raidar",
-        known_modules=known_modules,
-    )
-
-    assert imports == {"raidar.sample.artifacts", "raidar.sample.workspace"}
-
-
-def test_architectural_dependencies_exclude_stdlib_but_keep_third_party(
-    tmp_path: Path,
-) -> None:
-    fanout = _load_fanout_module()
-    current_path = tmp_path / "orchestrator" / "src" / "raidar" / "module.py"
-    current_path.parent.mkdir(parents=True)
-    current_path.write_text(
-        "import json\nfrom click.testing import CliRunner\n",
-        encoding="utf-8",
-    )
-    current = fanout.PythonFile(
-        path=current_path,
-        relpath="orchestrator/src/raidar/module.py",
-        module="raidar.module",
-        is_package=False,
-    )
-
-    imports = fanout.imported_modules(
-        current_path.read_text(encoding="utf-8"),
-        current,
-        root_package="raidar",
-        known_modules={"raidar", "raidar.module"},
-    )
-
-    assert imports == {"click.testing", "json"}
-    assert fanout.architectural_dependencies(imports) == {"click.testing"}
-
-
-def test_source_nloc_ignores_blank_lines_and_comments() -> None:
-    fanout = _load_fanout_module()
-
-    assert fanout.source_nloc("\n# comment\nx = 1\n\n    # indented comment\n") == 1
