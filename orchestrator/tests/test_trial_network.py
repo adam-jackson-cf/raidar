@@ -88,9 +88,14 @@ def test_existing_allowlists_intersect_the_contract_and_preserve_narrower_phase_
 ) -> None:
     task = TaskConfig(steps=[StepConfig(name="first")])
     task.environment.network_mode = NetworkMode.ALLOWLIST
-    task.environment.allowed_hosts = ["*.openai.com", "pypi.org", "unapproved.example.org"]
+    task.environment.allowed_hosts = [
+        "*.openai.com",
+        "pypi.org",
+        "unapproved.example.org",
+        "10.0.0.0/8",
+    ]
     task.agent.network_mode = NetworkMode.ALLOWLIST
-    task.agent.allowed_hosts = ["api.openai.com", "unapproved.example.org"]
+    task.agent.allowed_hosts = ["api.openai.com", "unapproved.example.org", "10.1.0.0/16"]
     task.steps[0].agent.network_mode = NetworkMode.PUBLIC
     path = tmp_path / "task.toml"
     path.write_text(task.model_dump_toml())

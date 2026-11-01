@@ -21,6 +21,7 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
+from raidar.contract.trial import PlannedTrial, ProbeSummary, ProgressionRule, TrialHashes
 from raidar.design.experiment.loader import LoadedExperiment, load_experiment
 from raidar.design.experiment.lock import (
     build_lock,
@@ -28,12 +29,15 @@ from raidar.design.experiment.lock import (
     default_resolvers,
     render_lock,
 )
+from raidar.design.experiment.schema import ProtocolSpec
 from raidar.design.problem.importer import import_problem
 from raidar.design.problem.models import ProblemId
 from raidar.design.problem.store import ProblemStore
 from raidar.design.problem.validator import ValidateOptions, validate_problem, write_report
 from raidar.engine.health.reaper import ReapReport, write_reap_report
 from raidar.engine.target.config import Target
+from raidar.engine.trial.collect import StepEvidence, TrialContext, TrialEvidence
+from raidar.engine.trial.progression import progression_rule
 from raidar.engine.trial.workspace import SEED_SLUG, SHA_KEY
 from raidar.grading.leak import LeakReport
 from raidar.grading.models import CaseGroup, CaseResult, CaseStatus, InfraFailure, VerifierGrade
@@ -264,13 +268,32 @@ def write_trial(
     snapshot is then ``SEED_DIGEST``).
     """
     trial_dir.mkdir(parents=True, exist_ok=True)
+    for outcome in outcomes:
+        if seeded:
+            write_seed_record(trial_dir, outcome.name)
+        _write_reset(trial_dir, outcome.name, outcome.reset_ok)
+        record_dir = step_record_dir(trial_dir, outcome.name)
+        write_pre_agent_leak(record_dir, LeakReport(clean=True, seconds=0.5))
+        write_reap_report(record_dir, ReapReport("agent", (), (), None))
+        if outcome.passed is not None:
+            write_step_record(record_dir, _record(outcome.name, outcome, trial_dir))
+    result = harbor_result(outcomes, agent_version=agent_version, trial_exception=trial_exception)
+    (trial_dir / "result.json").write_text(json.dumps(result))
+    return trial_dir
+
+
+def harbor_result(
+    outcomes: Sequence[StepOutcome],
+    *,
+    agent_version: str = "0.156.1",
+    trial_exception: str | None = None,
+) -> dict[str, Any]:
+    """Harbor's ``result.json`` content for the outcomes (see ``write_trial`` for the timeline)."""
     step_results = []
     clock = 11.0
     for outcome in outcomes:
         a_start, a_end = clock + 2, clock + 12
         v_start, v_end = a_end + 3, a_end + 8
-        if seeded:
-            write_seed_record(trial_dir, outcome.name)
         item: dict[str, Any] = {
             "step_name": outcome.name,
             "agent_result": {
@@ -293,14 +316,8 @@ def write_trial(
             ),
         }
         step_results.append(item)
-        _write_reset(trial_dir, outcome.name, outcome.reset_ok)
-        record_dir = step_record_dir(trial_dir, outcome.name)
-        write_pre_agent_leak(record_dir, LeakReport(clean=True, seconds=0.5))
-        write_reap_report(record_dir, ReapReport("agent", (), (), None))
-        if outcome.passed is not None:
-            write_step_record(record_dir, _record(outcome.name, outcome, trial_dir))
         clock = v_end
-    result = {
+    return {
         "agent_info": {"name": "codex", "version": agent_version},
         "started_at": _iso(0),
         "finished_at": _iso(clock + 3),
@@ -318,5 +335,67 @@ def write_trial(
             else None
         ),
     }
-    (trial_dir / "result.json").write_text(json.dumps(result))
-    return trial_dir
+
+
+def trial_evidence(
+    outcomes: Sequence[StepOutcome],
+    *,
+    agent_version: str = "0.156.1",
+    trial_exception: str | None = None,
+    result: bool = True,
+    idle_killed: Sequence[str] = (),
+) -> TrialEvidence:
+    """What ``read_evidence`` would parse from ``write_trial``'s directory, built in memory."""
+    steps = {}
+    for outcome in outcomes:
+        graded = outcome.passed is not None
+        failures = () if outcome.reset_ok else ("context-reset: no reset report",)
+        steps[outcome.name] = StepEvidence(
+            record=_record(outcome.name, outcome, Path("/trial")) if graded else None,
+            record_path=f"raidar-oracle/steps/{outcome.name}/record.json" if graded else None,
+            probes=ProbeSummary(passed=not failures, failures=failures),
+            idle_killed=outcome.name in idle_killed,
+        )
+    document = harbor_result(outcomes, agent_version=agent_version, trial_exception=trial_exception)
+    return TrialEvidence(document if result else None, steps, None)
+
+
+CLASSIFIED_STEPS = tuple(f"checkpoint_{k}" for k in range(1, 9))
+
+
+def classification_context(
+    steps: tuple[str, ...] = CLASSIFIED_STEPS,
+    rule: ProgressionRule | None = None,
+    task_dir: Path = Path("/task"),
+) -> TrialContext:
+    """Eight planned checkpoints, of which ``steps`` are selected to run (the rest truncated)."""
+    hashes = TrialHashes(
+        lock="l",
+        problem="p",
+        arm="a",
+        workflow="w",
+        packages="s",
+        primitive_code="s",
+        agent="g",
+        protocol="r",
+        trial="t",
+    )
+    trial = PlannedTrial(
+        trial_id="b00-p0-baseline",
+        attempt=0,
+        order=0,
+        sequence=0,
+        arm="baseline",
+        problem="scb/adder@fixture",
+        problem_index=0,
+        steps=steps,
+        hashes=hashes,
+    )
+    return TrialContext(
+        trial=trial,
+        planned_steps=tuple((step, step) for step in CLASSIFIED_STEPS),
+        task_dir=task_dir,
+        provisions=(),
+        pinned_harness_version="0.156.1",
+        rule=rule or progression_rule(ProtocolSpec()),
+    )

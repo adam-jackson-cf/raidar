@@ -1,4 +1,4 @@
-"""A trial's parity record and harness isolation, read from what its steps left behind."""
+"""A trial's parity record and harness isolation, decided from parsed step evidence."""
 
 from __future__ import annotations
 
@@ -8,43 +8,35 @@ from typing import Any
 
 import pytest
 
-from raidar.engine.trial.parity import agent_network, harness_isolation, parity_record
+from raidar.engine.trial.parity import (
+    build_parity,
+    distinct_isolations,
+    harness_isolation,
+    network_policies,
+    parity_record,
+    record_turns,
+)
 from tests.execution_support import SEED_DIGEST, write_seed_record
 
 PROCESS = {"user": "agent", "path": "/usr/local/bin:/usr/bin", "tmpdir": None}
 ISOLATION = {"flags": ["--ignore-user-config", "--disable", "plugins"]}
-
-
-def _workflow(trial_dir: Path, step: str, *turns: dict[str, Any]) -> None:
-    folder = trial_dir / "steps" / step / "agent" / "workflow"
-    folder.mkdir(parents=True, exist_ok=True)
-    (folder / "workflow.json").write_text(json.dumps({"kind": "raidar-workflow", "turns": turns}))
+LIVENESS = {"idle_s": 300.0}
 
 
 def _turn(**changes: Any) -> dict[str, Any]:
     return {"harness_isolation": ISOLATION, "agent_process": PROCESS, **changes}
 
 
-def _task(folder: Path) -> Path:
-    folder.mkdir(parents=True, exist_ok=True)
-    (folder / "task.toml").write_text('[agent]\nnetwork_mode = "allowlist"\n')
-    return folder
+def test_the_parity_record_keeps_each_distinct_agent_process_and_the_limits() -> None:
+    turns = [_turn(), _turn(), _turn(agent_process={**PROCESS, "tmpdir": "/tmp/t"}), {"other": 1}]
 
-
-def test_the_parity_record_reads_the_seed_and_each_distinct_agent_process(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    monkeypatch.setenv("RAIDAR_LIVENESS_IDLE_S", "300")
-    write_seed_record(tmp_path, "checkpoint_1")
-    _workflow(tmp_path, "checkpoint_1", _turn(), _turn())
-    _workflow(tmp_path, "checkpoint_2", _turn(agent_process={**PROCESS, "tmpdir": "/tmp/t"}))
-
-    record = parity_record(
-        tmp_path,
-        ("checkpoint_1", "checkpoint_2"),
-        task_dir=_task(tmp_path / "task"),
+    record = build_parity(
+        turns,
+        seed_digest=SEED_DIGEST,
+        network=[{"network_mode": "allowlist", "allowed_hosts": []}],
         image_id="sha256:i",
         timeouts={"agent_timeout_s": 1800.0},
+        liveness=LIVENESS,
     )
 
     assert record.seed_digest == SEED_DIGEST
@@ -54,34 +46,76 @@ def test_the_parity_record_reads_the_seed_and_each_distinct_agent_process(
     assert record.network == ({"network_mode": "allowlist", "allowed_hosts": []},)
 
 
-def test_missing_evidence_leaves_the_parity_parts_empty(tmp_path: Path) -> None:
-    record = parity_record(
-        tmp_path, ("checkpoint_1",), task_dir=_task(tmp_path), image_id=None, timeouts={}
+def test_missing_evidence_leaves_the_parity_parts_empty() -> None:
+    record = build_parity(
+        [], seed_digest=None, network=[], image_id=None, timeouts={}, liveness=LIVENESS
     )
 
-    assert (record.seed_digest, record.agent_process) == (None, ())
+    assert (record.seed_digest, record.agent_process, record.network) == (None, (), ())
 
 
-def test_harness_isolation_keeps_each_distinct_application(tmp_path: Path) -> None:
+def test_harness_isolation_keeps_each_distinct_application() -> None:
     other = {"flags": ["--ignore-user-config"]}
-    _workflow(tmp_path, "checkpoint_1", _turn(), _turn(harness_isolation=None))
-    _workflow(tmp_path, "checkpoint_2", _turn(), _turn(harness_isolation=other))
+    turns = [_turn(), _turn(harness_isolation=None), _turn(), _turn(harness_isolation=other)]
 
-    assert harness_isolation(tmp_path, ("checkpoint_1", "checkpoint_2", "checkpoint_3")) == (
-        ISOLATION,
-        other,
-    )
+    assert distinct_isolations(turns) == (ISOLATION, other)
 
 
-def test_the_network_record_is_each_distinct_agent_phase_policy(tmp_path: Path) -> None:
-    (tmp_path / "task.toml").write_text(
-        '[agent]\nnetwork_mode = "allowlist"\nallowed_hosts = ["pypi.org", "api.openai.com"]\n'
-        '[[steps]]\n[steps.agent]\nnetwork_mode = "allowlist"\n'
-        'allowed_hosts = ["api.openai.com", "pypi.org"]\n'
-        '[[steps]]\n[steps.agent]\nnetwork_mode = "no-network"\n'
-    )
+@pytest.mark.parametrize("record", [None, [], "text", {"turns": None}, {"turns": 3 * [None]}])
+def test_a_malformed_workflow_record_yields_no_turns(record: object) -> None:
+    assert list(record_turns(record)) == []
 
-    assert agent_network(tmp_path) == (
+
+def test_only_mapping_turns_of_a_workflow_record_count() -> None:
+    assert list(record_turns({"turns": [_turn(), "x", _turn(agent_process=None)]})) == [
+        _turn(),
+        _turn(agent_process=None),
+    ]
+
+
+def test_the_network_record_is_each_distinct_agent_phase_policy() -> None:
+    reordered = {"network_mode": "allowlist", "allowed_hosts": ["api.openai.com", "pypi.org"]}
+    document = {
+        "agent": {"network_mode": "allowlist", "allowed_hosts": ["pypi.org", "api.openai.com"]},
+        "steps": [{"agent": reordered}, {"agent": {"network_mode": "no-network"}}, {}],
+    }
+
+    assert network_policies(document) == (
         {"network_mode": "allowlist", "allowed_hosts": ["api.openai.com", "pypi.org"]},
         {"network_mode": "no-network", "allowed_hosts": []},
+        {"network_mode": None, "allowed_hosts": []},
     )
+    assert network_policies({}) == ({"network_mode": None, "allowed_hosts": []},)
+
+
+def test_the_record_reader_gathers_the_seed_turns_and_policies_from_a_few_files(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("RAIDAR_LIVENESS_IDLE_S", "300")
+    write_seed_record(tmp_path, "checkpoint_1")
+    workflow = tmp_path / "steps" / "checkpoint_1" / "agent" / "workflow"
+    workflow.mkdir(parents=True, exist_ok=True)
+    (workflow / "workflow.json").write_text(json.dumps({"turns": [_turn()]}))
+    broken = tmp_path / "steps" / "checkpoint_2" / "agent" / "workflow"
+    broken.mkdir(parents=True)
+    (broken / "workflow.json").write_text("{not json")
+    task = tmp_path / "task"
+    task.mkdir()
+    (task / "task.toml").write_text('[agent]\nnetwork_mode = "allowlist"\n')
+
+    record = parity_record(
+        tmp_path,
+        ("checkpoint_1", "checkpoint_2", "checkpoint_3"),
+        task_dir=task,
+        image_id="sha256:i",
+        timeouts={},
+    )
+
+    assert record.seed_digest == SEED_DIGEST
+    assert len(record.agent_process) == 1
+    assert record.limits["liveness"]["idle_s"] == 300.0
+    assert record.network == ({"network_mode": "allowlist", "allowed_hosts": []},)
+    steps = ("checkpoint_1", "checkpoint_2", "checkpoint_3")
+    assert harness_isolation(tmp_path, steps) == (ISOLATION,)
+    unseeded = parity_record(tmp_path, (), task_dir=task, image_id=None, timeouts={})
+    assert (unseeded.seed_digest, unseeded.agent_process) == (None, ())

@@ -21,14 +21,6 @@ class ResolvedCodexAuth:
     auth_json_path: Path | None
     source_label: str
 
-    def metadata(self) -> dict[str, str | None]:
-        return {
-            "requested_mode": self.requested_mode,
-            "resolved_mode": self.resolved_mode,
-            "source": self.source_label,
-            "auth_json_path": str(self.auth_json_path) if self.auth_json_path else None,
-        }
-
 
 def normalize_codex_auth_mode(value: str | None = None) -> str:
     """Return the configured Codex auth mode."""
