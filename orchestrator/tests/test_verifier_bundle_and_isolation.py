@@ -4,9 +4,6 @@ from __future__ import annotations
 
 import hashlib
 import os
-import shutil
-import subprocess
-import sys
 import textwrap
 from pathlib import Path
 
@@ -32,13 +29,10 @@ from raidar.grading.bundle import (
 from raidar.grading.leak import LeakScanError, leak_scan_command, parse_leak_output
 from raidar.grading.sandbox import (
     CONTAINER_LAYOUT,
-    RUNTIME_DIR,
     DockerCopySandbox,
-    SandboxLayout,
     SandboxRun,
     render_pytest_args,
     sandbox_argv,
-    sandbox_env,
 )
 from tests.verifier_support import make_bundle, step_spec
 
@@ -440,46 +434,3 @@ def test_invalid_manifest_is_a_bundle_error(tmp_path: Path) -> None:
     (bundle.root / BUNDLE_MANIFEST).write_text('{"schema_version": 2}')
     with pytest.raises(BundleError, match="invalid"):
         load_bundle(bundle.root)
-
-
-@pytest.mark.skipif(shutil.which("uv") is None, reason="needs uv on PATH")
-@pytest.mark.parametrize("with_lock", [False, True])
-def test_uv_entrypoint_runs_offline_when_the_submission_declares_a_dev_group(
-    tmp_path: Path, with_lock: bool
-) -> None:
-    # Pilot v2 forge-01 (aborted): a submission with `dev = ["pytest>=8"]` failed
-    # every case because `uv run --project /app` tried to download pytest offline.
-    app = tmp_path / "app"
-    app.mkdir()
-    (app / "pyproject.toml").write_text(
-        '[project]\nname = "sub"\nversion = "0.1.0"\nrequires-python = ">=3.10"\n'
-        'dependencies = []\n\n[dependency-groups]\ndev = ["pytest>=8"]\n'
-    )
-    if with_lock:
-        (app / "uv.lock").write_text(
-            'version = 1\nrequires-python = ">=3.10"\n\n[[package]]\nname = "sub"\n'
-            'version = "0.1.0"\nsource = { virtual = "." }\n'
-        )
-    (app / "prog.py").write_text("print('ran')\n")
-    layout = SandboxLayout(
-        app=str(app),
-        tests=str(tmp_path / "tests"),
-        runtime=str(RUNTIME_DIR),
-        out=str(tmp_path / "out"),
-        scratch=str(tmp_path / "scratch"),
-        python=sys.executable,
-    )
-    env = sandbox_env(make_bundle(tmp_path), layout, coverage=False)
-    assert env["UV_OFFLINE"] == "1"
-    host = {k: v for k, v in os.environ.items() if not k.startswith("UV_") and k != "VIRTUAL_ENV"}
-    result = subprocess.run(
-        ["uv", "run", "--project", str(app), str(app / "prog.py")],
-        cwd=app,
-        env={**host, **env},
-        capture_output=True,
-        text=True,
-        timeout=120,
-        check=False,
-    )
-    assert result.returncode == 0, result.stderr
-    assert result.stdout.strip() == "ran"

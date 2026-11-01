@@ -22,12 +22,9 @@ import pytest
 from harbor.models.trial.config import AgentConfig
 
 from tests.at3_support import OUTCOME, SCENARIOS, PackageDriveAgent
-from tests.docker_trial_support import build_task, docker_target_ready, run_trial_sync
+from tests.docker_trial_support import build_task, run_trial_sync
 
-pytestmark = pytest.mark.skipif(
-    not docker_target_ready(),
-    reason="needs a ready Docker target (data check passing) and the built python pack image",
-)
+pytestmark = [pytest.mark.docker, pytest.mark.security]
 
 STEP = "checkpoint_1"
 

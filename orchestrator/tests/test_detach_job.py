@@ -35,6 +35,8 @@ from raidar.engine.job.detach import (
 )
 from raidar.engine.job.run import create_job_dir
 
+pytestmark = pytest.mark.slow
+
 EXPERIMENT_ID = "python__toy__detach"
 # Stands in for `make experiment-execute DETACH=0 ...`: writes the job like raidar run does.
 FAKE_JOB = """

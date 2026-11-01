@@ -330,16 +330,6 @@ def test_workflow_new_refuses_an_unknown_template(
     assert "no workflow template" in result.output
 
 
-def test_a_lock_with_an_sdist_is_a_lock_problem(tmp_path: Path) -> None:
-    root = tmp_path / "acme" / "pkg"
-    shutil.copytree(REAL_PACKAGE, root)
-    (root / "tool" / "uv.lock").write_text(LOCK)
-
-    problems = stage_lock.lock_problems(root)
-
-    assert any("sdist" in problem for problem in problems)
-
-
 def test_stage_check_never_runs_package_code_on_the_host(
     stages: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

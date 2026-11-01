@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-pytest_plugins = ("tests.workflow_support",)
+pytest_plugins = ("tests.workflow_support", "tests.process_guard")
 
 
 @pytest.fixture

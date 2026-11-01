@@ -18,6 +18,7 @@ from tests.dependency_support import make_wheel
 from tests.primitive_support import LocalEnvironment, relocate
 
 needs_uv = pytest.mark.skipif(shutil.which("uv") is None, reason="uv is required")
+pytestmark = pytest.mark.slow
 INDEX = "https://pypi.org/simple"
 
 

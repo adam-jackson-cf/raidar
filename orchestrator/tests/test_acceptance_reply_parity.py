@@ -37,6 +37,8 @@ from tests.criteria_support import (
     write_workspace,
 )
 
+pytestmark = pytest.mark.slow
+
 
 class Rig:
     """One checkpoint's reply runtime over a workspace the host shell stands in for."""

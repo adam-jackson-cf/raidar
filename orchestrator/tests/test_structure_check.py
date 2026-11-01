@@ -11,6 +11,8 @@ import pytest
 REPO_ROOT = Path(__file__).resolve().parents[2]
 RAIDAR = "orchestrator/src/raidar"
 
+pytestmark = pytest.mark.quality
+
 
 def _load_structure_module():
     script_path = REPO_ROOT / "scripts" / "checks" / "check-structure.py"
