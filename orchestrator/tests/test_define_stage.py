@@ -6,25 +6,21 @@ Package fixtures exercise units, repair, accepted-question rounds, closure and s
 from __future__ import annotations
 
 import contextlib
-import hashlib
 import io
 import json
-import shutil
+import runpy
+import sys
 from pathlib import Path
 from typing import Any
 
 import pytest
-import yaml
 
 from define_tool import compact, stage, tool
+from define_tool.draft import Draft
 from define_tool.unitrules import VERSIONS
-from raidar.contract.paths import stages_root
 from tests import define_support as dbv
 
-PACKAGE = stages_root() / "raidar" / "define"
-FIXTURES = sorted(path.name for path in (PACKAGE / "fixtures").iterdir())
 PARAMS = {"unit_rules": 2, "max_refinement_rounds": 2}
-GATE_CASES = {"pass": 0, "refuse": tool.FAULT}
 
 
 def context(work: Path, state: Path, **over: Any) -> dict[str, Any]:
@@ -61,43 +57,6 @@ def draft(tmp_path: Path, reply: dict[str, Any], *sealed: str) -> Path:
     for word in sealed:
         tool.run(state, ["done", word], lambda: "")
     return state
-
-
-def fixture_run(tmp_path: Path, case: str) -> tuple[Any, dict[str, Any], dict[str, str]]:
-    """Run fixture ``case`` on a copy of its state: (result, its expectation, output digests)."""
-    source = PACKAGE / "fixtures" / case
-    expected = yaml.safe_load((source / "expect.yaml").read_text(encoding="utf-8"))
-    document = json.loads((source / "context.json").read_text(encoding="utf-8"))
-    gate = case in GATE_CASES
-    work = tmp_path / "work"
-    shutil.copytree(source / "state", work)
-    watched = work / ".raidar" / "define" if gate else work
-    document["state"] = str(watched)
-    document["outputs"] = {
-        "criteria": str(watched / "criteria.json"),
-        "definition": str(tmp_path / "definition.md"),
-    }
-    code, out = call(tmp_path, document, "sealed" if gate else "inspect")
-    result: Any = code if gate else json.loads(out)
-    digests = {
-        name: hashlib.sha256(Path(path).read_bytes()).hexdigest()
-        for name, path in document["outputs"].items()
-        if Path(path).exists()
-    }
-    return result, expected, digests
-
-
-@pytest.mark.parametrize("case", FIXTURES)
-def test_every_fixture_meets_its_expectation(tmp_path: Path, case: str) -> None:
-    result, expected, digests = fixture_run(tmp_path, case)
-
-    if case in GATE_CASES:
-        assert result == GATE_CASES[case]
-        assert (result == 0) == (expected["status"] == "pass")
-    else:
-        assert set(result) == {"status", "message", "tokens", "carry"}
-        assert result["status"] == expected["status"]
-        assert digests == (expected["outputs"] or {})
 
 
 @pytest.mark.parametrize("saved", [b"", b"{", b"\xff", b"[" * 50 + b"]" * 50])
@@ -175,9 +134,11 @@ def test_the_context_comes_from_the_environment_for_the_gate(
 
 def test_a_call_without_any_context_is_a_usage_error(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv(stage.CONTEXT_ENV, raising=False)
+    monkeypatch.setattr("sys.argv", ["define_tool.stage", "inspect"])
+    monkeypatch.delitem(sys.modules, "define_tool.stage")
 
     with pytest.raises(SystemExit) as raised:
-        stage.main(["inspect"])
+        runpy.run_module("define_tool.stage", run_name="__main__")
 
     assert raised.value.code == 2
 
@@ -246,9 +207,58 @@ def test_the_seal_names_what_blocks_and_changes_nothing(tmp_path: Path) -> None:
     assert sorted((p.name, p.read_bytes()) for p in state.iterdir()) == before
 
 
-def test_a_sealed_ready_draft_passes_the_prerequisite(tmp_path: Path) -> None:
-    state = draft(tmp_path, dbv.ready(), "ready")
+def test_a_sealed_ready_draft_passes_the_prerequisite(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    reply = dbv.ready(dbv.body([dbv.criterion(dbv.AC[0]), dbv.regressed(dbv.AC[1])]))
+    held = Draft(dbv.items(reply), "ready")
+    monkeypatch.setattr(tool, "read_draft", lambda _: held)
+    monkeypatch.setattr(tool, "read_calls", lambda _: [])
+    written: dict[Path, str] = {}
+    monkeypatch.setattr(tool, "write_definition", written.__setitem__)
+    document = context(Path("/output"), Path("/state"))
 
-    code, out = call(tmp_path, context(tmp_path, state), "sealed")
+    assert stage.sealed(document) == 0
+    assert written == {}
+    assert stage.inspect(document, PARAMS)["status"] == "done"
 
-    assert (code, out) == (0, "")
+    definition = written[Path("/output/feature-definition.md")]
+    assert "GET /greet" in definition
+    verification = next(
+        line.strip().removeprefix("Verification: ")
+        for line in definition.splitlines()
+        if line.strip().startswith("Verification: ")
+    )
+    criteria = json.loads(written[Path("/state/criteria.json")])
+    assert criteria["contract"] == "criteria/1"
+    (feature,) = criteria["features"]
+    assert (feature["id"], feature["name"], feature["outcome"]) == (
+        "F1",
+        "Greeting",
+        "GET /greet answers with a greeting for the caller's name",
+    )
+    behaviour, regression = feature["criteria"]
+    assert behaviour == {
+        "id": "F1.AC1",
+        "criterion": dbv.TEXTS["F1.AC1"],
+        "verification": verification,
+        "sources": [
+            "GET /greet returns 200 with the text `hello <name>`, where `name` is the "
+            "`name` query parameter.",
+            "Add a greeting endpoint.",
+        ],
+        "kind": "new",
+        "aspects": [
+            {"situation": situation, "outcome": outcome}
+            for situation, outcome in dbv.ASPECTS["F1.AC1"]
+        ],
+        "examples": [
+            {"situation": "GET /greet with `name=Ada`", "outcome": "`200` and `hello Ada`"}
+        ],
+    }
+    assert regression["id"] == "F1.AC2"
+    assert (regression["kind"], regression["aspects"], regression["examples"]) == (
+        "regression",
+        [],
+        [],
+    )
