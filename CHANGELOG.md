@@ -4,6 +4,16 @@ All notable changes to this project are documented in this file.
 
 ## Unreleased
 
+### Contract identity batch: relocks held at RT7
+
+- Attempt all 12 experiments through `make experiment-lock`: zero locks regenerated; all 12
+  existing locks retained byte-for-byte. Thirteen RT7 issues name stale grading validation,
+  with no other lock blocker: `scb/circuit_eval.checkpoint_1`, `scb/forge`, `scb/dag_execution`
+  and `scb/log_query`, all pinned at `38d627ecf668`.
+- Admission refuses before writing while the validation implementation differs from this
+  checkout. The orchestrator must revalidate once after this batch, then regenerate every lock
+  through the public target. No validation pin, immutable release or RT7 gate was weakened.
+
 ### Contract 2.0.0 distribution-policy split
 
 - Keep transport-neutral agent definitions, token/audit records, immutable references and
