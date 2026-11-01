@@ -20,7 +20,7 @@ from harbor.models.trajectories import Step, ToolCall, Trajectory
 from pydantic import ValidationError
 
 from raidar.contract.review import ReviewStatus
-from raidar.evaluation.review.projection.spans import SpanBuilder, to_ms
+from raidar.evaluation.review.projection.spans import SpanBuilder, TextReader, to_ms
 
 TRAJECTORY_FILE = "trajectory.json"
 _NAME_LIMIT = 60
@@ -199,7 +199,12 @@ def _session(builder: SpanBuilder, document: Trajectory, parent: str, prompt_nam
 
 
 def project_trajectory(
-    builder: SpanBuilder, trace_dir: Path, parent: str, *, first_checkpoint: bool
+    builder: SpanBuilder,
+    trace_dir: Path,
+    parent: str,
+    *,
+    first_checkpoint: bool,
+    read: TextReader,
 ) -> None:
     """Add a step's ATIF trajectory under ``parent`` (an error span when unreadable).
 
@@ -208,7 +213,7 @@ def project_trajectory(
     """
     path = trace_dir / TRAJECTORY_FILE
     try:
-        document = Trajectory.model_validate_json(path.read_text(encoding="utf-8"))
+        document = Trajectory.model_validate_json(read(path))
     except (OSError, ValidationError) as exc:
         builder.add(
             name="trajectory unreadable",

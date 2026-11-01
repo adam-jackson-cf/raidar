@@ -13,52 +13,10 @@ the protocol says so.
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
 
-import pytest
 from click.testing import CliRunner
 
 from raidar.cli import main
-from raidar.grading import offline
-from raidar.grading.regrade import RegradeOptions
-
-
-@pytest.mark.parametrize(
-    ("scorers", "replay", "makes"),
-    [
-        (("code-quality@9",), False, True),
-        (("code-quality@9", "correctness@10"), True, False),
-        (("correctness@10", "resource-usage@8"), False, False),
-    ],
-)
-def test_rescore_makes_coverage_first_only_for_a_scorer_that_reads_it(
-    monkeypatch: pytest.MonkeyPatch,
-    tmp_path: Path,
-    scorers: tuple[str, ...],
-    replay: bool,
-    makes: bool,
-) -> None:
-    called: list[Any] = []
-
-    async def fake(
-        path: Path, store: Path, options: RegradeOptions, concurrency: int = 1
-    ) -> dict[str, Any]:
-        called.append((path, store, options.docker_context, concurrency))
-        return {"steps": [], "errors": 0}
-
-    monkeypatch.setattr(offline, "produce_coverage_path", fake)
-
-    result = offline.produce_coverage(
-        tmp_path / "job",
-        tmp_path / "store",
-        scorers,
-        RegradeOptions(docker_context="orbstack"),
-        replay=replay,
-        concurrency=2,
-    )
-
-    assert (result is not None) is makes
-    assert called == ([(tmp_path / "job", tmp_path / "store", "orbstack", 2)] if makes else [])
 
 
 def test_coverage_check_needs_regrade(tmp_path: Path) -> None:

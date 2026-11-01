@@ -30,7 +30,11 @@ from pathlib import Path
 
 from raidar.evaluation.analysis.assessed import build_outcome
 from raidar.evaluation.analysis.policy_inputs import ComponentInput, score_inputs
-from raidar.evaluation.review.quality.gate_view import build_gate_view
+from raidar.evaluation.review.quality.gate_view import (
+    GateReader,
+    build_gate_view,
+    read_gate_from_disk,
+)
 from raidar.evaluation.review.quality.models import (
     COMPONENTS,
     Cell,
@@ -390,6 +394,7 @@ def build_run_detail(
     labels: Mapping[str, LabelRecord] | None = None,
     jev_note: str | None = None,
     gate: Assessment | None = None,
+    gate_reader: GateReader = read_gate_from_disk,
 ) -> QualityRunDetail:
     record = trial.record
     checkpoints = _checkpoints(trial, quality, correctness)
@@ -426,5 +431,5 @@ def build_run_detail(
         exclusions=_exclusions(quality),
         jev_decisions=_jev_items(decisions, labels or {}),
         notes=_notes(trial, jev_note),
-        gate=build_gate_view(trial, gate, checkpoints),
+        gate=build_gate_view(trial, gate, checkpoints, gate_reader),
     )

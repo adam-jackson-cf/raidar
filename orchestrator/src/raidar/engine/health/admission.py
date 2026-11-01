@@ -24,7 +24,8 @@ from __future__ import annotations
 
 import hashlib
 import json
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Iterable, Mapping, Sequence
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -32,7 +33,7 @@ from raidar_contract.agent import Capabilities
 
 from raidar.contract.job_layout import JOB_LOCK_FILE, JOB_MANIFEST, TRIAL_RECORDS_DIR
 from raidar.contract.trial import TrialRecord
-from raidar.engine.health.model import load_health
+from raidar.engine.health.model import HealthReport, load_health
 
 SMOKE_KIND = "smoke"
 Identity = dict[str, Any]
@@ -112,19 +113,44 @@ def _read(path: Path) -> dict[str, Any] | None:
     return loaded if isinstance(loaded, dict) else None
 
 
-def _trial_problem(job_dir: Path, trial_id: str) -> str | None:
+@dataclass(frozen=True)
+class SmokeJob:
+    """A finished smoke job: its manifest and lock, and how to read what its trials left.
+
+    ``record`` returns a selected trial's parsed record, or why it cannot be read.
+    """
+
+    name: str
+    manifest: Mapping[str, Any]
+    lock: Mapping[str, Any]
+    record: Callable[[str], TrialRecord | str]
+    health: Callable[[TrialRecord], HealthReport | None]
+
+
+def _stored_job(
+    job_dir: Path, name: str, manifest: Mapping[str, Any], lock: Mapping[str, Any]
+) -> SmokeJob:
+    def record(trial_id: str) -> TrialRecord | str:
+        record_file = job_dir / TRIAL_RECORDS_DIR / f"{trial_id}.json"
+        if not record_file.is_file():
+            return f"trial {trial_id} has no record"
+        try:
+            return TrialRecord.model_validate_json(record_file.read_text())
+        except ValueError as error:
+            return f"trial {trial_id} has an unreadable record ({type(error).__name__})"
+
+    return SmokeJob(name, manifest, lock, record, lambda r: load_health(job_dir / r.trial_dir))
+
+
+def _trial_problem(
+    record: TrialRecord, read_health: Callable[[TrialRecord], HealthReport | None]
+) -> str | None:
     """Why one trial is not clean, or ``None``."""
-    record_file = job_dir / TRIAL_RECORDS_DIR / f"{trial_id}.json"
-    if not record_file.is_file():
-        return f"trial {trial_id} has no record"
-    try:
-        record = TrialRecord.model_validate_json(record_file.read_text())
-    except ValueError as error:
-        return f"trial {trial_id} has an unreadable record ({type(error).__name__})"
+    trial_id = record.trial.trial_id
     if not record.valid:
         failed = [c.name for c in record.validity.checks if not c.passed]
         return f"trial {trial_id} is invalid ({failed})"
-    health = load_health(job_dir / record.trial_dir)
+    health = read_health(record)
     if health is None:
         return f"trial {trial_id} has no health.json"
     if health.violations:
@@ -153,49 +179,52 @@ def _no_work_problem(record: TrialRecord) -> str | None:
     return None
 
 
-def smoke_problem(job_dir: Path, manifest: Mapping[str, Any]) -> str | None:
-    """Why a smoke job is not clean, or ``None`` when it is."""
-    if "finished_at" not in manifest or "aborted" in manifest:
-        return "did not finish"
-    selected = manifest.get("selected") or []
+def job_problem(job: SmokeJob) -> tuple[list[TrialRecord], str | None]:
+    """A smoke job's selected trial records, and why the job is not clean (``None``: it is)."""
+    if "finished_at" not in job.manifest or "aborted" in job.manifest:
+        return [], "did not finish"
+    selected = job.manifest.get("selected") or []
     if not selected:
-        return "ran no trial"
+        return [], "ran no trial"
+    records: list[TrialRecord] = []
     for trial_id in selected:
-        problem = _trial_problem(job_dir, str(trial_id))
-        if problem:
-            return problem
-    return None
+        record = job.record(str(trial_id))
+        if isinstance(record, str):
+            return [], record
+        if problem := _trial_problem(record, job.health):
+            return [], problem
+        records.append(record)
+    return records, None
 
 
-def _smoke_jobs(jobs_root: Path) -> list[tuple[Path, dict[str, Any], dict[str, Any]]]:
+def smoke_problem(job_dir: Path, manifest: Mapping[str, Any]) -> str | None:
+    """Why the smoke job stored at ``job_dir`` is not clean, or ``None`` when it is."""
+    return job_problem(_stored_job(job_dir, job_dir.name, manifest, {}))[1]
+
+
+def _smoke_jobs(jobs_root: Path) -> list[SmokeJob]:
     found = []
     for manifest_file in sorted(jobs_root.glob(f"*/*/{JOB_MANIFEST}")):
+        job_dir = manifest_file.parent
         manifest = _read(manifest_file)
-        lock = _read(manifest_file.parent / JOB_LOCK_FILE)
+        lock = _read(job_dir / JOB_LOCK_FILE)
         if manifest is not None and lock is not None and experiment_kind(lock) == SMOKE_KIND:
-            found.append((manifest_file.parent, manifest, lock))
+            found.append(_stored_job(job_dir, str(job_dir.relative_to(jobs_root)), manifest, lock))
     return found
 
 
-def _candidate_identity(
-    job_dir: Path, manifest: dict[str, Any], lock: dict[str, Any], wanted: Identity
-) -> tuple[Identity | None, str | None]:
-    if lock.get("draft"):
+def _candidate_identity(job: SmokeJob, wanted: Identity) -> tuple[Identity | None, str | None]:
+    if job.lock.get("draft"):
         return None, "a draft lock marks a dev job: it never admits a measured run"
-    if problem := smoke_problem(job_dir, manifest):
+    records, problem = job_problem(job)
+    if problem:
         return None, problem
-    arms = {
-        TrialRecord.model_validate_json(
-            (job_dir / TRIAL_RECORDS_DIR / f"{trial_id}.json").read_text()
-        ).trial.arm
-        for trial_id in manifest["selected"]
-    }
     smoke = identity(
-        lock,
-        manifest.get("runner"),
-        manifest.get("recipes"),
-        manifest.get("execution_target"),
-        arm_ids=arms,
+        job.lock,
+        job.manifest.get("runner"),
+        job.manifest.get("recipes"),
+        job.manifest.get("execution_target"),
+        arm_ids={record.trial.arm for record in records},
     )
     if smoke is None:
         return None, "run provenance or executed-arm identity is incomplete"
@@ -203,26 +232,25 @@ def _candidate_identity(
     return (None, "; ".join(differs)) if differs else (smoke, None)
 
 
-def _search(wanted: Identity | None, jobs_root: Path) -> tuple[list[str], dict[str, str]]:
+def _search(wanted: Identity | None, jobs: Iterable[SmokeJob]) -> tuple[list[str], dict[str, str]]:
     """Clean compatible smoke jobs collectively covering the requested agents."""
     if wanted is None:
         return [], {"": "run provenance is incomplete"}
     reasons: dict[str, str] = {}
     remaining = list(wanted["arms"])
     selected: list[str] = []
-    for job_dir, manifest, lock in _smoke_jobs(jobs_root):
-        name = str(job_dir.relative_to(jobs_root))
-        smoke, reason = _candidate_identity(job_dir, manifest, lock, wanted)
+    for job in jobs:
+        smoke, reason = _candidate_identity(job, wanted)
         if smoke is None:
-            reasons[name] = reason or "no compatible smoke identity"
+            reasons[job.name] = reason or "no compatible smoke identity"
             continue
         uncovered = _remaining_arms(remaining, smoke)
         if uncovered != remaining:
-            selected.append(name)
+            selected.append(job.name)
             remaining = uncovered
         if not remaining:
             return selected, reasons
-        reasons[name] = f"arm identit(ies) {remaining} not smoked"
+        reasons[job.name] = f"arm identit(ies) {remaining} not smoked"
     return [], reasons or {"": "no smoke job found"}
 
 
@@ -283,13 +311,24 @@ def admit(
     allow_unsmoked: bool,
 ) -> dict[str, Any]:
     """The ``job.json`` ``admission`` record, or ``AdmissionError`` when the job is refused."""
+    return admit_jobs(kind, wanted, lambda: _smoke_jobs(jobs_root), allow_unsmoked=allow_unsmoked)
+
+
+def admit_jobs(
+    kind: str | None,
+    wanted: Identity | None,
+    jobs: Callable[[], Iterable[SmokeJob]],
+    *,
+    allow_unsmoked: bool,
+) -> dict[str, Any]:
+    """``admit`` over the smoke jobs ``jobs`` finds (read only when the kind needs a smoke)."""
     if kind == SMOKE_KIND:
         return {"required": False, "kind": kind}
     if wanted is not None and (
         problem := capability_problem(wanted["arms"], wanted.get("varies", ()))
     ):
         raise AdmissionError(f"this {kind} experiment's arms cannot be compared: {problem}")
-    smoke_jobs, unmet = _search(wanted, jobs_root)
+    smoke_jobs, unmet = _search(wanted, jobs())
     if smoke_jobs:
         return {
             "required": True,

@@ -209,7 +209,10 @@ def _findings(aggregate: Mapping[str, Any], runs: Sequence[ReviewRunRecord]) -> 
 
 def _task_document(trial: TrialInput) -> Mapping[str, Any]:
     path = trial.job_dir / "tasks" / trial.record.trial.trial_id / "task.toml"
-    return tomllib.loads(path.read_text(encoding="utf-8")) if path.is_file() else {}
+    try:
+        return tomllib.loads(trial.read(path))
+    except FileNotFoundError:
+        return {}
 
 
 def _comparable(group: ArmGroup, task: Mapping[str, Any]) -> ArmComparableConfig:

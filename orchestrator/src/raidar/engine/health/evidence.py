@@ -83,8 +83,8 @@ from pydantic import ValidationError
 from raidar_contract.workflow import PACKAGE_SCHEMA, PackageWorkflowDefinition
 
 from raidar.contract.harbor_result import RESULT_FILE
-from raidar.engine.health.base import Audit, make_check
-from raidar.engine.health.isolation import _source_findings
+from raidar.engine.health.base import make_check
+from raidar.engine.health.isolation import _agent_reader, _source_findings
 from raidar.engine.health.judge import JudgeStep, _call_evidence, _closure, _undecided
 from raidar.engine.health.model import PASS, UNMEASURED, VIOLATION, HealthCheck
 
@@ -293,7 +293,7 @@ def _turn_gap(step: Step, number: int, turn: Any) -> str | None:
         return f"turn {number}: no valid turn log directory"
     sources = audit.get("sources")
     bad, missing = _source_findings(
-        sources if isinstance(sources, list) else [], step.agent / log_dir
+        sources if isinstance(sources, list) else [], _agent_reader(step.agent), relative
     )
     problems = [*missing, *bad]
     return f"turn {number}: {problems[0]}" if problems else None
@@ -767,13 +767,19 @@ ROWS: tuple[Row, ...] = (
 )
 
 
-def _agent_config(trial_dir: Path) -> Mapping[str, Any] | None:
-    result = _json(trial_dir / RESULT_FILE)
-    for source in (_json(trial_dir / CONFIG_FILE), result.get("config") if result else None):
+def agent_of(config: Any, result: Any) -> Mapping[str, Any] | None:
+    """The ``agent`` section of the trial's own ``config.json``, else of ``result.json``'s."""
+    for source in (config, result.get("config") if isinstance(result, dict) else None):
         agent = source.get("agent") if isinstance(source, dict) else None
         if isinstance(agent, dict):
             return agent
     return None
+
+
+def _agent_config(trial_dir: Path) -> Mapping[str, Any] | None:
+    config = _json(trial_dir / CONFIG_FILE)
+    agent = agent_of(config, None)
+    return agent if agent is not None else agent_of(config, _json(trial_dir / RESULT_FILE))
 
 
 def _definition(agent: Mapping[str, Any]) -> Any:
@@ -888,11 +894,10 @@ def _runner_kwargs(primitives: Any, locked: Any, uses: tuple[tuple[str, str], ..
     )
 
 
-def configured(trial_dir: Path, override: str | None) -> Expected:
-    """What the lab's own record of the trial locks; ``UNKNOWN`` when it cannot be read."""
+def expected_from(agent: Mapping[str, Any] | None, override: str | None) -> Expected:
+    """What a parsed ``agent`` configuration locks; ``UNKNOWN`` when there is none to read."""
     if override:
         return OVERRIDE
-    agent = _agent_config(trial_dir)
     if agent is None:
         return UNKNOWN
     definition = _definition(agent)
@@ -901,14 +906,19 @@ def configured(trial_dir: Path, override: str | None) -> Expected:
     return OVERRIDE if agent.get("name") in OVERRIDES else UNKNOWN
 
 
+def configured(trial_dir: Path, override: str | None) -> Expected:
+    """What the lab's own record of the trial locks; ``UNKNOWN`` when it cannot be read."""
+    return expected_from(None if override else _agent_config(trial_dir), override)
+
+
 def _applies(row: Row, expected: Expected) -> bool:
     if not expected.runs_workflow:
         return False
     return not row.primitives or any(p in expected.locked for p in row.primitives)
 
 
-def _step(audit: Audit, name: str, expected: Expected) -> Step:
-    agent = audit.trial_dir / "steps" / name / "agent"
+def _step(trial_dir: Path, name: str, expected: Expected) -> Step:
+    agent = trial_dir / "steps" / name / "agent"
     raw = _json(agent / WORKFLOW_RECORD)
     return Step(name, agent, raw if isinstance(raw, dict) else None, expected)
 
@@ -936,10 +946,16 @@ def _check(row: Row, steps: Sequence[Step], expected: Expected) -> HealthCheck:
     return make_check(row.id, PASS, f"{row.evidence}: present", steps=[s.name for s in ruled])
 
 
-def evidence_family(audit: Audit) -> tuple[HealthCheck, ...]:
-    """One check per table row over the attempted steps; none when no step ran."""
-    if not audit.attempted:
-        return ()
-    expected = configured(audit.trial_dir, audit.record.agent_override)
-    steps = [_step(audit, s.step, expected) for s in audit.attempted]
+def evidence_checks(steps: Sequence[Step], expected: Expected) -> tuple[HealthCheck, ...]:
+    """One check per table row over the attempted steps."""
     return tuple(_check(row, steps, expected) for row in ROWS)
+
+
+def evidence_family(
+    trial_dir: Path, override: str | None, attempted: Sequence[str]
+) -> tuple[HealthCheck, ...]:
+    """One check per table row over the attempted steps; none when no step ran."""
+    if not attempted:
+        return ()
+    expected = configured(trial_dir, override)
+    return evidence_checks([_step(trial_dir, name, expected) for name in attempted], expected)

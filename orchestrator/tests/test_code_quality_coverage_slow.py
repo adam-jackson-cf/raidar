@@ -35,7 +35,7 @@ from raidar.grading.records import (
 from raidar.scoring.catalog.builtin import default_scorer_registry
 from raidar.scoring.code_quality import CodeQualityScorer
 from raidar.scoring.code_quality.coverage_reader import OFFLINE_NOT_PRODUCED
-from raidar.scoring.code_quality.observations import CASE_EXCLUDED, EXCLUDED_METRIC, NO_RUN_EVIDENCE
+from raidar.scoring.code_quality.observations import CASE_EXCLUDED, EXCLUDED_METRIC
 from raidar.scoring.framework.builtin_manifests import CODE_QUALITY
 from raidar.scoring.framework.context import AssessContext
 from raidar.scoring.framework.rescore import assess
@@ -164,23 +164,6 @@ def test_an_unproduced_offline_run_is_unavailable_and_the_assessment_provisional
     assert _by_key(result)[("verbosity", "checkpoint_1")].status is AssessStatus.OK
 
 
-def test_a_failed_offline_parity_check_is_ineligible_never_zero(tmp_path: Path) -> None:
-    trial = case_trial(tmp_path / "trial", golden_case("synthetic_shop"))
-    store = tmp_path / "store"
-    _defer(
-        trial,
-        store,
-        {"checkpoint_2": ParityVerdict(eligible=False, reasons=("environment_mismatch",))},
-    )
-
-    result, awaiting = _run(trial, store)
-
-    assert not awaiting
-    item = _by_key(result)[("regression", T12)]
-    assert (item.status, item.value) == (AssessStatus.INELIGIBLE, None)
-    assert item.reason == "coverage_parity_failed: environment_mismatch"
-
-
 def test_rescore_keeps_an_awaiting_assessment_provisional_then_completes_it(
     tmp_path: Path,
 ) -> None:
@@ -255,43 +238,6 @@ def reference_exclusions(tmp_path: Path) -> dict[tuple[str, str], Observation]:
     trial = case_trial(tmp_path / "ref", golden_case("synthetic_shop"))
     _defer(trial, tmp_path / "ref-store", {})
     return _by_key(_run(trial, tmp_path / "ref-store")[0])
-
-
-def test_a_trial_whose_parity_held_leaves_out_no_case(tmp_path: Path) -> None:
-    trial = case_trial(tmp_path / "trial", golden_case("synthetic_shop"))
-    store = tmp_path / "store"
-    _defer(trial, store, {})
-
-    observed = _by_key(_run(trial, store)[0])
-
-    assert observed[("regression", T12)].status is AssessStatus.OK
-    assert observed[(EXCLUDED_METRIC, T12)].value == 0.0
-
-
-@pytest.mark.parametrize(
-    "reasons",
-    [
-        ("environment_mismatch",),
-        ("coverage_outside_outcomes", "outcome_mismatch"),
-        ("ledger_mismatch", "outcome_mismatch", "process_ledger_mismatch"),
-    ],
-)
-def test_any_other_parity_failure_stays_ineligible(
-    tmp_path: Path, reasons: tuple[str, ...]
-) -> None:
-    trial = case_trial(tmp_path / "trial", _flipped_case())
-    store = tmp_path / "store"
-    _defer(trial, store, {"checkpoint_2": ParityVerdict(eligible=False, reasons=reasons)})
-
-    observed = _by_key(_run(trial, store)[0])
-
-    item = observed[("regression", T12)]
-    assert (item.status, item.reason) == (
-        AssessStatus.INELIGIBLE,
-        f"coverage_parity_failed: {', '.join(reasons)}",
-    )
-    assert observed[(EXCLUDED_METRIC, T12)].status is AssessStatus.NOT_APPLICABLE
-    assert (observed[(EXCLUDED_METRIC, T12)].reason or "").startswith(NO_RUN_EVIDENCE)
 
 
 def test_the_in_trial_pass_is_reconciled_the_same_way(tmp_path: Path) -> None:

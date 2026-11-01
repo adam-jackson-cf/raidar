@@ -7,7 +7,7 @@ their artifacts on every build; nothing is persisted per experiment.
 from __future__ import annotations
 
 import argparse
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from pathlib import Path
 
 from raidar.contract.review import (
@@ -39,6 +39,17 @@ def _unique_details(details: Sequence[ReviewRunDetail]) -> list[ReviewRunDetail]
     return list(details)
 
 
+def assemble_projection(
+    epoch: EpochProjection, job_roots: Sequence[Path]
+) -> ReviewProjectionArtifact:
+    """The artifact for an epoch projection, flagging families that mix headline metrics."""
+    if not epoch.experiments:
+        where = ", ".join(str(root) for root in job_roots) or "no source"
+        raise ValueError(f"no projectable runs found under {where}")
+    experiments = mark_policy_mismatches(epoch.experiments)
+    return _artifact(job_roots, experiments, _unique_details(epoch.details))
+
+
 def merge_review_projections(
     *,
     job_roots: Sequence[Path] = (),
@@ -46,12 +57,7 @@ def merge_review_projections(
     locks: Sequence[Path] = (),
 ) -> ReviewProjectionArtifact:
     """Project the runs under ``job_roots`` and flag families that mix headline metrics."""
-    epoch = project_experiment_epoch(job_roots, stores, locks)
-    if not epoch.experiments:
-        where = ", ".join(str(root) for root in job_roots) or "no source"
-        raise ValueError(f"no projectable runs found under {where}")
-    experiments = mark_policy_mismatches(epoch.experiments)
-    return _artifact(job_roots, experiments, _unique_details(epoch.details))
+    return assemble_projection(project_experiment_epoch(job_roots, stores, locks), job_roots)
 
 
 def _artifact(
@@ -94,11 +100,15 @@ def _parser() -> argparse.ArgumentParser:
     return parser
 
 
-def main(argv: Sequence[str] | None = None) -> None:
+def main(
+    argv: Sequence[str] | None = None,
+    *,
+    merge: Callable[..., ReviewProjectionArtifact] = merge_review_projections,
+) -> None:
     args = _parser().parse_args(argv)
     if not args.jobs_root:
         raise SystemExit("give at least one --jobs-root")
-    artifact = merge_review_projections(
+    artifact = merge(
         job_roots=[path.resolve() for path in args.jobs_root],
         stores=[path.resolve() for path in args.store],
         locks=[path.resolve() for path in args.lock],

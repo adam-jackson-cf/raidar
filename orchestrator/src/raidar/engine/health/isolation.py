@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path, PurePosixPath
 from typing import Any
@@ -28,6 +29,12 @@ from raidar.engine.health.model import PASS, UNMEASURED, VIOLATION, HealthCheck
 WORKFLOW_FILE = "workflow/workflow.json"
 AGENTS_FILES = ("AGENTS.md", "AGENTS.override.md", "CLAUDE.md")
 _SHOWN = 3
+
+
+_ReadBytes = Callable[[PurePosixPath], bytes | None]
+"""Bytes of a file named relative to a step's ``agent`` directory; None when unreadable."""
+_ReadWorkspace = Callable[[PurePosixPath], str | None]
+"""Text of a workspace file as the step began; None when the file is absent."""
 
 
 def _json(path: Path) -> Any:
@@ -53,11 +60,27 @@ def _before_snapshot(a: Audit, step: str) -> Path | None:
     return _stored_snapshot(a, order[index - 1]) if index > 0 else None
 
 
-def _file_lines(path: Path) -> set[str]:
-    if not path.is_file():
-        return set()
-    lines = path.read_text(encoding="utf-8", errors="replace").splitlines()
-    return {line.strip() for line in lines if line.strip()}
+def _snapshot_reader(root: Path) -> _ReadWorkspace:
+    def read(file: PurePosixPath) -> str | None:
+        path = root / file
+        return path.read_text(encoding="utf-8", errors="replace") if path.is_file() else None
+
+    return read
+
+
+def _agent_reader(agent: Path) -> _ReadBytes:
+    def read(path: PurePosixPath) -> bytes | None:
+        try:
+            return (agent / path).read_bytes()
+        except OSError:
+            return None
+
+    return read
+
+
+def _text_lines(text: str | None) -> set[str]:
+    """The stripped, non-empty lines of ``text`` (none for an absent file)."""
+    return {line.strip() for line in (text or "").splitlines() if line.strip()}
 
 
 def _relative(path: PurePosixPath) -> bool:
@@ -75,7 +98,7 @@ def _component_placements(workflow: dict[str, Any]) -> list[tuple[PurePosixPath,
     ]
 
 
-def _placements(agent: Path, workflow: Any) -> list[tuple[PurePosixPath, Path]]:
+def _placements(workflow: Any) -> list[tuple[PurePosixPath, PurePosixPath]]:
     """``(workspace file, step record)`` for each text the workflow placed in the workspace.
 
     A component names its file and its host-written record; the package workflow writes no
@@ -85,10 +108,20 @@ def _placements(agent: Path, workflow: Any) -> list[tuple[PurePosixPath, Path]]:
         return []
     placed = _component_placements(workflow)
     return [
-        (path, agent / PurePosixPath(record))
+        (path, PurePosixPath(record))
         for path, record in placed
         if isinstance(record, str) and _relative(path) and _relative(PurePosixPath(record))
     ]
+
+
+def _placed_lines(workflow: Any, read: _ReadBytes) -> dict[PurePosixPath, set[str]]:
+    """The lines each workspace file was given by the workflow's components."""
+    placed: dict[PurePosixPath, set[str]] = {}
+    for file, record in _placements(workflow):
+        data = read(record)
+        text = None if data is None else data.decode("utf-8", errors="replace")
+        placed.setdefault(file, set()).update(_text_lines(text))
+    return placed
 
 
 @dataclass(frozen=True)
@@ -96,7 +129,7 @@ class _PreTurn:
     """What the workspace's instruction files could hold before one turn."""
 
     placed: dict[PurePosixPath, set[str]] = field(default_factory=dict)
-    before: Path | None = None
+    before: _ReadWorkspace | None = None
     """The step's starting workspace; None for the first step (nothing was stored before it)."""
     resumed: bool = False
     """A later turn of the step: no snapshot was retained from before it, and the agent may have
@@ -105,36 +138,32 @@ class _PreTurn:
     def lines(self, file: PurePosixPath) -> set[str]:
         found = set(self.placed.get(file, ()))
         if self.before is not None:
-            found |= _file_lines(self.before / file)
+            found |= _text_lines(self.before(file))
         return found
 
 
-def _broken_components(agent: Path) -> list[tuple[PurePosixPath, str]]:
+def _broken_components(workflow: Any, read: _ReadBytes) -> list[tuple[PurePosixPath, str]]:
     """The recorded components whose record is missing or does not hold its digest, or whose
     path leaves the workspace."""
-    workflow = _json(agent / WORKFLOW_FILE)
     entries = workflow.get("components") if isinstance(workflow, dict) else None
     paths = [
         (PurePosixPath(entry["path"]), entry)
         for entry in (entries if isinstance(entries, list) else [])
         if isinstance(entry, dict) and isinstance(entry.get("path"), str)
     ]
-    faults = [(path, _component_fault(agent, entry, path)) for path, entry in paths]
+    faults = [(path, _component_fault(entry, path, read)) for path, entry in paths]
     return [(path, reason) for path, reason in faults if reason is not None]
 
 
-def _component_fault(agent: Path, entry: dict[str, object], path: PurePosixPath) -> str | None:
+def _component_fault(entry: dict[str, object], path: PurePosixPath, read: _ReadBytes) -> str | None:
     """Why one recorded component is broken, or None."""
     record = entry.get("record")
-    try:
-        text = (agent / record).read_bytes() if isinstance(record, str) else None
-    except OSError:
-        text = None
+    text = read(PurePosixPath(record)) if isinstance(record, str) else None
     if text is None:
         return "its record is missing"
     if hashlib.sha256(text).hexdigest() != entry.get("sha256"):
         return "its record is not the recorded digest"
-    if path.is_absolute() or ".." in path.parts:
+    if not _relative(path):
         return "it is placed outside the workspace"
     return None
 
@@ -186,9 +215,9 @@ def _foreign_findings(
 
 
 def _audit_findings(
-    audit: dict[str, Any], pre: _PreTurn, turn_dir: Path
+    audit: dict[str, Any], pre: _PreTurn, read_source: _ReadBytes, log_dir: PurePosixPath
 ) -> tuple[list[str], list[str]]:
-    bad, missing = _source_findings(audit.get("sources") or [], turn_dir)
+    bad, missing = _source_findings(audit.get("sources") or [], read_source, log_dir)
     bad += list(audit.get("violations") or [])
     missing += list(audit.get("unmeasured") or [])
     if not audit.get("records"):
@@ -205,37 +234,38 @@ def _audit_findings(
     return bad, missing
 
 
-def _source_findings(sources: list[dict[str, str]], turn_dir: Path) -> tuple[list[str], list[str]]:
+def _source_findings(
+    sources: list[dict[str, str]], read: _ReadBytes, log_dir: PurePosixPath
+) -> tuple[list[str], list[str]]:
     bad: list[str] = []
     missing: list[str] = []
     if not sources:
         missing.append("no native audit source files")
     for source in sources:
         relative = PurePosixPath(source["path"])
-        if relative.is_absolute() or ".." in relative.parts:
+        if not _relative(relative):
             bad.append(f"audit source outside the turn: {relative}")
             continue
-        try:
-            digest = hashlib.sha256((turn_dir / str(relative)).read_bytes()).hexdigest()
-        except OSError:
+        data = read(log_dir / relative)
+        if data is None:
             missing.append(f"native audit source missing: {relative}")
             continue
-        if digest != source.get("sha256"):
+        if hashlib.sha256(data).hexdigest() != source.get("sha256"):
             bad.append(f"native audit source changed: {relative}")
     return bad, missing
 
 
 def _turn_findings(
-    agent: Path, turn: dict[str, Any], pre: _PreTurn
+    turn: dict[str, Any], pre: _PreTurn, read: _ReadBytes
 ) -> tuple[int, list[str], list[str]]:
     audit = turn.get("session_audit")
     if not isinstance(audit, dict):
         return 0, [], ["no native session audit"]
     log_dir = turn.get("log_dir")
     relative = PurePosixPath(log_dir) if isinstance(log_dir, str) else None
-    if relative is None or relative.is_absolute() or ".." in relative.parts:
+    if relative is None or not _relative(relative):
         return 0, [], ["no valid turn log directory"]
-    bad, missing = _audit_findings(audit, pre, agent / str(relative))
+    bad, missing = _audit_findings(audit, pre, read, relative)
     return int(audit.get("records") or 0), bad, missing
 
 
@@ -250,29 +280,27 @@ def _record_messages(audit: Any, messages: dict[str, list[dict[str, str]]]) -> N
 
 
 def _step_findings(
-    a: Audit,
     step: str,
+    workflow: Any,
+    read: _ReadBytes,
+    before: _ReadWorkspace | None,
     violations: dict[str, str],
     unmeasured: list[str],
     messages: dict[str, list[dict[str, str]]],
 ) -> int:
-    agent = a.trial_dir / "steps" / step / "agent"
-    workflow = _json(agent / WORKFLOW_FILE)
+    """Fold one step's workflow record into the findings; return its checked native records."""
     turns = workflow.get("turns") if isinstance(workflow, dict) else None
     if not isinstance(turns, list) or not turns:
         unmeasured.append(f"{step}: no readable {WORKFLOW_FILE}")
         return 0
-    placed: dict[PurePosixPath, set[str]] = {}
-    for file, record in _placements(agent, workflow):
-        placed.setdefault(file, set()).update(_file_lines(record))
-    before = _before_snapshot(a, step)
-    for path, why in _broken_components(agent):
+    placed = _placed_lines(workflow, read)
+    for path, why in _broken_components(workflow, read):
         violations.setdefault(f"component {path}: {why}", f"component {path}: {why} ({step})")
     checked = 0
     for index, turn in enumerate(turns):
         label = f"{step}/{turn.get('stage')}/{turn.get('turn')}"
         pre = _PreTurn(placed, before, resumed=index > 0)
-        records, bad, missing = _turn_findings(agent, turn, pre)
+        records, bad, missing = _turn_findings(turn, pre, read)
         checked += records
         for finding in bad:
             violations.setdefault(finding, f"{finding} ({label})")
@@ -281,15 +309,12 @@ def _step_findings(
     return checked
 
 
-def check_p8(a: Audit) -> HealthCheck:
-    if a.record.agent_override:
-        return make_check(
-            "P8", UNMEASURED, f"agent override {a.record.agent_override!r} runs no native session"
-        )
-    violations: dict[str, str] = {}
-    unmeasured: list[str] = []
-    messages: dict[str, list[dict[str, str]]] = {}
-    checked = sum(_step_findings(a, s.step, violations, unmeasured, messages) for s in a.attempted)
+def _verdict(
+    checked: int,
+    violations: dict[str, str],
+    unmeasured: list[str],
+    messages: dict[str, list[dict[str, str]]],
+) -> HealthCheck:
     unmeasured = list(dict.fromkeys(unmeasured))
     if violations:
         found = list(violations.values())
@@ -307,3 +332,27 @@ def check_p8(a: Audit) -> HealthCheck:
         f"{checked} native record(s) saw only workspace skills and instructions",
         messages=messages,
     )
+
+
+def check_p8(a: Audit) -> HealthCheck:
+    if a.record.agent_override:
+        return make_check(
+            "P8", UNMEASURED, f"agent override {a.record.agent_override!r} runs no native session"
+        )
+    violations: dict[str, str] = {}
+    unmeasured: list[str] = []
+    messages: dict[str, list[dict[str, str]]] = {}
+    checked = 0
+    for attempted in a.attempted:
+        agent = a.trial_dir / "steps" / attempted.step / "agent"
+        snapshot = _before_snapshot(a, attempted.step)
+        checked += _step_findings(
+            attempted.step,
+            _json(agent / WORKFLOW_FILE),
+            _agent_reader(agent),
+            None if snapshot is None else _snapshot_reader(snapshot),
+            violations,
+            unmeasured,
+            messages,
+        )
+    return _verdict(checked, violations, unmeasured, messages)

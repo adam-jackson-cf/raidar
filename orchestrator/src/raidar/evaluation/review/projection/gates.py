@@ -21,9 +21,9 @@ from raidar.contract.trial import (
     ValidityCheck,
 )
 from raidar.evaluation.review.projection.notes import EvidenceRef, Finding
-from raidar.evaluation.review.projection.spans import SpanBuilder
+from raidar.evaluation.review.projection.spans import SpanBuilder, TextReader
 from raidar.grading.models import CaseStatus
-from raidar.grading.records import StepRecord, load_step_record
+from raidar.grading.records import RECORD_FILE, StepRecord
 
 LAB_CHECK = "lab_checks"
 INFRA_GATE = "infra"
@@ -38,12 +38,14 @@ class GateContext:
     start: int
     trial_dir: Path
     record: TrialRecord
+    read: TextReader
 
 
-def verifier_record(trial_dir: Path, step_result: StepResult) -> StepRecord | None:
+def verifier_record(ctx: GateContext, step_result: StepResult) -> StepRecord | None:
     if step_result.verifier_record is None:
         return None
-    return load_step_record((trial_dir / step_result.verifier_record).parent)
+    path = (ctx.trial_dir / step_result.verifier_record).parent / RECORD_FILE
+    return StepRecord.model_validate_json(ctx.read(path))
 
 
 def attempted(record: TrialRecord) -> list[StepResult]:
@@ -68,9 +70,7 @@ def _case_summary(step: StepRecord | None) -> dict[str, object]:
     }
 
 
-def _case_detail(step: StepRecord | None, step_result: StepResult) -> str:
-    if step_result.checkpoint_state is CheckpointState.INFRA_ERROR:
-        return "no verdict: " + ("; ".join(step_result.infra_reasons) or "infrastructure error")
+def _case_detail(step: StepRecord | None) -> str:
     if step is None:
         return "no verifier record"
     counts = step.grade.group_counts().values()
@@ -79,7 +79,7 @@ def _case_detail(step: StepRecord | None, step_result: StepResult) -> str:
 
 
 def _checkpoint_gate(ctx: GateContext, parent: str, step_result: StepResult) -> Finding | None:
-    step = verifier_record(ctx.trial_dir, step_result)
+    step = verifier_record(ctx, step_result)
     state = step_result.checkpoint_state
     solved = state is CheckpointState.SOLVED
     excluded = state is CheckpointState.EXCLUDED
@@ -101,7 +101,7 @@ def _checkpoint_gate(ctx: GateContext, parent: str, step_result: StepResult) -> 
     )
     if solved or excluded or state is CheckpointState.INFRA_ERROR:
         return None  # an infrastructure error is reported once, by the infra gate
-    detail = _case_detail(step, step_result)
+    detail = _case_detail(step)
     return Finding(
         id=f"gate-{step_result.checkpoint}",
         kind="issue",

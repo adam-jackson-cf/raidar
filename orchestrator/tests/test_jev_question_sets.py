@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import shutil
+from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
@@ -371,16 +372,23 @@ def test_codebase_scope_criteria_get_a_bounded_whole_codebase_state(tmp_path: Pa
     assert report["totals"]["input_sufficiency"]["value"] == 1.0
 
     # A codebase too large for the budget is clipped (partial) and stays under the cap.
-    label = "x" * 400
+    label = "x" * 2_000
     big = "\n".join(
         f"def helper_{i}(value, scale=1, label='{label}'):\n    return render([value])\n"
-        for i in range(120)
+        for i in range(60)
     )
     (snapshot / "big.py").write_text("from app import render\n\n" + big)
     capped = make_runtime(
         tmp_path / "s2", transport=RecordedTransport(), policies=(policy(RUBRIC_POLICY),)
     )
-    (large,) = RubricRunner(capped, question_set).run([source])
+    render_criteria = {
+        name for item in codebase if item.symbol.qualname == "render" for name in item.criteria
+    }
+    narrowed = replace(
+        question_set,
+        criteria=tuple(item for item in question_set.criteria if item.name in render_criteria),
+    )
+    (large,) = RubricRunner(capped, narrowed).run([source])
     render_requests = [
         item
         for item in large.judgements

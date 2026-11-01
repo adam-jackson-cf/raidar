@@ -31,6 +31,7 @@ from packaging.utils import canonicalize_name
 from raidar.engine.health.base import Audit, make_check
 from raidar.engine.health.model import PASS, UNMEASURED, HealthCheck
 from raidar.grading.records import step_record_dir
+from raidar.grading.submission_deps import SubmissionDependencies
 
 GRADER_LOG = "grading.log"
 _MISSING_MODULE = re.compile(r"ModuleNotFoundError: No module named ['\"]([^'\"]+)['\"]")
@@ -83,7 +84,7 @@ def undeclared_modules(
     ]
 
 
-def _dependencies(a: Audit, step: str) -> Any:
+def _dependencies(a: Audit, step: str) -> SubmissionDependencies | None:
     ledger = a.ledger(step)
     return None if ledger is None else ledger.submission_dependencies
 
@@ -95,24 +96,23 @@ def _unprovided(a: Audit, step: str) -> list[dict[str, str]] | None:
     return [{"requirement": u.requirement, "reason": u.reason} for u in dependencies.unprovided]
 
 
-def _local(a: Audit, step: str) -> set[str] | None:
+def _local(a: Audit, stored_path: str) -> set[str] | None:
     """The snapshot's own module names; ``None`` when the stored tree is not there to read."""
-    ledger = a.ledger(step)
-    stored = None if ledger is None or ledger.snapshot is None else ledger.snapshot.stored_path
-    tree = a.trial_dir / stored if stored else None
-    return local_modules(tree) if tree is not None and tree.is_dir() else None
+    tree = a.trial_dir / stored_path
+    return local_modules(tree) if tree.is_dir() else None
 
 
 def _undeclared(a: Audit, step: str) -> list[dict[str, str]] | None:
+    ledger = a.ledger(step)
     dependencies = _dependencies(a, step)
     log = step_record_dir(a.trial_dir, step) / GRADER_LOG
-    if dependencies is None or not log.is_file():
+    if ledger is None or dependencies is None or not log.is_file():
         return None
     try:
         text = log.read_text(errors="replace")
     except OSError:
         return None
-    return undeclared_modules(text, dependencies.declared, _local(a, step))
+    return undeclared_modules(text, dependencies.declared, _local(a, ledger.snapshot.stored_path))
 
 
 def _reading(

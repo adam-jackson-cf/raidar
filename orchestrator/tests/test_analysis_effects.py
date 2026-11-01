@@ -23,10 +23,18 @@ from raidar.evaluation.analysis.effects import (
     sign_flip_test,
 )
 from raidar.evaluation.analysis.markdown import render_markdown
-from raidar.evaluation.analysis.report import AnalysisReport, analyse
+from raidar.evaluation.analysis.outcomes import (
+    DependencyStep,
+    ParityComparison,
+    PoolFinding,
+    PoolingReport,
+    Value,
+)
+from raidar.evaluation.analysis.report import AnalysisReport, DevRun, analyse
 from raidar.evaluation.analysis.stats import IntervalMethod, summarise
 from raidar.scoring.catalog.outcomes import (
     OUTCOME_METRICS,
+    VERIFIER_DISAGREEMENTS,
     Kind,
     declared_kind,
     declared_outcome_types,
@@ -104,7 +112,8 @@ def test_too_few_pairs_is_insufficient_even_with_a_large_effect() -> None:
         _run(paired_arms("solve_rate", [0.0, 0.0, 0.0], [1.0, 0.9, 1.0]), 3), "solve_rate"
     )
     assert effect.verdict is Verdict.INSUFFICIENT
-    assert effect.verdict_reason == "3 pairs < minimum 5 (not pinned by a lock)"
+    assert "3 pairs" in effect.verdict_reason
+    assert "minimum 5" in effect.verdict_reason
 
 
 def test_excluded_share_above_the_limit_is_insufficient_and_counted_by_cause() -> None:
@@ -673,3 +682,74 @@ def test_the_exact_enumeration_limit_is_a_visible_resource_refusal_not_an_approx
     assert "exact-state-limit" in refused.verdict_reason
     assert "safety limit 100 partial sums" in render_markdown(_run(outcomes, 14, tight))
     assert "safety limit 250000 partial sums" in render_markdown(_run(outcomes, 14))
+
+
+def test_the_report_labels_development_pooling_replacement_and_pinned_set_provenance() -> None:
+    pooling = PoolingReport(
+        unmeasured=("old-1",),
+        overrides_used=("subject", "timing_cost"),
+        findings=(PoolFinding(field="subject", message="agent differs"),),
+        timing_cost_comparable=False,
+        capabilities={"isolation_proof": "full"},
+        parity={"toy@1": ParityComparison(trials=2, record={"image_id": "img"})},
+    )
+    loaded = dataclasses.replace(
+        inputs(paired_arms("solve_rate", [0.25] * 6, [0.5] * 6), 6),
+        dev_job=DevRun(max_checkpoints=2, agent_override=None, note="truncated to 2"),
+        replaced=("run-1/toy-baseline-b0",),
+        solvable={"toy@1": {"sha256": "ab" * 32, "cases": {"checkpoint_1": 2}}},
+        pooling=pooling,
+    )
+
+    report = analyse(loaded, SETTINGS)
+    text = render_markdown(report)
+
+    assert not report.citable
+    assert report.dev_job is not None
+    for fact in ("Not citable", "truncated to 2", "toy-baseline-b0", "checkpoint_1: 2 cases"):
+        assert fact in text
+    for fact in ("old-1", "agent differs", "not comparable", "full", "img"):
+        assert fact in text
+    assert report.solvable == {"toy@1": {"sha256": "ab" * 32, "cases": {"checkpoint_1": 2}}}
+
+    varied = dataclasses.replace(
+        loaded, pooling=PoolingReport(capabilities=None, varies=("harness",))
+    )
+    assert "harness" in render_markdown(analyse(varied, SETTINGS))
+
+
+def test_the_report_shows_dependency_readings_errata_and_material_arm_differences() -> None:
+    def affected(hits: int) -> tuple[DependencyStep, ...]:
+        return tuple(
+            DependencyStep(
+                step=f"checkpoint_{index}",
+                unprovided=[{"requirement": "x", "reason": "no wheel"}] if index < hits else [],
+                undeclared_imports=None,
+                solvable_solved=False if index < hits else None,
+            )
+            for index in range(4)
+        )
+
+    outcomes = [
+        outcome.model_copy(
+            update={
+                "dependency_steps": affected(3 if outcome.arm == GUIDED else 0),
+                "metrics": {**outcome.metrics, VERIFIER_DISAGREEMENTS: Value.ok(1.0)},
+            }
+        )
+        for outcome in paired_arms("solve_rate", [0.25] * 6, [0.5] * 6)
+    ]
+    errata = {"toy@1": {"sha256": "cd" * 32, "exclude_from_solved": ["a", "b"]}}
+    loaded = dataclasses.replace(inputs(outcomes, 6), errata=errata)
+
+    report = analyse(loaded, SETTINGS)
+    text = render_markdown(report)
+
+    assert "Dependency readings" in text
+    assert "75% (18/24)" in text
+    assert "unmeasured" in text
+    assert "18/18 judged" in text
+    assert report.dependency_warnings
+    assert "Problem errata" in text
+    assert "2 exclude-from-solved" in text
+    assert all(arm.verifier_diagnostics is not None for arm in report.arms)

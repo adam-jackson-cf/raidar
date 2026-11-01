@@ -33,6 +33,7 @@ A check without evidence is ``unmeasured`` with its reason, never ``pass``.
 from __future__ import annotations
 
 from collections.abc import Callable, Mapping, Sequence
+from functools import partial
 from pathlib import Path
 from typing import Any
 
@@ -65,13 +66,10 @@ def _timed_out(ledger: StepRecord) -> bool:
     return failure is not None and "timeout" in failure.code
 
 
-def _counted_as_pass(step: StepResult, ledger: StepRecord) -> bool:
+def _counted_as_pass(step: StepResult) -> bool:
+    """Only a timed-out ledger is asked, and a graded timeout is never solved by its own cases."""
     rewards = step.rewards or {}
-    return (
-        step.checkpoint_state is CheckpointState.SOLVED
-        or rewards.get("solved", 0.0) > 0
-        or ledger.grade.solved
-    )
+    return step.checkpoint_state is CheckpointState.SOLVED or rewards.get("solved", 0.0) > 0
 
 
 def check_v1(a: Audit) -> HealthCheck:
@@ -80,9 +78,7 @@ def check_v1(a: Audit) -> HealthCheck:
         return make_check("V1", UNMEASURED, "no verifier record to audit")
     timed_out = [step.step for step, ledger in graded if _timed_out(ledger)]
     counted = [
-        step.step
-        for step, ledger in graded
-        if _timed_out(ledger) and _counted_as_pass(step, ledger)
+        step.step for step, ledger in graded if _timed_out(ledger) and _counted_as_pass(step)
     ]
     if counted:
         return make_check(
@@ -125,15 +121,22 @@ def check_v2(a: Audit) -> HealthCheck:
     )
 
 
-def _digest_findings(a: Audit, step: StepResult, ledger: StepRecord) -> tuple[str | None, bool]:
+def _stored_digest(a: Audit, ledger: StepRecord) -> str | None:
+    """The digest of the stored ``/app`` tree, or None when the tree is not on the host."""
+    stored = a.trial_dir / ledger.snapshot.stored_path
+    return tree_digest(stored) if stored.is_dir() else None
+
+
+def _digest_findings(
+    step: StepResult, ledger: StepRecord, stored_digest: Callable[[], str | None]
+) -> tuple[str | None, bool]:
     """(mismatch, verified): ``verified`` is False when the stored tree is not there to hash."""
     digest = ledger.snapshot.digest
     if step.snapshot is None or step.snapshot.digest != digest:
         return f"{step.step}: record snapshot differs from the ledger's snapshot digest", True
-    stored = a.trial_dir / ledger.snapshot.stored_path
-    if not stored.is_dir():
+    actual = stored_digest()
+    if actual is None:
         return None, False
-    actual = tree_digest(stored)
     if actual != digest:
         return f"{step.step}: stored /app snapshot {actual[:12]} != evaluated {digest[:12]}", True
     return None, True
@@ -152,7 +155,10 @@ def check_v3(a: Audit) -> HealthCheck:
     graded = a.graded()
     if not graded:
         return make_check("V3", UNMEASURED, "no verifier record to audit")
-    results = [(step, *_digest_findings(a, step, ledger)) for step, ledger in graded]
+    results = [
+        (step, *_digest_findings(step, ledger, partial(_stored_digest, a, ledger)))
+        for step, ledger in graded
+    ]
     bad = [(step.step, why) for step, why, _ in results if why]
     if bad:
         return make_check(
@@ -282,14 +288,18 @@ CHECKS: tuple[Callable[[Audit], HealthCheck], ...] = (
 )  # fmt: skip
 
 
-def audit_trial(
-    job_dir: Path, trial_dir: Path, record: TrialRecord, job: Mapping[str, Any]
-) -> HealthReport:
-    audit = Audit(job_dir, trial_dir, record, job)
+def audit_report(audit: Audit) -> HealthReport:
+    """Every check over one trial's already-read evidence."""
     return HealthReport(
-        trial_id=record.trial.trial_id,
+        trial_id=audit.record.trial.trial_id,
         checks=(
             *(check(audit) for check in CHECKS),
             *check_workflow(audit),
         ),
     )
+
+
+def audit_trial(
+    job_dir: Path, trial_dir: Path, record: TrialRecord, job: Mapping[str, Any]
+) -> HealthReport:
+    return audit_report(Audit.from_disk(job_dir, trial_dir, record, job))

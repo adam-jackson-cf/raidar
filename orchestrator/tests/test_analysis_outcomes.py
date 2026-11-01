@@ -7,6 +7,8 @@ read as zero.
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 
 from raidar.contract.trial import (
@@ -19,15 +21,31 @@ from raidar.contract.trial import (
     TrialRecord,
     ValidityCheck,
 )
+from raidar.engine.health.model import HealthCheck, HealthReport
+from raidar.evaluation.analysis import dependencies as dependencies_module
 from raidar.evaluation.analysis.assessed import (
     CODE_QUALITY_REF,
     CORRECTNESS_REF,
+    EXCLUDED_CASES,
     RESOURCE_USAGE_REF,
     build_outcome,
     headline_score,
 )
+from raidar.evaluation.analysis.dependencies import (
+    UNDECLARED_IMPORT,
+    UNPROVIDED,
+    ReadingShare,
+    arm_dependencies,
+    dependency_steps,
+    dependency_warnings,
+)
 from raidar.evaluation.analysis.outcomes import TRUNCATED, UNASSESSED, Value
-from raidar.scoring.catalog.outcomes import OUTCOME_METRICS
+from raidar.grading.solvable import EXCLUDED_STEP_REASON
+from raidar.scoring.catalog.outcomes import (
+    OUTCOME_METRICS,
+    VERIFIER_DISAGREEMENT_SOURCE,
+    VERIFIER_DISAGREEMENTS,
+)
 from raidar.scoring.framework.metrics import (
     SCB_CANONICAL,
     SCB_CANONICAL_ONESHOT,
@@ -40,6 +58,7 @@ from raidar.scoring.framework.result import (
     AssessStatus,
     Observation,
 )
+from tests.analysis_support import trial
 
 STEPS = ("checkpoint_1", "checkpoint_2", "checkpoint_3")
 HASHES = TrialHashes(
@@ -325,3 +344,176 @@ def test_oneshot_floor_policy_c_zero_scores_zero_without_quality() -> None:
     components = {"C": Value.ok(0.0), "V": Value.missing("ineligible", "no files")}
     assert headline_score(SCB_CANONICAL_ONESHOT_V2, 1, components) == Value.ok(0.0)
     assert headline_score(SCB_CANONICAL_ONESHOT, 1, components).status == "ineligible"
+
+
+def _solvable_correctness(verdicts: tuple[float | None, ...], solved: float | None) -> AssessResult:
+    """Per-step ``solved_solvable`` verdicts; ``None`` is a step the solvable set excludes."""
+    observations = [
+        _ok("solved_solvable", step, verdict)
+        if verdict is not None
+        else _gap("solved_solvable", step, AssessStatus.NOT_APPLICABLE, EXCLUDED_STEP_REASON)
+        for step, verdict in zip(STEPS, verdicts, strict=False)
+    ]
+    observations.append(
+        _ok("solved_checkpoints_solvable", TRAJECTORY_SUBJECT, solved)
+        if solved is not None
+        else _gap(
+            "solved_checkpoints_solvable",
+            TRAJECTORY_SUBJECT,
+            AssessStatus.UNAVAILABLE,
+            EXCLUDED_STEP_REASON,
+        )
+    )
+    if solved is None:
+        return AssessResult(
+            status=AssessStatus.UNAVAILABLE,
+            reason=EXCLUDED_STEP_REASON,
+            observations=tuple(observations),
+        )
+    return AssessResult(status=AssessStatus.OK, observations=tuple(observations))
+
+
+def test_an_excluded_middle_step_leaves_the_solvable_rate_over_the_scored_steps() -> None:
+    result = _solvable_correctness((1.0, None, 1.0), solved=2.0)
+    outcome = build_outcome(_record(), {CORRECTNESS_REF: result}, policy=SCB_CANONICAL)
+
+    assert outcome.metrics["solve_rate_solvable"] == Value.ok(1.0)  # 2 of 2 scored, not 2 of 3
+    assert outcome.metrics["final_solved_solvable"] == Value.ok(1.0)  # checkpoint_3 scored last
+
+
+def test_an_excluded_final_step_hands_the_solvable_final_to_the_last_scored_step() -> None:
+    result = _solvable_correctness((1.0, 0.0, None), solved=1.0)
+    outcome = build_outcome(_record(), {CORRECTNESS_REF: result}, policy=SCB_CANONICAL)
+
+    assert outcome.metrics["solve_rate_solvable"] == Value.ok(0.5)  # 1 of 2 scored, not 1 of 3
+    assert outcome.metrics["final_solved_solvable"] == Value.ok(0.0)  # checkpoint_2 scored last
+
+
+def test_every_step_excluded_is_unavailable_never_a_measured_zero() -> None:
+    result = _solvable_correctness((None, None, None), solved=None)
+    outcome = build_outcome(_record(), {CORRECTNESS_REF: result}, policy=SCB_CANONICAL)
+
+    assert outcome.metrics["solve_rate_solvable"].status == "unavailable"
+    assert outcome.metrics["solve_rate_solvable"].value is None
+    assert outcome.metrics["final_solved_solvable"].value is None
+
+
+@pytest.mark.parametrize("bound", [1, 2])
+def test_a_k_bound_trial_is_a_k_checkpoint_task_for_the_solvable_outcomes(bound: int) -> None:
+    verdicts = (1.0, 0.0, 1.0)[:bound]
+    result = _solvable_correctness(verdicts, solved=sum(verdicts))
+    record = _record(steps=STEPS[:bound])
+    outcome = build_outcome(record, {CORRECTNESS_REF: result}, policy=SCB_CANONICAL)
+
+    assert outcome.steps == STEPS[:bound]
+    assert outcome.metrics["solve_rate_solvable"].value == pytest.approx(sum(verdicts) / bound)
+    assert outcome.metrics["final_solved_solvable"].value == verdicts[-1]
+
+
+def test_a_trial_with_no_stored_assessments_is_unassessed_in_every_scored_outcome() -> None:
+    outcome = build_outcome(_record(), {}, policy=SCB_CANONICAL)
+
+    for name in ("solve_rate", "final_solved", "correctness", "headline_score", "verbosity"):
+        assert outcome.metrics[name].status == UNASSESSED, name
+    assert CORRECTNESS_REF in (outcome.metrics["solve_rate"].reason or "")
+
+
+def _health(**checks: dict[str, object]) -> HealthReport:
+    return HealthReport(
+        trial_id="t0",
+        checks=tuple(
+            HealthCheck(id=check, family="D", status="pass", evidence=evidence)
+            for check, evidence in checks.items()
+        ),
+    )
+
+
+def test_dependency_readings_come_from_the_audits_measured_and_unmeasured_steps(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    health = _health(
+        D1={
+            "steps": {"a": [{"requirement": "x", "reason": "no wheel"}, "junk"], "b": []},
+            "unmeasured": ["c"],
+        },
+        D2={"steps": {"a": [{"module": "m", "basis": "name"}, "junk"], "b": "oops"}},
+    )
+    monkeypatch.setattr(dependencies_module, "load_health", lambda trial_dir: health)
+    correctness = AssessResult(
+        status=AssessStatus.OK,
+        observations=(_ok("solved_solvable", "a", 0.0), _ok("solved_solvable", "b", 1.0)),
+    )
+
+    steps = dependency_steps(("a", "b", "c", "z"), Path("trial"), correctness)
+
+    assert [step.step for step in steps] == ["a", "b", "c"]  # z was never attempted
+    a, b, c = steps
+    assert a.unprovided == ({"requirement": "x", "reason": "no wheel"},)
+    assert a.undeclared_imports == ({"module": "m", "basis": "name"},)
+    assert (b.unprovided, b.undeclared_imports) == ((), None)
+    assert (c.unprovided, c.undeclared_imports) == (None, None)
+    assert (a.solvable_solved, b.solvable_solved, c.solvable_solved) == (False, True, None)
+
+    outcome = trial("guided", 0, {}).model_copy(update={"dependency_steps": steps})
+    shares = arm_dependencies([outcome]) or {}
+    unprovided, imports = shares[UNPROVIDED], shares[UNDECLARED_IMPORT]
+    assert (unprovided.measured, unprovided.affected, unprovided.unmeasured) == (2, 1, 1)
+    assert (unprovided.solvable_failed, unprovided.solvable_judged) == (1, 1)
+    assert (imports.measured, imports.affected, imports.heuristic) == (1, 1, 1)
+
+
+def test_a_trial_audited_before_the_dependency_checks_has_every_step_unmeasured(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    for report in (None, _health(V={})):
+        monkeypatch.setattr(dependencies_module, "load_health", lambda trial_dir, r=report: r)
+        steps = dependency_steps(("a", "b"), Path("trial"), None)
+        assert [(s.step, s.unprovided, s.solvable_solved) for s in steps] == [
+            ("a", None, None),
+            ("b", None, None),
+        ]
+
+
+def test_arms_are_warned_about_only_when_their_affected_shares_differ_materially() -> None:
+    def arm(affected: int, measured: int) -> dict[str, ReadingShare]:
+        share = ReadingShare(
+            measured=measured,
+            affected=affected,
+            unmeasured=0,
+            share=affected / measured if measured else None,
+            solvable_failed=0,
+            solvable_judged=0,
+        )
+        return {UNPROVIDED: share, UNDECLARED_IMPORT: share}
+
+    base = arm(1, 10)
+    assert dependency_warnings("base", {"base": base, "t": arm(1, 10)}, ["t"]) == ()
+    assert len(dependency_warnings("base", {"base": base, "t": arm(5, 10)}, ["t"])) == 2
+    unmeasured = dependency_warnings("base", {"base": base, "t": arm(0, 0)}, ["t"])
+    assert unmeasured
+    assert all("not comparable" in warning for warning in unmeasured)
+    assert dependency_warnings("base", {"base": None, "t": None}, ["t"]) == ()
+    assert arm_dependencies([]) is None
+
+
+def test_verifier_disagreements_sum_the_transitions_that_measured_them() -> None:
+    def outcome_for(result: AssessResult | None) -> Value:
+        results = {VERIFIER_DISAGREEMENT_SOURCE: result}
+        built = build_outcome(_record(), results, policy=SCB_CANONICAL)
+        return built.metrics[VERIFIER_DISAGREEMENTS]
+
+    measured = AssessResult(
+        status=AssessStatus.OK,
+        observations=(
+            _ok(EXCLUDED_CASES, "checkpoint_2", 2.0),
+            _ok(EXCLUDED_CASES, "checkpoint_3", 1.0),
+            _gap(EXCLUDED_CASES, "checkpoint_1", AssessStatus.NOT_APPLICABLE, "no run"),
+        ),
+    )
+    unmeasured = AssessResult(
+        status=AssessStatus.UNAVAILABLE, reason="no coverage", observations=()
+    )
+
+    assert outcome_for(measured) == Value.ok(3.0)
+    assert outcome_for(unmeasured).status == AssessStatus.NOT_APPLICABLE.value
+    assert outcome_for(None).status == UNASSESSED

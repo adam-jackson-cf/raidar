@@ -15,7 +15,6 @@ from raidar.evaluation.analysis.manipulation import (
 from raidar.scoring.catalog.builtin import default_scorer_registry
 from raidar.scoring.catalog.checks import DEFAULT_CHECKS, PROCESS_COMPLIANCE_REFS
 from raidar.scoring.framework.manifest import Tier
-from raidar.scoring.framework.rescore import assess
 from raidar.scoring.framework.result import (
     TRAJECTORY_SUBJECT,
     AssessResult,
@@ -24,12 +23,12 @@ from raidar.scoring.framework.result import (
 )
 from raidar.scoring.framework.store import AssessmentStore
 from raidar.scoring.process_checks.manifest import PROCESS_COMPLIANCE
+from tests.scorer_support import assess_fixed, traced_memory_context
 from tests.trace_trial_support import (
     TracedStep,
     agent_step,
     codex_exec,
     codex_patch,
-    traced_context,
     trajectory,
 )
 
@@ -171,21 +170,23 @@ def test_arm_results_load_from_the_assessment_store(tmp_path: Path, ref: str) ->
     keys: dict[str, list[str]] = {"guided": [], "baseline": []}
     for arm, tested in (("guided", True), ("baseline", False)):
         for index in range(3):
-            ctx = traced_context(
+            ctx = traced_memory_context(
                 tmp_path / f"{arm}-{index}",
                 [TracedStep("checkpoint_1", trace=_trial_trace(tested))],
             )
-            record = assess(store, registry.get(ref), ctx, trial=f"{arm}-{index}")
+            record = assess_fixed(store, registry.get(ref), ctx, trial=f"{arm}-{index}")
             keys[arm].append(record.key)
     results = load_arm_results(store.root, keys)
     report = manipulation_check(results, guided="guided", baseline="baseline", checks=[TESTS])
     assert report.checks[0].difference == 1.0
     assert report.checks[0].p_value == pytest.approx(1 / 20)
 
-    other = assess(
+    other = assess_fixed(
         store,
         registry.get("correctness@10"),
-        traced_context(tmp_path / "c", [TracedStep("checkpoint_1", trace=_trial_trace(True))]),
+        traced_memory_context(
+            tmp_path / "c", [TracedStep("checkpoint_1", trace=_trial_trace(True))]
+        ),
         trial="c",
     )
     with pytest.raises(ValueError, match=ref):

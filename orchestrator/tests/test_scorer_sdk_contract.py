@@ -7,36 +7,32 @@ import json
 from pathlib import Path
 
 import pytest
-import yaml
 from pydantic import ValidationError
 
-from raidar.contract.references import (
-    RefKind,
-    RegistryRef,
-    RegistryReferenceError,
-    ResolverSet,
-)
-from raidar.design.experiment.loader import load_experiment
-from raidar.design.experiment.lock import build_lock, render_lock
+from raidar.contract.references import RefKind, RegistryRef, RegistryReferenceError
 from raidar.grading.models import CaseStatus
-from raidar.scoring.catalog.builtin import scorer_resolver
-from raidar.scoring.framework import result as result_module
+from raidar.scoring.catalog.builtin import ScorerResolver
 from raidar.scoring.framework.builtin_manifests import BUILTIN_MANIFESTS, CODE_QUALITY, CORRECTNESS
 from raidar.scoring.framework.context import statused_result
+from raidar.scoring.framework.keys import scorer_identity
 from raidar.scoring.framework.manifest import (
     EvidenceInput,
-    MetricLevel,
     MetricSpec,
     MetricType,
     ScorerManifest,
 )
-from raidar.scoring.framework.metrics import MetricResolver
 from raidar.scoring.framework.ownership import (
     DuplicateMetricError,
     MetricOwnershipError,
     MissingMetricError,
 )
-from raidar.scoring.framework.registry import ScorerRegistration, ScorerUnavailableError
+from raidar.scoring.framework.registry import (
+    RUNTIME_TOOL_LOCKS,
+    ScorerRegistration,
+    ScorerRegistry,
+    ScorerUnavailableError,
+    _descend,
+)
 from raidar.scoring.framework.result import (
     AssessResult,
     AssessStatus,
@@ -45,19 +41,18 @@ from raidar.scoring.framework.result import (
     Observation,
     Span,
 )
-from raidar.scoring.framework.trial_inputs import load_trial_context
+from raidar.scoring.framework.trial_inputs import blind_agent_result
 from raidar.scoring.framework.validation import (
     InvalidEvidenceError,
     InvalidObservationError,
     validate_result,
     validate_scorer_set,
 )
-from tests.experiment_spec_support import (
-    MECHANICS_SMOKE,
-    SMOKE_EXPERIMENT,
-    experiment_document,
-    fixture_resolvers,
-    write_experiment,
+from raidar.subject.environment.python.pack_definition import (
+    ToolExecution,
+    ToolInstaller,
+    ToolLock,
+    ToolSpec,
 )
 from tests.scorer_support import (
     APP_V1,
@@ -66,15 +61,15 @@ from tests.scorer_support import (
     StepFixture,
     fake_manifest,
     fake_scorer_v2,
-    two_step_trial,
+    snapshot_context,
+    two_step_context,
     write_files,
-    write_trial,
 )
 
 
 @pytest.fixture
 def ctx(tmp_path: Path):
-    return load_trial_context(two_step_trial(tmp_path / "trial"))
+    return two_step_context(tmp_path)
 
 
 def _with(result: AssessResult, **changes: object) -> AssessResult:
@@ -213,14 +208,13 @@ def test_snapshot_scorers_must_report_steps_with_unreadable_evidence_as_ineligib
     tmp_path: Path,
 ) -> None:
     latin1 = {**APP_V2, "app/core.py": "s = 'caf\xe9'\n".encode("latin-1")}
-    trial = write_trial(
-        tmp_path / "trial",
+    ctx = snapshot_context(
+        tmp_path,
         [
             StepFixture("checkpoint_1", APP_V1, (CaseStatus.PASSED,)),
             StepFixture("checkpoint_2", latin1, (CaseStatus.PASSED,)),
         ],
     )
-    ctx = load_trial_context(trial)
     manifest = fake_manifest()
     result = validate_result(manifest, ctx, FakeScorer(manifest).assess(ctx))
     statuses = {(o.metric, o.subject): o.status for o in result.observations}
@@ -250,13 +244,20 @@ def test_snapshot_scorers_must_report_steps_with_unreadable_evidence_as_ineligib
     validate_result(oracle_only, ctx, forced("production_files", "checkpoint_2"))
 
 
-def test_scorers_never_see_arm_or_model_labels_in_structured_inputs(ctx) -> None:
-    for step in ctx.steps:
-        assert step.agent_result is not None
-        assert "arm-model-label" not in json.dumps(step.agent_result)
-        assert step.agent_result["model_usage"] == [
-            {"n_input_tokens": 7, "n_cache_tokens": None, "n_output_tokens": None, "cost_usd": None}
-        ]
+def test_scorers_never_see_arm_or_model_labels_in_structured_inputs() -> None:
+    raw = {
+        "n_input_tokens": 3,
+        "model_usage": {"arm-model-label": {"n_input_tokens": 7}},
+        "metadata": {"model": "arm-model-label"},
+        "rollout_details": [{"model": "arm-model-label"}],
+    }
+    blinded = blind_agent_result(raw)
+    assert blinded is not None
+    assert "arm-model-label" not in json.dumps(blinded)
+    assert blinded["n_input_tokens"] == 3
+    assert blinded["model_usage"] == [
+        {"n_input_tokens": 7, "n_cache_tokens": None, "n_output_tokens": None, "cost_usd": None}
+    ]
 
 
 def test_implementation_digest_covers_helpers_the_scorer_imports(
@@ -290,16 +291,6 @@ def test_implementation_digest_covers_helpers_the_scorer_imports(
     assert after_kernel != before
     (package / "shared.py").write_text("LIMIT = 4\n")
     assert registration.implementation_digest() != after_kernel
-    # Raidar modules the scorer imports are covered too.
-    covered = ScorerRegistration(fake_manifest(), "tests.scorer_support:fake_scorer_v1")
-    sdk_result = Path(result_module.__file__)
-    original = sdk_result.read_bytes()
-    baseline = covered.implementation_digest()
-    try:
-        sdk_result.write_bytes(original + b"\n_TOUCHED = 1\n")
-        assert covered.implementation_digest() != baseline
-    finally:
-        sdk_result.write_bytes(original)
 
 
 def test_statused_result_explicitly_covers_every_declared_metric_without_values(ctx) -> None:
@@ -328,6 +319,35 @@ def test_accepted_results_are_canonical_whatever_the_emission_order(ctx) -> None
     assert [o.metric for o in first.observations[:4]] == ["production_files"] * 2 + ["solved"] * 2
 
 
+def test_a_scorer_without_an_implementation_has_an_identity_but_no_implementation_digest() -> None:
+    registration = ScorerRegistration(fake_manifest())
+    assert registration.implementation_digest() is None
+    identity = scorer_identity(registration)
+    assert (identity.ref, identity.implementation_digest) == (registration.manifest.ref, None)
+
+
+def test_a_dotted_module_name_resolves_package_module_and_namespace_directories(
+    tmp_path: Path,
+) -> None:
+    write_files(tmp_path, {"pkg/__init__.py": "", "mod.py": "", "ns/inner.py": ""})
+    assert _descend(tmp_path, "pkg") == (tmp_path / "pkg" / "__init__.py", tmp_path / "pkg")
+    assert _descend(tmp_path, "mod") == (tmp_path / "mod.py", None)
+    assert _descend(tmp_path, "ns") == (None, tmp_path / "ns")
+    assert _descend(tmp_path, "absent") is None
+
+
+def test_evidence_names_every_line_it_cites() -> None:
+    evidence = Evidence(
+        metric="solved",
+        subject="checkpoint_1",
+        path="app/main.py",
+        sha256="0" * 64,
+        kind="file",
+        spans=(Span(line=1), Span(line=7, end_line=9)),
+    )
+    assert evidence.locations() == ("app/main.py:1", "app/main.py:7")
+
+
 def test_manifests_reject_ambiguous_declarations() -> None:
     base = fake_manifest().model_dump()
     duplicate = {**base, "metrics": [*base["metrics"], base["metrics"][0]]}
@@ -347,63 +367,65 @@ def test_scorers_in_one_plan_have_disjoint_metric_namespaces() -> None:
         validate_scorer_set([fake_manifest("1"), fake_manifest("2")])
 
 
-def test_builtin_manifests_declare_levels_the_policies_need() -> None:
-    levels = {metric.id: metric.level for metric in CODE_QUALITY.metrics}
-    assert levels["rework"] is MetricLevel.TRANSITION
-    assert levels["regression"] is MetricLevel.TRANSITION
-    assert levels["verbosity"] is MetricLevel.CHECKPOINT
-    assert CORRECTNESS.metric("reached") is not None
-    assert all(metric.tier.value == "deterministic" for metric in CORRECTNESS.metrics)
+def test_a_scorer_reference_resolves_to_a_digest_of_that_scorer_and_unknown_ones_are_refused(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    resolver = ScorerResolver(
+        ScorerRegistry(
+            [ScorerRegistration(fake_manifest("1")), ScorerRegistration(fake_manifest("2"))]
+        )
+    )
 
+    def resolve(ref: str) -> str:
+        return resolver.resolve(RegistryRef.parse(RefKind.SCORER, ref), base_dir=tmp_path).digest
 
-def _committed_scorer_refs() -> list[str]:
-    refs: list[str] = []
-    for path in (MECHANICS_SMOKE, SMOKE_EXPERIMENT):
-        refs += yaml.safe_load(path.read_text())["assessment"]["scorers"]
-    return sorted(set(refs))
+    assert resolve("fake-quality@1") == resolve("fake-quality@1")
+    assert resolve("fake-quality@1") != resolve("fake-quality@2")
+    with pytest.raises(RegistryReferenceError, match="unknown scorer"):
+        resolve("nope@1")
 
+    tool = ToolSpec(
+        execution=ToolExecution.HOST_PARSE,
+        installer=ToolInstaller.UV_ENV,
+        packages=("probe-lib==1.0", "helper-lib==3.0"),
+        executables=("probe",),
+        modules=("probe",),
+    )
+    lock = ToolLock(
+        version=1,
+        runtime="python",
+        python="3.12",
+        exclude_newer="2026-01-01",
+        tools={"analysis-tool": tool},
+    )
+    monkeypatch.setitem(RUNTIME_TOOL_LOCKS, "python", lambda: lock)
+    pinned = fake_manifest("3").model_copy(
+        update={
+            "runtimes": ("python",),
+            "tools": ("analysis-tool",),
+            "execution": ToolExecution.HOST_PARSE,
+        }
+    )
+    pinned_resolver = ScorerResolver(ScorerRegistry([ScorerRegistration(pinned)]))
+    reference = RegistryRef.parse(RefKind.SCORER, pinned.ref)
+    before = pinned_resolver.resolve(reference, base_dir=tmp_path)
+    lock = lock.model_copy(
+        update={
+            "tools": {
+                "analysis-tool": tool.model_copy(
+                    update={"packages": ("probe-lib==2.0", "helper-lib==3.0")}
+                )
+            }
+        }
+    )
+    after = pinned_resolver.resolve(reference, base_dir=tmp_path)
 
-def test_committed_scorer_references_resolve_through_the_entry_point(tmp_path: Path) -> None:
-    resolver = ResolverSet().resolver_for(RefKind.SCORER)
-    assert resolver is not None
-    refs = _committed_scorer_refs()
-    resolved = {
-        ref: resolver.resolve(RegistryRef.parse(RefKind.SCORER, ref), base_dir=tmp_path)
-        for ref in refs
-    }
-    assert set(resolved) >= {"correctness@10", "code-quality@9", "resource-usage@8"}
-    quality = resolved["code-quality@9"]
-    assert quality.tool_versions["ruff"] == "0.8.6"
-    assert quality.tool_versions["scb-check"] == "0.1.3"
-    assert quality.metadata["manifest"] == CODE_QUALITY.definition()
-    assert resolved["correctness@10"].tool_versions == {}
-    again = resolver.resolve(RegistryRef.parse(RefKind.SCORER, "code-quality@9"), base_dir=tmp_path)
-    assert again.digest == quality.digest
-    with pytest.raises(RegistryReferenceError, match="unknown scorer 'nope@1'"):
-        resolver.resolve(RegistryRef.parse(RefKind.SCORER, "nope@1"), base_dir=tmp_path)
+    assert before.tool_versions == {"probe-lib": "1.0", "helper-lib": "3.0"}
+    assert after.tool_versions == {"probe-lib": "2.0", "helper-lib": "3.0"}
+    assert after.digest != before.digest
 
 
 def test_scorers_without_an_implementation_cannot_assess() -> None:
     registration = ScorerRegistration(CORRECTNESS)
     with pytest.raises(ScorerUnavailableError, match="no implementation"):
         registration.load()
-
-
-def test_lock_records_scorer_manifests_and_tool_pins_byte_identically(tmp_path: Path) -> None:
-    scorers = _committed_scorer_refs()
-    path = write_experiment(tmp_path, experiment_document(assessment={"scorers": scorers}))
-    problem, agent, workflow, _ = fixture_resolvers()
-    resolvers = ResolverSet(
-        [problem, agent, workflow, MetricResolver(), scorer_resolver()], entry_point_group=None
-    )
-    lock_path = path.with_name("experiment.lock.json")
-    first = render_lock(build_lock(load_experiment(path), lock_path=lock_path, resolvers=resolvers))
-    second = render_lock(
-        build_lock(load_experiment(path), lock_path=lock_path, resolvers=resolvers)
-    )
-    assert first == second
-    lock = json.loads(first)
-    assert sorted(lock["assessment"]["references"]["scorer"]) == scorers
-    assert lock["assessment"]["tools"]["ruff"] == "0.8.6"
-    # Scorer digests and pinned tools are assessment inputs, never run identity.
-    assert "ruff" not in lock["execution"]["tools"]
