@@ -1,7 +1,7 @@
 // Run detail → Quality panel (under the scorecard): the run's per-checkpoint
 // C·V·E·H·R·G·I·S strip with eligibility badges. A V/E/H/R/G cell or column
 // opens its file:line evidence in the full Quality run view. A gated trial also shows its
-// commit-gate effort per checkpoint (rounds, failure families, fix cost).
+// verification effort per checkpoint (rounds, failed blocking checks, fix cost).
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';

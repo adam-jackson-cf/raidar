@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import re
 from pathlib import Path
@@ -9,6 +10,7 @@ from typing import Any
 
 import pytest
 
+from define_tool.stage import criteria_document
 from raidar.judge.live import RecordedJev
 from raidar.scoring import definition_coverage as definition
 from raidar.scoring import test_coverage as tests_scorer
@@ -70,30 +72,64 @@ def _trace(
     *,
     define: bool = True,
     tests: dict[str, list[str]] | None = None,
-    extra: str = "",
+    regression: bool = False,
 ) -> Path:
-    text = DEFINITION.read_text(encoding="utf-8") + extra
+    text = DEFINITION.read_text(encoding="utf-8")
     quotes = list(dict.fromkeys(SOURCE.findall(text)))
     agent = root / "agent"
-    (agent / "workflow/define").mkdir(parents=True)
-    units = [
-        {"id": f"U{n}", "text": q, "required": True, "citable": True}
-        for n, q in enumerate(quotes, 1)
-    ]
-    (agent / "workflow/define/units.json").write_text(json.dumps(units))
-    (agent / "workflow/define/units.md").write_text("units")
-    (agent / "workflow/define/feature-definition.md").write_text(text)
+    destination = agent / "workflow/package/spec/criteria.json"
+    destination.parent.mkdir(parents=True)
+    document = criteria_document(text)
+    if regression:
+        document["features"].append(
+            {
+                "id": "F9",
+                "name": "Regression",
+                "outcome": "Existing ordering is preserved",
+                "criteria": [
+                    {
+                        "id": "F9.AC1",
+                        "criterion": "Existing ordering is unchanged.",
+                        "verification": "Run the regression test",
+                        "sources": [],
+                        "kind": "regression",
+                        "aspects": [],
+                        "examples": [],
+                    }
+                ],
+            }
+        )
+    data = json.dumps(document).encode()
+    destination.write_bytes(data)
+    stdout = json.dumps(
+        {"tokens": {"UNITS": "\n".join(f"U{n}*: {quote}" for n, quote in enumerate(quotes, 1))}}
+    )
     sources = agent / "workflow/sources/final/tests"
     sources.mkdir(parents=True)
     (sources / "test_tally.py").write_text(TEST_FILE)
     record: dict[str, Any] = {
-        "stages": ["define", "build"] if define else ["build"],
-        "define": {
-            "ending": "definition_ready",
-            "units": "workflow/define/units.md",
-            "definition": "workflow/define/feature-definition.md",
+        "outputs/1": {
+            "acme/spec": {
+                "criteria": {
+                    "contract": "criteria/1",
+                    "host_path": "workflow/package/spec/criteria.json",
+                    "sha256": hashlib.sha256(data).hexdigest(),
+                    "bytes": len(data),
+                    "error": None,
+                }
+            }
+        }
+        if define
+        else {},
+        "setup/1": {
+            "acme/spec": {
+                "call": {
+                    "stdout": stdout,
+                    "stdout_sha256": hashlib.sha256(stdout.encode()).hexdigest(),
+                }
+            }
         },
-        "build": {
+        "acceptance-reply/1": {
             "ac_tests": tests if tests is not None else {},
             "sources": "workflow/sources/final",
         },
@@ -192,7 +228,10 @@ def test_arms_without_define_and_unreached_steps_are_not_applicable(
 @pytest.mark.parametrize("scorer", SCORERS)
 def test_missing_artifacts_are_insufficient_evidence_not_zero(tmp_path: Path, scorer: Any) -> None:
     agent = _trace(tmp_path)
-    (agent / "workflow/define/units.json").unlink()
+    record_path = agent / "workflow/workflow.json"
+    record = json.loads(record_path.read_text())
+    record["setup/1"] = {}
+    record_path.write_text(json.dumps(record))
     result, _ = _assess(scorer(_jev(RecordedTransport())), _step(agent), _step(None))
 
     assert result.status is AssessStatus.INSUFFICIENT_EVIDENCE
@@ -202,13 +241,12 @@ def test_missing_artifacts_are_insufficient_evidence_not_zero(tmp_path: Path, sc
 def test_an_unsealed_definition_is_insufficient_evidence(tmp_path: Path) -> None:
     agent = _trace(tmp_path)
     record = json.loads((agent / "workflow/workflow.json").read_text())
-    record["define"] = {"ending": "definition_unusable", "units": "workflow/define/units.md"}
+    record["outputs/1"]["acme/spec"]["criteria"]["error"] = "not a single regular file"
     (agent / "workflow/workflow.json").write_text(json.dumps(record))
     scorer = definition.definition_coverage_scorer(_jev(RecordedTransport()))
     result, _ = _assess(scorer, _step(agent))
 
     assert result.status is AssessStatus.INSUFFICIENT_EVIDENCE
-    assert "definition_unusable" in (result.reason or "")
 
 
 def test_test_coverage_scores_mapped_tests_with_helpers_and_holds_weak_ones(tmp_path: Path) -> None:
@@ -241,11 +279,10 @@ def test_test_coverage_scores_mapped_tests_with_helpers_and_holds_weak_ones(tmp_
 
 
 def test_test_coverage_judges_a_mapped_regression_criterion(tmp_path: Path) -> None:
-    extra = "\n- F9.AC1: Existing ordering is unchanged.\n  Kind: regression\n"
     mapped = {"F9.AC1": ["tests/test_tally.py::test_report_invocation"]}
     transport = RecordedTransport(answer_for=lambda _i, _q: STRONG)
     scorer = tests_scorer.make_test_coverage_scorer(_jev(transport))
-    result, raw = _assess(scorer, _step(_trace(tmp_path, tests=mapped, extra=extra)))
+    result, raw = _assess(scorer, _step(_trace(tmp_path, tests=mapped, regression=True)))
 
     row = next(r for r in _readings(raw)["checkpoint_1"]["criteria"] if r["id"] == "F9.AC1")
     assert row["regression"] is True
@@ -268,7 +305,7 @@ def test_a_step_with_no_workflow_record_is_insufficient_evidence(
 def test_test_coverage_without_retained_sources_is_insufficient_evidence(tmp_path: Path) -> None:
     agent = _trace(tmp_path, tests={"F1.AC1": ["tests/test_tally.py::test_report_invocation"]})
     record = json.loads((agent / "workflow/workflow.json").read_text())
-    record["build"]["sources"] = "workflow/sources/missing"
+    record["acceptance-reply/1"]["sources"] = "workflow/sources/missing"
     (agent / "workflow/workflow.json").write_text(json.dumps(record))
     scorer = tests_scorer.make_test_coverage_scorer(_jev(RecordedTransport()))
     result, _ = _assess(scorer, _step(agent))

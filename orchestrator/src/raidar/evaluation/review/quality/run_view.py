@@ -3,9 +3,9 @@ and, for a trial that ran behind a commit gate, its gate effort (``gate_view``).
 
 Checkpoint cells come straight from the stored observations:
 
-- C is ``correctness@9`` ``strict_pass_rate`` at the checkpoint;
-- V, E, H are ``code-quality@8`` at the checkpoint;
-- R, G are ``code-quality@8`` on the transition *into* the checkpoint, so
+- C is ``correctness@10`` ``strict_pass_rate`` at the checkpoint;
+- V, E, H are ``code-quality@9`` at the checkpoint;
+- R, G are ``code-quality@9`` on the transition *into* the checkpoint, so
   the first checkpoint has none (``not_applicable``).
 
 The checkpoint-level I and S are a review view, not a headline: they apply

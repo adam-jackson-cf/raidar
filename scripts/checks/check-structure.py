@@ -84,7 +84,7 @@ RAIDAR_PACKAGES: dict[str, frozenset[str]] = {
     "design": frozenset({"experiment", "problem"}),
     "subject": frozenset({"agent", "workflow", "environment", "package", "primitive"}),
     "engine": frozenset({"target", "job", "trial", "health", "perf"}),
-    "grading": frozenset({"runtime", "prefix", "coverage"}),
+    "grading": frozenset({"runtime", "pre_fix", "coverage"}),
     "scoring": frozenset(
         {
             "catalog",
@@ -92,7 +92,7 @@ RAIDAR_PACKAGES: dict[str, frozenset[str]] = {
             "correctness",
             "code_quality",
             "process_checks",
-            "gate_effort",
+            "verification_effort",
             "resource_usage",
             "judge",
             "coverage_inputs",

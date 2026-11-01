@@ -585,10 +585,8 @@ lab/workflows/raidar/
 - **Resolver availability** (2026-10-28 voted decision). Per declared set and architecture, production allows one immediate timeout retry: at most two attempts of 120 s each, no backoff, identical requirements and pinned policy, with attempts recorded. A second timeout is `dependency_resolver_unavailable` infrastructure, not `cap-exceeded` and never an agent score.
 - **Wilson 95% intervals** for single-arm solve rates (FXL `evaluation/analysis/stats.py:35`).
 - **`process-compliance` stops being a scorer** (phase 6). Its metrics are about the agent's behaviour, not about verify, so they become health readings.
-- **`gate-effort` becomes `verification-effort@1`** (phase 5). It answers the same questions: fix rounds, blocking findings, clean at step end, and the cost of fix turns. It reads `gate/1` records, and is `not_applicable` without a `gate/1` package.
-  - Today `gate-effort@11` reads `guardrail-gate` records that nothing has written since phase 2.
-- **Pre-fix grading is kept** (phase 5). The hidden tests grade the tree as it was before each fix turn, to show what fix rounds bought. `gate/1` saves that tree before each fix turn; today the seal records only its digest. It applies only when `max_fix_rounds` > 0.
-  - It replaces `grading/prefix`'s reading of `guardrail-gate@3` snapshots.
+- **`verification-effort@1`** (phase 5) reads `gate/1` seals and `gate_fix` turns: fix rounds, failed blocking checks, first-pass and step-end cleanliness, and fix-token/cost/time evidence. It is `not_applicable` without `gate/1`; absent applicable evidence is unavailable, never zero. The old `gate-effort` runtime and consumers are deleted.
+- **Pre-fix grading is kept** (phase 5). `gate/1` retains the tree before each fix turn when `max_fix_rounds` > 0. `grading/pre_fix` grades that digest-checked tree with the checkpoint's own verifier into the Assessment store; escaping paths and changed trees are refused. No legacy prefix reader remains.
 - **`definition-coverage@1` and `test-coverage@1`** (FXL's offline audit, stages A and B) run host-side at assessment time.
   - They read `criteria/1` outputs and `ac_tests`.
   - They are uncalibrated **readings** until they are validated against labels (FXL `docs/design/jev-review.md`).

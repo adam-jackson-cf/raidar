@@ -1,7 +1,8 @@
 """What analysis and the review projections read from the quality, gate and process scorers.
 
 - the quality slot reads the code-quality scorer, and the headline names it as the scorer it needs;
-- the gate and process outcomes are the metrics ``gate-effort`` and ``process-compliance`` report;
+- the gate and process outcomes are the metrics ``verification-effort`` and
+  ``process-compliance`` report;
 - every compared metric names its better direction.
 """
 
@@ -17,25 +18,24 @@ from raidar.scoring.catalog.outcomes import (
 )
 from raidar.scoring.framework.builtin_manifests import CODE_QUALITY
 from raidar.scoring.framework.metrics import DEFAULT_METRIC_REGISTRY
-from raidar.scoring.gate_effort.manifest import GATE_EFFORT
 from raidar.scoring.process_checks.manifest import PROCESS_COMPLIANCE
+from raidar.scoring.verification_effort.manifest import VERIFICATION_EFFORT
 
-GATE_ONLY_ADDED_LATER = {
+GATE_OUTCOMES = {
+    "first_pass_clean_rate",
+    "clean_at_step_end_rate",
+    "unresolved_rate",
+    "gate_error_rate",
+    "mean_rounds_to_clean",
+    "total_fix_rounds",
+    "total_first_run_blocking",
+    "total_blocking_checks",
+    "total_fix_input_tokens",
+    "total_fix_output_tokens",
+    "total_fix_cost_usd",
+    "total_fix_wall_s",
+    "total_gate_wall_s",
     "fix_round_correctness_delta",
-    "total_new_first_run_blocking",
-    "final_step_end_blocking",
-    "total_first_run_untyped_call",
-    "final_step_end_untyped_call",
-    "first_run_tests_failed_rate",
-    "first_run_coverage_met_rate",
-    "total_first_run_failed_tests",
-    "first_pass_clean_except_autofix_rate",
-    "first_pass_clean_except_tests_rate",
-    "first_pass_clean_except_autofix_tests_rate",
-    "total_new_first_run_blocking_ex_cascade",
-    "final_step_end_blocking_ex_cascade",
-    "total_new_first_run_blocking_net",
-    "final_step_end_blocking_net",
 }
 
 
@@ -45,11 +45,11 @@ def test_the_headline_needs_the_code_quality_scorer() -> None:
     assert CODE_QUALITY.ref in needed_scorers(policy)
 
 
-def test_gate_outcomes_are_the_metrics_gate_effort_reports() -> None:
+def test_gate_outcomes_are_the_metrics_verification_effort_reports() -> None:
     compared = {metric.id.removeprefix(GATE_PREFIX) for metric in GATE_METRICS}
-    reported = {metric.id for metric in GATE_EFFORT.metrics}
+    reported = {metric.id for metric in VERIFICATION_EFFORT.metrics}
 
-    assert compared >= GATE_ONLY_ADDED_LATER
+    assert compared == GATE_OUTCOMES
     assert compared <= reported
 
 
@@ -69,11 +69,10 @@ def test_process_outcomes_are_the_trajectory_metrics_process_compliance_reports(
 
 def test_every_compared_metric_names_its_better_direction() -> None:
     assert _better("gate.first_pass_clean_rate") == "↑ higher"
-    assert _better("gate.total_new_first_run_blocking") == "↓ lower"
-    assert _better("gate.first_pass_clean_except_autofix_tests_rate") == "↑ higher"
-    assert _better("gate.final_step_end_blocking_ex_cascade") == "↓ lower"
-    assert _better("gate.total_new_first_run_blocking_net") == "↓ lower"
-    assert _better("gate.final_step_end_blocking_net") == "↓ lower"
+    assert _better("gate.total_first_run_blocking") == "↓ lower"
+    assert _better("gate.total_blocking_checks") == "↓ lower"
+    assert _better("gate.clean_at_step_end_rate") == "↑ higher"
+    assert _better("gate.fix_round_correctness_delta") == "↑ higher"
     assert _better("erosion") == "↑ higher"
     assert _better("process.total_test_commands_not_run") == "↓ lower"
     assert _better("process.work_session_tests_run_rate") == "↑ higher"

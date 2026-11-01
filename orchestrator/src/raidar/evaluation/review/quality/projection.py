@@ -15,7 +15,6 @@ from raidar_contract.canonical import pretty_canonical_json_bytes
 
 from raidar.evaluation.review.integrity import check_review_jobs
 from raidar.evaluation.review.quality.experiment_view import ReviewedTrial, build_experiments
-from raidar.evaluation.review.quality.gate_view import GATE_EFFORT_REF
 from raidar.evaluation.review.quality.labels import JevAudit
 from raidar.evaluation.review.quality.models import QualityProjection
 from raidar.evaluation.review.quality.run_view import build_run_detail
@@ -23,7 +22,11 @@ from raidar.evaluation.review.quality.sources import (
     StoreIndex,
     discover_trials,
 )
-from raidar.scoring.catalog.outcomes import CODE_QUALITY_REF, CORRECTNESS_REF
+from raidar.scoring.catalog.outcomes import (
+    CODE_QUALITY_REF,
+    CORRECTNESS_REF,
+    VERIFICATION_EFFORT_REF,
+)
 
 
 def build_quality_projection(
@@ -50,7 +53,7 @@ def _reviewed(jobs_root: Path, store_root: Path, locks: Sequence[Path]) -> list[
             decisions=jev.decisions,
             labels=audit.labels,
             jev_note=jev.note,
-            gate=store.find(GATE_EFFORT_REF, trial),
+            gate=store.find(VERIFICATION_EFFORT_REF, trial),
         )
         reviewed.append(ReviewedTrial(source=trial, detail=detail))
     return reviewed

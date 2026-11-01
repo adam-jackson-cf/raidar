@@ -20,7 +20,7 @@ from raidar.evaluation.analysis.assessed import (
     CORRECTNESS_REF,
     PROCESS_COMPLIANCE_REF,
     build_outcome,
-    gate_effort_ref,
+    verification_effort_ref,
 )
 from raidar.evaluation.analysis.dependencies import dependency_steps
 from raidar.evaluation.analysis.lookup import AssessmentLookup, assessment_config
@@ -77,7 +77,7 @@ def _process_ref(declared: tuple[str, ...]) -> str | None:
 
 
 def _scorer_refs(declared: tuple[str, ...], process_ref: str | None) -> tuple[str, ...]:
-    gate_ref = gate_effort_ref(declared)
+    gate_ref = verification_effort_ref(declared)
     wanted = (
         *ANALYSED_SCORERS,
         *((process_ref,) if process_ref else ()),
@@ -99,7 +99,7 @@ def _read_trials(
     policy: Metric,
     refs: tuple[str, str],
 ) -> tuple[list[Any], _TrialResults, _TrialResults]:
-    """Every chosen trial's outcome, and its process-compliance and gate-effort results."""
+    """Every chosen trial's outcome, with its process and verification-effort results."""
     process_ref, gate_ref = refs
     outcomes: list[Any] = []
     process: _TrialResults = {}
@@ -180,7 +180,7 @@ def load_inputs(request: LoadRequest) -> tuple[AnalysisInputs, Mapping[str, Any]
     process_ref = _process_ref(declared)
     lookup = _lookup(request, _scorer_refs(declared, process_ref))
     chosen, replaced = select_records(jobs)
-    gate_ref = gate_effort_ref(declared)
+    gate_ref = verification_effort_ref(declared)
     read = _read_trials(
         chosen, lookup, request, lock, policy=policy, refs=(process_ref or "", gate_ref or "")
     )

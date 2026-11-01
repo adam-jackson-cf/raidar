@@ -20,7 +20,7 @@ from raidar.contract.references import ResolverSet
 from raidar.design.experiment.loader import load_experiment
 from raidar.design.experiment.lock import build_lock, render_lock, stale_sections
 from raidar.design.experiment.validation import SpecValidationError
-from raidar.evaluation.analysis.assessed import GATE_EFFORT_REF, gate_effort_ref
+from raidar.evaluation.analysis.assessed import VERIFICATION_EFFORT_REF, verification_effort_ref
 from raidar.evaluation.analysis.effects import Settings
 from raidar.evaluation.analysis.markdown import render_markdown
 from raidar.evaluation.analysis.outcomes import Value
@@ -215,7 +215,9 @@ def test_arms_with_no_shared_attempt_are_refused_not_crashed() -> None:
         analyse(dataclasses.replace(base, planned=planned), SETTINGS)
 
 
-def test_the_lock_declared_gate_effort_scorer_is_read() -> None:
-    assert GATE_EFFORT_REF == "gate-effort@15"
-    assert gate_effort_ref(["correctness@9", "gate-effort@15"]) == "gate-effort@15"
-    assert gate_effort_ref(["correctness@9"]) is None
+def test_the_lock_declared_verification_effort_scorer_is_read() -> None:
+    assert VERIFICATION_EFFORT_REF == "verification-effort@1"
+    assert verification_effort_ref(["correctness@10", "verification-effort@1"]) == (
+        "verification-effort@1"
+    )
+    assert verification_effort_ref(["correctness@10"]) is None

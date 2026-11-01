@@ -1,7 +1,7 @@
 """``raidar analyze`` over stored jobs and a real Assessment store.
 
 Trials are written with host-side verifier records, rescored with the real
-``correctness@9`` and ``resource-usage@7`` scorers, and analysed through the
+``correctness@10`` and ``resource-usage@8`` scorers, and analysed through the
 CLI. The analysis must find each trial's Assessments by recomputing the keys
 ``raidar assess --rescore`` wrote, and must leave jobs and the store untouched.
 """
@@ -107,7 +107,7 @@ def _lock(
 
 
 # Analysis looks Assessments up under the lock's assessment settings.
-LOCKED_SETTINGS = lock_rescore_config(_lock(["correctness@9"]))
+LOCKED_SETTINGS = lock_rescore_config(_lock(["correctness@10"]))
 
 
 def _record(
@@ -197,14 +197,14 @@ def _write_run(
 
 @pytest.fixture
 def pilot(tmp_path: Path) -> tuple[Path, Path, Path]:
-    lock = _lock(["correctness@9", "code-quality@8", "resource-usage@7"])
+    lock = _lock(["correctness@10", "code-quality@9", "resource-usage@8"])
     lock_path = tmp_path / "pilot.lock.json"
     lock_path.write_text(json.dumps(lock))
     job_dir = _write_run(tmp_path, lock)
     store = tmp_path / "store"
     rescore_path(
         job_dir / "trials",
-        ("correctness@9", "resource-usage@7"),
+        ("correctness@10", "resource-usage@8"),
         AssessmentStore(store),
         default_scorer_registry(),
         config=LOCKED_SETTINGS.scorers,
@@ -266,7 +266,7 @@ def test_analyze_reports_stored_assessments_without_touching_inputs(
     assert solve["sample_size"]["recommended_pairs"] == 7  # ceil(7.84 * (0.2236 / 0.25)^2)
     # The default primary of a continue experiment is the solvable-set solve rate; this lock
     # pins no solvable set, so it is unavailable (never zero) with the raw rate beside it.
-    # S is secondary; code-quality@8 was never rescored, so S is unassessed too.
+    # S is secondary; code-quality@9 was never rescored, so S is unassessed too.
     assert report["primary_metric"] == "solve_rate_solvable"
     primary = report["comparisons"][0]["primary"]
     assert (primary["metric"], primary["verdict"]) == ("solve_rate_solvable", "insufficient")
@@ -296,14 +296,14 @@ def test_analyze_reports_stored_assessments_without_touching_inputs(
 def test_floor_policy_scores_c_zero_trials_zero_end_to_end_while_the_base_policy_leaves_unscored(
     tmp_path: Path,
 ) -> None:
-    # S2-SS-2 through rescore and `raidar analyze`: code-quality@8 is never rescored, so every
+    # S2-SS-2 through rescore and `raidar analyze`: code-quality@9 is never rescored, so every
     # trial has a quality gap. Under @2 a trial with C = 0 still scores S = 0 and is
     # paired; one with C > 0 stays unassessed. Under @1 (fork-exact) every S is unassessed.
     outcomes = {
         "baseline": [(FAIL, FAIL)] * 5,
         "guided": [(FAIL, FAIL)] * 2 + [(PASS, FAIL)] * 3,
     }
-    scorers = ["correctness@9", "code-quality@8", "resource-usage@7"]
+    scorers = ["correctness@10", "code-quality@9", "resource-usage@8"]
     for headline, pairs, unassessed in (("scb-canonical@2", 2, 3), ("scb-canonical@1", 0, 5)):
         root = tmp_path / headline
         lock = _lock(scorers, headline=headline)
@@ -314,7 +314,7 @@ def test_floor_policy_scores_c_zero_trials_zero_end_to_end_while_the_base_policy
         store = root / "store"
         rescore_path(
             job_dir / "trials",
-            ("correctness@9", "resource-usage@7"),
+            ("correctness@10", "resource-usage@8"),
             AssessmentStore(store),
             default_scorer_registry(),
             config=lock_rescore_config(lock).scorers,
@@ -342,14 +342,14 @@ PINNED: dict[str, Any] = {
 
 
 def _pinned_pilot(tmp_path: Path) -> tuple[Path, Path, Path]:
-    lock = _lock(["correctness@9", "resource-usage@7"], **PINNED)
+    lock = _lock(["correctness@10", "resource-usage@8"], **PINNED)
     lock_path = tmp_path / "pinned.lock.json"
     lock_path.write_text(json.dumps(lock))
     job_dir = _write_run(tmp_path / "pinned", lock)
     store = tmp_path / "pinned-store"
     rescore_path(
         job_dir / "trials",
-        ("correctness@9", "resource-usage@7"),
+        ("correctness@10", "resource-usage@8"),
         AssessmentStore(store),
         default_scorer_registry(),
         config=LOCKED_SETTINGS.scorers,
@@ -408,12 +408,12 @@ def test_analyze_refuses_to_write_into_a_run_or_to_mix_locks(
     assert inside.exit_code != 0
     assert "outside" in inside.output
     other = tmp_path / "other.lock.json"
-    other.write_text(json.dumps(_lock(["correctness@9"], experiment="other")))
+    other.write_text(json.dumps(_lock(["correctness@10"], experiment="other")))
     mixed = _analyze(job_dir, store, other, tmp_path / "out")
     assert mixed.exit_code != 0
     assert "executed under lock" in mixed.output
     # A relock that only changes the scorers keeps the execution identity the run recorded.
-    rescored = _lock(["correctness@9"])
+    rescored = _lock(["correctness@10"])
     assert rescored["lock_sha256"] == json.loads(lock_path.read_text())["lock_sha256"]
     other.write_text(json.dumps(rescored))
     assert _analyze(job_dir, store, other, tmp_path / "rescored").exit_code == 0
@@ -441,7 +441,7 @@ def test_a_valid_rerun_replaces_an_invalid_trial_but_two_valid_ones_conflict() -
 def test_a_job_resolves_only_the_lock_its_manifest_names_and_otherwise_asks_for_one(
     tmp_path: Path,
 ) -> None:
-    lock = _lock(["correctness@9"])
+    lock = _lock(["correctness@10"])
     experiment_file = tmp_path / "pilot.yaml"
     lock_path = tmp_path / "pilot.lock.json"
     lock_path.write_text(json.dumps(lock))
@@ -456,7 +456,7 @@ def test_a_job_resolves_only_the_lock_its_manifest_names_and_otherwise_asks_for_
     assert default_lock(job(experiment_file=str(experiment_file))) == lock_path
     with pytest.raises(AnalysisInputError, match="names no experiment_file; pass --lock"):
         default_lock(job())
-    lock_path.write_text(json.dumps(_lock(["correctness@9"], experiment="another")))
+    lock_path.write_text(json.dumps(_lock(["correctness@10"], experiment="another")))
     with pytest.raises(AnalysisInputError, match="another experiment.*pass --lock"):
         default_lock(job(experiment_file=str(experiment_file)))
     lock_path.unlink()
@@ -465,14 +465,14 @@ def test_a_job_resolves_only_the_lock_its_manifest_names_and_otherwise_asks_for_
 
 
 def test_truncated_runs_are_refused_unless_labelled_and_never_pooled(tmp_path: Path) -> None:
-    lock = _lock(["correctness@9", "resource-usage@7"])
+    lock = _lock(["correctness@10", "resource-usage@8"])
     lock_path = tmp_path / "pilot.lock.json"
     lock_path.write_text(json.dumps(lock))
     truncated = _write_run(tmp_path, lock, name="dev", max_checkpoints=2)
     store = tmp_path / "store"
     rescore_path(
         truncated / "trials",
-        ("correctness@9", "resource-usage@7"),
+        ("correctness@10", "resource-usage@8"),
         AssessmentStore(store),
         default_scorer_registry(),
         config=LOCKED_SETTINGS.scorers,
@@ -509,7 +509,7 @@ def test_truncated_runs_are_refused_unless_labelled_and_never_pooled(tmp_path: P
 def test_rescore_and_analysis_follow_the_lock_not_the_runs_execution_time_file(
     tmp_path: Path,
 ) -> None:
-    lock = _lock(["correctness@9", "code-quality@8", "resource-usage@7"])
+    lock = _lock(["correctness@10", "code-quality@9", "resource-usage@8"])
     lock_path = tmp_path / "pilot.lock.json"
     lock_path.write_text(json.dumps(lock))
     job_dir = _write_run(tmp_path, lock)  # its assessment-config.yaml says `scorers: {}`
@@ -521,7 +521,7 @@ def test_rescore_and_analysis_follow_the_lock_not_the_runs_execution_time_file(
             "--rescore",
             str(job_dir / "trials"),
             "--scorer",
-            "correctness@9",
+            "correctness@10",
             "--store",
             str(store),
             "--lock",
@@ -623,13 +623,13 @@ def test_analyze_has_no_bundle_search_option() -> None:
     assert "--bundle-search" not in result.output
 
 
-@pytest.mark.parametrize("process", ["process-compliance@11", None])
+@pytest.mark.parametrize("process", ["process-compliance@12", None])
 def test_the_manipulation_check_reads_the_declared_process_compliance_version(
     tmp_path: Path, process: str | None
 ) -> None:
     # Jev parked (2026-10-04): the deterministic scorer is the default; a lock declaring
     # no process-compliance version gets no manipulation check.
-    scorers = ["correctness@9", *([process] if process else [])]
+    scorers = ["correctness@10", *([process] if process else [])]
     lock = _lock(scorers)
     lock_path = tmp_path / "lock.json"
     lock_path.write_text(json.dumps(lock))
@@ -657,42 +657,51 @@ def test_the_manipulation_check_reads_the_declared_process_compliance_version(
 
 
 def _write_gate_record(agent_dir: Path, *, clean: bool) -> None:
-    """A guardrail-gate@1 record: one refused run, one fix, then the step's verdict."""
-    gate = agent_dir / "guardrail-gate"
-    gate.mkdir(parents=True, exist_ok=True)
-    refused = (
-        "guardrail-check: REFUSED (1 blocking, 0 warnings, 1 Python files)\n"
-        "Blocking (fix these) (1):\n  app/main.py:1:1: C901 too complex\n"
-    )
-    passed = "guardrail-check: PASSED (0 blocking, 0 warnings, 1 Python files)\n"
-    (gate / "gate_run_1.log").write_text(refused)
-    (gate / "gate_run_2.log").write_text(passed if clean else refused)
-    runs = [
-        {
-            "run": 1,
-            "after": "stage_1_work",
-            "passed": False,
-            "log": "guardrail-gate/gate_run_1.log",
-        },
-        {"run": 2, "after": "stage_2_fix", "passed": clean, "log": "guardrail-gate/gate_run_2.log"},
-    ]
-    stages = [
-        {"index": index, "stage": role, "round": index - 1, "n_input_tokens": 10,
-         "n_output_tokens": 1, "cost_usd": 0.001, "duration_sec": 5.0}
-        for index, role in ((1, "work"), (2, "fix"))
-    ]  # fmt: skip
-    record = {
-        "termination_reason": "gate_clean" if clean else "rounds_exhausted",
-        "rounds_configured": 1,
-        "gate_runs": runs,
-        "stages": stages,
-        "gate_clean_at_step_end": clean,
+    """A host-written ``gate/1`` record: one refused seal, one fix turn, then the step's verdict."""
+
+    def seal(run: int, after: str, *, passed: bool) -> dict[str, Any]:
+        check = {
+            "name": "lint.complexity",
+            "category": "lint",
+            "blocking": True,
+            "status": "passed" if passed else "failed",
+            "seconds": 0.5,
+            "cause": None if passed else "C901 too complex",
+        }
+        return {
+            "who": "seal",
+            "run": run,
+            "after": after,
+            "verdict": "passed" if passed else "refused",
+            "attribution": "passed" if passed else "refused",
+            "seconds": 1.0,
+            "error": None,
+            "checks": [check],
+        }
+
+    fix_turn = {
+        "stage": "fix",
+        "kind": "gate_fix",
+        "turn": 1,
+        "seconds": 5.0,
+        "tokens": {"input": 10, "cached": 0, "output": 1, "cost_usd": 0.001},
     }
-    (gate / "guardrail-gate.json").write_text(json.dumps(record))
+    record = {
+        "gate/1": {
+            "max_fix_rounds": 1,
+            "errors": [],
+            "pre_fix_snapshots": [],
+            "gates": [seal(1, "stage_1_work", passed=False), seal(2, "stage_2_fix", passed=clean)],
+        },
+        "turns": [fix_turn],
+    }
+    workflow = agent_dir / "workflow"
+    workflow.mkdir(parents=True, exist_ok=True)
+    (workflow / "workflow.json").write_text(json.dumps(record))
 
 
-def test_gate_effort_and_its_default_gate_check_reach_the_report(tmp_path: Path) -> None:
-    scorers = ["correctness@9", "gate-effort@15"]
+def test_verification_effort_and_its_default_gate_check_reach_the_report(tmp_path: Path) -> None:
+    scorers = ["correctness@10", "verification-effort@1"]
     lock = _lock(scorers)
     lock_path = tmp_path / "lock.json"
     lock_path.write_text(json.dumps(lock))
@@ -717,13 +726,13 @@ def test_gate_effort_and_its_default_gate_check_reach_the_report(tmp_path: Path)
     report = json.loads((output / "analysis.json").read_text())
     baseline, guided = report["arms"]
     rate = "gate.first_pass_clean_rate"
-    assert baseline["gate_effort"][rate]["gaps"] == {"not_applicable": 5}
-    assert guided["gate_effort"][rate]["mean"] == 0.0
-    assert guided["gate_effort"]["gate.mean_rounds_to_clean"]["mean"] == 1.0
-    assert guided["gate_effort"]["gate.total_first_run_blocking.complexity"]["mean"] == 2.0
+    assert baseline["verification_effort"][rate]["gaps"] == {"not_applicable": 5}
+    assert guided["verification_effort"][rate]["mean"] == 0.0
+    assert guided["verification_effort"]["gate.mean_rounds_to_clean"]["mean"] == 1.0
+    assert guided["verification_effort"]["gate.total_first_run_blocking"]["mean"] == 2.0
     (comparison,) = report["comparisons"]
     assert comparison["gate_effects"] == []
-    assert "baseline arm measured no gate-effort value" in comparison["gate_note"]
+    assert "baseline arm measured no verification-effort value" in comparison["gate_note"]
     manipulation = comparison["manipulation"]
     assert manipulation["verdict"] == "insufficient_data"
     (check,) = manipulation["checks"]

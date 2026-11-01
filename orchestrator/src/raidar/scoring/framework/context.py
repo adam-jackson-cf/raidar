@@ -64,7 +64,7 @@ class StepInputs:
     agent_result: Mapping[str, Any] | None
     agent_execution_s: float | None = None
     judged: bool = False
-    """Harbor's record of the step shows a judged verify stage: its spend includes judge calls."""
+    """Harbor's record declares jev-judge/1: measured spend includes its calls."""
 
 
 @dataclass

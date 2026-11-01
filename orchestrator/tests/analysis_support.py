@@ -4,9 +4,9 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 
-from raidar.evaluation.analysis.gate_effort import GateDescriptive
 from raidar.evaluation.analysis.outcomes import TrialOutcome, Value
 from raidar.evaluation.analysis.report import AnalysisInputs, ArmSummary, PlannedTrial
+from raidar.evaluation.analysis.verification_effort import GateDescriptive
 from raidar.scoring.catalog.outcomes import declared_outcome_types
 
 BASELINE = "baseline"
@@ -104,8 +104,8 @@ def inputs(
     )
 
 
-def arm_summary(name: str, gate_effort: Mapping[str, float]) -> ArmSummary:
-    """One valid trial's arm summary carrying the given gate-effort means."""
+def arm_summary(name: str, verification_effort: Mapping[str, float]) -> ArmSummary:
+    """One valid trial's arm summary carrying the given verification-effort means."""
     return ArmSummary(
         arm=name,
         planned=1,
@@ -115,8 +115,8 @@ def arm_summary(name: str, gate_effort: Mapping[str, float]) -> ArmSummary:
         not_run=0,
         infra_reasons={},
         cost_means={},
-        gate_effort={
+        verification_effort={
             metric: GateDescriptive(n=1, mean=value, sd=None, interval=None)
-            for metric, value in gate_effort.items()
+            for metric, value in verification_effort.items()
         },
     )

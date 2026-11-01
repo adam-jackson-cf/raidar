@@ -149,16 +149,14 @@ def agent_execution_seconds(timing: Any) -> float | None:
 
 
 def ran_judge(agent_result: Any) -> bool:
-    """Whether Harbor's own record of the step shows a judged verify stage.
+    """Whether Harbor's own metadata declares the judge primitive.
 
-    The workflow runner stores its record in ``agent_result.metadata.workflow``; a ``verify``
-    stage with judge settings there means the step's spend includes judge calls, whatever the
-    trace directory still holds.
+    Presence, not a successful verdict, determines applicability: missing or malformed retained
+    judge evidence must not silently reduce a judged step's measured cost.
     """
     metadata = agent_result.get("metadata") if isinstance(agent_result, Mapping) else None
     workflow = metadata.get("workflow") if isinstance(metadata, Mapping) else None
-    verify = workflow.get("verify") if isinstance(workflow, Mapping) else None
-    return isinstance(verify, Mapping) and "judge" in verify
+    return isinstance(workflow, Mapping) and "jev-judge/1" in workflow
 
 
 def blind_agent_result(raw: Any) -> dict[str, Any] | None:

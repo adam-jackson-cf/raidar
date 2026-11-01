@@ -41,7 +41,7 @@ BASE_EXPERIMENT: dict[str, Any] = {
         {"id": "baseline", "agent": "luna", "workflow": "raidar/one-shot@2"},
         {"id": "guided", "agent": "luna", "workflow": "raidar/one-shot@2"},
     ],
-    "assessment": {"scorers": ["correctness@9"]},
+    "assessment": {"scorers": ["correctness@10"]},
     "analysis": {"baseline_arm": "baseline", "attempts": 5, "seed": 7},
 }
 
@@ -102,6 +102,6 @@ def fixture_resolvers(*, checkpoints: int = 8) -> list[RegistryResolver]:
         AgentResolver(),
         WorkflowResolver(),
         InMemoryResolver(
-            RefKind.SCORER, {"correctness@9": {"exact": True}}, tool_versions={"pytest": "8.4.1"}
+            RefKind.SCORER, {"correctness@10": {"exact": True}}, tool_versions={"pytest": "8.4.1"}
         ),
     ]

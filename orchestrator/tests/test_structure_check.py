@@ -29,7 +29,7 @@ structure = _load_structure_module()
 @pytest.mark.parametrize(
     "path",
     [
-        "orchestrator/src/raidar/scoring/framework/gate_effort_v10/scorer.py",
+        "orchestrator/src/raidar/scoring/framework/scorer_v10/scorer.py",
         "orchestrator/tests/test_code_quality_v3.py",
         "lab/experiments/smoke/python__forge__mechanics-v1/experiment.yaml",
         "orchestrator/src/raidar/subject/workflow/runner_v2.py",

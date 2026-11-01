@@ -110,7 +110,7 @@ def test_composite_is_the_headline_policy_score_over_one_hundred(
         if run.unscored:
             continue
         detail = _detail(projection, run.id)
-        quality = _span(detail, "scorer:code-quality@8")
+        quality = _span(detail, "scorer:code-quality@9")
         scoring = _span(detail, "scoring")
         components = {
             "C": Decimal(str(run.diagnostic_score)),
@@ -384,7 +384,7 @@ def test_an_excluded_checkpoint_is_neutral_in_review_and_keeps_its_raw_diagnosti
     metric = next(item for item in detail.run.metric_scores if item["metric_id"] == "checkpoint_1")
     assert metric["passed"] is None
     assert metric["score"] == 1.0
-    contribution = _span(detail, "scorer:correctness@9")["metric_contributions"][0]
+    contribution = _span(detail, "scorer:correctness@10")["metric_contributions"][0]
     assert contribution["score"] == 1.0
 
 
@@ -509,7 +509,7 @@ def test_following_the_unassessed_hint_stores_the_assessment_the_review_finds(
     config = job_dir / "assessment-config.yaml"
     config.write_text(
         config.read_text().replace(
-            "scorers: {}", "scorers:\n  correctness@9:\n    progression: continue"
+            "scorers: {}", "scorers:\n  correctness@10:\n    progression: continue"
         )
     )
     runs, store = tmp_path / "jobs", tmp_path / "store"
@@ -517,29 +517,29 @@ def test_following_the_unassessed_hint_stores_the_assessment_the_review_finds(
     [hint] = [
         reason
         for reason in _detail(before, PASSING).run.unscored_reasons
-        if "correctness@9" in reason and "raidar assess" in reason
+        if "correctness@10" in reason and "raidar assess" in reason
     ]
     command = hint.split("`")[1].replace("<store>", str(store)).split()
     result = CliRunner().invoke(assess, command[2:])
     assert result.exit_code == 0, result.output
     after = merge_review_projections(job_roots=[runs], stores=[store])
     scoring = _span(_detail(after, PASSING), "scoring")
-    assert "correctness@9" in scoring["assessments"]
-    assert "correctness@9" not in scoring["not_assessed"]
+    assert "correctness@10" in scoring["assessments"]
+    assert "correctness@10" not in scoring["not_assessed"]
 
 
 def test_a_headline_scorer_the_experiment_never_declared_is_named_not_unassessed() -> None:
     from raidar.evaluation.review.projection.assessments import TrialAssessments
     from raidar.evaluation.review.projection.headline import UNDECLARED_MARKER, headline
 
-    missing = TrialAssessments(missing={"correctness@9": "no stored Assessment"})
+    missing = TrialAssessments(missing={"correctness@10": "no stored Assessment"})
     one = ("checkpoint_1",)
-    result = headline("scb-canonical-oneshot@1", one, missing, declared=["correctness@9"])
+    result = headline("scb-canonical-oneshot@1", one, missing, declared=["correctness@10"])
     assert result.composite is None
     (reason,) = result.reasons
     assert UNDECLARED_MARKER in reason
     declared = headline(
-        "scb-canonical-oneshot@1", one, missing, declared=["correctness@9", "code-quality@8"]
+        "scb-canonical-oneshot@1", one, missing, declared=["correctness@10", "code-quality@9"]
     )
     assert all("unassessed" in reason for reason in declared.reasons)
 

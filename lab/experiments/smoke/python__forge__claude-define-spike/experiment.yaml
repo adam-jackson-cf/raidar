@@ -21,7 +21,7 @@ arms:
     agent: agent
     workflow: raidar/define-build-verify@2
 assessment:
-  scorers: [correctness@9, code-quality@8, resource-usage@7, process-compliance@11, definition-coverage@5, test-coverage@5]
+  scorers: [correctness@10, code-quality@9, resource-usage@8, process-compliance@12, definition-coverage@6, test-coverage@6]
   metric: scb-canonical@2
 analysis:
   baseline_arm: define

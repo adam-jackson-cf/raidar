@@ -180,7 +180,7 @@ def test_validate_command_exits_nonzero_with_field_errors(tmp_path: Path) -> Non
         ({"problems": [{"ref": "scb/forge@abc123", "path": "tasks/forge"}]}, "problems.0"),
         ({"problems": [{"ref": "scb/forge@abc123"}] * 2}, "problems.1"),
         ({"protocol": {"min_reward": 0.5}}, "protocol"),
-        ({"assessment": {"scorers": ["correctness@9", "correctness@9"]}}, "assessment.scorers.1"),
+        ({"assessment": {"scorers": ["correctness@10", "correctness@10"]}}, "assessment.scorers.1"),
     ],
     ids=["problem-two-sources", "duplicate-problem", "min-reward-in-continue", "dup-scorer"],
 )
@@ -201,10 +201,10 @@ def test_set_override_can_replace_a_list_item(tmp_path: Path) -> None:
     path = write_experiment(tmp_path, experiment_document())
 
     spec = load_experiment(
-        path, CliOverrides(assignments=("assessment.scorers.0=code-quality@8",))
+        path, CliOverrides(assignments=("assessment.scorers.0=code-quality@9",))
     ).spec
 
-    assert spec.assessment.scorers == ("code-quality@8",)
+    assert spec.assessment.scorers == ("code-quality@9",)
 
 
 def test_verdict_thresholds_are_pinned_in_the_analysis_block(tmp_path: Path) -> None:
