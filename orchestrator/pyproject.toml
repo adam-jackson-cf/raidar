@@ -125,11 +125,11 @@ branch = true
 precision = 2
 
 # Coverage floors in percent: the one source of truth read by `raidar quality`.
-# S0 fast-only baseline, floored to hundredths; ratchet each floor after every slice.
+# Integrated fast-only baseline, floored to hundredths; ratchet each floor after every slice.
 # Refactor completion requires both floors >= 95.00.
 [tool.raidar.coverage]
-line_floor = 85.20
-branch_floor = 75.86
+line_floor = 93.64
+branch_floor = 89.58
 
 [tool.mypy]
 python_version = "3.12"
