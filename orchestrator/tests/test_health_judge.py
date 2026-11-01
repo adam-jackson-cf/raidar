@@ -77,9 +77,7 @@ def _step(root: Path, probability: float | None = 0.9) -> dict[str, Any]:
 
 
 def _save(root: Path, verify: dict[str, Any]) -> None:
-    _write(
-        root, "workflow/workflow.json", {"stages": ["define", "build", "verify"], "verify": verify}
-    )
+    _write(root, "workflow/workflow.json", {"stages": ["build"], "jev-judge/1": verify})
 
 
 def _checks(root: Path) -> dict[str, Any]:

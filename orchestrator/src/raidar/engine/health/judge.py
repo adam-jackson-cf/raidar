@@ -277,9 +277,9 @@ def _judge_steps(steps: Sequence[tuple[str, Path]]) -> tuple[list[JudgeStep], li
         if not isinstance(workflow, dict):
             unread.append(f"{name}: missing workflow record")
             continue
-        verify = workflow.get("verify")
-        if isinstance(verify, dict) and verify.get("judge") is not None:
-            found.append(JudgeStep(name, agent, verify))
+        record = workflow.get("jev-judge/1")
+        if isinstance(record, dict) and record.get("judge") is not None:
+            found.append(JudgeStep(name, agent, record))
     return found, unread
 
 

@@ -285,7 +285,7 @@ def test_an_idle_kill_is_a_fault_candidate_with_its_reason_and_pids(tmp_path: Pa
     assert append_fault_candidates(t.job_dir, report) == []
 
 
-@pytest.mark.parametrize("check_id", ["G1", "E1"])
+@pytest.mark.parametrize("check_id", ["W3", "J2"])
 def test_non_liveness_findings_are_retained_as_faults(tmp_path: Path, check_id: str) -> None:
     check = HealthCheck(
         id=check_id,
@@ -315,10 +315,8 @@ def test_violations_map_to_validity_checks_and_nothing_else_invalidates() -> Non
             ("L2", "pass"),
             ("P3", "pass"),
             ("T1", "unmeasured"),
-            ("E2", "unmeasured"),
             ("J2", "unmeasured"),
-            ("G1", "violation"),  # readings of the agent-writable hook log never invalidate
-            ("G2", "violation"),
+            ("D1", "violation"),  # readings never invalidate
             ("H-target", "violation"),
         )
     )
@@ -332,7 +330,6 @@ def test_violations_map_to_validity_checks_and_nothing_else_invalidates() -> Non
                 ("T3", "violation"),
                 ("L2", "violation"),
                 ("P8", "violation"),
-                ("E1", "violation"),
                 ("J2", "violation"),
                 ("W2", "violation"),
             )
@@ -342,7 +339,6 @@ def test_violations_map_to_validity_checks_and_nothing_else_invalidates() -> Non
     assert "V2: V2 violation" in failed["health_verdicts"].detail
     assert "H4" in failed["health_budgets"].detail
     assert "T3" in failed["health_tamper"].detail
-    assert "E1" in failed["health_define"].detail
     assert "J2" in failed["health_judge"].detail
     assert "W2" in failed["health_evidence"].detail
 

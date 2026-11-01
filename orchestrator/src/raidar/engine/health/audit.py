@@ -18,10 +18,11 @@ result can be trusted, and returns one ``HealthReport`` (``health.json``). Famil
   plugin recommendations, ``AGENTS.md`` text only from the workspace).
 - **T** tamper: ``T1`` the tool tree is unchanged since the first hash; ``T2`` the records
   manifest verifies; ``T3`` the reaper left no residual process.
-- **E** the define stage, only when the workflow records show one
-  (``raidar.engine.health.definition``): ``E1`` every gate-passed checkpoint holds a sealed,
-  passing definition; ``E2`` the recorded ``define`` calls agree with the final draft; ``E3`` an
-  unusable definition is recorded and never passed.
+- **J** the workflow judge, only when the workflow record holds a ``jev-judge/1`` record
+  (``raidar.engine.health.judge``): ``J1`` retained requests and answers agree, ``J2`` aspect
+  closure follows the answers, ``J3`` no unclosed criterion ends ``verified``.
+- **W** the lab-owned evidence of every locked primitive (``raidar.engine.health.evidence``),
+  keyed by primitive contract id; installed-tool integrity findings invalidate through ``W11``.
 - **D** dependency readings, never validity: ``D1`` declared requirements Raidar could not
   provide; ``D2`` a ``ModuleNotFoundError`` for an undeclared non-stdlib module
   (``raidar.engine.health.dependencies``).

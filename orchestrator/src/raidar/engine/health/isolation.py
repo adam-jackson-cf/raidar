@@ -75,26 +75,15 @@ def _component_placements(workflow: dict[str, Any]) -> list[tuple[PurePosixPath,
     ]
 
 
-def _instruction_placements(workflow: dict[str, Any]) -> list[tuple[PurePosixPath, Any]]:
-    instructions = workflow.get("instructions")
-    stages = [stage for stage in workflow.values() if isinstance(stage, dict)]
-    return [
-        (PurePosixPath(stage["rules_file"]), record)
-        for record in (instructions if isinstance(instructions, list) else [])
-        for stage in stages
-        if stage.get("rules_record") == record and isinstance(stage.get("rules_file"), str)
-    ]
-
-
 def _placements(agent: Path, workflow: Any) -> list[tuple[PurePosixPath, Path]]:
     """``(workspace file, step record)`` for each text the workflow placed in the workspace.
 
-    A component names its file. A stage's instruction record is bound to the ``rules_file`` its
-    own stage record names; one with no recorded file vouches for no file.
+    A component names its file and its host-written record; the package workflow writes no
+    other placement. One with no recorded file vouches for no file.
     """
     if not isinstance(workflow, dict):
         return []
-    placed = _component_placements(workflow) + _instruction_placements(workflow)
+    placed = _component_placements(workflow)
     return [
         (path, agent / PurePosixPath(record))
         for path, record in placed
