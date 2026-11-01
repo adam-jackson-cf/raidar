@@ -2,14 +2,29 @@
 
 from __future__ import annotations
 
+import copy
 import json
 from typing import Any
 
 import pytest
+from raidar_contract.criteria import validate_criteria
 
 from raidar.subject.primitive.judge import JudgeConfig
 from raidar.subject.workflow import judging, pysource
-from raidar.subject.workflow.acceptance import Aspect, Criterion, Example, Feature
+from raidar.subject.workflow.acceptance import (
+    Acceptance,
+    Aspect,
+    Criterion,
+    Example,
+    Feature,
+    absent_tests,
+    appears,
+    file_of,
+    literal_value,
+    literals,
+    rows,
+)
+from tests.criteria_support import CRITERIA, acceptance
 
 TESTS = """\
 import pytest
@@ -194,7 +209,10 @@ def test_each_mapped_test_gets_its_result_at_the_gate() -> None:
     }
 
 
-@pytest.mark.parametrize("record", [None, {}, {"collected": COLLECTED}, {"outcomes": {}}])
+UNKNOWN_RESULTS: list[Any] = [None, {}, {"collected": COLLECTED}, {"outcomes": {}}]
+
+
+@pytest.mark.parametrize("record", UNKNOWN_RESULTS)
 def test_results_are_unknown_when_the_gate_recorded_none(record: Any) -> None:
     assert judging.gate_results([OBJECT], record) == {OBJECT: "unknown"}
 
@@ -515,7 +533,7 @@ def test_the_pushback_shows_the_issues_words_the_aspects_not_closed_and_the_test
             "ValueError is raised",
             f"Mapped tests: `{REJECTS}` (passed)",
         ]
-    ).replace("(passed)", "(passed)")
+    )
 
 
 def test_an_undecided_criterion_is_pushed_back_saying_it_counts_as_open() -> None:
@@ -553,3 +571,114 @@ def test_subjects_pair_every_criterion_with_its_mapped_tests_in_definition_order
         ("F2.AC1", "F2", (OBJECT,)),
     ]
     assert judging.PassResult(1, ()).listing() == {"closed": [], "open": [], "undecided": []}
+
+
+# --- the criteria and the mapping a builder reports --------------------------------
+
+
+@pytest.mark.parametrize(
+    ("span", "value"),
+    [
+        ('"ValueError"', "ValueError"),
+        ("'a'", "a"),
+        ("“hi”", "hi"),
+        ("  a   b ", "a b"),
+        ('"', '"'),
+        ('""', ""),
+        ("2.50", "2.5"),
+        ("10.0", "10"),
+        ("-0.50", "-0.5"),
+        ("1e3", "1e3"),
+    ],
+)
+def test_a_literal_is_set_aside_from_its_quotes_and_spacing_and_a_number_is_canonical(
+    span: str, value: str
+) -> None:
+    assert literal_value(span) == value
+
+
+def test_the_literals_of_a_text_are_its_code_spans() -> None:
+    assert literals('returns `[]` and `"ValueError"`, not plain text') == ("[]", "ValueError")
+    assert literals("no spans here") == ()
+    assert literals("a `` `x` `` span holds a backtick") == ("`x`",)
+
+
+@pytest.mark.parametrize(
+    ("literal", "text", "found"),
+    [
+        ("2.5", "costs 2.50 dollars", True),
+        ("1", "10 items", False),
+        ("5", "assert x == 5", True),
+        ("5", "assert x == 55", False),
+        ("5", "v5", False),
+        ("ValueError", "pytest.raises(ValueError)", True),
+        ("a b", "a      b", True),
+        ('"a"', 'f(\\"a\\")', True),
+        ("absent", "nothing of it", False),
+    ],
+)
+def test_a_literal_appears_as_a_whole_number_or_a_substring_in_a_tests_text(
+    literal: str, text: str, found: bool
+) -> None:
+    assert appears(literal, text) is found
+
+
+def document() -> Any:
+    changed: dict[str, Any] = copy.deepcopy(CRITERIA)
+    first = changed["features"][0]["criteria"][0]
+    first["examples"] = [{"situation": "[]", "outcome": "raises `ValueError`"}]
+    return validate_criteria(changed)
+
+
+def test_a_criteria_document_is_read_with_numbered_aspects_literals_and_kinds() -> None:
+    held = Acceptance()
+    held.load(document())
+
+    first, second = held.criteria
+    assert (first.kind, second.kind) == ("", "regression")
+    assert [aspect.id for aspect in first.aspects] == ["F1.AC1.A1"]
+    assert first.aspects[0].text == "a JSON array -> it is rejected"
+    assert first.examples[0].literals == ("ValueError",)
+    assert (held.ids, held.optional) == (["F1.AC1", "F1.AC2"], ["F1.AC2"])
+
+
+def test_a_turns_report_replaces_the_tests_of_the_known_criteria_it_lists() -> None:
+    held = acceptance({"F1.AC2": ["tests/old.py::test_old"]})
+
+    held.merge(
+        [
+            {"criterion": " F1.AC1 ", "tests": [" tests/a.py::test_a ", "", 3]},
+            {"criterion": "F9.AC9", "tests": ["tests/z.py::test_z"]},
+            {"criterion": "F1.AC2", "tests": []},
+            {"criterion": 5, "tests": ["tests/y.py::test_y"]},
+        ]
+    )
+
+    assert held.ac_tests == {
+        "F1.AC1": ["tests/a.py::test_a"],
+        "F1.AC2": ["tests/old.py::test_old"],
+    }
+    assert held.mapped_files == ["tests/a.py", "tests/old.py"]
+
+
+def test_the_mapping_is_refused_for_unknown_criteria_unmapped_ones_and_absent_files() -> None:
+    held = acceptance()
+    unknown_and_unmapped = held.errors([{"criterion": "F8.AC1"}], set())
+    assert len(unknown_and_unmapped) == 2
+    assert "`F8.AC1`" in unknown_and_unmapped[0]
+    assert "`F1.AC1`" in unknown_and_unmapped[1]
+    assert "F1.AC2" not in unknown_and_unmapped[1]  # a regression criterion may go unmapped
+
+    held.ac_tests["F1.AC1"] = ["tests/a.py::test_a", "gone.py::test_g"]
+    (absent,) = held.errors([{"criterion": "F1.AC1"}], {"tests/a.py"})
+    assert "F1.AC1: `gone.py::test_g`" in absent
+    assert held.errors([{"criterion": "F1.AC1"}], {"tests/a.py", "gone.py"}) == []
+
+
+def test_tests_in_missing_files_are_listed_by_criterion_and_rows_keep_objects_only() -> None:
+    mapping = {"C1": ["a.py::t", "b.py::t"], "C2": ["a.py::u"]}
+
+    assert absent_tests(mapping, lambda path: path == "a.py") == {"C1": ["b.py::t"]}
+    assert rows({"k": [{"a": 1}, 3, "x"]}, "k") == [{"a": 1}]
+    assert rows({"k": "no"}, "k") == []
+    assert file_of(" a/b.py::Class::test_t ") == "a/b.py"

@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 import json
+import shutil
 from pathlib import Path
 
 import pytest
 import yaml
 from raidar_contract.agent import AgentName
+from raidar_contract.canonical import digest_json
 from raidar_contract.package.registry import load_stage_package
 
 from raidar.contract.paths import releases_file, stage_checks_root, stages_root, workflows_root
@@ -20,7 +22,7 @@ from raidar.design.experiment.arm import (
 from raidar.design.experiment.schema import AgentEntry
 from raidar.subject.draft import draft_resolution
 from raidar.subject.releases import ReleasedAgent, released_agent, released_workflow
-from raidar.subject.workflow import package_checks
+from raidar.subject.workflow import identity, package_checks
 from raidar.subject.workflow.identity import (
     RUNNER_ID,
     import_closure,
@@ -36,39 +38,62 @@ from raidar.subject.workflow.package_runtime import (
     installed_trees,
     load_evidence,
 )
-from tests.package_support import fixture_package
+from tests.package_support import STAGE_FIXTURES, fixture_package
 from tests.release_support import release_tree
 
 AGENT = "codex"
+REAL_DIGEST = identity._digest.__wrapped__  # type: ignore[attr-defined]
+
+
+@pytest.fixture(autouse=True)
+def _fake_source_digest(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Primitive code digests the real source tree (slow tier); fast tests fold the inputs."""
+    monkeypatch.setattr(
+        identity,
+        "_digest",
+        lambda roots, adapter: digest_json({"roots": roots, "adapter": str(adapter)}),
+    )
+
+
+@pytest.fixture(scope="module")
+def tree_template(tmp_path_factory: pytest.TempPathFactory) -> Path:
+    """The registered gated-workflow tree, built once; tests copy its few small files."""
+    base = tmp_path_factory.mktemp("lock-template")
+    with pytest.MonkeyPatch.context() as patch:
+        patch.setenv("RAIDAR_VAR", str(base / "var"))
+        patch.setattr(package_checks, "uv_lock_stale", lambda tool: None)
+        root = release_tree(base / "repo")
+        fixture_package("gate-check", stages_root(root))
+        folder = workflows_root(root) / "acme" / "gated"
+        folder.mkdir(parents=True)
+        (folder / "workflow.yaml").write_text(
+            yaml.safe_dump(
+                {
+                    "schema": 2,
+                    "name": "gated",
+                    "build": {"prompt": "%%%GATE_CHECK%%% %%%TASK%%%"},
+                    "stages": [{"use": "acme/gate-check@1"}],
+                }
+            )
+        )
+        register = yaml.safe_load(releases_file(root).read_text())
+        register["stages"] = {
+            "acme/gate-check@1": load_stage_package(
+                stages_root(root) / "acme" / "gate-check"
+            ).digest
+        }
+        register["workflows"]["acme/gated@1"] = released_workflow(
+            "acme/gated@1", repo_root=root, draft=True
+        ).digest
+        releases_file(root).write_text(yaml.safe_dump(register))
+    return root
 
 
 @pytest.fixture
-def tree(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+def tree(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, tree_template: Path) -> Path:
     monkeypatch.setenv("RAIDAR_VAR", str(tmp_path / "var"))
     monkeypatch.setattr(package_checks, "uv_lock_stale", lambda tool: None)
-    root = release_tree(tmp_path / "repo")
-    fixture_package("gate-check", stages_root(root))
-    folder = workflows_root(root) / "acme" / "gated"
-    folder.mkdir(parents=True)
-    (folder / "workflow.yaml").write_text(
-        yaml.safe_dump(
-            {
-                "schema": 2,
-                "name": "gated",
-                "build": {"prompt": "%%%GATE_CHECK%%% %%%TASK%%%"},
-                "stages": [{"use": "acme/gate-check@1"}],
-            }
-        )
-    )
-    register = yaml.safe_load(releases_file(root).read_text())
-    register["stages"] = {
-        "acme/gate-check@1": load_stage_package(stages_root(root) / "acme" / "gate-check").digest
-    }
-    register["workflows"]["acme/gated@1"] = released_workflow(
-        "acme/gated@1", repo_root=root, draft=True
-    ).digest
-    releases_file(root).write_text(yaml.safe_dump(register))
-    return root
+    return shutil.copytree(tree_template, tmp_path / "repo")
 
 
 def _arm(
@@ -142,8 +167,8 @@ def test_an_arm_without_packages_is_identified_by_the_runtime_primitives_alone(t
     }
 
 
-def test_primitive_code_is_deterministic_adapter_bound_and_core_is_adapter_free(tree: Path) -> None:
-    (stage,) = released_workflow("acme/gated@1", repo_root=tree).stages
+def test_primitive_code_is_deterministic_adapter_bound_and_core_is_adapter_free() -> None:
+    package = load_stage_package(STAGE_FIXTURES / "gate-check")
     contracts = {"gate/1"}
 
     codex = primitive_code(contracts, AgentName.CODEX)
@@ -151,9 +176,44 @@ def test_primitive_code_is_deterministic_adapter_bound_and_core_is_adapter_free(
 
     assert codex == primitive_code(contracts, AgentName.CODEX)
     assert all(codex[key] != claude[key] for key in codex)
-    core = package_primitives([stage.package])
+    core = package_primitives([package])
     assert set(core) == {"frame/1", "install/1", "gate/1"}
     assert not set(core.values()) & set(codex.values())
+
+
+def test_a_primitive_digest_follows_source_syntax_and_the_adapter_not_comments(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    source = tmp_path / "primitive.py"
+    monkeypatch.setattr(identity, "_inventory", lambda roots, adapter: {"p.py": source})
+    digest = REAL_DIGEST
+
+    source.write_text("x = 1\n")
+    base = digest(("m",), None)
+    source.write_text("# a comment\nx = 1\n")
+    assert digest(("m",), None) == base
+    source.write_text("x = 2\n")
+    assert digest(("m",), None) != base
+
+
+def test_the_inventory_holds_the_closure_files_adapter_entries_and_payload_scripts(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(identity, "import_closure", lambda module: frozenset({module}))
+
+    bare = identity.primitive_inventory("gate/1", None)
+    codex = identity.primitive_inventory("gate/1", AgentName.CODEX)
+
+    assert "subject/primitive/gate.py" in bare
+    assert "subject/agent/adapters/codex_cli.py" not in bare
+    assert "subject/agent/adapters/codex_cli.py" in codex
+    assert any(name.startswith("subject/primitive/payload/") for name in bare)
+    assert identity.primitive_inventory(RUNNER_ID, None) != bare
+    with pytest.raises(ValueError, match="unsupported primitive contract"):
+        identity.primitive_inventory("nope/9", None)
+    assert identity._inventory_key(identity.CONTRACT_DIR / "agent.py") == "raidar_contract/agent.py"
+    assert identity._source("os") is None
+    assert identity._source("raidar_contract") == identity.CONTRACT_DIR / "__init__.py"
 
 
 # ---- proof the lock needs --------------------------------------------------------------------

@@ -10,6 +10,7 @@ from __future__ import annotations
 import os
 import re
 import shutil
+import tempfile
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -26,7 +27,7 @@ from raidar.subject.primitive.calls import ResourceFloors, TreeManifest
 from raidar.subject.primitive.gate import Attribution, GateOutcome
 from raidar.subject.primitive.outputs import OutputsResult
 from raidar.subject.workflow import stage_check
-from raidar.subject.workflow.identity import package_primitives
+from raidar.subject.workflow.identity import IMPLICIT_CONTRACTS, package_contracts
 from tests.lifecycle_support import (
     FakeContainer,
     ScriptedRunner,
@@ -186,9 +187,18 @@ class CheckRig:
             image="image",
             docker_context="context",
             pack="pack-recipe-1",
-            primitives=package_primitives([self.package]),
+            primitives=self.primitives,
             logs_dir=logs or self.root / "logs",
         )
+
+    @property
+    def primitives(self) -> dict[str, str]:
+        """The recorded primitive identity: one stand-in digest per contract the package uses.
+
+        Real source digests are asserted where identity is decided; the service only carries them.
+        """
+        contracts = sorted({*IMPLICIT_CONTRACTS, *package_contracts([self.package])})
+        return dict.fromkeys(contracts, "p" * 64)
 
 
 def _trusted_exec(rig: CheckRig) -> Callable[..., Any]:
@@ -220,7 +230,7 @@ def install_rig(
 ) -> CheckRig:
     """Route ``stage_check`` and the primitives below it to a ``CheckRig``."""
     root.mkdir(parents=True, exist_ok=True)
-    package = package or load_stage_package(stop_only_note_state(root / "pkg"))
+    package = package or _DEFAULT_PACKAGE
     rig = CheckRig(root, package, **fields)
     if rig.shared:
         install_container(monkeypatch, rig.enter())
@@ -267,6 +277,9 @@ def install_rig(
     return rig
 
 
+GATE_CASES = ("pass", "refuse")
+
+
 def _note_state() -> Path:
     return Path(__file__).parent / "fixtures" / "stages" / "acme" / "note-state"
 
@@ -278,14 +291,23 @@ def copy_package(name: str, destination: Path) -> Path:
     return target
 
 
+def _gate_fixtures(directory: str, names: list[str]) -> list[str]:
+    """``copytree`` ignore: the gate's ``pass`` and ``refuse`` fixture folders."""
+    return [name for name in names if Path(directory).name == "fixtures" and name in GATE_CASES]
+
+
 def stop_only_note_state(destination: Path) -> Path:
     """A copy of note-state with its gate removed: only the stop's fixtures are mandatory."""
-    root = copy_package("note-state", destination)
+    root = destination / "note-state"
+    shutil.copytree(_note_state(), root, ignore=_gate_fixtures)
     manifest = root / "stage.yaml"
     data = yaml.safe_load(manifest.read_text(encoding="utf-8"))
     del data["gate"]
     del data["requires"]["gate"]
     manifest.write_text(yaml.safe_dump(data), encoding="utf-8")
-    for case in ("pass", "refuse"):
-        shutil.rmtree(root / "fixtures" / case)
     return root
+
+
+_SHARED = tempfile.TemporaryDirectory(prefix="stage-check-shared-")
+# Built once at import: tests that edit a package build their own copy.
+_DEFAULT_PACKAGE = load_stage_package(stop_only_note_state(Path(_SHARED.name)))

@@ -1,15 +1,17 @@
 """Fixtures for the ``acceptance-reply/1`` and ``jev-judge/1`` behaviour tests.
 
-The container is the host's shell, the criteria are a ``criteria/1`` document and the gate is
-the record ``gate/1`` seals: no package, container image or model is involved.
+The container is a shell that runs Raidar's own ``python3 -c`` scripts in this process, the
+criteria are a ``criteria/1`` document and the gate is the record ``gate/1`` seals: no package,
+container image, subprocess or model is involved.
 """
 
 from __future__ import annotations
 
-import asyncio
 import hashlib
+import io
 import json
-import subprocess
+import shlex
+import sys
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
@@ -64,17 +66,36 @@ CRITERIA = {
 }
 
 
-class Host:
-    """The container as the host's shell: commands run in a subprocess."""
+class ScriptShell:
+    """The container's shell, for the ``python3 -c <script> <args>`` commands the host sends.
+
+    The script is Raidar's own, run here against the real files of the workspace it names
+    (stdout captured, ``sys.exit`` as the exit code); a command of any other shape is refused.
+    """
+
+    def __init__(self) -> None:
+        self.commands: list[str] = []
 
     async def exec(self, command: str, **_: Any) -> Any:
-        process = await asyncio.create_subprocess_shell(
-            command, stdout=subprocess.PIPE, stderr=subprocess.PIPE
-        )
-        out, err = await process.communicate()
-        return SimpleNamespace(
-            return_code=process.returncode, stdout=out.decode(), stderr=err.decode()
-        )
+        self.commands.append(command)
+        words = shlex.split(command)
+        if words[0] != "python3" or "-c" not in words:
+            return SimpleNamespace(return_code=127, stdout="", stderr=f"{words[0]}: not found")
+        at = words.index("-c")
+        script, argv = words[at + 1], words[at + 2 :]
+        out = io.TextIOWrapper(io.BytesIO(), encoding="utf-8", newline="")
+        saved = sys.argv, sys.stdout
+        sys.argv, sys.stdout = ["-c", *argv], out
+        code = 0
+        try:
+            exec(compile(script, "<script>", "exec"), {"__name__": "__main__"})
+        except SystemExit as stop:
+            code = int(stop.code or 0)
+        finally:
+            sys.argv, sys.stdout = saved
+        out.flush()
+        stdout = out.buffer.getvalue().decode("utf-8")  # type: ignore[attr-defined]
+        return SimpleNamespace(return_code=code, stdout=stdout, stderr="")
 
 
 def acceptance(mapping: dict[str, list[str]] | None = None) -> Acceptance:

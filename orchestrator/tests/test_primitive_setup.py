@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
@@ -28,23 +29,14 @@ def _tokens(document: Any) -> ToolOutcome:
     return ToolOutcome(json.dumps(document).encode())
 
 
-async def test_setup_returns_every_declared_token_and_calls_with_the_context(rig: Rig) -> None:
-    result = await run_setup(rig.site)
-
-    assert result.tokens == {"GUIDANCE": "Say what you changed."}
-    primitive, argv, context = rig.container.calls[0]
-    assert (primitive, argv) == ("setup/1", ["note-state", "setup"])
-    assert context == {
-        "task": "the task",
-        "params": {"min_words": 3},
-        "round": 0,
-        "carry": {},
-        "state": WATCH,
-        "outputs": {"note": f"{WATCH}/note.md"},
-    }
-
-
-async def test_setup_copies_outputs_that_exist_and_tolerates_absent_ones(rig: Rig) -> None:
+@pytest.mark.parametrize("watch", [True, False])
+async def test_setup_copies_outputs_that_exist_and_tolerates_absent_ones(
+    rig: Rig, watch: bool
+) -> None:
+    if not watch:
+        manifest = rig.package.manifest.model_copy(update={"on_stop": None, "gate": []})
+        rig.site = replace(rig.site, package=replace(rig.package, manifest=manifest))
+        rig.container.tool = lambda *_: _tokens({"tokens": {"GUIDANCE": "Keep a useful note."}})
     absent = await run_setup(rig.site)
     rig.container.write_note("seeded by setup")
     present = await run_setup(rig.site)
@@ -52,6 +44,18 @@ async def test_setup_copies_outputs_that_exist_and_tolerates_absent_ones(rig: Ri
     assert absent.record["outputs"]["note"]["error"] is not None
     copied = present.record["outputs"]["note"]
     assert Path(copied["host_path"]).read_text() == "seeded by setup"
+    assert present.tokens.keys() == {"GUIDANCE"}
+    rig.site = replace(
+        rig.site,
+        package=replace(
+            rig.site.package,
+            manifest=rig.site.package.manifest.model_copy(update={"setup": None}),
+        ),
+    )
+    calls = len(rig.container.calls)
+    no_setup = await run_setup(rig.site)
+    assert no_setup.tokens == {}
+    assert len(rig.container.calls) == calls
 
 
 @pytest.mark.parametrize(

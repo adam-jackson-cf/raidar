@@ -15,7 +15,7 @@ from raidar.subject.workflow.package_checks import ResolvedStage, package_issues
 from raidar.subject.workflow.package_stage import PackageStage
 from raidar.subject.workflow.stage import FIRST_BUILD, GATE_FIX, REPAIR, REWORK, Checkpoint
 from tests.package_support import write_package
-from tests.test_primitive_gate import Container
+from tests.workflow_support import LocalEnvironment
 
 
 def judge_document(**changes: Any) -> dict[str, Any]:
@@ -133,7 +133,7 @@ async def test_a_reply_workflow_appends_the_reply_shape_to_builder_turns_only(
             pack="python",
             skills_placement=".agents/skills",
         )
-        await runtime.prepare(Checkpoint(Container({}), tmp_path, "task"))
+        await runtime.prepare(Checkpoint(LocalEnvironment({}), tmp_path, "task"))
         stages.append(runtime)
     unstructured, replying = stages
 
