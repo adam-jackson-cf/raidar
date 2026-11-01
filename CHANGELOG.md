@@ -21,6 +21,10 @@ All notable changes to this project are documented in this file.
   generated locks can escape as parser/index/key errors instead of
   `DependencyInfraError`. Error normalization is deferred to a deliberate grading
   change with revalidation; it is not part of this test-only integration.
+- Close engine-and-agent fast-tier coverage gaps with behavioral planning, admission,
+  detached-job, trial-failure, provisioning, authentication and image-boundary scenarios.
+  Inject runners, clocks and virtual task/job filesystems; preserve production source,
+  grading/primitive identities, released packages and the existing coverage floors.
 
 ### Phase-5 local exit evidence (phase 5B step 7)
 
