@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import shutil
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -11,6 +12,7 @@ import yaml
 from raidar_contract.agent import AgentName
 from raidar_contract.canonical import digest_json
 from raidar_contract.package.registry import load_stage_package
+from raidar_contract.releases import Release
 
 from raidar.contract.paths import releases_file, stage_checks_root, stages_root, workflows_root
 from raidar.design.experiment.agent import ResolvedAgent
@@ -29,6 +31,7 @@ from raidar.subject.workflow.identity import (
     package_primitives,
     primitive_code,
 )
+from raidar.subject.workflow.package_checks import ResolvedStage
 from raidar.subject.workflow.package_runtime import (
     PackageEvidence,
     check_record,
@@ -38,7 +41,7 @@ from raidar.subject.workflow.package_runtime import (
     installed_trees,
     load_evidence,
 )
-from tests.package_support import STAGE_FIXTURES, fixture_package
+from tests.package_support import STAGE_FIXTURES, fixture_package, note_state_package
 from tests.release_support import release_tree
 
 AGENT = "codex"
@@ -281,3 +284,59 @@ def test_the_import_closure_follows_nested_and_relative_imports_and_parent_packa
     assert "raidar.subject.primitive.calls" in closure
     assert "raidar.subject.primitive" in closure  # the parent package's __init__
     assert "raidar" in closure
+
+
+def test_a_package_with_a_stop_owes_a_stage_check_record_even_with_an_installed_tree() -> None:
+    package = note_state_package()
+    stage = ResolvedStage(
+        Release.parse_stage("acme/note-state@1"), package, package.effective_params()
+    )
+
+    issues = evidence_issues(stage, PackageEvidence({"arm64": "t" * 64}, None))
+
+    assert len(issues) == 1
+    assert "no stage-check record" in issues[0]
+    assert "make stage-check NAME=acme/note-state" in issues[0]
+
+
+def _uv(monkeypatch: pytest.MonkeyPatch, outcome: object) -> None:
+    def run(*args: object, **kwargs: object) -> object:
+        if isinstance(outcome, BaseException):
+            raise outcome
+        return outcome
+
+    monkeypatch.setattr(package_checks.subprocess, "run", run)
+
+
+def _done(code: int, out: str = "", err: str = "") -> subprocess.CompletedProcess[str]:
+    return subprocess.CompletedProcess(["uv"], code, out, err)
+
+
+@pytest.mark.parametrize(
+    ("outcome", "expected"),
+    [
+        (_done(0), None),
+        (_done(2, err="warn\nthe lock needs to be updated\n"), "the lock needs to be updated"),
+        (_done(1, out="from stdout\n"), "from stdout"),
+        (_done(3), "uv lock --check exited 3"),
+        (OSError("no uv"), "uv lock --check could not run: no uv"),
+    ],
+    ids=["current", "stderr", "stdout", "silent", "missing-uv"],
+)
+def test_uv_lock_stale_reports_why_the_lock_is_refused(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, outcome: object, expected: str | None
+) -> None:
+    _uv(monkeypatch, outcome)
+
+    assert package_checks.uv_lock_stale(tmp_path) == expected
+
+
+def test_a_uv_that_times_out_is_a_stale_lock_not_a_crash(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    _uv(monkeypatch, subprocess.TimeoutExpired(["uv"], 120))
+
+    reason = package_checks.uv_lock_stale(tmp_path)
+
+    assert reason is not None
+    assert reason.startswith("uv lock --check could not run")

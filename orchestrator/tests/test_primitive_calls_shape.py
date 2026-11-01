@@ -911,6 +911,17 @@ async def test_state_is_never_uploaded_over_an_existing_tree(
     assert container.files == {}
 
 
+async def test_an_empty_state_directory_that_cannot_be_created_is_a_transport_failure(
+    container: Container,
+) -> None:
+    container.codes["mkdir"] = 1
+
+    with pytest.raises(calls.TransportError, match="exited 1"):
+        await calls.make_state_dir(container, "/var/calls/state")
+
+    assert container.files == {}
+
+
 async def test_state_with_a_link_is_refused_before_the_container_is_touched(
     container: Container, tmp_path: Path
 ) -> None:

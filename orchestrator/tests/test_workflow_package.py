@@ -3,26 +3,41 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import shutil
 import time
 from collections.abc import Sequence
 from dataclasses import replace
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any, ClassVar, cast
 
 import pytest
 from raidar_contract.package.manifest import Output, StagePackage
-from raidar_contract.package.registry import load_stage_package, stage_folder
+from raidar_contract.package.registry import stage_folder
 from raidar_contract.workflow import PackageWorkflowDefinition
 
+from raidar.judge.live import LIVE_MODEL, RecordedJev
 from raidar.subject.primitive.calls import TransportError
 from raidar.subject.primitive.gate import Attribution, GateInvalid, GateOutcome
 from raidar.subject.primitive.site import TrialInvalid
+from raidar.subject.workflow import asking, package_stage
 from raidar.subject.workflow import package as package_module
+from raidar.subject.workflow import stage as stage_module
 from raidar.subject.workflow.package import CheckpointPlan, PackageCheckpoint
 from raidar.subject.workflow.package_member import PackageSpec
 from raidar.subject.workflow.package_stage import PackageStage
-from raidar.subject.workflow.stage import FIRST_BUILD, GATE_FIX, REPAIR, REWORK, Checkpoint, Spent
+from raidar.subject.workflow.stage import (
+    FIRST_BUILD,
+    GATE_FIX,
+    REPAIR,
+    REWORK,
+    Checkpoint,
+    Spent,
+)
+from tests import package_support
+from tests.criteria_support import CRITERIA, gate_record
+from tests.criteria_support import reply as builder_reply
 from tests.lifecycle_support import (
     NOTE_STATE,
     PACK,
@@ -46,16 +61,19 @@ from tests.package_support import (
     ScriptedGate,
     definition_json,
     make_lab,
+    note_state_package,
     passed,
     refused,
 )
 
 BUILD = "Build:\n%%%NOTE_STATE%%%\n%%%NOTE_TWO%%%\nTask: %%%TASK%%%"
+NOW = 1000.0
+"""The frozen monotonic clock the judged and deadline cases read their time left against."""
 
 
 def package(name: str, gated: bool = False) -> StagePackage:
     """The note-state package without its gate (the gate runs in-container), under ``name``."""
-    base = load_stage_package(NOTE_STATE)
+    base = note_state_package()
     watch = f"/app/.raidar/{name}"
     manifest = base.manifest.model_copy(
         update={
@@ -463,6 +481,16 @@ def lab(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Lab:
     return make_lab(tmp_path, monkeypatch)
 
 
+@pytest.fixture
+def fast_lab(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Lab:
+    """A ``Lab`` over the cached fixture package without a copied repository tree."""
+    with monkeypatch.context() as scoped:
+        scoped.setattr(package_support.shutil, "copytree", lambda *args, **kwargs: None)
+        found = make_lab(tmp_path, monkeypatch)
+    found.package = note_state_package()
+    return found
+
+
 async def test_an_unusable_judge_invalidates_before_any_package_code_runs(lab: Lab) -> None:
     body = definition_json()
     body["build"]["reply"] = "acceptance-reply/1"
@@ -835,3 +863,227 @@ async def test_a_stop_that_gives_unusable_output_repairs_then_ends_the_checkpoin
     assert first.kind == REPAIR
     assert second is None
     assert stage.package_record()["stop/1"]["note-state"]["closed"] is True
+
+
+# a quiet package, the stage's judge and the order its resumes win ---------------------------------
+
+
+async def test_a_package_with_no_stop_and_no_outputs_is_never_asked_and_collects_nothing(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    rig = Rig(tmp_path, monkeypatch, deadline=None)
+    quiet = package("quiet")
+    quiet = replace(
+        quiet,
+        prompt="Stay quiet.\n",
+        manifest=quiet.manifest.model_copy(
+            update={"on_stop": None, "outputs": {}, "setup": None, "tokens": []}
+        ),
+    )
+    spec = PackageSpec(quiet.name, quiet, installed(quiet, rig.container), quiet.effective_params())
+    runtime = PackageCheckpoint(
+        rig.checkpoint,
+        [spec],
+        CheckpointPlan("Build: %%%QUIET%%% Task: %%%TASK%%%", PACK, PRIMITIVES),
+        runner=ScriptedRunner(rig.container, tmp_path / "logs"),
+    )
+
+    await runtime.prepare()
+    rig.container.calls.clear()
+
+    assert await runtime.check("turn-1") is None
+    await runtime.close(None)
+    record = runtime.record()
+    assert rig.container.calls == []
+    assert record["stop/1"] == {}
+    assert record["outputs/1"] == {}
+
+
+async def test_an_ungated_resume_that_fits_the_time_left_is_ordered(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(stage_module, "time", SimpleNamespace(monotonic=lambda: NOW))
+    rig = Rig(tmp_path, monkeypatch, deadline=NOW + 100)
+    rig.checkpoint.turns.append(Spent(REWORK, 1.0))
+    await rig.runtime.prepare()
+
+    resume = await rig.runtime.check("turn-1")
+
+    assert resume is not None
+    assert resume.kind == REWORK
+
+
+def _judged(
+    lab: Lab, monkeypatch: pytest.MonkeyPatch, deadline: float | None = None
+) -> tuple[PackageStage, Checkpoint]:
+    def refuse_post(*args: Any, **kwargs: Any) -> Any:
+        raise AssertionError("no judge call is expected")
+
+    monkeypatch.setattr(
+        asking,
+        "new_jev",
+        lambda directory, timeout_s: RecordedJev(
+            directory,
+            timeout_s=timeout_s,
+            transport=SimpleNamespace(post=refuse_post),
+            environ={"OPENROUTER_API_KEY": "k"},
+        ),
+    )
+    if not hasattr(ScriptedGate, "evidence"):  # a case's own evidence is kept
+        monkeypatch.setattr(
+            ScriptedGate, "evidence", SimpleNamespace(baseline=None, gates=[]), raising=False
+        )
+    body = definition_json()
+    body["build"]["reply"] = "acceptance-reply/1"
+    body["judge"] = {
+        "criteria": "note-state.note",
+        "model": LIVE_MODEL,
+        "closed_at": 0.8,
+        "open_at": 0.3,
+        "max_passes": 1,
+        "rework": "Fix:\n%%%PUSHBACK%%%\n%%%GATE%%%",
+    }
+    logs = lab.tmp_path / "judge-logs"
+    stage = PackageStage(
+        PackageWorkflowDefinition.model_validate(body),
+        locked=lab.lock(),
+        pack=PACK,
+        skills_placement=PLACEMENT,
+        repo_root=lab.repo,
+    )
+    stage.loaded = [(stage.definition.stages[0], lab.package)]  # the cached package: no tree read
+    return stage, Checkpoint(lab.container, logs, TASK, deadline=deadline)
+
+
+async def test_a_judged_prepare_keeps_only_the_tests_that_passed_on_the_base(
+    fast_lab: Lab, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    baseline = {
+        "status": "passed",
+        "tests": {"outcomes": {"t.py::a": "passed", "t.py::b": "failed"}},
+    }
+    monkeypatch.setattr(
+        ScriptedGate, "evidence", SimpleNamespace(baseline=baseline, gates=[]), raising=False
+    )
+    stage, checkpoint = _judged(fast_lab, monkeypatch)
+
+    await stage.prepare(checkpoint)
+
+    assert stage.package_record()["jev-judge/1"]["baseline_passed"] == ["t.py::a"]
+
+
+async def test_an_errored_base_run_leaves_no_test_known_to_pass(
+    fast_lab: Lab, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    baseline = {"status": "error", "tests": {"outcomes": {"t.py::a": "passed"}}}
+    monkeypatch.setattr(
+        ScriptedGate, "evidence", SimpleNamespace(baseline=baseline, gates=[]), raising=False
+    )
+    stage, checkpoint = _judged(fast_lab, monkeypatch)
+
+    await stage.prepare(checkpoint)
+
+    assert stage.package_record()["jev-judge/1"]["baseline_passed"] == []
+
+
+async def test_a_stage_loaded_ahead_of_prepare_is_not_read_from_the_tree_again(
+    fast_lab: Lab, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    stage, checkpoint = fast_lab.stage()
+    stage.loaded = [(stage.definition.stages[0], fast_lab.package)]
+
+    def reread(*args: Any, **kwargs: Any) -> Any:
+        raise AssertionError("the package was read again")
+
+    monkeypatch.setattr(package_stage, "load_locked_package", reread)
+
+    await stage.prepare(checkpoint)
+
+    assert stage.prompt.endswith(f"Task: {TASK}")
+
+
+async def test_a_judged_stage_resumes_the_stops_rework_and_reserves_the_judge_time(
+    fast_lab: Lab, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(stage_module, "time", SimpleNamespace(monotonic=lambda: NOW))
+    stage, checkpoint = _judged(fast_lab, monkeypatch, deadline=NOW + 100)
+    checkpoint.turns.append(Spent(REWORK, 1.0))
+    await stage.prepare(checkpoint)  # no note yet: the stop asks for a rework
+
+    resume = await stage.check(checkpoint, "turn-1")
+
+    assert resume is not None
+    assert resume.kind == REWORK
+
+
+async def test_a_done_producer_whose_output_is_not_criteria_is_an_integrity_failure_once_recorded(
+    fast_lab: Lab, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    stage, checkpoint = _judged(fast_lab, monkeypatch)
+    await stage.prepare(checkpoint)
+    fast_lab.container.write_note("a note of enough words here")
+
+    for turn in ("turn-1", "turn-2"):
+        with pytest.raises(TrialInvalid) as refused_:
+            await stage.check(checkpoint, turn)
+        assert refused_.value.kind == "integrity"
+
+    errors = stage.package_record()["jev-judge/1"]["errors"]
+    assert len(errors) == 1  # the same failure is recorded once
+    assert errors[0].startswith("note-state.note:")
+
+
+async def test_an_unreadable_reply_is_repaired_before_the_judge_looks_at_the_tree(
+    fast_lab: Lab, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    stage, checkpoint = _judged(fast_lab, monkeypatch)
+    await stage.prepare(checkpoint)
+    fast_lab.container.write_note(json.dumps(CRITERIA))  # the producer is done: valid criteria
+    reply = checkpoint.logs_dir / "turn-1" / "last-message.txt"
+    reply.parent.mkdir(parents=True)
+    reply.write_text("built it, no structured reply")
+
+    resume = await stage.check(checkpoint, "turn-1")
+
+    assert resume is not None
+    assert resume.kind == REPAIR
+    record = stage.package_record()
+    assert record["acceptance-reply/1"]["repairs"] == {"syntax": 1, "semantic": 0}
+    judge = record["jev-judge/1"]
+    assert judge["criteria_sha256"] is not None  # known before the reply was checked
+    assert (judge["passes"], judge["ending"]) == (0, None)  # nothing was judged yet
+
+
+async def test_a_valid_reply_lets_the_judge_pass_its_verdict_on_the_sealed_tree(
+    fast_lab: Lab, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    regression_only = json.loads(json.dumps(CRITERIA))
+    regression_only["features"][0]["criteria"].pop(0)  # F1.AC2: a regression, nothing to map
+    sealed = gate_record(1, {})
+    monkeypatch.setattr(
+        ScriptedGate,
+        "evidence",
+        SimpleNamespace(baseline=None, gates=[sealed]),
+        raising=False,
+    )
+    ScriptedGate.outcomes = [GateOutcome(Attribution.PASSED, sealed, "")]
+    stage, checkpoint = _judged(fast_lab, monkeypatch)
+    await stage.prepare(checkpoint)
+    fast_lab.container.write_note(json.dumps(regression_only))
+    reply = checkpoint.logs_dir / "turn-1" / "last-message.txt"
+    reply.parent.mkdir(parents=True)
+    reply.write_text(builder_reply())
+
+    resume = await stage.check(checkpoint, "turn-1")
+
+    assert resume is None  # one pass allowed: the open regression ends the loop, no rework
+    await stage.close(checkpoint, "deadline")  # a later cut must not replace the judge's ending
+    record = stage.package_record()
+    (reply_record,) = record["acceptance-reply/1"]["replies"]
+    assert reply_record["ok"] is True
+    judge = record["jev-judge/1"]
+    assert (judge["passes"], judge["ending"]) == (1, "pass_limit")
+    assert judge["gate_ending"] == "gate_passed"
+    assert judge["judged"][0]["gate"] == 1
+    assert judge["judged"][0]["open"] == ["F1.AC2"]  # no test of it passed on the base
+    assert judge["judge_calls"] == []  # a regression criterion is never asked

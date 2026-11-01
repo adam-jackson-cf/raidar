@@ -28,9 +28,6 @@ from raidar.subject.primitive.payload import install_tree, isolate, main, superv
 from tests.primitive_support import lay as _lay
 from tests.primitive_support import sha as _sha
 
-IS_ROOT = os.geteuid() == 0
-
-
 # ------------------------------------------------------------------------------------ walk
 
 
@@ -92,16 +89,40 @@ def test_a_foreign_owner_is_refused(tmp_path: Path) -> None:
     assert theirs["violation"].startswith("owner: ")
 
 
-@pytest.mark.skipif(IS_ROOT, reason="root reads unreadable files")
-def test_an_unreadable_file_is_a_violation_not_a_crash(tmp_path: Path) -> None:
+def test_an_unreadable_file_is_a_violation_not_a_crash(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     root = _lay(tmp_path / "tree")
-    (root / "a.txt").chmod(0)
-    try:
-        found = walk.scan(str(root), walk.Limits())
-    finally:
-        (root / "a.txt").chmod(0o600)
 
+    def unreadable(*args: Any) -> int:
+        raise PermissionError(errno.EACCES, "Permission denied")
+
+    monkeypatch.setattr(walk.os, "open", unreadable)
+    found = walk.scan(str(root), walk.Limits())
+
+    assert found["exists"]
     assert found["violation"].startswith("unreadable: a.txt")
+
+
+def test_a_directory_listing_failure_is_recorded_as_unreadable(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def unreadable(path: str) -> list[str]:
+        raise PermissionError(errno.EACCES, "Permission denied")
+
+    monkeypatch.setattr(walk.os, "listdir", unreadable)
+    found = walk.scan(str(tmp_path), walk.Limits())
+
+    assert found["exists"]
+    assert found["violation"] == "unreadable: Permission denied"
+
+
+def test_a_file_that_ends_before_its_declared_size_refuses_a_further_archive_read() -> None:
+    reader = walk._Exact(io.BytesIO(b"ab"), 3)
+
+    assert reader.read(2) == b"ab"
+    with pytest.raises(walk.Violation, match="changed while archived"):
+        reader.read()
 
 
 def test_a_missing_root_is_reported_absent_and_a_single_file_is_a_manifest_of_one(
@@ -574,6 +595,19 @@ def test_an_unlimited_or_unreadable_memory_source_is_unknown_never_zero(
     assert main.probe({"paths": []})["memory_available"] is None
 
 
+def test_memory_without_an_available_counter_falls_back_to_the_container_limit(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    counters = {
+        main.MEMINFO: "MemTotal: 9000 kB\nMemFree: 100 kB\n",
+        f"{main.CGROUP}/memory.max": "2048\n",
+        f"{main.CGROUP}/memory.current": "512\n",
+    }
+    monkeypatch.setattr("builtins.open", lambda path, **kw: io.StringIO(counters[path]))
+
+    assert main.probe({"paths": []}) == {"disk_free": {}, "memory_available": 1536}
+
+
 def test_an_unknown_command_is_an_error_not_a_silent_success(tmp_path: Path) -> None:
     path = tmp_path / "spec.json"
     path.write_text("{}")
@@ -626,6 +660,17 @@ def test_a_failing_prctl_stops_before_a_filter_is_installed(
         isolate.install_seccomp()
 
     assert seen == [isolate.PR_SET_NO_NEW_PRIVS]
+
+
+def test_an_installed_filter_still_refuses_execution_when_network_denial_is_unproven(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(isolate, "_architecture", lambda: "aarch64")
+    monkeypatch.setattr(isolate.ctypes, "CDLL", lambda *a, **kw: _Libc())
+    _socket_module(monkeypatch, lambda *a: SimpleNamespace(close=lambda: None))
+
+    with pytest.raises(isolate.IsolationError, match="socket\\(\\) was not refused"):
+        isolate.install_seccomp()
 
 
 def _socket_module(monkeypatch: pytest.MonkeyPatch, behaviour: Any) -> None:
@@ -1459,22 +1504,25 @@ def test_scratch_goes_to_the_childs_user_and_a_root_supervisor_locks_the_call_di
     assert chmodded == [("call", 0o755)]
 
 
-def test_the_supervisor_entry_prints_one_result_and_destroys_the_call_directory(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+def test_the_payload_entry_reports_unsafe_state_without_running_and_destroys_call_scratch(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    spec = _call_spec(tmp_path)
+    state = tmp_path / "state"
+    state.mkdir()
+    (state / "loop").symlink_to(state)
+    spec = _call_spec(tmp_path, state=str(state))
     (tmp_path / "call").mkdir()
     (tmp_path / "call" / "leftover").write_text("x")
     path = tmp_path / "spec.json"
     path.write_text(json.dumps(spec))
-    monkeypatch.setattr(
-        supervise, "supervise", lambda given: {"seen": given["argv"], "exit_code": 0}
-    )
 
-    assert supervise.main([str(path)]) == 0
+    assert main.main(["supervise", str(path)]) == 0
 
     lines = capsys.readouterr().out.splitlines()
-    assert [json.loads(line) for line in lines] == [{"seen": ["tool"], "exit_code": 0}]
+    (record,) = [json.loads(line) for line in lines]
+    assert record["ran"] is False
+    assert record["bounds_violation"] == "symlink: loop"
+    assert record["isolation_error"] is None
     assert not (tmp_path / "call").exists()
 
 
@@ -1517,3 +1565,21 @@ def test_a_root_supervisor_locks_the_call_directory_even_before_a_context_exists
     supervise._prepare_dirs(_call_spec(tmp_path))
 
     assert chowned == ["call"]
+
+
+def test_install_mode_normalisation_does_not_chmod_a_symlink_target(tmp_path: Path) -> None:
+    root = tmp_path / "install"
+    root.mkdir()
+    outside = tmp_path / "outside"
+    outside.write_text("not part of the install")
+    outside.chmod(0o600)
+    (root / "python").symlink_to(outside)
+    regular = root / "module.py"
+    regular.write_text("value = 1\n")
+    regular.chmod(0o600)
+
+    install_tree._normalise_modes(root)
+
+    assert stat.S_IMODE(outside.stat().st_mode) == 0o600
+    assert (root / "python").is_symlink()
+    assert stat.S_IMODE(regular.stat().st_mode) == 0o644
