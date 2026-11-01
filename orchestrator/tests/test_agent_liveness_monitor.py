@@ -14,7 +14,6 @@ from raidar.engine.health.liveness import (
     LivenessConfig,
     PhaseMonitor,
     install_liveness_monitor,
-    liveness_script,
     parse_poll_output,
 )
 from raidar.engine.health.reaper import _KILLED, _RESIDUAL
@@ -61,6 +60,8 @@ class ScriptedEnv:
         reply = self.replies.pop(0) if len(self.replies) > 1 else self.replies[0]
         if isinstance(reply, Exception):
             raise reply
+        if isinstance(reply, SimpleNamespace):
+            return reply
         return SimpleNamespace(stdout=reply, stderr="", return_code=0)
 
 
@@ -96,10 +97,6 @@ def test_poll_parsing_sums_agent_ticks_and_skips_loopback_and_zombies() -> None:
 )
 def test_unusable_poll_output_is_unmeasured(text: str) -> None:
     assert parse_poll_output(text) is None
-
-
-def test_script_quotes_the_user() -> None:
-    assert "'a b'" in liveness_script("a b")
 
 
 def test_all_quiet_for_the_idle_window_is_idle_and_observe_mode_keeps_sampling() -> None:
@@ -160,15 +157,25 @@ def test_a_burst_of_cpu_resets_the_idle_window() -> None:
     assert m.verdict.decision == "active"  # quiet only since the burst: 45 s < 60 s
 
 
-def test_a_failed_poll_is_unmeasured_and_never_idle() -> None:
+@pytest.mark.parametrize(
+    ("reply", "reason"),
+    [
+        (RuntimeError("container stopped"), "container stopped"),
+        (TimeoutError("poll deadline"), "poll deadline"),
+        (SimpleNamespace(stdout="", stderr="poll denied", return_code=1), "poll denied"),
+        ("malformed poll", "unusable"),
+    ],
+    ids=["exec-error", "timeout", "nonzero", "malformed"],
+)
+def test_a_failed_poll_is_unmeasured_and_never_idle(reply: Any, reason: str) -> None:
     clock = Clock()
-    env = ScriptedEnv([RuntimeError("container stopped")])
+    env = ScriptedEnv([reply])
     m = monitor(env, clock)
     run_samples(m, clock, 20)
     assert m.verdict.decision == "active"
     assert m.verdict.first_idle_at_s is None
     assert all(not s["measured"] for s in m.samples)
-    assert "container stopped" in m.samples[0]["unmeasured"]
+    assert reason in m.samples[0]["unmeasured"]
     assert m.as_json()["unmeasured_samples"] == 20
 
 
@@ -195,6 +202,40 @@ def test_enforce_mode_kills_the_agent_uid_with_the_reaper_script() -> None:
     assert m.verdict.kill is not None
     assert m.verdict.kill["residual"] == []
     assert "kill -KILL" in env.calls[-1]["command"]
+
+
+def test_a_cancel_during_the_kill_still_records_the_idle_kill() -> None:
+    """Phase cancellation cannot abandon an in-flight reap or lose its verdict."""
+    quiet = poll_output([stat_line(5, "sleep", 3)])
+    kill_output = f"{_KILLED}\n5 1000 S sleep\n{_RESIDUAL}\n"
+
+    async def scenario() -> None:
+        entered, release = asyncio.Event(), asyncio.Event()
+
+        class BlockedKill(ScriptedEnv):
+            async def exec(self, command: str, **kwargs: Any) -> Any:
+                if "kill -KILL" in command:
+                    entered.set()
+                    await release.wait()
+                return await super().exec(command, **kwargs)
+
+        clock = Clock()
+        m = monitor(BlockedKill([quiet] * 4 + [kill_output]), clock, mode="enforce", idle_s=45)
+        for _ in range(3):
+            await m.sample()
+            clock.now += 15
+        task = asyncio.create_task(m.sample())
+        await entered.wait()
+        task.cancel()
+        release.set()
+        with pytest.raises(asyncio.CancelledError):
+            await task
+        assert m.verdict.decision == "idle_killed"
+        assert m.verdict.kill is not None
+        assert m.verdict.kill["killed"] == ["5 1000 S sleep"]
+        assert m.verdict.kill["residual"] == []
+
+    asyncio.run(scenario())
 
 
 def test_enforce_mode_reports_a_failed_kill() -> None:

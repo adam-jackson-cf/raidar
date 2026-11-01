@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 from pathlib import Path
 from typing import Any
@@ -16,8 +17,18 @@ from raidar.contract.trial import (
     TrialRecord,
     ValidityCheck,
 )
-from raidar.engine.target.guard import REAP_FILE, TargetGuard, TargetLostError
-from raidar.engine.target.health import TargetUnavailableError
+from raidar.engine.target import guard as guard_module
+from raidar.engine.target.config import Selection
+from raidar.engine.target.guard import (
+    ENV_RECONNECT_S,
+    REAP_FILE,
+    TargetGuard,
+    TargetLostError,
+    reconnect_budget_s,
+)
+from raidar.engine.target.health import DockerFacts, TargetUnavailableError
+from raidar.engine.target.job import MECHANICS_EPOCH, JobTarget
+from raidar.engine.trial.driver import run_in_order
 from tests.execution_support import fake_engine_target
 
 HASHES = TrialHashes(
@@ -225,3 +236,98 @@ async def test_review_records_the_loss_when_the_target_never_returns(tmp_path: P
     assert target.reaped == []
     reaped = json.loads((tmp_path / "t0" / REAP_FILE).read_text())
     assert reaped["reconnected"] is False
+
+
+async def test_a_lost_target_stops_scheduling_but_running_trials_finish() -> None:
+    target = FakeTarget()
+    guard = target.guard(reconnect_s=0.0)
+    release_second = asyncio.Event()
+    started: list[int] = []
+    finished: list[int] = []
+
+    async def worker(job: int) -> int:
+        started.append(job)
+        if job == 1:
+            await release_second.wait()
+        finished.append(job)
+        return job
+
+    async def admit(job: int) -> None:
+        if job == 2:
+            target.up = False
+        try:
+            await guard.admit(str(job))
+        except TargetLostError:
+            assert finished == [0], "trial 1 is still in flight when the target is lost"
+            release_second.set()
+            raise
+
+    with pytest.raises(TargetLostError):
+        await run_in_order(list(range(5)), worker, concurrency=2, admit=admit)
+
+    assert started == [0, 1]
+    assert sorted(finished) == [0, 1]  # the in-flight trial was not cancelled
+
+
+@pytest.mark.parametrize(
+    ("raw", "expected"),
+    [(None, 300.0), ("45", 45.0), ("-5", 0.0), ("0.5", 0.5)],
+)
+def test_the_reconnect_budget_comes_from_the_environment_never_negative(
+    monkeypatch: pytest.MonkeyPatch, raw: str | None, expected: float
+) -> None:
+    monkeypatch.delenv(ENV_RECONNECT_S, raising=False)
+    if raw is not None:
+        monkeypatch.setenv(ENV_RECONNECT_S, raw)
+
+    assert reconnect_budget_s() == expected
+
+
+def test_a_reconnect_budget_that_is_not_a_number_is_refused(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv(ENV_RECONNECT_S, "soon")
+
+    with pytest.raises(guard_module.TargetError, match="number of seconds"):
+        reconnect_budget_s()
+
+
+def test_a_guard_for_a_target_probes_and_ensures_that_targets_context(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    seen: list[tuple[str, object]] = []
+    target = fake_engine_target("ctx")
+    monkeypatch.setattr(
+        guard_module, "docker_healthy", lambda context: seen.append(("health", context)) or True
+    )
+    monkeypatch.setattr(
+        guard_module,
+        "ensure_target",
+        lambda chosen, timeout_s: seen.append(("ensure", (chosen, timeout_s))),
+    )
+    monkeypatch.setenv(ENV_RECONNECT_S, "12")
+
+    guard = TargetGuard.for_target(target, reap=lambda _t, _d: {})
+    explicit = TargetGuard.for_target(target, reap=lambda _t, _d: {}, reconnect_s=3.0)
+
+    assert guard.healthy() is True
+    guard.ensure(7.0)
+    assert seen == [("health", target.docker_context), ("ensure", (target, 7.0))]
+    assert (guard.reconnect_s, explicit.reconnect_s) == (12.0, 3.0)
+
+
+@pytest.mark.parametrize("facts", [None, DockerFacts("29.0", "OrbStack", "aarch64", 8, 1024)])
+def test_the_job_target_records_where_the_job_ran_and_under_which_mechanics(
+    facts: DockerFacts | None,
+) -> None:
+    trial = fake_engine_target("trial-ctx")
+
+    fields = JobTarget(Selection.of(trial), facts).manifest_fields(requested_concurrency=64)
+
+    recorded = fields["execution_target"]
+    assert fields["mechanics_epoch"] == MECHANICS_EPOCH
+    assert recorded["docker_context"] == "trial-ctx"
+    assert recorded["transport"] is None
+    assert recorded["effective_concurrency"] == trial.effective_concurrency(64)
+    assert recorded["docker"] == (facts.as_record() if facts else None)
+    assert recorded["grader"] == {"name": trial.name, "docker_context": "trial-ctx"}

@@ -8,18 +8,25 @@ import inspect
 import json
 import tomllib
 from collections.abc import Sequence
+from dataclasses import replace
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any
 
 import pytest
 import yaml
 from click.testing import CliRunner
 from harbor.models.trial.config import TrialConfig
+from harbor.trial.hooks import TrialEvent
 
 from raidar.cli import main
+from raidar.contract.trial import TrialRecord
 from raidar.design.experiment.lock import lock_integrity_issues, spec_source_digest
+from raidar.design.experiment.schema import ProtocolSpec
 from raidar.design.problem.rewrite import VERIFIER_IMPORT_PATH
 from raidar.design.problem.store import ROOT_ENV
+from raidar.engine.health.liveness import LIVENESS_REPORT, idle_killed_steps
+from raidar.engine.health.reaper import ReapReport, reap_infra_reason, write_reap_report
 from raidar.engine.health.records_manifest import RECORDS_MANIFEST, tamper_findings
 from raidar.engine.job.provenance import execution_source_digest
 from raidar.engine.job.run import execute, load_problems
@@ -27,26 +34,39 @@ from raidar.engine.target.config import Selection
 from raidar.engine.target.guard import REAP_FILE, TargetGuard, TargetLostError
 from raidar.engine.target.health import TargetUnavailableError
 from raidar.engine.target.job import JobTarget
+from raidar.engine.trial.collect import (
+    TrialEvidence,
+    classify_evidence,
+    classify_trial,
+    execution_validity,
+    harness_installs,
+)
 from raidar.engine.trial.config import harbor_trial_config
 from raidar.engine.trial.context import JobContext
-from raidar.engine.trial.driver import TrialRun, run_in_order
+from raidar.engine.trial.driver import TrialRun
 from raidar.engine.trial.environment import RUN_SCOPED_DOCKER_IMPORT_PATH, run_scope
 from raidar.engine.trial.materialise import MaterialiseError, materialise_task
 from raidar.engine.trial.plan import PlanOptions, build_plan
+from raidar.engine.trial.progression import progression_rule
 from raidar.engine.trial.provision import TrialProvision
 from raidar.engine.trial.workspace import SEED_SLUG
+from raidar.grading.guard import install_leak_guard
+from raidar.grading.records import load_pre_agent_leak, step_record_dir
 from raidar.grading.verifier import RaidarVerifier
 from raidar.subject.environment.python.pack_definition import load_pack_spec
 from raidar.subject.workflow.runner import WorkflowRunner
 from tests.execution_support import (
     ImportedFixture,
     StepOutcome,
+    classification_context,
     fake_engine_target,
     locked_experiment,
+    trial_evidence,
     validated_fixture,
     write_trial,
 )
 from tests.health_support import write_agent_session
+from tests.verifier_support import FakeAgentEnvironment
 
 pytestmark = pytest.mark.slow
 
@@ -119,8 +139,29 @@ def _recorded_trial(config: TrialConfig, outcomes: Sequence[StepOutcome]) -> Tri
     return TrialRun(trial_dir, None)
 
 
+async def _recorded_guarded_trial(
+    config: TrialConfig, outcomes: Sequence[StepOutcome], bundle_root: Path, leaked: bool
+) -> TrialRun:
+    outcome = _recorded_trial(config, outcomes)
+    hooks: dict[TrialEvent, list[Any]] = {}
+    planted = "TESTS\t/tests/private.py\n" if leaked else ""
+    trial = SimpleNamespace(
+        paths=SimpleNamespace(trial_dir=outcome.trial_dir),
+        agent_environment=FakeAgentEnvironment(leak_stdout=planted + "RAIDAR_LEAK_SCAN_DONE\n"),
+        add_hook=lambda event, hook: hooks.setdefault(event, []).append(hook),
+    )
+    install_leak_guard(trial, bundle_root)
+    event = SimpleNamespace(
+        result=SimpleNamespace(step_results=[SimpleNamespace(step_name="checkpoint_1")])
+    )
+    for hook in hooks[TrialEvent.AGENT_START]:
+        await hook(event)
+    return outcome
+
+
+@pytest.mark.parametrize("leaked", [False, True])
 def test_a_run_materialises_each_trial_and_writes_step_results(
-    tmp_path: Path, fixture_problem: ImportedFixture, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path, fixture_problem: ImportedFixture, monkeypatch: pytest.MonkeyPatch, leaked: bool
 ) -> None:
     monkeypatch.setenv(ROOT_ENV, str(fixture_problem.store.root))
     monkeypatch.setattr("raidar.engine.trial.materialise.image_present", lambda tag: True)
@@ -136,7 +177,7 @@ def test_a_run_materialises_each_trial_and_writes_step_results(
         seen.append(config)
         provided.append(provisions)
         outcomes = [StepOutcome("checkpoint_1", passed=False)]  # halts after checkpoint 1
-        return _recorded_trial(config, outcomes)
+        return await _recorded_guarded_trial(config, outcomes, bundle_root, leaked)
 
     ctx = JobContext(
         plan=plan,
@@ -148,6 +189,9 @@ def test_a_run_materialises_each_trial_and_writes_step_results(
     )
     records = asyncio.run(execute(ctx))
     assert [r.trial.trial_id for r in records] == [t.trial_id for t in plan.selected_trials()]
+    if leaked:
+        _assert_hidden_inputs_blocked(ctx, records)
+        return
     config = seen[0]
     assert config.verifier.import_path == VERIFIER_IMPORT_PATH
     kwargs = config.verifier.kwargs
@@ -186,6 +230,23 @@ def test_a_run_materialises_each_trial_and_writes_step_results(
     _assert_run_keeps_its_lock_and_settings(job_dir, plan.lock_sha256)
     with pytest.raises(FileExistsError):
         asyncio.run(execute(ctx))
+
+
+def _assert_hidden_inputs_blocked(ctx: JobContext, records: Sequence[TrialRecord]) -> None:
+    for record in records:
+        assert not record.valid
+        assert record.trial_exception == "LeakScanError"
+        assert record.step_results[0].infra_reasons == ("runner_exception:LeakScanError",)
+        stored = json.loads(
+            (ctx.job_dir / "trial-records" / f"{record.trial.trial_id}.json").read_text()
+        )
+        assert stored["trial_exception"] == "LeakScanError"
+        report = load_pre_agent_leak(
+            step_record_dir(ctx.trials_dir / record.trial.trial_id, "checkpoint_1")
+        )
+        assert report is not None
+        assert report.clean is False
+        assert report.tests_dir_entries == ("/tests/private.py",)
 
 
 def _assert_job_provenance(manifest: dict[str, Any], job_dir: Path) -> None:
@@ -330,7 +391,7 @@ def test_a_trial_that_raises_is_recorded_as_infra_and_the_run_completes(
     ) -> TrialRun:
         if config.trial_name == failing:
             raise RuntimeError("Trial.create: docker unreachable")
-        await asyncio.sleep(0.05)
+        await asyncio.sleep(0)  # yield: the sibling runs while the failure is handled
         outcomes = [StepOutcome("checkpoint_1")]
         return _recorded_trial(config, outcomes)
 
@@ -510,48 +571,43 @@ def test_run_command_runs_the_selection_into_the_runs_dir(
     assert none.exit_code != 0
 
 
-def test_trials_start_in_plan_order_and_never_exceed_concurrency() -> None:
-    running = 0
-    peak = 0
-    started: list[int] = []
+def test_the_trial_directory_reader_yields_the_evidence_classification_decides_on(
+    tmp_path: Path,
+) -> None:
+    steps = tuple(f"checkpoint_{k}" for k in range(1, 4))
+    outcomes = [
+        StepOutcome("checkpoint_1", passed=False, exception="NonZeroAgentExitCodeError"),
+        StepOutcome("checkpoint_2"),
+        StepOutcome("checkpoint_3", passed=None),
+    ]
+    trial_dir = write_trial(tmp_path / "trial", outcomes)
+    (trial_dir / LIVENESS_REPORT).write_text(
+        json.dumps({"phases": [{"step": "checkpoint_1", "decision": "idle_killed"}]})
+    )
+    (trial_dir / "trial.log").write_text("Running command: npm install -g @openai/codex@0.157.0\n")
+    residual = ReapReport("agent", (), ("42 sleep",), None)
+    write_reap_report(step_record_dir(trial_dir, "checkpoint_2"), residual)
+    reap = reap_infra_reason(residual.as_json())
+    assert reap is not None
+    task_dir = tmp_path / "task"
+    (task_dir / "steps" / "checkpoint_1").mkdir(parents=True)
+    (task_dir / "steps" / "checkpoint_1" / "instruction.md").write_bytes(b"do it")
 
-    async def worker(job: int) -> int:
-        nonlocal running, peak
-        started.append(job)
-        running += 1
-        peak = max(peak, running)
-        await asyncio.sleep(0.01 * (5 - job % 5))
-        running -= 1
-        return job * 10
+    read = classify_trial(trial_dir, classification_context(steps, task_dir=task_dir))
 
-    results = asyncio.run(run_in_order(list(range(12)), worker, concurrency=3))
-    assert results == [job * 10 for job in range(12)]
-    assert started == list(range(12))
-    assert peak == 3
-    serial = asyncio.run(run_in_order([1, 2], worker, concurrency=1))
-    assert serial == [10, 20]
-    with pytest.raises(ValueError, match="concurrency"):
-        asyncio.run(run_in_order([1], worker, concurrency=0))
-
-
-def test_a_raising_worker_starts_nothing_more_and_leaves_nothing_running() -> None:
-    started: list[int] = []
-    finished: list[int] = []
-
-    async def worker(job: int) -> int:
-        started.append(job)
-        if job == 1:
-            raise RuntimeError("Trial.create: docker unreachable")
-        await asyncio.sleep(0.05)
-        finished.append(job)
-        return job
-
-    async def scenario() -> None:
-        with pytest.raises(RuntimeError, match="docker unreachable"):
-            await run_in_order([0, 1, 2, 3, 4, 5], worker, concurrency=2)
-        await asyncio.sleep(0.2)  # anything still running would finish here
-
-    asyncio.run(scenario())
-    assert 1 in started
-    assert max(started) <= 3  # stopped starting jobs once the failure was seen
-    assert set(finished) <= {0}  # siblings were cancelled, not orphaned
+    memory = trial_evidence(outcomes, idle_killed=("checkpoint_1",))
+    reaped = replace(memory.steps["checkpoint_2"], reap=reap)
+    evidence = TrialEvidence(memory.result, {**memory.steps, "checkpoint_2": reaped}, None)
+    expected = classify_evidence(classification_context(steps), evidence)
+    assert read[0].instruction_sha256 == hashlib.sha256(b"do it").hexdigest()
+    assert [r.model_copy(update={"instruction_sha256": None}) for r in read] == list(expected)
+    assert read[1].infra_reasons == (reap,)
+    assert idle_killed_steps(trial_dir) == {"checkpoint_1"}
+    assert harness_installs(trial_dir) == ["0.157.0"]
+    rule = progression_rule(ProtocolSpec())
+    checks = execution_validity(trial_dir, read, "0.156.1", rule).checks
+    assert not next(c for c in checks if c.name == "agent_version").passed
+    never_started = tmp_path / "never-started"
+    never_started.mkdir()
+    unstarted = classify_trial(never_started, classification_context(steps))
+    assert unstarted[0].infra_reasons == ("not_started:no_result",)

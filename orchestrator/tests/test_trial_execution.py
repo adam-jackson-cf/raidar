@@ -1,73 +1,93 @@
-"""Running a job's trials: start order, concurrency, guard wiring, job directory records."""
+"""Trial decisions: concurrency, host credentials, and pre-agent protection."""
 
 from __future__ import annotations
 
 import asyncio
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any
 
 import pytest
+from harbor.environments.base import ExecResult
 from harbor.models.trial.config import AgentConfig, TrialConfig
+from harbor.trial.hooks import TrialEvent
 
+from raidar.engine.job import provenance
 from raidar.engine.job.provenance import execution_source_digest
 from raidar.engine.trial import driver
 from raidar.engine.trial.agent_config import reported_harness_pin
-from raidar.engine.trial.driver import TrialRun, run_harbor_trial
+from raidar.engine.trial.driver import TrialRun, run_harbor_trial, run_in_order
 from raidar.engine.trial.environment import RunScopedDockerEnvironment, run_scope
 from raidar.engine.trial.host_auth import CODEX_AUTH_ENV, with_host_auth
-from raidar.engine.trial.provision import TrialProvision
+from raidar.grading import guard, leak
 from raidar.subject.agent.config import Harness
 from raidar.subject.workflow.runner import WorkflowRunner
 
 
-def test_the_leak_guard_is_installed_before_the_trial_runs(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+@pytest.mark.parametrize(
+    ("leaked", "exception_type"),
+    [(False, None), (False, "AgentTimeoutError"), (True, None)],
+)
+async def test_hidden_tests_stop_the_agent_before_it_can_read_them(
+    monkeypatch: pytest.MonkeyPatch, leaked: bool, exception_type: str | None
 ) -> None:
-    events: list[str] = []
+    reports: list[Any] = []
+    bundle = SimpleNamespace(
+        resolve_step=lambda _step: "checkpoint_1",
+        hidden_file_hashes=lambda: {"a" * 64: "test_private.py"},
+    )
+    monkeypatch.setattr(guard, "load_bundle", lambda _path: bundle)
+    monkeypatch.setattr(guard, "write_pre_agent_leak", lambda _path, report: reports.append(report))
+    monkeypatch.setattr(leak.time, "perf_counter", lambda: 0.0)
+    for installer in (
+        "install_agent_reaper",
+        "install_trial_provisioning",
+        "install_tool_tree_watch",
+        "install_liveness_monitor",
+    ):
+        monkeypatch.setattr(driver, installer, lambda *_args: None)
 
-    class FakeTrial:
-        class paths:  # noqa: N801 (mirrors Harbor's attribute)
-            trial_dir = tmp_path / "t"
+    class ProtectedTrial:
+        paths = SimpleNamespace(trial_dir=Path("/trial"))
+        agent_started = False
+
+        def __init__(self) -> None:
+            self.hooks: dict[TrialEvent, list[Any]] = {}
+            self.agent_environment = self
+
+        def add_hook(self, event: TrialEvent, hook: Any) -> None:
+            self.hooks.setdefault(event, []).append(hook)
+
+        async def exec(self, _command: str, **_kwargs: Any) -> ExecResult:
+            planted = "TESTS\t/tests/private.py\n" if leaked else ""
+            return ExecResult(return_code=0, stdout=planted + "RAIDAR_LEAK_SCAN_DONE\n")
 
         async def run(self) -> Any:
-            events.append("run")
-            return type("Result", (), {"exception_info": None})()
+            event = SimpleNamespace(
+                result=SimpleNamespace(step_results=[SimpleNamespace(step_name="checkpoint_1")])
+            )
+            for hook in self.hooks.get(TrialEvent.AGENT_START, []):
+                await hook(event)
+            self.agent_started = True
+            info = SimpleNamespace(exception_type=exception_type) if exception_type else None
+            return SimpleNamespace(exception_info=info)
 
-    async def create(config: TrialConfig) -> FakeTrial:
-        events.append("create")
-        return FakeTrial()
+    trial = ProtectedTrial()
 
-    def guard(trial: Any, bundle: Any) -> None:
-        events.append(f"guard:{bundle}")
+    async def create(_config: TrialConfig) -> ProtectedTrial:
+        return trial
 
     monkeypatch.setattr(driver.Trial, "create", create)
-    monkeypatch.setattr(driver, "install_leak_guard", guard)
-    monkeypatch.setattr(
-        driver, "install_agent_reaper", lambda trial, bundle: events.append("reaper")
-    )
-    monkeypatch.setattr(
-        driver,
-        "install_trial_provisioning",
-        lambda trial, provisions: events.append(f"provision:{len(provisions)}"),
-    )
-    monkeypatch.setattr(
-        driver, "install_tool_tree_watch", lambda trial, bundle: events.append("tool-tree")
-    )
-    monkeypatch.setattr(driver, "install_liveness_monitor", lambda trial: events.append("liveness"))
-    provisions = (TrialProvision("lint-tool", {}, "true", "true"),)
-    outcome = asyncio.run(
-        run_harbor_trial(TrialConfig.model_construct(), tmp_path / "bundle", provisions)
-    )
-    assert events == [
-        "create",
-        f"guard:{tmp_path / 'bundle'}",
-        "reaper",
-        "provision:1",
-        "tool-tree",
-        "liveness",
-        "run",
-    ]
-    assert outcome == TrialRun(tmp_path / "t", None)
+    if leaked:
+        with pytest.raises(leak.LeakScanError):
+            await run_harbor_trial(TrialConfig.model_construct(), Path("/bundle"))
+    else:
+        outcome = await run_harbor_trial(TrialConfig.model_construct(), Path("/bundle"))
+        assert outcome == TrialRun(Path("/trial"), exception_type)
+    assert trial.agent_started is not leaked
+    (report,) = reports
+    assert report.clean is not leaked
+    assert report.tests_dir_entries == (("/tests/private.py",) if leaked else ())
 
 
 def test_codex_gets_the_host_session_file_path_only(
@@ -120,8 +140,9 @@ def test_run_scoped_environment_suffixes_the_compose_session(
 
 @pytest.mark.parametrize("owner", ["engine/health", "grading", "subject/agent", "contract"])
 def test_execution_provenance_tracks_behavior_and_source_paths_but_not_documentation(
-    tmp_path: Path, owner: str
+    tmp_path: Path, owner: str, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    monkeypatch.setattr(provenance, "contract_sources", dict)
     root = tmp_path / "raidar"
     source = root / owner / "operation.py"
     source.parent.mkdir(parents=True)
@@ -136,6 +157,126 @@ def test_execution_provenance_tracks_behavior_and_source_paths_but_not_documenta
     assert execution_source_digest(root) != changed
 
 
-def test_execution_provenance_refuses_an_empty_source_tree(tmp_path: Path) -> None:
+def test_execution_provenance_refuses_an_empty_source_tree(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(provenance, "contract_sources", dict)
     with pytest.raises(ValueError, match="no Raidar Python source"):
         execution_source_digest(tmp_path)
+
+
+async def _never(job: int) -> int:
+    raise AssertionError("no job may start")
+
+
+async def _run_gated(jobs: list[int], concurrency: int) -> tuple[list[int], list[int], int]:
+    """Run ``jobs`` with each worker held on its own gate; release the newest running one first,
+    so completion order differs from start order. Synchronised on events, never on time."""
+    gates = {job: asyncio.Event() for job in jobs}
+    progress = asyncio.Event()
+    started: list[int] = []
+    running = 0
+    peak = 0
+
+    async def worker(job: int) -> int:
+        nonlocal running, peak
+        started.append(job)
+        running += 1
+        peak = max(peak, running)
+        progress.set()
+        await gates[job].wait()
+        running -= 1
+        return job * 10
+
+    async def conductor() -> None:
+        released = 0
+        while released < len(jobs):
+            await progress.wait()
+            progress.clear()
+            live = [job for job in started if not gates[job].is_set()]
+            if len(live) == concurrency or released + len(live) == len(jobs):
+                gates[live[-1]].set()
+                released += 1
+                progress.set()
+
+    gate_keeper = asyncio.create_task(conductor())
+    results = await run_in_order(jobs, worker, concurrency=concurrency)
+    await gate_keeper
+    return results, started, peak
+
+
+def test_trials_start_in_plan_order_and_never_exceed_concurrency() -> None:
+    jobs = list(range(12))
+    results, started, peak = asyncio.run(_run_gated(jobs, 3))
+    assert results == [job * 10 for job in jobs]
+    assert started == jobs
+    assert peak == 3
+    serial, _, serial_peak = asyncio.run(_run_gated([1, 2], 1))
+    assert serial == [10, 20]
+    assert serial_peak == 1
+    with pytest.raises(ValueError, match="concurrency"):
+        asyncio.run(run_in_order([1], _never, concurrency=0))
+
+
+def test_a_raising_worker_starts_nothing_more_and_leaves_nothing_running() -> None:
+    started: list[int] = []
+    finished: list[int] = []
+    cancelled: list[int] = []
+
+    async def worker(job: int) -> int:
+        started.append(job)
+        if job == 1:
+            raise RuntimeError("Trial.create: docker unreachable")
+        try:
+            await asyncio.Event().wait()  # only cancellation ends this sibling
+        except asyncio.CancelledError:
+            cancelled.append(job)
+            raise
+        finished.append(job)
+        return job
+
+    with pytest.raises(RuntimeError, match="docker unreachable"):
+        asyncio.run(run_in_order([0, 1, 2, 3, 4, 5], worker, concurrency=2))
+    assert started == [0, 1]  # stopped starting jobs once the failure was seen
+    assert cancelled == [0]  # the sibling was cancelled, not orphaned
+    assert finished == []
+
+
+def test_a_refused_admission_starts_nothing_more_but_lets_running_trials_finish() -> None:
+    admitted: list[int] = []
+    started: list[int] = []
+    finished: list[int] = []
+    proceed = asyncio.Event()
+
+    async def admit(job: int) -> None:
+        admitted.append(job)
+        if job == 2:
+            proceed.set()  # the running trials complete on their own
+            raise RuntimeError("target lost")
+
+    async def worker(job: int) -> int:
+        started.append(job)
+        await proceed.wait()
+        finished.append(job)
+        return job
+
+    with pytest.raises(RuntimeError, match="target lost"):
+        asyncio.run(run_in_order([0, 1, 2, 3], worker, concurrency=3, admit=admit))
+    assert admitted == [0, 1, 2]
+    assert started == [0, 1]
+    assert finished == [0, 1]
+
+
+def test_admission_runs_before_each_trial_starts() -> None:
+    events: list[str] = []
+
+    async def admit(job: int) -> None:
+        events.append(f"admit{job}")
+
+    async def worker(job: int) -> int:
+        events.append(f"run{job}")
+        return job
+
+    results = asyncio.run(run_in_order([0, 1], worker, concurrency=1, admit=admit))
+    assert results == [0, 1]
+    assert events == ["admit0", "run0", "admit1", "run1"]

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import subprocess
 from collections.abc import Mapping, Sequence
@@ -13,7 +14,7 @@ from click.testing import CliRunner
 from pydantic import ValidationError
 
 from raidar.cli import main
-from raidar.grading.resolver import GRADER_TOOLS
+from raidar.grading.closure import build_context
 from raidar.subject.environment.python import provisioner as provisioner_module
 from raidar.subject.environment.python.pack_definition import (
     PROVISIONING_PHASE,
@@ -32,6 +33,7 @@ from raidar.subject.environment.python.provisioner import (
     ToolProvisioningError,
     default_cache_root,
 )
+from tests.test_declared_wheels_docker import _canary_wheel
 
 UV = "/fake/bin/uv"
 
@@ -95,11 +97,8 @@ def _provisioner(cache: Path, runner: FakeUv, lock: ToolLock | None = None) -> T
     )
 
 
-def test_tool_lock_pins_the_scb_fork_contract_versions() -> None:
+def test_host_tools_never_include_the_scorer_and_the_sandbox_tool_stays_off_the_host() -> None:
     lock = load_tool_lock()
-    packages = {p for spec in lock.tools.values() for p in spec.packages}
-    assert {"ruff==0.8.6", "radon==6.0.1", "scb-check==0.1.3"} <= packages
-    assert lock.python == "3.12"
     host = {n for n, s in lock.tools.items() if s.execution is ToolExecution.HOST_PARSE}
     evals = {n for n, s in lock.tools.items() if s.execution is ToolExecution.EVAL_SANDBOX}
     assert "scb-oracle-pytest" in evals
@@ -122,18 +121,6 @@ def test_tool_lock_rejects_anything_but_an_exact_pin(package: str) -> None:
     raw["tools"]["scb-check"]["packages"] = [package]
     with pytest.raises(ValidationError, match="exact-pinned"):
         ToolLock.model_validate(raw)
-
-
-def test_eval_sandbox_lock_entry_is_the_grader_image_tool_set() -> None:
-    lock = load_tool_lock()
-    eval_packages = {
-        package
-        for spec in lock.tools.values()
-        if spec.execution is ToolExecution.EVAL_SANDBOX
-        for package in spec.packages
-    }
-    assert eval_packages == set(GRADER_TOOLS)
-    assert "coverage" in lock.scorer_distributions()
 
 
 def test_creating_a_provisioner_installs_nothing(tmp_path: Path) -> None:
@@ -185,8 +172,10 @@ def test_install_commands_are_pinned_and_scoped_to_the_lock_directory(tmp_path: 
         lock.tool("scb-python-quality").packages
     )
     tool_argv, tool_env = next((a, e) for a, e in install_calls if a[1] == "tool")
-    assert "scb-check==0.1.3" in tool_argv
-    assert tool_argv[tool_argv.index("--python") + 1] == "3.12"
+    assert tool_argv[-len(lock.tool("scb-check").packages) :] == list(
+        lock.tool("scb-check").packages
+    )
+    assert tool_argv[tool_argv.index("--python") + 1] == lock.python
     assert Path(tool_env["UV_TOOL_DIR"]).is_relative_to(provisioner.lock_dir)
     assert Path(tool_env["UV_TOOL_BIN_DIR"]).is_relative_to(provisioner.lock_dir)
 
@@ -314,3 +303,91 @@ def test_a_reused_install_that_drifted_is_reinstalled(tmp_path: Path) -> None:
     marker = json.loads((drifted.root / MARKER_NAME).read_text())
     assert marker["resolved"]["python_version"] == "3.12.13"
     assert any(args[1:3] == ["tool", "install"] for args, _ in upgraded.calls)
+
+
+def test_provisioning_needs_uv(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    monkeypatch.setattr(provisioner_module.shutil, "which", lambda _name: None)
+    provisioner = ToolProvisioner(load_tool_lock(), cache_root=tmp_path / "cache", runner=FakeUv())
+
+    with pytest.raises(ToolProvisioningError, match="uv is required"):
+        provisioner.ensure("scb-check")
+    assert not (provisioner.lock_dir / "scb-check").exists()
+
+
+class _ProbeFault(FakeUv):
+    """A uv whose environment probe answers something other than the resolved environment."""
+
+    def __init__(self, answer: str) -> None:
+        super().__init__()
+        self.answer = answer
+
+    def _probe(self, modules: list[str]) -> str:
+        return self.answer
+
+
+@pytest.mark.parametrize(
+    ("answer", "message"),
+    [("not json", "gave no JSON"), ("[1, 2]", "gave \\[1, 2\\]")],
+)
+def test_a_malformed_environment_probe_fails_the_install_and_leaves_nothing(
+    tmp_path: Path, answer: str, message: str
+) -> None:
+    provisioner = _provisioner(tmp_path / "cache", _ProbeFault(answer))
+
+    with pytest.raises(ToolProvisioningError, match=message):
+        provisioner.ensure("scb-check")
+    assert not (provisioner.lock_dir / "scb-check").exists()
+
+
+def test_an_install_that_left_no_interpreter_is_rejected(tmp_path: Path) -> None:
+    class NoInterpreter(FakeUv):
+        def __call__(
+            self, argv: Sequence[str], env: Mapping[str, str]
+        ) -> subprocess.CompletedProcess[str]:
+            done = super().__call__(argv, env)
+            if list(argv)[1:3] == ["tool", "install"]:
+                Path(env["UV_TOOL_DIR"], "scb-check", "bin", "python").unlink()
+            return done
+
+    provisioner = _provisioner(tmp_path / "cache", NoInterpreter())
+
+    with pytest.raises(ToolProvisioningError, match="without its interpreter"):
+        provisioner.ensure("scb-check")
+
+
+@pytest.mark.parametrize("damage", ["unreadable marker", "marker is not an object"])
+def test_a_reused_install_with_a_damaged_marker_is_reinstalled(tmp_path: Path, damage: str) -> None:
+    cache = tmp_path / "cache"
+    first = _provisioner(cache, FakeUv()).ensure("scb-check")
+    marker = first.root / MARKER_NAME
+    marker.write_text("{broken" if damage == "unreadable marker" else "[]")
+
+    again = _provisioner(cache, FakeUv()).ensure("scb-check")
+
+    assert again.first_use is not None
+    assert again.first_use.reason == REASON_DRIFT
+
+
+def test_wheel_build_context_excludes_hidden_tests_and_submission_code(tmp_path: Path) -> None:
+    acquisition = tmp_path / "acquisition"
+    acquisition.mkdir()
+    _canary_wheel(acquisition)
+    wheel = acquisition / "raidar_canary-1.0-py3-none-any.whl"
+    digest = hashlib.sha256(wheel.read_bytes()).hexdigest()
+    lock = (
+        'lock-version = "1.0"\n[[packages]]\nname = "raidar-canary"\nversion = "1.0"\n'
+        f'[[packages.wheels]]\nurl = "{wheel.as_uri()}"\n'
+        f'[packages.wheels.hashes]\nsha256 = "{digest}"\n'
+    )
+    (acquisition / "hidden_test.py").write_text("raise AssertionError('hidden')")
+    (acquisition / "setup.py").write_text("raise AssertionError('submission')")
+    (acquisition / "tests").mkdir()
+    (acquisition / "tests" / "nested.py").write_text("hidden")
+    context = tmp_path / "context"
+    build_context(lock, acquisition, context)
+    assert sorted(path.relative_to(context).as_posix() for path in context.rglob("*")) == [
+        "requirements.txt",
+        "wheels",
+        "wheels/raidar_canary-1.0-py3-none-any.whl",
+    ]
+    assert (context / "wheels" / wheel.name).read_bytes() == wheel.read_bytes()

@@ -247,7 +247,11 @@ def read_provision_record(agent_dir: Path, slug: str) -> dict[str, Any] | None:
 
 def provision_check(agent_dir: Path, slug: str) -> tuple[bool, str]:
     """The step's record for ``slug`` shows a successful install and a passing check."""
-    record = read_provision_record(agent_dir, slug)
+    return provision_record_check(read_provision_record(agent_dir, slug), slug)
+
+
+def provision_record_check(record: Mapping[str, Any] | None, slug: str) -> tuple[bool, str]:
+    """Decide whether recorded installation and pre-agent checks both succeeded."""
     if record is None:
         return False, f"{slug}: no provision record before the agent started"
     install = record.get("install") or {}

@@ -5,11 +5,10 @@ from __future__ import annotations
 import json
 from pathlib import Path
 from types import SimpleNamespace
+from typing import Any
 
 import pytest
 
-from raidar.design.experiment.arm import resolve_arm
-from raidar.design.experiment.loader import load_experiment
 from raidar.design.experiment.schema import ExperimentSpec
 from raidar.engine.job.credentials import (
     CredentialPreflightError,
@@ -17,9 +16,10 @@ from raidar.engine.job.credentials import (
     harness_credential_issue,
     preflight_credentials,
 )
+from raidar.engine.trial.agent_config import AgentOverride
 from raidar.engine.trial.plan import PlanOptions
 from raidar.subject.agent.config import Harness
-from tests.experiment_spec_support import experiment_document, write_experiment
+from tests.experiment_spec_support import experiment_document
 
 FAKE = "x" * 24  # placeholder credential value; never a real secret
 
@@ -59,7 +59,7 @@ def test_claude_code_without_credentials_or_with_forced_oauth_and_no_token_fails
     assert "CLAUDE_FORCE_OAUTH" in str(harness_credential_issue(Harness.CLAUDE_CODE, forced))
 
 
-def _spec(tmp_path: Path) -> ExperimentSpec:
+def _spec() -> ExperimentSpec:
     """Two codex agents (ids ``luna`` and ``second``), one arm each."""
     document = experiment_document(kind="benchmark")
     document["agents"].append({**document["agents"][0], "id": "second"})
@@ -68,17 +68,26 @@ def _spec(tmp_path: Path) -> ExperimentSpec:
         {"id": "second", "agent": "second", "workflow": "raidar/one-shot@2"},
     ]
     document["analysis"]["baseline_arm"] = "first"
-    return load_experiment(write_experiment(tmp_path, document)).spec
+    return ExperimentSpec.model_validate(document)
 
 
 class _Plan:
-    """The slice of ExperimentPlan the preflight reads, over really resolved arms."""
+    """The parsed agent/arm inputs the preflight consumes, without a run directory."""
 
-    def __init__(self, tmp_path: Path, arms: list[str], override: str | None = None) -> None:
-        spec = _spec(tmp_path)
+    def __init__(self, arms: list[str], override: AgentOverride | None = None) -> None:
+        spec = _spec()
         self.loaded = SimpleNamespace(spec=spec)
-        self.arms = {arm.id: SimpleNamespace(arm=resolve_arm(spec, arm.id)) for arm in spec.arms}
-        self.options = PlanOptions(agent_override=override)  # type: ignore[arg-type]
+        agents = {
+            entry.id: SimpleNamespace(
+                entry=entry, harness=Harness.CODEX_CLI, released=SimpleNamespace(ref=entry.release)
+            )
+            for entry in spec.agents
+        }
+        self.arms = {
+            arm.id: SimpleNamespace(arm=SimpleNamespace(agent=agents[arm.agent]))
+            for arm in spec.arms
+        }
+        self.options = PlanOptions(agent_override=override)
         self._arms = arms
 
     def selected_trials(self) -> list[object]:
@@ -86,7 +95,7 @@ class _Plan:
 
 
 def test_issues_name_the_agent_field_of_each_selected_arm_only(tmp_path: Path) -> None:
-    plan = _Plan(tmp_path, ["first", "second"])
+    plan = _Plan(["first", "second"])
     env = _codex_home(tmp_path, with_auth=False)
     issues = credential_issues(plan, ["first", "second"], env)  # type: ignore[arg-type]
     assert [issue.field.split(" ")[0] for issue in issues] == [
@@ -102,16 +111,45 @@ def test_issues_name_the_agent_field_of_each_selected_arm_only(tmp_path: Path) -
     assert FAKE not in rendered
 
 
+def test_an_agent_shared_by_several_selected_arms_is_reported_once(tmp_path: Path) -> None:
+    plan = _Plan(["first"])
+    plan.arms["third"] = plan.arms["first"]  # a second arm running the same agent
+    env = _codex_home(tmp_path, with_auth=False)
+
+    issues = credential_issues(plan, ["first", "third"], env)  # type: ignore[arg-type]
+
+    assert [issue.field.split(" ")[0] for issue in issues] == ["agents.0.release"]
+
+
 def test_preflight_fails_before_any_trial_without_echoing_values(tmp_path: Path) -> None:
     empty = _codex_home(tmp_path, with_auth=False)
-    plan = _Plan(tmp_path, ["first", "second"])
+    plan = _Plan(["first", "second"])
+    leaky = {**empty, "CODEX_AUTH_MODE": "chatgpt", "OPENAI_API_KEY": FAKE}
     with pytest.raises(CredentialPreflightError) as caught:
-        preflight_credentials(plan, {**empty, "CODEX_AUTH_MODE": "api"})  # type: ignore[arg-type]
+        preflight_credentials(plan, leaky)  # type: ignore[arg-type]
     message = str(caught.value)
     assert "no trial was started" in message
     assert "agents.0.release" in message
     assert "agents.1.release" in message
-    keyed = {**empty, "OPENAI_API_KEY": FAKE}
-    preflight_credentials(plan, keyed)  # type: ignore[arg-type]
-    override = _Plan(tmp_path, ["first"], override="nop")
+    assert FAKE not in message
+    preflight_credentials(plan, {**empty, "OPENAI_API_KEY": FAKE})  # type: ignore[arg-type]
+
+
+def test_a_no_llm_agent_override_needs_no_credential(tmp_path: Path) -> None:
+    override = _Plan(["first"], override="nop")
+
     preflight_credentials(override, {})  # type: ignore[arg-type]
+
+
+def test_preflight_reads_the_process_environment_by_default(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    plan: Any = _Plan(["first"])
+    monkeypatch.setenv("CODEX_HOME", str(_codex_home(tmp_path, with_auth=False)["CODEX_HOME"]))
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    monkeypatch.delenv("CODEX_AUTH_MODE", raising=False)
+    with pytest.raises(CredentialPreflightError, match="agents.0.release"):
+        preflight_credentials(plan)
+
+    monkeypatch.setenv("OPENAI_API_KEY", FAKE)
+    preflight_credentials(plan)

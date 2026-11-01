@@ -181,3 +181,17 @@ def test_cleanup_attempts_every_project_before_reporting_failures(
     # every project is attempted before the failure is raised
     assert docker.downs() == ["b00-p0-baseline__env-0123456789", "b01-p0-guided__env-abcdefabcd"]
     assert "b01-p0-guided__env-abcdefabcd" in str(captured.value)
+
+
+def test_a_listing_that_times_out_is_not_swallowed() -> None:
+    class Hung(FakeDocker):
+        def __call__(self, command: Sequence[str]) -> subprocess.CompletedProcess[str]:
+            raise subprocess.TimeoutExpired(list(command), 60)
+
+    with pytest.raises(subprocess.TimeoutExpired):
+        cleanup_trial_projects(docker_context=CONTEXT, runner=Hung(""))
+
+
+@pytest.mark.parametrize("listing", ["garbage without a tab", "\n\n", "x\ty\tz\n"])
+def test_malformed_listing_lines_never_name_a_trial_project(listing: str) -> None:
+    assert trial_projects(listing) == []
