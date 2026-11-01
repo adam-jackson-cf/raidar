@@ -34,6 +34,9 @@ Run its offline gate fixtures with `make stage-check NAME=raidar/verify TARGET=l
 [`raidar/define@1`](lab/stages/raidar/define/) owns the standalone definition tool and emits
 the sealed definition plus `criteria/1`. Its stop call has a 60-second timeout and at most
 three resume turns. Malformed agent drafts receive one repair opportunity, then close.
+[`raidar/docs-check@1`](lab/stages/raidar/docs-check/) runs pinned codespell over repository
+text. `make stage-new NAME=acme/my-check` copies that real package by default; `FROM=ns/name`
+selects another source. Only the manifest name changes; commands, skills, fixtures and modes stay.
 
 Problem validation scores only repeat-stable reference cases. A checkpoint must add a
 previously uncollected test its own reference passes in every repeat, or that checkpoint
