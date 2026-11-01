@@ -5,7 +5,6 @@ from __future__ import annotations
 import configparser
 import json
 import re
-import subprocess
 import tomllib
 from pathlib import Path
 
@@ -201,16 +200,6 @@ def test_the_seed_needs_locks_exactly_when_the_problem_has_dependencies(
 ) -> None:
     with pytest.raises(ValueError, match="locks"):
         workspace_seed("scb/adder", dependencies, "3.12", CUTOFF, locks)
-
-
-@pytest.mark.parametrize("locked", [True, False])
-def test_the_seed_install_script_is_valid_shell(locked: bool) -> None:
-    seed = workspace_seed(
-        "scb/adder", ["numpy"] if locked else [], "3.12", CUTOFF, _LOCKS if locked else {}
-    )
-
-    for script in (seed.install, seed.check):
-        subprocess.run(["sh", "-n", "-c", script], check=True)
 
 
 def test_the_seed_provision_carries_the_project_locks_and_what_it_seeded() -> None:

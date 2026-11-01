@@ -45,10 +45,14 @@ OPT_IN = "RAIDAR_EXECUTION_DOCKER"
 # report-only default that ``make perf-check`` applies to real experiment runs.
 STRICT_CHECK = ("perf", "check", "--strict")
 CONCURRENCY_ENV = "RAIDAR_PERF_FIXTURE_CONCURRENCY"
-pytestmark = pytest.mark.skipif(
-    os.environ.get(OPT_IN) != "1",
-    reason=f"the perf fixture runs real Harbor trials: set {OPT_IN}=1 (make perf-fixture)",
-)
+pytestmark = [
+    pytest.mark.docker,
+    pytest.mark.perf,
+    pytest.mark.skipif(
+        os.environ.get(OPT_IN) != "1",
+        reason=f"the perf fixture runs real Harbor trials: set {OPT_IN}=1 (make perf-fixture)",
+    ),
+]
 
 
 def _require_target() -> Target:

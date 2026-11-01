@@ -23,7 +23,7 @@ from raidar.engine.target.config import activate
 from raidar.engine.trial.cleanup import cleanup_trial_projects
 from raidar.engine.trial.environment import RUN_SCOPED_DOCKER_IMPORT_PATH, SCOPE_KWARG, run_scope
 from raidar.engine.trial.provision import PayloadFile, TrialProvision, install_trial_provisioning
-from tests.docker_trial_support import build_task, docker_target, docker_target_ready
+from tests.docker_trial_support import build_task, docker_target
 
 TOOL = "/opt/raidar-tools/probe-tool/bin/probe"
 STEPS = ("checkpoint_1", "checkpoint_2")
@@ -38,10 +38,7 @@ PROBE_PROVISION = TrialProvision(
     check=f"test -x {TOOL}",
 )
 
-pytestmark = pytest.mark.skipif(
-    not docker_target_ready(),
-    reason="needs a ready Docker target (data check passing) and the built python pack image",
-)
+pytestmark = [pytest.mark.docker, pytest.mark.security]
 
 
 async def _run(tmp_path: Path, tamper_on_step: int | None) -> Path:

@@ -14,6 +14,8 @@ import pytest
 import define_tool as payload
 from define_tool import tool
 
+pytestmark = pytest.mark.slow
+
 ISSUE = (
     "# Greeting\n\nThe greeting is printed when the program runs.\n\n"
     "The greeting names the caller.\n"

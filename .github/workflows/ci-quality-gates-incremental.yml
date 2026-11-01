@@ -28,7 +28,15 @@ jobs:
 
       - name: Install orchestrator dev dependencies
         run: |
-          uv sync --project orchestrator --all-extras --frozen
+          env -u AGENT uv sync --project orchestrator --all-extras --frozen
 
       - name: Run root quality gate
-        run: make quality
+        run: env -u AGENT make quality
+
+      - name: Run slow tier
+        if: github.event_name == 'push'
+        run: env -u AGENT make test-slow
+
+      - name: Run quality tier
+        if: github.event_name == 'push'
+        run: env -u AGENT make test-quality

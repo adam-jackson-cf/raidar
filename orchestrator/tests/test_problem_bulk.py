@@ -23,6 +23,8 @@ from tests.problems_support import (
 )
 from tests.verifier_support import LocalProcessSandbox
 
+pytestmark = pytest.mark.slow
+
 
 def test_source_selection_requires_one_pin_and_unambiguous_names(tmp_path: Path) -> None:
     checkout, commit = build_fake_scb_repo(tmp_path / "source")

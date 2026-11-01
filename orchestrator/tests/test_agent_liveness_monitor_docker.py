@@ -1,4 +1,4 @@
-"""Liveness monitor against real Harbor trials (opt in with ``RAIDAR_EXECUTION_DOCKER=1``).
+"""Liveness monitor against real Harbor trials (make test-docker).
 
 The Docker target is the current one (``TARGET=<name>`` / ``RAIDAR_TARGET``, else the targets
 file's default). Thresholds are short so each trial lasts about a minute.
@@ -8,7 +8,6 @@ from __future__ import annotations
 
 import asyncio
 import json
-import os
 import subprocess
 import uuid
 from pathlib import Path
@@ -31,10 +30,7 @@ from raidar.subject.environment.python.pack_definition import load_pack_spec
 from tests.docker_trial_support import docker_context
 from tests.liveness_support import AFTER_PHASE_REPORT, DETACHED_MARKER, run_probe_trial
 
-pytestmark = pytest.mark.skipif(
-    os.environ.get("RAIDAR_EXECUTION_DOCKER") != "1",
-    reason="set RAIDAR_EXECUTION_DOCKER=1 (and TARGET=<name>) to run real trials",
-)
+pytestmark = pytest.mark.docker
 
 
 def _context() -> str:

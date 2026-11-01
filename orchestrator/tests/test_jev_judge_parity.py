@@ -47,6 +47,8 @@ from tests.criteria_support import (
     write_workspace,
 )
 
+pytestmark = pytest.mark.slow
+
 KEY = "sk-or-test-key"
 REWORK_PROMPT = "Fix these.\n\n%%%PUSHBACK%%%\n\nGate:\n%%%GATE%%%"
 OPEN, CLOSED_P = 0.1, 0.95

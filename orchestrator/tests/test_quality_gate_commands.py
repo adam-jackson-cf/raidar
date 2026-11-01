@@ -1,34 +1,76 @@
+import subprocess
+from decimal import Decimal
+
 import click
 import pytest
 
 from raidar.cli import process, quality
 
+FLOOR = Decimal("95.00")
 
-def test_commands_run_through_one_runner_that_raises_on_failure(monkeypatch, tmp_path) -> None:
-    calls: list[tuple[list[str], object]] = []
 
-    class Result:
-        def __init__(self, returncode: int) -> None:
-            self.returncode = returncode
+def report(*, line: tuple[int, int], branch: tuple[int, int]) -> dict:
+    return {
+        "totals": {
+            "covered_lines": line[0],
+            "num_statements": line[1],
+            "covered_branches": branch[0],
+            "num_branches": branch[1],
+        }
+    }
 
-    monkeypatch.setattr(
-        process.subprocess,
-        "run",
-        lambda cmd, cwd, env, check: calls.append((cmd, env)) or Result(0),
+
+FLOORS = {"line": FLOOR, "branch": FLOOR}
+# Of 100000 measured items: below, exactly at, above the 95% floor.
+BELOW, EQUAL, ABOVE = 94_999, 95_000, 95_001
+# 94.9996% displays as 95.00 at precision 2 yet is below the floor.
+ROUNDS_UP_BELOW = (9_499_996, 10_000_000)
+PASSING = (EQUAL, 100_000)
+
+
+@pytest.mark.parametrize("kind", ["line", "branch"])
+@pytest.mark.parametrize(
+    ("covered", "total", "passes"),
+    [
+        (BELOW, 100_000, False),
+        (*ROUNDS_UP_BELOW, False),
+        (EQUAL, 100_000, True),
+        (ABOVE, 100_000, True),
+    ],
+)
+def test_coverage_gate_fails_below_the_floor_at_any_precision(
+    kind: str, covered: int, total: int, passes: bool
+) -> None:
+    measured = {"line": PASSING, "branch": PASSING}
+    measured[kind] = (covered, total)
+    data = report(line=measured["line"], branch=measured["branch"])
+
+    if passes:
+        quality.enforce_coverage_report(data, FLOORS)
+        return
+    with pytest.raises(click.ClickException, match=f"{kind} coverage"):
+        quality.enforce_coverage_report(data, FLOORS)
+
+
+def test_line_and_branch_floors_are_enforced_independently() -> None:
+    both_low = report(line=(BELOW, 100_000), branch=(BELOW, 100_000))
+    with pytest.raises(click.ClickException) as raised:
+        quality.enforce_coverage_report(both_low, FLOORS)
+    assert "line coverage" in raised.value.message
+    assert "branch coverage" in raised.value.message
+
+    quality.enforce_coverage_report(
+        report(line=(BELOW, 100_000), branch=(ABOVE, 100_000)),
+        {"line": Decimal("94.00"), "branch": FLOOR},
     )
-    process.run_or_raise(["tool", "ok"], tmp_path, env={"A": "1"})
-    assert calls == [(["tool", "ok"], {"A": "1"})]
-
-    monkeypatch.setattr(
-        process.subprocess,
-        "run",
-        lambda cmd, cwd, env, check: Result(7),
-    )
-    with pytest.raises(click.ClickException, match="Command failed \\(7\\): tool fail"):
-        process.run_or_raise(["tool", "fail"], tmp_path)
 
 
-def test_quality_gate_helpers_validate_requirements_and_commands(monkeypatch, tmp_path) -> None:
+def test_coverage_gate_fails_when_nothing_was_measured() -> None:
+    with pytest.raises(click.ClickException, match="no branch measurements"):
+        quality.enforce_coverage_report(report(line=PASSING, branch=(0, 0)), FLOORS)
+
+
+def test_quality_gate_helpers_validate_requirements_and_commands(monkeypatch) -> None:
     with pytest.raises(click.ClickException, match="--stage is only supported"):
         quality.validate_quality_gate_options(fix=False, stage=True)
 
@@ -50,3 +92,13 @@ def test_quality_gate_helpers_validate_requirements_and_commands(monkeypatch, tm
     )
     with pytest.raises(click.ClickException, match="Missing required command: lint-imports"):
         quality.assert_quality_gate_requirements()
+
+
+def test_a_failed_child_command_stops_the_quality_runner(monkeypatch, tmp_path) -> None:
+    monkeypatch.setattr(
+        process.subprocess,
+        "run",
+        lambda *args, **kwargs: subprocess.CompletedProcess(args[0], returncode=7),
+    )
+    with pytest.raises(click.ClickException, match="Command failed \\(7\\): tool fail"):
+        process.run_or_raise(["tool", "fail"], tmp_path)

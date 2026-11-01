@@ -18,6 +18,8 @@ from raidar.scoring.framework.store import (
     ScorerIdentity,
 )
 
+pytestmark = pytest.mark.slow
+
 
 def _promote(root: Path, value: int, writer: int, start: Path) -> None:
     store = AssessmentStore(root)

@@ -9,9 +9,11 @@ cache (``RAIDAR_TOOL_CACHE`` or ``var/cache/tools``), exactly as scoring uses it
 
 from __future__ import annotations
 
+import copy
 import gzip
 import json
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
+from dataclasses import dataclass, field
 from functools import cache
 from pathlib import Path
 from typing import Any
@@ -24,10 +26,18 @@ from raidar.grading.records import (
     step_record_dir,
     write_step_record,
 )
-from raidar.scoring.code_quality.measurement import ToolEnvironment, provisioned_environment
+from raidar.scoring.code_quality.measurement import (
+    ProcessResult,
+    ToolEnvironment,
+    provisioned_environment,
+    run_process,
+)
+from raidar.scoring.framework.context import AssessContext
+from raidar.scoring.framework.trial_inputs import load_trial_context
 from tests.scorer_support import StepFixture, write_files, write_trial
 
 GOLDENS = Path(__file__).parent / "fixtures" / "code_quality" / "fork_goldens.json.gz"
+SHOP_CONFIG = {"entry_file": "app.py"}
 
 
 @cache
@@ -49,6 +59,53 @@ def quality_tools() -> ToolEnvironment:
 def materialise(root: Path, files: Mapping[str, str]) -> Path:
     write_files(root, dict(files))
     return root
+
+
+FORK_CASES = ("synthetic_shop", "language_features", "forge")
+
+
+def case_snapshots(tmp_path: Path, case: dict[str, Any]) -> list[Path]:
+    return [
+        materialise(tmp_path / checkpoint["checkpoint"], checkpoint["files"])
+        for checkpoint in case["checkpoints"]
+    ]
+
+
+@dataclass
+class Scripted:
+    """Runs the real tool env except where a rule answers (or raises) instead."""
+
+    rules: list[tuple[Callable[[Sequence[str]], bool], ProcessResult | Exception]] = field(
+        default_factory=list
+    )
+
+    def __call__(
+        self, argv: Sequence[str], cwd: Path | None, stdin: str | None, deadline: float
+    ) -> ProcessResult:
+        for matches, answer in self.rules:
+            if matches(argv):
+                if isinstance(answer, Exception):
+                    raise answer
+                return answer
+        return run_process(argv, cwd, stdin, deadline)
+
+
+def ok_result(stdout: str, returncode: int = 0) -> ProcessResult:
+    return ProcessResult(returncode, stdout, "")
+
+
+FLAKY = "tests/test_cart.py::test_parse[a]"
+FLIPPED = ParityVerdict(eligible=False, reasons=("ledger_mismatch", "outcome_mismatch"))
+
+
+def flip_run(run: dict[str, Any], node: str, outcome: str = "failed") -> dict[str, Any]:
+    """``run`` with ``node``'s outcome (and ledger row) set to ``outcome``."""
+    flipped = copy.deepcopy(run)
+    for key in ("outcomes", "ledger"):
+        for item in flipped[key]:
+            if item["node_id"] == node:
+                item["outcome"] = outcome
+    return flipped
 
 
 def without_executable(payload: dict[str, Any]) -> dict[str, Any]:
@@ -118,3 +175,9 @@ def case_trial(
                 json.dumps({"transition_step": name, **runs}, sort_keys=True)
             )
     return trial_dir
+
+
+def trial_context(trial: Path, config: dict[str, Any] | None = None) -> AssessContext:
+    ctx = load_trial_context(trial)
+    ctx.config = dict(SHOP_CONFIG if config is None else config)
+    return ctx
