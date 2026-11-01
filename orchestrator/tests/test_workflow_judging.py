@@ -7,9 +7,9 @@ from typing import Any
 
 import pytest
 
+from define_tool.aspects import Aspect, Example
+from define_tool.featuredef import Criterion, Feature
 from raidar.subject.workflow import judging, pysource
-from raidar.subject.workflow.define_tool.aspects import Aspect, Example
-from raidar.subject.workflow.define_tool.featuredef import Criterion, Feature
 from raidar.subject.workflow.definition import JudgeSettings
 
 TESTS = """\

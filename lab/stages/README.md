@@ -179,6 +179,15 @@ Fixtures cover each failing check, excluded directories, a six-second test passi
 default and the same test refusing at a two-second override. Whole checks use the maximum
 `stage/1` budget of 300 seconds; the spike's 600-second watchdog is not preserved.
 
+`raidar/define@1` owns `define_tool` under its tool source, not under the orchestrator.
+Setup, the sealing prerequisite and the stop each have a 60-second timeout; the stop allows
+at most three resume turns. The defaults retain unit rules 2 and two accepted clarification
+rounds. Ready drafts emit the definition and `criteria/1`, including aspects and examples.
+An unusable draft requests one repair, then closes; a corrupt draft cannot turn into an
+instrument error merely because its agent-authored bytes do not parse. Trusted-context
+errors still fail the call. Fixtures cover done, closed, resume, clarification, repair,
+regression criteria and gate acceptance/refusal.
+
 ## Contract history
 
 - 2026-10-28: `stage/1`, `stage-tree/1` and `criteria/1` specified before the generic package implementation. Spike stage classes remain until the phase-5 port; they are not the author API.

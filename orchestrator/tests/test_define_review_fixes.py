@@ -13,15 +13,15 @@ from typing import Any
 
 import pytest
 
-from raidar.subject.workflow.define_tool import (
+from define_tool import (
     compact,
     evidence,
     featuredef,
     normative,
     sections,
 )
-from raidar.subject.workflow.define_tool.core import JsonObject
-from raidar.subject.workflow.define_tool.unitrules import V1
+from define_tool.core import JsonObject
+from define_tool.unitrules import V1
 
 # The traced reading: each criterion has an id and a `Verification:` line.
 TRACED_DEFINITION = """\

@@ -4,9 +4,9 @@ from __future__ import annotations
 
 import pytest
 
-from raidar.subject.workflow.define_tool import block
-from raidar.subject.workflow.define_tool.block import Item
-from raidar.subject.workflow.define_tool.kinds import Kind
+from define_tool import block
+from define_tool.block import Item
+from define_tool.kinds import Kind
 
 FULL = """\
 title: Greeting endpoint

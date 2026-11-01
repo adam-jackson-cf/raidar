@@ -61,10 +61,13 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/raidar"]
+# The retained spike imports the stage-owned tool directly; remove this host path with the spike.
+dev-mode-dirs = ["src", "../lab/stages/raidar/define/tool/src"]
 
 [tool.ruff]
 line-length = 100
 target-version = "py312"
+src = [".", "src", "../lab/stages/raidar/define/tool/src"]
 extend-exclude = [
     "../lab/experiments",
     "../var",
@@ -104,10 +107,12 @@ max-complexity = 10
 asyncio_mode = "auto"
 addopts = "--ignore-glob=.env* --ignore-glob=**/.env*"
 testpaths = ["tests"]
+pythonpath = ["../lab/stages/raidar/define/tool/src"]
 
 [tool.mypy]
 python_version = "3.12"
 files = ["src", "tests"]
 ignore_missing_imports = true
+mypy_path = ["../lab/stages/raidar/define/tool/src"]
 # PyYAML ships no type information and types-PyYAML is not a dependency: its API is Any.
 disable_error_code = ["import-untyped"]

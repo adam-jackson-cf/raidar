@@ -7,8 +7,8 @@ import json
 from pathlib import Path
 from typing import Any
 
+from define_tool import tool
 from raidar.engine.health.definition import definition_family
-from raidar.subject.workflow.define_tool import tool
 
 BLOCK = """title: Greeting
 objective: The greet command prints a greeting.

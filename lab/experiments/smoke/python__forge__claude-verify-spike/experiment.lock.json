@@ -841,7 +841,7 @@
       "tree-sitter-language-pack": "0.13.0"
     }
   },
-  "document_sha256": "465ded0efd2a7da4b16b0545ea0e91a5cd72fa312f4f2a0e76e8e9a6d79c6e8a",
+  "document_sha256": "13baf89fd87fe46e6193254242901fcad08321005fb92093ddcb4ac2e569cf78",
   "execution": {
     "arms": {
       "verify": {
@@ -859,12 +859,12 @@
           "version_pin": "2.1.285",
           "workflow_skills": "placement.skills .claude/skills in the workspace /app"
         },
-        "digest": "6d4b5a3ad64a8130ecea6e09a3d82c7dea553d0a1590d983e77d31168da8c754",
+        "digest": "aaeb915a8b9b400da1c6eb78b02d72ffa0b5080310206e2ed798ffcfb6f3f158",
         "model": "claude-sonnet-4-6",
         "packages": {},
         "primitive_code": {
-          "build": "b638973b5b83519aabfba68bea01680b6bfa0d97fcdcba0fb716e07638dd8f02",
-          "verify": "b638973b5b83519aabfba68bea01680b6bfa0d97fcdcba0fb716e07638dd8f02"
+          "build": "f8a15e14c3b45409a2e2cab025e9e2059b18cb16d6ddb055ea76c13f206284bd",
+          "verify": "f8a15e14c3b45409a2e2cab025e9e2059b18cb16d6ddb055ea76c13f206284bd"
         },
         "provider": "anthropic",
         "reasoning": "low",
@@ -1692,7 +1692,7 @@
     "source_sha256": "a1280caf52c8b3980474c05576a49d5f1785a8d9d7a2b2e553c911574cafbd01",
     "spec_sha256": "408eb487f5523af03227aa1930ededf5682e6e38861d724c648b211df11e2f56"
   },
-  "lock_sha256": "cecaeea48aee5b8dc8ea2d092a20b640bfd8ce78e7ff13211d3219838dc204fa",
+  "lock_sha256": "5445e81c3058d4c6cc81b9c0602b5f4884292c1851d285b604d4495772977285",
   "lock_version": 5,
   "overrides": {
     "flags": {},
@@ -1701,7 +1701,7 @@
   "sections": {
     "analysis": "81cdc2d12aacc031bb70595c13973ff647ab49a68bebda4be7a9b65ba3127a78",
     "assessment": "dce26b7322a34e10c22c380fff0f675581046b9df217d283beaef5d6a55efb37",
-    "execution": "cecaeea48aee5b8dc8ea2d092a20b640bfd8ce78e7ff13211d3219838dc204fa",
+    "execution": "5445e81c3058d4c6cc81b9c0602b5f4884292c1851d285b604d4495772977285",
     "toolchain": "9a32fba5858fad219ac72112d73a8896da8790e53180ce35ddc3f94710a30cbc"
   },
   "spec": {

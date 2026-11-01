@@ -31,6 +31,9 @@ with the same pinned tools: lint, format, strict types and individual pytest out
 Its `test_timeout` parameter controls the actual per-test deadline (default 60 seconds);
 whole checks have the `stage/1` ceiling of 300 seconds, rather than the spike's 600 seconds.
 Run its offline gate fixtures with `make stage-check NAME=raidar/verify TARGET=local`.
+[`raidar/define@1`](lab/stages/raidar/define/) owns the standalone definition tool and emits
+the sealed definition plus `criteria/1`. Its stop call has a 60-second timeout and at most
+three resume turns. Malformed agent drafts receive one repair opportunity, then close.
 
 Problem validation scores only repeat-stable reference cases. A checkpoint must add a
 previously uncollected test its own reference passes in every repeat, or that checkpoint
