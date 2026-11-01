@@ -8,11 +8,13 @@ Nothing authored runs as root; the supervisor children are this file's own inter
 
 from __future__ import annotations
 
+import contextlib
 import ctypes
 import errno
 import io
 import json
 import os
+import signal
 import stat
 import subprocess
 import tarfile
@@ -735,11 +737,783 @@ def test_argv0_resolution_only_trusts_executables_on_the_given_path(tmp_path: Pa
 def test_a_setup_that_never_reports_is_a_failure_not_a_hang(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setattr(supervise, "STATUS_WAIT_S", 0.2)
     read, write = os.pipe()
     try:
+        monkeypatch.setattr(supervise, "STATUS_WAIT_S", 0)  # the wait is already over
         assert supervise._read_status(read) == "child setup did not finish"
+        monkeypatch.setattr(supervise, "STATUS_WAIT_S", 10)
     finally:
         os.close(write)
     assert supervise._read_status(read) is None
     os.close(read)
+
+
+def test_a_setup_failure_is_reported_as_its_text() -> None:
+    read, write = os.pipe()
+    os.write(write, b"OSError: no such directory")
+    os.close(write)
+
+    assert supervise._read_status(read) == "OSError: no such directory"
+    os.close(read)
+
+
+# ------------------------------------------------------------------ supervisor decisions
+# The supervisor's decisions run on real pipes with an injected clock, launcher and wait
+# status; nothing forks and nothing sleeps. ``test_primitive_payload_supervisor_slow.py``
+# keeps the seams that need a real child process.
+class _Done(BaseException):  # noqa: N818 - stands in for a process exit
+    def __init__(self, code: int) -> None:
+        self.code = code
+
+
+class _Clock:
+    def __init__(self, tick: float = 0.1) -> None:
+        self.now, self.tick = 0.0, tick
+
+    def monotonic(self) -> float:
+        self.now += self.tick
+        return self.now
+
+    def sleep(self, seconds: float) -> None:
+        self.now += seconds
+
+
+@pytest.fixture
+def clock(monkeypatch: pytest.MonkeyPatch) -> _Clock:
+    fake = _Clock()
+    monkeypatch.setattr(
+        supervise, "time", SimpleNamespace(monotonic=fake.monotonic, sleep=fake.sleep)
+    )
+    monkeypatch.setattr(supervise, "POLL_S", 0)
+    return fake
+
+
+class _Pipes:
+    """The supervisor's end of a launched child: stdout/stderr pipes the test feeds."""
+
+    def __init__(self, stdout: bytes = b"", stderr: bytes = b"", *, close: bool = True) -> None:
+        self.out_r, self.out_w = os.pipe()
+        self.err_r, self.err_w = os.pipe()
+        os.write(self.out_w, stdout)
+        os.write(self.err_w, stderr)
+        if close:
+            self.close_writers()
+
+    def close_writers(self) -> None:
+        for descriptor in (self.out_w, self.err_w):
+            with contextlib.suppress(OSError):
+                os.close(descriptor)
+
+    def launched(self, pid: int = 4321, error: str | None = None) -> supervise.Launched:
+        return supervise.Launched(pid, self.out_r, self.err_r, error)
+
+    def release(self) -> None:
+        self.close_writers()
+        for descriptor in (self.out_r, self.err_r):
+            with contextlib.suppress(OSError):
+                os.close(descriptor)
+
+
+def _polls(monkeypatch: pytest.MonkeyPatch, *statuses: int | None) -> None:
+    pending = list(statuses)
+    monkeypatch.setattr(
+        supervise, "_poll_main", lambda pid: pending.pop(0) if len(pending) > 1 else pending[0]
+    )
+
+
+def _call_spec(tmp_path: Path, **over: Any) -> dict[str, Any]:
+    spec = supervise.build_spec(
+        call_dir=str(tmp_path / "call"),
+        argv=["tool"],
+        env={"PATH": supervise.BASE_PATH},
+        cwd=str(tmp_path),
+        timeout_s=1,
+        uid=None,
+        gid=None,
+        seccomp=False,
+        trees=[],
+    )
+    spec.update(over)
+    return spec
+
+
+def test_output_is_pumped_until_the_child_and_its_pipes_are_done(
+    monkeypatch: pytest.MonkeyPatch, clock: _Clock
+) -> None:
+    pipes = _Pipes(b"out", b"err")
+    out, err = supervise.Capture(100, tail=False), supervise.Capture(100, tail=True)
+    _polls(monkeypatch, None, 3 << 8)
+    try:
+        outcome = supervise.collect(pipes.launched(), {"timeout_s": 5}, out, err)
+    finally:
+        pipes.release()
+
+    assert (outcome.status, outcome.timed_out) == (3 << 8, False)
+    assert (out.data, err.data) == (b"out", b"err")
+
+
+def test_a_child_that_outlives_its_timeout_is_cut_off_at_the_deadline(
+    monkeypatch: pytest.MonkeyPatch, clock: _Clock
+) -> None:
+    pipes = _Pipes(close=False)
+    _polls(monkeypatch, None)
+    try:
+        outcome = supervise.collect(
+            pipes.launched(),
+            {"timeout_s": 0.35},
+            supervise.Capture(9, tail=False),
+            supervise.Capture(9, tail=True),
+        )
+    finally:
+        pipes.release()
+
+    assert (outcome.status, outcome.timed_out) == (None, True)
+    assert clock.now < 1
+
+
+def test_a_descendant_holding_the_pipes_open_is_waited_for_only_for_the_grace(
+    monkeypatch: pytest.MonkeyPatch, clock: _Clock
+) -> None:
+    pipes = _Pipes(close=False)
+    _polls(monkeypatch, 0)
+    try:
+        outcome = supervise.collect(
+            pipes.launched(),
+            {"timeout_s": 60},
+            supervise.Capture(9, tail=False),
+            supervise.Capture(9, tail=True),
+        )
+    finally:
+        pipes.release()
+
+    assert (outcome.status, outcome.timed_out) == (0, False)
+    assert supervise.GRACE_S <= clock.now < supervise.GRACE_S + 1
+
+
+def test_a_flood_stops_collection_at_the_cap(
+    monkeypatch: pytest.MonkeyPatch, clock: _Clock
+) -> None:
+    pipes = _Pipes(b"x" * 50, close=False)
+    out = supervise.Capture(10, tail=False)
+    _polls(monkeypatch, None)
+    try:
+        outcome = supervise.collect(
+            pipes.launched(), {"timeout_s": 60}, out, supervise.Capture(9, tail=True)
+        )
+    finally:
+        pipes.release()
+
+    assert out.overflow
+    assert (outcome.status, outcome.timed_out) == (None, False)
+    assert (out.data, out.total) == (b"x" * 10, 50)
+
+
+def test_a_main_child_still_running_with_closed_pipes_is_polled_not_spun(
+    monkeypatch: pytest.MonkeyPatch, clock: _Clock
+) -> None:
+    pipes = _Pipes()
+    _polls(monkeypatch, None, None, 0)
+    try:
+        outcome = supervise.collect(
+            pipes.launched(),
+            {"timeout_s": 60},
+            supervise.Capture(9, tail=False),
+            supervise.Capture(9, tail=True),
+        )
+    finally:
+        pipes.release()
+
+    assert outcome.status == 0
+
+
+def test_what_a_killed_childs_pipes_still_buffer_is_read_without_blocking() -> None:
+    pipes = _Pipes(b"tail", b"", close=False)
+    out, err = supervise.Capture(100, tail=False), supervise.Capture(100, tail=True)
+    try:
+        supervise.flush(pipes.launched(), out, err)
+    finally:
+        pipes.release()
+
+    assert (out.data, err.data) == (b"tail", b"")
+
+
+def test_a_closed_pipe_ends_the_flush() -> None:
+    pipes = _Pipes(b"a", b"b")
+    out, err = supervise.Capture(100, tail=False), supervise.Capture(100, tail=True)
+    try:
+        supervise.flush(pipes.launched(), out, err)
+    finally:
+        pipes.release()
+
+    assert (out.data, err.data) == (b"a", b"b")
+
+
+def test_poll_reports_a_status_only_for_a_finished_child(monkeypatch: pytest.MonkeyPatch) -> None:
+    answers = iter([(0, 0), (77, 512)])
+    monkeypatch.setattr(os, "waitpid", lambda pid, flags: next(answers))
+
+    assert supervise._poll_main(77) is None
+    assert supervise._poll_main(77) == 512
+
+
+@pytest.mark.parametrize(
+    ("status", "expected"),
+    [(None, (None, None)), (3 << 8, (3, None)), (9, (None, 9)), (0, (0, None))],
+)
+def test_a_wait_status_decodes_to_an_exit_code_or_a_signal(
+    status: int | None, expected: tuple[int | None, int | None]
+) -> None:
+    assert supervise._decode(status) == expected
+
+
+def test_the_childs_group_is_killed_and_a_known_status_is_kept(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    killed: list[tuple[int, int]] = []
+    monkeypatch.setattr(os, "killpg", lambda pid, sig: killed.append((pid, sig)))
+
+    assert supervise.finish_main(55, supervise.Outcome(7, False)) == 7
+    assert killed == [(55, signal.SIGKILL)]
+
+
+@pytest.mark.parametrize(
+    ("wait", "expected"),
+    [(lambda pid, flags: (pid, 9), 9), (None, None)],
+)
+def test_an_unreaped_child_is_waited_for_after_its_group_is_killed(
+    monkeypatch: pytest.MonkeyPatch, wait: Any, expected: int | None
+) -> None:
+    def gone(pid: int, sig: int) -> None:
+        raise ProcessLookupError
+
+    def nothing(pid: int, flags: int) -> None:
+        raise ChildProcessError
+
+    monkeypatch.setattr(os, "killpg", gone)
+    monkeypatch.setattr(os, "waitpid", wait or nothing)
+
+    assert supervise.finish_main(55, supervise.Outcome(None, True)) == expected
+
+
+def test_stray_adopted_processes_are_killed_and_counted(
+    monkeypatch: pytest.MonkeyPatch, clock: _Clock
+) -> None:
+    pending = [[11, 12], [13], []]
+    signalled: list[int] = []
+    reaped: list[bool] = []
+
+    def kill(pid: int, sig: int) -> None:
+        if pid == 12:
+            raise ProcessLookupError
+        signalled.append(pid)
+
+    monkeypatch.setattr(supervise, "_children", lambda me: pending.pop(0))
+    monkeypatch.setattr(supervise, "_reap_all", lambda: reaped.append(True))
+    monkeypatch.setattr(os, "killpg", lambda pgid, sig: (_ for _ in ()).throw(PermissionError))
+    monkeypatch.setattr(os, "kill", kill)
+
+    assert supervise.kill_descendants(2**22) == 2
+    assert signalled == [11, 13]
+    assert len(reaped) == 2
+
+
+def test_killing_descendants_gives_up_after_its_rounds(
+    monkeypatch: pytest.MonkeyPatch, clock: _Clock
+) -> None:
+    monkeypatch.setattr(supervise, "KILL_ROUNDS", 3)
+    monkeypatch.setattr(supervise, "_children", lambda me: [9])
+    monkeypatch.setattr(supervise, "_reap_all", lambda: None)
+    monkeypatch.setattr(os, "killpg", lambda pgid, sig: None)
+    monkeypatch.setattr(os, "kill", lambda pid, sig: None)
+
+    assert supervise.kill_descendants(2**22) == 3
+
+
+def test_reaping_stops_when_nothing_is_left_to_wait_for(monkeypatch: pytest.MonkeyPatch) -> None:
+    answers: list[Any] = [(5, 0), (6, 0), (0, 0)]
+
+    def wait(pid: int, flags: int) -> tuple[int, int]:
+        return answers.pop(0)
+
+    monkeypatch.setattr(os, "waitpid", wait)
+    supervise._reap_all()
+    assert answers == []
+
+    monkeypatch.setattr(os, "waitpid", lambda pid, flags: (_ for _ in ()).throw(ChildProcessError))
+    supervise._reap_all()
+
+
+def test_adopted_children_are_read_from_the_process_table(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    tables = {
+        "/proc/12/stat": "12 (a b) S 99 1 2",
+        "/proc/14/stat": "14 (c) S 7 1 2",
+        "/proc/15/stat": "15 (d)",
+    }
+
+    def read(path: str, **kwargs: Any) -> io.StringIO:
+        if path not in tables:
+            raise OSError(path)
+        return io.StringIO(tables[path])
+
+    with monkeypatch.context() as patch:
+        patch.setattr(os, "listdir", lambda path: ["12", "self", "13", "14", "15"])
+        patch.setattr(supervise, "open", read, raising=False)
+        assert supervise._children(99) == [12]
+        assert supervise._children(7) == [14]
+
+
+def test_a_host_without_a_process_table_has_no_adopted_children(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def missing(path: str) -> list[str]:
+        raise FileNotFoundError(path)
+
+    with monkeypatch.context() as patch:
+        patch.setattr(os, "listdir", missing)
+        assert supervise._children(1) == []
+
+
+def test_the_child_redirects_its_stdio_and_closes_every_other_descriptor(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    seen: list[tuple[str, tuple[int, ...]]] = []
+    with monkeypatch.context() as patch:
+        patch.setattr(os, "open", lambda path, flags: 99)
+        patch.setattr(os, "dup2", lambda a, b: seen.append(("dup2", (a, b))))
+        patch.setattr(os, "closerange", lambda a, b: seen.append(("close", (a, b))))
+        patch.setattr(os, "sysconf", lambda name: 4096)
+        supervise._prepare_stdio(7, 8, 9)
+
+    assert seen == [
+        ("dup2", (99, 0)),
+        ("dup2", (7, 1)),
+        ("dup2", (8, 2)),
+        ("close", (3, 9)),
+        ("close", (10, 4096)),
+    ]
+
+
+@pytest.mark.parametrize(
+    ("over", "expected"),
+    [
+        ({}, ["chdir"]),
+        ({"uid": 1000, "gid": 1001}, ["drop 1000 1001", "chdir"]),
+        ({"seccomp": True}, ["seccomp", "chdir"]),
+        ({"uid": 1, "gid": 2, "seccomp": True}, ["drop 1 2", "seccomp", "chdir"]),
+    ],
+)
+def test_the_child_drops_privileges_then_installs_the_filter_then_enters_its_directory(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, over: dict[str, Any], expected: list[str]
+) -> None:
+    order: list[str] = []
+    monkeypatch.setattr(
+        isolate, "drop_privileges", lambda uid, gid: order.append(f"drop {uid} {gid}")
+    )
+    monkeypatch.setattr(isolate, "install_seccomp", lambda: order.append("seccomp"))
+    monkeypatch.setattr(os, "chdir", lambda path: order.append("chdir"))
+
+    supervise._become_child(_call_spec(tmp_path, **over))
+
+    assert order == expected
+
+
+def _child_setup(monkeypatch: pytest.MonkeyPatch) -> list[Any]:
+    steps: list[Any] = []
+
+    def leave(code: int) -> None:
+        raise _Done(code)
+
+    monkeypatch.setattr(os, "setsid", lambda: steps.append("setsid"))
+    monkeypatch.setattr(os, "umask", lambda mask: steps.append(("umask", mask)))
+    monkeypatch.setattr(os, "execve", lambda *a: steps.append(("execve", a)))
+    monkeypatch.setattr(os, "_exit", leave)
+    monkeypatch.setattr(supervise, "_prepare_stdio", lambda *a: steps.append(("stdio", a)))
+    return steps
+
+
+def test_a_child_that_cannot_be_prepared_reports_why_and_exits_127(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    _child_setup(monkeypatch)
+    monkeypatch.setattr(
+        supervise, "_become_child", lambda spec: (_ for _ in ()).throw(OSError("no such dir"))
+    )
+    read, write = os.pipe()
+
+    with pytest.raises(_Done) as left:
+        supervise._child(_call_spec(tmp_path), 1, 2, write)
+
+    os.close(write)
+    assert left.value.code == 127
+    assert os.read(read, 100) == b"OSError: no such dir"
+    os.close(read)
+
+
+def test_a_command_that_is_not_on_the_path_never_reaches_exec(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    steps = _child_setup(monkeypatch)
+    monkeypatch.setattr(supervise, "_become_child", lambda spec: None)
+    read, write = os.pipe()
+
+    with pytest.raises(_Done):
+        supervise._child(
+            _call_spec(tmp_path, argv=["no-such-tool"], env={"PATH": str(tmp_path)}), 1, 2, write
+        )
+
+    os.close(write)
+    assert b"FileNotFoundError" in os.read(read, 200)
+    os.close(read)
+    assert not any(step[0] == "execve" for step in steps if isinstance(step, tuple))
+
+
+def test_a_prepared_child_executes_the_resolved_argv_with_the_clean_environment(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    steps = _child_setup(monkeypatch)
+    monkeypatch.setattr(supervise, "_become_child", lambda spec: steps.append("become"))
+    tool = tmp_path / "tool"
+    tool.write_text("")
+    tool.chmod(0o755)
+    spec = _call_spec(tmp_path, argv=["tool", "--x"], env={"PATH": str(tmp_path), "A": "1"})
+    read, write = os.pipe()
+
+    with pytest.raises(_Done):  # the faked exec returns, so the child leaves with 127
+        supervise._child(spec, 1, 2, write)
+
+    os.close(write)
+    assert os.read(read, 10) == b""
+    os.close(read)
+    assert steps[:3] == ["setsid", ("stdio", (1, 2, write)), ("umask", 0o022)]
+    assert steps[3] == "become"
+    assert steps[4] == ("execve", (str(tool), ["tool", "--x"], {"PATH": str(tmp_path), "A": "1"}))
+
+
+def test_the_parent_of_a_launched_child_gets_its_pid_pipes_and_setup_outcome(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setattr(os, "fork", lambda: 4321)
+
+    launched = supervise.launch(_call_spec(tmp_path))
+
+    assert (launched.pid, launched.setup_error) == (4321, None)
+    os.close(launched.out_fd)
+    os.close(launched.err_fd)
+
+
+def test_a_launched_child_runs_the_child_side_and_never_returns(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    given: list[tuple[Any, ...]] = []
+
+    def child(spec: dict[str, Any], out_w: int, err_w: int, status_w: int) -> None:
+        given.append((spec["argv"], out_w, err_w, status_w))
+        raise _Done(127)
+
+    monkeypatch.setattr(os, "fork", lambda: 0)
+    monkeypatch.setattr(supervise, "_child", child)
+
+    with pytest.raises(_Done):
+        supervise.launch(_call_spec(tmp_path))
+
+    assert given[0][0] == ["tool"]
+    for descriptor in given[0][1:]:
+        os.close(descriptor)
+
+
+def _launch_with(
+    monkeypatch: pytest.MonkeyPatch, pipes: _Pipes, *, status: int | None, error: str | None = None
+) -> None:
+    _polls(monkeypatch, status)
+    monkeypatch.setattr(supervise, "launch", lambda spec: pipes.launched(error=error))
+    monkeypatch.setattr(supervise, "kill_descendants", lambda pgid: 2)
+    monkeypatch.setattr(os, "killpg", lambda pid, sig: None)
+
+
+def _run_child(tmp_path: Path, **over: Any) -> dict[str, Any]:
+    result: dict[str, Any] = {}
+    supervise._run_child(_call_spec(tmp_path, **over), result)
+    return result
+
+
+def test_a_run_reports_exit_code_streams_digests_and_stray_kills(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, clock: _Clock
+) -> None:
+    pipes = _Pipes(b"out", b"err")
+    _launch_with(monkeypatch, pipes, status=3 << 8)
+
+    result = _run_child(tmp_path)
+
+    assert result["ran"]
+    assert result["isolation_error"] is None
+    assert (result["exit_code"], result["signal"], result["timed_out"], result["overflow"]) == (
+        3,
+        None,
+        False,
+        False,
+    )
+    assert result["stdout_sha256"] == _sha(b"out")
+    assert (result["stdout_bytes"], result["stderr_bytes"]) == (3, 3)
+    assert result["descendants_killed"] == 2
+    assert result["duration_s"] > 0
+
+
+def test_a_child_killed_by_a_signal_reports_the_signal_not_an_exit_code(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, clock: _Clock
+) -> None:
+    _launch_with(monkeypatch, _Pipes(), status=9)
+
+    result = _run_child(tmp_path)
+
+    assert (result["exit_code"], result["signal"]) == (None, 9)
+
+
+def test_a_timed_out_child_is_reaped_and_flagged(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, clock: _Clock
+) -> None:
+    pipes = _Pipes(b"partial", close=False)
+    _launch_with(monkeypatch, pipes, status=None)
+    monkeypatch.setattr(os, "waitpid", lambda pid, flags: (pid, 9))
+
+    result = _run_child(tmp_path, timeout_s=0.35)
+
+    assert result["timed_out"]
+    assert (result["exit_code"], result["signal"]) == (None, 9)
+    assert supervise.base64.b64decode(result["stdout_b64"]) == b"partial"
+    pipes.release()
+
+
+def test_a_flood_is_cut_at_the_cap_and_flagged(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, clock: _Clock
+) -> None:
+    pipes = _Pipes(b"x" * 4096, close=False)
+    _launch_with(monkeypatch, pipes, status=None)
+    monkeypatch.setattr(os, "waitpid", lambda pid, flags: (pid, 9))
+
+    result = _run_child(tmp_path, stdout_cap=1000)
+
+    assert result["overflow"]
+    assert not result["timed_out"]
+    assert len(supervise.base64.b64decode(result["stdout_b64"])) == 1000
+    assert result["stdout_bytes"] >= 1000
+    pipes.release()
+
+
+def test_a_child_that_cannot_be_started_is_reported_as_not_run(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, clock: _Clock
+) -> None:
+    _launch_with(monkeypatch, _Pipes(), status=127 << 8, error="FileNotFoundError: tool")
+
+    result = _run_child(tmp_path)
+
+    assert result["ran"] is False
+    assert result["isolation_error"] == "FileNotFoundError: tool"
+    assert result["exit_code"] == 127
+
+
+# -------------------------------------------------------------- the supervisor's refusals
+def _supervised(
+    monkeypatch: pytest.MonkeyPatch, spec: dict[str, Any]
+) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+    started: list[dict[str, Any]] = []
+
+    def run(given: dict[str, Any], result: dict[str, Any]) -> None:
+        started.append(given)
+        result["ran"] = True
+
+    monkeypatch.setattr(supervise, "_run_child", run)
+    return supervise.supervise(spec), started
+
+
+def _tree_check(root: Path) -> dict[str, Any]:
+    limits = {"links": True, "owner": None}
+    digest = walk.scan(str(root), walk.Limits.from_spec(limits), entries=False)["digest"]
+    return {"root": str(root), "limits": limits, "digest": digest}
+
+
+def test_a_changed_tool_tree_is_refused_before_it_runs_and_flagged_after(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    tool = _lay(tmp_path / "tool")
+    check = _tree_check(tool)
+    (tool / "a.txt").write_bytes(b"tampered")
+
+    refused, started = _supervised(monkeypatch, _call_spec(tmp_path, verify=[check]))
+
+    assert refused["ran"] is False
+    assert started == []
+    assert [t["ok"] for t in refused["tool_before"]] == [False]
+    assert "tool_after" not in refused
+
+    (tool / "a.txt").write_bytes(b"alpha")
+    clean, started = _supervised(monkeypatch, _call_spec(tmp_path, verify=[check]))
+    assert clean["ran"]
+    assert [t["ok"] for t in clean["tool_before"]] == [True]
+    assert [t["ok"] for t in clean["tool_after"]] == [True]
+    assert len(started) == 1
+
+
+def test_an_unsafe_or_oversized_watched_state_refuses_the_run_and_missing_state_does_not(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    state = _lay(tmp_path / "state")
+    (state / "l").symlink_to(state)
+
+    unsafe, started = _supervised(monkeypatch, _call_spec(tmp_path, state=str(state)))
+    (state / "l").unlink()
+    limits = {"max_bytes": 1, "max_files": 10, "max_depth": 5}
+    oversized, _ = _supervised(
+        monkeypatch, _call_spec(tmp_path, state=str(state), state_limits=limits)
+    )
+    absent, started_absent = _supervised(
+        monkeypatch, _call_spec(tmp_path, state=str(tmp_path / "absent"))
+    )
+    unwatched, _ = _supervised(monkeypatch, _call_spec(tmp_path))
+
+    assert unsafe["ran"] is False
+    assert unsafe["bounds_violation"] == "symlink: l"
+    assert started == []
+    assert oversized["ran"] is False
+    assert "too many bytes" in oversized["bounds_violation"]
+    assert absent["ran"]
+    assert absent["bounds_violation"] is None
+    assert unwatched["bounds_violation"] is None
+    assert len(started_absent) == 1
+
+
+def _libc(monkeypatch: pytest.MonkeyPatch, result: Any) -> None:
+    def cdll(*args: Any, **kwargs: Any) -> Any:
+        if isinstance(result, Exception):
+            raise result
+        return result
+
+    monkeypatch.setattr(ctypes, "CDLL", cdll)
+
+
+@pytest.mark.parametrize(
+    "libc",
+    [SimpleNamespace(prctl=lambda *args: -1), OSError("no libc"), SimpleNamespace()],
+)
+def test_a_supervisor_that_cannot_become_a_subreaper_refuses_to_run_the_child(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, libc: Any
+) -> None:
+    _libc(monkeypatch, libc)
+
+    result, started = _supervised(monkeypatch, _call_spec(tmp_path, seccomp=True))
+
+    assert result["ran"] is False
+    assert result["isolation_error"] == "could not become a subreaper"
+    assert started == []
+    assert "tool_after" not in result
+
+
+def test_a_subreaper_is_only_needed_when_the_filter_is(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    seen: list[tuple[int, ...]] = []
+
+    def prctl(*args: int) -> int:
+        seen.append(args)
+        return 0
+
+    _libc(monkeypatch, SimpleNamespace(prctl=prctl))
+
+    assert supervise._subreaper({"seccomp": False}) is None
+    assert seen == []
+    assert supervise._subreaper({"seccomp": True}) is None
+    assert seen == [(supervise.PR_SET_CHILD_SUBREAPER, 1, 0, 0, 0)]
+
+
+def test_call_scratch_directories_are_private_to_the_call(tmp_path: Path) -> None:
+    spec = _call_spec(tmp_path)
+
+    supervise._prepare_dirs(spec)
+
+    for name in ("home", "tmp"):
+        assert stat.S_IMODE((tmp_path / "call" / name).stat().st_mode) == 0o700
+
+
+def test_scratch_goes_to_the_childs_user_and_a_root_supervisor_locks_the_call_directory(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    chowned: list[tuple[str, int, int]] = []
+    chmodded: list[tuple[str, int]] = []
+    (tmp_path / "call").mkdir()
+    (tmp_path / "call" / "context.json").write_text("{}")
+    monkeypatch.setattr(
+        os, "chown", lambda path, uid, gid: chowned.append((Path(path).name, uid, gid))
+    )
+    monkeypatch.setattr(os, "chmod", lambda path, mode: chmodded.append((Path(path).name, mode)))
+    monkeypatch.setattr(os, "geteuid", lambda: 0)
+
+    supervise._prepare_dirs(_call_spec(tmp_path, uid=1000, gid=1001))
+
+    assert chowned == [
+        ("home", 1000, 1001),
+        ("tmp", 1000, 1001),
+        ("call", 0, 0),
+        ("context.json", 0, 0),
+    ]
+    assert chmodded == [("call", 0o755)]
+
+
+def test_the_supervisor_entry_prints_one_result_and_destroys_the_call_directory(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    spec = _call_spec(tmp_path)
+    (tmp_path / "call").mkdir()
+    (tmp_path / "call" / "leftover").write_text("x")
+    path = tmp_path / "spec.json"
+    path.write_text(json.dumps(spec))
+    monkeypatch.setattr(
+        supervise, "supervise", lambda given: {"seen": given["argv"], "exit_code": 0}
+    )
+
+    assert supervise.main([str(path)]) == 0
+
+    lines = capsys.readouterr().out.splitlines()
+    assert [json.loads(line) for line in lines] == [{"seen": ["tool"], "exit_code": 0}]
+    assert not (tmp_path / "call").exists()
+
+
+def test_a_quiet_poll_while_setup_runs_keeps_waiting_for_its_report(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    real = supervise.selectors.DefaultSelector
+
+    class Quiet:
+        def __init__(self) -> None:
+            self.inner, self.quiet = real(), 1
+
+        def register(self, *args: Any) -> Any:
+            return self.inner.register(*args)
+
+        def select(self, timeout: float) -> list[Any]:
+            if self.quiet:
+                self.quiet -= 1
+                return []
+            return self.inner.select(0)
+
+    monkeypatch.setattr(supervise.selectors, "DefaultSelector", Quiet)
+    read, write = os.pipe()
+    os.write(write, b"late")
+    os.close(write)
+
+    assert supervise._read_status(read) == "late"
+    os.close(read)
+
+
+def test_a_root_supervisor_locks_the_call_directory_even_before_a_context_exists(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    chowned: list[str] = []
+    monkeypatch.setattr(os, "chown", lambda path, uid, gid: chowned.append(Path(path).name))
+    monkeypatch.setattr(os, "chmod", lambda path, mode: None)
+    monkeypatch.setattr(os, "geteuid", lambda: 0)
+    (tmp_path / "call").mkdir()
+
+    supervise._prepare_dirs(_call_spec(tmp_path))
+
+    assert chowned == ["call"]

@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import time
-from typing import Any
 
 import pytest
 
@@ -272,15 +271,33 @@ def test_violations_are_bounded_and_each_message_is_short() -> None:
     assert all(len(line) < VIOLATION_WIDTH + 40 for line in found)
 
 
-def test_the_builder_reply_skeleton_states_the_shape_once() -> None:
-    assert skeleton(BUILD_SCHEMA) == (
-        '{"account": string, "adrs": [{"id": string, "status": string, "context": string, '
-        '"decision": string, "consequences": string}], "ac_tests": [{"criterion": string, '
-        '"tests": [string]}]}'
+def test_a_schema_is_rendered_as_the_shape_of_the_object_it_asks_for() -> None:
+    schema: JsonObject = {
+        "type": "object",
+        "properties": {
+            "a": {"type": "string"},
+            "b": {
+                "type": "array",
+                "items": {"type": "object", "properties": {"c": {"type": "string"}}},
+            },
+            "d": {"type": "array", "items": {"type": "string"}},
+        },
+    }
+
+    assert skeleton(schema) == '{"a": string, "b": [{"c": string}], "d": [string]}'
+
+
+def test_the_builder_reply_names_each_schema_property_once_at_the_prompts_end() -> None:
+    shown = skeleton(BUILD_SCHEMA)
+    properties = list(BUILD_SCHEMA["properties"])  # type: ignore[call-overload]
+
+    assert [shown.index(f'"{name}":') for name in properties] == sorted(
+        shown.index(f'"{name}":') for name in properties
     )
+    assert all(shown.count(f'"{name}":') == 1 for name in properties)
     suffix = shape_suffix(BUILD_SCHEMA)
-    assert suffix.startswith("\n\nReply with ONLY one JSON object of this shape")
-    assert suffix.endswith(skeleton(BUILD_SCHEMA))
+    assert suffix.endswith(shown)
+    assert suffix.count(shown) == 1
 
 
 def test_a_schema_node_with_no_type_cannot_be_rendered() -> None:
@@ -321,9 +338,3 @@ def test_a_refused_reply_names_the_violations_and_the_misplaced_properties() -> 
 
 def test_an_unreadable_reply_is_a_syntax_error_with_no_dropped_list() -> None:
     assert read_reply("", BUILD_SCHEMA) == (None, "reply holds no JSON object", [])
-
-
-def test_the_reply_value_is_a_plain_mapping() -> None:
-    value: Any = read_reply('{"account": "a", "adrs": [], "ac_tests": []}', BUILD_SCHEMA)[0]
-
-    assert isinstance(value, dict)

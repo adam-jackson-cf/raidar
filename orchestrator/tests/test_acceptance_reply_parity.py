@@ -31,13 +31,11 @@ from tests.criteria_support import (
     OBJECT,
     REJECTS,
     TESTS,
-    Host,
+    ScriptShell,
     acceptance,
     reply,
     write_workspace,
 )
-
-pytestmark = pytest.mark.slow
 
 
 class Rig:
@@ -46,7 +44,7 @@ class Rig:
     def __init__(self, tmp_path: Path, files: dict[str, str] | None = None) -> None:
         self.workspace = tmp_path / "app"
         write_workspace(self.workspace, {FILE: TESTS} if files is None else files)
-        self.checkpoint = Checkpoint(Host(), tmp_path / "logs", "task")
+        self.checkpoint = Checkpoint(ScriptShell(), tmp_path / "logs", "task")
         self.acceptance = acceptance()
         self.reply = AcceptanceReply(self.acceptance, str(self.workspace))
         self.turns = 0
@@ -186,12 +184,21 @@ async def test_a_turn_of_another_kind_is_not_read(rig: Rig) -> None:
     assert rig.reply.record()["replies"] == []
 
 
-def test_the_reply_shape_is_appended_to_builder_turns_only(rig: Rig) -> None:
-    for kind in (FIRST_BUILD, GATE_FIX, REWORK, REPAIR):
-        decorated = rig.reply.decorate(kind, "go")
-        assert decorated.startswith("go\n\n")
-        assert "ac_tests" in decorated
-    assert rig.reply.decorate("define", "go") == "go"
+async def test_a_turn_that_left_no_final_message_is_a_syntax_fault_of_a_first_build(
+    rig: Rig,
+) -> None:
+    (rig.checkpoint.logs_dir / "turn-1").mkdir(parents=True)  # no last-message.txt, no turn spent
+
+    resume = await rig.reply.check(rig.checkpoint, "turn-1")
+
+    assert resume is not None
+    assert resume.kind == REPAIR
+    (kept,) = rig.reply.record()["replies"]
+    assert (kept["kind"], kept["fault"], kept["error"]) == (
+        FIRST_BUILD,
+        "syntax",
+        "reply holds no JSON object",
+    )
 
 
 async def test_criteria_unknown_so_far_leave_the_mapping_unchecked(tmp_path: Path) -> None:

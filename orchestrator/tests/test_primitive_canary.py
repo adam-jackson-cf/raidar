@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
@@ -96,17 +97,19 @@ async def test_a_record_for_other_identities_is_refused(rig: Rig, mismatch: dict
     assert rig.container.calls == []
 
 
-def test_the_workflow_may_carry_primitives_the_record_does_not_name(rig: Rig) -> None:
+def test_the_workflow_may_carry_primitives_the_record_does_not_name() -> None:
+    record = StageCheckRecord("package", PACK, PRIMITIVES, "stdout", {}, 1_000, 1_000)
     union = {**PRIMITIVES, "gate/1": "g" * 64}
-
-    assert rig.expected.identity_error(rig.package.digest, PACK, union) is None
+    assert record.identity_error("package", PACK, union) is None
+    assert record.identity_error("other-package", PACK, union) is not None
 
 
 @pytest.mark.parametrize("workflow", [{}, {"stop/1": "q" * 64}, {"gate/1": "g" * 64}])
 def test_a_primitive_the_record_names_must_be_present_and_equal(
-    rig: Rig, workflow: dict[str, str]
+    workflow: dict[str, str],
 ) -> None:
-    error = rig.expected.identity_error(rig.package.digest, PACK, workflow)
+    record = StageCheckRecord("package", PACK, PRIMITIVES, "stdout", {}, 1_000, 1_000)
+    error = record.identity_error("package", PACK, workflow)
 
     assert error is not None
     assert "stop/1" in error
@@ -175,18 +178,61 @@ async def test_a_canary_that_cannot_be_staged_with_room_left_is_an_integrity_fai
     assert invalid.value.kind == "integrity"
 
 
-async def test_run_fixture_replays_any_fixture_case_for_stage_check(rig: Rig) -> None:
+async def test_run_fixture_replays_any_fixture_case_for_stage_check(
+    rig: Rig, tmp_path: Path
+) -> None:
     run = await run_fixture(rig.site, "resume", "resume-0")
 
     assert run.usable
     assert run.outputs == note_digest(rig.container, "resume")
     assert run.stdout_sha256 != rig.expected.stdout_sha256
+    note_output = rig.package.manifest.outputs["note"]
+    manifest = rig.package.manifest.model_copy(
+        update={
+            "outputs": {
+                **rig.package.manifest.outputs,
+                "external": note_output.model_copy(update={"path": "/app/external.md"}),
+            }
+        }
+    )
+    external_site = replace(rig.site, package=replace(rig.package, manifest=manifest))
+    external = await run_fixture(external_site, "resume", "outside-watch")
+    assert external.outputs == {**run.outputs, "external": None}
+    empty_root = tmp_path / "empty-package"
+    fixture = empty_root / "fixtures" / "resume"
+    fixture.mkdir(parents=True)
+    (fixture / "context.json").write_text(
+        '{"task":"write a note","params":{"min_words":3},"round":0,"carry":{}}'
+    )
+    empty_site = replace(rig.site, package=replace(rig.package, root=empty_root))
+    empty = await run_fixture(empty_site, "resume", "empty")
+    assert empty.usable
+    assert empty.outputs == {"note": None}
+    package = replace(
+        rig.package, manifest=rig.package.manifest.model_copy(update={"on_stop": None})
+    )
+    with pytest.raises(TrialInvalid) as invalid:
+        await run_fixture(replace(rig.site, package=package), "resume", "no-stop")
+    assert invalid.value.kind == "instrument"
 
 
-def test_the_stage_check_record_round_trips_as_json(rig: Rig) -> None:
-    again = StageCheckRecord.from_json(rig.expected.as_json())
-
-    assert again == rig.expected
+@pytest.mark.parametrize(
+    ("floors", "exhausted"),
+    [
+        (ResourceFloors({"/app": 999, "/tmp": 2_000}, 1_000), True),
+        (ResourceFloors({"/app": 1_000}, 999), True),
+        (ResourceFloors({"/app": 1_000}, 1_000), False),
+        (ResourceFloors({"/app": 1_001}, 1_001), False),
+        (ResourceFloors({"/app": None}, None), False),
+    ],
+)
+def test_the_stored_record_preserves_resource_attribution(
+    floors: ResourceFloors, exhausted: bool
+) -> None:
+    original = StageCheckRecord("package", PACK, PRIMITIVES, "stdout", {}, 1_000, 1_000)
+    again = StageCheckRecord.from_json(original.as_json())
+    assert again.below_floor(floors) is exhausted
     assert again.memory_available == 1_000
-    no_memory = {**rig.expected.as_json(), "floors": {"disk_free": 1, "memory_available": None}}
+    no_memory = {**original.as_json(), "floors": {"disk_free": 1, "memory_available": None}}
     assert StageCheckRecord.from_json(no_memory).memory_available is None
+    assert not StageCheckRecord.from_json(no_memory).below_floor(ResourceFloors({"/app": 1}, 0))
