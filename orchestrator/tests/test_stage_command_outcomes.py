@@ -643,3 +643,35 @@ def test_workflow_new_refuses_names_that_could_escape_or_are_malformed(
 
     assert result.exit_code != 0
     assert not workflows.exists()
+
+
+def test_available_pack_allows_a_check_without_installed_proof_or_a_stop_record(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    async def check(*args: Any, **kwargs: Any) -> CheckReport:
+        return _passing(record=None, installed=None)
+
+    monkeypatch.setattr(
+        stage_fixtures, "load_named", lambda name: (Path("/stage"), SimpleNamespace(digest="d"))
+    )
+    monkeypatch.setattr(stage_fixtures, "lock_problems", lambda root: [])
+    monkeypatch.setattr(stage_fixtures, "package_primitives", lambda packages: {})
+    monkeypatch.setattr(stage_fixtures, "load_runtime_pack", lambda runtime: object())
+    monkeypatch.setattr(stage_fixtures, "image_tag", lambda spec: "pack:fixture")
+    monkeypatch.setattr(stage_fixtures, "image_lock_hash", lambda spec: "pack-hash")
+    monkeypatch.setattr(stage_fixtures, "inspect_image", lambda tag: "image-id")
+    monkeypatch.setattr(
+        stage_fixtures,
+        "docker_selection",
+        lambda target: SimpleNamespace(trial=SimpleNamespace(docker_context="ctx")),
+    )
+    monkeypatch.setattr(stage_fixtures, "_logs_dir", lambda *args: tmp_path / "logs")
+    monkeypatch.setattr(stage_fixtures, "stage_checks_root", lambda: tmp_path)
+    monkeypatch.setattr(stage_fixtures, "check_package", check)
+
+    result = _check()
+
+    assert result.exit_code == 0, result.output
+    assert "passed" in result.output
+    assert "no canary record" in result.output
+    assert list(tmp_path.iterdir()) == []

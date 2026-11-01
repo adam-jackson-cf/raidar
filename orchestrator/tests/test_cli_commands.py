@@ -2,15 +2,19 @@
 
 from __future__ import annotations
 
+import os
+import runpy
 import subprocess
 import sys
 import tomllib
 from pathlib import Path
 
+import click
 import pytest
 from click.testing import CliRunner
 
-from raidar.cli import env_harbor, main
+from raidar.cli import env_harbor, main, process
+from raidar.contract import paths
 
 
 def test_cli_version_matches_pyproject_version() -> None:
@@ -187,3 +191,72 @@ def test_harbor_cleanup_surfaces_docker_failures(monkeypatch, docker_target_offl
 
     assert result.exit_code != 0
     assert "docker ps failed: no daemon" in result.output
+
+
+@pytest.mark.parametrize(
+    ("source", "existing", "expected"),
+    [
+        ("dotenv", None, "local"),
+        ("dotenv", "shell", "shell"),
+        ("infisical", None, None),
+    ],
+)
+def test_cli_local_configuration_never_overrides_shell_or_infisical(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    source: str,
+    existing: str | None,
+    expected: str | None,
+) -> None:
+    (tmp_path / ".env").write_text("RAIDAR_TEST_CONFIG=local\n")
+    monkeypatch.setattr(paths, "ORCHESTRATOR_ROOT", tmp_path)
+    monkeypatch.setenv("RAIDAR_SECRETS_SOURCE", source)
+    monkeypatch.setenv("RAIDAR_TEST_CONFIG", "sentinel")
+    monkeypatch.delenv("RAIDAR_TEST_CONFIG", raising=False)
+    if existing is not None:
+        monkeypatch.setenv("RAIDAR_TEST_CONFIG", existing)
+
+    runpy.run_path(str(Path(process.__file__).with_name("__init__.py")))
+
+    assert os.environ.get("RAIDAR_TEST_CONFIG") == expected
+
+
+def test_cli_entry_file_exposes_help(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setattr(sys, "argv", ["raidar", "--help"])
+    monkeypatch.setenv("RAIDAR_SECRETS_SOURCE", "infisical")
+
+    with pytest.raises(SystemExit) as stopped:
+        runpy.run_path(str(Path(process.__file__).with_name("__init__.py")), run_name="__main__")
+
+    assert stopped.value.code == 0
+    output = capsys.readouterr().out
+    assert "Usage:" in output
+    assert "lock" in output
+    assert "assess" in output
+
+
+@pytest.mark.parametrize("returncode", [0, 7, -15])
+def test_external_command_failure_stops_the_cli_before_completion(
+    monkeypatch: pytest.MonkeyPatch, returncode: int
+) -> None:
+    monkeypatch.setattr(
+        process.subprocess,
+        "run",
+        lambda *args, **kwargs: subprocess.CompletedProcess(args[0], returncode),
+    )
+
+    @click.command()
+    def command() -> None:
+        process.run_or_raise(["tool", "check"], Path("/workspace"))
+        click.echo("completed")
+
+    result = CliRunner().invoke(command)
+
+    assert result.exit_code == (0 if returncode == 0 else 1)
+    if returncode == 0:
+        assert result.output.endswith("completed\n")
+    else:
+        assert "completed" not in result.output
+        assert f"Command failed ({returncode}): tool check" in result.output

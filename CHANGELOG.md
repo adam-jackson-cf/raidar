@@ -4,13 +4,6 @@ All notable changes to this project are documented in this file.
 
 ## Unreleased
 
-### Grading and problem fast coverage closure
-
-- Cover retained pre-fix grading, offline coverage reuse and parity, verifier/regrade refusals,
-  problem validation, resolution, audit, errata and CLI outcomes with injected fast tests.
-- Remove the unreachable negative-repeat outcome comparison: varying cases are already
-  quarantined before repeats are compared. Grading and primitive identity bytes stay unchanged.
-
 ### Test-suite integration and identity preservation
 
 - Separate fast decisions from slow process seams and quality canaries; keep
@@ -28,10 +21,10 @@ All notable changes to this project are documented in this file.
   generated locks can escape as parser/index/key errors instead of
   `DependencyInfraError`. Error normalization is deferred to a deliberate grading
   change with revalidation; it is not part of this test-only integration.
-- Close engine-and-agent fast-tier coverage gaps with behavioral planning, admission,
-  detached-job, trial-failure, provisioning, authentication and image-boundary scenarios.
-  Inject runners, clocks and virtual task/job filesystems; preserve production source,
-  grading/primitive identities, released packages and the existing coverage floors.
+- Cover repository-interface boundaries in fast tests: local configuration
+  precedence, command failure exits, starter-release refusals, optional stage
+  proofs, ledger references, draft-mode restoration, wheel admission, snapshot
+  races and resolver ownership. Preserve production identities and coverage floors.
 
 ### Phase-5 local exit evidence (phase 5B step 7)
 
@@ -422,10 +415,6 @@ All notable changes to this project are documented in this file.
 - Fault recording interprets idle findings only for the liveness check, retaining gate and
   definition violations without treating their text findings as idle events.
 - Preserve grader and coverage secret-isolation records beyond temporary sandbox cleanup.
-
-## 0.15.0 - 2026-10-24
-
-- pack: drop planning tags from parsed recipe comments; a test holds the Dockerfile's tag to the next pack release
 
 ## 0.15.0 - 2026-10-24
 
