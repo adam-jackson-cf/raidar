@@ -4,9 +4,13 @@ A stage package contributes to a checkpoint's one primary agent session. It is n
 
 The portable implementation is `contract/`, distribution `raidar-contract`, import
 `raidar_contract`; it depends only on pydantic and PyYAML. Raidar uses that same
-implementation. `make contract-build` builds unpublished wheel/sdist artifacts under
-`var/contract-dist/` and prints their SHA-256 hashes. The contract remains prerelease
-until the phase-5 exit; runtime primitives and Harbor integration stay in the orchestrator.
+implementation, pinned to `1.0.0`. `make contract-build CONTRACT_DIST_DIR=<new-dir>` builds
+unpublished wheel/sdist artifacts, prints SHA-256 hashes and atomically refuses existing output.
+The private release artifacts are under `var/contract/v1.0.0/` (logical `contract/v1.0.0`),
+with exact-version/hash pins in `contract/releases/1.0.0.requirements.txt`; consumers install
+artifacts, never build from a tag. `raidar_contract.CONTRACTS` maps unversioned contract/schema
+names to integer supported versions. Runtime primitives and Harbor integration stay in the
+orchestrator; the final `contract-v1.0.0` tag requires the non-model phase-5 exit checks.
 
 ## Folder and names
 

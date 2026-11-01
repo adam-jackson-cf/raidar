@@ -21,9 +21,12 @@ The public stage-package authoring contract is [`lab/stages/README.md`](lab/stag
 `stage/1`, calls and canaries, `criteria/1`, immutable references and `stage-tree/1` identity.
 The portable schemas and digests have one implementation in [`contract/`](contract/),
 distribution `raidar-contract` (import `raidar_contract`), with only pydantic and PyYAML
-runtime dependencies. `make contract-build` builds a wheel and sdist under `var/contract-dist/`
-and prints their SHA-256 hashes; it publishes nothing. The orchestrator uses this package
-through a local path dependency; Harbor execution remains in the orchestrator.
+runtime dependencies. `make contract-build CONTRACT_DIST_DIR=<new-dir>` builds a wheel and sdist,
+prints SHA-256 hashes and refuses existing output; it publishes nothing. Private `1.0.0` artifacts
+are under `var/contract/v1.0.0/`, pinned by [`contract/releases/1.0.0.requirements.txt`](contract/releases/1.0.0.requirements.txt).
+Consumers install these artifacts with exact-version and hash enforcement, not from a Git tag.
+The orchestrator uses the same exact-version package through a local editable path; Harbor execution
+remains in the orchestrator. `raidar_contract.CONTRACTS` maps contract/schema names to supported versions.
 The three shipped workflows now use schema 2 and the generic package runtime. Unmarked arms run
 `raidar/one-shot@2` (no stages); `workflow-new` copies `raidar/one-shot-verify`, with verify and
 zero fix turns. `raidar/define-build-verify@2` consumes the define package's `criteria/1`
@@ -124,18 +127,21 @@ never commits, restores or stages the agent's work. A refusal with no fix turns 
 after a deadline or cancellation. `max_fix_rounds` defaults to zero. Baseline checks
 also run as the agent; the separate deterministic setup check executes no task code.
 Root installs immutable tools; there is no root hook broker. Hooks run as the agent's
-user and append to an agent-writable log. G1, G2, W5's hook-log condition and W11's
-`hook_log_*` findings are readings, never validity. G3 and independently measured tool,
-installed-tree, watched-path, protected-path and session-log integrity remain validity.
+user and append to an agent-writable log. W5's hook-log condition and W11's `hook_log_*` findings
+are readings, never validity. Independently measured tool, installed-tree, watched-path,
+protected-path and session-log integrity remain validity; no live stage-keyed G/E reader remains.
 The seal keeps its protected record channel and call supervisor; it disables Linux
 dumpability so checks cannot reopen its record pipes through `/proc`.
 Authoritative workflow, setup, baseline, seal and session-audit records are retained
-host-side. Health W1–W11 make missing enabled-stage evidence, setup failure and recorded
+host-side. Health W1–W11 make missing required primitive evidence, setup failure and recorded
 integrity violations invalid trials, not merely unmeasured outcomes. An unusable
 definition stays unusable for its checkpoint; zero criteria cannot yield `verified`.
-For schema 2, W1 requires the owed primitive records and package installation references and
-rejects recorded runtime invalidity or gate errors; malformed configuration stays invalid.
-The detailed W3–W10 primitive-specific re-key remains phase 5B work.
+Applicability comes from schema-2 host config and locked primitive ids, not stage names.
+Digest-checked package manifests supply setup/stop/output obligations in host-only config,
+outside package/lock identity; missing or inconsistent declarations fail closed.
+W3–W7 read `gate/1`, W8–W9 read package calls/outputs, and W10 reads reply/judge evidence.
+Refused canaries, agent-attributed failures and legitimate closed/cut outcomes remain valid
+when their required evidence is complete. Generic health families remain phase 6.
 
 The two coverage scorers run only at assessment time over retained define/build artifacts:
 `definition-coverage@6` reads each required unit's citing criteria; `test-coverage@6`
