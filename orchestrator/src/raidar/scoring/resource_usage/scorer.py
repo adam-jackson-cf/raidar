@@ -1,4 +1,4 @@
-"""``resource-usage@7``: tokens, cost, turns and agent wall time (plan G4).
+"""``resource-usage@8``: tokens, cost, turns and agent wall time (plan G4).
 
 Per checkpoint, the values come from Harbor as it recorded the step:
 
@@ -6,8 +6,8 @@ Per checkpoint, the values come from Harbor as it recorded the step:
   ``agent_result`` (``n_input_tokens``, which includes cached input,
   ``n_output_tokens`` and ``cost_usd``). They already cover every session the
   agent ran in the step, so a review loop's reviewer sessions count for the
-  arm that ran them. ``cost_usd`` also counts the step's judge calls (``workflow.json``
-  ``verify.judge_calls``, successful attempts' ``cost_usd``), so a judged arm is not cheaper
+  arm that ran them. ``cost_usd`` also counts ``jev-judge/1.judge_calls`` in
+  ``workflow.json``, including charged failures, so a judged arm is not cheaper
   for its judge's spend.
 - ``turns`` counts agent-sourced steps over every session in the step's ATIF
   trajectory, including embedded sub-agent sessions.
@@ -105,11 +105,10 @@ def _wall(inputs: StepInputs) -> Measured:
 
 
 def _judge_calls(inputs: StepInputs) -> list[Any] | Measured:
-    """The step's recorded judge calls, or why they cannot be read.
+    """The step's primitive judge calls, or why their spend cannot be read.
 
-    No ``workflow.json`` means no workflow ran, unless Harbor's record of the step shows a judged
-    verify stage (``StepInputs.judged``): then the missing or unreadable evidence leaves the spend
-    unknown, never zero.
+    Harbor's metadata preserves judge applicability even when retained trace evidence is missing.
+    A declared judge with missing calls leaves spend unknown, never zero.
     """
     path = inputs.trace_dir / "workflow" / "workflow.json" if inputs.trace_dir else None
     if path is None or not path.is_file():
@@ -124,23 +123,15 @@ def _judge_calls(inputs: StepInputs) -> list[Any] | Measured:
 
 
 def _recorded_judge_calls(record: object, judged: bool) -> list[Any] | Measured:
-    verify = record.get("verify") if isinstance(record, dict) else None
-    if not isinstance(record, dict) or (verify is not None and not isinstance(verify, dict)):
-        return _unavailable("the step's workflow record is malformed: judge spend is unknown")
-    if not isinstance(verify, dict):
-        if judged:
-            return _unavailable("a judged step has no verify record: judge spend is unknown")
-        return []
-    if not judged and not _has_judge(verify):
-        return []
-    calls = verify.get("judge_calls")
+    if not isinstance(record, dict):
+        return _unavailable("the workflow record is malformed: judge spend is unknown")
+    if "jev-judge/1" not in record:
+        return _unavailable("the judged step has no jev-judge/1 evidence") if judged else []
+    judge = record["jev-judge/1"]
+    calls = judge.get("judge_calls") if isinstance(judge, dict) else None
     if not isinstance(calls, list):
-        return _unavailable("the verify record lists no judge calls: judge spend is unknown")
+        return _unavailable("jev-judge/1 lists no calls: judge spend is unknown")
     return calls
-
-
-def _has_judge(verify: dict[str, Any]) -> bool:
-    return "judge" in verify or "judge_calls" in verify
 
 
 def _call_cost(call: Any) -> float | None | Measured:
@@ -281,5 +272,5 @@ class ResourceUsageScorer:
 
 
 def resource_usage_scorer() -> ResourceUsageScorer:
-    """Registry factory for ``resource-usage@7``."""
+    """Registry factory for ``resource-usage@8``."""
     return ResourceUsageScorer()

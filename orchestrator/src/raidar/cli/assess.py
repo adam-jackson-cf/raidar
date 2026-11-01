@@ -17,14 +17,14 @@ plain rescore stores Assessments under the keys analysis looks up for that
 lock. Only a target outside any job reads its ``assessment-config.yaml``.
 The report names the config it used.
 
-Pre-fix grades: when a scorer run reads them (``gate-effort``), ``--rescore``
-first grades every guardrail-gate@3 pre-fix snapshot of the target that is not
-yet graded into ``--store`` (``raidar.grading.prefix.grade``: the step's own
+Pre-fix grades: when a scorer run reads them (``verification-effort``), ``--rescore``
+first grades every ``gate/1`` retained pre-fix tree of the target that is not
+yet graded into ``--store`` (``raidar.grading.pre_fix.grade``: the step's own
 bundle, sandbox and timeout, on ``--target``'s grader target), never into the job, and
 reports what it graded. ``--replay`` grades nothing. ``--regrade`` with
 ``--store`` also regrades the stored pre-fix grades beside the final snapshots.
 
-Offline coverage: when a scorer run reads it (``code-quality@8``), ``--rescore``
+Offline coverage: when a scorer run reads it (``code-quality@9``), ``--rescore``
 first makes, into ``--store``, the verifier's coverage run of every step whose
 trial deferred it (``protocol.verifier_coverage: offline``;
 ``raidar.grading.coverage.offline``), never into the job, and reports what it

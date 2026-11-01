@@ -3,8 +3,8 @@
 Inputs are the job's ``TrialRecord`` (validity and identity) and the
 stored ``AssessResult`` of each scorer (``None`` when the store has no
 Assessment for this trial). Nothing is recomputed from raw run files:
-correctness comes from ``correctness@9``, quality from ``code-quality@8``,
-cost from ``resource-usage@7``, and the headline score from the experiment's
+correctness comes from ``correctness@10``, quality from ``code-quality@9``,
+cost from ``resource-usage@8``, and the headline score from the experiment's
 Metric applied to those components.
 
 The score component C (``correctness``) is the policy's definition
@@ -18,12 +18,12 @@ Two derivations are analysis-owned:
   before the last checkpoint (``not_attempted`` counts as unsolved, memo §10.1);
 - ``strict_solved[k]`` is 1 exactly when ``k`` lies in the reached prefix;
 - the ``*_solvable`` outcomes (the default primary) repeat ``solve_rate``, ``reached`` and
-  ``final_solved`` over the solvable-set metrics of ``correctness@9``; they are
+  ``final_solved`` over the solvable-set metrics of ``correctness@10``; they are
   ``unavailable`` for a problem whose lock pins no solvable set, and never replace the raw ones;
 - the ``*_errata`` outcomes repeat ``solve_rate``, ``reached`` and
-  ``final_solved`` over ``correctness@9``'s errata-applied metrics (the problem's
+  ``final_solved`` over ``correctness@10``'s errata-applied metrics (the problem's
   pinned errata); they are labelled as such and never replace the raw ones;
-- the ``gate.*`` outcomes (a gate-effort scorer, only when the lock declares
+- the ``gate.*`` outcomes (``verification-effort``, only when the lock declares
   one) are the scorer's trajectory metrics as stored: an arm without the commit
   gate reads ``not_applicable``; only the metrics that version reports are read;
 - the ``process.*`` outcomes (``process.stall_rate``; ``process-compliance``,
@@ -53,7 +53,6 @@ from raidar.scoring.catalog.outcomes import (
     FINAL_SOLVED,
     FINAL_SOLVED_ERRATA,
     FINAL_SOLVED_SOLVABLE,
-    GATE_EFFORT_REF,
     GATE_METRICS,
     GATE_PREFIX,
     HEADLINE_SCORE,
@@ -71,6 +70,7 @@ from raidar.scoring.catalog.outcomes import (
     SOLVE_RATE_SOLVABLE,
     SOLVED,
     STRICT_SOLVED,
+    VERIFICATION_EFFORT_REF,
     VERIFIER_DISAGREEMENT_SOURCE,
     VERIFIER_DISAGREEMENTS,
 )
@@ -280,17 +280,17 @@ def _series(
     return series
 
 
-def gate_effort_ref(declared: Collection[str]) -> str | None:
-    """``gate-effort`` when a lock declares it, else None."""
-    return GATE_EFFORT_REF if GATE_EFFORT_REF in declared else None
+def verification_effort_ref(declared: Collection[str]) -> str | None:
+    """``verification-effort`` when a lock declares it, else None."""
+    return VERIFICATION_EFFORT_REF if VERIFICATION_EFFORT_REF in declared else None
 
 
 def gate_metrics(result: AssessResult | None) -> dict[str, Value]:
-    """The ``gate.*`` outcomes from a trial's gate-effort trajectory observations.
+    """The ``gate.*`` outcomes from a trial's verification-effort trajectory observations.
 
     An arm without the gate reads ``not_applicable`` (the scorer's status), never 0.
     """
-    observed = Observed(GATE_EFFORT_REF, result)
+    observed = Observed(VERIFICATION_EFFORT_REF, result)
     return {
         metric.id: observed.value(metric.id.removeprefix(GATE_PREFIX)) for metric in GATE_METRICS
     }
@@ -324,8 +324,8 @@ def _effort_metrics(results: Mapping[str, AssessResult | None]) -> dict[str, Val
     Like cost totals, they describe what ran, truncated or not.
     """
     metrics: dict[str, Value] = {}
-    if GATE_EFFORT_REF in results:
-        metrics |= gate_metrics(results[GATE_EFFORT_REF])
+    if VERIFICATION_EFFORT_REF in results:
+        metrics |= gate_metrics(results[VERIFICATION_EFFORT_REF])
     if PROCESS_COMPLIANCE_REF in results:
         metrics |= process_metrics(results[PROCESS_COMPLIANCE_REF])
     if VERIFIER_DISAGREEMENT_SOURCE in results:
@@ -339,7 +339,7 @@ EXCLUDED_CASES = "regression_parity_excluded_cases"
 def disagreements(result: AssessResult | None) -> Value:
     """Grader cases whose outcome differed between grading and coverage, over a trial.
 
-    The sum of code-quality@8's per-transition ``regression_parity_excluded_cases``
+    The sum of code-quality@9's per-transition ``regression_parity_excluded_cases``
     over the transitions that measured it (a transition whose G read no run is not
     applicable and adds nothing). A diagnostic of the verifier, described, never compared.
     """

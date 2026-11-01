@@ -7,23 +7,20 @@ from collections.abc import Iterable, Sequence
 from raidar.evaluation.analysis.curves import Band, Curve
 from raidar.evaluation.analysis.dependencies import READINGS, ReadingShare
 from raidar.evaluation.analysis.effects import ArmExclusions, Effect, Exclusions, IntervalOut
-from raidar.evaluation.analysis.gate_effort import GateDescriptive
 from raidar.evaluation.analysis.manipulation import ManipulationReport
 from raidar.evaluation.analysis.ranking import Ranking, RankingRow
 from raidar.evaluation.analysis.report import AnalysisReport, ArmSummary, Comparison
+from raidar.evaluation.analysis.verification_effort import GateDescriptive
 from raidar.scoring.catalog.outcomes import (
     ALL_METRICS,
-    CROSS_MODE_CUMULATIVE,
-    GATE_EFFORT_REF,
     GATE_METRICS,
-    GATE_PREFIX,
     PROCESS_COMPLIANCE_REF,
+    VERIFICATION_EFFORT_REF,
     VERIFIER_DISAGREEMENTS,
     VERIFIER_METRICS,
     outcome_metric,
 )
 from raidar.scoring.framework.manifest import Direction
-from raidar.scoring.gate_effort.families import FAMILIES
 
 MISSING = "—"
 BETTER = {
@@ -41,24 +38,9 @@ BETTER_LEGEND = (
 )
 
 
-CUMULATIVE_MARK = " †"
-CUMULATIVE_LEGEND = (
-    "† A shadow gate sums this over its never-fixed tree at every step (it re-counts the "
-    "accumulated debt), an enforced gate over each step's new work only, so a shadow arm's "
-    "value does not compare with an enforced arm's. Compare total_new_first_run_blocking* "
-    "and total_new_autofix_* across gate modes."
-)
-
-
 def _better(metric: str, direction: Direction | None = None) -> str:
     found = direction if direction is not None else DIRECTIONS.get(metric)
-    better = BETTER[found] if found is not None else MISSING
-    return better + CUMULATIVE_MARK if metric in CROSS_MODE_CUMULATIVE else better
-
-
-def _legend(metrics: Iterable[str]) -> list[str]:
-    """The cumulative-count legend, when a table shows a marked metric."""
-    return ["", CUMULATIVE_LEGEND, ""] if CROSS_MODE_CUMULATIVE.intersection(metrics) else []
+    return BETTER[found] if found is not None else MISSING
 
 
 def _num(value: float | None) -> str:
@@ -164,9 +146,6 @@ def _manipulation(report: ManipulationReport | None) -> list[str]:
     ]
 
 
-GATE_HEADLINE = tuple(
-    metric for metric in GATE_METRICS if "." not in metric.id.removeprefix(GATE_PREFIX)
-)
 GATE_RANKING = (
     "gate.first_pass_clean_rate",
     "gate.unresolved_rate",
@@ -184,33 +163,6 @@ def _descriptive(item: GateDescriptive | None) -> str:
     return f"{_num(item.mean)} {_ci(item.interval)} n={item.n}"
 
 
-def _gate_mean(arm: ArmSummary, metric: str) -> float | None:
-    item = (arm.gate_effort or {}).get(metric)
-    return item.mean if item is not None else None
-
-
-UNTYPED_CALL_ROW = "typing: of which no-untyped-call (call-site cascade)"
-"""gate-effort reports the mypy ``no-untyped-call`` cascade apart from the typing family."""
-
-
-def _cascade_row(arms: Sequence[ArmSummary]) -> list[list[str]]:
-    metric = f"{GATE_PREFIX}total_first_run_untyped_call"
-    if not any(metric in (arm.gate_effort or {}) for arm in arms):
-        return []
-    return [[UNTYPED_CALL_ROW, *(f"{_num(_gate_mean(arm, metric))} / —" for arm in arms)]]
-
-
-def _family_row(family: str, arms: Sequence[ArmSummary]) -> list[str]:
-    kinds = ("total_first_run_blocking", "total_blocking_findings")
-    return [
-        family,
-        *(
-            " / ".join(_num(_gate_mean(arm, f"gate.{kind}.{family}")) for kind in kinds)
-            for arm in arms
-        ),
-    ]
-
-
 def _descriptive_rows(
     columns: Sequence[dict[str, GateDescriptive]], metrics: Sequence[str]
 ) -> list[list[str]]:
@@ -224,101 +176,23 @@ def _descriptive_rows(
 
 
 def _gate_arms(report: AnalysisReport) -> list[str]:
-    arms = [arm for arm in report.arms if arm.gate_effort is not None]
+    arms = [arm for arm in report.arms if arm.verification_effort is not None]
     if not arms:
         return []
     names = [arm.arm for arm in arms]
-    columns = [arm.gate_effort or {} for arm in arms]
-    rows = _descriptive_rows(columns, [metric.id for metric in GATE_HEADLINE])
+    columns = [arm.verification_effort or {} for arm in arms]
+    rows = _descriptive_rows(columns, [metric.id for metric in GATE_METRICS])
     return [
         "",
-        f"## Gate effort ({report.gate_scorer or GATE_EFFORT_REF}, per arm)",
+        f"## Gate effort ({report.gate_scorer or VERIFICATION_EFFORT_REF}, per arm)",
         "",
         "Mean [CI] n over valid trials; an arm without the commit gate has no value "
-        "(not applicable), never 0; an arm with a shadow gate has its first-run values only; "
-        "a step with no source change is not applicable to first-pass clean. The tests check "
-        "and fix_round_correctness_delta (final minus pre-fix case pass rate over steps with a "
-        "fix round; not applicable to a shadow gate) are reported; a failed tests check counts "
-        "once in every blocking count. Blocking counts that compare across gate "
-        "modes: total_new_first_run_blocking (what each step's own work added before any "
-        "fix), final_step_end_blocking (the tree the last step handed on); a shadow gate's "
-        "total_first_run_blocking re-counts the accumulated tree at every step. The mypy "
-        "no-untyped-call cascade is reported apart, and failing tests and missed coverage as "
-        "separate first-run outcomes; first-pass clean rates ignore the "
-        "auto-fixable layout codes (FORMAT, I001, W291-W293), the tests check (TEST.*), or "
-        "both, and the cross-mode counts are also given without the no-untyped-call cascade "
-        "(*_ex_cascade) and with a refused suppression comment "
-        "counted once (mypy's unused-ignore at a SUPPRESS line folded into it; *_net). "
-        "guardrail-gate's autofix step is reported (passes, errors, files and lines "
-        "changed, block-tier findings fixed), with the counts after autofix and before it "
-        "(*_post_autofix_net, *_raw_net: an enforced gate's runs see the fixed tree, a shadow "
-        "gate's check the raw one, so the arms compare like for like) and the fix sessions' "
-        "cost and wall time by the kind of refusal that started them; the autofix lines and "
-        "block-tier findings each step's own work added "
-        "(total_new_autofix_*: the step's first pass minus what the previous step left for "
-        "autofix) compare across gate modes where total_autofix_* do not.",
+        "(not applicable), never 0; a step with no source change is not applicable to "
+        "first-pass clean. blocking_checks counts the failed blocking gate checks summed "
+        "over the step's decided gate runs; fix_round_correctness_delta is the mean "
+        "correctness change over steps with a fix round.",
         "",
         *_table(("Metric", "Better", *names), rows),
-        *_legend(row[0] for row in rows),
-        "Blocking findings per trial by rule family (mean first run / mean over every run):",
-        "",
-        *_table(
-            ("Family", *names),
-            [*(_family_row(family, arms) for family in FAMILIES), *_cascade_row(arms)],
-        ),
-        *_autofix_family_table(arms, names),
-        *_refusal_table(arms, names),
-    ]
-
-
-def _family_cell(arm: ArmSummary, metrics: Sequence[str], family: str) -> str:
-    return " / ".join(_num(_gate_mean(arm, f"{metric}.{family}")) for metric in metrics)
-
-
-def _autofix_family_table(arms: Sequence[ArmSummary], names: Sequence[str]) -> list[str]:
-    """gate-effort: block-tier findings the autofix passes fixed, per family (and new)."""
-    metric = f"{GATE_PREFIX}total_autofix_removed_blocking"
-    if not any(metric in (arm.gate_effort or {}) for arm in arms):
-        return []
-    new = f"{GATE_PREFIX}total_new_autofix_removed_blocking"
-    with_new = any(new in (arm.gate_effort or {}) for arm in arms)
-    metrics = (metric, new) if with_new else (metric,)
-    rows = [[family, *(_family_cell(arm, metrics, family) for arm in arms)] for family in FAMILIES]
-    title = (
-        "Block-tier findings the autofix passes fixed per trial by rule family (mean summed "
-        "over the passes † / mean each step's own work added, cross-mode):"
-        if with_new
-        else "Block-tier findings the autofix passes fixed per trial by rule family (mean):"
-    )
-    return [title, "", *_table(("Family", *names), rows)]
-
-
-def _refusal_table(arms: Sequence[ArmSummary], names: Sequence[str]) -> list[str]:
-    """gate-effort: fix-session cost and wall time by the kind of refusal that started it."""
-    cost, wall = (
-        f"{GATE_PREFIX}total_fix_cost_usd_by_refusal",
-        f"{GATE_PREFIX}total_fix_wall_s_by_refusal",
-    )
-    if not any(f"{cost}.mixed" in (arm.gate_effort or {}) for arm in arms):
-        return []
-    prefix = f"{cost}."
-    kinds = [metric.id[len(prefix) :] for metric in GATE_METRICS if metric.id.startswith(prefix)]
-    rows = [
-        [
-            kind,
-            *(
-                f"{_num(_gate_mean(arm, f'{cost}.{kind}'))} / "
-                f"{_num(_gate_mean(arm, f'{wall}.{kind}'))}"
-                for arm in arms
-            ),
-        ]
-        for kind in kinds
-    ]
-    return [
-        "Fix sessions per trial by the refusal that started them (mean cost USD / wall s; "
-        "coverage_minimum: TEST.coverage-minimum was the only blocking code):",
-        "",
-        *_table(("Refusal", *names), rows),
     ]
 
 
@@ -348,7 +222,7 @@ def _verifier_arms(report: AnalysisReport) -> list[str]:
         "## Verifier sensitivity (diagnostic; never an outcome)",
         "",
         "Grader cases whose outcome differed between the grading run and the coverage run, "
-        "per trial (code-quality@8 regression_parity_excluded_cases, summed). Correctness "
+        "per trial (code-quality@9 regression_parity_excluded_cases, summed). Correctness "
         "and the solve rates read the grading run's verdict; G leaves such cases out.",
         "",
         *_table(("Metric", "Better", *(arm.arm for arm in arms)), rows),
@@ -458,7 +332,6 @@ def _gate_effects(comparison: Comparison) -> list[str]:
         "### Gate effort (paired)",
         "",
         *_table(header, (_effect_row(effect) for effect in comparison.gate_effects)),
-        *_legend(effect.metric for effect in comparison.gate_effects),
     ]
 
 

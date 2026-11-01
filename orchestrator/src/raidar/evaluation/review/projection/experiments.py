@@ -93,7 +93,7 @@ def _measured(values: Sequence[float | None]) -> list[float]:
 
 
 def _scorer_outcomes(areas: Mapping[str, Sequence[float]]) -> dict[str, dict[str, Any]]:
-    """Mean score area (C for correctness@9, I for code-quality@8) over scored runs."""
+    """Mean score area (C for correctness@10, I for code-quality@9) over scored runs."""
     return {
         ref: {"sample_size": len(values), "mean_score": round(fmean(values), 6)}
         for ref, values in areas.items()

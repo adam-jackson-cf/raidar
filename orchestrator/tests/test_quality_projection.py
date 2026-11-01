@@ -18,13 +18,10 @@ from raidar.evaluation.review.quality.experiment_view import _primary
 from raidar.evaluation.review.quality.models import COMPONENTS, QualityProjection
 from raidar.evaluation.review.quality.projection import build_quality_projection, main
 from raidar.evaluation.review.quality.stats import pearson, quantiles
-from raidar.scoring.catalog.builtin import default_scorer_registry
 from raidar.scoring.catalog.outcomes import CORRECTNESS_METRIC, HEADLINE_SCORE
 from raidar.scoring.framework.metrics import SCB_CANONICAL
-from raidar.scoring.framework.rescore import assess
 from raidar.scoring.framework.result import AssessResult, AssessStatus, Observation, RunStats
 from raidar.scoring.framework.store import OBJECTS_DIR, AssessmentStore, assessment_key
-from raidar.scoring.framework.trial_inputs import load_trial_context
 from tests.review_fixtures.quality.generate import (
     CHECKPOINTS,
     EXPERIMENT,
@@ -136,7 +133,7 @@ def test_problem_row_is_the_analysis_outcome_of_the_same_assessments(
         outcome = build_outcome(record, results, policy=SCB_CANONICAL)
         rates = {
             item.subject: item.value or 0.0
-            for item in results["correctness@9"].observations
+            for item in results["correctness@10"].observations
             if item.metric == "strict_pass_rate" and item.status is AssessStatus.OK
         }
         steps = record.trial.steps
@@ -309,10 +306,10 @@ def test_assessments_are_matched_by_snapshot_content_not_trial_name(
 
     result = build_quality_projection(target / "jobs", target / "store")
     unmatched = result.run_details[f"{EXPERIMENT}.synthetic-run-2.b00-p0-baseline"]
-    assert unmatched.run.sources == {"code-quality@8": None, "correctness@9": None}
+    assert unmatched.run.sources == {"code-quality@9": None, "correctness@10": None}
     assert unmatched.rows[0].cells["V"].status == "unavailable"
     matched = result.run_details[f"{RUN_PREFIX}b00-p0-baseline"]
-    assert matched.run.sources["code-quality@8"] is not None
+    assert matched.run.sources["code-quality@9"] is not None
     problem = _problem(result)
     assert any("superseded" in item for item in problem.excluded)
 
@@ -325,7 +322,7 @@ def test_only_the_locked_exact_assessment_is_used_even_when_a_newer_one_has_the_
     store = AssessmentStore(target / "store")
     job_id = f"{RUN_PREFIX}b00-p0-baseline"
     before = build_quality_projection(target / "jobs", target / "store").run_details[job_id]
-    original = store.get(before.run.sources["correctness@9"] or "")
+    original = store.get(before.run.sources["correctness@10"] or "")
     assert original is not None
     updates: dict[str, object] = {}
     if changed == "config":
@@ -373,16 +370,16 @@ def test_only_the_locked_exact_assessment_is_used_even_when_a_newer_one_has_the_
     store.log(
         trial="b00-p0-baseline",
         key=replacement.key,
-        scorer="correctness@9",
+        scorer="correctness@10",
         outcome="added",
         stats=RunStats(duration_s=0),
     )
     after = build_quality_projection(target / "jobs", target / "store").run_details[job_id]
-    assert after.run.sources["correctness@9"] == original.key
+    assert after.run.sources["correctness@10"] == original.key
     assert after.problem["C"] == before.problem["C"]
     store.path_for(original.key).unlink()
     missing = build_quality_projection(target / "jobs", target / "store").run_details[job_id]
-    assert missing.run.sources["correctness@9"] is None
+    assert missing.run.sources["correctness@10"] is None
     assert missing.problem["C"].value is None
 
 
@@ -424,7 +421,7 @@ def test_relocking_assessment_settings_requires_the_new_exact_assessment(
     run_id = f"{RUN_PREFIX}b00-p0-baseline"
     before = build_quality_projection(target / "jobs", target / "store").run_details[run_id]
     store = AssessmentStore(target / "store")
-    original = store.get(before.run.sources["correctness@9"] or "")
+    original = store.get(before.run.sources["correctness@10"] or "")
     assert original is not None
     lock_path = target / "experiment.lock.json"
     lock = json.loads(lock_path.read_text())
@@ -434,14 +431,14 @@ def test_relocking_assessment_settings_requires_the_new_exact_assessment(
     lock = seal_lock(lock)
     lock_path.write_text(json.dumps(lock))
     unassessed = build_quality_projection(target / "jobs", target / "store").run_details[run_id]
-    assert unassessed.run.sources["correctness@9"] is None
+    assert unassessed.run.sources["correctness@10"] is None
     trial = target / "jobs" / EXPERIMENT / RUN_ID / "trials" / "b00-p0-baseline"
     exact = FixtureAssessments(lock_rescore_config(lock)).assessment(
-        "correctness@9", trial, original.result
+        "correctness@10", trial, original.result
     )
     store.put(exact)
     assessed = build_quality_projection(target / "jobs", target / "store").run_details[run_id]
-    assert assessed.run.sources["correctness@9"] == exact.key
+    assert assessed.run.sources["correctness@10"] == exact.key
 
 
 @pytest.mark.parametrize("change", ["missing", "relocked"])
@@ -646,33 +643,35 @@ def test_a_baseline_with_no_counted_trials_is_named_in_the_notes(
     assert any("baseline arm baseline has no counted trials" in note for note in problem.notes)
 
 
-# ---- gate effort (gate-effort + the guardrail-gate records) ---------------------------
+# ---- verification effort (verification-effort + the gate/1 records) -------------------
 
 
-def test_a_gated_run_shows_its_gate_rounds_and_failure_families(
+def test_a_gated_run_shows_its_gate_rounds_and_failed_checks(
     projection: QualityProjection,
 ) -> None:
     gated = projection.run_details[f"{RUN_PREFIX}b00-p0-guided"].gate
     assert gated is not None
     assert gated.source is not None
+    assert gated.scorer == "verification-effort@1"
     assert [step.checkpoint for step in gated.steps] == [f"checkpoint_{n}" for n in range(1, 6)]
     unresolved = gated.steps[3]
-    assert unresolved.termination == "rounds_exhausted"
     assert unresolved.cells["unresolved"].value == 1.0
     assert unresolved.cells["rounds_to_clean"].status == "not_applicable"
     assert [item.verdict for item in unresolved.rounds] == ["refused"] * 4
+    assert [item.run for item in unresolved.rounds] == [1, 2, 3, 4]
     first = unresolved.rounds[0]
-    assert first.families is not None
-    assert first.blocking == sum(first.families.values())
-    assert first.log_path is not None
-    assert first.log_path.endswith("steps/checkpoint_4/agent/guardrail-gate/gate_run_1.log")
-    # The step cells are the stored Assessment's: the families sum over every run.
-    totals = {family: cell.value for family, cell in unresolved.families.items()}
-    assert sum(value or 0 for value in totals.values()) == sum(
-        item.blocking or 0 for item in unresolved.rounds
+    assert first.after == "stage_1_work"
+    assert first.attribution == "refused"
+    assert first.failed_checks
+    # The step cells are the stored Assessment's: failed blocking checks sum over the runs.
+    assert unresolved.cells["blocking_checks"].value == sum(
+        len(item.failed_checks) for item in unresolved.rounds
     )
     assert gated.totals["unresolved_rate"].value == pytest.approx(0.2)
-    # The ungated arm has no gate view at all (never zeros).
+    clean = gated.steps[0]
+    assert [item.verdict for item in clean.rounds] == ["passed"]
+    assert clean.rounds[0].failed_checks == ()
+    # A trial without a gate/1 record has no gate view at all (never zeros).
     assert projection.run_details[f"{RUN_PREFIX}b00-p0-baseline"].gate is None
 
 
@@ -681,10 +680,10 @@ def test_gate_records_without_an_assessment_or_with_a_broken_record_say_so(
 ) -> None:
     target = _copy(fixture_dir, tmp_path)
     for path in sorted((target / "store" / OBJECTS_DIR).glob("*/*.json")):
-        if json.loads(path.read_text())["scorer"]["ref"] == "gate-effort@15":
+        if json.loads(path.read_text())["scorer"]["ref"] == "verification-effort@1":
             path.unlink()
     trace = target / "jobs" / EXPERIMENT / RUN_ID / "trials" / "b01-p0-guided" / "steps"
-    (trace / "checkpoint_2" / "agent" / "guardrail-gate" / "guardrail-gate.json").write_text("[")
+    (trace / "checkpoint_2" / "agent" / "workflow" / "workflow.json").write_text("[")
 
     rebuilt = build_quality_projection(target / "jobs", target / "store", synthetic=True)
 
@@ -722,33 +721,6 @@ def test_experiments_label_the_primary_outcome_as_the_analysis_report_does(
     assert _primary([member(None)])[0] == "solve_rate_solvable"  # type: ignore[list-item]
 
 
-def test_a_shadow_gate_is_labelled(fixture_dir: Path, tmp_path: Path) -> None:
-    target = _copy(fixture_dir, tmp_path)
-    steps = target / "jobs" / EXPERIMENT / RUN_ID / "trials" / "b01-p0-guided" / "steps"
-    for record_path in steps.glob("*/agent/guardrail-gate/guardrail-gate.json"):
-        record = json.loads(record_path.read_text())
-        record["mode"] = "shadow"
-        record_path.write_text(json.dumps(record))
-
-    # A changed trace has a new assessment key; rescore the gate under that key.
-    assess(
-        AssessmentStore(target / "store"),
-        default_scorer_registry().get("gate-effort@15"),
-        load_trial_context(steps.parent),
-        trial="b01-p0-guided",
-    )
-
-    rebuilt = build_quality_projection(target / "jobs", target / "store", synthetic=True)
-
-    gate = rebuilt.run_details[f"{RUN_PREFIX}b01-p0-guided"].gate
-    assert gate is not None
-    assert (gate.shadow, gate.scorer) == (True, "gate-effort@15")
-    assert not gate.notes
-    enforced = rebuilt.run_details[f"{RUN_PREFIX}b00-p0-guided"].gate
-    assert enforced is not None
-    assert (enforced.shadow, enforced.scorer) == (False, "gate-effort@15")
-
-
 @pytest.mark.parametrize("quality_gap", ["missing", "ineligible"])
 def test_zero_correctness_remains_scored_when_sensitivity_components_are_unmeasured(
     fixture_dir: Path, tmp_path: Path, quality_gap: str
@@ -758,13 +730,13 @@ def test_zero_correctness_remains_scored_when_sensitivity_components_are_unmeasu
     for path in (target / "store" / OBJECTS_DIR).glob("*/*.json"):
         payload = json.loads(path.read_text())
         ref = payload["scorer"]["ref"]
-        if ref == "code-quality@8" and quality_gap == "missing":
+        if ref == "code-quality@9" and quality_gap == "missing":
             path.unlink()
             continue
         for observation in payload["result"]["observations"]:
-            if ref == "correctness@9" and observation["metric"] == "strict_pass_rate":
+            if ref == "correctness@10" and observation["metric"] == "strict_pass_rate":
                 observation["value"] = 0
-            elif ref == "code-quality@8" and observation["metric"] == "problem_architecture":
+            elif ref == "code-quality@9" and observation["metric"] == "problem_architecture":
                 observation.update(
                     status="ineligible", value=None, reason="unmeasured architecture"
                 )

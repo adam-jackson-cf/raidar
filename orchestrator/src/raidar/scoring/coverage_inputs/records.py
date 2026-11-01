@@ -1,32 +1,27 @@
-"""A step's retained define and build artifacts, read host-side for the coverage scorers.
+"""Coverage inputs from retained primitive records, never package executable code.
 
-The workflow runner keeps, per attempted step under the agent log directory,
-``workflow/workflow.json`` and the files it names: the define stage's ``units.json`` and the
-sealed ``feature-definition.md``, and the build's final ``ac_tests`` map with the final test
-sources (``build.sources``). This module reads those files and nothing else; it never imports the
-workflow's own code (scoring stays independent of workflows), so the formats are parsed here from
-what is stored: units as ``[{id, text, required, citable}]``; criteria as the compact markdown
-``- F1.AC1: <statement>`` with indented ``Source:``, ``Aspect:``, ``Example:`` and ``Kind:`` lines.
+``outputs/1`` supplies a digest-checked ``criteria/1`` document. Its producer's captured
+``setup/1`` UNITS token supplies the citable task units (``U12*: required``, ``U13: optional``).
+``acceptance-reply/1`` supplies the final test map and retained test-source directory.
 """
 
 from __future__ import annotations
 
+import hashlib
 import json
 import re
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from raidar_contract.criteria import validate_criteria
+
 WORKFLOW_RECORD = "workflow/workflow.json"
-REGRESSION = "regression"
-_CRITERION = re.compile(r"^- (?P<id>[A-Z]+[0-9]+\.AC[0-9]+)\s*:?\s*(?P<text>.*)$")
-_FIELD = re.compile(r"^\s+(Source|Aspect|Example|Kind|Verification)\s*:\s*(?P<text>.*)$")
-_CONTINUATION = re.compile(r"^\s{2,}\S")
-_QUOTES = '"“”'
+_UNIT = re.compile(r"^([UC][0-9]+)(\*)?: (.*)$")
 
 
 def normalised(text: str) -> str:
-    """The text on one line, runs of whitespace joined (how the definition shows a unit)."""
+    """Join whitespace as the package's numbered-unit presentation does."""
     return " ".join(text.split())
 
 
@@ -47,7 +42,7 @@ class Criterion:
     regression: bool
 
     def view(self) -> dict[str, Any]:
-        """What Jev is shown of a criterion (its ``Source:`` and ``Verification:`` dropped)."""
+        """What Jev sees, without source quotes or verification instructions."""
         return {
             "statement": self.text,
             "aspects": list(self.aspects),
@@ -61,7 +56,7 @@ class Criterion:
 
 @dataclass(frozen=True)
 class Defined:
-    """A step whose workflow defined: the units, and the criteria when a definition was sealed."""
+    """The producer's citable units and, when sealed, portable criteria."""
 
     ending: str | None
     units: tuple[Unit, ...]
@@ -70,22 +65,20 @@ class Defined:
 
 @dataclass(frozen=True)
 class NotDefined:
-    """The step ran no define stage."""
+    """The workflow declares no criteria output."""
 
     reason: str
 
 
 @dataclass(frozen=True)
 class Unreadable:
-    """Evidence a measurement needs is missing or malformed."""
+    """Required retained evidence is missing, malformed or changed."""
 
     reason: str
 
 
 @dataclass(frozen=True)
 class Built:
-    """The final mapped tests: criterion id to test ids, and where their sources are kept."""
-
     ac_tests: dict[str, tuple[str, ...]]
     sources: Path
 
@@ -93,8 +86,17 @@ class Built:
 def _inside(root: Path, relative: object) -> Path | None:
     if not isinstance(relative, str) or not relative:
         return None
-    path = (root / relative).resolve()
-    return path if path.is_relative_to(root.resolve()) else None
+    named = Path(relative)
+    if named.is_absolute() or ".." in named.parts:
+        return None
+    path = root / named
+    if any(
+        part.is_symlink()
+        for part in (path, *path.parents)
+        if part != root and part.is_relative_to(root)
+    ):
+        return None
+    return path if path.resolve().is_relative_to(root.resolve()) else None
 
 
 def _json(path: Path) -> Any:
@@ -109,103 +111,125 @@ def workflow_record(trace_dir: Path) -> dict[str, Any] | None:
     return loaded if isinstance(loaded, dict) else None
 
 
-def _units(trace_dir: Path, record: dict[str, Any]) -> tuple[Unit, ...] | None:
-    named = _inside(trace_dir, record.get("units"))
-    if named is None:
+def _setup_stdout(record: dict[str, Any], producer: str) -> str | None:
+    setups = record.get("setup/1")
+    setup = setups.get(producer) if isinstance(setups, dict) else None
+    call = setup.get("call") if isinstance(setup, dict) else None
+    if not isinstance(call, dict):
         return None
-    loaded = _json(named.with_suffix(".json"))
-    if not isinstance(loaded, list):
+    stdout = call.get("stdout")
+    if not isinstance(stdout, str):
         return None
-    found = []
-    for item in loaded:
-        if not isinstance(item, dict) or not isinstance(item.get("id"), str):
-            return None
-        if not isinstance(item.get("text"), str):
-            return None
-        found.append(Unit(item["id"], item["text"], item.get("required") is True))
-    return tuple(found)
-
-
-def parse_criteria(text: str) -> tuple[Criterion, ...]:
-    """The acceptance criteria of a rendered feature definition, in order."""
-    found: list[dict[str, Any]] = []
-    open_item: dict[str, Any] | None = None
-    last: list[str] | None = None  # the field a wrapped line extends (None: the statement)
-    for line in text.splitlines():
-        start = _CRITERION.match(line)
-        field = _FIELD.match(line)
-        if start:
-            open_item = {"id": start["id"], "text": start["text"].strip(), "fields": []}
-            found.append(open_item)
-            last = None
-        elif field and open_item is not None:
-            last = [field[1], field["text"].strip()]
-            open_item["fields"].append(last)
-        elif open_item is not None and _CONTINUATION.match(line):
-            if last is None:
-                open_item["text"] = f"{open_item['text']} {line.strip()}"
-            else:
-                last[1] += f" {line.strip()}"
-        else:
-            open_item = None
-    return tuple(_criterion(item) for item in found)
-
-
-def _criterion(item: dict[str, Any]) -> Criterion:
-    fields: list[list[str]] = item["fields"]
-
-    def values(name: str) -> tuple[str, ...]:
-        return tuple(text for key, text in fields if key == name)
-
-    return Criterion(
-        id=item["id"],
-        text=item["text"],
-        sources=tuple(source.strip(_QUOTES) for source in values("Source")),
-        aspects=values("Aspect"),
-        examples=values("Example"),
-        regression=REGRESSION in {kind.strip().lower() for kind in values("Kind")},
+    return (
+        stdout if hashlib.sha256(stdout.encode()).hexdigest() == call.get("stdout_sha256") else None
     )
 
 
+def _units(record: dict[str, Any], producer: str) -> tuple[Unit, ...] | None:
+    stdout = _setup_stdout(record, producer)
+    if stdout is None:
+        return None
+    try:
+        document = json.loads(stdout)
+        text = document["tokens"]["UNITS"]
+    except (ValueError, KeyError, TypeError):
+        return None
+    return _numbered_units(text) if isinstance(text, str) else None
+
+
+def _numbered_units(text: str) -> tuple[Unit, ...] | None:
+    units: list[Unit] = []
+    seen: set[str] = set()
+    for line in text.splitlines():
+        match = _UNIT.fullmatch(line)
+        if match is None or match[1] in seen:
+            return None
+        seen.add(match[1])
+        units.append(Unit(match[1], match[3], match[2] == "*"))
+    return tuple(units)
+
+
+def _criteria(trace_dir: Path, output: dict[str, Any]) -> tuple[Criterion, ...] | Unreadable:
+    path = _inside(trace_dir, output.get("host_path"))
+    if path is None:
+        return Unreadable("the criteria output has no safe retained path")
+    try:
+        data = path.read_bytes()
+        if len(data) != output.get("bytes") or hashlib.sha256(data).hexdigest() != output.get(
+            "sha256"
+        ):
+            return Unreadable("the retained criteria output differs from its captured digest")
+        document = validate_criteria(json.loads(data))
+    except (OSError, ValueError) as error:
+        return Unreadable(f"the retained criteria output is unreadable: {error}")
+    return tuple(
+        Criterion(
+            item.id,
+            item.criterion,
+            item.sources,
+            tuple(f"{probe.situation} → {probe.outcome}" for probe in item.aspects),
+            tuple(f"{probe.situation} → {probe.outcome}" for probe in item.examples),
+            item.kind == "regression",
+        )
+        for item in document.all_criteria()
+    )
+
+
+def _criteria_outputs(record: dict[str, Any]) -> list[tuple[str, dict[str, Any]]] | None:
+    outputs = record.get("outputs/1")
+    if not isinstance(outputs, dict):
+        return None
+    found: list[tuple[str, dict[str, Any]]] = []
+    for producer, named in outputs.items():
+        if not isinstance(named, dict):
+            return None
+        found.extend(
+            (producer, output)
+            for output in named.values()
+            if isinstance(output, dict) and output.get("contract") == "criteria/1"
+        )
+    return found
+
+
 def read_define(trace_dir: Path) -> Defined | NotDefined | Unreadable:
-    """The step's define evidence; ``NotDefined`` when its workflow has no define stage."""
+    """Read the single criteria producer; ambiguous or changed evidence fails closed."""
     record = workflow_record(trace_dir)
     if record is None:
-        return Unreadable("no workflow record: whether the step defined cannot be known")
-    if "define" not in (record.get("stages") or []):
-        return NotDefined("the arm's workflow has no define stage")
-    define = record.get("define")
-    if not isinstance(define, dict):
-        return Unreadable("the workflow record holds no define record")
-    units = _units(trace_dir, define)
-    if units is None:
-        return Unreadable("the define stage's units were not retained or do not read")
-    return _defined(trace_dir, define, units)
+        return Unreadable("no workflow record: criteria production cannot be known")
+    candidates = _criteria_outputs(record)
+    if candidates is None:
+        return Unreadable("the workflow holds no valid outputs/1 record")
+    if not candidates:
+        return NotDefined("the workflow has no criteria/1 output")
+    if len(candidates) != 1:
+        return Unreadable("coverage requires one unambiguous criteria/1 producer")
+    return _defined(trace_dir, record, *candidates[0])
 
 
 def _defined(
-    trace_dir: Path, define: dict[str, Any], units: tuple[Unit, ...]
+    trace_dir: Path, record: dict[str, Any], producer: str, output: dict[str, Any]
 ) -> Defined | Unreadable:
-    ending = define.get("ending") if isinstance(define.get("ending"), str) else None
-    written = _inside(trace_dir, define.get("definition"))
-    if written is None:
+    units = _units(record, producer)
+    if units is None:
+        return Unreadable("the criteria producer's setup/1 units are missing or malformed")
+    endings = record.get("endings", {})
+    ending = endings.get(producer) if isinstance(endings, dict) else None
+    if output.get("error") is not None:
         return Defined(ending, units, None)
-    try:
-        return Defined(ending, units, parse_criteria(written.read_text(encoding="utf-8")))
-    except OSError:
-        return Unreadable("the sealed feature definition is named but cannot be read")
+    criteria = _criteria(trace_dir, output)
+    return criteria if isinstance(criteria, Unreadable) else Defined(ending, units, criteria)
 
 
 def read_build(trace_dir: Path) -> Built | Unreadable:
-    """The final ``ac_tests`` map and the directory of the retained test sources."""
+    """The acceptance-reply primitive's final test map and retained sources."""
     record = workflow_record(trace_dir)
-    build = record.get("build") if record else None
-    if not isinstance(build, dict):
-        return Unreadable("the workflow record holds no build record")
-    mapped = build.get("ac_tests")
+    reply = record.get("acceptance-reply/1") if record else None
+    if not isinstance(reply, dict):
+        return Unreadable("the workflow holds no acceptance-reply/1 record")
+    mapped = reply.get("ac_tests")
     if not isinstance(mapped, dict):
-        return Unreadable("the build record holds no ac_tests")
-    sources = _inside(trace_dir, build.get("sources"))
+        return Unreadable("acceptance-reply/1 holds no ac_tests map")
+    sources = _inside(trace_dir, reply.get("sources"))
     if sources is None or not sources.is_dir():
         return Unreadable("the final test sources were not retained")
     tests: dict[str, tuple[str, ...]] = {}

@@ -55,7 +55,7 @@ def _step(tmp_path: Path, calls: list[dict[str, object]] | None) -> StepInputs:
     if calls is not None:
         (tmp_path / "workflow").mkdir(parents=True)
         (tmp_path / "workflow" / "workflow.json").write_text(
-            json.dumps({"verify": {"judge_calls": calls}})
+            json.dumps({"jev-judge/1": {"judge_calls": calls}})
         )
     return StepInputs(
         step="checkpoint_1",

@@ -2,10 +2,10 @@
 
 - ``regrade``: the stored step snapshots graded again (``raidar.grading.regrade``)
   and, with an Assessment store, the stored pre-fix grades beside them
-  (``raidar.grading.prefix.grade``); the report's ``match`` covers both;
+  (``raidar.grading.pre_fix.grade``); the report's ``match`` covers both;
 - ``grade_pre_fix``: before a rescore whose scorers read the grades of
-  guardrail-gate@3's pre-fix snapshots (``PRE_FIX_GRADE_SCORERS``), every
-  not-yet-graded snapshot of the target is graded into the store. A replay
+  gate/1's retained pre-fix trees (``PRE_FIX_GRADE_SCORERS``), every
+  not-yet-graded tree of the target is graded into the store. A replay
   grades nothing (it must reproduce stored bytes only);
 - ``produce_coverage``: before a rescore whose scorers read offline coverage runs
   (``OFFLINE_COVERAGE_SCORERS``), the coverage run of every step whose trial
@@ -32,13 +32,13 @@ from typing import Any
 
 from raidar.grading.bundle import BundleError
 from raidar.grading.coverage.offline import check_coverage_path, produce_coverage_path
-from raidar.grading.prefix.grade import grade_pre_fix_path, regrade_pre_fix_path
+from raidar.grading.pre_fix.grade import grade_pre_fix_path, regrade_pre_fix_path
 from raidar.grading.regrade import RegradeError, RegradeOptions, regrade_path
 
-# Scorers that read the offline grades of guardrail-gate@3's pre-fix snapshots.
-PRE_FIX_GRADE_SCORERS = frozenset({"gate-effort@15"})
+# Scorers that read the offline grades of gate/1's retained pre-fix trees.
+PRE_FIX_GRADE_SCORERS = frozenset({"verification-effort@1"})
 # Scorers that read the offline coverage runs of steps whose trial deferred the coverage pass.
-OFFLINE_COVERAGE_SCORERS = frozenset({"code-quality@8"})
+OFFLINE_COVERAGE_SCORERS = frozenset({"code-quality@9"})
 
 
 class OfflineGradingError(RuntimeError):

@@ -1,11 +1,11 @@
-"""Offline grading of guardrail-gate@3's pre-fix snapshots beside the final step snapshot.
+"""Offline grading of the pre-fix trees gate/1 retained beside the final step snapshot.
 
-A graded trial whose step has a pre-fix snapshot (recorded in its gate record
-with its tree digest) gets that snapshot graded with the step's own bundle,
-sandbox and timeout into the Assessment store, never the job; a stored grade is
-not graded again; a changed snapshot is an error, never a grade; the regrade
-compares a fresh grade with the stored one. ``raidar assess --rescore`` grades
-first only when a scorer that reads the grades (gate-effort@15) runs.
+A graded trial whose step has a retained pre-fix tree (recorded in its ``gate/1`` record with its
+tree digest) gets that tree graded with the step's own bundle, sandbox and timeout into the
+Assessment store, never the job; a stored grade is not graded again; a changed or escaping
+tree is an error, never a grade; the regrade compares a fresh grade with the stored one.
+``raidar assess --rescore`` grades first only when a scorer that reads the grades
+(verification-effort@1) runs.
 """
 
 from __future__ import annotations
@@ -18,12 +18,12 @@ import pytest
 
 from raidar.contract.snapshot import tree_digest
 from raidar.grading import offline, records
-from raidar.grading.prefix.grade import (
+from raidar.grading.pre_fix.grade import (
     grade_pre_fix_path,
     pre_fix_snapshots,
     regrade_pre_fix_path,
 )
-from raidar.grading.prefix.store import read_pre_fix_grade
+from raidar.grading.pre_fix.store import read_pre_fix_grade
 from raidar.grading.records import grading_identity, load_step_record, step_record_dir
 from raidar.grading.regrade import RegradeOptions
 from tests.scorer_support import tree_state
@@ -36,6 +36,13 @@ from tests.test_verifier_and_regrade import (
 from tests.verifier_support import copy_grading_sources, make_bundle, write_app
 
 STEP = "checkpoint_2"
+RETAINED = "gate/pre_fix_1/app"
+
+
+def _write_record(agent: Path, entries: list[dict[str, Any]]) -> None:
+    record = {"turns": [], "gate/1": {"gates": [], "pre_fix_snapshots": entries}}
+    (agent / "workflow").mkdir(parents=True, exist_ok=True)
+    (agent / "workflow" / "workflow.json").write_text(json.dumps(record))
 
 
 async def _graded_trial(tmp_path: Path) -> Path:
@@ -48,18 +55,8 @@ async def _graded_trial(tmp_path: Path) -> Path:
     await verifier.verify()
     trial = tmp_path / "trial"
     agent = trial / "steps" / STEP / "agent"
-    snapshot = write_app(agent / "guardrail-gate" / "pre_fix_1" / "app", mul=False)
-    record = {
-        "pre_fix_snapshots": [
-            {
-                "round": 1,
-                "before_session": "stage_2_fix",
-                "path": "guardrail-gate/pre_fix_1/app",
-                "tree_digest": tree_digest(snapshot),
-            }
-        ]
-    }
-    (agent / "guardrail-gate" / "guardrail-gate.json").write_text(json.dumps(record))
+    snapshot = write_app(agent / RETAINED, mul=False)
+    _write_record(agent, [{"round": 1, "path": RETAINED, "tree_digest": tree_digest(snapshot)}])
     return trial
 
 
@@ -141,6 +138,24 @@ async def test_a_changed_snapshot_is_an_error_never_a_grade(tmp_path: Path) -> N
     assert not (tmp_path / "store").exists()
 
 
+@pytest.mark.parametrize("escape", ["parent", "absolute", "symlink"])
+async def test_a_recorded_path_that_leaves_the_agent_logs_is_never_graded(
+    tmp_path: Path, escape: str
+) -> None:
+    trial = await _graded_trial(tmp_path)
+    agent = trial / "steps" / STEP / "agent"
+    outside = write_app(tmp_path / "outside" / "app", mul=True)
+    (agent / "link").symlink_to(outside)
+    paths = {"parent": "../../../../outside/app", "absolute": str(outside), "symlink": "link"}
+    _write_record(agent, [{"round": 1, "path": paths[escape], "tree_digest": tree_digest(outside)}])
+
+    report = await grade_pre_fix_path(trial, tmp_path / "store", _options(tmp_path))
+
+    assert report["errors"] == 1
+    assert "leaves the agent logs" in report["snapshots"][0]["error"]
+    assert not (tmp_path / "store").exists()
+
+
 async def test_a_trial_without_pre_fix_snapshots_grades_nothing(tmp_path: Path) -> None:
     bundle = make_bundle(tmp_path / "fixture")
     place_step_artifact(tmp_path, "checkpoint_1")
@@ -155,9 +170,9 @@ async def test_a_trial_without_pre_fix_snapshots_grades_nothing(tmp_path: Path) 
 @pytest.mark.parametrize(
     ("scorers", "replay", "grades"),
     [
-        (("gate-effort@15",), False, True),
-        (("gate-effort@15", "correctness@9"), True, False),
-        (("correctness@9", "code-quality@8"), False, False),
+        (("verification-effort@1",), False, True),
+        (("verification-effort@1", "correctness@10"), True, False),
+        (("correctness@10", "code-quality@9"), False, False),
     ],
 )
 def test_rescore_grades_first_only_for_a_scorer_that_reads_the_grades(

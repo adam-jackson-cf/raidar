@@ -1,7 +1,7 @@
 // Quality element, run detail: the per-checkpoint C·V·E·H·R·G·I·S strip with
 // eligibility badges, V/E/H/R/G drill-downs to file:line evidence, and (Jev
 // parked 2026-10-04) the run's audited Jev decisions as collapsed, read-only history; a
-// gated trial adds its commit-gate effort per checkpoint.
+// gated trial adds its verification effort per checkpoint.
 import { useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';

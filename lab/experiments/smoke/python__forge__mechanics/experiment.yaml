@@ -34,7 +34,7 @@ arms:
     workflow: raidar/one-shot@2
 
 assessment:
-  scorers: [correctness@9, code-quality@8, resource-usage@7, process-compliance@11]
+  scorers: [correctness@10, code-quality@9, resource-usage@8, process-compliance@12]
   metric: scb-canonical@2
 
 analysis:

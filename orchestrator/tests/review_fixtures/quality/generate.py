@@ -7,7 +7,7 @@ job, Assessment and Jev shapes:
   (baseline arm and headline metric, as a real lock carries them), and
   ``jobs/<experiment>/<job>/`` job directories (``job.json`` naming the
   lock digest + ``trial-records/*.json`` TrialRecords);
-  ``store/``: ``code-quality@8`` and ``correctness@9`` Assessments whose
+  ``store/``: ``code-quality@9`` and ``correctness@10`` Assessments whose
   inputs carry each trial's snapshot digests (correctness in the real
   scorer's shape: per-checkpoint ``solved`` and ``strict_pass_rate``, and
   trial ``solved_checkpoints`` and ``reached``), plus a Jev audit of
@@ -17,8 +17,8 @@ The experiment id, job ids, problem and every snapshot digest carry a
 ``synthetic`` marker, and the projection built from it sets
 ``synthetic: true``. It is never benchmark evidence.
 
-- the gated arm's commit-gate records under each trial's step agent dirs
-  (``tests.review_fixtures.quality.gate``) and every trial's ``gate-effort``
+- the gated arm's gate/1 records (``workflow/workflow.json``) under each trial's step agent
+  dirs (``tests.review_fixtures.quality.gate``) and every trial's ``verification-effort``
   Assessment, made by the real scorer (``not_applicable`` for ``baseline``).
 
 Built-in shape (deterministic, seeded): two arms (``baseline``, ``guided``)
@@ -71,7 +71,7 @@ from raidar.scoring.judge.audit import (
 from raidar.scoring.judge.policies import PolicyMode
 from raidar.scoring.judge.rubric import RUBRIC_POLICY
 from tests.review_fixtures.projection.trials import write_bundle
-from tests.review_fixtures.quality.gate import GATE_EFFORT, gate_result
+from tests.review_fixtures.quality.gate import VERIFICATION_EFFORT, gate_result
 from tests.review_fixtures.quality.inputs import write_inputs
 from tests.review_fixtures.quality.lock import default_metric, write_synthetic_lock
 from tests.review_fixtures.quality.store import FixtureAssessments
@@ -375,7 +375,7 @@ def generate_quality_fixture(dest: Path) -> Path:
     experiment_file.write_text(
         f"# synthetic fixture: not benchmark evidence\nid: {EXPERIMENT}\n"
         "analysis:\n  baseline_arm: baseline\n  attempts: 6\n  seed: 20260930\n"
-        "assessment:\n  scorers: [correctness@9, code-quality@8, gate-effort@15]\n",
+        "assessment:\n  scorers: [correctness@10, code-quality@9, verification-effort@1]\n",
         encoding="utf-8",
     )
     lock_sha256 = write_synthetic_lock(
@@ -441,6 +441,6 @@ def generate_quality_fixture(dest: Path) -> Path:
                     AssessResult(status=AssessStatus.OK, observations=tuple(trial.correctness)),
                 )
             )
-            store.put(assessments.assessment(GATE_EFFORT.ref, trial_dir, gate))
+            store.put(assessments.assessment(VERIFICATION_EFFORT.ref, trial_dir, gate))
             _decisions(audit, trial)
     return dest

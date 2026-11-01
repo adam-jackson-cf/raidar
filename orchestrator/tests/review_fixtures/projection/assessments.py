@@ -1,7 +1,7 @@
 """Assessments for the synthetic fixture, stored under the keys a real rescore uses.
 
-``correctness@9`` and ``resource-usage@7`` run for real over the synthetic
-verifier records and ATIF traces. ``code-quality@8`` needs the provisioned
+``correctness@10`` and ``resource-usage@8`` run for real over the synthetic
+verifier records and ATIF traces. ``code-quality@9`` needs the provisioned
 measurement tools and multi-checkpoint lineage a synthetic snapshot cannot give
 meaningful values for, so its result is composed from the fixture's declared
 component values, then validated against the scorer's manifest (every metric
@@ -29,7 +29,7 @@ from raidar.scoring.framework.result import (
 )
 from raidar.scoring.framework.validation import validate_result
 
-MEASURED_SCORERS = ("correctness@9", "resource-usage@7")
+MEASURED_SCORERS = ("correctness@10", "resource-usage@8")
 _CHECKPOINT_COMPONENTS = ("verbosity", "erosion", "architecture")
 _TRANSITION_COMPONENTS = ("rework", "regression")
 _UNMEASURED = "no stored snapshot to measure"

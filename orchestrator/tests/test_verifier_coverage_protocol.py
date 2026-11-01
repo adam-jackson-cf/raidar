@@ -32,7 +32,7 @@ def test_committed_experiments_dump_it_only_when_they_set_it(tmp_path: Path) -> 
         assert "verifier_coverage" not in load_experiment(path).spec.to_json()["protocol"]
 
     document = experiment_document(
-        protocol={"verifier_coverage": "offline"}, assessment={"scorers": ["correctness@9"]}
+        protocol={"verifier_coverage": "offline"}, assessment={"scorers": ["correctness@10"]}
     )
     loaded = load_experiment(write_experiment(tmp_path, document))
     assert loaded.spec.to_json()["protocol"]["verifier_coverage"] == "offline"
@@ -43,7 +43,7 @@ def test_a_deferred_pass_loads_with_the_scorer_that_reads_the_offline_run(
 ) -> None:
     document = experiment_document(
         protocol={"verifier_coverage": "offline"},
-        assessment={"scorers": ["correctness@9", "code-quality@8"]},
+        assessment={"scorers": ["correctness@10", "code-quality@9"]},
     )
     path = write_experiment(tmp_path, document)
 
