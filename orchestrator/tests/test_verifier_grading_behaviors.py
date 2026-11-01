@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any, cast
 
 import pytest
+from harbor.models.trial.paths import TrialPaths
 
 from raidar.contract.wheels import DependencyInfraError
 from raidar.grading import grader as grader_module
@@ -18,14 +19,12 @@ from raidar.grading.grader import (
     _sandbox_infra,
     _sha256_hex,
     attribute_to_submission,
-    coverage_skip_verdict,
     grade_step,
     grading_budget,
-    needs_canary,
     parity_verdict,
 )
+from raidar.grading.leak import LeakReport
 from raidar.grading.models import (
-    CanaryRecord,
     CaseGroup,
     CaseResult,
     CaseStatus,
@@ -51,6 +50,8 @@ from raidar.grading.normalise import (
 from raidar.grading.outcomes import RunOutcome, StepGrade
 from raidar.grading.parity import check_parity, fork_regression_run_evidence, outcome_differences
 from raidar.grading.records import (
+    GraderRef,
+    SnapshotRef,
     errata_for,
     fork_payload,
     parse_errata,
@@ -58,7 +59,8 @@ from raidar.grading.records import (
 )
 from raidar.grading.sandbox import CONTAINER_LAYOUT, SandboxResult, SandboxRun
 from raidar.grading.submission_deps import SubmissionDependencies
-from tests.verifier_support import make_bundle, step_spec
+from raidar.grading.verifier import RaidarVerifier
+from tests.verifier_support import FakeAgentEnvironment, make_bundle, step_spec
 
 
 def _case(case_id: str, group: CaseGroup, status: CaseStatus) -> CaseResult:
@@ -400,47 +402,6 @@ def test_parity_verdict_is_ineligible_when_either_run_has_no_evidence() -> None:
     )
     assert not verdict.eligible
     assert differences == ("t::a: grading=passed coverage=failed",)
-
-
-@pytest.mark.parametrize(
-    "code",
-    [
-        "sandbox_timeout",
-        "sandbox_error",
-        "ledger_unreadable",
-        "incomplete_run",
-        "pytest_exit_status",
-        "ledger_exit_mismatch",
-    ],
-)
-def test_only_submission_attributable_failures_on_a_resolved_closure_get_a_canary(
-    code: str,
-) -> None:
-    assert needs_canary(_outcome(InfraFailure(code=code), dependencies=object()))
-    assert not needs_canary(_outcome(InfraFailure(code=code)))  # no resolved closure
-
-
-@pytest.mark.parametrize(
-    "code", ["dependency_resolver_unavailable", "collection_error", "no_tests_collected"]
-)
-def test_resolver_outages_and_corpus_faults_never_get_a_canary(code: str) -> None:
-    assert not needs_canary(_outcome(InfraFailure(code=code), dependencies=object()))
-    assert not needs_canary(_outcome(dependencies=object()))  # a graded run needs none
-
-
-def test_coverage_is_skipped_after_an_attributed_or_unexplained_grading_failure() -> None:
-    crashed = _outcome(InfraFailure(code="sandbox_timeout"))
-    passed = CanaryRecord(status="passed", trigger="sandbox_timeout")
-    attributed = coverage_skip_verdict(passed, _outcome())
-    assert attributed is not None
-    assert attributed.reasons == ("grading_failed_on_submission:sandbox_timeout",)
-
-    for canary in (CanaryRecord(), CanaryRecord(status="failed", trigger="sandbox_timeout")):
-        infra = coverage_skip_verdict(canary, crashed)
-        assert infra is not None
-        assert infra.reasons == ("grading_infra_failure:sandbox_timeout",)
-
-    assert coverage_skip_verdict(CanaryRecord(), _outcome()) is None
 
 
 def test_attributing_a_crash_to_the_submission_fails_every_starter_case() -> None:
@@ -859,3 +820,64 @@ async def test_cases_left_when_the_budget_runs_out_fail_and_are_timing_sensitive
     assert result.grading.timing_sensitive == (OTHER,)
     assert sandbox.runs[0].env["RAIDAR_ORACLE_BUDGET_S"] == "1"
     assert sandbox.runs[0].timeout_s == BUDGET_MARGIN_S + 1.0
+
+
+class _FastVerifier(RaidarVerifier):
+    """The production ``verify()`` with the grader, snapshot and pre-agent scan scripted."""
+
+    sandbox: ScriptedSandbox
+    pre_agent: LeakReport | None
+
+    async def prepare_sandbox(self) -> tuple[Any, GraderRef]:
+        ref = GraderRef(image="local", environment_id="img", image_built=False, timeout_s=900.0)
+        return self.sandbox, ref
+
+    def _pre_agent_leak(self, step: str, record_dir: Path) -> LeakReport | None:
+        return self.pre_agent
+
+    async def _snapshot(self, work: Path, record_dir: Path) -> tuple[Path, SnapshotRef]:
+        ref = SnapshotRef(requested="artifact", used="artifact", digest="d", stored_path="app")
+        return work / "snapshot", ref
+
+
+@pytest.mark.parametrize(
+    ("verify_leaks", "pre_agent_clean", "leaked"),
+    [
+        (False, None, False),
+        (False, True, False),
+        (True, None, True),
+        (True, True, True),
+        (False, False, True),  # only the pre-agent scan can see a /tests copy baked into the image
+        (True, False, True),
+    ],
+)
+async def test_a_step_leaks_when_either_scan_found_the_hidden_tests(
+    tmp_path: Path,
+    dependency_outage: list[Exception],
+    verify_leaks: bool,
+    pre_agent_clean: bool | None,
+    leaked: bool,
+) -> None:
+    bundle = make_bundle(tmp_path / "fixture")
+    digest = next(iter(bundle.hidden_file_hashes()))
+    stdout = f"{digest}  /app/stolen.py\n" if verify_leaks else ""
+    env = FakeAgentEnvironment(leak_stdout=stdout + "RAIDAR_LEAK_SCAN_DONE\n")
+    verifier = _FastVerifier(
+        oracle_bundle=str(bundle.root),
+        docker_context="test-ctx",
+        task=cast(Any, None),
+        trial_paths=TrialPaths(trial_dir=tmp_path / "trial"),
+        environment=cast(Any, env),
+        step_name="checkpoint_1",
+        pinned={"grader": {}},
+        coverage=False,
+    )
+    verifier.sandbox = ScriptedSandbox(_ran(_ledger(PASSED)))
+    verifier.pre_agent = None if pre_agent_clean is None else LeakReport(clean=pre_agent_clean)
+
+    result = await verifier.verify()
+
+    assert result.rewards is not None
+    assert (result.rewards["oracle_leak"] == 1.0) is leaked
+    assert ("solved" in result.rewards) is not leaked  # a leaked step reports no verdict at all
+    assert result.rewards["infrastructure_failure"] == 0.0

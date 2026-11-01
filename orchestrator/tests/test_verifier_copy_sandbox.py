@@ -11,6 +11,7 @@ from typing import Any
 
 import pytest
 
+from raidar.grading import sandbox as sandbox_module
 from raidar.grading.sandbox import (
     CONTAINER_LAYOUT,
     GRADER_ROLE_LABEL,
@@ -225,8 +226,23 @@ def _docker(**overrides: _Reply) -> _FakeDocker:
     return _FakeDocker(replies)
 
 
+_SPAWNER: list[_FakeDocker] = []
+
+
+@pytest.fixture(autouse=True)
+def docker_spawner(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Every docker process the sandbox starts is answered by the registered ``_FakeDocker``."""
+    _SPAWNER.clear()
+
+    async def spawn(*argv: str, **options: Any) -> _Proc:
+        return await _SPAWNER[0](*argv, **options)
+
+    monkeypatch.setattr(sandbox_module.asyncio, "create_subprocess_exec", spawn)
+
+
 def _sandbox(docker: _FakeDocker) -> DockerCopySandbox:
-    return DockerCopySandbox(image="grader:1", docker_context="ctx", spawn=docker)
+    _SPAWNER[:] = [docker]
+    return DockerCopySandbox(image="grader:1", docker_context="ctx")
 
 
 async def test_a_graded_run_reports_exit_code_output_ledger_and_isolation_evidence(

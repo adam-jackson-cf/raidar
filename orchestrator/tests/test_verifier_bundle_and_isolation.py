@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import os
 import textwrap
 from dataclasses import replace
@@ -31,7 +32,6 @@ from raidar.grading.bundle import (
 )
 from raidar.grading.leak import (
     SCAN_TIMEOUT_S,
-    LeakReport,
     LeakScanError,
     leak_scan_command,
     parse_leak_output,
@@ -58,11 +58,10 @@ from raidar.grading.sandbox import (
     sandbox_env,
 )
 from raidar.grading.verifier import (
+    RaidarVerifier,
+    SnapshotUnavailableError,
     _artifact_status,
     _plumbing,
-    artifact_unusable_reason,
-    parse_artifact_status,
-    step_leaked,
     step_rewards,
 )
 from tests.verifier_support import FakeAgentEnvironment, make_bundle, step_spec
@@ -439,79 +438,78 @@ def test_invalid_manifest_is_a_bundle_error(tmp_path: Path) -> None:
 
 
 # ----------------------------------------------------------- verifier decisions
+def _entry(source: str, destination: str, status: str) -> dict[str, str]:
+    return {"source": source, "destination": destination, "status": status}
+
+
 @pytest.mark.parametrize(
-    ("text", "status"),
+    ("manifest", "status"),
     [
-        ('[{"source": "/app", "destination": "artifacts/app", "status": "ok"}]', "ok"),
-        ('{"entries": [{"source": "/app", "destination": "x/app", "status": "failed"}]}', "failed"),
+        ([_entry("/app", "artifacts/app", "ok")], "ok"),
+        ({"entries": [_entry("/app", "x/app", "failed")]}, "failed"),
         (
-            '[{"source": "/app", "destination": "x/app", "status": "failed"},'
-            ' {"source": "/app", "destination": "x/app", "status": "ok"}]',
+            [_entry("/app", "x/app", "failed"), _entry("/app", "x/app", "ok")],
             "ok",  # the last record for the artifact wins
         ),
-        ('[{"source": "/logs", "destination": "x/app", "status": "failed"}]', None),
-        ('[{"source": "/app", "destination": "x/other", "status": "failed"}]', None),
-        ('["not-an-entry", 3]', None),
-        ("[]", None),
+        ([_entry("/logs", "x/app", "failed")], None),
+        ([_entry("/app", "x/other", "failed")], None),
+        (["not-an-entry", 3], None),
+        ([], None),
         ("{not json", "manifest_unreadable"),
         ("", "manifest_unreadable"),
     ],
 )
 def test_artifact_manifest_status_is_the_last_record_for_the_app_artifact(
-    text: str, status: str | None
+    tmp_path: Path, manifest: object, status: str | None
 ) -> None:
-    assert parse_artifact_status(text) == status
+    app = tmp_path / "artifacts" / "app"
+    app.mkdir(parents=True)
+    text = manifest if isinstance(manifest, str) else json.dumps(manifest)
+    (app.parent / "manifest.json").write_text(text)
+    assert _artifact_status(app) == status
 
 
 @pytest.mark.parametrize(
-    ("status", "is_dir", "reason"),
+    ("manifest", "is_dir", "reason"),
     [
         (None, True, None),  # older Harbor: a collected directory without a manifest
         (None, False, "artifact_missing"),
-        ("ok", True, None),
-        ("ok", False, None),
-        ("failed", True, "artifact_failed"),
-        ("empty", True, "artifact_empty"),
-        ("manifest_unreadable", True, "artifact_manifest_unreadable"),
+        ([_entry("/app", "artifacts/app", "ok")], True, None),
+        ([_entry("/app", "artifacts/app", "ok")], False, None),
+        ([_entry("/app", "artifacts/app", "failed")], True, "artifact_failed"),
+        ([_entry("/app", "artifacts/app", "empty")], True, "artifact_empty"),
+        ("{not json", True, "artifact_manifest_unreadable"),
     ],
 )
 def test_only_a_collected_or_ok_artifact_is_gradable(
-    status: str | None, is_dir: bool, reason: str | None
+    tmp_path: Path, manifest: object, is_dir: bool, reason: str | None
 ) -> None:
-    assert artifact_unusable_reason(status, is_dir=is_dir) == reason
+    artifacts = tmp_path / "artifacts"
+    artifacts.mkdir()
+    if is_dir:
+        (artifacts / "app").mkdir()
+    if manifest is not None:
+        text = manifest if isinstance(manifest, str) else json.dumps(manifest)
+        (artifacts / "manifest.json").write_text(text)
+    paths = SimpleNamespace(step_artifacts_dir=lambda step: artifacts, artifacts_dir=artifacts)
+    verifier = cast(Any, SimpleNamespace(step_name="checkpoint_1", trial_paths=paths))
+    if reason is None:
+        assert RaidarVerifier._artifact_snapshot(verifier) == artifacts / "app"
+    else:
+        with pytest.raises(SnapshotUnavailableError, match=reason):
+            RaidarVerifier._artifact_snapshot(verifier)
 
 
-def test_artifact_status_reads_the_manifest_beside_the_app_directory(tmp_path: Path) -> None:
+def test_a_manifest_that_is_not_a_file_or_not_text_is_read_as_the_directory_says(
+    tmp_path: Path,
+) -> None:
     app = tmp_path / "artifacts" / "app"
-    assert _artifact_status(app) is None
     manifest = tmp_path / "artifacts" / "manifest.json"
-    manifest.parent.mkdir()
-    manifest.write_text('[{"source": "/app", "destination": "artifacts/app", "status": "empty"}]')
-    assert _artifact_status(app) == "empty"
-    manifest.unlink()
-    manifest.mkdir()  # present but unreadable as a file
+    manifest.mkdir(parents=True)  # present but not a file: no recorded status
     assert _artifact_status(app) is None
     manifest.rmdir()
     manifest.write_bytes(b"\xff\xfe")
     assert _artifact_status(app) == "manifest_unreadable"
-
-
-@pytest.mark.parametrize(
-    ("verify_clean", "pre_agent_clean", "leaked"),
-    [
-        (True, None, False),
-        (True, True, False),
-        (False, None, True),
-        (False, True, True),
-        (True, False, True),  # only the pre-agent scan can see a /tests copy baked into the image
-        (False, False, True),
-    ],
-)
-def test_a_step_leaks_when_either_scan_found_the_hidden_tests(
-    verify_clean: bool, pre_agent_clean: bool | None, leaked: bool
-) -> None:
-    pre_agent = None if pre_agent_clean is None else LeakReport(clean=pre_agent_clean)
-    assert step_leaked(LeakReport(clean=verify_clean), pre_agent) is leaked
 
 
 def test_a_leaked_step_reports_only_the_leak_and_infra_flags() -> None:

@@ -90,14 +90,14 @@ def step_rewards(rewards: dict[str, float], *, leaked: bool) -> dict[str, float]
 ARTIFACT_MANIFEST = "manifest.json"
 
 
-def parse_artifact_status(manifest_text: str) -> str | None:
-    """The last status Harbor's manifest records for the /app artifact, if any.
-
-    Unparseable text is ``manifest_unreadable``; entries for other sources are ignored.
-    """
+def _artifact_status(app_dir: Path) -> str | None:
+    """Harbor's recorded status for the /app artifact at ``app_dir``, if any."""
+    manifest = app_dir.parent / ARTIFACT_MANIFEST
+    if not manifest.is_file():
+        return None
     try:
-        entries = json.loads(manifest_text)
-    except ValueError:
+        entries = json.loads(manifest.read_text())
+    except (OSError, ValueError):
         return "manifest_unreadable"
     if isinstance(entries, dict):
         entries = entries.get("entries", [])
@@ -109,34 +109,6 @@ def parse_artifact_status(manifest_text: str) -> str | None:
         and str(entry.get("destination", "")).endswith(f"/{APP_ARTIFACT_DESTINATION}")
     ]
     return statuses[-1] if statuses else None
-
-
-def artifact_unusable_reason(status: str | None, *, is_dir: bool) -> str | None:
-    """Why the collected /app artifact cannot be graded, or ``None`` when it can.
-
-    A directory with no recorded status is usable (older Harbor); any status but ``ok`` is an
-    empty or truncated tree, and a missing directory without a status was never collected.
-    """
-    if status is None:
-        return None if is_dir else "artifact_missing"
-    return None if status == "ok" else f"artifact_{status}"
-
-
-def step_leaked(leak: LeakReport, pre_agent: LeakReport | None) -> bool:
-    """A step is leaked when the verify-time or the pre-agent scan found the hidden tests."""
-    return not leak.clean or (pre_agent is not None and not pre_agent.clean)
-
-
-def _artifact_status(app_dir: Path) -> str | None:
-    """Harbor's recorded status for the /app artifact at ``app_dir``, if any."""
-    manifest = app_dir.parent / ARTIFACT_MANIFEST
-    if not manifest.is_file():
-        return None
-    try:
-        text = manifest.read_text()
-    except (OSError, ValueError):
-        return "manifest_unreadable"
-    return parse_artifact_status(text)
 
 
 class RaidarVerifier(BaseVerifier):
@@ -217,9 +189,11 @@ class RaidarVerifier(BaseVerifier):
         )
         path = artifacts / APP_ARTIFACT_DESTINATION
         status = _artifact_status(path)
-        reason = artifact_unusable_reason(status, is_dir=path.is_dir())
-        if reason is None:
+        if status is None and path.is_dir():
             return path
+        if status == "ok":
+            return path
+        reason = "artifact_missing" if status is None else f"artifact_{status}"
         raise SnapshotUnavailableError(
             f"step {self.step_name!r}: the /app artifact at {path} is unusable ({reason}); "
             "snapshot_source=artifact never falls back to a download"
@@ -287,7 +261,7 @@ class RaidarVerifier(BaseVerifier):
             evidence_write_s = time.perf_counter() - mark
         finally:
             shutil.rmtree(work, ignore_errors=True)  # cleanup: counted as plumbing
-        leaked = step_leaked(leak, pre_agent)
+        leaked = not leak.clean or (pre_agent is not None and not pre_agent.clean)
         gate_rewards = (
             result.grade.rewards()
             if self.solvable is None
