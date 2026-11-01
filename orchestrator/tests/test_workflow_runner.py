@@ -16,16 +16,27 @@ from typing import Any
 
 import pytest
 from harbor.models.agent.context import AgentContext
+from raidar_contract.agent_records import ZERO
 from raidar_contract.workflow import load_package_workflow
 
 from raidar.subject.primitive.site import TrialInvalid
+from raidar.subject.workflow.package_stage import PackageStage
 from raidar.subject.workflow.runner import (
+    EVIDENCE_DIRS,
     PROMPT_FILE,
     RECORD_FILE,
     SessionWatch,
     WorkflowRunner,
 )
-from raidar.subject.workflow.turns import TRAJECTORY_FILE, WORKFLOW_DIR
+from raidar.subject.workflow.stage import REWORK, Checkpoint, Resume
+from raidar.subject.workflow.turns import (
+    TRAJECTORY_FILE,
+    WORKFLOW_DIR,
+    Run,
+    Turn,
+    native_account,
+    session_id,
+)
 from tests.native_support import CodexNative
 from tests.release_support import REAL_LAB
 
@@ -69,6 +80,9 @@ class FakeInner(CodexNative):
             context.n_cache_tokens = n_cached
             context.n_output_tokens = n_output
             context.cost_usd = cost
+
+    async def resume(self, instruction: str, environment: Any, context: AgentContext) -> None:
+        await self.run(instruction, environment, context)
 
 
 class FakeEnvironment:
@@ -372,3 +386,187 @@ def test_a_cancelled_turn_is_recorded_as_cut_and_the_cancellation_still_propagat
 
     record = json.loads((tmp_path / WORKFLOW_DIR / RECORD_FILE).read_text())
     assert record["turns"][0]["error"].startswith("CancelledError")
+
+
+# --- resumed turns, copy failures, closing and publication ----------------------------
+
+
+def _record(logs_dir: Path) -> dict[str, Any]:
+    loaded: dict[str, Any] = json.loads((logs_dir / WORKFLOW_DIR / RECORD_FILE).read_text())
+    return loaded
+
+
+def test_a_check_that_asks_resumes_the_session_with_its_message(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    answers: list[Resume | None] = [Resume("fix it", REWORK), None]
+
+    async def check(self: PackageStage, checkpoint: Checkpoint, after: str) -> Resume | None:
+        return answers.pop(0)
+
+    monkeypatch.setattr(PackageStage, "check", check)
+
+    _run(tmp_path)
+
+    record = _record(tmp_path)
+    assert [(item["kind"], item["resumed"]) for item in record["turns"]] == [
+        ("first_build", False),
+        ("rework", True),
+    ]
+    assert record["turns"][0]["session_id"] == record["turns"][1]["session_id"] == SESSION
+    assert record["tokens"] is not None
+
+
+class BrokenDownload(RemoteEnvironment):
+    async def download_dir(self, source: str, target: Path) -> None:
+        raise OSError("disk full")
+
+
+def test_logs_that_cannot_be_copied_are_recorded_on_the_turn_and_its_usage_stays_unknown(
+    tmp_path: Path,
+) -> None:
+    context = AgentContext()
+
+    asyncio.run(
+        _runner(tmp_path).run(INSTRUCTION, BrokenDownload(), context)  # type: ignore[arg-type]
+    )
+
+    (turn,) = _record(tmp_path)["turns"]
+    assert turn["settle_error"] == "OSError: disk full"
+    assert turn["tokens"] is None
+    assert context.n_input_tokens is None
+
+
+def test_a_native_agent_with_no_session_store_needs_no_ctime_read(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(FakeInner, "session_store", lambda self: ())
+
+    _, environment = _run(tmp_path)
+
+    assert _record(tmp_path)["integrity"] == []
+    assert not [line for line in environment.commands if line.startswith("python3 ")]
+
+
+def test_an_instrument_failure_when_the_packages_close_is_recorded_invalid(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    async def close(self: PackageStage, checkpoint: Checkpoint, cut: str | None) -> None:
+        raise TrialInvalid("integrity", "the lock moved at close")
+
+    monkeypatch.setattr(PackageStage, "close", close)
+
+    _run(tmp_path)
+
+    record = _record(tmp_path)
+    assert record["invalid"]["detail"] == "the lock moved at close"
+    assert "package_integrity" in [item["name"] for item in record["integrity"]]
+
+
+def test_a_recorded_host_path_is_rewritten_only_when_it_leads_into_the_staging(
+    tmp_path: Path,
+) -> None:
+    runner = _runner(tmp_path)
+    runner.staging = tmp_path / "stage"
+    inside = f"{runner.staging}/gate/g.json"
+    outside = f"{tmp_path}/elsewhere/g.json"
+    climbing = f"{runner.staging}/../elsewhere/g.json"
+    value = {
+        "evidence": [{"host_path": inside}, {"host_path": outside}, {"host_path": climbing}],
+        "host_path": str(runner.staging),
+        "note": {"host_path": "relative/g.json", "other": inside},
+        "count": 3,
+    }
+
+    found = runner._portable(value)
+
+    assert found["evidence"] == [
+        {"host_path": "gate/g.json"},
+        {"host_path": outside},
+        {"host_path": climbing},
+    ]
+    assert found["host_path"] == str(runner.staging)
+    assert found["note"] == {"host_path": "relative/g.json", "other": inside}
+    assert found["count"] == 3
+
+
+def test_publication_replaces_what_the_agent_left_and_publishes_no_linked_evidence(
+    tmp_path: Path,
+) -> None:
+    logs = tmp_path / "logs"
+    logs.mkdir()
+    runner = _runner(logs)
+    runner.staging = tmp_path / "stage"
+    kept, forged, linked = EVIDENCE_DIRS[1], EVIDENCE_DIRS[2], EVIDENCE_DIRS[3]
+    (runner.staging / kept).mkdir(parents=True)
+    (runner.staging / kept / "g.json").write_text("host-kept")
+    (runner.staging / WORKFLOW_DIR).mkdir()
+    (runner.staging / WORKFLOW_DIR / RECORD_FILE).write_text("{}")
+    (tmp_path / "outside").mkdir()
+    (runner.staging / linked).symlink_to(tmp_path / "outside")
+    (logs / forged).mkdir(parents=True)
+    (logs / forged / "forged.json").write_text("agent-written")
+    (logs / kept).mkdir()
+    (logs / kept / "old.json").write_text("agent-written")
+
+    runner._publish(runner.staging / WORKFLOW_DIR, runner.staging / "no-such-trajectory.json")
+
+    assert (logs / kept / "g.json").read_text() == "host-kept"
+    assert not (logs / kept / "old.json").exists()
+    assert not (logs / forged).exists()
+    assert not (logs / linked).exists()
+    assert (logs / WORKFLOW_DIR / RECORD_FILE).read_text() == "{}"
+    assert not (logs / TRAJECTORY_FILE).exists()
+    assert not runner.staging.exists()
+
+
+# --- the session evidence of a turn ------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("content", "expected"),
+    [
+        (None, None),
+        ("not json", None),
+        ("[1]", None),
+        ('{"session_id": ""}', None),
+        ('{"session_id": 7}', None),
+        ('{"session_id": "abc"}', "abc"),
+    ],
+)
+def test_a_turns_session_id_is_the_trajectorys_non_empty_string_or_none(
+    tmp_path: Path, content: str | None, expected: str | None
+) -> None:
+    if content is not None:
+        (tmp_path / TRAJECTORY_FILE).write_text(content)
+
+    assert session_id(tmp_path) == expected
+
+
+class Meter:
+    def __init__(self) -> None:
+        self.calls = 0
+
+    def accounting(self, context: AgentContext, previous: Any) -> Any:
+        self.calls += 1
+        return ZERO, ZERO
+
+
+def _turn(index: int, *, resumed: bool) -> Turn:
+    return Turn("build", "k", index, resumed, "sha", "then", 0.0, session_id="s")
+
+
+def test_a_resumed_turn_with_no_measured_earlier_total_has_unknown_tokens() -> None:
+    first, second = _turn(1, resumed=False), _turn(2, resumed=True)
+    meter = Meter()
+
+    native_account(second, Run([first, second]), meter, AgentContext())
+
+    assert second.tokens is None
+    assert meter.calls == 0
+
+    first.session_total = ZERO
+    native_account(second, Run([first, second]), meter, AgentContext())
+
+    assert second.tokens == ZERO
+    assert meter.calls == 1

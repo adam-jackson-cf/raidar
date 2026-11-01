@@ -9,7 +9,10 @@ from typing import Any
 import pytest
 from raidar_contract.package import StagePackageError
 from raidar_contract.package.registry import load_stage_package
+from raidar_contract.releases import Release, ReleaseError
+from raidar_contract.workflow import PackageWorkflowDefinition
 
+from raidar.subject import stages
 from tests.package_support import fixture_package, write_package
 
 
@@ -269,3 +272,27 @@ def test_json_null_param_cannot_be_overridden_with_a_boolean(tmp_path: Path) -> 
     package = load_stage_package(write_package(tmp_path, {"params": {"optional": None}}))
     with pytest.raises(StagePackageError, match="NoneType"):
         package.effective_params({"optional": False})
+
+
+def test_a_workflow_whose_packages_fail_the_st_checks_is_refused_naming_the_workflow(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    package = load_stage_package(
+        write_package(tmp_path, {"name": "future", "requires": {"gate": "gate/9"}})
+    )
+    release = Release.parse_stage("acme/future@1")
+    monkeypatch.setattr(
+        stages, "released_stage", lambda *args, **kwargs: stages.ReleasedStage(release, package)
+    )
+    definition = PackageWorkflowDefinition.model_validate(
+        {
+            "schema": 2,
+            "name": "future-flow",
+            "build": {"prompt": "%%%FUTURE%%% %%%TASK%%%"},
+            "stages": [{"use": "acme/future@1"}],
+            "gate": {"max_fix_rounds": 0},
+        }
+    )
+
+    with pytest.raises(ReleaseError, match=r"^future-flow: ST2: .*gate/9"):
+        stages.resolve_stages(definition, tmp_path, object(), draft=True)  # type: ignore[arg-type]
