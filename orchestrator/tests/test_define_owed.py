@@ -7,12 +7,12 @@ from pathlib import Path
 
 import pytest
 
-from raidar.subject.workflow.define_tool import compact, owed, tool
-from raidar.subject.workflow.define_tool.core import JsonObject
-from raidar.subject.workflow.define_tool.draft import SEALS
-from raidar.subject.workflow.define_tool.intakecheck import check_reply, with_probes
-from raidar.subject.workflow.define_tool.kinds import Kind
-from raidar.subject.workflow.define_tool.owed import (
+from define_tool import compact, owed, tool
+from define_tool.core import JsonObject
+from define_tool.draft import SEALS
+from define_tool.intakecheck import check_reply, with_probes
+from define_tool.kinds import Kind
+from define_tool.owed import (
     Arrow,
     Case,
     ListUnit,
@@ -20,7 +20,7 @@ from raidar.subject.workflow.define_tool.owed import (
     Owed,
     Section,
 )
-from raidar.subject.workflow.define_tool.unitrules import V2
+from define_tool.unitrules import V2
 
 ISSUE = """\
 # Calc

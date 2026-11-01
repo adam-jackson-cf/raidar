@@ -7,10 +7,10 @@ from typing import Any
 
 import pytest
 
-from raidar.subject.workflow.define_tool import compact, featuredef
-from raidar.subject.workflow.define_tool.core import JsonObject, rows
-from raidar.subject.workflow.define_tool.kinds import Kind
-from raidar.subject.workflow.define_tool.unitrules import V1, V2
+from define_tool import compact, featuredef
+from define_tool.core import JsonObject, rows
+from define_tool.kinds import Kind
+from define_tool.unitrules import V1, V2
 
 ISSUE = """\
 # Pager
@@ -143,7 +143,7 @@ def test_units_are_numbered_in_document_order() -> None:
 
 
 def test_the_required_units_are_the_normative_statements() -> None:
-    from raidar.subject.workflow.define_tool import normative
+    from define_tool import normative
 
     assert [u.text for u in UNITS.required()] == [u.text for u in normative.normative(ISSUE, V1)]
 

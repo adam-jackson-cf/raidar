@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from raidar.subject.workflow.define_tool import issuetext as texts
+from define_tool import issuetext as texts
 
 
 def test_code_spans_read_single_and_longer_backtick_runs() -> None:

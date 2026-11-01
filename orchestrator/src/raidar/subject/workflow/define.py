@@ -7,9 +7,9 @@ import json
 import shlex
 import time
 from dataclasses import dataclass
-from pathlib import Path
 from typing import Any
 
+from raidar.contract.paths import stages_root
 from raidar.subject.primitive import calls
 from raidar.subject.workflow.acceptance import Acceptance
 from raidar.subject.workflow.definition import DEFINE_TOKEN, DefineSettings
@@ -18,7 +18,7 @@ from raidar.subject.workflow.stage import DEFINE_ROUND, Checkpoint, Resume, Stag
 SOURCE_COMMIT = "ac5db0f28364911ef2298e428748120be8b0d56c"
 PYTHON_PIN = "3.12.14"
 RECORD_DIR = "workflow/define"
-PAYLOAD = Path(__file__).with_name("define_tool")
+PAYLOAD = stages_root() / "raidar" / "define" / "tool" / "src" / "define_tool"
 REPAIR = (
     "The definition could not be used: {error}. Run `define check`, fix what it "
     "lists, then run `define done ready` (or `define done ask` when you are "
@@ -162,8 +162,8 @@ class Define(Stage):
         await self._inputs(checkpoint)
 
     async def _inputs(self, checkpoint: Checkpoint) -> None:
-        from raidar.subject.workflow.define_tool import compact  # noqa: PLC0415
-        from raidar.subject.workflow.define_tool.unitrules import VERSIONS  # noqa: PLC0415
+        from define_tool import compact  # noqa: PLC0415
+        from define_tool.unitrules import VERSIONS  # noqa: PLC0415
 
         units = compact.units(self.context["issue"], self.context["said"], VERSIONS[2])
         self.units = units.text()

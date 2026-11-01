@@ -19,9 +19,9 @@ from pathlib import Path
 
 import pytest
 
-from raidar.subject.workflow.define_tool import compact, featuredef, normative
-from raidar.subject.workflow.define_tool.core import rows, strings, text
-from raidar.subject.workflow.define_tool.unitrules import V1
+from define_tool import compact, featuredef, normative
+from define_tool.core import rows, strings, text
+from define_tool.unitrules import V1
 from tests.define_replay_support import reply
 
 FIXTURES = Path(__file__).parent / "fixtures" / "define" / "compact_replay"
