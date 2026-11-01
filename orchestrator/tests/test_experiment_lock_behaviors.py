@@ -35,6 +35,7 @@ from raidar.design.experiment.lock import (
     toolchain_versions,
 )
 from raidar.scoring.framework.metrics import MetricResolver
+from raidar.subject.draft import draft_resolution, drafting, set_draft_resolution
 from raidar.subject.releases import released_agent
 from tests.experiment_spec_support import (
     InMemoryResolver,
@@ -600,3 +601,14 @@ def test_a_lock_inside_a_referenced_task_directory_is_not_hashed_into_itself(
 
     assert "tasks/forge/task.toml" in lock["execution"]["files"]
     assert "tasks/forge/experiment.lock.json" not in lock["execution"]["files"]
+
+
+def test_process_draft_resolution_is_overridden_only_for_the_nested_context() -> None:
+    with draft_resolution(False):
+        set_draft_resolution(True)
+        assert drafting()
+        with draft_resolution(False):
+            assert not drafting()
+        assert drafting()
+        set_draft_resolution(False)
+        assert not drafting()
