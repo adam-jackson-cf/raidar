@@ -24,30 +24,16 @@ import pytest
 
 from raidar.scoring.code_quality.architecture import produce_production_graph
 from raidar.scoring.code_quality.checkpoint import eligibility_code
-from raidar.scoring.code_quality.diffs import (
-    changed_lines,
-    production_symbols,
-    regression_scope,
-    rework_symbols,
-)
-from raidar.scoring.code_quality.lineage import calculate_problem_rework
-from raidar.scoring.code_quality.lineage_models import (
-    PhysicalLineEvidence,
-    RegressionBreadthInput,
-    ReworkCheckpointInput,
-    SymbolIdentity,
-)
 from raidar.scoring.code_quality.quality import ProductionQualityError, produce_production_quality
-from raidar.scoring.code_quality.regression import calculate_regression_breadth
 from raidar.scoring.code_quality.snapshot_tool.cli import measure
-from raidar.scoring.framework.inventory import FileRole, build_inventory
+from raidar.scoring.framework.inventory import build_inventory
 from tests.code_quality_support import (
     FORK_CASES,
+    assert_lineage_and_regression_equal_the_fork,
     case_snapshots,
     golden_case,
     quality_tools,
     without_executable,
-    without_runs,
 )
 
 pytestmark = pytest.mark.slow
@@ -135,85 +121,7 @@ def test_a_snapshot_without_production_source_is_ineligible_like_the_fork(
     assert measured["graph"] == {"nodes": [], "edges": []}
 
 
-def _rework_symbols(snapshot: Path, case: dict[str, Any]) -> tuple[SymbolIdentity, ...]:
-    """R's identities as the fork's live producer projects them: V/E's eligible symbols."""
-    measured = measure(snapshot, case["entry_file"])
-    quality = produce_production_quality(
-        "checkpoint",
-        snapshot,
-        build_inventory(snapshot).files,
-        measured["files"],
-        measured["symbols"],
-        quality_tools(),
-    )
-    return rework_symbols(quality.evidence)
-
-
-def _lineage_inputs(snapshots: list[Path], case: dict[str, Any]) -> list[ReworkCheckpointInput]:
-    inputs: list[ReworkCheckpointInput] = []
-    for index, (snapshot, checkpoint) in enumerate(
-        zip(snapshots, case["checkpoints"], strict=True)
-    ):
-        symbols = _rework_symbols(snapshot, case)
-        assert [symbol.model_dump(mode="json") for symbol in symbols] == checkpoint[
-            "rework_symbols"
-        ]
-        removed: tuple[PhysicalLineEvidence, ...] = ()
-        added: tuple[PhysicalLineEvidence, ...] = ()
-        if index:
-            prior = inputs[-1].symbols or ()
-            paths = (symbol.path for symbol in (*prior, *symbols))
-            removed, added = changed_lines(snapshots[index - 1], snapshot, paths)
-        inputs.append(
-            ReworkCheckpointInput(
-                checkpoint_id=checkpoint["checkpoint"],
-                symbols=symbols,
-                removed_lines=removed,
-                added_lines=added,
-            )
-        )
-    return inputs
-
-
-def _diff_owners(snapshot: Path, case: dict[str, Any]) -> tuple[SymbolIdentity, ...]:
-    production = [i.path for i in build_inventory(snapshot).files if i.role is FileRole.PRODUCTION]
-    return production_symbols(measure(snapshot, case["entry_file"])["symbols"], production)
-
-
-@pytest.mark.parametrize("name", ["synthetic_shop", "forge"])
-def test_rework_lineage_ledger_and_regression_attribution_equal_the_fork_live_producers(
-    tmp_path: Path, name: str
+def test_rework_lineage_and_regression_equal_the_fork_over_the_large_case_with_the_real_tools(
+    tmp_path: Path,
 ) -> None:
-    case = golden_case(name)
-    snapshots = case_snapshots(tmp_path, case)
-    inputs = _lineage_inputs(snapshots, case)
-    rework = calculate_problem_rework(inputs)
-    assert rework.model_dump(mode="json") == case["lineage"]
-    compared = 0
-    for index in range(1, len(inputs)):
-        prior, current = inputs[index - 1], inputs[index]
-        key = f"{prior.checkpoint_id}->{current.checkpoint_id}"
-        runs = case["runs"].get(current.checkpoint_id)
-        if runs is None:
-            continue
-        inventory = build_inventory(snapshots[index - 1])
-        prior_production = [i.path for i in inventory.files if i.role is FileRole.PRODUCTION]
-        owners = _diff_owners(snapshots[index], case)
-        _, added = changed_lines(
-            snapshots[index - 1],
-            snapshots[index],
-            (*prior_production, *(symbol.path for symbol in owners)),
-        )
-        attribution = calculate_regression_breadth(
-            RegressionBreadthInput(
-                transition_id=f"{prior.checkpoint_id}--{current.checkpoint_id}",
-                baseline=runs["baseline"],
-                produced=runs["produced"],
-                changed_symbols=regression_scope(
-                    added, owners, rework.transitions[index - 1].lineage_candidates
-                ),
-            )
-        )
-        assert without_runs(attribution.model_dump(mode="json")) == case["regressions"][key]
-        compared += 1
-    assert compared == len(case["regressions"])
+    assert_lineage_and_regression_equal_the_fork(tmp_path, golden_case("forge"), quality_tools())

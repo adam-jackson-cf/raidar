@@ -9,6 +9,7 @@ import pytest
 from click.testing import CliRunner
 
 from raidar.cli import main
+from raidar.judge.protocol import NoulQuestion
 from raidar.scoring.judge.audit import AuditLog
 from raidar.scoring.judge.calibration import LabelImportError, import_labels, promotion_readiness
 from raidar.scoring.judge.label_export import (
@@ -18,14 +19,27 @@ from raidar.scoring.judge.label_export import (
     load_review_labels,
 )
 from raidar.scoring.judge.rubric import RUBRIC_POLICY
-from tests.review_fixtures.quality.generate import generate_quality_fixture
+from tests.jev_support import SUFFICIENT, RecordedTransport, make_runtime, noul_answer
 
 RUN = "synthetic-quality.synthetic-run-1.b00-p0-baseline"
+QUESTIONS = {"stub": NoulQuestion(instructions="Is this a stub?")}
 
 
 @pytest.fixture
 def store(tmp_path: Path) -> Path:
-    return generate_quality_fixture(tmp_path / "fx") / "store"
+    """Four recorded decisions of the rubric policy in a tiny audit store."""
+    root = tmp_path / "store"
+    transport = RecordedTransport(answer_for=lambda _id, _question: noul_answer(0.9))
+    runtime = make_runtime(root, transport=transport)
+    for index in range(4):
+        runtime.decide(
+            RUBRIC_POLICY,
+            subject=f"cp1:s{index}",
+            state={"case": index},
+            questions=QUESTIONS,
+            sufficiency=SUFFICIENT,
+        )
+    return root
 
 
 def _decision_ids(store: Path) -> list[str]:

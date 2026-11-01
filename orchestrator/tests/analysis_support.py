@@ -3,7 +3,18 @@
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
+from typing import Any
 
+from raidar.contract.trial import (
+    ExecutionValidity,
+    ProgressionRule,
+    StepResult,
+    TrialHashes,
+    TrialRecord,
+    ValidityCheck,
+)
+from raidar.contract.trial import PlannedTrial as RecordedTrial
+from raidar.design.experiment.lock import LOCK_VERSION, seal_lock
 from raidar.evaluation.analysis.outcomes import TrialOutcome, Value
 from raidar.evaluation.analysis.report import AnalysisInputs, ArmSummary, PlannedTrial
 from raidar.evaluation.analysis.verification_effort import GateDescriptive
@@ -119,4 +130,88 @@ def arm_summary(name: str, verification_effort: Mapping[str, float]) -> ArmSumma
             metric: GateDescriptive(n=1, mean=value, sd=None, interval=None)
             for metric, value in verification_effort.items()
         },
+    )
+
+
+def analysis_lock(
+    scorers: list[str],
+    *,
+    experiment: str = "pilot",
+    headline: str = "scb-canonical@1",
+    **thresholds: Any,
+) -> dict[str, Any]:
+    """A sealed lock for the ``toy`` problem of two checkpoints, built in memory."""
+    analysis = {"baseline_arm": "baseline", **thresholds}
+    spec = {
+        "kind": "ab-test",
+        "runtime": "python",
+        "analysis": {**analysis, "attempts": 5, "seed": 11},
+        "assessment": {"scorers": scorers},
+        "protocol": {"progression": "continue"},
+    }
+    return seal_lock(
+        {
+            "lock_version": LOCK_VERSION,
+            "experiment": {"id": experiment},
+            "spec": spec,
+            "execution": {"design": {"id": experiment, "attempts": 5, "seed": 11}},
+            "assessment": {
+                "spec": spec["assessment"],
+                "metric": {"ref": headline, "selection": "default_by_k", "checkpoints": [2]},
+            },
+            "analysis": {**analysis, "outcome_types": declared_outcome_types({"scb/toy@1": 2})},
+            "toolchain": {},
+        }
+    )
+
+
+RECORD_STEPS = ("checkpoint_1", "checkpoint_2")
+RECORD_HASHES = TrialHashes(
+    lock="l",
+    problem="p",
+    arm="a",
+    workflow="w",
+    packages="s",
+    primitive_code="s",
+    agent="g",
+    protocol="r",
+    trial="t",
+)
+
+
+def trial_record(
+    trial_id: str,
+    arm: str,
+    attempt: int,
+    *,
+    valid: bool = True,
+    truncated_to: int | None = None,
+    agent_override: str | None = None,
+    problem: str = "scb/toy@1",
+    steps: tuple[str, ...] = RECORD_STEPS,
+    step_results: tuple[StepResult, ...] = (),
+) -> TrialRecord:
+    """A trial record built in memory; ``steps`` is the bound prefix it planned."""
+    return TrialRecord(
+        experiment="pilot",
+        job_id="run-1",
+        trial=RecordedTrial(
+            trial_id=trial_id,
+            attempt=attempt,
+            order=0,
+            sequence=attempt,
+            arm=arm,
+            problem=problem,
+            problem_index=0,
+            steps=steps,
+            hashes=RECORD_HASHES,
+        ),
+        trial_dir=f"trials/{trial_id}",
+        progression=ProgressionRule(mode="continue", reward_key="solved"),
+        truncated_to=truncated_to,
+        agent_override=agent_override,
+        step_results=step_results,
+        reached=tuple(True for _ in steps),
+        reached_source="derived",
+        validity=ExecutionValidity(checks=(ValidityCheck(name="steps_started", passed=valid),)),
     )

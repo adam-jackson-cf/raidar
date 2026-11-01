@@ -20,11 +20,11 @@ from dataclasses import dataclass, field
 
 from raidar.contract.review import ReviewExperimentRecord, ReviewRunDetail
 from raidar.contract.trial import TrialRecord
-from raidar.evaluation.review.projection.assessments import AssessmentLookup
+from raidar.evaluation.review.projection.assessments import TrialAssessmentLookup
 from raidar.evaluation.review.projection.experiments import ArmGroup, experiment_record
 from raidar.evaluation.review.projection.headline import headline, withheld_reasons
 from raidar.evaluation.review.projection.sources import JobSource
-from raidar.evaluation.review.projection.spans import safe_id
+from raidar.evaluation.review.projection.spans import TextReader, read_disk, safe_id
 from raidar.evaluation.review.projection.trials import ArmLabels, TrialInput, run_detail
 
 _OVERRIDE_MODELS = {"oracle": "reference solution", "nop": "no agent"}
@@ -104,7 +104,8 @@ def _labels(trial: _Trial) -> ArmLabels:
 def _trial_input(
     trial: _Trial,
     review_id: str,
-    lookup: AssessmentLookup,
+    lookup: TrialAssessmentLookup,
+    read: TextReader,
 ) -> TrialInput:
     source, record = trial.source, trial.record
     trial_dir = source.job_dir / record.trial_dir
@@ -128,6 +129,7 @@ def _trial_input(
         ),
         synthetic=source.synthetic,
         integrity_note=source.integrity_note,
+        read=read,
     )
 
 
@@ -145,12 +147,16 @@ def _group(
     )
 
 
-def project_sources(sources: Sequence[JobSource], lookup: AssessmentLookup) -> EpochProjection:
+def project_sources(
+    sources: Sequence[JobSource],
+    lookup: TrialAssessmentLookup,
+    read: TextReader = read_disk,
+) -> EpochProjection:
     """Project the jobs admitted by the source loader's integrity/provenance gate."""
     trials = [_Trial(source, record) for source in sources for record in source.records]
     ids = _review_ids(trials)
     inputs = [
-        (trial, _trial_input(trial, ids[index], lookup)) for index, trial in enumerate(trials)
+        (trial, _trial_input(trial, ids[index], lookup, read)) for index, trial in enumerate(trials)
     ]
     grouped: dict[GroupKey, list[tuple[_Trial, TrialInput, ReviewRunDetail]]] = defaultdict(list)
     for trial, view in inputs:

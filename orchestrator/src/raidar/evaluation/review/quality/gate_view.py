@@ -16,7 +16,7 @@ A record that cannot be read is an explicit note on the view, never a zero.
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from pathlib import Path
 from typing import cast
 
@@ -126,11 +126,21 @@ def _trace_dirs(
     return found
 
 
-def _read(trace_dir: Path | None, notes: list[str], checkpoint: str) -> StepGate | None:
+GateReader = Callable[[Path], StepGate | None]
+"""Reads one step's ``gate/1`` record from its agent dir."""
+
+
+def read_gate_from_disk(trace_dir: Path) -> StepGate | None:
+    return read_step_gate(trace_dir if trace_dir.is_dir() else None)
+
+
+def _read(
+    trace_dir: Path | None, notes: list[str], checkpoint: str, reader: GateReader
+) -> StepGate | None:
     if trace_dir is None:
         return None
     try:
-        return read_step_gate(trace_dir if trace_dir.is_dir() else None)
+        return reader(trace_dir)
     except GateRecordError as exc:
         notes.append(f"{checkpoint}: gate record unreadable ({exc})")
         return None
@@ -153,13 +163,19 @@ def _assessment_notes(assessment: Assessment | None) -> list[str]:
 
 
 def build_gate_view(
-    trial: TrialSource, assessment: Assessment | None, checkpoints: Sequence[str]
+    trial: TrialSource,
+    assessment: Assessment | None,
+    checkpoints: Sequence[str],
+    reader: GateReader = read_gate_from_disk,
 ) -> GateView | None:
     """The trial's verification effort, or None when it ran without a gate/1 record."""
     cells = _Cells(assessment)
     notes: list[str] = []
     traces = _trace_dirs(trial, checkpoints, notes)
-    gates = {checkpoint: _read(traces[checkpoint], notes, checkpoint) for checkpoint in checkpoints}
+    gates = {
+        checkpoint: _read(traces[checkpoint], notes, checkpoint, reader)
+        for checkpoint in checkpoints
+    }
     if not cells.measured() and not notes and all(gate is None for gate in gates.values()):
         return None
     notes.extend(_assessment_notes(assessment))

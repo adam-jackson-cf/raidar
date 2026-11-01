@@ -13,16 +13,28 @@ from __future__ import annotations
 
 import json
 import random
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from pathlib import Path
 
 from raidar.scoring.framework.context import AssessContext, StepInputs
-from raidar.scoring.framework.result import AssessResult
+from raidar.scoring.framework.result import TRAJECTORY_SUBJECT, AssessResult, AssessStatus
 from raidar.scoring.framework.validation import validate_result
+from raidar.scoring.verification_effort.assess import NO_GATE
+from raidar.scoring.verification_effort.grades import Grades
 from raidar.scoring.verification_effort.manifest import VERIFICATION_EFFORT
+from raidar.scoring.verification_effort.records import GATE_KEY, StepGate, _gate_record
 from raidar.scoring.verification_effort.scorer import verification_effort_scorer
+from raidar.scoring.verification_effort.steps import Step, step_values
+from raidar.scoring.verification_effort.totals import trajectory_values
 
-__all__ = ["VERIFICATION_EFFORT", "gate_result", "write_step_gate"]
+__all__ = [
+    "VERIFICATION_EFFORT",
+    "gate_records",
+    "gate_result",
+    "memory_gate_result",
+    "parse_gate",
+    "write_step_gate",
+]
 
 RECORD_PATH = Path("workflow") / "workflow.json"
 MAX_ROUNDS = 3
@@ -83,8 +95,8 @@ def _turn(index: int, kind: str, rng: random.Random) -> dict[str, object]:
     }
 
 
-def write_step_gate(agent_dir: Path, rng: random.Random, position: int) -> None:
-    """One step's ``workflow/workflow.json`` under ``agent_dir`` (``position``: 0-based step)."""
+def step_gate_record(rng: random.Random, position: int) -> dict[str, object]:
+    """One step's ``workflow/workflow.json`` content (``position``: 0-based step)."""
     refusals = _REFUSALS[position % len(_REFUSALS)]
     runs = min(refusals, MAX_ROUNDS) + 1
     gates = [_gate_run(rng, run, refused=run <= refusals) for run in range(1, runs + 1)]
@@ -92,7 +104,7 @@ def write_step_gate(agent_dir: Path, rng: random.Random, position: int) -> None:
         _turn(1, "agent", rng),
         *(_turn(index, "gate_fix", rng) for index in range(2, runs + 1)),
     ]
-    record = {
+    return {
         "gate/1": {
             "max_fix_rounds": MAX_ROUNDS,
             "base": {},
@@ -107,13 +119,53 @@ def write_step_gate(agent_dir: Path, rng: random.Random, position: int) -> None:
         },
         "turns": turns,
     }
+
+
+def gate_records(checkpoints: Sequence[str], seed: str) -> dict[str, dict[str, object]]:
+    """A gated trial's per-checkpoint records, drawn in order from one generator."""
+    rng = random.Random(seed)
+    return {
+        checkpoint: step_gate_record(rng, position)
+        for position, checkpoint in enumerate(checkpoints)
+    }
+
+
+def write_step_gate(agent_dir: Path, record: dict[str, object]) -> None:
+    """One step's ``workflow/workflow.json`` under ``agent_dir``."""
     target = agent_dir / RECORD_PATH
     target.parent.mkdir(parents=True, exist_ok=True)
     target.write_text(json.dumps(record, indent=2), encoding="utf-8")
 
 
-def _step(trial_dir: Path, checkpoint: str) -> StepInputs:
-    agent_dir = trial_dir / "steps" / checkpoint / "agent"
+def parse_gate(record: dict[str, object]) -> StepGate:
+    """The ``StepGate`` a step's record reads as (what ``read_step_gate`` returns)."""
+    gate = record[GATE_KEY]
+    assert isinstance(gate, dict)
+    return _gate_record(record, gate)
+
+
+def memory_gate_result(
+    gates: Mapping[str, StepGate] | None, checkpoints: Sequence[str]
+) -> AssessResult:
+    """The verification-effort result for per-checkpoint gates, without reading any record.
+
+    Runs the scorer's own per-step and trajectory value rules over ``gates`` (``None``: the
+    trial ran without a gate/1 package).
+    """
+    if gates is None:
+        return AssessResult(status=AssessStatus.NOT_APPLICABLE, reason=NO_GATE, observations=())
+    steps = [Step(_inputs(checkpoint, None), gates[checkpoint]) for checkpoint in checkpoints]
+    found = [(step, step_values(step, frozenset(), Grades(None))) for step in steps]
+    totals = trajectory_values([(step.inputs.step, values) for step, values in found])
+    observations = [
+        measured.observation(metric, step.inputs.step)
+        for step, values in found
+        for metric, measured in values.items()
+    ] + [measured.observation(metric, TRAJECTORY_SUBJECT) for metric, measured in totals.items()]
+    return AssessResult(status=AssessStatus.OK, observations=tuple(observations))
+
+
+def _inputs(checkpoint: str, agent_dir: Path | None) -> StepInputs:
     return StepInputs(
         step=checkpoint,
         reached=True,
@@ -122,10 +174,15 @@ def _step(trial_dir: Path, checkpoint: str) -> StepInputs:
         snapshot_digest=None,
         record=None,
         record_digest=None,
-        trace_dir=agent_dir if agent_dir.is_dir() else None,
+        trace_dir=agent_dir,
         trace_digest=None,
         agent_result=None,
     )
+
+
+def _step(trial_dir: Path, checkpoint: str) -> StepInputs:
+    agent_dir = trial_dir / "steps" / checkpoint / "agent"
+    return _inputs(checkpoint, agent_dir if agent_dir.is_dir() else None)
 
 
 def gate_result(
@@ -133,11 +190,10 @@ def gate_result(
 ) -> AssessResult:
     """Write the trial's gate records (gated arm only) and assess them with verification-effort."""
     if gated:
-        rng = random.Random(seed)
-        for position, checkpoint in enumerate(checkpoints):
+        for checkpoint, record in gate_records(checkpoints, seed).items():
             agent_dir = trial_dir / "steps" / checkpoint / "agent"
             agent_dir.mkdir(parents=True, exist_ok=True)
-            write_step_gate(agent_dir, rng, position)
+            write_step_gate(agent_dir, record)
     ctx = AssessContext(
         problem=problem, steps=tuple(_step(trial_dir, checkpoint) for checkpoint in checkpoints)
     )

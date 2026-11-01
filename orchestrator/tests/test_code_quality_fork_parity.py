@@ -6,8 +6,8 @@ those inputs through its ported producers and kernels:
 
 - measurement adapters: file rows, tree-sitter symbol rows and hashes, the
   entrypoint-bounded call graph;
-- V/E raw evidence (Ruff contract, clone detector, erosion mass) under the
-  real pinned tool env, and H graph evidence;
+- V/E's eligible-symbol evidence and H graph evidence (the Ruff and clone evidence under the
+  real pinned tool env is the slow file's);
 - the R lineage kernel and ledger exactly as the fork's live producer feeds
   them (V/E's unhashed eligible symbols and snapshot diffs);
 - the G attribution kernel over run evidence and the fork's live changed-symbol
@@ -36,7 +36,14 @@ from raidar.scoring.code_quality.models import CheckpointCorrectnessEvidence
 from raidar.scoring.code_quality.regression import calculate_regression_breadth
 from raidar.scoring.code_quality.snapshot_tool.cli import measure
 from raidar.scoring.framework.inventory import FileRole, build_inventory
-from tests.code_quality_support import FORK_CASES, case_snapshots, fork_goldens, golden_case
+from tests.code_quality_support import (
+    FORK_CASES,
+    assert_lineage_and_regression_equal_the_fork,
+    case_snapshots,
+    fork_goldens,
+    golden_case,
+    in_memory_tools,
+)
 
 _SYMBOL_ORDER = ("file_path", "start", "end", "name", "type")
 
@@ -102,6 +109,12 @@ def test_rework_is_unavailable_like_the_fork_when_a_checkpoint_has_no_ve_evidenc
     case = golden_case("language_features")
     assert [item["rework_symbols"] is None for item in case["checkpoints"]].count(True) >= 1
     assert case["lineage"] is None
+
+
+def test_rework_lineage_and_regression_equal_the_fork_live_producers(tmp_path: Path) -> None:
+    assert_lineage_and_regression_equal_the_fork(
+        tmp_path, golden_case("synthetic_shop"), in_memory_tools()
+    )
 
 
 def test_lineage_kernel_scenarios_equal_the_fork() -> None:

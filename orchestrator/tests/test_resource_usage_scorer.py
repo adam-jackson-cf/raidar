@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-import shutil
 from pathlib import Path
 
 import pytest
@@ -11,9 +10,10 @@ import pytest
 from raidar.scoring.framework.atif import TrajectoryError, load_trajectory
 from raidar.scoring.framework.context import AssessContext
 from raidar.scoring.framework.result import AssessResult, AssessStatus, EvidenceSource, Observation
-from raidar.scoring.framework.trial_inputs import load_trial_context
+from raidar.scoring.framework.trial_inputs import agent_execution_seconds
 from raidar.scoring.framework.validation import validate_result
 from raidar.scoring.resource_usage import resource_usage_scorer
+from tests.scorer_support import traced_memory_context
 from tests.trace_trial_support import (
     TracedStep,
     agent_step,
@@ -21,10 +21,8 @@ from tests.trace_trial_support import (
     delegate,
     execution,
     session,
-    traced_context,
     trajectory,
     usage,
-    write_traced_trial,
 )
 
 
@@ -71,8 +69,7 @@ def test_totals_reconcile_with_harbor_agent_results(tmp_path: Path) -> None:
             execution=execution("02:00.000000", "02:35.266879"),
         ),
     ]
-    ctx = traced_context(tmp_path, steps)
-    observed = _by_key(_assess(ctx))
+    observed = _by_key(_assess(traced_memory_context(tmp_path, steps)))
 
     assert observed["input_tokens", "checkpoint_2"].value == 84049
     assert observed["output_tokens", "checkpoint_2"].value == 511
@@ -81,8 +78,7 @@ def test_totals_reconcile_with_harbor_agent_results(tmp_path: Path) -> None:
     assert observed["turns", "checkpoint_2"].value == 5
     assert observed["agent_wall_s", "checkpoint_1"].value == pytest.approx(90.5)
 
-    raw = json.loads((tmp_path / "trial" / "result.json").read_text())["step_results"]
-    agent_results = [item["agent_result"] for item in raw]
+    agent_results = [step.usage for step in steps]
     assert observed["total_tokens", "trajectory"].value == sum(
         item["n_input_tokens"] + item["n_output_tokens"] for item in agent_results
     )
@@ -101,7 +97,7 @@ def test_unreported_usage_stays_unavailable_and_unreached_steps_are_not_counted(
         TracedStep("checkpoint_1", trace=trajectory(agent_step(1)), usage=usage(10, 5, 0.5)),
         TracedStep("checkpoint_2", trace=None, usage=oracle_agent),
     ]
-    ctx = traced_context(tmp_path, steps, planned=["checkpoint_3"])
+    ctx = traced_memory_context(tmp_path, steps, planned=["checkpoint_3"])
     observed = _by_key(_assess(ctx))
 
     for metric in ("input_tokens", "output_tokens", "cost_usd", "turns", "agent_wall_s"):
@@ -116,7 +112,7 @@ def test_unreported_usage_stays_unavailable_and_unreached_steps_are_not_counted(
 
 
 def test_turn_evidence_points_into_the_stored_trace(tmp_path: Path) -> None:
-    ctx = traced_context(
+    ctx = traced_memory_context(
         tmp_path,
         [TracedStep("checkpoint_1", trace=trajectory(agent_step(1)), usage=usage(1, 1, 0.0))],
     )
@@ -130,7 +126,7 @@ def test_turn_evidence_points_into_the_stored_trace(tmp_path: Path) -> None:
 
 
 def test_unreadable_trajectories_are_unavailable_not_zero(tmp_path: Path) -> None:
-    ctx = traced_context(
+    ctx = traced_memory_context(
         tmp_path, [TracedStep("checkpoint_1", trace={"no": "steps"}, usage=usage(1, 1, 0.0))]
     )
     turns = _by_key(_assess(ctx))["turns", "checkpoint_1"]
@@ -160,7 +156,9 @@ def test_turns_cover_sub_agents_at_any_depth_but_not_deterministic_dispatch(
     )
     dispatch = {**agent_step(1), "llm_call_count": 0}
     trace = trajectory(dispatch, delegate("child"), subagents=[child])
-    ctx = traced_context(tmp_path, [TracedStep("checkpoint_1", trace=trace, usage=usage(1, 1, 0))])
+    ctx = traced_memory_context(
+        tmp_path, [TracedStep("checkpoint_1", trace=trace, usage=usage(1, 1, 0))]
+    )
     loaded = load_trajectory(ctx.steps[0].trace_dir)
     assert loaded is not None
     assert [step.session for step in loaded.steps if step.source == "agent"] == [
@@ -175,42 +173,25 @@ def test_turns_cover_sub_agents_at_any_depth_but_not_deterministic_dispatch(
 
 
 def test_a_trial_with_no_usage_at_all_is_unavailable(tmp_path: Path) -> None:
-    ctx = traced_context(tmp_path, [TracedStep("checkpoint_1", trace=None, usage=None)])
+    ctx = traced_memory_context(tmp_path, [TracedStep("checkpoint_1", trace=None, usage=None)])
     result = _assess(ctx)
     assert result.status is AssessStatus.UNAVAILABLE
 
 
-def test_one_shot_trials_read_trial_level_usage_and_timing(tmp_path: Path) -> None:
-    """A single-step Harbor trial reports usage and timing at the trial level."""
-    trial = write_traced_trial(
-        tmp_path / "trial",
-        [TracedStep("checkpoint_1", trace=trajectory(agent_step(1)), usage=usage(7, 3, 0.2))],
-    )
-    result_path = trial / "result.json"
-    stored = json.loads(result_path.read_text())
-    (step,) = stored.pop("step_results")
-    stored["agent_result"] = step["agent_result"]
-    stored["agent_execution"] = execution("00:00", "00:12.5")
-    result_path.write_text(json.dumps(stored))
-    shutil.move(trial / "steps" / "checkpoint_1" / "agent", trial / "agent")
-    observed = _by_key(_assess(load_trial_context(trial)))
-    assert observed["total_tokens", "trajectory"].value == 10
-    assert observed["agent_wall_s", "checkpoint_1"].value == pytest.approx(12.5)
-    assert observed["turns", "checkpoint_1"].value == 1
-
-    stored["agent_execution"] = {
-        "started_at": "2026-09-30T00:00:00",
-        "finished_at": "2026-09-30T00:00:02Z",
-    }
-    result_path.write_text(json.dumps(stored))
-    zoned = _by_key(_assess(load_trial_context(trial)))["agent_wall_s", "checkpoint_1"]
-    assert zoned.value == pytest.approx(2.0)
-    for bad in (
-        {"started_at": "yesterday", "finished_at": "2026-09-30T00:00:02Z"},
-        {"started_at": "2026-09-30T00:00:02Z", "finished_at": "2026-09-30T00:00:01Z"},
-        "bad",
-    ):
-        stored["agent_execution"] = bad
-        result_path.write_text(json.dumps(stored))
-        wall = _by_key(_assess(load_trial_context(trial)))["agent_wall_s", "checkpoint_1"]
-        assert wall.status is AssessStatus.UNAVAILABLE
+@pytest.mark.parametrize(
+    ("timing", "seconds"),
+    [
+        (execution("00:00", "00:12.5"), 12.5),
+        # A zone-less start is read as UTC so both ends compare.
+        ({"started_at": "2026-09-30T00:00:00", "finished_at": "2026-09-30T00:00:02Z"}, 2.0),
+        ({"started_at": "yesterday", "finished_at": "2026-09-30T00:00:02Z"}, None),
+        ({"started_at": "2026-09-30T00:00:02Z", "finished_at": "2026-09-30T00:00:01Z"}, None),
+        ({"started_at": "2026-09-30T00:00:02Z"}, None),
+        ("bad", None),
+        (None, None),
+    ],
+)
+def test_agent_wall_time_is_the_agent_execution_phase_or_unknown(
+    timing: object, seconds: float | None
+) -> None:
+    assert agent_execution_seconds(timing) == seconds

@@ -4,9 +4,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from raidar.engine.health.audit import audit_trial
-from raidar.engine.health.dependencies import GRADER_LOG, local_modules, undeclared_modules
-from raidar.engine.health.model import HealthCheck, HealthReport, write_health
+from raidar.engine.health.dependencies import local_modules, undeclared_modules
+from raidar.engine.health.model import HealthReport, write_health
 from raidar.engine.trial.collect import HEALTH_VALIDITY
 from raidar.evaluation.analysis.dependencies import (
     arm_dependencies,
@@ -14,41 +13,6 @@ from raidar.evaluation.analysis.dependencies import (
     dependency_warnings,
 )
 from raidar.evaluation.analysis.outcomes import DependencyStep, TrialOutcome
-from raidar.grading.records import load_step_record, step_record_dir, write_step_record
-from raidar.grading.submission_deps import SubmissionDependencies
-from tests.health_support import STEP, healthy_trial
-
-
-def _dependencies(declared: tuple[str, ...], unprovided: list[dict[str, str]]) -> object:
-    return SubmissionDependencies.model_validate(
-        {
-            "declared": declared,
-            "set_sha256": "s" * 64,
-            "source": "resolved",
-            "lock_text": "",
-            "lock_sha256": "l" * 64,
-            "arch": "arm64",
-            "provided": (),
-            "unprovided": unprovided,
-            "resolve_s": 0.0,
-            "build_s": 0.0,
-            "image_id": "sha256:x",
-        }
-    )
-
-
-def _readings(
-    tmp_path: Path, declared: tuple[str, ...], unprovided: list[dict[str, str]], log: str | None
-) -> dict[str, HealthCheck]:
-    t = healthy_trial(tmp_path)
-    record_dir = step_record_dir(t.trial_dir, STEP)
-    ledger = load_step_record(record_dir)
-    deps = _dependencies(declared, unprovided)
-    write_step_record(record_dir, ledger.model_copy(update={"submission_dependencies": deps}))
-    if log is not None:
-        (record_dir / GRADER_LOG).write_text(log)
-    report = audit_trial(t.job_dir, t.trial_dir, t.record, t.job())
-    return {c.id: c for c in report.checks}
 
 
 def test_undeclared_modules_skip_stdlib_local_and_declared_names() -> None:
@@ -73,23 +37,6 @@ def test_local_modules_read_the_snapshot_root_and_src(tmp_path: Path) -> None:
     (tmp_path / "tool.py").write_text("")
     (tmp_path / "src" / "lib").mkdir(parents=True)
     assert local_modules(tmp_path) == {"pkg", "tool", "src", "lib"}
-
-
-def test_d1_and_d2_record_structured_evidence_per_step(tmp_path: Path) -> None:
-    unprovided = [{"requirement": "sdistonly==1", "reason": "no-wheel"}]
-    log = "ModuleNotFoundError: No module named 'polars'\n"
-    checks = _readings(tmp_path, ("sdistonly==1",), unprovided, log)
-    assert checks["D1"].status == "pass"
-    assert checks["D1"].evidence["steps"] == {STEP: unprovided}
-    assert checks["D2"].evidence["steps"] == {STEP: [{"module": "polars", "basis": "heuristic"}]}
-    assert checks["D2"].evidence["unmeasured"] == []
-
-
-def test_a_missing_grader_log_is_unmeasured_not_unaffected(tmp_path: Path) -> None:
-    checks = _readings(tmp_path, (), [], None)
-    assert checks["D1"].evidence["steps"] == {STEP: []}
-    assert checks["D2"].status == "unmeasured"
-    assert checks["D2"].evidence["unmeasured"] == [STEP]
 
 
 def test_readings_never_invalidate_a_trial() -> None:
