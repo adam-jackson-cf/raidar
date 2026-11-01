@@ -8,6 +8,8 @@ from __future__ import annotations
 
 import hashlib
 import json
+import runpy
+import sys
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import replace
 from decimal import Decimal
@@ -684,6 +686,7 @@ def test_the_jev_audit_reads_decisions_and_their_current_labels_from_a_store(
     audit = AuditLog.for_store(tmp_path)
     for decision in data.decisions:
         audit.append(decision)
+    audit.append(data.decisions[0].model_copy(update={"trial": None, "request_id": "unbound"}))
     labelled = data.decisions[0]
     audit.append_label(
         LabelRecord(
@@ -700,8 +703,8 @@ def test_the_jev_audit_reads_decisions_and_their_current_labels_from_a_store(
     assert {request: record.label for request, record in read.labels.items()} == {
         labelled.request_id: "correct"
     }
-    result = _project(data, audit=read)
-    items = result.run_details[f"{RUN_PREFIX}b00-p0-baseline"].jev_decisions
+    reviewed = review_trials(data.trials[:1], data.find, read, data.read_gate)
+    items = reviewed[0].detail.jev_decisions
     assert sorted(item.label or "" for item in items) == ["", "", "correct"]
     assert JevAudit.open(tmp_path / "no-store") == JevAudit(decisions={}, labels={})
 
@@ -1070,13 +1073,27 @@ def test_portable_paths_are_relative_to_the_working_directory_or_just_a_name(
 
 
 def test_a_projection_round_trips_through_the_cli_and_names_its_inputs_portably(
-    tmp_path: Path,
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     runs, store = tmp_path / "jobs", tmp_path / "store"
     runs.mkdir()
     store.mkdir()
     output = tmp_path / "out" / "quality.json"
-    main(["--jobs-root", str(runs), "--store", str(store), "--output", str(output), "--synthetic"])
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "raidar-quality-projection",
+            "--jobs-root",
+            str(runs),
+            "--store",
+            str(store),
+            "--output",
+            str(output),
+            "--synthetic",
+        ],
+    )
+    runpy.run_module("raidar.evaluation.review.quality", run_name="__main__")
     loaded = QualityProjection.model_validate_json(output.read_bytes())
     assert loaded.synthetic
     assert loaded.runs == ()
@@ -1097,3 +1114,99 @@ def test_descriptive_statistics_boundaries() -> None:
     assert quantiles([1.0, 2.0, 3.0, 4.0, 5.0]) == (1.0, 2.0, 3.0, 4.0, 5.0)
     assert pearson([1.0, 1.0, 1.0], [1.0, 2.0, 3.0]) is None
     assert pearson([1.0, 2.0, 3.0], [2.0, 4.0, 6.0]) == pytest.approx(1.0)
+
+
+@pytest.mark.parametrize("duplicate", [False, True])
+def test_projection_contract_refuses_ambiguous_or_incomplete_run_indexes(
+    projection: QualityProjection, duplicate: bool
+) -> None:
+    payload = projection.model_dump(mode="json")
+    if duplicate:
+        payload["runs"].append(payload["runs"][0])
+    else:
+        del payload["run_details"][payload["runs"][0]["id"]]
+    with pytest.raises(ValueError, match="duplicate ids|run index and run_details differ"):
+        QualityProjection.model_validate(payload)
+
+
+def test_older_trials_discovered_later_do_not_replace_newer_results(
+    data: SyntheticQuality, projection: QualityProjection
+) -> None:
+    from raidar.evaluation.review.quality.experiment_view import _counted
+
+    source = data.trials[0]
+    old = ReviewedTrial(source=source, detail=projection.run_details[source.review_id])
+    new_run = old.detail.run.model_copy(update={"id": "newer"})
+    new = ReviewedTrial(
+        source=replace(source, finished_at=LATER),
+        detail=old.detail.model_copy(update={"run": new_run}),
+    )
+    counted, excluded, infra = _counted([new, old])
+    assert counted == [new]
+    assert len(excluded) == 1
+    assert excluded[0].startswith(old.detail.run.id + ":")
+    assert not infra
+
+
+@pytest.mark.parametrize("kind", ["binary", None])
+def test_quality_pairs_refuse_binary_or_undeclared_component_tests(
+    kind: str | None,
+) -> None:
+    from raidar.evaluation.analysis.effects import ArmExclusions, Exclusions, Settings
+    from raidar.evaluation.review.quality.experiment_view import _delta
+
+    declarations = {"problems": {PROBLEM: {"binary": ["verbosity"]}}} if kind is not None else None
+    exclusions = Exclusions(
+        planned=6,
+        paired=6,
+        arms=tuple(ArmExclusions(arm=arm, planned=6, excluded=0) for arm in ("baseline", "gated")),
+    )
+    result = _delta(
+        PROBLEM,
+        "V",
+        "gated",
+        ([0.5] * 6, exclusions, []),
+        Settings(
+            min_pairs=2,
+            bootstrap_samples=100,
+            outcome_types=declarations,
+            max_exclusion_difference=0.0,
+        ),
+    )
+    assert result.verdict == "insufficient"
+    assert ("binary" if kind else "declar") in result.reason
+
+
+def test_constant_component_has_no_correlation() -> None:
+    from raidar.evaluation.review.quality.experiment_view import _correlation
+
+    result = _correlation("V", "E", [{"V": 0.5, "E": value} for value in (0.0, 0.5, 1.0)])
+    assert result.r is None
+    assert result.reason == "a component is constant"
+
+
+def test_incompatible_primary_outcome_is_not_presented_as_a_measured_primary(
+    data: SyntheticQuality, projection: QualityProjection
+) -> None:
+    source = data.trials[0]
+    source = replace(
+        source, experiment=replace(source.experiment, analysis={"primary_outcome": "bogus"})
+    )
+    assert _primary(
+        [ReviewedTrial(source=source, detail=projection.run_details[source.review_id])]
+    ) == (
+        None,
+        None,
+        None,
+    )
+
+
+def test_mixed_headline_policies_are_named_in_problem_notes() -> None:
+    from raidar.evaluation.review.quality.experiment_view import _problem_notes
+
+    notes = _problem_notes(
+        ["scb-canonical@1", "alternate@1"], "baseline", ["baseline", "gated"], None
+    )
+    assert len(notes) == 1
+    assert "scb-canonical@1" in notes[0]
+    assert "alternate@1" in notes[0]
