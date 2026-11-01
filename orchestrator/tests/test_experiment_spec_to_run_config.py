@@ -3,40 +3,37 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any
 
 import pytest
-import yaml
-from click.testing import CliRunner
 from pydantic import ValidationError
 
-from raidar.cli import main
 from raidar.design.experiment.lock import default_lock_path
 from raidar.design.experiment.schema import AssessmentSpec, ExperimentSpec, ProtocolSpec
 from raidar.design.experiment.validation import semantic_issues
-from raidar.design.problem.store import ROOT_ENV
 from raidar.engine.job.assessment import rescore_config
-from tests.experiment_spec_support import MECHANICS_SMOKE, SMOKE_EXPERIMENT
+from tests.experiment_spec_support import experiment_document
 
 
-def test_each_experiment_file_defaults_to_its_own_lock() -> None:
-    assert default_lock_path(MECHANICS_SMOKE).name == "experiment.lock.json"
-    assert default_lock_path(Path("x/oneshot.experiment.yaml")).name == (
-        "oneshot.experiment.lock.json"
-    )
-    assert default_lock_path(Path("a/b.yml")) == Path("a/b.lock.json")
-    assert len({default_lock_path(MECHANICS_SMOKE), default_lock_path(SMOKE_EXPERIMENT)}) == 2
-
-
-def test_lock_command_writes_the_keyed_default_path(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+@pytest.mark.parametrize(
+    ("experiment", "lock"),
+    [
+        ("lab/experiment.yaml", "lab/experiment.lock.json"),
+        ("x/oneshot.experiment.yaml", "x/oneshot.experiment.lock.json"),
+        ("a/b.yml", "a/b.lock.json"),
+        ("a/plain", "a/plain.lock.json"),
+    ],
+)
+def test_each_experiment_file_defaults_to_the_lock_keyed_by_its_name(
+    experiment: str, lock: str
 ) -> None:
-    monkeypatch.setenv(ROOT_ENV, str(SMOKE_EXPERIMENT.parents[3] / "problems"))
-    experiment = tmp_path / "oneshot.experiment.yaml"
-    experiment.write_text(SMOKE_EXPERIMENT.read_text())
-    result = CliRunner().invoke(main, ["lock", str(experiment)])
-    assert result.exit_code == 0, result.output
-    assert (tmp_path / "oneshot.experiment.lock.json").is_file()
-    assert not (tmp_path / "experiment.lock.json").exists()
+    assert default_lock_path(Path(experiment)) == Path(lock)
+
+
+def test_experiments_sharing_a_directory_never_share_a_lock() -> None:
+    first, second = Path("d/experiment.yaml"), Path("d/oneshot.experiment.yaml")
+
+    assert default_lock_path(first) != default_lock_path(second)
 
 
 def test_assessment_settings_become_the_rescore_config() -> None:
@@ -71,9 +68,14 @@ def test_protocol_progression_reaches_the_scorers_that_read_it() -> None:
     }
 
 
+def _document(*scorers: str, **scorer_config: dict[str, Any]) -> dict[str, Any]:
+    document = experiment_document()
+    document["assessment"] = {"scorers": list(scorers), "scorer_config": scorer_config}
+    return document
+
+
 def test_a_scorer_config_contradicting_the_protocol_is_a_field_error() -> None:
-    raw = yaml.safe_load(MECHANICS_SMOKE.read_text())
-    raw["assessment"]["scorer_config"] = {"correctness@10": {"progression": "halt_on_failure"}}
+    raw = _document("correctness@10", **{"correctness@10": {"progression": "halt_on_failure"}})
     issues = semantic_issues(ExperimentSpec.model_validate(raw))
     assert [issue.loc for issue in issues] == [
         "assessment.scorer_config.correctness@10.progression"
@@ -83,9 +85,12 @@ def test_a_scorer_config_contradicting_the_protocol_is_a_field_error() -> None:
 
 
 def test_only_scorers_that_take_a_protocol_key_are_held_to_it() -> None:
-    raw = yaml.safe_load(MECHANICS_SMOKE.read_text())
     # resource-usage@8 does not take progression from the protocol: its own key stands.
-    raw["assessment"]["scorer_config"] = {"resource-usage@8": {"progression": "halt_on_failure"}}
+    raw = _document(
+        "correctness@10",
+        "resource-usage@8",
+        **{"resource-usage@8": {"progression": "halt_on_failure"}},
+    )
     spec = ExperimentSpec.model_validate(raw)
     assert semantic_issues(spec) == []
     # The registry's protocol keys decide, whatever their name.

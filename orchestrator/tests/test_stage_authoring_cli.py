@@ -8,6 +8,7 @@ import os
 import shutil
 import subprocess
 import sys
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -18,16 +19,8 @@ from raidar_contract.package.fixtures import static_problems
 from raidar_contract.package.registry import load_stage_package
 
 from raidar.cli import main, stage, stage_fixtures, stage_lock, stage_package, workflow_new
-from raidar.contract.paths import lab_root
 from raidar.subject.workflow import stage_check
-
-REAL_PACKAGE = lab_root() / "stages" / "raidar" / "docs-check"
-TEMPLATE_LOCK = (REAL_PACKAGE / "tool" / "uv.lock").read_text()
-# Model uv's sdist metadata as well as the real package's pinned wheel.
-SDIST = (
-    f'sdist = {{ url = "https://files.pythonhosted.org/x.tar.gz", hash = "sha256:{"0" * 64}" }}\n'
-)
-LOCK = TEMPLATE_LOCK.replace("wheels = [", SDIST + "wheels = [")
+from tests.release_support import REAL_PACKAGE, UV_LOCK_WITH_SDIST
 
 
 @pytest.fixture
@@ -181,6 +174,23 @@ def test_stage_new_refuses_to_replace_a_symlink_at_the_target(stages: Path, tmp_
     assert (stages / "acme" / "my-check").is_symlink()
 
 
+@pytest.mark.parametrize(
+    "manifest",
+    ["- a\n- list\n", "name:\n  - x\n", "summary: x\n", "name:\n", "name: [unclosed\n"],
+    ids=["not-a-mapping", "name-not-scalar", "no-name", "empty-name", "invalid-yaml"],
+)
+def test_stage_new_from_a_manifest_it_cannot_rename_writes_nothing(
+    stages: Path, manifest: str
+) -> None:
+    (stages / "acme" / "odd").mkdir(parents=True)
+    (stages / "acme" / "odd" / "stage.yaml").write_text(manifest)
+
+    result = CliRunner().invoke(main, ["stage", "new", "acme/copy", "--from", "acme/odd"])
+
+    assert result.exit_code != 0
+    assert not (stages / "acme" / "copy").exists()
+
+
 @pytest.mark.parametrize("kind", ["file", "directory", "fixture", "fifo"])
 def test_stage_new_refuses_a_source_with_a_symlink_or_special_file_and_writes_nothing(
     stages: Path, tmp_path: Path, kind: str
@@ -217,20 +227,9 @@ def test_stage_new_refuses_a_symlinked_namespace_folder(stages: Path, tmp_path: 
     assert list(elsewhere.iterdir()) == []
 
 
-@pytest.mark.parametrize(
-    "args",
-    [["../x"], ["acme/.."], ["acme/ok", "--from", "../etc"], ["acme/ok", "--from", "a/b/c"]],
-)
+@pytest.mark.parametrize("args", [["../x"], ["acme/ok", "--from", "../etc"]])
 def test_stage_new_refuses_names_that_could_traverse(stages: Path, args: list[str]) -> None:
     result = CliRunner().invoke(main, ["stage", "new", *args])
-
-    assert result.exit_code != 0
-    assert not (stages / "acme").exists()
-
-
-@pytest.mark.parametrize("name", ["Bad", "-x", "a b", "a/b/c", "", "my-check", "acme/"])
-def test_stage_new_refuses_a_bad_name(stages: Path, name: str) -> None:
-    result = CliRunner().invoke(main, ["stage", "new", name])
 
     assert result.exit_code != 0
     assert not (stages / "acme").exists()
@@ -240,44 +239,62 @@ def test_stage_new_refuses_a_bad_name(stages: Path, name: str) -> None:
 def test_every_package_command_refuses_a_name_without_a_namespace(
     stages: Path, command: str
 ) -> None:
-    CliRunner().invoke(main, ["stage", "new", "acme/my-check"])
-
     result = CliRunner().invoke(main, ["stage", command, "my-check"])
 
     assert result.exit_code != 0
     assert "<ns>/<name>" in result.output
 
 
-@pytest.mark.parametrize("case", ["pass", "refuse"])
-def test_a_missing_mandatory_fixture_is_a_static_problem(stages: Path, case: str) -> None:
-    CliRunner().invoke(main, ["stage", "new", "acme/my-check"])
-    shutil.rmtree(stages / "acme" / "my-check" / "fixtures" / case)
+_STATIC_FAULTS: dict[str, tuple[Callable[[Path], object], str]] = {
+    "missing pass fixture": (
+        lambda root: shutil.rmtree(root / "fixtures" / "pass"),
+        "missing mandatory fixture 'pass'",
+    ),
+    "missing refuse fixture": (
+        lambda root: shutil.rmtree(root / "fixtures" / "refuse"),
+        "missing mandatory fixture 'refuse'",
+    ),
+    "wrong expected status": (
+        lambda root: (root / "fixtures" / "refuse" / "expect.yaml").write_text("status: pass\n"),
+        "'refuse' must expect status 'refuse'",
+    ),
+    "stop result without a stop": (
+        lambda root: (root / "fixtures" / "binary-file" / "expect.yaml").write_text(
+            "status: done\n"
+        ),
+        "expects a stop result but the package has no stop",
+    ),
+}
 
-    problems = static_problems(load_stage_package(stages / "acme" / "my-check"))
 
-    assert any(f"missing mandatory fixture {case!r}" in problem for problem in problems)
-
-
-def test_a_wrong_expected_status_for_a_mandatory_fixture_is_a_static_problem(
-    stages: Path,
+@pytest.mark.parametrize("fault", sorted(_STATIC_FAULTS))
+def test_a_fixture_set_that_breaks_the_authoring_contract_is_a_static_problem(
+    stages: Path, fault: str
 ) -> None:
     CliRunner().invoke(main, ["stage", "new", "acme/my-check"])
-    expect = stages / "acme" / "my-check" / "fixtures" / "refuse" / "expect.yaml"
-    expect.write_text("status: pass\n")
+    mutate, expected = _STATIC_FAULTS[fault]
+    mutate(stages / "acme" / "my-check")
 
     problems = static_problems(load_stage_package(stages / "acme" / "my-check"))
 
-    assert any("'refuse' must expect status 'refuse'" in problem for problem in problems)
+    assert any(expected in problem for problem in problems)
 
 
-def test_a_stop_result_fixture_needs_a_stop(stages: Path) -> None:
-    CliRunner().invoke(main, ["stage", "new", "acme/my-check"])
-    expect = stages / "acme" / "my-check" / "fixtures" / "binary-file" / "expect.yaml"
-    expect.write_text("status: done\n")
+def test_stage_list_reports_an_empty_tree_and_an_invalid_package(
+    stages: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(stage_package, "stages_root", lambda: tmp_path / "none")
+    empty = CliRunner().invoke(main, ["stage", "list"])
+    monkeypatch.setattr(stage_package, "stages_root", lambda: stages)
+    (stages / "acme" / "broken").mkdir(parents=True)
+    (stages / "acme" / "broken" / "stage.yaml").write_text("this: [is not a manifest\n")
 
-    problems = static_problems(load_stage_package(stages / "acme" / "my-check"))
+    listed = CliRunner().invoke(main, ["stage", "list"])
 
-    assert any("expects a stop result but the package has no stop" in item for item in problems)
+    assert empty.exit_code == 0, empty.output
+    assert "no stage packages" in empty.output
+    assert listed.exit_code == 0, listed.output
+    assert "acme/broken\tINVALID: " in listed.output
 
 
 def test_stage_list_and_info_show_the_package_and_its_next_register_line(
@@ -330,41 +347,6 @@ def test_workflow_new_refuses_an_unknown_template(
     assert "no workflow template" in result.output
 
 
-def test_stage_check_never_runs_package_code_on_the_host(
-    stages: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """V4: with no container, nothing at all executes."""
-    CliRunner().invoke(main, ["stage", "new", "acme/my-check"])
-    executed: list[Any] = []
-
-    def forbidden(*args: Any, **kwargs: Any) -> Any:
-        executed.append(args)
-        raise AssertionError(f"host execution: {args}")
-
-    class NoDocker:
-        def __init__(self, *args: Any, **kwargs: Any) -> None:
-            pass
-
-        async def __aenter__(self) -> Any:
-            raise RuntimeError("no docker in this test")
-
-        async def __aexit__(self, *exc: Any) -> None:
-            return None
-
-    for name in ("run", "Popen", "check_call", "check_output"):
-        monkeypatch.setattr(subprocess, name, forbidden)
-    monkeypatch.setattr(asyncio, "create_subprocess_exec", forbidden)
-    monkeypatch.setattr(stage_fixtures, "lock_problems", lambda root: [])
-    monkeypatch.setattr(stage_fixtures, "_pack", lambda target: ("image", "context", "pack"))
-    monkeypatch.setattr(stage_check, "PackContainer", NoDocker)
-
-    result = CliRunner().invoke(main, ["stage", "check", "acme/my-check"])
-
-    assert result.exit_code != 0
-    assert "stage-check could not complete" in result.output
-    assert executed == []
-
-
 def test_stage_check_with_a_static_problem_never_creates_a_container(
     stages: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -413,14 +395,24 @@ def _tripwire(monkeypatch: pytest.MonkeyPatch) -> list[Any]:
 def test_no_authoring_path_runs_package_code_on_the_host(
     stages: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """V4: new, list, info, lock (resolution only) and static checks start no host process."""
+    """V4: new, list, info, lock (resolution only) and check start no host process."""
     CliRunner().invoke(main, ["stage", "new", "acme/my-check"])
     attempts = _tripwire(monkeypatch)
     resolved: list[Any] = []
 
+    class NoDocker:
+        def __init__(self, *args: Any, **kwargs: Any) -> None:
+            pass
+
+        async def __aenter__(self) -> Any:
+            raise RuntimeError("no docker in this test")
+
+        async def __aexit__(self, *exc: Any) -> None:
+            return None
+
     def uv(project: Path, *args: str) -> subprocess.CompletedProcess[str]:
         resolved.append(args)
-        (project / "uv.lock").write_text(LOCK)
+        (project / "uv.lock").write_text(UV_LOCK_WITH_SDIST)
         return subprocess.CompletedProcess(args, 0, "", "")
 
     monkeypatch.setattr(stage_lock, "_uv", uv)
@@ -428,11 +420,17 @@ def test_no_authoring_path_runs_package_code_on_the_host(
     locked = CliRunner().invoke(main, ["stage", "lock", "acme/my-check"])
     listed = CliRunner().invoke(main, ["stage", "list"])
     info = CliRunner().invoke(main, ["stage", "info", "acme/my-check"])
+    monkeypatch.setattr(stage_fixtures, "lock_problems", lambda root: [])
+    monkeypatch.setattr(stage_fixtures, "_pack", lambda target: ("image", "context", "pack"))
+    monkeypatch.setattr(stage_check, "PackContainer", NoDocker)
+    checked = CliRunner().invoke(main, ["stage", "check", "acme/my-check"])
     package = load_stage_package(stages / "acme" / "my-check")
 
     assert locked.exit_code == 0, locked.output
     assert listed.exit_code == 0, listed.output
     assert info.exit_code == 0, info.output
+    assert checked.exit_code != 0
+    assert "stage-check could not complete" in checked.output
     assert static_problems(package) == []
     assert resolved  # uv resolved; nothing else ran
     assert attempts == []

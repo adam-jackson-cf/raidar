@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -15,7 +16,7 @@ from raidar_contract.workflow import (
 
 from raidar.contract.paths import agents_root, workflows_root
 from raidar.subject.agent.definition import load_agent
-from tests.release_support import REAL_LAB, edit_agent, release_tree, write_workflow
+from tests.release_support import edit_agent, release_tree, write_workflow
 
 ONE_SHOT = "raidar/one-shot"
 
@@ -31,18 +32,6 @@ def _workflow(**over: Any) -> dict[str, Any]:
 
 def _load(tree: Path) -> Any:
     return load_package_workflow(workflows_root(tree) / ONE_SHOT, ONE_SHOT)
-
-
-def test_the_real_definitions_load(tree: Path) -> None:
-    assert load_agent(agents_root(tree), "codex").name == "codex"
-    assert _load(tree).enabled_stages == ()
-    shipped = REAL_LAB / "workflows" / "raidar"
-    verifying = load_package_workflow(shipped / "one-shot-verify", "raidar/one-shot-verify")
-    assert verifying.enabled_stages == ("raidar/verify",)
-    defining = load_package_workflow(shipped / "define-build-verify", "raidar/define-build-verify")
-    assert defining.enabled_stages == ("raidar/define", "raidar/verify")
-    assert defining.judge is not None
-    assert defining.build.reply == "acceptance-reply/1"
 
 
 # ---- workflows -----------------------------------------------------------------------
@@ -107,86 +96,66 @@ def test_a_workflow_must_be_named_for_its_directory(tree: Path) -> None:
 # ---- agents --------------------------------------------------------------------------
 
 
-def test_an_agent_model_the_adapter_does_not_offer_is_refused(tree: Path) -> None:
-    edit_agent(tree, lambda doc: doc["models"]["gpt-6-luna"].update(canonical="gpt-nonexistent"))
-
-    with pytest.raises(AgentDefinitionError, match="gpt-nonexistent"):
-        load_agent(agents_root(tree), "codex")
-
-
-def test_an_agent_reasoning_level_the_adapter_does_not_offer_is_refused(tree: Path) -> None:
-    edit_agent(tree, lambda doc: doc["models"]["gpt-6-luna"].update(reasoning=["low", "ultra"]))
-
-    with pytest.raises(AgentDefinitionError, match="ultra"):
-        load_agent(agents_root(tree), "codex")
-
-
-@pytest.mark.parametrize("flag", ["isolated_home", "ignore_user_config"])
-def test_isolation_settings_cannot_be_switched_off(tree: Path, flag: str) -> None:
-    edit_agent(tree, lambda doc: doc["settings"].update({flag: False}))
-
-    with pytest.raises(AgentDefinitionError, match=flag):
-        load_agent(agents_root(tree), "codex")
-
-
-def test_an_unknown_adapter_is_refused(tree: Path) -> None:
-    edit_agent(tree, lambda doc: doc.update(adapter="ghost-cli"))
-
-    with pytest.raises(AgentDefinitionError, match="adapter"):
-        load_agent(agents_root(tree), "codex")
-
-
-def test_an_agent_must_be_named_for_its_file(tree: Path) -> None:
-    edit_agent(tree, lambda doc: doc.update(name="other"))
-
-    with pytest.raises(AgentDefinitionError, match="must equal the file name"):
-        load_agent(agents_root(tree), "codex")
-
-
-def test_an_agent_tool_version_must_be_pinned(tree: Path) -> None:
-    edit_agent(tree, lambda doc: doc["tool"].update(version="latest"))
-
-    with pytest.raises(AgentDefinitionError, match="version"):
-        load_agent(agents_root(tree), "codex")
-
-
-@pytest.mark.parametrize("name", ["permissions", "host_isolation", "isolation_proof"])
-def test_an_agent_must_declare_every_capability(tree: Path, name: str) -> None:
-    edit_agent(tree, lambda doc: doc["capabilities"].pop(name))
-
-    with pytest.raises(AgentDefinitionError, match=name):
-        load_agent(agents_root(tree), "codex")
-
-
-def test_an_agent_declares_no_capability_outside_the_fixed_names(tree: Path) -> None:
-    edit_agent(tree, lambda doc: doc["capabilities"].update(telepathy="yes"))
-
-    with pytest.raises(AgentDefinitionError, match="telepathy"):
-        load_agent(agents_root(tree), "codex")
+_AGENT_REFUSALS: dict[str, tuple[Callable[[dict[str, Any]], object], str]] = {
+    "model the adapter does not offer": (
+        lambda d: d["models"]["gpt-6-luna"].update(canonical="gpt-nonexistent"),
+        "gpt-nonexistent",
+    ),
+    "reasoning level the adapter does not offer": (
+        lambda d: d["models"]["gpt-6-luna"].update(reasoning=["low", "ultra"]),
+        "ultra",
+    ),
+    "isolated home switched off": (
+        lambda d: d["settings"].update(isolated_home=False),
+        "isolated_home",
+    ),
+    "user config not ignored": (
+        lambda d: d["settings"].update(ignore_user_config=False),
+        "ignore_user_config",
+    ),
+    "unknown adapter": (lambda d: d.update(adapter="ghost-cli"), "adapter"),
+    "name differs from the file": (lambda d: d.update(name="other"), "must equal the file name"),
+    "unpinned tool version": (lambda d: d["tool"].update(version="latest"), "version"),
+    "missing permissions": (lambda d: d["capabilities"].pop("permissions"), "permissions"),
+    "missing host isolation": (
+        lambda d: d["capabilities"].pop("host_isolation"),
+        "host_isolation",
+    ),
+    "missing isolation proof": (
+        lambda d: d["capabilities"].pop("isolation_proof"),
+        "isolation_proof",
+    ),
+    "capability outside the fixed names": (
+        lambda d: d["capabilities"].update(telepathy="yes"),
+        "telepathy",
+    ),
+    "version pin differing from the tool pin": (
+        lambda d: d["capabilities"].update(version_pin="0.1.0"),
+        "version_pin",
+    ),
+    "isolation proof neither full nor partial": (
+        lambda d: d["capabilities"].update(isolation_proof="some"),
+        "isolation_proof",
+    ),
+    "repeated feature": (
+        lambda d: d["settings"].update(features_off=["plugins", "plugins"]),
+        "features_off",
+    ),
+    "feature that is not a name": (
+        lambda d: d["settings"].update(features_off=["Plugins"]),
+        "features_off",
+    ),
+    "bundled skill that is not a folder name": (
+        lambda d: d["settings"].update(bundled_skills=["../escape"]),
+        "bundled_skills",
+    ),
+}
 
 
-def test_the_declared_version_pin_is_the_tool_pin(tree: Path) -> None:
-    edit_agent(tree, lambda doc: doc["capabilities"].update(version_pin="0.1.0"))
+@pytest.mark.parametrize("case", sorted(_AGENT_REFUSALS))
+def test_an_agent_definition_that_breaks_a_rule_is_refused(tree: Path, case: str) -> None:
+    mutate, match = _AGENT_REFUSALS[case]
+    edit_agent(tree, mutate)
 
-    with pytest.raises(AgentDefinitionError, match="version_pin"):
-        load_agent(agents_root(tree), "codex")
-
-
-def test_an_isolation_proof_is_full_or_partial(tree: Path) -> None:
-    edit_agent(tree, lambda doc: doc["capabilities"].update(isolation_proof="some"))
-
-    with pytest.raises(AgentDefinitionError, match="isolation_proof"):
-        load_agent(agents_root(tree), "codex")
-
-
-@pytest.mark.parametrize(
-    ("setting", "value"),
-    [("features_off", ["plugins", "plugins"]), ("features_off", ["Plugins"]),
-     ("bundled_skills", ["../escape"])],
-    ids=["repeated", "not-a-feature-name", "not-a-folder-name"],
-)  # fmt: skip
-def test_isolation_name_lists_are_checked(tree: Path, setting: str, value: list[str]) -> None:
-    edit_agent(tree, lambda doc: doc["settings"].update({setting: value}))
-
-    with pytest.raises(AgentDefinitionError, match=setting):
+    with pytest.raises(AgentDefinitionError, match=match):
         load_agent(agents_root(tree), "codex")

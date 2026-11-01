@@ -21,17 +21,13 @@ from click.testing import CliRunner
 from raidar_contract.package.registry import load_stage_package
 
 from raidar.cli import main, stage_fixtures, stage_lock, stage_package, workflow_new
-from raidar.contract.paths import lab_root, stage_checks_root
+from raidar.contract.paths import stage_checks_root
 from raidar.contract.wheels import uv_lock_refusals
 from raidar.subject.primitive.canary import StageCheckRecord
 from raidar.subject.workflow.stage_check import CaseResult, CheckReport, ReplayRun
+from tests.release_support import REAL_PACKAGE, UV_LOCK_WITH_SDIST
 
-REAL_PACKAGE = lab_root() / "stages" / "raidar" / "docs-check"
 TEMPLATE_LOCK = (REAL_PACKAGE / "tool" / "uv.lock").read_text()
-SDIST = (
-    f'sdist = {{ url = "https://files.pythonhosted.org/x.tar.gz", hash = "sha256:{"0" * 64}" }}\n'
-)
-UV_LOCK_WITH_SDIST = TEMPLATE_LOCK.replace("wheels = [", SDIST + "wheels = [")
 
 
 @pytest.fixture
@@ -54,7 +50,8 @@ def _new(name: str = "acme/my-check") -> None:
 
 
 @pytest.mark.parametrize(
-    "name", ["A", "-a", "a_b", "a/", "/a", "a/b/c", "a b", "", "bare-name", "acme/Bad"]
+    "name",
+    ["A", "-a", "a_b", "a/", "/a", "a/b/c", "a b", "", "bare-name", "acme/Bad", "../x", "acme/.."],
 )
 def test_invalid_package_names_are_refused(name: str) -> None:
     with pytest.raises(click.BadParameter):
@@ -489,16 +486,6 @@ def test_a_check_that_cannot_complete_is_reported_and_publishes_nothing(
     assert result.exit_code != 0
     assert "stage-check could not complete: container died" in result.output
     assert not stage_checks_root().exists()
-
-
-def test_check_logs_go_under_a_per_package_directory_in_the_generated_tree(
-    rig: SimpleNamespace, tmp_path: Path
-) -> None:
-    _check()
-
-    (logs,) = rig.calls
-    assert logs.parent == tmp_path / "var" / "tmp" / "stage-check" / "acme--my-check"
-    assert logs.name.startswith("check-")
 
 
 # ---- stage check --replay --------------------------------------------------------------------

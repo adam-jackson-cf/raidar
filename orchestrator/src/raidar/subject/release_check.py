@@ -83,37 +83,41 @@ def _pin_issues(agents: list[AgentDefinition]) -> list[str]:
     return issues
 
 
+GitRunner = Callable[..., str | None]
+
+
 def _git(repo_root: Path, *args: str) -> str | None:
+    """Stdout of ``git -C repo_root args``; ``None`` on a non-zero exit."""
     done = subprocess.run(
         ["git", "-C", str(repo_root), *args], capture_output=True, text=True, check=False
     )
     return done.stdout.strip() if done.returncode == 0 else None
 
 
-def release_base(repo_root: Path = REPO_ROOT) -> str | None:
+def release_base(repo_root: Path = REPO_ROOT, *, git: GitRunner = _git) -> str | None:
     """The commit whose register the tree's must extend; ``None`` when there is nothing before.
 
     Off ``main``: the merge base with ``main`` (local, else ``origin/main``). On ``main``'s tip
     (merge base is ``HEAD``): ``HEAD``'s parent. ``ReleaseError`` when no ``main`` is found.
     """
-    head = _git(repo_root, "rev-parse", "HEAD")
+    head = git(repo_root, "rev-parse", "HEAD")
     if head is None:
         return None
-    base = next((b for ref in MAIN_REFS if (b := _git(repo_root, "merge-base", "HEAD", ref))), None)
+    base = next((b for ref in MAIN_REFS if (b := git(repo_root, "merge-base", "HEAD", ref))), None)
     if base is None:
         raise ReleaseError(
             "no main branch to check released versions against: fetch main or set RELEASES_BASE"
         )
-    return _git(repo_root, "rev-parse", "HEAD~1") if base == head else base
+    return git(repo_root, "rev-parse", "HEAD~1") if base == head else base
 
 
-def history_issues(base: str, repo_root: Path = REPO_ROOT) -> list[str]:
+def history_issues(base: str, repo_root: Path = REPO_ROOT, *, git: GitRunner = _git) -> list[str]:
     """Releases registered at commit ``base`` that the tree's register removed or re-hashed."""
     path = releases_file(repo_root)
     relative = path.relative_to(repo_root).as_posix()
-    text = _git(repo_root, "show", f"{base}:{relative}")
+    text = git(repo_root, "show", f"{base}:{relative}")
     if text is None:
-        if _git(repo_root, "cat-file", "-e", f"{base}^{{commit}}") is None:
+        if git(repo_root, "cat-file", "-e", f"{base}^{{commit}}") is None:
             return [f"release base {base!r} is not a commit"]
         return []  # the register did not exist yet at the base
     try:
@@ -124,7 +128,9 @@ def history_issues(base: str, repo_root: Path = REPO_ROOT) -> list[str]:
     return rewritten_releases(earlier, now)
 
 
-def release_issues(repo_root: Path = REPO_ROOT, *, base: str | None = None) -> list[str]:
+def release_issues(
+    repo_root: Path = REPO_ROOT, *, base: str | None = None, git: GitRunner = _git
+) -> list[str]:
     """Every register, definition, pin and (given ``base``) history problem; empty when sound."""
     try:
         register = load_register(releases_file(repo_root))
@@ -155,7 +161,7 @@ def release_issues(repo_root: Path = REPO_ROOT, *, base: str | None = None) -> l
     issues += _pin_issues(_loadable_agents(a_root))
     issues += import_issues(repo_root)
     if base is not None:
-        issues += history_issues(base, repo_root)
+        issues += history_issues(base, repo_root, git=git)
     return issues
 
 

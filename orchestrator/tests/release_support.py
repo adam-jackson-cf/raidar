@@ -1,4 +1,5 @@
-"""A throwaway repo root holding copies of the real codex agent and raidar/one-shot workflow."""
+"""Shared tree builders: a throwaway root of the real codex agent and raidar/one-shot workflow, plus
+the real ``raidar/docs-check`` package and a lock with sdist metadata for the stage commands."""
 
 from __future__ import annotations
 
@@ -13,6 +14,14 @@ from raidar.contract.paths import agents_root, releases_file, workflows_root
 from raidar.subject.agent.definition import load_agent
 
 REAL_LAB = Path(__file__).resolve().parents[2] / "lab"
+REAL_PACKAGE = REAL_LAB / "stages" / "raidar" / "docs-check"
+# Model uv's sdist metadata as well as the real package's pinned wheel.
+_SDIST = (
+    f'sdist = {{ url = "https://files.pythonhosted.org/x.tar.gz", hash = "sha256:{"0" * 64}" }}\n'
+)
+UV_LOCK_WITH_SDIST = (
+    (REAL_PACKAGE / "tool" / "uv.lock").read_text().replace("wheels = [", _SDIST + "wheels = [")
+)
 
 
 def release_tree(root: Path, *, register: bool = True) -> Path:

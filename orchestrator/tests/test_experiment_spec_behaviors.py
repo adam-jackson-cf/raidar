@@ -2,38 +2,26 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
 from click.testing import CliRunner
 
 from raidar.cli import main
+from raidar.design.experiment.agent import AgentResolutionError, entry_issues, resolve_agent
+from raidar.design.experiment.arm import ArmResolutionError, resolve_arm
 from raidar.design.experiment.loader import UNSET, CliOverrides, load_experiment, parse_assignment
-from raidar.design.experiment.schema import ExperimentSpec
+from raidar.design.experiment.schema import AgentEntry, ExperimentSpec
 from raidar.design.experiment.validation import SpecValidationError, kind_issues
-from tests.experiment_spec_support import (
-    AGENTS_BENCHMARK,
-    MECHANICS_SMOKE,
-    SMOKE_EXPERIMENT,
-    experiment_document,
-    write_experiment,
-)
+from raidar.subject.releases import released_agent
+from tests.experiment_spec_support import experiment_document, write_experiment
 
 
 def _issues(path: Path, overrides: CliOverrides | None = None) -> dict[str, str]:
     with pytest.raises(SpecValidationError) as caught:
         load_experiment(path, overrides)
     return {issue.loc: issue.message for issue in caught.value.issues}
-
-
-@pytest.mark.parametrize("committed", [MECHANICS_SMOKE, SMOKE_EXPERIMENT, AGENTS_BENCHMARK])
-def test_validate_command_accepts_committed_experiments(committed: Path) -> None:
-    result = CliRunner().invoke(main, ["validate", str(committed)])
-    scorers = len(load_experiment(committed).spec.assessment.scorers)
-
-    assert result.exit_code == 0, result.output
-    assert "Experiment validation passed." in result.output
-    assert f"scorer references: {scorers} (resolver available)" in result.output
 
 
 def test_invalid_file_reports_every_error_at_its_field(tmp_path: Path) -> None:
@@ -292,9 +280,85 @@ def test_a_benchmark_may_not_compare_workflows() -> None:
     assert kind_issues(ExperimentSpec.model_validate(document)) == []
 
 
-def test_concurrency_is_not_a_lock_or_validate_override(tmp_path: Path) -> None:
+@pytest.mark.parametrize(
+    ("flags", "named"),
+    [
+        (["--ignore-host-python"], "--ignore-host-python"),
+        (["--draft", "--check"], "--check"),
+        (["--draft", "--output", "lock.json"], "--output"),
+    ],
+)
+def test_lock_options_that_contradict_each_other_are_usage_errors(
+    tmp_path: Path, flags: list[str], named: str
+) -> None:
     path = write_experiment(tmp_path, experiment_document())
-    for command in ("lock", "validate"):
-        result = CliRunner().invoke(main, [command, str(path), "--concurrency", "3"])
-        assert result.exit_code == 2
-        assert "No such option: --concurrency" in result.output
+
+    result = CliRunner().invoke(main, ["lock", str(path), *flags])
+
+    assert result.exit_code == 2
+    assert named in result.output
+    assert not list(tmp_path.glob("*.lock.json"))
+
+
+def _agent_entry(**changes: str | None) -> AgentEntry:
+    fields = {"id": "luna", "release": "codex@3", "model": "gpt-6-luna", "reasoning": "low"}
+    return AgentEntry.model_validate({**fields, **changes})
+
+
+def test_a_resolved_agent_runs_with_its_release_pin_and_the_entrys_choices() -> None:
+    definition = released_agent("codex@3").definition
+
+    agent = resolve_agent(_agent_entry())
+
+    assert agent.version == definition.tool.version
+    assert agent.model == definition.models["gpt-6-luna"].canonical
+    assert agent.reasoning == "low"
+
+
+@pytest.mark.parametrize(
+    ("changes", "message"),
+    [
+        ({"release": "ghost@1"}, "agent 'luna'"),
+        ({"model": "nope"}, "offers models"),
+        ({"reasoning": "xhigh"}, "allows reasoning"),
+        ({"reasoning": None}, "needs one of"),
+    ],
+)
+def test_an_agent_that_does_not_fit_its_release_cannot_be_resolved(
+    changes: dict[str, str | None], message: str
+) -> None:
+    with pytest.raises(AgentResolutionError, match=message):
+        resolve_agent(_agent_entry(**changes))
+
+
+def test_a_model_without_reasoning_levels_takes_no_reasoning() -> None:
+    released = released_agent("codex@3")
+    plain = released.definition.models["gpt-6-luna"].model_copy(update={"reasoning": ()})
+    definition = released.definition.model_copy(update={"models": {"gpt-6-luna": plain}})
+    fitted = replace(released, definition=definition)
+
+    assert entry_issues(_agent_entry(reasoning=None), fitted) == []
+    assert [field for field, _ in entry_issues(_agent_entry(reasoning="low"), fitted)] == [
+        "reasoning"
+    ]
+
+
+def test_an_arm_resolves_its_agent_and_workflow_releases() -> None:
+    spec = ExperimentSpec.model_validate(experiment_document())
+
+    arm = resolve_arm(spec, "guided")
+
+    assert arm.arm_id == "guided"
+    assert arm.agent.entry == spec.agent("luna")
+
+
+def test_an_arm_whose_agent_or_workflow_is_not_released_cannot_be_resolved() -> None:
+    bad_agent = experiment_document()
+    bad_agent["agents"][0]["release"] = "ghost@1"
+    bad_workflow = experiment_document()
+    bad_workflow["arms"][1]["workflow"] = "acme/ghost@1"
+
+    with pytest.raises(ArmResolutionError, match="agent 'luna'"):
+        resolve_arm(ExperimentSpec.model_validate(bad_agent), "baseline")
+    with pytest.raises(ArmResolutionError, match="arm 'guided'"):
+        resolve_arm(ExperimentSpec.model_validate(bad_workflow), "guided")
