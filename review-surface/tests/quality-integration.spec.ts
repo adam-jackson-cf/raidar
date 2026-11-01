@@ -183,7 +183,7 @@ test('no console or page errors across the quality entry points', async ({ page 
   expect(errors).toEqual([]);
 });
 
-test('run detail Quality panel shows a gated trial\'s gate rounds and failure families', async ({ page }) => {
+test('run detail Quality panel shows a gated trial\'s gate rounds and failed checks', async ({ page }) => {
   // The experiment fixture has no gated arm, so this run's Quality detail carries the gate
   // view of the Quality fixture's gated trial (same contract, same component).
   const gated = await (await page.request.get('/api/quality/runs/synthetic-quality.synthetic-run-1.b00-p0-guided')).json();
