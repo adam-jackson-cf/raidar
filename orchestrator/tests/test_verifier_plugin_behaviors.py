@@ -370,19 +370,29 @@ def test_audited_calls_record_the_active_phase_and_pass_through_arguments(
     assert instance._originals == []
 
 
-def test_the_process_audit_wraps_and_restores_every_spawn_api(
-    plugin: ModuleType, tmp_path: Path
+@pytest.mark.parametrize("optional_spawn_apis", [True, False])
+def test_process_events_keep_test_provenance_without_platform_specific_spawn_apis(
+    plugin: ModuleType,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    optional_spawn_apis: bool,
 ) -> None:
-    before = (plugin.subprocess.Popen, plugin.os.system, plugin.pty.spawn)
+    if not optional_spawn_apis:
+        monkeypatch.delattr(plugin.os, "posix_spawn", raising=False)
+        monkeypatch.delattr(plugin.os, "fork", raising=False)
+    monkeypatch.setattr(plugin.subprocess, "Popen", lambda *args, **kwargs: None)
     instance = _configured(plugin, tmp_path)
     instance._install_process_audit()
     try:
-        assert plugin.subprocess.Popen is not before[0]
-        assert plugin.os.system is not before[1]
-        assert plugin.pty.spawn is not before[2]
+        plugin.subprocess.Popen(["fixture"])
+        assert instance._run.process_events == []
+        instance._active = ("test_a.py::test_run", "call")
+        plugin.subprocess.Popen(["fixture"])
+        assert instance._run.process_events == [
+            {"event": "subprocess.Popen", "node_id": "test_a.py::test_run", "phase": "call"}
+        ]
     finally:
         instance._restore_process_audit()
-    assert (plugin.subprocess.Popen, plugin.os.system, plugin.pty.spawn) == before
 
 
 def test_configure_strips_the_runtime_dir_and_enters_collection(
@@ -514,3 +524,25 @@ def test_no_declared_closure_leaves_the_import_path_untouched(
     runpy.run_path(str(RUNTIME_DIR / "sitecustomize.py"))
 
     assert sys.path == before
+
+
+def test_relative_measured_paths_keep_submission_line_attribution(
+    plugin: ModuleType, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    class Data:
+        def measured_files(self) -> list[str]:
+            return ["main.py"]
+
+        def contexts_by_lineno(self, path: str) -> dict[int, list[str]]:
+            return {7: ["test_a.py::test_x|call"]}
+
+    class Collector:
+        def get_data(self) -> Data:
+            return Data()
+
+    monkeypatch.setattr(plugin, "_current_coverage", lambda: Collector())
+    instance = make_plugin(plugin, tmp_path, coverage=True)
+    assert instance._coverage_contexts() == [
+        {"node_id": "test_a.py::test_x", "phase": "call", "path": "main.py", "executed_line": 7}
+    ]
+    assert instance._run.invalid_coverage_paths == 0
