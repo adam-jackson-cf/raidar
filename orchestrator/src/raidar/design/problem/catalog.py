@@ -2,15 +2,20 @@
 
 from __future__ import annotations
 
+import subprocess
 from pathlib import Path
 
 from raidar.design.problem.models import ProblemId
-from raidar.design.problem.source import PinnedCheckout, ensure_checkout, open_checkout
+from raidar.design.problem.source import PinnedCheckout, Runner, ensure_checkout, open_checkout
 from raidar.design.problem.store import ProblemStore, ProblemStoreError
 
 
 def source_catalog(
-    store: ProblemStore, source: str, checkout_path: Path | None = None
+    store: ProblemStore,
+    source: str,
+    checkout_path: Path | None = None,
+    *,
+    run: Runner = subprocess.run,
 ) -> tuple[PinnedCheckout, tuple[ProblemId, ...]]:
     """List upstream problems only after verifying the requested source pin."""
     dataset, separator, revision = source.partition("@")
@@ -18,9 +23,9 @@ def source_catalog(
     if not separator or revision not in (pin.commit, pin.version):
         raise ProblemStoreError(f"source must match pinned {dataset}@{pin.commit}")
     checkout = (
-        open_checkout(checkout_path, pin)
+        open_checkout(checkout_path, pin, run=run)
         if checkout_path is not None
-        else ensure_checkout(store.cache_dir(), dataset, pin)
+        else ensure_checkout(store.cache_dir(), dataset, pin, run=run)
     )
     problems = tuple(
         ProblemId.parse(f"{dataset}/{path.parent.name}@{pin.version}")
@@ -37,6 +42,7 @@ def select_problems(
     checkout_path: Path | None = None,
     *,
     importing: bool = False,
+    run: Runner = subprocess.run,
 ) -> tuple[ProblemId, ...]:
     """Resolve the single-reference and bulk forms without mixing their meanings."""
     if refs and (names is not None or source is not None):
@@ -48,7 +54,7 @@ def select_problems(
     if importing and source is None:
         raise ProblemStoreError("bulk import requires --source <dataset>@<commit>")
     available = (
-        source_catalog(store, source, checkout_path)[1]
+        source_catalog(store, source, checkout_path, run=run)[1]
         if source is not None
         else tuple(store.registered())
     )

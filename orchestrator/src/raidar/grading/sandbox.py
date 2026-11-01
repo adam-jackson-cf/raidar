@@ -31,7 +31,7 @@ import tarfile
 import tempfile
 import time
 import uuid
-from collections.abc import Callable, Mapping
+from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from typing import IO, Any, Protocol
@@ -229,6 +229,7 @@ class DockerCopySandbox:
     docker_context: str
     docker_bin: str = "docker"
     run_scope: str = ""
+    spawn: Callable[..., Awaitable[Any]] = asyncio.create_subprocess_exec
 
     @property
     def layout(self) -> SandboxLayout:
@@ -296,7 +297,7 @@ class DockerCopySandbox:
         self, argv: list[str], *, stdin: IO[bytes] | None = None, stdout: IO[bytes] | None = None
     ) -> tuple[int | None, bytes]:
         """Run a docker command to completion; (exit code, stdout+stderr or just stderr)."""
-        proc = await asyncio.create_subprocess_exec(
+        proc = await self.spawn(
             *argv,
             stdin=stdin if stdin is not None else asyncio.subprocess.DEVNULL,
             stdout=stdout if stdout is not None else asyncio.subprocess.PIPE,
@@ -362,7 +363,7 @@ class DockerCopySandbox:
     ) -> tuple[asyncio.subprocess.Process, bytes, bool]:
         """Start the grader container and wait for it; (process, output, timed out)."""
         mark = time.perf_counter()
-        proc = await asyncio.create_subprocess_exec(
+        proc = await self.spawn(
             *self._docker("start", "-a", name),
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.STDOUT,

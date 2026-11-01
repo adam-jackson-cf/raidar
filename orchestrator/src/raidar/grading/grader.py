@@ -292,6 +292,25 @@ def attribute_to_submission(grading: RunOutcome, starter: RunOutcome) -> RunOutc
     return RunOutcome(grading.role, cases, None, None, (), grading.seconds, grading.dependencies)
 
 
+def needs_canary(grading: RunOutcome) -> bool:
+    """Only a failure a submission can cause, on a resolved closure, is worth a canary run."""
+    failure = grading.infra_failure
+    return (
+        failure is not None
+        and failure.code in SUBMISSION_FAILURE_CODES
+        and grading.dependencies is not None
+    )
+
+
+def coverage_skip_verdict(canary: CanaryRecord, grading: RunOutcome) -> ParityVerdict | None:
+    """Why no coverage pass runs after grading, or ``None`` when one should."""
+    if canary.status == "passed":
+        return ineligible(f"grading_failed_on_submission:{canary.trigger}")
+    if grading.infra_failure is not None:
+        return ineligible(f"grading_infra_failure:{grading.infra_failure.code}")
+    return None
+
+
 async def grade_step(
     bundle: VerifierBundle,
     step_name: str,
@@ -317,12 +336,7 @@ async def grade_step(
         recorded=recorded,
     )
     canary = CanaryRecord()
-    failure = grading.infra_failure
-    if (
-        failure is not None
-        and failure.code in SUBMISSION_FAILURE_CODES
-        and grading.dependencies is not None
-    ):
+    if needs_canary(grading):
         canary, starter = await run_canary(
             bundle, step, sandbox, work, grading=grading, timeout_s=timeout_s
         )
@@ -341,12 +355,9 @@ async def grade_step(
         return StepGrade(
             grade=grade, grading=grading, coverage=None, parity=None, timings=timings, canary=canary
         )
-    if canary.status == "passed":
-        verdict = ineligible(f"grading_failed_on_submission:{canary.trigger}")
-        return StepGrade(grade, grading, None, verdict, timings=timings, canary=canary)
-    if grading.infra_failure is not None:
-        verdict = ineligible(f"grading_infra_failure:{grading.infra_failure.code}")
-        return StepGrade(grade, grading, None, verdict, timings=timings, canary=canary)
+    skipped = coverage_skip_verdict(canary, grading)
+    if skipped is not None:
+        return StepGrade(grade, grading, None, skipped, timings=timings, canary=canary)
     measured = await run_oracle(
         bundle,
         step,

@@ -2,14 +2,23 @@
 
 from __future__ import annotations
 
+import hashlib
 from pathlib import Path
 from typing import Any
 
 import pytest
 import yaml
+from click.testing import CliRunner
 
+from raidar.cli import main
+from raidar.design.problem.errata import (
+    Disposition,
+    ErrataError,
+    errata_ref_from_metadata,
+    load_errata,
+)
 from raidar.design.problem.models import ProblemId
-from raidar.design.problem.store import ROOT_ENV
+from raidar.design.problem.store import ROOT_ENV, ProblemStore, ProblemStoreError
 from raidar.evaluation.analysis.assessed import CORRECTNESS_REF, build_outcome
 from raidar.grading.errata import ErrataOutcome, ErrataRef, errata_outcome
 from raidar.grading.models import CaseStatus
@@ -25,6 +34,7 @@ from raidar.scoring.framework.result import (
 from raidar.scoring.framework.trial_inputs import load_trial_context
 from raidar.scoring.framework.validation import validate_result
 from tests.execution_support import ImportedFixture, validated_fixture
+from tests.problems_support import POSITIVE_REF, build_fixture_store
 from tests.scorer_support import APP_V1, StepFixture, write_trial
 from tests.test_analysis_outcomes import _record
 
@@ -55,11 +65,11 @@ def errata_document(problem: str, manifest_sha256: str, **changes: Any) -> dict[
     return {**document, **changes}
 
 
-def write_errata(fixture: ImportedFixture, **changes: Any) -> Path:
-    problem = ProblemId.parse(fixture.ref)
-    manifest = fixture.store.load_manifest(problem)
-    path = fixture.store.errata_path(problem)
-    document = {**errata_document(fixture.ref, manifest.digest()), **changes}
+def write_errata(store: ProblemStore, ref: str, **changes: Any) -> Path:
+    problem = ProblemId.parse(ref)
+    manifest = store.load_manifest(problem)
+    path = store.errata_path(problem)
+    document = {**errata_document(ref, manifest.digest()), **changes}
     path.write_text(yaml.safe_dump(document))
     return path
 
@@ -72,6 +82,78 @@ def fixture_fixture(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Imported
 
 
 # ---- the errata file ---------------------------------------------------------------
+
+
+@pytest.fixture(name="plain_store")
+def plain_store_fixture(tmp_path: Path) -> ProblemStore:
+    return build_fixture_store(tmp_path / "problems")
+
+
+def test_errata_is_pinned_by_its_bytes_and_refused_for_another_manifest(
+    plain_store: ProblemStore,
+) -> None:
+    store, ref = plain_store, POSITIVE_REF
+    path = write_errata(store, ref)
+    problem = ProblemId.parse(ref)
+    manifest = store.load_manifest(problem)
+    loaded = store.load_errata(problem, manifest)
+    assert loaded is not None
+    assert loaded.sha256 == hashlib.sha256(path.read_bytes()).hexdigest()
+    assert loaded.lock_metadata() == {
+        "sha256": loaded.sha256,
+        "exclude_from_solved": [EXCLUDED],
+        "informational": ["test_checkpoint_1.py::test_adds"],
+    }
+    assert loaded.ref() == ErrataRef(sha256=loaded.sha256, exclude_from_solved=(EXCLUDED,))
+    assert loaded.errata.ids(Disposition.INFORMATIONAL) == ("test_checkpoint_1.py::test_adds",)
+
+    with pytest.raises(ErrataError, match="for manifest"):
+        load_errata(path, problem=ref, manifest_sha256="0" * 64)
+    with pytest.raises(ErrataError, match="errata of"):
+        load_errata(path, problem="other/p@abcdefabcdef", manifest_sha256=manifest.digest())
+    write_errata(store, ref, cases=[errata_document("x", "y")["cases"][0]] * 2)
+    with pytest.raises(ErrataError, match="duplicate errata case ids"):
+        load_errata(path, problem=ref, manifest_sha256=manifest.digest())
+    reason = "TODO: state why the specification does not determine the asserted value"
+    write_errata(store, ref, cases=[{**errata_document("x", "y")["cases"][0], "reason": reason}])
+    with pytest.raises(ErrataError, match="placeholder reason"):
+        load_errata(path, problem=ref, manifest_sha256=manifest.digest())
+    path.unlink()
+    assert store.load_errata(problem, manifest) is None
+    assert errata_ref_from_metadata({"checkpoints": 2}) is None
+
+
+def test_a_lock_pinned_errata_is_only_honoured_while_the_store_still_holds_it(
+    plain_store: ProblemStore,
+) -> None:
+    store = plain_store
+    problem = ProblemId.parse(POSITIVE_REF)
+    manifest = store.load_manifest(problem)
+    assert store.pinned_errata(problem, manifest, None) is None
+    with pytest.raises(ProblemStoreError, match="changed since the lock"):
+        store.pinned_errata(problem, manifest, {"sha256": "a" * 64})
+    write_errata(store, POSITIVE_REF)
+    sha256 = store.load_errata(problem, manifest).sha256  # type: ignore[union-attr]
+    pinned = {"sha256": sha256, "exclude_from_solved": [EXCLUDED]}
+    assert store.pinned_errata(problem, manifest, pinned) == pinned
+    assert store.pinned_errata(problem, manifest, {"sha256": sha256}) == {
+        "sha256": sha256,
+        "exclude_from_solved": [],
+    }
+    for stale in (None, {"sha256": "a" * 64}):
+        with pytest.raises(ProblemStoreError, match="changed since the lock"):
+            store.pinned_errata(problem, manifest, stale)
+
+
+def test_problem_info_reports_the_errata_a_problem_carries(plain_store: ProblemStore) -> None:
+    def info() -> str:
+        args = ["problem", "info", POSITIVE_REF, "--store", str(plain_store.root)]
+        return CliRunner().invoke(main, args).output
+
+    write_errata(plain_store, POSITIVE_REF)
+    assert "(1 exclude-from-solved, 1 informational)" in info()
+    write_errata(plain_store, POSITIVE_REF, problem="other/p@abcdefabcdef")
+    assert "errata: invalid (" in info()
 
 
 # ---- the verifier record -------------------------------------------------------------
