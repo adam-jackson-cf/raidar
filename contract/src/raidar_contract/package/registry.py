@@ -1,8 +1,4 @@
-"""Locating and loading stage packages: pure path and data work, no primitive imports.
-
-Release-register resolution (``name@N`` against ``lab/releases.yaml``) is layered on top of
-``stage_folder`` and ``load_stage_package``; this module never executes or imports package code.
-"""
+"""Parse stage packages beneath a consumer-supplied root without executing package code."""
 
 from __future__ import annotations
 
@@ -19,15 +15,11 @@ from raidar_contract.package.digest import (
     stage_tree_digest,
 )
 from raidar_contract.package.manifest import (
-    NAME_RE,
     StageManifest,
     StagePackage,
     parse_manifest,
 )
-from raidar_contract.releases import Release
 
-LAB_DIR = "lab"
-STAGES_DIR = "stages"
 MANIFEST_FILE = "stage.yaml"
 PROMPT_FILE = "prompt.md"
 INSTRUCTIONS_FILE = "instructions.md"
@@ -39,11 +31,6 @@ FORBIDDEN_IMPORT = "raidar"
 _DYNAMIC_IMPORTS = frozenset({"__import__", "import_module"})
 _TOP_FILES = frozenset({MANIFEST_FILE, PROMPT_FILE, INSTRUCTIONS_FILE})
 _TOP_DIRS = frozenset({SKILLS_DIR, TOOL_DIR})
-
-
-def stage_folder(release: Release, repo_root: Path) -> Path:
-    """The folder ``lab/stages/<ns>/<name>`` a release reference names below ``repo_root``."""
-    return repo_root / LAB_DIR / STAGES_DIR / release.name
 
 
 def _text(files: dict[str, StageFile], path: str) -> str:
@@ -120,24 +107,6 @@ def _check_tool(manifest: StageManifest, files: dict[str, StageFile]) -> None:
     _check_tool_sources(files)
 
 
-def _check_location(root: Path) -> None:
-    """Refuse a symlinked package root or ancestor below ``stages``, and a path that is not
-    exactly ``stages/<namespace>/<name>`` with valid components."""
-    if root.is_symlink():
-        raise StagePackageError(f"{root}: a package root is never a symlink")
-    if STAGES_DIR not in root.parts:
-        return
-    index = len(root.parts) - 1 - root.parts[::-1].index(STAGES_DIR)
-    below = root.parts[index + 1 :]
-    if len(below) != 2 or not all(NAME_RE.fullmatch(part) for part in below):
-        raise StagePackageError(f"{root}: expected {STAGES_DIR}/<namespace>/<name>")
-    for ancestor in root.parents:
-        if ancestor.is_symlink():
-            raise StagePackageError(f"{ancestor}: symlinked ancestors are refused")
-        if ancestor.name == STAGES_DIR:
-            break
-
-
 def _check_shape(root: Path) -> None:
     for entry in root.iterdir():
         if entry.name in IGNORED_TREE_NAMES:
@@ -149,7 +118,6 @@ def _check_shape(root: Path) -> None:
 
 def load_stage_package(root: Path) -> StagePackage:
     """The validated package at ``root`` (folder leaf equals the manifest name)."""
-    _check_location(root)
     all_files = read_stage_tree(root)
     files = {item.path: item for item in all_files}
     manifest = parse_manifest(_text(files, MANIFEST_FILE))

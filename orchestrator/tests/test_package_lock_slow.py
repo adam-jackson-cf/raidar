@@ -9,11 +9,11 @@ import sys
 from pathlib import Path
 
 import pytest
-from raidar_contract.agent import AgentName
-from raidar_contract.package.registry import load_stage_package
 
 from raidar.scoring.framework.rescore import rescore_path
 from raidar.scoring.framework.store import AssessmentStore
+from raidar.subject.agent.schema import AgentName
+from raidar.subject.package.registry import load_stage_package
 from raidar.subject.primitive.registry import PRIMITIVE_MODULES
 from raidar.subject.workflow.identity import (
     ADAPTER_ENTRIES,

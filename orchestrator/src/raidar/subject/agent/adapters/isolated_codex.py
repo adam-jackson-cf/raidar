@@ -38,7 +38,6 @@ from harbor.agents.installed.codex import Codex, CodexOptions
 from harbor.environments.base import BaseEnvironment
 from harbor.models.agent.context import AgentContext
 from pydantic import Field
-from raidar_contract.agent_records import Credentials, StatePath, Tokens
 
 from raidar.subject.agent.adapters.codex_audit import (
     SESSIONS_DIR,
@@ -58,6 +57,7 @@ from raidar.subject.agent.adapters.instructions import (
 )
 from raidar.subject.agent.adapters.probe import parse_probe, probe_command
 from raidar.subject.agent.protocol import IsolationError, cumulative_accounting
+from raidar.subject.agent.records import Credentials, StatePath
 
 MANAGED_CONFIGS = ("/etc/codex/config.toml", "/etc/codex/requirements.toml")
 SYSTEM_SKILLS = "/etc/codex/skills"
@@ -201,11 +201,7 @@ class IsolatedCodex(Codex):
     def process_facts(self) -> dict[str, str | None] | None:
         return self.agent_process
 
-    def accounting(
-        self, context: AgentContext, previous: Tokens | None
-    ) -> tuple[Tokens | None, Tokens | None]:
-        """Codex reports the session's running total: the delta is that less the previous one."""
-        return cumulative_accounting(context, previous)
+    accounting = staticmethod(cumulative_accounting)
 
     def last_message(self, turn_dir: Path) -> str | None:
         return codex_last_message(turn_dir)

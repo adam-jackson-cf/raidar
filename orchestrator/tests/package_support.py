@@ -14,10 +14,10 @@ import pytest
 import yaml
 from raidar_contract.canonical import digest_json
 from raidar_contract.package.manifest import StagePackage
-from raidar_contract.package.registry import load_stage_package, stage_folder
-from raidar_contract.releases import Release
+from raidar_contract.references import Release
 from raidar_contract.workflow import PackageWorkflowDefinition
 
+from raidar.subject.package.registry import load_stage_package, stage_folder
 from raidar.subject.primitive import calls
 from raidar.subject.primitive.calls import TreeManifest
 from raidar.subject.primitive.canary import StageCheckRecord

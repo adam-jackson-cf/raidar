@@ -1,4 +1,4 @@
-# Release register: name@N -> sha256 of the resolved definition (raidar_contract.releases).
+# Release register: name@N -> sha256 of the resolved definition (raidar.contract.releases).
 # Definitions are edited in place under lab/agents/ and lab/workflows/<ns>/<name>/; releasing a
 # change adds the next version here with the new hash (`make releases-check` names it). Only each
 # name's latest version resolves; earlier versions stay as history. Bare (pre-namespace)

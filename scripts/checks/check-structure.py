@@ -25,8 +25,8 @@ import subprocess
 import sys
 from pathlib import Path, PurePosixPath
 
+from raidar.subject.package.registry import load_stage_package
 from raidar_contract.package import StagePackageError
-from raidar_contract.package.registry import load_stage_package
 
 ROOT_DIRECTORIES = frozenset(
     {

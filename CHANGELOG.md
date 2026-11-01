@@ -4,6 +4,18 @@ All notable changes to this project are documented in this file.
 
 ## Unreleased
 
+### Contract 2.0.0 distribution-policy split
+
+- Keep transport-neutral agent definitions, token/audit records, immutable references and
+  package/workflow/call semantics portable. Consumers supply agent settings/capability schemas.
+- Move Harbor ids, lab isolation/capability policy, credentials and reset shell paths to the
+  orchestrator's agent schema/records; move release-register policy to `raidar.contract.releases`
+  and lab stage lookup/location refusals to `raidar.subject.package.registry`. Remove old paths
+  without compatibility exports. `raidar_contract.references` owns immutable reference grammar.
+- Pin immutable 2.0.0 wheel/sdist artifacts separately from frozen 1.0.0 and 1.1.0 artifacts.
+  Contract ids, package digests and stage acceptance/refusals stay unchanged; primitive code
+  identities change and require experiment relocks after the orchestrator's one revalidation.
+
 ### Portable contract 1.1.0
 
 - Publish portable stop-result parsing, bounded stop decisions and call contexts (including

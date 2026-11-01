@@ -16,9 +16,9 @@ import pytest
 import yaml
 from click.testing import CliRunner
 from raidar_contract.package.fixtures import static_problems
-from raidar_contract.package.registry import load_stage_package
 
 from raidar.cli import main, stage, stage_fixtures, stage_lock, stage_package, workflow_new
+from raidar.subject.package.registry import load_stage_package
 from raidar.subject.workflow import stage_check
 from tests.release_support import REAL_PACKAGE, UV_LOCK_WITH_SDIST
 

@@ -16,9 +16,9 @@ from typing import Any
 
 import pytest
 from click.testing import CliRunner
-from raidar_contract.package.registry import load_stage_package
 
 from raidar.cli import main, stage_fixtures, stage_lock, stage_package
+from raidar.subject.package.registry import load_stage_package
 from raidar.subject.workflow import stage_check
 
 FIXTURE = Path(__file__).parent / "fixtures" / "stages" / "acme" / "marker-tool"

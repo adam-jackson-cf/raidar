@@ -7,10 +7,10 @@ from typing import Any
 
 import pytest
 from pydantic import ValidationError
-from raidar_contract.package.registry import load_stage_package
-from raidar_contract.releases import Release
+from raidar_contract.references import Release
 from raidar_contract.workflow import PackageJudge, PackageWorkflowDefinition
 
+from raidar.subject.package.registry import load_stage_package
 from raidar.subject.workflow.package_checks import ResolvedStage, package_issues
 from raidar.subject.workflow.package_stage import PackageStage
 from raidar.subject.workflow.stage import FIRST_BUILD, GATE_FIX, REPAIR, REWORK, Checkpoint

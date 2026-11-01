@@ -9,13 +9,13 @@ from types import SimpleNamespace
 from typing import Any
 
 import pytest
-from raidar_contract.agent import AgentName
 
 from raidar.subject.agent.config import Harness
 from raidar.subject.agent.definition import harbor_adapter
 from raidar.subject.agent.native import adapter_class_for_harness, credentials, native_agent_class
 from raidar.subject.agent.pricing import price_tokens
 from raidar.subject.agent.protocol import IsolationError, unread_json_lines
+from raidar.subject.agent.schema import AgentName
 from raidar.subject.environment.python import image as image_module
 from tests.native_support import native_agent
 

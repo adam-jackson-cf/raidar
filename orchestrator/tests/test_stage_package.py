@@ -8,11 +8,11 @@ from typing import Any
 
 import pytest
 from raidar_contract.package import StagePackageError
-from raidar_contract.package.registry import load_stage_package
-from raidar_contract.releases import Release, ReleaseError
+from raidar_contract.references import Release, ReleaseError
 from raidar_contract.workflow import PackageWorkflowDefinition
 
 from raidar.subject import stages
+from raidar.subject.package.registry import load_stage_package
 from tests.package_support import fixture_package, write_package
 
 

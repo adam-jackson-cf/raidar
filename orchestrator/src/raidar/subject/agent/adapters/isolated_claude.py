@@ -38,7 +38,7 @@ from typing import Any, override
 from harbor.agents.installed.claude_code import ClaudeCode
 from harbor.environments.base import BaseEnvironment
 from harbor.models.agent.context import AgentContext
-from raidar_contract.agent_records import Credentials, StatePath, Tokens
+from raidar_contract.agent_records import Tokens
 
 from raidar.subject.agent.adapters.claude_audit import (
     SESSIONS_DIR,
@@ -52,6 +52,7 @@ from raidar.subject.agent.adapters.instructions import (
 )
 from raidar.subject.agent.adapters.probe import parse_probe, probe_command
 from raidar.subject.agent.protocol import IsolationError, per_turn_accounting
+from raidar.subject.agent.records import Credentials, StatePath
 
 MANAGED_FILES = (
     "/etc/claude-code/managed-settings.json",

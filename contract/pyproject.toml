@@ -1,7 +1,7 @@
 [project]
 name = "raidar-contract"
-version = "1.1.0"
-description = "Portable Raidar contract: stage/1, workflow schema 2, criteria/1, stage-tree/1, releases and the agent schema"
+version = "2.0.0"
+description = "Portable Raidar contract: stage/1, workflow schema 2, criteria/1, stage-tree/1, immutable references and transport-neutral agent schemas"
 requires-python = ">=3.12"
 dependencies = [
     "pydantic>=2.0",

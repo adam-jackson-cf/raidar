@@ -20,13 +20,13 @@ from functools import cache
 from importlib.metadata import version
 from pathlib import Path
 
-from raidar_contract.agent import AgentName
 from raidar_contract.canonical import digest_json
 from raidar_contract.package.manifest import StagePackage
 from raidar_contract.workflow import PackageWorkflowDefinition
 
 from raidar.contract import source_imports
 from raidar.contract.source_digest import SOURCE_DIGEST_SCHEME, python_source_digest
+from raidar.subject.agent.schema import AgentName
 from raidar.subject.primitive.registry import PRIMITIVE_MODULES, WORKFLOW_PRIMITIVE_MODULES
 
 RAIDAR_DIR = Path(__file__).resolve().parents[2]
