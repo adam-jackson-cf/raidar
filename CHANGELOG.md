@@ -32,6 +32,10 @@ All notable changes to this project are documented in this file.
   detached-job, trial-failure, provisioning, authentication and image-boundary scenarios.
   Inject runners, clocks and virtual task/job filesystems; preserve production source,
   grading/primitive identities, released packages and the existing coverage floors.
+- Cover repository-interface boundaries in fast tests: local configuration
+  precedence, command failure exits, starter-release refusals, optional stage
+  proofs, ledger references, draft-mode restoration, wheel admission, snapshot
+  races and resolver ownership. Preserve production identities and coverage floors.
 
 ### Phase-5 local exit evidence (phase 5B step 7)
 

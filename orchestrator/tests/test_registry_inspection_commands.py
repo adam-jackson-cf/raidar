@@ -4,11 +4,12 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 from click.testing import CliRunner
 
-from raidar.cli import main
+from raidar.cli import experiment_init, main
 from raidar.design.problem.models import ProblemId
 from raidar.design.problem.store import ProblemStore, ProblemStoreError
 from tests.problems_support import (
@@ -135,3 +136,18 @@ def test_init_rejects_an_invalid_experiment_id(tmp_path: Path, bad: str) -> None
     assert result.exit_code != 0
     assert "not a valid experiment id" in result.output
     assert not (tmp_path / "x").exists()
+
+
+@pytest.mark.parametrize("missing", ["codex", "raidar/one-shot"])
+def test_init_refuses_missing_starter_releases_without_creating_an_experiment(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, missing: str
+) -> None:
+    register = SimpleNamespace(latest=lambda kind, name: None if name == missing else f"{name}@1")
+    monkeypatch.setattr(experiment_init, "load_register", lambda path: register)
+    experiment = tmp_path / "python__fixture__comparison" / "experiment.yaml"
+
+    result = CliRunner().invoke(main, ["init", str(experiment)])
+
+    assert result.exit_code == 1
+    assert "must register codex and raidar/one-shot" in result.output
+    assert not experiment.parent.exists()
