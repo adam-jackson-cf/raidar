@@ -4,6 +4,14 @@ All notable changes to this project are documented in this file.
 
 ## Unreleased
 
+### Portable contract 1.1.0
+
+- Publish portable stop-result parsing, bounded stop decisions and call contexts (including
+  gate `base`) from the contract; the orchestrator consumes those implementations directly.
+- Ship 63 shared parse/refusal/digest vectors and the standalone conformance runner for
+  manifests, schema-2 workflows, criteria, immutable references, stop results/contexts and
+  stage-tree identity. Existing package digests and contract ids remain unchanged.
+
 ### Grading execution identity
 
 - Hash the complete local grading import closure, including package initializers and

@@ -1,0 +1,1359 @@
+[
+  {
+    "id": "manifest-minimal",
+    "kind": "manifest",
+    "input": {
+      "contract": "stage/1",
+      "name": "hello",
+      "summary": "A stage"
+    },
+    "expected": {
+      "value": {
+        "contract": "stage/1",
+        "name": "hello",
+        "summary": "A stage",
+        "requires": {},
+        "params": {},
+        "tokens": [],
+        "inputs": {},
+        "tool": null,
+        "setup": null,
+        "gate": [],
+        "on_stop": null,
+        "outputs": {},
+        "skills": []
+      },
+      "digest": "d793afeee28f215dc49225c2cd467f4229714e272ceddd5d0b64f72c311c1100"
+    }
+  },
+  {
+    "id": "manifest-full",
+    "kind": "manifest",
+    "input": {
+      "contract": "stage/1",
+      "name": "hello",
+      "summary": "A stage",
+      "requires": {
+        "stop/1": "stop/1",
+        "gate/1": "gate/1"
+      },
+      "params": {
+        "limit": 2
+      },
+      "tokens": [
+        "RESULT"
+      ],
+      "on_stop": {
+        "run": [
+          "stop"
+        ],
+        "max_rounds": 2
+      },
+      "gate": [
+        {
+          "name": "check",
+          "run": [
+            "check"
+          ],
+          "timeout_s": 4
+        }
+      ],
+      "tool": {
+        "commands": {
+          "run": [
+            "echo",
+            "ok"
+          ]
+        }
+      },
+      "skills": [
+        "guide"
+      ]
+    },
+    "expected": {
+      "value": {
+        "contract": "stage/1",
+        "name": "hello",
+        "summary": "A stage",
+        "requires": {
+          "gate/1": "gate/1",
+          "stop/1": "stop/1"
+        },
+        "params": {
+          "limit": 2
+        },
+        "tokens": [
+          "RESULT"
+        ],
+        "inputs": {},
+        "tool": {
+          "project": "tool",
+          "commands": {
+            "run": [
+              "echo",
+              "ok"
+            ]
+          }
+        },
+        "setup": null,
+        "gate": [
+          {
+            "name": "check",
+            "run": [
+              "check"
+            ],
+            "kind": "command",
+            "before": false,
+            "watch": null,
+            "timeout_s": 4
+          }
+        ],
+        "on_stop": {
+          "run": [
+            "stop"
+          ],
+          "watch": null,
+          "timeout_s": 60,
+          "max_rounds": 2
+        },
+        "outputs": {},
+        "skills": [
+          "guide"
+        ]
+      },
+      "digest": "535db8ab2f9dc1b97f37db52afcc0f910f92d69effd99a861b15454827bfb428"
+    }
+  },
+  {
+    "id": "manifest-extra",
+    "kind": "manifest",
+    "input": {
+      "contract": "stage/1",
+      "name": "hello",
+      "summary": "A stage",
+      "extra": 1
+    },
+    "expected": {
+      "refusal": "Extra inputs are not permitted"
+    }
+  },
+  {
+    "id": "manifest-trigger-missing",
+    "kind": "manifest",
+    "input": {
+      "contract": "stage/1",
+      "name": "hello",
+      "summary": "A stage",
+      "on_stop": {
+        "run": [
+          "stop"
+        ]
+      }
+    },
+    "expected": {
+      "refusal": "without requiring it"
+    }
+  },
+  {
+    "id": "manifest-duplicate-token",
+    "kind": "manifest",
+    "input": {
+      "contract": "stage/1",
+      "name": "hello",
+      "summary": "A stage",
+      "tokens": [
+        "A",
+        "A"
+      ]
+    },
+    "expected": {
+      "refusal": "duplicate tokens"
+    }
+  },
+  {
+    "id": "manifest-token-param-collision",
+    "kind": "manifest",
+    "input": {
+      "contract": "stage/1",
+      "name": "hello",
+      "summary": "A stage",
+      "tokens": [
+        "LIMIT"
+      ],
+      "params": {
+        "limit": 1
+      }
+    },
+    "expected": {
+      "refusal": "tokens collide with params"
+    }
+  },
+  {
+    "id": "manifest-timeout-high",
+    "kind": "manifest",
+    "input": {
+      "contract": "stage/1",
+      "name": "hello",
+      "summary": "A stage",
+      "setup": {
+        "run": [
+          "x"
+        ],
+        "timeout_s": 301
+      },
+      "requires": {
+        "setup/1": "setup/1"
+      }
+    },
+    "expected": {
+      "refusal": "less than or equal to 300"
+    }
+  },
+  {
+    "id": "manifest-stop-rounds-high",
+    "kind": "manifest",
+    "input": {
+      "contract": "stage/1",
+      "name": "hello",
+      "summary": "A stage",
+      "on_stop": {
+        "run": [
+          "x"
+        ],
+        "max_rounds": 6
+      },
+      "requires": {
+        "stop/1": "stop/1"
+      }
+    },
+    "expected": {
+      "refusal": "less than or equal to 5"
+    }
+  },
+  {
+    "id": "workflow-minimal",
+    "kind": "workflow",
+    "input": {
+      "schema": 2,
+      "name": "simple",
+      "build": {
+        "prompt": "%%%TASK%%%"
+      }
+    },
+    "expected": {
+      "value": {
+        "schema": 2,
+        "name": "simple",
+        "build": {
+          "prompt": "%%%TASK%%%",
+          "reply": null
+        },
+        "stages": [],
+        "gate": {
+          "max_fix_rounds": 0
+        },
+        "judge": null
+      },
+      "digest": "b6ad4e65e519396b1c7df938803ad6badfffe0a54dd0c701a23c1042100d389d",
+      "packages_digest": "f2d99b4e2266577729126b07a4e9a99f98fd87c24c5cd6b8bcc071453d888d43"
+    }
+  },
+  {
+    "id": "workflow-stages-params",
+    "kind": "workflow",
+    "input": {
+      "schema": 2,
+      "name": "simple",
+      "build": {
+        "prompt": "%%%TASK%%%"
+      },
+      "stages": [
+        {
+          "use": "demo/check@1",
+          "params": {
+            "limit": 3
+          }
+        }
+      ]
+    },
+    "expected": {
+      "value": {
+        "schema": 2,
+        "name": "simple",
+        "build": {
+          "prompt": "%%%TASK%%%",
+          "reply": null
+        },
+        "stages": [
+          {
+            "use": "demo/check@1",
+            "params": {
+              "limit": 3
+            }
+          }
+        ],
+        "gate": {
+          "max_fix_rounds": 0
+        },
+        "judge": null
+      },
+      "digest": "6c0f3602eaf9cd893709e55b013b327abb5640417238479ebd1c3e5dc371d577",
+      "packages_digest": "f2d99b4e2266577729126b07a4e9a99f98fd87c24c5cd6b8bcc071453d888d43"
+    }
+  },
+  {
+    "id": "workflow-judge",
+    "kind": "workflow",
+    "input": {
+      "schema": 2,
+      "name": "simple",
+      "build": {
+        "prompt": "%%%TASK%%%",
+        "reply": "acceptance-reply/1"
+      },
+      "judge": {
+        "criteria": "check.result",
+        "model": "judge-x",
+        "closed_at": 0.8,
+        "open_at": 0.2,
+        "max_passes": 2,
+        "rework": "%%%GATE%%% %%%PUSHBACK%%%"
+      }
+    },
+    "expected": {
+      "value": {
+        "schema": 2,
+        "name": "simple",
+        "build": {
+          "prompt": "%%%TASK%%%",
+          "reply": "acceptance-reply/1"
+        },
+        "stages": [],
+        "gate": {
+          "max_fix_rounds": 0
+        },
+        "judge": {
+          "criteria": "check.result",
+          "model": "judge-x",
+          "closed_at": 0.8,
+          "open_at": 0.2,
+          "max_passes": 2,
+          "rework": "%%%GATE%%% %%%PUSHBACK%%%"
+        }
+      },
+      "digest": "78956b91db6cad0dd94a80ae9c1cf422d109a9e92eee9c71d7cb8f0e1d33c7c6",
+      "packages_digest": "a035ba2ff2dd0fe6a4f94f2ced86ae5e6ae805c4776f6df48f4dfec58ec604a4"
+    }
+  },
+  {
+    "id": "workflow-schema1",
+    "kind": "workflow",
+    "input": {
+      "schema": 1,
+      "name": "simple",
+      "build": {
+        "prompt": "%%%TASK%%%"
+      }
+    },
+    "expected": {
+      "refusal": "Input should be 2"
+    }
+  },
+  {
+    "id": "workflow-bare-ref",
+    "kind": "workflow",
+    "input": {
+      "schema": 2,
+      "name": "simple",
+      "build": {
+        "prompt": "%%%TASK%%%"
+      },
+      "stages": [
+        {
+          "use": "check@1"
+        }
+      ]
+    },
+    "expected": {
+      "refusal": "String should match pattern"
+    }
+  },
+  {
+    "id": "workflow-duplicate-refs",
+    "kind": "workflow",
+    "input": {
+      "schema": 2,
+      "name": "simple",
+      "build": {
+        "prompt": "%%%TASK%%%"
+      },
+      "stages": [
+        {
+          "use": "demo/check@1"
+        },
+        {
+          "use": "demo/check@2"
+        }
+      ]
+    },
+    "expected": {
+      "refusal": "listed twice"
+    }
+  },
+  {
+    "id": "workflow-missing-task",
+    "kind": "workflow",
+    "input": {
+      "schema": 2,
+      "name": "simple",
+      "build": {
+        "prompt": "no slot"
+      }
+    },
+    "expected": {
+      "refusal": "exactly once"
+    }
+  },
+  {
+    "id": "workflow-judge-needs-reply",
+    "kind": "workflow",
+    "input": {
+      "schema": 2,
+      "name": "simple",
+      "build": {
+        "prompt": "%%%TASK%%%"
+      },
+      "judge": {
+        "criteria": "check.result",
+        "model": "judge-x",
+        "closed_at": 0.8,
+        "open_at": 0.2,
+        "max_passes": 2,
+        "rework": "%%%GATE%%% %%%PUSHBACK%%%"
+      }
+    },
+    "expected": {
+      "refusal": "judge requires build.reply"
+    }
+  },
+  {
+    "id": "workflow-threshold-order",
+    "kind": "workflow",
+    "input": {
+      "schema": 2,
+      "name": "simple",
+      "build": {
+        "prompt": "%%%TASK%%%",
+        "reply": "acceptance-reply/1"
+      },
+      "judge": {
+        "criteria": "check.result",
+        "model": "judge-x",
+        "closed_at": 0.8,
+        "open_at": 0.9,
+        "max_passes": 2,
+        "rework": "%%%GATE%%% %%%PUSHBACK%%%"
+      }
+    },
+    "expected": {
+      "refusal": "open_at must be below"
+    }
+  },
+  {
+    "id": "criteria-new",
+    "kind": "criteria",
+    "input": {
+      "contract": "criteria/1",
+      "features": [
+        {
+          "id": "feature",
+          "name": "Feature",
+          "outcome": "Works",
+          "criteria": [
+            {
+              "id": "criterion",
+              "criterion": "It works",
+              "verification": "test",
+              "sources": [
+                "prompt"
+              ],
+              "kind": "new",
+              "aspects": [
+                {
+                  "situation": "case",
+                  "outcome": "works"
+                }
+              ],
+              "examples": []
+            }
+          ]
+        }
+      ]
+    },
+    "expected": {
+      "value": {
+        "contract": "criteria/1",
+        "features": [
+          {
+            "id": "feature",
+            "name": "Feature",
+            "outcome": "Works",
+            "criteria": [
+              {
+                "id": "criterion",
+                "criterion": "It works",
+                "verification": "test",
+                "sources": [
+                  "prompt"
+                ],
+                "kind": "new",
+                "aspects": [
+                  {
+                    "situation": "case",
+                    "outcome": "works"
+                  }
+                ],
+                "examples": []
+              }
+            ]
+          }
+        ]
+      },
+      "digest": "f2922f62f25f685adb9dc4d0c50303378b6e9da6496f8685dd0dc6dea516829a"
+    }
+  },
+  {
+    "id": "criteria-regression",
+    "kind": "criteria",
+    "input": {
+      "contract": "criteria/1",
+      "features": [
+        {
+          "id": "feature",
+          "name": "Feature",
+          "outcome": "Works",
+          "criteria": [
+            {
+              "id": "criterion",
+              "criterion": "It works",
+              "verification": "test",
+              "sources": [
+                "prompt"
+              ],
+              "kind": "regression",
+              "aspects": [],
+              "examples": [
+                {
+                  "situation": "old",
+                  "outcome": "preserved"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "expected": {
+      "value": {
+        "contract": "criteria/1",
+        "features": [
+          {
+            "id": "feature",
+            "name": "Feature",
+            "outcome": "Works",
+            "criteria": [
+              {
+                "id": "criterion",
+                "criterion": "It works",
+                "verification": "test",
+                "sources": [
+                  "prompt"
+                ],
+                "kind": "regression",
+                "aspects": [],
+                "examples": [
+                  {
+                    "situation": "old",
+                    "outcome": "preserved"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "digest": "fa3325cb966b00f84d74e727613aee90506afbd104763a33f3034ac689d7ea28"
+    }
+  },
+  {
+    "id": "criteria-duplicate-ids",
+    "kind": "criteria",
+    "input": {
+      "contract": "criteria/1",
+      "features": [
+        {
+          "id": "feature",
+          "name": "Feature",
+          "outcome": "Works",
+          "criteria": [
+            {
+              "id": "feature",
+              "criterion": "It works",
+              "verification": "test",
+              "sources": [
+                "prompt"
+              ],
+              "kind": "new",
+              "aspects": [
+                {
+                  "situation": "case",
+                  "outcome": "works"
+                }
+              ],
+              "examples": []
+            }
+          ]
+        }
+      ]
+    },
+    "expected": {
+      "refusal": "duplicate ids"
+    }
+  },
+  {
+    "id": "criteria-new-no-aspects",
+    "kind": "criteria",
+    "input": {
+      "contract": "criteria/1",
+      "features": [
+        {
+          "id": "feature",
+          "name": "Feature",
+          "outcome": "Works",
+          "criteria": [
+            {
+              "id": "criterion",
+              "criterion": "It works",
+              "verification": "test",
+              "sources": [
+                "prompt"
+              ],
+              "kind": "new",
+              "aspects": [],
+              "examples": []
+            }
+          ]
+        }
+      ]
+    },
+    "expected": {
+      "refusal": "needs at least one aspect"
+    }
+  },
+  {
+    "id": "criteria-empty-features",
+    "kind": "criteria",
+    "input": {
+      "contract": "criteria/1",
+      "features": []
+    },
+    "expected": {
+      "refusal": "at least 1 item"
+    }
+  },
+  {
+    "id": "criteria-unknown-field",
+    "kind": "criteria",
+    "input": {
+      "contract": "criteria/1",
+      "features": [
+        {
+          "id": "feature",
+          "name": "Feature",
+          "outcome": "Works",
+          "criteria": [
+            {
+              "id": "criterion",
+              "criterion": "It works",
+              "verification": "test",
+              "sources": [
+                "prompt"
+              ],
+              "kind": "new",
+              "aspects": [
+                {
+                  "situation": "case",
+                  "outcome": "works"
+                }
+              ],
+              "examples": []
+            }
+          ]
+        }
+      ],
+      "mystery": 1
+    },
+    "expected": {
+      "refusal": "Extra inputs are not permitted"
+    }
+  },
+  {
+    "id": "reference-stage-valid",
+    "kind": "reference",
+    "input": "demo/check@1",
+    "reference_kind": "stage",
+    "expected": {
+      "value": {
+        "name": "demo/check",
+        "version": 1,
+        "text": "demo/check@1"
+      }
+    }
+  },
+  {
+    "id": "reference-workflow-valid",
+    "kind": "reference",
+    "input": "demo/flow@3",
+    "reference_kind": "workflow",
+    "expected": {
+      "value": {
+        "name": "demo/flow",
+        "version": 3,
+        "text": "demo/flow@3"
+      }
+    }
+  },
+  {
+    "id": "reference-agent-valid",
+    "kind": "reference",
+    "input": "codex@2",
+    "reference_kind": "agent",
+    "expected": {
+      "value": {
+        "name": "codex",
+        "version": 2,
+        "text": "codex@2"
+      }
+    }
+  },
+  {
+    "id": "reference-stage-invalid-26",
+    "kind": "reference",
+    "input": "check@1",
+    "reference_kind": "stage",
+    "expected": {
+      "refusal": "invalid"
+    }
+  },
+  {
+    "id": "reference-workflow-invalid-27",
+    "kind": "reference",
+    "input": "flow@1",
+    "reference_kind": "workflow",
+    "expected": {
+      "refusal": "invalid"
+    }
+  },
+  {
+    "id": "reference-agent-invalid-28",
+    "kind": "reference",
+    "input": "codex@latest",
+    "reference_kind": "agent",
+    "expected": {
+      "refusal": "invalid"
+    }
+  },
+  {
+    "id": "reference-stage-invalid-29",
+    "kind": "reference",
+    "input": "demo/check@0",
+    "reference_kind": "stage",
+    "expected": {
+      "refusal": "invalid"
+    }
+  },
+  {
+    "id": "reference-agent-invalid-30",
+    "kind": "reference",
+    "input": "../codex@1",
+    "reference_kind": "agent",
+    "expected": {
+      "refusal": "invalid"
+    }
+  },
+  {
+    "id": "stop-done",
+    "kind": "stop",
+    "input": {
+      "status": "done",
+      "message": "",
+      "tokens": {},
+      "carry": {}
+    },
+    "declared": [],
+    "expected": {
+      "value": {
+        "status": "done",
+        "message": "",
+        "tokens": {},
+        "carry": {}
+      },
+      "digest": "baf2605b45349c86febb58eb28efd7fcb8f89aaa32dc432af303a4defc8a28ba"
+    }
+  },
+  {
+    "id": "stop-resume",
+    "kind": "stop",
+    "input": {
+      "status": "resume",
+      "message": "continue",
+      "tokens": {},
+      "carry": {}
+    },
+    "declared": [],
+    "expected": {
+      "value": {
+        "status": "resume",
+        "message": "continue",
+        "tokens": {},
+        "carry": {}
+      },
+      "digest": "9b36359803903fd5498a4597771e91ce31319f7ca0c3f6db533556a21f8f7b1d"
+    }
+  },
+  {
+    "id": "stop-closed",
+    "kind": "stop",
+    "input": {
+      "status": "closed",
+      "message": "",
+      "tokens": {},
+      "carry": {}
+    },
+    "declared": [],
+    "expected": {
+      "value": {
+        "status": "closed",
+        "message": "",
+        "tokens": {},
+        "carry": {}
+      },
+      "digest": "c660b629b587ae185f9429b834185a00cdd0721d4cf7ff7abb971e13328e1dde"
+    }
+  },
+  {
+    "id": "stop-invalid-ws",
+    "kind": "stop",
+    "input": {
+      "status": "resume",
+      "message": "  ",
+      "tokens": {},
+      "carry": {}
+    },
+    "declared": [],
+    "expected": {
+      "refusal": "nonempty message"
+    }
+  },
+  {
+    "id": "stop-invalid-missing",
+    "kind": "stop",
+    "input": {
+      "status": "done",
+      "message": "",
+      "tokens": {}
+    },
+    "declared": [],
+    "expected": {
+      "refusal": "exactly status"
+    }
+  },
+  {
+    "id": "stop-invalid-extra",
+    "kind": "stop",
+    "input": {
+      "status": "done",
+      "message": "",
+      "tokens": {},
+      "carry": {},
+      "other": 1
+    },
+    "declared": [],
+    "expected": {
+      "refusal": "exactly status"
+    }
+  },
+  {
+    "id": "stop-invalid-status",
+    "kind": "stop",
+    "input": {
+      "status": "unknown",
+      "message": "",
+      "tokens": {},
+      "carry": {}
+    },
+    "declared": [],
+    "expected": {
+      "refusal": "not done, resume or closed"
+    }
+  },
+  {
+    "id": "stop-invalid-message",
+    "kind": "stop",
+    "input": {
+      "status": "done",
+      "message": 2,
+      "tokens": {},
+      "carry": {}
+    },
+    "declared": [],
+    "expected": {
+      "refusal": "message must be a string"
+    }
+  },
+  {
+    "id": "stop-invalid-tokens",
+    "kind": "stop",
+    "input": {
+      "status": "done",
+      "message": "",
+      "tokens": [],
+      "carry": {}
+    },
+    "declared": [],
+    "expected": {
+      "refusal": "tokens must map"
+    }
+  },
+  {
+    "id": "stop-invalid-carry",
+    "kind": "stop",
+    "input": {
+      "status": "done",
+      "message": "",
+      "tokens": {},
+      "carry": []
+    },
+    "declared": [],
+    "expected": {
+      "refusal": "carry must be a JSON object"
+    }
+  },
+  {
+    "id": "stop-invalid-undeclared",
+    "kind": "stop",
+    "input": {
+      "status": "done",
+      "message": "",
+      "tokens": {
+        "X": "v"
+      },
+      "carry": {}
+    },
+    "declared": [],
+    "expected": {
+      "refusal": "undeclared tokens"
+    }
+  },
+  {
+    "id": "stop-invalid-utf8",
+    "kind": "stop",
+    "input": {},
+    "raw_hex": "ff",
+    "expected": {
+      "refusal": "not JSON"
+    }
+  },
+  {
+    "id": "stop-invalid-json",
+    "kind": "stop",
+    "input": {},
+    "raw_hex": "7b",
+    "expected": {
+      "refusal": "not JSON"
+    }
+  },
+  {
+    "id": "stop-step-resume-bound",
+    "kind": "stop-step",
+    "input": {
+      "status": "resume",
+      "message": "continue",
+      "tokens": {},
+      "carry": {}
+    },
+    "state": {
+      "rounds": 2,
+      "max_rounds": 2,
+      "outputs_problem": null
+    },
+    "expected": {
+      "value": {
+        "action": "closed",
+        "reason": "resume beyond max_rounds"
+      }
+    }
+  },
+  {
+    "id": "stop-step-resume-under",
+    "kind": "stop-step",
+    "input": {
+      "status": "resume",
+      "message": "continue",
+      "tokens": {},
+      "carry": {}
+    },
+    "state": {
+      "rounds": 1,
+      "max_rounds": 2,
+      "outputs_problem": null
+    },
+    "expected": {
+      "value": {
+        "action": "resume",
+        "reason": "requested"
+      }
+    }
+  },
+  {
+    "id": "stop-step-closed-no-output",
+    "kind": "stop-step",
+    "input": {
+      "status": "closed",
+      "message": "",
+      "tokens": {},
+      "carry": {}
+    },
+    "state": {
+      "rounds": 0,
+      "max_rounds": 2,
+      "outputs_problem": "missing"
+    },
+    "expected": {
+      "value": {
+        "action": "closed",
+        "reason": "closed by the package"
+      }
+    }
+  },
+  {
+    "id": "stop-step-done-no-output",
+    "kind": "stop-step",
+    "input": {
+      "status": "done",
+      "message": "",
+      "tokens": {},
+      "carry": {}
+    },
+    "state": {
+      "rounds": 0,
+      "max_rounds": 2,
+      "outputs_problem": "missing"
+    },
+    "expected": {
+      "value": {
+        "action": "unusable",
+        "reason": "missing"
+      }
+    }
+  },
+  {
+    "id": "stop-step-done-success",
+    "kind": "stop-step",
+    "input": {
+      "status": "done",
+      "message": "",
+      "tokens": {},
+      "carry": {}
+    },
+    "state": {
+      "rounds": 0,
+      "max_rounds": 2,
+      "outputs_problem": null
+    },
+    "expected": {
+      "value": {
+        "action": "done",
+        "reason": "reported"
+      }
+    }
+  },
+  {
+    "id": "context-no-base",
+    "kind": "context",
+    "input": {
+      "task": "do it",
+      "params": {},
+      "round": 0,
+      "carry": {},
+      "state": null,
+      "outputs": {}
+    },
+    "expected": {
+      "value": {
+        "task": "do it",
+        "params": {},
+        "round": 0,
+        "carry": {},
+        "state": null,
+        "outputs": {}
+      },
+      "digest": "228bc97b34052435a61e32562b75545dc4cdea4ab87d4d4f5aac6e3c7118f3c6"
+    }
+  },
+  {
+    "id": "context-with-base",
+    "kind": "context",
+    "input": {
+      "task": "do it",
+      "params": {},
+      "round": 0,
+      "carry": {},
+      "state": null,
+      "outputs": {},
+      "base": "root"
+    },
+    "expected": {
+      "value": {
+        "task": "do it",
+        "params": {},
+        "round": 0,
+        "carry": {},
+        "state": null,
+        "outputs": {},
+        "base": "root"
+      },
+      "digest": "a3f5d95ec10f8b3946e824c88a3216c6c0c5d328ecaff55fc6e9357814499893"
+    }
+  },
+  {
+    "id": "context-nested-carry",
+    "kind": "context",
+    "input": {
+      "task": "do it",
+      "params": {},
+      "round": 0,
+      "carry": {
+        "nested": {
+          "items": [
+            1,
+            true,
+            null
+          ]
+        }
+      },
+      "state": null,
+      "outputs": {}
+    },
+    "expected": {
+      "value": {
+        "task": "do it",
+        "params": {},
+        "round": 0,
+        "carry": {
+          "nested": {
+            "items": [
+              1,
+              true,
+              null
+            ]
+          }
+        },
+        "state": null,
+        "outputs": {}
+      },
+      "digest": "eaea67c07cacfa3735b1170815b065a0a7708f0b5ac925c7951c74b048d22a41"
+    }
+  },
+  {
+    "id": "context-round-0",
+    "kind": "context",
+    "input": {
+      "task": "do it",
+      "params": {},
+      "round": 0,
+      "carry": {},
+      "state": null,
+      "outputs": {}
+    },
+    "expected": {
+      "value": {
+        "task": "do it",
+        "params": {},
+        "round": 0,
+        "carry": {},
+        "state": null,
+        "outputs": {}
+      },
+      "digest": "228bc97b34052435a61e32562b75545dc4cdea4ab87d4d4f5aac6e3c7118f3c6"
+    }
+  },
+  {
+    "id": "context-round-5",
+    "kind": "context",
+    "input": {
+      "task": "do it",
+      "params": {},
+      "round": 5,
+      "carry": {},
+      "state": null,
+      "outputs": {}
+    },
+    "expected": {
+      "value": {
+        "task": "do it",
+        "params": {},
+        "round": 5,
+        "carry": {},
+        "state": null,
+        "outputs": {}
+      },
+      "digest": "fd5877e90c6fd5d921dde56e24971ad9d1b7b1dfd9643c54b033f5645082feff"
+    }
+  },
+  {
+    "id": "context-round-negative",
+    "kind": "context",
+    "input": {
+      "task": "do it",
+      "params": {},
+      "round": -1,
+      "carry": {},
+      "state": null,
+      "outputs": {}
+    },
+    "expected": {
+      "refusal": "greater_than_equal"
+    }
+  },
+  {
+    "id": "context-round-high",
+    "kind": "context",
+    "input": {
+      "task": "do it",
+      "params": {},
+      "round": 6,
+      "carry": {},
+      "state": null,
+      "outputs": {}
+    },
+    "expected": {
+      "refusal": "less_than_equal"
+    }
+  },
+  {
+    "id": "context-round-bool",
+    "kind": "context",
+    "input": {
+      "task": "do it",
+      "params": {},
+      "round": true,
+      "carry": {},
+      "state": null,
+      "outputs": {}
+    },
+    "expected": {
+      "refusal": "Input should be a valid integer"
+    }
+  },
+  {
+    "id": "context-extra",
+    "kind": "context",
+    "input": {
+      "task": "do it",
+      "params": {},
+      "round": 0,
+      "carry": {},
+      "state": null,
+      "outputs": {},
+      "extra": 1
+    },
+    "expected": {
+      "refusal": "Extra inputs are not permitted"
+    }
+  },
+  {
+    "id": "context-missing",
+    "kind": "context",
+    "input": {
+      "params": {},
+      "round": 0,
+      "carry": {},
+      "state": null,
+      "outputs": {}
+    },
+    "expected": {
+      "refusal": "Field required"
+    }
+  },
+  {
+    "id": "tree-empty",
+    "kind": "stage-tree",
+    "input": [],
+    "expected": {
+      "value": [],
+      "digest": "dbe973b9c3f40580858b09d2a29f1e5f62b64e30d8ba726abb9a52976f890019"
+    }
+  },
+  {
+    "id": "tree-exact",
+    "kind": "stage-tree",
+    "input": [
+      {
+        "path": "z",
+        "hex": "00ff",
+        "executable": true
+      },
+      {
+        "path": "a",
+        "hex": "610a"
+      },
+      {
+        "path": "fixtures/case/input",
+        "hex": "78"
+      }
+    ],
+    "expected": {
+      "value": [
+        [
+          "a",
+          "87428fc522803d31065e7bce3cf03fe475096631e5e07bbd7a0fde60c4cf25c7",
+          false
+        ],
+        [
+          "z",
+          "06eb7d6a69ee19e5fbdf749018d3d2abfa04bcbd1365db312eb86dc7169389b8",
+          true
+        ]
+      ],
+      "digest": "940e2c470d632c201086f32ce66d9d49c2c4dea4d4be9a4678ccf3c7b81add3a"
+    }
+  },
+  {
+    "id": "tree-fixtures-excluded",
+    "kind": "stage-tree",
+    "input": [
+      {
+        "path": "fixtures/anything",
+        "hex": "78"
+      }
+    ],
+    "expected": {
+      "value": [],
+      "digest": "dbe973b9c3f40580858b09d2a29f1e5f62b64e30d8ba726abb9a52976f890019"
+    }
+  },
+  {
+    "id": "tree-symlink-refused",
+    "kind": "stage-tree",
+    "input": [
+      {
+        "path": "fixtures/link",
+        "symlink": "../target"
+      }
+    ],
+    "expected": {
+      "refusal": "symlink"
+    }
+  }
+]

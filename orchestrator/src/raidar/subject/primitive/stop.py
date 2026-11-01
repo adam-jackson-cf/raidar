@@ -16,12 +16,17 @@ Repairs do not consume the ``max_rounds`` budget of ordinary resumes.
 
 from __future__ import annotations
 
-import json
 from collections.abc import Mapping
 from dataclasses import dataclass, field
-from typing import Any, Literal
+from typing import Literal
 
 from pydantic import JsonValue
+from raidar_contract.call import (
+    STOP_NOT_CALLED,
+    StopResult,
+    judge_stop_result,
+    parse_stop_result,
+)
 
 from raidar.subject.primitive.calls import put_root_file
 from raidar.subject.primitive.canary import Canary
@@ -30,19 +35,7 @@ from raidar.subject.primitive.site import Invocation, PackageSite, invoke
 
 PRIMITIVE = "stop/1"
 CLOSED_FLAGS = "/var/lib/raidar-calls/closed"
-STATUSES = ("done", "resume", "closed")
 Action = Literal["done", "resume", "repair", "closed"]
-FIELDS = {"status", "message", "tokens", "carry"}
-
-
-@dataclass(frozen=True)
-class StopResult:
-    """A valid stop result."""
-
-    status: str
-    message: str
-    tokens: dict[str, str]
-    carry: dict[str, JsonValue]
 
 
 @dataclass(frozen=True)
@@ -65,40 +58,6 @@ class StopState:
     carry: dict[str, JsonValue] = field(default_factory=dict)
     tokens: dict[str, str] = field(default_factory=dict)
     decisions: list[dict[str, object]] = field(default_factory=list)
-
-
-def _document(stdout: bytes) -> dict[str, Any]:
-    """The JSON object in ``stdout`` with exactly the stop result's fields."""
-    try:
-        data = json.loads(stdout.decode("utf-8"))
-    except (UnicodeDecodeError, json.JSONDecodeError, RecursionError) as error:
-        raise ValueError(f"stop output is not JSON: {error}") from error
-    if not isinstance(data, dict) or set(data) != FIELDS:
-        raise ValueError("stop output must have exactly status, message, tokens and carry")
-    return data
-
-
-def _check_tokens(tokens: object, declared: tuple[str, ...]) -> None:
-    if not isinstance(tokens, dict) or not all(isinstance(v, str) for v in tokens.values()):
-        raise ValueError("stop tokens must map names to strings")
-    if set(tokens) - set(declared):
-        raise ValueError(f"stop returned undeclared tokens {sorted(set(tokens) - set(declared))}")
-
-
-def parse_result(stdout: bytes, declared: tuple[str, ...]) -> StopResult:
-    """The stop result in ``stdout``; ``ValueError`` names what makes it unusable."""
-    data = _document(stdout)
-    status, message, tokens, carry = data["status"], data["message"], data["tokens"], data["carry"]
-    if status not in STATUSES:
-        raise ValueError(f"stop status {status!r} is not done, resume or closed")
-    if not isinstance(message, str):
-        raise ValueError("stop message must be a string")
-    _check_tokens(tokens, declared)
-    if not isinstance(carry, dict):
-        raise ValueError("stop carry must be a JSON object")
-    if status == "resume" and not message.strip():
-        raise ValueError("a resume needs a nonempty message")
-    return StopResult(status, message, tokens, carry)
 
 
 def closed_flag_path(site: PackageSite) -> str:
@@ -156,16 +115,20 @@ async def _judge(
         "status": result.status,
         "outputs": outputs.record(),
     }
-    if result.status == "closed":
-        return await _close(site, state, "closed by the package", record)
-    if result.status == "resume":
-        if state.rounds >= max_rounds:
-            return await _close(site, state, "resume beyond max_rounds", record)
+    step = judge_stop_result(
+        result,
+        rounds=state.rounds,
+        max_rounds=max_rounds,
+        outputs_problem=_missing(outputs) if outputs.problems else None,
+    )
+    if step.action == "closed":
+        return await _close(site, state, step.reason, record)
+    if step.action == "resume":
         state.rounds += 1
-        return _decided(state, StopDecision("resume", result.message, "requested", record))
-    if outputs.problems:
-        return _missing(outputs)
-    return _decided(state, StopDecision("done", "", "reported", record))
+        return _decided(state, StopDecision("resume", result.message, step.reason, record))
+    if step.action == "unusable":
+        return step.reason
+    return _decided(state, StopDecision("done", "", step.reason, record))
 
 
 def _missing(outputs: OutputsResult) -> str:
@@ -181,7 +144,7 @@ async def run_stop(site: PackageSite, state: StopState, canary: Canary) -> StopD
     """
     stop = site.package.manifest.on_stop
     if stop is None or state.closed:
-        return _decided(state, StopDecision("closed", "", "no stop call", {}))
+        return _decided(state, StopDecision("closed", "", STOP_NOT_CALLED, {}))
     label = f"stop-{len(state.decisions)}"
     call = await invoke(
         site,
@@ -204,7 +167,7 @@ async def run_stop(site: PackageSite, state: StopState, canary: Canary) -> StopD
     why = "stop call failed (exit, signal, timeout or output cap)"
     if call.result.usable:
         try:
-            parsed = parse_result(call.result.stdout, site.package.manifest.token_names())
+            parsed = parse_stop_result(call.result.stdout, site.package.manifest.token_names())
         except ValueError as error:
             why = str(error)
         else:
