@@ -5,6 +5,7 @@ from pathlib import Path
 import pytest
 import yaml
 from click.testing import CliRunner
+from pydantic import ValidationError
 
 from raidar.cli.ledger import ledger_group
 from raidar.evaluation.ledger.check import check_ledger, load_ledger, record_problems
@@ -217,3 +218,26 @@ def test_cli_index_then_check(tmp_path: Path) -> None:
     rendered = (tmp_path / README_NAME).read_text()
     assert "workspace \\| state next line" in rendered
     assert runner.invoke(ledger_group, ["check", "--root", str(tmp_path)]).exit_code == 0
+
+
+@pytest.mark.parametrize("faults", [["M-001"], ["FCR-001", "FCR-invalid"]])
+def test_remedy_cannot_link_non_fault_identifiers(faults: list[str]) -> None:
+    with pytest.raises(ValidationError, match="not fault ids"):
+        RemedyRecord.model_validate(_remedy(faults=faults))
+
+
+@pytest.mark.parametrize("experiment", [None, "lab/experiments/ab-test/trial/experiment.yaml"])
+def test_remedy_experiment_is_optional_but_must_be_a_relative_reference(
+    experiment: str | None,
+) -> None:
+    remedy = RemedyRecord.model_validate(_remedy(experiment=experiment))
+
+    fault = FaultRecord.model_validate(_fault())
+    assert record_problems({fault.id: fault}, {remedy.id: remedy}) == []
+    assert remedy.model_dump()["experiment"] == experiment
+
+
+@pytest.mark.parametrize("experiment", ["/outside/experiment.yaml", "../escape.yaml", "bad path"])
+def test_remedy_refuses_unsafe_experiment_references(experiment: str) -> None:
+    with pytest.raises(ValidationError, match="experiment path"):
+        RemedyRecord.model_validate(_remedy(experiment=experiment))
