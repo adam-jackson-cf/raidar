@@ -23,7 +23,7 @@ protocol:
 arms:
   - id: codex
     agent: codex
-    workflow: raidar/one-shot@1
+    workflow: raidar/one-shot@2
 
 assessment:
   scorers: [correctness@9]

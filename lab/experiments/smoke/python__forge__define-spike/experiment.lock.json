@@ -1075,7 +1075,7 @@
       "tree-sitter-language-pack": "0.13.0"
     }
   },
-  "document_sha256": "c50303714909a9fb6d0a8efa894cfadef1255ee1121294a39ea70d088b533ddf",
+  "document_sha256": "c5e5be11bad4bac08e5617234bcb072280860bd512b3ded73fe949650f12ebc1",
   "execution": {
     "arms": {
       "define": {
@@ -1093,13 +1093,33 @@
           "version_pin": "0.156.1",
           "workflow_skills": "placement.skills .agents/skills in the workspace /app"
         },
-        "digest": "aaff376d0093460703f73e8936822a69d5faa9bcaaf167a8e85e79828ef22791",
+        "digest": "2552fb3ac42937289370f01e837a7c4ad39298632104027ec7f1e4f0c9e9039a",
         "model": "gpt-6-luna",
-        "packages": {},
+        "packages": {
+          "raidar/define": {
+            "check": "89056adad45932e6e3c117e38c21a06cd73c5745928926a81b7aa0c938857e8f",
+            "installed": {
+              "arm64": "d28105d3a2c568160a2726192e3157427f0bf12bcab322ba436b35c5ca8d3b4d"
+            },
+            "release": "raidar/define@1",
+            "sha256": "2dc004c3683e4ee4d71f897c8cb41c759660b9bbfe3a563d6956f8c881efc028"
+          },
+          "raidar/verify": {
+            "installed": {
+              "arm64": "4dd7023bf77b8f4347be6ba1bd75806717c878d82a5a4601b7214979135c9389"
+            },
+            "release": "raidar/verify@1",
+            "sha256": "8b8a9af4e2f57491e0a9fabecfd9c8301ca5bbdb8982d6638ace605337d43128"
+          }
+        },
         "primitive_code": {
-          "build": "ab469bf7dd6a7f922963984c21584fc7e1eb45468e543dabf6aa34a880751b05",
-          "define": "ab469bf7dd6a7f922963984c21584fc7e1eb45468e543dabf6aa34a880751b05",
-          "verify": "ab469bf7dd6a7f922963984c21584fc7e1eb45468e543dabf6aa34a880751b05"
+          "frame/1": "461bb2b2988ba8a3c081fee5595e8e2014d1cba57e12d3da58d6d695ec444d0d",
+          "gate/1": "3068251946a5649ca542d98f36399404819e00b88468cb10375f25ffbe58a7fb",
+          "install/1": "012eb722cf18829167463674f19cf48cd4ccc9da22138baa5600066be6742b3d",
+          "outputs/1": "ddb248dd25ef2decac6ec03b812b67f071724b6bf5e0d144b71f739cf43b0cd9",
+          "runner/1": "1553c6a55254a624261ee9f2bd26703009ec1b6d9c6c8173e53d9781240b7ec5",
+          "setup/1": "a0b650ad52188d7626c55ea3ba5f1a904cb0ada1a49af64532c6905aa8c85d8f",
+          "stop/1": "07a8bb9692b19cd7c4bd19f487fc9c15241a0457f54246f037e114587806e7e9"
         },
         "provider": "openai",
         "reasoning": "low",
@@ -1108,8 +1128,8 @@
           "package": "@openai/codex",
           "version": "0.156.1"
         },
-        "workflow": "raidar/define-build-verify@1",
-        "workflow_sha256": "52190a8da774cd846bb283dc71363ca2e9cb7dbd6bda140d1eccc9ff95fb3d91"
+        "workflow": "raidar/define-build-verify@2",
+        "workflow_sha256": "6bf8b572f496306b61cc446ae9cc1eef5ce4c73f88ef719235ed4fb264d23b8b"
       }
     },
     "design": {
@@ -1125,7 +1145,7 @@
         {
           "agent": "agent",
           "id": "define",
-          "workflow": "raidar/define-build-verify@1"
+          "workflow": "raidar/define-build-verify@2"
         }
       ],
       "attempts": 1,
@@ -1899,13 +1919,12 @@
         }
       },
       "workflow": {
-        "raidar/define-build-verify@1": {
-          "digest": "52190a8da774cd846bb283dc71363ca2e9cb7dbd6bda140d1eccc9ff95fb3d91",
+        "raidar/define-build-verify@2": {
+          "digest": "6bf8b572f496306b61cc446ae9cc1eef5ce4c73f88ef719235ed4fb264d23b8b",
           "metadata": {
             "stages": [
-              "define",
-              "build",
-              "verify"
+              "raidar/define",
+              "raidar/verify"
             ]
           }
         }
@@ -1925,10 +1944,10 @@
   "experiment": {
     "id": "python__forge__define-spike",
     "source": "experiment.yaml",
-    "source_sha256": "65e7dbaa4cdbf94a8f223270bf9cbbf0e66269473a4cf951f2072c88626af5f0",
-    "spec_sha256": "e63812e962047e165bc5d778ee5ffbfb03dcffab7514aadf1169000c0db9a42c"
+    "source_sha256": "8569d412fd02f83147276d56244b6b8620873b5ff108d912681f319df449c40e",
+    "spec_sha256": "459b4c26ac16e9c15d8b1eb0d8b9734db45b5011d11a3384d8509a4bcca0b630"
   },
-  "lock_sha256": "aa7ff3dcc38342b9218b802ce093b65a3d27ffc93e1a2a1dbe6701fd0d3cad32",
+  "lock_sha256": "7657273651c0afe71be0ef81211c533fc45af773f4ded4dadf7ae403d81c0e8c",
   "lock_version": 5,
   "overrides": {
     "flags": {},
@@ -1937,8 +1956,8 @@
   "sections": {
     "analysis": "f7f0b52ed6909ba0f3864eb9e7f7d513625da8dc445234304b8aa033c4343cb6",
     "assessment": "d62fbb3e311c0de90c2a9b809818c0b33eaffd3c85f0757955d0614572b14292",
-    "execution": "aa7ff3dcc38342b9218b802ce093b65a3d27ffc93e1a2a1dbe6701fd0d3cad32",
-    "toolchain": "9a32fba5858fad219ac72112d73a8896da8790e53180ce35ddc3f94710a30cbc"
+    "execution": "7657273651c0afe71be0ef81211c533fc45af773f4ded4dadf7ae403d81c0e8c",
+    "toolchain": "f659222273077d164b616b044b099482329257b8242be3400bb8174638133474"
   },
   "spec": {
     "agents": [
@@ -1964,7 +1983,7 @@
       {
         "agent": "agent",
         "id": "define",
-        "workflow": "raidar/define-build-verify@1"
+        "workflow": "raidar/define-build-verify@2"
       }
     ],
     "assessment": {
@@ -1983,7 +2002,7 @@
         "test-coverage@5"
       ]
     },
-    "description": "End-to-end raidar/define-build-verify@1 spike on forge; not citable.",
+    "description": "End-to-end raidar/define-build-verify@2 spike on forge; not citable.",
     "environment": {
       "compose_init": true,
       "type": "docker"
@@ -2010,6 +2029,6 @@
     "litellm": "1.102.1",
     "python": "3.13.7",
     "raidar": "0.15.0",
-    "raidar_spec": "056509cc54665388e077fca119c297b6b58f6b60db29b63cc181aed67159023d"
+    "raidar_spec": "c05fb465122b93838e790d70bf993f25de457615e2393bfbec74b0abecbbf87a"
   }
 }

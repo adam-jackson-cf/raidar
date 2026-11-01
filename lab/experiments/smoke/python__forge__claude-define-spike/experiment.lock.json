@@ -1075,7 +1075,7 @@
       "tree-sitter-language-pack": "0.13.0"
     }
   },
-  "document_sha256": "35ca24f6560be7f58569dc49f8891aec602c235b6278d55c4c0296a87fd10522",
+  "document_sha256": "a5b6b6f8ae30f5504652183e1ceadfc20c97f108dbb76dfb3a68f76d2b53c76d",
   "execution": {
     "arms": {
       "define": {
@@ -1093,13 +1093,33 @@
           "version_pin": "2.1.285",
           "workflow_skills": "placement.skills .claude/skills in the workspace /app"
         },
-        "digest": "38138f438cf24daa8f0b0358f78b0c30241a4b7efad0bde22069dff4c7c6bfab",
+        "digest": "3b91994b286f58118cc28b41a62dae57ec2d9e1687a6e2e18477bcf0b8157531",
         "model": "claude-sonnet-4-6",
-        "packages": {},
+        "packages": {
+          "raidar/define": {
+            "check": "89056adad45932e6e3c117e38c21a06cd73c5745928926a81b7aa0c938857e8f",
+            "installed": {
+              "arm64": "d28105d3a2c568160a2726192e3157427f0bf12bcab322ba436b35c5ca8d3b4d"
+            },
+            "release": "raidar/define@1",
+            "sha256": "2dc004c3683e4ee4d71f897c8cb41c759660b9bbfe3a563d6956f8c881efc028"
+          },
+          "raidar/verify": {
+            "installed": {
+              "arm64": "4dd7023bf77b8f4347be6ba1bd75806717c878d82a5a4601b7214979135c9389"
+            },
+            "release": "raidar/verify@1",
+            "sha256": "8b8a9af4e2f57491e0a9fabecfd9c8301ca5bbdb8982d6638ace605337d43128"
+          }
+        },
         "primitive_code": {
-          "build": "f8a15e14c3b45409a2e2cab025e9e2059b18cb16d6ddb055ea76c13f206284bd",
-          "define": "f8a15e14c3b45409a2e2cab025e9e2059b18cb16d6ddb055ea76c13f206284bd",
-          "verify": "f8a15e14c3b45409a2e2cab025e9e2059b18cb16d6ddb055ea76c13f206284bd"
+          "frame/1": "b0cd981a275a0f25f6e1cec75f882f9eeb773bda33ec4d9d04de0cc20efafbab",
+          "gate/1": "f24e44c3aab5f6eb619fdc05786b3105aea0f5b0ee3364eeb6dec2e4d15f1f40",
+          "install/1": "e3181fe8d2a4cf86d776b4a88bd31aec726ccd818e4484b56be66ec4e627ce8e",
+          "outputs/1": "0586c92750f3a7cb24e9dd9381f6bdde0e7fc6c4ef333746f5823b2026186b6a",
+          "runner/1": "ce6eb5ce138d7c802e72d0d35ae220a09169c3c5b29ab42ca558c44069f5efc9",
+          "setup/1": "55439984004f73bd2bd5bcb3cc3adc048acb93b24043712e2148b9c76ebd4015",
+          "stop/1": "9ba58a816b9915a2910aa2a35878dfefa813605968a1900c7786d7a2e57577e8"
         },
         "provider": "anthropic",
         "reasoning": "low",
@@ -1108,8 +1128,8 @@
           "package": "@anthropic-ai/claude-code",
           "version": "2.1.285"
         },
-        "workflow": "raidar/define-build-verify@1",
-        "workflow_sha256": "52190a8da774cd846bb283dc71363ca2e9cb7dbd6bda140d1eccc9ff95fb3d91"
+        "workflow": "raidar/define-build-verify@2",
+        "workflow_sha256": "6bf8b572f496306b61cc446ae9cc1eef5ce4c73f88ef719235ed4fb264d23b8b"
       }
     },
     "design": {
@@ -1125,7 +1145,7 @@
         {
           "agent": "agent",
           "id": "define",
-          "workflow": "raidar/define-build-verify@1"
+          "workflow": "raidar/define-build-verify@2"
         }
       ],
       "attempts": 1,
@@ -1899,13 +1919,12 @@
         }
       },
       "workflow": {
-        "raidar/define-build-verify@1": {
-          "digest": "52190a8da774cd846bb283dc71363ca2e9cb7dbd6bda140d1eccc9ff95fb3d91",
+        "raidar/define-build-verify@2": {
+          "digest": "6bf8b572f496306b61cc446ae9cc1eef5ce4c73f88ef719235ed4fb264d23b8b",
           "metadata": {
             "stages": [
-              "define",
-              "build",
-              "verify"
+              "raidar/define",
+              "raidar/verify"
             ]
           }
         }
@@ -1925,10 +1944,10 @@
   "experiment": {
     "id": "python__forge__claude-define-spike",
     "source": "experiment.yaml",
-    "source_sha256": "1e2c8625a8376d6c5a1f03cd969e1fd0f9629b19e4f8dce51b0291e3c5af3219",
-    "spec_sha256": "35b88b34f8501fef470e7fd80e2bb3ae2cd63e20c91dc51185d76a2bc1e04552"
+    "source_sha256": "2f8e3eb751090e3a57b89f7dcf0c7c3dfcf5e2bed90ca7b8b7c1547f9bff625d",
+    "spec_sha256": "b1b9c3a56c32300ea4a00a540dd8b5b6b4068ad5d41c1ac55c906dcd28cc48dc"
   },
-  "lock_sha256": "71c10c78fb10641f54bdc7891dc465338f2fda5c8f5eb1015a02cc281cc623c6",
+  "lock_sha256": "e06833dc5a019d602913d797afed2bb34346a1f3531efa8ae82ca5430da83e09",
   "lock_version": 5,
   "overrides": {
     "flags": {},
@@ -1937,8 +1956,8 @@
   "sections": {
     "analysis": "f7f0b52ed6909ba0f3864eb9e7f7d513625da8dc445234304b8aa033c4343cb6",
     "assessment": "d62fbb3e311c0de90c2a9b809818c0b33eaffd3c85f0757955d0614572b14292",
-    "execution": "71c10c78fb10641f54bdc7891dc465338f2fda5c8f5eb1015a02cc281cc623c6",
-    "toolchain": "9a32fba5858fad219ac72112d73a8896da8790e53180ce35ddc3f94710a30cbc"
+    "execution": "e06833dc5a019d602913d797afed2bb34346a1f3531efa8ae82ca5430da83e09",
+    "toolchain": "f659222273077d164b616b044b099482329257b8242be3400bb8174638133474"
   },
   "spec": {
     "agents": [
@@ -1964,7 +1983,7 @@
       {
         "agent": "agent",
         "id": "define",
-        "workflow": "raidar/define-build-verify@1"
+        "workflow": "raidar/define-build-verify@2"
       }
     ],
     "assessment": {
@@ -1983,7 +2002,7 @@
         "test-coverage@5"
       ]
     },
-    "description": "Claude Code raidar/define-build-verify@1 mechanics on forge; not citable.",
+    "description": "Claude Code raidar/define-build-verify@2 mechanics on forge; not citable.",
     "environment": {
       "compose_init": true,
       "type": "docker"
@@ -2010,6 +2029,6 @@
     "litellm": "1.102.1",
     "python": "3.13.7",
     "raidar": "0.15.0",
-    "raidar_spec": "056509cc54665388e077fca119c297b6b58f6b60db29b63cc181aed67159023d"
+    "raidar_spec": "c05fb465122b93838e790d70bf993f25de457615e2393bfbec74b0abecbbf87a"
   }
 }

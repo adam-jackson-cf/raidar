@@ -38,8 +38,8 @@ BASE_EXPERIMENT: dict[str, Any] = {
     "runtime": "python",
     "agents": [{"id": "luna", "release": "codex@3", "model": "gpt-6-luna", "reasoning": "low"}],
     "arms": [
-        {"id": "baseline", "agent": "luna", "workflow": "raidar/one-shot@1"},
-        {"id": "guided", "agent": "luna", "workflow": "raidar/one-shot@1"},
+        {"id": "baseline", "agent": "luna", "workflow": "raidar/one-shot@2"},
+        {"id": "guided", "agent": "luna", "workflow": "raidar/one-shot@2"},
     ],
     "assessment": {"scorers": ["correctness@9"]},
     "analysis": {"baseline_arm": "baseline", "attempts": 5, "seed": 7},

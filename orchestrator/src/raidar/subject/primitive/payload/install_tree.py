@@ -81,8 +81,10 @@ def _install_wheels(stage: Path, root: Path, spec: dict[str, Any]) -> None:
     _run([spec["uv"], "venv", "--quiet", "--python", spec["python"], str(root / "venv")], stage)
     if not spec["wheels"]:
         return
+    # Installer cache timestamps are not runtime data and make installed-tree hashes unstable.
     install = [
         spec["uv"], "pip", "install", *spec["flags"],
+        "--no-installer-metadata",
         "--find-links", str(stage / "wheels"),
         "--link-mode", "copy",
         "--python", str(root / "venv" / "bin" / "python"),

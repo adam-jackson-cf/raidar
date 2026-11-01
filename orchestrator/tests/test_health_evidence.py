@@ -361,3 +361,157 @@ def test_legitimate_terminal_agent_outcomes_leave_the_table_valid(
     _mutate(agent, outcome)
 
     assert {c.status for c in _checks(t).values()} == {"pass"}
+
+
+def _schema_two(
+    t: HealthyTrial,
+    *,
+    packages: tuple[str, ...] = (),
+    gate: bool = False,
+    definition: dict[str, Any] | None = None,
+) -> Path:
+    """The real schema-2 config (definition ``to_json`` shape plus the runner kwargs
+    ``arm_agent_config`` adds for a package arm) and ``PackageCheckpoint.record``'s output."""
+    body = definition or {
+        "schema": 2,
+        "name": "one-shot",
+        "build": {"prompt": "build %%%TASK%%%", "reply": None},
+        "stages": [{"use": f"raidar/{name}@1", "params": {}} for name in packages],
+        "gate": {"max_fix_rounds": 0},
+        "judge": None,
+    }
+    kwargs: dict[str, Any] = {"definition": body}
+    if packages:
+        primitives = dict.fromkeys(("frame/1", "install/1", "runner/1", "setup/1"), "d" * 64)
+        if gate:
+            primitives["gate/1"] = "d" * 64
+        locked = {f"raidar/{name}": {"release": f"raidar/{name}@1"} for name in packages}
+        kwargs |= {"locked_packages": locked, "primitives": primitives, "pack": "p"}
+    (t.trial_dir / "config.json").write_text(json.dumps({"agent": {"kwargs": kwargs}}))
+    agent = t.trial_dir / "steps" / STEP / "agent"
+    path = agent / "workflow/workflow.json"
+    workflow = json.loads(path.read_text())
+    workflow |= {
+        "frame/1": dict.fromkeys(packages, "fragment"),
+        "install/1": {
+            name: {"schema": "install/1", "reference": f"raidar/{name}", "package_digest": "a" * 64}
+            for name in packages
+        },
+        "setup/1": {},
+        "stop/1": {},
+        "outputs/1": {},
+    }
+    if gate:
+        workflow["gate/1"] = {"max_fix_rounds": 0, "gates": [], "errors": []}
+    path.write_text(json.dumps(workflow))
+    return agent
+
+
+CASES: list[tuple[tuple[str, ...], bool]] = [((), False), (("verify",), False), (("verify",), True)]
+
+
+@pytest.mark.parametrize(("packages", "gate"), CASES, ids=["baseline", "package", "gated"])
+def test_a_healthy_schema_two_trial_holds_every_row(
+    tmp_path: Path, packages: tuple[str, ...], gate: bool
+) -> None:
+    t = healthy_trial(tmp_path)
+    _schema_two(t, packages=packages, gate=gate)
+
+    assert {c.status for c in _checks(t).values()} == {"pass"}
+
+
+@pytest.mark.parametrize(
+    "change",
+    [
+        _drop("install/1"),
+        _set("install/1", value={}),
+        _set("install/1", "verify", "reference", value="raidar/other"),
+        _drop("frame/1"),
+        _drop("setup/1"),
+        _drop("stop/1"),
+        _drop("outputs/1"),
+        _drop("gate/1"),
+        _set("gate/1", value={"errors": []}),
+        _set("gate/1", "errors", value=["GateInvalid: the tools changed"]),
+        _set("invalid", value={"kind": "integrity", "detail": "x", "record": None}),
+    ],
+    ids=[
+        "no-install",
+        "no-package-install",
+        "wrong-reference",
+        "no-frame",
+        "no-setup",
+        "no-stop",
+        "no-outputs",
+        "no-gate",
+        "no-gates-list",
+        "gate-errors",
+        "recorded-invalid",
+    ],
+)
+def test_a_gated_schema_two_workflow_owes_every_primitive_record(
+    tmp_path: Path, change: Mutation
+) -> None:
+    t = healthy_trial(tmp_path)
+    agent = _schema_two(t, packages=("verify",), gate=True)
+    _mutate(agent, change)
+
+    assert _checks(t)["W1"].status == "violation"
+
+
+def test_an_ungated_schema_two_workflow_owes_no_gate_record(tmp_path: Path) -> None:
+    t = healthy_trial(tmp_path)
+    agent = _schema_two(t, packages=("verify",))
+    _mutate(agent, _set("gate/1", value={}))
+
+    assert _checks(t)["W1"].status == "pass"
+
+
+@pytest.mark.parametrize("kwarg", ["locked_packages", "primitives"])
+def test_a_schema_two_package_arm_missing_its_runner_kwargs_is_unknown(
+    tmp_path: Path, kwarg: str
+) -> None:
+    t = healthy_trial(tmp_path)
+    _schema_two(t, packages=("verify",), gate=True)
+    config = json.loads((t.trial_dir / "config.json").read_text())
+    del config["agent"]["kwargs"][kwarg]
+    (t.trial_dir / "config.json").write_text(json.dumps(config))
+
+    assert _checks(t)["W3"].status == "violation"  # unknown applicability owes every row
+
+
+@pytest.mark.parametrize("evidence", [_remove("workflow/workflow.json"), _drop("turns"), _rollout])
+def test_a_schema_two_trial_still_owes_build_and_session_evidence(
+    tmp_path: Path, evidence: Mutation
+) -> None:
+    t = healthy_trial(tmp_path)
+    agent = _schema_two(t)
+    _mutate(agent, evidence)
+
+    assert {c.status for c in _checks(t).values()} & {"violation"}
+
+
+@pytest.mark.parametrize(
+    "broken",
+    [
+        {"schema": 2},
+        {"schema": 2, "name": "x", "build": {"prompt": "no task token"}},
+        {"schema": 2, "name": "x", "build": {"prompt": "%%%TASK%%%"}, "stray": 1},
+        {"schema": 2, "name": "x", "build": {"prompt": "%%%TASK%%%"}, "stages": [{"use": "bad"}]},
+        {
+            "schema": 2,
+            "name": "x",
+            "build": {"prompt": "%%%TASK%%%", "reply": "acceptance-reply/1"},
+        },
+    ],
+    ids=["empty", "no-token", "stray-key", "bad-release", "reply-unreadable"],
+)
+def test_a_malformed_or_unreadable_schema_two_definition_has_unknown_applicability(
+    tmp_path: Path, broken: dict[str, Any]
+) -> None:
+    t = healthy_trial(tmp_path)
+    _schema_two(t, definition=broken)
+
+    checks = _checks(t)
+    assert checks["W1"].status == "violation"
+    assert checks["W3"].status == "violation"  # owed by no known stage: only unknown owes it

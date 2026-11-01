@@ -25,7 +25,6 @@ from raidar_contract.package.registry import load_stage_package, stage_folder
 from raidar_contract.releases import Release
 from raidar_contract.workflow import PackageWorkflowDefinition
 
-from raidar.contract.paths import workflows_root
 from raidar.subject.primitive import calls
 from raidar.subject.primitive.calls import TransportError, TreeManifest
 from raidar.subject.primitive.gate import Attribution, GateInvalid, GateOutcome
@@ -39,7 +38,6 @@ from raidar.subject.workflow.package_stage import PackageStage
 from raidar.subject.workflow.runner import RECORD_FILE, WorkflowRunner
 from raidar.subject.workflow.stage import GATE_FIX, REPAIR, REWORK, Checkpoint, Spent
 from raidar.subject.workflow.turns import WORKFLOW_DIR
-from tests.experiment_spec_support import REPO_ROOT
 from tests.lifecycle_support import (
     NOTE_STATE,
     PACK,
@@ -52,6 +50,7 @@ from tests.lifecycle_support import (
     stage_check_record,
 )
 from tests.native_support import CodexNative
+from tests.release_support import SPIKE_WORKFLOWS
 from tests.workflow_support import LocalEnvironment
 
 BUILD = "Build:\n%%%NOTE_STATE%%%\nTask: %%%TASK%%%"
@@ -816,7 +815,7 @@ def test_a_schema_2_definition_selects_the_one_package_stage_and_the_spike_does_
     stages, stage = checkpoint_stages(
         package, locked=lab.lock(), primitives=PRIMITIVES, pack=PACK, skills_placement=PLACEMENT
     )
-    spike = load_workflow(workflows_root(REPO_ROOT), "raidar/one-shot")
+    spike = load_workflow(SPIKE_WORKFLOWS, "raidar/one-shot")
     spike_stages, spike_stage = checkpoint_stages(
         spike, locked={}, primitives={}, pack="", skills_placement=PLACEMENT
     )

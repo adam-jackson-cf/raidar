@@ -11,7 +11,6 @@ from typing import Any
 import pytest
 from harbor.models.agent.context import AgentContext
 
-from raidar.contract.paths import workflows_root
 from raidar.subject.workflow.definition import load_workflow
 from raidar.subject.workflow.runner import (
     PROMPT_FILE,
@@ -19,8 +18,8 @@ from raidar.subject.workflow.runner import (
     WorkflowRunner,
 )
 from raidar.subject.workflow.turns import TRAJECTORY_FILE, WORKFLOW_DIR
-from tests.experiment_spec_support import REPO_ROOT
 from tests.native_support import CodexNative
+from tests.release_support import SPIKE_WORKFLOWS
 
 INSTRUCTION = "Add a function `add(a, b)` to main.py."
 ONE_SHOT_PROMPT = f"Work the issue below per the repository's own rules.\n\n{INSTRUCTION}"
@@ -86,7 +85,7 @@ def inner(monkeypatch: pytest.MonkeyPatch) -> type[FakeInner]:
 
 
 def _runner(logs_dir: Path) -> WorkflowRunner:
-    definition = load_workflow(workflows_root(REPO_ROOT), "raidar/one-shot")
+    definition = load_workflow(SPIKE_WORKFLOWS, "raidar/one-shot")
     return WorkflowRunner(
         logs_dir=logs_dir,
         model_name="openai/gpt-6-luna",

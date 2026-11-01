@@ -28,7 +28,7 @@ from raidar.subject.workflow.definition import load_workflow
 from raidar.subject.workflow.inner import INNER_KWARG, InnerAgentSpec
 from raidar.subject.workflow.runner import WorkflowRunner
 from tests.docker_trial_support import build_task, docker_target_ready, run_trial_sync
-from tests.release_support import REAL_LAB
+from tests.release_support import SPIKE_WORKFLOWS
 from tests.workflow_attack_support import (
     ATTACK_DEFINE,
     ATTACK_MODE,
@@ -61,7 +61,7 @@ def definition(defining: bool) -> tuple[str, dict[str, Any]]:
     """The workflow's reference and resolved definition: one-shot-verify, or define-build-verify
     without its judge (the define stage really enabled), with the tests check and two fixes."""
     name = "raidar/define-build-verify" if defining else "raidar/one-shot-verify"
-    resolved: Any = load_workflow(REAL_LAB / "workflows", name).to_json()
+    resolved: Any = load_workflow(SPIKE_WORKFLOWS, name).to_json()
     stages = resolved["stages"]
     stages["verify"]["checks"] = [TESTS_CHECK]
     stages["verify"]["max_fix_rounds"] = 2
