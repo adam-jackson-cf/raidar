@@ -1,0 +1,5 @@
+[project]
+name = "stage-tool"
+version = "0"
+requires-python = ">=3.12"
+dependencies = ["mypy==2.3.1", "pytest==9.1.1", "ruff==0.8.6"]

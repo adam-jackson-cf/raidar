@@ -27,6 +27,18 @@ TYPECHECK_TARGETS = [
 COVERAGE_FAIL_UNDER = "95"
 
 
+def package_tool_sources() -> list[str]:
+    """Stage-owned Python source roots, relative to the orchestrator."""
+    return sorted(
+        path.relative_to(ORCHESTRATOR_ROOT, walk_up=True).as_posix()
+        for path in (
+            manifest.parent / "tool" / "src"
+            for manifest in REPO_ROOT.glob("lab/stages/*/*/stage.yaml")
+        )
+        if path.is_dir()
+    )
+
+
 def register(main: click.Group) -> None:
     main.add_command(quality)
 
@@ -54,68 +66,17 @@ def assert_quality_gate_requirements() -> None:
 
 
 def run_ruff_quality_gates(*, fix: bool) -> None:
+    targets = [".", "../contract/src", *package_tool_sources()]
+    options = ["--config", "pyproject.toml", "--force-exclude"]
     if fix:
+        run_or_raise([PYTHON, "-m", "ruff", "format", *options, *targets], ORCHESTRATOR_ROOT)
         run_or_raise(
-            [
-                PYTHON,
-                "-m",
-                "ruff",
-                "format",
-                ".",
-                "../contract/src",
-                "--config",
-                "pyproject.toml",
-                "--force-exclude",
-            ],
-            ORCHESTRATOR_ROOT,
-        )
-        run_or_raise(
-            [
-                PYTHON,
-                "-m",
-                "ruff",
-                "check",
-                ".",
-                "../contract/src",
-                "--config",
-                "pyproject.toml",
-                "--fix",
-                "--force-exclude",
-            ],
-            ORCHESTRATOR_ROOT,
+            [PYTHON, "-m", "ruff", "check", *targets, "--fix", *options], ORCHESTRATOR_ROOT
         )
         return
 
-    run_or_raise(
-        [
-            PYTHON,
-            "-m",
-            "ruff",
-            "format",
-            ".",
-            "../contract/src",
-            "--config",
-            "pyproject.toml",
-            "--check",
-            "--force-exclude",
-        ],
-        ORCHESTRATOR_ROOT,
-    )
-    run_or_raise(
-        [
-            PYTHON,
-            "-m",
-            "ruff",
-            "check",
-            ".",
-            "../contract/src",
-            "--config",
-            "pyproject.toml",
-            "--no-fix",
-            "--force-exclude",
-        ],
-        ORCHESTRATOR_ROOT,
-    )
+    run_or_raise([PYTHON, "-m", "ruff", "format", "--check", *options, *targets], ORCHESTRATOR_ROOT)
+    run_or_raise([PYTHON, "-m", "ruff", "check", *targets, "--no-fix", *options], ORCHESTRATOR_ROOT)
 
 
 def coverage_env() -> dict[str, str]:
@@ -127,20 +88,32 @@ def coverage_env() -> dict[str, str]:
 
 
 def run_orchestrator_quality_gates() -> None:
+    tools = package_tool_sources()
+    source_roots = [
+        "orchestrator/src",
+        "contract/src",
+        *(
+            (ORCHESTRATOR_ROOT / source).resolve().relative_to(REPO_ROOT).as_posix()
+            for source in tools
+        ),
+    ]
+    root_packages = [
+        "raidar",
+        "raidar_contract",
+        *(
+            init.parent.name
+            for source in tools
+            for init in (ORCHESTRATOR_ROOT / source).glob("*/__init__.py")
+        ),
+    ]
     run_or_raise(
         [
             PYTHON,
             str(FANOUT_CHECK_SCRIPT),
             "--repo-root",
             str(REPO_ROOT),
-            "--source-root",
-            "orchestrator/src",
-            "--source-root",
-            "contract/src",
-            "--root-package",
-            "raidar",
-            "--root-package",
-            "raidar_contract",
+            *(part for source in source_roots for part in ("--source-root", source)),
+            *(part for name in root_packages for part in ("--root-package", name)),
         ],
         REPO_ROOT,
     )
@@ -150,10 +123,10 @@ def run_orchestrator_quality_gates() -> None:
     )
     run_or_raise(["lint-imports", "--config", str(IMPORT_LINTER_CONFIG)], ORCHESTRATOR_ROOT)
     run_or_raise(
-        ["lizard", "-C", "10", "-l", "python", "src", "../contract/src"], ORCHESTRATOR_ROOT
+        ["lizard", "-C", "10", "-l", "python", "src", "../contract/src", *tools], ORCHESTRATOR_ROOT
     )
     run_or_raise(
-        [PYTHON, "-m", "mypy", "--follow-imports=skip", *TYPECHECK_TARGETS],
+        [PYTHON, "-m", "mypy", "--follow-imports=skip", *TYPECHECK_TARGETS, *tools],
         ORCHESTRATOR_ROOT,
     )
     run_or_raise(
@@ -164,6 +137,7 @@ def run_orchestrator_quality_gates() -> None:
             "tests",
             "--cov=src",
             "--cov=../contract/src",
+            *(f"--cov={source}" for source in tools),
             "--cov-report=term-missing:skip-covered",
             f"--cov-fail-under={COVERAGE_FAIL_UNDER}",
             "-x",

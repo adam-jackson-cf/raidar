@@ -358,7 +358,9 @@ def _package_command(config: dict[str, Any], check: dict[str, Any], outcomes: Pa
     if check["kind"] != "pytest":
         return list(check["argv"])
     sites = [arg for path in _project_sites(Path(config["root"])) for arg in ("--site", path)]
-    per_test = max(1, int(check["timeout_s"]) // 2)
+    per_test = check.get("test_timeout")
+    if per_test is None:
+        per_test = max(1, int(check["timeout_s"]) // 2)
     return [
         check["python"], str(Path(__file__).resolve()), "pytest-run",
         "--timeout", str(per_test), "--outcomes", str(outcomes), "--agent-user", *sites,

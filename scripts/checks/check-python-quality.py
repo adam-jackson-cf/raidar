@@ -95,11 +95,17 @@ def is_excluded_relpath(relpath: str) -> bool:
     )
 
 
+def _is_maintained_root(relpath: str) -> bool:
+    return any(path_matches_prefix(relpath, root) for root in MAINTAINED_ROOTS) or bool(
+        re.match(r"^lab/stages/[^/]+/[^/]+/tool/src/", relpath)
+    )
+
+
 def is_maintained_python_relpath(relpath: str) -> bool:
     normalized = relpath.lstrip("./")
     if not normalized.endswith(".py") or is_excluded_relpath(normalized):
         return False
-    return any(path_matches_prefix(normalized, root) for root in MAINTAINED_ROOTS)
+    return _is_maintained_root(normalized)
 
 
 def discover_maintained_python_files(repo_root: Path) -> list[Path]:
@@ -119,7 +125,7 @@ def _is_snake_case_name(name: str) -> bool:
 
 
 def _root_diagnostics(relpath: str) -> list[Diagnostic]:
-    if any(path_matches_prefix(relpath, root) for root in MAINTAINED_ROOTS):
+    if _is_maintained_root(relpath):
         return []
     return [
         Diagnostic(
