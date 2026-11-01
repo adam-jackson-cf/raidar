@@ -281,7 +281,7 @@
     },
     "tools": {}
   },
-  "document_sha256": "39eeb70821ece4edcd3f223e5f0c562adae731f5cf89c8a57701b83a2b8c7d39",
+  "document_sha256": "b356fb51809ef63d35e6c6fb8e0c13ff2e9d4ad601fe4afa58e27f6495d4aa54",
   "execution": {
     "arms": {
       "codex": {
@@ -299,11 +299,11 @@
           "version_pin": "0.156.1",
           "workflow_skills": "placement.skills .agents/skills in the workspace /app"
         },
-        "digest": "8b671f5bc0d4c621a79597fdf62119c49c11f87afc36ff4fbb97f1ea64f7de26",
+        "digest": "b6d580988e691d83f0918231e505e70467b3c5bcce2989b2049c5b9a34791566",
         "model": "gpt-6-luna",
         "packages": {},
         "primitive_code": {
-          "build": "e83e549a04207d34cf285c911431baa81e2dc9da1166e164109ee609caca9da1"
+          "build": "b73104963cfcc4f879f52b58762dc39b4a0c67bd53639a8ef8bd5aaf7894063f"
         },
         "provider": "openai",
         "reasoning": "low",
@@ -501,7 +501,7 @@
     "source_sha256": "49c5169986cf45732f4fbad7335dad4ac907d49e3beb3129096cbf96f192edd6",
     "spec_sha256": "9af431f89829ce6cc845a011e1b542a0e4df04a8cf73de4d8a5de39da2cc722c"
   },
-  "lock_sha256": "49f11d8f340d6468dc1e900b8c5495c4d40bb147470a99ebdc9f204369f1a561",
+  "lock_sha256": "f6b380903b695b82e976530c39406beba0111f8b007db538a7efa8669dba76e7",
   "lock_version": 5,
   "overrides": {
     "flags": {},
@@ -510,7 +510,7 @@
   "sections": {
     "analysis": "33aede75abee4373a36e88c3e4bad96deaadffcf5db85e1efadee2a8414fd67b",
     "assessment": "b7258a0f7f20f232400525fd93c98f17bc493e7fc955255c22a99cfb968e0745",
-    "execution": "49f11d8f340d6468dc1e900b8c5495c4d40bb147470a99ebdc9f204369f1a561",
+    "execution": "f6b380903b695b82e976530c39406beba0111f8b007db538a7efa8669dba76e7",
     "toolchain": "9a32fba5858fad219ac72112d73a8896da8790e53180ce35ddc3f94710a30cbc"
   },
   "spec": {

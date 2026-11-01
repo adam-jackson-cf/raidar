@@ -82,6 +82,11 @@ Calls use argv lists, never shell text. `run` is nonempty. `timeout_s` defaults 
 
 A gate entry accepts exactly `name`, `run`, `kind`, `before`, `watch`, `timeout_s`. Check names are free and unique; no language-specific check-name enumeration exists. Default kind is a command, requiring `run`. The reserved `kind: pytest` records individual test outcomes and requires at least one collected test with no failed cases to pass; it uses the package's pinned pytest. `before: true` checks are prerequisites: they run before ordinary checks and a refusal prevents the latter. `watch` identifies bounded stage state. Every check runs on the agent's commits and at the final record-only seal. The seal never commits, stages, restores or repairs the workspace. Workflow `gate: {max_fix_rounds: N}` bounds fix turns, default zero. A pre-fix solution tree is retained whenever a fix turn starts.
 
+For pytest-kind checks, effective `params.test_timeout`, when present, must be a positive
+integer and sets the actual per-test timeout. Without that parameter, the per-test default
+is `max(1, timeout_s // 2)`. The whole-check `timeout_s` budget remains separate and is at
+most 300 seconds.
+
 `on_stop` accepts `run`, `watch`, `timeout_s`, `max_rounds`; the latter defaults to zero and is in 0–5. It runs after each agent turn once leftover agent processes have been reaped. It prints exactly this strict JSON object:
 
 ```json
@@ -164,6 +169,15 @@ Creation refuses overwrites. The `docs-check` template includes a generated pure
 Guaranteed: package code runs only as the agent's user inside a container, cannot reach host secrets, the judge key, hidden verifier bundle or authoritative evidence store; installs are offline and hash-checked; grading is separate. A package cannot define a scorer or host callback.
 
 Not guaranteed: truthful prompts/checks or useful methods. Same-user tools can read the workspace and harness credentials available to the agent, and an agent invoking a tool outside Raidar's isolated call path can use the trial network allowlist. The contract does not promise same-user credential secrecy. Only packages merged through reviewed PRs count for lab decisions. A separate stage-call user, remote transports, signing, multiple concurrent releases, non-Python runtimes and package generators are deferred.
+
+## Upstream packages
+
+`raidar/verify@1` runs lint, format, strict types and pytest with ruff 0.8.6, mypy 2.3.1
+and pytest 9.1.1. Its 60-second `test_timeout` default can be overridden through package
+parameters. The gate records individual pytest outcomes and refuses empty test collections.
+Fixtures cover each failing check, excluded directories, a six-second test passing at the
+default and the same test refusing at a two-second override. Whole checks use the maximum
+`stage/1` budget of 300 seconds; the spike's 600-second watchdog is not preserved.
 
 ## Contract history
 

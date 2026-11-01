@@ -4,6 +4,19 @@ All notable changes to this project are documented in this file.
 
 ## Unreleased
 
+### Verify stage package (phase 5A step 3)
+
+- Ship `raidar/verify@1`: the spike's lint, format, strict-mypy and pytest checks on pinned
+  ruff 0.8.6, mypy 2.3.1 and pytest 9.1.1, including excluded-directory handling and individual
+  pytest outcomes. Offline gate fixtures cover every refusal, empty collections and actual
+  per-test timeout overrides; Docker parity compares each check with the spike on identical trees.
+- Pytest-kind package checks now honor positive-integer `params.test_timeout`; the verify
+  default is 60 seconds. The parameter does not replace the whole-check budget. Packages
+  without it retain the existing `timeout_s // 2` per-test default (minimum one second).
+- Keep the binding `stage/1` ceiling: all verify checks have 300-second total budgets,
+  rather than the spike's 600-second watchdog. Portable contract and stage-owned Python tool
+  sources remain in lint, type, complexity, fanout and coverage gates after ownership moves.
+
 ### Schema-2 admission and workflow namespaces (phase 5A step 2)
 
 - Workflow references now require a namespace (`ns/name@N`; folders `lab/workflows/<ns>/<name>/`).

@@ -181,6 +181,18 @@ def context_path(paths: GatePaths, package: GatePackage) -> str:
     return f"{paths.contexts}/{package.name}.json"
 
 
+def _pytest_options(package: GatePackage, check: GateCheck) -> dict[str, int]:
+    if check.kind != "pytest":
+        return {}
+    params = package.context.get("params", {})
+    if "test_timeout" not in params:
+        return {}
+    timeout = params["test_timeout"]
+    if type(timeout) is not int or timeout <= 0:
+        raise ValueError("pytest test_timeout must be a positive integer")
+    return {"test_timeout": timeout}
+
+
 def _check_entries(paths: GatePaths, packages: Sequence[GatePackage]) -> list[dict[str, Any]]:
     return [
         {
@@ -190,6 +202,7 @@ def _check_entries(paths: GatePaths, packages: Sequence[GatePackage]) -> list[di
             "before": check.before,
             "closed_flag": package.closed_flag,
             "timeout_s": check.timeout_s,
+            **_pytest_options(package, check),
             "path": package.installed.path,
             "python": package.installed.python,
             "context": context_path(paths, package),

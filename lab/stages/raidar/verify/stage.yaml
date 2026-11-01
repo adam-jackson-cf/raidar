@@ -1,0 +1,14 @@
+contract: stage/1
+name: verify
+summary: Gate every commit and the final tree with ruff, ruff format, strict mypy and pytest.
+requires: {gate: gate/1}
+params: {test_timeout: 60}
+tool:
+  project: tool
+  commands: {verify: [python, -I, -B, -m, verify_tool]}
+gate:
+  - {name: lint, run: [verify, lint], timeout_s: 300}
+  - {name: format, run: [verify, format], timeout_s: 300}
+  - {name: types, run: [verify, types], timeout_s: 300}
+  - {name: tests, kind: pytest, timeout_s: 300}
+skills: [test-per-aspect, pytest-templates]

@@ -841,7 +841,7 @@
       "tree-sitter-language-pack": "0.13.0"
     }
   },
-  "document_sha256": "5644ed85daf90d3f048c6388a9aa25083883046a2100a7e1c956db16701e8f2d",
+  "document_sha256": "e5a52d1eafe17ac60a02e02403e7857d80221f8ac9ec9b9115d7675cf94ab2c2",
   "execution": {
     "arms": {
       "verify": {
@@ -859,12 +859,12 @@
           "version_pin": "0.156.1",
           "workflow_skills": "placement.skills .agents/skills in the workspace /app"
         },
-        "digest": "c6f3983f39f9a15cabc71274871de104f0123df66c7e25b98c502defc9e0e77b",
+        "digest": "1c0c8ef3e5f32bcdd62c6549b016517fba7fb97bf974ab2eb43f14dfd90cefe3",
         "model": "gpt-6-luna",
         "packages": {},
         "primitive_code": {
-          "build": "e83e549a04207d34cf285c911431baa81e2dc9da1166e164109ee609caca9da1",
-          "verify": "e83e549a04207d34cf285c911431baa81e2dc9da1166e164109ee609caca9da1"
+          "build": "b73104963cfcc4f879f52b58762dc39b4a0c67bd53639a8ef8bd5aaf7894063f",
+          "verify": "b73104963cfcc4f879f52b58762dc39b4a0c67bd53639a8ef8bd5aaf7894063f"
         },
         "provider": "openai",
         "reasoning": "low",
@@ -1692,7 +1692,7 @@
     "source_sha256": "78f0e83fff735556e691a7ba0f565412b51c7039472c10cfd88b7d85ef5c1571",
     "spec_sha256": "39f79facfa1ff583aa5beacf24512b6666c9723158651d37c0e9932ff29be1f7"
   },
-  "lock_sha256": "9faf8af08c6666e33c1c5f5a075cb1fff279ba51cad9b5a8239bfb79444e462f",
+  "lock_sha256": "6813e61c17dca9017e121aa8936b5249c72a3513a4aacac5cd4155e60df87d5a",
   "lock_version": 5,
   "overrides": {
     "flags": {},
@@ -1701,7 +1701,7 @@
   "sections": {
     "analysis": "81cdc2d12aacc031bb70595c13973ff647ab49a68bebda4be7a9b65ba3127a78",
     "assessment": "dce26b7322a34e10c22c380fff0f675581046b9df217d283beaef5d6a55efb37",
-    "execution": "9faf8af08c6666e33c1c5f5a075cb1fff279ba51cad9b5a8239bfb79444e462f",
+    "execution": "6813e61c17dca9017e121aa8936b5249c72a3513a4aacac5cd4155e60df87d5a",
     "toolchain": "9a32fba5858fad219ac72112d73a8896da8790e53180ce35ddc3f94710a30cbc"
   },
   "spec": {

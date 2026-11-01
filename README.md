@@ -25,9 +25,12 @@ runtime dependencies. `make contract-build` builds a wheel and sdist under `var/
 and prints their SHA-256 hashes; it publishes nothing. The orchestrator uses this package
 through a local path dependency; Harbor execution remains in the orchestrator.
 The generic package runtime, immutable registry/lock identity and authoring commands are
-implemented alongside the spike classes. Local quality: 3,103 passed, 48 skipped, 95.18% coverage.
-Docker fixture/AT3, security and post-change performance proof remain pending while `mbp` is
-offline; shipped workflows retain spike classes until their phase-5 port.
+implemented alongside the spike classes, which the shipped schema-1 workflows still select.
+The upstream [`raidar/verify@1`](lab/stages/raidar/verify/) package runs the spike's four checks
+with the same pinned tools: lint, format, strict types and individual pytest outcomes.
+Its `test_timeout` parameter controls the actual per-test deadline (default 60 seconds);
+whole checks have the `stage/1` ceiling of 300 seconds, rather than the spike's 600 seconds.
+Run its offline gate fixtures with `make stage-check NAME=raidar/verify TARGET=local`.
 
 Problem validation scores only repeat-stable reference cases. A checkpoint must add a
 previously uncollected test its own reference passes in every repeat, or that checkpoint
