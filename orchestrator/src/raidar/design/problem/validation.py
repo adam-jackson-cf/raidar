@@ -397,10 +397,6 @@ def check_positive_repeats(name: str, runs: ValidationRuns) -> Check:
     return Check(name, CheckStatus.INFRA if infra else CheckStatus.PASS, tuple(infra + notes))
 
 
-def _without(grade: Grade, cases: frozenset[str]) -> dict[str, bool]:
-    return {case: ok for case, ok in grade.verdicts().items() if case not in cases}
-
-
 def _compare_repeat_step(
     index: int,
     step: str,
@@ -421,8 +417,7 @@ def _compare_repeat_step(
 
 
 def _differs(reference: Grade, grade: Grade, quarantined: frozenset[str]) -> bool:
-    if _without(grade, quarantined) != _without(reference, quarantined):
-        return True
+    # varying_cases already quarantines every per-case disagreement across these repeats.
     touched = quarantined & (set(grade.outcomes) | set(reference.outcomes))
     return grade.groups != reference.groups and not touched
 
