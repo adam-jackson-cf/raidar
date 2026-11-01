@@ -1,0 +1,25 @@
+schema_version: 3
+kind: smoke
+id: python__circuit_eval-cp1__phase5-at1
+description: AT1 package authoring smoke with a deliberately refused spelling commit and one bounded fix; not citable.
+problems:
+  - ref: scb/circuit_eval.checkpoint_1@38d627ecf668
+runtime: python
+agents:
+  - id: agent
+    release: codex@3
+    model: gpt-6-luna
+    reasoning: low
+protocol:
+  agent_timeout_sec: 1800
+arms:
+  - id: docs-fix
+    agent: agent
+    workflow: raidar/docs-fix-smoke@1
+assessment:
+  scorers: [correctness@10, verification-effort@1]
+  metric: scb-canonical-oneshot@1
+analysis:
+  baseline_arm: docs-fix
+  attempts: 1
+  seed: 20261101

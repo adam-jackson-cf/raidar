@@ -66,10 +66,10 @@
       },
       "scorer": {
         "correctness@10": {
-          "digest": "2f47b5e342998f9cf6f874be4466c6149eb97ef89fdbf8451db61ee94f25a31f",
+          "digest": "4e6f072937b22b9d3842e58f8918f79c8ac9c4d57fbd78e26593bad100b5e5d8",
           "metadata": {
             "implementation": "raidar.scoring.correctness:correctness_scorer",
-            "implementation_digest": "af2102738f2fa3f6a16de4a3575e0df5095b9e62215207e4d98ad7ba55b40fac",
+            "implementation_digest": "e9b0051cac0fcddf013f55b3b47b20a3ea634b20a37860cc3bec14d755caf552",
             "manifest": {
               "description": "Reference-solvable SCB success and raw SCB verdicts per checkpoint and trajectory.",
               "evidence_required": [
@@ -283,7 +283,7 @@
     },
     "tools": {}
   },
-  "document_sha256": "acbf49cc29a6e3210781d438b6dab324fc52c04309a9a973445fb9b43eb18a55",
+  "document_sha256": "965d07388daa4486a6fd73617a99e6f91acb2aadb72b0a3ba6706ec0b14a4eea",
   "execution": {
     "arms": {
       "baseline": {
@@ -301,13 +301,13 @@
           "version_pin": "0.156.1",
           "workflow_skills": "placement.skills .agents/skills in the workspace /app"
         },
-        "digest": "c1bfc03cacc642e39adec4f3687de79446d69acc8c39c25a64c26b70cda60483",
+        "digest": "b0c9f2c5ea694a1a46445405252082748a9345c969ec558d883c6b29f1cf3f18",
         "model": "gpt-6-luna",
         "packages": {},
         "primitive_code": {
-          "frame/1": "461bb2b2988ba8a3c081fee5595e8e2014d1cba57e12d3da58d6d695ec444d0d",
-          "install/1": "012eb722cf18829167463674f19cf48cd4ccc9da22138baa5600066be6742b3d",
-          "runner/1": "4f997f994a77c1573e5bdee975e12a69f58f065cb74a405db9a36a221db4c5b1"
+          "frame/1": "f28dbc86cd61736c45d725e009251bd8831ad91ba81f144b7c7a3c8c03f1a68c",
+          "install/1": "2a556be119deb5e7c67eac5f42f62fe51083a97bdb40a064fada91083cd608d4",
+          "runner/1": "1d3e719ff5afbf9c1130a67ab3a662fd5a9b4eaf938b66ad109da08d1505717e"
         },
         "provider": "openai",
         "reasoning": "low",
@@ -561,7 +561,7 @@
               "grader": {
                 "environment_id": "sha256:1989940cc347e516b774a3833071b60dbfae6a730e55462cdf38a095e23d8765",
                 "image": "raidar-oracle-grader:963c14e63ff5e15d",
-                "implementation_sha256": "8ec19265f72d6f0de11214f53f7c3a962b6c290e7ce7e959759f1afe8a3642aa"
+                "implementation_sha256": "a2d56b47f85fc39be2eb00015c5b9192263590f3f0d9db17b0cc2dd962d7ee98"
               },
               "not_run": [
                 "native_parity_positive",
@@ -1862,7 +1862,7 @@
               "grader": {
                 "environment_id": "sha256:1989940cc347e516b774a3833071b60dbfae6a730e55462cdf38a095e23d8765",
                 "image": "raidar-oracle-grader:963c14e63ff5e15d",
-                "implementation_sha256": "8ec19265f72d6f0de11214f53f7c3a962b6c290e7ce7e959759f1afe8a3642aa"
+                "implementation_sha256": "a2d56b47f85fc39be2eb00015c5b9192263590f3f0d9db17b0cc2dd962d7ee98"
               },
               "not_run": [
                 "native_parity_positive",
@@ -1909,7 +1909,7 @@
     "source_sha256": "05b02bba280640d136b5bea02db23d3286ea99b02b1f602b78cecf322266a66a",
     "spec_sha256": "fbaa8778230cd22df145360d20868d91bb3ce0d5ecacae41843ae52367cdd4e0"
   },
-  "lock_sha256": "9a9717f2eb8a844853a1fa1ad9c78b3b36ab2b2e7ecedffd20464eb814fc69c2",
+  "lock_sha256": "37afbc01494fde697c0eab768d000ca5935e7d57f4bfb3768e9cea149a5bfccf",
   "lock_version": 5,
   "overrides": {
     "flags": {},
@@ -1917,9 +1917,9 @@
   },
   "sections": {
     "analysis": "59bfabf9aa8be2bb5ceb15f67d7b3cee206ddd8a9f4450fb0b815f0045ec5eb6",
-    "assessment": "38ccce27f0523c3a7911a27cd017ad7f4d562757b7e840e9d7c0079819b6189c",
-    "execution": "9a9717f2eb8a844853a1fa1ad9c78b3b36ab2b2e7ecedffd20464eb814fc69c2",
-    "toolchain": "6256053eb5ce8c39f8bf92cd11a70df1ddd8a4a0b880f514605f4aecbd9774ae"
+    "assessment": "ded3cd9d7f87ca0bdd45a7f3700f052ce047c45f6e3ea7f59000a18d31ff8c5b",
+    "execution": "37afbc01494fde697c0eab768d000ca5935e7d57f4bfb3768e9cea149a5bfccf",
+    "toolchain": "58e193ae81834a67258b1957b54f082d26664061f19dcbb4c30d40271018516b"
   },
   "spec": {
     "agents": [
@@ -1991,6 +1991,6 @@
     "litellm": "1.102.1",
     "python": "3.13.7",
     "raidar": "0.15.0",
-    "raidar_spec": "29df8c63188e8a71be7894d3d05e9fc3d5a2f56cc3052c65099bcc7bb70516eb"
+    "raidar_spec": "9442522eb28abd74160db93ab75e9f8d4e94797ead61d0305de890afac362787"
   }
 }

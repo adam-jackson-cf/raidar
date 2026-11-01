@@ -1,0 +1,990 @@
+{
+  "analysis": {
+    "alpha": 0.05,
+    "baseline_arm": "docs-fix",
+    "max_exclusion_difference": null,
+    "max_exclusion_fraction": 0.2,
+    "min_effects": {},
+    "min_pairs": 5,
+    "outcome_types": {
+      "aggregate": {
+        "binary": []
+      },
+      "problems": {
+        "scb/circuit_eval.checkpoint_1@38d627ecf668": {
+          "binary": [
+            "solve_rate",
+            "reached",
+            "final_solved",
+            "solve_rate_errata",
+            "reached_errata",
+            "final_solved_errata",
+            "solve_rate_solvable",
+            "reached_solvable",
+            "final_solved_solvable"
+          ],
+          "checkpoints": 1
+        }
+      }
+    }
+  },
+  "assessment": {
+    "metric": {
+      "checkpoints": [
+        1
+      ],
+      "ref": "scb-canonical-oneshot@1",
+      "selection": "declared"
+    },
+    "references": {
+      "metric": {
+        "scb-canonical-oneshot@1": {
+          "digest": "593a6b179c49d480f6c44108ae95f12183872ff18dea791edaebc3b5dd6c3dfe",
+          "metadata": {
+            "component_places": "1E-12",
+            "correctness": "C=sum_k(passed_k/graded_k)/K over planned checkpoints; unreached checkpoint=0; reached checkpoint with graded_k=0 -> ineligible",
+            "formula": "S=100*C*(0.70+0.30*I)",
+            "inertia_weights": {
+              "E": "0.30",
+              "H": "0.40",
+              "V": "0.30"
+            },
+            "max_checkpoints": 1,
+            "min_checkpoints": 1,
+            "not_applicable": [
+              "G",
+              "R"
+            ],
+            "ref": "scb-canonical-oneshot@1",
+            "rounding": "ROUND_HALF_EVEN",
+            "score_places": "0.000001",
+            "zero_correctness": null
+          }
+        }
+      },
+      "scorer": {
+        "correctness@10": {
+          "digest": "4e6f072937b22b9d3842e58f8918f79c8ac9c4d57fbd78e26593bad100b5e5d8",
+          "metadata": {
+            "implementation": "raidar.scoring.correctness:correctness_scorer",
+            "implementation_digest": "e9b0051cac0fcddf013f55b3b47b20a3ea634b20a37860cc3bec14d755caf552",
+            "manifest": {
+              "description": "Reference-solvable SCB success and raw SCB verdicts per checkpoint and trajectory.",
+              "evidence_required": [
+                "oracle.cases"
+              ],
+              "execution": "host-parse",
+              "id": "correctness",
+              "metrics": [
+                {
+                  "description": "Strict solve: every graded case passed and grading had no infrastructure failure.",
+                  "direction": "higher_better",
+                  "exactness": "scb-exact",
+                  "id": "solved",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "boolean",
+                  "unit": null
+                },
+                {
+                  "description": "Passed / graded cases across all groups at the checkpoint.",
+                  "direction": "higher_better",
+                  "exactness": "scb-exact",
+                  "id": "strict_pass_rate",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "ratio",
+                  "unit": null
+                },
+                {
+                  "description": "Passed / graded core cases at the checkpoint (SCB all-cases rule).",
+                  "direction": "higher_better",
+                  "exactness": "scb-exact",
+                  "id": "core_pass_rate",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "ratio",
+                  "unit": null
+                },
+                {
+                  "description": "Passed / graded functionality cases at the checkpoint (SCB all-cases rule).",
+                  "direction": "higher_better",
+                  "exactness": "scb-exact",
+                  "id": "functionality_pass_rate",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "ratio",
+                  "unit": null
+                },
+                {
+                  "description": "Passed / graded error cases at the checkpoint (SCB all-cases rule).",
+                  "direction": "higher_better",
+                  "exactness": "scb-exact",
+                  "id": "error_pass_rate",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "ratio",
+                  "unit": null
+                },
+                {
+                  "description": "Passed / graded regression cases at the checkpoint (SCB all-cases rule).",
+                  "direction": "higher_better",
+                  "exactness": "scb-exact",
+                  "id": "regression_pass_rate",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "ratio",
+                  "unit": null
+                },
+                {
+                  "description": "Graded regression cases (from earlier checkpoints) that did not pass.",
+                  "direction": "lower_better",
+                  "exactness": "native",
+                  "id": "regression_failures",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "count",
+                  "unit": null
+                },
+                {
+                  "description": "Checkpoints solved in the trajectory (continue view); C = this / K.",
+                  "direction": "higher_better",
+                  "exactness": "scb-exact",
+                  "id": "solved_checkpoints",
+                  "inputs": [],
+                  "level": "trajectory",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "count",
+                  "unit": null
+                },
+                {
+                  "description": "Consecutive checkpoints solved from the first (strict view).",
+                  "direction": "higher_better",
+                  "exactness": "native",
+                  "id": "reached",
+                  "inputs": [],
+                  "level": "trajectory",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "count",
+                  "unit": null
+                },
+                {
+                  "description": "Errata-applied solve: the strict rule over the graded cases the lock's pinned problem errata keeps (exclude-from-solved cases left out); not_applicable without an errata.",
+                  "direction": "higher_better",
+                  "exactness": "native",
+                  "id": "solved_errata",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "boolean",
+                  "unit": null
+                },
+                {
+                  "description": "Errata-applied solved checkpoints in the trajectory (continue view).",
+                  "direction": "higher_better",
+                  "exactness": "native",
+                  "id": "solved_checkpoints_errata",
+                  "inputs": [],
+                  "level": "trajectory",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "count",
+                  "unit": null
+                },
+                {
+                  "description": "Errata-applied consecutive checkpoints solved from the first (strict view).",
+                  "direction": "higher_better",
+                  "exactness": "native",
+                  "id": "reached_errata",
+                  "inputs": [],
+                  "level": "trajectory",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "count",
+                  "unit": null
+                },
+                {
+                  "description": "Reference-solvable SCB success: every case the reference passes in every validation repeat passed; unavailable without a solvable set, never zero. Not specification compliance.",
+                  "direction": "higher_better",
+                  "exactness": "native",
+                  "id": "solved_solvable",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "boolean",
+                  "unit": null
+                },
+                {
+                  "description": "Reference-solvable SCB successful checkpoints in the trajectory (continue view).",
+                  "direction": "higher_better",
+                  "exactness": "native",
+                  "id": "solved_checkpoints_solvable",
+                  "inputs": [],
+                  "level": "trajectory",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "count",
+                  "unit": null
+                },
+                {
+                  "description": "Reference-solvable SCB consecutive successful checkpoints (strict view).",
+                  "direction": "higher_better",
+                  "exactness": "native",
+                  "id": "reached_solvable",
+                  "inputs": [],
+                  "level": "trajectory",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "count",
+                  "unit": null
+                }
+              ],
+              "runtimes": [
+                "*"
+              ],
+              "tools": [],
+              "version": "10"
+            },
+            "tool_lock": {}
+          }
+        },
+        "verification-effort@1": {
+          "digest": "d4498efd462a3ca36d15b7ea1805342ab47facf2593ae5c4e7cae28ace725676",
+          "metadata": {
+            "implementation": "raidar.scoring.verification_effort:verification_effort_scorer",
+            "implementation_digest": "a9c9a9225a55d815b87b7bfe48c45e4f6b2ec3c0c7522073d0d07d47d31d899d",
+            "manifest": {
+              "description": "The effort a package workflow's gate/1 checks cost per step, read from the host-written gate/1 record of each step's workflow record: seals, fix turns, first-pass and step-end cleanliness, blocking checks that failed, the fix turns' tokens, cost and wall time, and the fix turns' correctness (the hidden tests' case pass rate of the workspace the first fix turn started from, graded offline, against the step's final grade). A step that changed no production or test file is not applicable to first-pass cleanliness. Not applicable to a trajectory without a gate/1 package.",
+              "evidence_required": [
+                "trace",
+                "oracle.cases",
+                "snapshot.current",
+                "snapshot.prior"
+              ],
+              "execution": "host-parse",
+              "id": "verification-effort",
+              "metrics": [
+                {
+                  "description": "Gate seals in the step (one after each turn).",
+                  "direction": "neutral",
+                  "exactness": "native",
+                  "id": "gate_runs",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "count",
+                  "unit": null
+                },
+                {
+                  "description": "Fix turns the gate's refusals started in the step.",
+                  "direction": "lower_better",
+                  "exactness": "native",
+                  "id": "fix_rounds",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "count",
+                  "unit": null
+                },
+                {
+                  "description": "The gate's first seal passed (after the work turn).",
+                  "direction": "higher_better",
+                  "exactness": "native",
+                  "id": "first_pass_clean",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "boolean",
+                  "unit": null
+                },
+                {
+                  "description": "The step's last gate seal passed (manipulation-check signal).",
+                  "direction": "higher_better",
+                  "exactness": "native",
+                  "id": "gate_clean_at_step_end",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "boolean",
+                  "unit": null
+                },
+                {
+                  "description": "The step ended with its last gate seal refusing.",
+                  "direction": "lower_better",
+                  "exactness": "native",
+                  "id": "unresolved",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "boolean",
+                  "unit": null
+                },
+                {
+                  "description": "A gate seal could not decide (agent error or infrastructure).",
+                  "direction": "lower_better",
+                  "exactness": "native",
+                  "id": "gate_error",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "boolean",
+                  "unit": null
+                },
+                {
+                  "description": "Fix turns before the gate passed; only for steps that ended clean.",
+                  "direction": "lower_better",
+                  "exactness": "native",
+                  "id": "rounds_to_clean",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "count",
+                  "unit": null
+                },
+                {
+                  "description": "Blocking checks that failed in the step's first gate seal.",
+                  "direction": "lower_better",
+                  "exactness": "native",
+                  "id": "first_run_blocking",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "count",
+                  "unit": null
+                },
+                {
+                  "description": "Failed blocking checks summed over the step's decided gate seals.",
+                  "direction": "lower_better",
+                  "exactness": "native",
+                  "id": "blocking_checks",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "count",
+                  "unit": null
+                },
+                {
+                  "description": "Input tokens of the step's fix turns (work turn excluded).",
+                  "direction": "lower_better",
+                  "exactness": "native",
+                  "id": "fix_input_tokens",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "count",
+                  "unit": "tokens"
+                },
+                {
+                  "description": "Output tokens of the step's fix turns.",
+                  "direction": "lower_better",
+                  "exactness": "native",
+                  "id": "fix_output_tokens",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "count",
+                  "unit": "tokens"
+                },
+                {
+                  "description": "Cost of the step's fix turns.",
+                  "direction": "lower_better",
+                  "exactness": "native",
+                  "id": "fix_cost_usd",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "real",
+                  "unit": "usd"
+                },
+                {
+                  "description": "Wall time of the step's fix turns.",
+                  "direction": "lower_better",
+                  "exactness": "native",
+                  "id": "fix_wall_s",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "real",
+                  "unit": "s"
+                },
+                {
+                  "description": "Wall time of the step's gate seals.",
+                  "direction": "lower_better",
+                  "exactness": "native",
+                  "id": "gate_wall_s",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "real",
+                  "unit": "s"
+                },
+                {
+                  "description": "Case pass rate of the workspace the step's first fix turn started from.",
+                  "direction": "neutral",
+                  "exactness": "native",
+                  "id": "pre_fix_pass_rate",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "ratio",
+                  "unit": null
+                },
+                {
+                  "description": "The step's final case pass rate minus the pre-fix pass rate (a step with a fix turn).",
+                  "direction": "higher_better",
+                  "exactness": "native",
+                  "id": "correctness_delta",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "real",
+                  "unit": null
+                },
+                {
+                  "description": "Share of decided gated steps whose first seal passed.",
+                  "direction": "higher_better",
+                  "exactness": "native",
+                  "id": "first_pass_clean_rate",
+                  "inputs": [],
+                  "level": "trajectory",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "ratio",
+                  "unit": null
+                },
+                {
+                  "description": "Share of decided gated steps that ended with a passing seal.",
+                  "direction": "higher_better",
+                  "exactness": "native",
+                  "id": "clean_at_step_end_rate",
+                  "inputs": [],
+                  "level": "trajectory",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "ratio",
+                  "unit": null
+                },
+                {
+                  "description": "Share of decided gated steps that ended refused.",
+                  "direction": "lower_better",
+                  "exactness": "native",
+                  "id": "unresolved_rate",
+                  "inputs": [],
+                  "level": "trajectory",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "ratio",
+                  "unit": null
+                },
+                {
+                  "description": "Share of decided gated steps with a seal that could not decide.",
+                  "direction": "lower_better",
+                  "exactness": "native",
+                  "id": "gate_error_rate",
+                  "inputs": [],
+                  "level": "trajectory",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "ratio",
+                  "unit": null
+                },
+                {
+                  "description": "Mean fix turns to clean over the steps that ended clean.",
+                  "direction": "lower_better",
+                  "exactness": "native",
+                  "id": "mean_rounds_to_clean",
+                  "inputs": [],
+                  "level": "trajectory",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "real",
+                  "unit": null
+                },
+                {
+                  "description": "Fix turns over the trajectory.",
+                  "direction": "lower_better",
+                  "exactness": "native",
+                  "id": "total_fix_rounds",
+                  "inputs": [],
+                  "level": "trajectory",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "count",
+                  "unit": null
+                },
+                {
+                  "description": "Failed blocking checks of the first seals, summed.",
+                  "direction": "lower_better",
+                  "exactness": "native",
+                  "id": "total_first_run_blocking",
+                  "inputs": [],
+                  "level": "trajectory",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "count",
+                  "unit": null
+                },
+                {
+                  "description": "Failed blocking checks over every decided seal, summed.",
+                  "direction": "lower_better",
+                  "exactness": "native",
+                  "id": "total_blocking_checks",
+                  "inputs": [],
+                  "level": "trajectory",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "count",
+                  "unit": null
+                },
+                {
+                  "description": "Fix-turn input tokens over the trajectory.",
+                  "direction": "lower_better",
+                  "exactness": "native",
+                  "id": "total_fix_input_tokens",
+                  "inputs": [],
+                  "level": "trajectory",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "count",
+                  "unit": "tokens"
+                },
+                {
+                  "description": "Fix-turn output tokens over the trajectory.",
+                  "direction": "lower_better",
+                  "exactness": "native",
+                  "id": "total_fix_output_tokens",
+                  "inputs": [],
+                  "level": "trajectory",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "count",
+                  "unit": "tokens"
+                },
+                {
+                  "description": "Fix-turn cost over the trajectory.",
+                  "direction": "lower_better",
+                  "exactness": "native",
+                  "id": "total_fix_cost_usd",
+                  "inputs": [],
+                  "level": "trajectory",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "real",
+                  "unit": "usd"
+                },
+                {
+                  "description": "Fix-turn wall time over the trajectory.",
+                  "direction": "lower_better",
+                  "exactness": "native",
+                  "id": "total_fix_wall_s",
+                  "inputs": [],
+                  "level": "trajectory",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "real",
+                  "unit": "s"
+                },
+                {
+                  "description": "Gate seal wall time over the trajectory.",
+                  "direction": "lower_better",
+                  "exactness": "native",
+                  "id": "total_gate_wall_s",
+                  "inputs": [],
+                  "level": "trajectory",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "real",
+                  "unit": "s"
+                },
+                {
+                  "description": "Mean over steps with a fix turn of final minus pre-fix case pass rate.",
+                  "direction": "higher_better",
+                  "exactness": "native",
+                  "id": "fix_round_correctness_delta",
+                  "inputs": [],
+                  "level": "trajectory",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "real",
+                  "unit": null
+                }
+              ],
+              "runtimes": [
+                "*"
+              ],
+              "tools": [],
+              "version": "1"
+            },
+            "tool_lock": {}
+          }
+        }
+      }
+    },
+    "spec": {
+      "inventory_policy": {
+        "generated_globs": [],
+        "test_globs": []
+      },
+      "metric": "scb-canonical-oneshot@1",
+      "scorer_config": {},
+      "scorers": [
+        "correctness@10",
+        "verification-effort@1"
+      ]
+    },
+    "tools": {}
+  },
+  "document_sha256": "10ac96df98a2f5a2d375c8a6c43cd0085a44f3659a8a88f63aa481fd7a158701",
+  "execution": {
+    "arms": {
+      "docs-fix": {
+        "adapter": "codex",
+        "agent": "agent",
+        "agent_release": "codex@3",
+        "capabilities": {
+          "command_output": "command_execution and file_change items of the --json stream and the session rollout",
+          "global_instructions": "placement.instructions {home}/AGENTS.md in the run's CODEX_HOME",
+          "host_isolation": "fresh CODEX_HOME holding only auth.json; --ignore-user-config; --disable features_off; skills.config switches off bundled and container host skills by path",
+          "isolation_proof": "full",
+          "network": "the trial's Harbor network policy: an allowlist of the provider's and the runtime's package hosts",
+          "permissions": "--dangerously-bypass-approvals-and-sandbox on every command; the trial container is the sandbox",
+          "structured_output": "prompted",
+          "version_pin": "0.156.1",
+          "workflow_skills": "placement.skills .agents/skills in the workspace /app"
+        },
+        "digest": "1f02efacca136b2ecbf7e6e000caaba7e0358778bbf840f14c9f134cd91b0fc5",
+        "model": "gpt-6-luna",
+        "packages": {
+          "raidar/docs-check": {
+            "installed": {
+              "arm64": "fe7ed44f00862b4a650a23e70120aa80cc4520c5a51d516db8f960192b4078b1"
+            },
+            "release": "raidar/docs-check@1",
+            "sha256": "517b57850d1ef748cf5985320ce6d805be5b5fd0a2fa2971983b97de0df5a827"
+          },
+          "raidar/verify": {
+            "installed": {
+              "arm64": "4dd7023bf77b8f4347be6ba1bd75806717c878d82a5a4601b7214979135c9389"
+            },
+            "release": "raidar/verify@1",
+            "sha256": "8b8a9af4e2f57491e0a9fabecfd9c8301ca5bbdb8982d6638ace605337d43128"
+          }
+        },
+        "primitive_code": {
+          "frame/1": "f28dbc86cd61736c45d725e009251bd8831ad91ba81f144b7c7a3c8c03f1a68c",
+          "gate/1": "b0f58b2acaa667bc1476ed991898f8dc44753ef1a0199038d8a00f790ec8bfd5",
+          "install/1": "2a556be119deb5e7c67eac5f42f62fe51083a97bdb40a064fada91083cd608d4",
+          "runner/1": "1d3e719ff5afbf9c1130a67ab3a662fd5a9b4eaf938b66ad109da08d1505717e"
+        },
+        "provider": "openai",
+        "reasoning": "low",
+        "tool": {
+          "binary": "codex",
+          "package": "@openai/codex",
+          "version": "0.156.1"
+        },
+        "workflow": "raidar/docs-fix-smoke@1",
+        "workflow_sha256": "cf64eb48aee085137a96cdd2a5a365868263defc5fe7664c773fe27393d44297"
+      }
+    },
+    "design": {
+      "agents": [
+        {
+          "id": "agent",
+          "model": "gpt-6-luna",
+          "reasoning": "low",
+          "release": "codex@3"
+        }
+      ],
+      "arms": [
+        {
+          "agent": "agent",
+          "id": "docs-fix",
+          "workflow": "raidar/docs-fix-smoke@1"
+        }
+      ],
+      "attempts": 1,
+      "environment": {
+        "compose_init": true,
+        "type": "docker"
+      },
+      "id": "python__circuit_eval-cp1__phase5-at1",
+      "kind": "smoke",
+      "problems": [
+        {
+          "path": null,
+          "ref": "scb/circuit_eval.checkpoint_1@38d627ecf668"
+        }
+      ],
+      "protocol": {
+        "agent_timeout_sec": 1800,
+        "min_reward": null,
+        "progression": "continue",
+        "snapshot_source": "artifact",
+        "verifier_timeout_sec": 900
+      },
+      "runtime": "python",
+      "seed": 20261101
+    },
+    "files": {},
+    "problems": [
+      {
+        "checkpoints": 1,
+        "digest": "adc99f373f79469e082faadd058e987dd1dec831a845ff1329d47591d75294ef",
+        "label": "scb/circuit_eval.checkpoint_1@38d627ecf668"
+      }
+    ],
+    "references": {
+      "agent": {
+        "codex@3": {
+          "digest": "36bf2bd7d6e482206c62eb4eed7bc06a5e03ce808a8022fae02ef8afc193989b",
+          "metadata": {
+            "adapter": "codex",
+            "capabilities": {
+              "command_output": "command_execution and file_change items of the --json stream and the session rollout",
+              "global_instructions": "placement.instructions {home}/AGENTS.md in the run's CODEX_HOME",
+              "host_isolation": "fresh CODEX_HOME holding only auth.json; --ignore-user-config; --disable features_off; skills.config switches off bundled and container host skills by path",
+              "isolation_proof": "full",
+              "network": "the trial's Harbor network policy: an allowlist of the provider's and the runtime's package hosts",
+              "permissions": "--dangerously-bypass-approvals-and-sandbox on every command; the trial container is the sandbox",
+              "structured_output": "prompted",
+              "version_pin": "0.156.1",
+              "workflow_skills": "placement.skills .agents/skills in the workspace /app"
+            },
+            "tool_version": "0.156.1"
+          }
+        }
+      },
+      "problem": {
+        "scb/circuit_eval.checkpoint_1@38d627ecf668": {
+          "digest": "adc99f373f79469e082faadd058e987dd1dec831a845ff1329d47591d75294ef",
+          "metadata": {
+            "bundle_sha256": "f712d5e4607cb0983df0bc72dd7d5fd35da50e7dc67e867a71e95954e542005e",
+            "checkpoints": 1,
+            "dependencies_sha256": "c4c71b394551c34e93d709c5f038f353a9d859fde73a13f6062d0f4d25f456a6",
+            "entry_command": "uv run --project /app circopt.py",
+            "entry_file": "circopt.py",
+            "mode": "one_shot",
+            "pack_image": "raidar/pack-python:2b91a52663e099f2",
+            "solvable": {
+              "sha256": "6b273d0cfa751e986bbd9314179295cd98ddfd110e151692495a17aac3125a03",
+              "steps": {
+                "checkpoint_1": [
+                  "checkpoint_1::test_check_accepts_all_operators",
+                  "checkpoint_1::test_check_arity_errors[arity_and_too_few-a-AND(a)]",
+                  "checkpoint_1::test_check_arity_errors[arity_buf_too_many-a b-BUF(a, b)]",
+                  "checkpoint_1::test_check_arity_errors[arity_nand_too_few-a-NAND(a)]",
+                  "checkpoint_1::test_check_arity_errors[arity_nor_too_few-a-NOR(a)]",
+                  "checkpoint_1::test_check_arity_errors[arity_not_too_many-a-NOT(a, a)]",
+                  "checkpoint_1::test_check_arity_errors[arity_or_too_few-a-OR(a)]",
+                  "checkpoint_1::test_check_arity_errors[arity_xnor_too_few-a-XNOR(a)]",
+                  "checkpoint_1::test_check_arity_errors[arity_xor_too_few-a-XOR(a)]",
+                  "checkpoint_1::test_check_comparator_2bit_circuit",
+                  "checkpoint_1::test_check_cycle_error_message",
+                  "checkpoint_1::test_check_decoder_circuit",
+                  "checkpoint_1::test_check_file_not_found",
+                  "checkpoint_1::test_check_identifiers_are_case_sensitive",
+                  "checkpoint_1::test_check_majority_vote_circuit",
+                  "checkpoint_1::test_check_parity_generator_circuit",
+                  "checkpoint_1::test_check_parse_errors_have_location[bad_syntax-            input a b\\n            output y\\n            y = AND(a, b\\n            ]",
+                  "checkpoint_1::test_check_parse_errors_have_location[brackets-            input a[0]\\n            output y\\n            y = a\\n            ]",
+                  "checkpoint_1::test_check_parse_errors_have_location[literal_x-            input a\\n            output y\\n            y = X\\n            ]",
+                  "checkpoint_1::test_check_shared_scalar_circuit",
+                  "checkpoint_1::test_check_valid_circuit_reports_interface",
+                  "checkpoint_1::test_check_validation_errors[declaration_after_assignment-            input a\\n            output y\\n            y = a\\n            wire t1\\n            t1 = a\\n            -DeclarationAfterAssignmentError]",
+                  "checkpoint_1::test_check_validation_errors[duplicate_name-            input a a\\n            output y\\n            y = a\\n            -DuplicateNameError]",
+                  "checkpoint_1::test_check_validation_errors[duplicate_name_across_lines-            input a\\n            input a\\n            output y\\n            y = a\\n            -DuplicateNameError]",
+                  "checkpoint_1::test_check_validation_errors[input_assignment-            input a\\n            output y\\n            y = a\\n            a = 1\\n            -InputAssignmentError]",
+                  "checkpoint_1::test_check_validation_errors[multiple_assignment-            input a\\n            output y\\n            y = a\\n            y = NOT(a)\\n            -MultipleAssignmentError]",
+                  "checkpoint_1::test_check_validation_errors[unassigned_signal-            input a\\n            output y\\n            -UnassignedSignalError]",
+                  "checkpoint_1::test_check_validation_errors[unassigned_wire-            input a\\n            output y\\n            wire t1\\n            y = a\\n            -UnassignedSignalError]",
+                  "checkpoint_1::test_check_validation_errors[undeclared_lhs-            input a\\n            output y\\n            t1 = a\\n            y = a\\n            -UndefinedNameError]",
+                  "checkpoint_1::test_check_validation_errors[undefined_name-            input a\\n            output y\\n            y = z\\n            -UndefinedNameError]",
+                  "checkpoint_1::test_cli_unknown_command",
+                  "checkpoint_1::test_cli_usage_error_no_args",
+                  "checkpoint_1::test_cli_usage_error_without_command",
+                  "checkpoint_1::test_help_ignores_json_flag",
+                  "checkpoint_1::test_version_json",
+                  "checkpoint_1::test_version_plain_text"
+                ]
+              }
+            },
+            "source": {
+              "commit": "38d627ecf668a88f88f8d260f8df8df6116e9b03",
+              "dataset": "scb",
+              "problem": "circuit_eval",
+              "url": "https://github.com/gabeorlanski/scb-problems"
+            },
+            "steps": [
+              "checkpoint_1"
+            ],
+            "task_sha256": "0cdda12fb5a2c68270f63581682b7f7e94a0cc8be0641a0ab1b78142cf278938",
+            "validation": {
+              "grader": {
+                "environment_id": "sha256:1989940cc347e516b774a3833071b60dbfae6a730e55462cdf38a095e23d8765",
+                "image": "raidar-oracle-grader:963c14e63ff5e15d",
+                "implementation_sha256": "a2d56b47f85fc39be2eb00015c5b9192263590f3f0d9db17b0cc2dd962d7ee98"
+              },
+              "not_run": [
+                "native_parity_positive",
+                "native_parity_negative"
+              ],
+              "spec_determinacy": {
+                "assertions": {
+                  "audited": 2,
+                  "total": 80
+                },
+                "audit_version": 2,
+                "flagged": [],
+                "flagged_count": 0,
+                "status": "measured"
+              },
+              "verdict": "validated_partial"
+            }
+          }
+        }
+      },
+      "workflow": {
+        "raidar/docs-fix-smoke@1": {
+          "digest": "cf64eb48aee085137a96cdd2a5a365868263defc5fe7664c773fe27393d44297",
+          "metadata": {
+            "stages": [
+              "raidar/verify",
+              "raidar/docs-check"
+            ]
+          }
+        }
+      }
+    },
+    "tools": {},
+    "versions": {
+      "agents": {
+        "agent": {
+          "release": "codex@3",
+          "version": "0.156.1"
+        }
+      },
+      "harbor": "0.23.0"
+    }
+  },
+  "experiment": {
+    "id": "python__circuit_eval-cp1__phase5-at1",
+    "source": "experiment.yaml",
+    "source_sha256": "ee4771b997a090438d3611fe5cd2fc09fb6e1a6cc7b9b6e4feb44db1c2656736",
+    "spec_sha256": "0e03d713fd6942f8f1fb6f91b6e8106f1d270d3d6fd4cca7edf65bcfe66e4ba8"
+  },
+  "lock_sha256": "7a1efd33ee47c3a78f92b98410c4b0da841854862f9b5939ecb9fc7b8f3d05cd",
+  "lock_version": 5,
+  "overrides": {
+    "flags": {},
+    "set": []
+  },
+  "sections": {
+    "analysis": "2165078bb3edf1fd89313bb7b0fdb121366bd76e9a351568321984d79da72faa",
+    "assessment": "08e01286f865117bd8d1c56f61b3087e33654521d27e4035e69a32d1a7fe7b8c",
+    "execution": "7a1efd33ee47c3a78f92b98410c4b0da841854862f9b5939ecb9fc7b8f3d05cd",
+    "toolchain": "58e193ae81834a67258b1957b54f082d26664061f19dcbb4c30d40271018516b"
+  },
+  "spec": {
+    "agents": [
+      {
+        "id": "agent",
+        "model": "gpt-6-luna",
+        "reasoning": "low",
+        "release": "codex@3"
+      }
+    ],
+    "analysis": {
+      "alpha": 0.05,
+      "attempts": 1,
+      "baseline_arm": "docs-fix",
+      "concurrency": 1,
+      "max_exclusion_difference": null,
+      "max_exclusion_fraction": 0.2,
+      "min_effects": {},
+      "min_pairs": 5,
+      "seed": 20261101
+    },
+    "arms": [
+      {
+        "agent": "agent",
+        "id": "docs-fix",
+        "workflow": "raidar/docs-fix-smoke@1"
+      }
+    ],
+    "assessment": {
+      "inventory_policy": {
+        "generated_globs": [],
+        "test_globs": []
+      },
+      "metric": "scb-canonical-oneshot@1",
+      "scorer_config": {},
+      "scorers": [
+        "correctness@10",
+        "verification-effort@1"
+      ]
+    },
+    "description": "AT1 package authoring smoke with a deliberately refused spelling commit and one bounded fix; not citable.",
+    "environment": {
+      "compose_init": true,
+      "type": "docker"
+    },
+    "id": "python__circuit_eval-cp1__phase5-at1",
+    "kind": "smoke",
+    "problems": [
+      {
+        "path": null,
+        "ref": "scb/circuit_eval.checkpoint_1@38d627ecf668"
+      }
+    ],
+    "protocol": {
+      "agent_timeout_sec": 1800,
+      "min_reward": null,
+      "progression": "continue",
+      "snapshot_source": "artifact",
+      "verifier_timeout_sec": 900
+    },
+    "runtime": "python",
+    "schema_version": 3
+  },
+  "toolchain": {
+    "litellm": "1.102.1",
+    "python": "3.13.7",
+    "raidar": "0.15.0",
+    "raidar_spec": "9442522eb28abd74160db93ab75e9f8d4e94797ead61d0305de890afac362787"
+  }
+}

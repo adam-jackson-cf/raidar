@@ -22,7 +22,7 @@ dependencies = [
     "litellm==1.102.1",
     "jsonschema>=4.0",
     # The portable contract (one implementation: a path dependency, never published from here).
-    "raidar-contract",
+    "raidar-contract==1.0.0",
 ]
 
 [project.optional-dependencies]
