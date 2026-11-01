@@ -1,19 +1,23 @@
-"""The define stage under the inputs review found it mishandling.
+"""The define stage under the inputs review found it mishandling, and the readers behind them.
 
 Each test drives the scenario the review recorded: a section that repeats, a
 required unit nothing can cite, an empty criterion, label lines inside a
 wrapped criterion, a paragraph wrapped by indentation, placeholder
 verifications, code fences of either kind, quotes that cut a word, unit ranges,
-code comments that read as headings and a malformed id reported twice.
+code comments that read as headings and a malformed id reported twice. The
+last families cover decisions of the readers those scenarios pass through
+(evidence quotes, aspect lines, criterion reading, tables, sentence splitting).
 """
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any
 
 import pytest
 
 from define_tool import (
+    aspects,
     compact,
     evidence,
     featuredef,
@@ -21,6 +25,7 @@ from define_tool import (
     sections,
 )
 from define_tool.core import JsonObject
+from define_tool.kinds import Kind
 from define_tool.unitrules import V1
 
 # The traced reading: each criterion has an id and a `Verification:` line.
@@ -448,3 +453,397 @@ def test_a_compact_criterion_without_text_is_blocking() -> None:
     checked = compact.check(definition, compact.units(SHORT_ISSUE, (), V1), SHORT_ISSUE)
 
     assert any("has no text" in item for item in checked.blocking)
+
+
+# --- evidence: what a quote must be --------------------------------------------------
+
+HEADED_ISSUE = "Intro line here.\n\n## Sorting\n\nSort the rows by name ascending.\n"
+LIST_ISSUE = (
+    "Support rows, cols, tables and views.\n\n"
+    "Rows are sorted by name ascending, and cols are kept.\n"
+)
+FEATURE_NAMES = ["rows", "cols", "tables", "views"]
+
+
+@pytest.mark.parametrize(
+    ("quote", "fragment"),
+    [
+        ("", "the `from:` evidence is empty"),
+        ("...", "the `from:` evidence is empty"),
+        ("here Sorting Sort the rows by name", "the `from:` evidence runs past a heading"),
+    ],
+)
+def test_evidence_that_says_nothing_or_spans_sections_is_refused(quote: str, fragment: str) -> None:
+    assert evidence.quote_problem("rows", quote, HEADED_ISSUE).startswith(fragment)
+
+
+def test_a_sentence_listing_the_feature_beside_others_is_no_evidence_of_it() -> None:
+    listed = "Support rows, cols, tables and views."
+    problem = evidence.quote_problem("rows", listed, LIST_ISSUE, FEATURE_NAMES)
+
+    assert problem.startswith("the `from:` evidence is a list mention")
+    assert all(f"`{other}`" in problem for other in ("cols", "tables", "views"))
+    # One other feature is an operand of the behaviour, not a list.
+    stated = "Rows are sorted by name ascending, and cols are kept."
+    assert evidence.quote_problem("rows", stated, LIST_ISSUE, FEATURE_NAMES) == ""
+
+
+def test_a_verbatim_quote_keeps_the_case_of_a_code_span_only() -> None:
+    code = "Set `JSON` output on.\n"
+
+    assert evidence.verbatim_problem("", code) == "is empty"
+    assert evidence.verbatim_problem("Set JSON output on", code) == ""
+    assert evidence.verbatim_problem("Set json output on", code).startswith(
+        "is not a verbatim quote"
+    )
+    assert evidence.verbatim_problem("sort the rows by name ascending", SORT_ISSUE) == ""
+
+
+def test_a_verbatim_quote_is_one_section_with_enough_words() -> None:
+    assert evidence.verbatim_problem("here Sorting Sort the rows", HEADED_ISSUE) == (
+        "runs past a heading: quote one section"
+    )
+    short = evidence.verbatim_problem("Sort the rows", HEADED_ISSUE, 5)
+    assert short.startswith("is too short to state anything: quote at least 5 words")
+    assert evidence.verbatim_problem("Sort the rows", HEADED_ISSUE, 2) == ""
+
+
+@pytest.mark.parametrize(
+    ("reference", "shaped", "in_workspace", "read_error"),
+    [
+        ("pager.py:3", True, True, False),
+        (" pager.py:2-5 ", True, False, False),
+        ("pager.py:3-", False, False, False),
+        ("pager.py:a", False, False, False),
+        ("", False, False, False),
+        ("pager.py:0", True, False, False),
+        ("pager.py:3-2", True, False, False),
+        ("missing.py:1", True, False, False),
+        ("../outside.py:1", True, False, False),
+        ("pager.py:1", True, False, True),
+    ],
+)
+def test_a_reference_is_a_path_then_a_line_or_a_range(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    reference: str,
+    shaped: bool,
+    in_workspace: bool,
+    read_error: bool,
+) -> None:
+    (tmp_path / "pager.py").write_bytes(b"first\nsecond\nthird\n")
+    (tmp_path.parent / "outside.py").write_bytes(b"outside\n")
+
+    def unreadable(_: Path) -> bytes:
+        raise OSError("unreadable")
+
+    if read_error:
+        monkeypatch.setattr(Path, "read_bytes", unreadable)
+
+    assert (evidence.reference_problem(reference, None) == "") is shaped
+    assert (evidence.reference_problem(reference, tmp_path) == "") is in_workspace
+
+
+# --- aspects: the lines under a criterion -----------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("line", "fragment"),
+    [
+        ("`a -> b", "unclosed backtick"),
+        ("a \u2192 b", "uses `\u2192`"),
+        ("a b", "has no `->`"),
+        ("a -> b -> c", "has 2 `->`"),
+        ("-> b", "empty side"),
+    ],
+)
+def test_an_aspect_or_example_line_needs_one_ascii_arrow_and_two_sides(
+    line: str, fragment: str
+) -> None:
+    assert fragment in aspects.arrow_problem(line)
+
+
+def test_an_arrow_inside_a_literal_is_not_the_arrow() -> None:
+    line = "`a -> b` -> `c`"
+
+    assert aspects.arrow_problem(line) == ""
+    assert aspects.split_arrow(line) == ("`a -> b`", "`c`")
+
+
+def test_lines_without_an_arrow_are_kept_unsplit_and_numbered_per_criterion() -> None:
+    found = aspects.read_aspects("F1.AC1", ["a -> b", "no arrow"])
+
+    assert [item.record() for item in found] == [
+        {"id": "F1.AC1.A1", "situation": "a", "outcome": "b"},
+        {"id": "F1.AC1.A2", "situation": "", "outcome": ""},
+    ]
+    assert aspects.read_aspects("", ["x -> y"])[0].id == "A1"
+    assert aspects.read_example("`a` only") == aspects.Example("`a` only")
+    example = aspects.read_example('run `x` -> exit `1.50`, `"ok"`')
+    assert example.record() == {
+        "given": "run `x`",
+        "expected": 'exit `1.50`, `"ok"`',
+        "literals": ["1.5", "ok"],
+    }
+
+
+def test_a_number_is_found_in_any_spelling_and_never_inside_another_number() -> None:
+    assert aspects.appears("2.5", "costs 2.50 units")
+    assert aspects.appears("-1", "got -1")
+    assert not aspects.appears("1", "costs 10 or 1.5")
+    assert aspects.appears('"hi"', 'prints \\"hi\\"')
+    assert aspects.appears("exit 1", "an exit  1 code")
+
+
+ASPECTED = """\
+# Pager
+
+## Objective
+
+List names.
+
+## Features
+
+### F1 Listing
+
+Outcome: Names are listed.
+
+Acceptance criteria:
+- F1.AC1: Names are listed.
+  Source: "The tool lists names."
+  Aspect: `pager` gets names -> it lists `3` names
+  Example: `pager a` -> `3`
+  Verification: `t.py::t` asserts it.
+
+## Decisions and assumptions
+
+- None.
+"""
+QUOTE_LINE = '  Source: "The tool lists names."\n'
+ASPECT_LINE = "  Aspect: `pager` gets names -> it lists `3` names\n"
+EXAMPLE_LINE = "  Example: `pager a` -> `3`\n"
+
+
+def aspected_findings(text: str) -> list[aspects.Finding]:
+    return featuredef.findings(text, anchored=True, source=SHORT_ISSUE, aspects=True)
+
+
+@pytest.mark.parametrize(("traced", "aspected"), [(False, False), (True, False), (True, True)])
+def test_a_clean_aspected_definition_has_no_blocking_finding(traced: bool, aspected: bool) -> None:
+    document = ASPECTED
+    if not aspected:
+        document = document.replace(ASPECT_LINE, "").replace(EXAMPLE_LINE, "")
+    found = featuredef.findings(
+        document, traced=traced, anchored=traced, source=SHORT_ISSUE, aspects=aspected
+    )
+    assert [item.text for item in found if not item.advisory] == []
+
+
+@pytest.mark.parametrize(
+    ("old", "new", "words"),
+    [
+        (EXAMPLE_LINE, "  Example: `pager a` => `3`\n", "uses `=>`"),
+        (
+            ASPECT_LINE,
+            "  Aspect: pager gets `names -> it lists 3 names\n",
+            "unclosed backtick",
+        ),
+        (QUOTE_LINE, QUOTE_LINE + "  Kind: Bogus\n", "names no kind"),
+    ],
+    ids=["example-arrow", "aspect-backtick", "unknown-kind"],
+)
+def test_a_faulty_aspect_example_or_kind_line_is_a_blocking_shape_finding(
+    old: str, new: str, words: str
+) -> None:
+    hits = [item for item in aspected_findings(ASPECTED.replace(old, new)) if words in item.text]
+
+    assert hits
+    assert all(not item.advisory and item.kind == Kind.ASPECT_SHAPE for item in hits)
+
+
+# --- the criterion reader --------------------------------------------------------------
+
+
+def test_a_wrapped_verification_or_quote_reads_as_one_line() -> None:
+    wrapped = ASPECTED.replace(QUOTE_LINE, '  Source: "The tool\n    lists names."\n').replace(
+        "asserts it.", "asserts\n    it."
+    )
+
+    (item,) = featuredef.parse(wrapped, True, True, True).acceptance()
+
+    assert item.sources == ("The tool lists names.",)
+    assert item.verification == "`t.py::t` asserts it."
+    assert [f.text for f in aspected_findings(wrapped) if not f.advisory] == []
+
+
+def test_a_quote_after_the_list_ended_is_outside_the_criteria_list() -> None:
+    stray = ASPECTED.replace(
+        "\n## Decisions", '\nA reviewer note.\nSource: "The tool lists names."\n\n## Decisions'
+    )
+
+    unlisted = [f for f in aspected_findings(stray) if f.kind == Kind.UNLISTED_CRITERION]
+
+    assert len(unlisted) == 1
+    assert 'Source: "The tool lists names."' in unlisted[0].text
+    assert not unlisted[0].advisory
+    assert not any("A reviewer note." in f.text for f in aspected_findings(stray))
+
+
+def test_a_first_criterion_may_follow_the_criteria_label_on_its_line() -> None:
+    inline = ASPECTED.replace("Acceptance criteria:\n- F1.AC1:", "Acceptance criteria: F1.AC1:")
+
+    (item,) = featuredef.parse(inline, True, True, True).acceptance()
+
+    assert (item.id, item.text) == ("F1.AC1", "Names are listed.")
+    assert item.sources == ("The tool lists names.",)
+
+
+def test_a_run_records_a_feature_at_the_depth_it_was_read() -> None:
+    (plain,) = featuredef.parse(ASPECTED).features
+    (full,) = featuredef.parse(ASPECTED, True, True, True).features
+    quotes_only = ASPECTED.replace(ASPECT_LINE, "").replace(EXAMPLE_LINE, "")
+    (anchored,) = featuredef.parse(quotes_only, True, True).features
+    (criterion,) = anchored.traced
+    assert criterion.sources == ("The tool lists names.",)
+    assert criterion.aspects == criterion.examples == ()
+
+    assert plain.record() == {
+        "id": "F1",
+        "name": "Listing",
+        "outcome": "Names are listed.",
+        "criteria": ["F1.AC1: Names are listed."],
+    }
+    labels = (QUOTE_LINE, ASPECT_LINE, EXAMPLE_LINE)
+    bare = ASPECTED
+    for label in labels:
+        bare = bare.replace(label, "")
+    (traced,) = featuredef.parse(bare, True).features
+    assert traced.record()["acceptance"] == [
+        {
+            "id": "F1.AC1",
+            "criterion": "Names are listed.",
+            "verification": "`t.py::t` asserts it.",
+        }
+    ]
+    assert full.record() == {
+        "id": "F1",
+        "name": "Listing",
+        "outcome": "Names are listed.",
+        "criteria": ["Names are listed."],
+        "acceptance": [
+            {
+                "id": "F1.AC1",
+                "criterion": "Names are listed.",
+                "verification": "`t.py::t` asserts it.",
+                "sources": ["The tool lists names."],
+                "kind": "",
+                "aspects": [
+                    {
+                        "id": "F1.AC1.A1",
+                        "situation": "`pager` gets names",
+                        "outcome": "it lists `3` names",
+                    }
+                ],
+                "examples": [
+                    {"given": "`pager a`", "expected": "`3`", "literals": ["3"]},
+                ],
+            }
+        ],
+    }
+
+
+@pytest.mark.parametrize(
+    ("said", "plain"),
+    [
+        ('"The tool lists names."', "The tool lists names."),
+        ("\u201cThe tool lists names.\u201d", "The tool lists names."),
+        ('"The tool lists names".', "The tool lists names"),
+        ("'x y'", "x y"),
+        ("The tool lists names.", "The tool lists names."),
+        ('"', '"'),
+        ("", ""),
+    ],
+)
+def test_a_quote_loses_only_the_one_pair_of_marks_it_is_wrapped_in(said: str, plain: str) -> None:
+    assert featuredef.unquote(said) == plain
+
+
+@pytest.mark.parametrize("empty", ["", "  \n"])
+def test_an_empty_definition_is_one_blocking_finding(empty: str) -> None:
+    (found,) = featuredef.findings(empty)
+
+    assert not found.advisory
+    assert featuredef.check(empty) == [found.text]
+
+
+# --- tables ----------------------------------------------------------------------------
+
+
+def test_a_markdown_table_reads_its_rows_by_column_with_escaped_pipes_and_short_rows() -> None:
+    body = (
+        "Decisions:\n"
+        "| ID | Meaning |\n"
+        "|---|---|\n"
+        "| F1 Listing | lists \\| names |\n"
+        "| F2 Ready |\n"
+        "| F3 | x \\|\n"
+        "\nafter\n"
+    )
+
+    found = sections.table(body)
+
+    assert found is not None
+    assert found.columns == ("ID", "Meaning")
+    assert found.rows == (
+        {"ID": "F1 Listing", "Meaning": "lists | names"},
+        {"ID": "F2 Ready", "Meaning": ""},
+        {"ID": "F3", "Meaning": "x |"},
+    )
+
+
+@pytest.mark.parametrize("body", ["no table here", "| a |", "| a |\n| b |\n| c |"])
+def test_lines_without_a_header_and_separator_are_no_table(body: str) -> None:
+    assert sections.table(body) is None
+
+
+def test_a_row_is_identified_by_the_first_word_of_its_first_cell() -> None:
+    assert sections.lead("F1 Feature name") == "F1"
+    assert sections.lead("   ") == ""
+
+
+# --- sentences and units ---------------------------------------------------------------
+
+
+def unit_texts(issue: str) -> list[str]:
+    return [unit.text for unit in normative.units(issue, V1)]
+
+
+def test_an_abbreviation_or_a_code_span_does_not_end_a_sentence() -> None:
+    assert unit_texts("Use a flag, e.g. Names are sorted.\n") == [
+        "Use a flag, e.g. Names are sorted."
+    ]
+    assert unit_texts("Print `a. B` and exit.\n") == ["Print `a. B` and exit."]
+    assert unit_texts("Print a. B and exit.\n") == ["Print a.", "B and exit."]
+
+
+def test_a_line_with_no_word_is_no_unit() -> None:
+    assert unit_texts("Names are sorted.\n\n...\n\nIt never fails.\n") == [
+        "Names are sorted.",
+        "It never fails.",
+    ]
+    assert unit_texts("|---|---|\n| Names are sorted. | required |\n") == [
+        "Names are sorted. | required"
+    ]
+
+
+def test_a_quote_shares_the_units_it_overlaps_by_whole_words_only() -> None:
+    every = [
+        normative.Unit("Names are sorted.", ()),
+        normative.Unit("The order is stable.", ()),
+    ]
+
+    assert normative.sharing("are sorted. The order", every) == [0, 1]
+    assert normative.sharing("is stable", every) == [1]
+    assert normative.sharing("sort", every) == []
+    assert normative.sharing("", every) == []
+    assert normative.sharing("!!", every) == []

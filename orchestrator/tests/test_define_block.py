@@ -6,6 +6,7 @@ import pytest
 
 from define_tool import block
 from define_tool.block import Item
+from define_tool.draft import Draft
 from define_tool.kinds import Kind
 
 FULL = """\
@@ -281,6 +282,10 @@ def test_an_item_given_twice_in_a_block_keeps_the_last_and_says_so() -> None:
         "`F1` is given 2 times in this block: the last one is kept"
     ]
     assert len(parsed.items) == 3
+    draft = Draft()
+    draft.put(parsed.items)
+    assert [item.data["name"] for item in draft.kind(block.FEATURE)] == ["b"]
+    assert draft.kind(block.TITLE)[0].data == {"text": "x"}
 
 
 def test_a_question_may_name_its_feature_in_several_words() -> None:

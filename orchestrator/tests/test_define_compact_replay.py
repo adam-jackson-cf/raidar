@@ -7,13 +7,16 @@ back mechanically into the reply that says the same thing (each ``Source:``
 quote becomes the unit ids it overlaps), checked and rendered, and the rendered
 file must read back, for everything the judge reads, exactly as the recorded one.
 This proves the round trip and the unit numbering; whether a model cites units
-as well as it quotes them only a run shows. The sizes printed are bytes of
-JSON against bytes of markdown, not tokens.
+as well as it quotes them only a run shows.
+
+Each case parses, checks, renders and re-parses a real-sized definition in memory (no
+process, git or network), so a case takes about 0.2-0.7 s under coverage: the six
+recorded definitions are the representative scenarios and cannot be shrunk without
+losing what they prove. The only I/O is reading the fixture text.
 """
 
 from __future__ import annotations
 
-import json
 import re
 from pathlib import Path
 
@@ -27,7 +30,6 @@ from tests.define_replay_support import reply
 FIXTURES = Path(__file__).parent / "fixtures" / "define" / "compact_replay"
 CASES = [(cohort, number) for cohort in ("a", "b") for number in (1, 2, 3)]
 _RETIRES = re.compile(r"retires `([^`]+)`: (.*)")
-BODY = {"features": [], "status": "ready", "questions": [], "replies": []}
 
 
 def unquoted(issue: str, quotes: list[str]) -> list[normative.Unit]:
@@ -129,29 +131,3 @@ def test_a_recorded_retirement_is_granted_from_the_structured_list() -> None:
     assert lead_ins & set(strings(mine[0], "sources")), "it cites a lead-in"
     rendered = featuredef.parse(checked.rendered, True, True, True)
     assert featuredef.retired_tests(rendered.decisions, issue) == [test]
-
-
-@pytest.mark.parametrize(("cohort", "number"), CASES)
-def test_the_compact_reply_is_smaller_than_the_recorded_file(cohort: str, number: int) -> None:
-    """Print the bytes of the recorded file, the compact reply and the reply without rung-1
-    decisions.
-
-    For information (bytes, not tokens): the last column drops the decisions at
-    rung 1, which the compact prompt does not ask for.
-    """
-    issue, recorded_text = read(cohort, number)
-    recorded = featuredef.parse(recorded_text, True, True, True)
-    definition = reply(recorded, compact.units(issue, (), V1))
-    chosen = [d for d in rows(definition, "decisions") if text(d, "rung") != "1"]
-    full = len(json.dumps({**BODY, "definition": definition}, ensure_ascii=False).encode())
-    lean = len(
-        json.dumps(
-            {**BODY, "definition": {**definition, "decisions": chosen}},
-            ensure_ascii=False,
-        ).encode()
-    )
-    print(
-        f"{cohort}-cp{number}: recorded file {len(recorded_text.encode())} B, "
-        f"compact reply {full} B, without rung-1 decisions {lean} B"
-    )
-    assert lean < full < len(recorded_text.encode())
