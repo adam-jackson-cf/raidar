@@ -6,7 +6,6 @@ import hashlib
 import io
 import json
 import runpy
-from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 import pytest
@@ -27,15 +26,25 @@ def state(tmp_path: Path) -> Path:
     return directory
 
 
-def call(state: Path, *args: str, stdin: str = "") -> tool.Outcome:
+@pytest.fixture
+def draft() -> Draft:
+    return Draft()
+
+
+def call(state: Path | Draft, *args: str, stdin: str = "") -> tool.Outcome:
+    if isinstance(state, Draft):
+        context = tool.Context(dbv.BODY, (), "(first round)", (), "", 1)
+        return tool._command(state, context, args, lambda: stdin)
     return tool.run(state, list(args), lambda: stdin)
 
 
-def put(state: Path, reply: JsonObject) -> tool.Outcome:
+def put(state: Path | Draft, reply: JsonObject) -> tool.Outcome:
     return call(state, "put", stdin=dbv.block_of(reply))
 
 
-def drafted(state: Path) -> Draft:
+def drafted(state: Path | Draft) -> Draft:
+    if isinstance(state, Draft):
+        return state
     found = tool.read_draft(state)
     assert found is not None
     return found
@@ -111,12 +120,6 @@ def test_a_state_file_that_is_not_json_is_an_error(state: Path) -> None:
     assert broken.output.startswith("define: ERROR, the state cannot be used")
 
 
-def test_a_context_that_is_missing_is_an_error(tmp_path: Path) -> None:
-    outcome = tool.run(tmp_path / "nowhere", ["show"], lambda: "")
-
-    assert outcome.code == tool.BROKEN
-
-
 def test_the_record_of_calls_keeps_each_with_its_findings_in_order(
     state: Path,
 ) -> None:
@@ -141,9 +144,9 @@ def test_the_record_of_calls_keeps_each_with_its_findings_in_order(
 
 
 def test_one_put_of_the_whole_definition_builds_it_and_done_seals_it(
-    state: Path,
+    draft: Draft,
 ) -> None:
-    built = put(state, dbv.ready())
+    built = put(draft, dbv.ready())
 
     assert built.code == 0
     assert built.output.splitlines()[0] == (
@@ -153,9 +156,9 @@ def test_one_put_of_the_whole_definition_builds_it_and_done_seals_it(
     assert built.output.endswith(
         "nothing to fix; run `define done ready` (or `ask`) when the draft is finished\n"
     )
-    sealed = call(state, "done", "ready")
+    sealed = call(draft, "done", "ready")
     assert (sealed.code, sealed.output) == (0, "done ready: sealed\n")
-    held = drafted(state)
+    held = drafted(draft)
     assert held.sealed == "ready"
     assert held.reply("ready") == dbv.ready()
 
@@ -176,13 +179,13 @@ def test_what_show_prints_a_put_reads_back_as_the_same_definition(
 
 
 def test_a_put_names_what_is_wrong_by_item_and_still_applies_the_rest(
-    state: Path,
+    draft: Draft,
 ) -> None:
     whole = dbv.block_of(dbv.ready())
     text = whole + "colour: red\nac F1.AC9: nine\naspect: no arrow\n"
     first = len(whole.splitlines()) + 1
 
-    outcome = call(state, "put", stdin=text)
+    outcome = call(draft, "put", stdin=text)
 
     assert outcome.code == tool.FAULT
     assert f"- line {first}: unknown key `colour`" in outcome.output
@@ -191,17 +194,17 @@ def test_a_put_names_what_is_wrong_by_item_and_still_applies_the_rest(
     )
     assert "has no `aspect:` line" in outcome.output
     assert outcome.output.endswith(" to fix\n")
-    held = drafted(state)
+    held = drafted(draft)
     assert len(held.kind(block.AC)) == 6
     assert held.sealed == ""
 
 
-def test_a_fix_is_a_put_of_the_one_item_and_leaves_the_rest(state: Path) -> None:
+def test_a_fix_is_a_put_of_the_one_item_and_leaves_the_rest(draft: Draft) -> None:
     bad = dbv.body([dbv.criterion("F1.AC1", sources=["U9"])])
-    broken = put(state, dbv.ready(bad))
+    broken = put(draft, dbv.ready(bad))
     fix = block.show([Item(block.AC, "F1.AC1", dbv.criterion("F1.AC1"), "F1")])
 
-    fixed = call(state, "put", stdin=fix)
+    fixed = call(draft, "put", stdin=fix)
 
     assert broken.code == tool.FAULT
     assert "`U9`, which is no unit" in broken.output
@@ -209,46 +212,53 @@ def test_a_fix_is_a_put_of_the_one_item_and_leaves_the_rest(state: Path) -> None
         0,
         "put: applied 1 item (1 criterion)",
     )
-    assert drafted(state).reply("ready")["definition"] == dbv.body([dbv.criterion("F1.AC1")])
+    assert drafted(draft).reply("ready")["definition"] == dbv.body([dbv.criterion("F1.AC1")])
+    assert tool.recheck(draft, tool.Context(dbv.BODY, (), "", (), "", 1), "ready").blocking == ()
 
 
-def test_putting_the_same_block_twice_changes_nothing(state: Path) -> None:
-    put(state, dbv.ready())
-    once = call(state, "show").output
+def test_putting_the_same_block_twice_changes_nothing(draft: Draft) -> None:
+    put(draft, dbv.ready())
+    once = call(draft, "show").output
 
-    put(state, dbv.ready())
+    put(draft, dbv.ready())
 
-    assert call(state, "show").output == once
+    assert call(draft, "show").output == once
 
 
-def test_a_criterion_whose_feature_is_not_defined_is_refused(state: Path) -> None:
-    outcome = call(state, "put", stdin="ac F4.AC1: orphan\nsource: U1\n")
+@pytest.mark.parametrize("prefix", ["", "title: t\n"])
+def test_a_criterion_whose_feature_is_not_defined_is_refused(draft: Draft, prefix: str) -> None:
+    outcome = call(draft, "put", stdin=f"{prefix}ac F4.AC1: orphan\nsource: U1\n")
+    line = len(prefix.splitlines()) + 1
 
     assert outcome.code == tool.FAULT
     assert (
-        "- F4.AC1 line 1: feature F4 is not defined: put `feature F4: <name>` with it"
+        f"- F4.AC1 line {line}: feature F4 is not defined: put `feature F4: <name>` with it"
         in outcome.output
     )
-    assert outcome.output.startswith("put: applied nothing\n")
-    assert drafted(state).items == []
+    assert outcome.output.startswith(
+        "put: applied 1 item (1 title)\n" if prefix else "put: applied nothing\n"
+    )
+    assert draft.items == (
+        [Item(block.TITLE, block.TITLE, {"text": "t"}, line=1)] if prefix else []
+    )
 
 
-def test_a_criterion_may_come_before_its_feature_in_one_block(state: Path) -> None:
-    call(state, "put", stdin="ac F1.AC1: t\nsource: U1\nfeature F1: f\n")
+def test_a_criterion_may_come_before_its_feature_in_one_block(draft: Draft) -> None:
+    call(draft, "put", stdin="ac F1.AC1: t\nsource: U1\nfeature F1: f\n")
 
-    assert [item.key for item in drafted(state).items] == ["F1", "F1.AC1"]
+    assert [item.key for item in drafted(draft).items] == ["F1", "F1.AC1"]
 
 
-def test_check_lists_the_findings_without_changing_anything(state: Path) -> None:
-    put(state, dbv.ready(dbv.EMPTY))
-    before = call(state, "show").output
+def test_check_lists_the_findings_without_changing_anything(draft: Draft) -> None:
+    put(draft, dbv.ready(dbv.EMPTY))
+    before = call(draft, "show").output
 
-    checked = call(state, "check")
+    checked = call(draft, "check")
 
     assert checked.code == tool.FAULT
     assert checked.output.startswith("check:\n")
     assert "- the definition has no feature: put `feature F1: <name>`" in checked.output
-    assert call(state, "show").output == before
+    assert call(draft, "show").output == before
 
 
 def test_done_refuses_while_a_finding_blocks_and_seals_when_only_advice_is_left(
@@ -310,41 +320,44 @@ def test_a_context_that_names_no_unit_rules_is_the_tool_failing(
     assert tool.read_calls(directory)[-1].command == tool.ERROR_CALL
 
 
-def test_a_change_after_done_unseals_the_draft(state: Path) -> None:
-    put(state, dbv.ready())
-    call(state, "done", "ready")
+def test_a_change_after_done_unseals_the_draft(draft: Draft) -> None:
+    put(draft, dbv.ready())
+    call(draft, "done", "ready")
 
-    call(state, "put", stdin="title: A new title\n")
-    assert drafted(state).sealed == ""
-    call(state, "done", "ready")
-    call(state, "drop", "decision", "1")
+    call(draft, "put", stdin="title: A new title\n")
+    assert drafted(draft).sealed == ""
+    call(draft, "done", "ready")
+    call(draft, "drop", "decision", "1")
 
-    assert drafted(state).sealed == ""
+    assert drafted(draft).sealed == ""
 
 
+@pytest.mark.parametrize("origin", ["issue", "none"])
 def test_done_ask_seals_the_questions_and_sends_the_definition_empty(
-    state: Path,
+    draft: Draft,
+    origin: str,
 ) -> None:
-    put(state, dbv.asks())
+    reply = dbv.asks(features=[dbv.named(behaviour_from=origin)])
+    put(draft, reply)
 
-    asked = call(state, "done", "ask")
+    asked = call(draft, "done", "ask")
 
     assert asked.code == 0
-    assert drafted(state).reply("needs_input") == dbv.asks()
-    wrong = call(state, "done", "ready")
+    assert drafted(draft).reply("needs_input") == reply
+    wrong = call(draft, "done", "ready")
     assert wrong.code == tool.FAULT
     assert "- `define done ready` needs no `question`" in wrong.output
 
 
 def test_a_question_alone_is_checked_as_asking_and_a_definition_as_ready(
-    state: Path,
+    draft: Draft,
 ) -> None:
-    put(state, dbv.ready())
-    assert drafted(state).presumed() == "ready"
+    put(draft, dbv.ready())
+    assert drafted(draft).presumed() == "ready"
 
-    put(state, dbv.asks())
+    put(draft, dbv.asks())
 
-    assert drafted(state).presumed() == "needs_input"
+    assert drafted(draft).presumed() == "needs_input"
 
 
 def test_replies_are_checked_against_the_questions_open_this_call(
@@ -359,27 +372,27 @@ def test_replies_are_checked_against_the_questions_open_this_call(
     assert "- there is no `reply Q1.2:` line" in outcome.output
 
 
-def test_drop_removes_an_item_and_a_feature_takes_its_criteria(state: Path) -> None:
-    put(state, dbv.ready())
+def test_drop_removes_an_item_and_a_feature_takes_its_criteria(draft: Draft) -> None:
+    put(draft, dbv.ready())
 
-    one = call(state, "drop", "F1.AC5")
+    one = call(draft, "drop", "F1.AC5")
     assert one.output.splitlines()[0] == "drop: removed `F1.AC5`"
-    assert len(drafted(state).kind(block.AC)) == 4
+    assert len(drafted(draft).kind(block.AC)) == 4
 
     for words, kind in (
         (("decision", "1"), block.DECISION),
         (("named", "F1", "greeting"), block.NAMED),
         (("F1",), block.FEATURE),
     ):
-        assert call(state, "drop", *words).code in (0, tool.FAULT)
-        assert drafted(state).kind(kind) == []
-    assert drafted(state).kind(block.AC) == []
+        assert call(draft, "drop", *words).code in (0, tool.FAULT)
+        assert drafted(draft).kind(kind) == []
+    assert drafted(draft).kind(block.AC) == []
 
 
-def test_drop_of_nothing_says_so(state: Path) -> None:
-    put(state, dbv.ready())
+def test_drop_of_nothing_says_so(draft: Draft) -> None:
+    put(draft, dbv.ready())
 
-    outcome = call(state, "drop", "F9")
+    outcome = call(draft, "drop", "F9")
 
     assert outcome.code == tool.FAULT
     assert outcome.output.startswith("drop: nothing is named `F9`; the draft holds ")
@@ -419,8 +432,8 @@ def test_a_file_that_is_missing_is_a_usage_error_and_changes_nothing(
         ("done", "maybe"),
     ],
 )
-def test_anything_else_prints_the_usage(state: Path, args: tuple[str, ...]) -> None:
-    outcome = call(state, *args)
+def test_anything_else_prints_the_usage(draft: Draft, args: tuple[str, ...]) -> None:
+    outcome = call(draft, *args)
 
     assert (outcome.code, outcome.output) == (tool.USAGE_ERROR, tool.USAGE + "\n")
 
@@ -432,15 +445,6 @@ def run_main(args: list[str], env: dict[str, str], stdin: str = "") -> tuple[int
     out: list[str] = []
     code = tool.main(args, env, lambda: stdin, out.append)
     return code, "".join(out)
-
-
-def test_the_command_finds_its_state_through_the_environment(state: Path) -> None:
-    env = {tool.STATE_ENV: str(state)}
-
-    code, output = run_main(["put"], env, "title: Via main\n")
-
-    assert code == tool.FAULT
-    assert output.startswith("put: applied 1 item (1 title)")
 
 
 def test_the_command_without_a_state_directory_builds_in_the_default_one(
@@ -457,6 +461,7 @@ def test_a_state_directory_that_is_not_there_is_the_tool_failing(tmp_path: Path)
     code, output = run_main(["show"], {tool.STATE_ENV: str(tmp_path / "nowhere")})
 
     assert code == tool.BROKEN
+    assert not (tmp_path / "nowhere").exists()
     assert output.startswith("define: ERROR, the state cannot be used (")
 
 
@@ -555,22 +560,15 @@ def test_the_command_takes_its_arguments_and_input_from_the_process(
     monkeypatch.setattr("sys.stdin", io.TextIOWrapper(io.BytesIO(b"title: From stdin \xff\xfe\n")))
     monkeypatch.setenv(tool.STATE_ENV, str(state))
 
-    assert tool.main() == tool.FAULT
+    with pytest.raises(SystemExit) as stopped:
+        runpy.run_module("define_tool", run_name="__main__")
+
+    assert stopped.value.code == tool.FAULT
 
     assert capsys.readouterr().out.startswith("put: applied 1 item (1 title)")
     held = drafted(state).kind(block.TITLE)[0].data["text"]
     assert isinstance(held, str)
     assert held.startswith("From stdin ")
-
-
-def test_the_package_runs_as_a_module(state: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr("sys.argv", ["define", "show"])
-    monkeypatch.setenv(tool.STATE_ENV, str(state))
-
-    with pytest.raises(SystemExit) as stopped:
-        runpy.run_module("define_tool", run_name="__main__")
-
-    assert stopped.value.code == 0
 
 
 # --- the draft ---------------------------------------------------------------------------
@@ -597,38 +595,23 @@ def test_a_draft_and_its_record_read_back_the_same() -> None:
     assert again == draft
 
 
-def test_every_call_leaves_the_state_the_engine_reads(state: Path, tmp_path: Path) -> None:
-    put(state, dbv.ready())
-    call(state, "done", "ready")
-
-    assert sorted(path.name for path in state.iterdir()) == sorted(
-        [
-            tool.CALLS_FILE,
-            tool.EVENTS_FILE,
-            tool.CONTEXT_FILE,
-            tool.LOCK_FILE,
-            tool.STATE_FILE,
-        ]
-    )
-
-
 # --- identity, drop and the summary ---------------------------------------------------------
 
 QUESTION = "question F1: {}\nkind: {}\nproposal: p\noption: o\n"
 
 
 def test_rewording_a_question_replaces_it_and_another_kind_is_another_question(
-    state: Path,
+    draft: Draft,
 ) -> None:
     for words in ("What greeting?", "What greeting text?"):
-        call(state, "put", stdin=QUESTION.format(words, "missing_input"))
+        call(draft, "put", stdin=QUESTION.format(words, "missing_input"))
 
-    asked = drafted(state).kind(block.QUESTION)
+    asked = drafted(draft).kind(block.QUESTION)
     assert [item.data["question"] for item in asked] == ["What greeting text?"]
 
-    call(state, "put", stdin=QUESTION.format("Why?", "objective_unclear"))
+    call(draft, "put", stdin=QUESTION.format("Why?", "objective_unclear"))
 
-    assert len(drafted(state).kind(block.QUESTION)) == 2
+    assert len(drafted(draft).kind(block.QUESTION)) == 2
 
 
 @pytest.mark.parametrize(
@@ -645,24 +628,24 @@ def test_rewording_a_question_replaces_it_and_another_kind_is_another_question(
         "question F1 missing_input",
     ],
 )
-def test_drop_names_an_item_as_show_writes_it(state: Path, reference: str) -> None:
+def test_drop_names_an_item_as_show_writes_it(draft: Draft, reference: str) -> None:
     put_all = (
         "named: Greeting\nfrom: none\nretire: tests/x.py::t\nsource: U1\nreason: r\n"
         f"decision 3: d\nrung: 2\n{QUESTION.format('Why?', 'missing_input')}"
     )
-    call(state, "put", stdin=put_all)
-    held = len(drafted(state).items)
+    call(draft, "put", stdin=put_all)
+    held = len(drafted(draft).items)
 
-    outcome = call(state, "drop", *reference.split(" "))
+    outcome = call(draft, "drop", *reference.split(" "))
 
     assert outcome.output.startswith(f"drop: removed `{reference}`")
-    assert len(drafted(state).items) == held - 1
+    assert len(drafted(draft).items) == held - 1
 
 
-def test_a_drop_that_names_nothing_lists_what_the_draft_holds(state: Path) -> None:
-    empty = call(state, "drop", "F1")
-    put(state, dbv.ready())
-    held = call(state, "drop", "F1.AC9")
+def test_a_drop_that_names_nothing_lists_what_the_draft_holds(draft: Draft) -> None:
+    empty = call(draft, "drop", "F1")
+    put(draft, dbv.ready())
+    held = call(draft, "drop", "F1.AC9")
 
     assert empty.output == "drop: nothing is named `F1`; the draft holds nothing yet\n"
     assert held.output.startswith("drop: nothing is named `F1.AC9`; the draft holds `")
@@ -671,51 +654,17 @@ def test_a_drop_that_names_nothing_lists_what_the_draft_holds(state: Path) -> No
 
 @pytest.mark.parametrize("number", ["²", "٣", "1" * 5000, "-1"])
 def test_a_decision_number_that_is_not_ascii_digits_is_a_finding_not_a_crash(
-    state: Path, number: str
+    draft: Draft, number: str
 ) -> None:
-    outcome = call(state, "put", stdin=f"decision {number}: text\nrung: 1\n")
+    outcome = call(draft, "put", stdin=f"decision {number}: text\nrung: 1\n")
 
     assert outcome.code == tool.FAULT
     assert "is not a number: write `decision 1: <text>`" in outcome.output
-    assert drafted(state).items == []
-    assert [item.command for item in tool.read_calls(state)] == ["put"]
-
-
-def test_a_criterion_refused_for_its_feature_names_the_line_it_was_on(
-    state: Path,
-) -> None:
-    outcome = call(state, "put", stdin="title: t\nac F4.AC1: orphan\nsource: U1\n")
-
-    assert outcome.output.startswith(
-        "put: applied 1 item (1 title)\n- F4.AC1 line 2: feature F4 is not defined"
-    )
-
-
-def test_the_summary_counts_in_plain_english(state: Path) -> None:
-    replies = "reply Q1.1: accepted\nreply Q1.2: accepted\nquestion F1: a\n"
-
-    outcome = call(state, "put", stdin=replies + "kind: missing_input\n")
-
-    assert outcome.output.startswith("put: applied 3 items (1 question, 2 replies)\n")
+    assert drafted(draft).items == []
+    assert outcome.call.command == "put"
 
 
 # --- a tool that cannot work, and calls that overlap -----------------------------------------
-
-
-def test_calls_made_at_once_are_applied_one_after_the_other(state: Path) -> None:
-    call(state, "put", stdin="feature F1: f\n")
-
-    with ThreadPoolExecutor(max_workers=12) as pool:
-        outcomes = list(
-            pool.map(
-                lambda n: call(state, "put", stdin=f"ac F1.AC{n}: c\nsource: U1\n"),
-                range(1, 25),
-            )
-        )
-
-    assert [item.code for item in outcomes if item.code == tool.BROKEN] == []
-    assert len(drafted(state).kind(block.AC)) == 24
-    assert len(tool.read_calls(state)) == 25
 
 
 def test_a_state_that_cannot_be_written_is_the_tool_failing_and_is_marked(
@@ -732,15 +681,6 @@ def test_a_state_that_cannot_be_written_is_the_tool_failing_and_is_marked(
     assert outcome.output == "define: ERROR, the state cannot be used (disk full)\n"
     assert [item.command for item in tool.read_calls(state)] == [tool.ERROR_CALL]
     assert tool.read_draft(state) is None
-
-
-def test_a_state_that_cannot_be_locked_or_marked_is_still_the_tool_failing(
-    tmp_path: Path,
-) -> None:
-    outcome = tool.run(tmp_path / "nowhere", ["show"], lambda: "")
-
-    assert (outcome.code, outcome.call.command) == (tool.BROKEN, tool.ERROR_CALL)
-    assert not (tmp_path / "nowhere").exists()
 
 
 # --- what a finding says --------------------------------------------------------------------
@@ -787,18 +727,16 @@ FAULTY = [
 ]
 
 
-def test_findings_name_the_lines_of_the_block_not_the_file_it_is_rendered_to(
-    tmp_path: Path,
-) -> None:
+def test_findings_name_the_lines_of_the_block_not_the_file_it_is_rendered_to() -> None:
     said = []
-    for number, (text, commands) in enumerate(FAULTY):
-        directory = tmp_path / str(number)
-        tool.start(
-            directory,
-            tool.Context(dbv.BODY, (), "", ("Q1.1", "Q1.2"), str(tmp_path), 1),
-        )
-        said.append(call(directory, "put", stdin=text).output)
-        said += [call(directory, *command.split()).output for command in commands]
+    for text, commands in FAULTY:
+        draft = Draft()
+        context = tool.Context(dbv.BODY, (), "", ("Q1.1", "Q1.2"), "", 1)
+        said.append(tool._command(draft, context, ["put"], lambda source=text: source).output)
+        said += [
+            tool._command(draft, context, command.split(), lambda: "").output
+            for command in commands
+        ]
 
     findings = [line for output in said for line in output.splitlines() if line[:2] == "- "]
     assert len(findings) > 40

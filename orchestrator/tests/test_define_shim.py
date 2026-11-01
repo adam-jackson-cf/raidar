@@ -3,16 +3,21 @@ codes."""
 
 from __future__ import annotations
 
+import hashlib
+import json
 import os
 import shutil
 import subprocess
 import sys
 from pathlib import Path
+from typing import Any
 
 import pytest
+import yaml
 
 import define_tool as payload
 from define_tool import tool
+from raidar.contract.paths import stages_root
 
 pytestmark = pytest.mark.slow
 
@@ -21,6 +26,9 @@ ISSUE = (
     "The greeting names the caller.\n"
 )
 PACKAGE = Path(payload.__file__).parent
+STAGE_PACKAGE = stages_root() / "raidar" / "define"
+FIXTURES = sorted(path.name for path in (STAGE_PACKAGE / "fixtures").iterdir())
+GATE_CASES = {"pass": 0, "refuse": tool.FAULT}
 # What the container's ``define`` command is: the pinned interpreter, isolated, on the package
 # uploaded to a directory of its own.
 LAUNCHER = """\
@@ -139,19 +147,6 @@ def test_calls_run_at_once_by_a_shell_each_land_and_none_crashes(
     )
 
 
-@pytest.mark.parametrize("number", ["²", "9" * 5000])
-def test_a_decision_number_python_cannot_read_is_a_finding_not_a_traceback(
-    home: tuple[dict[str, str], Path], number: str
-) -> None:
-    env, work = home
-
-    done = shell(f"define put <<'EOF'\ndecision {number}: text\nrung: 1\nEOF\n", env, work)
-
-    assert done.returncode == tool.FAULT
-    assert "is not a number: write `decision 1: <text>`" in done.stdout
-    assert "Traceback" not in done.stderr
-
-
 def test_a_state_directory_the_tool_cannot_write_is_the_tool_failing_not_a_traceback(
     home: tuple[dict[str, str], Path],
 ) -> None:
@@ -202,3 +197,59 @@ STATUS = (
     'import sys; sys.path.insert(0, "{root}"); '
     "from define_tool import status; raise SystemExit(status.main())"
 )
+
+
+def fixture_run(tmp_path: Path, case: str) -> tuple[Any, dict[str, Any], dict[str, str]]:
+    """Run fixture ``case`` on a copy of its state: (result, its expectation, output digests)."""
+    source = STAGE_PACKAGE / "fixtures" / case
+    expected = yaml.safe_load((source / "expect.yaml").read_text(encoding="utf-8"))
+    document = json.loads((source / "context.json").read_text(encoding="utf-8"))
+    gate = case in GATE_CASES
+    work = tmp_path / "work"
+    shutil.copytree(source / "state", work)
+    watched = work / ".raidar" / "define" if gate else work
+    document["state"] = str(watched)
+    document["outputs"] = {
+        "criteria": str(watched / "criteria.json"),
+        "definition": str(tmp_path / "definition.md"),
+    }
+    context_path = tmp_path / "context.json"
+    context_path.write_text(json.dumps(document), encoding="utf-8")
+    completed = subprocess.run(
+        [
+            sys.executable,
+            "-I",
+            "-c",
+            f"import sys; sys.path.insert(0, {str(PACKAGE.parent)!r}); "
+            "from define_tool import stage; raise SystemExit(stage.main())",
+            "sealed" if gate else "inspect",
+            "--context",
+            str(context_path),
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+        timeout=60,
+    )
+    result: Any = completed.returncode if gate else json.loads(completed.stdout)
+    if not gate:
+        assert completed.returncode == 0, completed.stdout + completed.stderr
+    digests = {
+        name: hashlib.sha256(Path(path).read_bytes()).hexdigest()
+        for name, path in document["outputs"].items()
+        if Path(path).exists()
+    }
+    return result, expected, digests
+
+
+@pytest.mark.parametrize("case", FIXTURES)
+def test_every_fixture_meets_its_expectation(tmp_path: Path, case: str) -> None:
+    result, expected, digests = fixture_run(tmp_path, case)
+
+    if case in GATE_CASES:
+        assert result == GATE_CASES[case]
+        assert (result == 0) == (expected["status"] == "pass")
+    else:
+        assert set(result) == {"status", "message", "tokens", "carry"}
+        assert result["status"] == expected["status"]
+        assert digests == (expected["outputs"] or {})
