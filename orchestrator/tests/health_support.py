@@ -162,15 +162,24 @@ def _write_evidence(trial_dir: Path) -> None:
     (trial_dir / "raidar-liveness.json").write_text(json.dumps({"phases": [phase]}))
 
 
-def write_trial_config(trial_dir: Path, *, define: bool, verify: bool, judge: bool) -> None:
-    """The lab's own ``config.json`` for a trial: the agent's resolved workflow definition."""
-    stages: dict[str, Any] = {"build": {"prompt": "build %%%TASK%%%"}}
-    if define:
-        stages["define"] = {"enabled": True}
-    if verify:
-        stages["verify"] = {"enabled": True, **({"judge": {"model": "m"}} if judge else {})}
-    config = {"agent": {"kwargs": {"definition": {"stages": stages}}}}
-    (trial_dir / "config.json").write_text(json.dumps(config))
+BASELINE_DEFINITION: dict[str, Any] = {
+    "schema": 2,
+    "name": "one-shot",
+    "build": {"prompt": "build %%%TASK%%%", "reply": None},
+    "stages": [],
+    "gate": {"max_fix_rounds": 0},
+    "judge": None,
+}
+"""The real ``schema: 2`` definition of a package-free arm (``PackageWorkflowDefinition``)."""
+
+
+def write_trial_config(
+    trial_dir: Path, definition: dict[str, Any] | None = None, **kwargs: Any
+) -> None:
+    """The lab's own ``config.json``: the resolved definition and the runner kwargs that
+    ``arm_agent_config`` adds for a package arm (``locked_packages``, ``primitives``, ``pack``)."""
+    body = {"definition": definition or BASELINE_DEFINITION, **kwargs}
+    (trial_dir / "config.json").write_text(json.dumps({"agent": {"kwargs": body}}))
 
 
 def healthy_trial(
@@ -180,7 +189,7 @@ def healthy_trial(
     trial_dir = job_dir / "trials" / TRIAL_ID
     outcomes = outcomes or [StepOutcome(STEP)]
     write_trial(trial_dir, outcomes)
-    write_trial_config(trial_dir, define=False, verify=False, judge=False)
+    write_trial_config(trial_dir)
     for outcome in outcomes:
         if outcome.passed is not None:
             _store_snapshot(trial_dir, outcome.name)

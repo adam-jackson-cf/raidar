@@ -4,6 +4,18 @@ All notable changes to this project are documented in this file.
 
 ## Unreleased
 
+### Primitive-keyed required health evidence (phase 5B step 4)
+
+- Re-key W3–W10 by locked contract ids: `gate/1`, `setup/1`, `stop/1`, `outputs/1`,
+  `acceptance-reply/1` and `jev-judge/1`, never by package names or stage types.
+- Derive required setup/stop/output declarations from each digest-checked package manifest
+  into host-written trial config only. Missing or inconsistent declarations fail closed.
+- Check qualified call identities, retained output digests, stop-state consistency and reply/judge
+  artifacts. A cleanly refused starting canary is healthy; instrument failures still invalidate.
+- Preserve legitimate closed and cut outcomes; agent-writable hook-log gaps remain readings.
+- Remove the obsolete stage-keyed gate health reader and its validity entry in this cutover;
+  package trials have one primitive evidence path, not parallel legacy and primitive readers.
+
 ### `verification-effort@1` and pre-fix grading from `gate/1` records (phase 5B step 3)
 
 - Replace the scorer `gate-effort` with `verification-effort@1` (`raidar.scoring.verification_effort`).
