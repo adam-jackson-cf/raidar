@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
 import shutil
 import subprocess
 import sys
@@ -13,16 +14,16 @@ from typing import Any
 import pytest
 import yaml
 from click.testing import CliRunner
-from raidar_contract.package.fixtures import required_cases, static_problems
+from raidar_contract.package.fixtures import static_problems
 from raidar_contract.package.registry import load_stage_package
 
 from raidar.cli import main, stage, stage_fixtures, stage_lock, stage_package, workflow_new
-from raidar.cli.stage_template import LOCK as TEMPLATE_LOCK
-from raidar.cli.stage_template import render_template
-from raidar.contract.wheels import uv_lock_refusals
+from raidar.contract.paths import lab_root
 from raidar.subject.workflow import stage_check
 
-# Model uv's sdist metadata as well as the generated template's pinned wheel.
+REAL_PACKAGE = lab_root() / "stages" / "raidar" / "docs-check"
+TEMPLATE_LOCK = (REAL_PACKAGE / "tool" / "uv.lock").read_text()
+# Model uv's sdist metadata as well as the real package's pinned wheel.
 SDIST = (
     f'sdist = {{ url = "https://files.pythonhosted.org/x.tar.gz", hash = "sha256:{"0" * 64}" }}\n'
 )
@@ -31,93 +32,132 @@ LOCK = TEMPLATE_LOCK.replace("wheels = [", SDIST + "wheels = [")
 
 @pytest.fixture
 def stages(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    """A stages root holding only a copy of the real ``raidar/docs-check`` source package."""
     root = tmp_path / "stages"
+    shutil.copytree(REAL_PACKAGE, root / "raidar" / "docs-check")
     monkeypatch.setattr(stage_package, "stages_root", lambda: root)
     return root
 
 
-def _write(root: Path, files: dict[str, bytes]) -> None:
-    for relative, data in files.items():
-        target = root / relative
-        target.parent.mkdir(parents=True, exist_ok=True)
-        target.write_bytes(data)
+def _files(root: Path, folder: str) -> dict[str, bytes]:
+    return {
+        path.relative_to(root).as_posix(): path.read_bytes()
+        for path in sorted((root / folder).rglob("*"))
+        if path.is_file()
+    }
 
 
-def test_stage_new_writes_a_command_only_package_that_meets_the_fixture_contract(
+def test_stage_new_defaults_to_the_real_docs_check_package_and_copies_it_verbatim(
     stages: Path,
 ) -> None:
+    original = _files(stages / "raidar" / "docs-check", ".")
     result = CliRunner().invoke(main, ["stage", "new", "acme/my-check"])
 
     assert result.exit_code == 0, result.output
-    package = load_stage_package(stages / "acme" / "my-check")
-    manifest = package.manifest
-    assert static_problems(package) == []
-    assert set(required_cases(package)) == {"pass", "refuse"}
-    assert manifest.setup is None
-    assert manifest.on_stop is None
-    assert not manifest.outputs
-    assert manifest.tool is not None
-    assert manifest.tool.commands
-    assert [item.path for item in package.files if item.path.startswith("tool/src")] == []
-    assert not any(item.path.endswith(".py") for item in package.files)
-    assert (stages / "acme" / "my-check" / "tool" / "uv.lock").is_file()
+    copy = stages / "acme" / "my-check"
+    real = stages / "raidar" / "docs-check"
+    copied, source = _files(copy, "."), original.copy()
+    assert load_stage_package(copy).manifest.name == "my-check"
+    manifest = copied.pop("stage.yaml")
+    assert manifest == source.pop("stage.yaml").replace(b"name: docs-check", b"name: my-check", 1)
+    assert copied == source
+    assert _files(real, ".") == original
 
 
-def test_the_template_pins_one_third_party_command_and_ships_adversarial_gate_fixtures(
-    stages: Path,
-) -> None:
-    CliRunner().invoke(main, ["stage", "new", "acme/my-check"])
-    package = load_stage_package(stages / "acme" / "my-check")
+def test_stage_new_copies_any_in_tree_package_fixtures_and_modes_included(stages: Path) -> None:
+    first = CliRunner().invoke(main, ["stage", "new", "acme/first"])
+    (stages / "acme" / "first" / "fixtures" / "pass" / "state" / "extra.txt").write_text("x")
+    script = stages / "acme" / "first" / "tool" / "run.sh"
+    script.write_text("#!/bin/sh\n")
+    script.chmod(0o755)
 
-    pyproject = (stages / "acme" / "my-check" / "tool" / "pyproject.toml").read_text()
-    statuses = {
-        case: yaml.safe_load((package.fixture_dir(case) / "expect.yaml").read_text())["status"]
-        for case in package.fixture_cases()
-    }
+    second = CliRunner().invoke(main, ["stage", "new", "beta/second", "--from", "acme/first"])
 
-    assert 'dependencies = ["codespell==2.4.1"]' in pyproject
-    assert {"pass", "refuse", "nested-misspelling", "zero-byte-file", "binary-file"} <= set(
-        statuses
+    assert first.exit_code == 0, first.output
+    assert second.exit_code == 0, second.output
+    copy = stages / "beta" / "second"
+    assert (copy / "fixtures" / "pass" / "state" / "extra.txt").read_text() == "x"
+    assert (copy / "tool" / "run.sh").stat().st_mode & 0o111
+    assert load_stage_package(copy).manifest.name == "second"
+
+
+def test_stage_new_preserves_flow_yaml_comments_and_crlf(stages: Path) -> None:
+    manifest = stages / "raidar" / "docs-check" / "stage.yaml"
+    document = yaml.safe_load(manifest.read_text())
+    source = (
+        b"# preserve this comment\r\n"
+        + yaml.safe_dump(document, default_flow_style=True).replace("\n", "\r\n").encode()
     )
-    assert statuses["pass"] == "pass"
-    assert statuses["refuse"] == "refuse"
-    assert set(statuses.values()) == {"pass", "refuse"}
-    assert any(
-        "fixtures/" in str(path) for path in (stages / "acme" / "my-check").rglob("expect.yaml")
-    )
-    assert all("fixtures/" not in item.path for item in package.files)
+    manifest.write_bytes(source)
 
-
-def test_every_new_package_carries_the_same_wheels_only_lock_unchanged(stages: Path) -> None:
-    CliRunner().invoke(main, ["stage", "new", "acme/first-check"])
-    CliRunner().invoke(main, ["stage", "new", "acme/second-check"])
-
-    locks = [
-        (stages / name / "tool" / "uv.lock").read_bytes()
-        for name in ("acme/first-check", "acme/second-check")
-    ]
-
-    assert locks[0] == locks[1] == TEMPLATE_LOCK.encode()
-    assert b"sdist" not in locks[0]
-    assert uv_lock_refusals(locks[0].decode()) == []
-
-
-@pytest.mark.parametrize("template", ["docs-check", None])
-def test_stage_new_copies_the_docs_check_template(stages: Path, template: str | None) -> None:
-    extra = [] if template is None else ["--from", template]
-
-    result = CliRunner().invoke(main, ["stage", "new", "acme/my-check", *extra])
+    result = CliRunner().invoke(main, ["stage", "new", "acme/renamed"])
 
     assert result.exit_code == 0, result.output
-    assert "from docs-check" in result.output
+    target = stages / "acme" / "renamed"
+    assert load_stage_package(target).manifest.name == "renamed"
+    assert (target / "stage.yaml").read_bytes() == source.replace(
+        b"name: docs-check", b"name: renamed", 1
+    )
 
 
-def test_stage_new_refuses_an_unknown_template_and_writes_nothing(stages: Path) -> None:
-    result = CliRunner().invoke(main, ["stage", "new", "acme/my-check", "--from", "nope"])
+@pytest.mark.parametrize(
+    ("fields", "old", "new", "mode"),
+    [
+        (
+            "name: &identity 'docs-check' # keep\r\nsummary: *identity\r\n",
+            b"'docs-check'",
+            b"'renamed'",
+            0o644,
+        ),
+        (
+            "name: |- # keep\r\n  docs-check\r\nsummary: prose\r\n",
+            b"  docs-check\r\n",
+            b"  renamed\r\n",
+            0o644,
+        ),
+        (
+            "summary: &identity docs-check\r\nname: *identity # keep\r\n",
+            b"name: *identity",
+            b"name: renamed",
+            0o644,
+        ),
+        (
+            'name: !!str "docs\\u002dcheck" # keep\r\nsummary: prose\r\n',
+            b'"docs\\u002dcheck"',
+            b'"renamed"',
+            0o644,
+        ),
+        ("name: docs-check\r\nsummary: prose\r\n", b"name: docs-check", b"name: renamed", 0o444),
+    ],
+    ids=["anchor", "block", "alias", "tag", "read-only"],
+)
+def test_stage_new_renames_scalar_without_damaging_yaml_or_permissions(
+    stages: Path, fields: str, old: bytes, new: bytes, mode: int
+) -> None:
+    manifest = stages / "raidar" / "docs-check" / "stage.yaml"
+    document = yaml.safe_load(manifest.read_text())
+    for field in ("name", "summary"):
+        document.pop(field)
+    source = fields.encode() + yaml.safe_dump(document).replace("\n", "\r\n").encode()
+    manifest.write_bytes(source)
+    manifest.chmod(mode)
+
+    result = CliRunner().invoke(main, ["stage", "new", "acme/renamed"])
+
+    assert result.exit_code == 0, result.output
+    target = stages / "acme" / "renamed"
+    assert load_stage_package(target).manifest.name == "renamed"
+    assert (target / "stage.yaml").read_bytes() == source.replace(old, new, 1)
+    assert (target / "stage.yaml").stat().st_mode & 0o777 == mode
+    assert manifest.read_bytes() == source
+
+
+def test_stage_new_refuses_an_unknown_source_and_writes_nothing(stages: Path) -> None:
+    result = CliRunner().invoke(main, ["stage", "new", "acme/my-check", "--from", "acme/nope"])
 
     assert result.exit_code != 0
-    assert "available: docs-check" in result.output
-    assert not (stages / "acme" / "my-check").exists()
+    assert "no stage package" in result.output
+    assert not (stages / "acme").exists()
 
 
 def test_stage_new_supports_a_namespace_and_refuses_to_overwrite(stages: Path) -> None:
@@ -130,12 +170,70 @@ def test_stage_new_supports_a_namespace_and_refuses_to_overwrite(stages: Path) -
     assert "refusing to overwrite" in again.output
 
 
+def test_stage_new_refuses_to_replace_a_symlink_at_the_target(stages: Path, tmp_path: Path) -> None:
+    (stages / "acme").mkdir()
+    (stages / "acme" / "my-check").symlink_to(tmp_path)
+
+    result = CliRunner().invoke(main, ["stage", "new", "acme/my-check"])
+
+    assert result.exit_code != 0
+    assert "refusing to overwrite" in result.output
+    assert (stages / "acme" / "my-check").is_symlink()
+
+
+@pytest.mark.parametrize("kind", ["file", "directory", "fixture", "fifo"])
+def test_stage_new_refuses_a_source_with_a_symlink_or_special_file_and_writes_nothing(
+    stages: Path, tmp_path: Path, kind: str
+) -> None:
+    real = stages / "raidar" / "docs-check"
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    (outside / "secret.txt").write_text("secret")
+    if kind == "file":
+        (real / "tool" / "leak").symlink_to(outside / "secret.txt")
+    elif kind == "directory":
+        (real / "tool" / "leak").symlink_to(outside, target_is_directory=True)
+    elif kind == "fixture":
+        (real / "fixtures" / "pass" / "state" / "leak").symlink_to(outside / "secret.txt")
+    else:
+        os.mkfifo(real / "tool" / "pipe")
+
+    result = CliRunner().invoke(main, ["stage", "new", "acme/my-check"])
+
+    assert result.exit_code != 0
+    assert "refused" in result.output
+    assert not (stages / "acme").exists()
+
+
+def test_stage_new_refuses_a_symlinked_namespace_folder(stages: Path, tmp_path: Path) -> None:
+    elsewhere = tmp_path / "elsewhere"
+    elsewhere.mkdir()
+    (stages / "acme").symlink_to(elsewhere, target_is_directory=True)
+
+    result = CliRunner().invoke(main, ["stage", "new", "acme/my-check"])
+
+    assert result.exit_code != 0
+    assert "symlinked folders are refused" in result.output
+    assert list(elsewhere.iterdir()) == []
+
+
+@pytest.mark.parametrize(
+    "args",
+    [["../x"], ["acme/.."], ["acme/ok", "--from", "../etc"], ["acme/ok", "--from", "a/b/c"]],
+)
+def test_stage_new_refuses_names_that_could_traverse(stages: Path, args: list[str]) -> None:
+    result = CliRunner().invoke(main, ["stage", "new", *args])
+
+    assert result.exit_code != 0
+    assert not (stages / "acme").exists()
+
+
 @pytest.mark.parametrize("name", ["Bad", "-x", "a b", "a/b/c", "", "my-check", "acme/"])
 def test_stage_new_refuses_a_bad_name(stages: Path, name: str) -> None:
     result = CliRunner().invoke(main, ["stage", "new", name])
 
     assert result.exit_code != 0
-    assert not stages.exists()
+    assert not (stages / "acme").exists()
 
 
 @pytest.mark.parametrize("command", ["lock", "info", "check"])
@@ -232,7 +330,7 @@ def test_workflow_new_refuses_an_unknown_template(
 
 def test_a_lock_with_an_sdist_is_a_lock_problem(tmp_path: Path) -> None:
     root = tmp_path / "acme" / "pkg"
-    _write(root, render_template("acme/pkg"))
+    shutil.copytree(REAL_PACKAGE, root)
     (root / "tool" / "uv.lock").write_text(LOCK)
 
     problems = stage_lock.lock_problems(root)

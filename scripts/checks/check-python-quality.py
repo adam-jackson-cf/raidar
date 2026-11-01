@@ -137,9 +137,19 @@ def _root_diagnostics(relpath: str) -> list[Diagnostic]:
     ]
 
 
+def _python_dir_parts(relpath: str) -> tuple[str, ...]:
+    """Stage namespaces and names are data labels, not Python import packages."""
+    parts = Path(relpath).parts[:-1]
+    if relpath.startswith("lab/stages/"):
+        return parts[:2] + parts[4:]
+    if relpath.startswith("orchestrator/tests/fixtures/stages/"):
+        return parts[:4] + parts[6:]
+    return parts
+
+
 def _generic_name_diagnostics(relpath: str) -> list[Diagnostic]:
     diagnostics: list[Diagnostic] = []
-    parts = Path(relpath).parts[:-1]
+    parts = _python_dir_parts(relpath)
     for part in parts:
         if part in GENERIC_NAME_PARTS:
             diagnostics.append(
@@ -190,10 +200,7 @@ def _package_dir_diagnostics(relpath: str) -> list[Diagnostic]:
         "src",
         "tests",
     }
-    parts = Path(relpath).parts[:-1]
-    if relpath.startswith("orchestrator/tests/fixtures/stages/"):
-        # A stage's hyphenated namespace and name folders are not Python import packages.
-        parts = parts[:4] + parts[6:]
+    parts = _python_dir_parts(relpath)
     for part in parts:
         if part in ignored_parts or _is_snake_case_name(part):
             continue

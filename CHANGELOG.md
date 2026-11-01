@@ -4,6 +4,19 @@ All notable changes to this project are documented in this file.
 
 ## Unreleased
 
+### Real docs-check and package copying (phase 5A step 5)
+
+- Ship `raidar/docs-check@1`, invoking pinned codespell 2.4.1 over repository text with six
+  offline fixtures, including binary, zero-byte, non-ASCII and nested-misspelling cases.
+- Replace `stage-new`'s generated template with a byte-preserving copy of `FROM=<ns>/<name>`,
+  defaulting to the real `raidar/docs-check` package. Delete `cli/stage_template.py`.
+  Change only the manifest name, preserving commands, skills, fixtures, modes and YAML
+  presentation (comments, anchors/aliases, scalar styles and CRLF), even for read-only manifests.
+  Refuse traversal, overwrites, symlinks and special files instead of copying unsafe trees.
+- Keep stage namespaces/names out of Python directory naming checks without relaxing the
+  package/module rules inside `tool/src`. Remove obsolete template and affected wiring assertions.
+  A real default-source `stage-new` followed by local `stage-check` passes on a renamed copy.
+
 ### Define stage package (phase 5A step 4)
 
 - Ship `raidar/define@1` with setup, a sealing prerequisite, a bounded stop and `criteria/1`

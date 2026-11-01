@@ -175,7 +175,7 @@ help:
 	@echo "  make experiment-lock EXPERIMENT=... [LOCK_CHECK=1]     Write (or check, naming stale sections) <experiment>.lock.json; refuses runtime"
 	@echo "                                                        incompatibilities (RT0-RT6); lock_sha256 covers execution inputs only"
 	@echo "                                                        DRAFT=1: smoke experiments only; writes under var/tmp/, jobs are dev, never admitted to a measured comparison"
-	@echo "  make stage-new NAME=<ns>/<name> [FROM=docs-check]     Write the complete tier-2 command package (pinned codespell gate, uv.lock, fixtures) at lab/stages/<ns>/<name>/ (never overwrites; upstream packages use ns raidar)"
+	@echo "  make stage-new NAME=<ns>/<name> [FROM=<ns>/<name>]     Copy a real package (default raidar/docs-check), preserving bytes/modes except its manifest name; refuses overwrites and unsafe trees"
 	@echo "  make stage-lock NAME=<ns>/<name>                      Generate the package's wheels-only tool/uv.lock (resolution only; no package code runs on the host)"
 	@echo "  make stage-check NAME=<ns>/<name> [REPLAY=<trial-dir>] [TARGET=name]"
 	@echo "                                                        Run fixtures twice, offline as UID 1000 in a throwaway pack container (never on the host), validate the static"

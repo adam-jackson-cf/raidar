@@ -24,3 +24,4 @@ workflows:
 stages:
   raidar/verify@1: 8b8a9af4e2f57491e0a9fabecfd9c8301ca5bbdb8982d6638ace605337d43128
   raidar/define@1: 2dc004c3683e4ee4d71f897c8cb41c759660b9bbfe3a563d6956f8c881efc028
+  raidar/docs-check@1: 517b57850d1ef748cf5985320ce6d805be5b5fd0a2fa2971983b97de0df5a827
