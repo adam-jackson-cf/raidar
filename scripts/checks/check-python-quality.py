@@ -49,8 +49,7 @@ SCRIPT_NAME_ALLOWLIST = {
     "verify-version-wiring.py",
 }
 
-# V2: only these lab-owned paths may install dependencies. The spike's installer is
-# retained until its phase-5 package port; no new workflow may install independently.
+# V2: only these lab-owned paths may install dependencies; no workflow installs independently.
 INSTALL_MODULES = frozenset(
     {
         "cli/env_harbor.py",
@@ -60,7 +59,6 @@ INSTALL_MODULES = frozenset(
         "subject/environment/python/provisioner.py",
         "subject/primitive/install.py",
         "subject/primitive/payload/install_tree.py",
-        "subject/workflow/verify.py",
     }
 )
 INSTALL_COMMAND = re.compile(r"\b(?:pip\s+install|uv\s+sync)\b")
