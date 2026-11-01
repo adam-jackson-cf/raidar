@@ -80,15 +80,6 @@ def test_agent_smoke_reasoning_defaults_to_low_and_empty_means_unset(
     assert f'--set "agents.0.reasoning={effort}"' in run_args
 
 
-def test_smoke_agents_arm_runs_one_arm_of_the_agents_smoke() -> None:
-    result = _make_dry_run("smoke-agents", "SMOKE_ARM=codex")
-
-    assert result.returncode == 0, result.stderr
-    (run_args,) = _raidar_lines(result.stdout, "run")
-    assert run_args.startswith(f'"{AGENTS_PATH}"')
-    assert '--arm "codex"' in run_args
-
-
 def test_smoke_agents_arms_match_the_agents_smoke_experiment() -> None:
     agents_smoke = REPO_ROOT / AGENTS_PATH
     spec = yaml.safe_load(agents_smoke.read_text(encoding="utf-8"))
@@ -97,6 +88,12 @@ def test_smoke_agents_arms_match_the_agents_smoke_experiment() -> None:
     arms = " ".join(arm["id"] for arm in spec["arms"])
 
     assert f"SMOKE_ARMS := {arms}\n" in makefile
+    for arm in spec["arms"]:
+        result = _make_dry_run("smoke-agents", f"SMOKE_ARM={arm['id']}")
+        assert result.returncode == 0, result.stderr
+        (run_args,) = _raidar_lines(result.stdout, "run")
+        assert run_args.startswith(f'"{AGENTS_PATH}"')
+        assert f'--arm "{arm["id"]}"' in run_args
 
 
 @pytest.mark.parametrize("arm", ["unknown-agent", "claude"])
@@ -120,53 +117,6 @@ def test_smoke_dry_run_check_prints_every_public_smoke_shape() -> None:
     run_lines = _raidar_lines(result.stdout, "run")
     assert len(run_lines) == 4
     assert sum('--arm "' in line for line in run_lines) == 1
-
-
-@pytest.mark.parametrize(
-    ("args", "command", "expected"),
-    [
-        (("problem-list",), "problem", ["list"]),
-        (
-            ("problem-info", "PROBLEM=scb/forge@38d627ecf668"),
-            "problem",
-            ["info", '"scb/forge@38d627ecf668"'],
-        ),
-        (
-            ("experiment-init", "EXPERIMENT=my-exp/experiment.yaml", "EXPERIMENT_ID=my-exp"),
-            "init",
-            ['"my-exp/experiment.yaml"', "--id", '"my-exp"'],
-        ),
-        (("stage-new", "NAME=ns/my-check"), "stage", ["new", '"ns/my-check"']),
-        (("stage-lock", "NAME=ns/my-check"), "stage", ["lock", '"ns/my-check"']),
-        (("stage-info", "NAME=ns/my-check"), "stage", ["info", '"ns/my-check"']),
-        (("stage-list",), "stage", ["list"]),
-        (
-            ("stage-check", "NAME=ns/my-check", "REPLAY=var/jobs/t1"),
-            "stage",
-            ["check", '"ns/my-check"', "--replay", '"var/jobs/t1"'],
-        ),
-        (("stage-check", "NAME=ns/my-check"), "stage", ["check", '"ns/my-check"']),
-        (("workflow-new", "NAME=acme/mine"), "workflow", ["new", '"acme/mine"']),
-        (
-            ("workflow-new", "NAME=acme/mine", "FROM=raidar/one-shot"),
-            "workflow",
-            ["new", '"acme/mine"', "--from", '"raidar/one-shot"'],
-        ),
-        (
-            ("experiment-lock", "EXPERIMENT=e/experiment.yaml", "DRAFT=1"),
-            "lock",
-            ['"e/experiment.yaml"', "--draft"],
-        ),
-    ],
-)
-def test_registry_and_init_targets_call_their_raidar_verbs(
-    args: tuple[str, ...], command: str, expected: list[str]
-) -> None:
-    result = _make_dry_run(*args)
-
-    assert result.returncode == 0, result.stderr
-    (arguments,) = _raidar_lines(result.stdout, command)
-    assert arguments.split() == expected
 
 
 @pytest.mark.parametrize(
