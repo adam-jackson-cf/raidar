@@ -13,6 +13,8 @@ from raidar.subject.agent.definition import load_agent
 from raidar.subject.workflow.definition import WORKFLOW_FILE, load_workflow
 
 REAL_LAB = Path(__file__).resolve().parents[2] / "lab"
+SPIKE_WORKFLOWS = Path(__file__).resolve().parent / "spike_workflows"
+"""Schema-1 copies of the former shipped workflows for the spike tests (deleted with the spike)."""
 
 
 def release_tree(root: Path, *, register: bool = True) -> Path:
@@ -20,9 +22,7 @@ def release_tree(root: Path, *, register: bool = True) -> Path:
     agents, workflows = agents_root(root), workflows_root(root)
     agents.mkdir(parents=True)
     shutil.copy(REAL_LAB / "agents" / "codex.yaml", agents / "codex.yaml")
-    shutil.copytree(
-        REAL_LAB / "workflows" / "raidar" / "one-shot", workflows / "raidar" / "one-shot"
-    )
+    shutil.copytree(SPIKE_WORKFLOWS / "raidar" / "one-shot", workflows / "raidar" / "one-shot")
     if register:
         write_register(root)
     return root

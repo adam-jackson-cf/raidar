@@ -288,7 +288,7 @@ def test_a_benchmark_may_not_compare_workflows() -> None:
     document["arms"][1]["workflow"] = "acme/other@1"
 
     assert [issue.loc for issue in kind_issues(ExperimentSpec.model_validate(document))] == ["arms"]
-    document["arms"][1]["workflow"] = "raidar/one-shot@1"
+    document["arms"][1]["workflow"] = "raidar/one-shot@2"
     assert kind_issues(ExperimentSpec.model_validate(document)) == []
 
 

@@ -21,7 +21,7 @@ from raidar.subject.workflow.definition import (
     WorkflowDefinitionError,
     load_workflow,
 )
-from tests.release_support import REAL_LAB, edit_agent, release_tree, write_workflow
+from tests.release_support import SPIKE_WORKFLOWS, edit_agent, release_tree, write_workflow
 
 
 @pytest.fixture
@@ -40,9 +40,9 @@ def _build(prompt: str) -> dict[str, Any]:
 def test_the_real_definitions_load(tree: Path) -> None:
     assert load_agent(agents_root(tree), "codex").name == "codex"
     assert load_workflow(workflows_root(tree), "raidar/one-shot").enabled_stages == ("build",)
-    verifying = load_workflow(REAL_LAB / "workflows", "raidar/one-shot-verify")
+    verifying = load_workflow(SPIKE_WORKFLOWS, "raidar/one-shot-verify")
     assert verifying.enabled_stages == ("build", "verify")
-    defining = load_workflow(REAL_LAB / "workflows", "raidar/define-build-verify")
+    defining = load_workflow(SPIKE_WORKFLOWS, "raidar/define-build-verify")
     assert defining.enabled_stages == ("define", "build", "verify")
 
 
@@ -57,7 +57,7 @@ def test_a_workflow_with_an_unknown_stage_is_refused(tree: Path) -> None:
 
 
 def test_the_define_prompt_needs_the_units_token_once() -> None:
-    real = load_workflow(REAL_LAB / "workflows", "raidar/define-build-verify")
+    real = load_workflow(SPIKE_WORKFLOWS, "raidar/define-build-verify")
     stages: Any = copy.deepcopy(real.to_json()["stages"])
     stages["define"]["prompt"] = "no units"
 
@@ -71,7 +71,7 @@ def test_the_define_prompt_needs_the_units_token_once() -> None:
 def test_the_verify_token_is_in_the_build_prompt_exactly_when_verify_runs(
     tree: Path, enabled: bool
 ) -> None:
-    real = load_workflow(REAL_LAB / "workflows", "raidar/one-shot-verify").to_json()
+    real = load_workflow(SPIKE_WORKFLOWS, "raidar/one-shot-verify").to_json()
     stages: Any = real["stages"]
     stages["verify"]["enabled"] = enabled
     without = f"do {TASK_TOKEN}"
@@ -120,7 +120,7 @@ def test_a_skill_no_stage_lists_is_refused(tree: Path) -> None:
 
 def test_the_skill_bytes_are_part_of_the_workflow_hash(tmp_path: Path) -> None:
     root = tmp_path / "workflows"
-    shutil.copytree(REAL_LAB / "workflows", root)
+    shutil.copytree(SPIKE_WORKFLOWS, root)
     before = load_workflow(root, "raidar/define-build-verify")
     skill = root / "raidar" / "define-build-verify" / "skills" / "aspect-writing" / "SKILL.md"
     skill.write_text(skill.read_text(encoding="utf-8") + "\n", encoding="utf-8")
@@ -129,7 +129,7 @@ def test_the_skill_bytes_are_part_of_the_workflow_hash(tmp_path: Path) -> None:
 
 
 def test_skills_are_placed_for_the_enabled_stages_only(tmp_path: Path) -> None:
-    definition = load_workflow(REAL_LAB / "workflows", "raidar/define-build-verify")
+    definition = load_workflow(SPIKE_WORKFLOWS, "raidar/define-build-verify")
 
     placed = skill_files(definition, ".agents/skills")
 

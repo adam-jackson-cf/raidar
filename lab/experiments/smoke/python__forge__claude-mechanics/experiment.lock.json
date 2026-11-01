@@ -841,7 +841,7 @@
       "tree-sitter-language-pack": "0.13.0"
     }
   },
-  "document_sha256": "3deddb84809e13d50be477501f87fa751bb4f3bc5408f75a37deaf98253c1f09",
+  "document_sha256": "be3ff34d607bf10f9ef14c79aa308ef6cf2eca40dce870f99b7dcfa9257c486a",
   "execution": {
     "arms": {
       "baseline": {
@@ -859,11 +859,13 @@
           "version_pin": "2.1.285",
           "workflow_skills": "placement.skills .claude/skills in the workspace /app"
         },
-        "digest": "528611e51b00e3134fe26656f42ad8ef6292a7e723d3330fd4bcaf6f2936543e",
+        "digest": "4bbbd6c58e82781246b818fd7e17db584ed216dc96620b31a8a590ecd516c79e",
         "model": "claude-sonnet-4-6",
         "packages": {},
         "primitive_code": {
-          "build": "f8a15e14c3b45409a2e2cab025e9e2059b18cb16d6ddb055ea76c13f206284bd"
+          "frame/1": "b0cd981a275a0f25f6e1cec75f882f9eeb773bda33ec4d9d04de0cc20efafbab",
+          "install/1": "e3181fe8d2a4cf86d776b4a88bd31aec726ccd818e4484b56be66ec4e627ce8e",
+          "runner/1": "ce6eb5ce138d7c802e72d0d35ae220a09169c3c5b29ab42ca558c44069f5efc9"
         },
         "provider": "anthropic",
         "reasoning": "low",
@@ -872,8 +874,8 @@
           "package": "@anthropic-ai/claude-code",
           "version": "2.1.285"
         },
-        "workflow": "raidar/one-shot@1",
-        "workflow_sha256": "7041679bb89e24a756cbcdd84ebf8260f960baf44c77ec48bdb26d43a86a1113"
+        "workflow": "raidar/one-shot@2",
+        "workflow_sha256": "39e672e9c1c14311757c5d3393b74d5d3f50d1f209d4abf4943445ed6f83fb40"
       }
     },
     "design": {
@@ -889,7 +891,7 @@
         {
           "agent": "agent",
           "id": "baseline",
-          "workflow": "raidar/one-shot@1"
+          "workflow": "raidar/one-shot@2"
         }
       ],
       "attempts": 1,
@@ -1663,12 +1665,10 @@
         }
       },
       "workflow": {
-        "raidar/one-shot@1": {
-          "digest": "7041679bb89e24a756cbcdd84ebf8260f960baf44c77ec48bdb26d43a86a1113",
+        "raidar/one-shot@2": {
+          "digest": "39e672e9c1c14311757c5d3393b74d5d3f50d1f209d4abf4943445ed6f83fb40",
           "metadata": {
-            "stages": [
-              "build"
-            ]
+            "stages": []
           }
         }
       }
@@ -1687,10 +1687,10 @@
   "experiment": {
     "id": "python__forge__claude-mechanics",
     "source": "experiment.yaml",
-    "source_sha256": "92d203f82fb550d99a5c501db878fe46940054e0ca8e211b7675f8a4ce533538",
-    "spec_sha256": "b66de11a7a867693d48a7fb1d0677edebad2b2508be374c6faaf2909bdc58145"
+    "source_sha256": "013479d450ee1b9dd2f13941ece97f299680b38d7eb30168c71740e0cc7c8c8d",
+    "spec_sha256": "112a149cdc447debede727f61e544d236479047ed630c629ffdf49e5dab1dcf6"
   },
-  "lock_sha256": "2647a86dba8ef92fe2455da9c1e4f0064f54309956b46de202fd0d198a41513f",
+  "lock_sha256": "66fc193db7c6fa971f3ba4c00393bef2906f0ad5820d8e9da4060dca8b19453f",
   "lock_version": 5,
   "overrides": {
     "flags": {},
@@ -1699,8 +1699,8 @@
   "sections": {
     "analysis": "1b12d4c79118b1962282a0c33350352b893d39995117c241bba045eff2a1d044",
     "assessment": "dce26b7322a34e10c22c380fff0f675581046b9df217d283beaef5d6a55efb37",
-    "execution": "2647a86dba8ef92fe2455da9c1e4f0064f54309956b46de202fd0d198a41513f",
-    "toolchain": "9a32fba5858fad219ac72112d73a8896da8790e53180ce35ddc3f94710a30cbc"
+    "execution": "66fc193db7c6fa971f3ba4c00393bef2906f0ad5820d8e9da4060dca8b19453f",
+    "toolchain": "f659222273077d164b616b044b099482329257b8242be3400bb8174638133474"
   },
   "spec": {
     "agents": [
@@ -1726,7 +1726,7 @@
       {
         "agent": "agent",
         "id": "baseline",
-        "workflow": "raidar/one-shot@1"
+        "workflow": "raidar/one-shot@2"
       }
     ],
     "assessment": {
@@ -1770,6 +1770,6 @@
     "litellm": "1.102.1",
     "python": "3.13.7",
     "raidar": "0.15.0",
-    "raidar_spec": "056509cc54665388e077fca119c297b6b58f6b60db29b63cc181aed67159023d"
+    "raidar_spec": "c05fb465122b93838e790d70bf993f25de457615e2393bfbec74b0abecbbf87a"
   }
 }

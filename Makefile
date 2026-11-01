@@ -136,7 +136,7 @@ help:
 	@echo "  make harbor-cleanup [JOB=<job-dir>] [DRY_RUN=1]        Remove trial environments a stopped job left behind"
 	@echo "  make quality                                           Run repo quality gates"
 	@echo "  make structure-check                                   Check the repository layout (no versions in names, root and package allowlists, depth); part of make quality"
-	@echo "  make release-archive REF=<name>@<N>                    Tag archive/<name>@<N> at HEAD before editing a released scorer in place (refuses an existing tag)"
+	@echo "  make release-archive REF=<name>@<N>                    Tag archive/<name>@<N> at HEAD before editing a released definition in place (refuses an existing tag)"
 	@echo "  Generated data lives under var/ (git-ignored; RAIDAR_VAR=<dir> relocates it): jobs, stores, analysis, problems, tmp"
 	@echo "  Secrets: execute/smoke/assess/jev targets inject Infisical (project mac-os-cf, env dev) when the infisical"
 	@echo "  CLI is logged in, else read orchestrator/.env. [SECRETS=auto|infisical|dotenv] [INFISICAL_ENV=dev]"

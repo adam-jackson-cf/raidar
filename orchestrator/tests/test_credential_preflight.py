@@ -64,8 +64,8 @@ def _spec(tmp_path: Path) -> ExperimentSpec:
     document = experiment_document(kind="benchmark")
     document["agents"].append({**document["agents"][0], "id": "second"})
     document["arms"] = [
-        {"id": "first", "agent": "luna", "workflow": "raidar/one-shot@1"},
-        {"id": "second", "agent": "second", "workflow": "raidar/one-shot@1"},
+        {"id": "first", "agent": "luna", "workflow": "raidar/one-shot@2"},
+        {"id": "second", "agent": "second", "workflow": "raidar/one-shot@2"},
     ]
     document["analysis"]["baseline_arm"] = "first"
     return load_experiment(write_experiment(tmp_path, document)).spec

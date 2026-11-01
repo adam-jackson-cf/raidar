@@ -1,11 +1,12 @@
-# One-shot: one build turn per checkpoint; released as one-shot@N in lab/releases.yaml.
-# The build prompt is factory-x-loops' measured baseline workflow/one-shot/v1.toml
-# ([stage_prompts] implement), byte for byte; %%%TASK%%% is the checkpoint's task text.
-schema: 1
+# One-shot: one build turn per checkpoint; the default workflow of an arm that names none.
+# Released as raidar/one-shot@N in lab/releases.yaml. The build prompt is factory-x-loops'
+# measured baseline workflow/one-shot/v1.toml ([stage_prompts] implement), byte for byte;
+# %%%TASK%%% is the checkpoint's task text. No stages: the build frame alone.
+schema: 2
 name: one-shot
-stages:
-  build:
-    prompt: |-
-      Work the issue below per the repository's own rules.
+build:
+  prompt: |-
+    Work the issue below per the repository's own rules.
 
-      %%%TASK%%%
+    %%%TASK%%%
+stages: []

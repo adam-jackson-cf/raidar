@@ -201,6 +201,22 @@ regression criteria and gate acceptance/refusal.
 passing and refusing text, nested misspellings, non-ASCII text, zero-byte files and binary files.
 The package invokes the pinned dependency directly; there is no generated placeholder checker.
 
+## Shipped workflows (schema 2)
+
+- `raidar/one-shot@2`: no stages; the default of an arm that names no workflow.
+- `raidar/one-shot-verify@2`: `raidar/verify@1`, zero gate fix turns; the default source of
+  `make workflow-new NAME=acme/my-workflow`.
+- `raidar/define-build-verify@2`: `raidar/define@1` then `raidar/verify@1`, two gate fixes,
+  `acceptance-reply/1`, `define.criteria` and the pinned aspect judge (at most three passes).
+  Schema validation, registration and locking work; trial execution deliberately refuses
+  until phase 5B wires reply and judge execution to `criteria/1`.
+
+The schema-1 namespaced `@1` releases are preserved by immutable `archive/raidar/<name>@1`
+tags. All three build prompt strings and the judge rework string remain byte-identical.
+Fixed framing, equal checkpoint deadlines and the fit rule are unchanged. Package parameters
+retain their defaults. Wheel installation uses `--no-installer-metadata`: transient uv cache
+timestamps cannot stale installed-tree locks, and every file actually installed is still hashed.
+
 ## Contract history
 
 - 2026-10-28: `stage/1`, `stage-tree/1` and `criteria/1` specified before the generic package implementation. Spike stage classes remain until the phase-5 port; they are not the author API.

@@ -5,12 +5,14 @@ from __future__ import annotations
 import hashlib
 import os
 import shutil
+from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
 import pytest
 
 from raidar.contract import wheel_cache
+from raidar.contract.wheels import LockedWheel
 from raidar.subject.primitive import calls, install
 from tests.dependency_support import make_wheel
 from tests.primitive_support import LocalEnvironment, relocate
@@ -77,6 +79,34 @@ async def _install(
         owner=None,
         **options,  # type: ignore[arg-type]
     )
+
+
+@needs_uv
+async def test_fresh_installs_match_despite_different_uploaded_wheel_timestamps(
+    container: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    wheel = make_wheel(container / "wheels", "demo")
+    files = _files(_lock({"demo": wheel}))
+    original = install._stage
+    timestamps = iter((1_000_000_000, 2_000_000_000))
+
+    def stage(
+        host: Path,
+        tool: Sequence[install.ShippedFile],
+        wheels: Sequence[LockedWheel],
+        cache_root: Path | None,
+    ) -> None:
+        original(host, tool, wheels, cache_root)
+        timestamp = next(timestamps)
+        for path in (host / "wheels").iterdir():
+            os.utime(path, ns=(timestamp, timestamp))
+
+    monkeypatch.setattr(install, "_stage", stage)
+    first = await _install(container, files)
+    shutil.rmtree(first.root)
+    second = await _install(container, files)
+
+    assert first.digest == second.digest
 
 
 @needs_uv
