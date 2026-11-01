@@ -448,7 +448,15 @@ The rule is therefore attribution by control run, from `stage-stop-failure-opus.
   To compare two versions of a method in one experiment, give the variant its own name.
 - **References** are `ns/name@N`; a stage reference without a namespace is refused. `raidar/` is reserved for upstream packages and protected by CODEOWNERS on `lab/stages/raidar/`. Bare names, `latest`, branches, tags and paths are refused when the workflow is parsed.
 - **The digest does not depend on the transport.** Git, OCI or archive imports can later populate `lab/stages/<ns>/` with no migration, verified against `stage-tree/1`.
-- **Workflow namespaces and local imports (R5).** Workflow references are `ns/name@N` with folders at `lab/workflows/<ns>/<name>/`; a bare workflow reference is refused. The earlier bare releases stay in the register as frozen history and never resolve. `make stage-import` and `make workflow-import` copy an exported folder (fixtures included) after reading bytes only, with the existing symlink, special-file and traversal refusals, and verify it against the supplied digest (`stage-tree/1`, or the definition digest). They refuse the `raidar/` namespace, a digest mismatch and different bytes under an existing release, print the release line, and neither release nor authorize the package. `workflow-import` also refuses any `use:` not registered with an identical digest, so packages are imported first. Provenance, `{sha256, source: <repo>@<commit>:<path>}`, goes in `lab/imports.yaml`, which `releases-check` verifies. `stage-check` stays required for imported packages. Remote transports stay deferred.
+- **Workflow namespaces and local imports (R5).** Workflow references are `ns/name@N` with folders at `lab/workflows/<ns>/<name>/`; a bare workflow reference is refused. The earlier bare releases stay in the register as frozen history and never resolve. `make stage-import` and `make workflow-import` copy an exported folder (fixtures included) after reading bytes only, with the existing symlink, special-file and traversal refusals, and verify it against the supplied digest (`stage-tree/1`, or the resolved definition digest). They refuse the `raidar/` namespace, a digest mismatch and different bytes under an existing release, print the release line, and neither release nor authorize the package. `workflow-import` also refuses any `use:` not registered with an identical digest, so packages are imported first. `stage-check` stays required for imported packages. Remote transports stay deferred.
+  - Both import commands require `SOURCE=<one non-empty line>`. `lab/imports.yaml` records
+    `{name, sha256, source}`, one entry per digest, with source verbatim. Provenance is
+    **unverified**: it is never resolved against a repository or commit. Missing, blank or
+    multiline source, or a recorded digest with different source/name, is refused. Identity
+    is the digest only; source enters no release, lock, pooling or admission.
+  - `releases-check` requires a matching import entry for every non-`raidar` package/workflow
+    folder and every historical release of an imported name; every source is one non-empty
+    line. Imports never overwrite different existing bytes, including under a frozen release.
 - **Drafts.** `make experiment-lock … DRAFT=1` is allowed only for `smoke` experiments. It resolves unregistered packages from the working tree and writes the lock under `var/tmp/`. Draft jobs are dev jobs, and they never admit a measured run.
 - **Lock-time checks, family ST**, beside RT0–RT6. The lock is refused when:
   - **ST1:** the package contract is unsupported;
@@ -475,8 +483,8 @@ The rule is therefore attribution by control run, from `stage-stop-failure-opus.
   | `make stage-list` | Every package, its latest release and digest |
   | `make stage-info NAME=ns/x` | The expanded manifest: commands, triggers, outputs, resolved params, closure |
   | `make workflow-new NAME=ns/x [FROM=raidar/one-shot-verify]` | Copies a shipped workflow as a starting point; the default template is `raidar/one-shot-verify` |
-  | `make stage-import SRC=<dir> NAME=ns/x SHA256=<stage-tree/1>` | Imports an exported package verified against its digest; prints the release line; records `lab/imports.yaml` |
-  | `make workflow-import SRC=<dir> NAME=ns/x SHA256=<digest>` | The same for a workflow; refuses a `use:` that is not registered with an identical digest |
+  | `make stage-import SRC=<dir> NAME=ns/x SHA256=<stage-tree/1> SOURCE=<line>` | Imports exact package bytes; records unverified provenance and prints the release line |
+  | `make workflow-import SRC=<dir> NAME=ns/x SHA256=<digest> SOURCE=<line>` | Same for a workflow; requires every dependency registered with identical bytes |
 
   `releases-check` and `structure-check` are extended to cover packages; `releases-check` also verifies `lab/imports.yaml`.
 - **Trust (C4, accepted for the first version, documented).**
