@@ -553,6 +553,7 @@ lab/workflows/raidar/
 - Live controls only act and record, and readings never invalidate.
 - One health report per trial is the **only** producer of validity. Today's execution checks (`engine/trial/collect.py:336-381`, `finish.py:50-59`) move into it.
 - **Validity rows (S6).** Missing evidence for an enabled package or primitive invalidates the trial. Instrument failures and agent outcomes follow section 5.3.
+- **Phase-5 W rows.** W3–W7 read locked `gate/1`; W8 reads declared `setup/1`, `stop/1` and `outputs/1`; W9 reads `stop/1`; W10 reads `acceptance-reply/1` and `jev-judge/1`. Applicability comes from host-written schema-2 config and locked primitive ids, never stage names or agent-writable records. Package manifest declarations are copied into trial config only, outside package/lock identity; missing or inconsistent declarations fail closed. A refused canary with no instrument error is healthy evidence. The generic family cutover remains phase 6.
 
 | Family | Checks | Generic or tied to a primitive |
 |---|---|---|

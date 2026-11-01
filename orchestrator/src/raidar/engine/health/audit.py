@@ -18,10 +18,6 @@ result can be trusted, and returns one ``HealthReport`` (``health.json``). Famil
   plugin recommendations, ``AGENTS.md`` text only from the workspace).
 - **T** tamper: ``T1`` the tool tree is unchanged since the first hash; ``T2`` the records
   manifest verifies; ``T3`` the reaper left no residual process.
-- **G** the verify gate, only when the workflow records show a verify stage
-  (``raidar.engine.health.gate``): ``G1`` the hook's records agree with the seals' and ``G2`` no
-  bypass are readings of the agent-writable hook log, never validity; ``G3`` the gate's tools
-  unchanged is a validity check.
 - **E** the define stage, only when the workflow records show one
   (``raidar.engine.health.definition``): ``E1`` every gate-passed checkpoint holds a sealed,
   passing definition; ``E2`` the recorded ``define`` calls agree with the final draft; ``E3`` an

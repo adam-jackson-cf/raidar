@@ -373,7 +373,7 @@ def execution_validity(
 # validity failure. ``P8`` is the isolation of the agent's skills and instructions; ``G`` the
 # verify gate's integrity (changed gate tools: ``G3`` only, Raidar's own digest of the tool
 # directory; ``G1`` and ``G2`` read the agent-writable hook log, so they are readings that never
-# invalidate, like ``D1``); ``W`` the table of lab-owned evidence an enabled stage must leave
+# invalidate, like ``D1``); ``W`` the table of lab-owned evidence a locked primitive must leave
 # (``raidar.engine.health.evidence``): missing evidence there is invalid, unlike the
 # ``unmeasured`` readings of G, E, J and P8 (W5, the hook log, and the hook-log findings of W11
 # are readings too).
@@ -382,7 +382,6 @@ HEALTH_VALIDITY: Mapping[str, tuple[str, ...]] = {
     "health_budgets": ("H1", "H3", "H4", "H5", "H6"),
     "health_tamper": ("T1", "T2", "T3"),
     "health_isolation": ("P8",),
-    "health_gate": ("G3",),
     "health_define": ("E1", "E2", "E3"),
     "health_judge": ("J1", "J2", "J3"),
     "health_evidence": tuple(f"W{n}" for n in range(1, 12)),

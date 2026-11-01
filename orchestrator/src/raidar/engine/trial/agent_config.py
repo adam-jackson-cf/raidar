@@ -46,13 +46,33 @@ def effective_agent_timeout_s(agent_timeout_sec: int) -> float:
     )
 
 
+def _declared(arm: ResolvedArm) -> dict[str, dict[str, object]]:
+    """Each locked package's manifest declarations (setup, stop, output names), read from the
+    resolved ``StagePackage`` of the same package tree whose ``stage-tree/1`` digest the lock
+    guards. Written to the trial configuration only (never to the lock or any identity): health
+    reads them to know which setup, stop and output records a package owes, and treats a missing
+    or malformed declaration as unknown applicability."""
+    return {
+        stage.release.name: {
+            "setup": stage.package.manifest.setup is not None,
+            "stop": stage.package.manifest.on_stop is not None,
+            "outputs": sorted(stage.package.manifest.outputs),
+        }
+        for stage in arm.workflow.stages
+    }
+
+
 def _package_kwargs(arm: ResolvedArm, pack: PackSpec) -> dict[str, object]:
-    """What a package workflow's runner needs beyond its definition: the locked packages, the
-    primitives' code identities and the pack the trial's container is built from."""
+    """What a package workflow's runner needs beyond its definition: the locked packages (with
+    their declarations, which are not part of the lock's identity), the primitives' code
+    identities and the pack the trial's container is built from."""
     if not arm.workflow.stages:
         return {}
+    declared = _declared(arm)
     return {
-        "locked_packages": arm.packages,
+        "locked_packages": {
+            name: {**entry, "declared": declared[name]} for name, entry in arm.packages.items()
+        },
         "primitives": arm.primitive_code,
         "pack": image_lock_hash(pack),
     }
