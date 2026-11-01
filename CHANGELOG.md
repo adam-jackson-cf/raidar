@@ -4,6 +4,22 @@ All notable changes to this project are documented in this file.
 
 ## Unreleased
 
+### Test-suite integration and identity preservation
+
+- Separate fast decisions from slow process seams and quality canaries; keep
+  Docker, security and performance checks on the local target without model calls.
+- Restore the validated grading implementation and test it through existing
+  interfaces and monkeypatched runners. Test-only changes must preserve grading,
+  primitive and released-package identities; deliberate identity changes require
+  separate review with before/after values and scheduled revalidation.
+- Remove the unused primitive resolver, auth metadata method, unused reasoning
+  override and redundant credential-redaction guard as reviewed dead-code cleanup;
+  regenerate affected execution locks without changing released package bytes.
+- Known deferred resolver gap: malformed `uv --version` output and unreadable
+  generated locks can escape as parser/index/key errors instead of
+  `DependencyInfraError`. Error normalization is deferred to a deliberate grading
+  change with revalidation; it is not part of this test-only integration.
+
 ### Phase-5 local exit evidence (phase 5B step 7)
 
 - Local OrbStack security: 38 cases passed, including all seven AT3 cases; AT4 passed 46

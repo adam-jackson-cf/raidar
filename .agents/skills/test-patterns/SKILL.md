@@ -64,6 +64,12 @@ What each tier is, its selector, budget, coverage floors and make target:
 - Never weaken an assertion, add a coverage pragma, or widen coverage `omit`
   to reach a floor; delete unreachable code instead. Never lower a coverage
   floor.
+- Test-only work must not change identity-bearing bytes: the grading digest
+  scope, `primitive_code` import closures, or released package bytes. Reach
+  that code through existing interfaces or monkeypatched runners instead.
+  An identity change requires its own reviewed commit with before/after
+  values, a reason, and any required revalidation scheduled; a test slice
+  that moves identity fails review.
 - Stage tool sources stay in coverage. Released package bytes are frozen
   (raidar-release); prove package behaviour beyond in-process units through
   `make stage-check`. Fixture programs are inputs, not coverage targets; their

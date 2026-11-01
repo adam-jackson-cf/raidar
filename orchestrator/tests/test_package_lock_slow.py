@@ -23,10 +23,9 @@ from raidar.subject.workflow.identity import (
     primitive_code,
     primitive_inventory,
 )
-from tests.health_support import healthy_trial
+from tests.health_support import audit, healthy_trial
 from tests.package_support import STAGE_FIXTURES
 from tests.scorer_support import fake_registry, two_step_trial
-from tests.test_trial_health_audit import audit
 
 pytestmark = pytest.mark.slow
 

@@ -19,26 +19,16 @@ from raidar.contract.trial import (
 )
 from raidar.engine.health import audit as checks
 from raidar.engine.health import signals
-from raidar.engine.health.audit import audit_trial
 from raidar.engine.health.base import Audit
 from raidar.engine.health.fault_candidates import FAULT_CANDIDATES, append_fault_candidates
 from raidar.engine.health.model import HealthCheck, HealthReport, load_health
 from raidar.engine.trial.collect import health_validity
 from raidar.engine.trial.finish import HEALTH_ERROR_FILE, audit_and_write
 from tests.execution_support import StepOutcome, _record
-from tests.health_support import LIMITS, STEP, TRIAL_ID, HealthyTrial, _context
+from tests.health_support import LIMITS, STEP, TRIAL_ID, _context
 
 LATE = "2026-09-30T14:00:00+00:00"
 KILL = {"killed": ["42 1000 S node codex", "43 1000 S sleep 9999"], "residual": [], "error": None}
-
-
-def audit(t: HealthyTrial, record: Any = None) -> dict[str, HealthCheck]:
-    report = audit_trial(t.job_dir, t.trial_dir, record or t.record, t.job())
-    return {check.id: check for check in report.checks}
-
-
-def status(t: HealthyTrial, check_id: str, record: Any = None) -> str:
-    return audit(t, record)[check_id].status
 
 
 def _phase(decision: str, **extra: Any) -> dict[str, Any]:
@@ -47,8 +37,8 @@ def _phase(decision: str, **extra: Any) -> dict[str, Any]:
 
 
 @pytest.fixture
-def evidence(monkeypatch: pytest.MonkeyPatch) -> Audit:
-    """Inject only the reader; checks consume real record/ledger models and parsed result data."""
+def evidence() -> Audit:
+    """An in-memory audit: checks consume real record/ledger models and parsed result data."""
     ledger = _record(STEP, StepOutcome(STEP), Path("/trial"))
     ctx = _context((STEP,))
     step = StepResult(
@@ -81,8 +71,7 @@ def evidence(monkeypatch: pytest.MonkeyPatch) -> Audit:
             {"step_name": STEP, "agent_execution": dict(span), "verifier": dict(span)}
         ],
     }
-    monkeypatch.setattr("raidar.engine.health.base.read_result", lambda path: result)
-    found = Audit(
+    return Audit(
         Path("/job"),
         Path(f"/job/trials/{TRIAL_ID}"),
         record,
@@ -92,14 +81,14 @@ def evidence(monkeypatch: pytest.MonkeyPatch) -> Audit:
             "concurrency": 1,
             "execution_target": {"name": "local", "docker": {"ncpu": 4}},
         },
+        result=result,
+        ledgers={STEP: ledger},
     )
-    found._ledgers[STEP] = ledger
-    return found
 
 
 def test_v1_a_timed_out_evaluator_is_never_a_pass(evidence: Audit) -> None:
     ledger = _record(STEP, StepOutcome(STEP, infra="sandbox_timeout"), Path("/trial"))
-    evidence._ledgers[STEP] = ledger
+    evidence._ledgers = {**evidence._ledgers, STEP: ledger}
     evidence.attempted = (
         evidence.attempted[0].model_copy(
             update={
@@ -122,7 +111,7 @@ def test_v1_a_timed_out_evaluator_is_never_a_pass(evidence: Audit) -> None:
 
 
 def test_v_checks_without_a_verifier_record_are_unmeasured(evidence: Audit) -> None:
-    evidence._ledgers[STEP] = None
+    evidence._ledgers = {**evidence._ledgers, STEP: None}
     assert {
         check(evidence).status for check in (checks.check_v1, checks.check_v2, checks.check_v3)
     } == {"unmeasured"}

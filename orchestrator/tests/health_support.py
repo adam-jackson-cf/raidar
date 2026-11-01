@@ -21,7 +21,9 @@ from raidar.contract.trial import (
     ValidityCheck,
 )
 from raidar.design.experiment.schema import ProtocolSpec
+from raidar.engine.health.audit import audit_trial
 from raidar.engine.health.base import Audit
+from raidar.engine.health.model import HealthCheck
 from raidar.engine.health.records_manifest import seal_trial
 from raidar.engine.trial.collect import TrialContext, classify_trial
 from raidar.engine.trial.progression import progression_rule
@@ -81,6 +83,16 @@ class HealthyTrial:
         record_file = self.job_dir / "trial-records" / f"{TRIAL_ID}.json"
         digest = seal_trial(self.trial_dir, record_file, self.job_dir)
         self.set_job(records_manifests={TRIAL_ID: digest}, finished_at="2026-01-01T00:00:00+00:00")
+
+
+def audit(t: HealthyTrial, record: TrialRecord | None = None) -> dict[str, HealthCheck]:
+    """Audit a stored trial through the real evidence readers."""
+    report = audit_trial(t.job_dir, t.trial_dir, record or t.record, t.job())
+    return {check.id: check for check in report.checks}
+
+
+def status(t: HealthyTrial, check_id: str, record: TrialRecord | None = None) -> str:
+    return audit(t, record)[check_id].status
 
 
 def _context(steps: tuple[str, ...]) -> TrialContext:
