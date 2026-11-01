@@ -13,6 +13,7 @@ from typing import Any
 import pytest
 
 from raidar.grading import sandbox as sandbox_module
+from raidar.grading.payload import runtime_files
 from raidar.grading.sandbox import (
     CONTAINER_LAYOUT,
     GRADER_ROLE_LABEL,
@@ -95,6 +96,14 @@ def test_copy_in_tar_sets_ownership_and_modes(tmp_path: Path) -> None:
     assert out.isdir()
     assert (out.uid, out.gid) == (1000, 1000)
     assert not any(name.startswith("oracle/out/") for name in members)
+    with tarfile.open(tmp_path / "in.tar") as archive:
+        shipped = {
+            member.name.removeprefix("oracle/runtime/"): archive.extractfile(member).read()
+            for member in archive.getmembers()
+            if member.isfile() and member.name.startswith("oracle/runtime/")
+        }
+    assert shipped == {name: path.read_bytes() for name, path in runtime_files().items()}
+    assert not any("__pycache__" in name for name in members)
 
 
 def test_copy_in_tar_keeps_case_sensitive_names_and_symlinks(tmp_path: Path) -> None:

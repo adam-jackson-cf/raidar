@@ -15,24 +15,22 @@ docstring edit leaves a digest unchanged.
 
 from __future__ import annotations
 
-import ast
 from collections.abc import Iterable, Mapping
 from functools import cache
 from importlib.metadata import version
 from pathlib import Path
 
-import raidar_contract
 from raidar_contract.agent import AgentName
 from raidar_contract.canonical import digest_json
 from raidar_contract.package.manifest import StagePackage
 from raidar_contract.workflow import PackageWorkflowDefinition
 
+from raidar.contract import source_imports
 from raidar.contract.source_digest import SOURCE_DIGEST_SCHEME, python_source_digest
 from raidar.subject.primitive.registry import PRIMITIVE_MODULES, WORKFLOW_PRIMITIVE_MODULES
 
 RAIDAR_DIR = Path(__file__).resolve().parents[2]
-CONTRACT_DIR = Path(raidar_contract.__file__).resolve().parent
-ROOT_PACKAGE = "raidar"
+CONTRACT_DIR = source_imports.CONTRACT_DIR
 CONTRACT_PACKAGE = "raidar_contract"
 PAYLOAD_DIR = "subject/primitive/payload"
 RUNNER_ID = "runner/1"
@@ -64,70 +62,10 @@ ADAPTER_ENTRIES: Mapping[AgentName, tuple[str, ...]] = {
 path string (``native_agent_class``), which a source closure cannot follow, so each is a root."""
 
 
-def _source(module: str) -> Path | None:
-    """The file of ``raidar`` or ``raidar_contract`` module ``module`` (a package ``__init__``)."""
-    root, _, rest = module.partition(".")
-    if root == ROOT_PACKAGE:
-        base = RAIDAR_DIR.parent / module.replace(".", "/")
-    elif root == CONTRACT_PACKAGE:
-        base = CONTRACT_DIR / rest.replace(".", "/") if rest else CONTRACT_DIR / "__init__"
-    else:
-        return None
-    if base.with_suffix(".py").is_file():
-        return base.with_suffix(".py")
-    init = base / "__init__.py"
-    return init if init.is_file() else None
-
-
-def _from_base(node: ast.ImportFrom, package: str) -> str:
-    """The absolute module an ``import from`` statement names (relative levels resolved)."""
-    if not node.level:
-        return node.module or ""
-    anchor = package.rsplit(".", node.level - 1)[0] if node.level > 1 else package
-    return f"{anchor}.{node.module}" if node.module else anchor
-
-
-def _statement_names(node: ast.AST, package: str) -> set[str]:
-    if isinstance(node, ast.Import):
-        return {alias.name for alias in node.names}
-    if isinstance(node, ast.ImportFrom):
-        base = _from_base(node, package)
-        return {base, *(f"{base}.{alias.name}" for alias in node.names)}
-    return set()
-
-
-def _imported(module: str, path: Path) -> set[str]:
-    package = module if path.name == "__init__.py" else module.rpartition(".")[0]
-    names: set[str] = set()
-    for node in ast.walk(ast.parse(path.read_bytes(), filename=str(path))):
-        names |= _statement_names(node, package)
-    return {name for name in names if name.split(".")[0] in (ROOT_PACKAGE, CONTRACT_PACKAGE)}
-
-
-@cache
-def import_closure(module: str) -> frozenset[str]:
-    """Every ``raidar`` module (and package ``__init__``) ``module`` imports, itself included."""
-    found: set[str] = set()
-    pending = [module]
-    while pending:
-        name = pending.pop()
-        if name in found:
-            continue
-        path = _source(name)
-        if path is None:
-            continue
-        found.add(name)
-        parent = name.rpartition(".")[0]
-        if parent:
-            pending.append(parent)
-        pending.extend(_imported(name, path))
-    return frozenset(found)
-
-
 def _files(modules: Iterable[str]) -> dict[str, Path]:
     files: dict[str, Path] = {}
     for module in modules:
-        path = _source(module)
+        path = source_imports.source_path(module)
         if path is not None:
             files[_inventory_key(path)] = path
     for path in (RAIDAR_DIR / PAYLOAD_DIR).rglob("*.py"):
@@ -146,7 +84,7 @@ def _inventory(roots: tuple[str, ...], adapter: AgentName | None) -> dict[str, P
     modules: set[str] = set()
     entries = () if adapter is None else ADAPTER_ENTRIES[adapter]
     for root in (*roots, *entries):
-        modules |= import_closure(root)
+        modules |= source_imports.import_closure(root)
     return _files(modules)
 
 

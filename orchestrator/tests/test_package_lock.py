@@ -14,7 +14,9 @@ from raidar_contract.canonical import digest_json
 from raidar_contract.package.registry import load_stage_package
 from raidar_contract.releases import Release
 
+from raidar.contract import source_imports
 from raidar.contract.paths import releases_file, stage_checks_root, stages_root, workflows_root
+from raidar.contract.source_imports import import_closure
 from raidar.design.experiment.agent import ResolvedAgent
 from raidar.design.experiment.arm import (
     ArmResolutionError,
@@ -27,7 +29,6 @@ from raidar.subject.releases import ReleasedAgent, released_agent, released_work
 from raidar.subject.workflow import identity, package_checks
 from raidar.subject.workflow.identity import (
     RUNNER_ID,
-    import_closure,
     package_primitives,
     primitive_code,
 )
@@ -202,7 +203,7 @@ def test_a_primitive_digest_follows_source_syntax_and_the_adapter_not_comments(
 def test_the_inventory_holds_the_closure_files_adapter_entries_and_payload_scripts(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setattr(identity, "import_closure", lambda module: frozenset({module}))
+    monkeypatch.setattr(source_imports, "import_closure", lambda module: frozenset({module}))
 
     bare = identity.primitive_inventory("gate/1", None)
     codex = identity.primitive_inventory("gate/1", AgentName.CODEX)
@@ -215,8 +216,8 @@ def test_the_inventory_holds_the_closure_files_adapter_entries_and_payload_scrip
     with pytest.raises(ValueError, match="unsupported primitive contract"):
         identity.primitive_inventory("nope/9", None)
     assert identity._inventory_key(identity.CONTRACT_DIR / "agent.py") == "raidar_contract/agent.py"
-    assert identity._source("os") is None
-    assert identity._source("raidar_contract") == identity.CONTRACT_DIR / "__init__.py"
+    assert source_imports.source_path("os") is None
+    assert source_imports.source_path("raidar_contract") == identity.CONTRACT_DIR / "__init__.py"
 
 
 # ---- proof the lock needs --------------------------------------------------------------------

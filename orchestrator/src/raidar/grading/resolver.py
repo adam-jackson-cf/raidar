@@ -43,6 +43,7 @@ from packaging.utils import (
     parse_sdist_filename,
     parse_wheel_filename,
 )
+from packaging.version import InvalidVersion, Version
 
 from raidar.contract.wheels import (
     ARCHES,
@@ -367,7 +368,14 @@ class UvResolver:
                 )
             except (OSError, subprocess.SubprocessError) as error:
                 raise DependencyInfraError(f"uv is unavailable: {error}") from error
-            self._version.append(done.stdout.split()[1])
+            parts = done.stdout.split()
+            if len(parts) < 2 or parts[0] != "uv":
+                raise DependencyInfraError("uv returned an invalid version")
+            try:
+                Version(parts[1])
+            except InvalidVersion as error:
+                raise DependencyInfraError("uv returned an invalid version") from error
+            self._version.append(parts[1])
         return f"uv@{self._version[0]}"
 
     def _index_client(self, deadline: float) -> IndexClient:
@@ -528,10 +536,16 @@ class UvResolver:
 
     def _within_caps(self, lock: str, usable: list[str]) -> tuple[str, list[Unprovided]]:
         """The lock if it is within the caps and index-sourced wheels only, else why not."""
-        if not lock_sources_ok(lock, self._prefixes()):
+        try:
+            packages = len(pylock_packages(lock))
+            wheel_bytes = _closure_bytes(lock)
+            sources_ok = lock_sources_ok(lock, self._prefixes())
+        except (ValueError, KeyError, TypeError, AttributeError) as error:
+            raise DependencyInfraError("uv returned an unreadable lock") from error
+        if not sources_ok:
             # A transitive direct reference, vcs, path or sdist entry: nothing is fetched from it.
             return "", [Unprovided(requirement=text, reason="direct-reference") for text in usable]
-        if len(pylock_packages(lock)) > self.max_packages or _closure_bytes(lock) > self.max_bytes:
+        if packages > self.max_packages or wheel_bytes > self.max_bytes:
             return "", [Unprovided(requirement=text, reason="cap-exceeded") for text in usable]
         return lock, []
 

@@ -45,6 +45,7 @@ from raidar.grading.bundle import (
 )
 from raidar.grading.closure import ClosureImage, docker_arch, ensure_closure_image
 from raidar.grading.dependency_pins import lock_sha256
+from raidar.grading.payload import runtime_files
 from raidar.judge.secrets import absence_evidence, require_key_absent
 
 RUNTIME_DIR = Path(__file__).resolve().parent / "runtime"
@@ -481,7 +482,14 @@ def build_copy_in_tar(run: SandboxRun, layout: SandboxLayout, archive: Path) -> 
         _add_tree(bundle, run.tests_dir, layout.tests.lstrip("/"), root, writable=False)
         parent = layout.runtime.lstrip("/").rsplit("/", 1)[0]
         _add_dir(bundle, parent, root, 0o755)
-        _add_tree(bundle, RUNTIME_DIR, layout.runtime.lstrip("/"), root, writable=False)
+        _add_dir(bundle, layout.runtime.lstrip("/"), root, 0o555)
+        for name, path in runtime_files(RUNTIME_DIR).items():
+            bundle.add(
+                path,
+                arcname=f"{layout.runtime.lstrip('/')}/{name}",
+                recursive=False,
+                filter=_stamp(root, writable=False),
+            )
         _add_dir(bundle, layout.out.lstrip("/"), owner, 0o755)
 
 
