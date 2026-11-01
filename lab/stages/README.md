@@ -152,17 +152,26 @@ Lock refusals: **ST1** unsupported/invalid package contract; **ST2** unsupported
 Use the repository-root public interface (`env -u AGENT` is required when running from an OMP session):
 
 ```sh
-env -u AGENT make stage-new NAME=acme/my-check FROM=docs-check  # complete tier-2 command template
+env -u AGENT make stage-new NAME=acme/my-check FROM=raidar/docs-check  # default source
 env -u AGENT make stage-lock NAME=acme/my-check
-env -u AGENT make stage-check NAME=acme/my-check TARGET=mbp
-env -u AGENT make stage-check NAME=acme/my-check REPLAY=<trial> TARGET=mbp
+env -u AGENT make stage-check NAME=acme/my-check TARGET=local
+env -u AGENT make stage-check NAME=acme/my-check REPLAY=<trial> TARGET=local
 env -u AGENT make stage-list
 env -u AGENT make stage-info NAME=acme/my-check
 env -u AGENT make workflow-new NAME=acme/my-workflow            # FROM=raidar/one-shot-verify by default
 env -u AGENT make experiment-lock EXPERIMENT=<smoke-yaml> DRAFT=1
 ```
 
-Creation refuses overwrites. The `docs-check` template includes a generated pure-wheel lock, a pinned codespell command and six fixtures. Fixtures/replay run offline in throwaway pack containers, never on the host. Draft locking is smoke-only, writes under `var/tmp/drafts/<experiment-id>/`, marks jobs as dev, and never admits a measured comparison. Normal locks require registered immutable references. Generated artifacts belong under `var/` or `RAIDAR_VAR`. See `make help` for the exhaustive command catalogue.
+Creation copies a real `FROM=<ns>/<name>` package, defaulting to `raidar/docs-check`, and refuses
+overwrites, traversal, symlinks and special files, including unsafe fixture trees. It preserves
+bytes and modes, changing only the manifest's name scalar: no command, skill, prompt, module,
+state path or fixture renaming. YAML comments, aliases, scalar styles and CRLF survive copying.
+The source package remains untouched. `raidar/docs-check` pins codespell 2.4.1 and has six
+fixtures. Fixtures/replay run offline in throwaway pack containers, never on the host.
+Draft locking is smoke-only, writes under `var/tmp/drafts/<experiment-id>/`, marks jobs as dev,
+and never admits a measured comparison. Normal locks require registered immutable references.
+Generated artifacts belong under `var/` or `RAIDAR_VAR`. See `make help` for the exhaustive
+command catalogue.
 
 ## Trust boundary (C4)
 
@@ -187,6 +196,10 @@ An unusable draft requests one repair, then closes; a corrupt draft cannot turn 
 instrument error merely because its agent-authored bytes do not parse. Trusted-context
 errors still fail the call. Fixtures cover done, closed, resume, clarification, repair,
 regression criteria and gate acceptance/refusal.
+
+`raidar/docs-check@1` runs codespell 2.4.1 over repository text, skipping `.git`. Fixtures cover
+passing and refusing text, nested misspellings, non-ASCII text, zero-byte files and binary files.
+The package invokes the pinned dependency directly; there is no generated placeholder checker.
 
 ## Contract history
 

@@ -438,11 +438,6 @@ def test_smoke_dry_run_check_prints_every_public_smoke_shape() -> None:
             ['"my-exp/experiment.yaml"', "--id", '"my-exp"'],
         ),
         (("stage-new", "NAME=ns/my-check"), "stage", ["new", '"ns/my-check"']),
-        (
-            ("stage-new", "NAME=ns/my-check", "FROM=docs-check"),
-            "stage",
-            ["new", '"ns/my-check"', "--from", '"docs-check"'],
-        ),
         (("stage-lock", "NAME=ns/my-check"), "stage", ["lock", '"ns/my-check"']),
         (("stage-info", "NAME=ns/my-check"), "stage", ["info", '"ns/my-check"']),
         (("stage-list",), "stage", ["list"]),

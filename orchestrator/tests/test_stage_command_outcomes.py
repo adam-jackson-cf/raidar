@@ -7,6 +7,7 @@ assertion is on files the commands leave behind, exit codes and refusals.
 from __future__ import annotations
 
 import json
+import shutil
 import subprocess
 from collections.abc import Callable
 from pathlib import Path
@@ -20,13 +21,13 @@ from click.testing import CliRunner
 from raidar_contract.package.registry import load_stage_package
 
 from raidar.cli import main, stage_fixtures, stage_lock, stage_package, workflow_new
-from raidar.cli.stage_template import LOCK as TEMPLATE_LOCK
-from raidar.cli.stage_template import render_template
-from raidar.contract.paths import stage_checks_root
+from raidar.contract.paths import lab_root, stage_checks_root
 from raidar.contract.wheels import uv_lock_refusals
 from raidar.subject.primitive.canary import StageCheckRecord
 from raidar.subject.workflow.stage_check import CaseResult, CheckReport, ReplayRun
 
+REAL_PACKAGE = lab_root() / "stages" / "raidar" / "docs-check"
+TEMPLATE_LOCK = (REAL_PACKAGE / "tool" / "uv.lock").read_text()
 SDIST = (
     f'sdist = {{ url = "https://files.pythonhosted.org/x.tar.gz", hash = "sha256:{"0" * 64}" }}\n'
 )
@@ -42,15 +43,11 @@ def stages(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
 
 
 def _new(name: str = "acme/my-check") -> None:
+    source = stage_package.stages_root() / "raidar" / "docs-check"
+    if not source.exists():
+        shutil.copytree(REAL_PACKAGE, source)
     result = CliRunner().invoke(main, ["stage", "new", name])
     assert result.exit_code == 0, result.output
-
-
-def _write(root: Path, files: dict[str, bytes]) -> None:
-    for relative, data in files.items():
-        target = root / relative
-        target.parent.mkdir(parents=True, exist_ok=True)
-        target.write_bytes(data)
 
 
 # ---- stage_package: names, loading, release state --------------------------------------------
@@ -136,7 +133,7 @@ def test_release_state_distinguishes_unreleased_released_and_changed(
 
 def _package_with_tool(tmp_path: Path) -> Path:
     root = tmp_path / "pkg"
-    _write(root, render_template("acme/pkg"))
+    shutil.copytree(REAL_PACKAGE, root)
     return root
 
 

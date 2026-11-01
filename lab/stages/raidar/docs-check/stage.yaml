@@ -1,0 +1,12 @@
+contract: stage/1
+name: docs-check
+summary: Refuse a commit whose text files contain common misspellings (codespell).
+requires: {gate: gate/1}
+tool:
+  project: tool
+  commands: {docs-check: [python, -I, -B, -m, codespell_lib]}
+gate:
+  - name: spelling
+    run: [docs-check, --quiet-level=2, --skip=.git, .]
+    timeout_s: 60
+skills: [docs-check]
