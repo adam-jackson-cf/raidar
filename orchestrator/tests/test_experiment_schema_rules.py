@@ -7,11 +7,23 @@ from typing import Any
 
 import pytest
 from click.testing import CliRunner
+from pydantic import ValidationError
 
 from raidar.cli import main
 from raidar.design.experiment.loader import load_experiment
+from raidar.design.experiment.schema import AssessmentSpec, ProblemEntry
 from raidar.design.experiment.validation import SpecValidationError, spec_warnings
-from tests.experiment_spec_support import experiment_document, write_experiment
+from tests.experiment_spec_support import (
+    experiment_document,
+    lock_document,
+    pin_spec_digest,
+    write_experiment,
+)
+
+
+@pytest.fixture(autouse=True)
+def _fixed_spec_digest(monkeypatch: pytest.MonkeyPatch) -> None:
+    pin_spec_digest(monkeypatch)
 
 
 def _issues(path: Path) -> dict[str, str]:
@@ -109,26 +121,66 @@ def test_small_benchmarks_and_smoke_runs_validate_with_warnings(tmp_path: Path) 
     small["analysis"]["attempts"] = 2
     smoke = experiment_document(kind="smoke")
     smoke["arms"] = smoke["arms"][:1]
-    runner = CliRunner()
 
-    small_result = runner.invoke(main, ["validate", str(write_experiment(tmp_path / "b", small))])
-    smoke_result = runner.invoke(main, ["validate", str(write_experiment(tmp_path / "s", smoke))])
-
-    assert small_result.exit_code == 0, small_result.output
-    assert "below the 5 attempts per agent" in small_result.output
-    assert smoke_result.exit_code == 0, smoke_result.output
-    assert "not citable" in smoke_result.output
+    for name, document, location in (
+        ("benchmark", small, "analysis.attempts"),
+        ("smoke", smoke, "kind"),
+    ):
+        path = write_experiment(tmp_path / name, document)
+        warnings = spec_warnings(load_experiment(path).spec)
+        assert [warning.loc for warning in warnings] == [location]
+        result = CliRunner().invoke(main, ["validate", str(path)])
+        assert result.exit_code == 0, result.output
+        assert location in result.output
+    small["analysis"]["attempts"] = 5
+    assert spec_warnings(load_experiment(write_experiment(tmp_path / "enough", small)).spec) == []
 
 
 def test_the_kind_is_part_of_the_execution_identity(tmp_path: Path) -> None:
-    from tests.test_experiment_lock_behaviors import _lock
-
     smoke = experiment_document(kind="smoke")
-    ab_test = _lock(write_experiment(tmp_path / "ab", experiment_document()))
-    relabelled = _lock(write_experiment(tmp_path / "smoke", smoke))
+    ab_test = lock_document(write_experiment(tmp_path / "ab", experiment_document()))
+    relabelled = lock_document(write_experiment(tmp_path / "smoke", smoke))
 
     assert ab_test["execution"]["design"]["kind"] == "ab-test"
+    assert relabelled["execution"]["design"]["kind"] == "smoke"
     assert ab_test["lock_sha256"] != relabelled["lock_sha256"]
+
+
+# ---- local problem paths and scorer configuration ---------------------------------
+
+
+@pytest.mark.parametrize("path", ["", ".", "/abs/task", "..", "a/../b", "a\\b"])
+def test_a_local_problem_path_must_stay_inside_the_experiment_directory(path: str) -> None:
+    with pytest.raises(ValidationError):
+        ProblemEntry.model_validate({"path": path})
+
+
+def test_a_local_problem_path_is_normalised_and_takes_no_checkpoint_selection() -> None:
+    assert ProblemEntry.model_validate({"path": "./tasks/forge"}).path == "tasks/forge"
+    with pytest.raises(ValidationError, match="selects within a registry"):
+        ProblemEntry.model_validate({"path": "tasks/forge", "checkpoints": 2})
+
+
+@pytest.mark.parametrize(
+    "config",
+    [{"x": float("nan")}, {"x": [1, {"y": float("inf")}]}, {"x": {"y": float("-inf")}}],
+    ids=["nan", "list-nested", "dict-nested"],
+)
+def test_scorer_config_must_be_strict_json(config: dict[str, object]) -> None:
+    with pytest.raises(ValidationError, match="non-finite number"):
+        AssessmentSpec.model_validate(
+            {"scorers": ["correctness@10"], "scorer_config": {"correctness@10": config}}
+        )
+
+
+def test_finite_scorer_config_is_accepted() -> None:
+    config = {"x": [1, 2.5, {"y": None}]}
+
+    spec = AssessmentSpec.model_validate(
+        {"scorers": ["correctness@10"], "scorer_config": {"correctness@10": config}}
+    )
+
+    assert spec.scorer_config["correctness@10"] == config
 
 
 # ---- naming --------------------------------------------------------------------

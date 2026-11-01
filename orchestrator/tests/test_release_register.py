@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import shutil
+import subprocess
+from collections.abc import Callable
 from pathlib import Path
 
 import pytest
@@ -12,8 +14,9 @@ from raidar_contract.releases import Release, ReleaseError, ReleaseKind, parse_r
 
 from raidar.cli import main
 from raidar.contract.paths import agents_root
+from raidar.subject import release_check
 from raidar.subject.agent.definition import load_agent
-from raidar.subject.release_check import release_issues
+from raidar.subject.release_check import history_issues, release_base, release_issues
 from raidar.subject.releases import released_agent, released_workflow
 from tests.release_support import edit_agent, release_tree, write_register, write_workflow
 
@@ -196,15 +199,151 @@ def test_an_unreadable_register_is_reported(tree: Path) -> None:
 # ---- raidar releases check -----------------------------------------------------------------
 
 
-def test_releases_check_exits_nonzero_naming_each_problem(
-    monkeypatch: pytest.MonkeyPatch,
+def test_releases_cli_refuses_history_drift_and_accepts_an_explicit_base_without_main(
+    tree: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    monkeypatch.setattr("raidar.cli.releases.release_base", lambda: None)
+    path = tree / "lab" / "releases.yaml"
+    original = path.read_text()
+    monkeypatch.setattr("raidar.cli.releases.release_base", lambda: "prior")
     monkeypatch.setattr(
-        "raidar.cli.releases.release_issues", lambda **_: ["agents/codex changed since codex@1"]
+        "raidar.cli.releases.release_issues",
+        lambda *, base: release_issues(tree, base=base, git=_git(at_base=original)),
+    )
+    document = yaml.safe_load(original)
+    document["agents"]["codex@1"] = "b" * 64
+    path.write_text(yaml.safe_dump(document))
+    failed = CliRunner().invoke(main, ["releases", "check"])
+    assert failed.exit_code == 1
+    assert "release codex@1 was re-hashed" in failed.output
+    path.write_text(original)
+    sound = CliRunner().invoke(main, ["releases", "check"])
+    assert sound.exit_code == 0
+    assert "releases: ok" in sound.output
+
+    def no_main():
+        raise ReleaseError("no main branch")
+
+    monkeypatch.setattr("raidar.cli.releases.release_base", no_main)
+    refused = CliRunner().invoke(main, ["releases", "check"])
+    assert refused.exit_code == 1
+    assert "no main branch" in refused.output
+    explicit = CliRunner().invoke(main, ["releases", "check", "--base", "prior"])
+    assert explicit.exit_code == 0, explicit.output
+
+
+# ---- release_base and history_issues: the decisions, through an injected git ----------------
+
+
+def _git(
+    *,
+    head: str | None = "head",
+    merge_bases: dict[str, str] | None = None,
+    at_base: str | None = None,
+    commit: bool = True,
+) -> Callable[..., str | None]:
+    def run(root: Path, *args: str) -> str | None:
+        if args == ("rev-parse", "HEAD"):
+            return head
+        if args == ("rev-parse", "HEAD~1"):
+            return "parent"
+        if args[:2] == ("merge-base", "HEAD"):
+            return (merge_bases or {}).get(args[2])
+        if args[0] == "show":
+            return at_base
+        if args[0] == "cat-file":
+            return "" if commit else None
+        raise AssertionError(args)
+
+    return run
+
+
+@pytest.mark.parametrize(
+    ("git", "expected"),
+    [
+        (_git(head=None), None),
+        (_git(merge_bases={"main": "fork"}), "fork"),
+        (_git(merge_bases={"origin/main": "fork"}), "fork"),
+        (_git(merge_bases={"main": "head"}), "parent"),
+    ],
+    ids=["no-repo", "off-main", "origin-main-only", "on-main-tip"],
+)
+def test_the_release_base_is_the_merge_base_or_the_parent_on_main(
+    git: Callable[..., str | None], expected: str | None, tmp_path: Path
+) -> None:
+    assert release_base(tmp_path, git=git) == expected
+
+
+def test_without_a_main_branch_the_base_is_an_error(tmp_path: Path) -> None:
+    with pytest.raises(ReleaseError, match="no main branch"):
+        release_base(tmp_path, git=_git())
+
+
+def _history(tmp_path: Path, now: str, git: Callable[..., str | None]) -> list[str]:
+    (tmp_path / "lab").mkdir(exist_ok=True)
+    (tmp_path / "lab" / "releases.yaml").write_text(now, encoding="utf-8")
+    return history_issues("base", tmp_path, git=git)
+
+
+def _agents(versions: dict[int, str]) -> str:
+    return yaml.safe_dump({"agents": {f"codex@{n}": d for n, d in versions.items()}})
+
+
+def test_a_rehashed_released_version_is_refused(tmp_path: Path) -> None:
+    issues = _history(tmp_path, _agents({1: "b" * 64}), _git(at_base=_agents({1: "a" * 64})))
+
+    assert len(issues) == 1
+    assert "release codex@1 was re-hashed" in issues[0]
+
+
+def test_a_removed_released_version_is_refused(tmp_path: Path) -> None:
+    issues = _history(
+        tmp_path,
+        _agents({1: "a" * 64}),
+        _git(at_base=_agents({1: "a" * 64, 2: "b" * 64})),
     )
 
-    result = CliRunner().invoke(main, ["releases", "check"])
+    assert any("release codex@2 was removed" in issue for issue in issues)
 
-    assert result.exit_code == 1
-    assert "agents/codex changed since codex@1" in result.output
+
+def test_a_version_appended_beside_the_released_ones_passes(tmp_path: Path) -> None:
+    now = _agents({1: "a" * 64, 2: "b" * 64})
+
+    assert _history(tmp_path, now, _git(at_base=_agents({1: "a" * 64}))) == []
+
+
+def test_a_base_that_is_not_a_commit_is_reported(tmp_path: Path) -> None:
+    issues = _history(tmp_path, _agents({}), _git(at_base=None, commit=False))
+
+    assert issues == ["release base 'base' is not a commit"]
+
+
+def test_a_register_absent_at_the_base_constrains_nothing(tmp_path: Path) -> None:
+    assert _history(tmp_path, _agents({1: "a" * 64}), _git(at_base=None)) == []
+
+
+def test_an_unreadable_register_at_the_base_is_reported(tmp_path: Path) -> None:
+    issues = _history(tmp_path, _agents({1: "a" * 64}), _git(at_base="agents: {codex@1: no}\n"))
+
+    assert len(issues) == 1
+    assert "base" in issues[0]
+
+
+@pytest.mark.parametrize("exit_code", [0, 1])
+def test_git_process_outcomes_distinguish_a_missing_repository(
+    monkeypatch: pytest.MonkeyPatch, exit_code: int
+) -> None:
+    def run(command, **kwargs):
+        output = " head \n" if command[-1] == "HEAD" else " fork \n"
+        return subprocess.CompletedProcess(command, exit_code, stdout=output)
+
+    monkeypatch.setattr(release_check.subprocess, "run", run)
+    assert release_base(Path("repo")) == ("fork" if exit_code == 0 else None)
+
+
+def test_git_timeout_is_not_an_empty_or_clean_history(monkeypatch: pytest.MonkeyPatch) -> None:
+    def timeout(command, **kwargs):
+        raise subprocess.TimeoutExpired(command, 1)
+
+    monkeypatch.setattr(release_check.subprocess, "run", timeout)
+    with pytest.raises(subprocess.TimeoutExpired):
+        release_base(Path("repo"))

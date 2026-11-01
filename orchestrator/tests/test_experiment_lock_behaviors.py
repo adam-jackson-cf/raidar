@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from importlib.metadata import PackageNotFoundError
 from pathlib import Path
 from typing import Any
 
@@ -19,41 +20,39 @@ from raidar.contract.references import (
 )
 from raidar.design.experiment.loader import CliOverrides, load_experiment
 from raidar.design.experiment.lock import (
+    LOCK_VERSION,
     SECTIONS,
     LockError,
+    StaleLockError,
     build_lock,
+    check_lock_file,
     default_resolvers,
     describe_staleness,
+    harbor_version,
     lock_integrity_issues,
     render_lock,
     stale_sections,
+    toolchain_versions,
 )
 from raidar.scoring.framework.metrics import MetricResolver
+from raidar.subject.releases import released_agent
 from tests.experiment_spec_support import (
     InMemoryResolver,
     experiment_document,
     fixture_resolvers,
+    pin_spec_digest,
     write_experiment,
 )
+from tests.experiment_spec_support import lock_bytes as _lock_bytes
+from tests.experiment_spec_support import lock_document as _lock
 
 PYTHON_TASK = '[metadata]\nraidar_runtime = "python"\n'
 """A local task declares its runtime (``RT1``)."""
 
 
-def _lock_bytes(
-    path: Path, *, checkpoints: int = 8, overrides: CliOverrides | None = None
-) -> bytes:
-    resolvers = ResolverSet(
-        [*fixture_resolvers(checkpoints=checkpoints), MetricResolver()], entry_point_group=None
-    )
-    loaded = load_experiment(path, overrides)
-    return render_lock(
-        build_lock(loaded, lock_path=path.with_name("experiment.lock.json"), resolvers=resolvers)
-    )
-
-
-def _lock(path: Path, **kwargs: Any) -> dict[str, Any]:
-    return json.loads(_lock_bytes(path, **kwargs))
+@pytest.fixture(autouse=True)
+def _fixed_spec_digest(monkeypatch: pytest.MonkeyPatch) -> None:
+    pin_spec_digest(monkeypatch)
 
 
 def test_relocking_unchanged_inputs_is_byte_identical(tmp_path: Path) -> None:
@@ -67,8 +66,13 @@ def test_relocking_unchanged_inputs_is_byte_identical(tmp_path: Path) -> None:
     lock = json.loads(first)
     assert list(lock) == sorted(lock)
     execution, assessment = lock["execution"], lock["assessment"]
-    assert execution["versions"]["harbor"] == "0.23.0"
-    assert execution["versions"]["agents"] == {"luna": {"release": "codex@3", "version": "0.156.1"}}
+    assert execution["versions"]["harbor"] == harbor_version()
+    assert execution["versions"]["agents"] == {
+        "luna": {
+            "release": "codex@3",
+            "version": released_agent("codex@3").definition.tool.version,
+        }
+    }
     assert set(execution["references"]) == {"problem", "agent", "workflow"}
     assert set(assessment["references"]) == {"scorer", "metric"}
     # Tools are recorded with the section whose reference pins them.
@@ -435,3 +439,164 @@ def test_entry_point_resolver_misconfiguration_is_rejected(
 
     with pytest.raises(RegistryReferenceError, match=message):
         ResolverSet().resolver_for(RefKind.SCORER)
+
+
+def _written_lock(root: Path) -> tuple[Path, dict[str, Any]]:
+    """A current lock on disk, and its parsed document."""
+    path = write_experiment(root, experiment_document())
+    data = _lock_bytes(path)
+    lock_path = root / "experiment.lock.json"
+    lock_path.write_bytes(data)
+    return lock_path, json.loads(data)
+
+
+def test_the_lock_file_check_accepts_exactly_the_current_lock(tmp_path: Path) -> None:
+    lock_path, current = _written_lock(tmp_path)
+
+    assert check_lock_file(lock_path, current) is None
+
+
+@pytest.mark.parametrize(
+    ("content", "message"),
+    [
+        (None, "does not exist"),
+        (b"{not json", "not readable JSON"),
+        (b"[1]", "not a JSON object"),
+        (json.dumps({"lock_version": LOCK_VERSION - 1}).encode(), "relock"),
+        (json.dumps({"lock_version": LOCK_VERSION}).encode(), "missing section"),
+    ],
+)
+def test_the_lock_file_check_refuses_a_missing_or_unusable_file(
+    tmp_path: Path, content: bytes | None, message: str
+) -> None:
+    lock_path, current = _written_lock(tmp_path)
+    if content is None:
+        lock_path.unlink()
+    else:
+        lock_path.write_bytes(content)
+
+    with pytest.raises(StaleLockError, match=message):
+        check_lock_file(lock_path, current)
+
+
+def test_the_lock_file_check_refuses_a_lock_that_is_not_in_canonical_form(tmp_path: Path) -> None:
+    lock_path, current = _written_lock(tmp_path)
+    lock_path.write_text(json.dumps(current, indent=4), encoding="utf-8")
+
+    with pytest.raises(StaleLockError, match="not in canonical form"):
+        check_lock_file(lock_path, current)
+
+
+def test_the_lock_file_check_names_what_a_changed_input_makes_stale(tmp_path: Path) -> None:
+    lock_path, _ = _written_lock(tmp_path)
+    changed = experiment_document()
+    changed["analysis"]["attempts"] = 6
+    current = _lock(write_experiment(tmp_path / "changed", changed))
+
+    with pytest.raises(StaleLockError, match="out of date") as caught:
+        check_lock_file(lock_path, current)
+
+    assert set(caught.value.stale) >= {"execution"}
+    assert describe_staleness(caught.value.stale) in str(caught.value)
+
+
+def test_a_package_that_is_not_installed_is_recorded_as_such(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def absent(package: str) -> str:
+        raise PackageNotFoundError(package)
+
+    monkeypatch.setattr("raidar.design.experiment.lock.version", absent)
+
+    assert harbor_version() == "not-installed"
+    assert toolchain_versions()["litellm"] == "not-installed"
+
+
+def test_local_task_paths_that_are_missing_or_escape_the_experiment_are_reported(
+    tmp_path: Path,
+) -> None:
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    (outside / "task.toml").write_text(PYTHON_TASK, encoding="utf-8")
+    root = tmp_path / "exp"
+    (root / "linked-file").mkdir(parents=True)
+    (root / "linked").symlink_to(outside, target_is_directory=True)
+    (root / "linked-file" / "task.toml").symlink_to(outside / "task.toml")
+    problems = [{"path": "gone"}, {"path": "linked"}, {"path": "linked-file"}]
+    path = write_experiment(root, experiment_document(problems=problems))
+
+    with pytest.raises(LockError) as caught:
+        _lock(path)
+
+    messages = {issue.loc: issue.message for issue in caught.value.issues}
+    assert "does not exist" in messages["problems.0.path"]
+    assert "outside the experiment directory" in messages["problems.1.path"]
+    assert "outside the experiment directory" in messages["problems.2.path"]
+
+
+def _lock_with_problem(path: Path, metadata: dict[str, object]) -> dict[str, Any]:
+    _, agent, workflow, scorer = fixture_resolvers()
+    problem = InMemoryResolver(RefKind.PROBLEM, {"scb/forge@abc123": metadata})
+    resolvers = ResolverSet(
+        [problem, agent, workflow, scorer, MetricResolver()], entry_point_group=None
+    )
+    lock_path = path.with_name("experiment.lock.json")
+    return build_lock(load_experiment(path), lock_path=lock_path, resolvers=resolvers)
+
+
+def test_a_checkpoint_selection_binds_the_first_checkpoints_of_a_multi_checkpoint_problem(
+    tmp_path: Path,
+) -> None:
+    selecting = experiment_document(problems=[{"ref": "scb/forge@abc123", "checkpoints": 1}])
+    path = write_experiment(tmp_path, selecting)
+
+    lock = _lock_with_problem(path, {"checkpoints": 8})
+
+    assert lock["execution"]["problems"][0]["checkpoints"] == 1
+
+
+@pytest.mark.parametrize(
+    "metadata",
+    [{"checkpoints": 1}, {"checkpoints": 8, "mode": "one_shot"}],
+    ids=["fewer", "oneshot"],
+)
+def test_a_checkpoint_selection_the_problem_cannot_satisfy_is_refused(
+    tmp_path: Path, metadata: dict[str, object]
+) -> None:
+    selecting = experiment_document(problems=[{"ref": "scb/forge@abc123", "checkpoints": 2}])
+    path = write_experiment(tmp_path, selecting)
+
+    with pytest.raises(LockError) as caught:
+        _lock_with_problem(path, metadata)
+
+    issue = next(i for i in caught.value.issues if i.loc == "problems.0.checkpoints")
+    assert "cannot take the first 2 checkpoint(s)" in issue.message
+
+
+def test_a_reference_kind_without_a_resolver_is_reported_at_its_field(tmp_path: Path) -> None:
+    path = write_experiment(tmp_path, experiment_document())
+    problem, agent, workflow, _ = fixture_resolvers()
+    resolvers = ResolverSet([problem, agent, workflow, MetricResolver()], entry_point_group=None)
+
+    with pytest.raises(LockError) as caught:
+        build_lock(load_experiment(path), lock_path=path, resolvers=resolvers)
+
+    messages = {issue.loc: issue.message for issue in caught.value.issues}
+    assert "no resolver registered for scorer" in messages["assessment.scorers.0"]
+
+
+def test_a_lock_inside_a_referenced_task_directory_is_not_hashed_into_itself(
+    tmp_path: Path,
+) -> None:
+    task = tmp_path / "tasks" / "forge"
+    task.mkdir(parents=True)
+    (task / "task.toml").write_text(f'{PYTHON_TASK}[[steps]]\nname = "s"\n', encoding="utf-8")
+    lock_file = task / "experiment.lock.json"
+    lock_file.write_text("stale\n", encoding="utf-8")
+    path = write_experiment(tmp_path, experiment_document(problems=[{"path": "tasks/forge"}]))
+    resolvers = ResolverSet([*fixture_resolvers(), MetricResolver()], entry_point_group=None)
+
+    lock = build_lock(load_experiment(path), lock_path=lock_file, resolvers=resolvers)
+
+    assert "tasks/forge/task.toml" in lock["execution"]["files"]
+    assert "tasks/forge/experiment.lock.json" not in lock["execution"]["files"]

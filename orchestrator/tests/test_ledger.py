@@ -7,8 +7,9 @@ import yaml
 from click.testing import CliRunner
 
 from raidar.cli.ledger import ledger_group
-from raidar.evaluation.ledger.check import check_ledger, load_ledger
+from raidar.evaluation.ledger.check import check_ledger, load_ledger, record_problems
 from raidar.evaluation.ledger.index import README_NAME, render_index
+from raidar.evaluation.ledger.records import FaultRecord, RemedyRecord
 
 
 def _history(*steps: tuple[str, str]) -> list[dict[str, object]]:
@@ -90,9 +91,21 @@ def test_missing_required_field_refused(ledger: Path) -> None:
     assert "impact" in _problems(ledger)
 
 
-def test_missing_frontmatter_refused(ledger: Path) -> None:
-    (ledger / "faults" / "FCR-001.md").write_text("no frontmatter\n", encoding="utf-8")
+@pytest.mark.parametrize(
+    "text",
+    ["no frontmatter\n", "---\nid: FCR-001\n", "---\n- item\n---\n", "---\nkey: [\n---\n"],
+)
+def test_malformed_frontmatter_refuses_indexing_without_overwriting(
+    ledger: Path, text: str
+) -> None:
+    index = ledger / README_NAME
+    before = index.read_bytes()
+    (ledger / "faults" / "FCR-001.md").write_text(text, encoding="utf-8")
     assert "frontmatter" in _problems(ledger)
+    result = CliRunner().invoke(ledger_group, ["index", "--root", str(ledger)])
+    assert result.exit_code == 1
+    assert "faults/FCR-001.md" in result.output
+    assert index.read_bytes() == before
 
 
 def test_id_must_match_filename(ledger: Path) -> None:
@@ -100,45 +113,51 @@ def test_id_must_match_filename(ledger: Path) -> None:
     assert "does not match the filename" in _problems(ledger)
 
 
-def test_remedy_link_must_resolve(ledger: Path) -> None:
-    _write(ledger, "remedies", "M-001", _remedy(faults=["FCR-009"]))
-    _index(ledger)
-    assert "fault `FCR-009` does not exist" in _problems(ledger)
+def test_remedy_links_resolve_in_memory() -> None:
+    fault = FaultRecord.model_validate(_fault())
+    remedy = RemedyRecord.model_validate(_remedy(faults=["FCR-009"]))
+    assert record_problems({fault.id: fault}, {remedy.id: remedy}) == [
+        "M-001: fault `FCR-009` does not exist"
+    ]
+    linked = remedy.model_copy(update={"faults": [fault.id]})
+    assert record_problems({fault.id: fault}, {linked.id: linked}) == []
 
 
-def test_illegal_transition_refused(ledger: Path) -> None:
-    history = _history(("open", "2026-10-01"), ("resolved", "2026-10-02"))
-    _write(ledger, "faults", "FCR-001", _fault(status="resolved", status_history=history))
-    _index(ledger)
-    assert "illegal transition `open` -> `resolved`" in _problems(ledger)
+@pytest.mark.parametrize(
+    ("kind", "steps"),
+    [
+        ("fault", ["open", "targeted", "resolved", "reopened", "targeted"]),
+        ("fault", ["open", "targeted", "mitigated", "resolved"]),
+        ("fault", ["open", "not-reproducible"]),
+        ("fault", ["open", "routed"]),
+        ("remedy", ["proposed", "locked", "executed", "measured", "adopted"]),
+        ("remedy", ["proposed", "locked", "rejected"]),
+    ],
+)
+def test_legal_status_chains_pass_without_reading_files(kind: str, steps: list[str]) -> None:
+    history = _history(*((status, f"2026-10-{index + 1:02}") for index, status in enumerate(steps)))
+    if kind == "fault":
+        fault = FaultRecord.model_validate(_fault(status=steps[-1], status_history=history))
+        assert record_problems({fault.id: fault}, {}) == []
+    else:
+        fault = FaultRecord.model_validate(_fault())
+        remedy = RemedyRecord.model_validate(_remedy(status=steps[-1], status_history=history))
+        assert record_problems({fault.id: fault}, {remedy.id: remedy}) == []
 
 
-def test_legal_chain_passes(ledger: Path) -> None:
-    steps = [("open", "2026-10-01"), ("targeted", "2026-10-02"), ("resolved", "2026-10-03")]
-    steps += [("reopened", "2026-10-03"), ("targeted", "2026-10-05")]
-    _write(ledger, "faults", "FCR-001", _fault(status="targeted", status_history=_history(*steps)))
-    _index(ledger)
-    assert check_ledger(ledger) == []
-
-
-def test_dates_must_not_go_backwards(ledger: Path) -> None:
-    history = _history(("open", "2026-10-05"), ("targeted", "2026-10-02"))
-    _write(ledger, "faults", "FCR-001", _fault(status="targeted", status_history=history))
-    _index(ledger)
-    assert "precedes" in _problems(ledger)
-
-
-def test_status_must_equal_last_history_entry(ledger: Path) -> None:
-    _write(ledger, "faults", "FCR-001", _fault(status="targeted"))
-    _index(ledger)
-    assert "differs from last history status" in _problems(ledger)
-
-
-def test_first_history_status_must_be_initial(ledger: Path) -> None:
-    history = _history(("targeted", "2026-10-01"))
-    _write(ledger, "faults", "FCR-001", _fault(status="targeted", status_history=history))
-    _index(ledger)
-    assert "first history status must be `open`" in _problems(ledger)
+@pytest.mark.parametrize(
+    ("status", "steps", "problem"),
+    [
+        ("resolved", [("open", "2026-10-01"), ("resolved", "2026-10-02")], "illegal transition"),
+        ("targeted", [("open", "2026-10-05"), ("targeted", "2026-10-02")], "precedes"),
+        ("targeted", [("open", "2026-10-01")], "differs from last history status"),
+        ("targeted", [("targeted", "2026-10-01")], "first history status"),
+        ("open", [("open", "2026-10-01"), ("unknown", "2026-10-02")], "unknown history status"),
+    ],
+)
+def test_history_integrity_reports_the_broken_rule(status: str, steps: list, problem: str) -> None:
+    fault = FaultRecord.model_validate(_fault(status=status, status_history=_history(*steps)))
+    assert problem in "\n".join(record_problems({fault.id: fault}, {}))
 
 
 @pytest.mark.parametrize("ref", ["/abs/path.log", "../escape.log", "has space.log"])
@@ -192,4 +211,9 @@ def test_cli_index_then_check(tmp_path: Path) -> None:
     runner = CliRunner()
     assert runner.invoke(ledger_group, ["check", "--root", str(tmp_path)]).exit_code == 1
     assert runner.invoke(ledger_group, ["index", "--root", str(tmp_path)]).exit_code == 0
+    assert runner.invoke(ledger_group, ["check", "--root", str(tmp_path)]).exit_code == 0
+    _write(tmp_path, "faults", "FCR-001", _fault(target="workspace | state\nnext line"))
+    assert runner.invoke(ledger_group, ["index", "--root", str(tmp_path)]).exit_code == 0
+    rendered = (tmp_path / README_NAME).read_text()
+    assert "workspace \\| state next line" in rendered
     assert runner.invoke(ledger_group, ["check", "--root", str(tmp_path)]).exit_code == 0
