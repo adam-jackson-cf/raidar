@@ -16,8 +16,8 @@ from raidar.engine.health.reaper import REAP_REPORT
 from raidar.engine.health.records_manifest import seal_trial, tamper_findings
 from raidar.engine.trial.finish import audit_and_write
 from raidar.grading.records import step_record_dir
-from tests.health_support import STEP, TRIAL_ID, healthy_trial
-from tests.test_trial_health_audit import LATE, _phase, audit, status
+from tests.health_support import STEP, TRIAL_ID, audit, healthy_trial, status
+from tests.test_trial_health_audit import LATE, _phase
 
 pytestmark = pytest.mark.slow
 
