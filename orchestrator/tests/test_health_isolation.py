@@ -196,22 +196,6 @@ def test_placed_text_vouches_on_the_first_step(tmp_path: Path) -> None:
     assert p8(t).status == "pass"
 
 
-def test_a_stage_instruction_record_is_bound_to_its_own_rules_file(tmp_path: Path) -> None:
-    t = session(tmp_path, AGENTS.format(body="the gate rule"))
-    agent = t.trial_dir / "steps" / STEP / "agent"
-    (agent / "workflow" / "records").mkdir()
-    (agent / "workflow" / "records" / "rules.md").write_text("the gate rule\n")
-    flow_path = agent / "workflow" / "workflow.json"
-    flow = json.loads(flow_path.read_text())
-    flow["instructions"] = ["workflow/records/rules.md"]
-    flow["verify"] = {"rules_record": "workflow/records/rules.md", "rules_file": "AGENTS.md"}
-    flow_path.write_text(json.dumps(flow))
-    assert p8(t).status == "pass"
-    flow["verify"]["rules_file"] = "docs/OTHER.md"
-    flow_path.write_text(json.dumps(flow))
-    assert p8(t).status == "unmeasured"  # the first step cannot check a line no file vouches for
-
-
 def test_a_component_whose_record_is_not_its_digest_is_a_violation(tmp_path: Path) -> None:
     t = session(tmp_path, roots("/app/.agents/skills"))
     place_component(t, ".agents/skills/x/SKILL.md", "a skill\n", sha256="0" * 64)

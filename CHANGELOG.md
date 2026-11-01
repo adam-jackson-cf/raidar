@@ -4,6 +4,14 @@ All notable changes to this project are documented in this file.
 
 ## Unreleased
 
+### Complete spike health consumer deletion (phase 5B step 5)
+
+- Remove the stage-keyed definition health reader and validity entry; required package outputs,
+  stop calls and terminal states are checked by the primitive-keyed W rows.
+- Read judge closure evidence from `jev-judge/1` and instruction provenance from component
+  placements only. Delete the legacy stage-instruction path, without a compatibility reader.
+- Retain historical G/E family labels only for loading stored health reports; no live producer remains.
+
 ### Primitive-keyed required health evidence (phase 5B step 4)
 
 - Re-key W3–W10 by locked contract ids: `gate/1`, `setup/1`, `stop/1`, `outputs/1`,
