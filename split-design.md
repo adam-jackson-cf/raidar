@@ -38,7 +38,7 @@
   - **Phase-5 plan** (Astra's nine steps, with the T1 adjustments, T5): section 9.
 - **2026-11-01: package standard and systems under test.** Records: `docs/reboot/evidence/decide-standard-{opus,astra,sol}.md`. Both voters agreed Q2. For Q1, Sol chose Opus on ownership and timing (T1), and Astra on including the transport-neutral agent schema (T2).
   - The standard has separate content and version identity. It stays in this repository under Raidar's governance; a separate repository needs two votes and a named trigger (section 5.8). C7 and R4 are unchanged.
-  - Contract `1.0.0` is frozen. Next come `1.1.0`'s stop-result and context models and shared conformance cases, then a distribution MAJOR separating lab policy before FXL's runtime phase.
+  - Contract `1.0.0` stays frozen. `1.1.0` adds portable stop-result/context models and shared conformance cases; `2.0.0` separates lab policy from the distribution. Contract ids and package digests stay unchanged. Grading-identity scope changes are batched with these releases; the orchestrator revalidates once afterward, before relocks and trials can pass RT7.
   - An arm denotes a system under test: composed (agent + workflow) or opaque (a pinned external system, not an agent). Every arm today is composed. The workflow execution engine is the executor; "interface" is not a Raidar term (section 2).
   - A same-agent workflow comparison measures the imported method under Raidar's executor, not FXL's deployed system (section 7.3). Opaque-arm support waits for a registered question (phase 12).
 - **2026-10-27: enforcement review** ([docs/reboot/evidence/enforcement-review-opus.md](docs/reboot/evidence/enforcement-review-opus.md)). User decisions:
@@ -552,7 +552,7 @@ lab/workflows/raidar/
 
 ### 5.8 The contract package `raidar-contract` (decided 2026-10-31; amended 2026-11-01)
 
-- **Standard and distribution.** The package standard is separate in content and version identity. It stays in this repository under Raidar's governance. `contract/` (`raidar-contract`, import `raidar_contract`; pydantic and pyyaml only) supplies the shared implementation; Raidar and FXL pin it. The frozen distribution still includes lab schemas; the planned distribution split removes them without changing contract ids or digests.
+- **Standard and distribution.** The package standard is separate in content and version identity. It stays in this repository under Raidar's governance. `contract/` (`raidar-contract`, import `raidar_contract`; pydantic and pyyaml only) supplies the shared implementation; Raidar and FXL pin it. `2.0.0` removes lab schemas and policy without changing contract ids, accepted stage inputs/refusals or package digests.
 - **In the standard:**
   - the manifest and package layout; params, tokens and frame-slot rules;
   - the observable call contracts of `setup/1`, `gate/1`, `stop/1` and `outputs/1`: ordering, context including `base`, `RAIDAR_STAGE_CONTEXT`, the stop result `{status, message, tokens, carry}`, caps, round bounds and closed semantics;
@@ -563,13 +563,16 @@ lab/workflows/raidar/
   - shared conformance cases that consumers parse, refuse and digest identically.
 - **Out of the standard.** Primitive implementations, health, attribution, the release register, `lab/` paths, import provenance, lock identity and pooling, credential handling, and Harbor types. Runtime implementations and credential/state methods stay outside it. The Harbor-typed protocol stays in `orchestrator`. Judge configuration is portable; judge implementation and calibration are not.
 - **Governance.** Moving the standard to its own repository needs two votes plus at least one trigger: a third runtime or outside authors; FXL needing a change Raidar refuses; or factory-x running packages on a runtime neither project owns. Even then, primitive implementations and validity semantics stay in Raidar. C7's approval and cutover rules and R4's namespace ownership are unchanged.
-- **Couplings cut during extraction.** `package_definition.py` imports the spike `definition.py` (`NAME_PATTERN`, `TASK_TOKEN`), and `registry.py` imports `REPO_ROOT`. The orchestrator depends on the package through a uv path source; the old modules are deleted, with no re-exports.
+- **Couplings cut during extraction.** The spike's schema, repository-root and primitive imports were removed. `2.0.0` keeps generic agent settings/capability schema parameters and portable token/audit records; Harbor ids, Isolation/Capabilities, Credentials and reset shell paths live in orchestrator agent schema/records. Immutable references live in `raidar_contract.references`; lab register policy lives in `raidar.contract.releases`, and lab stage lookup/location policy in `raidar.subject.package.registry`. The orchestrator uses a uv path source; obsolete modules and compatibility exports are absent.
 - **Publication and versions (T2).** Immutable wheel and sdist artefacts under `contract/vX.Y.Z`, consumed by exact-version and hash pins; nothing is built from a tag at install time. SemVer: MAJOR when any contract id changes (`stage/N`, schema N, `criteria/N`, `stage-tree/N`, agent schema N); MINOR for new API that leaves accepted inputs, refusals and digests unchanged; PATCH for bug fixes on the same terms. Removing lab-policy modules is a distribution MAJOR, not a contract-id change. The package exposes a `CONTRACTS` map.
 - **Order:**
   1. `1.0.0` is frozen at phase 5 exit (done).
-  2. `1.1.0` adds stop-result and context models plus shared conformance cases. Accepted inputs, refusals and digests stay unchanged.
-  3. Before FXL's runtime phase, split lab policy out of the distribution. This is a distribution MAJOR with no contract-id or digest change.
-- **Private phase-5 artifacts.** `var/contract/v1.0.0/` is the local storage for logical `contract/v1.0.0`; exact-version/hash pins are `contract/releases/1.0.0.requirements.txt`. The public build target atomically claims a new output directory and never overwrites one. No external publication is performed. `CONTRACTS` maps unversioned names to supported integer versions; the orchestrator's editable path also pins `raidar-contract==1.0.0`.
+  2. `1.1.0` adds stop-result and context models plus 63 shared conformance cases (done, `contract-v1.1.0`). Accepted inputs, refusals and package digests stay unchanged.
+  3. `2.0.0` splits lab policy out before FXL's runtime phase (done, `contract-v2.0.0`). This is a distribution MAJOR with no contract-id or package-digest change.
+- **Private artifacts.** `var/contract/v<version>/` stores logical `contract/v<version>` artifacts for `1.0.0`, `1.1.0` and `2.0.0`; exact-version/hash pins are `contract/releases/<version>.requirements.txt`. The build target atomically claims a new output directory and never overwrites one. No external publication is performed. `CONTRACTS` still maps stage, workflow, criteria, stage-tree and agent to `1`, `2`, `1`, `1`, `1`; the orchestrator pins `raidar-contract==2.0.0`.
+- **Shared conformance.** Each wheel/sdist ships the same 63 manifest, schema-2 workflow, criteria, stage-tree, reference, stop-result, stop-step and context cases with fixed parse/refusal/digest expectations. Installed consumers run `python -m raidar_contract.conformance.check`, without Raidar or Harbor.
+- **Grading execution identity (Astra, adopted by Sol).** Root the complete executable import closure at every `grading/**` module plus explicit subprocess/plugin roots. Include package initializers, `raidar.judge.secrets` and the contract modules grading actually imports; there are no initializer exemptions. Inventory dynamic roots and resources explicitly and refuse unaccounted inputs. Hash exactly the shipped runtime bytes, excluding `__pycache__` from both inventory and tar transport, plus host Python/packaging/pydantic versions under `python-ast/1`. Distribution versions stay in static project metadata, never executable initializers, so a metadata-only version bump leaves grading identity unchanged.
+- **One revalidation for this batch.** The scope correction and small deferred resolver fixes deliberately change grading identity. Malformed `uv --version` output and malformed generated locks are infrastructure failures, never dependency refusals; behavioral regressions cover both. The portable minor and lab-policy major leave the resulting grading digest unchanged. Attempt every public relock, but never hand-edit validation pins/locks or weaken RT7: current admission refuses stale validation before writing. The orchestrator owns the single post-batch revalidation, followed by relocking before new trials.
 
 ## 6. Health (R2)
 
@@ -678,8 +681,8 @@ Migration, in order:
 
 **Rules for every phase:**
 - Each phase lands as one cutover.
-- `env -u AGENT make quality` stays green: coverage ≥ 95%, import-linter contracts, the structure allowlist and experiment locks.
-- Whenever an identity changes, the same commit relocks every experiment.
+- `env -u AGENT make quality` stays green at the fast-only line/branch floors in `orchestrator/pyproject.toml` (never lowered), import-linter contracts, the structure allowlist and experiment locks. A grading-identity batch may report precisely identified RT7 refusals until its single scheduled revalidation; no trials run under stale validation.
+- Whenever an execution identity changes, attempt every experiment relock in the same cutover batch. If RT7 refuses lock creation, retain the old lock and record the blocker; revalidate once, then regenerate through `make experiment-lock`, never by editing pins or locks.
 - A phase that changes a run is smoke-proved. Real runs use codex `gpt-6-luna` at `low` with `DETACH=1`, after the user approves.
 - A phase that changes a primitive, the runner or `engine/trial` passes `make security-gate` on `mbp` before it closes.
 
@@ -706,8 +709,8 @@ Migration, in order:
 | 12 | Opaque arms | Build only when a registered question needs one, after the health, driver and lab-validation prerequisites. Pin the external system and bundle digest; execute inside the trial container, never on the unrestricted host; specify dispatch, locks, admission, evidence, accounting, pooling and cancellation | System-level claims only; externally enforced deadline, reaping, isolated workspace, protected snapshots and hidden grading; unknown evidence labelled; primitive health explicitly not applicable; no pooling across SUT kinds |
 
 **Before FXL's runtime phase, in order:**
-1. Release contract `1.1.0` with stop-result and context models and shared conformance cases (section 5.8).
-2. Split lab policy out of the distribution as a distribution MAJOR. Contract ids and package digests stay unchanged.
+1. [x] Release contract `1.1.0` with stop-result/context models and 63 shared conformance cases (`contract-v1.1.0`, section 5.8).
+2. [x] Split lab policy out as distribution `2.0.0` (`contract-v2.0.0`). Contract ids, stage acceptance/refusals and package digests stay unchanged. The orchestrator's single post-batch grading revalidation and successful relocks remain prerequisites for trials, not unfinished standard work.
 
 **Acceptance test for Need 1 (AT-N1).** Starting from a clean checkout:
 1. `make problem-import SOURCE=scb@<commit> PROBLEMS=<two problems not yet imported>`;

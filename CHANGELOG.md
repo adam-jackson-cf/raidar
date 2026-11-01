@@ -25,6 +25,9 @@ All notable changes to this project are documented in this file.
 - Pin immutable 2.0.0 wheel/sdist artifacts separately from frozen 1.0.0 and 1.1.0 artifacts.
   Contract ids, package digests and stage acceptance/refusals stay unchanged; primitive code
   identities change and require experiment relocks after the orchestrator's one revalidation.
+- Fast-only coverage measures 37,951/38,171 lines (99.423646%) and 9,134/9,254 branches
+  (98.703263%); ratchet the separate floors from 99.42/98.69 to 99.423/98.703. Full code
+  quality gates, including those ratcheted floors, pass independently of RT7-blocked locks.
 
 ### Portable contract 1.1.0
 

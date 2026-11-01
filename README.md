@@ -21,12 +21,18 @@ The public stage-package authoring contract is [`lab/stages/README.md`](lab/stag
 `stage/1`, calls and canaries, `criteria/1`, immutable references and `stage-tree/1` identity.
 The portable schemas and digests have one implementation in [`contract/`](contract/),
 distribution `raidar-contract` (import `raidar_contract`), with only pydantic and PyYAML
-runtime dependencies. `make contract-build CONTRACT_DIST_DIR=<new-dir>` builds a wheel and sdist,
-prints SHA-256 hashes and refuses existing output; it publishes nothing. Private `1.0.0` artifacts
-are under `var/contract/v1.0.0/`, pinned by [`contract/releases/1.0.0.requirements.txt`](contract/releases/1.0.0.requirements.txt).
-Consumers install these artifacts with exact-version and hash enforcement, not from a Git tag.
-The orchestrator uses the same exact-version package through a local editable path; Harbor execution
-remains in the orchestrator. `raidar_contract.CONTRACTS` maps contract/schema names to supported versions.
+runtime dependencies. The orchestrator pins `2.0.0` through the same local editable package.
+`make contract-build CONTRACT_DIST_DIR=<new-dir>` builds a wheel and sdist, prints SHA-256 hashes
+and refuses existing output; it publishes nothing. Private artifacts for frozen `1.0.0`,
+portable-call `1.1.0` and policy-split `2.0.0` live under `var/contract/v<version>/`, pinned by
+[`contract/releases/`](contract/releases/). Consumers install exact-version/hash-enforced artifacts,
+never build from a Git tag. `contract-v1.1.0` and `contract-v2.0.0` identify the releases.
+The 63 shared conformance cases ship in both releases:
+`python -m raidar_contract.conformance.check` runs them without Raidar or Harbor.
+`2.0.0` retains transport-neutral agent schemas and token/audit records; Harbor ids, isolation
+and capability policy, credentials/reset shell paths, lab registers and stage locations remain
+in the orchestrator. `raidar_contract.CONTRACTS` still maps stage/workflow/criteria/stage-tree/agent
+to `1`/`2`/`1`/`1`/`1`; the distribution split changes no package digest or stage input/refusal.
 The three shipped workflows now use schema 2 and the generic package runtime. Unmarked arms run
 `raidar/one-shot@2` (no stages); `workflow-new` copies `raidar/one-shot-verify`, with verify and
 zero fix turns. `raidar/define-build-verify@2` consumes the define package's `criteria/1`
@@ -198,6 +204,12 @@ validation uses this same provisioning.
 Validation pins the grader's immutable image content ID and implementation digest.
 RT7 and the grading runtime refuse a mismatch; missing identity evidence prevents execution
 until revalidation. Existing three-repeat records are not retroactively certified.
+The implementation digest covers the complete executable grading import closure, package
+initializers included, explicit subprocess/plugin roots, exactly shipped runtime bytes (no
+`__pycache__`) and host Python/packaging/pydantic versions. Static distribution-version metadata
+is outside that closure. The 1.1.0/2.0.0 batch follows the scope correction without another grading
+digest change; the orchestrator performs one revalidation afterward. RT7 currently refuses
+relocking before writing when validation is stale; never hand-edit pins/locks to bypass it.
 A grading crash or timeout triggers a starter canary in the same sandbox configuration:
 completion (not solving the task) passes. A passing canary attributes the failed grade to
 the submission; a failing canary remains infrastructure. Each step records the canary status.
@@ -205,6 +217,8 @@ Resolver timeouts allow one immediate retry: at most two attempts of 120 s per d
 and architecture, with identical requirements and pinned policy and recorded attempts.
 A second timeout is infrastructure (`dependency_resolver_unavailable`), never `cap-exceeded`
 and never an agent score.
+Malformed resolver version output or generated lock data is likewise infrastructure, never
+a dependency refusal.
 
 The grader's `test_dependencies` venv has its own pin, separate from the agent seed, which
 resolves `test_dependencies` only and never the reference's sets. The grader pin covers
