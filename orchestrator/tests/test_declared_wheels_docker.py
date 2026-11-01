@@ -30,13 +30,13 @@ from raidar.grading.sandbox import DockerCopySandbox, SandboxRun, sandbox_env
 from raidar.grading.submission_deps import SubmissionDependencies, python_path_entries
 from raidar.subject.environment.python.image import image_tag
 from raidar.subject.environment.python.pack_definition import load_pack_spec
-from tests.docker_trial_support import docker_context, docker_target_ready
+from tests.docker_trial_support import docker_context
+
+pytestmark = [pytest.mark.docker, pytest.mark.security]
 
 
 @pytest.fixture
 def ready_target() -> str:
-    if not docker_target_ready():
-        pytest.skip("requires the pack image on the selected Docker target")
     return docker_context()
 
 

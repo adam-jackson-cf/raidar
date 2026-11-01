@@ -105,9 +105,31 @@ max-complexity = 10
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
-addopts = "--ignore-glob=.env* --ignore-glob=**/.env*"
+addopts = "--strict-markers --ignore-glob=.env* --ignore-glob=**/.env*"
 testpaths = ["tests"]
 pythonpath = ["../lab/stages/raidar/define/tool/src"]
+# Tiers are applied at file level only (pytestmark); see .agents/skills/test-patterns.
+markers = [
+    "slow: real processes or I/O beyond the fast tier's budget",
+    "quality: repository-wide quality and guardrail checks",
+    "docker: needs a Docker target",
+    "security: security checks (overlays docker)",
+    "perf: performance budgets (overlays docker)",
+]
+
+[tool.coverage.run]
+branch = true
+
+# Display only: pass/fail is the integer-count comparison against the floors below.
+[tool.coverage.report]
+precision = 2
+
+# Coverage floors in percent: the one source of truth read by `raidar quality`.
+# S0 fast-only baseline, floored to hundredths; ratchet each floor after every slice.
+# Refactor completion requires both floors >= 95.00.
+[tool.raidar.coverage]
+line_floor = 85.20
+branch_floor = 75.86
 
 [tool.mypy]
 python_version = "3.12"

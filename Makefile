@@ -115,6 +115,7 @@ AGENT_SMOKE_EFFECTIVE_REASONING = $(if $(filter command line environment,$(origi
 	review-surface-data review-surface-build review-surface-serve review-surface-test \
 	review-surface-quality-data quality-fixture-synthetic \
 	structure-check release-archive \
+	test-fast test-slow test-quality test-docker \
 	quality
 
 define require_var
@@ -135,6 +136,10 @@ help:
 	@echo "  make codex-auth-setup [DEVICE_AUTH=1]                 Create or validate file-backed Codex ChatGPT auth"
 	@echo "  make harbor-cleanup [JOB=<job-dir>] [DRY_RUN=1]        Remove trial environments a stopped job left behind"
 	@echo "  make quality                                           Run repo quality gates"
+	@echo "  make test-fast                                         Fast test tier (not slow/quality/docker/security/perf) with line and branch coverage floors; part of make quality"
+	@echo "  make test-slow                                         Slow tier (slow and not quality and not docker): real local processes, git, run directories; CI runs it on push"
+	@echo "  make test-quality                                      Quality tier (quality and not docker): quality-rule canaries; CI runs it on push"
+	@echo "  make test-docker [TARGET=name]                         Docker tier (docker, not security/perf) on the target; fails, never skips, without Docker (not in make quality)"
 	@echo "  make structure-check                                   Check the repository layout (no versions in names, root and package allowlists, depth); part of make quality"
 	@echo "  make release-archive REF=<name>@<N>                    Tag archive/<name>@<N> at HEAD before editing a released definition in place (refuses an existing tag)"
 	@echo "  Generated data lives under var/ (git-ignored; RAIDAR_VAR=<dir> relocates it): jobs, stores, analysis, problems, tmp"
@@ -219,7 +224,7 @@ help:
 	@echo "  make perf-fixture [PERF_FIXTURE_DIR=<dir>] [PERF_FIXTURE_CONCURRENCY=1]"
 	@echo "                                                        No-LLM fixture experiment (5 attempts x 2 arms) then strict perf check (Docker; builds the pack image if absent; fails, never skips, without Docker)"
 	@echo "  make perf-gate [PERF_GATE_DIR=var/tmp/perf-gate]       Enforced N1 overhead gate: perf-fixture at concurrency 1 and 3, strict; fails on any breach (Docker; release/gate check, not in make quality)"
-	@echo "  make security-gate [TARGET=<name>]                    Security regressions (no LLM): planted agent code vs the verify gate and tool tree, real containers; fails, never skips, without Docker (phase-exit check, not in make quality)"
+	@echo "  make security-gate [TARGET=<name>]                    Security regressions (-m security, no LLM): planted agent code vs the verify gate and tool tree, real containers; fails, never skips, without Docker (phase-exit check, not in make quality)"
 	@echo "  Jev targets below are DORMANT (Jev parked 2026-10-04: both policies off, out of scoring and analysis;"
 	@echo "  kept for history and a future decision; see docs/reboot/requirements.md change log, F7):"
 	@echo "  make jev-shadow-rubric SNAPSHOTS=<checkpoint-dirs> STORE=<assessment-store> [SPECS=<steps-dir>] [WITHIN=artifacts/app] [TRIAL=<id>] [REPLAY_ONLY=1] [OUT=report.json]"
@@ -524,7 +529,7 @@ perf-fixture:
 
 # The enforced N1 overhead gate: the no-LLM fixture at fixed concurrency 1 and 3, each
 # checked strictly against the accepted budgets. Needs Docker, so it is a release/gate
-# check, not part of make quality (whose Docker tests stay opt-in and skipped).
+# check, not part of make quality (whose Docker tests are deselected).
 PERF_GATE_DIR ?= $(REPO_TMP_DIR)/perf-gate
 
 perf-gate: docker-check
@@ -535,13 +540,29 @@ perf-gate: docker-check
 # The security regressions (no LLM): planted agent code against the verify gate and the
 # protected tool tree, in real containers. Needs Docker, so like perf-gate it is a phase-exit
 # check, not part of make quality; RAIDAR_REQUIRE_DOCKER=1 makes a missing target fail, not skip.
-SECURITY_GATE_TESTS := tests/test_workflow_verify_docker.py tests/test_trial_health_audit_docker.py tests/test_declared_wheels_docker.py tests/test_package_at3_docker.py
-
 security-gate: docker-check
 	@$(TARGET_ENV) $(RAIDAR) pack build python
 	@$(TARGET_ENV) export RAIDAR_REQUIRE_DOCKER=1 && \
 		cd orchestrator && $(REPO_RUNTIME_ENV) uv run --project . --extra dev \
-		python -m pytest $(SECURITY_GATE_TESTS) -v -rs
+		python -m pytest -m security -v -rs
+
+# Test tiers (selectors: .agents/skills/test-patterns/references/test-tiers.md).
+test-fast:
+	@$(RAIDAR_DEV) quality test-fast
+
+test-slow:
+	@cd orchestrator && $(REPO_RUNTIME_ENV) uv run --project . --extra dev \
+		python -m pytest -m "slow and not quality and not docker" -q
+
+test-quality:
+	@cd orchestrator && $(REPO_RUNTIME_ENV) uv run --project . --extra dev \
+		python -m pytest -m "quality and not docker" -q
+
+test-docker: docker-check
+	@$(TARGET_ENV) $(RAIDAR) pack build python
+	@$(TARGET_ENV) export RAIDAR_REQUIRE_DOCKER=1 && \
+		cd orchestrator && $(REPO_RUNTIME_ENV) uv run --project . --extra dev \
+		python -m pytest -m "docker and not security and not perf" -v -rs
 
 problem-list:
 	@$(RAIDAR) problem list $(if $(PROBLEM_STORE),--store "$(PROBLEM_STORE)",) \

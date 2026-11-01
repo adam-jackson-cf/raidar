@@ -60,6 +60,8 @@ from tests.problems_support import (
     record_validation,
 )
 
+pytestmark = pytest.mark.slow
+
 
 @pytest.fixture
 def scb(tmp_path: Path) -> tuple[ProblemStore, Path, str]:

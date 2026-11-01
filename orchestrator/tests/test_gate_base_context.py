@@ -9,8 +9,12 @@ import stat
 from dataclasses import replace
 from pathlib import Path
 
+import pytest
+
 from raidar.subject.primitive.gate import GateRun, context_path
 from tests.test_primitive_gate import PASS, Container, command, make_rig
+
+pytestmark = pytest.mark.slow
 
 
 async def test_base_overrides_authored_context_and_stays_at_start(tmp_path: Path) -> None:

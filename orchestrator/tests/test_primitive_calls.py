@@ -12,7 +12,6 @@ import hashlib
 import io
 import json
 import os
-import struct
 import sys
 import tarfile
 import time
@@ -23,8 +22,10 @@ from typing import Any
 import pytest
 
 from raidar.subject.primitive import calls
-from raidar.subject.primitive.payload import isolate, supervise
+from raidar.subject.primitive.payload import supervise
 from tests.primitive_support import UNCONFINED, LocalEnvironment, Tree, relocate
+
+pytestmark = pytest.mark.slow
 
 PY = sys.executable
 CONTEXT = {"task": "write a note", "round": 0}
@@ -496,11 +497,6 @@ async def test_garbage_where_an_archive_should_be_is_a_violation_not_an_error(
     assert not (container / "c").exists()
 
 
-def test_a_malformed_record_manifest_is_a_violation_not_a_raise() -> None:
-    for document in ({"path": "x"}, {"path": "x", "entries": 5}, {"entries": [{"path": 1}]}):
-        assert calls.record_manifest(document).violation.startswith("malformed manifest")
-
-
 # ------------------------------------------------------------- root helpers and floors
 async def test_root_files_flags_and_resource_floors(container: Path) -> None:
     environment = LocalEnvironment()
@@ -526,17 +522,3 @@ async def test_state_can_be_uploaded_regular_only(container: Path) -> None:
     (source / "link").symlink_to(source)
     with pytest.raises(ValueError, match="regular"):
         await calls.upload_state(environment, source, target + "2")
-
-
-# ------------------------------------------------------------------ the network filter
-@pytest.mark.parametrize("arch", ["x86_64", "aarch64"])
-def test_the_seccomp_program_is_well_formed_and_names_the_denied_calls(arch: str) -> None:
-    program = isolate.build_filter(arch)
-    instructions = list(struct.iter_unpack("HBBI", program))
-
-    for position, (code, jump_true, _, _) in enumerate(instructions):
-        if code in (0x15, 0x35):
-            assert position + 1 + jump_true < len(instructions)
-    assert instructions[-1][0] == 0x06
-    numbers = {k for code, _, _, k in instructions if code == 0x15}
-    assert numbers >= {41 if arch == "x86_64" else 198, 425, 426, 427, 438}

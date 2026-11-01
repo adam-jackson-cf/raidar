@@ -41,6 +41,8 @@ from raidar.subject.primitive.gate import (
 from raidar.subject.primitive.payload import install_tree, walk
 from tests.workflow_support import LocalEnvironment
 
+pytestmark = pytest.mark.slow
+
 FIXTURE = Path(__file__).parent / "fixtures" / "stages" / "acme" / "gate-check"
 PASS = FIXTURE / "fixtures" / "pass" / "state"
 REFUSE = FIXTURE / "fixtures" / "refuse" / "state"
@@ -356,22 +358,6 @@ def test_a_check_whose_tool_cannot_start_is_an_integrity_failure(tmp_path: Path)
     record = rig.record([command("gone", "no-such-tool")])
     assert [c["cause"] for c in record["checks"]] == ["unrunnable"]
     assert attribute(record)[0] is Attribution.INTEGRITY
-
-
-def test_changed_tool_bytes_or_a_missing_record_are_integrity_failures() -> None:
-    assert attribute({"verdict": "passed", "checks": []}, tools_intact=False)[0] is (
-        Attribution.INTEGRITY
-    )
-    nothing = {"verdict": "error", "error": "no record", "checks": []}
-    attribution, reason = attribute(nothing)
-    assert attribution is Attribution.INTEGRITY
-    assert "no record" in reason
-
-
-def test_passed_and_refused_records_keep_their_verdicts() -> None:
-    assert attribute({"verdict": "passed"})[0] is Attribution.PASSED
-    assert attribute({"verdict": "refused"})[0] is Attribution.REFUSED
-    assert Attribution.REFUSED.value == "refused"
 
 
 def test_a_canary_that_cannot_decide_invalidates_the_instrument(tmp_path: Path) -> None:

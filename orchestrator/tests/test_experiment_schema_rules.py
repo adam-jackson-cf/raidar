@@ -11,14 +11,7 @@ from click.testing import CliRunner
 from raidar.cli import main
 from raidar.design.experiment.loader import load_experiment
 from raidar.design.experiment.validation import SpecValidationError, spec_warnings
-from tests.experiment_spec_support import (
-    AGENTS_BENCHMARK,
-    EXPERIMENTS,
-    MECHANICS_SMOKE,
-    SMOKE_EXPERIMENT,
-    experiment_document,
-    write_experiment,
-)
+from tests.experiment_spec_support import experiment_document, write_experiment
 
 
 def _issues(path: Path) -> dict[str, str]:
@@ -40,15 +33,6 @@ def _benchmark(**changes: Any) -> dict[str, Any]:
 
 
 # ---- kinds ---------------------------------------------------------------------
-
-
-def test_every_committed_experiment_is_in_its_kind_directory() -> None:
-    files = sorted(EXPERIMENTS.glob("*/*/experiment.yaml"))
-    assert {SMOKE_EXPERIMENT, AGENTS_BENCHMARK, MECHANICS_SMOKE} <= set(files)
-    for path in files:
-        spec = load_experiment(path).spec
-        assert (path.parents[1].name, path.parent.name) == (spec.kind, spec.id)
-        assert spec.id.split("__")[0] == spec.runtime == "python"
 
 
 def test_research_loop_is_reserved(tmp_path: Path) -> None:

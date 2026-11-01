@@ -12,6 +12,8 @@ import pytest
 
 SCRIPT_PATH = Path(__file__).resolve().parents[2] / "scripts" / "release" / "bump-version.py"
 
+pytestmark = pytest.mark.quality
+
 
 @pytest.fixture(scope="module")
 def bump_version_module():

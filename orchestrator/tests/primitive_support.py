@@ -8,6 +8,7 @@ root and may not be Linux); ``ChildPolicy`` is the one explicit switch for that.
 
 from __future__ import annotations
 
+import hashlib
 import shutil
 import subprocess
 import sys
@@ -81,3 +82,15 @@ def relocate(monkeypatch: pytest.MonkeyPatch, root: Path) -> None:
     links = root / "usr" / "bin"
     links.mkdir(parents=True)
     monkeypatch.setattr(install, "LINKS_DIR", str(links))
+
+
+def lay(root: Path) -> Path:
+    """A small tree: ``a.txt`` and ``d/b.bin``."""
+    (root / "d").mkdir(parents=True)
+    (root / "a.txt").write_bytes(b"alpha")
+    (root / "d" / "b.bin").write_bytes(b"beta!")
+    return root
+
+
+def sha(data: bytes) -> str:
+    return hashlib.sha256(data).hexdigest()

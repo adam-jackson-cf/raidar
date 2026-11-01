@@ -31,6 +31,8 @@ from raidar.grading.sandbox import GradingSandbox
 from raidar.grading.verifier import RaidarVerifier, SnapshotUnavailableError
 from tests.verifier_support import FakeAgentEnvironment, LocalProcessSandbox, make_bundle, write_app
 
+pytestmark = pytest.mark.slow
+
 
 class LocalVerifier(RaidarVerifier):
     """The production verifier with the grader container swapped for a host subprocess."""

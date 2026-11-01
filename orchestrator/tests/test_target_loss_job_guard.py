@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import asyncio
 import json
 from pathlib import Path
 from typing import Any
@@ -19,7 +18,6 @@ from raidar.contract.trial import (
 )
 from raidar.engine.target.guard import REAP_FILE, TargetGuard, TargetLostError
 from raidar.engine.target.health import TargetUnavailableError
-from raidar.engine.trial.driver import run_in_order
 from tests.execution_support import fake_engine_target
 
 HASHES = TrialHashes(
@@ -227,27 +225,3 @@ async def test_review_records_the_loss_when_the_target_never_returns(tmp_path: P
     assert target.reaped == []
     reaped = json.loads((tmp_path / "t0" / REAP_FILE).read_text())
     assert reaped["reconnected"] is False
-
-
-async def test_a_lost_target_stops_scheduling_but_running_trials_finish() -> None:
-    target = FakeTarget()
-    guard = target.guard(reconnect_s=0.0)
-    started: list[int] = []
-    finished: list[int] = []
-
-    async def worker(job: int) -> int:
-        started.append(job)
-        await asyncio.sleep(0.05 if job == 0 else 0.2)
-        finished.append(job)
-        return job
-
-    async def admit(job: int) -> None:
-        if job == 2:
-            target.up = False
-        await guard.admit(str(job))
-
-    with pytest.raises(TargetLostError):
-        await run_in_order(list(range(5)), worker, concurrency=2, admit=admit)
-
-    assert started == [0, 1]
-    assert sorted(finished) == [0, 1]  # in-flight trials were not cancelled

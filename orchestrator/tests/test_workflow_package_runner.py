@@ -53,6 +53,8 @@ from tests.lifecycle_support import (
 from tests.native_support import CodexNative
 from tests.workflow_support import LocalEnvironment
 
+pytestmark = pytest.mark.slow
+
 BUILD = "Build:\n%%%NOTE_STATE%%%\nTask: %%%TASK%%%"
 TASK = "Write the note."
 TREE = "t" * 64

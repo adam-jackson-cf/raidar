@@ -21,6 +21,8 @@ from raidar.grading.sandbox import DockerCopySandbox, SandboxRun, sweep_grader_o
 from raidar.judge.secrets import SecretIsolationError
 from tests.problems_support import POSITIVE_REF, build_fixture_store
 
+pytestmark = pytest.mark.slow
+
 FAKE_DOCKER = """#!/bin/bash
 state="$FAKE_DOCKER_STATE"
 printf '%s\\n' "$*" >> "$state/calls"

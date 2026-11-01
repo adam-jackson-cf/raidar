@@ -18,6 +18,8 @@ import pytest
 
 from raidar.subject.workflow.stage_container import ContainerError, PackContainer
 
+pytestmark = pytest.mark.slow
+
 FAKE_DOCKER = textwrap.dedent(
     """\
     #!{python}

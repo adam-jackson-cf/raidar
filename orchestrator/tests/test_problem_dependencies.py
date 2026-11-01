@@ -19,6 +19,8 @@ from raidar.grading.dependency_pins import REFUSAL_REASON, DependencyLocks, Unpr
 from raidar.grading.resolver import Resolution
 from tests.problems_support import FakeResolver, build_fake_scb_repo, fake_store
 
+pytestmark = pytest.mark.slow
+
 
 class Outage:
     identity = "outage"
