@@ -11,7 +11,7 @@ import pytest
 from click.testing import CliRunner
 
 from raidar.cli import main
-from raidar.cli.target_options import job_target
+from raidar.cli.target_options import docker_selection, job_target, run_guarded
 from raidar.engine.target.config import (
     TARGETS_TEMPLATE,
     TargetError,
@@ -22,6 +22,8 @@ from raidar.engine.target.config import (
     resolve_selection,
     resolve_target,
 )
+from raidar.engine.target.guard import TargetLostError
+from raidar.engine.target.health import TargetUnavailableError
 from raidar.engine.trial.environment import run_scope
 
 FILE = """
@@ -269,3 +271,61 @@ def test_a_run_needs_trusted_trial_and_grader_targets(tmp_path: Path) -> None:
     write_targets(tmp_path, text.replace('grader = "local"', 'grader = "lab"'))
     with pytest.raises(click.ClickException, match=r"targets\.lab\.trusted"):
         job_target("mbp")  # a trusted trial target with an untrusted grader target
+
+
+def test_the_concurrency_a_target_allows_caps_the_request(tmp_path: Path) -> None:
+    book = load_targets(write_targets(tmp_path))
+
+    assert [book.get("local").effective_concurrency(n) for n in (2, 3, 8)] == [2, 3, 3]
+    assert book.get("lab").effective_concurrency(8) == 8, "no cap set"
+
+
+@pytest.fixture
+def docker_steps(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> list[tuple[str, str]]:
+    """Records ensure/sweep calls of ``docker_selection`` in place of Docker."""
+    write_targets(tmp_path)
+    monkeypatch.setenv("DOCKER_CONTEXT", "before")  # so activation is undone with the test
+    steps: list[tuple[str, str]] = []
+    monkeypatch.setattr(
+        "raidar.cli.target_options.ensure_target", lambda t: steps.append(("ensure", t.name))
+    )
+    monkeypatch.setattr(
+        "raidar.cli.target_options.sweep_grader_orphans", lambda ctx: steps.append(("sweep", ctx))
+    )
+    return steps
+
+
+def test_selection_without_ensure_touches_no_docker_but_still_activates(
+    docker_steps: list[tuple[str, str]],
+) -> None:
+    docker_selection("local", ensure=False)
+
+    assert docker_steps == []
+    assert os.environ["DOCKER_CONTEXT"] == "orbstack"
+
+
+def test_an_unavailable_target_is_a_command_error_and_is_not_activated(
+    monkeypatch: pytest.MonkeyPatch, docker_steps: list[tuple[str, str]]
+) -> None:
+    def down(_target: object) -> None:
+        raise TargetUnavailableError("daemon down")
+
+    monkeypatch.setattr("raidar.cli.target_options.ensure_target", down)
+
+    with pytest.raises(click.ClickException, match="daemon down"):
+        docker_selection("local")
+    assert os.environ["DOCKER_CONTEXT"] == "before"
+
+
+def test_a_guarded_run_returns_its_result_and_reports_a_lost_target_as_an_abort(
+    tmp_path: Path,
+) -> None:
+    async def finished() -> int:
+        return 5
+
+    async def lost() -> int:
+        raise TargetLostError("stayed down for 5s")
+
+    assert run_guarded(tmp_path, finished()) == 5
+    with pytest.raises(click.ClickException, match=r"job .* aborted: stayed down for 5s"):
+        run_guarded(tmp_path, lost())

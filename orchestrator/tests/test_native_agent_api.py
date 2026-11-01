@@ -2,13 +2,20 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
-from raidar_contract.agent_records import StatePath
+import pytest
+from raidar_contract.agent import AgentDefinitionError
 
-from raidar.engine.health.setup_script import render_setup_script
-from raidar.subject.agent.config import Harness
-from raidar.subject.agent.native import credentials, native_agent_class, state_paths
+from raidar.subject.agent.config import AgentSpec, Harness, ModelTarget
+from raidar.subject.agent.definition import harness_of, load_agent, provider_of
+from raidar.subject.agent.native import (
+    adapter_class_for_harness,
+    credentials,
+    resolve_adapter,
+)
+from tests.capability_support import CAPABILITIES
 
 KEY = "test-key"
 
@@ -56,30 +63,72 @@ def test_claude_has_credentials_but_no_session_file() -> None:
     assert "CLAUDE_FORCE_OAUTH" in str(forced.issue)
 
 
-def test_state_paths_cover_both_harnesses_codex_first() -> None:
-    paths = state_paths()
+def test_a_codex_login_in_the_default_home_is_found_without_codex_home(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.delenv("CODEX_HOME", raising=False)
+    (tmp_path / ".codex").mkdir()
+    (tmp_path / ".codex" / "auth.json").write_text('{"tokens": {"access_token": "x"}}')
 
-    assert [p.baseline for p in paths] == [
-        "codex-home",
-        "codex-home",
-        "agents-home",
-        "claude-config",
-        "claude-config",
-        "claude.json",
-    ]
-    assert StatePath("$HOME_DIR/.claude.json", "claude.json", "file") in paths
+    found = credentials(Harness.CODEX_CLI, {})
 
-
-def test_the_reset_script_resets_every_native_agents_state_path() -> None:
-    script = render_setup_script()
-
-    assert "@STATE_TARGETS@" not in script
-    for path in state_paths():
-        assert f'  "{path.target}|{path.baseline}|{path.kind}"' in script
+    assert found.issue is None
+    assert found.session_file == tmp_path / ".codex" / "auth.json"
+    assert found.session_used
 
 
-def test_every_harness_resolves_a_native_agent_class_with_the_protocol_classmethods() -> None:
-    for harness in Harness:
-        native = native_agent_class(harness)
-        assert callable(native.credentials)  # type: ignore[attr-defined]
-        assert native.state_paths()  # type: ignore[attr-defined]
+def test_codex_chatgpt_mode_without_a_session_file_is_refused_not_silently_keyed(
+    tmp_path: Path,
+) -> None:
+    env = {"CODEX_HOME": str(tmp_path), "CODEX_AUTH_MODE": "chatgpt", "OPENAI_API_KEY": KEY}
+
+    found = credentials(Harness.CODEX_CLI, env)
+
+    assert "file-backed" in str(found.issue)
+    assert not found.session_used
+
+
+def test_a_harness_without_a_registered_adapter_is_refused(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr("raidar.subject.agent.adapters.registry.registry._adapters", {})
+    spec = AgentSpec(harness=Harness.CODEX_CLI, model=ModelTarget(provider="openai", name="x"))
+
+    with pytest.raises(ValueError, match="No adapter registered for harness codex-cli"):
+        resolve_adapter(spec)
+    with pytest.raises(ValueError, match="No adapter registered for harness codex-cli"):
+        adapter_class_for_harness(Harness.CODEX_CLI)
+
+
+@pytest.mark.parametrize("invalid", [None, "model", "reasoning"])
+def test_declared_models_must_all_be_runnable_by_the_registered_adapter(
+    tmp_path: Path, invalid: str | None
+) -> None:
+    models = {
+        "first": {"canonical": "gpt-5.4", "reasoning": ["low", "high"]},
+        "second": {"canonical": "gpt-5.3-codex-spark", "reasoning": ["low"]},
+    }
+    if invalid == "model":
+        models["second"]["canonical"] = "gpt-nonexistent"
+    elif invalid == "reasoning":
+        models["second"]["reasoning"] = ["ultra"]
+    document = {
+        "schema": 1,
+        "name": "fixture",
+        "adapter": "codex",
+        "tool": {"package": "test-cli", "binary": "test", "version": "1.0"},
+        "settings": {"isolated_home": True, "ignore_user_config": True},
+        "placement": {"skills": "{home}/skills", "instructions": "{home}/AGENTS.md"},
+        "resume": True,
+        "models": models,
+        "capabilities": CAPABILITIES,
+    }
+    (tmp_path / "fixture.yaml").write_text(json.dumps(document))
+    if invalid:
+        with pytest.raises(AgentDefinitionError, match=r"models\.second"):
+            load_agent(tmp_path, "fixture")
+    else:
+        definition = load_agent(tmp_path, "fixture")
+        assert harness_of(definition) == Harness.CODEX_CLI
+        assert provider_of(definition) == "openai"

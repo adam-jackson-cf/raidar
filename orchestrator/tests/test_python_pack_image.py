@@ -9,6 +9,7 @@ import shutil
 import subprocess
 from collections.abc import Sequence
 from pathlib import Path
+from typing import Any
 
 import pytest
 import yaml
@@ -21,6 +22,15 @@ from harbor.environments.definition import should_use_prebuilt_docker_image
 from pydantic import ValidationError
 
 from raidar.cli import main
+from raidar.subject import environment as environment_module
+from raidar.subject.environment import UnknownPackError, load_runtime_pack
+from raidar.subject.environment.drift import (
+    LockedPackError,
+    lock_runtime_pack,
+    pack_drift_issues,
+    problem_pack_images,
+)
+from raidar.subject.environment.python import harness as harness_module
 from raidar.subject.environment.python import image as image_module
 from raidar.subject.environment.python.harness import (
     HarnessPinError,
@@ -43,6 +53,7 @@ from raidar.subject.environment.python.pack_definition import (
     PackSpec,
     load_pack_spec,
     load_tool_lock,
+    pinned_distribution,
 )
 from raidar.subject.environment.python.task import (
     bind_task_environment,
@@ -229,29 +240,6 @@ def test_image_definition_names_no_scorer_tool_or_browser() -> None:
         "CLAUDE_CODE_VERSION",
     }
     assert build_args(spec)["AGENT_HOME"] == spec.image.agent_home
-
-
-# Deferred cleanup (repo-structure-design.md §11): the image context's bytes name the pack
-# image, and both problem pins bind this release, so its Dockerfile keeps a planning tag
-# ("reboot plan WS-I I1") until the next pack release. That release changes this hash; the
-# test below then fails until the tag is gone. Remove the tag and this exemption together.
-PLANNING_TAG_RELEASE = "2b91a52663e099f2"
-PLANNING_TAG_MARKERS = ("reboot plan", "WS-")
-
-
-def test_the_next_pack_release_drops_the_planning_tags_from_the_recipe() -> None:
-    spec = load_pack_spec()
-    # pack.yaml and tools.lock.yaml are hashed as parsed data, so their comments are free.
-    recipe = [PACK_SPEC_PATH, PACK_SPEC_PATH.with_name("tools.lock.yaml")]
-    if image_lock_hash(spec)[:16] != PLANNING_TAG_RELEASE:
-        recipe += [path for path in spec.context_dir.rglob("*") if path.is_file()]
-    tagged = [
-        f"{path.name}: {marker!r}"
-        for path in recipe
-        for marker in PLANNING_TAG_MARKERS
-        if marker in path.read_text()
-    ]
-    assert tagged == [], "drop the planning tags (and PLANNING_TAG_RELEASE) in this pack release"
 
 
 def test_build_reuses_only_a_labelled_clean_tag_and_force_rebuilds() -> None:
@@ -476,6 +464,9 @@ def test_pack_commands_report_the_audit_and_fail_cleanly(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path, docker_target_offline: None
 ) -> None:
     spec = load_pack_spec()
+    lock = load_tool_lock()
+    monkeypatch.setattr("raidar.cli.pack.load_runtime_pack", lambda runtime: spec)
+    monkeypatch.setattr("raidar.cli.pack.load_tool_lock", lambda: lock)
     monkeypatch.setenv("RAIDAR_TOOL_CACHE", str(tmp_path / "cache"))
     runner = CliRunner()
     label = image_lock_hash(spec)
@@ -511,3 +502,124 @@ def test_pack_commands_report_the_audit_and_fail_cleanly(
     failed = runner.invoke(main, ["pack", "build", "python"])
     assert (failed.exit_code, failed.exception.__class__) == (1, SystemExit)
     assert "docker build" in failed.output
+
+
+@pytest.mark.parametrize("name", ["main", " main "])
+def test_an_entry_file_name_becomes_a_snapshot_relative_path(name: str) -> None:
+    spec = load_pack_spec()
+
+    assert spec.entry_file(name) == spec.entry_file_template.format(entry_file="main")
+
+
+@pytest.mark.parametrize("name", ["", "  ", "/etc/passwd", "../up", "a/../../b"])
+def test_an_entry_file_that_escapes_the_snapshot_is_refused(name: str) -> None:
+    with pytest.raises(ValueError, match="snapshot-relative"):
+        load_pack_spec().entry_file(name)
+
+
+def test_a_pin_must_be_exact_and_names_normalise() -> None:
+    assert pinned_distribution("Scb_Check==0.1.3") == "scb-check"
+    with pytest.raises(ValueError, match="not an exact"):
+        pinned_distribution("scb-check>=1")
+
+
+@pytest.mark.parametrize("loader", [load_pack_spec, load_tool_lock])
+def test_a_definition_file_that_is_not_a_mapping_is_refused(tmp_path: Path, loader: Any) -> None:
+    path = tmp_path / "definition.yaml"
+    path.write_text("- just\n- a list\n")
+
+    with pytest.raises(ValueError, match="must contain a mapping"):
+        loader(path)
+
+
+def test_an_existing_compose_file_must_be_a_mapping(tmp_path: Path) -> None:
+    environment_dir = tmp_path / "environment"
+    environment_dir.mkdir()
+    (environment_dir / "docker-compose.yaml").write_text("- not\n- a mapping\n")
+
+    with pytest.raises(ValueError, match="must contain a mapping"):
+        bind_task_environment(environment_dir, load_pack_spec())
+
+
+def test_a_harbor_agent_that_is_not_installed_or_has_no_version_command_is_refused(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    pin = load_pack_spec().image.harnesses["codex-cli"]
+    monkeypatch.setattr(harness_module.AgentFactory, "get_agent_class", lambda _name: dict)
+    with pytest.raises(HarnessPinError, match="not an installed agent"):
+        harbor_version_command(pin)
+
+    monkeypatch.setattr(harness_module, "_harbor_agent", lambda _pin: object())
+    with pytest.raises(HarnessPinError, match="no install version command"):
+        harbor_version_command(pin)
+
+
+# ---- runtime packs and RT6 pack drift ---------------------------------------------------
+
+
+def _lock_with(runtime: str, **images: str) -> dict[str, Any]:
+    problems = {ref: {"metadata": {"pack_image": image}} for ref, image in images.items()}
+    return {"spec": {"runtime": runtime}, "execution": {"references": {"problem": problems}}}
+
+
+def test_the_runtime_names_its_pack_and_an_unknown_or_misnamed_one_is_refused(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    assert load_runtime_pack("python").id == "python"
+    with pytest.raises(UnknownPackError, match=r"no runtime pack for 'node-ts' \(packs: python\)"):
+        load_runtime_pack("node-ts")
+    monkeypatch.setitem(environment_module.PACK_LOADERS, "ruby", load_pack_spec)
+    with pytest.raises(UnknownPackError, match="declares id 'python'"):
+        load_runtime_pack("ruby")
+
+
+@pytest.mark.parametrize(
+    ("lock", "expected"),
+    [
+        ({}, {}),
+        ({"execution": "nope"}, {}),
+        ({"execution": {"references": []}}, {}),
+        (
+            {"execution": {"references": {"problem": {"a": "not a record", "b": {"metadata": 1}}}}},
+            {},
+        ),
+        (_lock_with("python", a="r:1"), {"a": "r:1"}),
+        ({"execution": {"references": {"problem": {"a": {"metadata": {"pack_image": 7}}}}}}, {}),
+    ],
+)
+def test_the_locked_pack_images_are_read_defensively_from_the_lock(
+    lock: dict[str, Any], expected: dict[str, str]
+) -> None:
+    assert problem_pack_images(lock) == expected
+
+
+@pytest.mark.parametrize(
+    ("locked", "drifted"),
+    [
+        ("raidar/pack-python:old", True),
+        ("raidar/pack-python:new", False),
+        ("raidar/pack-python:old@sha256:abc", True),
+        ("registry:5000/raidar/pack-python:old", False),  # another repository: not this pack
+        ("fixture/own-image:1", False),
+    ],
+)
+def test_only_another_build_of_the_same_pack_repository_is_drift(
+    locked: str, drifted: bool
+) -> None:
+    issues = pack_drift_issues({"p@1": locked}, "raidar/pack-python:new")
+
+    assert bool(issues) is drifted
+    if drifted:
+        assert issues[0].startswith("[RT6] pack drift: p@1")
+
+
+def test_a_lock_runs_only_on_the_pack_image_it_was_locked_with() -> None:
+    pack = load_pack_spec()
+    current = image_tag(pack)
+    stale = f"{pack.image.repository}:0000000000000000"
+
+    assert lock_runtime_pack(_lock_with("python", a=current)).id == "python"
+    with pytest.raises(LockedPackError, match=r"\[RT6\] pack drift: a"):
+        lock_runtime_pack(_lock_with("python", a=stale))
+    with pytest.raises(LockedPackError, match=r"\[RT6\] no runtime pack"):
+        lock_runtime_pack(_lock_with("node-ts"))

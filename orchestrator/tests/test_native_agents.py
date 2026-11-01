@@ -175,6 +175,20 @@ def test_a_model_the_table_does_not_price_makes_the_cost_unavailable(
 
 
 @pytest.mark.parametrize(
+    "model_usage",
+    [{}, "claude-x", {"claude-x": "many"}, {"claude-x": {"inputTokens": "many"}}],
+    ids=["empty", "not-a-table", "entry-not-a-table", "entry-incomplete"],
+)
+def test_a_model_usage_the_audit_cannot_read_leaves_the_cost_unavailable(
+    tmp_path: Path, model_usage: Any
+) -> None:
+    envelope = {**_result("one", tokens=(10, 5, 3, 7), cost=0.5), "modelUsage": model_usage}
+    (tmp_path / "claude-code.txt").write_text(_lines(INIT, envelope))
+
+    assert _usage(tmp_path) == Tokens(18, 5, 7, None)
+
+
+@pytest.mark.parametrize(
     ("usage", "expected"),
     [
         (None, None),
@@ -226,6 +240,15 @@ def test_a_resumed_codex_turn_without_a_new_message_has_none(tmp_path: Path) -> 
 
     assert agent.last_message(first) == "first reply"
     assert agent.last_message(resumed) is None
+    assert agent.last_message(tmp_path / "never-ran") is None
+
+
+def test_a_codex_stream_with_noise_still_yields_its_last_message(tmp_path: Path) -> None:
+    reply = {"type": "item.completed", "item": {"type": "agent_message", "text": "done"}}
+    noise = "plain noise\n{broken\n"
+    (tmp_path / "codex.txt").write_text(noise + _lines({"type": "turn.started"}, reply))
+
+    assert _codex(tmp_path).last_message(tmp_path) == "done"
 
 
 # --- isolation ------------------------------------------------------------------------------
@@ -317,13 +340,47 @@ def test_container_host_skills_would_be_copied_into_the_home_and_are_refused(
     assert env.commands("claude --verbose") == []
 
 
-def test_harbor_inputs_that_land_in_the_claude_home_are_refused(tmp_path: Path) -> None:
+@pytest.mark.parametrize(
+    ("inputs", "message"),
+    [
+        ({"skills_dir": "/skills"}, "skills_dir"),
+        ({"memory_dir": "/memory"}, "memory_dir"),
+        ({"mcp_servers": [SimpleNamespace(name="m")]}, "MCP servers"),
+        ({"config": {"model": "x"}}, "native config"),
+    ],
+    ids=["skills", "memory", "mcp", "config"],
+)
+def test_harbor_inputs_that_land_in_the_claude_home_are_refused(
+    tmp_path: Path, inputs: dict[str, Any], message: str
+) -> None:
     env = ClaudeEnvironment()
 
-    with pytest.raises(IsolationError, match="skills_dir"):
-        _turn(_claude(tmp_path, skills_dir="/skills"), env, resume=False)
+    with pytest.raises(IsolationError, match=message):
+        _turn(_claude(tmp_path, **inputs), env, resume=False)
 
     assert env.calls == []
+
+
+@pytest.mark.parametrize("resume", [False, True], ids=["first-turn", "resumed-turn"])
+def test_claude_instructions_are_placed_in_the_isolated_home(tmp_path: Path, resume: bool) -> None:
+    env = ClaudeEnvironment()
+    agent = _claude(tmp_path, instructions="Use tabs.\n", instructions_path="{home}/CLAUDE.md")
+
+    _turn(agent, env, resume=resume)
+
+    (placed,) = env.commands("base64 -d")
+    assert placed["command"].endswith("| base64 -d > /logs/agent/sessions/CLAUDE.md")
+    assert placed["env"]["CLAUDE_CONFIG_DIR"] == "/logs/agent/sessions"
+
+
+def test_claude_instructions_never_land_outside_the_isolated_home(tmp_path: Path) -> None:
+    env = ClaudeEnvironment()
+    agent = _claude(tmp_path, instructions="x", instructions_path="/app/CLAUDE.md")
+
+    with pytest.raises(IsolationError, match="outside the isolated home"):
+        _turn(agent, env, resume=False)
+
+    assert env.commands("base64 -d") == []
 
 
 # --- session audit --------------------------------------------------------------------------
@@ -451,3 +508,70 @@ def test_a_claude_audit_without_records_is_unmeasured(tmp_path: Path) -> None:
     assert audit["sources"] == []
     assert audit["violations"] == []
     assert len(audit["unmeasured"]) == 2
+
+
+def test_a_claude_audit_reports_every_line_it_could_not_read(tmp_path: Path) -> None:
+    (tmp_path / "claude-code.txt").write_text(
+        "plain text\n{broken\n" + _lines(INIT, {"type": "future"})
+    )
+    _transcript(
+        tmp_path,
+        {"type": "user", "message": {"content": [{"text": "kept"}]}},
+        {"type": "attachment", "attachment": {"text": "kept"}},
+        {"type": "attachment", "attachment": "not an object"},
+        {"type": "mystery"},
+    )
+
+    audit = _claude(tmp_path).session_audit(tmp_path)
+
+    assert audit["records"] == 6  # the unparsable stream lines are not records
+    assert any("3 line(s) of the claude stream" in why for why in audit["unmeasured"])
+    assert any("2 line(s) of the session transcript s1.jsonl" in why for why in audit["unmeasured"])
+
+
+def test_a_claude_audit_takes_the_version_from_the_transcript_without_an_init_event(
+    tmp_path: Path,
+) -> None:
+    _transcript(tmp_path, {"type": "user", "version": "2.0.1", "message": {"content": "hi"}})
+
+    audit = _claude(tmp_path).session_audit(tmp_path)
+
+    assert audit["version"] == "2.0.1"
+    assert any("no system init event" in why for why in audit["unmeasured"])
+
+
+def test_a_codex_audit_reports_every_row_it_could_not_read(tmp_path: Path) -> None:
+    rollout = _rollout(
+        tmp_path,
+        {"type": "session_meta", "payload": {"cli_version": "0.156.1"}},
+        {"type": "mystery", "payload": {}},
+        {"type": "response_item", "payload": {"type": "hologram"}},
+        {
+            "type": "response_item",
+            "payload": {"type": "message", "role": "alien", "content": [{"text": "x"}]},
+        },
+        _message("user", "# AGENTS.md instructions for /app\n\nno instruction block"),
+    )
+    rollout.write_text(rollout.read_text() + "garbage\n")
+
+    audit = _codex(tmp_path).session_audit(tmp_path)
+
+    assert audit["records"] == 5  # the garbage line is not a record
+    assert any("4 line(s) of the rollout" in why for why in audit["unmeasured"])
+    assert any("no <INSTRUCTIONS> block" in why for why in audit["unmeasured"])
+    assert audit["instructions"] == []
+
+
+@pytest.mark.parametrize("harness", list(Harness), ids=lambda harness: harness.value)
+def test_the_session_store_is_where_the_audit_reads_the_turns_transcripts(
+    tmp_path: Path, harness: Harness
+) -> None:
+    agent = native_agent(harness, tmp_path)
+    (store,) = agent.session_store()
+    if harness is Harness.CODEX_CLI:
+        _rollout(tmp_path, {"type": "session_meta", "payload": {"cli_version": "1"}})
+    else:
+        _transcript(tmp_path, {"type": "user", "message": {"content": "hi"}})
+
+    assert (tmp_path / store).is_dir()
+    assert agent.session_audit(tmp_path)["records"] == 1

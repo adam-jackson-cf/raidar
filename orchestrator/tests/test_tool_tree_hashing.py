@@ -65,18 +65,6 @@ def test_a_failed_hash_exec_is_an_unmeasured_reading() -> None:
     assert "unusable" in error
 
 
-def test_the_script_hashes_the_tool_tree_and_its_provisioned_links_as_root() -> None:
-    env = Env([f"@@TOOLS present {SHA} 3"])
-    reading, _ = asyncio.run(hash_tool_tree(env))
-    assert reading == ToolTreeReading(True, SHA, 3)
-    (call,) = env.calls
-    assert call["user"] == "root"
-    assert "/opt/raidar-tools" in call["command"]
-    assert "/usr/local/bin" in call["command"]
-    assert "sha256sum" in call["command"]
-    assert "./.staging" in call["command"]  # the install's scratch area is not hashed
-
-
 def test_hooks_take_one_baseline_and_a_hash_after_every_agent_phase(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

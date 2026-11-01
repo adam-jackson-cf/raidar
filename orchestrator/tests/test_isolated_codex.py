@@ -30,8 +30,9 @@ class ScriptedEnvironment:
     default_user = "agent"
     capabilities = SimpleNamespace(mounted=True)
 
-    def __init__(self, *, managed: str = "") -> None:
+    def __init__(self, *, managed: str = "", probe: str = PROBE) -> None:
         self.managed = managed
+        self.probe = probe
         self.calls: list[dict[str, Any]] = []
 
     async def exec(self, command: str, **kwargs: Any) -> Any:
@@ -40,7 +41,7 @@ class ScriptedEnvironment:
         if "/etc/codex/config.toml" in command:
             stdout = self.managed
         elif "SKILL.md" in command and "codex exec" not in command:
-            stdout = PROBE
+            stdout = self.probe
         return SimpleNamespace(return_code=0, stdout=stdout, stderr="")
 
     def commands(self, needle: str) -> list[str]:
@@ -81,7 +82,7 @@ def test_every_command_carries_the_isolation_flags(tmp_path: Path, resume: bool)
     assert command.index("--ignore-user-config") < command.index("-- ")
     assert agent.harness_isolation is not None
     assert agent.harness_isolation["features_off"] == FEATURES
-    assert agent.agent_process == {
+    assert agent.process_facts() == {
         "user": "agent",
         "path": "/usr/local/bin:/usr/bin",
         "tmpdir": None,
@@ -98,6 +99,26 @@ def test_the_turn_starts_from_a_fresh_codex_home(tmp_path: Path) -> None:
     created = next(i for i, c in enumerate(commands) if 'mkdir -p "$CODEX_HOME"' in c)
     assert removed < created
     assert environment.calls[removed]["user"] == "root"
+
+
+def test_a_container_with_nothing_to_switch_off_adds_only_the_config_isolation(
+    tmp_path: Path,
+) -> None:
+    environment = ScriptedEnvironment(probe="user=agent\npath=/usr/bin\ntmpdir=/scratch\n")
+    agent = native_agent(Harness.CODEX_CLI, tmp_path, features_off=[], bundled_skills=[])
+
+    _turn(agent, environment, resume=False)
+
+    (command,) = environment.commands("codex exec")
+    assert "--ignore-user-config" in command
+    assert "--disable" not in command
+    assert "skills.config" not in command
+    assert agent.process_facts() == {"user": "agent", "path": "/usr/bin", "tmpdir": "/scratch"}
+
+
+def test_a_command_cannot_be_built_before_the_turn_was_isolated(tmp_path: Path) -> None:
+    with pytest.raises(IsolationError, match="before the turn was isolated"):
+        _agent(tmp_path).build_cli_flags()
 
 
 def test_a_container_with_managed_codex_config_is_refused(tmp_path: Path) -> None:

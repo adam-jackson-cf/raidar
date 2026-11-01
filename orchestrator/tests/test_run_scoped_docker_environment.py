@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
+import asyncio
 import io
 import json
 import sys
 import tarfile
+from contextlib import asynccontextmanager
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any
 
 import pytest
@@ -410,3 +413,169 @@ async def test_the_final_agent_log_download_keeps_files_the_host_rewrote(
     container["/logs/agent"]["codex.txt"] = "v3"
     await env.download_dir("/logs/agent", host)
     assert (host / "codex.txt").read_text() == "v3"
+
+
+class _BlockedProcess:
+    """A discovery child that never answers; records that it was terminated and reaped."""
+
+    def __init__(self, started: asyncio.Event) -> None:
+        self.started = started
+        self.returncode: int | None = None
+        self.terminated = False
+        self.reaped = False
+
+    async def communicate(self) -> tuple[bytes, None]:
+        self.started.set()
+        await asyncio.Event().wait()
+        return b"", None
+
+    def terminate(self) -> None:
+        self.terminated = True
+        self.returncode = -15
+
+    async def wait(self) -> int:
+        self.reaped = True
+        return -15
+
+
+@pytest.mark.parametrize("stop", ["deadline", "cancel", "lookup_bound"])
+async def test_blocked_discovery_is_bounded_and_reaps_its_process(
+    monkeypatch: pytest.MonkeyPatch, stop: str, tmp_path: Path
+) -> None:
+    started = asyncio.Event()
+    blocked = _BlockedProcess(started)
+
+    async def spawn(*_: Any, **__: Any) -> _BlockedProcess:
+        return blocked
+
+    env, _ = _resolvable_env(monkeypatch, tmp_path, b"")
+
+    @asynccontextmanager
+    async def deadline(_seconds: float | None) -> Any:
+        try:
+            yield
+        except asyncio.CancelledError:
+            if stop == "deadline":
+                raise TimeoutError from None
+            raise
+
+    async def bounded(awaitable: Any, timeout: float) -> Any:
+        if stop == "lookup_bound":
+            awaitable.close()
+            started.set()
+            raise TimeoutError
+        return await awaitable
+
+    controlled = SimpleNamespace(**vars(asyncio))
+    controlled.create_subprocess_exec = spawn
+    controlled.timeout = deadline
+    controlled.wait_for = bounded
+    monkeypatch.setattr(env_module, "asyncio", controlled)
+    task = asyncio.create_task(
+        env._run_docker_compose_command(  # noqa: SLF001
+            ["exec", "main", "true"], timeout_sec=20
+        )
+    )
+    await started.wait()
+    if stop == "deadline":
+        task.cancel()
+    if stop == "cancel":
+        task.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await task
+    else:
+        with pytest.raises(RuntimeError, match="discovery timed out"):
+            await task
+
+    assert blocked.terminated
+    assert blocked.reaped
+
+
+async def test_container_lookup_consumes_the_execution_deadline(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    env = _bare_env("cid", tmp_path)
+    observed: list[float] = []
+    loop = asyncio.get_running_loop()
+    now = [loop.time()]
+    monkeypatch.setattr(loop, "time", lambda: now[0])
+
+    async def resolve() -> str:
+        now[0] += 0.4
+        return "cid"
+
+    async def execute(argv: list[str], *, timeout_sec: float, **_: Any) -> ExecResult:
+        observed.append(timeout_sec)
+        return ExecResult(return_code=0)
+
+    monkeypatch.setattr(env, "_resolve_main_container", resolve)
+    monkeypatch.setattr(env, "_run_engine_command", execute)
+    await env._run_docker_compose_command(["exec", "main", "true"], timeout_sec=1)  # noqa: SLF001
+    assert observed == [pytest.approx(0.6)]
+
+
+async def test_a_command_whose_discovery_used_the_whole_budget_times_out(
+    tmp_path: Path,
+) -> None:
+    env = _bare_env("cid", tmp_path)
+
+    with pytest.raises(RuntimeError, match="timed out after 0 seconds"):
+        await env._run_docker_compose_command(["exec", "main", "true"], timeout_sec=0)  # noqa: SLF001
+
+
+async def test_a_windows_container_is_never_looked_up(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    env, spawned = _resolvable_env(monkeypatch, tmp_path, b"cid\n")
+    env._is_windows_container = True  # noqa: SLF001
+
+    assert await env._resolve_main_container() is None  # noqa: SLF001
+    assert spawned == []
+
+
+async def test_a_blocked_transfer_is_bounded_terminated_and_reported(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    blocked = _BlockedProcess(asyncio.Event())
+
+    async def spawn(*_: Any, **__: Any) -> _BlockedProcess:
+        return blocked
+
+    async def expired(awaitable: Any, timeout: float) -> Any:
+        awaitable.close()
+        raise TimeoutError
+
+    controlled = SimpleNamespace(**vars(asyncio))
+    controlled.create_subprocess_exec = spawn
+    controlled.wait_for = expired
+    monkeypatch.setattr(env_module, "asyncio", controlled)
+    env = _bare_env("cid", tmp_path)
+    monkeypatch.setattr(env, "_compose_env_vars", lambda include_os_env=True: {}, raising=False)
+
+    with pytest.raises(RuntimeError, match="Transfer of '/app' timed out"):
+        await env.download_dir_with_exclusions(
+            source_dir="/app", target_dir=tmp_path / "app", exclude=[]
+        )
+
+    assert blocked.terminated
+    assert blocked.reaped
+
+
+async def test_without_a_resolvable_container_the_download_stays_on_harbors_path(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    seen: list[tuple[str, Path | str, list[str]]] = []
+
+    async def harbor(
+        self: Any, *, source_dir: str, target_dir: Path | str, exclude: list[str]
+    ) -> None:
+        seen.append((source_dir, target_dir, exclude))
+
+    monkeypatch.setattr(
+        "harbor.environments.docker.docker.DockerEnvironment.download_dir_with_exclusions", harbor
+    )
+    env = _bare_env(None, tmp_path)
+
+    await env.download_dir_with_exclusions(source_dir="/app", target_dir="/t", exclude=[".venv"])
+
+    assert seen == [("/app", "/t", [".venv"])]

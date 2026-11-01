@@ -7,7 +7,6 @@ disabling the network entirely.
 
 from __future__ import annotations
 
-from ipaddress import ip_network
 from pathlib import Path
 
 from harbor.models.task.config import (
@@ -26,30 +25,15 @@ RUNTIME_PACKAGE_HOSTS = {
 }
 
 
-def _ip_intersection(first: str, second: str) -> str | None:
-    try:
-        first_network = ip_network(first)
-        second_network = ip_network(second)
-    except ValueError:
-        return None
-    if first_network.version != second_network.version:
-        return None
-    first_range = (int(first_network.network_address), int(first_network.broadcast_address))
-    second_range = (int(second_network.network_address), int(second_network.broadcast_address))
-    if second_range[0] <= first_range[0] <= first_range[1] <= second_range[1]:
-        return first
-    if first_range[0] <= second_range[0] <= second_range[1] <= first_range[1]:
-        return second
-    return None
-
-
 def _host_intersection(first: str, second: str) -> str | None:
+    """The host both entries allow; the ceiling holds host names only, so an IP/CIDR entry
+    can never intersect it and is dropped."""
     if first == second:
         return first
     for pattern, candidate in ((first, second), (second, first)):
         if pattern.startswith("*.") and candidate.endswith(pattern[1:]):
             return candidate
-    return _ip_intersection(first, second)
+    return None
 
 
 def _restrict_policy(policy: NetworkPolicy, ceiling: NetworkPolicy) -> NetworkPolicy:
