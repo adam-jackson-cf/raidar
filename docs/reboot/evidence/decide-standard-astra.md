@@ -1,0 +1,52 @@
+Q1:
+- **Vote (a): an independently governed standard project, with Raidar and FXL as consumers. Confidence: high on separation; medium on timing.** Current R1—Raidar-owned `raidar-contract`—is a suitable transition, not the preferred permanent ownership.
+- Separate the **package contract**, not Raidar’s evaluation engine. Independent ownership prevents either the evaluator or method developer from unilaterally defining compatibility.
+- **Include:** `stage/1` manifest, parameters, tokens, fixtures and refusals; workflow schema 2 and dependency/frame rules; `criteria/1`; canonical hashing, `stage-tree/1` and workflow digest composition; immutable release-reference syntax and digest bindings.
+- Include primitives’ **observable call contracts**: context, ordering, statuses, terminal closure, bounds, outputs and required evidence. Schemas alone cannot establish equivalent execution.
+- Include transport-neutral agent schema/protocol semantics and record shapes: isolation, process facts, accounting, final response, resume storage, audit, credential readiness and reset state. Exclude credential handling implementations and Harbor types.
+- **Exclude:** primitive implementations, container orchestration, provider adapters, credentials, method packages, problem bindings, hidden grading, scoring, calibration, comparative analysis and admission policy.
+- Keep judge configuration/contracts distinguishable from judge implementation and calibration; standardizing `criteria/1` does not standardize correctness.
+- **Releases/provenance:** standardize immutable content bindings and provenance interchange, not a central package registry. Raidar retains its register, latest-only resolution policy and import approvals.
+- Current `subject/imports.py` verifies content but explicitly does **not** verify `SOURCE`; provenance is identity-free. Preserve that distinction. A matching digest proves bytes, not authorship, safety or efficacy.
+- **Governance:** named standard maintainers, independent release authority, mandatory Raidar and FXL impact reviews, and shared conformance vectors. Raidar alone still decides what its lab admits.
+- Amend **C7** only in approval ownership: retain two independent votes, release candidates, migration notes, immutable artifacts and major/contract-ID bumps for changed acceptance, behavior or identity. Each consumer performs its own clean cutover; historical results remain untouched.
+- **R4 remains:** Raidar owns `raidar/*` controls; FXL develops `fxl/*` methods; imports preserve bytes. Independent standard ownership does not transfer either namespace or Raidar’s enforcement code.
+- **Timing:** adopt the ownership decision before freeze; complete phase 5 using the extracted package; transfer the authoritative source after its exit, before independent stable development diverges. A repository move alone needs no semantic contract bump or package digest change; retain existing artifact hashes.
+- **Phase 5B:** no new runtime, generalized plugin system or schema redesign. Continue the package cutover and exits. Preserve the current contract as an explicitly scoped first profile, not a claim of universal portability.
+- Current-code qualification: `contract/agent.py` still enumerates only Codex/Claude and assumes CLI pins; the manifest fixes `/app/.raidar`. These are limitations to version deliberately, not silently broaden during extraction.
+- Current `split-design.md:666` records passing local non-model checks and prepared-but-unrun AT1/AT2. Private `1.0.0` artifacts already exist; that is not evidence of completed model exits or FXL runtime equivalence.
+
+Q2:
+- **Vote: support both package-method evaluation and complete-system evaluation, with distinct claims. Confidence: high.** “Claude Code CLI versus an FXL workflow” compares different layers until the actual executable treatments are specified.
+- In the pivot’s layers, Claude Code bundles an interface and harness; an FXL workflow supplies orchestration above an agent. Tools execute actions; prompts, skills and external data supply context. Neither an interface label nor package syntax establishes enforcement.
+- Preserve **agent = harness pin + model + reasoning**, **workflow = method definition**, **arm = agent + workflow**.
+- Make **system under test (SUT)** an explicit resolved execution description: an arm bound to a pinned executor, driver, environment and evidence profile. No parallel “interface” registry; interface remains descriptive.
+- Here **executor** means the workflow execution engine. Do not overload existing `runtime: python`, which means the language toolchain pack.
+- **Package-method evaluation (“white-box”):** Raidar executes an imported workflow through its primitives and pinned agent adapter. This estimates the workflow’s effect **under Raidar execution**, not FXL’s deployed performance.
+- Raidar supplies bounded calls, protected evidence, accounting, isolation checks and independent grading. Package fixtures and FXL smoke do not replace Raidar smoke/admission.
+- “Gate not bypassed” must be precise: the authoritative final seal checks the final workspace independently of the agent’s hook behavior. Hook logs alone do not prove every commit was gated; passing checks do not prove task correctness.
+- **Complete-system evaluation (“black-box”):** a system adapter drives the pinned FXL runner, factory-x deployment or another environment. The whole execution path is the treatment.
+- Harbor may represent that executable as a `BaseAgent`; Raidar must not consequently relabel an entire workflow engine as a native harness.
+- Pin the outer runner, SDK/driver, underlying agent, workflow/configuration, services and execution environment. Keep the actual agent/workflow identities even when internal execution is opaque; do not fabricate a schema-2 workflow for an incompatible system.
+- Black-box execution still requires an externally enforced deadline, cancellation/reaping, isolated workspace, protected snapshots and hidden grading. Aggregate all subordinate model/judge work; unknown usage remains unknown.
+- Internal gate compliance and instruction isolation require independent evidence. Self-reported success cannot establish them; missing evidence is `unmeasured`, never inherited white-box validity.
+- Run an FXL “host runtime” inside a dedicated sandbox/VM where possible. Running on an unrestricted host is not admitted by today’s design. A remote deployment needs a separately specified external-system profile.
+- **Example A—workflow effect, expressible with today’s schema after importing the treatment:**
+  - `kind: ab-test`, `runtime: python`, `environment: {type: docker}`, `varies: []`.
+  - Agent `claude`: `release: claude-code@2`, `model: claude-sonnet-4-6`, `reasoning: high`.
+  - Baseline arm: `{id: cli, agent: claude, workflow: raidar/one-shot@2}`.
+  - Treatment arm: `{id: fxl, agent: claude, workflow: fxl/candidate@1}`; **proposed import/release, not currently registered**.
+  - Both use Claude CLI `2.1.285`, Raidar’s executor/primitives, the same pinned problems, toolchain, task inputs, network/resources, checkpoint deadline, progression and verifier.
+  - Workflow differs; `varies: []` is correct today because `Variation` accepts only `harness`, `model`, `reasoning`. Workflow variation is expressed by the arms; `varies: [workflow]` currently fails schema validation.
+  - Claim: the imported workflow changes outcomes relative to build-only Claude under this lab configuration. Not “FXL’s SDK system beats Claude Code,” nor an interactive-CLI usability result.
+- **Example B—complete-system effect, proposed future schema, not runnable today:**
+  - Baseline: Claude CLI agent + `raidar/one-shot@2` + Raidar executor.
+  - Treatment: a new pinned Claude-SDK agent release + `fxl/candidate@1` + pinned FXL executor; retain the same underlying Claude harness pin, model and reasoning **only if established**.
+  - Declare `varies: [workflow, executor, driver]`; add `harness`, `model`, `reasoning` or `environment` whenever those actually differ. These new factor names require implementation.
+  - Hold the problem/toolchain, grading and externally enforced resource budgets fixed. Charge repair, gate, judge and subordinate-agent work against the treatment’s budget; report tokens/cost alongside outcomes.
+  - Claim: the combined execution system performs differently. It cannot attribute the difference to workflow, SDK or executor separately. Use a same-workflow CLI/SDK comparison, then a crossed workflow/executor design, for attribution.
+- Pair and counterbalance attempts; pre-register the primary outcome, equivalence/effect margins and exclusion-difference bound. Equal deadlines do not imply equal spend.
+- **Present blocker:** `lab/agents/claude-code.yaml` declares partial isolation; `claude_audit.py` cannot establish roots for merely listed skills. The design requires full proof before measured Claude use. Neither example is currently an admitted effectiveness experiment.
+- **Implementation/phases:** phase 5 needs only the adopted terminology/ownership clarification, not black-box execution. Phase 6 defines evidence-profile validity; phase 7 assesses SDK drivers; phase 9 validates comparisons. Add complete-system support as a separately approved phase after those prerequisites.
+- That support changes experiment schema/validation, resolved arm identities, executor dispatch, locks, admission, pooling and health—not merely an adapter registration. Extend the portable agent contract only where new driver semantics require it, following C7; do not reopen `stage/1` for opaque-system support.
+- **[INFERENCE]** FXL’s future executor can satisfy such a profile; its implementation and cross-runtime equivalence were not established here. Read-only source review completed; no files edited or containers run.
