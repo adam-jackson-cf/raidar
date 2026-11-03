@@ -30,15 +30,27 @@ def test_release_updates_and_verifies_the_lock_before_publishing_files(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
-    pyproject = tmp_path / "pyproject.toml"
-    lockfile = tmp_path / "uv.lock"
-    changelog = tmp_path / "CHANGELOG.md"
-    pyproject.write_text('[project]\nname = "sample"\nversion = "1.2.3"\n', encoding="utf-8")
+    project = tmp_path / "project"
+    project.mkdir()
+    dependency = tmp_path / "dep"
+    dependency.mkdir()
+    (dependency / "pyproject.toml").write_text(
+        '[project]\nname = "dep"\nversion = "0.1.0"\n',
+        encoding="utf-8",
+    )
+    pyproject = project / "pyproject.toml"
+    lockfile = project / "uv.lock"
+    changelog = project / "CHANGELOG.md"
+    pyproject.write_text(
+        '[project]\nname = "sample"\nversion = "1.2.3"\ndependencies = ["dep"]\n'
+        '\n[tool.uv.sources]\ndep = { path = "../dep", editable = true }\n',
+        encoding="utf-8",
+    )
     changelog.write_text("# Changelog\n", encoding="utf-8")
     monkeypatch.setenv("UV_OFFLINE", "true")
     monkeypatch.setenv("UV_CACHE_DIR", str(tmp_path / "cache"))
     monkeypatch.setenv("UV_PYTHON", sys.executable)
-    subprocess.run(["uv", "lock", "--project", str(tmp_path)], check=True)
+    subprocess.run(["uv", "lock", "--project", str(project)], check=True)
     monkeypatch.setattr(bump_version_module, "PYPROJECT_PATH", pyproject)
     monkeypatch.setattr(bump_version_module, "LOCKFILE_PATH", lockfile)
     monkeypatch.setattr(bump_version_module, "CHANGELOG_PATH", changelog)
@@ -52,5 +64,8 @@ def test_release_updates_and_verifies_the_lock_before_publishing_files(
     assert (
         next(package for package in packages if package["name"] == "sample")["version"] == "1.2.4"
     )
+    assert next(package for package in packages if package["name"] == "dep")["source"] == {
+        "editable": "../dep"
+    }
     assert "## 1.2.4" in changelog.read_text()
-    subprocess.run(["uv", "lock", "--project", str(tmp_path), "--check"], check=True)
+    subprocess.run(["uv", "lock", "--project", str(project), "--check"], check=True)
