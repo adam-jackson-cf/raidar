@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import shutil
 import subprocess
 from collections.abc import Callable
@@ -10,6 +11,7 @@ from pathlib import Path
 import pytest
 import yaml
 from click.testing import CliRunner
+from raidar_contract.canonical import digest_json
 from raidar_contract.references import Release, ReleaseError
 
 from raidar.cli import main
@@ -17,9 +19,16 @@ from raidar.contract.paths import agents_root
 from raidar.contract.releases import ReleaseKind, parse_register
 from raidar.subject import agent_checks, release_check
 from raidar.subject.agent.definition import load_agent
+from raidar.subject.package.registry import load_stage_package
 from raidar.subject.release_check import history_issues, release_base, release_issues
 from raidar.subject.releases import released_agent, released_workflow
-from tests.release_support import edit_agent, release_tree, write_register, write_workflow
+from tests.release_support import (
+    REAL_PACKAGE,
+    edit_agent,
+    release_tree,
+    write_register,
+    write_workflow,
+)
 
 
 @pytest.fixture
@@ -133,6 +142,211 @@ def test_a_definition_that_no_longer_loads_is_a_release_error(tree: Path) -> Non
 
 def test_a_consistent_tree_has_no_issues(tree: Path) -> None:
     assert release_issues(tree) == []
+
+
+@pytest.fixture
+def stage_evidence_tree(tree: Path) -> tuple[Path, Path, Path]:
+    package = tree / "lab" / "stages" / "raidar" / "docs-check"
+    shutil.copytree(REAL_PACKAGE, package)
+    digest = load_stage_package(package).digest
+    register_path = tree / "lab" / "releases.yaml"
+    document = yaml.safe_load(register_path.read_text())
+    document["stages"] = {"raidar/docs-check@1": digest}
+    register_path.write_text(yaml.safe_dump(document))
+    record = tree / "lab" / "stage-checks" / f"{digest}.installed.json"
+    record.parent.mkdir()
+    record.write_text(json.dumps({"arm64": {"tree_digest": "a" * 64, "wheels": []}}))
+    lock = tree / "lab" / "experiments" / "smoke" / "evidence" / "experiment.lock.json"
+    lock.parent.mkdir(parents=True)
+    lock.write_text(
+        json.dumps(
+            {
+                "execution": {
+                    "arms": {
+                        "checked": {
+                            "packages": {
+                                "raidar/docs-check": {
+                                    "release": "raidar/docs-check@1",
+                                    "sha256": digest,
+                                    "installed": {"arm64": "a" * 64},
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        )
+    )
+    return tree, record, lock
+
+
+def test_committed_stage_evidence_needs_no_var_or_host_architecture(
+    stage_evidence_tree: tuple[Path, Path, Path],
+) -> None:
+    tree, _record, _lock = stage_evidence_tree
+    assert not (tree / "var").exists()
+    assert release_issues(tree) == []
+
+
+@pytest.mark.parametrize(
+    ("contents", "reason"),
+    [
+        (None, "unusable installed-tree record"),
+        ("not json", "unusable installed-tree record"),
+        ("{}", "no installed-tree record for arm64"),
+        (
+            {"amd64": {"tree_digest": "a" * 64, "wheels": []}},
+            "no installed-tree record for arm64",
+        ),
+        ({"arm64": {"tree_digest": "b" * 64, "wheels": []}}, "differs from locked"),
+        (
+            {"arm64": {"tree_digest": "not-a-digest", "wheels": []}},
+            "unusable installed-tree record",
+        ),
+        ({"arm64": {"tree_digest": "a" * 64}}, "unusable installed-tree record"),
+    ],
+)
+def test_lock_pinned_stage_evidence_must_be_usable(
+    stage_evidence_tree: tuple[Path, Path, Path], contents: object, reason: str
+) -> None:
+    tree, record, _lock = stage_evidence_tree
+    if contents is None:
+        record.unlink()
+    else:
+        record.write_text(contents if isinstance(contents, str) else json.dumps(contents))
+    issues = release_issues(tree)
+    assert len(issues) == 1
+    assert reason in issues[0]
+    assert "checked" in issues[0]
+    assert "raidar/docs-check" in issues[0]
+
+
+def test_each_committed_lock_contributes_its_pinned_architectures(
+    stage_evidence_tree: tuple[Path, Path, Path],
+) -> None:
+    tree, _record, lock = stage_evidence_tree
+    document = json.loads(lock.read_text())
+    document["execution"]["arms"]["checked"]["packages"]["raidar/docs-check"]["installed"] = {
+        "amd64": "b" * 64
+    }
+    other = lock.parent.with_name("another") / "oneshot.experiment.lock.json"
+    other.parent.mkdir()
+    other.write_text(json.dumps(document))
+    issues = release_issues(tree)
+    assert len(issues) == 1
+    assert "oneshot.experiment.lock.json" in issues[0]
+    assert "no installed-tree record for amd64" in issues[0]
+
+
+@pytest.mark.parametrize("suffix", [".json", ".installed.json"])
+def test_stage_records_cannot_name_unregistered_digests(
+    stage_evidence_tree: tuple[Path, Path, Path], suffix: str
+) -> None:
+    tree, record, _lock = stage_evidence_tree
+    (record.parent / f"{'f' * 64}{suffix}").write_text("{}")
+    assert any("unregistered stage digest" in issue for issue in release_issues(tree))
+
+
+def test_registered_historical_stage_evidence_remains_valid(
+    stage_evidence_tree: tuple[Path, Path, Path],
+) -> None:
+    tree, record, lock = stage_evidence_tree
+    path = tree / "lab" / "releases.yaml"
+    document = yaml.safe_load(path.read_text())
+    document["stages"]["raidar/docs-check@2"] = document["stages"]["raidar/docs-check@1"]
+    document["stages"]["raidar/docs-check@1"] = "f" * 64
+    path.write_text(yaml.safe_dump(document))
+    (record.parent / f"{'f' * 64}.installed.json").write_text(record.read_text())
+    locked = json.loads(lock.read_text())
+    locked["execution"]["arms"]["checked"]["packages"]["raidar/docs-check"]["sha256"] = "f" * 64
+    lock.write_text(json.dumps(locked))
+    assert release_issues(tree) == []
+
+
+@pytest.mark.parametrize(
+    "scope", ["no-architectures", "no-packages", "omitted-packages", "no-arms"]
+)
+def test_locks_without_pinned_architectures_do_not_require_host_evidence(
+    stage_evidence_tree: tuple[Path, Path, Path], scope: str
+) -> None:
+    tree, record, lock = stage_evidence_tree
+    document = json.loads(lock.read_text())
+    document["execution"]["arms"]["checked"]["packages"]["raidar/docs-check"]["installed"] = {}
+    if scope == "no-packages":
+        document["execution"]["arms"]["checked"]["packages"] = {}
+    elif scope == "omitted-packages":
+        document["execution"]["arms"]["checked"] = {}
+    elif scope == "no-arms":
+        document["execution"]["arms"] = {}
+    lock.write_text(json.dumps(document))
+    record.unlink()
+    assert release_issues(tree) == []
+
+
+def test_var_evidence_cannot_replace_committed_evidence(
+    stage_evidence_tree: tuple[Path, Path, Path],
+) -> None:
+    tree, record, _lock = stage_evidence_tree
+    transient = tree / "var" / "stage-checks" / record.name
+    transient.parent.mkdir(parents=True)
+    record.rename(transient)
+    assert any("unusable installed-tree record" in issue for issue in release_issues(tree))
+
+
+@pytest.mark.parametrize("contents", ["not json", "{}", '{"execution": {"arms": []}}'])
+def test_unreadable_lock_reports_why_stage_evidence_cannot_be_checked(
+    stage_evidence_tree: tuple[Path, Path, Path], contents: str
+) -> None:
+    tree, _record, lock = stage_evidence_tree
+    lock.write_text(contents)
+    assert any("cannot check locked stage evidence" in issue for issue in release_issues(tree))
+
+
+@pytest.mark.parametrize("release", ["raidar/ghost@1", "invalid"])
+def test_lock_package_identity_must_be_registered(
+    stage_evidence_tree: tuple[Path, Path, Path], release: str
+) -> None:
+    tree, _record, lock = stage_evidence_tree
+    document = json.loads(lock.read_text())
+    document["execution"]["arms"]["checked"]["packages"]["raidar/docs-check"]["release"] = release
+    lock.write_text(json.dumps(document))
+    issues = release_issues(tree)
+    assert len(issues) == 1
+    assert "not registered" in issues[0] or "cannot check locked stage evidence" in issues[0]
+
+
+@pytest.mark.parametrize(
+    ("contents", "reason"),
+    [
+        (None, "unusable stage-check record"),
+        ("not json", "unusable stage-check record"),
+        ([], "wrong package identity"),
+        ({"package": "f" * 64}, "wrong package identity"),
+        ({"package": "correct", "changed": True}, "differs from the lock"),
+        ({"package": "correct"}, None),
+    ],
+)
+def test_locked_canary_record_identity_and_digest_are_checked(
+    stage_evidence_tree: tuple[Path, Path, Path], contents: object, reason: str | None
+) -> None:
+    tree, installed, lock = stage_evidence_tree
+    package_digest = installed.name.removesuffix(".installed.json")
+    expected = {"package": package_digest}
+    document = json.loads(lock.read_text())
+    document["execution"]["arms"]["checked"]["packages"]["raidar/docs-check"]["check"] = (
+        digest_json(expected)
+    )
+    lock.write_text(json.dumps(document))
+    record = installed.with_name(f"{package_digest}.json")
+    if isinstance(contents, dict) and contents.get("package") == "correct":
+        contents = {**contents, "package": package_digest}
+    if contents is not None:
+        record.write_text(contents if isinstance(contents, str) else json.dumps(contents))
+    issues = release_issues(tree)
+    if reason is None:
+        assert issues == []
+    else:
+        assert any(reason in issue for issue in issues)
 
 
 def test_a_definition_with_no_registration_is_reported(tree: Path) -> None:

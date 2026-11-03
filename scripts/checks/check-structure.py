@@ -67,6 +67,7 @@ LAB_DIRECTORIES = frozenset(
         "agents",
         "workflows",
         "stages",
+        "stage-checks",
         "environments",
         "judge",
     }

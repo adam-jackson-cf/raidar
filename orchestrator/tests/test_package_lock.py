@@ -51,7 +51,7 @@ REAL_DIGEST = identity._digest.__wrapped__  # type: ignore[attr-defined]
 
 
 @pytest.fixture(autouse=True)
-def _fake_source_digest(monkeypatch: pytest.MonkeyPatch) -> None:
+def _fake_source_digest(monkeypatch: pytest.MonkeyPatch, stage_check_store: Path) -> None:
     """Primitive code digests the real source tree (slow tier); fast tests fold the inputs."""
     monkeypatch.setattr(
         identity,
@@ -224,8 +224,21 @@ def test_the_inventory_holds_the_closure_files_adapter_entries_and_payload_scrip
 # ---- proof the lock needs --------------------------------------------------------------------
 
 
-def test_a_normal_arm_needs_the_stage_check_proof_a_draft_may_lack_it(tree: Path) -> None:
+def test_a_normal_arm_needs_tracked_stage_check_proof_without_a_var_fallback(
+    tree: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, stage_check_store: Path
+) -> None:
     (stage,) = released_workflow("acme/gated@1", repo_root=tree).stages
+    relocated = tmp_path / "relocated-var"
+    monkeypatch.setenv("RAIDAR_VAR", str(relocated))
+    assert stage_checks_root(tree) == tree / "lab" / "stage-checks"
+    assert stage_checks_root() == stage_check_store
+    legacy = relocated / "stage-checks"
+    legacy.mkdir(parents=True)
+    (legacy / f"{stage.package.digest}.installed.json").write_text(
+        json.dumps({"arm64": {"tree_digest": "legacy", "wheels": []}})
+    )
+    (legacy / f"{stage.package.digest}.json").write_text('{"legacy": true}')
+    assert check_record(stage.package.digest) is None
 
     missing = evidence_issues(stage, load_evidence(stage))
     assert missing
@@ -234,6 +247,10 @@ def test_a_normal_arm_needs_the_stage_check_proof_a_draft_may_lack_it(tree: Path
     _write_proof(stage.package.digest)
     assert evidence_issues(stage, load_evidence(stage)) == []
     assert installed_trees(stage.package.digest) == {"arm64": "t" * 64}
+
+    (stage_check_store / f"{stage.package.digest}.installed.json").unlink()
+    assert evidence_issues(stage, load_evidence(stage))
+    assert installed_trees(stage.package.digest) == {}
 
 
 def test_a_stop_needs_its_check_record_and_the_lock_binds_it(tmp_path: Path) -> None:

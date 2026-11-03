@@ -3,11 +3,12 @@
 ``lab/`` holds the run-time data the code loads, each tree at one explicit path below: the
 experiments, the problem pins, the ledger, the agent definitions (``lab/agents/``), the workflow
 definitions (``lab/workflows/``) with their release register (``lab/releases.yaml``), the
-runtime-pack recipes (``lab/environments/``) and the judge policies (``lab/judge/``).
+runtime-pack recipes (``lab/environments/``), judge policies (``lab/judge/``) and reviewed
+stage-check evidence (``lab/stage-checks/``).
 
-``var/`` holds everything Raidar generates (jobs, Assessment stores, analysis output,
-imported problem content and the scratch directory); it is git-ignored. ``RAIDAR_VAR``
-relocates it; unset, it is ``<repo>/var``.
+``var/`` holds generated execution data (jobs, Assessment stores, analysis output,
+imported problem content and scratch logs); it is git-ignored. ``RAIDAR_VAR`` relocates
+it; unset, it is ``<repo>/var``.
 """
 
 from __future__ import annotations
@@ -36,9 +37,9 @@ def tmp_root() -> Path:
     return var_root() / "tmp"
 
 
-def stage_checks_root() -> Path:
-    """``stage-check`` records, one ``<package digest>.json`` each (generated, never tracked)."""
-    return var_root() / "stage-checks"
+def stage_checks_root(repo_root: Path = REPO_ROOT) -> Path:
+    """Reviewed stage-check records, tracked outside the stage package trees."""
+    return lab_root(repo_root) / "stage-checks"
 
 
 def stages_root(repo_root: Path = REPO_ROOT) -> Path:

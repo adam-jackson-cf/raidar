@@ -54,14 +54,40 @@ def _logs_dir(name: str, purpose: str) -> Path:
     return tmp_root() / "stage-check" / name.replace("/", "--") / f"{purpose}-{stamp}"
 
 
-def _publish_installed(path: Path, installed: dict[str, object]) -> None:
-    """Merge this architecture's expected installed-tree digest and wheels into ``path``."""
-    known = json.loads(path.read_text(encoding="utf-8")) if path.is_file() else {}
+def _record_conflict(path: Path) -> click.ClickException:
+    return click.ClickException(
+        f"{path} already exists with different bytes; delete the record deliberately, "
+        "run make stage-check again and relock"
+    )
+
+
+def _installed_bytes(path: Path, installed: dict[str, object]) -> bytes:
+    """Serialize this architecture's proof, preserving the other recorded architectures."""
+    try:
+        known = json.loads(path.read_text(encoding="utf-8")) if path.is_file() else {}
+    except ValueError as error:
+        raise _record_conflict(path) from error
+    if not isinstance(known, dict):
+        raise _record_conflict(path)
     known[str(installed["arch"])] = {
         "tree_digest": installed["tree_digest"],
         "wheels": installed["wheels"],
     }
-    path.write_text(json.dumps(known, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    return (json.dumps(known, indent=2, sort_keys=True) + "\n").encode("utf-8")
+
+
+def _publish_records(root_dir: Path, records: dict[Path, bytes]) -> None:
+    """Preflight every identity before publishing, leaving identical records untouched."""
+    pending = {}
+    for path, content in records.items():
+        if path.exists():
+            if path.read_bytes() != content:
+                raise _record_conflict(path)
+        else:
+            pending[path] = content
+    root_dir.mkdir(parents=True, exist_ok=True)
+    for path, content in pending.items():
+        path.write_bytes(content)
 
 
 def _replay(name: str, package: StagePackage, trial: Path, image: str, context: str) -> None:
@@ -123,12 +149,17 @@ def check_command(name: str, replay: Path | None, target_name: str | None) -> No
     if not report.ok:
         raise click.ClickException(f"{name} failed its checks (calls recorded under {logs})")
     root_dir = stage_checks_root()
-    root_dir.mkdir(parents=True, exist_ok=True)
+    records = {}
     if report.installed is not None:
-        _publish_installed(root_dir / f"{package.digest}.installed.json", report.installed)
+        installed_path = root_dir / f"{package.digest}.installed.json"
+        records[installed_path] = _installed_bytes(installed_path, report.installed)
+    target = root_dir / f"{package.digest}.json"
+    if report.record is not None:
+        records[target] = (
+            json.dumps(record_json(report.record), indent=2, sort_keys=True) + "\n"
+        ).encode("utf-8")
+    _publish_records(root_dir, records)
     if report.record is None:
         click.echo(f"{name} passed; it declares no stop, so there is no canary record")
         return
-    target = root_dir / f"{package.digest}.json"
-    target.write_text(json.dumps(record_json(report.record), indent=2, sort_keys=True) + "\n")
     click.echo(f"{name} passed; canary record {target}")

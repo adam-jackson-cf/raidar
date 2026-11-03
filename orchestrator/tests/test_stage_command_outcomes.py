@@ -31,7 +31,7 @@ TEMPLATE_LOCK = (REAL_PACKAGE / "tool" / "uv.lock").read_text()
 
 
 @pytest.fixture
-def stages(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+def stages(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, stage_check_store: Path) -> Path:
     root = tmp_path / "stages"
     monkeypatch.setattr(stage_package, "stages_root", lambda: root)
     monkeypatch.setenv("RAIDAR_VAR", str(tmp_path / "var"))
@@ -392,30 +392,89 @@ def test_a_complete_pass_publishes_the_canary_record_and_this_architectures_proo
     assert f"canary record {root / (rig.digest + '.json')}" in result.output
 
 
-def test_publishing_one_architecture_keeps_the_others_and_replaces_only_its_own(
+@pytest.mark.parametrize("change", ["replace", "add", "format", "malformed", "not-a-map"])
+def test_publishing_different_installed_bytes_refuses_and_preserves_existing_proof(
+    rig: SimpleNamespace, change: str
+) -> None:
+    assert _check().exit_code == 0
+    root = stage_checks_root()
+    proof = root / f"{rig.digest}.installed.json"
+    canary = root / f"{rig.digest}.json"
+    if change == "replace":
+        rig.report = _passing(installed=_installed("arm64", "e" * 64))
+    elif change == "add":
+        rig.report = _passing(installed=_installed("riscv64", "e" * 64))
+    elif change == "format":
+        proof.write_text(json.dumps(json.loads(proof.read_text())))
+    elif change == "malformed":
+        proof.write_bytes(b"\xff")
+    else:
+        proof.write_text("[]")
+    original = {path: path.read_bytes() for path in (proof, canary)}
+
+    result = _check()
+
+    assert result.exit_code != 0
+    assert "delete" in result.output
+    assert "relock" in result.output
+    assert {path: path.read_bytes() for path in original} == original
+
+
+def test_identical_publication_keeps_both_records_and_their_mtimes(
     rig: SimpleNamespace,
 ) -> None:
+    assert _check().exit_code == 0
+    records = list(stage_checks_root().iterdir())
+    original = {path: (path.read_bytes(), path.stat().st_mtime_ns) for path in records}
+
+    result = _check()
+
+    assert result.exit_code == 0, result.output
+    assert {path: (path.read_bytes(), path.stat().st_mtime_ns) for path in records} == original
+
+
+def test_identical_installed_publication_preserves_other_architectures(
+    rig: SimpleNamespace,
+) -> None:
+    assert _check().exit_code == 0
+    proof = stage_checks_root() / f"{rig.digest}.installed.json"
+    installed = json.loads(proof.read_text())
+    installed["amd64"] = {"tree_digest": "c" * 64, "wheels": []}
+    proof.write_text(json.dumps(installed, indent=2, sort_keys=True) + "\n")
+    original = proof.read_bytes()
+    modified = proof.stat().st_mtime_ns
+
+    result = _check()
+
+    assert result.exit_code == 0, result.output
+    assert proof.read_bytes() == original
+    assert proof.stat().st_mtime_ns == modified
+
+
+@pytest.mark.parametrize("conflict", ["canary", "installed"])
+def test_a_conflict_does_not_partially_publish_the_other_missing_record(
+    rig: SimpleNamespace, conflict: str
+) -> None:
+    assert _check().exit_code == 0
     root = stage_checks_root()
-    root.mkdir(parents=True)
+    canary = root / f"{rig.digest}.json"
     proof = root / f"{rig.digest}.installed.json"
-    proof.write_text(
-        json.dumps(
-            {
-                "amd64": {"tree_digest": "c" * 64, "wheels": []},
-                "arm64": {"tree_digest": "stale", "wheels": []},
-            }
-        )
-    )
+    existing, missing = (canary, proof) if conflict == "canary" else (proof, canary)
+    missing.unlink()
+    existing.write_bytes(existing.read_bytes() + b" ")
+    original = existing.read_bytes()
 
+    result = _check()
+
+    assert result.exit_code != 0
+    assert existing.read_bytes() == original
+    assert not missing.exists()
+
+    # Replacing reviewed evidence is an explicit delete/regenerate operation.
+    existing.unlink()
     assert _check().exit_code == 0
-
-    published = json.loads(proof.read_text())
-    assert published["amd64"] == {"tree_digest": "c" * 64, "wheels": []}
-    assert published["arm64"]["tree_digest"] == "a" * 64
-
-    rig.report = _passing(installed=_installed("riscv64", "e" * 64))
-    assert _check().exit_code == 0
-    assert set(json.loads(proof.read_text())) == {"amd64", "arm64", "riscv64"}
+    assert existing.exists()
+    assert missing.exists()
 
 
 def test_a_package_without_a_stop_publishes_proof_but_no_canary_record(
