@@ -64,10 +64,10 @@
       },
       "scorer": {
         "correctness@10": {
-          "digest": "4e6f072937b22b9d3842e58f8918f79c8ac9c4d57fbd78e26593bad100b5e5d8",
+          "digest": "bf219a460ad69b3f4d422a1bad9c04df0ab435d86c2ae1c0e91b576988562555",
           "metadata": {
             "implementation": "raidar.scoring.correctness:correctness_scorer",
-            "implementation_digest": "e9b0051cac0fcddf013f55b3b47b20a3ea634b20a37860cc3bec14d755caf552",
+            "implementation_digest": "4daa585db532c8260f7bd7650ad8a329d1792334915bc93cce0396e6632c1c7a",
             "manifest": {
               "description": "Reference-solvable SCB success and raw SCB verdicts per checkpoint and trajectory.",
               "evidence_required": [
@@ -267,10 +267,10 @@
           }
         },
         "verification-effort@1": {
-          "digest": "d4498efd462a3ca36d15b7ea1805342ab47facf2593ae5c4e7cae28ace725676",
+          "digest": "37db010d8a45d4fc778b2d725901a400b762e0e97258501966bdec8abae8cd2c",
           "metadata": {
             "implementation": "raidar.scoring.verification_effort:verification_effort_scorer",
-            "implementation_digest": "a9c9a9225a55d815b87b7bfe48c45e4f6b2ec3c0c7522073d0d07d47d31d899d",
+            "implementation_digest": "fa7528819b1659cdbaebfee8db6323fd1a1a3579107aee428c64eb0cb58a2bb6",
             "manifest": {
               "description": "The effort a package workflow's gate/1 checks cost per step, read from the host-written gate/1 record of each step's workflow record: seals, fix turns, first-pass and step-end cleanliness, blocking checks that failed, the fix turns' tokens, cost and wall time, and the fix turns' correctness (the hidden tests' case pass rate of the workspace the first fix turn started from, graded offline, against the step's final grade). A step that changed no production or test file is not applicable to first-pass cleanliness. Not applicable to a trajectory without a gate/1 package.",
               "evidence_required": [
@@ -668,7 +668,7 @@
     },
     "tools": {}
   },
-  "document_sha256": "7ce83087d1725f577a9c7b149f75c1b3abbbe0753e18f2c96ed1633f3ce149f6",
+  "document_sha256": "22c95cc76ea5ddca9bcfd5bbee8faa237c5f4b92b60b85cc401910baba772d84",
   "execution": {
     "arms": {
       "docs-fix": {
@@ -686,7 +686,7 @@
           "version_pin": "0.156.1",
           "workflow_skills": "placement.skills .agents/skills in the workspace /app"
         },
-        "digest": "095f24880f03e13e7c35e59cb62d08531f78aacbf773236c96418b4a7253775f",
+        "digest": "c9dba7ae99fa66c3958a318e1fd272bf37eed4bac1e4a3f7f4940adc57498390",
         "model": "gpt-6-luna",
         "packages": {
           "raidar/docs-check": {
@@ -705,10 +705,10 @@
           }
         },
         "primitive_code": {
-          "frame/1": "9018cc5beb0c225b5212587b6fa6888eee8655ebaac2e7a385ec59e6f5854a12",
-          "gate/1": "b9035fe1c22b8d196dc7d8e73cd4fff66f16912cefd8adfd9e3901029909692f",
-          "install/1": "dd974f370d2d409f3815868f7fd7e799145be26a379b7d516d7adf32a225a309",
-          "runner/1": "00bbe835f0be20ef676cd4ab8c8ea411a5a81eebf49535d6acada028d6f0b317"
+          "frame/1": "71a0fd7e66c739e714d21f6e5c2c6358483126326b0cd5a05788a23072a22865",
+          "gate/1": "b64530e591f6419e3366722bb2d2ed655e67aa6b7b006ba7a738251024a77c8a",
+          "install/1": "148ba37ff51fd8c10d81cc1f1f617997d90a6fb332a3247ee4a1d01aa7ad28d6",
+          "runner/1": "25a7a1951ff33daf081572f565116922e2fd11fcfab62481172ba86367ea3584"
         },
         "provider": "openai",
         "reasoning": "low",
@@ -857,7 +857,7 @@
               "grader": {
                 "environment_id": "sha256:1989940cc347e516b774a3833071b60dbfae6a730e55462cdf38a095e23d8765",
                 "image": "raidar-oracle-grader:963c14e63ff5e15d",
-                "implementation_sha256": "a2d56b47f85fc39be2eb00015c5b9192263590f3f0d9db17b0cc2dd962d7ee98"
+                "implementation_sha256": "c69aa42508be80a1c69ff6b6f9ec897c7bdd9468942404cf375ca13835ffe2e9"
               },
               "not_run": [
                 "native_parity_positive",
@@ -907,7 +907,7 @@
     "source_sha256": "ee4771b997a090438d3611fe5cd2fc09fb6e1a6cc7b9b6e4feb44db1c2656736",
     "spec_sha256": "0e03d713fd6942f8f1fb6f91b6e8106f1d270d3d6fd4cca7edf65bcfe66e4ba8"
   },
-  "lock_sha256": "a3777f6fa2a8b8f1593ba7626c7ac5f4234eefa38afed7926f4d2d7f8c7fc293",
+  "lock_sha256": "d3ad760acfe59df7e8aeb66a8269e94ef07b4aa5aa6ef157e0e2a3ddf99b467b",
   "lock_version": 5,
   "overrides": {
     "flags": {},
@@ -915,9 +915,9 @@
   },
   "sections": {
     "analysis": "2165078bb3edf1fd89313bb7b0fdb121366bd76e9a351568321984d79da72faa",
-    "assessment": "08e01286f865117bd8d1c56f61b3087e33654521d27e4035e69a32d1a7fe7b8c",
-    "execution": "a3777f6fa2a8b8f1593ba7626c7ac5f4234eefa38afed7926f4d2d7f8c7fc293",
-    "toolchain": "58e193ae81834a67258b1957b54f082d26664061f19dcbb4c30d40271018516b"
+    "assessment": "bd09cd5f8a8962b6854b1f751a4766403fe685df3f4631b351285fb747249bfa",
+    "execution": "d3ad760acfe59df7e8aeb66a8269e94ef07b4aa5aa6ef157e0e2a3ddf99b467b",
+    "toolchain": "e83fbb01b6fa0483d2b4efb10ba7a4e10127612b9c7e6ddb697e32a2ca39c1dd"
   },
   "spec": {
     "agents": [
@@ -985,6 +985,6 @@
     "litellm": "1.102.1",
     "python": "3.13.7",
     "raidar": "0.15.0",
-    "raidar_spec": "9442522eb28abd74160db93ab75e9f8d4e94797ead61d0305de890afac362787"
+    "raidar_spec": "cc9db81c6c78e861b026c7aeed8802a2994593f112071b576a608fa28e994307"
   }
 }
