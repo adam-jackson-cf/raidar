@@ -201,7 +201,9 @@ def update_pyproject(new_version: str) -> None:
 
 def render_lock_update(pyproject: str) -> str:
     """Resolve and verify the prospective release before changing repository files."""
-    with tempfile.TemporaryDirectory(prefix="raidar-release-") as directory:
+    with tempfile.TemporaryDirectory(
+        prefix=".raidar-release-", dir=PYPROJECT_PATH.parent.parent
+    ) as directory:
         staging = Path(directory)
         (staging / "pyproject.toml").write_text(pyproject, encoding="utf-8")
         staged_lock = staging / "uv.lock"
