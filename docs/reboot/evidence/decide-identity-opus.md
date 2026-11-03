@@ -1,0 +1,18 @@
+Decision: c (medium-high). Revert slice C's source changes, but treat its two small resolver fixes as a separate later change instead of revalidating for them now.
+
+- The `grading_execution_digest()` code is in `orchestrator/src/raidar/grading/records.py:115`. It hashes the normalised syntax trees of `grading/**/*.py` and `contract/src/raidar_contract/**`, three runtime payload files, and the versions of Python, packaging and pydantic.
+- `git diff 0b46b2eb..HEAD --stat` shows four changed files, all from `96f07e8f`: `grader.py` (+25/−10 lines), `resolver.py` (+25/−6), `sandbox.py` (+4/−3) and `verifier.py` (+39/−11). There are no changes to the contract package, `uv.lock`, `pyproject.toml` or `.python-version`, so the host-runtime part of the hash should not have moved.
+- **No behaviour change** in `grader.py` (`needs_canary`, `coverage_skip_verdict`), `verifier.py` (`parse_artifact_status`, `artifact_unusable_reason`, `step_leaked`) or `sandbox.py` (a `spawn` field defaulting to `asyncio.create_subprocess_exec`). I checked each branch against the old code and they match. The `run` field added to `resolver.py`, defaulting to `subprocess.run`, also changes no behaviour. It only adds the field to `UvResolver`'s equality and repr.
+- **Behaviour change** in `resolver.py`:
+  - If `uv --version` prints fewer than two words, it used to raise an uncaught `IndexError`. It now raises `DependencyInfraError`.
+  - If the lock uv produces can't be read (`TOMLDecodeError` or `KeyError`), the error used to escape uncaught. It is now also a `DependencyInfraError`, which grading records as `dependency_resolver_unavailable` rather than a crash.
+  - Side effect: package counts and wheel sizes are now read before the sources check. So a lock that has both a direct reference and a malformed wheel `size` now crashes instead of returning `direct-reference`.
+- **Why the fix doesn't force option (a).** It is a real defect, but only in error handling. Before, it crashed the run loudly; it never produced a wrong grade. The 9 validations passed, which means none of them hit these paths [INFERENCE]. Revalidating now would re-measure grades that cannot change, so 6 hours buys nothing. That's my disagreement with the brief's "a fix would require (a)".
+- **Plan:**
+  1. Restore all four files to their `0b46b2eb` bytes. Ruff fixes must not touch them either.
+  2. Rewrite the tests to monkeypatch `raidar.grading.resolver.subprocess.run` and `raidar.grading.sandbox.asyncio.create_subprocess_exec`. The test-patterns skill allows patching runners like this.
+  3. Test the decisions the extracted functions covered through `grade_step` with fake sandbox and resolver objects, and through `_artifact_status` with small temporary manifest files.
+  4. Run `grading_execution_digest()` and confirm it returns `a2d56b47…`. If it doesn't, something else changed and (a) is needed. Then relock and run `make quality`.
+- **Deferred fix.** Land the resolver fixes later as their own deliberate grading change, bundled with the next revalidation that is needed anyway. Until then the gap is known: malformed uv output crashes the run instead of being classified as an infrastructure failure.
+- **Future rule:** test work must not change any bytes that feed identity: the grading digest scope above, `primitive_code`, or released package bytes. Reach that code through existing interfaces or monkeypatched runners. Any change there must be its own commit or PR that shows the identity value before and after, explains why the change is needed, and comes with a scheduled revalidation. A test slice that moves an identity value fails review.
+- **Not verified here:** I edited nothing and computed no digests, because the brief allowed only read-only git and grep.
