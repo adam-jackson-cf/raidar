@@ -16,6 +16,8 @@ All notable changes to this project are documented in this file.
 
 - Pin host Python and all three Python CI workflows to 3.13.7; document frozen environment
   setup and the exact host-version grading identity while retaining `requires-python >=3.12`.
+  CI installs the pinned interpreter with `setup-uv` / `uv python install` instead of runner
+  `setup-python`.
 - Preserve relative local package sources during release lock staging.
 - Require Docker in the performance gate, retain the pre-S6 security source through
   `archive/pre-s6-root-seal`, and fail enforced security checks if that source is missing.
