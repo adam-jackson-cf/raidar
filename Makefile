@@ -521,7 +521,7 @@ PERF_FIXTURE_CONCURRENCY ?=
 
 perf-fixture:
 	@$(TARGET_ENV) $(RAIDAR) pack build python
-	@$(TARGET_ENV) export RAIDAR_EXECUTION_DOCKER=1 && \
+	@$(TARGET_ENV) export RAIDAR_EXECUTION_DOCKER=1 RAIDAR_REQUIRE_DOCKER=1 && \
 		$(if $(PERF_FIXTURE_DIR),export RAIDAR_PERF_FIXTURE_DIR="$(abspath $(PERF_FIXTURE_DIR))" &&,) \
 		$(if $(PERF_FIXTURE_CONCURRENCY),export RAIDAR_PERF_FIXTURE_CONCURRENCY="$(PERF_FIXTURE_CONCURRENCY)" &&,) \
 		cd orchestrator && $(REPO_RUNTIME_ENV) uv run --project . --extra dev \

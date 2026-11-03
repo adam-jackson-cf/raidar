@@ -4,15 +4,24 @@ All notable changes to this project are documented in this file.
 
 ## Unreleased
 
-### Contract identity batch: relocks held at RT7
+### Contract identity batch: revalidation and relocks complete
 
-- Attempt all 12 experiments through `make experiment-lock`: zero locks regenerated; all 12
-  existing locks retained byte-for-byte. Thirteen RT7 issues name stale grading validation,
-  with no other lock blocker: `scb/circuit_eval.checkpoint_1`, `scb/forge`, `scb/dag_execution`
-  and `scb/log_query`, all pinned at `38d627ecf668`.
-- Admission refuses before writing while the validation implementation differs from this
-  checkout. The orchestrator must revalidate once after this batch, then regenerate every lock
-  through the public target. No validation pin, immutable release or RT7 gate was weakened.
+- Revalidated all nine SCB problems with five repeats under grading digest `c69aa425…`;
+  all nine are `validated_partial`. Regenerated experiment locks through the public
+  `make experiment-lock` target; all experiment locks are current.
+- Retain RT7's refusal before writing when validation identity differs. No validation pin,
+  immutable release or RT7 gate was weakened.
+
+### PR review fixes
+
+- Pin host Python and all three Python CI workflows to 3.13.7; document frozen environment
+  setup and the exact host-version grading identity while retaining `requires-python >=3.12`.
+- Preserve relative local package sources during release lock staging.
+- Require Docker in the performance gate, retain the pre-S6 security source through
+  `archive/pre-s6-root-seal`, and fail enforced security checks if that source is missing.
+  Document fetching origin tags before contract rebuilds and the security gate.
+- Move the historical 2026-10-24 code review to
+  `docs/reboot/evidence/codereview-2026-10-24.md` without a root-file allowlist exception.
 
 ### Contract 2.0.0 distribution-policy split
 
@@ -24,7 +33,7 @@ All notable changes to this project are documented in this file.
   without compatibility exports. `raidar_contract.references` owns immutable reference grammar.
 - Pin immutable 2.0.0 wheel/sdist artifacts separately from frozen 1.0.0 and 1.1.0 artifacts.
   Contract ids, package digests and stage acceptance/refusals stay unchanged; primitive code
-  identities change and require experiment relocks after the orchestrator's one revalidation.
+  identities changed, and experiment relocks followed the completed revalidation above.
 - Final fast-only coverage measures 37,952/38,169 lines (99.431476%) and 9,134/9,252 branches
   (98.724600%); ratchet the separate floors from 99.42/98.69 to 99.43/98.72.
 - Migrate cache-invalidation fixtures from obsolete module-file metadata to isolated copies
@@ -52,8 +61,8 @@ All notable changes to this project are documented in this file.
 - Keep distribution versions in non-executed project metadata, not package initialization.
   Grading identity includes the host Python, packaging and pydantic versions as before.
 - Normalize malformed resolver version output and unreadable generated locks as infrastructure
-  failures, never dependency refusals. This deliberately changes grading identity; all pinned
-  problems require one revalidation after the contract release/distribution batch.
+  failures, never dependency refusals. This deliberately changed grading identity; all nine
+  SCB problems completed revalidation after the contract release/distribution batch above.
 
 ### Grading and problem fast coverage closure
 

@@ -420,7 +420,7 @@ The detailed entries are the authoritative findings. `B` entries describe implem
 ### D12 — Low: nested build instruction targets another checkout
 
 - **Location:** `review-surface/src/pages/AGENTS.md:15`.
-- **Evidence and consequence:** The command uses absolute `/Users/adamjackson/Projects/complete/raidar/review-surface` instead of this `raidar-reboot-impl` tree. It can rebuild another checkout or fail while leaving this UI stale.
+- **Evidence and consequence:** The command uses an absolute path to `review-surface/` in a sibling `raidar` checkout instead of this `raidar-reboot-impl` tree. It can rebuild another checkout or fail while leaving this UI stale.
 - **Correction:** Use the root public `make review-surface-build` target and repository-relative instructions.
 
 ### D13 — Low: performance CI silently drops its job evidence
