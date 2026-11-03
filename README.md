@@ -17,6 +17,16 @@ Raidar uses [Harbor's vocabulary](#concepts) wherever Harbor has a term (job, tr
 
 The binding design is [`split-design.md`](split-design.md): arms, workflows and stage packages, problem onboarding, health, measurement and the implementation plan. Earlier design records live under [`docs/reboot/`](docs/reboot/).
 
+Host setup uses Python **3.13.7**, pinned in `.python-version` and CI:
+
+```sh
+env -u AGENT uv sync --project orchestrator --python 3.13.7 --all-extras --frozen
+```
+
+The grading digest includes the exact host Python version; a different patch version
+changes the digest and fails RT7 against the current validation pins. Package compatibility
+remains `requires-python = ">=3.12"`; validated grading requires the pinned interpreter.
+
 The public stage-package authoring contract is [`lab/stages/README.md`](lab/stages/README.md):
 `stage/1`, calls and canaries, `criteria/1`, immutable references and `stage-tree/1` identity.
 The portable schemas and digests have one implementation in [`contract/`](contract/),
@@ -207,9 +217,9 @@ until revalidation. Existing three-repeat records are not retroactively certifie
 The implementation digest covers the complete executable grading import closure, package
 initializers included, explicit subprocess/plugin roots, exactly shipped runtime bytes (no
 `__pycache__`) and host Python/packaging/pydantic versions. Static distribution-version metadata
-is outside that closure. The 1.1.0/2.0.0 batch follows the scope correction without another grading
-digest change; the orchestrator performs one revalidation afterward. RT7 currently refuses
-relocking before writing when validation is stale; never hand-edit pins/locks to bypass it.
+is outside that closure. The 1.1.0/2.0.0 batch completed revalidation under digest `c69aa425…`:
+all nine SCB problems are `validated_partial` and all experiment locks are current.
+RT7 refuses relocking before writing when validation is stale; never hand-edit pins/locks to bypass it.
 A grading crash or timeout triggers a starter canary in the same sandbox configuration:
 completion (not solving the task) passes. A passing canary attributes the failed grade to
 the submission; a failing canary remains infrastructure. Each step records the canary status.

@@ -15,8 +15,8 @@ runs it at concurrency 1 and 3 and is the enforced overhead gate: the check
 here is ``--strict`` against the accepted budgets, unchanged. The strict JSON
 report is written to ``<fixture dir>/perf-check.json``.
 
-Opted in, a missing prerequisite fails the test instead of skipping it, so a
-CI job or ``make perf-fixture`` can never pass without running the fixture.
+``make perf-fixture`` requires Docker, so a missing prerequisite fails instead
+of skipping: CI can never pass without running the fixture.
 The Docker target is the one ``TARGET=`` / ``RAIDAR_TARGET`` / the targets file's
 ``default`` selects; its configured data check must pass.
 """
@@ -25,7 +25,6 @@ from __future__ import annotations
 
 import json
 import os
-import subprocess
 from pathlib import Path
 
 import pytest
@@ -33,10 +32,6 @@ from click.testing import CliRunner
 
 from raidar.cli import main
 from raidar.design.problem.store import ROOT_ENV
-from raidar.engine.target.config import Target, TargetError
-from raidar.engine.target.health import ensure_target
-from raidar.subject.environment.python.image import image_tag
-from raidar.subject.environment.python.pack_definition import load_pack_spec
 from tests.docker_trial_support import docker_target
 from tests.execution_support import imported_pack_fixture, locked_experiment
 
@@ -55,36 +50,10 @@ pytestmark = [
 ]
 
 
-def _require_target() -> Target:
-    """Opted in: every prerequisite must hold, or the fixture fails (never skips).
-
-    The target is the one ``RAIDAR_TARGET`` / the targets file's ``default`` selects; its
-    reachability and configured data check must pass.
-    """
-    try:
-        target = docker_target()
-        ensure_target(target)
-    except TargetError as error:
-        pytest.fail(str(error))
-    tag = image_tag(load_pack_spec())
-    found = subprocess.run(
-        ["docker", "--context", target.docker_context, "image", "inspect", tag],
-        capture_output=True,
-        timeout=60,
-        check=False,
-    )
-    if found.returncode != 0:
-        pytest.fail(
-            f"pack image {tag} not present on docker context {target.docker_context!r}; "
-            "make pack-build"
-        )
-    return target
-
-
 def test_fixture_experiment_runs_and_holds_the_n1_budgets(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    target = _require_target()
+    target = docker_target()
     context = target.docker_context
     root = Path(os.environ.get("RAIDAR_PERF_FIXTURE_DIR") or tmp_path)
     concurrency = int(os.environ.get(CONCURRENCY_ENV) or 1)

@@ -18,6 +18,7 @@ executes as root there.
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 from typing import Any
 
@@ -203,6 +204,8 @@ def test_the_archived_root_seal_ran_the_planted_commands_as_root(tmp_path: Path)
     try:
         NegativeControlAgent.gate_source = pre_s6_gate(REPOSITORY)
     except FileNotFoundError as exc:
+        if os.environ.get("RAIDAR_REQUIRE_DOCKER") == "1":
+            pytest.fail(str(exc))
         pytest.skip(str(exc))
     task = tmp_path / "task"
     build_task(task, {STEP: "negative control"}, agent_timeout_sec=600)
