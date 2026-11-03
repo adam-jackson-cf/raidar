@@ -1,7 +1,7 @@
 """The proof a package arm needs before it is locked, and the trial's check against it.
 
 ``make stage-check`` runs a package's fixtures in a pack container and leaves two files under
-``var/stage-checks/`` named by the package's ``stage-tree/1`` digest:
+``lab/stage-checks/`` named by the package's ``stage-tree/1`` digest:
 
 - ``<digest>.json``: the ``StageCheckRecord`` of the passing ``done`` fixture (canary baseline);
 - ``<digest>.installed.json``: ``{arch: {tree_digest, wheels}}``, the installed tree

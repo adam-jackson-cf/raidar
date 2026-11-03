@@ -17,7 +17,12 @@ from pathlib import Path
 from raidar_contract.agent import agent_names
 from raidar_contract.references import ReleaseError
 
-from raidar.contract.paths import REPO_ROOT, agents_root, releases_file, stages_root, workflows_root
+from raidar.contract.paths import (
+    REPO_ROOT,
+    agents_root,
+    releases_file,
+    workflows_root,
+)
 from raidar.contract.releases import (
     ReleaseKind,
     load_register,
@@ -28,9 +33,8 @@ from raidar.contract.releases import (
 from raidar.subject.agent.definition import load_agent
 from raidar.subject.agent_checks import agent_pin_issues
 from raidar.subject.imports import import_issues
-from raidar.subject.package.registry import load_stage_package
+from raidar.subject.package.release_check import stage_release_issues
 from raidar.subject.releases import tree_workflow_digest
-from raidar.subject.stages import stage_names
 
 MAIN_REFS = ("main", "origin/main")
 
@@ -95,12 +99,7 @@ def release_issues(
         lambda name: load_agent(a_root, name).digest,
         register,
     )
-    issues += registration_issues(
-        ReleaseKind.STAGE,
-        stage_names(repo_root),
-        lambda name: load_stage_package(stages_root(repo_root) / name).digest,
-        register,
-    )
+    issues += stage_release_issues(repo_root, register)
     issues += registration_issues(
         ReleaseKind.WORKFLOW,
         sorted(

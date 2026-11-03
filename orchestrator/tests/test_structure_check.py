@@ -46,6 +46,9 @@ def test_main_exits_zero_on_a_clean_layout_and_one_on_a_violation(tmp_path: Path
     subprocess.run(["git", "init"], cwd=tmp_path, check=True, capture_output=True)
     (tmp_path / "lab" / "judge").mkdir(parents=True)
     (tmp_path / "lab" / "judge" / "a.yaml").write_text("", encoding="utf-8")
+    records = tmp_path / "lab" / "stage-checks"
+    records.mkdir()
+    (records / f"{'a' * 64}.installed.json").write_text("{}", encoding="utf-8")
 
     assert structure.main(["--repo-root", str(tmp_path)]) == 0
 

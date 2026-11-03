@@ -1,0 +1,13 @@
+{
+  "arm64": {
+    "tree_digest": "fe7ed44f00862b4a650a23e70120aa80cc4520c5a51d516db8f960192b4078b1",
+    "wheels": [
+      {
+        "filename": "codespell-2.4.1-py3-none-any.whl",
+        "name": "codespell",
+        "sha256": "3dadafa67df7e4a3dbf51e0d7315061b80d265f9552ebd699b3dd6834b47e425",
+        "version": "2.4.1"
+      }
+    ]
+  }
+}

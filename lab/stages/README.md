@@ -160,6 +160,22 @@ adapter-inclusive `primitive_code`; it does not weaken admission or pooling iden
 
 The lock pins expected installed-tree digests per architecture. Later checkpoints reuse an existing install only after a fresh root-owned, no-follow measurement matches that expectation; a changed or unmeasurable tree invalidates the trial and is never repaired or reinstalled over.
 
+Installed-tree and stop-canary records are tracked outside package folders at
+`lab/stage-checks/<package-digest>.installed.json` and
+`lab/stage-checks/<package-digest>.json`, respectively. The installed record contains
+per-architecture tree digests and wheel inventories; the canary record contains package,
+pack and primitive identities, stdout/output hashes and observed resource floors. Keeping
+these records outside `lab/stages/<ns>/<name>/` preserves `stage-tree/1`: the records do not
+change the package identity they describe. Locks and trials use only this canonical store,
+with no fallback to `var/`; execution logs remain under `var/`.
+
+`make stage-check` accepts identical record bytes as a no-op and refuses different bytes
+under the same identity. To replace evidence, deliberately delete the affected record,
+rerun `make stage-check`, then relock dependent experiments with `make experiment-lock`.
+Byte-preserving relocation needs no relock. `make releases-check` refuses records naming
+unregistered package digests and released packages lacking installed-tree evidence for
+architectures pinned by committed locks. `make structure-check` permits `lab/stage-checks/`.
+
 Lock refusals: **ST1** unsupported/invalid package contract; **ST2** unsupported required primitive; **ST3** missing/forward input producer; **ST4** register/digest mismatch; **ST5** stale lock, sdist or missing pack wheel; **ST6** missing/repeated frame slot; **ST7** colliding commands, skills, output paths or tokens.
 
 ## Author commands

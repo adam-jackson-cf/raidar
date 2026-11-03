@@ -449,6 +449,19 @@ The rule is therefore attribution by control run, from `stage-stop-failure-opus.
 ### 5.6 The shared stage registry (decided)
 
 - **Packages live in this repository**, at `lab/stages/<ns>/<name>/`. Upstream packages are `lab/stages/raidar/<name>/`; imported third-party packages are committed under their own namespace, so every checkout can reproduce a run and every package passes PR review.
+- **Tracked stage-check evidence** lives at `lab/stage-checks/<package-digest>.installed.json`
+  (installed-tree digests and wheel inventories by architecture) and
+  `lab/stage-checks/<package-digest>.json` (stop-canary identities, stdout/output hashes and
+  observed resource floors). Records stay outside every package folder so they do not enter
+  `stage-tree/1` or change the package identity they describe. Locks and trials read this
+  canonical store, with no fallback to `var/`; execution logs remain under `var/`.
+  `make stage-check` treats identical record bytes as a no-op and refuses different bytes
+  under the same identity. Replacing evidence requires deliberately deleting the affected
+  record, rerunning `make stage-check` and relocking dependent experiments with
+  `make experiment-lock`; preserved bytes need no relock.
+  `make releases-check` refuses records naming unregistered package digests and released
+  packages missing installed-tree evidence for architectures pinned by committed locks.
+  `make structure-check` permits this tracked evidence store.
 - **Releases** go in a new `stages:` section of `lab/releases.yaml` (`name@N` → digest). The rules are the same as for agents and workflows:
   - a released number is frozen;
   - only the latest release of a name resolves;

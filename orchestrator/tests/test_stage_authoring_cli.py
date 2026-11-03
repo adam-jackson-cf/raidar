@@ -24,7 +24,7 @@ from tests.release_support import REAL_PACKAGE, UV_LOCK_WITH_SDIST
 
 
 @pytest.fixture
-def stages(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+def stages(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, stage_check_store: Path) -> Path:
     """A stages root holding only a copy of the real ``raidar/docs-check`` source package."""
     root = tmp_path / "stages"
     shutil.copytree(REAL_PACKAGE, root / "raidar" / "docs-check")
@@ -297,12 +297,25 @@ def test_stage_list_reports_an_empty_tree_and_an_invalid_package(
     assert "acme/broken\tINVALID: " in listed.output
 
 
+@pytest.mark.parametrize("record_present", [False, True])
 def test_stage_list_and_info_show_the_package_and_its_next_register_line(
-    stages: Path, monkeypatch: pytest.MonkeyPatch
+    stages: Path,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    stage_check_store: Path,
+    record_present: bool,
 ) -> None:
     monkeypatch.setattr(stage, "lock_problems", lambda root: [])
     CliRunner().invoke(main, ["stage", "new", "acme/my-check"])
     package = load_stage_package(stages / "acme" / "my-check")
+    legacy = tmp_path / "var" / "stage-checks"
+    legacy.mkdir(parents=True)
+    monkeypatch.setenv("RAIDAR_VAR", str(tmp_path / "var"))
+    (legacy / f"{package.digest}.json").write_text("{}")
+    record = stage_check_store / f"{package.digest}.json"
+    if record_present:
+        record.parent.mkdir(parents=True)
+        record.write_text("{}")
 
     listed = CliRunner().invoke(main, ["stage", "list"])
     info = CliRunner().invoke(main, ["stage", "info", "acme/my-check"])
@@ -314,6 +327,7 @@ def test_stage_list_and_info_show_the_package_and_its_next_register_line(
     assert document["digest"] == package.digest
     assert document["register"] == f"register stages: acme/my-check@1: {package.digest}"
     assert document["fixtures"] == sorted(package.fixture_cases())
+    assert document["canary_record"] == (str(record) if record_present else None)
 
 
 def test_workflow_new_defaults_to_one_shot_verify_and_refuses_overwrite(

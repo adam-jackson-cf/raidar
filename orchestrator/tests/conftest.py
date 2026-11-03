@@ -6,7 +6,28 @@ from pathlib import Path
 
 import pytest
 
+from raidar.contract import paths
+
 pytest_plugins = ("tests.workflow_support", "tests.process_guard")
+
+
+@pytest.fixture
+def stage_check_store(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, request: pytest.FixtureRequest
+) -> Path:
+    """Redirect only stage evidence; unrelated lab definitions retain their normal roots."""
+    stage_checks_root = paths.stage_checks_root
+    repo = tmp_path / "repo"
+
+    def isolated_root(repo_root: Path = repo) -> Path:
+        return stage_checks_root(repo_root)
+
+    monkeypatch.setattr(paths, "stage_checks_root", isolated_root)
+    monkeypatch.setattr("raidar.cli.stage.stage_checks_root", isolated_root)
+    monkeypatch.setattr("raidar.cli.stage_fixtures.stage_checks_root", isolated_root)
+    monkeypatch.setattr("raidar.subject.workflow.package_runtime.stage_checks_root", isolated_root)
+    monkeypatch.setattr(request.module, "stage_checks_root", isolated_root, raising=False)
+    return isolated_root()
 
 
 @pytest.fixture
