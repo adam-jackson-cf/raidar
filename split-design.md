@@ -710,7 +710,9 @@ Migration, in order:
 
 **Before FXL's runtime phase, in order:**
 1. [x] Release contract `1.1.0` with stop-result/context models and 63 shared conformance cases (`contract-v1.1.0`, section 5.8).
-2. [x] Split lab policy out as distribution `2.0.0` (`contract-v2.0.0`). Contract ids, stage acceptance/refusals and package digests stay unchanged. The orchestrator's single post-batch grading revalidation and successful relocks remain prerequisites for trials, not unfinished standard work.
+2. [x] Split lab policy out as distribution `2.0.0` (`contract-v2.0.0`). Contract ids, stage acceptance/refusals and package digests stay unchanged. The single post-batch grading revalidation ran on 2026-11-03 under grading digest `c69aa425…` (`45e465a8`): all nine problems `validated_partial`, every experiment relocked.
+
+**Test approach (2026-11-01 to 11-03, before Option A).** Raidar's suite follows `.agents/skills/test-patterns` (adapted from FXL) and coding-guidance's regression and verification runbooks. Tiers: fast, slow, quality, docker, security and perf. The coverage gate compares integer counts, so it no longer rounds 94.99 up to 95. Line and branch floors are ratcheted to 99.43 and 98.72. Test-only work must not change identity-bearing bytes. Votes: `docs/reboot/evidence/decide-{tests,identity,scope,provenance}-*.md`. The prospective budgets (fast under 30 s, slow under 300 s) are not yet met.
 
 **Acceptance test for Need 1 (AT-N1).** Starting from a clean checkout:
 1. `make problem-import SOURCE=scb@<commit> PROBLEMS=<two problems not yet imported>`;
