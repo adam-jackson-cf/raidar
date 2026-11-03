@@ -57,10 +57,10 @@
       },
       "scorer": {
         "code-quality@9": {
-          "digest": "7cc839276d447a1adbd535e467affb623ca2997b8903934e624743200a102a83",
+          "digest": "7accfa4151cfcbd9ee66d5a37023de6d27b352ee954cbc5370a21793e04d6a52",
           "metadata": {
             "implementation": "raidar.scoring.code_quality:code_quality_scorer",
-            "implementation_digest": "7aa63ec06dcbff548af62855ee0f1a7dfc48dd5e06d78986e90d0b9f095c9574",
+            "implementation_digest": "1cc9d4824cfa4be738da081604c88563eac2eaeb6be370a4b70b8a3d064c417b",
             "manifest": {
               "description": "SCB-fork code-quality and inertia components over the per-step snapshots; a step graded without the in-trial coverage pass reads G's coverage run from the offline run in the Assessment store, and G leaves out at most 3 cases whose outcome differs between the grading and coverage runs instead of reading the step as ineligible.",
               "evidence_required": [
@@ -279,10 +279,10 @@
           }
         },
         "correctness@10": {
-          "digest": "4e6f072937b22b9d3842e58f8918f79c8ac9c4d57fbd78e26593bad100b5e5d8",
+          "digest": "bf219a460ad69b3f4d422a1bad9c04df0ab435d86c2ae1c0e91b576988562555",
           "metadata": {
             "implementation": "raidar.scoring.correctness:correctness_scorer",
-            "implementation_digest": "e9b0051cac0fcddf013f55b3b47b20a3ea634b20a37860cc3bec14d755caf552",
+            "implementation_digest": "4daa585db532c8260f7bd7650ad8a329d1792334915bc93cce0396e6632c1c7a",
             "manifest": {
               "description": "Reference-solvable SCB success and raw SCB verdicts per checkpoint and trajectory.",
               "evidence_required": [
@@ -482,10 +482,10 @@
           }
         },
         "process-compliance@12": {
-          "digest": "3f6b315b65f4d3078fcbd938c53d9afe041391fa254cb94ddbc4ec8e11a118fb",
+          "digest": "da2ca3c4569a10d1f913fedd37009c7f079f96c47f642368bd6eafa8361704f1",
           "metadata": {
             "implementation": "raidar.scoring.process_checks:deterministic_process_compliance_scorer",
-            "implementation_digest": "1c24c0f2ec9edb1d90bd8789f73290ba0aa5bddc1d3c439ffb79e5ab0841b6ba",
+            "implementation_digest": "18c13e43c7cda82173da5904d6c48f982d0f959a28faf4446542033b43024aae",
             "manifest": {
               "description": "Deterministic trace checks of agent process (stall outcomes, a test command counts only when it ran, the step's work session's own test run after its last edit, a compliance rate without the plan check unless the condition asks for a plan); a check the trace cannot decide is undetermined, never judged by a model. Adds whether the work session ran the tests at all, and whether it ran them after its last edit to a non-test file.",
               "evidence_required": [
@@ -686,10 +686,10 @@
           }
         },
         "resource-usage@8": {
-          "digest": "697c9340a9bdcb71ca6e25c7125e0ed9a9ad71d33650b3d51b14d20ad8f6bae0",
+          "digest": "02e2119373061536870a133417352ed0892c75a22e7b45797ace552910f5f0de",
           "metadata": {
             "implementation": "raidar.scoring.resource_usage:resource_usage_scorer",
-            "implementation_digest": "a28cf3a66b2d978b5d51f5dd83dc7973a91e75ba90391e6c1480461381e49923",
+            "implementation_digest": "490cda9e9110377eee76b845a17698f79037e3f754564f16acb71a68fcdcbcd5",
             "manifest": {
               "description": "Tokens, canonical-table agent cost plus host judge spend, turns and agent wall time.",
               "evidence_required": [
@@ -841,7 +841,7 @@
       "tree-sitter-language-pack": "0.13.0"
     }
   },
-  "document_sha256": "dfcfbf74df0dc2346dfe6275575071621c71e0015e11cf4e988f6c85a6c964d8",
+  "document_sha256": "10b8d89c625a644ba4a4c003c3bfaf89f0ea3b0b7513b98f0f0049f8f6626845",
   "execution": {
     "arms": {
       "baseline": {
@@ -859,13 +859,13 @@
           "version_pin": "0.156.1",
           "workflow_skills": "placement.skills .agents/skills in the workspace /app"
         },
-        "digest": "8e5301c415a57365e20b7392b80de6498d482b12aafe43d8336b894449c8415e",
+        "digest": "14c29f63ad4ca76df9de59284be3b3df6d0b559e239a9b1ea05709278580cab4",
         "model": "gpt-6-luna",
         "packages": {},
         "primitive_code": {
-          "frame/1": "9018cc5beb0c225b5212587b6fa6888eee8655ebaac2e7a385ec59e6f5854a12",
-          "install/1": "dd974f370d2d409f3815868f7fd7e799145be26a379b7d516d7adf32a225a309",
-          "runner/1": "00bbe835f0be20ef676cd4ab8c8ea411a5a81eebf49535d6acada028d6f0b317"
+          "frame/1": "71a0fd7e66c739e714d21f6e5c2c6358483126326b0cd5a05788a23072a22865",
+          "install/1": "148ba37ff51fd8c10d81cc1f1f617997d90a6fb332a3247ee4a1d01aa7ad28d6",
+          "runner/1": "25a7a1951ff33daf081572f565116922e2fd11fcfab62481172ba86367ea3584"
         },
         "provider": "openai",
         "reasoning": "low",
@@ -1617,7 +1617,7 @@
               "grader": {
                 "environment_id": "sha256:1989940cc347e516b774a3833071b60dbfae6a730e55462cdf38a095e23d8765",
                 "image": "raidar-oracle-grader:963c14e63ff5e15d",
-                "implementation_sha256": "a2d56b47f85fc39be2eb00015c5b9192263590f3f0d9db17b0cc2dd962d7ee98"
+                "implementation_sha256": "c69aa42508be80a1c69ff6b6f9ec897c7bdd9468942404cf375ca13835ffe2e9"
               },
               "not_run": [
                 "native_parity_positive",
@@ -1690,7 +1690,7 @@
     "source_sha256": "f13940048fe0b2e13bf586e74d65476d18673cb9ed836ac7edca551c4b04e56f",
     "spec_sha256": "3edb089ea1ee03462a5cd688e45c5fde0cf5015165d2eabd5f5a4023e6b52257"
   },
-  "lock_sha256": "844b1f62a6972dafca2f634892e067c4dc9d532067264f0d66156255fb4fad2e",
+  "lock_sha256": "1bc3544de4b30a874a4a7efaac650fbeff62fd8d2ea4df30348c20dac4549b8f",
   "lock_version": 5,
   "overrides": {
     "flags": {},
@@ -1698,9 +1698,9 @@
   },
   "sections": {
     "analysis": "1b12d4c79118b1962282a0c33350352b893d39995117c241bba045eff2a1d044",
-    "assessment": "543dee1f5d38603a294f89de47690ec5487635e1d86d63eb2427138b5a55f379",
-    "execution": "844b1f62a6972dafca2f634892e067c4dc9d532067264f0d66156255fb4fad2e",
-    "toolchain": "58e193ae81834a67258b1957b54f082d26664061f19dcbb4c30d40271018516b"
+    "assessment": "442dc46f3b85ce6326b2ae407fd4f60e4446d02e56e18d7a06627463df82d6a5",
+    "execution": "1bc3544de4b30a874a4a7efaac650fbeff62fd8d2ea4df30348c20dac4549b8f",
+    "toolchain": "e83fbb01b6fa0483d2b4efb10ba7a4e10127612b9c7e6ddb697e32a2ca39c1dd"
   },
   "spec": {
     "agents": [
@@ -1770,6 +1770,6 @@
     "litellm": "1.102.1",
     "python": "3.13.7",
     "raidar": "0.15.0",
-    "raidar_spec": "9442522eb28abd74160db93ab75e9f8d4e94797ead61d0305de890afac362787"
+    "raidar_spec": "cc9db81c6c78e861b026c7aeed8802a2994593f112071b576a608fa28e994307"
   }
 }

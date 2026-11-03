@@ -23,8 +23,6 @@
     },
     {
       "detail": [
-        "checkpoint_2: 1 nondeterministic",
-        "checkpoint_3: 1 nondeterministic",
         "checkpoint_4: 1 nondeterministic",
         "checkpoint_5: 1 nondeterministic",
         "checkpoint_6: 1 nondeterministic",
@@ -60,7 +58,7 @@
     "engine": "direct",
     "grader_environment_id": "sha256:752528685e4bc099e2e1d2e4ffb9bbf35c74afbf7aeb965b7445c18163566f1e",
     "grader_image": "raidar-oracle-grader:2cf4f359dd32f0b6",
-    "grader_implementation_sha256": "4520a3d16ca56fd6d838293b9b9e71e9e493441d74c97982fd6c0ed9ee95cec2",
+    "grader_implementation_sha256": "c69aa42508be80a1c69ff6b6f9ec897c7bdd9468942404cf375ca13835ffe2e9",
     "harbor": "0.23.0",
     "pack_image": "raidar/pack-python:2b91a52663e099f2"
   },
@@ -1029,12 +1027,12 @@
                 21
               ],
               "regression": [
-                140,
+                141,
                 159
               ]
             },
             "infra_failure": null,
-            "passed": 168,
+            "passed": 169,
             "total": 194
           }
         }
@@ -1589,12 +1587,12 @@
                 13
               ],
               "regression": [
-                141,
+                140,
                 141
               ]
             },
             "infra_failure": null,
-            "passed": 141,
+            "passed": 140,
             "total": 159
           },
           "checkpoint_8": {
@@ -2136,7 +2134,7 @@
         "status": "measured"
       },
       "checkpoint_8": {
-        "observation": "variation observed in 5 runs for this reference and environment",
+        "observation": "no variation observed in 5 runs for this reference and environment",
         "reference_sha256": "57dd62fe1fc1f7ba73817b56db225b0febc1b506f5b176fb4c78bc3d89bffac2",
         "runs": 5,
         "status": "measured"
@@ -2180,7 +2178,7 @@
         "status": "measured"
       },
       "checkpoint_7": {
-        "observation": "no variation observed in 5 runs for this reference and environment",
+        "observation": "variation observed in 5 runs for this reference and environment",
         "reference_sha256": "57dd62fe1fc1f7ba73817b56db225b0febc1b506f5b176fb4c78bc3d89bffac2",
         "runs": 5,
         "status": "measured"
@@ -2236,13 +2234,11 @@
       "verdict": "validated"
     },
     "checkpoint_2": {
-      "digest": "78feef57c5801aab258952c8528b58e27fe5ab389510aa0838f3f25878f10545",
+      "digest": "a964ca89a6bff022ac8e49aacd42b82165a1b4627d14d503190e2cbde3a6aaa2",
       "exclusion": null,
-      "nondeterministic": [
-        "checkpoint_2::test_regex_find_all_submatch_index_ordering"
-      ],
-      "nondeterministic_count": 1,
-      "size": 54,
+      "nondeterministic": [],
+      "nondeterministic_count": 0,
+      "size": 55,
       "solvable": [
         "checkpoint_1::test_condition_false_string_does_not_match",
         "checkpoint_1::test_condition_render_error_fallback",
@@ -2294,6 +2290,7 @@
         "checkpoint_2::test_known_deterministic_output[hmac_sha256]",
         "checkpoint_2::test_known_deterministic_output[uuidv5]",
         "checkpoint_2::test_missing_body_from_file_rejects_startup",
+        "checkpoint_2::test_regex_find_all_submatch_index_ordering",
         "checkpoint_2::test_regex_find_all_submatch_no_match",
         "checkpoint_2::test_templated_headers_with_helpers",
         "checkpoint_2::test_uuidv5_deterministic_across_requests",
@@ -2302,13 +2299,11 @@
       "verdict": "validated"
     },
     "checkpoint_3": {
-      "digest": "43d45a64f8017f83f84293cfc850366f0c8f65fc0e8398aa0b613d82314c1436",
+      "digest": "b86099d0dfcfe5b66a582c9e71e6b4518bfb0dcb19cfd25eef4bf4968a77364e",
       "exclusion": null,
-      "nondeterministic": [
-        "checkpoint_2::test_regex_find_all_submatch_index_ordering"
-      ],
-      "nondeterministic_count": 1,
-      "size": 76,
+      "nondeterministic": [],
+      "nondeterministic_count": 0,
+      "size": 77,
       "solvable": [
         "checkpoint_1::test_condition_false_string_does_not_match",
         "checkpoint_1::test_condition_render_error_fallback",
@@ -2360,6 +2355,7 @@
         "checkpoint_2::test_known_deterministic_output[hmac_sha256]",
         "checkpoint_2::test_known_deterministic_output[uuidv5]",
         "checkpoint_2::test_missing_body_from_file_rejects_startup",
+        "checkpoint_2::test_regex_find_all_submatch_index_ordering",
         "checkpoint_2::test_regex_find_all_submatch_no_match",
         "checkpoint_2::test_templated_headers_with_helpers",
         "checkpoint_2::test_uuidv5_deterministic_across_requests",
@@ -2390,10 +2386,10 @@
       "verdict": "validated"
     },
     "checkpoint_4": {
-      "digest": "5f329d0c5568acef6297da655bbccecf8ef5ecfbcf7929ce4a6ba6c0e432ae2c",
+      "digest": "2118b8d9ff6fac552bbc5c5f98e3b9b5acb03b222bfc547e5dfbd479606a6564",
       "exclusion": null,
       "nondeterministic": [
-        "checkpoint_2::test_regex_find_all_submatch_index_ordering"
+        "checkpoint_4::test_equal_order_preserves_relative"
       ],
       "nondeterministic_count": 1,
       "size": 98,
@@ -2448,6 +2444,7 @@
         "checkpoint_2::test_known_deterministic_output[hmac_sha256]",
         "checkpoint_2::test_known_deterministic_output[uuidv5]",
         "checkpoint_2::test_missing_body_from_file_rejects_startup",
+        "checkpoint_2::test_regex_find_all_submatch_index_ordering",
         "checkpoint_2::test_regex_find_all_submatch_no_match",
         "checkpoint_2::test_templated_headers_with_helpers",
         "checkpoint_2::test_uuidv5_deterministic_across_requests",
@@ -2478,7 +2475,6 @@
         "checkpoint_4::test_action_order_after_inherit",
         "checkpoint_4::test_behavior_extends_behavior",
         "checkpoint_4::test_child_expect_overrides_parent",
-        "checkpoint_4::test_equal_order_preserves_relative",
         "checkpoint_4::test_extend_forward_ref_across_files",
         "checkpoint_4::test_extend_merges_child_values",
         "checkpoint_4::test_extend_preserves_parent_values",
@@ -2500,10 +2496,10 @@
       "verdict": "validated"
     },
     "checkpoint_5": {
-      "digest": "9035b13c664f1df1f990bddc59420ff8a385cc8efec3247902a2b46d42b78e3e",
+      "digest": "0980a7d4fa7da478e165c70a1c1f2bf41d1fc01f73ccf8d28b3e6eaae88c6ec7",
       "exclusion": null,
       "nondeterministic": [
-        "checkpoint_2::test_regex_find_all_submatch_index_ordering"
+        "checkpoint_4::test_equal_order_preserves_relative"
       ],
       "nondeterministic_count": 1,
       "size": 113,
@@ -2558,6 +2554,7 @@
         "checkpoint_2::test_known_deterministic_output[hmac_sha256]",
         "checkpoint_2::test_known_deterministic_output[uuidv5]",
         "checkpoint_2::test_missing_body_from_file_rejects_startup",
+        "checkpoint_2::test_regex_find_all_submatch_index_ordering",
         "checkpoint_2::test_regex_find_all_submatch_no_match",
         "checkpoint_2::test_templated_headers_with_helpers",
         "checkpoint_2::test_uuidv5_deterministic_across_requests",
@@ -2588,7 +2585,6 @@
         "checkpoint_4::test_action_order_after_inherit",
         "checkpoint_4::test_behavior_extends_behavior",
         "checkpoint_4::test_child_expect_overrides_parent",
-        "checkpoint_4::test_equal_order_preserves_relative",
         "checkpoint_4::test_extend_forward_ref_across_files",
         "checkpoint_4::test_extend_merges_child_values",
         "checkpoint_4::test_extend_preserves_parent_values",
@@ -2625,10 +2621,10 @@
       "verdict": "validated"
     },
     "checkpoint_6": {
-      "digest": "03ef968f0de35e0c1ff9fc927b772acbfc732627545dd945c8d552933ef11c84",
+      "digest": "b6404f644743de15f85d0592bbbd3568de40ef1c92636a117ba585dda44ccdfc",
       "exclusion": null,
       "nondeterministic": [
-        "checkpoint_2::test_regex_find_all_submatch_index_ordering"
+        "checkpoint_4::test_equal_order_preserves_relative"
       ],
       "nondeterministic_count": 1,
       "size": 140,
@@ -2683,6 +2679,7 @@
         "checkpoint_2::test_known_deterministic_output[hmac_sha256]",
         "checkpoint_2::test_known_deterministic_output[uuidv5]",
         "checkpoint_2::test_missing_body_from_file_rejects_startup",
+        "checkpoint_2::test_regex_find_all_submatch_index_ordering",
         "checkpoint_2::test_regex_find_all_submatch_no_match",
         "checkpoint_2::test_templated_headers_with_helpers",
         "checkpoint_2::test_uuidv5_deterministic_across_requests",
@@ -2713,7 +2710,6 @@
         "checkpoint_4::test_action_order_after_inherit",
         "checkpoint_4::test_behavior_extends_behavior",
         "checkpoint_4::test_child_expect_overrides_parent",
-        "checkpoint_4::test_equal_order_preserves_relative",
         "checkpoint_4::test_extend_forward_ref_across_files",
         "checkpoint_4::test_extend_merges_child_values",
         "checkpoint_4::test_extend_preserves_parent_values",
@@ -2780,7 +2776,7 @@
       "digest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
       "exclusion": "no_new_scoreable_tests",
       "nondeterministic": [
-        "checkpoint_2::test_regex_find_all_submatch_index_ordering"
+        "checkpoint_4::test_equal_order_preserves_relative"
       ],
       "nondeterministic_count": 1,
       "size": 0,
@@ -2788,10 +2784,10 @@
       "verdict": "excluded"
     },
     "checkpoint_8": {
-      "digest": "0ba94cb29b3d92cb420316d21b5327f4f1547abfa14d42ad7903c11f8bc1abe1",
+      "digest": "a9c58fe5b89319b49432c4b0e13f01bb02407576ee0099a76a1e5f4683c6cc9c",
       "exclusion": null,
       "nondeterministic": [
-        "checkpoint_2::test_regex_find_all_submatch_index_ordering"
+        "checkpoint_4::test_equal_order_preserves_relative"
       ],
       "nondeterministic_count": 1,
       "size": 174,
@@ -2846,6 +2842,7 @@
         "checkpoint_2::test_known_deterministic_output[hmac_sha256]",
         "checkpoint_2::test_known_deterministic_output[uuidv5]",
         "checkpoint_2::test_missing_body_from_file_rejects_startup",
+        "checkpoint_2::test_regex_find_all_submatch_index_ordering",
         "checkpoint_2::test_regex_find_all_submatch_no_match",
         "checkpoint_2::test_templated_headers_with_helpers",
         "checkpoint_2::test_uuidv5_deterministic_across_requests",
@@ -2876,7 +2873,6 @@
         "checkpoint_4::test_action_order_after_inherit",
         "checkpoint_4::test_behavior_extends_behavior",
         "checkpoint_4::test_child_expect_overrides_parent",
-        "checkpoint_4::test_equal_order_preserves_relative",
         "checkpoint_4::test_extend_forward_ref_across_files",
         "checkpoint_4::test_extend_merges_child_values",
         "checkpoint_4::test_extend_preserves_parent_values",
