@@ -61,7 +61,7 @@ Run `make help` to see the public interface.
    its evidence, then regenerate and relock too. Do not silently replace observed resource
    floors. `make releases-check` requires installed-tree evidence for each architecture
    pinned by committed locks and refuses records naming unregistered package digests.
-5. Run `env -u AGENT make quality`. Expect it to pass, with the fast tier at about 5,090 tests.
+5. Run `env -u AGENT make quality`. Expect it to pass, with the fast tier at about 5,130 tests.
 6. Run `git fetch origin --tags` before `env -u AGENT make contract-build` if you need the wheels.
 
 ### What did not travel
@@ -79,4 +79,4 @@ Run `make help` to see the public interface.
 - `claude-code` isolation is `partial`; measured Claude arms need `full`.
 - Claude Code credentials: `claude setup-token` into Infisical as `CLAUDE_CODE_OAUTH_TOKEN`.
 - The fast and slow tiers miss their prospective 30 s and 300 s budgets (about 137 s and 390 s).
-- mocked_http's varying hidden tests: 7 in one validation run, 5 in the next. The cause is unknown; the classification as upstream test nondeterminism is provisional.
+- mocked_http's varying hidden tests across three validation runs, oldest first: 7, 5, then 7 (2026-11-04). The cause is unknown; the classification as upstream test nondeterminism is provisional.
