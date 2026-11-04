@@ -668,7 +668,7 @@
     },
     "tools": {}
   },
-  "document_sha256": "c0fa6543d5404b05829aaea5d090ff592bd759c4542a548e01c39cfa900a5ec1",
+  "document_sha256": "2a58c63977c759a1906b6fa932acdc38191059167bc0d69b427b385bd24b9aa0",
   "execution": {
     "arms": {
       "define-build-verify": {
@@ -686,11 +686,11 @@
           "version_pin": "0.156.1",
           "workflow_skills": "placement.skills .agents/skills in the workspace /app"
         },
-        "digest": "c6d852b8bfe418dbf0ddd665f4660aae66332bd24ee709f48639b67f66e4c158",
+        "digest": "b48fa9c16019b2e082a9a572f95e04fd611ee6fc9cc6fc93e517f1eacd01bc8d",
         "model": "gpt-6-luna",
         "packages": {
           "raidar/define": {
-            "check": "e59b7b96216dcb1042bea42ab994417cbd46851f81d5ea594b736291f40c94c0",
+            "check": "bdeb092f3425de667f5693c7c38957d0a6464e1e40b911ad5b113db8895fcba9",
             "installed": {
               "arm64": "d28105d3a2c568160a2726192e3157427f0bf12bcab322ba436b35c5ca8d3b4d"
             },
@@ -706,15 +706,15 @@
           }
         },
         "primitive_code": {
-          "acceptance-reply/1": "eb1359f4bc3b1a909cf3d7db28fc76d46666071a2b6b40cf7374f8ab0fed2128",
-          "frame/1": "71a0fd7e66c739e714d21f6e5c2c6358483126326b0cd5a05788a23072a22865",
-          "gate/1": "3820ac4a715b412b8583b4bbf552d87d28033174e349fa8380f494584ce5a33d",
-          "install/1": "f30acb4e98499de8807044e4f3aab073791b3af2fe2dad0b46e8d43cb78f4395",
-          "jev-judge/1": "e03f8c5261cc752ac9f31fb8cdacc8d83886fd9b0c3dce7564edd7fc71311e37",
-          "outputs/1": "8718443c0c3209fae17b17d0754211860b3d468e692f18d907925a8cfef997e1",
-          "runner/1": "32e90b6fda89288443a7326a847336cc6ba78c11a310c28e07dea382816abbee",
-          "setup/1": "59f6bfe4a0b1ed520e0e2d370da8d5b69952feaba4271b73c8636a6ebbdb541e",
-          "stop/1": "82c725ef421ca8bfb4afd68f5ba7fc5ae7daf86ebfbec0dc7fc87cbdf2b6dcb2"
+          "acceptance-reply/1": "04c21c9be151c7d5e2fc38e5ea2b1c66661bd461fb8cdeeef5864ada1d7d20df",
+          "frame/1": "c89c277bb146542f985499df52718e346e2ddaa57dd5530a441128ecb5da268c",
+          "gate/1": "bf0b6fca834e655a8cfab509ca40e5db54c9ae806d4b1cffa69eb2bfa968e61e",
+          "install/1": "ec2b4ad10c7cae38d001d112b6f12086422b00841ca324fcd661f0be3e273a81",
+          "jev-judge/1": "cd2326be7dc9edbe0c8655782001e1a6dcc9eeb015262e18d75071f940115aa0",
+          "outputs/1": "f76e6d67b488c47a4ce7b358f67582f7c1148a945f99d3df519a8a2fa0690fd0",
+          "runner/1": "bb68215e9adbbd98bcf6d421f21a2a2cde060755ac5835ea9d8f51e5a8eadfe6",
+          "setup/1": "7a41450eb711998f63347b9d2c8facd855ed68d2a9c8cd0252dbf0647ca967ad",
+          "stop/1": "4d6a0b7bab0ec7cfec164329e0c2b4773a7c52079c443a07ba09c7da2b880ec3"
         },
         "provider": "openai",
         "reasoning": "low",
@@ -913,7 +913,7 @@
     "source_sha256": "696ee945a66e8b5f3a2f48deddaf768d66dcce2be503a867d8fa8eb51d9cdec8",
     "spec_sha256": "adb2e3e8535f4de6250f69daa8250a24f7d20808648ce74367c2e14cfd94a326"
   },
-  "lock_sha256": "36bf6d5561723bc3556d71bcad7227701a9fd578c98c25b2a256517fae7d086e",
+  "lock_sha256": "39251d43f5df0cfba2b09647060a5cedb3622df44ad84ff69d73ea72813e0995",
   "lock_version": 5,
   "overrides": {
     "flags": {},
@@ -922,8 +922,8 @@
   "sections": {
     "analysis": "21588ee2b7c9012065b4b874f8e6323a59a870ccdec3ddfdd44dbcb87796da8f",
     "assessment": "c9441304cf5dfd637b293b49a884fc1886936dc55291e9a2490cd5747ffed2ee",
-    "execution": "36bf6d5561723bc3556d71bcad7227701a9fd578c98c25b2a256517fae7d086e",
-    "toolchain": "e83fbb01b6fa0483d2b4efb10ba7a4e10127612b9c7e6ddb697e32a2ca39c1dd"
+    "execution": "39251d43f5df0cfba2b09647060a5cedb3622df44ad84ff69d73ea72813e0995",
+    "toolchain": "333007c848ce939cab63d826a8c18e858a159a27631949483fb50abf6f509d15"
   },
   "spec": {
     "agents": [
@@ -990,7 +990,7 @@
   "toolchain": {
     "litellm": "1.102.1",
     "python": "3.13.7",
-    "raidar": "0.15.0",
+    "raidar": "1.0.0",
     "raidar_spec": "cc9db81c6c78e861b026c7aeed8802a2994593f112071b576a608fa28e994307"
   }
 }

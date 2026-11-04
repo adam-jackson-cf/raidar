@@ -734,7 +734,11 @@ class GateRun:
         return await self._run(command, None)
 
     async def _run(self, command: str, user: str | None) -> str:
-        result = await calls.trusted_exec(self.environment, f"umask 022\n{command}", user=user)
+        result = await calls.trusted_exec(
+            self.environment,
+            command if user in ("root", "0", 0) else f"umask 022\n{command}",
+            user=user,
+        )
         if result.return_code != 0:
             detail = (result.stderr or result.stdout or "").strip()[-1000:]
             message = f"exit {result.return_code}: {command[:120]!r}: {detail}"

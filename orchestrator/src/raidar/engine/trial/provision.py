@@ -120,7 +120,8 @@ def _write_payload(provision: TrialProvision, folder: Path) -> None:
 async def _upload(environment: Any, provision: TrialProvision) -> None:
     staging = shlex.quote(str(provision.staging))
     await environment.exec(
-        f"rm -rf {staging} && mkdir -p {staging} && chmod 700 {shlex.quote(str(STAGING_ROOT))}",
+        f"umask 022; rm -rf {staging} && mkdir -p {staging} "
+        f"&& chmod 700 {shlex.quote(str(STAGING_ROOT))}",
         user="root",
         timeout_sec=UPLOAD_TIMEOUT_S,
     )
@@ -146,7 +147,7 @@ async def install_at_start(
         await _upload(environment, provision)
         env = {PAYLOAD_ENV: str(provision.staging), AGENT_USER_ENV: user or ""}
         result = await environment.exec(
-            provision.install, env=env, user="root", timeout_sec=INSTALL_TIMEOUT_S
+            f"umask 022; {provision.install}", env=env, user="root", timeout_sec=INSTALL_TIMEOUT_S
         )
         state.ok = result.return_code == 0
         state.output = "" if state.ok else _tail(f"{result.stdout or ''}\n{result.stderr or ''}")
@@ -159,7 +160,10 @@ async def install_at_start(
 
 async def _check(environment: Any, provision: TrialProvision, user: str | None) -> dict[str, Any]:
     try:
-        result = await environment.exec(provision.check, user=user, timeout_sec=CHECK_TIMEOUT_S)
+        command = provision.check
+        if user in ("root", "0", 0):
+            command = f"umask 022; {command}"
+        result = await environment.exec(command, user=user, timeout_sec=CHECK_TIMEOUT_S)
     except Exception as error:  # noqa: BLE001 - recorded; the step's lab check turns it into infra
         return {"ok": False, "error": f"check exec failed: {type(error).__name__}: {error}"}
     record: dict[str, Any] = {"ok": result.return_code == 0}
@@ -222,7 +226,8 @@ def install_trial_provisioning(trial: Any, provisions: Sequence[TrialProvision])
             check = await _check(environment, provision, user) if state.ok else None
             try:
                 await environment.exec(
-                    append_record_command(
+                    "umask 022; "
+                    + append_record_command(
                         provision.slug, _record(provision, step, user, state, check)
                     ),
                     user="root",

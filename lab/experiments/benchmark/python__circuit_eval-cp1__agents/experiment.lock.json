@@ -281,7 +281,7 @@
     },
     "tools": {}
   },
-  "document_sha256": "01c4d2ebc1e16261d8c866a339c8ab9dbc889a7fa3d0acedd6619e5eb1fd21ab",
+  "document_sha256": "4d00001400c573123fdbdc3dcf6293b62e362b100e010192f5f0efaa62eb4d70",
   "execution": {
     "arms": {
       "codex": {
@@ -299,13 +299,13 @@
           "version_pin": "0.156.1",
           "workflow_skills": "placement.skills .agents/skills in the workspace /app"
         },
-        "digest": "90df9ca1059056a903cdf8e6260fd97a3e7e44d3f507747684d9625c0154847b",
+        "digest": "ccb342674eb05737739241990dc0e41af6313f1f2a62ddc033e8335ff2b16c69",
         "model": "gpt-6-luna",
         "packages": {},
         "primitive_code": {
-          "frame/1": "71a0fd7e66c739e714d21f6e5c2c6358483126326b0cd5a05788a23072a22865",
-          "install/1": "f30acb4e98499de8807044e4f3aab073791b3af2fe2dad0b46e8d43cb78f4395",
-          "runner/1": "32e90b6fda89288443a7326a847336cc6ba78c11a310c28e07dea382816abbee"
+          "frame/1": "c89c277bb146542f985499df52718e346e2ddaa57dd5530a441128ecb5da268c",
+          "install/1": "ec2b4ad10c7cae38d001d112b6f12086422b00841ca324fcd661f0be3e273a81",
+          "runner/1": "bb68215e9adbbd98bcf6d421f21a2a2cde060755ac5835ea9d8f51e5a8eadfe6"
         },
         "provider": "openai",
         "reasoning": "low",
@@ -501,7 +501,7 @@
     "source_sha256": "5e40cab21cd7f98b921e27158f36f98ea08446be7ad4bdf40b949318b8abd237",
     "spec_sha256": "6c116ee9ce80cbb364a937a5622305ec77288bd348e4aa6f0909ce1d8753df75"
   },
-  "lock_sha256": "74d774404aa369add223a8ed7ccc0d5b87b9d9d724520733de47ee7ad07ac576",
+  "lock_sha256": "47c3a5eda6ec6b073ae1c6e6e6a949425159789a5ae05ac926aa053af9709985",
   "lock_version": 5,
   "overrides": {
     "flags": {},
@@ -510,8 +510,8 @@
   "sections": {
     "analysis": "33aede75abee4373a36e88c3e4bad96deaadffcf5db85e1efadee2a8414fd67b",
     "assessment": "05fc802b766d3e7351e9470b3ad7d78c4d7bfbf1defcdb073a327001a5f4a028",
-    "execution": "74d774404aa369add223a8ed7ccc0d5b87b9d9d724520733de47ee7ad07ac576",
-    "toolchain": "e83fbb01b6fa0483d2b4efb10ba7a4e10127612b9c7e6ddb697e32a2ca39c1dd"
+    "execution": "47c3a5eda6ec6b073ae1c6e6e6a949425159789a5ae05ac926aa053af9709985",
+    "toolchain": "333007c848ce939cab63d826a8c18e858a159a27631949483fb50abf6f509d15"
   },
   "spec": {
     "agents": [
@@ -577,7 +577,7 @@
   "toolchain": {
     "litellm": "1.102.1",
     "python": "3.13.7",
-    "raidar": "0.15.0",
+    "raidar": "1.0.0",
     "raidar_spec": "cc9db81c6c78e861b026c7aeed8802a2994593f112071b576a608fa28e994307"
   }
 }
