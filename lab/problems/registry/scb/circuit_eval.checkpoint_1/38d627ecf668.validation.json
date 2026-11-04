@@ -39,9 +39,9 @@
   ],
   "engine": "direct",
   "environment": {
-    "docker_context": "orbstack",
+    "docker_context": "raidar-mbp",
     "engine": "direct",
-    "grader_environment_id": "sha256:1989940cc347e516b774a3833071b60dbfae6a730e55462cdf38a095e23d8765",
+    "grader_environment_id": "sha256:e0044b07679a3b973081c381f8d3a64d6b0b32e84c0debb82069887ab984a8c1",
     "grader_image": "raidar-oracle-grader:963c14e63ff5e15d",
     "grader_implementation_sha256": "a93cc5f71c842e1963145679d64ebacf607412debb2e28fe44313ae6964e2074",
     "harbor": "0.23.0",

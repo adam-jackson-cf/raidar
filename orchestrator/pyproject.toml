@@ -52,6 +52,9 @@ raidar = "raidar.cli:main"
 problem = "raidar.design.problem.resolver:resolver_factory"
 scorer = "raidar.scoring.catalog.builtin:scorer_resolver"
 
+[tool.uv]
+required-version = "==0.10.0"
+
 [tool.uv.sources]
 raidar-contract = { path = "../contract", editable = true }
 

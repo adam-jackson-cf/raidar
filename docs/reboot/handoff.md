@@ -52,15 +52,7 @@ Run `make help` to see the public interface.
 1. Clone, check out the working branch (or `main` once the PR has merged), and run `env -u AGENT make help`.
 2. Install and log in to Infisical (project `ae2a56a4-28d9-429f-bb7c-7d45e26b9ffa`, env `dev`), and run `codex login`, which uses the ChatGPT subscription.
 3. Sync the host environment with `env -u AGENT uv sync --project orchestrator --python 3.13.7 --all-extras --frozen`, replacing any incompatible environment with the pinned interpreter.
-4. Docker: create `~/.config/raidar/targets.toml` (`env -u AGENT make target-init`), and mark a target `trusted = true` only with the user's decision. The old machine used a work-only file, `var/tmp/targets-local.toml`, that marked OrbStack trusted; it did not travel.
-   On amd64, deliberately delete the affected installed-tree records in `lab/stage-checks/`,
-   then run `env -u AGENT make stage-check NAME=<ns/name> TARGET=<trusted-target>` for the
-   needed packages and `env -u AGENT make experiment-lock EXPERIMENT=<path to experiment.yaml>`
-   for dependent experiments. Stage-check refuses different bytes under the same identity;
-   identical bytes are a no-op. Delete a canary record only when intentionally replacing
-   its evidence, then regenerate and relock too. Do not silently replace observed resource
-   floors. `make releases-check` requires installed-tree evidence for each architecture
-   pinned by committed locks and refuses records naming unregistered package digests.
+4. Docker: this machine uses the remote **`mbp`** target; see [Set up the `mbp` Docker target](#set-up-the-mbp-docker-target) below. Mark a target `trusted = true` only with the user's decision.
 5. Run `env -u AGENT make quality`. Expect it to pass, with the fast tier at about 5,130 tests.
 6. Run `git fetch origin --tags` before `env -u AGENT make contract-build` if you need the wheels.
 

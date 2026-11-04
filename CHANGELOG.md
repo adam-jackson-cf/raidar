@@ -135,6 +135,17 @@ All notable changes to this project are documented in this file.
 
 ## Unreleased
 
+### Project Python pin guard
+
+- Add `orchestrator/.python-version` matching the root Python 3.13.7 pin so
+  `uv run --project orchestrator` selects the pinned interpreter.
+- Run `make toolchain-pin-check` first in `make quality`; refuse missing or byte-different
+  pins and a running interpreter that differs from the pin, with install and frozen-sync fixes.
+- Pin uv to 0.10.0 in the project and every CI setup step, aligned with the
+  identity-bearing problem dependency resolver rather than changing its identity.
+- Extend the same guard to refuse host, CI or tracked registry resolver drift from
+  the project uv pin; fix the host with `uv self update 0.10.0`.
+
 ### Contract identity batch: revalidation and relocks complete
 
 - Revalidated all nine SCB problems with five repeats under grading digest `c69aa425…`;
