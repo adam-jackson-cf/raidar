@@ -57,6 +57,7 @@ def clean_environment(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     for name in ("RAIDAR_TARGET", "DOCKER_HOST", "DOCKER_CONTEXT"):
         monkeypatch.delenv(name, raising=False)
     monkeypatch.setenv("RAIDAR_TARGETS_FILE", str(tmp_path / "targets.toml"))
+    monkeypatch.setenv("RAIDAR_STATE_DIR", str(tmp_path / "run"))
 
 
 def write_targets(tmp_path: Path, text: str = FILE) -> Path:

@@ -1,4 +1,4 @@
-# Raidar handoff: continuing on a new machine (2026-11-03)
+# Raidar handoff: continuing on a new machine (2026-11-04)
 
 Give this file to the agent that picks up the work. It is self-contained; read it top to bottom before acting.
 
@@ -23,14 +23,15 @@ Run `make help` to see the public interface.
   - Tags: `contract-v1.0.0` (the frozen `stage/1`), `contract-v1.1.0` (call-protocol models and 63 conformance cases) and `contract-v2.0.0` (lab policy moved to the orchestrator).
   - Hash pins are in `contract/releases/`. The built artefacts were under `var/contract/` and did not travel: run `git fetch origin --tags` before `env -u AGENT make contract-build`, and check the hashes against the pins.
 - **The test suite follows the test-patterns tiers** (fast, slow, quality, docker, security, perf). The fast-tier coverage floors are 99.43% line and 98.72% branch, compared as integer counts. Never lower them.
-- **All nine SCB problems are `validated_partial`**, revalidated with 5 repeats under grading digest `a93cc5f7…` (2026-11-04, after the `lab/stage-checks/` cutover). All experiment locks are current.
-- **Every Docker check ran on the old machine's local OrbStack**, standing in for the remote `mbp` target (user decision 2026-10-31). A re-run on a trusted remote target is still pending, though not blocking.
+- **All nine SCB problems are `validated_partial`**, revalidated with 5 repeats on the **`mbp`** target under grading digest `a93cc5f7…` (2026-11-04). Verdicts and solvable sets equal the earlier local-OrbStack run. The grader pins are now `mbp`'s image IDs (see below). All experiment locks are current.
+- **The new machine uses the remote `mbp` Docker target.** The full no-model check sequence passed there on 2026-11-04 (see [Set up the `mbp` Docker target](#set-up-the-mbp-docker-target)). That run found and fixed a security defect. `mbp`'s `docker exec` runs with umask 0000, which left the installed tool tree world-writable; root payloads now set umask 022 (PR #7, an identity change to all nine primitives).
 - **Stage-check evidence travels with the checkout** in tracked `lab/stage-checks/`, outside
   package folders so released package digests stay unchanged. Installed-tree and stop-canary
   records use this canonical store, with no `var/` fallback; execution logs remain under `var/`.
-  The committed installed-tree records cover **arm64 only**. An arm64 host can check the
-  existing locks without regenerating evidence; an **amd64 host needs `make stage-check`
-  plus a relock** before running those arms (see setup below).
+  Installed-tree records are keyed by the **Docker target's container architecture**, not the
+  host's. The committed records cover **arm64 only**, which is `mbp`'s architecture, so the new
+  machine needs no new evidence whatever its own CPU. A **non-arm64 Docker target** needs
+  `make stage-check` plus a relock before running those arms.
 
 ### How decisions are made (user rule since 2026-10-28)
 - The orchestrating agent only orchestrates, verifies and reports.
@@ -43,18 +44,64 @@ Run `make help` to see the public interface.
 - **Identity-bearing bytes:** the grading digest closure (`grading_execution_digest()` in `orchestrator/src/raidar/grading/records.py`), `primitive_code`, and released package bytes.
   - Changing them invalidates the problem validations (RT7), and a revalidation takes about 6 h for 9 problems × 5 repeats.
   - Test-only work must never change them. Any identity change gets its own reviewed commit, with before/after values and a scheduled revalidation.
-  - The grading digest includes the exact host Python version. `.python-version` and CI pin **3.13.7**; a different patch version changes the digest and fails RT7 against the current validation pins. `requires-python = ">=3.12"` remains the package compatibility range, not the validated grading interpreter.
+  - The grading digest includes the exact host Python version. `.python-version` and `orchestrator/.python-version` pin **3.13.7**, and CI installs it. Without the project-local pin, `uv run --project orchestrator` picked the newest installed Python (3.14.10 on the old machine), which changes the digest and fails RT7. `requires-python = ">=3.12"` remains the package compatibility range, not the validated grading interpreter.
+  - The host **uv must be 0.10.0**. The problems' dependency records pin `resolver: uv@0.10.0`, and provisioning refuses any other uv. `orchestrator/pyproject.toml` sets `required-version = "==0.10.0"`, and CI pins it too. The old machine's uv updated itself to 0.13.7; `uv self update 0.10.0` fixes that.
+  - `env -u AGENT make toolchain-pin-check` (the first step of `make quality`) checks both pins, the venv interpreter and the host uv.
 - **Prefix `make`, `uv` and `pytest` with `env -u AGENT`.**
 - **Real-model trials need the user's approval.** Agents sign in with the local ChatGPT subscription (`CODEX_AUTH_MODE=chatgpt`), never the API key. The API keys are for Jev only, the judge model reached through OpenRouter. Secrets come from Infisical; never print them.
 - **Report format:** an Activity Summary, then key points K1..Kn. Plain language; separate what was observed from what is inferred. State measured claims with sample size and an interval, or label them provisional.
 
 ### Set up this machine
-1. Clone, check out the working branch (or `main` once the PR has merged), and run `env -u AGENT make help`.
+1. Clone `main` and run `env -u AGENT make help`.
 2. Install and log in to Infisical (project `ae2a56a4-28d9-429f-bb7c-7d45e26b9ffa`, env `dev`), and run `codex login`, which uses the ChatGPT subscription.
-3. Sync the host environment with `env -u AGENT uv sync --project orchestrator --python 3.13.7 --all-extras --frozen`, replacing any incompatible environment with the pinned interpreter.
+3. Install the pinned toolchain: `uv self update 0.10.0` (or the uv 0.10.0 installer) and `uv python install 3.13.7`. Then run `env -u AGENT uv sync --project orchestrator --all-extras --frozen`; uv reads `orchestrator/.python-version`. Check with `env -u AGENT make toolchain-pin-check`.
 4. Docker: this machine uses the remote **`mbp`** target; see [Set up the `mbp` Docker target](#set-up-the-mbp-docker-target) below. Mark a target `trusted = true` only with the user's decision.
-5. Run `env -u AGENT make quality`. Expect it to pass, with the fast tier at about 5,130 tests.
+5. Run `env -u AGENT make quality`. Expect it to pass, with the fast tier at about 5,140 tests.
 6. Run `git fetch origin --tags` before `env -u AGENT make contract-build` if you need the wheels.
+
+### Set up the `mbp` Docker target
+`mbp` is the user's spare Apple-silicon Mac: aarch64, OrbStack, Docker 29.8.2, 10 CPUs, about 25 GB memory. It is **shared** with other projects. Never touch `native-*` containers, and never stop, remove or prune anything that is not Raidar's.
+
+1. **Tailscale:** join the same tailnet. `tailscale status` must list `adams-macbook-pro`, and OrbStack must be running on `mbp`.
+2. **SSH:** this machine's public key must be in `mbp`'s `~adamjackson/.ssh/authorized_keys` (the user adds it). The tunnel runs non-interactively, so load a passphrase-protected key into the agent first: `ssh-add --apple-use-keychain ~/.ssh/<key>`. Check with `ssh -o BatchMode=yes adamjackson@adams-macbook-pro.tailf3b31b.ts.net true`; `Permission denied (publickey)` with an accepted key means the key isn't loaded.
+3. **Targets file:** run `env -u AGENT make target-init`, then make `~/.config/raidar/targets.toml`:
+   ```toml
+   default = "mbp"
+
+   [targets.mbp]
+   kind = "docker"
+   trusted = true          # user decision 2026-10-23 (ADR-002 §2.3)
+   max_concurrency = 3
+
+   [targets.mbp.transport]
+   kind = "ssh-socket"
+   host = "adamjackson@adams-macbook-pro.tailf3b31b.ts.net"
+   identity = "~/.ssh/<key>"
+   remote_socket = "/Users/adamjackson/.orbstack/run/docker.sock"
+   ```
+4. **Tunnel:** run `env -u AGENT make target-up TARGET=mbp`, then `env -u AGENT make target-status TARGET=mbp`. Expect `"healthy": true` and `"arch": "aarch64"`. Raidar owns the Docker context `raidar-mbp`, and the tunnel log is `~/.raidar/run/mbp.log`. If the tunnel goes stale, run `make target-down TARGET=mbp`, then `target-up`.
+5. **Pinned images on `mbp`: load, never rebuild, never prune.** Validations and locks pin each grader's image ID, and the verifier refuses any other ID (`refuse_grader_mismatch`). Builds are not reproducible, and a missing tag triggers a rebuild with a new ID, which is then refused. The IDs also depend on the daemon's image store: `mbp`'s classic store reports config digests, while a containerd store (OrbStack's default elsewhere) reports index digests. So graded trials run on `mbp`.
+
+   | Image | ID on `mbp` (`docker image inspect --format '{{.Id}}'`) | Problems |
+   |---|---|---|
+   | `raidar-oracle-grader:963c14e63ff5e15d` | `sha256:e0044b07679a…` | circuit_eval.checkpoint_1, code_search, dag_execution, forge, log_query, metric_transform_lang |
+   | `raidar-oracle-grader:81cc253926b5099e` | `sha256:1e1af4686cbf…` | datagate |
+   | `raidar-oracle-grader:4d9f312562ca60cb` | `sha256:4154e005ff32…` | execution_server |
+   | `raidar-oracle-grader:2cf4f359dd32f0b6` | `sha256:9a697be7c29f…` | mocked_http |
+   | `raidar/pack-python:2b91a52663e099f2` | built 2026-10-31; its tree matches the committed installed-tree records | all package arms |
+
+   The full grader IDs are `environment.grader_environment_id` in `lab/problems/registry/scb/*/38d627ecf668.validation.json`; compare them before grading. The pack tag is a recipe hash, not a byte identity: `mbp`'s own 2026-09-30 build differs, and it is kept as `raidar/pack-python:2b91a52663e099f2-mbp-20260930`.
+
+   If the images are ever lost, reload them from the archive the user keeps (originally `~/raidar-grader-images/` on the old machine): `docker --context raidar-mbp load -i oracle-graders-2026-11-04.tar` (sha256 `689db9c15dfb7a02181a711f0b900040cf9892b014022d87e6ee967dae6053ef`) and `pack-python-2b91a52663e099f2-2026-10-31.tar` (sha256 `8d71ef0b7cf6ebd3dc6591d259858fc7bd4eb2aa2434e685880e5b05d3d80e4e`). Loading into `mbp`'s classic store reproduces the pinned IDs. Without the archive, revalidate all nine problems on `mbp` (about 6 h) and relock.
+6. **First test (no model):**
+   1. `env -u AGENT make toolchain-pin-check`, then `env -u AGENT make quality`.
+   2. `env -u AGENT make test-docker TARGET=mbp`.
+   3. `git fetch origin --tags`, then `env -u AGENT make security-gate TARGET=mbp`. Expect 36 passed.
+   4. `env -u AGENT make perf-gate TARGET=mbp`.
+   5. A graded oracle trial, which checks the grader pins end to end: `env -u AGENT make experiment-execute EXPERIMENT=lab/experiments/smoke/python__circuit_eval-cp1__phase5-at1/experiment.yaml AGENT_OVERRIDE=oracle DRAFT=1 TARGET=mbp`.
+   6. `env -u AGENT make experiment-locks-check`.
+
+   Don't use `make stage-check` as a readiness check. It is for new or changed packages. `raidar/define`'s canary record holds resource floors measured on one host, so a re-run always refuses with "different bytes"; gate-only packages re-run as no-ops on the same pack image.
 
 ### What did not travel
 - `var/`: jobs, assessment stores, Docker logs and execution evidence. Installed-tree and
@@ -67,8 +114,8 @@ Run `make help` to see the public interface.
 - **Or FXL's runtime work:** the Factory X Loops project builds its `stage/1` runtime against `raidar-contract` 2.0.0. Its blockers R1, R2 and R5 are cleared, and R3's `raidar/test-evidence` package is phase 10.
 
 ### Open items
-- Re-run the Docker checks (`make test-docker`, `make security-gate`, `make perf-gate`, the stage-checks) on a trusted remote target. Run `git fetch origin --tags` before `env -u AGENT make security-gate` so the archived negative-control source is available.
+- The `mbp` check sequence passed on 2026-11-04. The AT1 and AT2 real-model smokes have not been re-run on `mbp` since the primitive identity change; run them with the user's approval.
 - `claude-code` isolation is `partial`; measured Claude arms need `full`.
 - Claude Code credentials: `claude setup-token` into Infisical as `CLAUDE_CODE_OAUTH_TOKEN`.
 - The fast and slow tiers miss their prospective 30 s and 300 s budgets (about 137 s and 390 s).
-- mocked_http's varying hidden tests across three validation runs, oldest first: 7, 5, then 7 (2026-11-04). The cause is unknown; the classification as upstream test nondeterminism is provisional.
+- mocked_http's varying hidden tests across four validation runs, oldest first: 7, 5, 7, then 6 (the last on `mbp`, 2026-11-04). The cause is unknown; the classification as upstream test nondeterminism is provisional.

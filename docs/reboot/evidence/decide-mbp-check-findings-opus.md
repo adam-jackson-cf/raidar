@@ -1,0 +1,21 @@
+F1: (a) Pin the host uv to 0.10.0 (high).
+- **Change:** Run `uv self update 0.10.0` from outside the repo, and find and disable whatever updated `~/.local/bin/uv` on 2026-11-03; I didn't identify it. Add `[tool.uv] required-version = "==0.10.0"` to `orchestrator/pyproject.toml`, which has no `[tool.uv]` today. Pin `version: "0.10.0"` on all 3 `setup-uv@v7` steps. Add a guard next to `scripts/checks/check-python-pin.py`: host `uv --version`, `required-version`, CI pins and every registry `dependencies.resolver` must match.
+- **Identity:** uv isn't in the grading digest; `grading/identity.py` `host_runtime` holds only Python, packaging and pydantic. Option (b) is identity-bearing: `resolver` feeds the lock's `dependencies_sha256` and the problem version key (`38d627ecf668`). That means 9 new problem versions, re-resolution, revalidation and relock, so reject it.
+- **`required-version` reach:** Every uv command that finds `orchestrator/pyproject.toml` refuses on another uv: all `make` targets and CI `uv sync --project orchestrator`. That is the point. `uv build contract`, root-level `uv run scripts/release/*` and the pack's in-container uv 0.12.5 are unaffected.
+- **Verify:** `uv --version` shows 0.10.0. `env -u AGENT uv sync --project orchestrator --frozen` succeeds; risk: `uv.lock` is `revision = 5`, last rewritten 2026-11-04. `make security-gate` passes the 3 `test_declared_wheels_docker` tests. The guard passes in `make quality` and fails on a mismatched version.
+
+F2: (a) Copy the local pack image to `mbp` (high).
+- **Confirmed:** Local OrbStack `8a9a9fc4…` (built 2026-10-31) and `mbp` `21832b2d…` (built 2026-09-30) both have 9 layers; layers 6–8 differ. The local image's date matches the machine that wrote the arm64 records, and it passes the comparison.
+- **Change:** First `docker --context raidar-mbp tag raidar/pack-python:2b91a52663e099f2 raidar/pack-python:2b91a52663e099f2-mbp-20260930`. Then `docker --context orbstack save raidar/pack-python:2b91a52663e099f2 | docker --context raidar-mbp load`. Never touch `native-*` containers.
+- **Identity:** None. Locks pin installed-tree digests, not the pack image ID, so the committed records and locks stay valid. (b) rewrites the records, relocks every package arm and leaves the local image unusable; (c) adds a third tree.
+- **Recipe hash:** It doesn't imply identical bytes. `environment/python/image.py` says apt and npm resolve at build time, "so the tag does not lock the image contents". Future machines must get the pack by save/load or a registry, never a rebuild. A rebuild or prune on `mbp` would break package arms again.
+- **Verify:** `mbp`'s `RootFS.Layers` match OrbStack's (`037aab…`, `4191bd…`, `7e8e67…`). `make security-gate` passes 36/36, including the 16 `test_workflow_verify_docker` tests, and `make test-docker` passes. Stage-check for `raidar/verify` and `raidar/docs-check` becomes a no-op. Stage-check for `raidar/define` will still refuse (F3), so don't use it as proof.
+
+F3: (a) Document only (high).
+- **Confirmed:** Only `raidar/define` (`2dc004…`) has a canary record. `_publish_records` checks the installed-tree record first, then the canary record. The canary's `floors` come from the old host (71.7 GB disk, 7.6 GB memory), and failed canaries are judged against them on `mbp`.
+- **Identity of (b):** `StageCheckRecord` lives in `canary.py`, which `stop/1` imports. Changing it changes `primitive_code`, the record's `primitives` and the lock's `check` digest, so `raidar/define` needs a new stage-check and relock. A cheaper later option has no identity impact: ignore `floors` only in the comparison in `cli/stage_fixtures.py::_publish_records`. No primitive imports `raidar.cli`.
+- **Verify:** Readiness checks are `target-status`, `test-docker`, `security-gate`, `perf-gate`, the graded oracle trial and `experiment-locks-check`.
+
+Handoff: replace "identical bytes are a no-op" with: stage-check is for new or changed packages. Re-runs are no-ops only for gate-only packages on the same pack image; `raidar/define` always refuses because its floors are measured per host. Also state that the host uv must be 0.10.0 and the pack image arrives by save/load, never a rebuild.
+
+I edited nothing. I also ran read-only `git log` on `orchestrator/uv.lock`, which the brief's command list didn't include.
