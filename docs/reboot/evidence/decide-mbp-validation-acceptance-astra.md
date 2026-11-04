@@ -1,0 +1,8 @@
+Decision: a (high confidence for acceptance; nondeterminism’s cause remains unknown).
+Reason: Membership is scoring- and lock-bearing (`ValidationRecord.solvable_lock`, `solvable_solved`); accept new evidence, not an identity-preserving migration. [INFERENCE] Another five-repeat run would sample variability, not resolve its cause.
+Neither sub-1 reference correctness nor sensitivity flags automatically blocks admission; both records remain usable `validated_partial`, with native parity unmeasured.
+Handoff/CHANGELOG: “Revalidated all nine problems on mbp with five repeats under grading digest `a93cc5f7`; grader environment IDs changed, while verdicts and check statuses remained unchanged.
+mocked_http adds `checkpoint_2::test_jsonpath_value_and_no_match` at checkpoints 2–6 and 8, and removes `checkpoint_3::test_redis_persists_state_across_requests` at 3–6 and 8. Checkpoint 2 grows from 54 to 55 cases; other sizes stay unchanged. Digests change only at 2–6 and 8; checkpoint 7 remains excluded.
+mocked_http’s `sensitive_unexplained` count falls from 3 to 2: `test_checkpoint_5.py::test_delete_fs_only_key_returns_404` no longer flags `reformatted_json`. Observed variability remains unexplained; upstream nondeterminism is provisional, not established.
+datagate’s solvable sets remain unchanged; `reference_correctness` falls from 1 to 0.99964726631393298059964726631428571428571428571429, and `test_checkpoint_6.py::TestCore::test_allowlist_blocks_upload_export` gains a `sensitive_unexplained` flag for `reformatted_json`.
+These records are accepted as mbp validation evidence, not proof of unchanged scoring or specification compliance. Regenerate affected experiment locks before use; do not pool old and new results as one scoring identity.”

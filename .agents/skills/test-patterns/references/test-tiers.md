@@ -20,7 +20,7 @@ feasibility claims; never raise a performance threshold to pass.
 The host-tier timing reference is the existing CI runner (`ubuntu-latest`,
 Python 3.12). Record local baselines with their platform, Python version and
 wall time; they are not CI feasibility evidence. Docker phase-exit proof uses
-the approved local OrbStack target.
+the trusted remote `mbp` target.
 
 ## Process guard
 
@@ -34,9 +34,8 @@ process starts (`subprocess.Popen`, `os.system`, `os.posix_spawn`, `os.fork`,
 
 The readiness probe runs once in fixture setup, on the first selected `docker`
 item, never during collection. Under `RAIDAR_REQUIRE_DOCKER=1` a missing
-selected target fails instead of skipping. Local runs use OrbStack:
-`RAIDAR_TARGETS_FILE=$PWD/var/tmp/targets-local.toml TARGET=local`. `mbp`
-re-runs are pending evidence, not blocking.
+selected target fails instead of skipping. Runs use the `mbp` target
+(`TARGET=mbp`; setup in `docs/reboot/handoff.md`).
 
 ## Coverage
 
@@ -56,8 +55,8 @@ re-runs are pending evidence, not blocking.
 
 ## All green
 
-Fast, slow and quality tiers pass, and Docker, security and perf pass on local
-OrbStack; `mbp` re-run pending, not blocking.
+Fast, slow and quality tiers pass, and Docker, security and perf pass on the
+`mbp` target.
 
 ## Targets
 

@@ -138,9 +138,17 @@ All notable changes to this project are documented in this file.
 ### mbp Docker target readiness
 
 - Revalidate all nine SCB problems with five repeats on the `mbp` target under grading
-  digest `a93cc5f7…`; verdicts and solvable sets are unchanged. Grader pins become `mbp`'s
-  classic-store image IDs (grader IDs depend on the daemon's image store), and all
-  experiment locks are regenerated through `make experiment-lock`.
+  digest `a93cc5f7…`, re-pinning grader environment IDs to `mbp`'s classic-store image IDs
+  (grader IDs depend on the daemon's image store). Verdicts (`validated_partial`) and check
+  statuses are unchanged, and seven records are otherwise unchanged in outcome. mocked_http's
+  solvable membership changed: `checkpoint_2::test_jsonpath_value_and_no_match` joins
+  checkpoints 2–6 and 8 and `checkpoint_3::test_redis_persists_state_across_requests` leaves
+  3–6 and 8 (checkpoint 2 grows from 54 to 55; those digests change). datagate's solvable sets
+  are unchanged; its `reference_correctness` falls from 1 to 0.9996 and
+  `test_checkpoint_6.py::TestCore::test_allowlist_blocks_upload_export` gains a
+  `sensitive_unexplained` flag. Accepted as `mbp` validation evidence (vote: unanimous); no
+  experiment binds either problem yet. All experiment locks are regenerated through
+  `make experiment-lock`.
 - Isolate `RAIDAR_STATE_DIR` in the target-selection tests, so a live `mbp` tunnel no
   longer makes `make quality` start a real process.
 - Document the `mbp` setup, pinned images and their archive, and the no-model first test in
