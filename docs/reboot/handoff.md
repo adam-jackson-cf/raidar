@@ -56,7 +56,7 @@ Run `make help` to see the public interface.
 2. Install and log in to Infisical (project `ae2a56a4-28d9-429f-bb7c-7d45e26b9ffa`, env `dev`), and run `codex login`, which uses the ChatGPT subscription.
 3. Install the pinned toolchain: `uv self update 0.10.0` (or the uv 0.10.0 installer) and `uv python install 3.13.7`. Then run `env -u AGENT uv sync --project orchestrator --all-extras --frozen`; uv reads `orchestrator/.python-version`. Check with `env -u AGENT make toolchain-pin-check`.
 4. Docker: this machine uses the remote **`mbp`** target; see [Set up the `mbp` Docker target](#set-up-the-mbp-docker-target) below. Mark a target `trusted = true` only with the user's decision.
-5. Run `env -u AGENT make quality`. Expect it to pass, with the fast tier at about 5,140 tests.
+5. Run `env -u AGENT make quality`. Expect it to pass, with the fast tier at about 5,150 tests.
 6. Run `git fetch origin --tags` before `env -u AGENT make contract-build` if you need the wheels.
 
 ### Set up the `mbp` Docker target
@@ -102,6 +102,15 @@ Run `make help` to see the public interface.
    6. `env -u AGENT make experiment-locks-check`.
 
    Don't use `make stage-check` as a readiness check. It is for new or changed packages. `raidar/define`'s canary record holds resource floors measured on one host, so a re-run always refuses with "different bytes"; gate-only packages re-run as no-ops on the same pack image.
+
+   The old machine ran this sequence on 2026-11-04, with the `mbp` tunnel up, and saw:
+   - `make quality`: 5,147 fast tests passed;
+   - `make test-docker`: 10 passed;
+   - `make security-gate`: 36 passed;
+   - `make perf-gate`: every `mbp` budget passed, with warm environment start p95 at 4.55 s and 4.88 s against 5.5 s;
+   - the oracle trial: `valid=True reached=1 [solved]`;
+   - `make experiment-locks-check`: all locks current;
+   - all nine grader IDs on `mbp` equal the validation records.
 
 ### What did not travel
 - `var/`: jobs, assessment stores, Docker logs and execution evidence. Installed-tree and

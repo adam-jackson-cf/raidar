@@ -668,7 +668,7 @@
     },
     "tools": {}
   },
-  "document_sha256": "bb8244fc4bbf1f322317d7ca4a7db70c3ccc90c25e5ea9313a6b8be6e729de2b",
+  "document_sha256": "e3583d71737c49120d87cad09061cc39c14d4d746f430d8a0165b1cd58b2c324",
   "execution": {
     "arms": {
       "docs-fix": {
@@ -855,7 +855,7 @@
             "task_sha256": "0cdda12fb5a2c68270f63581682b7f7e94a0cc8be0641a0ab1b78142cf278938",
             "validation": {
               "grader": {
-                "environment_id": "sha256:1989940cc347e516b774a3833071b60dbfae6a730e55462cdf38a095e23d8765",
+                "environment_id": "sha256:e0044b07679a3b973081c381f8d3a64d6b0b32e84c0debb82069887ab984a8c1",
                 "image": "raidar-oracle-grader:963c14e63ff5e15d",
                 "implementation_sha256": "a93cc5f71c842e1963145679d64ebacf607412debb2e28fe44313ae6964e2074"
               },
@@ -907,7 +907,7 @@
     "source_sha256": "ee4771b997a090438d3611fe5cd2fc09fb6e1a6cc7b9b6e4feb44db1c2656736",
     "spec_sha256": "0e03d713fd6942f8f1fb6f91b6e8106f1d270d3d6fd4cca7edf65bcfe66e4ba8"
   },
-  "lock_sha256": "53c72cf16c2bd87a8b6fe97ace2bd318f1499459e1875d9dc4195b264c6f15c5",
+  "lock_sha256": "db722fe30b97b195243db1bbbafc7d0fe52b36a9d0922376b715823adb2ff27d",
   "lock_version": 5,
   "overrides": {
     "flags": {},
@@ -916,7 +916,7 @@
   "sections": {
     "analysis": "2165078bb3edf1fd89313bb7b0fdb121366bd76e9a351568321984d79da72faa",
     "assessment": "c9441304cf5dfd637b293b49a884fc1886936dc55291e9a2490cd5747ffed2ee",
-    "execution": "53c72cf16c2bd87a8b6fe97ace2bd318f1499459e1875d9dc4195b264c6f15c5",
+    "execution": "db722fe30b97b195243db1bbbafc7d0fe52b36a9d0922376b715823adb2ff27d",
     "toolchain": "333007c848ce939cab63d826a8c18e858a159a27631949483fb50abf6f509d15"
   },
   "spec": {

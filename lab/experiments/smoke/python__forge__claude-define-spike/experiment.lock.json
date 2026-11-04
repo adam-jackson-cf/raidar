@@ -1075,7 +1075,7 @@
       "tree-sitter-language-pack": "0.13.0"
     }
   },
-  "document_sha256": "d96b4f69a827467e798d99ba0d750cf1b1a17009b902881b022dbb9ed60c9121",
+  "document_sha256": "5658e17d42944374b3817090319d5fa171dd20e3a7957f753165a747e40aa153",
   "execution": {
     "arms": {
       "define": {
@@ -1871,7 +1871,7 @@
             "task_sha256": "70e93e9882fd776df49d4ae9fe3d9f9cef30c5dba69916db6b398cb942ad55c2",
             "validation": {
               "grader": {
-                "environment_id": "sha256:1989940cc347e516b774a3833071b60dbfae6a730e55462cdf38a095e23d8765",
+                "environment_id": "sha256:e0044b07679a3b973081c381f8d3a64d6b0b32e84c0debb82069887ab984a8c1",
                 "image": "raidar-oracle-grader:963c14e63ff5e15d",
                 "implementation_sha256": "a93cc5f71c842e1963145679d64ebacf607412debb2e28fe44313ae6964e2074"
               },
@@ -1949,7 +1949,7 @@
     "source_sha256": "cc62bbedff428013bb5c8211b91601642dfeeaef46159a4063c09aedb9fefbc7",
     "spec_sha256": "06aac1e03107800b8e8c668be7b5c394fddfdb942bd62f53ea7932231538977d"
   },
-  "lock_sha256": "3103d748bfebef9548dd31441d5ee18a1b048eed65f0dab339ac25dee0089843",
+  "lock_sha256": "556ef965aa14c946a83b931fc5e684f01f90050d83b7de9613ecbc6e6b1425ee",
   "lock_version": 5,
   "overrides": {
     "flags": {},
@@ -1958,7 +1958,7 @@
   "sections": {
     "analysis": "f7f0b52ed6909ba0f3864eb9e7f7d513625da8dc445234304b8aa033c4343cb6",
     "assessment": "7af46696276c21b0461b97e8c58f2396c7730e56e1719087038da7acd2c6fef3",
-    "execution": "3103d748bfebef9548dd31441d5ee18a1b048eed65f0dab339ac25dee0089843",
+    "execution": "556ef965aa14c946a83b931fc5e684f01f90050d83b7de9613ecbc6e6b1425ee",
     "toolchain": "333007c848ce939cab63d826a8c18e858a159a27631949483fb50abf6f509d15"
   },
   "spec": {

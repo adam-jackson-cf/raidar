@@ -135,6 +135,17 @@ All notable changes to this project are documented in this file.
 
 ## Unreleased
 
+### mbp Docker target readiness
+
+- Revalidate all nine SCB problems with five repeats on the `mbp` target under grading
+  digest `a93cc5f7…`; verdicts and solvable sets are unchanged. Grader pins become `mbp`'s
+  classic-store image IDs (grader IDs depend on the daemon's image store), and all
+  experiment locks are regenerated through `make experiment-lock`.
+- Isolate `RAIDAR_STATE_DIR` in the target-selection tests, so a live `mbp` tunnel no
+  longer makes `make quality` start a real process.
+- Document the `mbp` setup, pinned images and their archive, and the no-model first test in
+  `docs/reboot/handoff.md`.
+
 ### Project Python pin guard
 
 - Add `orchestrator/.python-version` matching the root Python 3.13.7 pin so
