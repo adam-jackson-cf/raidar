@@ -281,7 +281,7 @@
     },
     "tools": {}
   },
-  "document_sha256": "e22477488ad323318b996a81d82187bfb836899ac3bb50ea3c40060352f1ab7c",
+  "document_sha256": "f7cf64eea13c4e256609b3d9ac805c8b39049433f390d4a3290f8ccc70bf0df9",
   "execution": {
     "arms": {
       "codex": {
@@ -452,7 +452,7 @@
             "task_sha256": "0cdda12fb5a2c68270f63581682b7f7e94a0cc8be0641a0ab1b78142cf278938",
             "validation": {
               "grader": {
-                "environment_id": "sha256:1989940cc347e516b774a3833071b60dbfae6a730e55462cdf38a095e23d8765",
+                "environment_id": "sha256:e0044b07679a3b973081c381f8d3a64d6b0b32e84c0debb82069887ab984a8c1",
                 "image": "raidar-oracle-grader:963c14e63ff5e15d",
                 "implementation_sha256": "a93cc5f71c842e1963145679d64ebacf607412debb2e28fe44313ae6964e2074"
               },
@@ -501,7 +501,7 @@
     "source_sha256": "dc0152b6cc532547c13525aaadeafdd4c6857ed69a17250c6614bd6987c8784b",
     "spec_sha256": "e65c92d63cbbc80c75f63a0a611f0902d285f732d29f570bc1a2eec0a831bad6"
   },
-  "lock_sha256": "8614b530a34fb04431f95f07374846d5c55f8f86b92a74a6f5e90420529cb81f",
+  "lock_sha256": "b453a994f535c428f5a5946c440a71ae6c0f30c306e31a7ac8cb29416e674b94",
   "lock_version": 5,
   "overrides": {
     "flags": {},
@@ -510,7 +510,7 @@
   "sections": {
     "analysis": "33aede75abee4373a36e88c3e4bad96deaadffcf5db85e1efadee2a8414fd67b",
     "assessment": "05fc802b766d3e7351e9470b3ad7d78c4d7bfbf1defcdb073a327001a5f4a028",
-    "execution": "8614b530a34fb04431f95f07374846d5c55f8f86b92a74a6f5e90420529cb81f",
+    "execution": "b453a994f535c428f5a5946c440a71ae6c0f30c306e31a7ac8cb29416e674b94",
     "toolchain": "333007c848ce939cab63d826a8c18e858a159a27631949483fb50abf6f509d15"
   },
   "spec": {

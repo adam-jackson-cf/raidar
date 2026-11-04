@@ -283,7 +283,7 @@
     },
     "tools": {}
   },
-  "document_sha256": "376bf0546b4072856b4d89b297364effcd5ece72357c34258c4def54a3a86cf0",
+  "document_sha256": "a53931328e2b999f9ccf33d46f76f34b62a342000700a60ac7e7b0fb08b54b25",
   "execution": {
     "arms": {
       "baseline": {
@@ -559,7 +559,7 @@
             "task_sha256": "5a8c97c1a560dbd2b3f0a027b2bd4c56522506f4fe8d06e3856ac3f95b64721e",
             "validation": {
               "grader": {
-                "environment_id": "sha256:1989940cc347e516b774a3833071b60dbfae6a730e55462cdf38a095e23d8765",
+                "environment_id": "sha256:e0044b07679a3b973081c381f8d3a64d6b0b32e84c0debb82069887ab984a8c1",
                 "image": "raidar-oracle-grader:963c14e63ff5e15d",
                 "implementation_sha256": "a93cc5f71c842e1963145679d64ebacf607412debb2e28fe44313ae6964e2074"
               },
@@ -1860,7 +1860,7 @@
             "task_sha256": "87bf08fbb0332d2ab4378772a81af8ad771c8d8391641a7592772a6d84979cdc",
             "validation": {
               "grader": {
-                "environment_id": "sha256:1989940cc347e516b774a3833071b60dbfae6a730e55462cdf38a095e23d8765",
+                "environment_id": "sha256:e0044b07679a3b973081c381f8d3a64d6b0b32e84c0debb82069887ab984a8c1",
                 "image": "raidar-oracle-grader:963c14e63ff5e15d",
                 "implementation_sha256": "a93cc5f71c842e1963145679d64ebacf607412debb2e28fe44313ae6964e2074"
               },
@@ -1909,7 +1909,7 @@
     "source_sha256": "05b02bba280640d136b5bea02db23d3286ea99b02b1f602b78cecf322266a66a",
     "spec_sha256": "fbaa8778230cd22df145360d20868d91bb3ce0d5ecacae41843ae52367cdd4e0"
   },
-  "lock_sha256": "61ecae8f273469a91463a8447c766e1f9d4b397792a0f64f493564775b9683ea",
+  "lock_sha256": "f5b95ff5472d7def4e5d125dae22c9cacba26b026fda2acb93e27320a7575bf5",
   "lock_version": 5,
   "overrides": {
     "flags": {},
@@ -1918,7 +1918,7 @@
   "sections": {
     "analysis": "59bfabf9aa8be2bb5ceb15f67d7b3cee206ddd8a9f4450fb0b815f0045ec5eb6",
     "assessment": "acd941024c1e8760ca0941778f4c5a21ebbd68ee65112ef82d84c8229f501bf9",
-    "execution": "61ecae8f273469a91463a8447c766e1f9d4b397792a0f64f493564775b9683ea",
+    "execution": "f5b95ff5472d7def4e5d125dae22c9cacba26b026fda2acb93e27320a7575bf5",
     "toolchain": "333007c848ce939cab63d826a8c18e858a159a27631949483fb50abf6f509d15"
   },
   "spec": {
