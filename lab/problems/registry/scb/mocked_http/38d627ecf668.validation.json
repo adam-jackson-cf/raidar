@@ -23,6 +23,8 @@
     },
     {
       "detail": [
+        "checkpoint_2: 1 nondeterministic",
+        "checkpoint_3: 1 nondeterministic",
         "checkpoint_4: 1 nondeterministic",
         "checkpoint_5: 1 nondeterministic",
         "checkpoint_6: 1 nondeterministic",
@@ -58,7 +60,7 @@
     "engine": "direct",
     "grader_environment_id": "sha256:752528685e4bc099e2e1d2e4ffb9bbf35c74afbf7aeb965b7445c18163566f1e",
     "grader_image": "raidar-oracle-grader:2cf4f359dd32f0b6",
-    "grader_implementation_sha256": "c69aa42508be80a1c69ff6b6f9ec897c7bdd9468942404cf375ca13835ffe2e9",
+    "grader_implementation_sha256": "a93cc5f71c842e1963145679d64ebacf607412debb2e28fe44313ae6964e2074",
     "harbor": "0.23.0",
     "pack_image": "raidar/pack-python:2b91a52663e099f2"
   },
@@ -892,7 +894,7 @@
             "total": 55
           },
           "checkpoint_3": {
-            "all_pass": true,
+            "all_pass": false,
             "groups": {
               "core": [
                 2,
@@ -907,12 +909,12 @@
                 18
               ],
               "regression": [
-                55,
+                54,
                 55
               ]
             },
             "infra_failure": null,
-            "passed": 77,
+            "passed": 76,
             "total": 77
           },
           "checkpoint_4": {
@@ -1587,12 +1589,12 @@
                 13
               ],
               "regression": [
-                140,
+                141,
                 141
               ]
             },
             "infra_failure": null,
-            "passed": 140,
+            "passed": 141,
             "total": 159
           },
           "checkpoint_8": {
@@ -2104,7 +2106,7 @@
         "status": "measured"
       },
       "checkpoint_3": {
-        "observation": "no variation observed in 5 runs for this reference and environment",
+        "observation": "variation observed in 5 runs for this reference and environment",
         "reference_sha256": "4fe3e0f5e5237d818f715b8086f7b144c383fe2bb1a8d71ceec2c44ed54ea34b",
         "runs": 5,
         "status": "measured"
@@ -2178,7 +2180,7 @@
         "status": "measured"
       },
       "checkpoint_7": {
-        "observation": "variation observed in 5 runs for this reference and environment",
+        "observation": "no variation observed in 5 runs for this reference and environment",
         "reference_sha256": "57dd62fe1fc1f7ba73817b56db225b0febc1b506f5b176fb4c78bc3d89bffac2",
         "runs": 5,
         "status": "measured"
@@ -2234,11 +2236,13 @@
       "verdict": "validated"
     },
     "checkpoint_2": {
-      "digest": "a964ca89a6bff022ac8e49aacd42b82165a1b4627d14d503190e2cbde3a6aaa2",
+      "digest": "6a58fdfe99d388feda6413d846b44dc21e24f5b4de5dbb390003b8ab2447382a",
       "exclusion": null,
-      "nondeterministic": [],
-      "nondeterministic_count": 0,
-      "size": 55,
+      "nondeterministic": [
+        "checkpoint_2::test_jsonpath_value_and_no_match"
+      ],
+      "nondeterministic_count": 1,
+      "size": 54,
       "solvable": [
         "checkpoint_1::test_condition_false_string_does_not_match",
         "checkpoint_1::test_condition_render_error_fallback",
@@ -2286,7 +2290,6 @@
         "checkpoint_2::test_is_last_index_returns_false",
         "checkpoint_2::test_jsonpath_empty_body_and_headers",
         "checkpoint_2::test_jsonpath_recursive_descent",
-        "checkpoint_2::test_jsonpath_value_and_no_match",
         "checkpoint_2::test_known_deterministic_output[hmac_sha256]",
         "checkpoint_2::test_known_deterministic_output[uuidv5]",
         "checkpoint_2::test_missing_body_from_file_rejects_startup",
@@ -2299,11 +2302,13 @@
       "verdict": "validated"
     },
     "checkpoint_3": {
-      "digest": "b86099d0dfcfe5b66a582c9e71e6b4518bfb0dcb19cfd25eef4bf4968a77364e",
+      "digest": "ba228e732fd35fe253910aba335d25ca714133b968f7da30298dc8599f6c6612",
       "exclusion": null,
-      "nondeterministic": [],
-      "nondeterministic_count": 0,
-      "size": 77,
+      "nondeterministic": [
+        "checkpoint_2::test_jsonpath_value_and_no_match"
+      ],
+      "nondeterministic_count": 1,
+      "size": 76,
       "solvable": [
         "checkpoint_1::test_condition_false_string_does_not_match",
         "checkpoint_1::test_condition_render_error_fallback",
@@ -2351,7 +2356,6 @@
         "checkpoint_2::test_is_last_index_returns_false",
         "checkpoint_2::test_jsonpath_empty_body_and_headers",
         "checkpoint_2::test_jsonpath_recursive_descent",
-        "checkpoint_2::test_jsonpath_value_and_no_match",
         "checkpoint_2::test_known_deterministic_output[hmac_sha256]",
         "checkpoint_2::test_known_deterministic_output[uuidv5]",
         "checkpoint_2::test_missing_body_from_file_rejects_startup",
@@ -2386,10 +2390,10 @@
       "verdict": "validated"
     },
     "checkpoint_4": {
-      "digest": "2118b8d9ff6fac552bbc5c5f98e3b9b5acb03b222bfc547e5dfbd479606a6564",
+      "digest": "a424786c33d79882014f90c4a4a812cdf59e535f2f91cf9fc62e10fa63a8f4d7",
       "exclusion": null,
       "nondeterministic": [
-        "checkpoint_4::test_equal_order_preserves_relative"
+        "checkpoint_2::test_jsonpath_value_and_no_match"
       ],
       "nondeterministic_count": 1,
       "size": 98,
@@ -2440,7 +2444,6 @@
         "checkpoint_2::test_is_last_index_returns_false",
         "checkpoint_2::test_jsonpath_empty_body_and_headers",
         "checkpoint_2::test_jsonpath_recursive_descent",
-        "checkpoint_2::test_jsonpath_value_and_no_match",
         "checkpoint_2::test_known_deterministic_output[hmac_sha256]",
         "checkpoint_2::test_known_deterministic_output[uuidv5]",
         "checkpoint_2::test_missing_body_from_file_rejects_startup",
@@ -2475,6 +2478,7 @@
         "checkpoint_4::test_action_order_after_inherit",
         "checkpoint_4::test_behavior_extends_behavior",
         "checkpoint_4::test_child_expect_overrides_parent",
+        "checkpoint_4::test_equal_order_preserves_relative",
         "checkpoint_4::test_extend_forward_ref_across_files",
         "checkpoint_4::test_extend_merges_child_values",
         "checkpoint_4::test_extend_preserves_parent_values",
@@ -2496,10 +2500,10 @@
       "verdict": "validated"
     },
     "checkpoint_5": {
-      "digest": "0980a7d4fa7da478e165c70a1c1f2bf41d1fc01f73ccf8d28b3e6eaae88c6ec7",
+      "digest": "d2ce0259d014fb2f9fc2d4f4e2f5c0978bdeadc361e5e642d8e60c118508447e",
       "exclusion": null,
       "nondeterministic": [
-        "checkpoint_4::test_equal_order_preserves_relative"
+        "checkpoint_2::test_jsonpath_value_and_no_match"
       ],
       "nondeterministic_count": 1,
       "size": 113,
@@ -2550,7 +2554,6 @@
         "checkpoint_2::test_is_last_index_returns_false",
         "checkpoint_2::test_jsonpath_empty_body_and_headers",
         "checkpoint_2::test_jsonpath_recursive_descent",
-        "checkpoint_2::test_jsonpath_value_and_no_match",
         "checkpoint_2::test_known_deterministic_output[hmac_sha256]",
         "checkpoint_2::test_known_deterministic_output[uuidv5]",
         "checkpoint_2::test_missing_body_from_file_rejects_startup",
@@ -2585,6 +2588,7 @@
         "checkpoint_4::test_action_order_after_inherit",
         "checkpoint_4::test_behavior_extends_behavior",
         "checkpoint_4::test_child_expect_overrides_parent",
+        "checkpoint_4::test_equal_order_preserves_relative",
         "checkpoint_4::test_extend_forward_ref_across_files",
         "checkpoint_4::test_extend_merges_child_values",
         "checkpoint_4::test_extend_preserves_parent_values",
@@ -2621,10 +2625,10 @@
       "verdict": "validated"
     },
     "checkpoint_6": {
-      "digest": "b6404f644743de15f85d0592bbbd3568de40ef1c92636a117ba585dda44ccdfc",
+      "digest": "00e72d0095bb770762ed9f87027ddd740af6bcd359b585e3669b102233707219",
       "exclusion": null,
       "nondeterministic": [
-        "checkpoint_4::test_equal_order_preserves_relative"
+        "checkpoint_2::test_jsonpath_value_and_no_match"
       ],
       "nondeterministic_count": 1,
       "size": 140,
@@ -2675,7 +2679,6 @@
         "checkpoint_2::test_is_last_index_returns_false",
         "checkpoint_2::test_jsonpath_empty_body_and_headers",
         "checkpoint_2::test_jsonpath_recursive_descent",
-        "checkpoint_2::test_jsonpath_value_and_no_match",
         "checkpoint_2::test_known_deterministic_output[hmac_sha256]",
         "checkpoint_2::test_known_deterministic_output[uuidv5]",
         "checkpoint_2::test_missing_body_from_file_rejects_startup",
@@ -2710,6 +2713,7 @@
         "checkpoint_4::test_action_order_after_inherit",
         "checkpoint_4::test_behavior_extends_behavior",
         "checkpoint_4::test_child_expect_overrides_parent",
+        "checkpoint_4::test_equal_order_preserves_relative",
         "checkpoint_4::test_extend_forward_ref_across_files",
         "checkpoint_4::test_extend_merges_child_values",
         "checkpoint_4::test_extend_preserves_parent_values",
@@ -2776,7 +2780,7 @@
       "digest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
       "exclusion": "no_new_scoreable_tests",
       "nondeterministic": [
-        "checkpoint_4::test_equal_order_preserves_relative"
+        "checkpoint_2::test_jsonpath_value_and_no_match"
       ],
       "nondeterministic_count": 1,
       "size": 0,
@@ -2784,10 +2788,10 @@
       "verdict": "excluded"
     },
     "checkpoint_8": {
-      "digest": "a9c58fe5b89319b49432c4b0e13f01bb02407576ee0099a76a1e5f4683c6cc9c",
+      "digest": "d5ac3e416db13179b9f5f3a5cc3dcb73d2ac58f9ff10451418d4ea1c2c7fe29b",
       "exclusion": null,
       "nondeterministic": [
-        "checkpoint_4::test_equal_order_preserves_relative"
+        "checkpoint_2::test_jsonpath_value_and_no_match"
       ],
       "nondeterministic_count": 1,
       "size": 174,
@@ -2838,7 +2842,6 @@
         "checkpoint_2::test_is_last_index_returns_false",
         "checkpoint_2::test_jsonpath_empty_body_and_headers",
         "checkpoint_2::test_jsonpath_recursive_descent",
-        "checkpoint_2::test_jsonpath_value_and_no_match",
         "checkpoint_2::test_known_deterministic_output[hmac_sha256]",
         "checkpoint_2::test_known_deterministic_output[uuidv5]",
         "checkpoint_2::test_missing_body_from_file_rejects_startup",
@@ -2873,6 +2876,7 @@
         "checkpoint_4::test_action_order_after_inherit",
         "checkpoint_4::test_behavior_extends_behavior",
         "checkpoint_4::test_child_expect_overrides_parent",
+        "checkpoint_4::test_equal_order_preserves_relative",
         "checkpoint_4::test_extend_forward_ref_across_files",
         "checkpoint_4::test_extend_merges_child_values",
         "checkpoint_4::test_extend_preserves_parent_values",
@@ -3009,6 +3013,12 @@
           "neutral_error_text",
           "reformatted_json"
         ]
+      },
+      {
+        "case": "test_checkpoint_5.py::test_delete_fs_only_key_returns_404",
+        "variants": [
+          "reformatted_json"
+        ]
       }
     ],
     "static_undetermined": [],
@@ -3118,8 +3128,10 @@
           },
           "reformatted_json": {
             "infra_failure": null,
-            "passed": 112,
-            "sensitive": [],
+            "passed": 111,
+            "sensitive": [
+              "test_checkpoint_5.py::test_delete_fs_only_key_returns_404"
+            ],
             "total": 114
           }
         }
@@ -3193,7 +3205,7 @@
       "flagged_by_checkpoint": {},
       "flagged_by_rule": {},
       "sensitive_determined": 0,
-      "sensitive_unexplained": 2,
+      "sensitive_unexplained": 3,
       "status": "unmeasured",
       "unconfirmed": 0
     },

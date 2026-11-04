@@ -217,7 +217,7 @@ until revalidation. Existing three-repeat records are not retroactively certifie
 The implementation digest covers the complete executable grading import closure, package
 initializers included, explicit subprocess/plugin roots, exactly shipped runtime bytes (no
 `__pycache__`) and host Python/packaging/pydantic versions. Static distribution-version metadata
-is outside that closure. The 1.1.0/2.0.0 batch completed revalidation under digest `c69aa425…`:
+is outside that closure. The latest revalidation (2026-11-04) ran under digest `a93cc5f7…`:
 all nine SCB problems are `validated_partial` and all experiment locks are current.
 RT7 refuses relocking before writing when validation is stale; never hand-edit pins/locks to bypass it.
 A grading crash or timeout triggers a starter canary in the same sandbox configuration:
