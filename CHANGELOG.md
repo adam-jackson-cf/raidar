@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented in this file.
 
+## 1.0.1 - 2026-11-04
+
+### Bug Fixes
+
+- fix(primitives): prefix every trusted exec with umask 022 (review)
+- fix(primitives): make trusted root writes independent of the exec umask
+
 ## 1.0.0 - 2026-11-04
 
 ### Breaking Changes
@@ -145,17 +152,17 @@ All notable changes to this project are documented in this file.
   installed stages.
   Adapter-independent `primitive_code` identities change (before → after):
 
-  | Primitive | Before | After |
-  | --- | --- | --- |
-  | `frame/1` | `eb5b21cfd00f` | `652c9b5e0d44` |
-  | `install/1` | `3d2db909d53f` | `26f8b652c7d6` |
-  | `setup/1` | `b3d01881feb2` | `ada355d77160` |
-  | `gate/1` | `bef0d66da646` | `f798194a60cc` |
-  | `stop/1` | `71040bd83d68` | `be4e10b8556e` |
-  | `outputs/1` | `f74053cffaa4` | `42665fff1116` |
-  | `runner/1` | `7567d6530738` | `032c333c72cb` |
+  | Primitive            | Before         | After          |
+  | -------------------- | -------------- | -------------- |
+  | `frame/1`            | `eb5b21cfd00f` | `652c9b5e0d44` |
+  | `install/1`          | `3d2db909d53f` | `26f8b652c7d6` |
+  | `setup/1`            | `b3d01881feb2` | `ada355d77160` |
+  | `gate/1`             | `bef0d66da646` | `f798194a60cc` |
+  | `stop/1`             | `71040bd83d68` | `be4e10b8556e` |
+  | `outputs/1`          | `f74053cffaa4` | `42665fff1116` |
+  | `runner/1`           | `7567d6530738` | `032c333c72cb` |
   | `acceptance-reply/1` | `9ea725bb07af` | `0b8212672f99` |
-  | `jev-judge/1` | `383fe55e9aed` | `528b309f53b5` |
+  | `jev-judge/1`        | `383fe55e9aed` | `528b309f53b5` |
 
 - Track installed-tree and stop-canary evidence in `lab/stage-checks/`, outside package
   folders, preserving existing record bytes, package identities and experiment locks.
