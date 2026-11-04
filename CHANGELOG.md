@@ -2,6 +2,130 @@
 
 All notable changes to this project are documented in this file.
 
+## 1.0.0 - 2026-11-04
+
+### Breaking Changes
+
+### Features
+
+- feat(stages): expose complete public authoring and replay targets
+- feat(stages): implement the immutable package runtime alongside spikes
+- feat(grading): provision declared wheel dependencies
+- feat(problems): enable problem-agnostic SCB onboarding
+- feat: make workflow mechanics native-agent agnostic
+- feat(workflow): judge structured builds with bounded rework and coverage readings
+- feat(workflow): spike deterministic define in the primary session
+- feat!: verify stage in the primary session (spike S2)
+- feat!: isolate codex and record harness parity (spike S1)
+- feat!: cut arms over to agent and workflow releases (phase 2)
+
+### Bug Fixes
+
+- fix: pin grading runtime and enforce Docker gates
+- fix: preserve relative release lock sources
+- fix: remove generic stage-check wrong-state case
+- fix: repair phase 4 Docker gate execution and replay
+- fix(problems): make K4 solvability step-local
+- fix(scoring): honor locked checkpoint prefixes in assessment and analysis
+- fix(workflow): isolate checks and make seals record-only
+- fix(grading): retain sandbox secret isolation evidence and document workflow judging
+- fix(workflow): identify the complete checked workspace
+- fix(define): provision pinned interpreter without trial network access
+- fix: remediate the 2026-10-24 deep review (41 defects, 13 doc findings)
+
+### Documentation
+
+- docs(changelog): keep main's 0.15.0 pack entry after linearizing
+- docs(handoff): correct fast-tier count and mocked_http run order
+- docs: handoff for a new machine, plan status and committed vote records
+- docs: record phase 5 exit and package standard decisions
+- docs(design): phases 4 and 4b complete on local Docker checks
+- docs(design): record voted decisions for phase 4b, hook broker and stage namespaces
+- docs(stages): publish stage/1 contract before implementation
+- docs(reboot): stage packages, shared registry and problem onboarding design
+- docs(reboot): record spike S4
+- docs(reboot): record spike S2 and S3
+- docs(reboot): sessions, stage interface in one primary session, coverage scorers, spike status
+- docs(reboot): record phase 2 completion
+- docs(reboot): codex-only scope; phase 1 session-resume spike evidence
+- docs(reboot): agreed lab design and implementation plan, with independent reviews
+- docs: record the lab/arm boundary, arm terms and solve-rate decisions; versioned-items flow map
+- docs(agents): per-directory AGENTS.md guidance and workflow skills (experiment design/execution/assessment, release, smoke, performance, branch sync)
+
+### Refactoring
+
+- refactor: track stage-check evidence in the lab
+- refactor(tests): isolate slice E decisions from stored-run seams
+
+### Tests
+
+- test: close repository interface fast coverage gaps
+- test: close slice E fast-tier coverage gaps
+- test: close engine and agent fast coverage gaps
+- test: close grading and problem fast coverage gaps
+- test: close primitive and workflow fast coverage gaps
+- test: close fast quality gate command coverage
+- test: separate slice D decisions from runtime seams
+- test(stages): complete generic runner and scripted AT3 acceptance
+- test(stages): enforce ST1-ST7 and effective package identity
+- test(stages): prove locked registry and installed-tree identity
+
+### Chores
+
+- chore(stages): enforce execution boundaries and record phase readiness
+- chore(problems): record final K4 Docker validation
+- chore: enforce frozen releases, add security gate, root design doc
+
+### Other Changes
+
+- Complete extracted policy coverage and migrate cache invalidation fixtures
+- Document portable contract releases and the single revalidation boundary
+- Record RT7-blocked public relocks for every experiment
+- Publish contract 2.0.0 with lab policy owned by the orchestrator
+- Publish portable call contracts and conformance vectors as 1.1.0
+- Bind grading identity to its complete executable import closure
+- Ratchet fast-tier coverage floors after the suite refactor
+- Ratchet integrated fast coverage floors without lowering targets
+- Relock all experiments after reviewed primitive cleanup
+- Integrate audit fixtures and enforce test-only identity preservation
+- Restore validated grading identity and test through existing seams
+- Remove reviewed dead code from primitive identity closure
+- Restore primitive identity before reviewing dead-code cleanup
+- Move pure quality decisions to fast tests and remove Make wiring pins
+- Refactor repository behavior tests around fast decisions and real seams
+- Refactor grading and problem tests into behavioral tiers
+- Refactor define tests around fast behavioral decisions
+- Remove the unused primitive module resolver and wiring tests
+- Refactor slice A tests around fast decisions and real seams
+- Establish S0 test tiers and exact coverage gates
+- Finish verification-effort cutover in lint rules and review surface
+- Record phase 5B non-model exit evidence
+- Finalize private contract 1.0.0 artifacts and release locks
+- Delete remaining spike health consumers
+- Re-key required health evidence by locked primitive
+- Score verification effort and pre-fix grades from gate records
+- Connect portable criteria reply and judge execution
+- Add verified package and workflow imports
+- Migrate shipped workflows to schema-two packages
+- Ship real docs-check and byte-preserving stage copies
+- Move define tool into raidar/define package
+- Port raidar/verify at spike check parity
+- Finish schema-2 admission and namespace workflows
+- Extract portable raidar-contract distribution
+- Record FXL pivot decisions and ledger namespaces
+
+- ci: install pinned Python through uv
+- phase4b: apply voted resolver and excluded-halt settings
+- phase4b(F): retire hook broker and namespace stage packages
+- phase4b(E): correct solvable gates, evidence, timing and costs
+- phase4b(D): pin graders and attribute grading failures with canaries
+- phase4b(C): use declared-support exact tests and attrition refusals
+- phase4b(B): observe five reference runs without determinism claims
+- phase4b(A): report reference-solvable primary and audit coverage
+- problems: revalidate all nine under grading digest a93cc5f7 and relock
+- problems: revalidate all nine under the import-closure grading digest
+- problems: revalidate all nine with 5 repeats under the pinned grader
+
 ## Unreleased
 
 ### Contract identity batch: revalidation and relocks complete

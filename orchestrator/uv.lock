@@ -1,5 +1,5 @@
 version = 1
-revision = 3
+revision = 5
 requires-python = ">=3.12"
 
 [[package]]
@@ -1927,7 +1927,7 @@ wheels = [
 
 [[package]]
 name = "raidar"
-version = "0.15.0"
+version = "1.0.0"
 source = { editable = "." }
 dependencies = [
     { name = "aiohttp" },
