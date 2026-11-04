@@ -4,6 +4,19 @@ All notable changes to this project are documented in this file.
 
 ## 1.0.1 - 2026-11-04
 
+### Documentation
+
+- docs(mbp): record mocked_http's sensitive_unexplained change; fix CI Python note
+- docs(handoff): mbp setup and first test; isolate tunnel state in target tests
+
+### Chores
+
+- chore(mbp): relock on 1.0.1; state the revalidation differences exactly
+- chore(mbp): relock experiments on the mbp grader pins; record first-test results
+- chore(mbp): re-pin grader identities to mbp, pin Python and uv toolchains
+
+## 1.0.1 - 2026-11-04
+
 ### Bug Fixes
 
 - fix(primitives): prefix every trusted exec with umask 022 (review)
