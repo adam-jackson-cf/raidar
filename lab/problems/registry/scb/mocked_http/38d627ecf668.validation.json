@@ -23,7 +23,6 @@
     },
     {
       "detail": [
-        "checkpoint_2: 1 nondeterministic",
         "checkpoint_3: 1 nondeterministic",
         "checkpoint_4: 1 nondeterministic",
         "checkpoint_5: 1 nondeterministic",
@@ -56,9 +55,9 @@
   ],
   "engine": "direct",
   "environment": {
-    "docker_context": "orbstack",
+    "docker_context": "raidar-mbp",
     "engine": "direct",
-    "grader_environment_id": "sha256:752528685e4bc099e2e1d2e4ffb9bbf35c74afbf7aeb965b7445c18163566f1e",
+    "grader_environment_id": "sha256:9a697be7c29fef1c71febc56083dfbdb9aee20fbd80e1e129e093e532daf78d7",
     "grader_image": "raidar-oracle-grader:2cf4f359dd32f0b6",
     "grader_implementation_sha256": "a93cc5f71c842e1963145679d64ebacf607412debb2e28fe44313ae6964e2074",
     "harbor": "0.23.0",
@@ -700,10 +699,10 @@
             "total": 55
           },
           "checkpoint_3": {
-            "all_pass": true,
+            "all_pass": false,
             "groups": {
               "core": [
-                2,
+                1,
                 2
               ],
               "error": [
@@ -720,7 +719,7 @@
               ]
             },
             "infra_failure": null,
-            "passed": 77,
+            "passed": 76,
             "total": 77
           },
           "checkpoint_4": {
@@ -894,7 +893,7 @@
             "total": 55
           },
           "checkpoint_3": {
-            "all_pass": false,
+            "all_pass": true,
             "groups": {
               "core": [
                 2,
@@ -909,12 +908,12 @@
                 18
               ],
               "regression": [
-                54,
+                55,
                 55
               ]
             },
             "infra_failure": null,
-            "passed": 76,
+            "passed": 77,
             "total": 77
           },
           "checkpoint_4": {
@@ -2236,13 +2235,11 @@
       "verdict": "validated"
     },
     "checkpoint_2": {
-      "digest": "6a58fdfe99d388feda6413d846b44dc21e24f5b4de5dbb390003b8ab2447382a",
+      "digest": "a964ca89a6bff022ac8e49aacd42b82165a1b4627d14d503190e2cbde3a6aaa2",
       "exclusion": null,
-      "nondeterministic": [
-        "checkpoint_2::test_jsonpath_value_and_no_match"
-      ],
-      "nondeterministic_count": 1,
-      "size": 54,
+      "nondeterministic": [],
+      "nondeterministic_count": 0,
+      "size": 55,
       "solvable": [
         "checkpoint_1::test_condition_false_string_does_not_match",
         "checkpoint_1::test_condition_render_error_fallback",
@@ -2290,6 +2287,7 @@
         "checkpoint_2::test_is_last_index_returns_false",
         "checkpoint_2::test_jsonpath_empty_body_and_headers",
         "checkpoint_2::test_jsonpath_recursive_descent",
+        "checkpoint_2::test_jsonpath_value_and_no_match",
         "checkpoint_2::test_known_deterministic_output[hmac_sha256]",
         "checkpoint_2::test_known_deterministic_output[uuidv5]",
         "checkpoint_2::test_missing_body_from_file_rejects_startup",
@@ -2302,10 +2300,10 @@
       "verdict": "validated"
     },
     "checkpoint_3": {
-      "digest": "ba228e732fd35fe253910aba335d25ca714133b968f7da30298dc8599f6c6612",
+      "digest": "1bdf9832e06d2368e459f58a1ef5c1f2b315bc17f448eb3e04c12963b04e8ba0",
       "exclusion": null,
       "nondeterministic": [
-        "checkpoint_2::test_jsonpath_value_and_no_match"
+        "checkpoint_3::test_redis_persists_state_across_requests"
       ],
       "nondeterministic_count": 1,
       "size": 76,
@@ -2356,6 +2354,7 @@
         "checkpoint_2::test_is_last_index_returns_false",
         "checkpoint_2::test_jsonpath_empty_body_and_headers",
         "checkpoint_2::test_jsonpath_recursive_descent",
+        "checkpoint_2::test_jsonpath_value_and_no_match",
         "checkpoint_2::test_known_deterministic_output[hmac_sha256]",
         "checkpoint_2::test_known_deterministic_output[uuidv5]",
         "checkpoint_2::test_missing_body_from_file_rejects_startup",
@@ -2367,7 +2366,6 @@
         "checkpoint_3::test_mixed_action_ordering",
         "checkpoint_3::test_redis_array_semicolon_separator",
         "checkpoint_3::test_redis_hash_and_list_ops",
-        "checkpoint_3::test_redis_persists_state_across_requests",
         "checkpoint_3::test_redis_state_lost_on_restart",
         "checkpoint_3::test_redisdo_condition_stateful_routing",
         "checkpoint_3::test_redisdo_del_multiple_keys",
@@ -2390,10 +2388,10 @@
       "verdict": "validated"
     },
     "checkpoint_4": {
-      "digest": "a424786c33d79882014f90c4a4a812cdf59e535f2f91cf9fc62e10fa63a8f4d7",
+      "digest": "389734bdad2bd7f97545d2ab5c54dbd5fcd2d5a54bdf29196746f5e1e1b5db8a",
       "exclusion": null,
       "nondeterministic": [
-        "checkpoint_2::test_jsonpath_value_and_no_match"
+        "checkpoint_3::test_redis_persists_state_across_requests"
       ],
       "nondeterministic_count": 1,
       "size": 98,
@@ -2444,6 +2442,7 @@
         "checkpoint_2::test_is_last_index_returns_false",
         "checkpoint_2::test_jsonpath_empty_body_and_headers",
         "checkpoint_2::test_jsonpath_recursive_descent",
+        "checkpoint_2::test_jsonpath_value_and_no_match",
         "checkpoint_2::test_known_deterministic_output[hmac_sha256]",
         "checkpoint_2::test_known_deterministic_output[uuidv5]",
         "checkpoint_2::test_missing_body_from_file_rejects_startup",
@@ -2455,7 +2454,6 @@
         "checkpoint_3::test_mixed_action_ordering",
         "checkpoint_3::test_redis_array_semicolon_separator",
         "checkpoint_3::test_redis_hash_and_list_ops",
-        "checkpoint_3::test_redis_persists_state_across_requests",
         "checkpoint_3::test_redis_state_lost_on_restart",
         "checkpoint_3::test_redisdo_condition_stateful_routing",
         "checkpoint_3::test_redisdo_del_multiple_keys",
@@ -2500,10 +2498,10 @@
       "verdict": "validated"
     },
     "checkpoint_5": {
-      "digest": "d2ce0259d014fb2f9fc2d4f4e2f5c0978bdeadc361e5e642d8e60c118508447e",
+      "digest": "ba6b8cf93fcc11ee443cf4e5eb5ed3504957610b8d50194c86e5824a659d0c00",
       "exclusion": null,
       "nondeterministic": [
-        "checkpoint_2::test_jsonpath_value_and_no_match"
+        "checkpoint_3::test_redis_persists_state_across_requests"
       ],
       "nondeterministic_count": 1,
       "size": 113,
@@ -2554,6 +2552,7 @@
         "checkpoint_2::test_is_last_index_returns_false",
         "checkpoint_2::test_jsonpath_empty_body_and_headers",
         "checkpoint_2::test_jsonpath_recursive_descent",
+        "checkpoint_2::test_jsonpath_value_and_no_match",
         "checkpoint_2::test_known_deterministic_output[hmac_sha256]",
         "checkpoint_2::test_known_deterministic_output[uuidv5]",
         "checkpoint_2::test_missing_body_from_file_rejects_startup",
@@ -2565,7 +2564,6 @@
         "checkpoint_3::test_mixed_action_ordering",
         "checkpoint_3::test_redis_array_semicolon_separator",
         "checkpoint_3::test_redis_hash_and_list_ops",
-        "checkpoint_3::test_redis_persists_state_across_requests",
         "checkpoint_3::test_redis_state_lost_on_restart",
         "checkpoint_3::test_redisdo_condition_stateful_routing",
         "checkpoint_3::test_redisdo_del_multiple_keys",
@@ -2625,10 +2623,10 @@
       "verdict": "validated"
     },
     "checkpoint_6": {
-      "digest": "00e72d0095bb770762ed9f87027ddd740af6bcd359b585e3669b102233707219",
+      "digest": "8dbca064f456cab6dfd6f087a5eeaaa43ecc9c497536c054db4670e4a892b0b4",
       "exclusion": null,
       "nondeterministic": [
-        "checkpoint_2::test_jsonpath_value_and_no_match"
+        "checkpoint_3::test_redis_persists_state_across_requests"
       ],
       "nondeterministic_count": 1,
       "size": 140,
@@ -2679,6 +2677,7 @@
         "checkpoint_2::test_is_last_index_returns_false",
         "checkpoint_2::test_jsonpath_empty_body_and_headers",
         "checkpoint_2::test_jsonpath_recursive_descent",
+        "checkpoint_2::test_jsonpath_value_and_no_match",
         "checkpoint_2::test_known_deterministic_output[hmac_sha256]",
         "checkpoint_2::test_known_deterministic_output[uuidv5]",
         "checkpoint_2::test_missing_body_from_file_rejects_startup",
@@ -2690,7 +2689,6 @@
         "checkpoint_3::test_mixed_action_ordering",
         "checkpoint_3::test_redis_array_semicolon_separator",
         "checkpoint_3::test_redis_hash_and_list_ops",
-        "checkpoint_3::test_redis_persists_state_across_requests",
         "checkpoint_3::test_redis_state_lost_on_restart",
         "checkpoint_3::test_redisdo_condition_stateful_routing",
         "checkpoint_3::test_redisdo_del_multiple_keys",
@@ -2780,7 +2778,7 @@
       "digest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
       "exclusion": "no_new_scoreable_tests",
       "nondeterministic": [
-        "checkpoint_2::test_jsonpath_value_and_no_match"
+        "checkpoint_3::test_redis_persists_state_across_requests"
       ],
       "nondeterministic_count": 1,
       "size": 0,
@@ -2788,10 +2786,10 @@
       "verdict": "excluded"
     },
     "checkpoint_8": {
-      "digest": "d5ac3e416db13179b9f5f3a5cc3dcb73d2ac58f9ff10451418d4ea1c2c7fe29b",
+      "digest": "628b4296d9bd3b579e72f60a7694bc82c6ce78b97e97488fc97300349d335011",
       "exclusion": null,
       "nondeterministic": [
-        "checkpoint_2::test_jsonpath_value_and_no_match"
+        "checkpoint_3::test_redis_persists_state_across_requests"
       ],
       "nondeterministic_count": 1,
       "size": 174,
@@ -2842,6 +2840,7 @@
         "checkpoint_2::test_is_last_index_returns_false",
         "checkpoint_2::test_jsonpath_empty_body_and_headers",
         "checkpoint_2::test_jsonpath_recursive_descent",
+        "checkpoint_2::test_jsonpath_value_and_no_match",
         "checkpoint_2::test_known_deterministic_output[hmac_sha256]",
         "checkpoint_2::test_known_deterministic_output[uuidv5]",
         "checkpoint_2::test_missing_body_from_file_rejects_startup",
@@ -2853,7 +2852,6 @@
         "checkpoint_3::test_mixed_action_ordering",
         "checkpoint_3::test_redis_array_semicolon_separator",
         "checkpoint_3::test_redis_hash_and_list_ops",
-        "checkpoint_3::test_redis_persists_state_across_requests",
         "checkpoint_3::test_redis_state_lost_on_restart",
         "checkpoint_3::test_redisdo_condition_stateful_routing",
         "checkpoint_3::test_redisdo_del_multiple_keys",
@@ -3013,12 +3011,6 @@
           "neutral_error_text",
           "reformatted_json"
         ]
-      },
-      {
-        "case": "test_checkpoint_5.py::test_delete_fs_only_key_returns_404",
-        "variants": [
-          "reformatted_json"
-        ]
       }
     ],
     "static_undetermined": [],
@@ -3128,10 +3120,8 @@
           },
           "reformatted_json": {
             "infra_failure": null,
-            "passed": 111,
-            "sensitive": [
-              "test_checkpoint_5.py::test_delete_fs_only_key_returns_404"
-            ],
+            "passed": 112,
+            "sensitive": [],
             "total": 114
           }
         }
@@ -3205,7 +3195,7 @@
       "flagged_by_checkpoint": {},
       "flagged_by_rule": {},
       "sensitive_determined": 0,
-      "sensitive_unexplained": 3,
+      "sensitive_unexplained": 2,
       "status": "unmeasured",
       "unconfirmed": 0
     },

@@ -114,7 +114,7 @@ AGENT_SMOKE_EFFECTIVE_REASONING = $(if $(filter command line environment,$(origi
 	review-fixture-synthetic \
 	review-surface-data review-surface-build review-surface-serve review-surface-test \
 	review-surface-quality-data quality-fixture-synthetic \
-	structure-check release-archive \
+	toolchain-pin-check structure-check release-archive \
 	test-fast test-slow test-quality test-docker \
 	quality
 
@@ -140,6 +140,7 @@ help:
 	@echo "  make test-slow                                         Slow tier (slow and not quality and not docker): real local processes, git, run directories; CI runs it on push"
 	@echo "  make test-quality                                      Quality tier (quality and not docker): quality-rule canaries; CI runs it on push"
 	@echo "  make test-docker [TARGET=name]                         Docker tier (docker, not security/perf) on the target; fails, never skips, without Docker (not in make quality)"
+	@echo "  make toolchain-pin-check                               Check Python pins/interpreter and uv host/CI/resolver alignment; first step of make quality"
 	@echo "  make structure-check                                   Check the repository layout (no versions in names, root and package allowlists, depth); part of make quality"
 	@echo "  make release-archive REF=<name>@<N>                    Tag archive/<name>@<N> at HEAD before editing a released definition in place (refuses an existing tag)"
 	@echo "  Generated data lives under var/ (git-ignored; RAIDAR_VAR=<dir> relocates it): jobs, stores, analysis, problems, tmp"
@@ -714,6 +715,10 @@ agent-smoke: docker-check pack-build
 smoke-agents: docker-check pack-build
 	$(call smoke_run,$(SMOKE_AGENTS_EXPERIMENT),smoke-agents,$(SMOKE_SETS),$(if $(SMOKE_ARM),--arm "$(SMOKE_ARM)",))
 
+# Align the project interpreter with byte-equal Python pins and uv across host, CI and registry resolvers.
+toolchain-pin-check:
+	@$(REPO_RUNTIME_ENV) uv run --project orchestrator python scripts/checks/check_toolchain_pins.py --repo-root "$(CURDIR)"
+
 # Repository structure rules (no version in names, root and package allowlists, depth limit).
 structure-check:
 	@$(REPO_RUNTIME_ENV) uv run --project orchestrator python scripts/checks/check-structure.py --repo-root "$(CURDIR)"
@@ -739,6 +744,7 @@ release-archive:
 		&& echo "created tag archive/$(REF) at $$(git rev-parse --short HEAD)"
 
 quality:
+	@$(MAKE) --no-print-directory toolchain-pin-check
 	@$(MAKE) --no-print-directory structure-check
 	@$(MAKE) --no-print-directory smoke-dry-run-check
 	@$(MAKE) --no-print-directory releases-check
