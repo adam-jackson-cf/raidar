@@ -120,11 +120,9 @@ async def trusted_exec(
     env_vars: Mapping[str, str] | None = None,
 ) -> ExecResult:
     """One command through the environment; a transport failure raises ``TransportError``."""
-    if user in ("root", "0", 0):
-        command = f"umask 022; {command}"
     try:
         return await environment.exec(
-            command,
+            f"umask 022; {command}",
             cwd=cwd,
             env=dict(env_vars) if env_vars else None,
             timeout_sec=None if timeout_sec is None else int(timeout_sec),

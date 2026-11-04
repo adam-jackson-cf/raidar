@@ -955,6 +955,38 @@ async def test_a_failed_excluding_download_is_a_transport_error(tmp_path: Path) 
         await calls.download_dir_excluding(environment, "/w", tmp_path, ["x"])
 
 
+@pytest.mark.parametrize(
+    "user",
+    ["root", "0", 0, None, "1000:1000"],
+    ids=["root-name", "root-string", "root-int", "default-user", "non-root"],
+)
+async def test_a_command_reaches_the_environment_as_given_with_whole_second_timeouts(
+    user: str | int | None,
+) -> None:
+    seen: dict[str, Any] = {}
+
+    async def exec_(command: str, **kwargs: Any) -> Any:
+        seen.update(command=command, **kwargs)
+        return _exec_result()
+
+    await calls.trusted_exec(
+        SimpleNamespace(exec=exec_),
+        "true",
+        user=user,
+        timeout_sec=2.7,
+        cwd="/w",
+        env_vars={"A": "1"},
+    )
+
+    assert seen == {
+        "command": "umask 022; true",
+        "cwd": "/w",
+        "env": {"A": "1"},
+        "timeout_sec": 2,
+        "user": user,
+    }
+
+
 # ------------------------------------------------------------------------------ seccomp
 @pytest.mark.parametrize("arch", ["x86_64", "aarch64"])
 def test_the_seccomp_program_is_well_formed_and_names_the_denied_calls(arch: str) -> None:

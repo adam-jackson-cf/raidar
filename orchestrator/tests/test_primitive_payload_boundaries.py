@@ -1184,7 +1184,7 @@ def _child_setup(monkeypatch: pytest.MonkeyPatch) -> list[Any]:
         raise _Done(code)
 
     monkeypatch.setattr(os, "setsid", lambda: steps.append("setsid"))
-    monkeypatch.setattr(os, "umask", lambda mask: 0)
+    monkeypatch.setattr(os, "umask", lambda mask: steps.append(("umask", mask)) or 0)
     monkeypatch.setattr(os, "execve", lambda *a: steps.append(("execve", a)))
     monkeypatch.setattr(os, "_exit", leave)
     monkeypatch.setattr(supervise, "_prepare_stdio", lambda *a: steps.append(("stdio", a)))
@@ -1244,9 +1244,9 @@ def test_a_prepared_child_executes_the_resolved_argv_with_the_clean_environment(
     os.close(write)
     assert os.read(read, 10) == b""
     os.close(read)
-    assert steps[:2] == ["setsid", ("stdio", (1, 2, write))]
-    assert steps[2] == "become"
-    assert steps[3] == ("execve", (str(tool), ["tool", "--x"], {"PATH": str(tmp_path), "A": "1"}))
+    assert steps[:3] == ["setsid", ("stdio", (1, 2, write)), ("umask", 0o022)]
+    assert steps[3] == "become"
+    assert steps[4] == ("execve", (str(tool), ["tool", "--x"], {"PATH": str(tmp_path), "A": "1"}))
 
 
 def test_the_parent_of_a_launched_child_gets_its_pid_pipes_and_setup_outcome(
