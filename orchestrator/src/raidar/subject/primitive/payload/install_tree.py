@@ -150,11 +150,18 @@ def _normalise_modes(root: Path) -> None:
 def install(spec: dict[str, Any]) -> dict[str, Any]:
     stage, root = Path(spec["stage"]), Path(spec["root"])
     _check_staged(stage, spec)
+    created_directories = [root]
+    parent = root.parent
+    while not parent.exists():
+        created_directories.append(parent)
+        parent = parent.parent
     root.mkdir(parents=True, mode=0o755)
+    for directory in reversed(created_directories):
+        directory.chmod(0o755)
     _copy_files(stage, root, spec)
     _install_wheels(stage, root, spec)
     _write_source_path(root)
-    _normalise_modes(root)
     commands = _wrap(root, spec["commands"], spec["links"])
+    _normalise_modes(root)
     shutil.rmtree(stage, ignore_errors=True)
     return {"ok": True, "commands": commands}

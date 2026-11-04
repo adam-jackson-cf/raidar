@@ -1075,7 +1075,7 @@
       "tree-sitter-language-pack": "0.13.0"
     }
   },
-  "document_sha256": "4625e63a5bb9d7363cf07832d8c99dfadf89065156abd2c31ebad0b9f02816ba",
+  "document_sha256": "5af4f279f791fc4223cb0a727e19e243cd847953fb2077388822c4ba0bcb539d",
   "execution": {
     "arms": {
       "define": {
@@ -1093,11 +1093,11 @@
           "version_pin": "2.1.285",
           "workflow_skills": "placement.skills .claude/skills in the workspace /app"
         },
-        "digest": "5e653494b903bd1daf6faa73f4cb3d2108bbe4a12faee153eb5d679ed8b3e95a",
+        "digest": "8e28b96b000a071def682edaa09b1eff13dad858033fe3676c397e3d7c7cec41",
         "model": "claude-sonnet-4-6",
         "packages": {
           "raidar/define": {
-            "check": "e59b7b96216dcb1042bea42ab994417cbd46851f81d5ea594b736291f40c94c0",
+            "check": "bdeb092f3425de667f5693c7c38957d0a6464e1e40b911ad5b113db8895fcba9",
             "installed": {
               "arm64": "d28105d3a2c568160a2726192e3157427f0bf12bcab322ba436b35c5ca8d3b4d"
             },
@@ -1113,15 +1113,15 @@
           }
         },
         "primitive_code": {
-          "acceptance-reply/1": "8624a55ebc3914f13002126bd1292954273447898a00a796e30f74dcd75975af",
-          "frame/1": "c2b1cf4c213d606060f220a8451d1f75131362fec1b5233724df62c30a9bf998",
-          "gate/1": "879d1b6b11d4bcb8f2d150dfde6dfbdd1324e90390c0f4a7ec651828f78b8a09",
-          "install/1": "e86cb33c3f31067af96592fa78f92f84bb6e9acc72c44ca72d45bb526ca9a074",
-          "jev-judge/1": "618c198064e5ac95c8bbbf94316b3bbfa37c0aee8007c039d004647bab477e25",
-          "outputs/1": "dd1650f2ea960ffb8563acacf79f93f9faae7986342c5c5245b202a5f4506988",
-          "runner/1": "258c4faa8842b9dae244b3df5abac9eeb0cd7d39ae264efb5f62072d26cb1b17",
-          "setup/1": "869c184730b34516a913339f9e19582bb0d7574831b9cdd640dfdbee1f8bcdc5",
-          "stop/1": "8c7d7e88901701a6072a2192ab732db17603464609d1c630007ac44aff8be360"
+          "acceptance-reply/1": "00c42b672f58ee41ea589718289c3d3f0a0e113eedca47c739cb4242d877199c",
+          "frame/1": "8443dcf24e309240de6fc4aa6f84af8e80dfb884c51eabf2cd01fb1b7ca6fd0f",
+          "gate/1": "655d77a5ae56868cef131705f33c25e243db2d7ba521fe51a3a88a21d458c674",
+          "install/1": "b8d22dbaeb17cd8d0c0b19df56be864479b6b1ff27da973575feac2fd9c61077",
+          "jev-judge/1": "7f08a02fe033e20b7e34ffd05ddfc59332a765291b793e8b2fa5ea77e4cfe833",
+          "outputs/1": "3e5a6dda3cbefcc8db450b12bb8c9bb787b6a712b698fd706fb898dd19914dd2",
+          "runner/1": "ac383f2ebe0a256cd03bbe04cb8fa86d78e9e67b523c626a74ec8a27024b2c10",
+          "setup/1": "dfbc4108687291c8fdbd31b48e1b9eefb4075813d4feeb08392672ee7e600748",
+          "stop/1": "69f3b49188d823b0c73c273b50164d5a35c6138eaf86bef7e00affbc8f4a7c9d"
         },
         "provider": "anthropic",
         "reasoning": "low",
@@ -1949,7 +1949,7 @@
     "source_sha256": "cc62bbedff428013bb5c8211b91601642dfeeaef46159a4063c09aedb9fefbc7",
     "spec_sha256": "06aac1e03107800b8e8c668be7b5c394fddfdb942bd62f53ea7932231538977d"
   },
-  "lock_sha256": "4a0aca53b6025befe39482c665137dd766eaedeace9a607a0313ab720053aa6d",
+  "lock_sha256": "9fe68e6b1f1e574d52f2daeb3c9ff0be95ac2eaf58f9d5d283e4b52411b63f1c",
   "lock_version": 5,
   "overrides": {
     "flags": {},
@@ -1958,8 +1958,8 @@
   "sections": {
     "analysis": "f7f0b52ed6909ba0f3864eb9e7f7d513625da8dc445234304b8aa033c4343cb6",
     "assessment": "7af46696276c21b0461b97e8c58f2396c7730e56e1719087038da7acd2c6fef3",
-    "execution": "4a0aca53b6025befe39482c665137dd766eaedeace9a607a0313ab720053aa6d",
-    "toolchain": "e83fbb01b6fa0483d2b4efb10ba7a4e10127612b9c7e6ddb697e32a2ca39c1dd"
+    "execution": "9fe68e6b1f1e574d52f2daeb3c9ff0be95ac2eaf58f9d5d283e4b52411b63f1c",
+    "toolchain": "333007c848ce939cab63d826a8c18e858a159a27631949483fb50abf6f509d15"
   },
   "spec": {
     "agents": [
@@ -2030,7 +2030,7 @@
   "toolchain": {
     "litellm": "1.102.1",
     "python": "3.13.7",
-    "raidar": "0.15.0",
+    "raidar": "1.0.0",
     "raidar_spec": "cc9db81c6c78e861b026c7aeed8802a2994593f112071b576a608fa28e994307"
   }
 }

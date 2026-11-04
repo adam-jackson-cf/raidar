@@ -226,9 +226,16 @@ async def test_root_files_flags_and_resource_floors(container: Path) -> None:
     environment = LocalEnvironment()
     flag = str(container / "container" / "var" / "calls" / "closed" / "pkg")
 
-    assert not await calls.root_file_exists(environment, flag)
-    await calls.put_root_file(environment, flag, b"closed")
-    assert await calls.root_file_exists(environment, flag)
+    previous = os.umask(0)
+    try:
+        assert not await calls.root_file_exists(environment, flag)
+        await calls.put_root_file(environment, flag, b"closed")
+        assert await calls.root_file_exists(environment, flag)
+    finally:
+        os.umask(previous)
+    for directory in (Path(flag).parent, Path(flag).parent.parent, Path(flag).parent.parent.parent):
+        assert directory.stat().st_mode & 0o777 == 0o755
+    assert Path(flag).stat().st_mode & 0o777 == 0o644
 
     floors = await calls.resource_floors(environment, [str(container)])
     assert (floors.disk_free[str(container)] or 0) > 0
@@ -239,7 +246,16 @@ async def test_state_can_be_uploaded_regular_only(container: Path) -> None:
     source = _tree(container / "fixture")
     target = str(container / "container" / "var" / "calls" / "canary" / "state")
 
-    await calls.upload_state(environment, source, target)
+    empty = container / "container" / "empty" / "ns" / "state"
+    previous = os.umask(0)
+    try:
+        await calls.upload_state(environment, source, target)
+        await calls.make_state_dir(environment, str(empty))
+    finally:
+        os.umask(previous)
+    for root in (Path(target), empty):
+        for directory in (root, root.parent, root.parent.parent):
+            assert directory.stat().st_mode & 0o777 == 0o755
     assert (Path(target) / "a.txt").read_text() == "alpha"
     with pytest.raises(calls.TransportError):
         await calls.upload_state(environment, source, target)  # never over an existing tree

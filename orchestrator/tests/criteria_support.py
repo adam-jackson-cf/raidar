@@ -78,7 +78,7 @@ class ScriptShell:
 
     async def exec(self, command: str, **_: Any) -> Any:
         self.commands.append(command)
-        words = shlex.split(command)
+        words = shlex.split(command.removeprefix("umask 022; "))
         if words[0] != "python3" or "-c" not in words:
             return SimpleNamespace(return_code=127, stdout="", stderr=f"{words[0]}: not found")
         at = words.index("-c")

@@ -105,6 +105,12 @@ async def test_fresh_installs_match_despite_different_uploaded_wheel_timestamps(
     monkeypatch.setattr(install, "_stage", stage)
     first = await _install(container, files)
     shutil.rmtree(first.root)
+    original_exec = LocalEnvironment.exec
+
+    async def permissive_exec(self: LocalEnvironment, command: str, **kwargs: object) -> object:
+        return await original_exec(self, f"umask 000; {command}", **kwargs)
+
+    monkeypatch.setattr(LocalEnvironment, "exec", permissive_exec)
     second = await _install(container, files)
 
     assert first.digest == second.digest

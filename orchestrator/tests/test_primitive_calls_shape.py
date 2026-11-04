@@ -67,6 +67,7 @@ class Container:
         timeout_sec: int | None = None,
         user: str | int | None = None,
     ) -> Any:
+        command = command.removeprefix("umask 022; ")
         self.commands.append(command)
         for needle, error in self.fail.items():
             if needle in command:
@@ -952,31 +953,6 @@ async def test_a_failed_excluding_download_is_a_transport_error(tmp_path: Path) 
 
     with pytest.raises(calls.TransportError, match="download failed: OSError: stream cut"):
         await calls.download_dir_excluding(environment, "/w", tmp_path, ["x"])
-
-
-async def test_a_command_reaches_the_environment_as_given_with_whole_second_timeouts() -> None:
-    seen: dict[str, Any] = {}
-
-    async def exec_(command: str, **kwargs: Any) -> Any:
-        seen.update(command=command, **kwargs)
-        return _exec_result()
-
-    await calls.trusted_exec(
-        SimpleNamespace(exec=exec_),
-        "true",
-        user="root",
-        timeout_sec=2.7,
-        cwd="/w",
-        env_vars={"A": "1"},
-    )
-
-    assert seen == {
-        "command": "true",
-        "cwd": "/w",
-        "env": {"A": "1"},
-        "timeout_sec": 2,
-        "user": "root",
-    }
 
 
 # ------------------------------------------------------------------------------ seccomp

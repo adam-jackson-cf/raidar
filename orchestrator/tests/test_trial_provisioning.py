@@ -57,6 +57,7 @@ class _Env:
         timeout_sec: int = 0,
         env: dict[str, str] | None = None,
     ) -> Any:
+        command = command.removeprefix("umask 022; ")
         kind = {"INSTALL": "install", "CHECK": "check"}.get(command)
         kind = kind or ("record" if ">>" in command else "stage")
         self.calls.append({"kind": kind, "user": user, "env": env, "command": command})

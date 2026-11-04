@@ -75,6 +75,7 @@ class _Env:
     async def exec(
         self, command: str, user: str | None = None, timeout_sec: int = 0, env: Any = None
     ) -> Any:
+        command = command.removeprefix("umask 022; ")
         if ">>" in command:
             slug = command.rsplit("/", 1)[1].split(".jsonl", 1)[0]
             if slug in self.raises:
@@ -109,10 +110,12 @@ def _provision(slug: str = "tool", **overrides: Any) -> TrialProvision:
     return TrialProvision(**{**fields, **overrides})
 
 
-async def _run_one_step(env: _Env, provisions: list[TrialProvision]) -> None:
+async def _run_one_step(
+    env: _Env, provisions: list[TrialProvision], *, user: str = "agent"
+) -> None:
     hooks: dict[TrialEvent, list[Any]] = {}
     trial = SimpleNamespace(
-        task=SimpleNamespace(config=SimpleNamespace(agent=SimpleNamespace(user="agent"))),
+        task=SimpleNamespace(config=SimpleNamespace(agent=SimpleNamespace(user=user))),
         agent_environment=env,
         add_hook=lambda event, hook: hooks.setdefault(event, []).append(hook),
     )
@@ -173,9 +176,10 @@ async def test_an_install_that_raises_is_recorded_not_propagated() -> None:
     assert not _verdict(record)[0]
 
 
-async def test_a_check_that_cannot_run_is_recorded_as_a_failed_check() -> None:
+@pytest.mark.parametrize("user", ["agent", "root"])
+async def test_a_check_that_cannot_run_is_recorded_as_a_failed_check(user: str) -> None:
     env = _Env(raises={"CHECK-tool"})
-    await _run_one_step(env, [_provision()])
+    await _run_one_step(env, [_provision()], user=user)
 
     (record,) = env.records
     assert record["install"]["ok"] is True

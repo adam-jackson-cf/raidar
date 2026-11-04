@@ -75,6 +75,7 @@ COMMANDS = {"manifest": _manifest, "snapshot": _snapshot, "probe": probe, "insta
 
 
 def main(arguments: list[str]) -> int:
+    os.umask(0o022)
     if arguments[0] == "supervise":
         return supervise.main(arguments[1:])
     with open(arguments[1], encoding="utf-8") as handle:

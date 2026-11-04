@@ -295,19 +295,32 @@ def _stage(tmp_path: Path, files: dict[str, tuple[bytes, bool]], **over: Any) ->
 
 
 def test_an_install_copies_bytes_normalises_modes_and_wraps_commands_safely(
-    tmp_path: Path,
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     hostile = ["python", "-c", "x; touch /tmp/pwn $(id)"]
     spec = _stage(
         tmp_path,
         {"libexec/run": (b"#!/bin/sh\n", True), "data/x.txt": (b"data", False)},
         commands={"tool": hostile},
+        root=str(tmp_path / "stages" / "ns" / "name"),
     )
 
-    done = install_tree.install(spec)
+    stages = tmp_path / "stages"
+    stages.mkdir(mode=0o700)
+    spec_path = tmp_path / "install.json"
+    spec_path.write_text(json.dumps(spec))
+    previous = os.umask(0)
+    try:
+        assert main.main(["install", str(spec_path)]) == 0
+    finally:
+        os.umask(previous)
+    done = json.loads(capsys.readouterr().out)
 
     root = Path(spec["root"])
     assert done == {"ok": True, "commands": ["tool"]}
+    assert stat.S_IMODE(stages.stat().st_mode) == 0o700
+    for directory in (root.parent, root, root / "bin"):
+        assert stat.S_IMODE(directory.stat().st_mode) == 0o755
     assert (root / "data" / "x.txt").read_bytes() == b"data"
     assert stat.S_IMODE((root / "libexec" / "run").stat().st_mode) == 0o755
     assert stat.S_IMODE((root / "data" / "x.txt").stat().st_mode) == 0o644
@@ -1171,7 +1184,7 @@ def _child_setup(monkeypatch: pytest.MonkeyPatch) -> list[Any]:
         raise _Done(code)
 
     monkeypatch.setattr(os, "setsid", lambda: steps.append("setsid"))
-    monkeypatch.setattr(os, "umask", lambda mask: steps.append(("umask", mask)))
+    monkeypatch.setattr(os, "umask", lambda mask: 0)
     monkeypatch.setattr(os, "execve", lambda *a: steps.append(("execve", a)))
     monkeypatch.setattr(os, "_exit", leave)
     monkeypatch.setattr(supervise, "_prepare_stdio", lambda *a: steps.append(("stdio", a)))
@@ -1231,9 +1244,9 @@ def test_a_prepared_child_executes_the_resolved_argv_with_the_clean_environment(
     os.close(write)
     assert os.read(read, 10) == b""
     os.close(read)
-    assert steps[:3] == ["setsid", ("stdio", (1, 2, write)), ("umask", 0o022)]
-    assert steps[3] == "become"
-    assert steps[4] == ("execve", (str(tool), ["tool", "--x"], {"PATH": str(tmp_path), "A": "1"}))
+    assert steps[:2] == ["setsid", ("stdio", (1, 2, write))]
+    assert steps[2] == "become"
+    assert steps[3] == ("execve", (str(tool), ["tool", "--x"], {"PATH": str(tmp_path), "A": "1"}))
 
 
 def test_the_parent_of_a_launched_child_gets_its_pid_pipes_and_setup_outcome(

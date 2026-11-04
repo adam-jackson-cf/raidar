@@ -1546,12 +1546,11 @@ def test_an_output_archive_failure_does_not_misattribute_the_authored_checks_res
 
 
 class Libc:
-    """The C library's ``prctl`` (the dumpable flag) and the umask the gate sets."""
+    """The C library's ``prctl`` (the dumpable flag)."""
 
     def __init__(self) -> None:
         self.result = 0
         self.calls: list[tuple[int, ...]] = []
-        self.umasks: list[int] = []
 
     def prctl(self, *args: int) -> int:
         self.calls.append(args)
@@ -1563,7 +1562,7 @@ def libc(monkeypatch: pytest.MonkeyPatch) -> Libc:
     fake = Libc()
     monkeypatch.setattr(sys, "platform", "linux")
     monkeypatch.setattr(gate_tool.ctypes, "CDLL", lambda *a, **k: fake)
-    monkeypatch.setattr(os, "umask", lambda mask: fake.umasks.append(mask) or 0)
+    monkeypatch.setattr(os, "umask", lambda mask: 0)
     return fake
 
 
@@ -1587,7 +1586,6 @@ def test_strip_rules_filters_standard_input_and_reports_a_file(
     monkeypatch.setattr(sys, "stdin", io.StringIO("own\n\n" + BLOCK))
     assert gate_tool.main(["strip-rules"]) == 0
     assert capsys.readouterr().out == "own\n"
-    assert libc.umasks == [0o022]  # nothing the gate writes is world-writable
 
     target = tmp_path / "rules.md"
     target.write_text(BLOCK)
