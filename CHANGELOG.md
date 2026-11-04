@@ -22,9 +22,10 @@ All notable changes to this project are documented in this file.
   locked architectures and reject unregistered record digests; document arm64-only evidence
   and the stage-check/relock requirement on amd64.
   Accept the Python 3.13.7 grading identity change `c69aa42508be…` → `a93cc5f71c84…`
-  from the canonical stage-check path helper; orchestrator revalidation scheduled before
-  relocking or new trials. Delete five orphan fixture/draft records while preserving the
-  four registered-digest records byte-for-byte.
+  from the canonical stage-check path helper. Revalidated all nine problems with five
+  repeats under `a93cc5f7…` (all `validated_partial`; mocked_http's varying hidden tests
+  were 7 in this run against 5 in the last) and relocked every experiment. Delete five
+  orphan fixture/draft records while preserving the four registered-digest records byte-for-byte.
 - Pin host Python and all three Python CI workflows to 3.13.7; document frozen environment
   setup and the exact host-version grading identity while retaining `requires-python >=3.12`.
   CI installs the pinned interpreter with `setup-uv` / `uv python install` instead of runner

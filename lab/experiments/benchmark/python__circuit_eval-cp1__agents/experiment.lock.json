@@ -64,10 +64,10 @@
       },
       "scorer": {
         "correctness@10": {
-          "digest": "bf219a460ad69b3f4d422a1bad9c04df0ab435d86c2ae1c0e91b576988562555",
+          "digest": "e0ef561ca8aee7ebc43eb5bf09a97b9d6f83b18a1b9c33c1f8dc202239dd429c",
           "metadata": {
             "implementation": "raidar.scoring.correctness:correctness_scorer",
-            "implementation_digest": "4daa585db532c8260f7bd7650ad8a329d1792334915bc93cce0396e6632c1c7a",
+            "implementation_digest": "00d7db1485bf476bcca8265321a59310138c7733d08f6a565e4744cb37436e28",
             "manifest": {
               "description": "Reference-solvable SCB success and raw SCB verdicts per checkpoint and trajectory.",
               "evidence_required": [
@@ -281,7 +281,7 @@
     },
     "tools": {}
   },
-  "document_sha256": "5dbf5412bfd6d8c1cc254a34731f17aaeded23e27da1e954f5867947412f65aa",
+  "document_sha256": "01c4d2ebc1e16261d8c866a339c8ab9dbc889a7fa3d0acedd6619e5eb1fd21ab",
   "execution": {
     "arms": {
       "codex": {
@@ -299,13 +299,13 @@
           "version_pin": "0.156.1",
           "workflow_skills": "placement.skills .agents/skills in the workspace /app"
         },
-        "digest": "f177cac6e78535d028a5beb451d69fe9e390b0f4388c30cb30ad5d9f4f931646",
+        "digest": "90df9ca1059056a903cdf8e6260fd97a3e7e44d3f507747684d9625c0154847b",
         "model": "gpt-6-luna",
         "packages": {},
         "primitive_code": {
           "frame/1": "71a0fd7e66c739e714d21f6e5c2c6358483126326b0cd5a05788a23072a22865",
-          "install/1": "148ba37ff51fd8c10d81cc1f1f617997d90a6fb332a3247ee4a1d01aa7ad28d6",
-          "runner/1": "25a7a1951ff33daf081572f565116922e2fd11fcfab62481172ba86367ea3584"
+          "install/1": "f30acb4e98499de8807044e4f3aab073791b3af2fe2dad0b46e8d43cb78f4395",
+          "runner/1": "32e90b6fda89288443a7326a847336cc6ba78c11a310c28e07dea382816abbee"
         },
         "provider": "openai",
         "reasoning": "low",
@@ -454,7 +454,7 @@
               "grader": {
                 "environment_id": "sha256:1989940cc347e516b774a3833071b60dbfae6a730e55462cdf38a095e23d8765",
                 "image": "raidar-oracle-grader:963c14e63ff5e15d",
-                "implementation_sha256": "c69aa42508be80a1c69ff6b6f9ec897c7bdd9468942404cf375ca13835ffe2e9"
+                "implementation_sha256": "a93cc5f71c842e1963145679d64ebacf607412debb2e28fe44313ae6964e2074"
               },
               "not_run": [
                 "native_parity_positive",
@@ -501,7 +501,7 @@
     "source_sha256": "5e40cab21cd7f98b921e27158f36f98ea08446be7ad4bdf40b949318b8abd237",
     "spec_sha256": "6c116ee9ce80cbb364a937a5622305ec77288bd348e4aa6f0909ce1d8753df75"
   },
-  "lock_sha256": "439425122726d51e6bf5e184064d95db3a45bbcd8e2e7216662eba7308a113c5",
+  "lock_sha256": "74d774404aa369add223a8ed7ccc0d5b87b9d9d724520733de47ee7ad07ac576",
   "lock_version": 5,
   "overrides": {
     "flags": {},
@@ -509,8 +509,8 @@
   },
   "sections": {
     "analysis": "33aede75abee4373a36e88c3e4bad96deaadffcf5db85e1efadee2a8414fd67b",
-    "assessment": "ce1df61d3a39a374d31214c78a0409bd9e152b8964842167ae072281c3ad5099",
-    "execution": "439425122726d51e6bf5e184064d95db3a45bbcd8e2e7216662eba7308a113c5",
+    "assessment": "05fc802b766d3e7351e9470b3ad7d78c4d7bfbf1defcdb073a327001a5f4a028",
+    "execution": "74d774404aa369add223a8ed7ccc0d5b87b9d9d724520733de47ee7ad07ac576",
     "toolchain": "e83fbb01b6fa0483d2b4efb10ba7a4e10127612b9c7e6ddb697e32a2ca39c1dd"
   },
   "spec": {

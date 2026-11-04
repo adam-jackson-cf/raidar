@@ -23,8 +23,14 @@ Run `make help` to see the public interface.
   - Tags: `contract-v1.0.0` (the frozen `stage/1`), `contract-v1.1.0` (call-protocol models and 63 conformance cases) and `contract-v2.0.0` (lab policy moved to the orchestrator).
   - Hash pins are in `contract/releases/`. The built artefacts were under `var/contract/` and did not travel: run `git fetch origin --tags` before `env -u AGENT make contract-build`, and check the hashes against the pins.
 - **The test suite follows the test-patterns tiers** (fast, slow, quality, docker, security, perf). The fast-tier coverage floors are 99.43% line and 98.72% branch, compared as integer counts. Never lower them.
-- **All nine SCB problems are `validated_partial`**, revalidated with 5 repeats under grading digest `c69aa425…`. All experiment locks are current.
+- **All nine SCB problems are `validated_partial`**, revalidated with 5 repeats under grading digest `a93cc5f7…` (2026-11-04, after the `lab/stage-checks/` cutover). All experiment locks are current.
 - **Every Docker check ran on the old machine's local OrbStack**, standing in for the remote `mbp` target (user decision 2026-10-31). A re-run on a trusted remote target is still pending, though not blocking.
+- **Stage-check evidence travels with the checkout** in tracked `lab/stage-checks/`, outside
+  package folders so released package digests stay unchanged. Installed-tree and stop-canary
+  records use this canonical store, with no `var/` fallback; execution logs remain under `var/`.
+  The committed installed-tree records cover **arm64 only**. An arm64 host can check the
+  existing locks without regenerating evidence; an **amd64 host needs `make stage-check`
+  plus a relock** before running those arms (see setup below).
 
 ### How decisions are made (user rule since 2026-10-28)
 - The orchestrating agent only orchestrates, verifies and reports.
@@ -47,11 +53,21 @@ Run `make help` to see the public interface.
 2. Install and log in to Infisical (project `ae2a56a4-28d9-429f-bb7c-7d45e26b9ffa`, env `dev`), and run `codex login`, which uses the ChatGPT subscription.
 3. Sync the host environment with `env -u AGENT uv sync --project orchestrator --python 3.13.7 --all-extras --frozen`, replacing any incompatible environment with the pinned interpreter.
 4. Docker: create `~/.config/raidar/targets.toml` (`env -u AGENT make target-init`), and mark a target `trusted = true` only with the user's decision. The old machine used a work-only file, `var/tmp/targets-local.toml`, that marked OrbStack trusted; it did not travel.
+   On amd64, deliberately delete the affected installed-tree records in `lab/stage-checks/`,
+   then run `env -u AGENT make stage-check NAME=<ns/name> TARGET=<trusted-target>` for the
+   needed packages and `env -u AGENT make experiment-lock EXPERIMENT=<path to experiment.yaml>`
+   for dependent experiments. Stage-check refuses different bytes under the same identity;
+   identical bytes are a no-op. Delete a canary record only when intentionally replacing
+   its evidence, then regenerate and relock too. Do not silently replace observed resource
+   floors. `make releases-check` requires installed-tree evidence for each architecture
+   pinned by committed locks and refuses records naming unregistered package digests.
 5. Run `env -u AGENT make quality`. Expect it to pass, with the fast tier at about 5,090 tests.
 6. Run `git fetch origin --tags` before `env -u AGENT make contract-build` if you need the wheels.
 
 ### What did not travel
-- `var/`: jobs, assessment stores, Docker logs and run evidence. The decisions are committed in `docs/reboot/evidence/`; the run outputs aren't needed to continue.
+- `var/`: jobs, assessment stores, Docker logs and execution evidence. Installed-tree and
+  stop-canary records do travel in tracked `lab/stage-checks/`; the decisions are committed
+  in `docs/reboot/evidence/`. The untracked run outputs aren't needed to continue.
 - The old machine's memory notes and OrbStack data.
 
 ### Next work: the user chooses
