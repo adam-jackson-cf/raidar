@@ -6,6 +6,13 @@ All notable changes to this project are documented in this file.
 
 ### Documentation
 
+- docs(handoff): tighten follow-up items per review
+- docs(handoff): record follow-up items and the archive's home on mac-cf3
+
+## 1.0.1 - 2026-11-04
+
+### Documentation
+
 - docs(mbp): record mocked_http's sensitive_unexplained change; fix CI Python note
 - docs(handoff): mbp setup and first test; isolate tunnel state in target tests
 
