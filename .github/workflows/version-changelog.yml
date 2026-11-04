@@ -67,6 +67,6 @@ jobs:
         if: steps.changes.outputs.changed == 'true'
         run: |
           git add -A
-          VERSION=$(grep -oP 'version = "\K[^"]+' orchestrator/pyproject.toml)
+          VERSION=$(grep -m1 -oP '^version = "\K[^"]+' orchestrator/pyproject.toml)
           git commit -m "chore: bump version to $VERSION [skip ci]"
           git push

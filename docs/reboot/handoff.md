@@ -23,8 +23,8 @@ Run `make help` to see the public interface.
   - Tags: `contract-v1.0.0` (the frozen `stage/1`), `contract-v1.1.0` (call-protocol models and 63 conformance cases) and `contract-v2.0.0` (lab policy moved to the orchestrator).
   - Hash pins are in `contract/releases/`. The built artefacts were under `var/contract/` and did not travel: run `git fetch origin --tags` before `env -u AGENT make contract-build`, and check the hashes against the pins.
 - **The test suite follows the test-patterns tiers** (fast, slow, quality, docker, security, perf). The fast-tier coverage floors are 99.43% line and 98.72% branch, compared as integer counts. Never lower them.
-- **All nine SCB problems are `validated_partial`**, revalidated with 5 repeats on the **`mbp`** target under grading digest `a93cc5f7…` (2026-11-04). Verdicts and solvable sets equal the earlier local-OrbStack run. The grader pins are now `mbp`'s image IDs (see below). All experiment locks are current.
-- **The new machine uses the remote `mbp` Docker target.** The full no-model check sequence passed there on 2026-11-04 (see [Set up the `mbp` Docker target](#set-up-the-mbp-docker-target)). That run found and fixed a security defect. `mbp`'s `docker exec` runs with umask 0000, which left the installed tool tree world-writable; root payloads now set umask 022 (PR #7, an identity change to all nine primitives).
+- **All nine SCB problems are `validated_partial`**, revalidated with 5 repeats on the **`mbp`** target under grading digest `a93cc5f7…` (2026-11-04). Verdicts and check statuses equal the earlier local-OrbStack run. Two records differ in outcome: mocked_http's solvable membership (one test in, one out; checkpoint 2 grows from 54 to 55) and datagate's reference correctness (0.9996, plus one new `sensitive_unexplained` case). The vote accepted both as `mbp` evidence; see `CHANGELOG.md`. The grader pins are now `mbp`'s image IDs (see below). All experiment locks are current.
+- **The new machine uses the remote `mbp` Docker target.** The full no-model check sequence passed there on 2026-11-04 (see [Set up the `mbp` Docker target](#set-up-the-mbp-docker-target)). That run found and fixed a security defect. `mbp`'s `docker exec` runs with umask 0000, which left the installed tool tree world-writable. Now the root payload entry sets umask 022, every trusted exec and provision command is prefixed with `umask 022;`, and installs chmod the directories they create (PR #7, an identity change to all nine primitives).
 - **Stage-check evidence travels with the checkout** in tracked `lab/stage-checks/`, outside
   package folders so released package digests stay unchanged. Installed-tree and stop-canary
   records use this canonical store, with no `var/` fallback; execution logs remain under `var/`.
@@ -98,7 +98,7 @@ Run `make help` to see the public interface.
    2. `env -u AGENT make test-docker TARGET=mbp`.
    3. `git fetch origin --tags`, then `env -u AGENT make security-gate TARGET=mbp`. Expect 36 passed.
    4. `env -u AGENT make perf-gate TARGET=mbp`.
-   5. A graded oracle trial, which checks the grader pins end to end: `env -u AGENT make experiment-execute EXPERIMENT=lab/experiments/smoke/python__circuit_eval-cp1__phase5-at1/experiment.yaml AGENT_OVERRIDE=oracle DRAFT=1 TARGET=mbp`.
+   5. A graded oracle trial, which checks the grader pins end to end: `env -u AGENT make experiment-execute EXPERIMENT=lab/experiments/smoke/python__circuit_eval-cp1__phase5-at1/experiment.yaml AGENT_OVERRIDE=oracle TARGET=mbp`. Smoke jobs are never citable.
    6. `env -u AGENT make experiment-locks-check`.
 
    Don't use `make stage-check` as a readiness check. It is for new or changed packages. `raidar/define`'s canary record holds resource floors measured on one host, so a re-run always refuses with "different bytes"; gate-only packages re-run as no-ops on the same pack image.
@@ -127,4 +127,4 @@ Run `make help` to see the public interface.
 - `claude-code` isolation is `partial`; measured Claude arms need `full`.
 - Claude Code credentials: `claude setup-token` into Infisical as `CLAUDE_CODE_OAUTH_TOKEN`.
 - The fast and slow tiers miss their prospective 30 s and 300 s budgets (about 137 s and 390 s).
-- mocked_http's varying hidden tests across four validation runs, oldest first: 7, 5, 7, then 6 (the last on `mbp`, 2026-11-04). The cause is unknown; the classification as upstream test nondeterminism is provisional.
+- mocked_http has one varying hidden test in every validation run. The checkpoints affected per run, oldest first: 7, 5, 7, then 6 (the last on `mbp`, 2026-11-04). The `mbp` run's varying test differs from earlier runs. The cause is unknown; the classification as upstream test nondeterminism is provisional. Investigate it before any measured experiment binds mocked_http or datagate.
