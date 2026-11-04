@@ -18,7 +18,7 @@ Budgets are measured wall time with dependencies and images provisioned
 (provisioning recorded separately). They are proposals, not measured
 feasibility claims; never raise a performance threshold to pass.
 The host-tier timing reference is the existing CI runner (`ubuntu-latest`,
-Python 3.12). Record local baselines with their platform, Python version and
+Python 3.13.7). Record local baselines with their platform, Python version and
 wall time; they are not CI feasibility evidence. Docker phase-exit proof uses
 the trusted remote `mbp` target.
 

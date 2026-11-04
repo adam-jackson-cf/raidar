@@ -143,7 +143,10 @@ All notable changes to this project are documented in this file.
   statuses are unchanged, and seven records are otherwise unchanged in outcome. mocked_http's
   solvable membership changed: `checkpoint_2::test_jsonpath_value_and_no_match` joins
   checkpoints 2–6 and 8 and `checkpoint_3::test_redis_persists_state_across_requests` leaves
-  3–6 and 8 (checkpoint 2 grows from 54 to 55; those digests change). datagate's solvable sets
+  3–6 and 8 (checkpoint 2 grows from 54 to 55; those digests change), and its
+  `sensitive_unexplained` count falls from 3 to 2
+  (`test_checkpoint_5.py::test_delete_fs_only_key_returns_404` no longer flags
+  `reformatted_json`). datagate's solvable sets
   are unchanged; its `reference_correctness` falls from 1 to 0.9996 and
   `test_checkpoint_6.py::TestCore::test_allowlist_blocks_upload_export` gains a
   `sensitive_unexplained` flag. Accepted as `mbp` validation evidence (vote: unanimous); no
