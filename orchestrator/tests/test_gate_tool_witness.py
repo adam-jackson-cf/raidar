@@ -1551,6 +1551,7 @@ class Libc:
     def __init__(self) -> None:
         self.result = 0
         self.calls: list[tuple[int, ...]] = []
+        self.umasks: list[int] = []
 
     def prctl(self, *args: int) -> int:
         self.calls.append(args)
@@ -1562,7 +1563,7 @@ def libc(monkeypatch: pytest.MonkeyPatch) -> Libc:
     fake = Libc()
     monkeypatch.setattr(sys, "platform", "linux")
     monkeypatch.setattr(gate_tool.ctypes, "CDLL", lambda *a, **k: fake)
-    monkeypatch.setattr(os, "umask", lambda mask: 0)
+    monkeypatch.setattr(os, "umask", lambda mask: fake.umasks.append(mask) or 0)
     return fake
 
 
@@ -1585,6 +1586,7 @@ def test_strip_rules_filters_standard_input_and_reports_a_file(
 ) -> None:
     monkeypatch.setattr(sys, "stdin", io.StringIO("own\n\n" + BLOCK))
     assert gate_tool.main(["strip-rules"]) == 0
+    assert libc.umasks == [0o022]
     assert capsys.readouterr().out == "own\n"
 
     target = tmp_path / "rules.md"

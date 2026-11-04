@@ -668,7 +668,7 @@
     },
     "tools": {}
   },
-  "document_sha256": "512a77eeab7ed7234cc69c1308798c49ff1a6a58ed38bf1a86058914eef86f23",
+  "document_sha256": "bb8244fc4bbf1f322317d7ca4a7db70c3ccc90c25e5ea9313a6b8be6e729de2b",
   "execution": {
     "arms": {
       "docs-fix": {
@@ -686,7 +686,7 @@
           "version_pin": "0.156.1",
           "workflow_skills": "placement.skills .agents/skills in the workspace /app"
         },
-        "digest": "0e498a2fc50afe533f670fe46df111dd659b8e0a0caade41552b10e04676e521",
+        "digest": "549d507293714f662a3c257de6450b7f22b50ad579e741684c3ffc6c11d0eba1",
         "model": "gpt-6-luna",
         "packages": {
           "raidar/docs-check": {
@@ -706,9 +706,9 @@
         },
         "primitive_code": {
           "frame/1": "c89c277bb146542f985499df52718e346e2ddaa57dd5530a441128ecb5da268c",
-          "gate/1": "bf0b6fca834e655a8cfab509ca40e5db54c9ae806d4b1cffa69eb2bfa968e61e",
-          "install/1": "ec2b4ad10c7cae38d001d112b6f12086422b00841ca324fcd661f0be3e273a81",
-          "runner/1": "bb68215e9adbbd98bcf6d421f21a2a2cde060755ac5835ea9d8f51e5a8eadfe6"
+          "gate/1": "d8600540cf34ce9e6490b5852e1cf7211f126f793d76df7e44d7a788b73849f8",
+          "install/1": "ef0f44adfc308bf5fd11d210ab28d92d935e6d0f6a631fd33e38ef01cb7634f8",
+          "runner/1": "1bfaa6d83270c5d517aefa4d5aee090eee3656dad0a40e270641533d943dd914"
         },
         "provider": "openai",
         "reasoning": "low",
@@ -907,7 +907,7 @@
     "source_sha256": "ee4771b997a090438d3611fe5cd2fc09fb6e1a6cc7b9b6e4feb44db1c2656736",
     "spec_sha256": "0e03d713fd6942f8f1fb6f91b6e8106f1d270d3d6fd4cca7edf65bcfe66e4ba8"
   },
-  "lock_sha256": "82773488cf18b5cfebd4666686338edecdb28f35c5353f2f3839e7726eb8c4de",
+  "lock_sha256": "53c72cf16c2bd87a8b6fe97ace2bd318f1499459e1875d9dc4195b264c6f15c5",
   "lock_version": 5,
   "overrides": {
     "flags": {},
@@ -916,7 +916,7 @@
   "sections": {
     "analysis": "2165078bb3edf1fd89313bb7b0fdb121366bd76e9a351568321984d79da72faa",
     "assessment": "c9441304cf5dfd637b293b49a884fc1886936dc55291e9a2490cd5747ffed2ee",
-    "execution": "82773488cf18b5cfebd4666686338edecdb28f35c5353f2f3839e7726eb8c4de",
+    "execution": "53c72cf16c2bd87a8b6fe97ace2bd318f1499459e1875d9dc4195b264c6f15c5",
     "toolchain": "333007c848ce939cab63d826a8c18e858a159a27631949483fb50abf6f509d15"
   },
   "spec": {

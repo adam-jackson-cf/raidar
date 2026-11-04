@@ -283,7 +283,7 @@
     },
     "tools": {}
   },
-  "document_sha256": "60c3e188e7c9d70387ad41d45cb37b34c0af7cdb77f47d1685ef32e0ab522ae7",
+  "document_sha256": "376bf0546b4072856b4d89b297364effcd5ece72357c34258c4def54a3a86cf0",
   "execution": {
     "arms": {
       "baseline": {
@@ -301,13 +301,13 @@
           "version_pin": "0.156.1",
           "workflow_skills": "placement.skills .agents/skills in the workspace /app"
         },
-        "digest": "0880d2a6d80928ed983d00057aaee7cbcf1aa6d9562f1d854b1ae7ba5b14b81b",
+        "digest": "fa0d13ab547e1a26f19692b2b4f71d44fccbd5cdfdc7ceaed18d07bcadbfd89e",
         "model": "gpt-6-luna",
         "packages": {},
         "primitive_code": {
           "frame/1": "c89c277bb146542f985499df52718e346e2ddaa57dd5530a441128ecb5da268c",
-          "install/1": "ec2b4ad10c7cae38d001d112b6f12086422b00841ca324fcd661f0be3e273a81",
-          "runner/1": "bb68215e9adbbd98bcf6d421f21a2a2cde060755ac5835ea9d8f51e5a8eadfe6"
+          "install/1": "ef0f44adfc308bf5fd11d210ab28d92d935e6d0f6a631fd33e38ef01cb7634f8",
+          "runner/1": "1bfaa6d83270c5d517aefa4d5aee090eee3656dad0a40e270641533d943dd914"
         },
         "provider": "openai",
         "reasoning": "low",
@@ -1909,7 +1909,7 @@
     "source_sha256": "05b02bba280640d136b5bea02db23d3286ea99b02b1f602b78cecf322266a66a",
     "spec_sha256": "fbaa8778230cd22df145360d20868d91bb3ce0d5ecacae41843ae52367cdd4e0"
   },
-  "lock_sha256": "a0076aeb2edf63f63ad0cb9066a76a791787a65d26cc192140fc1fa868b0ed9b",
+  "lock_sha256": "61ecae8f273469a91463a8447c766e1f9d4b397792a0f64f493564775b9683ea",
   "lock_version": 5,
   "overrides": {
     "flags": {},
@@ -1918,7 +1918,7 @@
   "sections": {
     "analysis": "59bfabf9aa8be2bb5ceb15f67d7b3cee206ddd8a9f4450fb0b815f0045ec5eb6",
     "assessment": "acd941024c1e8760ca0941778f4c5a21ebbd68ee65112ef82d84c8229f501bf9",
-    "execution": "a0076aeb2edf63f63ad0cb9066a76a791787a65d26cc192140fc1fa868b0ed9b",
+    "execution": "61ecae8f273469a91463a8447c766e1f9d4b397792a0f64f493564775b9683ea",
     "toolchain": "333007c848ce939cab63d826a8c18e858a159a27631949483fb50abf6f509d15"
   },
   "spec": {

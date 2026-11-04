@@ -736,7 +736,7 @@ class GateRun:
     async def _run(self, command: str, user: str | None) -> str:
         result = await calls.trusted_exec(
             self.environment,
-            command if user in ("root", "0", 0) else f"umask 022\n{command}",
+            command,
             user=user,
         )
         if result.return_code != 0:

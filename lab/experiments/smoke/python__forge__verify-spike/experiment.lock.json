@@ -841,7 +841,7 @@
       "tree-sitter-language-pack": "0.13.0"
     }
   },
-  "document_sha256": "b62ba407e0668b28c55bf6b1ef257fbed2501908fed728fbdb54f3845fb4c19a",
+  "document_sha256": "e8ba99d917d593c14a6ef969d89f1061f56d879afd2e9932f48833e571394890",
   "execution": {
     "arms": {
       "verify": {
@@ -859,7 +859,7 @@
           "version_pin": "0.156.1",
           "workflow_skills": "placement.skills .agents/skills in the workspace /app"
         },
-        "digest": "12253a0843d88deb6b2d3b12b1f8a50ffd707ce21cedf928f3f6daf1870e97df",
+        "digest": "a1a3f4ebe8bcda86d110cc99442de3c0550bacd5f605bef5d3d23634951204cb",
         "model": "gpt-6-luna",
         "packages": {
           "raidar/verify": {
@@ -872,9 +872,9 @@
         },
         "primitive_code": {
           "frame/1": "c89c277bb146542f985499df52718e346e2ddaa57dd5530a441128ecb5da268c",
-          "gate/1": "bf0b6fca834e655a8cfab509ca40e5db54c9ae806d4b1cffa69eb2bfa968e61e",
-          "install/1": "ec2b4ad10c7cae38d001d112b6f12086422b00841ca324fcd661f0be3e273a81",
-          "runner/1": "bb68215e9adbbd98bcf6d421f21a2a2cde060755ac5835ea9d8f51e5a8eadfe6"
+          "gate/1": "d8600540cf34ce9e6490b5852e1cf7211f126f793d76df7e44d7a788b73849f8",
+          "install/1": "ef0f44adfc308bf5fd11d210ab28d92d935e6d0f6a631fd33e38ef01cb7634f8",
+          "runner/1": "1bfaa6d83270c5d517aefa4d5aee090eee3656dad0a40e270641533d943dd914"
         },
         "provider": "openai",
         "reasoning": "low",
@@ -1701,7 +1701,7 @@
     "source_sha256": "314d508d12782a35c37b83edea19c022c572cc71b43d4ab322116e7154a8449e",
     "spec_sha256": "c54d25d1f584c1adf8515ffb8ead2941611a43c0cd6723e61c2cc6d44ea5db07"
   },
-  "lock_sha256": "16c30d99daa0202fb528e420e92afa8ed63363a48201883715a040e93cd8a5d3",
+  "lock_sha256": "8482b34073f5794332ed51fcdacd31edb0503cd13b16933df640191a839a34e0",
   "lock_version": 5,
   "overrides": {
     "flags": {},
@@ -1710,7 +1710,7 @@
   "sections": {
     "analysis": "81cdc2d12aacc031bb70595c13973ff647ab49a68bebda4be7a9b65ba3127a78",
     "assessment": "d2ceb1c2fd13a88435ce0ff32350ae3a086bd562bd529aa2b303682515550bde",
-    "execution": "16c30d99daa0202fb528e420e92afa8ed63363a48201883715a040e93cd8a5d3",
+    "execution": "8482b34073f5794332ed51fcdacd31edb0503cd13b16933df640191a839a34e0",
     "toolchain": "333007c848ce939cab63d826a8c18e858a159a27631949483fb50abf6f509d15"
   },
   "spec": {

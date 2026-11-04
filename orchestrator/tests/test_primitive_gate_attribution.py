@@ -241,7 +241,7 @@ class Container:
         self.broken: Exception | None = None
 
     def reply(self, command: str) -> Any:
-        script = command.split("\n", 1)[-1]
+        script = command.removeprefix("umask 022; ")
         for suffix, key, default in (("id -un", "owner", "agent"), ("id -u", "uid", "0")):
             if script.endswith(suffix):
                 return self.replies.get(key, default)

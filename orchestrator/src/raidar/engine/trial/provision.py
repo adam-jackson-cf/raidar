@@ -160,10 +160,9 @@ async def install_at_start(
 
 async def _check(environment: Any, provision: TrialProvision, user: str | None) -> dict[str, Any]:
     try:
-        command = provision.check
-        if user in ("root", "0", 0):
-            command = f"umask 022; {command}"
-        result = await environment.exec(command, user=user, timeout_sec=CHECK_TIMEOUT_S)
+        result = await environment.exec(
+            f"umask 022; {provision.check}", user=user, timeout_sec=CHECK_TIMEOUT_S
+        )
     except Exception as error:  # noqa: BLE001 - recorded; the step's lab check turns it into infra
         return {"ok": False, "error": f"check exec failed: {type(error).__name__}: {error}"}
     record: dict[str, Any] = {"ok": result.return_code == 0}

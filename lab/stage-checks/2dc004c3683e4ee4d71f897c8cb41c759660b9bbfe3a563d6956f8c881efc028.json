@@ -1,7 +1,7 @@
 {
   "floors": {
-    "disk_free": 286917124096,
-    "memory_available": 20178296832
+    "disk_free": 286508879872,
+    "memory_available": 20159332352
   },
   "outputs": {
     "criteria": "cf771a792cbbc5e6439e247a0743e524ce792c981c862817147a76e658a0e91f",
@@ -11,11 +11,11 @@
   "package": "2dc004c3683e4ee4d71f897c8cb41c759660b9bbfe3a563d6956f8c881efc028",
   "primitives": {
     "frame/1": "652c9b5e0d44de3876852fbefd81e6c4db7b79260790e85cfbc7d6a5f85a3f30",
-    "gate/1": "23892cc6b06542427c83675be29064a4a7cf701f0a0e1cfaeab895df4b7ae2fd",
-    "install/1": "4d066f8b9a2d9c781f45bb12d7d487868dcf42de757deda72275a3a4890a6cfa",
-    "outputs/1": "6a294431ec305f6bbd6090cfae9bd4419c7bd7efa7d4fb6b3bd0b8b0c388f484",
-    "setup/1": "a0b0b61c7a5e4faf863484ff735714a23cc844ecbbe42d703bef06164fe8e009",
-    "stop/1": "2daf27cf4e900d584381c606f4d1318a5c7f28c8c5fd435a4c921ee72091f851"
+    "gate/1": "f798194a60cc3dd53e601e24ef36ba031b9363c42d015c443be6aee8330f2049",
+    "install/1": "26f8b652c7d6f42da4276b2cb5261515d306f8e4e7c1b50502db4a9cddafe11f",
+    "outputs/1": "42665fff111671166e829367d34aa7be39ffdd562ef651caad5dc785e60ec5fd",
+    "setup/1": "ada355d77160d4055e911cc2d8837fea367f2d099764c37beef1599742680ec5",
+    "stop/1": "be4e10b8556e7f4bbbac6faf586930958ad7b9517f000d46f4ee0e36a5b60a1c"
   },
   "stdout_sha256": "db2a6c90f3e88fff6ffcc05f6efad870cb32b1d54b3a12e7e468788ef2ba07be"
 }

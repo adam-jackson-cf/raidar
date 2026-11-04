@@ -21,25 +21,6 @@ All notable changes to this project are documented in this file.
 
 ### Bug Fixes
 
-- fix(primitives): make trusted root writes independent of the container's exec umask.
-  Root payloads and root shell commands now set umask 022; installs explicitly
-  normalise newly created namespace parents and every installed directory,
-  including `bin/`, to 0755, preventing UID 1000 from replacing wrappers or renaming
-  installed stages.
-  Adapter-independent `primitive_code` identities change (before → after):
-
-  | Primitive | Before | After |
-  | --- | --- | --- |
-  | `frame/1` | `eb5b21cfd00f` | `652c9b5e0d44` |
-  | `install/1` | `3d2db909d53f` | `4d066f8b9a2d` |
-  | `setup/1` | `b3d01881feb2` | `a0b0b61c7a5e` |
-  | `gate/1` | `bef0d66da646` | `23892cc6b065` |
-  | `stop/1` | `71040bd83d68` | `2daf27cf4e90` |
-  | `outputs/1` | `f74053cffaa4` | `6a294431ec30` |
-  | `runner/1` | `7567d6530738` | `41cef40fafcd` |
-  | `acceptance-reply/1` | `9ea725bb07af` | `52f99a06b55a` |
-  | `jev-judge/1` | `383fe55e9aed` | `8e6164e676bd` |
-
 - fix: pin grading runtime and enforce Docker gates
 - fix: preserve relative release lock sources
 - fix: remove generic stage-check wrong-state case
@@ -156,6 +137,25 @@ All notable changes to this project are documented in this file.
   immutable release or RT7 gate was weakened.
 
 ### PR review fixes
+
+- fix(primitives): make trusted writes independent of the container's exec umask.
+  Root payloads and every trusted shell command now set umask 022; installs explicitly
+  normalise newly created namespace parents and every installed directory,
+  including `bin/`, to 0755, preventing UID 1000 from replacing wrappers or renaming
+  installed stages.
+  Adapter-independent `primitive_code` identities change (before → after):
+
+  | Primitive | Before | After |
+  | --- | --- | --- |
+  | `frame/1` | `eb5b21cfd00f` | `652c9b5e0d44` |
+  | `install/1` | `3d2db909d53f` | `26f8b652c7d6` |
+  | `setup/1` | `b3d01881feb2` | `ada355d77160` |
+  | `gate/1` | `bef0d66da646` | `f798194a60cc` |
+  | `stop/1` | `71040bd83d68` | `be4e10b8556e` |
+  | `outputs/1` | `f74053cffaa4` | `42665fff1116` |
+  | `runner/1` | `7567d6530738` | `032c333c72cb` |
+  | `acceptance-reply/1` | `9ea725bb07af` | `0b8212672f99` |
+  | `jev-judge/1` | `383fe55e9aed` | `528b309f53b5` |
 
 - Track installed-tree and stop-canary evidence in `lab/stage-checks/`, outside package
   folders, preserving existing record bytes, package identities and experiment locks.

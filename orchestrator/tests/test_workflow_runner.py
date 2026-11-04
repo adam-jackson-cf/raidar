@@ -243,7 +243,7 @@ class RemoteEnvironment(FakeEnvironment):
         self.downloaded: list[str] = []
 
     async def exec(self, command: str, **options: Any) -> Any:
-        if self.refuse is not None and command.startswith(self.refuse):
+        if self.refuse is not None and command.removeprefix("umask 022; ").startswith(self.refuse):
             raise ConnectionError("container gone")
         return await super().exec(command, **options)
 
@@ -353,7 +353,7 @@ def test_an_instrument_failure_in_a_turn_is_recorded_invalid_and_not_raised_as_t
 
     async def readable_metadata(self: FakeEnvironment, command: str, **options: Any) -> Any:
         result = await original_exec(self, command, **options)
-        if command.startswith("python3 "):
+        if command.removeprefix("umask 022; ").startswith("python3 "):
             result.stdout = "{}"
         return result
 
@@ -445,7 +445,11 @@ def test_a_native_agent_with_no_session_store_needs_no_ctime_read(
     _, environment = _run(tmp_path)
 
     assert _record(tmp_path)["integrity"] == []
-    assert not [line for line in environment.commands if line.startswith("python3 ")]
+    assert not [
+        line
+        for line in environment.commands
+        if line.removeprefix("umask 022; ").startswith("python3 ")
+    ]
 
 
 def test_an_instrument_failure_when_the_packages_close_is_recorded_invalid(

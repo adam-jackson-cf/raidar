@@ -281,7 +281,7 @@
     },
     "tools": {}
   },
-  "document_sha256": "4d00001400c573123fdbdc3dcf6293b62e362b100e010192f5f0efaa62eb4d70",
+  "document_sha256": "f409e11a73c585f259e8dfefa8ffaab9845b86395d9a149051b1a0d7a3dcfbd8",
   "execution": {
     "arms": {
       "codex": {
@@ -299,13 +299,13 @@
           "version_pin": "0.156.1",
           "workflow_skills": "placement.skills .agents/skills in the workspace /app"
         },
-        "digest": "ccb342674eb05737739241990dc0e41af6313f1f2a62ddc033e8335ff2b16c69",
+        "digest": "13819e46adc3e212ac2971616b3cbca5f2da24d495cc7c038529c43ddef61bbd",
         "model": "gpt-6-luna",
         "packages": {},
         "primitive_code": {
           "frame/1": "c89c277bb146542f985499df52718e346e2ddaa57dd5530a441128ecb5da268c",
-          "install/1": "ec2b4ad10c7cae38d001d112b6f12086422b00841ca324fcd661f0be3e273a81",
-          "runner/1": "bb68215e9adbbd98bcf6d421f21a2a2cde060755ac5835ea9d8f51e5a8eadfe6"
+          "install/1": "ef0f44adfc308bf5fd11d210ab28d92d935e6d0f6a631fd33e38ef01cb7634f8",
+          "runner/1": "1bfaa6d83270c5d517aefa4d5aee090eee3656dad0a40e270641533d943dd914"
         },
         "provider": "openai",
         "reasoning": "low",
@@ -501,7 +501,7 @@
     "source_sha256": "5e40cab21cd7f98b921e27158f36f98ea08446be7ad4bdf40b949318b8abd237",
     "spec_sha256": "6c116ee9ce80cbb364a937a5622305ec77288bd348e4aa6f0909ce1d8753df75"
   },
-  "lock_sha256": "47c3a5eda6ec6b073ae1c6e6e6a949425159789a5ae05ac926aa053af9709985",
+  "lock_sha256": "ae4920cfce2d3123cec87c48715677ee9a124a07f262d15c3783b24c6f7d9441",
   "lock_version": 5,
   "overrides": {
     "flags": {},
@@ -510,7 +510,7 @@
   "sections": {
     "analysis": "33aede75abee4373a36e88c3e4bad96deaadffcf5db85e1efadee2a8414fd67b",
     "assessment": "05fc802b766d3e7351e9470b3ad7d78c4d7bfbf1defcdb073a327001a5f4a028",
-    "execution": "47c3a5eda6ec6b073ae1c6e6e6a949425159789a5ae05ac926aa053af9709985",
+    "execution": "ae4920cfce2d3123cec87c48715677ee9a124a07f262d15c3783b24c6f7d9441",
     "toolchain": "333007c848ce939cab63d826a8c18e858a159a27631949483fb50abf6f509d15"
   },
   "spec": {
