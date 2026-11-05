@@ -11,6 +11,7 @@ from types import SimpleNamespace
 from typing import Any
 
 import pytest
+import uv
 from click.testing import CliRunner
 from harbor.models.task.task import Task
 from raidar_contract.canonical import digest_json
@@ -1075,8 +1076,12 @@ class _Runs:
         return outcome
 
 
+@pytest.mark.parametrize(
+    ("failure", "message"),
+    [("lock", "uv lock failed.*no index"), ("missing-binary", "uv is unavailable")],
+)
 def test_the_native_evaluator_project_is_staged_beside_an_untouched_problem(
-    tmp_path: Path,
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, failure: str, message: str
 ) -> None:
     problem = tmp_path / "adder_x"
     problem.mkdir()
@@ -1087,12 +1092,17 @@ def test_the_native_evaluator_project_is_staged_beside_an_untouched_problem(
     assert 'name = "adder-x-evaluator"' in pyproject
     assert '"pytest==8.4.1"' in pyproject
     assert '"pyyaml==6.0.2"' in pyproject
-    assert run.calls[0][0] == ["uv", "lock", "-q"]
     assert run.calls[0][1]["cwd"] == staged
     assert (problem / "config.yaml").read_text() == "test_dependencies: [pyyaml==6.0.2]\n"
     assert not (problem / "pyproject.toml").exists()
     (problem / "config.yaml").write_text("{}\n")
-    with pytest.raises(NativeRunnerError, match="uv lock failed.*no index"):
+
+    def missing_binary() -> str:
+        raise FileNotFoundError("no installed uv")
+
+    if failure == "missing-binary":
+        monkeypatch.setattr(uv, "find_uv_bin", missing_binary)
+    with pytest.raises(NativeRunnerError, match=message):
         stage_catalog(problem, tmp_path / "catalog", run=_Runs(_cp(1, err="no index")))
 
 

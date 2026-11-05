@@ -1,4 +1,4 @@
-# Raidar handoff: continuing on a new machine (2026-11-04)
+# Raidar handoff: continuing on a new machine (2026-11-05)
 
 Give this file to the agent that picks up the work. It is self-contained; read it top to bottom before acting.
 
@@ -23,8 +23,8 @@ Run `make help` to see the public interface.
   - Tags: `contract-v1.0.0` (the frozen `stage/1`), `contract-v1.1.0` (call-protocol models and 63 conformance cases) and `contract-v2.0.0` (lab policy moved to the orchestrator).
   - Hash pins are in `contract/releases/`. The built artefacts were under `var/contract/` and did not travel: run `git fetch origin --tags` before `env -u AGENT make contract-build`, and check the hashes against the pins.
 - **The test suite follows the test-patterns tiers** (fast, slow, quality, docker, security, perf). The fast-tier coverage floors are 99.43% line and 98.72% branch, compared as integer counts. Never lower them.
-- **All nine SCB problems are `validated_partial`**, revalidated with 5 repeats on the **`mbp`** target under grading digest `a93cc5f7…` (2026-11-04). Verdicts and check statuses equal the earlier local-OrbStack run. Two records differ in outcome. mocked_http's solvable membership changed: one test joins checkpoints 2–6 and 8 and another leaves 3–6 and 8, so checkpoint 2 grows from 54 to 55; its `sensitive_unexplained` count also falls from 3 to 2. datagate's reference correctness is 0.9996, with one new `sensitive_unexplained` case. The vote accepted both as `mbp` evidence; see `CHANGELOG.md`. The grader pins are now `mbp`'s image IDs (see below). All experiment locks are current.
-- **The new machine uses the remote `mbp` Docker target.** The full no-model check sequence passed there on 2026-11-04 (see [Set up the `mbp` Docker target](#set-up-the-mbp-docker-target)). That run found and fixed a security defect. `mbp`'s `docker exec` runs with umask 0000, which left the installed tool tree world-writable. Now the root payload entry sets umask 022, every trusted exec and provision command is prefixed with `umask 022;`, and installs chmod the directories they create (PR #7, an identity change to all nine primitives).
+- **All nine SCB problems are `validated_partial`**, revalidated with 5 repeats on the **`mbp`** target under grading digest `4cf6e9b2…` (2026-11-05, after the locked-uv change). Verdicts, check statuses and solvable-set sizes match the earlier runs. mocked_http's one varying hidden test changes which test is in its solvable sets from run to run (checkpoints 3–6 and 8); the vote accepted this as `mbp` evidence, see `CHANGELOG.md`. The grader pins are `mbp`'s image IDs (see below). All experiment locks are current.
+- **The new machine uses the remote `mbp` Docker target.** The full no-model check sequence passed there on 2026-11-04, and again on 2026-11-05 after the locked-uv change (see [Set up the `mbp` Docker target](#set-up-the-mbp-docker-target)). The first run found and fixed a security defect. `mbp`'s `docker exec` runs with umask 0000, which left the installed tool tree world-writable. Now the root payload entry sets umask 022, every trusted exec and provision command is prefixed with `umask 022;`, and installs chmod the directories they create (PR #7, an identity change to all nine primitives).
 - **Stage-check evidence travels with the checkout** in tracked `lab/stage-checks/`, outside
   package folders so released package digests stay unchanged. Installed-tree and stop-canary
   records use this canonical store, with no `var/` fallback; execution logs remain under `var/`.
@@ -45,8 +45,8 @@ Run `make help` to see the public interface.
   - Changing them invalidates the problem validations (RT7), and a revalidation takes about 6 h for 9 problems × 5 repeats.
   - Test-only work must never change them. Any identity change gets its own reviewed commit, with before/after values and a scheduled revalidation.
   - The grading digest includes the exact host Python version. `.python-version` and `orchestrator/.python-version` pin **3.13.7**, and CI installs it. Without the project-local pin, `uv run --project orchestrator` picked the newest installed Python (3.14.10 on the old machine), which changes the digest and fails RT7. `requires-python = ">=3.12"` remains the package compatibility range, not the validated grading interpreter.
-  - The host **uv must be 0.10.0**. The problems' dependency records pin `resolver: uv@0.10.0`, and provisioning refuses any other uv. `orchestrator/pyproject.toml` sets `required-version = "==0.10.0"`, and CI pins it too. The old machine's uv updated itself to 0.13.7; `uv self update 0.10.0` fixes that.
-  - `env -u AGENT make toolchain-pin-check` (the first step of `make quality`) checks both pins, the venv interpreter and the host uv.
+  - **Raidar runs its own locked uv, never the host's, wherever uv can affect results.** `uv==0.10.0` is an orchestrator dependency, matching the problems' `resolver: uv@0.10.0` pins. The grading dependency resolver, native validation, stage locks, the ST5 package check and Python tool provisioning call it through `uv.find_uv_bin()` (`raidar.contract.uv`). The host uv only bootstraps the environment: any uv `>=0.10.0` works, including Homebrew's, and nobody needs to change their global uv. Moving the resolver to a newer uv is a deliberate change: update the pin, lockfile and problem records, then revalidate.
+  - `env -u AGENT make toolchain-pin-check` (the first step of `make quality`) checks the Python pins and the running interpreter. It also checks that the declared `uv==X.Y.Z`, the `uv` version in `orchestrator/uv.lock` and every problem's resolver pin agree.
 - **Prefix `make`, `uv` and `pytest` with `env -u AGENT`.**
 - **Real-model trials need the user's approval.** Agents sign in with the local ChatGPT subscription (`CODEX_AUTH_MODE=chatgpt`), never the API key. The API keys are for Jev only, the judge model reached through OpenRouter. Secrets come from Infisical; never print them.
 - **Report format:** an Activity Summary, then key points K1..Kn. Plain language; separate what was observed from what is inferred. State measured claims with sample size and an interval, or label them provisional.
@@ -54,7 +54,7 @@ Run `make help` to see the public interface.
 ### Set up this machine
 1. Clone `main` and run `env -u AGENT make help`.
 2. Install and log in to Infisical (project `ae2a56a4-28d9-429f-bb7c-7d45e26b9ffa`, env `dev`), and run `codex login`, which uses the ChatGPT subscription.
-3. Install the pinned toolchain: `uv self update 0.10.0` (or the uv 0.10.0 installer) and `uv python install 3.13.7`. Then run `env -u AGENT uv sync --project orchestrator --all-extras --frozen`; uv reads `orchestrator/.python-version`. Check with `env -u AGENT make toolchain-pin-check`.
+3. Install the toolchain: any uv `>=0.10.0` (Homebrew's is fine), then `uv python install 3.13.7`. Run `env -u AGENT uv sync --project orchestrator --all-extras --frozen`. uv reads `orchestrator/.python-version` and installs Raidar's locked uv into the project environment. Check with `env -u AGENT make toolchain-pin-check`.
 4. Docker: this machine uses the remote **`mbp`** target; see [Set up the `mbp` Docker target](#set-up-the-mbp-docker-target) below. Mark a target `trusted = true` only with the user's decision.
 5. Run `env -u AGENT make quality`. Expect it to pass, with the fast tier at about 5,150 tests.
 6. Run `git fetch origin --tags` before `env -u AGENT make contract-build` if you need the wheels.
@@ -103,11 +103,11 @@ Run `make help` to see the public interface.
 
    Don't use `make stage-check` as a readiness check. It is for new or changed packages. `raidar/define`'s canary record holds resource floors measured on one host, so a re-run always refuses with "different bytes"; gate-only packages re-run as no-ops on the same pack image.
 
-   The old machine ran this sequence on 2026-11-04, with the `mbp` tunnel up, and saw:
-   - `make quality`: 5,147 fast tests passed;
+   The old machine last ran this sequence on 2026-11-05, with the `mbp` tunnel up, and saw:
+   - `make quality`: 5,154 fast tests passed;
    - `make test-docker`: 10 passed;
    - `make security-gate`: 36 passed;
-   - `make perf-gate`: every `mbp` budget passed, with warm environment start p95 at 4.55 s and 4.88 s against 5.5 s;
+   - `make perf-gate`: every `mbp` budget passed, with warm environment start p95 at 4.62 s and 4.70 s against 5.5 s;
    - the oracle trial: `valid=True reached=1 [solved]`;
    - `make experiment-locks-check`: all locks current;
    - all nine grader IDs on `mbp` equal the validation records.
@@ -123,11 +123,11 @@ Run `make help` to see the public interface.
 - **Or FXL's runtime work:** the Factory X Loops project builds its `stage/1` runtime against `raidar-contract` 2.0.0. Its blockers R1, R2 and R5 are cleared, and R3's `raidar/test-evidence` package is phase 10.
 
 ### Open items
-- The `mbp` check sequence passed on 2026-11-04. The AT1 and AT2 real-model smokes have not been re-run on `mbp` since the primitive identity change; run them with the user's approval.
+- The `mbp` check sequence passed on 2026-11-05. The AT1 and AT2 real-model smokes have not been re-run on `mbp` since the primitive identity changes; run them with the user's approval.
 - `claude-code` isolation is `partial`; measured Claude arms need `full`.
 - Claude Code credentials: `claude setup-token` into Infisical as `CLAUDE_CODE_OAUTH_TOKEN`.
 - The fast and slow tiers miss their prospective 30 s and 300 s budgets (about 137 s and 390 s).
-- mocked_http has one varying hidden test in every validation run. The checkpoints affected per run, oldest first: 7, 5, 7, then 6 (the last on `mbp`, 2026-11-04). The `mbp` run's varying test differs from earlier runs. The cause is unknown; the classification as upstream test nondeterminism is provisional. Investigate it before any measured experiment binds mocked_http or datagate.
+- mocked_http has one varying hidden test in every validation run. The checkpoints affected per run, oldest first: 7, 5, 7, 6, then 6 (the last two on `mbp`, 2026-11-04 and 2026-11-05). The varying test differs between runs. The cause is unknown; the classification as upstream test nondeterminism is provisional. Investigate it before any measured experiment binds mocked_http or datagate.
 - **Version-bumping merges leave the experiment locks stale.** After a merge with a `feat`, `fix` or `perf` commit, or any commit with `!` or a `BREAKING CHANGE` footer, the version workflow (`.github/workflows/version-changelog.yml`, `scripts/release/bump-version.py`) bumps the raidar version. Each lock records that version in `toolchain.raidar`, so `main` then fails `make experiment-locks-check`, which is part of `make quality`; this happened after PR #7. Until the design changes, relock every experiment in a follow-up PR that has no `feat`/`fix`/`perf` commits and no breaking markers. A lasting fix means stopping locks from recording the raidar version, or having the workflow relock; that is a design decision, so put it to a vote.
 - Nothing checks the `umask 022;` prefixes in `orchestrator/src/raidar/engine/trial/provision.py`. The test fakes strip the prefix, and no Docker or security test checks the modes of provisioned files.
-- `scripts/checks/check_toolchain_pins.py` raises a traceback if `uv --version` exits non-zero or prints fewer than two words. Run directly without `uv` on PATH, it also tracebacks; through `make toolchain-pin-check`, a missing `uv` fails earlier at `uv run`.
+- If the project environment has no `uv` binary, `uv.find_uv_bin()` falls back to `~/.local/bin/uv` (and the base-prefix scripts folder), not to PATH. Only grading then refuses a different version, through the resolver identity check in `grading/provision.py`. Native validation, stage locks, ST5 and tool provisioning would run the fallback unchecked. Re-running `uv sync` restores the locked binary.

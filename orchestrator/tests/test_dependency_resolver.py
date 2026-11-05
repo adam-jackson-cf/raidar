@@ -18,6 +18,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+import uv
 from packaging.requirements import Requirement
 
 from raidar.contract import wheel_cache
@@ -277,10 +278,22 @@ def test_an_unusable_uv_is_an_infrastructure_failure_for_its_identity(
         _ = resolver.identity
 
 
-def test_a_missing_uv_during_resolution_is_an_infrastructure_failure() -> None:
-    uv = ScriptedUv(_answers(FileNotFoundError("no uv")))
-    with pytest.raises(DependencyInfraError, match="uv is unavailable"):
-        scripted(uv)(["pkg"], arch="amd64", exclude_newer=CUTOFF)
+@pytest.mark.parametrize("missing_at", ["construction", "resolution"])
+def test_a_missing_uv_during_resolution_is_an_infrastructure_failure(
+    missing_at: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def missing_binary() -> str:
+        raise FileNotFoundError("no uv")
+
+    if missing_at == "construction":
+        monkeypatch.setattr(uv, "find_uv_bin", missing_binary)
+    shell = ScriptedUv(_answers(FileNotFoundError("no uv")))
+    if missing_at == "construction":
+        with pytest.raises(DependencyInfraError, match="uv is unavailable"):
+            UvResolver()
+    else:
+        with pytest.raises(DependencyInfraError, match="uv is unavailable"):
+            scripted(shell)(["pkg"], arch="amd64", exclude_newer=CUTOFF)
 
 
 def test_timeouts_are_retried_up_to_the_bound_then_fail_as_infrastructure(

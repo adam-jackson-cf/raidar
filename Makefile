@@ -140,7 +140,7 @@ help:
 	@echo "  make test-slow                                         Slow tier (slow and not quality and not docker): real local processes, git, run directories; CI runs it on push"
 	@echo "  make test-quality                                      Quality tier (quality and not docker): quality-rule canaries; CI runs it on push"
 	@echo "  make test-docker [TARGET=name]                         Docker tier (docker, not security/perf) on the target; fails, never skips, without Docker (not in make quality)"
-	@echo "  make toolchain-pin-check                               Check Python pins/interpreter and uv host/CI/resolver alignment; first step of make quality"
+	@echo "  make toolchain-pin-check                               Check Python pins/interpreter and declared/locked/resolver uv alignment; first step of make quality"
 	@echo "  make structure-check                                   Check the repository layout (no versions in names, root and package allowlists, depth); part of make quality"
 	@echo "  make release-archive REF=<name>@<N>                    Tag archive/<name>@<N> at HEAD before editing a released definition in place (refuses an existing tag)"
 	@echo "  Generated data lives under var/ (git-ignored; RAIDAR_VAR=<dir> relocates it): jobs, stores, analysis, problems, tmp"
@@ -715,7 +715,7 @@ agent-smoke: docker-check pack-build
 smoke-agents: docker-check pack-build
 	$(call smoke_run,$(SMOKE_AGENTS_EXPERIMENT),smoke-agents,$(SMOKE_SETS),$(if $(SMOKE_ARM),--arm "$(SMOKE_ARM)",))
 
-# Align the project interpreter with byte-equal Python pins and uv across host, CI and registry resolvers.
+# Align the project interpreter with byte-equal Python pins and declared/locked uv with registry resolvers.
 toolchain-pin-check:
 	@$(REPO_RUNTIME_ENV) uv run --project orchestrator python scripts/checks/check_toolchain_pins.py --repo-root "$(CURDIR)"
 

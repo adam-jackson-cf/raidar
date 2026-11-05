@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""Check Python pins and the host, CI and problem resolver uv toolchain pins.
+"""Check Python pins and the declared, locked and problem resolver uv pins.
 
 Python pin files must be byte-equal and match the running interpreter.
-orchestrator/pyproject.toml [tool.uv].required-version is the exact uv pin;
-host uv, every CI setup-uv step and tracked problem JSON resolvers must agree.
+The exact uv project dependency must match its locked package version and every
+tracked problem JSON resolver.
 """
 
 from __future__ import annotations
@@ -17,8 +17,6 @@ import sys
 import tomllib
 from collections.abc import Iterator
 from pathlib import Path
-
-import yaml
 
 
 def pin_violations(
@@ -37,43 +35,49 @@ def pin_violations(
     return found
 
 
-def _resolver_versions(record: object) -> Iterator[str]:
+def _resolvers(record: object) -> Iterator[object]:
     if isinstance(record, dict):
         for key, value in record.items():
-            if key == "resolver" and isinstance(value, str) and value.startswith("uv@"):
-                yield value.removeprefix("uv@")
-            yield from _resolver_versions(value)
+            if key == "resolver":
+                yield value
+            yield from _resolvers(value)
     elif isinstance(record, list):
         for value in record:
-            yield from _resolver_versions(value)
+            yield from _resolvers(value)
 
 
-def _uv_pin_violations(repo_root: Path) -> tuple[str, list[str]]:
+def _declared_uv_version(dependencies: list[str]) -> str | None:
+    declarations = [
+        dependency
+        for dependency in dependencies
+        if re.match(r"uv(?=[\s\[<>=!~;@]|$)", dependency, re.IGNORECASE)
+    ]
+    if len(declarations) != 1:
+        return None
+    exact = re.fullmatch(r"uv==(\d+\.\d+\.\d+)", declarations[0])
+    return exact.group(1) if exact is not None else None
+
+
+def _uv_pin_violations(repo_root: Path) -> list[str]:
     project = tomllib.loads((repo_root / "orchestrator/pyproject.toml").read_text(encoding="utf-8"))
-    required = project.get("tool", {}).get("uv", {}).get("required-version", "")
-    exact = re.fullmatch(r"==(\d+\.\d+\.\d+)", required)
-    if exact is None:
-        return "<version>", [
-            "orchestrator/pyproject.toml [tool.uv].required-version must be an exact ==X.Y.Z pin"
+    pin = _declared_uv_version(project.get("project", {}).get("dependencies", []))
+    if pin is None:
+        return [
+            "orchestrator/pyproject.toml [project].dependencies must declare exactly one "
+            "exact uv==X.Y.Z pin"
         ]
-    pin = exact.group(1)
-    host = subprocess.run(
-        ["uv", "--version"], check=True, capture_output=True, text=True
-    ).stdout.split()[1]
-    versions: list[tuple[str, object]] = [("host uv", host)]
-    workflow_dir = repo_root / ".github/workflows"
-    for workflow in sorted([*workflow_dir.glob("*.yml"), *workflow_dir.glob("*.yaml")]):
-        document = yaml.safe_load(workflow.read_text(encoding="utf-8"))
-        for job_name, job in document.get("jobs", {}).items():
-            for index, step in enumerate(job.get("steps", []), start=1):
-                if step.get("uses", "").startswith("astral-sh/setup-uv@"):
-                    versions.append(
-                        (
-                            f"{workflow.relative_to(repo_root)} job {job_name} "
-                            f"step {index} setup-uv",
-                            step.get("with", {}).get("version"),
-                        )
-                    )
+    lock = tomllib.loads((repo_root / "orchestrator/uv.lock").read_text(encoding="utf-8"))
+    locked = [
+        package.get("version") for package in lock.get("package", []) if package.get("name") == "uv"
+    ]
+    found = []
+    if locked != [pin]:
+        found.append(f"orchestrator/uv.lock: uv versions {locked!r} differ from declared uv {pin}")
+    found.extend(_registry_resolver_violations(repo_root, pin))
+    return found
+
+
+def _registry_resolver_violations(repo_root: Path, pin: str) -> list[str]:
     tracked = subprocess.run(
         ["git", "ls-files", "-z", "--", "lab/problems/registry"],
         cwd=repo_root,
@@ -81,15 +85,16 @@ def _uv_pin_violations(repo_root: Path) -> tuple[str, list[str]]:
         capture_output=True,
         text=True,
     ).stdout
+    found = []
     for relative in tracked.split("\0"):
         if relative.endswith(".json"):
             record = json.loads((repo_root / relative).read_text(encoding="utf-8"))
-            versions.extend((relative, version) for version in _resolver_versions(record))
-    return pin, [
-        f"{source}: uv {version!r} differs from required uv {pin}"
-        for source, version in versions
-        if version != pin
-    ]
+            found.extend(
+                f"{relative}: resolver {resolver!r} differs from declared uv@{pin}"
+                for resolver in _resolvers(record)
+                if resolver != f"uv@{pin}"
+            )
+    return found
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -103,8 +108,7 @@ def main(argv: list[str] | None = None) -> int:
         except FileNotFoundError:
             pins.append(None)
     found = pin_violations(pins[0], pins[1], platform.python_version())
-    uv_pin, uv_found = _uv_pin_violations(args.repo_root)
-    found.extend(uv_found)
+    found.extend(_uv_pin_violations(args.repo_root))
     if not found:
         print("toolchain-pin-check: ok")
         return 0
@@ -115,7 +119,6 @@ def main(argv: list[str] | None = None) -> int:
     print(
         "Restore byte-equal pin files, then run:\n"
         f"  uv python install {pin}\n"
-        f"  uv self update {uv_pin}\n"
         "  env -u AGENT uv sync --project orchestrator --all-extras --frozen",
         file=sys.stderr,
     )

@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+import uv
 from click.testing import CliRunner
 
 from raidar.cli import main, stage_fixtures, stage_lock, stage_package
@@ -63,11 +64,16 @@ def test_static_loading_the_lock_check_and_a_containerless_check_never_import_th
     monkeypatch.setattr(stage_fixtures, "_pack", lambda target: ("image", "context", "pack"))
     monkeypatch.setattr(stage_check, "PackContainer", NoDocker)
 
-    def uv(project: Path, *args: str) -> subprocess.CompletedProcess[str]:
-        (project / "uv.lock").write_text((package_root / "tool" / "uv.lock").read_text())
-        return subprocess.CompletedProcess(args, 0, "", "")
+    locked_uv = uv.find_uv_bin()
 
-    monkeypatch.setattr(stage_lock, "_uv", uv)
+    def run(argv: list[str], **kwargs: Any) -> subprocess.CompletedProcess[str]:
+        if argv[0] != locked_uv:
+            return subprocess.CompletedProcess(argv, 1, "", "host uv must not lock packages")
+        project = Path(argv[argv.index("--project") + 1])
+        (project / "uv.lock").write_text((package_root / "tool" / "uv.lock").read_text())
+        return subprocess.CompletedProcess(argv, 0, "", "")
+
+    monkeypatch.setattr(stage_lock.subprocess, "run", run)
 
     package = load_stage_package(package_root)
     problems = stage_lock.lock_problems(package_root)

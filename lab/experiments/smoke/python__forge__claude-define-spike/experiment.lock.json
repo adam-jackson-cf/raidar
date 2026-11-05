@@ -1075,7 +1075,7 @@
       "tree-sitter-language-pack": "0.13.0"
     }
   },
-  "document_sha256": "18feb75c6524810699b4a633e35926e8b3b24d0e2f378e737c0d62c832164d4f",
+  "document_sha256": "9897c00965e4e73d402b1cf16fad8ccb4b4ee4813087428cfb24dfbc4eb7d755",
   "execution": {
     "arms": {
       "define": {
@@ -1093,7 +1093,7 @@
           "version_pin": "2.1.285",
           "workflow_skills": "placement.skills .claude/skills in the workspace /app"
         },
-        "digest": "09af9805012138492bcafbb6ca43f67616e5bb28b9ff27b2693cc92e43bd9e14",
+        "digest": "e6b399f819e73cc315d3884d3d1e86b5316dd14e392b90209e342ff7852a21eb",
         "model": "claude-sonnet-4-6",
         "packages": {
           "raidar/define": {
@@ -1119,7 +1119,7 @@
           "install/1": "2d36f6e37de3a575f2f1f76c45c6a8ab24940983f095728303b4ed0a3b38adc8",
           "jev-judge/1": "6f68cdbe1b68002787882a36151eaaa189c5146aeda0190abfa11be095d83998",
           "outputs/1": "bc18d248d934bdd608f36c123fb512ecd7906d06f66011bf00e53ccea053cd84",
-          "runner/1": "9e27ccc4dff1b9af7d4efb786a89f68991334fc0ff2a552f471ed8335417595f",
+          "runner/1": "e8496e276434cedd89dd7d0e160ac17b7238152d5bb6d680f3fe09d0089990ce",
           "setup/1": "301f21fe643ce57793ec2975b1e4327295b344de31d3afeb4e26e8ff3bd5eb59",
           "stop/1": "0a7c2d8233d59c6ef9725eab0cddb131eb0a2a598eedfcba06d0c1ce509d43fd"
         },
@@ -1873,7 +1873,7 @@
               "grader": {
                 "environment_id": "sha256:e0044b07679a3b973081c381f8d3a64d6b0b32e84c0debb82069887ab984a8c1",
                 "image": "raidar-oracle-grader:963c14e63ff5e15d",
-                "implementation_sha256": "a93cc5f71c842e1963145679d64ebacf607412debb2e28fe44313ae6964e2074"
+                "implementation_sha256": "4cf6e9b2d6fe550a1c94485e527c4932f1981ba3fda827e74532749b12bc48d0"
               },
               "not_run": [
                 "native_parity_positive",
@@ -1949,7 +1949,7 @@
     "source_sha256": "cc62bbedff428013bb5c8211b91601642dfeeaef46159a4063c09aedb9fefbc7",
     "spec_sha256": "06aac1e03107800b8e8c668be7b5c394fddfdb942bd62f53ea7932231538977d"
   },
-  "lock_sha256": "556ef965aa14c946a83b931fc5e684f01f90050d83b7de9613ecbc6e6b1425ee",
+  "lock_sha256": "1b0be9453f58d93027db40a97136c0c5dc61d31c950ebcd6f0449379c490ed76",
   "lock_version": 5,
   "overrides": {
     "flags": {},
@@ -1958,7 +1958,7 @@
   "sections": {
     "analysis": "f7f0b52ed6909ba0f3864eb9e7f7d513625da8dc445234304b8aa033c4343cb6",
     "assessment": "7af46696276c21b0461b97e8c58f2396c7730e56e1719087038da7acd2c6fef3",
-    "execution": "556ef965aa14c946a83b931fc5e684f01f90050d83b7de9613ecbc6e6b1425ee",
+    "execution": "1b0be9453f58d93027db40a97136c0c5dc61d31c950ebcd6f0449379c490ed76",
     "toolchain": "6cc8912af73855247db526411e0e6b61efa307f63e3b8f22d22d48fdfb2d3ee9"
   },
   "spec": {

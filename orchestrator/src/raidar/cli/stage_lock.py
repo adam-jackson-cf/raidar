@@ -13,6 +13,7 @@ import subprocess
 import tempfile
 from pathlib import Path
 
+from raidar.contract.uv import locked_uv
 from raidar.contract.wheels import WheelPolicyError, generated_wheels_only_lock, uv_lock_refusals
 
 LOCK_FILE = "uv.lock"
@@ -37,7 +38,7 @@ def _scratch_project(tool: Path, scratch: Path, *, with_lock: bool) -> Path:
 def _uv(project: Path, *args: str) -> subprocess.CompletedProcess[str]:
     try:
         return subprocess.run(
-            ["uv", *args, "--project", str(project), "--python", PYTHON, "--no-build"],
+            [locked_uv(), *args, "--project", str(project), "--python", PYTHON, "--no-build"],
             capture_output=True,
             text=True,
             check=False,

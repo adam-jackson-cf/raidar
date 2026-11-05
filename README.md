@@ -17,11 +17,15 @@ Raidar uses [Harbor's vocabulary](#concepts) wherever Harbor has a term (job, tr
 
 The binding design is [`split-design.md`](split-design.md): arms, workflows and stage packages, problem onboarding, health, measurement and the implementation plan. Earlier design records live under [`docs/reboot/`](docs/reboot/).
 
-Host setup uses Python **3.13.7**, pinned in `.python-version` and CI:
+Host setup uses Python **3.13.7**, pinned in `.python-version` and CI, and host
+`uv >=0.10.0` as a bootstrap tool only:
 
 ```sh
 env -u AGENT uv sync --project orchestrator --python 3.13.7 --all-extras --frozen
 ```
+
+Result-affecting Raidar uv calls use the exact uv dependency locked in
+`orchestrator/uv.lock`, not the host uv.
 
 The grading digest includes the exact host Python version; a different patch version
 changes the digest and fails RT7 against the current validation pins. Package compatibility
@@ -80,7 +84,7 @@ comparison is a reading, not an exclusion. Native parity remains required for fu
 
 Prerequisites:
 
-- `uv`
+- Host `uv >=0.10.0` for bootstrap only; Raidar uses its locked uv dependency at runtime
 - Docker with `docker compose` 2.40.1 or newer, local or on another host. Each machine names its Docker targets in `~/.config/raidar/targets.toml` (`make target-init` writes a commented template); select one with `TARGET=<name>` or the file's `default`. A remote target is reached through a supervised SSH-forwarded socket (`make target-up TARGET=<name>`, `make target-status`), and hidden tests and agent credentials go only to targets marked `trusted = true`.
 - Node 18 or newer, for the review surface
 - Agent credentials: file-backed Codex auth (`make codex-auth-setup`) or `OPENAI_API_KEY` for `codex`; `ANTHROPIC_API_KEY`, `ANTHROPIC_AUTH_TOKEN` or `CLAUDE_CODE_OAUTH_TOKEN` for `claude-code`

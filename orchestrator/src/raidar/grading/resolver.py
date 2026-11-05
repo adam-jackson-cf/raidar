@@ -45,6 +45,7 @@ from packaging.utils import (
 )
 from packaging.version import InvalidVersion, Version
 
+from raidar.contract.uv import locked_uv
 from raidar.contract.wheels import (
     ARCHES,
     INDEX,
@@ -324,6 +325,13 @@ def classify_failure(
 
 
 # ------------------------------------------------------------------------- uv
+def _locked_uv() -> str:
+    try:
+        return locked_uv()
+    except FileNotFoundError as error:
+        raise DependencyInfraError(f"uv is unavailable: {error}") from error
+
+
 def _uv_environment() -> dict[str, str]:
     return {key: os.environ[key] for key in _PASSED_ENV if key in os.environ}
 
@@ -334,13 +342,13 @@ def _canonical_cutoff(exclude_newer: str) -> datetime:
 
 @dataclass(frozen=True)
 class UvResolver:
-    """``Resolver`` over the host ``uv``.
+    """``Resolver`` over Raidar's locked ``uv``.
 
     ``compile_args`` is appended to the ``uv pip compile`` command (tests point it at a
     local ``--no-index --find-links`` directory); the policy flags are always present.
     """
 
-    uv_bin: str = "uv"
+    uv_bin: str = field(default_factory=_locked_uv)
     timeout_s: float = TIMEOUT_S
     timeout_retries: int = TIMEOUT_RETRIES
     """Extra identical attempts after a timed-out resolution; the production bound is one, so

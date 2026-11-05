@@ -9,6 +9,8 @@ dependencies = [
     "pyyaml>=6.0",
     # PEP 508/440 parsing of the requirements a graded submission declares (FCR-007).
     "packaging>=24.0",
+    # Match the problems' resolver: uv@0.10.0 pins.
+    "uv==0.10.0",
     "click>=8.0",
     "python-dotenv>=1.2.2",
     "aiohttp>=3.13.5",
@@ -53,7 +55,7 @@ problem = "raidar.design.problem.resolver:resolver_factory"
 scorer = "raidar.scoring.catalog.builtin:scorer_resolver"
 
 [tool.uv]
-required-version = "==0.10.0"
+required-version = ">=0.10.0"
 
 [tool.uv.sources]
 raidar-contract = { path = "../contract", editable = true }

@@ -8,6 +8,7 @@ import subprocess
 from pathlib import Path
 
 import pytest
+import uv
 import yaml
 from raidar_contract.canonical import digest_json
 from raidar_contract.references import Release
@@ -319,7 +320,11 @@ def test_a_package_with_a_stop_owes_a_stage_check_record_even_with_an_installed_
 
 
 def _uv(monkeypatch: pytest.MonkeyPatch, outcome: object) -> None:
-    def run(*args: object, **kwargs: object) -> object:
+    locked_uv = uv.find_uv_bin()
+
+    def run(argv: list[str], **kwargs: object) -> object:
+        if argv[0] != locked_uv:
+            return _done(1, err="host uv cannot determine package admission")
         if isinstance(outcome, BaseException):
             raise outcome
         return outcome

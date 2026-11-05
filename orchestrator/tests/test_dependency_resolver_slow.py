@@ -8,6 +8,8 @@ timeouts are proved with a scripted shell in :mod:`tests.test_dependency_resolve
 
 from __future__ import annotations
 
+import os
+from importlib.metadata import version
 from pathlib import Path
 
 import pytest
@@ -20,6 +22,24 @@ from tests.dependency_support import CUTOFF, make_sdist, make_wheel
 pytestmark = pytest.mark.slow
 
 CANARY = "raidar-canary==1.0"
+
+
+@pytest.fixture(autouse=True)
+def hostile_host_uv(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Resolution ignores both a host executable and the caller's uv policy."""
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    decoy = bin_dir / "uv"
+    decoy.write_text(
+        '#!/bin/sh\nif [ "$1" = "--version" ]; then\n'
+        "    echo 'uv 9.9.9'\n    exit 0\nfi\nexit 1\n"
+    )
+    decoy.chmod(0o755)
+    monkeypatch.setenv("PATH", f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}")
+    cwd = tmp_path / "caller"
+    cwd.mkdir()
+    (cwd / "pyproject.toml").write_text('[tool.uv]\nrequired-version = "==9.9.9"\n')
+    monkeypatch.chdir(cwd)
 
 
 @pytest.fixture(name="links")
@@ -92,4 +112,4 @@ def test_a_failing_canary_is_an_infrastructure_failure(tmp_path: Path) -> None:
 
 
 def test_the_resolver_identity_is_the_installed_uv_version() -> None:
-    assert UvResolver().identity.startswith("uv@")
+    assert UvResolver().identity == f"uv@{version('uv')}"
