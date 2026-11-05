@@ -2,6 +2,12 @@
 
 All notable changes to this project are documented in this file.
 
+## 1.0.1 - 2026-11-05
+
+### Refactoring
+
+- refactor(toolchain): Raidar runs its own locked uv; revalidate and relock
+
 ## 1.0.1 - 2026-11-04
 
 ### Documentation
@@ -167,14 +173,15 @@ All notable changes to this project are documented in this file.
   Packaging `26.0`, pydantic `2.12.5` and Harbor `0.23.0` remain unchanged.
 - Repository inventory records these `primitive_code` changes:
 
-  | Adapter | Primitive | Before | After |
-  | --- | --- | --- | --- |
-  | codex | `runner/1` | `1bfaa6d83270c5d517aefa4d5aee090eee3656dad0a40e270641533d943dd914` | `4828ba856407dd1b52815091c4ba92c24242b44909514e2b9cc08af024a1d133` |
+  | Adapter     | Primitive  | Before                                                             | After                                                              |
+  | ----------- | ---------- | ------------------------------------------------------------------ | ------------------------------------------------------------------ |
+  | codex       | `runner/1` | `1bfaa6d83270c5d517aefa4d5aee090eee3656dad0a40e270641533d943dd914` | `4828ba856407dd1b52815091c4ba92c24242b44909514e2b9cc08af024a1d133` |
   | claude-code | `runner/1` | `9e27ccc4dff1b9af7d4efb786a89f68991334fc0ff2a552f471ed8335417595f` | `e8496e276434cedd89dd7d0e160ac17b7238152d5bb6d680f3fe09d0089990ce` |
 
   The other eight primitive digests for each adapter remain unchanged. The
   `runner/1` closure changes through `contract/uv.py` and
   `subject/workflow/package_checks.py`.
+
 - Revalidate all nine SCB problems with five repeats on `mbp` under `4cf6e9b2…` and relock
   all twelve experiments. Verdicts, check statuses and solvable-set sizes are unchanged, and
   grader IDs are unchanged. datagate returns to reference correctness 1, with no
