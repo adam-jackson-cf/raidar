@@ -21,6 +21,7 @@ from typing import Any
 
 import yaml
 
+from raidar.contract.uv import locked_uv
 from raidar.design.problem.source import Runner
 from raidar.design.problem.validation import Grade
 from raidar.grading.models import CaseGroup
@@ -58,7 +59,12 @@ def stage_catalog(problem_dir: Path, catalog: Path, *, run: Runner = subprocess.
         'requires-python = ">=3.12"\n'
         f"dependencies = [\n{dep_lines}]\n"
     )
-    proc = run(["uv", "lock", "-q"], cwd=dest, capture_output=True, text=True, check=False)
+    try:
+        proc = run(
+            [locked_uv(), "lock", "-q"], cwd=dest, capture_output=True, text=True, check=False
+        )
+    except FileNotFoundError as error:
+        raise NativeRunnerError(f"uv is unavailable: {error}") from error
     if proc.returncode != 0:
         raise NativeRunnerError(f"uv lock failed for the native evaluator: {proc.stderr[-2000:]}")
     return dest

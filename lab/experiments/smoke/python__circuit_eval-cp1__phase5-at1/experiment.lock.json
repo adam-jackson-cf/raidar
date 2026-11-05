@@ -668,7 +668,7 @@
     },
     "tools": {}
   },
-  "document_sha256": "f4942a61af2e40981218a45cdec82cf28ac0df30d79e909fabb93d3b580e4bd0",
+  "document_sha256": "6bf0716fc21882f7b7b79a06af5fff4323e9bcc9266e13af8e178036a3c800d3",
   "execution": {
     "arms": {
       "docs-fix": {
@@ -686,7 +686,7 @@
           "version_pin": "0.156.1",
           "workflow_skills": "placement.skills .agents/skills in the workspace /app"
         },
-        "digest": "549d507293714f662a3c257de6450b7f22b50ad579e741684c3ffc6c11d0eba1",
+        "digest": "616ca1faf9399d92a21caa4b57601f6db1760e1a84fbd1e81e0c2a1759ede815",
         "model": "gpt-6-luna",
         "packages": {
           "raidar/docs-check": {
@@ -708,7 +708,7 @@
           "frame/1": "c89c277bb146542f985499df52718e346e2ddaa57dd5530a441128ecb5da268c",
           "gate/1": "d8600540cf34ce9e6490b5852e1cf7211f126f793d76df7e44d7a788b73849f8",
           "install/1": "ef0f44adfc308bf5fd11d210ab28d92d935e6d0f6a631fd33e38ef01cb7634f8",
-          "runner/1": "1bfaa6d83270c5d517aefa4d5aee090eee3656dad0a40e270641533d943dd914"
+          "runner/1": "4828ba856407dd1b52815091c4ba92c24242b44909514e2b9cc08af024a1d133"
         },
         "provider": "openai",
         "reasoning": "low",
@@ -857,7 +857,7 @@
               "grader": {
                 "environment_id": "sha256:e0044b07679a3b973081c381f8d3a64d6b0b32e84c0debb82069887ab984a8c1",
                 "image": "raidar-oracle-grader:963c14e63ff5e15d",
-                "implementation_sha256": "a93cc5f71c842e1963145679d64ebacf607412debb2e28fe44313ae6964e2074"
+                "implementation_sha256": "4cf6e9b2d6fe550a1c94485e527c4932f1981ba3fda827e74532749b12bc48d0"
               },
               "not_run": [
                 "native_parity_positive",
@@ -907,7 +907,7 @@
     "source_sha256": "ee4771b997a090438d3611fe5cd2fc09fb6e1a6cc7b9b6e4feb44db1c2656736",
     "spec_sha256": "0e03d713fd6942f8f1fb6f91b6e8106f1d270d3d6fd4cca7edf65bcfe66e4ba8"
   },
-  "lock_sha256": "db722fe30b97b195243db1bbbafc7d0fe52b36a9d0922376b715823adb2ff27d",
+  "lock_sha256": "a152e955749a0343ec84cc5556bedb5708c3af585bc66728a888c106714c4151",
   "lock_version": 5,
   "overrides": {
     "flags": {},
@@ -916,7 +916,7 @@
   "sections": {
     "analysis": "2165078bb3edf1fd89313bb7b0fdb121366bd76e9a351568321984d79da72faa",
     "assessment": "c9441304cf5dfd637b293b49a884fc1886936dc55291e9a2490cd5747ffed2ee",
-    "execution": "db722fe30b97b195243db1bbbafc7d0fe52b36a9d0922376b715823adb2ff27d",
+    "execution": "a152e955749a0343ec84cc5556bedb5708c3af585bc66728a888c106714c4151",
     "toolchain": "6cc8912af73855247db526411e0e6b61efa307f63e3b8f22d22d48fdfb2d3ee9"
   },
   "spec": {

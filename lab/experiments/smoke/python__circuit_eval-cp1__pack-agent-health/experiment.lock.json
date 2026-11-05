@@ -281,7 +281,7 @@
     },
     "tools": {}
   },
-  "document_sha256": "0c69882806a15a4b3c870dd93a1fc5a0742b70e72c41d97131cc41b00c7a7cd0",
+  "document_sha256": "e186528d052ad5fe22bdbfd17a7ac8690159abb4163ac70be469d5e423b9cf9a",
   "execution": {
     "arms": {
       "codex": {
@@ -299,13 +299,13 @@
           "version_pin": "0.156.1",
           "workflow_skills": "placement.skills .agents/skills in the workspace /app"
         },
-        "digest": "13819e46adc3e212ac2971616b3cbca5f2da24d495cc7c038529c43ddef61bbd",
+        "digest": "2a87b3ad3a1ed2396ebcebc46d6cadab8b9296109e6cd3a0e02e298880cc5f7b",
         "model": "gpt-6-luna",
         "packages": {},
         "primitive_code": {
           "frame/1": "c89c277bb146542f985499df52718e346e2ddaa57dd5530a441128ecb5da268c",
           "install/1": "ef0f44adfc308bf5fd11d210ab28d92d935e6d0f6a631fd33e38ef01cb7634f8",
-          "runner/1": "1bfaa6d83270c5d517aefa4d5aee090eee3656dad0a40e270641533d943dd914"
+          "runner/1": "4828ba856407dd1b52815091c4ba92c24242b44909514e2b9cc08af024a1d133"
         },
         "provider": "openai",
         "reasoning": "low",
@@ -454,7 +454,7 @@
               "grader": {
                 "environment_id": "sha256:e0044b07679a3b973081c381f8d3a64d6b0b32e84c0debb82069887ab984a8c1",
                 "image": "raidar-oracle-grader:963c14e63ff5e15d",
-                "implementation_sha256": "a93cc5f71c842e1963145679d64ebacf607412debb2e28fe44313ae6964e2074"
+                "implementation_sha256": "4cf6e9b2d6fe550a1c94485e527c4932f1981ba3fda827e74532749b12bc48d0"
               },
               "not_run": [
                 "native_parity_positive",
@@ -501,7 +501,7 @@
     "source_sha256": "dc0152b6cc532547c13525aaadeafdd4c6857ed69a17250c6614bd6987c8784b",
     "spec_sha256": "e65c92d63cbbc80c75f63a0a611f0902d285f732d29f570bc1a2eec0a831bad6"
   },
-  "lock_sha256": "b453a994f535c428f5a5946c440a71ae6c0f30c306e31a7ac8cb29416e674b94",
+  "lock_sha256": "5d78b0d20f23dba32579a9d0b49090c73e9cc58c0a6b1c147e81c643ba3afe7e",
   "lock_version": 5,
   "overrides": {
     "flags": {},
@@ -510,7 +510,7 @@
   "sections": {
     "analysis": "33aede75abee4373a36e88c3e4bad96deaadffcf5db85e1efadee2a8414fd67b",
     "assessment": "05fc802b766d3e7351e9470b3ad7d78c4d7bfbf1defcdb073a327001a5f4a028",
-    "execution": "b453a994f535c428f5a5946c440a71ae6c0f30c306e31a7ac8cb29416e674b94",
+    "execution": "5d78b0d20f23dba32579a9d0b49090c73e9cc58c0a6b1c147e81c643ba3afe7e",
     "toolchain": "6cc8912af73855247db526411e0e6b61efa307f63e3b8f22d22d48fdfb2d3ee9"
   },
   "spec": {

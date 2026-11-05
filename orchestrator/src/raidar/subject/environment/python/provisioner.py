@@ -35,6 +35,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from raidar.contract.paths import var_root
+from raidar.contract.uv import locked_uv
 from raidar.subject.environment.python.pack_definition import (
     REASON_DRIFT,
     REASON_FIRST_USE,
@@ -185,10 +186,12 @@ class ToolProvisioner:
         return spec
 
     def _uv(self) -> str:
-        uv = self._uv_executable or shutil.which("uv")
-        if not uv:
-            raise ToolProvisioningError("uv is required to provision Python pack tools")
-        return uv
+        if self._uv_executable is not None:
+            return self._uv_executable
+        try:
+            return locked_uv()
+        except FileNotFoundError as error:
+            raise ToolProvisioningError("uv is required to provision Python pack tools") from error
 
     def _install(
         self, name: str, spec: ToolSpec, layout: _Layout, reason: str

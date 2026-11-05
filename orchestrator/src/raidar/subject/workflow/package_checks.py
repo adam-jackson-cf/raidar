@@ -31,6 +31,7 @@ from raidar_contract.package.tokens import PLACEHOLDER, TASK_SLOT, token_name
 from raidar_contract.references import Release
 from raidar_contract.workflow import PackageJudge
 
+from raidar.contract.uv import locked_uv
 from raidar.contract.wheels import uv_lock_refusals
 from raidar.subject.primitive.registry import SUPPORTED_CONTRACTS
 
@@ -65,7 +66,7 @@ def uv_lock_stale(tool: Path) -> str | None:
     """Why ``uv lock --check --offline`` refuses ``tool`` (``None``: the lock is current)."""
     try:
         done = subprocess.run(
-            ["uv", "lock", "--check", "--offline"],
+            [locked_uv(), "lock", "--check", "--offline"],
             cwd=tool,
             capture_output=True,
             text=True,

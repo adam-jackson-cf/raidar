@@ -59,7 +59,7 @@
     "engine": "direct",
     "grader_environment_id": "sha256:9a697be7c29fef1c71febc56083dfbdb9aee20fbd80e1e129e093e532daf78d7",
     "grader_image": "raidar-oracle-grader:2cf4f359dd32f0b6",
-    "grader_implementation_sha256": "a93cc5f71c842e1963145679d64ebacf607412debb2e28fe44313ae6964e2074",
+    "grader_implementation_sha256": "4cf6e9b2d6fe550a1c94485e527c4932f1981ba3fda827e74532749b12bc48d0",
     "harbor": "0.23.0",
     "pack_image": "raidar/pack-python:2b91a52663e099f2"
   },
@@ -699,10 +699,10 @@
             "total": 55
           },
           "checkpoint_3": {
-            "all_pass": false,
+            "all_pass": true,
             "groups": {
               "core": [
-                1,
+                2,
                 2
               ],
               "error": [
@@ -719,7 +719,7 @@
               ]
             },
             "infra_failure": null,
-            "passed": 76,
+            "passed": 77,
             "total": 77
           },
           "checkpoint_4": {
@@ -1588,12 +1588,12 @@
                 13
               ],
               "regression": [
-                141,
+                140,
                 141
               ]
             },
             "infra_failure": null,
-            "passed": 141,
+            "passed": 140,
             "total": 159
           },
           "checkpoint_8": {
@@ -2105,7 +2105,7 @@
         "status": "measured"
       },
       "checkpoint_3": {
-        "observation": "variation observed in 5 runs for this reference and environment",
+        "observation": "no variation observed in 5 runs for this reference and environment",
         "reference_sha256": "4fe3e0f5e5237d818f715b8086f7b144c383fe2bb1a8d71ceec2c44ed54ea34b",
         "runs": 5,
         "status": "measured"
@@ -2179,7 +2179,7 @@
         "status": "measured"
       },
       "checkpoint_7": {
-        "observation": "no variation observed in 5 runs for this reference and environment",
+        "observation": "variation observed in 5 runs for this reference and environment",
         "reference_sha256": "57dd62fe1fc1f7ba73817b56db225b0febc1b506f5b176fb4c78bc3d89bffac2",
         "runs": 5,
         "status": "measured"
@@ -2300,10 +2300,10 @@
       "verdict": "validated"
     },
     "checkpoint_3": {
-      "digest": "1bdf9832e06d2368e459f58a1ef5c1f2b315bc17f448eb3e04c12963b04e8ba0",
+      "digest": "a3fc84629f3349a6fe41bcfd9bc2f1c64ce975b9b979b56a785e221ee4444e63",
       "exclusion": null,
       "nondeterministic": [
-        "checkpoint_3::test_redis_persists_state_across_requests"
+        "checkpoint_3::test_redis_state_lost_on_restart"
       ],
       "nondeterministic_count": 1,
       "size": 76,
@@ -2366,7 +2366,7 @@
         "checkpoint_3::test_mixed_action_ordering",
         "checkpoint_3::test_redis_array_semicolon_separator",
         "checkpoint_3::test_redis_hash_and_list_ops",
-        "checkpoint_3::test_redis_state_lost_on_restart",
+        "checkpoint_3::test_redis_persists_state_across_requests",
         "checkpoint_3::test_redisdo_condition_stateful_routing",
         "checkpoint_3::test_redisdo_del_multiple_keys",
         "checkpoint_3::test_redisdo_empty_hash_and_keys",
@@ -2388,10 +2388,10 @@
       "verdict": "validated"
     },
     "checkpoint_4": {
-      "digest": "389734bdad2bd7f97545d2ab5c54dbd5fcd2d5a54bdf29196746f5e1e1b5db8a",
+      "digest": "7e8ff6b861d0919ab7ea0181d87ce270e1bc037fb8b1f630d582e8359ed1955a",
       "exclusion": null,
       "nondeterministic": [
-        "checkpoint_3::test_redis_persists_state_across_requests"
+        "checkpoint_3::test_redis_state_lost_on_restart"
       ],
       "nondeterministic_count": 1,
       "size": 98,
@@ -2454,7 +2454,7 @@
         "checkpoint_3::test_mixed_action_ordering",
         "checkpoint_3::test_redis_array_semicolon_separator",
         "checkpoint_3::test_redis_hash_and_list_ops",
-        "checkpoint_3::test_redis_state_lost_on_restart",
+        "checkpoint_3::test_redis_persists_state_across_requests",
         "checkpoint_3::test_redisdo_condition_stateful_routing",
         "checkpoint_3::test_redisdo_del_multiple_keys",
         "checkpoint_3::test_redisdo_empty_hash_and_keys",
@@ -2498,10 +2498,10 @@
       "verdict": "validated"
     },
     "checkpoint_5": {
-      "digest": "ba6b8cf93fcc11ee443cf4e5eb5ed3504957610b8d50194c86e5824a659d0c00",
+      "digest": "d253883521caf1acb32ccc4c3d5ef1317f8070c5e347ae395f807b2675f8f87d",
       "exclusion": null,
       "nondeterministic": [
-        "checkpoint_3::test_redis_persists_state_across_requests"
+        "checkpoint_3::test_redis_state_lost_on_restart"
       ],
       "nondeterministic_count": 1,
       "size": 113,
@@ -2564,7 +2564,7 @@
         "checkpoint_3::test_mixed_action_ordering",
         "checkpoint_3::test_redis_array_semicolon_separator",
         "checkpoint_3::test_redis_hash_and_list_ops",
-        "checkpoint_3::test_redis_state_lost_on_restart",
+        "checkpoint_3::test_redis_persists_state_across_requests",
         "checkpoint_3::test_redisdo_condition_stateful_routing",
         "checkpoint_3::test_redisdo_del_multiple_keys",
         "checkpoint_3::test_redisdo_empty_hash_and_keys",
@@ -2623,10 +2623,10 @@
       "verdict": "validated"
     },
     "checkpoint_6": {
-      "digest": "8dbca064f456cab6dfd6f087a5eeaaa43ecc9c497536c054db4670e4a892b0b4",
+      "digest": "32ca632e5266e9d2dacf33b453ae812c2ae29fff38e80bd7bd0a77b1ffb1d8c3",
       "exclusion": null,
       "nondeterministic": [
-        "checkpoint_3::test_redis_persists_state_across_requests"
+        "checkpoint_3::test_redis_state_lost_on_restart"
       ],
       "nondeterministic_count": 1,
       "size": 140,
@@ -2689,7 +2689,7 @@
         "checkpoint_3::test_mixed_action_ordering",
         "checkpoint_3::test_redis_array_semicolon_separator",
         "checkpoint_3::test_redis_hash_and_list_ops",
-        "checkpoint_3::test_redis_state_lost_on_restart",
+        "checkpoint_3::test_redis_persists_state_across_requests",
         "checkpoint_3::test_redisdo_condition_stateful_routing",
         "checkpoint_3::test_redisdo_del_multiple_keys",
         "checkpoint_3::test_redisdo_empty_hash_and_keys",
@@ -2778,7 +2778,7 @@
       "digest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
       "exclusion": "no_new_scoreable_tests",
       "nondeterministic": [
-        "checkpoint_3::test_redis_persists_state_across_requests"
+        "checkpoint_3::test_redis_state_lost_on_restart"
       ],
       "nondeterministic_count": 1,
       "size": 0,
@@ -2786,10 +2786,10 @@
       "verdict": "excluded"
     },
     "checkpoint_8": {
-      "digest": "628b4296d9bd3b579e72f60a7694bc82c6ce78b97e97488fc97300349d335011",
+      "digest": "c428e242a012e638ac7dc7d67385e26deae2f58dd9d56e5d07c1df9985742c5c",
       "exclusion": null,
       "nondeterministic": [
-        "checkpoint_3::test_redis_persists_state_across_requests"
+        "checkpoint_3::test_redis_state_lost_on_restart"
       ],
       "nondeterministic_count": 1,
       "size": 174,
@@ -2852,7 +2852,7 @@
         "checkpoint_3::test_mixed_action_ordering",
         "checkpoint_3::test_redis_array_semicolon_separator",
         "checkpoint_3::test_redis_hash_and_list_ops",
-        "checkpoint_3::test_redis_state_lost_on_restart",
+        "checkpoint_3::test_redis_persists_state_across_requests",
         "checkpoint_3::test_redisdo_condition_stateful_routing",
         "checkpoint_3::test_redisdo_del_multiple_keys",
         "checkpoint_3::test_redisdo_empty_hash_and_keys",

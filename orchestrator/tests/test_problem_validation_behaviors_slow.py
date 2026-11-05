@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 from typing import Any
 
@@ -132,7 +133,15 @@ async def test_one_shot_problem_grades_one_step_under_the_one_shot_policy(
     assert multi["headline_policy"]["policy"] == "scb-canonical@1"
 
 
-def test_native_catalog_stages_a_locked_evaluator_project_with_real_uv(tmp_path: Path) -> None:
+def test_native_catalog_stages_a_locked_evaluator_project_with_real_uv(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    decoy = bin_dir / "uv"
+    decoy.write_text("#!/bin/sh\nexit 1\n")
+    decoy.chmod(0o755)
+    monkeypatch.setenv("PATH", f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}")
     problem = tmp_path / "adder"
     problem.mkdir()
     (problem / "config.yaml").write_text("test_dependencies: [pyyaml==6.0.2]\n")

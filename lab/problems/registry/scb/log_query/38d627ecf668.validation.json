@@ -47,7 +47,7 @@
     "engine": "direct",
     "grader_environment_id": "sha256:e0044b07679a3b973081c381f8d3a64d6b0b32e84c0debb82069887ab984a8c1",
     "grader_image": "raidar-oracle-grader:963c14e63ff5e15d",
-    "grader_implementation_sha256": "a93cc5f71c842e1963145679d64ebacf607412debb2e28fe44313ae6964e2074",
+    "grader_implementation_sha256": "4cf6e9b2d6fe550a1c94485e527c4932f1981ba3fda827e74532749b12bc48d0",
     "harbor": "0.23.0",
     "pack_image": "raidar/pack-python:2b91a52663e099f2"
   },

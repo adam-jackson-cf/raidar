@@ -841,7 +841,7 @@
       "tree-sitter-language-pack": "0.13.0"
     }
   },
-  "document_sha256": "3866ddb508e7654b04372e71cab246da750632273fb63e5b32f9b9610bc4d37a",
+  "document_sha256": "f50520a80da62ca821edd267ff5905395a817f1cfd73941b7178615ea40bf2b0",
   "execution": {
     "arms": {
       "verify": {
@@ -859,7 +859,7 @@
           "version_pin": "2.1.285",
           "workflow_skills": "placement.skills .claude/skills in the workspace /app"
         },
-        "digest": "1e73a2b92e18f4bf328dedbb9b8fdbded5439381e80e00b772b2ca5b9a3c3386",
+        "digest": "f63232cee76f263e3e85249a44d475bbd4998050c2d38dea33b216b03a2001f3",
         "model": "claude-sonnet-4-6",
         "packages": {
           "raidar/verify": {
@@ -874,7 +874,7 @@
           "frame/1": "8443dcf24e309240de6fc4aa6f84af8e80dfb884c51eabf2cd01fb1b7ca6fd0f",
           "gate/1": "19ae0fdd295d9c51c78e9a651ac04b7b6f492d3b36b28eff3de04bdbc8b1d8dc",
           "install/1": "2d36f6e37de3a575f2f1f76c45c6a8ab24940983f095728303b4ed0a3b38adc8",
-          "runner/1": "9e27ccc4dff1b9af7d4efb786a89f68991334fc0ff2a552f471ed8335417595f"
+          "runner/1": "e8496e276434cedd89dd7d0e160ac17b7238152d5bb6d680f3fe09d0089990ce"
         },
         "provider": "anthropic",
         "reasoning": "low",
@@ -1626,7 +1626,7 @@
               "grader": {
                 "environment_id": "sha256:e0044b07679a3b973081c381f8d3a64d6b0b32e84c0debb82069887ab984a8c1",
                 "image": "raidar-oracle-grader:963c14e63ff5e15d",
-                "implementation_sha256": "a93cc5f71c842e1963145679d64ebacf607412debb2e28fe44313ae6964e2074"
+                "implementation_sha256": "4cf6e9b2d6fe550a1c94485e527c4932f1981ba3fda827e74532749b12bc48d0"
               },
               "not_run": [
                 "native_parity_positive",
@@ -1701,7 +1701,7 @@
     "source_sha256": "2eccf2ae97f4a2d5cfabca27905f2ef0ee8415a05a32f22fd14fe64f328be14f",
     "spec_sha256": "7d9d7b969cdec469737ba4a3f729040793b1b5845d251585afd7ad997ee999ca"
   },
-  "lock_sha256": "46bc8ac98d7e7ae2abd9c7207d374f14139785994b060732ad6d16c8656f478c",
+  "lock_sha256": "5bdc871e4586662a477b7ad7d87c22742b00ac02ddd328b525ad8fbf205ffcbc",
   "lock_version": 5,
   "overrides": {
     "flags": {},
@@ -1710,7 +1710,7 @@
   "sections": {
     "analysis": "81cdc2d12aacc031bb70595c13973ff647ab49a68bebda4be7a9b65ba3127a78",
     "assessment": "d2ceb1c2fd13a88435ce0ff32350ae3a086bd562bd529aa2b303682515550bde",
-    "execution": "46bc8ac98d7e7ae2abd9c7207d374f14139785994b060732ad6d16c8656f478c",
+    "execution": "5bdc871e4586662a477b7ad7d87c22742b00ac02ddd328b525ad8fbf205ffcbc",
     "toolchain": "6cc8912af73855247db526411e0e6b61efa307f63e3b8f22d22d48fdfb2d3ee9"
   },
   "spec": {

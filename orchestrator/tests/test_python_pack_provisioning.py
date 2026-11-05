@@ -9,6 +9,7 @@ from collections.abc import Mapping, Sequence
 from pathlib import Path
 
 import pytest
+import uv
 import yaml
 from click.testing import CliRunner
 from pydantic import ValidationError
@@ -41,9 +42,16 @@ UV = "/fake/bin/uv"
 class FakeUv:
     """Stands in for uv: materialises the files a real install would leave behind."""
 
-    def __init__(self, *, fail_on: str | None = None, python_version: str = "3.12.12") -> None:
+    def __init__(
+        self,
+        *,
+        fail_on: str | None = None,
+        python_version: str = "3.12.12",
+        uv_executable: str | None = None,
+    ) -> None:
         self.fail_on = fail_on
         self.python_version = python_version
+        self.uv_executable = uv_executable
         self.calls: list[tuple[list[str], dict[str, str]]] = []
 
     def __call__(
@@ -51,6 +59,12 @@ class FakeUv:
     ) -> subprocess.CompletedProcess[str]:
         args = list(argv)
         self.calls.append((args, dict(env)))
+        if (
+            self.uv_executable is not None
+            and args[1] in {"venv", "pip", "tool"}
+            and args[0] != self.uv_executable
+        ):
+            return subprocess.CompletedProcess(args, 2, "", "host uv cannot provision tools")
         if self.fail_on and self.fail_on in args:
             return subprocess.CompletedProcess(args, 2, "", "resolution failed")
         if args[1:2] == ["venv"]:
@@ -131,9 +145,13 @@ def test_creating_a_provisioner_installs_nothing(tmp_path: Path) -> None:
     assert not (tmp_path / "cache").exists()
 
 
-def test_first_use_is_timed_separately_and_the_cache_is_reused(tmp_path: Path) -> None:
-    runner = FakeUv()
-    provisioner = _provisioner(tmp_path / "cache", runner)
+def test_first_use_is_timed_separately_and_the_cache_is_reused(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    locked_uv = uv.find_uv_bin()
+    monkeypatch.setattr(provisioner_module.shutil, "which", lambda _name: "/host/bin/uv")
+    runner = FakeUv(uv_executable=locked_uv)
+    provisioner = ToolProvisioner(load_tool_lock(), cache_root=tmp_path / "cache", runner=runner)
 
     first = provisioner.ensure("scb-python-quality")
     assert first.first_use is not None
@@ -148,11 +166,15 @@ def test_first_use_is_timed_separately_and_the_cache_is_reused(tmp_path: Path) -
     assert first.executable("ruff").exists()
     calls_after_first = len(runner.calls)
 
-    again = _provisioner(tmp_path / "cache", runner).ensure("scb-python-quality")
+    again = ToolProvisioner(load_tool_lock(), cache_root=tmp_path / "cache", runner=runner).ensure(
+        "scb-python-quality"
+    )
     assert again.first_use is None
     assert again.root == first.root
     reuse_calls = [args for args, _ in runner.calls[calls_after_first:]]
-    assert all(args[0] != UV for args in reuse_calls), "reuse only re-probes; nothing installs"
+    assert all(args[0] != locked_uv for args in reuse_calls), (
+        "reuse only re-probes; nothing installs"
+    )
     assert provisioner.is_provisioned("scb-check") is False, "only the requested tool is installed"
 
 
@@ -306,7 +328,10 @@ def test_a_reused_install_that_drifted_is_reinstalled(tmp_path: Path) -> None:
 
 
 def test_provisioning_needs_uv(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    monkeypatch.setattr(provisioner_module.shutil, "which", lambda _name: None)
+    def missing_binary() -> str:
+        raise FileNotFoundError("no installed uv")
+
+    monkeypatch.setattr(uv, "find_uv_bin", missing_binary)
     provisioner = ToolProvisioner(load_tool_lock(), cache_root=tmp_path / "cache", runner=FakeUv())
 
     with pytest.raises(ToolProvisioningError, match="uv is required"):
