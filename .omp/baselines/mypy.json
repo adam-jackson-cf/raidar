@@ -3879,6 +3879,60 @@
       "count": 1
     },
     {
+      "path": "orchestrator/tests/test_ruff_full_quality.py",
+      "code": "no-untyped-def",
+      "fingerprint": "bca363be951f7b198ff18be4806caf538bdba5b21bebb902e63fef4596bc374b",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/tests/test_ruff_suppressions.py",
+      "code": "no-untyped-def",
+      "fingerprint": "05daf762a97eddbed06cb966766a7b0ac30d7994bf23561c4ad9b6d58f39147c",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/tests/test_ruff_suppressions.py",
+      "code": "no-untyped-def",
+      "fingerprint": "2150f16c0599135713b058540c3f8e7d5224cd0f2c4ce0d48ad5cb04f6bf13c0",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/tests/test_ruff_suppressions.py",
+      "code": "no-untyped-def",
+      "fingerprint": "3d8d937b2b825eea17096dfd05fa599ada080c53581b11c6e205efe6535c6a90",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/tests/test_ruff_suppressions.py",
+      "code": "no-untyped-def",
+      "fingerprint": "4a98ad123d2052d0b8894961ba79aa7456336f42a891f38cd083c8359b8ec8a2",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/tests/test_ruff_suppressions.py",
+      "code": "no-untyped-def",
+      "fingerprint": "601462762ac75c5103c6ec50bb12267ea33cd47e5adc48d3f181511e8efe6fa8",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/tests/test_ruff_suppressions.py",
+      "code": "no-untyped-def",
+      "fingerprint": "cf884931f5fd109eadef04a00e1a444ec2ac17554e94164b18654dfc0031828c",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/tests/test_ruff_suppressions.py",
+      "code": "no-untyped-def",
+      "fingerprint": "e2ecf192dd81f0fb18ac1e664398a9a79f356756f5ee66870087a8dbfdf4be16",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/tests/test_ruff_suppressions.py",
+      "code": "no-untyped-def",
+      "fingerprint": "f28bfbcb8074912e86ca1a738453aa00664ae358115a2d0cbb54d3a5b50531c2",
+      "count": 1
+    },
+    {
       "path": "orchestrator/tests/test_run_scoped_docker_environment.py",
       "code": "assignment",
       "fingerprint": "769c0d53397e0351d29a491e5c2a913652e08e6c5c1f8e1567226cc972190308",
