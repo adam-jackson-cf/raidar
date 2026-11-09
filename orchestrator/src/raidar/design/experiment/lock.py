@@ -20,7 +20,7 @@ each with its own digest under ``sections``:
   the headline metric (declared, or the default chosen by K). A change
   here means "rescore into the Assessment store", never "the jobs are stale".
 - ``analysis``: the baseline arm and the pinned verdict thresholds.
-- ``toolchain``: Python, Raidar, LiteLLM and the spec/lock rules digest.
+- ``toolchain``: Python, LiteLLM and the spec/lock rules digest.
 
 Before anything is written, the runtime-compatibility gate
 (``raidar.design.experiment.runtime_gate``, ``RT0``-``RT6``) checks the effective spec against its
@@ -86,7 +86,7 @@ from raidar.subject.releases import AgentResolver, WorkflowResolver
 LOCK_VERSION = 5
 """5: an arm's identity carries ``packages`` and ``primitive_code`` (no ``stage_code``)."""
 LOCK_SUFFIX = ".lock.json"
-TOOLCHAIN_PACKAGES = ("litellm", "raidar")
+TOOLCHAIN_PACKAGES = ("litellm",)
 SECTIONS = ("execution", "assessment", "analysis", "toolchain")
 DOCUMENT = "document"
 """Pseudo-section: the lock version, experiment file digests, overrides and effective spec."""
@@ -107,7 +107,7 @@ STALE_CONSEQUENCES = {
     "execution": "execution inputs changed; jobs under the old lock_sha256 are another experiment",
     "assessment": "scorers or the headline metric changed; rescore jobs (they still match)",
     "analysis": "baseline arm or verdict thresholds changed; re-analyse (jobs still match)",
-    "toolchain": "Python, Raidar, LiteLLM or the spec rules changed; relock (jobs still match)",
+    "toolchain": "Python, LiteLLM or the spec rules changed; relock (jobs still match)",
     DOCUMENT: "the experiment file or overrides changed; relock (jobs still match)",
 }
 

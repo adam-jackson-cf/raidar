@@ -78,7 +78,7 @@ def test_relocking_unchanged_inputs_is_byte_identical(tmp_path: Path) -> None:
     assert set(assessment["references"]) == {"scorer", "metric"}
     # Tools are recorded with the section whose reference pins them.
     assert (execution["tools"], assessment["tools"]) == ({}, {"pytest": "8.4.1"})
-    assert set(lock["toolchain"]) == {"python", "litellm", "raidar", "raidar_spec"}
+    assert set(lock["toolchain"]) == {"python", "litellm", "raidar_spec"}
     assert lock["sections"] == {name: digest_json(lock[name]) for name in SECTIONS}
     assert lock["lock_sha256"] == lock["sections"]["execution"]
     assert lock_integrity_issues(lock) == []

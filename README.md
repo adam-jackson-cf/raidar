@@ -27,6 +27,15 @@ env -u AGENT uv sync --project orchestrator --python 3.13.7 --all-extras --froze
 Result-affecting Raidar uv calls use the exact uv dependency locked in
 `orchestrator/uv.lock`, not the host uv.
 
+Releases are on-demand PRs, not post-merge writes. Fetch origin, start a release
+branch at `origin/main`, then run `env -u AGENT make version-release`. It refuses
+histories without a version bump and prints the `chore(release): X.Y.Z` commit
+subject. Commit the three generated files and use the normal gated PR flow.
+`env -u AGENT make version-check` checks CLI, lock and CHANGELOG consistency as
+part of `make quality`; regenerate a release after rebasing onto newer main.
+Experiment toolchains record Python, LiteLLM and `raidar_spec`, not the release
+version, so a version-only release does not require relocking.
+
 The grading digest includes the exact host Python version; a different patch version
 changes the digest and fails RT7 against the current validation pins. Package compatibility
 remains `requires-python = ">=3.12"`; validated grading requires the pinned interpreter.
