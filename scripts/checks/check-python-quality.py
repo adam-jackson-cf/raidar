@@ -43,6 +43,8 @@ ALLOWED_TEST_ROOT_FILES = {
 }
 SCRIPT_NAME_ALLOWLIST = {
     "bump-version.py",
+    "check-identity.py",
+    "check-finding-baseline.py",
     "check-python-fanout.py",
     "check-python-quality.py",
     "check-structure.py",
