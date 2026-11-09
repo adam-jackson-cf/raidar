@@ -117,7 +117,7 @@ AGENT_SMOKE_EFFECTIVE_REASONING = $(if $(filter command line environment,$(origi
 	toolchain-pin-check structure-check release-archive \
 	test-fast test-slow test-quality test-docker \
 	quality gate-commit gate-ci identity-check identity-record version-release version-check \
-	ruff-baseline ruff-check ruff-suppressions-check
+	ruff-baseline ruff-check ruff-suppressions-check mypy-check mypy-baseline
 
 define require_var
 	@if [ -z "$($1)" ]; then \
@@ -152,6 +152,8 @@ help:
 	@echo "  make ruff-baseline                                    Explicitly record current Full Ruff findings (gates never refresh)"
 	@echo "  make ruff-check                                       Check Full Ruff against the finding-specific shrink-only baseline"
 	@echo "  make ruff-suppressions-check                           Refuse added Ruff suppressions relative to origin/main"
+	@echo "  make mypy-check                                        Check maintained Python inventory and strict finding baseline (check-only)"
+	@echo "  make mypy-baseline                                     Explicitly record current strict findings; adoption only, then shrink entries with fixes"
 	@echo "  make release-archive REF=<name>@<N>                    Tag archive/<name>@<N> at HEAD before editing a released definition in place (refuses an existing tag)"
 	@echo "  Generated data lives under var/ (git-ignored; RAIDAR_VAR=<dir> relocates it): jobs, stores, analysis, problems, tmp"
 	@echo "  Secrets: execute/smoke/assess/jev targets inject Infisical (project mac-os-cf, env dev) when the infisical"
@@ -747,6 +749,12 @@ identity-check:
 
 identity-record:
 	@$(REPO_RUNTIME_ENV) uv run --project orchestrator --extra dev python scripts/checks/check-identity.py --write
+
+mypy-check:
+	@$(REPO_RUNTIME_ENV) uv run --project orchestrator --extra dev python scripts/checks/check-mypy-coverage.py
+
+mypy-baseline:
+	@$(REPO_RUNTIME_ENV) uv run --project orchestrator --extra dev python scripts/checks/check-mypy-coverage.py --write-baseline
 
 # Build the portable contract's wheel and sdist into var/ and print their sha256 (nothing is published).
 CONTRACT_DIST_DIR ?= $(RAIDAR_VAR)/contract-dist

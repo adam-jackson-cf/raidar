@@ -466,3 +466,12 @@ approved exception. Fix targets preserve released stage packages and raw grading
 Docker-backed tests (`make test-docker`), the N1 overhead gate (`make perf-gate`) and `make security-gate` remain separate checks on a ready Docker target.
 
 Tests are tiered (fast, slow, quality, docker, security, perf) with their own targets (`make test-fast`, `test-slow`, `test-quality`, `test-docker`); see [test tiers](.agents/skills/test-patterns/references/test-tiers.md).
+
+Strict mypy checks every maintained Python root, including tests and scripts. Its
+finding-specific debt is tracked in `.omp/baselines/mypy.json`: new findings,
+stale entries and baseline growth against `origin/main` fail the gate. Fixes
+remove their baseline entries in the same change. `make mypy-check` is check-only;
+`make mypy-baseline` explicitly records a scan for initial adoption, not a way to
+approve new debt. The inventory check requires new stage tool roots to join the
+configured target list. Fixture programs are inputs, not typing targets; released
+sources are checked without rewriting their bytes.

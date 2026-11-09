@@ -46,6 +46,7 @@ SCRIPT_NAME_ALLOWLIST = {
     "check-identity.py",
     "check-finding-baseline.py",
     "check-ruff-suppressions.py",
+    "check-mypy-coverage.py",
     "check-python-fanout.py",
     "check-python-quality.py",
     "check-structure.py",

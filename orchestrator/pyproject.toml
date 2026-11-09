@@ -179,8 +179,30 @@ branch_floor = 98.72
 
 [tool.mypy]
 python_version = "3.12"
-files = ["src", "tests"]
+strict = true
+warn_unused_ignores = true
+show_error_codes = true
+files = [
+    "src",
+    "tests",
+    "../contract/src",
+    "../scripts",
+    "../lab/stages/raidar/define/tool/src",
+    "../lab/stages/raidar/verify/tool/src",
+]
+mypy_path = [
+    "$MYPY_CONFIG_FILE_DIR/src",
+    "$MYPY_CONFIG_FILE_DIR",
+    "$MYPY_CONFIG_FILE_DIR/../scripts",
+    "$MYPY_CONFIG_FILE_DIR/../contract/src",
+    "$MYPY_CONFIG_FILE_DIR/../lab/stages/raidar/define/tool/src",
+    "$MYPY_CONFIG_FILE_DIR/../lab/stages/raidar/verify/tool/src",
+]
+explicit_package_bases = true
+# Fixture programs are tool inputs, not maintained importable Python.
+exclude = '(^|/)fixtures/'
+
+[[tool.mypy.overrides]]
+# PyYAML ships no type information and types-PyYAML is not a dependency.
+module = ["yaml"]
 ignore_missing_imports = true
-mypy_path = ["../lab/stages/raidar/define/tool/src"]
-# PyYAML ships no type information and types-PyYAML is not a dependency: its API is Any.
-disable_error_code = ["import-untyped"]

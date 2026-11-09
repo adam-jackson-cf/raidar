@@ -179,7 +179,7 @@ def test_quality_gates_stage_only_after_success_when_explicitly_requested(
         str(quality.PYTHON_QUALITY_CHECK_SCRIPT),
         "lint-imports",
         "lizard",
-        "mypy",
+        str(quality.MYPY_CHECK_SCRIPT),
         "pytest",
     ],
 )
