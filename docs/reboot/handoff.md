@@ -55,9 +55,11 @@ Run `make help` to see the public interface.
 1. Clone `main` and run `env -u AGENT make help`.
 2. Install and log in to Infisical (project `ae2a56a4-28d9-429f-bb7c-7d45e26b9ffa`, env `dev`), and run `codex login`, which uses the ChatGPT subscription.
 3. Install the toolchain: any uv `>=0.10.0` (Homebrew's is fine), then `uv python install 3.13.7`. Run `env -u AGENT uv sync --project orchestrator --all-extras --frozen`. uv reads `orchestrator/.python-version` and installs Raidar's locked uv into the project environment. Check with `env -u AGENT make toolchain-pin-check`.
-4. Docker: this machine uses the remote **`mbp`** target; see [Set up the `mbp` Docker target](#set-up-the-mbp-docker-target) below. Mark a target `trusted = true` only with the user's decision.
-5. Run `env -u AGENT make quality`. Expect it to pass, with the fast tier at about 5,150 tests.
-6. Run `git fetch origin --tags` before `env -u AGENT make contract-build` if you need the wheels.
+4. Docker: this machine uses the remote **`mbp`** target; see [Set up the `mbp` Docker target](#set-up-the-mbp-docker-target) below. Mark a target `trusted = true` only with the user's decision. Install the client Compose plugin with `brew install docker-compose`, and add `"cliPluginsExtraDirs": ["/opt/homebrew/lib/docker/cli-plugins"]` to `~/.docker/config.json` (preserve existing keys). Confirm `docker compose version`.
+5. Restore all nine registry problems: `var/` does not travel. Run `env -u AGENT make problem-import PROBLEM="scb/<name>@38d627ecf668"` for each of `circuit_eval.checkpoint_1`, `code_search`, `dag_execution`, `forge`, `log_query`, `metric_transform_lang`, `datagate`, `execution_server`, and `mocked_http`.
+6. Install the check-only commit hook: `env -u AGENT uv run --project orchestrator --extra dev pre-commit install --hook-type pre-commit`. It runs `make gate-commit` (whole-tree paths then `make quality`). `make gate-ci` adds slow and quality tiers and runs on every push and pull request.
+7. Run `env -u AGENT make gate-commit`. Fast-tier coverage floors are unchanged.
+8. Run `git fetch origin --tags` before `env -u AGENT make contract-build` if you need the wheels.
 
 ### Set up the `mbp` Docker target
 `mbp` is the user's spare Apple-silicon Mac: aarch64, OrbStack, Docker 29.8.2, 10 CPUs, about 25 GB memory. It is **shared** with other projects. Never touch `native-*` containers, and never stop, remove or prune anything that is not Raidar's.
@@ -92,7 +94,7 @@ Run `make help` to see the public interface.
 
    The full grader IDs are `environment.grader_environment_id` in `lab/problems/registry/scb/*/38d627ecf668.validation.json`; compare them before grading. The pack tag is a recipe hash, not a byte identity: `mbp`'s own 2026-09-30 build differs, and it is kept as `raidar/pack-python:2b91a52663e099f2-mbp-20260930`.
 
-   If the images are ever lost, reload them from the archive in `~/raidar-grader-images/` on this machine (mac-cf3, `cdhvc2hw3l`), next to each file's `.sha256`. Keep it outside the git checkout. Verify each file with `shasum -a 256 -c <file>.sha256`, then run `docker --context raidar-mbp load -i ~/raidar-grader-images/oracle-graders-2026-11-04.tar` (sha256 `689db9c15dfb7a02181a711f0b900040cf9892b014022d87e6ee967dae6053ef`) and the same for `pack-python-2b91a52663e099f2-2026-10-31.tar` (sha256 `8d71ef0b7cf6ebd3dc6591d259858fc7bd4eb2aa2434e685880e5b05d3d80e4e`). Loading into `mbp`'s classic store reproduces the pinned IDs. The old machine is being decommissioned, so this is the only copy outside `mbp`. Without the archive, revalidate all nine problems on `mbp` (about 6 h) and relock.
+   If the images are ever lost, reload them from `~/Documents/raidar-grader-images/` on this machine, outside the git checkout. The adjacent `.sha256` files contain old absolute paths: hash the tarballs directly with `shasum -a 256 ~/Documents/raidar-grader-images/*.tar` and compare the digests. `oracle-graders-2026-11-04.tar` must hash to `689db9c15dfb7a02181a711f0b900040cf9892b014022d87e6ee967dae6053ef`; `pack-python-2b91a52663e099f2-2026-10-31.tar` must hash to `8d71ef0b7cf6ebd3dc6591d259858fc7bd4eb2aa2434e685880e5b05d3d80e4e`. Then run `docker --context raidar-mbp load -i ~/Documents/raidar-grader-images/oracle-graders-2026-11-04.tar` and the same for the pack tarball. Loading into `mbp`'s classic store reproduces the pinned IDs. Without the archives, revalidate all nine problems on newly built graders before graded trials.
 6. **First test (no model):**
    1. `env -u AGENT make toolchain-pin-check`, then `env -u AGENT make quality`.
    2. `env -u AGENT make test-docker TARGET=mbp`.

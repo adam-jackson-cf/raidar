@@ -440,6 +440,12 @@ Make variables follow the vocabulary: `JOB`, `JOBS`, `JOB_ID`, `JOBS_DIR`, `AGEN
 
 No version appears in any file, module, class or folder name: a scorer, agent or workflow is edited in place, its version is the `name@N` registered in `lab/releases.yaml` (scorers: the `@N` in its manifest), and `make release-archive REF=<name>@<N>` tags the release being replaced as `archive/<name>@<N>` before the edit lands. Older experiments and jobs are not carried forward (tag `archive/pre-structure-reset` preserves them). Local jobs, stores and analysis from before the structure reset remain under `var/archive/pre-v1/`.
 
-`make quality` is the repository gate: `make structure-check` (layout rules: no versions in names, root and package allowlists, package depth), `make smoke-dry-run-check` (the smoke command shapes), `make releases-check` (`lab/releases.yaml` registers every agent, workflow and stage definition at its current hash; agent tool pins equal the pack's), `make experiment-locks-check` (every `lab/experiments/*/*/*.lock.json` is current), `make ledger-check`, then ruff, import contracts, lizard, mypy over `orchestrator/src/raidar`, fan-out, and the fast test tier with line and branch coverage floors. The pre-push hook runs `make quality`. Docker-backed tests run under `make test-docker`; the N1 overhead gate (`make perf-gate`) and `make security-gate` are run separately as release/gate checks.
+`make gate-commit` checks whole-tree path policy, then runs `make quality`: structure, smoke command shapes, release registration, experiment locks, ledger, ruff, import contracts, lizard, mypy, fan-out, and the fast test tier with unchanged line and branch coverage floors. `make gate-ci` adds the slow and quality tiers, in that order, on every push and pull request. Both entrypoints are declared in `.omp/gate.json`; the check-only pre-commit hook runs the commit entrypoint without fixing or staging files. Install it in each clone:
+
+```bash
+env -u AGENT uv run --project orchestrator --extra dev pre-commit install --hook-type pre-commit
+```
+
+Docker-backed tests (`make test-docker`), the N1 overhead gate (`make perf-gate`) and `make security-gate` remain separate checks on a ready Docker target.
 
 Tests are tiered (fast, slow, quality, docker, security, perf) with their own targets (`make test-fast`, `test-slow`, `test-quality`, `test-docker`); see [test tiers](.agents/skills/test-patterns/references/test-tiers.md).

@@ -1,24 +1,10 @@
 repos:
   - repo: local
     hooks:
-      - id: ci-quality-preflight
-        name: CI quality preflight (fast)
-        entry: bash scripts/checks/pre-commit-quality-preflight.sh
+      - id: repository-gate
+        name: Repository commit gate (check only)
+        entry: env -u AGENT uv run --project orchestrator --extra dev python scripts/checks/run-repository-gate.py commit
         language: system
         pass_filenames: false
         always_run: true
         stages: [pre-commit]
-      - id: ci-quality-gates
-        name: Run CI quality gates (auto-fix supported)
-        entry: bash -lc "cd orchestrator && env -u AGENT uv sync --all-extras --locked && env -u AGENT uv run raidar quality gates --fix --stage"
-        language: system
-        pass_filenames: false
-        always_run: true
-        stages: [pre-commit]
-      - id: ci-quality-gates-check
-        name: Run the repository gate (make quality, incl. smoke shapes and example locks)
-        entry: bash -lc "cd orchestrator && env -u AGENT uv sync --all-extras --locked && cd .. && env -u AGENT make quality"
-        language: system
-        pass_filenames: false
-        always_run: true
-        stages: [pre-push]
