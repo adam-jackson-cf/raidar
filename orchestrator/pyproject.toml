@@ -203,6 +203,108 @@ explicit_package_bases = true
 exclude = '(^|/)fixtures/'
 
 [[tool.mypy.overrides]]
-# PyYAML ships no type information and types-PyYAML is not a dependency.
-module = ["yaml"]
+# Mypy reports missing stubs; types-PyYAML/types-jsonschema/types-networkx are not dependencies.
+module = ["yaml", "jsonschema", "networkx"]
 ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+# Mypy reports these installed Harbor/Radon modules have neither stubs nor py.typed markers.
+module = [
+    "harbor.agents.base",
+    "harbor.agents.factory",
+    "harbor.agents.installed.base",
+    "harbor.agents.installed.claude_code",
+    "harbor.agents.installed.codex",
+    "harbor.agents.options",
+    "harbor.constants",
+    "harbor.environments.base",
+    "harbor.environments.capabilities",
+    "harbor.environments.definition",
+    "harbor.environments.docker",
+    "harbor.environments.docker.docker",
+    "harbor.models.agent.context",
+    "harbor.models.agent.name",
+    "harbor.models.task.config",
+    "harbor.models.task.task",
+    "harbor.models.trajectories",
+    "harbor.models.trial.config",
+    "harbor.models.trial.paths",
+    "harbor.models.verifier.result",
+    "harbor.trial.hooks",
+    "harbor.trial.multi_step",
+    "harbor.trial.network_policy",
+    "harbor.trial.trial",
+    "harbor.verifier.base",
+    "radon",
+    "radon.metrics",
+    "radon.raw",
+]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+# follow_imports=skip makes pytest.fixture/mark decorators Any in the maintained test namespace.
+module = ["tests", "tests.*"]
+disallow_untyped_decorators = false
+
+[[tool.mypy.overrides]]
+# follow_imports=skip makes click command/group/option decorators (and aliases) Any here.
+module = [
+    "raidar.cli",
+    "raidar.cli.agent",
+    "raidar.cli.analyze",
+    "raidar.cli.assess",
+    "raidar.cli.env_harbor",
+    "raidar.cli.execution",
+    "raidar.cli.experiment_init",
+    "raidar.cli.experiment_spec",
+    "raidar.cli.health",
+    "raidar.cli.imports",
+    "raidar.cli.jev",
+    "raidar.cli.jev_calibration",
+    "raidar.cli.ledger",
+    "raidar.cli.pack",
+    "raidar.cli.perf",
+    "raidar.cli.problem",
+    "raidar.cli.quality",
+    "raidar.cli.releases",
+    "raidar.cli.stage",
+    "raidar.cli.stage_fixtures",
+    "raidar.cli.stage_package",
+    "raidar.cli.target",
+    "raidar.cli.workflow_new",
+]
+disallow_untyped_decorators = false
+
+[[tool.mypy.overrides]]
+# follow_imports=skip makes pydantic field/model validators and serializers Any in these models.
+module = [
+    "raidar_contract.criteria",
+    "raidar_contract.package.manifest",
+    "raidar_contract.workflow",
+    "raidar.design.experiment.schema",
+    "raidar.design.problem.errata",
+    "raidar.design.problem.models",
+    "raidar.engine.target.config",
+    "raidar.evaluation.analysis.outcomes",
+    "raidar.evaluation.ledger.records",
+    "raidar.evaluation.review.quality.models",
+    "raidar.grading.bundle",
+    "raidar.scoring.code_quality.lineage_models",
+    "raidar.scoring.code_quality.models",
+    "raidar.scoring.framework.manifest",
+    "raidar.scoring.framework.result",
+    "raidar.scoring.framework.store",
+    "raidar.scoring.judge.audit",
+    "raidar.scoring.judge.label_export",
+    "raidar.scoring.judge.ledger",
+    "raidar.scoring.judge.policies",
+    "raidar.scoring.process_checks.assess",
+    "raidar.subject.agent.schema",
+    "raidar.subject.environment.python.pack_definition",
+]
+disallow_untyped_decorators = false
+
+[[tool.mypy.overrides]]
+# follow_imports=skip makes pytest.hookimpl Any in these two runtime hook modules.
+module = ["raidar.grading.runtime.raidar_oracle_plugin", "raidar.subject.primitive.gate_tool"]
+disallow_untyped_decorators = false
