@@ -37,7 +37,7 @@ class LocalEnvironment:
         process = await asyncio.create_subprocess_shell(
             command, env=self.env, stdout=subprocess.PIPE, stderr=subprocess.PIPE
         )
-        out, err = await process.communicate()
+        out, err = await asyncio.wait_for(process.communicate(), timeout=120)
         return SimpleNamespace(
             return_code=process.returncode, stdout=out.decode(), stderr=err.decode()
         )
@@ -107,7 +107,9 @@ def write(workspace: Path, **files: str) -> None:
 
 
 def commit(workspace: Path, env: dict[str, str], *flags: str) -> int:
-    subprocess.run(["git", "add", "-A"], cwd=workspace, check=True, env=env)
+    subprocess.run(["git", "add", "-A"], cwd=workspace, check=True, env=env, timeout=120)
     message = ["-m", "feat: add"]
-    done = subprocess.run(["git", "commit", "-q", *message, *flags], cwd=workspace, env=env)
+    done = subprocess.run(
+        ["git", "commit", "-q", *message, *flags], cwd=workspace, env=env, timeout=120
+    )
     return done.returncode

@@ -26,7 +26,7 @@ def _load_fanout_module():
 
 
 def _git(repo_root: Path, *args: str) -> None:
-    subprocess.run(["git", *args], cwd=repo_root, check=True)
+    subprocess.run(["git", *args], cwd=repo_root, check=True, timeout=120)
 
 
 def test_discovers_unignored_python_files_only(tmp_path: Path) -> None:

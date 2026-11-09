@@ -310,7 +310,9 @@ def test_a_check_past_its_timeout_is_the_agents(tmp_path: Path) -> None:
 
 
 def git(root: Path, *args: str) -> str:
-    done = subprocess.run(["git", "-C", str(root), *args], capture_output=True, text=True)
+    done = subprocess.run(
+        ["git", "-C", str(root), *args], capture_output=True, text=True, timeout=120
+    )
     return done.stdout
 
 

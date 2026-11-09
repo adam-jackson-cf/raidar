@@ -180,7 +180,7 @@ async def test_regrade_with_empty_wheel_cache_and_blocked_pypi_is_infrastructure
     # A unique base alias ensures this proof cannot be satisfied by a cached image layer.
     alias = f"raidar-outage-proof:{uuid.uuid4().hex[:12]}"
     docker = ["docker", "--context", ready_target]
-    subprocess.run([*docker, "tag", base.tag, alias], check=True, capture_output=True)
+    subprocess.run([*docker, "tag", base.tag, alias], check=True, capture_output=True, timeout=120)
     try:
         outcome = await grade_step(
             problem.bundle,
@@ -196,7 +196,9 @@ async def test_regrade_with_empty_wheel_cache_and_blocked_pypi_is_infrastructure
         assert outcome.grade.infra_failure.code == "dependency_resolver_unavailable"
         assert outcome.grade.cases == ()
     finally:
-        subprocess.run([*docker, "image", "rm", alias], check=True, capture_output=True)
+        subprocess.run(
+            [*docker, "image", "rm", alias], check=True, capture_output=True, timeout=120
+        )
 
 
 def _docker(context: str, *args: str, timeout: int = 240) -> subprocess.CompletedProcess[str]:

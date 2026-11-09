@@ -92,6 +92,7 @@ def test_import_splits_the_converted_task_into_agent_task_bundle_and_references(
             capture_output=True,
             text=True,
             check=True,
+            timeout=120,
         ).stdout.strip()
     )
     assert manifest.pack.image == image_tag(load_pack_spec())
@@ -140,7 +141,7 @@ def test_import_refuses_sources_that_are_not_exactly_the_pin(
     (repo / "adder" / "config.yaml").write_text("edited: true\n")
     with pytest.raises(SourceError, match="local changes"):
         import_problem(store, _ref(commit), source_checkout=repo)
-    subprocess.run(["git", "-C", str(repo), "checkout", "-q", "--", "."], check=True)
+    subprocess.run(["git", "-C", str(repo), "checkout", "-q", "--", "."], check=True, timeout=120)
     subprocess.run(
         [
             "git",
@@ -157,6 +158,7 @@ def test_import_refuses_sources_that_are_not_exactly_the_pin(
             "moved",
         ],
         check=True,
+        timeout=120,
     )
     with pytest.raises(SourceError, match="expected pinned commit"):
         import_problem(store, _ref(commit), source_checkout=repo)

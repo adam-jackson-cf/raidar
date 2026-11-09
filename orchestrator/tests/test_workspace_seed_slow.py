@@ -41,7 +41,7 @@ def test_the_seed_install_script_is_valid_shell(locked: bool) -> None:
     )
 
     for script in (seed.install, seed.check):
-        subprocess.run(["sh", "-n", "-c", script], check=True)
+        subprocess.run(["sh", "-n", "-c", script], check=True, timeout=120)
 
 
 def _context(task_dir: Path) -> TrialContext:

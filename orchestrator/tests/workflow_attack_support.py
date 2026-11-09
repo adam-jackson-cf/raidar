@@ -405,6 +405,7 @@ def pre_s6_gate(repository: Path) -> str:
         capture_output=True,
         text=True,
         check=False,
+        timeout=120,
     )
     if done.returncode != 0:
         raise FileNotFoundError(f"{PRE_S6_COMMIT} is not in this checkout: {done.stderr.strip()}")

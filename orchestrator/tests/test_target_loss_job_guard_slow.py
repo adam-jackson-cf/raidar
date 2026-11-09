@@ -164,9 +164,14 @@ def test_the_real_git_reports_the_commit_and_dirtiness_the_launch_record_assumes
         f"GIT_{who}_{key}": v for who in ("AUTHOR", "COMMITTER") for key, v in identity.items()
     }
     for args in (["init", "-q"], ["commit", "-q", "--allow-empty", "-m", "c"]):
-        subprocess.run(["git", *args], cwd=repo, check=True, env=env)
+        subprocess.run(["git", *args], cwd=repo, check=True, env=env, timeout=120)
     head = subprocess.run(
-        ["git", "rev-parse", "HEAD"], cwd=repo, check=True, capture_output=True, text=True
+        ["git", "rev-parse", "HEAD"],
+        cwd=repo,
+        check=True,
+        capture_output=True,
+        text=True,
+        timeout=120,
     ).stdout.strip()
 
     assert git_state(repo) == {"commit": head, "dirty": False, "error": None}
