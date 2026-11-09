@@ -20,7 +20,7 @@
     "primitive_code/codex/runner/1": "4828ba856407dd1b52815091c4ba92c24242b44909514e2b9cc08af024a1d133",
     "primitive_code/codex/setup/1": "a659b7faef1bf4cb78b99eef1ecb41077b853f97d72c82b516c02285ab7b98ef",
     "primitive_code/codex/stop/1": "c41f91c4b758ff50384d975eb2be8707408bccf2b3975832db78f40e9e2fe002",
-    "raidar_spec": "cc9db81c6c78e861b026c7aeed8802a2994593f112071b576a608fa28e994307",
+    "raidar_spec": "9b7d44f0ffb0994114916c0c49f86e37122e3754d5c6d8c295b021d00b0279f1",
     "scorer/code-quality@9": "0cc159f19aa797edd08218635da63ec114b94adaa1b328fb816a16590306bb9d",
     "scorer/correctness@10": "00d7db1485bf476bcca8265321a59310138c7733d08f6a565e4744cb37436e28",
     "scorer/definition-coverage@6": "39351b41b32b09bf38ebec5eb6cff5de32ce6abc7b2ae48851bb77a17c281ab3",
