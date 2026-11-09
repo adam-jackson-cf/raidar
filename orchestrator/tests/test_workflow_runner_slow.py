@@ -24,7 +24,7 @@ async def _python(*words: str) -> tuple[int, str]:
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,
     )
-    out, _ = await process.communicate()
+    out, _ = await asyncio.wait_for(process.communicate(), timeout=120)
     assert process.returncode is not None
     return process.returncode, out.decode()
 

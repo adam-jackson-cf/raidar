@@ -245,10 +245,12 @@ class LocalProcessSandbox:
             stderr=asyncio.subprocess.STDOUT,
         )
         try:
-            stdout, _ = await asyncio.wait_for(proc.communicate(), timeout=run.timeout_s)
+            stdout, _ = await asyncio.wait_for(
+                asyncio.wait_for(proc.communicate(), timeout=120), timeout=run.timeout_s
+            )
         except TimeoutError:
             proc.kill()
-            await proc.communicate()
+            await asyncio.wait_for(proc.communicate(), timeout=120)
             return SandboxResult(None, True, "")
         shutil.copytree(self.layout.out, run.out_dir, dirs_exist_ok=True)
         return SandboxResult(proc.returncode, False, stdout.decode(errors="replace"))

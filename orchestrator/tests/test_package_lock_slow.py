@@ -38,7 +38,9 @@ def _runtime_files(modules: list[str]) -> set[str]:
         "print(json.dumps(sorted(n for n in sys.modules "
         "if n == 'raidar' or n.startswith('raidar.'))))\n"
     )
-    done = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, check=True)
+    done = subprocess.run(
+        [sys.executable, "-c", code], capture_output=True, text=True, check=True, timeout=120
+    )
     files = set()
     for name in json.loads(done.stdout):
         base = RAIDAR_DIR.parent / name.replace(".", "/")

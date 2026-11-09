@@ -463,6 +463,14 @@ exceptions fail `make ruff-suppressions-check`. Lint targets Python 3.12 with pr
 formatting remains stable, line length stays 100, and descriptive summaries retain D401's
 approved exception. Fix targets preserve released stage packages and raw grading payloads.
 
+`make test-hygiene-check` is part of both gates. It requires bounded subprocess
+waits in Python tests, valid skill frontmatter and local support links, and
+content-addressed stage evidence in `lab/stage-checks/`. Current stage releases
+need installed-tree evidence; packages with `on_stop` also need a canary matching
+their current runtime primitives and declared outputs. Historical registered
+digests remain valid history; `var/` and wall-clock age are not evidence.
+Repair stage evidence with `make stage-check NAME=<namespace/name>`.
+
 Docker-backed tests (`make test-docker`), the N1 overhead gate (`make perf-gate`) and `make security-gate` remain separate checks on a ready Docker target.
 
 Tests are tiered (fast, slow, quality, docker, security, perf) with their own targets (`make test-fast`, `test-slow`, `test-quality`, `test-docker`); see [test tiers](.agents/skills/test-patterns/references/test-tiers.md).

@@ -476,6 +476,7 @@ def load_fork(root: Path) -> Any:
             capture_output=True,
             text=True,
             check=True,
+            timeout=120,
         ).stdout.strip(),
     )
 

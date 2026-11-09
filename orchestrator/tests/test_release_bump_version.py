@@ -50,7 +50,7 @@ def test_release_updates_and_verifies_the_lock_before_publishing_files(
     monkeypatch.setenv("UV_OFFLINE", "true")
     monkeypatch.setenv("UV_CACHE_DIR", str(tmp_path / "cache"))
     monkeypatch.setenv("UV_PYTHON", sys.executable)
-    subprocess.run(["uv", "lock", "--project", str(project)], check=True)
+    subprocess.run(["uv", "lock", "--project", str(project)], check=True, timeout=120)
     monkeypatch.setattr(bump_version_module, "PYPROJECT_PATH", pyproject)
     monkeypatch.setattr(bump_version_module, "LOCKFILE_PATH", lockfile)
     monkeypatch.setattr(bump_version_module, "CHANGELOG_PATH", changelog)
@@ -73,4 +73,4 @@ def test_release_updates_and_verifies_the_lock_before_publishing_files(
         "editable": "../dep"
     }
     assert "## 1.2.4" in changelog.read_text()
-    subprocess.run(["uv", "lock", "--project", str(project), "--check"], check=True)
+    subprocess.run(["uv", "lock", "--project", str(project), "--check"], check=True, timeout=120)

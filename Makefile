@@ -147,6 +147,7 @@ help:
 	@echo "  make test-docker [TARGET=name]                         Docker tier (docker, not security/perf) on the target; fails, never skips, without Docker (not in make quality)"
 	@echo "  make toolchain-pin-check                               Check Python pins/interpreter and declared/locked/resolver uv alignment; first step of make quality"
 	@echo "  make structure-check                                   Check the repository layout (no versions in names, root and package allowlists, depth); part of make quality"
+	@echo "  make test-hygiene-check                                Check bounded test processes, skill metadata/support links, and registered stage evidence"
 	@echo "  make identity-check                                    Refuse execution identity changes against .omp/identity.json"
 	@echo "  make identity-record                                   Explicitly record current identities; requires separate reviewed identity-change commit"
 	@echo "  make ruff-baseline                                    Explicitly record current Full Ruff findings (gates never refresh)"
@@ -743,6 +744,9 @@ ruff-check:
 
 ruff-suppressions-check:
 	@$(REPO_RUNTIME_ENV) uv run --project orchestrator --extra dev python scripts/checks/check-ruff-suppressions.py
+.PHONY: test-hygiene-check
+test-hygiene-check:
+	@$(REPO_RUNTIME_ENV) uv run --project orchestrator --extra dev python scripts/checks/check-test-hygiene.py --repo-root "$(CURDIR)"
 
 identity-check:
 	@$(REPO_RUNTIME_ENV) uv run --project orchestrator --extra dev python scripts/checks/check-identity.py
@@ -797,6 +801,7 @@ quality:
 	@$(MAKE) --no-print-directory toolchain-pin-check
 	@$(MAKE) --no-print-directory version-check
 	@$(MAKE) --no-print-directory structure-check
+	@$(MAKE) --no-print-directory test-hygiene-check
 	@$(MAKE) --no-print-directory smoke-dry-run-check
 	@$(MAKE) --no-print-directory releases-check
 	@$(MAKE) --no-print-directory experiment-locks-check

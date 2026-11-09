@@ -180,4 +180,4 @@ def test_adopted_children_are_found_through_procfs() -> None:
         assert child.pid not in supervise._children(child.pid)
     finally:
         child.kill()
-        child.wait()
+        child.wait(timeout=120)

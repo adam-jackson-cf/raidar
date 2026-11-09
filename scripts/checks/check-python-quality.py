@@ -50,6 +50,7 @@ SCRIPT_NAME_ALLOWLIST = {
     "check-python-fanout.py",
     "check-python-quality.py",
     "check-structure.py",
+    "check-test-hygiene.py",
     "check-repository-paths.py",
     "run-repository-gate.py",
     "verify-version-wiring.py",

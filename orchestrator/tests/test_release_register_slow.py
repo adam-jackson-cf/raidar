@@ -27,6 +27,7 @@ def git(root: Path, *args: str) -> str:
         capture_output=True,
         text=True,
         check=True,
+        timeout=120,
     )
     return done.stdout.strip()
 

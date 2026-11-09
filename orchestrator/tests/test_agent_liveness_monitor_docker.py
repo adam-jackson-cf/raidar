@@ -136,7 +136,9 @@ def test_a_stopped_container_is_unmeasured_not_idle() -> None:
     context, name = _context(), f"raidar-liveness-{uuid.uuid4().hex[:8]}"
     image = image_tag(load_pack_spec())
     run = ["docker", "--context", context]
-    subprocess.run([*run, "run", "-d", "--name", name, image, "sleep", "600"], check=True)
+    subprocess.run(
+        [*run, "run", "-d", "--name", name, image, "sleep", "600"], check=True, timeout=120
+    )
     try:
         monitor = PhaseMonitor(
             LivenessConfig("observe", idle_s=1), DockerExecEnv(context, name), "agent"
@@ -145,7 +147,9 @@ def test_a_stopped_container_is_unmeasured_not_idle() -> None:
         async def go() -> None:
             await monitor.sample()  # baseline from a live container
             await monitor.sample()
-            subprocess.run([*run, "stop", "-t", "1", name], check=True, capture_output=True)
+            subprocess.run(
+                [*run, "stop", "-t", "1", name], check=True, capture_output=True, timeout=120
+            )
             await monitor.sample()
 
         asyncio.run(go())
@@ -155,18 +159,22 @@ def test_a_stopped_container_is_unmeasured_not_idle() -> None:
         assert "unmeasured" in dead
         assert monitor.verdict.decision == "active"
     finally:
-        subprocess.run([*run, "rm", "-f", name], capture_output=True)
+        subprocess.run([*run, "rm", "-f", name], capture_output=True, timeout=120)
 
 
 def test_the_tool_tree_hash_sees_content_mode_links_and_ignores_staging() -> None:
     context, name = _context(), f"raidar-tooltree-{uuid.uuid4().hex[:8]}"
     run = ["docker", "--context", context]
     image = image_tag(load_pack_spec())
-    subprocess.run([*run, "run", "-d", "--name", name, image, "sleep", "600"], check=True)
+    subprocess.run(
+        [*run, "run", "-d", "--name", name, image, "sleep", "600"], check=True, timeout=120
+    )
     env = DockerExecEnv(context, name)
 
     def sh(command: str) -> None:
-        subprocess.run([*run, "exec", "-u", "root", name, "bash", "-c", command], check=True)
+        subprocess.run(
+            [*run, "exec", "-u", "root", name, "bash", "-c", command], check=True, timeout=120
+        )
 
     async def digest() -> tuple[bool, str | None]:
         reading, error = await hash_tool_tree(env)
@@ -194,4 +202,4 @@ def test_the_tool_tree_hash_sees_content_mode_links_and_ignores_staging() -> Non
             assert changed != baseline, tamper
             baseline = changed
     finally:
-        subprocess.run([*run, "rm", "-f", name], capture_output=True)
+        subprocess.run([*run, "rm", "-f", name], capture_output=True, timeout=120)

@@ -48,6 +48,7 @@ def test_variant_shim_runs_the_reference_unchanged_but_rewrites_stdout(tmp_path:
         capture_output=True,
         text=True,
         check=False,
+        timeout=120,
     )
     assert (proc.returncode, proc.stderr) == (3, "warn")
     assert json.loads(proc.stdout) == {"error": "e", "detail": "request rejected"}

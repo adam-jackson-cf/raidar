@@ -123,6 +123,7 @@ def test_pth_files_and_namespace_packages_of_the_closure_are_honoured(tmp_path: 
         text=True,
         env=environment,
         check=False,
+        timeout=120,
     )
     assert done.stdout.strip() == "protobuf cloud True", done.stderr
     bare = {**environment, "RAIDAR_SUBMISSION_DEPS": ""}
@@ -132,6 +133,7 @@ def test_pth_files_and_namespace_packages_of_the_closure_are_honoured(tmp_path: 
         text=True,
         env=bare,
         check=False,
+        timeout=120,
     )
     assert missing.returncode != 0
     assert "ModuleNotFoundError" in missing.stderr

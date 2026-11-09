@@ -27,7 +27,7 @@ def bash5() -> str:
     for path in ("/opt/homebrew/bin/bash", "/usr/local/bin/bash", "/bin/bash", "/usr/bin/bash"):
         if (
             Path(path).exists()
-            and subprocess.run([path, "-c", "((BASH_VERSINFO[0]>=4))"]).returncode == 0
+            and subprocess.run([path, "-c", "((BASH_VERSINFO[0]>=4))"], timeout=120).returncode == 0
         ):
             return path
     pytest.skip("needs bash >= 4 (associative arrays)")
@@ -69,7 +69,12 @@ def test_setup_script_resets_harness_state_to_the_baseline(tmp_path: Path, bash5
     script = workspace / "setup.sh"
     script.write_text(render_setup_script())
 
-    subprocess.run([bash5, str(script)], env=_env(tmp_path, RAIDAR_RESET_SKIP_KILL="1"), check=True)
+    subprocess.run(
+        [bash5, str(script)],
+        env=_env(tmp_path, RAIDAR_RESET_SKIP_KILL="1"),
+        check=True,
+        timeout=120,
+    )
 
     assert _tree(codex_home) == {"config.toml": "x = 1\n"}
     assert _tree(home / ".codex") == {"config.toml": "x = 1\n"}
@@ -90,7 +95,9 @@ def test_root_agent_user_is_refused_not_killed_and_fails_the_reset_check(
     script = workspace / "setup.sh"
     script.write_text(render_setup_script())
 
-    subprocess.run([bash5, str(script)], env=_env(tmp_path, RAIDAR_RESET_KILL_UID="0"), check=True)
+    subprocess.run(
+        [bash5, str(script)], env=_env(tmp_path, RAIDAR_RESET_KILL_UID="0"), check=True, timeout=120
+    )
 
     reset = json.loads((logs / "raidar-reset.json").read_text())
     assert "agent user is root" in reset["error"]
@@ -127,6 +134,7 @@ def test_setup_script_puts_back_the_agents_own_setup_sh(
         [bash5, str(script)],
         env=_env(tmp_path, RAIDAR_RESET_SKIP_KILL="1", RAIDAR_AGENT_SETUP_STASH=str(stash)),
         check=True,
+        timeout=120,
     )
 
     if stashed:

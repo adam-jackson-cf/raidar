@@ -24,6 +24,7 @@ def _make_dry_run(*args: str) -> subprocess.CompletedProcess[str]:
         capture_output=True,
         text=True,
         check=False,
+        timeout=120,
     )
 
 
@@ -111,6 +112,7 @@ def test_smoke_dry_run_check_prints_every_public_smoke_shape() -> None:
         capture_output=True,
         text=True,
         check=False,
+        timeout=120,
     )
 
     assert result.returncode == 0, result.stderr
@@ -137,6 +139,7 @@ def test_registry_and_init_targets_require_their_argument(target: str, variable:
         capture_output=True,
         text=True,
         check=False,
+        timeout=120,
     )
 
     assert result.returncode != 0
@@ -176,6 +179,7 @@ def test_review_surface_data_requires_jobs() -> None:
         capture_output=True,
         text=True,
         check=False,
+        timeout=120,
     )
 
     assert result.returncode != 0
@@ -225,6 +229,7 @@ def test_renamed_make_variables_fail_from_the_environment_too() -> None:
         text=True,
         check=False,
         env={**os.environ, "RUNS_DIR": "x"},
+        timeout=120,
     )
 
     assert result.returncode != 0
@@ -249,6 +254,7 @@ def test_secrets_dotenv_without_an_env_file_fails_before_running_anything() -> N
         capture_output=True,
         text=True,
         check=False,
+        timeout=120,
     )
 
     assert result.returncode != 0

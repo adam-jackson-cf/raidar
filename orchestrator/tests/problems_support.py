@@ -360,7 +360,7 @@ def _write_converted(root: Path) -> None:
 
 def _git(repo: Path, *args: str) -> str:
     return subprocess.run(
-        ["git", "-C", str(repo), *args], capture_output=True, text=True, check=True
+        ["git", "-C", str(repo), *args], capture_output=True, text=True, check=True, timeout=120
     ).stdout.strip()
 
 

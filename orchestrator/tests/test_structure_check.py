@@ -29,7 +29,7 @@ structure = _load_structure_module()
 
 
 def test_repo_paths_list_tracked_and_unignored_files_but_not_ignored_ones(tmp_path: Path) -> None:
-    subprocess.run(["git", "init"], cwd=tmp_path, check=True, capture_output=True)
+    subprocess.run(["git", "init"], cwd=tmp_path, check=True, capture_output=True, timeout=120)
     (tmp_path / ".gitignore").write_text("/var/\n", encoding="utf-8")
     (tmp_path / "var").mkdir()
     (tmp_path / "var" / "jobs.json").write_text("{}", encoding="utf-8")
@@ -43,7 +43,7 @@ def test_repo_paths_list_tracked_and_unignored_files_but_not_ignored_ones(tmp_pa
 
 
 def test_main_exits_zero_on_a_clean_layout_and_one_on_a_violation(tmp_path: Path) -> None:
-    subprocess.run(["git", "init"], cwd=tmp_path, check=True, capture_output=True)
+    subprocess.run(["git", "init"], cwd=tmp_path, check=True, capture_output=True, timeout=120)
     (tmp_path / "lab" / "judge").mkdir(parents=True)
     (tmp_path / "lab" / "judge" / "a.yaml").write_text("", encoding="utf-8")
     records = tmp_path / "lab" / "stage-checks"
