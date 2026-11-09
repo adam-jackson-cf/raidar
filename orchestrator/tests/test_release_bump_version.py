@@ -55,6 +55,11 @@ def test_release_updates_and_verifies_the_lock_before_publishing_files(
     monkeypatch.setattr(bump_version_module, "LOCKFILE_PATH", lockfile)
     monkeypatch.setattr(bump_version_module, "CHANGELOG_PATH", changelog)
     monkeypatch.setattr(bump_version_module, "get_commits_since_last_bump", lambda: ["fix: repair"])
+    monkeypatch.setattr(
+        bump_version_module,
+        "git_output",
+        lambda *args: "2026-11-09" if args[0] == "show" else "matching-revision",
+    )
     monkeypatch.setattr(sys, "argv", [str(SCRIPT_PATH)])
 
     assert bump_version_module.main() == 0

@@ -116,7 +116,7 @@ AGENT_SMOKE_EFFECTIVE_REASONING = $(if $(filter command line environment,$(origi
 	review-surface-quality-data quality-fixture-synthetic \
 	toolchain-pin-check structure-check release-archive \
 	test-fast test-slow test-quality test-docker \
-	quality gate-commit gate-ci identity-check identity-record
+	quality gate-commit gate-ci identity-check identity-record version-release version-check
 
 define require_var
 	@if [ -z "$($1)" ]; then \
@@ -138,6 +138,8 @@ help:
 	@echo "  make quality                                           Run repo quality gates"
 	@echo "  make gate-commit                                       Whole-tree path policy, identity equality, then make quality (check-only commit hook)"
 	@echo "  make gate-ci                                           Commit gate, slow tier, then quality tier (every push and pull request)"
+	@echo "  make version-release                                   Prepare an on-demand release PR from HEAD at origin/main; refuses no-bump histories"
+	@echo "  make version-check                                     Check CLI, lock and CHANGELOG versions and release-entry history; part of make quality"
 	@echo "  make test-fast                                         Fast test tier (not slow/quality/docker/security/perf) with line and branch coverage floors; part of make quality"
 	@echo "  make test-slow                                         Slow tier (slow and not quality and not docker): real local processes, git, run directories"
 	@echo "  make test-quality                                      Quality tier (quality and not docker): quality-rule canaries"
@@ -764,8 +766,15 @@ gate-ci:
 	@$(MAKE) --no-print-directory test-slow
 	@$(MAKE) --no-print-directory test-quality
 
+version-release:
+	@$(REPO_RUNTIME_ENV) uv run --project orchestrator python scripts/release/bump-version.py
+
+version-check:
+	@$(REPO_RUNTIME_ENV) uv run --project orchestrator python scripts/release/verify-version-wiring.py
+
 quality:
 	@$(MAKE) --no-print-directory toolchain-pin-check
+	@$(MAKE) --no-print-directory version-check
 	@$(MAKE) --no-print-directory structure-check
 	@$(MAKE) --no-print-directory smoke-dry-run-check
 	@$(MAKE) --no-print-directory releases-check

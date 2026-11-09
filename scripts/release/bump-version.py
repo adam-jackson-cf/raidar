@@ -110,10 +110,20 @@ def format_version(major: int, minor: int, patch: int) -> str:
     return f"{major}.{minor}.{patch}"
 
 
-def get_commits_since_last_bump() -> list[str]:
-    """Get commit subjects and bodies since last version bump commit."""
+def git_output(*arguments: str) -> str:
+    return subprocess.run(
+        ["git", *arguments],
+        capture_output=True,
+        text=True,
+        cwd=REPO_ROOT,
+        check=True,
+    ).stdout.strip()
+
+
+def get_commits_since_last_bump(revision: str = "HEAD") -> list[str]:
+    """Get all commit subjects and bodies since the last release boundary."""
     result = subprocess.run(
-        ["git", "log", "--format=%s%n%b%x1e", "--no-merges", "-100"],
+        ["git", "log", revision, "--format=%s%n%b%x1e", "--no-merges"],
         capture_output=True,
         text=True,
         cwd=REPO_ROOT,
@@ -162,6 +172,20 @@ def analyze_commits(commits: list[str]) -> tuple[str, list[dict[str, str]]]:
             categorized.append({"type": "other", "raw": subject})
 
     return bump_type, categorized
+
+
+def release_refusal(head: str, origin_main: str, commits: list[str]) -> str | None:
+    if head != origin_main:
+        return "Release requires HEAD at origin/main; fetch origin and use its main revision."
+    if analyze_commits(commits)[0] == "none":
+        return (
+            "No release bump is needed; use a history containing a bump-worthy commit."
+        )
+    return None
+
+
+def release_commit_subject(version: str) -> str:
+    return f"chore(release): {version}"
 
 
 def calculate_new_version(current: str, bump_type: str) -> str:
@@ -221,8 +245,10 @@ def generate_changelog_entry(
     version: str,
     commits: list[dict[str, str]],
     bump_type: str,
+    *,
+    date: str | None = None,
 ) -> str:
-    date = datetime.now(UTC).strftime("%Y-%m-%d")
+    date = date if date is not None else datetime.now(UTC).strftime("%Y-%m-%d")
     lines = [f"## {version} - {date}", ""]
 
     if bump_type == "major":
@@ -292,17 +318,23 @@ def main() -> int:
     )
     args = parser.parse_args()
 
-    current_version = get_current_version()
     commits = get_commits_since_last_bump()
+    refusal = release_refusal(
+        git_output("rev-parse", "HEAD"), git_output("rev-parse", "origin/main"), commits
+    )
+    if refusal is not None:
+        print(refusal)
+        return 1
 
-    if not commits:
-        print("No commits since last version bump")
-        return 0
-
+    current_version = get_current_version()
     bump_type, categorized = analyze_commits(commits)
     new_version = calculate_new_version(current_version, bump_type)
-    changelog_version = new_version if bump_type != "none" else current_version
-    entry = generate_changelog_entry(changelog_version, categorized, bump_type)
+    entry = generate_changelog_entry(
+        new_version,
+        categorized,
+        bump_type,
+        date=git_output("show", "-s", "--format=%cs", "HEAD"),
+    )
 
     print(f"Current version: {current_version}")
     print(f"Bump type: {bump_type}")
@@ -323,6 +355,7 @@ def main() -> int:
     if bump_type != "none":
         print(f"Updated pyproject.toml and uv.lock: {new_version}")
     print("Updated CHANGELOG.md")
+    print(f"Commit as: {release_commit_subject(new_version)}")
 
     return 0
 

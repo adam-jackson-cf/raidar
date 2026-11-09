@@ -450,6 +450,11 @@ def test_failed_lock_verification_leaves_all_release_files_unchanged(
     monkeypatch.setattr(bump, "LOCKFILE_PATH", lockfile)
     monkeypatch.setattr(bump, "CHANGELOG_PATH", changelog)
     monkeypatch.setattr(bump, "get_commits_since_last_bump", lambda: ["feat: add"])
+    monkeypatch.setattr(
+        bump,
+        "git_output",
+        lambda *args: "2026-11-09" if args[0] == "show" else "matching-revision",
+    )
     monkeypatch.setattr(sys, "argv", ["bump-version.py"])
 
     def resolve_then_fail_verification(command, **_kwargs):
