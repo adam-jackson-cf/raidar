@@ -4,6 +4,10 @@ All notable changes to this project are documented in this file.
 
 ## 1.0.1 - 2026-11-09
 
+- ci: guard execution identities with `.omp/identity.json` and explicit `identity-check` /
+  `identity-record` targets; commit gates refuse undeclared identity changes.
+- ci: add finding-specific Ruff/mypy baseline comparison with shrink-only base-ref enforcement.
+
 - ci: bootstrap repository commit and CI gates
 
 ## 1.0.1 - 2026-11-05
