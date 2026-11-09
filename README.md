@@ -475,3 +475,6 @@ remove their baseline entries in the same change. `make mypy-check` is check-onl
 approve new debt. The inventory check requires new stage tool roots to join the
 configured target list. Fixture programs are inputs, not typing targets; released
 sources are checked without rewriting their bytes.
+Missing third-party stubs and decorators made `Any` by `follow_imports=skip`
+have evidence-commented, named module overrides, not global exceptions. Test
+modules retain strict annotation checks while accepting pytest decorators.
