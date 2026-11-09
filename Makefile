@@ -116,7 +116,7 @@ AGENT_SMOKE_EFFECTIVE_REASONING = $(if $(filter command line environment,$(origi
 	review-surface-quality-data quality-fixture-synthetic \
 	toolchain-pin-check structure-check release-archive \
 	test-fast test-slow test-quality test-docker \
-	quality
+	quality gate-commit gate-ci
 
 define require_var
 	@if [ -z "$($1)" ]; then \
@@ -136,9 +136,11 @@ help:
 	@echo "  make codex-auth-setup [DEVICE_AUTH=1]                 Create or validate file-backed Codex ChatGPT auth"
 	@echo "  make harbor-cleanup [JOB=<job-dir>] [DRY_RUN=1]        Remove trial environments a stopped job left behind"
 	@echo "  make quality                                           Run repo quality gates"
+	@echo "  make gate-commit                                       Whole-tree path policy then make quality (check-only commit hook)"
+	@echo "  make gate-ci                                           Commit gate, slow tier, then quality tier (every push and pull request)"
 	@echo "  make test-fast                                         Fast test tier (not slow/quality/docker/security/perf) with line and branch coverage floors; part of make quality"
-	@echo "  make test-slow                                         Slow tier (slow and not quality and not docker): real local processes, git, run directories; CI runs it on push"
-	@echo "  make test-quality                                      Quality tier (quality and not docker): quality-rule canaries; CI runs it on push"
+	@echo "  make test-slow                                         Slow tier (slow and not quality and not docker): real local processes, git, run directories"
+	@echo "  make test-quality                                      Quality tier (quality and not docker): quality-rule canaries"
 	@echo "  make test-docker [TARGET=name]                         Docker tier (docker, not security/perf) on the target; fails, never skips, without Docker (not in make quality)"
 	@echo "  make toolchain-pin-check                               Check Python pins/interpreter and declared/locked/resolver uv alignment; first step of make quality"
 	@echo "  make structure-check                                   Check the repository layout (no versions in names, root and package allowlists, depth); part of make quality"
@@ -742,6 +744,16 @@ release-archive:
 		echo "tag archive/$(REF) already exists; it is never moved"; exit 1; fi
 	@git tag -a "archive/$(REF)" -m "Archive of $(REF) before an in-place edit" HEAD \
 		&& echo "created tag archive/$(REF) at $$(git rev-parse --short HEAD)"
+
+gate-commit:
+	@$(REPO_RUNTIME_ENV) uv run --project orchestrator --extra dev \
+		python scripts/checks/check-repository-paths.py
+	@$(MAKE) --no-print-directory quality
+
+gate-ci:
+	@$(MAKE) --no-print-directory gate-commit
+	@$(MAKE) --no-print-directory test-slow
+	@$(MAKE) --no-print-directory test-quality
 
 quality:
 	@$(MAKE) --no-print-directory toolchain-pin-check
