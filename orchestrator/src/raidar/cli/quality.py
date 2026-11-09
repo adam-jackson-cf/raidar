@@ -22,13 +22,7 @@ PYTHON = sys.executable
 FANOUT_CHECK_SCRIPT = REPO_ROOT / "scripts" / "checks" / "check-python-fanout.py"
 PYTHON_QUALITY_CHECK_SCRIPT = REPO_ROOT / "scripts" / "checks" / "check-python-quality.py"
 IMPORT_LINTER_CONFIG = ORCHESTRATOR_ROOT / ".importlinter"
-TYPECHECK_TARGETS = [
-    "src/raidar",
-    "../contract/src",
-    "tests/test_codex_cli_adapter.py",
-    "tests/test_claude_code_cli_adapter.py",
-    "tests/at3_support.py",
-]
+MYPY_CHECK_SCRIPT = REPO_ROOT / "scripts" / "checks" / "check-mypy-coverage.py"
 FAST_SELECTOR = "not slow and not quality and not docker and not security and not perf"
 PYPROJECT = ORCHESTRATOR_ROOT / "pyproject.toml"
 COVERAGE_KINDS = ("line", "branch")
@@ -171,6 +165,14 @@ def run_fast_tier() -> None:
     enforce_coverage_report(json.loads(report_path.read_text()), coverage_floors())
 
 
+def run_mypy_quality_gates() -> None:
+    """Check maintained inventory and strict findings against the shrink-only baseline."""
+    run_or_raise(
+        [PYTHON, str(MYPY_CHECK_SCRIPT), "--root", str(REPO_ROOT), "--config", str(PYPROJECT)],
+        ORCHESTRATOR_ROOT,
+    )
+
+
 def run_orchestrator_quality_gates() -> None:
     tools = package_tool_sources()
     source_roots = [
@@ -209,10 +211,7 @@ def run_orchestrator_quality_gates() -> None:
     run_or_raise(
         ["lizard", "-C", "10", "-l", "python", "src", "../contract/src", *tools], ORCHESTRATOR_ROOT
     )
-    run_or_raise(
-        [PYTHON, "-m", "mypy", "--follow-imports=skip", *TYPECHECK_TARGETS, *tools],
-        ORCHESTRATOR_ROOT,
-    )
+    run_mypy_quality_gates()
     run_fast_tier()
 
 
