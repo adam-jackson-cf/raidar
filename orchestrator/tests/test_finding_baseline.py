@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import subprocess
 import sys
 from pathlib import Path
 
@@ -257,3 +258,44 @@ def test_baseline_refuses_invalid_records(invalid: dict) -> None:
 def test_baseline_refuses_comparison_between_different_tools() -> None:
     with pytest.raises(baseline.ScanInputError):
         baseline.evaluate_baseline(_baseline(), [], _baseline(tool="mypy"))
+
+
+@pytest.mark.parametrize(
+    "message",
+    [
+        "fatal: path '.omp/baselines/mypy.json' does not exist in 'origin/main'",
+        "fatal: path '.omp/baselines/mypy.json' exists on disk, but not in 'origin/main'",
+    ],
+)
+def test_first_baseline_adoption_still_enforces_current_finding_equality(message: str) -> None:
+    record = _baseline(_finding(), tool="mypy")
+    result = subprocess.CompletedProcess([], 128, "", message + "\n")
+    base = baseline.read_base_baseline(result, record, ".omp/baselines/mypy.json", "origin/main")
+    assert baseline.evaluate_baseline(record, [_finding()], base) == (0, [])
+    assert baseline.evaluate_baseline(record, [], base)[0] == 1
+    assert baseline.evaluate_baseline(record, [_finding(count=2)], base)[0] == 1
+
+
+@pytest.mark.parametrize(
+    ("status", "stdout", "stderr"),
+    [
+        (128, "", "fatal: invalid object name 'origin/main'."),
+        (128, "", "fatal: path 'other.json' does not exist in 'origin/main'"),
+        (128, "", "fatal: path '.omp/baselines/mypy.json' does not exist in 'other'"),
+        (128, "", "permission denied"),
+        (0, "{", ""),
+    ],
+)
+def test_first_adoption_does_not_hide_other_base_read_failures(
+    status: int, stdout: str, stderr: str
+) -> None:
+    result = subprocess.CompletedProcess([], status, stdout, stderr)
+    with pytest.raises(ValueError, match="cannot read base baseline|Expecting"):
+        baseline.read_base_baseline(result, _baseline(), ".omp/baselines/mypy.json", "origin/main")
+
+
+def test_existing_base_baseline_is_read_instead_of_refreshing_it() -> None:
+    result = subprocess.CompletedProcess([], 0, json.dumps(_baseline()), "")
+    assert baseline.read_base_baseline(result, _baseline(_finding()), "baseline.json", "main") == (
+        _baseline()
+    )

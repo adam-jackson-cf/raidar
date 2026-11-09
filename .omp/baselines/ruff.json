@@ -1,0 +1,3306 @@
+{
+  "schemaVersion": 1,
+  "tool": "ruff",
+  "findings": [
+    {
+      "path": "contract/src/raidar_contract/__init__.py",
+      "code": "D205",
+      "fingerprint": "f5a77135ac4a5e715e7d10f3039997256d10a49a89c8011fde6667fae62285f3",
+      "count": 1
+    },
+    {
+      "path": "contract/src/raidar_contract/agent_records.py",
+      "code": "PLR0913",
+      "fingerprint": "d8307045cbdc1e55b3c6e29b28ff817629abb73bb8a96fe2b32347324ca22952",
+      "count": 1
+    },
+    {
+      "path": "lab/stages/raidar/define/tool/src/define_tool/aspects.py",
+      "code": "D205",
+      "fingerprint": "dc79d6b0a312961874cd1e90c339754cebb76adcfb8b705e286550b8b84ec5cf",
+      "count": 1
+    },
+    {
+      "path": "lab/stages/raidar/define/tool/src/define_tool/aspects.py",
+      "code": "D209",
+      "fingerprint": "dbe3749efe88c7975459001ef71ac10ca39f0b93754f0edb7a47b9e02e3f8974",
+      "count": 1
+    },
+    {
+      "path": "lab/stages/raidar/define/tool/src/define_tool/block.py",
+      "code": "D205",
+      "fingerprint": "9ea21c181e4c8ef768cd53c3ce530235bf8bdc2409109f4a34a97663198eca71",
+      "count": 1
+    },
+    {
+      "path": "lab/stages/raidar/define/tool/src/define_tool/block.py",
+      "code": "D205",
+      "fingerprint": "cebfecc3d2952cce800fcfe8d6bf9a6efac898ee8f49ac39eec65e12f74aeefc",
+      "count": 1
+    },
+    {
+      "path": "lab/stages/raidar/define/tool/src/define_tool/block.py",
+      "code": "D209",
+      "fingerprint": "01d7de0cd5e1c42a2158a20727d04f839b85383fc3a5b481164920aa1372b8a1",
+      "count": 1
+    },
+    {
+      "path": "lab/stages/raidar/define/tool/src/define_tool/block.py",
+      "code": "D209",
+      "fingerprint": "fcd2c001eee6cb8b890be79a5e939542ffb0475b20842239138b78de28ff4e10",
+      "count": 1
+    },
+    {
+      "path": "lab/stages/raidar/define/tool/src/define_tool/core.py",
+      "code": "D205",
+      "fingerprint": "dd97c6ec68690e21267c13e780a3d23290bb15811b41f740520d96d4400ee6f8",
+      "count": 1
+    },
+    {
+      "path": "lab/stages/raidar/define/tool/src/define_tool/draft.py",
+      "code": "D205",
+      "fingerprint": "38afeac24ecc9f805b50e69a98358405c29136f3989b56707a7817f372269525",
+      "count": 1
+    },
+    {
+      "path": "lab/stages/raidar/define/tool/src/define_tool/draft.py",
+      "code": "D205",
+      "fingerprint": "528dfede6d872abcda374972ad8373b5abea48e3a094358a36a89363fa7f4057",
+      "count": 1
+    },
+    {
+      "path": "lab/stages/raidar/define/tool/src/define_tool/draft.py",
+      "code": "D205",
+      "fingerprint": "7379bcebb04a332c3ebd5116391d42ae9686aae574f2e1e88d6ad6693e7824b6",
+      "count": 1
+    },
+    {
+      "path": "lab/stages/raidar/define/tool/src/define_tool/draft.py",
+      "code": "D209",
+      "fingerprint": "1ff99f19fa112f952aeedf8a2c49788677691348a7a82ca3d4c70b37145b97a2",
+      "count": 1
+    },
+    {
+      "path": "lab/stages/raidar/define/tool/src/define_tool/draft.py",
+      "code": "D209",
+      "fingerprint": "8463c72632c5abcd90ac5c3ca74af248c4204074c8b25b18824937db7f61439f",
+      "count": 1
+    },
+    {
+      "path": "lab/stages/raidar/define/tool/src/define_tool/draft.py",
+      "code": "D209",
+      "fingerprint": "a521e08c91d7e491fbead39e990b0883b8cdba8e89f2271063c68b33ab223b76",
+      "count": 1
+    },
+    {
+      "path": "lab/stages/raidar/define/tool/src/define_tool/enumerated.py",
+      "code": "D205",
+      "fingerprint": "24b0f24df277dfe34010bb0fc90da25f63e8dd01e5ac4c77d40d941d607eeb37",
+      "count": 1
+    },
+    {
+      "path": "lab/stages/raidar/define/tool/src/define_tool/enumerated.py",
+      "code": "D205",
+      "fingerprint": "610712694bed0634773cd6ece42b6d74cdd4d36bef857cf13ca877e5ad1b8de8",
+      "count": 1
+    },
+    {
+      "path": "lab/stages/raidar/define/tool/src/define_tool/enumerated.py",
+      "code": "D205",
+      "fingerprint": "88a61d19cc620e16cac3f7220fce5de2ba1a81072fffe0771380718271c0e19e",
+      "count": 1
+    },
+    {
+      "path": "lab/stages/raidar/define/tool/src/define_tool/enumerated.py",
+      "code": "D205",
+      "fingerprint": "9eb43d984acff6ab362051220ea475a1332e6390af8ce02e65146f06e381b256",
+      "count": 1
+    },
+    {
+      "path": "lab/stages/raidar/define/tool/src/define_tool/enumerated.py",
+      "code": "D205",
+      "fingerprint": "aefa8e9a161fe0697fae8153053cf75f5929fcadc4d823bf9f03b370e5119d17",
+      "count": 1
+    },
+    {
+      "path": "lab/stages/raidar/define/tool/src/define_tool/enumerated.py",
+      "code": "D205",
+      "fingerprint": "d582d8e9760a2816d55566506315f659657c2bcbb9ec3f29c7ed567e3ce457b6",
+      "count": 1
+    },
+    {
+      "path": "lab/stages/raidar/define/tool/src/define_tool/enumerated.py",
+      "code": "D205",
+      "fingerprint": "f2a92d7daf9900752c348b28dd6b32ff853cba623432d3d7dafa3c70af386ecd",
+      "count": 1
+    },
+    {
+      "path": "lab/stages/raidar/define/tool/src/define_tool/enumerated.py",
+      "code": "D205",
+      "fingerprint": "f8f86fa9073bece50902ad50c71d55ecf3ddadb3ee504d7646896243f96da9ce",
+      "count": 1
+    },
+    {
+      "path": "lab/stages/raidar/define/tool/src/define_tool/enumerated.py",
+      "code": "D209",
+      "fingerprint": "4090d8da2b96d20efc962d96992c3d901ed4581d46b856a6ef771bda0770bb34",
+      "count": 1
+    },
+    {
+      "path": "lab/stages/raidar/define/tool/src/define_tool/enumerated.py",
+      "code": "D209",
+      "fingerprint": "431837176fa6b8571756701bf0bbffc1b3b0e87792eec479ba025478debb94c7",
+      "count": 1
+    },
+    {
+      "path": "lab/stages/raidar/define/tool/src/define_tool/enumerated.py",
+      "code": "D209",
+      "fingerprint": "8dfb2f7bcfff3f22c109eea59cdc5a97ba29a873ca018af5062592129cb1159d",
+      "count": 1
+    },
+    {
+      "path": "lab/stages/raidar/define/tool/src/define_tool/enumerated.py",
+      "code": "D209",
+      "fingerprint": "943c72a604be9b9b56f10341a5e73676f29f1fab569d2fa112e1a08ef260a28d",
+      "count": 1
+    },
+    {
+      "path": "lab/stages/raidar/define/tool/src/define_tool/enumerated.py",
+      "code": "D209",
+      "fingerprint": "9b9ac74fa8dc7432de26486c10e236c6d587f3c0611e958e9e9eeb6bf9dcc162",
+      "count": 1
+    },
+    {
+      "path": "lab/stages/raidar/define/tool/src/define_tool/enumerated.py",
+      "code": "D209",
+      "fingerprint": "a36d16c3f45f89498746b69bdbeb283dd4a9e1f3b98fb5a91edf30d8e8b35c21",
+      "count": 1
+    },
+    {
+      "path": "lab/stages/raidar/define/tool/src/define_tool/enumerated.py",
+      "code": "D209",
+      "fingerprint": "ac87445bcc8d8bada08efc29eeef7f11e78121a0a6eac61cb830d95d621adada",
+      "count": 1
+    },
+    {
+      "path": "lab/stages/raidar/define/tool/src/define_tool/enumerated.py",
+      "code": "D209",
+      "fingerprint": "cc06ee6fa5b84d77b66e1c95520dc68ddba80757bc5c828cab1113245a8626bb",
+      "count": 1
+    },
+    {
+      "path": "lab/stages/raidar/define/tool/src/define_tool/featuredef.py",
+      "code": "I001",
+      "fingerprint": "6590ff2d12ba18b405dbcce5e08c85b2b082c516c664876d2cbcc4fb1552d68a",
+      "count": 1
+    },
+    {
+      "path": "lab/stages/raidar/define/tool/src/define_tool/intakecheck.py",
+      "code": "D205",
+      "fingerprint": "a3a522b01de34bddddde40e7b6c04b5a10569c2a8ac5b1ca539bb95920b5ccb5",
+      "count": 1
+    },
+    {
+      "path": "lab/stages/raidar/define/tool/src/define_tool/normative.py",
+      "code": "D205",
+      "fingerprint": "86a3c8b98fcb5a6a5d5a0f06433438d91d91804e55448a619f36914f0180b49b",
+      "count": 1
+    },
+    {
+      "path": "lab/stages/raidar/define/tool/src/define_tool/normative.py",
+      "code": "D205",
+      "fingerprint": "dad26101ff5eb926d6540eb8708a832ef2eedf6d4fc9d8b1b8593768e69028f7",
+      "count": 1
+    },
+    {
+      "path": "lab/stages/raidar/define/tool/src/define_tool/normative.py",
+      "code": "D209",
+      "fingerprint": "25b3d6701805b8abf8e8a93b067a48aee2e4254454e6f69bd2fe8554809673d1",
+      "count": 1
+    },
+    {
+      "path": "lab/stages/raidar/define/tool/src/define_tool/normative.py",
+      "code": "D209",
+      "fingerprint": "920fab355251c25c9a98b41c0726386e1d4a9fa0b22637c1eebb0adb752cd0f4",
+      "count": 1
+    },
+    {
+      "path": "lab/stages/raidar/define/tool/src/define_tool/owed.py",
+      "code": "D205",
+      "fingerprint": "16a9e623e95597da8a59c84566189a3d67cffcdb09dfd05fad10a99873634122",
+      "count": 1
+    },
+    {
+      "path": "lab/stages/raidar/define/tool/src/define_tool/owed.py",
+      "code": "D205",
+      "fingerprint": "27a82fa4313e46361371b2e2893668644c2be8df473ba1eb3638c96a36b07dd7",
+      "count": 1
+    },
+    {
+      "path": "lab/stages/raidar/define/tool/src/define_tool/owed.py",
+      "code": "D205",
+      "fingerprint": "8bcd02d3a1aef3d0135722e7737502d467dbe524a8a32feeaab502318be40824",
+      "count": 1
+    },
+    {
+      "path": "lab/stages/raidar/define/tool/src/define_tool/owed.py",
+      "code": "D209",
+      "fingerprint": "a81404a119d1898f7f118823a74ba938f6baddfc8743fd7153fbe3c6fd22c543",
+      "count": 1
+    },
+    {
+      "path": "lab/stages/raidar/define/tool/src/define_tool/owed.py",
+      "code": "D209",
+      "fingerprint": "be8202740f4d7b006ad6cf4365b946b474a845b6bd04307f679ab5f76ac9f888",
+      "count": 1
+    },
+    {
+      "path": "lab/stages/raidar/define/tool/src/define_tool/status.py",
+      "code": "D205",
+      "fingerprint": "fadc968a9a90a046386dff6eadf2c00c17bacb07a0ddaf201199086c8d99d70d",
+      "count": 1
+    },
+    {
+      "path": "lab/stages/raidar/define/tool/src/define_tool/tool.py",
+      "code": "D205",
+      "fingerprint": "27d09d14956e3269fa99beb8c5c2ad2c1e9387b82be52dbbf318797e496821c4",
+      "count": 1
+    },
+    {
+      "path": "lab/stages/raidar/define/tool/src/define_tool/tool.py",
+      "code": "D205",
+      "fingerprint": "48a1f821004bec7ff3e8504b7d1d6a278f1cb741be64e88406ecd1983faabcc0",
+      "count": 1
+    },
+    {
+      "path": "lab/stages/raidar/define/tool/src/define_tool/tool.py",
+      "code": "D209",
+      "fingerprint": "3312f710b8d78cac1e2c112b31abbacd8193c2ad0c5d7f34763c75ce54f2ba08",
+      "count": 1
+    },
+    {
+      "path": "lab/stages/raidar/define/tool/src/define_tool/tool.py",
+      "code": "D209",
+      "fingerprint": "6d871afb9bed3834d3fa84adb3db352d41ec4272e11f1647f3004e9441e9b4ee",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/cli/analyze.py",
+      "code": "I001",
+      "fingerprint": "6590ff2d12ba18b405dbcce5e08c85b2b082c516c664876d2cbcc4fb1552d68a",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/cli/analyze.py",
+      "code": "PLR0913",
+      "fingerprint": "326e78039ea069c69fc009906b024d94a680e13948077c34939d476d46cde4e0",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/cli/analyze.py",
+      "code": "PLR0917",
+      "fingerprint": "d88b12f029655d0863bb8874127ccc94c8905fb6cba9f4c9978e8a07a0df977a",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/cli/assess.py",
+      "code": "PLR0913",
+      "fingerprint": "0b474d2e5b561d26f658d7a1d8506ffb6e4756dcd73f823e57f21c08b41e540e",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/cli/assess.py",
+      "code": "PLR0913",
+      "fingerprint": "1993ffb5194fe6934a206d3cd506115e4d1931513cb5594b9dbde4ba8d1670a7",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/cli/assess.py",
+      "code": "PLR0917",
+      "fingerprint": "28219f852c78fac57c03a9555d3329c16572981984c4995f7742930740cfa331",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/cli/experiment_spec.py",
+      "code": "PLR0913",
+      "fingerprint": "3315f1f597efa9390d242e552b1e23dffc20d17caeeaec5f4df7f173893bbf29",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/cli/experiment_spec.py",
+      "code": "PLR0917",
+      "fingerprint": "69cd58a97fcc9e878d31c70926365d31ea6833af25f3ef4a503c0ad75126c85f",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/cli/grading.py",
+      "code": "PLR0913",
+      "fingerprint": "5cbbd0c7331e65ab7732613b35bf68dcff1580c1be06da830e31ec7c2c70d002",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/cli/grading.py",
+      "code": "PLR0913",
+      "fingerprint": "ede1518e569ee6d87658cadfe2220729dfa708bc7343ba5299089e168541dd5b",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/cli/imports.py",
+      "code": "I001",
+      "fingerprint": "6590ff2d12ba18b405dbcce5e08c85b2b082c516c664876d2cbcc4fb1552d68a",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/cli/jev.py",
+      "code": "PLR0913",
+      "fingerprint": "af53bf8c45a355c0a9c9de714d4f325810589e92a7742c3eda58e88c70c29674",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/cli/jev.py",
+      "code": "PLR0917",
+      "fingerprint": "4ab0c0714082d104827a15740b64cbb1cb0d0921e4ef86f8dfb1775d066a00fb",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/cli/jev_calibration.py",
+      "code": "D205",
+      "fingerprint": "f277134b7ab181b0900d64daf21cadc6d1eba3522933a86cda8773fa817b4d24",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/cli/jev_calibration.py",
+      "code": "PLR0913",
+      "fingerprint": "257de17908b7c8bb373494079e0726a0ec9b44141a4c7903eb34f0deac1d8a1a",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/cli/jev_calibration.py",
+      "code": "PLR0913",
+      "fingerprint": "7fc2b4fa1d33731a6899c60e01af85bc4debe25c9703e01ce043bd0280a2c9cd",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/cli/jev_calibration.py",
+      "code": "PLR0913",
+      "fingerprint": "ff437740f7387d4082c9d11a4b004e37ed5cea6730161990035ec8ad9d857f41",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/cli/jev_calibration.py",
+      "code": "PLR0917",
+      "fingerprint": "2a0de9093f071380f07eba9c727cf1e25bf9deb0ecb95051f751fb649aab8ed6",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/cli/jev_calibration.py",
+      "code": "PLR0917",
+      "fingerprint": "d4c73b534a341846e1ab4ae4fd6df091fb6a2b6cd3a8145f6a9b0c3cc7aaa81a",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/cli/jev_calibration.py",
+      "code": "PLR0917",
+      "fingerprint": "ffdb53ca9623664f2c4b2a58623c1aca90c6d38bd1fa1000f4a99903cbbfea7c",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/cli/problem.py",
+      "code": "PLR0913",
+      "fingerprint": "2685ec8fe6774fc8f28a3bb29a93401d6f8e547031d5ba21d1b610f06b303050",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/cli/problem.py",
+      "code": "PLR0913",
+      "fingerprint": "4a02d19c822136b4e3bb4d9cab8d4d7e53210f487f65c37c5a5085d92da2ad87",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/cli/problem.py",
+      "code": "PLR0913",
+      "fingerprint": "5694c047b23b0a4148fba3ab311f21cdf9fd45419604869acaea63d752623251",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/cli/problem.py",
+      "code": "PLR0917",
+      "fingerprint": "094df83a8a6e94d20a6cad52dcf246174c3b76334a3fb27686b66a17fcf0b328",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/cli/problem.py",
+      "code": "PLR0917",
+      "fingerprint": "3ccec94cc8bb0706ecd0812cfd530700dc186e10228ef31635d4de4e6c9bc830",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/cli/register.py",
+      "code": "D205",
+      "fingerprint": "d7dcbada5b72e154973177adc682d9820b005ad6b52335ff7d791c09ac6ef314",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/cli/register.py",
+      "code": "D209",
+      "fingerprint": "e66b52c6f0c3a8e03af639df3158421c695ebe2850b5129eb3dbf9fb9c14e279",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/cli/releases.py",
+      "code": "D205",
+      "fingerprint": "4f7bc17b075efc84468cdecfd88d982a001a7c312ef84e8547a7903acabd873f",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/cli/releases.py",
+      "code": "D209",
+      "fingerprint": "99c1aba45487c4f0e06bfd706c8e87c0ea813a439058efa8de12835c7e75418a",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/cli/releases.py",
+      "code": "I001",
+      "fingerprint": "6590ff2d12ba18b405dbcce5e08c85b2b082c516c664876d2cbcc4fb1552d68a",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/cli/stage.py",
+      "code": "I001",
+      "fingerprint": "6590ff2d12ba18b405dbcce5e08c85b2b082c516c664876d2cbcc4fb1552d68a",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/cli/stage_fixtures.py",
+      "code": "I001",
+      "fingerprint": "6590ff2d12ba18b405dbcce5e08c85b2b082c516c664876d2cbcc4fb1552d68a",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/cli/stage_package.py",
+      "code": "I001",
+      "fingerprint": "6590ff2d12ba18b405dbcce5e08c85b2b082c516c664876d2cbcc4fb1552d68a",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/contract/releases.py",
+      "code": "I001",
+      "fingerprint": "6590ff2d12ba18b405dbcce5e08c85b2b082c516c664876d2cbcc4fb1552d68a",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/design/experiment/agent.py",
+      "code": "I001",
+      "fingerprint": "6590ff2d12ba18b405dbcce5e08c85b2b082c516c664876d2cbcc4fb1552d68a",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/design/experiment/arm.py",
+      "code": "D205",
+      "fingerprint": "4c9d889445480fb348767129eca4310a284873900976b29b7822af1fbdf37c53",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/design/experiment/arm.py",
+      "code": "D205",
+      "fingerprint": "c87e578ff49841237b44543461047f4a4cb01fe6c9cd0c3dc9bb2789d16f0cd8",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/design/experiment/arm.py",
+      "code": "D209",
+      "fingerprint": "17062012c5e8f79abfc1055f6f1193242dd98fa23193e34dc97d0e424ec01c2f",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/design/experiment/arm.py",
+      "code": "D209",
+      "fingerprint": "4bcf20d63fab3d44503eb7de166fe3ece896b59c3adedda61bb55c67dd997bd9",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/design/experiment/arm.py",
+      "code": "I001",
+      "fingerprint": "6590ff2d12ba18b405dbcce5e08c85b2b082c516c664876d2cbcc4fb1552d68a",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/design/experiment/loader.py",
+      "code": "I001",
+      "fingerprint": "6590ff2d12ba18b405dbcce5e08c85b2b082c516c664876d2cbcc4fb1552d68a",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/design/experiment/lock.py",
+      "code": "D205",
+      "fingerprint": "17d6887ea6c9c7290c255a15c01f73d91b22a4e5ba83099cb0db3b0c7260276c",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/design/experiment/lock.py",
+      "code": "I001",
+      "fingerprint": "6590ff2d12ba18b405dbcce5e08c85b2b082c516c664876d2cbcc4fb1552d68a",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/design/experiment/lock.py",
+      "code": "PLR0913",
+      "fingerprint": "6315633b47370c21fecf84ffc25dcb544828fd2778936429d66e8cf652f25d0f",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/design/experiment/lock.py",
+      "code": "PLR0913",
+      "fingerprint": "7a6c8085ef57c5951de9d9634a6495c8b3bfa4db68f0f2bd53f26bc13fd93d23",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/design/experiment/lock.py",
+      "code": "PLR0913",
+      "fingerprint": "b89c8ac8e813940da23191ddb78385556def7c71d87250c63f2f90665a5fd70f",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/design/experiment/schema.py",
+      "code": "I001",
+      "fingerprint": "6590ff2d12ba18b405dbcce5e08c85b2b082c516c664876d2cbcc4fb1552d68a",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/design/experiment/validation.py",
+      "code": "I001",
+      "fingerprint": "6590ff2d12ba18b405dbcce5e08c85b2b082c516c664876d2cbcc4fb1552d68a",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/design/problem/catalog.py",
+      "code": "PLR0913",
+      "fingerprint": "06aec827a3d000c590789e1d55988961b5bd4e29dc4900fa71c62240680c122c",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/design/problem/dependencies.py",
+      "code": "PLR0913",
+      "fingerprint": "4250067e2ac2dc4a81e7a0a2668be3d3a503115699735d80fc98e6cd17cfd12c",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/design/problem/dependencies.py",
+      "code": "PLR0917",
+      "fingerprint": "1553f5fd0eea92e651e1e047f6cfbd7590cdb1708dc2711ed00b72df12d81788",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/design/problem/direct.py",
+      "code": "PLR0913",
+      "fingerprint": "c1695acc81a2989e7e471a171ac8def4d8e69dfc8ee4539aef5ee1d6229aa05f",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/design/problem/harbor_engine.py",
+      "code": "PLR0913",
+      "fingerprint": "743f26a226e08b3e2197b291cbbf479c806a375a54a6c9460fa687df861176da",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/design/problem/harbor_engine.py",
+      "code": "PLR0913",
+      "fingerprint": "bd4cfbde84c3ea3c625f0c3302932e262105c78c4c63bddb86738669998a652b",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/design/problem/importer.py",
+      "code": "PLR0913",
+      "fingerprint": "787f407df865030e14af41adf68a797ac2f177affa10ae9f06d284fb18820c05",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/design/problem/importer.py",
+      "code": "PLR0913",
+      "fingerprint": "8bb23b91c31191df93c0758e78d9a09384384b4207a25e0b2a444d03cf702463",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/design/problem/models.py",
+      "code": "I001",
+      "fingerprint": "6590ff2d12ba18b405dbcce5e08c85b2b082c516c664876d2cbcc4fb1552d68a",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/design/problem/rewrite.py",
+      "code": "PLR0913",
+      "fingerprint": "6cc65f0c53cf1cb90ba77e3c4070728c788d12509fb03a62c93a409b2cc9aba0",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/design/problem/rewrite.py",
+      "code": "PLR0913",
+      "fingerprint": "9c7e530a9b88ee21e9eb154f3a58f039ecb4c113dbe4401ac7d963c5a2071415",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/design/problem/validation.py",
+      "code": "I001",
+      "fingerprint": "6590ff2d12ba18b405dbcce5e08c85b2b082c516c664876d2cbcc4fb1552d68a",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/design/problem/validation.py",
+      "code": "PLR0913",
+      "fingerprint": "14bfeeb9f8774103a0b442fcffc2c2aad17f9b710ee659f5ee865b207a3ac482",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/design/problem/validation.py",
+      "code": "PLR0917",
+      "fingerprint": "f2656db411a326061647ef55f2b5bb85293c1f2c5819eb82bcd13eedf6e421d3",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/engine/health/base.py",
+      "code": "D205",
+      "fingerprint": "bfe7de26286e6e63e9390a5de6e6de5a307d3cdf95482d966e3911925c552383",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/engine/health/base.py",
+      "code": "D209",
+      "fingerprint": "1f19b6c5bfb91930ac5049eea6f5b4ccf35704c1f9ad2e0759d5db694f6cde00",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/engine/health/base.py",
+      "code": "PLR0913",
+      "fingerprint": "8aa406b29c349dfe3c9ad817594e87bb9bbf272fe6a7d8336bf46f026c048e4a",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/engine/health/evidence.py",
+      "code": "D205",
+      "fingerprint": "28c23d65bc57beee17ddb1ac12884aa4d8aa367a2aa47d8bb673eff7fe096136",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/engine/health/evidence.py",
+      "code": "D205",
+      "fingerprint": "414e55b4530881c77e7fffbf7a2ae776fc84afa2b0581cbe68a89db92df3d557",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/engine/health/evidence.py",
+      "code": "D205",
+      "fingerprint": "89644dbcef751337bce370176f48acd2f16f97a4a59e2e8de5b5ef6af0357126",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/engine/health/evidence.py",
+      "code": "D205",
+      "fingerprint": "8cd2e559508aa740b1d1d82163aa5d61f4798a63e8417ead57727653a50e144a",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/engine/health/evidence.py",
+      "code": "D205",
+      "fingerprint": "930fb444a53e02df235d6767598625a7d613f05fb32b721e941789236ed58716",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/engine/health/evidence.py",
+      "code": "D205",
+      "fingerprint": "ee1e44e15a0b6f61484d0ca155f37eab515da03f1063f5565eafd007c76ee08e",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/engine/health/evidence.py",
+      "code": "D205",
+      "fingerprint": "f7023d6f31af14e63296d7aa07fa1561972ba196cf311f887c0fc82e8eefa14e",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/engine/health/evidence.py",
+      "code": "D209",
+      "fingerprint": "30ee1cf914fdbb7b203e3875fee1e50ebada0b6b07c44aae19862b03f47094d1",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/engine/health/evidence.py",
+      "code": "D209",
+      "fingerprint": "3f916be3094a8d7605f2345c7af9d728420adf495a23fd478eed3e0e1121d8a0",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/engine/health/evidence.py",
+      "code": "D209",
+      "fingerprint": "5b2d17b1dbf0fbe6a6b2ec99cc25bee24a944a8133ed322e427a9d9d9d680cfc",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/engine/health/evidence.py",
+      "code": "D209",
+      "fingerprint": "69dd07f57f6656c49a72721dcd35a8a00d412b669a257a6bb9e98df9bbb16043",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/engine/health/evidence.py",
+      "code": "D209",
+      "fingerprint": "703d593bdbecfad802b3c35451612f4052354ff48d963b134cd4328eaf570fae",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/engine/health/evidence.py",
+      "code": "D209",
+      "fingerprint": "835be208bf539a76e9550557b7e37bf1280b865d9e1acb0c1a16077ff96c6259",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/engine/health/evidence.py",
+      "code": "D209",
+      "fingerprint": "9c31b4b033ba9a2dfa64e3b83296efa236d3b5fea13fe5c2fc4e63af8cdce928",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/engine/health/evidence.py",
+      "code": "D209",
+      "fingerprint": "9ef073ff7f3d8a3970dd3d3e2cd458badef7b1048f9c429175f0ab600fb5dd2b",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/engine/health/evidence.py",
+      "code": "D209",
+      "fingerprint": "b3f084bc6be26fb94fd8c688625bef5a6be4217abcd0dda3dea41e183aeb6376",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/engine/health/evidence.py",
+      "code": "D209",
+      "fingerprint": "cdd46ee3c7babe0e6fb55d920ae225114c31df33602a0683d794b04edfd15c46",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/engine/health/evidence.py",
+      "code": "I001",
+      "fingerprint": "6590ff2d12ba18b405dbcce5e08c85b2b082c516c664876d2cbcc4fb1552d68a",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/engine/health/isolation.py",
+      "code": "D205",
+      "fingerprint": "15657d86f82df9685aa9b644e86d0593d0836bbc88497905bde45c56d4860438",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/engine/health/isolation.py",
+      "code": "D209",
+      "fingerprint": "dc3db527eb2ce21b443d46874e44e04a2a524d67641a2c7cfe04f898c9645a74",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/engine/health/isolation.py",
+      "code": "PLR0913",
+      "fingerprint": "216175e3fb3e429457e2dfe5bca9cbc868c91e4f4bbebb97545cb91328572214",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/engine/health/isolation.py",
+      "code": "PLR0917",
+      "fingerprint": "03d1602e3c6c8bfb250d40af6f2294d998009f0d89b775c16c65d44eebbb1a8f",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/engine/health/liveness.py",
+      "code": "D205",
+      "fingerprint": "f433b377ebd5d4f96f45e751027f2d0700c1342dc2e2589f2518010c29e2a2b8",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/engine/health/liveness.py",
+      "code": "D209",
+      "fingerprint": "06ba8a5ec3cec734db314dea22883d65f984f8ac93fe482ef2e6ddbd4335a66c",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/engine/job/detach.py",
+      "code": "PLR0913",
+      "fingerprint": "2bdddc8ee6a713dc2a2623398b95e5ee401ebbcb9622f3aa15d63beeea5e6335",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/engine/job/provenance.py",
+      "code": "D205",
+      "fingerprint": "c646de6b3e931ec77acef2fedb5fa5fbd5e1c69deafcbbc2e4a4ac1fce036709",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/engine/job/provenance.py",
+      "code": "D209",
+      "fingerprint": "00abb3b8dc08330f72d1fa8310634537f16fe82a6ea94db292b17d214e0373fe",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/engine/job/provenance.py",
+      "code": "I001",
+      "fingerprint": "6590ff2d12ba18b405dbcce5e08c85b2b082c516c664876d2cbcc4fb1552d68a",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/engine/job/run.py",
+      "code": "PLR0913",
+      "fingerprint": "abbb86213d56cb6687e1b9814c18356bd2dae7016269a087139c32b1ac81edd0",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/engine/perf/phases.py",
+      "code": "PLR0913",
+      "fingerprint": "36dbc83aa1a150653ca023b989780569ed7dc1ada3f5c983d3d965e0b418f576",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/engine/perf/phases.py",
+      "code": "PLR0914",
+      "fingerprint": "67e67d2e940d16f75c1f718bd400a4e61f1d2491a0a04b363bca1d15a26c5f45",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/engine/target/health.py",
+      "code": "PLR0913",
+      "fingerprint": "062546cf263a39e927296944ee1f5c90a43526d18fdfcbec5339cd49be0f325e",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/engine/target/health.py",
+      "code": "PLR0913",
+      "fingerprint": "2b7c8287db5f60e6b5174f08b746bc37766084b8d3539fca418cfd5f620ff91b",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/engine/target/transport.py",
+      "code": "PLR0913",
+      "fingerprint": "46c685afd73306225bfc6c7851f1047095cf09dcb1a941ea183fe0f3b62c83e3",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/engine/target/transport.py",
+      "code": "PLR0913",
+      "fingerprint": "ace6273d6aa1cdcb561a7a7f09a3ebf16d2892c69446ca9dbdd03342a89d17c3",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/engine/trial/agent_config.py",
+      "code": "D205",
+      "fingerprint": "9d2d2cb412853e9e10eaabfb1001681fb09e724ceef49a3c0fd40ef0f869604f",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/engine/trial/agent_config.py",
+      "code": "D205",
+      "fingerprint": "b47074559d41a1f3e1586a62bcaf294985592b4d5fe40282f288ab85ff4170d7",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/engine/trial/agent_config.py",
+      "code": "D209",
+      "fingerprint": "e65b2f0691c6d37cea459eca71325a3143f3a9eeef96eee9438f175181f11937",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/engine/trial/agent_config.py",
+      "code": "D209",
+      "fingerprint": "eae4df07f17402bd1173bafb5b47d22f8f88c83cae14754a6b1429a21fdd8773",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/engine/trial/agent_config.py",
+      "code": "I001",
+      "fingerprint": "6590ff2d12ba18b405dbcce5e08c85b2b082c516c664876d2cbcc4fb1552d68a",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/engine/trial/cleanup.py",
+      "code": "D301",
+      "fingerprint": "16c235c4f93c44179d8a08a419a5cb9969e64338f50ea419de296cd010504397",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/engine/trial/collect.py",
+      "code": "PLR0913",
+      "fingerprint": "0934c2bb978e9f89a859e50ef74e6cc2bd82d80025d8b3e3de6776c82794d8f0",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/engine/trial/collect.py",
+      "code": "PLR0913",
+      "fingerprint": "7fd971f38e1c38d9f7ae7bd5b741b6cc8b56b5ca82562021cffadd7c85ee78b3",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/engine/trial/config.py",
+      "code": "D205",
+      "fingerprint": "3699ff4577b2d2d6c933ff9d6576ea487394c902df59f9c1d05f815920d38fe4",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/engine/trial/config.py",
+      "code": "D209",
+      "fingerprint": "ada69b82c50c457ec256e45dee03141ce862c199feb4e8744d26cbd53be9de03",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/engine/trial/config.py",
+      "code": "PLR0913",
+      "fingerprint": "fc3577dabc92e83c1ef59f490f14c28daa2a2b5d082a5027a5116d2aea154ff5",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/engine/trial/materialise.py",
+      "code": "PLR0913",
+      "fingerprint": "814ea62396ba18030d7c5016782468390cb8d240e8c0ed7e4675681d59a85002",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/engine/trial/network.py",
+      "code": "D205",
+      "fingerprint": "c4dc891922546e516b84f9c775d6a8974e4fc66c428f19aec976cc77c7b8f706",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/engine/trial/network.py",
+      "code": "D209",
+      "fingerprint": "4e90fe617828b88326abe15e7a8e1275260520e507a1f751ecb65e6da4f27a38",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/engine/trial/parity.py",
+      "code": "PLR0913",
+      "fingerprint": "88e9d9bad26741a10552810fa85e274215f87ccba17b3cc515a94663b5b94fb7",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/engine/trial/plan.py",
+      "code": "D404",
+      "fingerprint": "daf96751caac1c8197e78e4f8d36a535f9154f2c5ee99e2591b94c9e5699bab4",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/engine/trial/plan.py",
+      "code": "I001",
+      "fingerprint": "6590ff2d12ba18b405dbcce5e08c85b2b082c516c664876d2cbcc4fb1552d68a",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/engine/trial/record.py",
+      "code": "PLR0913",
+      "fingerprint": "653e48a664b824a19b1687703e4f7566efa2b8e4bfb0ae2579122603c56dad2c",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/engine/trial/record.py",
+      "code": "PLR0913",
+      "fingerprint": "a9ab30825abf19111115a1cc90223ce0425239d963aef595a478e7c810b6b971",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/engine/trial/task_config.py",
+      "code": "D205",
+      "fingerprint": "1795f2b22be321ccdaa6ab278b9eaa17f328b69fe7097f899975bda8b2d3eaa4",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/engine/trial/task_config.py",
+      "code": "D209",
+      "fingerprint": "f2739617cf90a6932f8cf31f517fec9c8febcba331ebdc8fbac71f8ac5f8f64a",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/engine/trial/workspace.py",
+      "code": "D205",
+      "fingerprint": "1d4354e1c5f7cfce5ea9e6c821b5f075700befae43e1bd3c117dc5c0c7f260f0",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/engine/trial/workspace.py",
+      "code": "D209",
+      "fingerprint": "504811dd2022a55565d8a46ba62360f165b2093dac5d097691bfd796ca1eabdf",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/evaluation/analysis/effects.py",
+      "code": "I001",
+      "fingerprint": "6590ff2d12ba18b405dbcce5e08c85b2b082c516c664876d2cbcc4fb1552d68a",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/evaluation/analysis/load.py",
+      "code": "PLR0913",
+      "fingerprint": "4da3d584b8db68fa945c05a2bf865b69217517b9633f0eaa87be4dce454a7714",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/evaluation/analysis/load.py",
+      "code": "PLR0914",
+      "fingerprint": "c1d351a7895fc7ed80b679b3bec9b7c4fe1511d6a59dd608b697ceacea46b834",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/evaluation/analysis/manipulation.py",
+      "code": "D400",
+      "fingerprint": "cfe6024f1aed6480b8fc594b1acb420ae83694c401e9dcd2e86e616495e118c9",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/evaluation/analysis/manipulation.py",
+      "code": "PLR0913",
+      "fingerprint": "49474a2626a3e85bc51997e445b064fb21dc8a0caae5d7cdda9b516101615fdb",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/evaluation/analysis/pooling.py",
+      "code": "D205",
+      "fingerprint": "668d789cc7ec05c99d996c009f6cbb3e9d98af4b5f1a0dc72b954038bb054c12",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/evaluation/analysis/pooling.py",
+      "code": "D205",
+      "fingerprint": "964d862d3ad507cb263cc1c57b2d1dadef17b3502160c68fbd733f3af66aa50f",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/evaluation/analysis/pooling.py",
+      "code": "D209",
+      "fingerprint": "5cbb3ccde643ce5d408ed09da00ed07fa4b4fdcd83338277239a4c2a8ca9282d",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/evaluation/analysis/pooling.py",
+      "code": "D209",
+      "fingerprint": "5de66ae5424e0b018171ac4bd7b8ef3ab9a885255d1734cbef6d2ba5ec2ea69c",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/evaluation/analysis/ranking.py",
+      "code": "PLR0913",
+      "fingerprint": "ca8a4cc1d104629416da8e699db52478a858249eead83c53b47cc84055710e98",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/evaluation/analysis/sources.py",
+      "code": "D205",
+      "fingerprint": "c73cb2c30acea81e87eaab4bbb2f96a9c421bb61272f88893792f94e85a676f6",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/evaluation/analysis/sources.py",
+      "code": "D209",
+      "fingerprint": "905af8163e8c6ab92546266ed434284c64038519ae7df7db3b463f72bbe96871",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/evaluation/analysis/stats.py",
+      "code": "D205",
+      "fingerprint": "1a8f5c8585100434a34bbbbc77bf417e653929e1c0ad431dd4238553326fdcc3",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/evaluation/analysis/stats.py",
+      "code": "D209",
+      "fingerprint": "52c96665ba0dca8bf330ce2444f4079de206078fedfd1f196418d27469d108b1",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/evaluation/review/projection/atif.py",
+      "code": "D205",
+      "fingerprint": "7e3505d7d9bb851daebfc945b120c7eb1a6ca013acc524e728348f3e6f505bd2",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/evaluation/review/projection/atif.py",
+      "code": "D209",
+      "fingerprint": "f0bcd8a10cc1ee0810f9a6a9c9daad9ae96855881f6111f7c5f39dc341d37df0",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/evaluation/review/projection/experiments.py",
+      "code": "I001",
+      "fingerprint": "6590ff2d12ba18b405dbcce5e08c85b2b082c516c664876d2cbcc4fb1552d68a",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/evaluation/review/projection/headline.py",
+      "code": "D205",
+      "fingerprint": "f63b631a8d4e42242207138123568a95096b68eaca0a2394b747a14bf2d603a4",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/evaluation/review/projection/headline.py",
+      "code": "D209",
+      "fingerprint": "f7d521c11e441bf7891b26bb77099cb7ad4c24a0b62aab92c09158790dd59c7e",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/evaluation/review/projection/spans.py",
+      "code": "PLR0913",
+      "fingerprint": "8dafe68c0488fe33a9dc550434f7dc3389f04ddc02da5a945658c46894e7b820",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/evaluation/review/quality/experiment_view.py",
+      "code": "PLR0913",
+      "fingerprint": "5224d983e4f98cfeb232bc71f867ee0d01a7cb2d0d53eaaf21da09b72a311e38",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/evaluation/review/quality/experiment_view.py",
+      "code": "PLR0913",
+      "fingerprint": "53623951dc47cb2cef6b65cec6defa6c4e14afb05a457dc2ce95ed3b607c0e9b",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/evaluation/review/quality/experiment_view.py",
+      "code": "PLR0917",
+      "fingerprint": "7b481bcc585713d97fa840ae5bfceba3b466bc2e337bec0666b98c06fbc9394d",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/evaluation/review/quality/experiment_view.py",
+      "code": "PLR0917",
+      "fingerprint": "97f82b86c1c22da077e856b257e4da3c3f59738ce107bbab44e1eba545c14573",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/evaluation/review/quality/projection.py",
+      "code": "I001",
+      "fingerprint": "6590ff2d12ba18b405dbcce5e08c85b2b082c516c664876d2cbcc4fb1552d68a",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/evaluation/review/quality/run_view.py",
+      "code": "D205",
+      "fingerprint": "63882776369a4cdc7c0b317a72ec90ca8707d2eefa641002e3a5b519a111e49e",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/evaluation/review/quality/run_view.py",
+      "code": "PLR0913",
+      "fingerprint": "18e888909e06e5ab8e57631188b766a4e233779165cac6eacd991d7f5db1e708",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/grading/closure.py",
+      "code": "PLR0913",
+      "fingerprint": "2f9f59cb384d1366df6ce52fba4df8b659692d46374fb2ed872ffeceabaed157",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/grading/coverage/offline.py",
+      "code": "PLR0913",
+      "fingerprint": "096339a48db3039f654392afb7219522a814067f79b90b04aa41b972e0e9a77f",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/grading/coverage/offline.py",
+      "code": "PLR0917",
+      "fingerprint": "ef569187bf38e08e3888ae670ccddff9c91aa331cbc2842e659211287b75b41e",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/grading/dependency_pins.py",
+      "code": "I001",
+      "fingerprint": "6590ff2d12ba18b405dbcce5e08c85b2b082c516c664876d2cbcc4fb1552d68a",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/grading/grader.py",
+      "code": "PLR0913",
+      "fingerprint": "129fe8b5c99645419a9d8fb17d22bfe062d4797743078dc9458ae67b5f86a4ed",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/grading/grader.py",
+      "code": "PLR0913",
+      "fingerprint": "a67171976846d9c24c1ce0c062ef7694b701c3dd222fa9b346c58b64a7997991",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/grading/grader.py",
+      "code": "PLR0913",
+      "fingerprint": "e81420469c4531bd02fd9430c1099fdb243928d8a56a2c2235a339a2444abbb7",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/grading/grader.py",
+      "code": "PLR0913",
+      "fingerprint": "fbb40615c9b4b0bf8a06f2a943f0f09b065c97f924729dfebd889cdc62d3837c",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/grading/grader_image.py",
+      "code": "D205",
+      "fingerprint": "ddc5e05e4340a899244d5f256fc1d26d680fea10841e38d0827c2541f4e1cf91",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/grading/grader_image.py",
+      "code": "D209",
+      "fingerprint": "d085d25e9641e4db7a53c2d2b85230bdc67bff62aadf2c03a9e7111a5426657b",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/grading/normalise.py",
+      "code": "D205",
+      "fingerprint": "0dfa153846f6d0288543b1f62e274b2206e8c449793a27f5491b0977ec5cee83",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/grading/normalise.py",
+      "code": "D209",
+      "fingerprint": "a571977251c21b457e41ede641547ac7d38f94efa8f852812398aa3a4ab755bb",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/grading/offline.py",
+      "code": "PLR0913",
+      "fingerprint": "5cbbd0c7331e65ab7732613b35bf68dcff1580c1be06da830e31ec7c2c70d002",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/grading/offline.py",
+      "code": "PLR0913",
+      "fingerprint": "ede1518e569ee6d87658cadfe2220729dfa708bc7343ba5299089e168541dd5b",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/grading/records.py",
+      "code": "I001",
+      "fingerprint": "6590ff2d12ba18b405dbcce5e08c85b2b082c516c664876d2cbcc4fb1552d68a",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/grading/records.py",
+      "code": "PLR0913",
+      "fingerprint": "532f0984abbe3b81269dab42caee8bf2e4dc17ccac0f50de61851da19beb164f",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/grading/regrade.py",
+      "code": "C409",
+      "fingerprint": "c3884b4460e4ae8e53eeddb237c29cff0a003e28ffdb66e622d9e7ef3a1a4585",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/grading/regrade.py",
+      "code": "D205",
+      "fingerprint": "2310daefdd268639b011baef66276ab1ffa118d4aadfd612a9f2e4755d984cda",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/grading/regrade.py",
+      "code": "D209",
+      "fingerprint": "0b81911b11385947894b424a0c2d028390ae8854d5650c97c320ac4d12aae5f9",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/grading/resolver.py",
+      "code": "N818",
+      "fingerprint": "74ae160272eb60f723ed4a32b7a8824194dd488c3f6ab0bd26c322cbe330bec6",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/grading/runtime/raidar_oracle_plugin.py",
+      "code": "PLR0913",
+      "fingerprint": "1ad14e1bfb07ac595ea9a40383aab0128905e910f9593e6f7b577fca98480bdc",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/grading/sandbox.py",
+      "code": "D403",
+      "fingerprint": "3943fa10ea98065ad77767cb301c06615699ff4f370a3c34c394c1896e8aea76",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/grading/submission_deps.py",
+      "code": "D205",
+      "fingerprint": "ad9dd36599254e39a1143fbe820f32732d20f573d12317eb7ee986d5c974ce88",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/grading/submission_deps.py",
+      "code": "D209",
+      "fingerprint": "f023e21e8269ce615cfd4895e97640877a0e535570c8127eef02a626e4cf2685",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/grading/verifier.py",
+      "code": "D205",
+      "fingerprint": "15cd98be88247ad86808b5625550ba1e46e80b3885ca5b270280f1c6771a9dba",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/grading/verifier.py",
+      "code": "D209",
+      "fingerprint": "1ae18cd3d9b9b8e0a9fc39c5b96a673aa696d1879b98c51e6b38ad23e7f0da7e",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/grading/verifier.py",
+      "code": "PLR0913",
+      "fingerprint": "04fc5b47d7fec3bd68e08ce5493582fd0a04a50e5143fa9db4b68e2d6050f2a6",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/grading/verifier.py",
+      "code": "PLR0914",
+      "fingerprint": "530ffd1040fb3609fb3f15d20ab36549ed164fe0783522a8a7352ffc73c7e678",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/scoring/catalog/builtin.py",
+      "code": "I001",
+      "fingerprint": "6590ff2d12ba18b405dbcce5e08c85b2b082c516c664876d2cbcc4fb1552d68a",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/scoring/code_quality/arithmetic.py",
+      "code": "PLR0913",
+      "fingerprint": "b0920219b6531663046663805b2436621b031dc3ef7e67046bd8628c340329e3",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/scoring/code_quality/arithmetic.py",
+      "code": "PLR0917",
+      "fingerprint": "08c9fa0b0bddddef16fa9f60bad4e2308840a38eb375f7ca980798ee26a51754",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/scoring/code_quality/checkpoint.py",
+      "code": "PLR0913",
+      "fingerprint": "a02f4a6cb1beeaeb33a7a433b0f69709800a49dedf024c073dcec06bc869059d",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/scoring/code_quality/checkpoint.py",
+      "code": "PLR0917",
+      "fingerprint": "9e9e06360c840e95ac3a6f5955a4f18c7b6369935ff24e079016be4aacf5cab0",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/scoring/code_quality/evidence.py",
+      "code": "PLR0913",
+      "fingerprint": "6e0481e6d3ea6a39afec1e1418156a2c1f4472faf9d946e51b94644ed8c11245",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/scoring/code_quality/evidence.py",
+      "code": "PLR0917",
+      "fingerprint": "ce08aa905ac2100d5b167b9b7301456cd80e772156ab9c68b32cf1a81d09e61c",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/scoring/code_quality/quality.py",
+      "code": "PLR0913",
+      "fingerprint": "e1bb59b5e3fc88279022053dc32bbf8c5d735139eb1889ec17b49a08c3d073d1",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/scoring/code_quality/quality.py",
+      "code": "PLR0913",
+      "fingerprint": "fbb40615c9b4b0bf8a06f2a943f0f09b065c97f924729dfebd889cdc62d3837c",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/scoring/code_quality/quality.py",
+      "code": "PLR0917",
+      "fingerprint": "a3812581ac2ca10f72c6edb6476d90ec51321e354591115f26dab456efe9d2db",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/scoring/code_quality/quality.py",
+      "code": "PLR0917",
+      "fingerprint": "c46afb7e9f92860aed122bd95c63cb4e69609cc55a77b5cc93f695c2ee971f3b",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/scoring/correctness/scorer.py",
+      "code": "PLR0913",
+      "fingerprint": "7f00514298979442c02328b1dc948417949bb9675668ae57333a78ca47500849",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/scoring/correctness/scorer.py",
+      "code": "PLR0917",
+      "fingerprint": "76adce66ab8e60fb4154b37c0174e5d4dca5b7329e3a0a057e80984a648f10d1",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/scoring/definition_coverage/scorer.py",
+      "code": "D400",
+      "fingerprint": "dc4ac8642d3fba1d7be39ed517f0894aac1612d82f872ad3c98bdc003d4c2f74",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/scoring/framework/atif.py",
+      "code": "I001",
+      "fingerprint": "6590ff2d12ba18b405dbcce5e08c85b2b082c516c664876d2cbcc4fb1552d68a",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/scoring/framework/builtin_manifests.py",
+      "code": "PLR0913",
+      "fingerprint": "5ced4164cb5fbb2a98593f77554765ebef5ee2228b677016330fadddaa26d21d",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/scoring/framework/builtin_manifests.py",
+      "code": "PLR0917",
+      "fingerprint": "facf395a6edf1cca75b6a45366e48b059448dabc34c65f87fc7b37e79ab164fe",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/scoring/framework/inventory.py",
+      "code": "I001",
+      "fingerprint": "6590ff2d12ba18b405dbcce5e08c85b2b082c516c664876d2cbcc4fb1552d68a",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/scoring/framework/manifest.py",
+      "code": "I001",
+      "fingerprint": "6590ff2d12ba18b405dbcce5e08c85b2b082c516c664876d2cbcc4fb1552d68a",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/scoring/framework/metrics.py",
+      "code": "I001",
+      "fingerprint": "6590ff2d12ba18b405dbcce5e08c85b2b082c516c664876d2cbcc4fb1552d68a",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/scoring/framework/registry.py",
+      "code": "I001",
+      "fingerprint": "6590ff2d12ba18b405dbcce5e08c85b2b082c516c664876d2cbcc4fb1552d68a",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/scoring/framework/rescore.py",
+      "code": "PLR0913",
+      "fingerprint": "0b691933ee49eb58e686c13e29018e31358c7225c6f6d469dd9a72ea418b4234",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/scoring/framework/rescore.py",
+      "code": "PLR0913",
+      "fingerprint": "1993ffb5194fe6934a206d3cd506115e4d1931513cb5594b9dbde4ba8d1670a7",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/scoring/framework/rescore.py",
+      "code": "PLR0913",
+      "fingerprint": "7ce56447be3a64645341c419222d129bb8781a56da452c0380fe9a29b45e839d",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/scoring/framework/store.py",
+      "code": "I001",
+      "fingerprint": "6590ff2d12ba18b405dbcce5e08c85b2b082c516c664876d2cbcc4fb1552d68a",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/scoring/framework/trial_inputs.py",
+      "code": "I001",
+      "fingerprint": "6590ff2d12ba18b405dbcce5e08c85b2b082c516c664876d2cbcc4fb1552d68a",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/scoring/judge/cache.py",
+      "code": "I001",
+      "fingerprint": "6590ff2d12ba18b405dbcce5e08c85b2b082c516c664876d2cbcc4fb1552d68a",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/scoring/judge/calibration.py",
+      "code": "D205",
+      "fingerprint": "ed17602e06814c751d9f1e114656664d6afccb8dd7a8c89d8101ec207e697f00",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/scoring/judge/calibration.py",
+      "code": "D209",
+      "fingerprint": "d8da7e7ba0f330ec4a7f1eab52bde8b618d4ec155f039e0fc9acafc8df51d32c",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/scoring/judge/calibration.py",
+      "code": "PLR0913",
+      "fingerprint": "e35a4fe0a02deeea9c6d4ac6d6233dc8bb4f5f4f69f34f7f5d856c89bc5b23ba",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/scoring/judge/codebase.py",
+      "code": "N815",
+      "fingerprint": "1073ab26d16097a71352e5f99541130c542df3976582a0fdda5172a4cd99d04e",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/scoring/judge/codebase.py",
+      "code": "N815",
+      "fingerprint": "a5d10e86bf6b8f0d880e055b0717ff3bd79fbe9cd8c2f30ef851bc093d7de40b",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/scoring/judge/policies.py",
+      "code": "I001",
+      "fingerprint": "6590ff2d12ba18b405dbcce5e08c85b2b082c516c664876d2cbcc4fb1552d68a",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/scoring/judge/promotion.py",
+      "code": "I001",
+      "fingerprint": "6590ff2d12ba18b405dbcce5e08c85b2b082c516c664876d2cbcc4fb1552d68a",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/scoring/judge/rubric.py",
+      "code": "PLR0913",
+      "fingerprint": "6933900fdc5b012a3ea63ea64cfb43b831fa2c89889ca09995b674af231b3193",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/scoring/judge/rubric.py",
+      "code": "PLR0917",
+      "fingerprint": "ff1bdf487c56ca5bdc2e84c7c7c7e9832a25cecc82923dd6e4a6dbf1930c4e98",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/scoring/judge/runtime.py",
+      "code": "PLR0913",
+      "fingerprint": "1376262b6418b89bb480954f861e000b75ef1287ea051d0cda8d157499305d04",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/scoring/judge/runtime.py",
+      "code": "PLR0913",
+      "fingerprint": "cb65d4b61774b23d1e24c6d703357817a477662ec577391a77317c863137bcea",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/scoring/judge/session.py",
+      "code": "PLR0913",
+      "fingerprint": "f8fd901f5c62e73dcb24ca7ffded3f4e5e4a2a9677157ca9b41cffbdc605182e",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/scoring/test_coverage/scorer.py",
+      "code": "D400",
+      "fingerprint": "90dd311228efb98857cbe65cb20a76d407397a177a0745b66c2877d88a0b459a",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/scoring/verification_effort/metrics.py",
+      "code": "PLR0913",
+      "fingerprint": "4e79da7dc95472fb4974385108c2df61aeadf24ec78029886dc7a06519018b8a",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/scoring/verification_effort/metrics.py",
+      "code": "PLR0917",
+      "fingerprint": "28a75bc35eed178520c226906d2cddcbc8e5c7dbbd10c6a346e10f9088775910",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/subject/agent/adapters/base.py",
+      "code": "D202",
+      "fingerprint": "27d3fb2615a8e950e78d8fe85c08c80c03a6741b9744c50f307157faeb927f11",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/subject/agent/adapters/base.py",
+      "code": "D202",
+      "fingerprint": "56cf7608e0f72eb9cded1e286865539bbb5c4f1c2303fc230f8eb264dc7bab5e",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/subject/agent/adapters/base.py",
+      "code": "D202",
+      "fingerprint": "9249c67cdb2f740e1679094d99478e32a7daf81d3e7cdd7f58696a42fbc7cdb4",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/subject/agent/adapters/base.py",
+      "code": "D202",
+      "fingerprint": "a465beb88e085e8114e89e15728c0f46e83f5ec9bd2e0db703874bce6d77fc90",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/subject/agent/adapters/base.py",
+      "code": "D202",
+      "fingerprint": "c9f0749d0461471bdfc21143d72b094cbb4d2ca9c87e471a3a57264b136ea31c",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/subject/agent/adapters/claude_audit.py",
+      "code": "I001",
+      "fingerprint": "6590ff2d12ba18b405dbcce5e08c85b2b082c516c664876d2cbcc4fb1552d68a",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/subject/agent/adapters/codex_audit.py",
+      "code": "D205",
+      "fingerprint": "027fccdef5ee2d3c72e5512716897cc5f517da9e86906878a865b6c19662620a",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/subject/agent/adapters/codex_audit.py",
+      "code": "D209",
+      "fingerprint": "1c8de07997453e2e0131b80a614a5f5965e7366acb282ff7b4b441fac62c4a31",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/subject/agent/adapters/codex_audit.py",
+      "code": "I001",
+      "fingerprint": "6590ff2d12ba18b405dbcce5e08c85b2b082c516c664876d2cbcc4fb1552d68a",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/subject/agent/adapters/isolated_claude.py",
+      "code": "I001",
+      "fingerprint": "6590ff2d12ba18b405dbcce5e08c85b2b082c516c664876d2cbcc4fb1552d68a",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/subject/agent/definition.py",
+      "code": "I001",
+      "fingerprint": "6590ff2d12ba18b405dbcce5e08c85b2b082c516c664876d2cbcc4fb1552d68a",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/subject/agent/harness.py",
+      "code": "D202",
+      "fingerprint": "11a00d48ab5fa8c053764a89902f0fbd3f7d1d94451d9ea3b018a6c1f2ab9416",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/subject/agent/harness.py",
+      "code": "D202",
+      "fingerprint": "4e77b1437259a364709f4d46fbdb53f9d7b020ceb1cb2f5fa68ee59f10985211",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/subject/agent/harness.py",
+      "code": "D202",
+      "fingerprint": "cb1bb5e54466899c0375514a01d47281b18a0ef3afeab8a7970a63f41a99ff5e",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/subject/agent/harness.py",
+      "code": "D202",
+      "fingerprint": "dd9fee5ef07afc7b0f73159b1e3ba0a467f19a078e90323a3beec99384de9e25",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/subject/agent/protocol.py",
+      "code": "I001",
+      "fingerprint": "6590ff2d12ba18b405dbcce5e08c85b2b082c516c664876d2cbcc4fb1552d68a",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/subject/agent/schema.py",
+      "code": "I001",
+      "fingerprint": "6590ff2d12ba18b405dbcce5e08c85b2b082c516c664876d2cbcc4fb1552d68a",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/subject/agent_checks.py",
+      "code": "I001",
+      "fingerprint": "6590ff2d12ba18b405dbcce5e08c85b2b082c516c664876d2cbcc4fb1552d68a",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/subject/environment/python/image.py",
+      "code": "I001",
+      "fingerprint": "6590ff2d12ba18b405dbcce5e08c85b2b082c516c664876d2cbcc4fb1552d68a",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/subject/imports.py",
+      "code": "I001",
+      "fingerprint": "6590ff2d12ba18b405dbcce5e08c85b2b082c516c664876d2cbcc4fb1552d68a",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/subject/imports.py",
+      "code": "PLR0913",
+      "fingerprint": "15dae1fb4216fa385e129606df1091ae73dc2beee35062fee8969891d3955d3e",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/subject/imports.py",
+      "code": "PLR0913",
+      "fingerprint": "693b29da88dac5a24609dee8594064e87b84bad4b660206f75e34147d3085709",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/subject/imports.py",
+      "code": "PLR0917",
+      "fingerprint": "81029bdc5d0d4c9c19e0b6c4549c105a5e9d074c5823b0c88d2e62d6e185c3c2",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/subject/imports.py",
+      "code": "PLR0917",
+      "fingerprint": "a7be95e51b8a8ab08bef98d239fc96297e981373cc239f357017b1a61872aa10",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/subject/package/registry.py",
+      "code": "D205",
+      "fingerprint": "bd18d75561993cb75404b39ef016a5576dee890b80df18ac7c4c223ada5c5546",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/subject/package/registry.py",
+      "code": "D209",
+      "fingerprint": "499b007a8f228a7665086d42d9894d9c4dd982078c0473cdefe2c9b58bd54e88",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/subject/package/registry.py",
+      "code": "I001",
+      "fingerprint": "6590ff2d12ba18b405dbcce5e08c85b2b082c516c664876d2cbcc4fb1552d68a",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/subject/package/release_check.py",
+      "code": "I001",
+      "fingerprint": "6590ff2d12ba18b405dbcce5e08c85b2b082c516c664876d2cbcc4fb1552d68a",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/subject/primitive/calls.py",
+      "code": "PLR0913",
+      "fingerprint": "2f5bdae66ea89ac3c51e366c2ed6a67355ae6a02b4fbe48df8acfc594afa7bfd",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/subject/primitive/calls.py",
+      "code": "PLR0913",
+      "fingerprint": "667bc8fc797fec289c3a5d0c2cc291b042ae8803aa0ed69517dbfe5aec45f1d2",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/subject/primitive/calls.py",
+      "code": "PLR0913",
+      "fingerprint": "a1711a80f1e94d00cad1cb04a7d9d17f0f96741061fd18212b8efa14d348b4e3",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/subject/primitive/calls.py",
+      "code": "PLR0913",
+      "fingerprint": "dca319393905643742f20c2931771e15699fc9c76fa3d978abb592b5ebf121cd",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/subject/primitive/calls.py",
+      "code": "PLR0913",
+      "fingerprint": "f72cd1e8722d20dc786967ab6cd71641a4fe3c8e3fbbd6b31f12aec5d049a434",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/subject/primitive/calls.py",
+      "code": "PLR0917",
+      "fingerprint": "5bfd879e506701f0b5f93ac88c178880272faf2e94b7dcd2dbbcb502f3aea284",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/subject/primitive/calls.py",
+      "code": "PLR0917",
+      "fingerprint": "748bc804beafb782e7538fb0f08e95bc7c4a9d7e0ef09322b28a66b143786cab",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/subject/primitive/gate.py",
+      "code": "D205",
+      "fingerprint": "858bd30649d3588c6ac5c558f965cf9020bab3b21fd66cb6c4477571a92d44a4",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/subject/primitive/gate.py",
+      "code": "D209",
+      "fingerprint": "722d39c1c60220920607edf92a39a7e8122b83866d173cdf3d85436c45efb80e",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/subject/primitive/gate.py",
+      "code": "I001",
+      "fingerprint": "6590ff2d12ba18b405dbcce5e08c85b2b082c516c664876d2cbcc4fb1552d68a",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/subject/primitive/gate.py",
+      "code": "N818",
+      "fingerprint": "8bcaf33e5799d0626c27aaa4a3e0634713513295845adeec37886c1e8eb73304",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/subject/primitive/gate_outputs.py",
+      "code": "I001",
+      "fingerprint": "6590ff2d12ba18b405dbcce5e08c85b2b082c516c664876d2cbcc4fb1552d68a",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/subject/primitive/gate_tool.py",
+      "code": "B901",
+      "fingerprint": "3b7e4e3edd655f86c348a7df3b6c4522ef19466a47c476aeb54a128bca9229dd",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/subject/primitive/gate_tool.py",
+      "code": "D205",
+      "fingerprint": "0525f5ed5b789c3a087875305e174908f46c73e0d2e942275ba5ad950969e58b",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/subject/primitive/gate_tool.py",
+      "code": "D205",
+      "fingerprint": "23f24efeac4f023d4cbadeb49bd3aaa430616b240866be7ec03d3aa62feabf56",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/subject/primitive/gate_tool.py",
+      "code": "D205",
+      "fingerprint": "487b862205687b8812c9f0b768a20b1b65ada2f60311b76247ad52a275b55dbd",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/subject/primitive/gate_tool.py",
+      "code": "D205",
+      "fingerprint": "4988f120d609a4aa165507f752f9f28234d36829f8e7c25f5bf47a33f1e75c44",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/subject/primitive/gate_tool.py",
+      "code": "D205",
+      "fingerprint": "4f8f5f234d74b728cb6315870dae480dc862dd1314b90f15aa4f13d2e4c5a186",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/subject/primitive/gate_tool.py",
+      "code": "D205",
+      "fingerprint": "5715faa84ef6d1d00323cb4b3f22f06860f3ee052a43f2156916e49e452ed1c6",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/subject/primitive/gate_tool.py",
+      "code": "D205",
+      "fingerprint": "924ac938757e8b414a39480c9d7160fd53ed35ffe4671b33cb1e5492664c30c8",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/subject/primitive/gate_tool.py",
+      "code": "D205",
+      "fingerprint": "96dc535bc41c16cff59e1c18db03fb687244e473302b11d4cb4f516fd02eda4c",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/subject/primitive/gate_tool.py",
+      "code": "D205",
+      "fingerprint": "b0511789d8929a3c61fd00b0d6ed93b9439a447e5b8d699b6d371e77cc885d5d",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/subject/primitive/gate_tool.py",
+      "code": "D205",
+      "fingerprint": "cf94c4a24586f45bec5b3cb4024aa1b687450bdcd9e41e579bc325d73575c853",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/subject/primitive/gate_tool.py",
+      "code": "D205",
+      "fingerprint": "d7b4417ef68c3380f634f5de3fb58f1a48c78edf652715d1d15ed95483203d64",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/subject/primitive/gate_tool.py",
+      "code": "D209",
+      "fingerprint": "2913930909dbaf6c52c1d206fbd5f82a3cfc65c652e6b624b797a7e786759fd2",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/subject/primitive/gate_tool.py",
+      "code": "D209",
+      "fingerprint": "5a26559fce8e64b08d1de854a903946a96870f9f80e40396268b8be53d0c650f",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/subject/primitive/gate_tool.py",
+      "code": "D209",
+      "fingerprint": "6710a06db66092d5a75753d5513a6588ccbdff43f1958e6a90b6fd8721e39515",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/subject/primitive/gate_tool.py",
+      "code": "D209",
+      "fingerprint": "87013ec2e985d7f1ef793efc126016ec09b2c566a2299a440edee2bd94b32b40",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/subject/primitive/gate_tool.py",
+      "code": "D209",
+      "fingerprint": "876e262782f102a788e44d3536f3283efe4a50bf8b661e19bb8536a736396ece",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/subject/primitive/gate_tool.py",
+      "code": "D209",
+      "fingerprint": "a2995d1b5c9433b285d45224752857da784b9b670b49e72560ee7e5bced28dcb",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/subject/primitive/gate_tool.py",
+      "code": "D209",
+      "fingerprint": "afe684bae64515187f7a83b095884688b089cd4600767891192ccbb86398d4f4",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/subject/primitive/gate_tool.py",
+      "code": "D209",
+      "fingerprint": "dd1b909ea7bdced3ca055369fc90d4051b865f238e701f6d0b41ab01e8b5351c",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/subject/primitive/gate_tool.py",
+      "code": "D209",
+      "fingerprint": "ebe37f04787a9e68040841b58d62fc43ce22664fde7e91a74c697e5ac2d8cd04",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/subject/primitive/gate_tool.py",
+      "code": "D209",
+      "fingerprint": "ef649a5986c2df6b5f432ab805c8dd7d0378347255fcdf953916e1c67852177b",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/subject/primitive/gate_tool.py",
+      "code": "D209",
+      "fingerprint": "f883cf9701b5ddf69c21c8854205e217d5647d897c5ad6cdd752228be259718f",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/subject/primitive/gate_tool.py",
+      "code": "D301",
+      "fingerprint": "a6af8254c6bb0ae0218d1da0ce951118500c4e200a7300e341ecb7d33a9587b9",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/subject/primitive/gate_tool.py",
+      "code": "PLR0913",
+      "fingerprint": "194ecbe973347d05c95f445e688de5fca8e3c4e8f6e953eca5077bdd28d76f77",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/subject/primitive/gate_tool.py",
+      "code": "PLR0914",
+      "fingerprint": "dfbf39c3122721afda337bd80d118f880a916bfc678d41e0df2210f4dd355455",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/subject/primitive/gate_tool.py",
+      "code": "PLR0917",
+      "fingerprint": "125ffefd18a9ca507796755031ab3e874018d71dffa8afb0ad6a98c82e562914",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/subject/primitive/install.py",
+      "code": "PLR0913",
+      "fingerprint": "8e4b5554b2e114f0664494d4f5fcc36cdb366f59dff6e4f431d645d57ddee8d2",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/subject/primitive/install.py",
+      "code": "PLR0913",
+      "fingerprint": "93d4a1352f9472f7fcb325e2b648576e44e5687c590ca098c9c7f5adc3c2936e",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/subject/primitive/install.py",
+      "code": "PLR0913",
+      "fingerprint": "9782bb980979b3f0f4bd3e76d6322dcc46c8b0882305fc930dd200192b4aa092",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/subject/primitive/install.py",
+      "code": "PLR0913",
+      "fingerprint": "d30d6a6ec65b9fcf6b0aa71e3ef137da5da1e2604637c256da0008255e63ea86",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/subject/primitive/install.py",
+      "code": "PLR0913",
+      "fingerprint": "f613b6fe27d8445f730e45cc8d54b173c2543c4a49ddfdf59cf835da6cd16413",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/subject/primitive/install.py",
+      "code": "PLR0917",
+      "fingerprint": "05f7d2c35b2098b20cf7e0d1bf6cad085db7427c6b125f8a9dc5973917439928",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/subject/primitive/install.py",
+      "code": "PLR0917",
+      "fingerprint": "3858f43d369890d00f506e4fbb689fecfe7acc0a673094df8256411d19703709",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/subject/primitive/install.py",
+      "code": "PLR0917",
+      "fingerprint": "be96ba615291372dfa043e2ada147c389c27a8954537d75c1686c3c81885b246",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/subject/primitive/outputs.py",
+      "code": "I001",
+      "fingerprint": "6590ff2d12ba18b405dbcce5e08c85b2b082c516c664876d2cbcc4fb1552d68a",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/subject/primitive/payload/supervise.py",
+      "code": "PLR0913",
+      "fingerprint": "a12b81d723c8a8e2d447df1f5bccb6ced4bc9a2a04e3d93214c378508a9a0427",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/subject/primitive/site.py",
+      "code": "D205",
+      "fingerprint": "7d2e794e7bcf62ec4f35a27633c9917a6ccf54292e877776ace74f649c53651d",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/subject/primitive/site.py",
+      "code": "D209",
+      "fingerprint": "69212a233a0658b804d767f3d85f2876bbb51d726218eecaf96fdd7bb5fbee89",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/subject/primitive/site.py",
+      "code": "I001",
+      "fingerprint": "6590ff2d12ba18b405dbcce5e08c85b2b082c516c664876d2cbcc4fb1552d68a",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/subject/primitive/site.py",
+      "code": "N818",
+      "fingerprint": "9a1e7ec104f0118112279e2b4a1d8af368aef25f2d1c01150b107581ef6cd89b",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/subject/primitive/site.py",
+      "code": "PLR0913",
+      "fingerprint": "56f2867adda380ffb69070cea41da4c3e260e4d44687e7517b5c3c9af0f61e43",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/subject/primitive/stop.py",
+      "code": "I001",
+      "fingerprint": "6590ff2d12ba18b405dbcce5e08c85b2b082c516c664876d2cbcc4fb1552d68a",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/subject/primitive/stop.py",
+      "code": "PLR0913",
+      "fingerprint": "3af3c55a3dd7d4adf9d9fd032cea71a0391958954a207d069e08d3b0d7d754aa",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/subject/primitive/stop.py",
+      "code": "PLR0917",
+      "fingerprint": "1248c18f0d9ab258ecc0bdcd613d4d6cb046b35f426442fec0854fb21742c187",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/subject/release_check.py",
+      "code": "I001",
+      "fingerprint": "6590ff2d12ba18b405dbcce5e08c85b2b082c516c664876d2cbcc4fb1552d68a",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/subject/releases.py",
+      "code": "D205",
+      "fingerprint": "70b017096e9452a657e5d9eb219b9128aaf9fe3c330df076ecf1c4a822bba5bf",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/subject/releases.py",
+      "code": "D209",
+      "fingerprint": "6944490d6dfb6387a2713eeec866c7bd1f39e91101d161df16eb884bace25dcd",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/subject/releases.py",
+      "code": "I001",
+      "fingerprint": "6590ff2d12ba18b405dbcce5e08c85b2b082c516c664876d2cbcc4fb1552d68a",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/subject/stages.py",
+      "code": "I001",
+      "fingerprint": "6590ff2d12ba18b405dbcce5e08c85b2b082c516c664876d2cbcc4fb1552d68a",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/subject/workflow/identity.py",
+      "code": "D205",
+      "fingerprint": "12d764b5992d5ddd1565c738d64edc866ae9b6d706df6f71604a7c6d131cfff8",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/subject/workflow/identity.py",
+      "code": "D205",
+      "fingerprint": "3646284d2caa7b9dd6b005e337b04f81a489da29581bb0c87ded5c6aab33723a",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/subject/workflow/identity.py",
+      "code": "D209",
+      "fingerprint": "1e078307b467c74e2c7cb8bff29ff178086a5dd090aa5f0a2714e810acf3440e",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/subject/workflow/identity.py",
+      "code": "D209",
+      "fingerprint": "4f6efbe76af77b45e814ce3d5b381c5a53c8524e460088ad93a1891280f4d3d6",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/subject/workflow/identity.py",
+      "code": "I001",
+      "fingerprint": "6590ff2d12ba18b405dbcce5e08c85b2b082c516c664876d2cbcc4fb1552d68a",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/subject/workflow/inner.py",
+      "code": "I001",
+      "fingerprint": "6590ff2d12ba18b405dbcce5e08c85b2b082c516c664876d2cbcc4fb1552d68a",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/subject/workflow/judgeloop.py",
+      "code": "D205",
+      "fingerprint": "1137f396ba28686b94f418a94f05a3211ca63c8fe798557d2c69953b7d13c179",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/subject/workflow/judgeloop.py",
+      "code": "D209",
+      "fingerprint": "db1e46129cefad455089d1d7bb5b20efe1e345166029ad72ee42bdb1164a3f3e",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/subject/workflow/judgeloop.py",
+      "code": "PLR0914",
+      "fingerprint": "f8c1a4ff7698b12126ef2a0a7ce5ee6fc45d38d7ea7a5f4a04c54a4c7ebb23be",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/subject/workflow/judging.py",
+      "code": "PLR0913",
+      "fingerprint": "4847568cbda1bd35dc468c2cda539247402d3ff5cc550654d1ccdd5637305492",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/subject/workflow/judging.py",
+      "code": "PLR0917",
+      "fingerprint": "3d1aff16f04f0673832ce16f446a4604b7ed677ae9a60b17eadf9dd9ef4da3c6",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/subject/workflow/package.py",
+      "code": "D205",
+      "fingerprint": "959cf290ecfd7d4324fd09b0f1bbc2b03edd35179118305f8513606a9edae35b",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/subject/workflow/package.py",
+      "code": "D205",
+      "fingerprint": "b56d27f5feda091065bcf958fa68581e6d5f4e96cca222ed44605f639f1d5474",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/subject/workflow/package.py",
+      "code": "D209",
+      "fingerprint": "633b43b8d752fe58a504d42a1afa63c803038f7ea0f853d9b9f13f03b6442e87",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/subject/workflow/package.py",
+      "code": "D209",
+      "fingerprint": "6bff27f0ded25f668c7160f83e7832c4de3e5e15f1986a993518b0fced244082",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/subject/workflow/package.py",
+      "code": "I001",
+      "fingerprint": "6590ff2d12ba18b405dbcce5e08c85b2b082c516c664876d2cbcc4fb1552d68a",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/subject/workflow/package_checks.py",
+      "code": "I001",
+      "fingerprint": "6590ff2d12ba18b405dbcce5e08c85b2b082c516c664876d2cbcc4fb1552d68a",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/subject/workflow/package_judge.py",
+      "code": "D205",
+      "fingerprint": "d18d8f1800296ac79d204eb525a8c5cf8f72bb82c4d9f1407b1aae9e3bc7d6f8",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/subject/workflow/package_judge.py",
+      "code": "D209",
+      "fingerprint": "25f85b2bd978f9ec8ed03ecc28b2ba15ed536c3f2575027d92237f0fd8fbb5a2",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/subject/workflow/package_judge.py",
+      "code": "I001",
+      "fingerprint": "6590ff2d12ba18b405dbcce5e08c85b2b082c516c664876d2cbcc4fb1552d68a",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/subject/workflow/package_member.py",
+      "code": "I001",
+      "fingerprint": "6590ff2d12ba18b405dbcce5e08c85b2b082c516c664876d2cbcc4fb1552d68a",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/subject/workflow/package_runtime.py",
+      "code": "I001",
+      "fingerprint": "6590ff2d12ba18b405dbcce5e08c85b2b082c516c664876d2cbcc4fb1552d68a",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/subject/workflow/package_stage.py",
+      "code": "I001",
+      "fingerprint": "6590ff2d12ba18b405dbcce5e08c85b2b082c516c664876d2cbcc4fb1552d68a",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/subject/workflow/package_trial.py",
+      "code": "D205",
+      "fingerprint": "39cfbfbb74873f31e4670156c2edfed29b943cac7affa91c36d1b54053e36c5a",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/subject/workflow/package_trial.py",
+      "code": "D209",
+      "fingerprint": "e10d0600e6a0926fe3dbe670f02a615dbfa65ba2a3c710decdfb476417c9bd41",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/subject/workflow/package_trial.py",
+      "code": "I001",
+      "fingerprint": "6590ff2d12ba18b405dbcce5e08c85b2b082c516c664876d2cbcc4fb1552d68a",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/subject/workflow/runner.py",
+      "code": "D205",
+      "fingerprint": "06b109175f7115a708dcb27fde4c31fbf40e05a453f0efb9771db0a0de00fa7c",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/subject/workflow/runner.py",
+      "code": "D205",
+      "fingerprint": "93ba812d7673a7f051fc9b4ffc21b9b75680f665c2c36d3807ae2a24212ed600",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/subject/workflow/runner.py",
+      "code": "D205",
+      "fingerprint": "a879a6be9509cdec5dedd6d29aa0013a38fa8deb3533715388aadd75c7d23855",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/subject/workflow/runner.py",
+      "code": "D205",
+      "fingerprint": "d32c30d0be51084f8b3ecf137063acfde2e389c4bb7f04d978d7cb8b4d925e33",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/subject/workflow/runner.py",
+      "code": "D205",
+      "fingerprint": "eb187b5e2b21b8afef7aef206555f717793f9e32a5b5154b5cc17dad9bf858a0",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/subject/workflow/runner.py",
+      "code": "D205",
+      "fingerprint": "fa2de2201635d027f4e006d156e141bb6b46a74418380d04b94e1729941e8b1a",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/subject/workflow/runner.py",
+      "code": "D209",
+      "fingerprint": "042b0c4b03c640b28e965b934b5115c164527ccc722e6b4671011af089394713",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/subject/workflow/runner.py",
+      "code": "D209",
+      "fingerprint": "0c0f01c0c613cda25cd6662a8081ff986cef2d7a3f88d974da68a6fa9f4534e0",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/subject/workflow/runner.py",
+      "code": "D209",
+      "fingerprint": "54be58e9ec731fb1ae79a34c0d37aa54a1b544f1c53448c8b2e479514b423dfe",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/subject/workflow/runner.py",
+      "code": "D209",
+      "fingerprint": "67775fe025e2818d952d4dc20f6a49528681da9c478dcc7900912c8f4cfd870c",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/subject/workflow/runner.py",
+      "code": "D209",
+      "fingerprint": "9ef220b7c2c0efc05e8bbe8fef1bf3e82814493a2376173a992ae709b705a90c",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/subject/workflow/runner.py",
+      "code": "D209",
+      "fingerprint": "cea1ad251a76f9c4c5c99ac89dd42b6af2146cea9fa8493354933e58701dd3c4",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/subject/workflow/runner.py",
+      "code": "PLR0913",
+      "fingerprint": "ca93b91d1ef91b60030b2094432e4f37b613f3eb33e705e294d9d59f448a615e",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/subject/workflow/stage_cases.py",
+      "code": "I001",
+      "fingerprint": "6590ff2d12ba18b405dbcce5e08c85b2b082c516c664876d2cbcc4fb1552d68a",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/subject/workflow/stage_check.py",
+      "code": "D205",
+      "fingerprint": "1a815ef3c729b878d41622e0328ab7ab1c0b9171d8624d5bfc1c9e1f7791d6ec",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/subject/workflow/stage_check.py",
+      "code": "D205",
+      "fingerprint": "c471056ede44b8c51e4fb2c32ac24ab7a86f495f027d78c31d81f763ace443b9",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/subject/workflow/stage_check.py",
+      "code": "D205",
+      "fingerprint": "cb9a6ab17703b759e5deaf5aff3a9d6784439c7832522cc9d0961c7910744eb4",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/subject/workflow/stage_check.py",
+      "code": "D209",
+      "fingerprint": "1ece0f8d4f277d0a565dfc1a1626dd62304e2a64c665e407649a70ab915e403e",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/subject/workflow/stage_check.py",
+      "code": "D209",
+      "fingerprint": "3712f5a8387e59d91a01174e763089d3265de444e7cc09390bc24f669b290ed4",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/subject/workflow/stage_check.py",
+      "code": "D209",
+      "fingerprint": "b3e61954658637f6c0dbdab41e9a8c1da6bcc9ac6220980854f579bd7e8e9aa9",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/subject/workflow/stage_check.py",
+      "code": "I001",
+      "fingerprint": "6590ff2d12ba18b405dbcce5e08c85b2b082c516c664876d2cbcc4fb1552d68a",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/subject/workflow/stage_check.py",
+      "code": "PLR0913",
+      "fingerprint": "2b17f020573a0a982e620d9ab1d7f1e6cd039dc4e647fc83039cb8a44cd0de21",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/subject/workflow/stage_check.py",
+      "code": "PLR0913",
+      "fingerprint": "dd7a79dab40f1283c5c5567e1a240117e82e1ec2db49541dd0ce3050fd9bebba",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/subject/workflow/turns.py",
+      "code": "I001",
+      "fingerprint": "6590ff2d12ba18b405dbcce5e08c85b2b082c516c664876d2cbcc4fb1552d68a",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/tests/analysis_support.py",
+      "code": "I001",
+      "fingerprint": "6590ff2d12ba18b405dbcce5e08c85b2b082c516c664876d2cbcc4fb1552d68a",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/tests/analysis_support.py",
+      "code": "PLR0913",
+      "fingerprint": "6e59c30f265675e025d47003254d07acff8800372109ef63427de702d7a0905f",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/tests/analysis_support.py",
+      "code": "PLR0913",
+      "fingerprint": "c92ec294eda6e2e5a8d7c35bd11f43184dd5947199d4c9b83fe55b1ef3e0b493",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/tests/at3_support.py",
+      "code": "I001",
+      "fingerprint": "6590ff2d12ba18b405dbcce5e08c85b2b082c516c664876d2cbcc4fb1552d68a",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/tests/code_quality_support.py",
+      "code": "PLR0913",
+      "fingerprint": "3e5b8c211ab97cd4f6a6178c946157925ce8fbe63469d0ffe062d5d45c830d60",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/tests/code_quality_support.py",
+      "code": "PLR0913",
+      "fingerprint": "93103c83f241a368920ea94c08267ad4a19625e6df99db58b1790fe487282731",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/tests/criteria_support.py",
+      "code": "I001",
+      "fingerprint": "6590ff2d12ba18b405dbcce5e08c85b2b082c516c664876d2cbcc4fb1552d68a",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/tests/execution_support.py",
+      "code": "PLR0913",
+      "fingerprint": "69153be5b13bdf817641e6a38394372958ae8486d01b7fd3b1e4fa857a446f27",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/tests/experiment_spec_support.py",
+      "code": "I001",
+      "fingerprint": "6590ff2d12ba18b405dbcce5e08c85b2b082c516c664876d2cbcc4fb1552d68a",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/tests/fixtures/code_quality/generate_fork_goldens.py",
+      "code": "I001",
+      "fingerprint": "5d0fdb1702b9dadf49f9eb1bcd15094a13fa64af140fc314183740609180b468",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/tests/lifecycle_support.py",
+      "code": "I001",
+      "fingerprint": "6590ff2d12ba18b405dbcce5e08c85b2b082c516c664876d2cbcc4fb1552d68a",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/tests/package_support.py",
+      "code": "I001",
+      "fingerprint": "6590ff2d12ba18b405dbcce5e08c85b2b082c516c664876d2cbcc4fb1552d68a",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/tests/problems_support.py",
+      "code": "PLR0913",
+      "fingerprint": "cec36f9ea76dbee2f95400136b4972d7eba8d09740dce5d0d2e98bd9ffd3eb8d",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/tests/release_support.py",
+      "code": "I001",
+      "fingerprint": "6590ff2d12ba18b405dbcce5e08c85b2b082c516c664876d2cbcc4fb1552d68a",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/tests/review_fixtures/projection/assessments.py",
+      "code": "I001",
+      "fingerprint": "6590ff2d12ba18b405dbcce5e08c85b2b082c516c664876d2cbcc4fb1552d68a",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/tests/review_fixtures/projection/generate.py",
+      "code": "I001",
+      "fingerprint": "6590ff2d12ba18b405dbcce5e08c85b2b082c516c664876d2cbcc4fb1552d68a",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/tests/review_fixtures/projection/lock.py",
+      "code": "I001",
+      "fingerprint": "6590ff2d12ba18b405dbcce5e08c85b2b082c516c664876d2cbcc4fb1552d68a",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/tests/review_fixtures/projection/trials.py",
+      "code": "I001",
+      "fingerprint": "6590ff2d12ba18b405dbcce5e08c85b2b082c516c664876d2cbcc4fb1552d68a",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/tests/review_fixtures/projection/trials.py",
+      "code": "PLR0913",
+      "fingerprint": "7fd971f38e1c38d9f7ae7bd5b741b6cc8b56b5ca82562021cffadd7c85ee78b3",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/tests/review_fixtures/projection/trials.py",
+      "code": "PLR0917",
+      "fingerprint": "d093d8a271a90734945d191e891ac9ac85a27af55e936412dc7ee241ccb2618e",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/tests/review_fixtures/quality/generate.py",
+      "code": "PLR0913",
+      "fingerprint": "3f5c554276a166d22f8a184718c16c64739c94dffd501388bdb8270d9e832315",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/tests/review_fixtures/quality/generate.py",
+      "code": "PLR0917",
+      "fingerprint": "df4e8be2cf4f8483be8f45895f16d9b3ef5eb03b3dfaa41ed45f3e68ac176f88",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/tests/review_fixtures/quality/lock.py",
+      "code": "PLR0913",
+      "fingerprint": "8ba0060c5a7b1d650c5fdf066bd19a2951e9355954690fa5b9278ae9cb826bc4",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/tests/stage_check_support.py",
+      "code": "I001",
+      "fingerprint": "6590ff2d12ba18b405dbcce5e08c85b2b082c516c664876d2cbcc4fb1552d68a",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/tests/test_acceptance_reply_parity.py",
+      "code": "I001",
+      "fingerprint": "6590ff2d12ba18b405dbcce5e08c85b2b082c516c664876d2cbcc4fb1552d68a",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/tests/test_analysis_command.py",
+      "code": "I001",
+      "fingerprint": "6590ff2d12ba18b405dbcce5e08c85b2b082c516c664876d2cbcc4fb1552d68a",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/tests/test_analysis_command.py",
+      "code": "PLR0913",
+      "fingerprint": "836158333a7a56c1a5a0259239d70d9a579a41d5e4a885af0d1b7f9518952dbf",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/tests/test_analysis_primary_outcome.py",
+      "code": "I001",
+      "fingerprint": "6590ff2d12ba18b405dbcce5e08c85b2b082c516c664876d2cbcc4fb1552d68a",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/tests/test_analysis_primary_outcome.py",
+      "code": "PLR0913",
+      "fingerprint": "5d1b6014e711556668d2e47a002acd044349c0ed81f2de253ccf43e6ec898a6d",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/tests/test_assessment_store_behaviors.py",
+      "code": "I001",
+      "fingerprint": "6590ff2d12ba18b405dbcce5e08c85b2b082c516c664876d2cbcc4fb1552d68a",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/tests/test_code_quality_scorer.py",
+      "code": "I001",
+      "fingerprint": "6590ff2d12ba18b405dbcce5e08c85b2b082c516c664876d2cbcc4fb1552d68a",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/tests/test_code_quality_scorer_slow.py",
+      "code": "I001",
+      "fingerprint": "6590ff2d12ba18b405dbcce5e08c85b2b082c516c664876d2cbcc4fb1552d68a",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/tests/test_code_quality_scorer_slow.py",
+      "code": "PLR0914",
+      "fingerprint": "d66886cc814485d5461ec00abff5abe23453417a961e0b90e323f6262fcfa6b8",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/tests/test_coverage_scorer_readings.py",
+      "code": "I001",
+      "fingerprint": "6590ff2d12ba18b405dbcce5e08c85b2b082c516c664876d2cbcc4fb1552d68a",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/tests/test_coverage_scorers.py",
+      "code": "I001",
+      "fingerprint": "6590ff2d12ba18b405dbcce5e08c85b2b082c516c664876d2cbcc4fb1552d68a",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/tests/test_criteria_contract.py",
+      "code": "I001",
+      "fingerprint": "6590ff2d12ba18b405dbcce5e08c85b2b082c516c664876d2cbcc4fb1552d68a",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/tests/test_define_review_fixes.py",
+      "code": "PLR0913",
+      "fingerprint": "1cd1b4c869ecbbfc8526f200e61a03fbdf7e04b4f95730e82c293c8304f2d801",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/tests/test_define_review_fixes.py",
+      "code": "PLR0917",
+      "fingerprint": "ca293189248a6fd92de9255309274439bc91f220f69dea5694de97a7951f43b4",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/tests/test_detached_supervisor_outcomes.py",
+      "code": "PLR0913",
+      "fingerprint": "47ac69ed8d41c24302c8f9c85dad74e2fd5af7390140d65611e37a3582d49044",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/tests/test_experiment_lock_behaviors.py",
+      "code": "I001",
+      "fingerprint": "6590ff2d12ba18b405dbcce5e08c85b2b082c516c664876d2cbcc4fb1552d68a",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/tests/test_gate_tool_witness.py",
+      "code": "PLR0913",
+      "fingerprint": "816606e156ee57eed74c6b92f5969c0093cfe754a8c5f026c23010f5fbddd962",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/tests/test_gate_tool_witness.py",
+      "code": "PLR0913",
+      "fingerprint": "c03bc5952440d681e9b7977544ae998264b81071bd0dfd13390d12a20d6ed811",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/tests/test_gate_tool_witness.py",
+      "code": "PLR0917",
+      "fingerprint": "7ebec81053918ae68d84664fc8344b464dcd72366af4fd1421a268b84f64b212",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/tests/test_gate_tool_witness.py",
+      "code": "PLR0917",
+      "fingerprint": "80330ee94755154442e670c77d875ab11984ec8da509f4c7cbf650d94f8aace1",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/tests/test_health_coverage_close.py",
+      "code": "I001",
+      "fingerprint": "6590ff2d12ba18b405dbcce5e08c85b2b082c516c664876d2cbcc4fb1552d68a",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/tests/test_health_isolation.py",
+      "code": "PLR0913",
+      "fingerprint": "b9bccbf173ba0341e19330b21049b5de6a85566c2ff41c58df6001517f0a1590",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/tests/test_health_judge.py",
+      "code": "PLR0913",
+      "fingerprint": "49ccc79c064387127082c20bdd01375cf766e1d2603d3d6e5e5945ddf775254a",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/tests/test_imports.py",
+      "code": "I001",
+      "fingerprint": "6590ff2d12ba18b405dbcce5e08c85b2b082c516c664876d2cbcc4fb1552d68a",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/tests/test_jev_calibration_workflow.py",
+      "code": "PLR0914",
+      "fingerprint": "02e1f0ee03030615508eb5f90fdb7b95d0aca1bb19022678315d4c9a55dde326",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/tests/test_jev_calibration_workflow.py",
+      "code": "PLR0914",
+      "fingerprint": "79838e9fda441f27e15778f264598af890276f18ec32a571026a6ecf8661a754",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/tests/test_jev_judge_parity.py",
+      "code": "I001",
+      "fingerprint": "6590ff2d12ba18b405dbcce5e08c85b2b082c516c664876d2cbcc4fb1552d68a",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/tests/test_jev_question_sets.py",
+      "code": "PLR0914",
+      "fingerprint": "469457e00e8f769aad23ba64ee7314d0ca6a84d260a5549187d9ea5d28b00b9b",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/tests/test_jev_question_sets.py",
+      "code": "PLR0914",
+      "fingerprint": "f57f42da12d857583ed8240bba14374786d45a3312b1ae9ca76b714edd68b99e",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/tests/test_job_admission_outcomes.py",
+      "code": "PLR0913",
+      "fingerprint": "9a489aea4a8cec1c3e8dd21a00a6fdcdc800e045c6177ab0ec89cff077a6202b",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/tests/test_native_agent_api.py",
+      "code": "I001",
+      "fingerprint": "6590ff2d12ba18b405dbcce5e08c85b2b082c516c664876d2cbcc4fb1552d68a",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/tests/test_native_agents.py",
+      "code": "I001",
+      "fingerprint": "6590ff2d12ba18b405dbcce5e08c85b2b082c516c664876d2cbcc4fb1552d68a",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/tests/test_offline_coverage_decisions.py",
+      "code": "PLR0913",
+      "fingerprint": "8e4b5554b2e114f0664494d4f5fcc36cdb366f59dff6e4f431d645d57ddee8d2",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/tests/test_package_identity.py",
+      "code": "I001",
+      "fingerprint": "6590ff2d12ba18b405dbcce5e08c85b2b082c516c664876d2cbcc4fb1552d68a",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/tests/test_package_lock.py",
+      "code": "I001",
+      "fingerprint": "6590ff2d12ba18b405dbcce5e08c85b2b082c516c664876d2cbcc4fb1552d68a",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/tests/test_package_lock.py",
+      "code": "I001",
+      "fingerprint": "ee337b715cbfce8ae70ec7c060d42ef09bd4803c8c71fabeca0417ba9ff0e49f",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/tests/test_package_stage_install.py",
+      "code": "I001",
+      "fingerprint": "6590ff2d12ba18b405dbcce5e08c85b2b082c516c664876d2cbcc4fb1552d68a",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/tests/test_plan_outcomes.py",
+      "code": "I001",
+      "fingerprint": "6590ff2d12ba18b405dbcce5e08c85b2b082c516c664876d2cbcc4fb1552d68a",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/tests/test_plan_outcomes.py",
+      "code": "PLR0913",
+      "fingerprint": "5ff0aa14ea05b126a917bd904d415d1923e9a2cb17035ffb4062d94a52b59f97",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/tests/test_primitive_calls_shape.py",
+      "code": "PLR0913",
+      "fingerprint": "f14fe8e1c3f5f9c2f59e1e64603c67171e6c649c411e87de1b9336b65d7b77dd",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/tests/test_primitive_calls_shape.py",
+      "code": "PLR0917",
+      "fingerprint": "e5e330b0d147c8b7f859a6944b700a8066101cbf9e982d186e9c64fc5472b0bc",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/tests/test_primitive_frame.py",
+      "code": "I001",
+      "fingerprint": "6590ff2d12ba18b405dbcce5e08c85b2b082c516c664876d2cbcc4fb1552d68a",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/tests/test_primitive_gate.py",
+      "code": "I001",
+      "fingerprint": "6590ff2d12ba18b405dbcce5e08c85b2b082c516c664876d2cbcc4fb1552d68a",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/tests/test_primitive_gate_attribution.py",
+      "code": "I001",
+      "fingerprint": "6590ff2d12ba18b405dbcce5e08c85b2b082c516c664876d2cbcc4fb1552d68a",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/tests/test_primitive_outputs.py",
+      "code": "I001",
+      "fingerprint": "6590ff2d12ba18b405dbcce5e08c85b2b082c516c664876d2cbcc4fb1552d68a",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/tests/test_primitive_payload_boundaries.py",
+      "code": "I001",
+      "fingerprint": "6590ff2d12ba18b405dbcce5e08c85b2b082c516c664876d2cbcc4fb1552d68a",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/tests/test_primitive_payload_supervisor_slow.py",
+      "code": "I001",
+      "fingerprint": "6590ff2d12ba18b405dbcce5e08c85b2b082c516c664876d2cbcc4fb1552d68a",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/tests/test_problem_errata_slow.py",
+      "code": "I001",
+      "fingerprint": "6590ff2d12ba18b405dbcce5e08c85b2b082c516c664876d2cbcc4fb1552d68a",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/tests/test_problem_record_decisions.py",
+      "code": "PLR0913",
+      "fingerprint": "1445b6acb4edbf0c67a6a6033d05c42772a86e3d11410d70dfc5e9c7149908a1",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/tests/test_problem_record_decisions.py",
+      "code": "PLR0913",
+      "fingerprint": "361217a0478de2ea058416dc26b1f8a7270c8c496e11dfe92b4da3e056417e9e",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/tests/test_problem_spec_determinacy_slow.py",
+      "code": "I001",
+      "fingerprint": "6590ff2d12ba18b405dbcce5e08c85b2b082c516c664876d2cbcc4fb1552d68a",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/tests/test_problem_validation_behaviors.py",
+      "code": "I001",
+      "fingerprint": "6590ff2d12ba18b405dbcce5e08c85b2b082c516c664876d2cbcc4fb1552d68a",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/tests/test_problem_validation_behaviors_slow.py",
+      "code": "I001",
+      "fingerprint": "6590ff2d12ba18b405dbcce5e08c85b2b082c516c664876d2cbcc4fb1552d68a",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/tests/test_python_pack_image.py",
+      "code": "I001",
+      "fingerprint": "6590ff2d12ba18b405dbcce5e08c85b2b082c516c664876d2cbcc4fb1552d68a",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/tests/test_quality_gate_commands.py",
+      "code": "PLR0913",
+      "fingerprint": "cfd972ac04d3c0a3c92f09c5d805ac3be8ecaf1141bc5a50f8d47852dc1a34fa",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/tests/test_quality_gate_commands.py",
+      "code": "PLR0917",
+      "fingerprint": "5c045d4e17bdbaffdeb4cd7dca96a2d8ebc7963e6b23896b710802f2cdab5a15",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/tests/test_quality_projection.py",
+      "code": "PLR0913",
+      "fingerprint": "71225af3afe9d040544f561689b7059232c20f45194323d48f1fee4596903e28",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/tests/test_release_definitions.py",
+      "code": "I001",
+      "fingerprint": "6590ff2d12ba18b405dbcce5e08c85b2b082c516c664876d2cbcc4fb1552d68a",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/tests/test_release_register.py",
+      "code": "I001",
+      "fingerprint": "6590ff2d12ba18b405dbcce5e08c85b2b082c516c664876d2cbcc4fb1552d68a",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/tests/test_rescore_store_bindings.py",
+      "code": "PLR0913",
+      "fingerprint": "924a2b408c42f256a7107fa336fe174292253be112e4a66bbd6e94b8c4b74beb",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/tests/test_rescore_store_bindings.py",
+      "code": "PLR0917",
+      "fingerprint": "3e4197cfcf12ef12a439442a4e0da0d6a0e3b0686af5fdc757c74c1fa6c3a276",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/tests/test_review_projection_contracts.py",
+      "code": "B903",
+      "fingerprint": "1a743f33a7c526a4ad00e8135db8dc6557314419a897ab4c44294f842962e95d",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/tests/test_stage_authoring_cli.py",
+      "code": "I001",
+      "fingerprint": "6590ff2d12ba18b405dbcce5e08c85b2b082c516c664876d2cbcc4fb1552d68a",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/tests/test_stage_check_outcomes.py",
+      "code": "I001",
+      "fingerprint": "6590ff2d12ba18b405dbcce5e08c85b2b082c516c664876d2cbcc4fb1552d68a",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/tests/test_stage_package.py",
+      "code": "I001",
+      "fingerprint": "6590ff2d12ba18b405dbcce5e08c85b2b082c516c664876d2cbcc4fb1552d68a",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/tests/test_submission_dependencies_slow.py",
+      "code": "I001",
+      "fingerprint": "6590ff2d12ba18b405dbcce5e08c85b2b082c516c664876d2cbcc4fb1552d68a",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/tests/test_target_tunnel_and_ensure.py",
+      "code": "PLR0913",
+      "fingerprint": "10f6e5759998137eb3e82fcbcf0471b7e4e4f20b537d8b8685ed38b4496f3d0d",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/tests/test_target_tunnel_and_ensure.py",
+      "code": "PLR0917",
+      "fingerprint": "a0b78a24f28de16bffb74c90cb35942375889960eff1aa1c20164c4ea92f064c",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/tests/test_toolchain_pin_check.py",
+      "code": "PLR0913",
+      "fingerprint": "528f5bf1661dc2bf03346e949c852cdac46a51cba0cb39182febd57c0657ad63",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/tests/test_toolchain_pin_check.py",
+      "code": "PLR0917",
+      "fingerprint": "dbdb24812f4a8d6b7cf77ef46501daf04d90adbc2c760e171aff2fe5f2bcd3ce",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/tests/test_trial_classification.py",
+      "code": "I001",
+      "fingerprint": "6590ff2d12ba18b405dbcce5e08c85b2b082c516c664876d2cbcc4fb1552d68a",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/tests/test_trial_classification.py",
+      "code": "PLR0913",
+      "fingerprint": "c5774c642b1dae0df3e93ae88b3da1abd97b3d0e4833c435ae31d2dd81912cf6",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/tests/test_trial_execution_slow.py",
+      "code": "PLR0913",
+      "fingerprint": "b95b820797910b77e69aa4df9aed97ce6d3ae050e8d38ab9cb5dff5d832bc1b9",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/tests/test_trial_execution_slow.py",
+      "code": "PLR0917",
+      "fingerprint": "4d3639900832abbdf6a1b560a63c45068e131ab99262f5f479c909575c78ff74",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/tests/test_trial_health_audit.py",
+      "code": "I001",
+      "fingerprint": "6590ff2d12ba18b405dbcce5e08c85b2b082c516c664876d2cbcc4fb1552d68a",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/tests/test_trial_lifecycle_outcomes.py",
+      "code": "I001",
+      "fingerprint": "6590ff2d12ba18b405dbcce5e08c85b2b082c516c664876d2cbcc4fb1552d68a",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/tests/test_trial_materialisation_outcomes.py",
+      "code": "I001",
+      "fingerprint": "6590ff2d12ba18b405dbcce5e08c85b2b082c516c664876d2cbcc4fb1552d68a",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/tests/test_trial_planning_slow.py",
+      "code": "I001",
+      "fingerprint": "6590ff2d12ba18b405dbcce5e08c85b2b082c516c664876d2cbcc4fb1552d68a",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/tests/test_trial_provision_outcomes.py",
+      "code": "I001",
+      "fingerprint": "6590ff2d12ba18b405dbcce5e08c85b2b082c516c664876d2cbcc4fb1552d68a",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/tests/test_verifier_bundle_and_isolation.py",
+      "code": "PLR0913",
+      "fingerprint": "873d36058b39f15ea3ce241d054ccfa2e77f3e8d227a39d4907151bcdadc2830",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/tests/test_verifier_plugin_behaviors.py",
+      "code": "B903",
+      "fingerprint": "f3ee12d9f9b581769a1e255cdc1a8d641ce454d9e18c19033795388745273f63",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/tests/test_verifier_plugin_behaviors_slow.py",
+      "code": "I001",
+      "fingerprint": "6590ff2d12ba18b405dbcce5e08c85b2b082c516c664876d2cbcc4fb1552d68a",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/tests/test_workflow_judge_contract.py",
+      "code": "I001",
+      "fingerprint": "6590ff2d12ba18b405dbcce5e08c85b2b082c516c664876d2cbcc4fb1552d68a",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/tests/test_workflow_judging.py",
+      "code": "I001",
+      "fingerprint": "6590ff2d12ba18b405dbcce5e08c85b2b082c516c664876d2cbcc4fb1552d68a",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/tests/test_workflow_judging.py",
+      "code": "PLR0913",
+      "fingerprint": "01cd30068b7ddbc099b64152f62d7e05554fe0e8f6b7fd8970124334278bcc2b",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/tests/test_workflow_package.py",
+      "code": "I001",
+      "fingerprint": "6590ff2d12ba18b405dbcce5e08c85b2b082c516c664876d2cbcc4fb1552d68a",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/tests/test_workflow_runner.py",
+      "code": "I001",
+      "fingerprint": "6590ff2d12ba18b405dbcce5e08c85b2b082c516c664876d2cbcc4fb1552d68a",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/tests/test_workspace_seed_slow.py",
+      "code": "I001",
+      "fingerprint": "6590ff2d12ba18b405dbcce5e08c85b2b082c516c664876d2cbcc4fb1552d68a",
+      "count": 1
+    },
+    {
+      "path": "scripts/checks/check-finding-baseline.py",
+      "code": "E306",
+      "fingerprint": "89e89459673e1602cc3f913641051491eb34079d161dbabd4b05052fb8c269a5",
+      "count": 1
+    },
+    {
+      "path": "scripts/checks/check-finding-baseline.py",
+      "code": "E501",
+      "fingerprint": "249c48d0edeff627309e723e88b98a01bd6c8c5054b9770b77c933965c4e1f09",
+      "count": 1
+    },
+    {
+      "path": "scripts/checks/check-finding-baseline.py",
+      "code": "E501",
+      "fingerprint": "35dfafba607316326c67cdc7a618a16006ed993db492c145778ddc224dc0b018",
+      "count": 1
+    },
+    {
+      "path": "scripts/checks/check-finding-baseline.py",
+      "code": "E501",
+      "fingerprint": "dd0ebe7df69f4d4b9fa5d5832fb6ca43ee6220aee3eeea8965cdc93ba7058c5b",
+      "count": 1
+    },
+    {
+      "path": "scripts/checks/check-python-fanout.py",
+      "code": "PLR0913",
+      "fingerprint": "e923c17b62309a65d0e49893489bfd9d879b4363e4b827cac502a305d367b012",
+      "count": 1
+    },
+    {
+      "path": "scripts/checks/check-python-quality.py",
+      "code": "E501",
+      "fingerprint": "2bef6efc8f4daad04c5c480fb7588462a4f691746e4db63d4c3010ce807ab649",
+      "count": 1
+    },
+    {
+      "path": "scripts/checks/check-python-quality.py",
+      "code": "E501",
+      "fingerprint": "30fa9736dca4b35bd7ea7fae7d26ece6824736f2a4a6dbbeca830e0771acf9f7",
+      "count": 1
+    },
+    {
+      "path": "scripts/checks/check-python-quality.py",
+      "code": "E501",
+      "fingerprint": "3b919db1abbef1104476a0889c7af44e29bed15c1964076a8dedf6ac0602a693",
+      "count": 1
+    },
+    {
+      "path": "scripts/checks/check-python-quality.py",
+      "code": "E501",
+      "fingerprint": "7526c2863da0dac1cc9bd2a82ea479c7ba501177e3ffe8246599dabc1d0c6c8f",
+      "count": 1
+    },
+    {
+      "path": "scripts/checks/check-python-quality.py",
+      "code": "PERF401",
+      "fingerprint": "85326ec3db7e6b1fe77f63a97dedebdced451ecae8b573451e7b3b32baad7d2e",
+      "count": 1
+    },
+    {
+      "path": "scripts/checks/check-repository-paths.py",
+      "code": "C901",
+      "fingerprint": "00872f6e90b13760fc68acbf5b103e89477baabb1c460d60ef2c54d3196efad1",
+      "count": 1
+    },
+    {
+      "path": "scripts/checks/check-repository-paths.py",
+      "code": "PERF401",
+      "fingerprint": "374bf4631c8510f7cceb898870c105451da27ccd85dd248447c300d8a6abc58c",
+      "count": 1
+    },
+    {
+      "path": "scripts/checks/check-repository-paths.py",
+      "code": "PERF401",
+      "fingerprint": "3a16464affae2f2acbebd1474f84aecd4acc43d7c1657f5965cb95cc5a73a396",
+      "count": 1
+    },
+    {
+      "path": "scripts/checks/check-repository-paths.py",
+      "code": "PERF401",
+      "fingerprint": "c3f0752b3cb7ccaf6befc1d3695402d16474c8c2b20d1ecf1fe526535e511529",
+      "count": 1
+    },
+    {
+      "path": "scripts/checks/check-repository-paths.py",
+      "code": "PERF401",
+      "fingerprint": "e6b9b68c655cfa19379b4f5ce6e8ec5cec3e86015777f72cba115450fd5566f9",
+      "count": 1
+    },
+    {
+      "path": "scripts/checks/check-repository-paths.py",
+      "code": "PLR0912",
+      "fingerprint": "28090358be8e10ce0c42d391addde679feeb207d68e11054f89e7aec00d36084",
+      "count": 1
+    },
+    {
+      "path": "scripts/checks/check-repository-paths.py",
+      "code": "SIM105",
+      "fingerprint": "2b4a65c4a0b18eb797e6de9ebbc5937d42d558c6bc7999474cd1bd35575e022a",
+      "count": 1
+    },
+    {
+      "path": "scripts/checks/check-ruff-suppressions.py",
+      "code": "C901",
+      "fingerprint": "5a502a4c93ee55197734ed8de5ff697ff9c286d2c7fd24c2dfdb32e042c228bc",
+      "count": 1
+    },
+    {
+      "path": "scripts/checks/check-ruff-suppressions.py",
+      "code": "E501",
+      "fingerprint": "169f3ccfb545754face7d523514022621a5a902c420b5d80b2c8f7a933cdd283",
+      "count": 1
+    },
+    {
+      "path": "scripts/checks/check-ruff-suppressions.py",
+      "code": "PERF401",
+      "fingerprint": "8fe22c1a4b32e69db06d4c29c89948bc9ffa681b883d767faa24c4ad77c26738",
+      "count": 1
+    },
+    {
+      "path": "scripts/checks/check-ruff-suppressions.py",
+      "code": "PERF401",
+      "fingerprint": "c2f15cc1b3144c63649b2eac2d8c10b62c31e592cd1e48b4fb381bc238839d71",
+      "count": 1
+    },
+    {
+      "path": "scripts/checks/check-ruff-suppressions.py",
+      "code": "PERF401",
+      "fingerprint": "c3ff9f56e0d02052c4f6d0b6a1dbde75c89d69f555953e81e91091b524373f87",
+      "count": 1
+    },
+    {
+      "path": "scripts/checks/check-structure.py",
+      "code": "B007",
+      "fingerprint": "ed9838515c4327224550f9dcbe507583ff2ee43f4bc54be54b6f30ce650d0fe7",
+      "count": 1
+    },
+    {
+      "path": "scripts/checks/check-structure.py",
+      "code": "D205",
+      "fingerprint": "228a74808e736733d6b51e9303edf2d1aef73c6342dbe970c28f266b8780f61b",
+      "count": 1
+    },
+    {
+      "path": "scripts/checks/check-structure.py",
+      "code": "D209",
+      "fingerprint": "69feaa15e58efae262bc82bda008a3fe698eca5562e6d86d2e06760cb8281bae",
+      "count": 1
+    },
+    {
+      "path": "scripts/checks/ruff_baseline.py",
+      "code": "PT018",
+      "fingerprint": "224097060ac20e69a6bb79a638d261dce2cf628d1c0a5c67abac32b8c6e61db3",
+      "count": 1
+    },
+    {
+      "path": "scripts/release/verify-version-wiring.py",
+      "code": "E501",
+      "fingerprint": "6f9aca145a9d2221150465dfe2ff63335750539d48f894c91b9dc850cb6b26be",
+      "count": 1
+    },
+    {
+      "path": "scripts/release/verify-version-wiring.py",
+      "code": "E501",
+      "fingerprint": "918732bd96645fa6f17fb7a11a2008672142fd07b553a02deb8ec0e92a1bb00c",
+      "count": 1
+    },
+    {
+      "path": "scripts/release/verify-version-wiring.py",
+      "code": "E501",
+      "fingerprint": "db50d017ce30a944d600aae2d4a166b976c769a1252941c3ceb64ba14530f0e2",
+      "count": 1
+    },
+    {
+      "path": "scripts/release/verify-version-wiring.py",
+      "code": "E501",
+      "fingerprint": "ea99b3269b1e9592a478bbc5918f512c526bf2204922faad2c8687243f2d1732",
+      "count": 1
+    },
+    {
+      "path": "scripts/release/verify-version-wiring.py",
+      "code": "E501",
+      "fingerprint": "fc18c4025719ed0a50aad2c6cf139c6fef1dda62137aa776072ffa9da4026221",
+      "count": 1
+    }
+  ]
+}

@@ -116,7 +116,8 @@ AGENT_SMOKE_EFFECTIVE_REASONING = $(if $(filter command line environment,$(origi
 	review-surface-quality-data quality-fixture-synthetic \
 	toolchain-pin-check structure-check release-archive \
 	test-fast test-slow test-quality test-docker \
-	quality gate-commit gate-ci identity-check identity-record version-release version-check
+	quality gate-commit gate-ci identity-check identity-record version-release version-check \
+	ruff-baseline ruff-check ruff-suppressions-check
 
 define require_var
 	@if [ -z "$($1)" ]; then \
@@ -148,6 +149,9 @@ help:
 	@echo "  make structure-check                                   Check the repository layout (no versions in names, root and package allowlists, depth); part of make quality"
 	@echo "  make identity-check                                    Refuse execution identity changes against .omp/identity.json"
 	@echo "  make identity-record                                   Explicitly record current identities; requires separate reviewed identity-change commit"
+	@echo "  make ruff-baseline                                    Explicitly record current Full Ruff findings (gates never refresh)"
+	@echo "  make ruff-check                                       Check Full Ruff against the finding-specific shrink-only baseline"
+	@echo "  make ruff-suppressions-check                           Refuse added Ruff suppressions relative to origin/main"
 	@echo "  make release-archive REF=<name>@<N>                    Tag archive/<name>@<N> at HEAD before editing a released definition in place (refuses an existing tag)"
 	@echo "  Generated data lives under var/ (git-ignored; RAIDAR_VAR=<dir> relocates it): jobs, stores, analysis, problems, tmp"
 	@echo "  Secrets: execute/smoke/assess/jev targets inject Infisical (project mac-os-cf, env dev) when the infisical"
@@ -728,6 +732,15 @@ toolchain-pin-check:
 # Repository structure rules (no version in names, root and package allowlists, depth limit).
 structure-check:
 	@$(REPO_RUNTIME_ENV) uv run --project orchestrator python scripts/checks/check-structure.py --repo-root "$(CURDIR)"
+
+ruff-baseline:
+	@$(REPO_RUNTIME_ENV) uv run --project orchestrator --extra dev python scripts/checks/ruff_baseline.py --record
+
+ruff-check:
+	@$(REPO_RUNTIME_ENV) uv run --project orchestrator --extra dev python scripts/checks/ruff_baseline.py
+
+ruff-suppressions-check:
+	@$(REPO_RUNTIME_ENV) uv run --project orchestrator --extra dev python scripts/checks/check-ruff-suppressions.py
 
 identity-check:
 	@$(REPO_RUNTIME_ENV) uv run --project orchestrator --extra dev python scripts/checks/check-identity.py

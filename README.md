@@ -451,6 +451,14 @@ No version appears in any file, module, class or folder name: a scorer, agent or
 
 `make gate-commit` checks whole-tree path policy, then runs `make quality`: structure, smoke command shapes, release registration, experiment locks, ledger, ruff, import contracts, lizard, mypy, fan-out, and the fast test tier with unchanged line and branch coverage floors. `make gate-ci` adds the slow and quality tiers, in that order, on every push and pull request. Both entrypoints are declared in `.omp/gate.json`; the check-only pre-commit hook runs the commit entrypoint without fixing or staging files. Install it in each clone:
 
+Full Ruff lint checks all maintained Python roots, including tests and scripts, against
+`.omp/baselines/ruff.json`. `make ruff-baseline` explicitly records current findings; gates
+never refresh it and reject new or stale findings. Existing debt is finding-specific and
+may only shrink after adoption. New suppression comments and non-catalogue per-file
+exceptions fail `make ruff-suppressions-check`. Lint targets Python 3.12 with preview rules;
+formatting remains stable, line length stays 100, and descriptive summaries retain D401's
+approved exception. Fix targets preserve released stage packages and raw grading payloads.
+
 ```bash
 env -u AGENT uv run --project orchestrator --extra dev pre-commit install --hook-type pre-commit
 ```
