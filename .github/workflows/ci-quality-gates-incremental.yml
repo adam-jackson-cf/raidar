@@ -2,12 +2,10 @@ name: ci-quality-gates-incremental
 
 on:
   push:
-    branches: [main, master]
   pull_request:
-    branches: [main, master]
 
 jobs:
-  quality-gates:
+  gate:
     runs-on: ubuntu-latest
     timeout-minutes: 40
     steps:
@@ -29,13 +27,5 @@ jobs:
         run: |
           env -u AGENT uv sync --project orchestrator --all-extras --frozen --python 3.13.7
 
-      - name: Run root quality gate
-        run: env -u AGENT make quality
-
-      - name: Run slow tier
-        if: github.event_name == 'push'
-        run: env -u AGENT make test-slow
-
-      - name: Run quality tier
-        if: github.event_name == 'push'
-        run: env -u AGENT make test-quality
+      - name: Run repository CI gate
+        run: env -u AGENT uv run --project orchestrator --extra dev python scripts/checks/run-repository-gate.py ci

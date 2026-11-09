@@ -46,6 +46,8 @@ SCRIPT_NAME_ALLOWLIST = {
     "check-python-fanout.py",
     "check-python-quality.py",
     "check-structure.py",
+    "check-repository-paths.py",
+    "run-repository-gate.py",
     "verify-version-wiring.py",
 }
 
@@ -226,6 +228,29 @@ def structure_diagnostics_for_relpath(relpath: str) -> list[Diagnostic]:
     diagnostics.extend(_module_name_diagnostics(normalized))
     diagnostics.extend(_generic_name_diagnostics(normalized))
     return diagnostics
+
+
+def placement_problems(relpath: str, tree: ast.Module) -> list[str]:
+    """File-level test ownership and tier markers shared by repository checks."""
+    functions = [
+        node for node in ast.walk(tree)
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+    ]
+    problems = []
+    if any(node.name.startswith("test_") for node in functions) and not (
+        relpath.startswith(("orchestrator/tests/", "contract/conformance/"))
+        or re.match(r"^lab/stages/[^/]+/[^/]+/tests/", relpath)
+    ):
+        problems.append("test functions live outside an owned test directory")
+    if relpath.startswith("orchestrator/tests/"):
+        for node in functions:
+            for decorator in node.decorator_list:
+                marker = decorator.func if isinstance(decorator, ast.Call) else decorator
+                if ast.unparse(marker) in {
+                    f"pytest.mark.{tier}" for tier in ("slow", "quality", "docker", "security", "perf")
+                }:
+                    problems.append(f"{ast.unparse(marker)} decorates {node.name}")
+    return problems
 
 
 def structure_diagnostics(repo_root: Path, paths: Sequence[Path]) -> list[Diagnostic]:

@@ -65,5 +65,13 @@ Fast, slow and quality tiers pass, and Docker, security and perf pass on the
 - `make test-fast` (`raidar quality test-fast`), `make test-slow`,
   `make test-quality`, `make test-docker TARGET=<name>`
   (`RAIDAR_REQUIRE_DOCKER=1`), `make security-gate`, `make perf-gate`.
-- CI runs slow and quality on push. The pre-commit hook runs `quality gates`;
-  pre-push runs `make quality`.
+- `make gate-commit`: whole-tree path policy followed by `make quality`; the
+  check-only pre-commit hook dispatches this target through `.omp/gate.json`.
+- `make gate-ci`: commit gate, then the full slow and quality tiers, on every
+  push and pull request. Docker, security and perf remain separate target checks.
+
+Install the hook in each clone (it never fixes or stages files):
+
+```bash
+env -u AGENT uv run --project orchestrator --extra dev pre-commit install --hook-type pre-commit
+```
