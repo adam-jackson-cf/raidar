@@ -76,6 +76,14 @@ def run_ruff_quality_gates(*, fix: bool) -> None:
     targets = [".", "../contract/src", *package_tool_sources()]
     options = ["--config", "pyproject.toml", "--force-exclude"]
     if fix:
+        options.extend(
+            [
+                "--extend-exclude",
+                "../lab/stages/raidar/define,../lab/stages/raidar/verify,"
+                "../lab/stages/raidar/docs-check,src/raidar/grading/runtime/raidar_oracle_plugin.py,"
+                "src/raidar/grading/runtime/sitecustomize.py",
+            ]
+        )
         run_or_raise([PYTHON, "-m", "ruff", "format", *options, *targets], ORCHESTRATOR_ROOT)
         run_or_raise(
             [PYTHON, "-m", "ruff", "check", *targets, "--fix", *options], ORCHESTRATOR_ROOT
@@ -83,7 +91,8 @@ def run_ruff_quality_gates(*, fix: bool) -> None:
         return
 
     run_or_raise([PYTHON, "-m", "ruff", "format", "--check", *options, *targets], ORCHESTRATOR_ROOT)
-    run_or_raise([PYTHON, "-m", "ruff", "check", *targets, "--no-fix", *options], ORCHESTRATOR_ROOT)
+    run_or_raise([PYTHON, str(REPO_ROOT / "scripts/checks/ruff_baseline.py")], REPO_ROOT)
+    run_or_raise([PYTHON, str(REPO_ROOT / "scripts/checks/check-ruff-suppressions.py")], REPO_ROOT)
 
 
 def coverage_env() -> dict[str, str]:

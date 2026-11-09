@@ -194,6 +194,21 @@ def evaluate_baseline(baseline: dict, findings: list[dict], base_baseline: dict)
     return int(bool(lines)), lines
 
 
+def read_base_baseline(
+    result: subprocess.CompletedProcess[str], baseline: dict, relative: str, ref: str
+) -> dict:
+    """Permit first adoption only when git identifies the exact missing baseline path."""
+    missing = {
+        f"fatal: path '{relative}' does not exist in '{ref}'",
+        f"fatal: path '{relative}' exists on disk, but not in '{ref}'",
+    }
+    if result.returncode:
+        if result.stderr.strip() in missing:
+            return baseline
+        raise ScanInputError(f"cannot read base baseline: {result.stderr.strip()}")
+    return json.loads(result.stdout)
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--tool", choices=("ruff", "mypy"), required=True)
@@ -216,9 +231,7 @@ def main() -> int:
                 ["git", "show", f"{args.base_ref}:{relative}"], cwd=root,
                 text=True, capture_output=True, check=False,
             )
-            if result.returncode:
-                raise ScanInputError(f"cannot read base baseline: {result.stderr.strip()}")
-            base_baseline = json.loads(result.stdout)
+            base_baseline = read_base_baseline(result, baseline, relative, args.base_ref)
         _baseline(baseline)
         if baseline["tool"] != args.tool:
             raise ScanInputError("baseline tool does not match --tool")

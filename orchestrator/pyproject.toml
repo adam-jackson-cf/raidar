@@ -71,6 +71,14 @@ dev-mode-dirs = ["src"]
 [tool.ruff]
 line-length = 100
 target-version = "py312"
+fix = true
+preview = true
+respect-gitignore = true
+output-format = "full"
+exclude = [
+    ".build", ".git", ".tox", ".venv", "venv", "__pycache__", "*.egg-info",
+    "build", "dist", "node_modules", ".pytest_cache", ".mypy_cache", ".ruff_cache",
+]
 # The define package's tool unit tests import its source in place (a test-only path).
 src = [".", "src", "../lab/stages/raidar/define/tool/src"]
 extend-exclude = [
@@ -83,6 +91,7 @@ extend-exclude = [
 
 [tool.ruff.lint]
 select = [
+    "W", "D", "N", "PLR0904", "PLR0913", "PLR0914", "PLR0917",
     "E",
     "F",
     "I",
@@ -99,15 +108,47 @@ select = [
     "PLR0912",
     "PLR0915",
 ]
+preview = true
+# E501 deliberately stays enabled; approved descriptive-summary exception: D401.
+ignore = ["D100", "D101", "D102", "D103", "D104", "D105", "D107", "D401"]
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["PLR2004"]
-"**/__init__.py" = ["F401"]
+"**/tests/**" = ["D", "S101", "PLR2004"]
+"test_*.py" = ["D", "S101", "PLR2004"]
+"**/__init__.py" = ["F401", "D104"]
+"conftest.py" = ["D"]
+"setup.py" = ["D"]
 # Canary fixture generator: each fixture is one literal source text, kept on one line.
 "tests/fixtures/python_guardrails/make_fixtures.py" = ["E501", "PLR0915"]
 
 [tool.ruff.lint.mccabe]
 max-complexity = 10
 
+
+[tool.ruff.lint.isort]
+combine-as-imports = true
+force-single-line = false
+known-first-party = ["raidar", "raidar_contract", "define_tool", "verify_tool"]
+split-on-trailing-comma = true
+
+[tool.ruff.lint.pylint]
+max-args = 5
+max-branches = 12
+max-locals = 15
+max-positional-args = 5
+max-public-methods = 20
+max-returns = 6
+max-statements = 50
+
+[tool.ruff.lint.pydocstyle]
+convention = "numpy"
+
+[tool.ruff.format]
+preview = false
+docstring-code-format = true
+indent-style = "space"
+line-ending = "auto"
+quote-style = "double"
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 addopts = "--strict-markers --ignore-glob=.env* --ignore-glob=**/.env*"
