@@ -2,6 +2,10 @@
 
 All notable changes to this project are documented in this file.
 
+## 1.0.1 - 2026-11-09
+
+- ci: bootstrap repository commit and CI gates
+
 ## 1.0.1 - 2026-11-05
 
 ### Refactoring
