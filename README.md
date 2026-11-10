@@ -485,6 +485,16 @@ two. Existing identity-bound findings are ratcheted individually in
 
 Docker-backed tests (`make test-docker`), the N1 overhead gate (`make perf-gate`) and `make security-gate` remain separate checks on a ready Docker target.
 
+`make analyzer-scope-check` enforces filesystem (PYS251), environment/process
+(PYS252), and applicable `CODEOWNERS` ownership (PYS253) across scoring, evaluation
+analysis, and engine health. Only the five adopted I/O boundaries are approved;
+the 68 existing direct operations are individually ratcheted in
+`.omp/baselines/analyzer-scope.json` per the adopted decision, never exempted by file.
+Production code and execution identities are preserved. PYQ210/PYQ211 are
+not applicable to the structural Scorer Protocol and inherited coverage entrypoint:
+the [adopted decision](docs/reboot/evidence/decide-analyzer-sol.md) records why no
+nominal analyzer hierarchy is imposed. This check is part of `make quality`.
+
 Tests are tiered (fast, slow, quality, docker, security, perf) with their own targets (`make test-fast`, `test-slow`, `test-quality`, `test-docker`); see [test tiers](.agents/skills/test-patterns/references/test-tiers.md).
 
 Strict mypy checks every maintained Python root, including tests and scripts. Its
