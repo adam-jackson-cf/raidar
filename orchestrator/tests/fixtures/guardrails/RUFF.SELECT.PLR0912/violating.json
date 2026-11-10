@@ -1,0 +1,6 @@
+{
+  "files": {
+    "orchestrator/src/probe.py": "\"\"\"Expose a canary function.\"\"\"\n\n\ndef probe(value: int) -> int:\n    \"\"\"Compute a value.\"\"\"\n    if value == 0:\n        value += 1\n    elif value == 1:\n        value += 1\n    elif value == 2:\n        value += 1\n    elif value == 3:\n        value += 1\n    elif value == 4:\n        value += 1\n    elif value == 5:\n        value += 1\n    elif value == 6:\n        value += 1\n    elif value == 7:\n        value += 1\n    elif value == 8:\n        value += 1\n    elif value == 9:\n        value += 1\n    elif value == 10:\n        value += 1\n    elif value == 11:\n        value += 1\n    elif value == 12:\n        value += 1\n    return value\n"
+  },
+  "format": false
+}

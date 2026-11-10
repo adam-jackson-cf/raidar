@@ -1,0 +1,7 @@
+{
+  "path": "orchestrator/src/raidar/scoring/code_quality/canary.py",
+  "files": {
+    "CODEOWNERS": "* @canary-owner\n",
+    "orchestrator/src/raidar/scoring/code_quality/canary.py": "def broken(:\n"
+  }
+}

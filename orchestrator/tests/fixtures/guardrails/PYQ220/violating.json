@@ -1,0 +1,4 @@
+{
+  "path": "orchestrator/src/raidar/engine/canary.py",
+  "source": "import subprocess\nsubprocess.run([\"true\"], timeout=1)\n"
+}

@@ -7,6 +7,9 @@ All notable changes to this project are documented in this file.
 - ci: retain invocation-bound fast-test phase reports and enforce their validity
   through both gates; add CI-only calibrated timing checks, externally verified
   policy approvals and sequential baseline measurement/import tooling.
+- ci: fail closed on all 104 guardrail evidence rows with real per-rule canaries,
+  isolated hook installation proof, live GitHub readback, and hash-checked
+  vendored validation; preserve approved exclusions, debt ratchets and identities.
 - ci: enforce installer/metadata parity, locked Prettier 3.6.2 checks outside
   consent-excluded and frozen paths, and strict locked dependency audits.
 - build(deps): update identity-neutral vulnerable dependencies; retain

@@ -1,0 +1,6 @@
+{
+  "files": {
+    "orchestrator/src/probe.py": "\"\"\"Expose imported values.\"\"\"\n\nfrom os import (name, path,)\n\nVALUE = (name, path)\n"
+  },
+  "format": false
+}

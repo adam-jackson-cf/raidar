@@ -1,0 +1,18 @@
+{
+  "report": {
+    "dependencies": [
+      {
+        "name": "canary",
+        "version": "1.0.0",
+        "vulns": [
+          {
+            "id": "CANARY-ADVISORY",
+            "fix_versions": [
+              "1.0.1"
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

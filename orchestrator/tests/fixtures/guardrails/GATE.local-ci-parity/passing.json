@@ -1,0 +1,43 @@
+{
+  "gate": {
+    "schemaVersion": 2,
+    "checks": {
+      "commit": [
+        "env",
+        "-u",
+        "AGENT",
+        "make",
+        "gate-commit"
+      ],
+      "ci": [
+        "env",
+        "-u",
+        "AGENT",
+        "make",
+        "gate-ci"
+      ]
+    },
+    "pathCheck": [
+      "env",
+      "-u",
+      "AGENT",
+      "uv",
+      "run",
+      "--project",
+      "orchestrator",
+      "--extra",
+      "dev",
+      "python",
+      "scripts/checks/check-repository-paths.py"
+    ],
+    "pathCheckTimeoutMs": 180000,
+    "testGlobs": [
+      "orchestrator/tests/**/*.py",
+      "contract/conformance/**/*.py",
+      "lab/stages/**/tests/**/*.py"
+    ],
+    "ciHost": "github"
+  },
+  "workflow": "name: ci-quality-gates-incremental\n\non:\n  push:\n  pull_request:\n\njobs:\n  gate:\n    runs-on: ubuntu-latest\n    timeout-minutes: 40\n    steps:\n      - name: Checkout\n        uses: actions/checkout@v4\n        with:\n          fetch-depth: 0 # releases-check compares the register with main's history\n\n      - name: Set up uv\n        uses: astral-sh/setup-uv@v7\n        with:\n          version: \"0.10.0\"\n          python-version: \"3.13.7\"\n\n      - name: Install Python\n        run: uv python install\n\n      - name: Install orchestrator dev dependencies\n        run: |\n          env -u AGENT uv sync --project orchestrator --all-extras --frozen --python 3.13.7\n\n      - name: Set up Node\n        uses: actions/setup-node@v4\n        with:\n          node-version: \"22\"\n\n      - name: Install locked formatter\n        run: npm ci --ignore-scripts\n\n      - name: Run repository CI gate\n        run: env -u AGENT uv run --project orchestrator --extra dev python scripts/checks/run-repository-gate.py ci\n\n      - name: Retain report\n        if: always()\n        run: echo retain\n",
+  "hook": "repos:\n  - repo: local\n    hooks:\n      - id: repository-gate\n        name: Repository commit gate (check only)\n        entry: env -u AGENT uv run --project orchestrator --extra dev python scripts/checks/run-repository-gate.py commit\n        language: system\n        pass_filenames: false\n        always_run: true\n        stages: [pre-commit]\n"
+}

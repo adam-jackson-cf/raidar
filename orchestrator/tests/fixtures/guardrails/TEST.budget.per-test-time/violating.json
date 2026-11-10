@@ -1,0 +1,282 @@
+{
+  "policy": {
+    "schemaVersion": 1,
+    "profile": {
+      "schemaVersion": 1,
+      "runnerClass": "synthetic-canary",
+      "osImageFamily": "synthetic",
+      "arch": "X64",
+      "pythonVersion": "3.13.7",
+      "lockDigest": "canary-lock",
+      "coverageDigest": "canary-coverage",
+      "selector": "not slow and not quality and not docker and not security and not perf",
+      "workers": 1
+    },
+    "formulas": {
+      "wall": "ceil_s(1.25*max)",
+      "perTest": "ceil_10ms(1.5*p95(test_maxima))",
+      "exception": "ceil_10ms(1.5*test_max)"
+    },
+    "status": "provisional",
+    "goal": {
+      "wallSeconds": 30,
+      "perTestSeconds": 0.1
+    },
+    "wallSeconds": 13,
+    "perTestSeconds": 0.06,
+    "exceptions": {}
+  },
+  "baselines": [
+    {
+      "schemaVersion": 1,
+      "invocationId": "synthetic-0",
+      "revision": "synthetic-canary",
+      "profile": {
+        "schemaVersion": 1,
+        "runnerClass": "synthetic-canary",
+        "osImageFamily": "synthetic",
+        "arch": "X64",
+        "pythonVersion": "3.13.7",
+        "lockDigest": "canary-lock",
+        "coverageDigest": "canary-coverage",
+        "selector": "not slow and not quality and not docker and not security and not perf",
+        "workers": 1
+      },
+      "machine": {
+        "imageVersion": "synthetic",
+        "cpuModel": "synthetic"
+      },
+      "wallSeconds": 10,
+      "inventory": [
+        "test_canary.py::test_input"
+      ],
+      "cases": {
+        "test_canary.py::test_input": {
+          "outcome": "passed",
+          "phases": {
+            "setup": 0.01,
+            "call": 0.02,
+            "teardown": 0.01
+          }
+        }
+      },
+      "exitCode": 0,
+      "complete": true,
+      "measurement": {
+        "runId": "synthetic-0",
+        "jobId": "synthetic",
+        "successful": true
+      }
+    },
+    {
+      "schemaVersion": 1,
+      "invocationId": "synthetic-1",
+      "revision": "synthetic-canary",
+      "profile": {
+        "schemaVersion": 1,
+        "runnerClass": "synthetic-canary",
+        "osImageFamily": "synthetic",
+        "arch": "X64",
+        "pythonVersion": "3.13.7",
+        "lockDigest": "canary-lock",
+        "coverageDigest": "canary-coverage",
+        "selector": "not slow and not quality and not docker and not security and not perf",
+        "workers": 1
+      },
+      "machine": {
+        "imageVersion": "synthetic",
+        "cpuModel": "synthetic"
+      },
+      "wallSeconds": 10,
+      "inventory": [
+        "test_canary.py::test_input"
+      ],
+      "cases": {
+        "test_canary.py::test_input": {
+          "outcome": "passed",
+          "phases": {
+            "setup": 0.01,
+            "call": 0.02,
+            "teardown": 0.01
+          }
+        }
+      },
+      "exitCode": 0,
+      "complete": true,
+      "measurement": {
+        "runId": "synthetic-1",
+        "jobId": "synthetic",
+        "successful": true
+      }
+    },
+    {
+      "schemaVersion": 1,
+      "invocationId": "synthetic-2",
+      "revision": "synthetic-canary",
+      "profile": {
+        "schemaVersion": 1,
+        "runnerClass": "synthetic-canary",
+        "osImageFamily": "synthetic",
+        "arch": "X64",
+        "pythonVersion": "3.13.7",
+        "lockDigest": "canary-lock",
+        "coverageDigest": "canary-coverage",
+        "selector": "not slow and not quality and not docker and not security and not perf",
+        "workers": 1
+      },
+      "machine": {
+        "imageVersion": "synthetic",
+        "cpuModel": "synthetic"
+      },
+      "wallSeconds": 10,
+      "inventory": [
+        "test_canary.py::test_input"
+      ],
+      "cases": {
+        "test_canary.py::test_input": {
+          "outcome": "passed",
+          "phases": {
+            "setup": 0.01,
+            "call": 0.02,
+            "teardown": 0.01
+          }
+        }
+      },
+      "exitCode": 0,
+      "complete": true,
+      "measurement": {
+        "runId": "synthetic-2",
+        "jobId": "synthetic",
+        "successful": true
+      }
+    },
+    {
+      "schemaVersion": 1,
+      "invocationId": "synthetic-3",
+      "revision": "synthetic-canary",
+      "profile": {
+        "schemaVersion": 1,
+        "runnerClass": "synthetic-canary",
+        "osImageFamily": "synthetic",
+        "arch": "X64",
+        "pythonVersion": "3.13.7",
+        "lockDigest": "canary-lock",
+        "coverageDigest": "canary-coverage",
+        "selector": "not slow and not quality and not docker and not security and not perf",
+        "workers": 1
+      },
+      "machine": {
+        "imageVersion": "synthetic",
+        "cpuModel": "synthetic"
+      },
+      "wallSeconds": 10,
+      "inventory": [
+        "test_canary.py::test_input"
+      ],
+      "cases": {
+        "test_canary.py::test_input": {
+          "outcome": "passed",
+          "phases": {
+            "setup": 0.01,
+            "call": 0.02,
+            "teardown": 0.01
+          }
+        }
+      },
+      "exitCode": 0,
+      "complete": true,
+      "measurement": {
+        "runId": "synthetic-3",
+        "jobId": "synthetic",
+        "successful": true
+      }
+    },
+    {
+      "schemaVersion": 1,
+      "invocationId": "synthetic-4",
+      "revision": "synthetic-canary",
+      "profile": {
+        "schemaVersion": 1,
+        "runnerClass": "synthetic-canary",
+        "osImageFamily": "synthetic",
+        "arch": "X64",
+        "pythonVersion": "3.13.7",
+        "lockDigest": "canary-lock",
+        "coverageDigest": "canary-coverage",
+        "selector": "not slow and not quality and not docker and not security and not perf",
+        "workers": 1
+      },
+      "machine": {
+        "imageVersion": "synthetic",
+        "cpuModel": "synthetic"
+      },
+      "wallSeconds": 10,
+      "inventory": [
+        "test_canary.py::test_input"
+      ],
+      "cases": {
+        "test_canary.py::test_input": {
+          "outcome": "passed",
+          "phases": {
+            "setup": 0.01,
+            "call": 0.02,
+            "teardown": 0.01
+          }
+        }
+      },
+      "exitCode": 0,
+      "complete": true,
+      "measurement": {
+        "runId": "synthetic-4",
+        "jobId": "synthetic",
+        "successful": true
+      }
+    }
+  ],
+  "revision": "synthetic-canary",
+  "invocation": "current",
+  "today": "2026-11-10",
+  "reports": [
+    {
+      "schemaVersion": 1,
+      "invocationId": "current",
+      "revision": "synthetic-canary",
+      "profile": {
+        "schemaVersion": 1,
+        "runnerClass": "synthetic-canary",
+        "osImageFamily": "synthetic",
+        "arch": "X64",
+        "pythonVersion": "3.13.7",
+        "lockDigest": "canary-lock",
+        "coverageDigest": "canary-coverage",
+        "selector": "not slow and not quality and not docker and not security and not perf",
+        "workers": 1
+      },
+      "machine": {
+        "imageVersion": "synthetic",
+        "cpuModel": "synthetic"
+      },
+      "wallSeconds": 10,
+      "inventory": [
+        "test_canary.py::test_input"
+      ],
+      "cases": {
+        "test_canary.py::test_input": {
+          "outcome": "passed",
+          "phases": {
+            "setup": 0.01,
+            "call": 0.041,
+            "teardown": 0.01
+          }
+        }
+      },
+      "exitCode": 0,
+      "complete": true,
+      "measurement": {
+        "runId": "current",
+        "jobId": "synthetic",
+        "successful": true
+      }
+    }
+  ]
+}

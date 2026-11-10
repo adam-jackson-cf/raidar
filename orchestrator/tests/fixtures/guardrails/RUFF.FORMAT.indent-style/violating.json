@@ -1,0 +1,6 @@
+{
+  "files": {
+    "orchestrator/src/probe.py": "\"\"\"Expose a function.\"\"\"\n\n\ndef probe():\n\treturn 1\n"
+  },
+  "format": true
+}

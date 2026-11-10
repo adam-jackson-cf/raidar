@@ -1,0 +1,6 @@
+{
+  "files": {
+    "orchestrator/src/probe.py": "\"\"\"Expose a canary value.\"\"\"\n\nimport sys\nimport os\n\nVALUE = (sys.version, os.name)\n"
+  },
+  "format": false
+}

@@ -1,0 +1,8 @@
+{
+  "files": {
+    "contract/src/raidar_contract/__init__.py": ""
+  },
+  "targets": [
+    "contract/src"
+  ]
+}

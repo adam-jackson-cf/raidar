@@ -1,0 +1,6 @@
+{
+  "files": {
+    "orchestrator/src/probe.py": "\"\"\"Expose a canary value.\"\"\"\n\nVALUE = 'word word word word word word word word word word word word word word word word word word word word word word word word '\n"
+  },
+  "format": false
+}

@@ -1,0 +1,6 @@
+{
+  "sources": {
+    "package.json": "{\n  \"name\": \"raidar-maintenance-toolchain\",\n  \"private\": true,\n  \"devDependencies\": {\n    \"prettier\": \"3.6.2\"\n  }\n}\n",
+    "package-lock.json": "{\n  \"name\": \"raidar-maintenance-toolchain\",\n  \"lockfileVersion\": 3,\n  \"requires\": true,\n  \"packages\": {\n    \"\": {\n      \"name\": \"raidar-maintenance-toolchain\",\n      \"devDependencies\": {\n        \"prettier\": \"3.6.2\"\n      }\n    },\n    \"node_modules/prettier\": {\n      \"version\": \"3.6.2\",\n      \"resolved\": \"https://registry.npmjs.org/prettier/-/prettier-3.6.2.tgz\",\n      \"integrity\": \"sha512-I7AIg5boAr5R0FFtJ6rCfD+LFsWHp81dolrFD8S79U9tb8Az2nGrJncnMSnys+bpQJfRUzqs9hnA81OAA3hCuQ==\",\n      \"dev\": true,\n      \"license\": \"MIT\",\n      \"bin\": {\n        \"prettier\": \"bin/prettier.cjs\"\n      },\n      \"engines\": {\n        \"node\": \">=14\"\n      },\n      \"funding\": {\n        \"url\": \"https://github.com/prettier/prettier?sponsor=1\"\n      }\n    }\n  }\n}\n"
+  }
+}

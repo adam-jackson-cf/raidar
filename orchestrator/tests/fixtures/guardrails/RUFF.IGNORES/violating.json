@@ -1,0 +1,11 @@
+{
+  "base": {
+    "probe.py": "\"\"\"Expose a canary value.\"\"\"\n\nVALUE: int = 1\n"
+  },
+  "head": {
+    "probe.py": "\"\"\"Expose a canary value.\"\"\"\n\nVALUE: int = 1\nVALUE = 2  # noqa: F821\n"
+  },
+  "paths": [
+    "probe.py"
+  ]
+}

@@ -97,6 +97,20 @@ def test_growth_accepts_new_file_and_case_mapped_to_changed_behavior() -> None:
     assert _findings({TEST: SIMPLE}, mapping=_mapping(TEST, CASE)) == []
 
 
+def test_growth_expands_static_range_and_length_without_executing_code() -> None:
+    current = (
+        "import pytest\n"
+        "@pytest.mark.parametrize('value', range(len(b'ab')))\n"
+        "def test_probe(value):\n"
+        "    assert probe(value) == value\n"
+    )
+    assert (
+        _findings({TEST: current}, mapping=_mapping(TEST, CASE, f"{CASE}[0]", f"{CASE}[1]")) == []
+    )
+    findings = _findings({TEST: current}, mapping=_mapping(TEST, CASE, f"{CASE}[0]"))
+    _assert_finding(findings, "TEST.growth.justified", f"{CASE}[1]")
+
+
 @pytest.mark.parametrize("missing", [TEST, CASE])
 def test_growth_refuses_each_unmapped_file_or_case(missing: str) -> None:
     selectors = [selector for selector in (TEST, CASE) if selector != missing]

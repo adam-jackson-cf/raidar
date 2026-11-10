@@ -1,0 +1,7 @@
+{
+  "files": {
+    "orchestrator/src/probe.py": "from dependency import VALUE\n\nRESULT: str = 1\n",
+    "orchestrator/src/dependency.py": "VALUE: int = \"implementation is deliberately not followed\"\n"
+  },
+  "format": false
+}
