@@ -499,6 +499,17 @@ and concrete types. Production and command loop/comprehension depth is capped at
 two. Existing identity-bound findings are ratcheted individually in
 `.omp/baselines/python-policy.json`; new findings or baseline growth fail.
 
+Both gates also run `make test-evidence-check` against `origin/main`
+(`TEST_EVIDENCE_BASE` overrides the comparison ref). Each added test file,
+function/method, and expanded parameter case needs its own selector in the tracked
+`.omp/test-behavior-map.json`: `{"schemaVersion": 1, "tests": {"path::test_name":
+{"source": "changed/source.py", "behavior": "Describe the changed behavior"}}}`.
+The source must change in the same PR. The checker rejects new cases with the
+same normalized called targets, bound inputs and assertions as an existing or
+other added case; map missing evidence or merge/remove duplicate tests.
+Parameter rows and IDs must be statically collectable; changed files with dynamic
+collection fail closed rather than executing test code during this static check.
+
 Docker-backed tests (`make test-docker`), the N1 overhead gate (`make perf-gate`) and `make security-gate` remain separate checks on a ready Docker target.
 
 `make analyzer-scope-check` enforces filesystem (PYS251), environment/process

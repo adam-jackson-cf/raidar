@@ -116,7 +116,7 @@ AGENT_SMOKE_EFFECTIVE_REASONING = $(if $(filter command line environment,$(origi
 	review-surface-quality-data quality-fixture-synthetic \
 	toolchain-pin-check structure-check release-archive \
 	test-fast test-slow test-quality test-docker \
-	quality gate-commit gate-ci identity-check identity-record version-release version-check analyzer-scope-check \
+	quality gate-commit gate-ci identity-check identity-record test-evidence-check version-release version-check analyzer-scope-check \
 	ruff-baseline ruff-check ruff-suppressions-check mypy-check mypy-baseline
 
 define require_var
@@ -153,6 +153,7 @@ help:
 	@echo "  make structure-check                                   Check the repository layout (no versions in names, root and package allowlists, depth); part of make quality"
 	@echo "  make test-hygiene-check                                Check bounded test processes, skill metadata/support links, and registered stage evidence"
 	@echo "  make identity-check                                    Refuse execution identity changes against .omp/identity.json"
+	@echo "  make test-evidence-check [TEST_EVIDENCE_BASE=origin/main] Check added tests map to changed behavior and reject duplicate paths"
 	@echo "  make identity-record                                   Explicitly record current identities; requires separate reviewed identity-change commit"
 	@echo "  make ruff-baseline                                    Explicitly record current Full Ruff findings (gates never refresh)"
 	@echo "  make ruff-check                                       Check Full Ruff against the finding-specific shrink-only baseline"
@@ -793,10 +794,17 @@ analyzer-scope-check:
 		--report "$(REPO_TMP_DIR)/analyzer-scope-findings.json" \
 		--baseline .omp/baselines/analyzer-scope.json
 
+TEST_EVIDENCE_BASE ?= origin/main
+
+test-evidence-check:
+	@$(REPO_RUNTIME_ENV) uv run --project orchestrator --extra dev \
+		python scripts/checks/check-test-evidence.py --repo-root "$(CURDIR)" --base-ref "$(TEST_EVIDENCE_BASE)"
+
 gate-commit:
 	@$(REPO_RUNTIME_ENV) uv run --project orchestrator --extra dev \
 		python scripts/checks/check-repository-paths.py
 	@$(MAKE) --no-print-directory identity-check
+	@$(MAKE) --no-print-directory test-evidence-check
 	@$(MAKE) --no-print-directory quality
 	@$(MAKE) --no-print-directory dependency-audit-check
 	@$(REPO_RUNTIME_ENV) uv run --project orchestrator --extra dev \

@@ -1,0 +1,141 @@
+{
+  "schemaVersion": 1,
+  "tests": {
+    "orchestrator/tests/test_test_evidence.py": {
+      "source": "scripts/checks/check-test-evidence.py",
+      "behavior": "Enforce changed-source behavior evidence for test growth and reject normalized duplicate behavior paths"
+    },
+    "orchestrator/tests/test_test_evidence.py::test_duplicate_accepts_distinct_bound_input_target_or_assertion": {
+      "source": "scripts/checks/check-test-evidence.py",
+      "behavior": "Keep distinct bound inputs, resolved targets, expected values and assertion operators as distinct behavior paths"
+    },
+    "orchestrator/tests/test_test_evidence.py::test_duplicate_accepts_distinct_bound_input_target_or_assertion[from other_product import probe\\n\\ndef test_probe():\\n    assert probe(2) == 4\\n]": {
+      "source": "scripts/checks/check-test-evidence.py",
+      "behavior": "Keep distinct bound inputs, resolved targets, expected values and assertion operators as distinct behavior paths"
+    },
+    "orchestrator/tests/test_test_evidence.py::test_duplicate_accepts_distinct_bound_input_target_or_assertion[from product import probe\\n\\ndef test_probe():\\n    assert probe(2) == 5\\n]": {
+      "source": "scripts/checks/check-test-evidence.py",
+      "behavior": "Keep distinct bound inputs, resolved targets, expected values and assertion operators as distinct behavior paths"
+    },
+    "orchestrator/tests/test_test_evidence.py::test_duplicate_accepts_distinct_bound_input_target_or_assertion[from product import probe\\n\\ndef test_probe():\\n    assert probe(2) > 4\\n]": {
+      "source": "scripts/checks/check-test-evidence.py",
+      "behavior": "Keep distinct bound inputs, resolved targets, expected values and assertion operators as distinct behavior paths"
+    },
+    "orchestrator/tests/test_test_evidence.py::test_duplicate_accepts_distinct_bound_input_target_or_assertion[from product import probe\\n\\ndef test_probe():\\n    assert probe(3) == 4\\n]": {
+      "source": "scripts/checks/check-test-evidence.py",
+      "behavior": "Keep distinct bound inputs, resolved targets, expected values and assertion operators as distinct behavior paths"
+    },
+    "orchestrator/tests/test_test_evidence.py::test_duplicate_compares_other_new_cases_too": {
+      "source": "scripts/checks/check-test-evidence.py",
+      "behavior": "Reject duplicate behavior among cases added together"
+    },
+    "orchestrator/tests/test_test_evidence.py::test_duplicate_compares_parameter_bound_behavior_not_row_labels": {
+      "source": "scripts/checks/check-test-evidence.py",
+      "behavior": "Detect duplicate parameter-bound behavior despite different parameter IDs"
+    },
+    "orchestrator/tests/test_test_evidence.py::test_duplicate_ignores_duplicates_already_present_in_base": {
+      "source": "scripts/checks/check-test-evidence.py",
+      "behavior": "Leave unchanged pre-existing duplicate cases outside the growth-only rule"
+    },
+    "orchestrator/tests/test_test_evidence.py::test_duplicate_refuses_existing_path_despite_names_aliases_or_formatting": {
+      "source": "scripts/checks/check-test-evidence.py",
+      "behavior": "Reject duplicate existing call paths after normalizing test names, local temporaries, import aliases and formatting"
+    },
+    "orchestrator/tests/test_test_evidence.py::test_duplicate_refuses_existing_path_despite_names_aliases_or_formatting[from product import probe as calculate\\n\\ndef test_copy():\\n    computed = calculate(2)\\n    assert computed == 4\\n]": {
+      "source": "scripts/checks/check-test-evidence.py",
+      "behavior": "Reject duplicate existing call paths after normalizing test names, local temporaries, import aliases and formatting"
+    },
+    "orchestrator/tests/test_test_evidence.py::test_duplicate_refuses_existing_path_despite_names_aliases_or_formatting[from product import probe\\n\\n# moved and renamed\\n\\ndef test_copy():\\n    answer = probe(2)\\n    assert answer == 4\\n]": {
+      "source": "scripts/checks/check-test-evidence.py",
+      "behavior": "Reject duplicate existing call paths after normalizing test names, local temporaries, import aliases and formatting"
+    },
+    "orchestrator/tests/test_test_evidence.py::test_duplicate_refuses_existing_path_despite_names_aliases_or_formatting[from product import probe\\n\\ndef test_copy():\\n    assert probe(2) == 4\\n]": {
+      "source": "scripts/checks/check-test-evidence.py",
+      "behavior": "Reject duplicate existing call paths after normalizing test names, local temporaries, import aliases and formatting"
+    },
+    "orchestrator/tests/test_test_evidence.py::test_growth_accepts_new_file_and_case_mapped_to_changed_behavior": {
+      "source": "scripts/checks/check-test-evidence.py",
+      "behavior": "Accept tracked evidence mapping each added file and function to changed-source behavior"
+    },
+    "orchestrator/tests/test_test_evidence.py::test_growth_counts_added_parameter_rows_not_only_functions": {
+      "source": "scripts/checks/check-test-evidence.py",
+      "behavior": "Require evidence for newly expanded explicit-ID and literal-auto-ID parameter rows"
+    },
+    "orchestrator/tests/test_test_evidence.py::test_growth_counts_added_parameter_rows_not_only_functions[(2, 4)-(2, 4), (-1, None)--1-None]": {
+      "source": "scripts/checks/check-test-evidence.py",
+      "behavior": "Require evidence for newly expanded explicit-ID and literal-auto-ID parameter rows"
+    },
+    "orchestrator/tests/test_test_evidence.py::test_growth_counts_added_parameter_rows_not_only_functions[pytest.param(2, 4, id='valid')-pytest.param(2, 4, id='valid'), pytest.param(-1, None, id='invalid')-invalid]": {
+      "source": "scripts/checks/check-test-evidence.py",
+      "behavior": "Require evidence for newly expanded explicit-ID and literal-auto-ID parameter rows"
+    },
+    "orchestrator/tests/test_test_evidence.py::test_growth_counts_each_added_stacked_parameter_combination": {
+      "source": "scripts/checks/check-test-evidence.py",
+      "behavior": "Require evidence for each added Cartesian combination of stacked parametrization"
+    },
+    "orchestrator/tests/test_test_evidence.py::test_growth_does_not_count_parameter_reordering_as_new_evidence": {
+      "source": "scripts/checks/check-test-evidence.py",
+      "behavior": "Treat row reordering without new selectors as unchanged test evidence"
+    },
+    "orchestrator/tests/test_test_evidence.py::test_growth_does_not_require_mapping_unchanged_or_removed_tests": {
+      "source": "scripts/checks/check-test-evidence.py",
+      "behavior": "Require growth evidence only for added rather than unchanged or removed tests"
+    },
+    "orchestrator/tests/test_test_evidence.py::test_growth_includes_async_tests_and_class_methods": {
+      "source": "scripts/checks/check-test-evidence.py",
+      "behavior": "Collect added async functions and test-class methods for evidence enforcement"
+    },
+    "orchestrator/tests/test_test_evidence.py::test_growth_includes_async_tests_and_class_methods[async def test_async():\\n    assert await probe(2) == 4\\n-test_async]": {
+      "source": "scripts/checks/check-test-evidence.py",
+      "behavior": "Collect added async functions and test-class methods for evidence enforcement"
+    },
+    "orchestrator/tests/test_test_evidence.py::test_growth_includes_async_tests_and_class_methods[class TestProbe:\\n    def test_value(self):\\n        assert probe(2) == 4\\n-TestProbe::test_value]": {
+      "source": "scripts/checks/check-test-evidence.py",
+      "behavior": "Collect added async functions and test-class methods for evidence enforcement"
+    },
+    "orchestrator/tests/test_test_evidence.py::test_growth_refuses_each_unmapped_file_or_case": {
+      "source": "scripts/checks/check-test-evidence.py",
+      "behavior": "Reject each missing added-file or added-function evidence entry with an actionable selector"
+    },
+    "orchestrator/tests/test_test_evidence.py::test_growth_refuses_each_unmapped_file_or_case[orchestrator/tests/test_probe.py::test_probe]": {
+      "source": "scripts/checks/check-test-evidence.py",
+      "behavior": "Reject each missing added-file or added-function evidence entry with an actionable selector"
+    },
+    "orchestrator/tests/test_test_evidence.py::test_growth_refuses_each_unmapped_file_or_case[orchestrator/tests/test_probe.py]": {
+      "source": "scripts/checks/check-test-evidence.py",
+      "behavior": "Reject each missing added-file or added-function evidence entry with an actionable selector"
+    },
+    "orchestrator/tests/test_test_evidence.py::test_growth_refuses_mapping_to_unchanged_source": {
+      "source": "scripts/checks/check-test-evidence.py",
+      "behavior": "Reject evidence referencing source unchanged against the comparison base"
+    },
+    "orchestrator/tests/test_test_evidence.py::test_growth_refuses_missing_or_malformed_behavior_evidence": {
+      "source": "scripts/checks/check-test-evidence.py",
+      "behavior": "Fail closed on unsupported schema, malformed mappings, missing behavior or blank behavior"
+    },
+    "orchestrator/tests/test_test_evidence.py::test_growth_refuses_missing_or_malformed_behavior_evidence[mapping0]": {
+      "source": "scripts/checks/check-test-evidence.py",
+      "behavior": "Fail closed on unsupported schema, malformed mappings, missing behavior or blank behavior"
+    },
+    "orchestrator/tests/test_test_evidence.py::test_growth_refuses_missing_or_malformed_behavior_evidence[mapping1]": {
+      "source": "scripts/checks/check-test-evidence.py",
+      "behavior": "Fail closed on unsupported schema, malformed mappings, missing behavior or blank behavior"
+    },
+    "orchestrator/tests/test_test_evidence.py::test_growth_refuses_missing_or_malformed_behavior_evidence[mapping2]": {
+      "source": "scripts/checks/check-test-evidence.py",
+      "behavior": "Fail closed on unsupported schema, malformed mappings, missing behavior or blank behavior"
+    },
+    "orchestrator/tests/test_test_evidence.py::test_growth_refuses_missing_or_malformed_behavior_evidence[mapping3]": {
+      "source": "scripts/checks/check-test-evidence.py",
+      "behavior": "Fail closed on unsupported schema, malformed mappings, missing behavior or blank behavior"
+    },
+    "orchestrator/tests/test_test_evidence.py::test_growth_refuses_untracked_behavior_map": {
+      "source": "scripts/checks/check-test-evidence.py",
+      "behavior": "Require the machine-readable evidence map to be tracked by git"
+    },
+    "orchestrator/tests/test_test_evidence.py::test_growth_requires_only_added_case_in_existing_file": {
+      "source": "scripts/checks/check-test-evidence.py",
+      "behavior": "Require added-function evidence without remapping an existing file or unchanged function"
+    }
+  }
+}
