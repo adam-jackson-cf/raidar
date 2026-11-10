@@ -27,5 +27,13 @@ jobs:
         run: |
           env -u AGENT uv sync --project orchestrator --all-extras --frozen --python 3.13.7
 
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Install locked formatter
+        run: npm ci --ignore-scripts
+
       - name: Run repository CI gate
         run: env -u AGENT uv run --project orchestrator --extra dev python scripts/checks/run-repository-gate.py ci

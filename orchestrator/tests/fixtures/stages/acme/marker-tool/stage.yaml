@@ -1,8 +1,8 @@
 contract: stage/1
 name: marker-tool
 summary: A tool whose import writes a marker, proving the host never imports authored code.
-requires: {setup: setup/1}
+requires: { setup: setup/1 }
 tool:
   project: tool
-  commands: {marker-tool: [python, -I, -B, -m, marker_tool]}
-setup: {run: [marker-tool, setup]}
+  commands: { marker-tool: [python, -I, -B, -m, marker_tool] }
+setup: { run: [marker-tool, setup] }

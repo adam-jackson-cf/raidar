@@ -31,8 +31,11 @@ title: Canonical fault category
 category: Behavioral | Integration | Recovery | Structural | Process | Measurement
 owner: raidar:<area> | subject:<repo>
 status: open
-evidence: [var/jobs/<group>/<experiment>/<job>/...:line]   # relative paths, `:line[-line]` optional
-configurations: ["experiment/job, arm (arm digest), checkpoints, agent+version, model, effort, measured result"]
+evidence: [var/jobs/<group>/<experiment>/<job>/...:line] # relative paths, `:line[-line]` optional
+configurations:
+  [
+    "experiment/job, arm (arm digest), checkpoints, agent+version, model, effort, measured result",
+  ]
 impact: consequence for the headline outcome and cumulative work
 hypothesis: suspected cause, labelled [HYPOTHESIS]
 criterion: measurable condition set before targeting, or null
@@ -40,8 +43,9 @@ target: experiment id or null
 solution: intervention or null
 validation: artifact and measurement or null
 status_history:
-  - {status: open, date: YYYY-MM-DD, evidence: [path], reason: why}
+  - { status: open, date: YYYY-MM-DD, evidence: [path], reason: why }
 ---
+
 Description and detection signal (an observable pattern later jobs can evaluate).
 ```
 
@@ -66,7 +70,8 @@ rationale: why it should move the fault's signal
 proof_plan: experiment that would decide it
 experiment: lab/experiments/.../experiment.yaml or the lock path, or null
 status: proposed
-status_history: [{status: proposed, date: YYYY-MM-DD, evidence: [], reason: why}]
+status_history:
+  [{ status: proposed, date: YYYY-MM-DD, evidence: [], reason: why }]
 outcome: result or null
 ---
 ```
@@ -77,26 +82,26 @@ fault to `targeted` only when a locked experiment names it.
 
 ## Categories
 
-| Category | Meaning |
-|---|---|
-| Behavioral | the agent's program does the wrong thing |
-| Integration | the program fails at a boundary (CLI contract, dependencies, environment) |
-| Recovery | the agent fails to repair a failure it could observe |
-| Structural | the change damages earlier behaviour or code structure (regressions, erosion) |
-| Process | the agent's process, or the workflow's delivery of it, deviates from what the arm intends |
+| Category    | Meaning                                                                                                                                                  |
+| ----------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Behavioral  | the agent's program does the wrong thing                                                                                                                 |
+| Integration | the program fails at a boundary (CLI contract, dependencies, environment)                                                                                |
+| Recovery    | the agent fails to repair a failure it could observe                                                                                                     |
+| Structural  | the change damages earlier behaviour or code structure (regressions, erosion)                                                                            |
+| Process     | the agent's process, or the workflow's delivery of it, deviates from what the arm intends                                                                |
 | Measurement | the verifier, the problem or the harness measures something other than the intended construct; the owner is outside the agent and workflow release space |
 
 ## Status lifecycle
 
-| Status | Meaning |
-|---|---|
-| `open` | Observed and evidenced; no intervention selected. |
-| `targeted` | A locked experiment explicitly targets the fault. |
-| `mitigated` | An intervention improved the signal without meeting the full criterion. |
-| `resolved` | The pre-registered criterion passed and the solution is recorded. |
-| `reopened` | A later job reproduced a resolved fault. |
-| `not-reproducible` | A controlled follow-up could not reproduce it. |
-| `routed` | A Measurement fault handed to its owner (verifier, problem, harness, analysis). |
+| Status             | Meaning                                                                         |
+| ------------------ | ------------------------------------------------------------------------------- |
+| `open`             | Observed and evidenced; no intervention selected.                               |
+| `targeted`         | A locked experiment explicitly targets the fault.                               |
+| `mitigated`        | An intervention improved the signal without meeting the full criterion.         |
+| `resolved`         | The pre-registered criterion passed and the solution is recorded.               |
+| `reopened`         | A later job reproduced a resolved fault.                                        |
+| `not-reproducible` | A controlled follow-up could not reproduce it.                                  |
+| `routed`           | A Measurement fault handed to its owner (verifier, problem, harness, analysis). |
 
 ```text
 open → targeted → mitigated → resolved

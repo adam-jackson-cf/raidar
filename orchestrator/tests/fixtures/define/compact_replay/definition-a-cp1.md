@@ -11,6 +11,7 @@ Build `tally.py`, a Python 3.12 standard-library command-line tool that reads a 
 Outcome: Users invoke the local Python command to summarize transactions without third-party runtime dependencies, network access, or clock access.
 
 Acceptance criteria:
+
 - F1.AC1: The Python 3.12 command accepts the report operation and a CSV path, with an optional top limit.
   Source: "Build a command-line tool, written in Python 3.12 using only the standard library, that summarises a CSV file of transactions by category."
   Source: "You run it as:"
@@ -31,6 +32,7 @@ Acceptance criteria:
 Outcome: The command consumes the promised UTF-8 CSV layout and treats dates as uninterpreted transaction fields.
 
 Acceptance criteria:
+
 - F2.AC1: Read UTF-8 rows after the first-line header in date, category, amount order, using the issue's unquoted-field input contract.
   Source: "FILE is UTF-8."
   Source: "The first line is always the header `date,category,amount`, and it is line 1."
@@ -50,11 +52,12 @@ Acceptance criteria:
 Outcome: The command accepts the stated decimal amount grammar and preserves exact values when summing transactions.
 
 Acceptance criteria:
+
 - F3.AC1: Accept amounts consisting of one or more digits and optionally a decimal point followed by one or two digits, including leading zeros; reject the stated invalid forms.
   Source: "`amount` is valid when it is one or more digits, optionally followed by a point and then one or two digits."
   Source: "So `4.5`, `12.00`, `800` and `007.5` are valid (leading zeros are allowed and `007.5` is the number 7.5), while `1.234`, `abc`, `-3`, `.5`, `4.` and an amount with spaces around it are invalid."
   Aspect: `python tally.py report FILE` reads a transaction with `amount` text `4.5`, `12.00`, `800`, or `007.5` -> the command exits with code `0`
-  Aspect: `python tally.py report FILE` reads a transaction with `amount` text `1.234`, `abc`, `-3`, `.5`, `4.`, or ` 4.5 ` -> the command exits with code `1`
+  Aspect: `python tally.py report FILE` reads a transaction with `amount` text `1.234`, `abc`, `-3`, `.5`, `4.`, or `4.5` -> the command exits with code `1`
   Example: one `food` transaction with amount `4.5` -> `food: 4.50\n`
   Example: one `food` transaction with amount `12.00` -> `food: 12.00\n`
   Example: one `food` transaction with amount `800` -> `food: 800.00\n`
@@ -73,6 +76,7 @@ Acceptance criteria:
 Outcome: Successful reports preserve category names, print two-decimal totals in UTF-8, and rank categories by decreasing total with deterministic name ordering for ties.
 
 Acceptance criteria:
+
 - F4.AC1: Aggregate transactions by the exact category text, preserving case and spaces.
   Source: "Group the transactions by category and sum the amounts of each category."
   Source: "A category name is used exactly as written: it is case-sensitive, and spaces are part of the name, so `food` and ` food` (leading space) are two different categories, and a space is printed as written."
@@ -110,6 +114,7 @@ Acceptance criteria:
 Outcome: The optional limit defaults to three, uses only its final occurrence, and rejects invalid final limits before file access.
 
 Acceptance criteria:
+
 - F5.AC1: The option is supplied as two separate words, and only the last occurrence is used and validated.
   Source: "`--top` is optional and is written as two separate words, `--top` then `N`."
   Source: "If `--top` is given more than once, only the last one is used (and only that one is checked)."
@@ -147,6 +152,7 @@ Acceptance criteria:
 Outcome: Read failures and the first invalid amount produce deterministic stderr errors, exit code one, and no partial stdout.
 
 Acceptance criteria:
+
 - F6.AC1: For a file that cannot be read, preserve the supplied path in the error and emit no report.
   Source: "If FILE cannot be read (it does not exist, or it is a directory, or anything else prevents reading it), print `error: cannot read <FILE>` to standard error, with `<FILE>` exactly as given on the command line."
   Source: "Print nothing to standard output and exit with code `1`."
@@ -160,7 +166,7 @@ Acceptance criteria:
 - F6.AC2: Stop at the first invalid amount, reporting its one-based file line number and exact amount text; emit no report even after valid preceding rows.
   Source: "If any row has an invalid amount, print `error: line <n>: invalid amount '<value>'` to standard error, where `<n>` is the 1-based line number in the file of the first such row (the header is line 1) and `<value>` is the amount text exactly as written."
   Source: "Print nothing at all to standard output, even if earlier rows were fine, and exit with code `1`."
-  Aspect: `python tally.py report FILE` reads a header on line `1`, a valid row on line `2`, invalid amount ` 4.5 ` on line `3`, and another invalid row on line `4` -> stderr is `error: line 3: invalid amount ' 4.5 '\n`
+  Aspect: `python tally.py report FILE` reads a header on line `1`, a valid row on line `2`, invalid amount `4.5` on line `3`, and another invalid row on line `4` -> stderr is `error: line 3: invalid amount ' 4.5 '\n`
   Aspect: `python tally.py report FILE` reads an invalid amount `abc` immediately after the header -> stderr is `error: line 2: invalid amount 'abc'\n`
   Aspect: `python tally.py report FILE` reads valid rows followed by an invalid amount -> stdout is empty
   Aspect: `python tally.py report FILE` reads any invalid amount -> the command exits with code `1`
@@ -172,6 +178,7 @@ Acceptance criteria:
 Outcome: A header-only file yields a successful no-data message.
 
 Acceptance criteria:
+
 - F7.AC1: A file containing only the header prints the newline-terminated no-data message and succeeds.
   Source: "If FILE contains only the header line, print `no data` followed by a newline to standard output and exit with code `0`."
   Source: "Nothing else is written to standard output, and standard error stays empty."
@@ -186,6 +193,7 @@ Acceptance criteria:
 Outcome: The issue's sample produces exactly its stated three-line report.
 
 Acceptance criteria:
+
 - F8.AC1: Report the supplied sample with the stated totals, tie ordering, and default truncation.
   Source: "Given `sample.csv`:"
   Source: "Running `report sample.csv` prints (exit code `0`):"

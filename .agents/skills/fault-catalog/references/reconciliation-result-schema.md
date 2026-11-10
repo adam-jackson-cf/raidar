@@ -12,17 +12,17 @@ summarise the experiment or control job execution.
 One entry in `reconciled_faults` per failure mode reconciled to an existing or
 new record, including a `no change` decision:
 
-| Field | Required value |
-|---|---|
-| `canonical_id` | The record ID, such as `FCR-003`. |
-| `exact_fault_type` | The record's exact canonical wording. |
-| `category` | The record's category. |
-| `owner` | The record's owner (agent release, workflow release, verifier, problem, harness, analysis). |
-| `status` | The record's status after reconciliation. |
-| `affected` | A list of `{experiment, job, arm, model, reasoning_effort, checkpoints}`. |
-| `concise_measured_evidence` | A short measured statement with its per-arm denominators. |
-| `record_link` | The repository-relative path (with anchor) of the record. |
-| `changed_record_ids` | Every record created or changed; `[]` for no change. |
+| Field                       | Required value                                                                              |
+| --------------------------- | ------------------------------------------------------------------------------------------- |
+| `canonical_id`              | The record ID, such as `FCR-003`.                                                           |
+| `exact_fault_type`          | The record's exact canonical wording.                                                       |
+| `category`                  | The record's category.                                                                      |
+| `owner`                     | The record's owner (agent release, workflow release, verifier, problem, harness, analysis). |
+| `status`                    | The record's status after reconciliation.                                                   |
+| `affected`                  | A list of `{experiment, job, arm, model, reasoning_effort, checkpoints}`.                   |
+| `concise_measured_evidence` | A short measured statement with its per-arm denominators.                                   |
+| `record_link`               | The repository-relative path (with anchor) of the record.                                   |
+| `changed_record_ids`        | Every record created or changed; `[]` for no change.                                        |
 
 Candidates whose distinctness stays unresolved go only in the optional
 `unresolved_candidates` collection, each with `candidate_evidence`,

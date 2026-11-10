@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented in this file.
 
+## Unreleased
+
+- ci: enforce installer/metadata parity, locked Prettier 3.6.2 checks outside
+  consent-excluded and frozen paths, and strict locked dependency audits.
+- build(deps): update identity-neutral vulnerable dependencies; retain
+  finding-specific security and formatting debt for identity-bound changes.
+
 ## 1.0.1 - 2026-11-09
 
 - ci: guard execution identities with `.omp/identity.json` and explicit `identity-check` /
@@ -850,7 +857,7 @@ All notable changes to this project are documented in this file.
 - fix(review-surface): static path prefix check, var/tmp projection default, drop dead StatBlock field
 - fix(analysis): refuse arms with no shared attempt instead of IndexError; job layout constants
 - fix(ledger): match ids with fullmatch; require an existing --root
-- fix(gate-effort): emit new_* gaps for a reached step without a gate record; drop dead scorer code
+- fix(gate-effort): emit new\_\* gaps for a reached step without a gate record; drop dead scorer code
 - fix(targets): validate target names/hosts, no leaked tunnel on context failure, private state dir
 
 ### Documentation
@@ -872,7 +879,7 @@ All notable changes to this project are documented in this file.
 
 ### Refactoring
 
-- refactor: split fan-out and complexity offenders (assess job lookup into analysis.sources, sandbox _run, check_l2, PhaseMonitor host)
+- refactor: split fan-out and complexity offenders (assess job lookup into analysis.sources, sandbox \_run, check_l2, PhaseMonitor host)
 - refactor(components): one provision lister, shared ANY_RUNTIME, drop unused missing_secrets
 - refactor(cli): public load_cli_experiment instead of a cross-module private
 - refactor(spec): import ANY_RUNTIME from core.runtimes

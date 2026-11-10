@@ -9,7 +9,7 @@ description: "Use when authoring or revising a Raidar experiment's arms, problem
 
 - Read the existing experiment before editing; use experiment-init only for a brand-new path.
 - Choose explore unless the user explicitly requests confirm; smoke is operational health, neither objective.
-- Use schema_version: 3 and one experiment.yaml at lab/experiments/<kind>/<runtime>__<subject>__<intent>/.
+- Use schema_version: 3 and one experiment.yaml at lab/experiments/<kind>/<runtime>**<subject>**<intent>/.
 - Declare one runtime, pinned problems, agents (release, model, reasoning), protocol, arms, assessment and analysis.
   An arm is an agent release plus a workflow release (`workflow: <name>@N`, default one-shot@1).
   Agent releases are lab/agents/<name>.yaml and workflows are lab/workflows/<name>/workflow.yaml,

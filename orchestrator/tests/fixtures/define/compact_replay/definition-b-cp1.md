@@ -11,6 +11,7 @@ Build `tally.py`, a Python 3.12 standard-library command-line tool that reads a 
 Outcome: Users run a local Python command to summarise transactions without external dependencies, network access, or clock access.
 
 Acceptance criteria:
+
 - F1.AC1: Provide the Python 3.12 standard-library entry point `python tally.py report FILE [--top N]` for reporting a transaction CSV by category.
   Source: "Build a command-line tool, written in Python 3.12 using only the standard library, that summarises a CSV file of transactions by category."
   Source: "You run it as:"
@@ -31,6 +32,7 @@ Acceptance criteria:
 Outcome: The command reads the specified UTF-8 transaction file under the issue's format guarantees and interprets valid amounts exactly.
 
 Acceptance criteria:
+
 - F2.AC1: Treat FILE as a UTF-8 CSV path whose first line is the header and whose remaining lines contain date, category, and amount in that order; do not validate dates.
   Source: "`FILE` is the path of a CSV file."
   Source: "FILE is UTF-8."
@@ -49,7 +51,7 @@ Acceptance criteria:
   Aspect: `python tally.py report FILE` reads a `food` transaction with amount `12.00` -> stdout is `food: 12.00\n`
   Aspect: `python tally.py report FILE` reads a `food` transaction with amount `800` -> stdout is `food: 800.00\n`
   Aspect: `python tally.py report FILE` reads a `food` transaction with amount `007.5` -> stdout is `food: 7.50\n`
-  Aspect: `python tally.py report FILE` reads a transaction with any of `1.234`, `abc`, `-3`, `.5`, `4.`, or ` 4.5 ` as amount -> the command exits with code `1`
+  Aspect: `python tally.py report FILE` reads a transaction with any of `1.234`, `abc`, `-3`, `.5`, `4.`, or `4.5` as amount -> the command exits with code `1`
   Example: one `food` transaction with amount `4.5` -> stdout `food: 4.50\n`
   Example: one `food` transaction with amount `12.00` -> stdout `food: 12.00\n`
   Example: one `food` transaction with amount `800` -> stdout `food: 800.00\n`
@@ -72,6 +74,7 @@ Acceptance criteria:
 Outcome: Output contains only category totals, preserves category text, and uses UTF-8 and two fractional digits.
 
 Acceptance criteria:
+
 - F3.AC1: Sum transactions by their exact case-sensitive category names, preserving spaces in names and output.
   Source: "Group the transactions by category and sum the amounts of each category."
   Source: "A category name is used exactly as written: it is case-sensitive, and spaces are part of the name, so `food` and ` food` (leading space) are two different categories, and a space is printed as written."
@@ -101,6 +104,7 @@ Acceptance criteria:
 Outcome: Categories appear by descending total with deterministic ascending code-point ties.
 
 Acceptance criteria:
+
 - F4.AC1: Sort totals highest first and equal-total category names by plain ascending string comparison.
   Source: "Order the lines by total, highest first."
   Source: "Categories with equal totals are ordered by category name in ascending code-point order (plain string comparison, so `a` comes before `b`, and `B` before `a`)."
@@ -114,6 +118,7 @@ Acceptance criteria:
 Outcome: Users select up to ten ordered category lines; omission selects three, repeated options use only the final value, and invalid final values fail before file access.
 
 Acceptance criteria:
+
 - F5.AC1: Support an optional two-word `--top N` option, not a joined spelling.
   Source: "`--top` is optional and is written as two separate words, `--top` then `N`."
   Aspect: `python tally.py report FILE` uses the optional `--top N` as separate words `--top` then `N`, with `N` equal to `1` and a nonempty valid CSV -> stdout contains exactly `1` category line
@@ -133,7 +138,7 @@ Acceptance criteria:
   Source: "`N` must consist only of the digits `0` to `9` and have a value from `1` to `10` inclusive."
   Aspect: `python tally.py report FILE --top N` uses `N` consisting only of digits `0` to `9` with numeric value `1`, `9`, or `10` on a valid CSV -> the command exits with code `0`
   Aspect: `python tally.py report FILE --top N` uses `01` on a valid CSV -> stdout contains the first `1` ordered category line
-  Aspect: `python tally.py report FILE --top N` uses any of `0`, `11`, `-1`, `+1`, `1.0`, ` 1 `, an empty argument, or non-ASCII digits -> the command exits with code `2`
+  Aspect: `python tally.py report FILE --top N` uses any of `0`, `11`, `-1`, `+1`, `1.0`, `1`, an empty argument, or non-ASCII digits -> the command exits with code `2`
   Example: `--top 1` -> selected line limit `1`
   Example: `--top 10` -> selected line limit `10`
   Example: `--top 0` -> exit code `2`
@@ -162,6 +167,7 @@ Acceptance criteria:
 Outcome: File-read failures and the first invalid amount produce precise stderr diagnostics and status 1 without any partial stdout.
 
 Acceptance criteria:
+
 - F6.AC1: Any inability to read FILE produces its exact command-line spelling in the error, no stdout, and exit code 1.
   Source: "If FILE cannot be read (it does not exist, or it is a directory, or anything else prevents reading it), print `error: cannot read <FILE>` to standard error, with `<FILE>` exactly as given on the command line."
   Source: "Print nothing to standard output and exit with code `1`."
@@ -175,7 +181,7 @@ Acceptance criteria:
 - F6.AC2: Report only the first invalid amount using its original text and its physical 1-based line number, counting the header as line 1; exit 1 with no stdout even after earlier valid rows.
   Source: "If any row has an invalid amount, print `error: line <n>: invalid amount '<value>'` to standard error, where `<n>` is the 1-based line number in the file of the first such row (the header is line 1) and `<value>` is the amount text exactly as written."
   Source: "Print nothing at all to standard output, even if earlier rows were fine, and exit with code `1`."
-  Aspect: `python tally.py report FILE` reads header line `1`, one valid row on line `2`, ` 4.5 ` on line `3`, and `abc` on line `4` -> stderr is `error: line 3: invalid amount ' 4.5 '\n`, instantiating `error: line <n>: invalid amount '<value>'` with `<n>` equal to `3` and `<value>` equal to ` 4.5 `
+  Aspect: `python tally.py report FILE` reads header line `1`, one valid row on line `2`, `4.5` on line `3`, and `abc` on line `4` -> stderr is `error: line 3: invalid amount ' 4.5 '\n`, instantiating `error: line <n>: invalid amount '<value>'` with `<n>` equal to `3` and `<value>` equal to `4.5`
   Aspect: `python tally.py report FILE` reads valid transactions followed by an invalid amount -> stdout is empty
   Aspect: `python tally.py report FILE` reads valid transactions followed by an invalid amount -> the command exits with code `1`
   Aspect: `python tally.py report FILE --top 1` reads more than one category followed by an invalid amount beyond the prospective output limit -> stderr reports the invalid row using `error: line <n>: invalid amount '<value>'`
@@ -187,6 +193,7 @@ Acceptance criteria:
 Outcome: A header-only CSV reports no data successfully.
 
 Acceptance criteria:
+
 - F7.AC1: A file containing only the header prints no data plus a newline and exits successfully.
   Source: "If FILE contains only the header line, print `no data` followed by a newline to standard output and exit with code `0`."
   Source: "Nothing else is written to standard output, and standard error stays empty."
@@ -202,6 +209,7 @@ Acceptance criteria:
 Outcome: The provided sample produces exactly the specified three lines, demonstrating grouping, sorting, ties, and the default limit together.
 
 Acceptance criteria:
+
 - F8.AC1: The supplied sample CSV yields the exact worked report and exit code 0.
   Source: "Given `sample.csv`:"
   Source: "date,category,amount"

@@ -41,14 +41,14 @@ Unknown keys are refused at every level. The top-level keys are exactly `contrac
 contract: stage/1
 name: review-notes
 summary: Check and refine a locally written review note.
-requires: {setup: setup/1, gate: gate/1, stop: stop/1, outputs: outputs/1}
-params: {strict: true}
+requires: { setup: setup/1, gate: gate/1, stop: stop/1, outputs: outputs/1 }
+params: { strict: true }
 tokens: [GUIDANCE]
-inputs: {}                         # local name -> {from: earlier-package.output, contract: criteria/1}
+inputs: {} # local name -> {from: earlier-package.output, contract: criteria/1}
 tool:
   project: tool
-  commands: {review-notes: [python, -I, -B, -m, review_notes]}
-setup: {run: [review-notes, setup], timeout_s: 60}
+  commands: { review-notes: [python, -I, -B, -m, review_notes] }
+setup: { run: [review-notes, setup], timeout_s: 60 }
 gate:
   - name: note-ready
     run: [review-notes, check]
@@ -61,7 +61,7 @@ on_stop:
   timeout_s: 60
   max_rounds: 3
 outputs:
-  note: {path: /app/.raidar/review-notes/note.md}
+  note: { path: /app/.raidar/review-notes/note.md }
 skills: []
 ```
 
@@ -100,7 +100,7 @@ most 300 seconds.
 `on_stop` accepts `run`, `watch`, `timeout_s`, `max_rounds`; the latter defaults to zero and is in 0–5. It runs after each agent turn once leftover agent processes have been reaped. It prints exactly this strict JSON object:
 
 ```json
-{"status":"done","message":"","tokens":{},"carry":{}}
+{ "status": "done", "message": "", "tokens": {}, "carry": {} }
 ```
 
 All four fields are required. `status` is `done`, `resume` or `closed`; `message` is a string; `tokens` maps declared names to strings; `carry` is a JSON object. `resume` needs a nonempty message. Carry is passed unchanged in the next call's context, not automatically inserted into a prompt. `done` requires all declared outputs. `closed` is terminal: a root-owned flag cannot be reopened. A resume beyond the round bound closes instead. One malformed/unusable repair is allowed per package per checkpoint, then closed. The first requested resume in workflow order wins, always resuming the same primary session. Gate fixes, repairs and rework obey the equal checkpoint deadline and the fit rule; a cut records `deadline` and grades what the agent left.
@@ -121,15 +121,15 @@ Every call is recorded host-side with package/primitive identity, argv, user, en
 
 Before the agent starts, the package's known-good `done` fixture runs inside the same container. Its stdout and output digests must match the passing `stage-check` record for the exact package, pack recipe and primitive identities. A failing or changed canary invalidates the trial. A gate's passing setup check on the starting workspace is its canary.
 
-| Condition | Attribution and action |
-|---|---|
-| Setup or initial canary fails | Instrument failure; trial invalid |
-| Valid result and owed outputs present | Agent outcome as reported |
-| Watched state outside Raidar bounds | Agent outcome; one repair then closed; tool not called |
-| Junk/schema error, stdout overflow, crash, signal, timeout or missing done output; canary passes and installed tool unchanged | Agent outcome; one repair then closed |
-| Failed call and failed canary, resources above recorded floors | Instrument failure; trial invalid |
-| Same, but agent-writable disk or memory below its floor | Agent outcome `environment_exhausted`; one repair then closed |
-| Changed tool tree, missing call record or failed container exec | Integrity failure; trial invalid |
+| Condition                                                                                                                     | Attribution and action                                        |
+| ----------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------- |
+| Setup or initial canary fails                                                                                                 | Instrument failure; trial invalid                             |
+| Valid result and owed outputs present                                                                                         | Agent outcome as reported                                     |
+| Watched state outside Raidar bounds                                                                                           | Agent outcome; one repair then closed; tool not called        |
+| Junk/schema error, stdout overflow, crash, signal, timeout or missing done output; canary passes and installed tool unchanged | Agent outcome; one repair then closed                         |
+| Failed call and failed canary, resources above recorded floors                                                                | Instrument failure; trial invalid                             |
+| Same, but agent-writable disk or memory below its floor                                                                       | Agent outcome `environment_exhausted`; one repair then closed |
+| Changed tool tree, missing call record or failed container exec                                                               | Integrity failure; trial invalid                              |
 
 Before following or opening watched files, Raidar rejects symlinks, FIFOs, devices and other nonregular files. Caps: 64 MiB of regular-file bytes, 10,000 files, depth 32. The bounded state manifest/snapshot is retained for replay. An agent's test that exits 126 or exceeds its timeout after a passing gate canary is an agent outcome, never `gate_error` invalidity.
 

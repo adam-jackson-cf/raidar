@@ -11,6 +11,7 @@ Extend the existing Python `tally.py report` command with text/JSON selection, a
 Outcome: The existing report entry point accepts the extended separate-word options in any order while retaining accepted part 1 behavior.
 
 Acceptance criteria:
+
 - F1.AC1: The report command accepts FILE followed by any ordering of the optional top, format and date arguments, each with a separate value word.
   Source: "Extend the `report` command from part 1."
   Source: "The full usage is now:"
@@ -29,6 +30,7 @@ Acceptance criteria:
 Outcome: The accepted category limit remains available, and every supported option uses and validates only its final occurrence.
 
 Acceptance criteria:
+
 - F2.AC1: For top, format and since independently, a repeated option uses only its last value; an earlier invalid value has no effect.
   Source: "As with `--top`, if any option is given more than once, only its last value is used (and only that one is checked)."
   Aspect: `report FILE --top abc --top 2` reads three distinct categories -> stdout contains exactly `2` category lines
@@ -45,6 +47,7 @@ Acceptance criteria:
 Outcome: Reports default to the accepted text output, or render deterministic UTF-8 JSON with exact two-decimal string totals.
 
 Acceptance criteria:
+
 - F3.AC1: Omitted format and explicit text produce identical part 1 text output.
   Source: "The default is `text`, which is the part 1 output; `--format text` given explicitly behaves identically."
   Aspect: `report FILE` reads populated CSV with TALLY_TOP absent -> stdout equals the accepted `text` report bytes
@@ -94,6 +97,7 @@ Acceptance criteria:
 Outcome: An inclusive validated calendar-date cutoff filters rows before aggregation, while all row amounts remain subject to the accepted validation.
 
 Acceptance criteria:
+
 - F4.AC1: Since includes dates equal to or after the cutoff and excludes earlier dates using YYYY-MM-DD string comparison.
   Source: "`--since DATE` keeps only the rows whose date is on or after DATE."
   Source: "The comparison is inclusive: a row dated exactly DATE is kept."
@@ -134,6 +138,7 @@ Acceptance criteria:
 Outcome: A nonempty environment value supplies the existing top limit only when the command line omits top; explicit top always takes precedence.
 
 Acceptance criteria:
+
 - F5.AC1: Without explicit top, a nonempty environment value uses the accepted digits-only top validation and range 1 through 10.
   Source: "The environment variable `TALLY_TOP` sets the default for `--top`:"
   Source: "If `--top` is not given and `TALLY_TOP` is set to a non-empty value, that value is used as N, and it must be valid by the same rule as `--top` (only digits, value 1 to 10)."
@@ -168,6 +173,7 @@ Acceptance criteria:
 Outcome: Only the first applicable error is reported in the required semantic order, independent of option order, with option checks complete before opening FILE.
 
 Acceptance criteria:
+
 - F6.AC1: Error precedence is resolved top, format, since, unreadable FILE, then invalid amounts; report only the first error.
   Source: "Option errors are reported before FILE is read, and only the first error is reported, in this order: the top value (`--top`, or `TALLY_TOP` when `--top` is absent), then `--format`, then `--since`, then FILE cannot be read, then invalid amounts."
   Source: "For example `--format xml --since nope` reports the `--format` error."
@@ -186,6 +192,7 @@ Acceptance criteria:
 Outcome: The issue's complete sample demonstrates inclusive filtering, aggregation, alphabetical tie-breaking and top truncation together.
 
 Acceptance criteria:
+
 - F7.AC1: The supplied five-row sample and invocation produce the specified two-object JSON line and success status.
   Source: "Given `sample.csv`:"
   Source: "date,category,amount"
@@ -222,4 +229,4 @@ Acceptance criteria:
 - Retain newline-terminated stderr messages, no partial stdout on errors, unreadable-file exit code 1, and first-invalid-amount reporting. Resolve and validate final option values before input opening. (source: rung 1: `tally.py:54`, `tally.py:59`, `tests/test_tally.py:470`, `tests/test_tally.py:526`; rung 2: "Option errors are reported before FILE is read, and only the first error is reported, in this order: the top value (`--top`, or `TALLY_TOP` when `--top` is absent), then `--format`, then `--since`, then FILE cannot be read, then invalid amounts.")
 - Put added pytest cases in root `tests/test_tally_part2.py`, reuse command-line and monitored-entry-point conventions, and use subprocess timeouts of 10 seconds. Environment-specific subprocesses extend the inherited environment and override only relevant keys; baseline cases explicitly remove TALLY_TOP to avoid host contamination. Run all earlier and new tests with changed-line coverage, ruff and strict mypy as required by the gate. (source: rung 1: `tests/test_tally.py:26`, `tests/test_tally.py:37`, `tests/test_tally.py:294`, `AGENTS.md:19`, `AGENTS.md:26`, `.git/hooks/pre-commit:15`.)
 - This intake writes only this definition. No code/test edits, branch, push, commit or gate invocation are part of intake; the builder owns implementation and automated verification. (source: rung 2: "This is a fixture workspace for a benchmark task: there is no branch, no remote
-and no pull request, so do not branch or push anything."; intake's explicit one-file restriction.)
+  and no pull request, so do not branch or push anything."; intake's explicit one-file restriction.)

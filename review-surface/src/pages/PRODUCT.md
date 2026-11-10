@@ -28,28 +28,35 @@ Avoid flows that jump directly to run details without first establishing the bro
 2. Guide the next question. Every view should help users decide what to compare, what changed, what failed, what evidence matters, or what arm hypothesis is worth testing next.
 3. Treat evidence as the source of authority. Aggregate views should lead to detail explains the result.
 4. The ux should be:
-  1. Consistency Through Repetition Is Paramount
-  
-    The same action, object, status, wording, visual semantic, and operation must carry the same meaning across the app. A user should expect the same result when taking or observing the same action throughout the product.
-  2. Visual Language Is a Semantic System
-  
-    Colour, shape, position, density, motion, iconography, and typography are not decoration. They simplify and reinforce meaning: state, priority, category, ownership, affordance, containment, workflow order, and task mode.
-  3. Flow State Comes From Natural Progression
-  
-    The UX should not rely on explanatory copy to make the task understandable. Start from a zoomed-out state that surfaces signals of interest, provide an obvious path to zoom in, reveal supporting detail, and preserve a return path.
-  4. Information Architecture Is a Promise
-  
-    Navigation, object hierarchy, page hierarchy, taxonomy, search, filters, and cross-links must match the user's mental model. A feature that supports a key job but is buried or mislabeled creates an IA contradiction.
-  5. Feature Surface Contracts Govern Screens
-  
-    Every wireframed surface must express a feature contract: purpose, user problem, data, content, actions, states, permissions, errors, dependencies, and evidence gaps.
-  6. Operation Grammar Must Be Predictable
-  
+5. Consistency Through Repetition Is Paramount
+
+   The same action, object, status, wording, visual semantic, and operation must carry the same meaning across the app. A user should expect the same result when taking or observing the same action throughout the product.
+
+6. Visual Language Is a Semantic System
+
+   Colour, shape, position, density, motion, iconography, and typography are not decoration. They simplify and reinforce meaning: state, priority, category, ownership, affordance, containment, workflow order, and task mode.
+
+7. Flow State Comes From Natural Progression
+
+   The UX should not rely on explanatory copy to make the task understandable. Start from a zoomed-out state that surfaces signals of interest, provide an obvious path to zoom in, reveal supporting detail, and preserve a return path.
+
+8. Information Architecture Is a Promise
+
+   Navigation, object hierarchy, page hierarchy, taxonomy, search, filters, and cross-links must match the user's mental model. A feature that supports a key job but is buried or mislabeled creates an IA contradiction.
+
+9. Feature Surface Contracts Govern Screens
+
+   Every wireframed surface must express a feature contract: purpose, user problem, data, content, actions, states, permissions, errors, dependencies, and evidence gaps.
+
+10. Operation Grammar Must Be Predictable
+
     Click, tap, hover, focus, select, open, edit, save, cancel, undo, retry, dismiss, and destructive actions must behave consistently. If one operation has different consequences, the control form must make that unmistakable.
-  7. Consider data sizing impact on Ui
-  
-    UI choices need to be suitable for the amount of data surfaced, labels are no going without interpretation if the label text is too long, navigation links or buttons are no good if we expect high volume of nav items etc.  Understand the data source before selecting an appropriate format.
-5. The dashboard should help users move from "what happened" to "what should we test next".
+
+11. Consider data sizing impact on Ui
+
+    UI choices need to be suitable for the amount of data surfaced, labels are no going without interpretation if the label text is too long, navigation links or buttons are no good if we expect high volume of nav items etc. Understand the data source before selecting an appropriate format.
+
+12. The dashboard should help users move from "what happened" to "what should we test next".
 
 ## Accessibility &amp; Inclusion
 

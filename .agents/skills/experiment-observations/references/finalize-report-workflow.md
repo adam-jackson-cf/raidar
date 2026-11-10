@@ -16,7 +16,6 @@
    however high its case pass rate.
 4. Do not include recommendations or model-selection advice.
 5. Return the concise view using exactly this template:
-
    - `- Cohort: <jobs, lock digest, valid trials per arm, exclusions>.`
    - `- Solved: <a checkpoint is solved only when every graded case, regressions included, passed>.`
    - `- Case pass rate: <passed / graded cases at a checkpoint, averaged over the arm's trials>.`
@@ -24,22 +23,20 @@
 
    `Outcomes`
 
-   | Arm | Valid trials | Mean checkpoints solved | Solve rate | Final solved | Mean C | Headline S | Mean cost (nominal) | Mean agent s |
-   | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-   | `<arm>` | `<n/planned>` | `<mean>` | `<value>` | `<k/n>` | `<value>` | `<value or Unavailable>` | `<USD>` | `<s>` |
+   | Arm     | Valid trials  | Mean checkpoints solved | Solve rate | Final solved | Mean C    | Headline S               | Mean cost (nominal) | Mean agent s |
+   | ------- | ------------- | ----------------------- | ---------- | ------------ | --------- | ------------------------ | ------------------- | ------------ |
+   | `<arm>` | `<n/planned>` | `<mean>`                | `<value>`  | `<k/n>`      | `<value>` | `<value or Unavailable>` | `<USD>`             | `<s>`        |
 
    `Effects (arm vs <baseline arm>)`
 
-   | Metric | View | n | Δ [95% CI] | Verdict |
-   | --- | --- | --- | --- | --- |
+   | Metric     | View     | n         | Δ [95% CI]         | Verdict                        |
+   | ---------- | -------- | --------- | ------------------ | ------------------------------ |
    | `<metric>` | `<view>` | `<pairs>` | `<delta [lo, hi]>` | `<verdict from analysis.json>` |
 
    `Observed fault types`
-
    - `<canonical ID> — <exact fault type> (<category>; <owner>; <status>): <arms/checkpoints>; <measured evidence>; [record](<record link>)`
 
    `Full report`
-
    - `[observations-<NNN>.md](var/analysis/<experiment-id>/observations-<NNN>.md)`
 
 6. Fill every placeholder from Step 1 and Step 2. Write `- None observed.` under
