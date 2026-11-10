@@ -125,6 +125,7 @@ SEAM_SUBPROCESS_WRAPPERS: dict[str, set[str]] = {
     "scripts/checks/check-python-fanout.py": {"_run_git"},
     "scripts/checks/check-python-quality.py": {"_check_baseline"},
     "scripts/checks/check-structure.py": {"repo_paths"},
+    "scripts/checks/check-test-evidence.py": {"_git_bytes"},
     "scripts/checks/check_toolchain_pins.py": {"_registry_resolver_violations"},
     "scripts/release/bump-version.py": {
         "git_output",
@@ -166,7 +167,6 @@ SCRIPT_NAME_ALLOWLIST = {
     "check-structure.py",
     "check-test-hygiene.py",
     "check-repository-paths.py",
-    "check-test-evidence.py",
     "run-repository-gate.py",
     "verify-version-wiring.py",
     "check_toolchain_pins.py",
