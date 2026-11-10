@@ -1,5 +1,17 @@
 {
   "files": {
+    ".omp/baselines/dependency-audit.json": "dependency audit adoption",
+    ".omp/baselines/prettier.json": "maintained prose formatting adoption",
+    ".omp/baselines/toolchain-debt.json": "toolchain parity adoption",
+    "orchestrator/tests/test_toolchain_parity.py": "toolchain parity policy",
+    "package-lock.json": "locked maintenance toolchain",
+    "package.json": "maintenance toolchain",
+    "scripts/checks/check-toolchain-parity.py": "toolchain parity policy",
+    ".omp/baselines/analyzer-scope.json": "analyzer scope adoption",
+    "scripts/checks/check-analyzer-scope.py": "analyzer scope policy",
+    "orchestrator/tests/test_analyzer_scope_ratchet.py": "analyzer baseline ratchet",
+    "orchestrator/tests/test_analyzer_scope_reports.py": "analyzer finding reports",
+    "orchestrator/tests/test_analyzer_scope_rules.py": "analyzer scope rules",
     ".omp/baselines/python-policy.json": "Python policy adoption",
     "orchestrator/tests/test_execution_boundary_rules.py": "Python collaborator boundaries",
     "orchestrator/tests/test_python_policy_rules.py": "Python structural policy",
@@ -1295,6 +1307,10 @@
     "orchestrator/tests/fixtures/stages/acme/note-state/tool/src/note_state/": "orchestrator/tests/fixtures/stages/acme/note-state/tool/src/note_state"
   },
   "test_tiers": {
+    "orchestrator/tests/test_toolchain_parity.py": [],
+    "orchestrator/tests/test_analyzer_scope_ratchet.py": [],
+    "orchestrator/tests/test_analyzer_scope_reports.py": [],
+    "orchestrator/tests/test_analyzer_scope_rules.py": [],
     "orchestrator/tests/test_execution_boundary_rules.py": [],
     "orchestrator/tests/test_python_policy_rules.py": [],
     "orchestrator/tests/test_repository_process_bindings.py": [],
@@ -1782,6 +1798,18 @@
     ]
   },
   "external_callback_names": {
+    "scripts/checks/check-analyzer-scope.py": [
+      "visit_Import",
+      "visit_ImportFrom",
+      "visit_Assign",
+      "visit_AnnAssign",
+      "visit_FunctionDef",
+      "visit_AsyncFunctionDef",
+      "visit_ClassDef",
+      "visit_Call",
+      "visit_Attribute",
+      "visit_Name"
+    ],
     "scripts/checks/check-test-hygiene.py": [
       "visit_Import",
       "visit_ImportFrom",
