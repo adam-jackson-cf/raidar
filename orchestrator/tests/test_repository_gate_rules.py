@@ -4,17 +4,20 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import os
 import re
 import subprocess
 import sys
 from pathlib import Path
+from types import ModuleType
+from typing import NoReturn
 
 import pytest
 
 ROOT = Path(__file__).resolve().parents[2]
 
 
-def _load_script(relative: str, name: str):
+def _load_script(relative: str, name: str) -> ModuleType:
     spec = importlib.util.spec_from_file_location(name, ROOT / relative)
     assert spec is not None
     assert spec.loader is not None
@@ -34,11 +37,11 @@ def _write_gate(root: Path, gate: object) -> None:
     (directory / "gate.json").write_text(json.dumps(gate))
 
 
-def _unexpected_run(*args, **kwargs):
+def _unexpected_run(*args: object, **kwargs: object) -> NoReturn:
     raise AssertionError("This input must not launch a process")
 
 
-def _assert_error_line(capsys) -> None:
+def _assert_error_line(capsys: pytest.CaptureFixture[str]) -> None:
     captured = capsys.readouterr()
     assert captured.out == ""
     assert len(captured.err.splitlines()) == 1
@@ -80,7 +83,7 @@ def test_check_argv_refuses_invalid_configuration(gate: object, check: str) -> N
 @pytest.mark.parametrize("check", ["commit", "ci"])
 @pytest.mark.parametrize("returncode", [0, 17])
 def test_dispatcher_propagates_the_selected_command_exit_code(
-    tmp_path: Path, check: str, returncode: int, capsys
+    tmp_path: Path, check: str, returncode: int, capsys: pytest.CaptureFixture[str]
 ) -> None:
     _write_gate(
         tmp_path,
@@ -91,7 +94,9 @@ def test_dispatcher_propagates_the_selected_command_exit_code(
     )
     calls = []
 
-    def run(command, *, cwd, check):
+    def run(
+        command: list[str], *, cwd: Path, check: bool, env: dict[str, str] | None = None
+    ) -> subprocess.CompletedProcess[str]:
         calls.append((command, cwd, check))
         return subprocess.CompletedProcess(command, returncode)
 
@@ -100,11 +105,55 @@ def test_dispatcher_propagates_the_selected_command_exit_code(
     assert capsys.readouterr() == ("", "")
 
 
+@pytest.mark.parametrize("check", ["commit", "ci"])
+def test_dispatcher_children_locate_repositories_from_their_own_working_directory(
+    tmp_path: Path, check: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _write_gate(
+        tmp_path,
+        {
+            "schemaVersion": 2,
+            "checks": {"commit": ["make", "gate-commit"], "ci": ["make", "gate-ci"]},
+        },
+    )
+    repository_variables = {
+        "GIT_DIR",
+        "GIT_WORK_TREE",
+        "GIT_INDEX_FILE",
+        "GIT_COMMON_DIR",
+        "GIT_OBJECT_DIRECTORY",
+        "GIT_ALTERNATE_OBJECT_DIRECTORIES",
+        "GIT_PREFIX",
+    }
+    for variable in repository_variables:
+        monkeypatch.setenv(variable, f"/invoking-repository/{variable}")
+    for variable in ("PATH", "HOME", "RAIDAR_X"):
+        monkeypatch.setenv(variable, f"/retained/{variable}")
+    expected_environment = {
+        name: value for name, value in os.environ.items() if name not in repository_variables
+    }
+    child_environments: list[dict[str, str] | None] = []
+
+    def run(
+        command: list[str], *, cwd: Path, check: bool, env: dict[str, str] | None = None
+    ) -> subprocess.CompletedProcess[str]:
+        child_environments.append(env)
+        return subprocess.CompletedProcess(command, 0)
+
+    assert dispatcher.main([check], root=tmp_path, run=run) == 0
+    assert len(child_environments) == 1
+    child_environment = child_environments[0]
+    assert child_environment is not None
+    assert child_environment.keys() == expected_environment.keys()
+    for name, value in expected_environment.items():
+        assert child_environment[name] == value, name
+
+
 @pytest.mark.parametrize(
     "configuration", ["missing", "unreadable", "invalid-json", "invalid-schema"]
 )
 def test_dispatcher_reports_configuration_errors_without_launching(
-    tmp_path: Path, configuration: str, capsys
+    tmp_path: Path, configuration: str, capsys: pytest.CaptureFixture[str]
 ) -> None:
     if configuration != "missing":
         directory = tmp_path / ".omp"
@@ -118,10 +167,12 @@ def test_dispatcher_reports_configuration_errors_without_launching(
     _assert_error_line(capsys)
 
 
-def test_dispatcher_reports_launch_errors(tmp_path: Path, capsys) -> None:
+def test_dispatcher_reports_launch_errors(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
     _write_gate(tmp_path, {"schemaVersion": 2, "checks": {"commit": ["missing-tool"]}})
 
-    def run(*args, **kwargs):
+    def run(*args: object, **kwargs: object) -> NoReturn:
         raise OSError("missing executable")
 
     assert dispatcher.main(["commit"], root=tmp_path, run=run) == 2
@@ -129,7 +180,9 @@ def test_dispatcher_reports_launch_errors(tmp_path: Path, capsys) -> None:
 
 
 @pytest.mark.parametrize("argv", [[], ["unknown"], ["commit", "ci"]])
-def test_dispatcher_reports_bad_usage(tmp_path: Path, argv: list[str], capsys) -> None:
+def test_dispatcher_reports_bad_usage(
+    tmp_path: Path, argv: list[str], capsys: pytest.CaptureFixture[str]
+) -> None:
     _write_gate(tmp_path, {"schemaVersion": 2, "checks": {"commit": ["make"]}})
     assert dispatcher.main(argv, root=tmp_path, run=_unexpected_run) == 2
     _assert_error_line(capsys)
@@ -207,7 +260,7 @@ def test_dependency_policy_attributes_import_failures_to_each_source(returncode:
         "contract/src/raidar_contract/probe.py",
     ]
 
-    def run(command, **kwargs):
+    def run(command: list[str], **kwargs: object) -> subprocess.CompletedProcess[str]:
         return subprocess.CompletedProcess(command, returncode)
 
     found = paths.dependency_findings([*sources, "orchestrator/tests/test_probe.py"], run=run)

@@ -3561,66 +3561,6 @@
       "count": 1
     },
     {
-      "path": "orchestrator/tests/test_repository_gate_rules.py",
-      "code": "no-untyped-def",
-      "fingerprint": "1220110a0c2296bff74d9f88e74497023520e51a357b4b38b56ae34131765315",
-      "count": 1
-    },
-    {
-      "path": "orchestrator/tests/test_repository_gate_rules.py",
-      "code": "no-untyped-def",
-      "fingerprint": "145c047aaea60a69ef7a07f35dafe39fe3d887c6a331880962b4a99748b75333",
-      "count": 1
-    },
-    {
-      "path": "orchestrator/tests/test_repository_gate_rules.py",
-      "code": "no-untyped-def",
-      "fingerprint": "34943a6eef298036ff24629b741c53a7c79fb6e302f1958d5460b70f63474778",
-      "count": 1
-    },
-    {
-      "path": "orchestrator/tests/test_repository_gate_rules.py",
-      "code": "no-untyped-def",
-      "fingerprint": "6a9d7d83321a5888a2c1784a9d60538717b1f04a0ea96ed358e896c2fef59adb",
-      "count": 1
-    },
-    {
-      "path": "orchestrator/tests/test_repository_gate_rules.py",
-      "code": "no-untyped-def",
-      "fingerprint": "7844d668e6bcb5ca67de3d5eb6501237a8f650c38a2013f066b2cfcce7104baf",
-      "count": 1
-    },
-    {
-      "path": "orchestrator/tests/test_repository_gate_rules.py",
-      "code": "no-untyped-def",
-      "fingerprint": "7d58e1d04d700bfd37217d1a5049d178555f1f16ed78c87fc0f3723e1bf99199",
-      "count": 1
-    },
-    {
-      "path": "orchestrator/tests/test_repository_gate_rules.py",
-      "code": "no-untyped-def",
-      "fingerprint": "a209bc401f1b6aeaaed8c070847a6f5b25d1c9bb400a0294b2e20c1de8bd593a",
-      "count": 1
-    },
-    {
-      "path": "orchestrator/tests/test_repository_gate_rules.py",
-      "code": "no-untyped-def",
-      "fingerprint": "c5e3287bef95ad46234e78234d76b8abab173bb43a2dc8375be2d31f318661ae",
-      "count": 1
-    },
-    {
-      "path": "orchestrator/tests/test_repository_gate_rules.py",
-      "code": "no-untyped-def",
-      "fingerprint": "d4850dbc335051e57f98c82a1a245ee546d69fab4267eb50da0ae28988873d67",
-      "count": 1
-    },
-    {
-      "path": "orchestrator/tests/test_repository_gate_rules.py",
-      "code": "no-untyped-def",
-      "fingerprint": "d5a9b5fd5f6f417e03babd9ba76aeda5e133c69f572ba8c427b210ad0251e54a",
-      "count": 1
-    },
-    {
       "path": "orchestrator/tests/test_rescore_store_bindings.py",
       "code": "no-any-return",
       "fingerprint": "49332e0d8b9ad7e8524058bbecaade22639ced8f83c4fe2285c125b23144b2b6",
@@ -4542,18 +4482,6 @@
       "path": "scripts/checks/check_toolchain_pins.py",
       "code": "var-annotated",
       "fingerprint": "6f25aa5b4db9ec255d1dd694001c36047e935ea0ab3fc80f31ae95c404321a24",
-      "count": 1
-    },
-    {
-      "path": "scripts/checks/run-repository-gate.py",
-      "code": "no-any-return",
-      "fingerprint": "43e5aeea9b9526c69014b6aece5d720a7bbe160c34419c214cdd492e3c164615",
-      "count": 1
-    },
-    {
-      "path": "scripts/checks/run-repository-gate.py",
-      "code": "no-untyped-def",
-      "fingerprint": "8597c44511c8aa07b984a07d63d924c21ab808c0095eeb67ce874a229c6e6840",
       "count": 1
     }
   ]
