@@ -116,7 +116,7 @@ AGENT_SMOKE_EFFECTIVE_REASONING = $(if $(filter command line environment,$(origi
 	review-surface-quality-data quality-fixture-synthetic \
 	toolchain-pin-check structure-check release-archive \
 	test-fast test-slow test-quality test-docker \
-	quality gate-commit gate-ci identity-check identity-record version-release version-check \
+	quality gate-commit gate-ci identity-check identity-record version-release version-check analyzer-scope-check \
 	ruff-baseline ruff-check ruff-suppressions-check mypy-check mypy-baseline
 
 define require_var
@@ -139,6 +139,7 @@ help:
 	@echo "  make quality                                           Run repo quality gates"
 	@echo "  make gate-commit                                       Whole-tree path policy, identity equality, then make quality (check-only commit hook)"
 	@echo "  make gate-ci                                           Commit gate, slow tier, then quality tier (every push and pull request)"
+	@echo "  make analyzer-scope-check                              Check analyzer I/O boundaries and CODEOWNERS with finding-level debt ratchets"
 	@echo "  make version-release                                   Prepare an on-demand release PR from HEAD at origin/main; refuses no-bump histories"
 	@echo "  make version-check                                     Check CLI, lock and CHANGELOG versions and release-entry history; part of make quality"
 	@echo "  make test-fast                                         Fast test tier (not slow/quality/docker/security/perf) with line and branch coverage floors; part of make quality"
@@ -780,6 +781,15 @@ release-archive:
 	@git tag -a "archive/$(REF)" -m "Archive of $(REF) before an in-place edit" HEAD \
 		&& echo "created tag archive/$(REF) at $$(git rev-parse --short HEAD)"
 
+analyzer-scope-check:
+	@$(REPO_RUNTIME_ENV) uv run --project orchestrator --extra dev \
+		python scripts/checks/check-analyzer-scope.py --format findings-json \
+		> "$(REPO_TMP_DIR)/analyzer-scope-findings.json"
+	@$(REPO_RUNTIME_ENV) uv run --project orchestrator --extra dev \
+		python scripts/checks/check-finding-baseline.py --tool analyzer-scope --format findings-json \
+		--report "$(REPO_TMP_DIR)/analyzer-scope-findings.json" \
+		--baseline .omp/baselines/analyzer-scope.json
+
 gate-commit:
 	@$(REPO_RUNTIME_ENV) uv run --project orchestrator --extra dev \
 		python scripts/checks/check-repository-paths.py
@@ -802,6 +812,7 @@ quality:
 	@$(MAKE) --no-print-directory version-check
 	@$(MAKE) --no-print-directory structure-check
 	@$(MAKE) --no-print-directory test-hygiene-check
+	@$(MAKE) --no-print-directory analyzer-scope-check
 	@$(MAKE) --no-print-directory smoke-dry-run-check
 	@$(MAKE) --no-print-directory releases-check
 	@$(MAKE) --no-print-directory experiment-locks-check
