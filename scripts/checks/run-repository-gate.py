@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import sys
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from pathlib import Path
 
 
@@ -29,7 +30,12 @@ def check_argv(gate: object, check: str) -> list[str]:
     return command
 
 
-def main(argv: Sequence[str], *, root: Path, run=subprocess.run) -> int:
+def main(
+    argv: Sequence[str],
+    *,
+    root: Path,
+    run: Callable[..., subprocess.CompletedProcess[str]] = subprocess.run,
+) -> int:
     try:
         if len(argv) != 1:
             raise GateConfigError("GATE.local-ci-parity: select exactly one of commit or ci")
@@ -42,8 +48,20 @@ def main(argv: Sequence[str], *, root: Path, run=subprocess.run) -> int:
             detail = f"GATE.local-ci-parity: repair .omp/gate.json: {detail}"
         print(detail, file=sys.stderr)
         return 2
+    # Hooks export repository locations that must not leak into checks' scratch repos.
+    environment = os.environ.copy()
+    for variable in (
+        "GIT_DIR",
+        "GIT_WORK_TREE",
+        "GIT_INDEX_FILE",
+        "GIT_COMMON_DIR",
+        "GIT_OBJECT_DIRECTORY",
+        "GIT_ALTERNATE_OBJECT_DIRECTORIES",
+        "GIT_PREFIX",
+    ):
+        environment.pop(variable, None)
     try:
-        return run(command, cwd=root, check=False).returncode
+        return run(command, cwd=root, check=False, env=environment).returncode
     except OSError as error:
         detail = " ".join(str(error).splitlines())
         print(f"GATE.local-ci-parity: install the declared runner: {detail}", file=sys.stderr)

@@ -449,6 +449,8 @@ Make variables follow the vocabulary: `JOB`, `JOBS`, `JOB_ID`, `JOBS_DIR`, `AGEN
 
 No version appears in any file, module, class or folder name: a scorer, agent or workflow is edited in place, its version is the `name@N` registered in `lab/releases.yaml` (scorers: the `@N` in its manifest), and `make release-archive REF=<name>@<N>` tags the release being replaced as `archive/<name>@<N>` before the edit lands. Older experiments and jobs are not carried forward (tag `archive/pre-structure-reset` preserves them). Local jobs, stores and analysis from before the structure reset remain under `var/archive/pre-v1/`.
 
+The gate dispatcher strips Git repository-location environment variables for both entrypoints, so checks' scratch repositories cannot inherit the committing repository or index.
+
 `make gate-commit` checks whole-tree path policy, then runs `make quality`: structure, smoke command shapes, release registration, experiment locks, ledger, ruff, import contracts, lizard, mypy, fan-out, and the fast test tier with unchanged line and branch coverage floors. `make gate-ci` adds the slow and quality tiers, in that order, on every push and pull request. Both entrypoints are declared in `.omp/gate.json`; the check-only pre-commit hook runs the commit entrypoint without fixing or staging files. Install it in each clone:
 
 ```bash
