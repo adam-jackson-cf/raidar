@@ -1,6 +1,86 @@
 {
   "schemaVersion": 1,
   "tests": {
+    "orchestrator/tests/test_test_budget_provenance.py": {
+      "source": "scripts/checks/test_budget_evidence.py",
+      "behavior": "Authenticate new baseline observations against external artifacts and preserve trusted immutable evidence without repeat downloads"
+    },
+    "orchestrator/tests/test_test_budget_provenance.py::test_authentic_new_jobs_share_one_external_run_download": {
+      "source": "scripts/checks/test_budget_evidence.py",
+      "behavior": "Authenticate new baseline observations against external artifacts and preserve trusted immutable evidence without repeat downloads"
+    },
+    "orchestrator/tests/test_test_budget_provenance.py::test_new_record_identity_must_bind_its_immutable_filename": {
+      "source": "scripts/checks/test_budget_evidence.py",
+      "behavior": "Authenticate new baseline observations against external artifacts and preserve trusted immutable evidence without repeat downloads"
+    },
+    "orchestrator/tests/test_test_budget_provenance.py::test_new_record_identity_must_bind_its_immutable_filename[10-bad.json-10-bad]": {
+      "source": "scripts/checks/test_budget_evidence.py",
+      "behavior": "Authenticate new baseline observations against external artifacts and preserve trusted immutable evidence without repeat downloads"
+    },
+    "orchestrator/tests/test_test_budget_provenance.py::test_new_record_identity_must_bind_its_immutable_filename[bad-21.json-bad-21]": {
+      "source": "scripts/checks/test_budget_evidence.py",
+      "behavior": "Authenticate new baseline observations against external artifacts and preserve trusted immutable evidence without repeat downloads"
+    },
+    "orchestrator/tests/test_test_budget_provenance.py::test_new_record_identity_must_bind_its_immutable_filename[renamed.json-10-21]": {
+      "source": "scripts/checks/test_budget_evidence.py",
+      "behavior": "Authenticate new baseline observations against external artifacts and preserve trusted immutable evidence without repeat downloads"
+    },
+    "orchestrator/tests/test_test_budget_provenance.py::test_new_record_must_equal_external_observations": {
+      "source": "scripts/checks/test_budget_evidence.py",
+      "behavior": "Authenticate new baseline observations against external artifacts and preserve trusted immutable evidence without repeat downloads"
+    },
+    "orchestrator/tests/test_test_budget_provenance.py::test_new_record_must_equal_external_observations[False]": {
+      "source": "scripts/checks/test_budget_evidence.py",
+      "behavior": "Authenticate new baseline observations against external artifacts and preserve trusted immutable evidence without repeat downloads"
+    },
+    "orchestrator/tests/test_test_budget_provenance.py::test_new_record_must_equal_external_observations[True]": {
+      "source": "scripts/checks/test_budget_evidence.py",
+      "behavior": "Authenticate new baseline observations against external artifacts and preserve trusted immutable evidence without repeat downloads"
+    },
+    "orchestrator/tests/test_test_budget_provenance.py::test_retained_trusted_record_cannot_be_rewritten": {
+      "source": "scripts/checks/test_budget_evidence.py",
+      "behavior": "Authenticate new baseline observations against external artifacts and preserve trusted immutable evidence without repeat downloads"
+    },
+    "orchestrator/tests/test_test_budget_provenance.py::test_retained_trusted_record_cannot_be_rewritten[cases]": {
+      "source": "scripts/checks/test_budget_evidence.py",
+      "behavior": "Authenticate new baseline observations against external artifacts and preserve trusted immutable evidence without repeat downloads"
+    },
+    "orchestrator/tests/test_test_budget_provenance.py::test_retained_trusted_record_cannot_be_rewritten[measurement]": {
+      "source": "scripts/checks/test_budget_evidence.py",
+      "behavior": "Authenticate new baseline observations against external artifacts and preserve trusted immutable evidence without repeat downloads"
+    },
+    "orchestrator/tests/test_test_budget_provenance.py::test_retained_trusted_record_cannot_be_rewritten[wallSeconds]": {
+      "source": "scripts/checks/test_budget_evidence.py",
+      "behavior": "Authenticate new baseline observations against external artifacts and preserve trusted immutable evidence without repeat downloads"
+    },
+    "orchestrator/tests/test_test_budget_provenance.py::test_trusted_records_survive_artifact_expiry_without_network": {
+      "source": "scripts/checks/test_budget_evidence.py",
+      "behavior": "Authenticate new baseline observations against external artifacts and preserve trusted immutable evidence without repeat downloads"
+    },
+    "orchestrator/tests/test_test_budget_provenance.py::test_trusted_snapshot_reads_baseline_bytes_from_base_not_worktree": {
+      "source": "scripts/checks/test_budget_evidence.py",
+      "behavior": "Authenticate new baseline observations against external artifacts and preserve trusted immutable evidence without repeat downloads"
+    },
+    "orchestrator/tests/test_test_budget_provenance.py::test_unavailable_external_evidence_cannot_authorize_new_baseline": {
+      "source": "scripts/checks/test_budget_evidence.py",
+      "behavior": "Authenticate new baseline observations against external artifacts and preserve trusted immutable evidence without repeat downloads"
+    },
+    "orchestrator/tests/test_test_budget_calibration.py": {
+      "source": "scripts/checks/check-test-budgets.py",
+      "behavior": "Establish the first evidence-derived limits without approval while preserving approval for later exceptions"
+    },
+    "orchestrator/tests/test_test_budget_calibration.py::test_first_calibration_is_not_a_budget_increase": {
+      "source": "scripts/checks/check-test-budgets.py",
+      "behavior": "Distinguish first calibration from adding an exception to an existing budget"
+    },
+    "orchestrator/tests/test_test_budget_calibration.py::test_first_calibration_is_not_a_budget_increase[False]": {
+      "source": "scripts/checks/check-test-budgets.py",
+      "behavior": "Establish the first evidence-derived bounded exceptions without an approval requirement"
+    },
+    "orchestrator/tests/test_test_budget_calibration.py::test_first_calibration_is_not_a_budget_increase[True]": {
+      "source": "scripts/checks/check-test-budgets.py",
+      "behavior": "Require approval when a named exception is added after a budget already exists"
+    },
     "orchestrator/tests/test_quality_gate_commands.py": {
       "source": "orchestrator/src/raidar/cli/quality.py",
       "behavior": "Run the budget report producer once with unchanged coverage floor and failure/staging behavior"

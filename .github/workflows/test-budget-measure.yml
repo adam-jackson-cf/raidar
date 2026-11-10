@@ -86,6 +86,7 @@ jobs:
         run: |
           env -u AGENT uv run --project orchestrator --extra dev python scripts/checks/test_budget_evidence.py seal --report "var/tmp/tests/budgets/$INVOCATION/report.json" --index "${{ matrix.index }}"
       - name: Upload immutable measurement evidence
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: test-budget-report-${{ matrix.index }}

@@ -1,5 +1,7 @@
 {
   "files": {
+    "orchestrator/tests/test_test_budget_provenance.py": "test-time budget evidence",
+    "orchestrator/tests/test_test_budget_calibration.py": "test-time budget calibration",
     ".github/workflows/test-budget-measure.yml": "test-time budget measurement",
     ".omp/test-budgets/limits.json": "test-time budget policy",
     "scripts/checks/check-test-budgets.py": "test-time budget policy",
@@ -1321,6 +1323,8 @@
     "orchestrator/tests/fixtures/stages/acme/note-state/tool/src/note_state/": "orchestrator/tests/fixtures/stages/acme/note-state/tool/src/note_state"
   },
   "test_tiers": {
+    "orchestrator/tests/test_test_budget_provenance.py": [],
+    "orchestrator/tests/test_test_budget_calibration.py": [],
     "orchestrator/tests/test_test_budget_rules.py": [],
     "orchestrator/tests/test_test_budget_report_quality.py": ["quality"],
     "orchestrator/tests/test_test_evidence.py": [],
