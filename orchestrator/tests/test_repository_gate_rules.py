@@ -202,33 +202,37 @@ def test_path_policy_accepts_owned_paths(tmp_path: Path) -> None:
 
 
 @pytest.mark.parametrize(
-    ("relative", "source", "rule"),
+    ("relative", "source", "rules"),
     [
-        ("notes.txt", "misplaced\n", "STRUCT.folder-placement"),
-        ("orchestrator/src/raidar/engine/trial/v2/probe.py", "VALUE = 1\n", "NAME.conventions"),
+        ("notes.txt", "misplaced\n", ("STRUCT.folder-placement",)),
+        (
+            "orchestrator/src/raidar/engine/trial/v2/probe.py",
+            "VALUE = 1\n",
+            ("STRUCT.folder-placement", "NAME.conventions"),
+        ),
         (
             "orchestrator/src/raidar/engine/trial/probe.py",
             "def test_probe():\n    pass\n",
-            "TEST.placement",
+            ("TEST.placement",),
         ),
         (
             "orchestrator/tests/test_repository_gate_rules.py",
             "import pytest\n\n@pytest.mark.slow\ndef test_probe():\n    pass\n",
-            "TEST.placement",
+            ("TEST.placement",),
         ),
-        ("orchestrator/src/raidar/engine/trial/probe.py", "def broken(\n", "PYS000"),
+        ("orchestrator/src/raidar/engine/trial/probe.py", "def broken(\n", ("PYS000",)),
     ],
 )
 def test_path_policy_reports_actionable_rule_findings(
-    tmp_path: Path, relative: str, source: str, rule: str
+    tmp_path: Path, relative: str, source: str, rules: tuple[str, ...]
 ) -> None:
     candidate = tmp_path / relative
     candidate.parent.mkdir(parents=True, exist_ok=True)
     candidate.write_text(source)
     found = paths.path_findings(tmp_path, [relative])
-    matches = [line for line in found if f": {rule}: " in line]
-    assert len(matches) == 1
-    _assert_finding(matches[0], relative, rule)
+    assert len(found) == len(rules)
+    for line, rule in zip(found, rules, strict=True):
+        _assert_finding(line, relative, rule)
 
 
 @pytest.mark.parametrize("relative", ["/outside.py", "../outside.py", "orchestrator/../outside.py"])
