@@ -1,0 +1,6 @@
+{
+  "files": {
+    "orchestrator/src/probe.py": "\"\"\"Expose a canary value.\"\"\"\n\nVALUES = list([1, 2])\n"
+  },
+  "format": false
+}

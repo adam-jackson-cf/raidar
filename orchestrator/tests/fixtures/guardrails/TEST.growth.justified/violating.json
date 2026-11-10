@@ -1,0 +1,15 @@
+{
+  "base_sources": {
+    "orchestrator/tests/test_canary.py": "def test_existing():\n    assert evaluate(1) == 1\n"
+  },
+  "current_sources": {
+    "orchestrator/tests/test_canary.py": "def test_existing():\n    assert evaluate(1) == 1\ndef test_added():\n    assert evaluate(2) == 2\n"
+  },
+  "changed_source_paths": [
+    "orchestrator/src/raidar/engine/canary.py"
+  ],
+  "behavior_map": {
+    "schemaVersion": 1,
+    "tests": {}
+  }
+}

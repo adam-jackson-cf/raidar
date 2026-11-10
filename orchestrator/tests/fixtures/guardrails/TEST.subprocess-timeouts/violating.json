@@ -1,0 +1,5 @@
+{
+  "files": {
+    "orchestrator/tests/test_canary.py": "import subprocess\nsubprocess.run([\"true\"])\n"
+  }
+}

@@ -1,0 +1,4 @@
+{
+  "path": "orchestrator/src/raidar/engine/canary.py",
+  "source": "class Canary:\n    def __init__(self, a,b,c,d,e,f,g,h,i): pass\n"
+}

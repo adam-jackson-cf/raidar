@@ -19,6 +19,11 @@ ROOT = Path(__file__).resolve().parents[2]
 def maintained(path: PurePosixPath) -> bool:
     """Whether a path belongs to the maintained Python inventory."""
     parts = path.parts
+    # This exact upstream program is vendored and hash-checked, not maintained.
+    if path == PurePosixPath(
+        "scripts/vendor/setup-repository-guardrails/validate_rule_coverage.py"
+    ):
+        return False
     if "fixtures" in parts or parts[:1] in (("docs",), ("var",)):
         return False
     return any(

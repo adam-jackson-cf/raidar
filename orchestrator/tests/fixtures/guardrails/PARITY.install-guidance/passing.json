@@ -1,0 +1,11 @@
+{
+  "guidance": {
+    "README.md": "```sh\nmake env-setup\n```\n"
+  },
+  "installers": {
+    "Makefile": "uv sync --project orchestrator --all-extras --locked"
+  },
+  "targets": {
+    "env-setup": "uv sync --project orchestrator --all-extras --locked"
+  }
+}

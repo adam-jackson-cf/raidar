@@ -144,8 +144,17 @@ SEAM_SUBPROCESS_WRAPPERS: dict[str, set[str]] = {
     "scripts/checks/check-toolchain-parity.py": {"run_process"},
     "scripts/checks/run-affected-seams.py": {"main"},
     "scripts/checks/check-repository-paths.py": {"main", "dependency_findings"},
+    "scripts/checks/record-host-readback.py": {"main"},
+    "scripts/checks/check-hook-installation.py": {"run_process"},
+    "scripts/checks/check-gate-rule-canary.py": {"run_process"},
+    "scripts/checks/validate-rule-coverage.py": {"main"},
+    "scripts/checks/check-tool-rule-canary.py": {"analyzer_canary"},
+    "scripts/checks/check-bespoke-rule-canary.py": {"run_fanout_checker"},
 }
 EXCLUDED_PREFIXES = (
+    # Exact upstream bytes and canary inputs are not maintained source.
+    "scripts/vendor/setup-repository-guardrails/validate_rule_coverage.py",
+    "orchestrator/tests/fixtures/guardrails/",
     ".cache/",
     ".git/",
     ".mypy_cache/",
@@ -167,6 +176,13 @@ ALLOWED_TEST_ROOT_FILES = {
 SCRIPT_NAME_ALLOWLIST = {
     "check-test-budgets.py",
     "run-budgeted-fast.py",
+    "check-rule-evidence.py",
+    "validate-rule-coverage.py",
+    "check-hook-installation.py",
+    "check-gate-rule-canary.py",
+    "record-host-readback.py",
+    "check-tool-rule-canary.py",
+    "check-bespoke-rule-canary.py",
     "bump-version.py",
     "check-identity.py",
     "check-finding-baseline.py",

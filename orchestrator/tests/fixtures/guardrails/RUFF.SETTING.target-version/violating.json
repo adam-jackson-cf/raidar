@@ -1,0 +1,6 @@
+{
+  "files": {
+    "orchestrator/src/probe.py": "\"\"\"Expose typed values.\"\"\"\n\nfrom typing import List\n\nVALUES: List[int] = []\n"
+  },
+  "format": false
+}

@@ -1,0 +1,5 @@
+{
+  "source": "~/.omp/agent/skills/setup-repository-guardrails/scripts/validate_rule_coverage.py",
+  "sha256": "ddce1136f9c0b00076939aced1bb83ced0a021124eecb5024efeece9703e33a0",
+  "maintenance": "Vendored, non-maintained byte copy. Update by copying the skill source byte-for-byte, review its checks and update this recorded sha256 atomically. The wrapper always checks this hash and the installed skill when present before full execution."
+}

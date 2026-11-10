@@ -1,0 +1,6 @@
+{
+  "files": {
+    "orchestrator/src/probe.py": "\"\"\"Expose a canary value.\"\"\"\n\nfrom typing import List\n\nVALUES: List[int] = []\n"
+  },
+  "format": false
+}

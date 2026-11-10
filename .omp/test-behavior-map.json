@@ -465,6 +465,166 @@
       "source": "scripts/checks/run-budgeted-fast.py",
       "behavior": "Retain selected inventory and real phase evidence for complete and truncated subprocess runs"
     },
+    "orchestrator/tests/test_rule_evidence_freshness.py": {
+        "source": "scripts/checks/validate-rule-coverage.py",
+        "behavior": "Reject stale host scope and corrupted exact vendored validator bytes before evidence execution"
+    },
+    "orchestrator/tests/test_rule_evidence_freshness.py::test_invalid_retained_evidence_fails_before_validation": {
+        "source": "scripts/checks/validate-rule-coverage.py",
+        "behavior": "Reject stale host scope and corrupted exact vendored validator bytes before evidence execution"
+    },
+    "orchestrator/tests/test_rule_evidence_freshness.py::test_invalid_retained_evidence_fails_before_validation[stale]": {
+        "source": "scripts/checks/validate-rule-coverage.py",
+        "behavior": "Reject stale host scope and corrupted exact vendored validator bytes before evidence execution"
+    },
+    "orchestrator/tests/test_rule_evidence_freshness.py::test_invalid_retained_evidence_fails_before_validation[vendor]": {
+        "source": "scripts/checks/validate-rule-coverage.py",
+        "behavior": "Reject stale host scope and corrupted exact vendored validator bytes before evidence execution"
+    },
+    "orchestrator/tests/test_rule_evidence.py::test_all_catalogue_ids_with_matching_evidence_kinds_pass": {
+        "source": "scripts/checks/check-rule-evidence.py",
+        "behavior": "Reject missing or changed catalogue bytes and incomplete, ambiguous or unapproved rule evidence"
+    },
+    "orchestrator/tests/test_rule_evidence.py::test_any_catalogue_byte_change_fails": {
+        "source": "scripts/checks/check-rule-evidence.py",
+        "behavior": "Reject missing or changed catalogue bytes and incomplete, ambiguous or unapproved rule evidence"
+    },
+    "orchestrator/tests/test_rule_evidence.py::test_any_catalogue_byte_change_fails[0]": {
+        "source": "scripts/checks/check-rule-evidence.py",
+        "behavior": "Reject missing or changed catalogue bytes and incomplete, ambiguous or unapproved rule evidence"
+    },
+    "orchestrator/tests/test_rule_evidence.py::test_any_catalogue_byte_change_fails[1]": {
+        "source": "scripts/checks/check-rule-evidence.py",
+        "behavior": "Reject missing or changed catalogue bytes and incomplete, ambiguous or unapproved rule evidence"
+    },
+    "orchestrator/tests/test_rule_evidence.py::test_any_catalogue_byte_change_fails[2]": {
+        "source": "scripts/checks/check-rule-evidence.py",
+        "behavior": "Reject missing or changed catalogue bytes and incomplete, ambiguous or unapproved rule evidence"
+    },
+    "orchestrator/tests/test_rule_evidence.py::test_any_catalogue_byte_change_fails[3]": {
+        "source": "scripts/checks/check-rule-evidence.py",
+        "behavior": "Reject missing or changed catalogue bytes and incomplete, ambiguous or unapproved rule evidence"
+    },
+    "orchestrator/tests/test_rule_evidence.py::test_any_catalogue_byte_change_fails[4]": {
+        "source": "scripts/checks/check-rule-evidence.py",
+        "behavior": "Reject missing or changed catalogue bytes and incomplete, ambiguous or unapproved rule evidence"
+    },
+    "orchestrator/tests/test_rule_evidence.py::test_any_catalogue_byte_change_fails[5]": {
+        "source": "scripts/checks/check-rule-evidence.py",
+        "behavior": "Reject missing or changed catalogue bytes and incomplete, ambiguous or unapproved rule evidence"
+    },
+    "orchestrator/tests/test_rule_evidence.py::test_any_catalogue_byte_change_fails[6]": {
+        "source": "scripts/checks/check-rule-evidence.py",
+        "behavior": "Reject missing or changed catalogue bytes and incomplete, ambiguous or unapproved rule evidence"
+    },
+    "orchestrator/tests/test_rule_evidence.py::test_any_catalogue_byte_change_fails[7]": {
+        "source": "scripts/checks/check-rule-evidence.py",
+        "behavior": "Reject missing or changed catalogue bytes and incomplete, ambiguous or unapproved rule evidence"
+    },
+    "orchestrator/tests/test_rule_evidence.py::test_any_catalogue_byte_change_fails[8]": {
+        "source": "scripts/checks/check-rule-evidence.py",
+        "behavior": "Reject missing or changed catalogue bytes and incomplete, ambiguous or unapproved rule evidence"
+    },
+    "orchestrator/tests/test_rule_evidence.py::test_any_catalogue_byte_change_fails[9]": {
+        "source": "scripts/checks/check-rule-evidence.py",
+        "behavior": "Reject missing or changed catalogue bytes and incomplete, ambiguous or unapproved rule evidence"
+    },
+    "orchestrator/tests/test_rule_evidence.py::test_approved_conditional_exclusion_passes_completeness": {
+        "source": "scripts/checks/check-rule-evidence.py",
+        "behavior": "Reject missing or changed catalogue bytes and incomplete, ambiguous or unapproved rule evidence"
+    },
+    "orchestrator/tests/test_rule_evidence.py::test_catalogue_length_drift_fails": {
+        "source": "scripts/checks/check-rule-evidence.py",
+        "behavior": "Reject missing or changed catalogue bytes and incomplete, ambiguous or unapproved rule evidence"
+    },
+    "orchestrator/tests/test_rule_evidence.py::test_catalogue_length_drift_fails[snapshot0]": {
+        "source": "scripts/checks/check-rule-evidence.py",
+        "behavior": "Reject missing or changed catalogue bytes and incomplete, ambiguous or unapproved rule evidence"
+    },
+    "orchestrator/tests/test_rule_evidence.py::test_catalogue_length_drift_fails[snapshot1]": {
+        "source": "scripts/checks/check-rule-evidence.py",
+        "behavior": "Reject missing or changed catalogue bytes and incomplete, ambiguous or unapproved rule evidence"
+    },
+    "orchestrator/tests/test_rule_evidence.py::test_each_catalogue_row_defect_has_one_actionable_line": {
+        "source": "scripts/checks/check-rule-evidence.py",
+        "behavior": "Reject missing or changed catalogue bytes and incomplete, ambiguous or unapproved rule evidence"
+    },
+    "orchestrator/tests/test_rule_evidence.py::test_each_catalogue_row_defect_has_one_actionable_line[blocked]": {
+        "source": "scripts/checks/check-rule-evidence.py",
+        "behavior": "Reject missing or changed catalogue bytes and incomplete, ambiguous or unapproved rule evidence"
+    },
+    "orchestrator/tests/test_rule_evidence.py::test_each_catalogue_row_defect_has_one_actionable_line[duplicate]": {
+        "source": "scripts/checks/check-rule-evidence.py",
+        "behavior": "Reject missing or changed catalogue bytes and incomplete, ambiguous or unapproved rule evidence"
+    },
+    "orchestrator/tests/test_rule_evidence.py::test_each_catalogue_row_defect_has_one_actionable_line[exclusion]": {
+        "source": "scripts/checks/check-rule-evidence.py",
+        "behavior": "Reject missing or changed catalogue bytes and incomplete, ambiguous or unapproved rule evidence"
+    },
+    "orchestrator/tests/test_rule_evidence.py::test_each_catalogue_row_defect_has_one_actionable_line[kind]": {
+        "source": "scripts/checks/check-rule-evidence.py",
+        "behavior": "Reject missing or changed catalogue bytes and incomplete, ambiguous or unapproved rule evidence"
+    },
+    "orchestrator/tests/test_rule_evidence.py::test_each_catalogue_row_defect_has_one_actionable_line[missing]": {
+        "source": "scripts/checks/check-rule-evidence.py",
+        "behavior": "Reject missing or changed catalogue bytes and incomplete, ambiguous or unapproved rule evidence"
+    },
+    "orchestrator/tests/test_rule_evidence.py::test_identical_catalogue_bytes_pass": {
+        "source": "scripts/checks/check-rule-evidence.py",
+        "behavior": "Reject missing or changed catalogue bytes and incomplete, ambiguous or unapproved rule evidence"
+    },
+    "orchestrator/tests/test_rule_evidence.py::test_missing_repository_snapshot_fails": {
+        "source": "scripts/checks/check-rule-evidence.py",
+        "behavior": "Reject missing or changed catalogue bytes and incomplete, ambiguous or unapproved rule evidence"
+    },
+    "orchestrator/tests/test_rule_evidence.py::test_missing_repository_snapshot_fails[None]": {
+        "source": "scripts/checks/check-rule-evidence.py",
+        "behavior": "Reject missing or changed catalogue bytes and incomplete, ambiguous or unapproved rule evidence"
+    },
+    "orchestrator/tests/test_rule_evidence.py::test_missing_repository_snapshot_fails[reference1]": {
+        "source": "scripts/checks/check-rule-evidence.py",
+        "behavior": "Reject missing or changed catalogue bytes and incomplete, ambiguous or unapproved rule evidence"
+    },
+    "orchestrator/tests/test_rule_evidence.py::test_offline_skill_absence_keeps_repository_snapshot_authoritative": {
+        "source": "scripts/checks/check-rule-evidence.py",
+        "behavior": "Reject missing or changed catalogue bytes and incomplete, ambiguous or unapproved rule evidence"
+    },
+    "orchestrator/tests/test_rule_evidence.py::test_owner_approval_cannot_exclude_an_always_applicable_rule": {
+        "source": "scripts/checks/check-rule-evidence.py",
+        "behavior": "Reject missing or changed catalogue bytes and incomplete, ambiguous or unapproved rule evidence"
+    },
+    "orchestrator/tests/test_test_evidence.py::test_growth_expands_static_range_and_length_without_executing_code": {
+        "source": "scripts/checks/check-test-evidence.py",
+        "behavior": "Resolve finite static range/len parameter rows without executing test expressions and require every expanded case mapping"
+    },
+    "orchestrator/tests/test_rule_evidence.py": {
+        "source": "scripts/checks/check-rule-evidence.py",
+        "behavior": "Reject missing or changed catalogue bytes and incomplete, ambiguous or unapproved rule evidence"
+    },
+    "orchestrator/tests/test_rule_evidence_quality.py": {
+        "source": "scripts/checks/validate-rule-coverage.py",
+        "behavior": "Require real checker canaries, fixtures, host required status and installed hook failure propagation"
+    },
+    "orchestrator/tests/test_rule_evidence_quality.py::test_disabled_checker_fails_its_violating_canary": {
+        "source": "scripts/checks/validate-rule-coverage.py",
+        "behavior": "Require real checker canaries, fixtures, host required status and installed hook failure propagation"
+    },
+    "orchestrator/tests/test_rule_evidence_quality.py::test_hook_installation_requires_installed_manager_in_isolated_clone": {
+        "source": "scripts/checks/validate-rule-coverage.py",
+        "behavior": "Require real checker canaries, fixtures, host required status and installed hook failure propagation"
+    },
+    "orchestrator/tests/test_rule_evidence_quality.py::test_host_stdout_without_gate_required_check_fails": {
+        "source": "scripts/checks/validate-rule-coverage.py",
+        "behavior": "Require real checker canaries, fixtures, host required status and installed hook failure propagation"
+    },
+    "orchestrator/tests/test_rule_evidence_quality.py::test_missing_fixture_refuses_rule_evidence": {
+        "source": "scripts/checks/validate-rule-coverage.py",
+        "behavior": "Require real checker canaries, fixtures, host required status and installed hook failure propagation"
+    },
+    "orchestrator/tests/test_rule_evidence_quality.py::test_real_repository_ledger_passes_executed_validator": {
+        "source": "scripts/checks/validate-rule-coverage.py",
+        "behavior": "Require real checker canaries, fixtures, host required status and installed hook failure propagation"
+    },
     "orchestrator/tests/test_test_evidence.py": {
       "source": "scripts/checks/check-test-evidence.py",
       "behavior": "Enforce changed-source behavior evidence for test growth and reject normalized duplicate behavior paths"

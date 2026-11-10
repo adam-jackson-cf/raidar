@@ -1,0 +1,5 @@
+{
+  "files": {
+    ".agents/skills/canary-check/SKILL.md": "---\nname: other-name\ndescription: Missing required prefix\n---\n"
+  }
+}

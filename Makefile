@@ -147,6 +147,8 @@ help:
 	@echo "  make dependency-audit-check [AUDIT_ARGS=--ci]            Strict locked audit on dependency changes (always with --ci)"
 	@echo "  make gate-commit                                       Whole-tree policy, identity, static/T1 checks and affected local T2 seams"
 	@echo "  make gate-ci                                           Commit gate, slow tier, then quality tier (every push and pull request)"
+	@echo "  make rule-coverage                                     Execute fail-closed evidence for every guardrail catalogue ID"
+	@echo "  make record-host-readback                              Record live default-branch rules and merge settings (refresh within 30 days)"
 	@echo "  make analyzer-scope-check                              Check analyzer I/O boundaries and CODEOWNERS with finding-level debt ratchets"
 	@echo "  make version-release                                   Prepare an on-demand release PR from HEAD at origin/main; refuses no-bump histories"
 	@echo "  make version-check                                     Check CLI, lock and CHANGELOG versions and release-entry history; part of make quality"
@@ -822,6 +824,7 @@ gate-commit:
 		python scripts/checks/check-repository-paths.py
 	@$(MAKE) --no-print-directory identity-check
 	@$(MAKE) --no-print-directory test-evidence-check
+	@$(MAKE) --no-print-directory rule-coverage
 	@$(MAKE) --no-print-directory quality
 	@$(MAKE) --no-print-directory test-budget-check
 	@$(MAKE) --no-print-directory dependency-audit-check
@@ -832,6 +835,15 @@ gate-ci:
 	@$(MAKE) --no-print-directory gate-commit AUDIT_ARGS=--ci
 	@$(MAKE) --no-print-directory test-slow
 	@$(MAKE) --no-print-directory test-quality
+
+.PHONY: rule-coverage record-host-readback
+rule-coverage:
+	@$(REPO_RUNTIME_ENV) uv run --project orchestrator --extra dev python scripts/checks/check-rule-evidence.py
+	@$(REPO_RUNTIME_ENV) uv run --project orchestrator --extra dev python scripts/checks/check-gate-rule-canary.py
+	@$(REPO_RUNTIME_ENV) uv run --project orchestrator --extra dev python scripts/checks/validate-rule-coverage.py --root . --catalog .omp/guardrail-rules.json --ledger .omp/rule-coverage.json
+
+record-host-readback:
+	@$(REPO_RUNTIME_ENV) uv run --project orchestrator --extra dev python scripts/checks/record-host-readback.py
 
 version-release:
 	@$(REPO_RUNTIME_ENV) uv run --project orchestrator python scripts/release/bump-version.py

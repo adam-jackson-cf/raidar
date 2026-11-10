@@ -1,0 +1,6 @@
+{
+  "files": {
+    "orchestrator/src/probe.py": "\"\"\"Expose a canary value.\"\"\"\n\nimport pytest\n\n\n@pytest.fixture()\ndef answer() -> int:\n    \"\"\"Return an answer.\"\"\"\n    return 42\n"
+  },
+  "format": false
+}

@@ -1,0 +1,6 @@
+{
+  "files": {
+    "orchestrator/src/probe.py": "VALUE: int = 1  # type: ignore\n"
+  },
+  "format": false
+}

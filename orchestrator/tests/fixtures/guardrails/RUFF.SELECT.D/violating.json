@@ -1,0 +1,6 @@
+{
+  "files": {
+    "orchestrator/src/probe.py": "\"\"\"Expose a canary value.\"\"\"\n\nclass Envelope:\n    \"\"\"Hold nested declarations.\"\"\"\n\n    class Payload:\n        pass\n"
+  },
+  "format": false
+}

@@ -313,6 +313,34 @@ class Constants(ast.NodeTransformer):
 
     def visit_Call(self, node: ast.Call) -> ast.AST:
         self.generic_visit(node)
+        if isinstance(node.func, ast.Name) and not node.keywords:
+            if node.func.id == "len" and len(node.args) == 1:
+                argument = node.args[0]
+                if isinstance(argument, ast.Constant) and isinstance(argument.value, (str, bytes)):
+                    return ast.Constant(value=len(argument.value))
+                if isinstance(argument, (ast.List, ast.Tuple)):
+                    return ast.Constant(value=len(argument.elts))
+            if (
+                node.func.id == "range"
+                and 1 <= len(node.args) <= 3
+                and all(
+                    isinstance(argument, ast.Constant) and type(argument.value) is int
+                    for argument in node.args
+                )
+            ):
+                values = [
+                    argument.value
+                    for argument in node.args
+                    if isinstance(argument, ast.Constant) and isinstance(argument.value, int)
+                ]
+                try:
+                    resolved = range(*values)
+                except ValueError:
+                    return node
+                return ast.List(
+                    elts=[ast.Constant(value=value) for value in resolved],
+                    ctx=ast.Load(),
+                )
         if (
             isinstance(node.func, ast.Attribute)
             and node.func.attr == "replace"

@@ -510,6 +510,21 @@ other added case; map missing evidence or merge/remove duplicate tests.
 Parameter rows and IDs must be statically collectable; changed files with dynamic
 collection fail closed rather than executing test code during this static check.
 
+Both gates run `make rule-coverage`: all 104 catalogue IDs in
+`.omp/guardrail-rules.json` need executed evidence in `.omp/rule-coverage.json`.
+Each local rule runs its real checker on passing and violating fixtures; hooks
+prove installation and commit-failure propagation in disposable repositories.
+PYQ210/PYQ211 retain the approved architectural exclusions above. Configuration
+deviations and finding-level debt remain explicit implemented enforcement, not
+claims of a debt-free tree.
+
+`make record-host-readback` records a live GitHub query for default-branch required
+`gate`, auto-merge and rebase-merge settings. Refresh `.omp/host-readback.json`
+within 30 days; missing, malformed or stale records fail coverage. The upstream
+validator is vendored unchanged under `scripts/vendor/setup-repository-guardrails/`;
+its provenance records the source and update procedure. The maintained launcher
+checks its recorded SHA-256 and installed skill bytes before full execution.
+
 Docker-backed tests (`make test-docker`), the N1 overhead gate (`make perf-gate`) and `make security-gate` remain separate checks on a ready Docker target.
 
 `make analyzer-scope-check` enforces filesystem (PYS251), environment/process

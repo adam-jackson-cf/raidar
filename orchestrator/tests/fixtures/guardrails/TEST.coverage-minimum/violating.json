@@ -1,0 +1,10 @@
+{
+  "report": {
+    "totals": {
+      "covered_lines": 1,
+      "num_statements": 100,
+      "covered_branches": 1,
+      "num_branches": 100
+    }
+  }
+}
