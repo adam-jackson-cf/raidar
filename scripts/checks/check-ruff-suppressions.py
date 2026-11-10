@@ -39,6 +39,14 @@ def _comments(source: str) -> list[tuple[str, int]]:
     return comments
 
 
+def _per_file_entries(patterns: Mapping[str, Sequence[str]]) -> list[tuple[str, str]]:
+    return [
+        (f"per-file-ignores:{pattern}:{code}", code)
+        for pattern, codes in patterns.items()
+        for code in codes
+    ]
+
+
 def _config_entries(path: str, source: str) -> list[tuple[str, int]]:
     if Path(path).name not in {"pyproject.toml", "ruff.toml", ".ruff.toml"}:
         return []
@@ -52,8 +60,7 @@ def _config_entries(path: str, source: str) -> list[tuple[str, int]]:
     for section in (config, config.get("lint", {})):
         for code in section.get("extend-ignore", []):
             entries.append((f"extend-ignore:{code}", code))
-        for pattern, codes in section.get("per-file-ignores", {}).items():
-            entries.extend((f"per-file-ignores:{pattern}:{code}", code) for code in codes)
+        entries.extend(_per_file_entries(section.get("per-file-ignores", {})))
     # TOML strings retain their spelling-independent identity in the parsed document.
     # Locate each rule in its setting, including multiline arrays and inline tables.
     rows = []

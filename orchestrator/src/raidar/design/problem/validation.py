@@ -290,6 +290,10 @@ def _verdict_grades(repeats: Sequence[StepGrades], step: str) -> list[Grade]:
     ]
 
 
+def _repeat_steps(repeats: Sequence[StepGrades]) -> dict[str, None]:
+    return dict.fromkeys(step for grades in repeats for step in grades)
+
+
 def varying_cases(runs: ValidationRuns) -> frozenset[str]:
     """Case ids whose outcome varies anywhere in a pool of runs of identical reference code.
 
@@ -301,7 +305,7 @@ def varying_cases(runs: ValidationRuns) -> frozenset[str]:
     varying: set[str] = set()
     for variant in VARIANTS:
         repeats = runs.oracle[variant]
-        for step in dict.fromkeys(step for grades in repeats for step in grades):
+        for step in _repeat_steps(repeats):
             identity = _identity(runs, variant, step)
             varying |= _pool_step(_verdict_grades(repeats, step), identity, pooled)
     varying.update(case for (_, case), seen in pooled.items() if len(seen) > 1)
@@ -313,12 +317,17 @@ def _pool_step(
 ) -> set[str]:
     """Pool one step's outcomes by (identity, case); return cases varying across its repeats."""
     varying: set[str] = set()
-    for case in {key for grade in grades for key in grade.outcomes}:
+    cases = {key for grade in grades for key in grade.outcomes}
+    for case in cases:
         seen = {grade.outcomes.get(case) for grade in grades}
         if len(seen) > 1:
             varying.add(case)
         pooled.setdefault((identity, case), set()).update(s for s in seen if s)
     return varying
+
+
+def _collected_cases(grades: Sequence[Grade | None]) -> set[str]:
+    return {key for grade in grades if grade is not None for key in grade.outcomes}
 
 
 def solvable_sets(runs: ValidationRuns) -> dict[str, StepSolvable]:
@@ -334,7 +343,7 @@ def solvable_sets(runs: ValidationRuns) -> dict[str, StepSolvable]:
     collected: set[str] = set()
     for step in _positive_steps(runs):
         every = [grades.get(step) for grades in repeats]
-        step_cases = {key for grade in every if grade is not None for key in grade.outcomes}
+        step_cases = _collected_cases(every)
         sets[step] = _step_solvable(step, every, step_cases, frozenset(collected), varying)
         collected |= step_cases
     return sets
@@ -589,19 +598,23 @@ def _repeat_observation(grades: Sequence[Grade | None]) -> str:
     return f"{prefix} in {len(grades)} runs for this reference and environment"
 
 
+def _step_repeat_observation(runs: ValidationRuns, variant: str, step: str) -> dict[str, object]:
+    grades = [run.get(step) for run in runs.oracle[variant]]
+    observation = _repeat_observation(grades)
+    return {
+        "reference_sha256": runs.references.get(variant, {}).get(step),
+        "runs": len(grades),
+        "status": "unmeasured" if observation == "unmeasured" else "measured",
+        "observation": observation,
+    }
+
+
 def _repeat_observations(runs: ValidationRuns) -> dict[str, dict[str, object]]:
     observations: dict[str, dict[str, object]] = {}
     for variant, repeats in runs.oracle.items():
         per_step: dict[str, object] = {}
-        for step in dict.fromkeys(step for run in repeats for step in run):
-            grades = [run.get(step) for run in repeats]
-            observation = _repeat_observation(grades)
-            per_step[step] = {
-                "reference_sha256": runs.references.get(variant, {}).get(step),
-                "runs": len(grades),
-                "status": "unmeasured" if observation == "unmeasured" else "measured",
-                "observation": observation,
-            }
+        for step in _repeat_steps(repeats):
+            per_step[step] = _step_repeat_observation(runs, variant, step)
         observations[variant] = per_step
     return observations
 

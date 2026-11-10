@@ -30,7 +30,7 @@ under Jev's 96k-character cap; whatever is clipped makes the input ``partial``.
 
 from __future__ import annotations
 
-from collections.abc import Mapping, Sequence
+from collections.abc import Iterator, Mapping, Sequence
 from dataclasses import dataclass, field, replace
 from enum import StrEnum
 from pathlib import Path
@@ -161,6 +161,10 @@ def _read_snapshot(root: Path, policy: InventoryPolicy | None) -> _Snapshot:
     return _Snapshot(files, unsupported)
 
 
+def _criterion_chunks(items: list[Criterion], size: int) -> Iterator[tuple[Criterion, ...]]:
+    return (tuple(items[start : start + size]) for start in range(0, len(items), size))
+
+
 def _chunks(
     question_set: RubricQuestionSet, symbol: Symbol
 ) -> list[tuple[Requirement, tuple[Criterion, ...]]]:
@@ -169,10 +173,9 @@ def _chunks(
         grouped.setdefault(criterion.requires, []).append(criterion)
     size = question_set.max_questions_per_request
     return [
-        (requirement, tuple(items[start : start + size]))
+        (requirement, criteria)
         for requirement in Requirement
-        for items in [grouped.get(requirement, [])]
-        for start in range(0, len(items), size)
+        for criteria in _criterion_chunks(grouped.get(requirement, []), size)
     ]
 
 
@@ -326,6 +329,24 @@ class RubricRunner:
         codebase = CodebaseIndex(snapshot.files) if self._asks_codebase else None
         judgements: list[Judgement] = []
         errors = []
+
+        def record_symbol(symbol: Symbol, text: str, hunks: list[DiffHunk], existed: bool) -> None:
+            current.symbols[symbol.identity] = symbol
+            unchanged = self._unchanged(symbol, prior, hunks, existed)
+            for requirement, criteria in _chunks(self.question_set, symbol):
+                judgement = self._judge(
+                    source,
+                    symbol,
+                    requirement,
+                    criteria,
+                    _Inputs(text, source.spec, codebase),
+                    prior if unchanged else None,
+                )
+                judgement = replace(judgement, span_unchanged=unchanged)
+                key = (*symbol.identity, requirement.value, judgement.criteria)
+                current.judgements[key] = judgement
+                judgements.append(judgement)
+
         for path, text in sorted(snapshot.files.items()):
             try:
                 symbols = extract_symbols(path, text)
@@ -334,21 +355,7 @@ class RubricRunner:
                 continue
             hunks = parse_diff_hunks(unified_diff_text(prior.files.get(path, ""), text, path))
             for symbol in symbols:
-                current.symbols[symbol.identity] = symbol
-                unchanged = self._unchanged(symbol, prior, hunks, path in prior.files)
-                for requirement, criteria in _chunks(self.question_set, symbol):
-                    judgement = self._judge(
-                        source,
-                        symbol,
-                        requirement,
-                        criteria,
-                        _Inputs(text, source.spec, codebase),
-                        prior if unchanged else None,
-                    )
-                    judgement = replace(judgement, span_unchanged=unchanged)
-                    key = (*symbol.identity, requirement.value, judgement.criteria)
-                    current.judgements[key] = judgement
-                    judgements.append(judgement)
+                record_symbol(symbol, text, hunks, path in prior.files)
         result = RubricCheckpoint(
             checkpoint=source.name,
             judgements=tuple(judgements),

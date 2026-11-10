@@ -216,8 +216,9 @@ def _sign_flip_sums(whole: Sequence[int], state_limit: int) -> dict[int, int] | 
     for step in whole:
         grown: dict[int, int] = {}
         for total, count in sums.items():
-            for moved in (total + step, total - step):
-                grown[moved] = grown.get(moved, 0) + count
+            positive, negative = total + step, total - step
+            grown[positive] = grown.get(positive, 0) + count
+            grown[negative] = grown.get(negative, 0) + count
         if len(grown) > state_limit:
             return None
         sums = grown

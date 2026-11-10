@@ -285,12 +285,6 @@
       "count": 1
     },
     {
-      "path": "orchestrator/src/raidar/engine/perf/report.py",
-      "code": "no-untyped-call",
-      "fingerprint": "9b4c4dae41e24404a47cce0acbb2c5ff89d6ce64c623bad8454f1fa6de81fa2d",
-      "count": 1
-    },
-    {
       "path": "orchestrator/src/raidar/engine/target/config.py",
       "code": "misc",
       "fingerprint": "96c3e3bdf943fe7bb9e90e7bb99533ae2c888394227d746f7d8c75e41981e58a",
@@ -1565,49 +1559,7 @@
     {
       "path": "orchestrator/tests/test_finding_baseline.py",
       "code": "no-untyped-call",
-      "fingerprint": "07874d3dc9b617538a44b92960473b304d68d35941f1df7b6d3841610d4f38f0",
-      "count": 1
-    },
-    {
-      "path": "orchestrator/tests/test_finding_baseline.py",
-      "code": "no-untyped-call",
       "fingerprint": "0948195647885c2b1108eedaf88fa273246858d0acf4545f05a1665f8de61718",
-      "count": 1
-    },
-    {
-      "path": "orchestrator/tests/test_finding_baseline.py",
-      "code": "no-untyped-call",
-      "fingerprint": "16f26d4bfbfcd9996c5390196b8ded0f91fc66f7b1457f088b91d6198622a87f",
-      "count": 1
-    },
-    {
-      "path": "orchestrator/tests/test_finding_baseline.py",
-      "code": "no-untyped-call",
-      "fingerprint": "1f259dd9ba076720a9518791a411af9db53157456cdcacc8e400b766f94525a4",
-      "count": 1
-    },
-    {
-      "path": "orchestrator/tests/test_finding_baseline.py",
-      "code": "no-untyped-call",
-      "fingerprint": "258bad4f72cfb81de65bd466534a7ac46a433768be63b28205ad855cd34db2d0",
-      "count": 1
-    },
-    {
-      "path": "orchestrator/tests/test_finding_baseline.py",
-      "code": "no-untyped-call",
-      "fingerprint": "2f026355ba57bec12945c6ce2df3efeb6198a0e23322bbaaa174b5622b3cccde",
-      "count": 1
-    },
-    {
-      "path": "orchestrator/tests/test_finding_baseline.py",
-      "code": "no-untyped-call",
-      "fingerprint": "3b226a289767b50924c69b04ac3200148f95703c9a7ea8ae5cd0190d85437026",
-      "count": 1
-    },
-    {
-      "path": "orchestrator/tests/test_finding_baseline.py",
-      "code": "no-untyped-call",
-      "fingerprint": "4298152f967a00b578296a97a86e625138778e8950848924afcb79178b4ba788",
       "count": 1
     },
     {
@@ -1621,18 +1573,6 @@
       "code": "no-untyped-call",
       "fingerprint": "64fa7bf033b536087becad95b473ecb94f4920313e35482c79bace4050c495d9",
       "count": 1
-    },
-    {
-      "path": "orchestrator/tests/test_finding_baseline.py",
-      "code": "no-untyped-call",
-      "fingerprint": "6a0bc96febad91976bbb979f4727536afee918285c4187ac7bda1e9d11388d43",
-      "count": 1
-    },
-    {
-      "path": "orchestrator/tests/test_finding_baseline.py",
-      "code": "no-untyped-call",
-      "fingerprint": "6baaa6a8eb2774c4ec9c8b049957e02873867141a55441b46960806f0cee55c5",
-      "count": 3
     },
     {
       "path": "orchestrator/tests/test_finding_baseline.py",
@@ -1661,31 +1601,7 @@
     {
       "path": "orchestrator/tests/test_finding_baseline.py",
       "code": "no-untyped-call",
-      "fingerprint": "83228b1954ebbe0671ba2dcadefda4008c49f4297b2826275777e39eb99a1295",
-      "count": 1
-    },
-    {
-      "path": "orchestrator/tests/test_finding_baseline.py",
-      "code": "no-untyped-call",
-      "fingerprint": "8783ca87a21dcfd17eb05c946dc1db47f6e57a79fd2a2b37525d825fcb04b28d",
-      "count": 1
-    },
-    {
-      "path": "orchestrator/tests/test_finding_baseline.py",
-      "code": "no-untyped-call",
-      "fingerprint": "8f061d4ef13ca5acce0d483e9b822766962b05b270017d6972f12ea16672f018",
-      "count": 1
-    },
-    {
-      "path": "orchestrator/tests/test_finding_baseline.py",
-      "code": "no-untyped-call",
       "fingerprint": "8f23d979fe21cb5676e291ff1d05534485b667d02ca97fe9ab2e4bf0109632ac",
-      "count": 1
-    },
-    {
-      "path": "orchestrator/tests/test_finding_baseline.py",
-      "code": "no-untyped-call",
-      "fingerprint": "90ed0cf057cc6f7abffa4a8c3f83902804118447d1b2b36d151086fdb4cbd0b4",
       "count": 1
     },
     {
@@ -1697,73 +1613,7 @@
     {
       "path": "orchestrator/tests/test_finding_baseline.py",
       "code": "no-untyped-call",
-      "fingerprint": "9b3cc1277f2c6c00ee3056e78414b9aa6353372ed866b19e84264b2140f61733",
-      "count": 1
-    },
-    {
-      "path": "orchestrator/tests/test_finding_baseline.py",
-      "code": "no-untyped-call",
-      "fingerprint": "9c849ca752bfdd2da94ac5ddb71a890538db3478ace02704b9e3055b11075676",
-      "count": 1
-    },
-    {
-      "path": "orchestrator/tests/test_finding_baseline.py",
-      "code": "no-untyped-call",
-      "fingerprint": "9eedc281c919f31413fae3d2b30dccced9f7046fb4f9380a0c152f38b0ba92da",
-      "count": 1
-    },
-    {
-      "path": "orchestrator/tests/test_finding_baseline.py",
-      "code": "no-untyped-call",
-      "fingerprint": "a544ae2203472812ab3518f3e167b1304fa43ae55e88966e342d64632b31304b",
-      "count": 1
-    },
-    {
-      "path": "orchestrator/tests/test_finding_baseline.py",
-      "code": "no-untyped-call",
-      "fingerprint": "b78af9204787cc974e483348c9b85a4cf33e3a53dcde4b50b9bc44afdc8e52c2",
-      "count": 1
-    },
-    {
-      "path": "orchestrator/tests/test_finding_baseline.py",
-      "code": "no-untyped-call",
-      "fingerprint": "b81d9a27e8c552248136ecf4fd5052e802540c471c6933ea3c16fe9460f44ee2",
-      "count": 1
-    },
-    {
-      "path": "orchestrator/tests/test_finding_baseline.py",
-      "code": "no-untyped-call",
-      "fingerprint": "bb3628cb0ce4bdc485e0200f2d43f62378a37389a512c0873c4f37d4910a85d4",
-      "count": 4
-    },
-    {
-      "path": "orchestrator/tests/test_finding_baseline.py",
-      "code": "no-untyped-call",
-      "fingerprint": "c0939230a3b0146e3a83797e55799507390dc3d2e9b99b4594e6bf17a25003a9",
-      "count": 1
-    },
-    {
-      "path": "orchestrator/tests/test_finding_baseline.py",
-      "code": "no-untyped-call",
-      "fingerprint": "e282dfb567ede72103613d006bb7c1b1f3038cb85a29380b2640abace434d593",
-      "count": 1
-    },
-    {
-      "path": "orchestrator/tests/test_finding_baseline.py",
-      "code": "no-untyped-call",
       "fingerprint": "e33e13ed70e68b86e20b6e1af28d87344198502dbea77702c252f4034e3109a4",
-      "count": 1
-    },
-    {
-      "path": "orchestrator/tests/test_finding_baseline.py",
-      "code": "no-untyped-call",
-      "fingerprint": "e62d666240fb738037d0c499c7a52b02b84a2afde2bfc368cfcda60bb6e214c8",
-      "count": 1
-    },
-    {
-      "path": "orchestrator/tests/test_finding_baseline.py",
-      "code": "no-untyped-call",
-      "fingerprint": "fc3804f51aa1e5b7d6cabeef67cc34d673ecf456bfb005e8eafba5359ee98542",
       "count": 1
     },
     {
@@ -1776,12 +1626,6 @@
       "path": "orchestrator/tests/test_finding_baseline.py",
       "code": "no-untyped-def",
       "fingerprint": "158489a1d0a3296eedceb41d2fed70d2594eb09d3959c3b8d16cb91ca5fb22a8",
-      "count": 1
-    },
-    {
-      "path": "orchestrator/tests/test_finding_baseline.py",
-      "code": "no-untyped-def",
-      "fingerprint": "3d37e24ae3488ac784028c9c5d6a052e967c8888b29bbffce16428101b9bd9cb",
       "count": 1
     },
     {
@@ -4637,19 +4481,7 @@
     {
       "path": "scripts/checks/check-finding-baseline.py",
       "code": "type-arg",
-      "fingerprint": "54de6fb103625bf81c172c9cc0d34b53c24524c6efeda99fa7a68e30f2a57129",
-      "count": 1
-    },
-    {
-      "path": "scripts/checks/check-finding-baseline.py",
-      "code": "type-arg",
       "fingerprint": "5c3ff14cfc11a2c00597c0d4d8a90444348adadf6fdbc35ac1764c4eec329836",
-      "count": 1
-    },
-    {
-      "path": "scripts/checks/check-finding-baseline.py",
-      "code": "type-arg",
-      "fingerprint": "88b6572bd70aa5e9ba829f0cd206dbc0e895dbabe26e83310f8eb45c464384a4",
       "count": 1
     },
     {
@@ -4704,12 +4536,6 @@
       "path": "scripts/checks/check-repository-paths.py",
       "code": "no-untyped-def",
       "fingerprint": "b667e06d3cdb91f86185ab5e4fbcc9312c87799d707516ba01d5b4e3c5a0bf60",
-      "count": 1
-    },
-    {
-      "path": "scripts/checks/check-structure.py",
-      "code": "var-annotated",
-      "fingerprint": "de9406d81228683561893964067349edddfbdbb70b1986f17553483f812e6c94",
       "count": 1
     },
     {

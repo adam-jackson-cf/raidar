@@ -14,7 +14,7 @@ so a miss under heavy contention is told apart from one at pilot concurrency.
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -70,6 +70,25 @@ def _windows(loaded: JobSamples) -> tuple[list[TrialWindow], int]:
     return timed, len(windows) - len(timed)
 
 
+def _split_bucket(
+    loaded: JobSamples,
+    check: PhaseCheck,
+    peaks: dict[tuple[str, str], int],
+    min_samples: int,
+    keep: Callable[[int], bool],
+) -> PhaseCheck | None:
+    samples = [
+        sample
+        for trial in loaded.trials
+        if (peak := peaks.get((trial.run, trial.trial))) is not None and keep(peak)
+        for sample in trial.samples
+    ]
+    judged = check_budgets(
+        samples, budgets=(check.budget,), min_samples=min_samples, multi_step=True
+    )
+    return judged[0] if judged and judged[0].samples else None
+
+
 def _split(
     loaded: JobSamples, check: PhaseCheck, peaks: dict[tuple[str, str], int], min_samples: int
 ) -> list[SplitCheck]:
@@ -79,17 +98,9 @@ def _split(
     }
     splits = []
     for label, keep in buckets.items():
-        samples = [
-            sample
-            for trial in loaded.trials
-            if (peak := peaks.get((trial.run, trial.trial))) is not None and keep(peak)
-            for sample in trial.samples
-        ]
-        judged = check_budgets(
-            samples, budgets=(check.budget,), min_samples=min_samples, multi_step=True
-        )
-        if judged and judged[0].samples:
-            splits.append(SplitCheck(label, judged[0]))
+        split = _split_bucket(loaded, check, peaks, min_samples, keep)
+        if split is not None:
+            splits.append(SplitCheck(label, split))
     return splits
 
 

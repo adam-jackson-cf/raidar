@@ -97,6 +97,40 @@ def test_call_boundary_and_its_consumers_are_allowed() -> None:
     )
 
 
+@pytest.mark.parametrize("selection", [[], [".agents/skills"], [".agents/skills/bad_skill"]])
+@pytest.mark.parametrize("report_format", ["text", "findings-json"])
+def test_skill_directory_policy_scans_skills_without_python(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+    selection: list[str],
+    report_format: str,
+) -> None:
+    (tmp_path / ".agents/skills/good-skill").mkdir(parents=True)
+    assert rules.main(["--repo-root", str(tmp_path), "--format", report_format]) == 0
+    capsys.readouterr()
+    (tmp_path / ".agents/skills/bad_skill").mkdir()
+    assert (
+        rules.main(
+            [
+                "--repo-root",
+                str(tmp_path),
+                "--format",
+                report_format,
+                *selection,
+            ]
+        )
+        == 1
+    )
+    captured = capsys.readouterr()
+    rendered = captured.err if report_format == "text" else captured.out
+    assert ".agents/skills/bad_skill" in rendered
+    assert "PYQ106" in rendered
+    if report_format == "text":
+        assert len(captured.err.splitlines()) == 1
+        assert "; rename the skill directory" in captured.err
+    assert rules.main(["--repo-root", str(tmp_path), ".agents/skills/good-skill"]) == 0
+
+
 @pytest.mark.parametrize(
     "prefix",
     [
@@ -111,6 +145,61 @@ def test_stage_data_names_do_not_relax_python_module_names(prefix: str) -> None:
     assert [item.code for item in found] == ["PYQ105"]
     found = rules.structure_diagnostics_for_relpath(prefix + "helpers/main.py")
     assert [item.code for item in found] == ["PYQ103"]
+
+
+@pytest.mark.parametrize(
+    "source",
+    [
+        "import subprocess\nclass Other:\n    def run_or_raise(self):\n"
+        "        subprocess.run([])\n",
+        "import subprocess\ndef run_or_raise():\n    def nested():\n        subprocess.run([])\n",
+    ],
+)
+def test_process_approval_does_not_leak_to_same_named_methods_or_nested_functions(
+    source: str,
+) -> None:
+    found = rules.class_interface_diagnostics_for_source(source, PREFIX + "cli/process.py")
+    assert [item.code for item in found] == ["PYQ220"]
+
+
+def test_process_import_aliases_are_resolved_in_their_own_function_scope() -> None:
+    source = (
+        "def run_or_raise():\n"
+        "    import subprocess as process\n"
+        "    process.run([])\n"
+        "def unrelated():\n"
+        "    import widget as process\n"
+        "    process.run([])\n"
+    )
+    assert rules.class_interface_diagnostics_for_source(source, PREFIX + "cli/process.py") == []
+
+
+def test_json_data_annotation_approval_is_exact_not_a_collaborator_escape() -> None:
+    imports = "from typing import Any\nfrom collections.abc import Mapping\n"
+    path = PREFIX + "scoring/framework/context.py"
+    data = imports + "class AssessContext:\n    config: Mapping[str, Any]\n"
+    assert rules.class_interface_diagnostics_for_source(data, path) == []
+    for changed in (
+        data.replace("config:", "collaborator:"),
+        data.replace("Mapping[str, Any]", "list[Any]"),
+    ):
+        found = rules.class_interface_diagnostics_for_source(changed, path)
+        assert [item.code for item in found] == ["PYQ231"]
+
+
+def test_named_contract_aliases_do_not_hide_any_inside_quoted_nested_annotations() -> None:
+    source = (
+        "from typing import Any\n"
+        "Payload = list['Any']\n"
+        "class Boundary:\n"
+        "    collaborator: 'Payload'\n"
+        "    def bind(self, other: Payload):\n"
+        "        local_json: dict[str, Any] = {}\n"
+    )
+    found = rules.class_interface_diagnostics_for_source(
+        source, PREFIX + "subject/agent/protocol.py"
+    )
+    assert [(item.code, item.line) for item in found] == [("PYQ231", 4), ("PYQ231", 5)]
 
 
 @pytest.mark.parametrize(

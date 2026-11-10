@@ -260,18 +260,24 @@ def contract_violations(paths: list[str], repo_root: Path) -> list[str]:
         if not (path.startswith("contract/src/") and path.endswith(".py")):
             continue
         tree = ast.parse((repo_root / path).read_bytes(), filename=path)
-        for node in ast.walk(tree):
-            if isinstance(node, ast.Import):
-                names = [alias.name for alias in node.names]
-            elif isinstance(node, ast.ImportFrom) and node.level == 0 and node.module:
-                names = [node.module]
-            else:
-                continue
-            found.extend(
-                f"{path}:{node.lineno}: the contract never imports {name}"
-                for name in names
-                if name.split(".")[0] in CONTRACT_FORBIDDEN_IMPORTS
-            )
+        found.extend(_contract_import_violations(path, tree))
+    return found
+
+
+def _contract_import_violations(path: str, tree: ast.Module) -> list[str]:
+    found: list[str] = []
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            names = [alias.name for alias in node.names]
+        elif isinstance(node, ast.ImportFrom) and node.level == 0 and node.module:
+            names = [node.module]
+        else:
+            continue
+        found.extend(
+            f"{path}:{node.lineno}: the contract never imports {name}"
+            for name in names
+            if name.split(".")[0] in CONTRACT_FORBIDDEN_IMPORTS
+        )
     return found
 
 

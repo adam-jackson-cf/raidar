@@ -56,7 +56,9 @@ class JevAudit:
         for trial in trials:
             bare = trial.record.trial.trial_id
             names = (trial.review_id, f"{trial.job_id}/{bare}")
-            decisions = [record for name in names for record in self.decisions.get(name, [])]
+            decisions: list[DecisionRecord] = []
+            for name in names:
+                decisions.extend(self.decisions.get(name, []))
             unresolved = self.decisions.get(bare, [])
             note = None
             if len(by_bare[bare]) == 1:

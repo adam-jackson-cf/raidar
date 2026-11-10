@@ -471,6 +471,16 @@ their current runtime primitives and declared outputs. Historical registered
 digests remain valid history; `var/` and wall-clock age are not evidence.
 Repair stage evidence with `make stage-check NAME=<namespace/name>`.
 
+Python policy is target-owned in `scripts/checks/check-python-quality.py`: unknown
+Python roots fail closed, commands require approved kebab-case names, tests map to
+canonical groups, and generic module/directory names require exact approval.
+Skills use kebab-case. Production and command subprocess calls stay in mapped
+seam functions (test process safety is checked separately); dynamic imports stay
+in explicit adapters, and collaborator contracts require named callable aliases
+and concrete types. Production and command loop/comprehension depth is capped at
+two. Existing identity-bound findings are ratcheted individually in
+`.omp/baselines/python-policy.json`; new findings or baseline growth fail.
+
 Docker-backed tests (`make test-docker`), the N1 overhead gate (`make perf-gate`) and `make security-gate` remain separate checks on a ready Docker target.
 
 Tests are tiered (fast, slow, quality, docker, security, perf) with their own targets (`make test-fast`, `test-slow`, `test-quality`, `test-docker`); see [test tiers](.agents/skills/test-patterns/references/test-tiers.md).

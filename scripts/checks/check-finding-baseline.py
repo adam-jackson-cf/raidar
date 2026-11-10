@@ -13,6 +13,7 @@ import sys
 from collections import Counter
 from collections.abc import Mapping
 from pathlib import Path, PurePosixPath
+from typing import Any
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -130,14 +131,48 @@ def parse_mypy(text: str, *, root: str, sources: Mapping[str, str]) -> list[dict
         else:
             raise ScanInputError(f"unrecognised mypy scan line: {line}")
     total = sum(counts.values())
-    if (not total and not success) or (success and total) or (
-        summary_count is not None and summary_count != total
+    if (
+        (not total and not success)
+        or (success and total)
+        or (summary_count is not None and summary_count != total)
     ):
         raise ScanInputError("incomplete or inconsistent mypy scan")
     return _findings(counts)
 
 
-def _entries(findings: list[dict]) -> dict[tuple[str, str, str], int]:
+def parse_findings_json(text: str, *, root: str) -> list[dict[str, object]]:
+    """Normalize complete reports emitted by repository-owned static checkers."""
+    try:
+        report = json.loads(text)
+    except (TypeError, ValueError) as exc:
+        raise ScanInputError("missing, empty or malformed findings JSON scan") from exc
+    if not isinstance(report, list):
+        raise ScanInputError("findings JSON scan must be a diagnostic list")
+    counts: Counter[tuple[str, str, str]] = Counter()
+    for item in report:
+        if not isinstance(item, dict) or set(item) != {"path", "code", "symbol", "source_line"}:
+            raise ScanInputError("invalid findings JSON diagnostic shape")
+        path, code, symbol, source_line = (
+            item[key] for key in ("path", "code", "symbol", "source_line")
+        )
+        if (
+            not isinstance(code, str)
+            or not code.strip()
+            or not isinstance(symbol, str)
+            or "\n" in symbol
+            or "\r" in symbol
+            or not isinstance(source_line, str)
+            or "\n" in source_line
+            or "\r" in source_line
+        ):
+            raise ScanInputError("invalid findings JSON code, symbol or source line")
+        counts[(_path(path, root), code, fingerprint(code, symbol, source_line))] += 1
+    findings: list[dict[str, object]] = _findings(counts)
+    _entries(findings)
+    return findings
+
+
+def _entries(findings: list[dict[str, Any]]) -> dict[tuple[str, str, str], int]:
     if not isinstance(findings, list):
         raise ScanInputError("findings must be a list")
     entries = {}
@@ -168,13 +203,16 @@ def _baseline(document: dict) -> dict[tuple[str, str, str], int]:
         or set(document) != {"schemaVersion", "tool", "findings"}
         or type(document["schemaVersion"]) is not int
         or document["schemaVersion"] != 1
-        or document["tool"] not in ("ruff", "mypy")
+        or not isinstance(document["tool"], str)
+        or re.fullmatch(r"[a-z0-9-]+", document["tool"]) is None
     ):
         raise ScanInputError("invalid baseline schema or tool")
     return _entries(document["findings"])
 
 
-def evaluate_baseline(baseline: dict, findings: list[dict], base_baseline: dict) -> tuple[int, list[str]]:
+def evaluate_baseline(
+    baseline: dict[str, Any], findings: list[dict[str, Any]], base_baseline: dict[str, Any]
+) -> tuple[int, list[str]]:
     recorded = _baseline(baseline)
     base = _baseline(base_baseline)
     current = _entries(findings)
@@ -185,12 +223,18 @@ def evaluate_baseline(baseline: dict, findings: list[dict], base_baseline: dict)
         identity = " ".join(key)
         old, new, previous = recorded.get(key, 0), current.get(key, 0), base.get(key, 0)
         if new > old:
-            lines.append(f"BASELINE.new {identity}: {old} -> {new}; fix the new finding, do not refresh the baseline")
+            lines.append(
+                f"BASELINE.new {identity}: {old} -> {new}; "
+                "fix the new finding, do not refresh the baseline"
+            )
         if new < old:
             fix = "remove the stale entry" if new == 0 else "reduce the baseline count"
             lines.append(f"BASELINE.stale {identity}: {old} -> {new}; {fix}")
         if old > previous:
-            lines.append(f"BASELINE.refresh {identity}: {previous} -> {old}; revert the baseline addition or count increase")
+            lines.append(
+                f"BASELINE.refresh {identity}: {previous} -> {old}; "
+                "revert the baseline addition or count increase"
+            )
     return int(bool(lines)), lines
 
 
@@ -211,7 +255,8 @@ def read_base_baseline(
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--tool", choices=("ruff", "mypy"), required=True)
+    parser.add_argument("--tool", required=True)
+    parser.add_argument("--format", choices=("ruff", "mypy", "findings-json"))
     parser.add_argument("--baseline", required=True)
     parser.add_argument("--report", required=True)
     parser.add_argument("--root", default=str(ROOT))
@@ -221,6 +266,11 @@ def main() -> int:
     args = parser.parse_args()
     root = Path(args.root).resolve()
     try:
+        if re.fullmatch(r"[a-z0-9-]+", args.tool) is None:
+            raise ScanInputError("--tool must match [a-z0-9-]+")
+        report_format = args.format or args.tool
+        if report_format not in {"ruff", "mypy", "findings-json"}:
+            raise ScanInputError("custom tools require --format findings-json")
         baseline_path = root / args.baseline
         baseline = json.loads(baseline_path.read_text(encoding="utf-8"))
         if args.base_baseline:
@@ -228,14 +278,18 @@ def main() -> int:
         else:
             relative = baseline_path.resolve().relative_to(root).as_posix()
             result = subprocess.run(
-                ["git", "show", f"{args.base_ref}:{relative}"], cwd=root,
-                text=True, capture_output=True, check=False,
+                ["git", "show", f"{args.base_ref}:{relative}"],
+                cwd=root,
+                text=True,
+                capture_output=True,
+                check=False,
             )
             base_baseline = read_base_baseline(result, baseline, relative, args.base_ref)
         _baseline(baseline)
         if baseline["tool"] != args.tool:
             raise ScanInputError("baseline tool does not match --tool")
         report = (root / args.report).read_text(encoding="utf-8")
+
         # Load only diagnostic sources, lazily through the parser's mapping seam.
         class Sources(dict):
             def __missing__(self, path):
@@ -247,10 +301,12 @@ def main() -> int:
                 except (OSError, ValueError) as exc:
                     raise ScanInputError(f"{path}: missing or unreadable source") from exc
 
-        parse = parse_ruff if args.tool == "ruff" else parse_mypy
-        status, lines = evaluate_baseline(
-            baseline, parse(report, root=str(root), sources=Sources()), base_baseline
-        )
+        if report_format == "findings-json":
+            findings = parse_findings_json(report, root=str(root))
+        else:
+            parse = parse_ruff if report_format == "ruff" else parse_mypy
+            findings = parse(report, root=str(root), sources=Sources())
+        status, lines = evaluate_baseline(baseline, findings, base_baseline)
     except (OSError, ValueError, UnicodeError) as exc:
         print(f"baseline-check: {exc}", file=sys.stderr)
         return 2

@@ -152,7 +152,7 @@ def test_path_policy_accepts_owned_paths(tmp_path: Path) -> None:
     ("relative", "source", "rule"),
     [
         ("notes.txt", "misplaced\n", "STRUCT.folder-placement"),
-        ("orchestrator/tests/v2/test_probe.py", "VALUE = 1\n", "NAME.conventions"),
+        ("orchestrator/src/raidar/engine/trial/v2/probe.py", "VALUE = 1\n", "NAME.conventions"),
         (
             "orchestrator/src/raidar/engine/trial/probe.py",
             "def test_probe():\n    pass\n",

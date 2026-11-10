@@ -226,12 +226,15 @@ class _Combiner:
         cases: dict[str, list[str]] = {}
         for step, summary in self.dynamic.grades.get(REFERENCE, {}).items():
             for case in summary.origin_cases:
-                cases[case] = sorted(
-                    variant
-                    for variant in self.dynamic.grades
-                    if variant != REFERENCE and case in _sensitive(self.dynamic, variant, step)
-                )
+                cases[case] = self._sensitive_variants(case, step)
         return cases
+
+    def _sensitive_variants(self, case: str, step: str) -> list[str]:
+        return sorted(
+            variant
+            for variant in self.dynamic.grades
+            if variant != REFERENCE and case in _sensitive(self.dynamic, variant, step)
+        )
 
     def case_buckets(self) -> dict[str, list[object]]:
         buckets: dict[str, list[object]] = {

@@ -3117,63 +3117,9 @@
       "count": 1
     },
     {
-      "path": "scripts/checks/check-finding-baseline.py",
-      "code": "E306",
-      "fingerprint": "89e89459673e1602cc3f913641051491eb34079d161dbabd4b05052fb8c269a5",
-      "count": 1
-    },
-    {
-      "path": "scripts/checks/check-finding-baseline.py",
-      "code": "E501",
-      "fingerprint": "249c48d0edeff627309e723e88b98a01bd6c8c5054b9770b77c933965c4e1f09",
-      "count": 1
-    },
-    {
-      "path": "scripts/checks/check-finding-baseline.py",
-      "code": "E501",
-      "fingerprint": "35dfafba607316326c67cdc7a618a16006ed993db492c145778ddc224dc0b018",
-      "count": 1
-    },
-    {
-      "path": "scripts/checks/check-finding-baseline.py",
-      "code": "E501",
-      "fingerprint": "dd0ebe7df69f4d4b9fa5d5832fb6ca43ee6220aee3eeea8965cdc93ba7058c5b",
-      "count": 1
-    },
-    {
       "path": "scripts/checks/check-python-fanout.py",
       "code": "PLR0913",
       "fingerprint": "e923c17b62309a65d0e49893489bfd9d879b4363e4b827cac502a305d367b012",
-      "count": 1
-    },
-    {
-      "path": "scripts/checks/check-python-quality.py",
-      "code": "E501",
-      "fingerprint": "2bef6efc8f4daad04c5c480fb7588462a4f691746e4db63d4c3010ce807ab649",
-      "count": 1
-    },
-    {
-      "path": "scripts/checks/check-python-quality.py",
-      "code": "E501",
-      "fingerprint": "30fa9736dca4b35bd7ea7fae7d26ece6824736f2a4a6dbbeca830e0771acf9f7",
-      "count": 1
-    },
-    {
-      "path": "scripts/checks/check-python-quality.py",
-      "code": "E501",
-      "fingerprint": "3b919db1abbef1104476a0889c7af44e29bed15c1964076a8dedf6ac0602a693",
-      "count": 1
-    },
-    {
-      "path": "scripts/checks/check-python-quality.py",
-      "code": "E501",
-      "fingerprint": "7526c2863da0dac1cc9bd2a82ea479c7ba501177e3ffe8246599dabc1d0c6c8f",
-      "count": 1
-    },
-    {
-      "path": "scripts/checks/check-python-quality.py",
-      "code": "PERF401",
-      "fingerprint": "85326ec3db7e6b1fe77f63a97dedebdced451ecae8b573451e7b3b32baad7d2e",
       "count": 1
     },
     {
@@ -3216,12 +3162,6 @@
       "path": "scripts/checks/check-repository-paths.py",
       "code": "SIM105",
       "fingerprint": "2b4a65c4a0b18eb797e6de9ebbc5937d42d558c6bc7999474cd1bd35575e022a",
-      "count": 1
-    },
-    {
-      "path": "scripts/checks/check-ruff-suppressions.py",
-      "code": "C901",
-      "fingerprint": "5a502a4c93ee55197734ed8de5ff697ff9c286d2c7fd24c2dfdb32e042c228bc",
       "count": 1
     },
     {

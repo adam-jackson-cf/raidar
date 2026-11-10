@@ -54,6 +54,10 @@ def variant_snapshots(problem: ImportedProblem, empty: Path) -> dict[str, dict[s
 GradeKey = tuple[str, str, int]
 
 
+def _variant_grade_keys(variant: str, snapshots: dict[str, Path], repeats: int) -> list[GradeKey]:
+    return [(variant, step, repeat) for repeat in range(repeats) for step in snapshots]
+
+
 def _by_repeat(
     keys: list[GradeKey], grades: list[Grade], repeats: int
 ) -> dict[str, list[StepGrades]]:
@@ -97,11 +101,8 @@ async def grade_references(
                 )
             return Grade.from_verifier(result.grade)
 
-        keys: list[GradeKey] = [
-            (variant, step, repeat)
-            for variant in (POSITIVE, NEGATIVE)
-            for repeat in range(repeats)
-            for step in snapshots[variant]
-        ]
+        keys: list[GradeKey] = []
+        for variant in (POSITIVE, NEGATIVE):
+            keys.extend(_variant_grade_keys(variant, snapshots[variant], repeats))
         grades = await asyncio.gather(*(one(*key) for key in keys))
     return _by_repeat(keys, list(grades), repeats)

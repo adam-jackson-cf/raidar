@@ -349,24 +349,28 @@ def build_plan(
     arms = arm_blueprints(loaded, pack, agent_override=options.agent_override)
     _check_arm_identities(lock, arms)
     trials: list[PlannedTrial] = []
+
+    def append_problem_trials(problem: ProblemTarget, attempt: int) -> None:
+        steps = problem.run_steps(options.max_checkpoints)
+        order = arm_order(spec.analysis.seed, attempt, problem.index, list(arms))
+        for position, arm_id in enumerate(order):
+            trials.append(
+                PlannedTrial(
+                    trial_id=f"b{attempt:02d}-p{problem.index}-{arm_id}",
+                    attempt=attempt,
+                    order=position,
+                    sequence=len(trials),
+                    arm=arm_id,
+                    problem=str(problem.ref),
+                    problem_index=problem.index,
+                    steps=steps,
+                    hashes=hashes.trial(arms[arm_id], problem, attempt, steps),
+                )
+            )
+
     for attempt in range(spec.analysis.attempts):
         for problem in problems:
-            steps = problem.run_steps(options.max_checkpoints)
-            order = arm_order(spec.analysis.seed, attempt, problem.index, list(arms))
-            for position, arm_id in enumerate(order):
-                trials.append(
-                    PlannedTrial(
-                        trial_id=f"b{attempt:02d}-p{problem.index}-{arm_id}",
-                        attempt=attempt,
-                        order=position,
-                        sequence=len(trials),
-                        arm=arm_id,
-                        problem=str(problem.ref),
-                        problem_index=problem.index,
-                        steps=steps,
-                        hashes=hashes.trial(arms[arm_id], problem, attempt, steps),
-                    )
-                )
+            append_problem_trials(problem, attempt)
     return ExperimentPlan(
         loaded=loaded,
         lock_sha256=str(_lock_field(lock, "lock_sha256")),
