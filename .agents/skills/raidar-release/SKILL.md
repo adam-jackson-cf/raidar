@@ -14,6 +14,12 @@ description: "Use when changing a released Raidar agent, workflow, stage package
 - Treat agent/workflow fingerprints, stage-tree/1 shipped bytes, primitive_code inventories,
   scorer manifest descriptions, observation subject trajectory, evidence input oracle.cases
   and problem oracle/ bundles as identity-bearing.
+- Test-only work must not change identity-bearing bytes: the grading digest
+  scope, `primitive_code` import closures, or released package bytes. Reach
+  that code through existing interfaces or monkeypatched runners instead.
+  An identity change requires its own reviewed commit with before/after
+  values, a reason, and any required revalidation scheduled; a test slice
+  that moves identity fails review.
 - Preserve legacy wire names including Harness CLI ids, raidar_oracle_plugin.py,
   raidar-oracle/, oracle_leak, oracle_bundle and oracle-bundle.json unless deliberately releasing them.
 
