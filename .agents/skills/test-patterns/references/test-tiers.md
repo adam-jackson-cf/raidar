@@ -42,10 +42,16 @@ owners, concrete remedies and review deadlines. The 30-second wall and
 Dispatch `test-budget-measure.yml` at a fixed revision (default five sequential
 jobs), then run `make test-budget-record RUNS="<GitHub run ids>"` to import
 successful complete artifacts. Ordinary reports are never baseline records.
+New baseline records must match GitHub measurement artifacts as canonical JSON.
+Retained trusted records cannot be rewritten and need
+no repeated artifact download after retention expires.
 Policy increases require an owner GitHub review bound to the exact policy diff
 digest and commit, verified through the API; a committed approval boolean is
 not authorization. Status remains provisional until verified measure evidence.
 The first baseline campaign follows in Unit 6b after this tooling merges.
+The first calibrated limits and their recomputed outlier ceilings need no
+approval when replacing null limits under an unchanged profile and formulas.
+Later exception additions, ceiling increases and deadline extensions do.
 
 For an increase, request the owner's review with one body line
 `Policy-Diff-SHA256: <policy_diff_digest(base, proposed)>`. Record its

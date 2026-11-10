@@ -90,7 +90,10 @@ def _trusted_base(root: Path, repository: str | None) -> str:
 
 
 def load_base_policy(root: Path, repository: str | None = None) -> dict[str, Any] | None:
-    base = _trusted_base(root, repository)
+    return _policy_at_base(root, _trusted_base(root, repository))
+
+
+def _policy_at_base(root: Path, base: str) -> dict[str, Any] | None:
     paths = (
         _run(root, "git", "ls-tree", "--name-only", base, "--", POLICY_PATH).decode().splitlines()
     )
@@ -274,17 +277,67 @@ def seal_measurement(root: Path, report_path: Path, index: str) -> None:
     )
 
 
+def _baselines_at_base(root: Path, base: str) -> dict[str, dict[str, Any]]:
+    directory = ".omp/test-budgets/baselines/"
+    paths = (
+        _run(root, "git", "ls-tree", "-r", "--name-only", base, "--", directory)
+        .decode()
+        .splitlines()
+    )
+    return {
+        path.removeprefix(directory): json.loads(_run(root, "git", "show", f"{base}:{path}"))
+        for path in paths
+        if path.endswith(".json")
+    }
+
+
+def authenticate_baselines(
+    root: Path,
+    current: dict[str, dict[str, Any]],
+    trusted: dict[str, dict[str, Any]],
+    repository: str | None = None,
+) -> None:
+    """Keep trusted records immutable and authenticate new observations externally."""
+    for name, report in current.items():
+        if name in trusted and _canonical(report) != _canonical(trusted[name]):
+            raise ValueError(f"{RULE}: trusted immutable baseline changed: {name}")
+    additions = {name: report for name, report in current.items() if name not in trusted}
+    if not additions:
+        return
+    repository = repository or _repository(root)
+    downloaded: dict[str, set[bytes]] = {}
+    for name, report in additions.items():
+        provenance = report["measurement"]
+        run_id = str(provenance["runId"])
+        job_id = str(provenance["jobId"])
+        if not run_id.isdecimal() or not job_id.isdecimal() or name != f"{run_id}-{job_id}.json":
+            raise ValueError(f"{RULE}: baseline filename or measurement identity is invalid")
+        if run_id not in downloaded:
+            downloaded[run_id] = {
+                _canonical(observed)
+                for observed, _ in _measurement_artifacts(root, repository, int(run_id))
+            }
+        if _canonical(report) not in downloaded[run_id]:
+            raise ValueError(f"{RULE}: baseline differs from GitHub measurement artifact: {name}")
+
+
 def _check_command(args: argparse.Namespace, checker: ModuleType) -> int:
     if args.report is None or not args.invocation:
         raise ValueError(f"{RULE}: check requires --report and --invocation")
     revision = args.revision or _run(args.root, "git", "rev-parse", "HEAD").decode().strip()
     policy = _json(args.root / POLICY_PATH)
-    baselines = [
-        _json(path) for path in sorted((args.root / ".omp/test-budgets/baselines").glob("*.json"))
-    ]
+    baseline_records = {
+        path.name: _json(path)
+        for path in sorted((args.root / ".omp/test-budgets/baselines").glob("*.json"))
+    }
+    baselines = list(baseline_records.values())
     ci = args.ci or os.environ.get("GITHUB_ACTIONS") == "true"
     repository = _repository(args.root) if ci or policy.get("status") == "accepted" else None
-    base = load_base_policy(args.root, repository)
+    base_ref = _trusted_base(args.root, repository)
+    base = _policy_at_base(args.root, base_ref)
+    authenticate_baselines(
+        args.root, baseline_records, _baselines_at_base(args.root, base_ref), repository
+    )
     digest = checker.policy_diff_digest(base, policy) if base is not None else None
     approvals = [
         _json(path) for path in sorted((args.root / ".omp/test-budgets/approvals").glob("*.json"))

@@ -506,6 +506,20 @@ def _increase_approved(policy: Json, context: BudgetContext) -> bool:
     )
 
 
+def _initial_calibration(policy: Json, limits: Json | None, base: Json | None) -> bool:
+    """Initial evidence replaces absent limits, rather than relaxing an existing budget."""
+    return (
+        base is not None
+        and base.get("wallSeconds") is None
+        and base.get("perTestSeconds") is None
+        and base.get("exceptions") == {}
+        and base.get("formulas") == policy.get("formulas")
+        and base.get("profile") == policy.get("profile")
+        and limits is not None
+        and not _validate_limits(policy, limits)
+    )
+
+
 def _authorize_policy(
     policy: Json, baselines: list[Json], limits: Json | None, context: BudgetContext
 ) -> list[Json]:
@@ -530,6 +544,7 @@ def _authorize_policy(
     if (
         context.base_policy is not None
         and policy_increases(context.base_policy, policy)
+        and not _initial_calibration(policy, limits, context.base_policy)
         and not _increase_approved(policy, context)
     ):
         findings.append(
@@ -582,10 +597,10 @@ def _decision_lines(
 ) -> list[str]:
     wall = report.get("wallSeconds")
     available_wall = wall if _seconds(wall) else None
-    enforced = limits["wallSeconds"] if limits is not None else "unavailable"
+    enforced = f"{limits['wallSeconds']}s" if limits is not None else "unavailable"
     gap = max(0, available_wall - 30) if available_wall is not None else "unavailable"
     lines = [
-        f"Fast budget: measured wall {available_wall}s; enforced limit {enforced}s; "
+        f"Fast budget: measured wall {available_wall}s; enforced limit {enforced}; "
         f"goal 30s; gap {gap}s"
     ]
     if limits is None:
