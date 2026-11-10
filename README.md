@@ -534,8 +534,11 @@ Dispatch `.github/workflows/test-budget-measure.yml` at a fixed revision, then
 into `.omp/test-budgets/`. `make test-budget-check` consumes only the current
 invocation's report. Baselines and formulas determine limits; owner approval
 for increases is verified using GitHub reviews bound to the policy diff and
-commit, never a committed boolean. Unit 6b records the first five baselines
-after the tooling merges; the 30-second goal remains separate.
+commit, never a committed boolean. After import, run
+`make test-budget-limits EXCEPTION_METADATA=.omp/test-budgets/exception-metadata.json`
+to compute provisional limits from the records and exact-nodeid owner, speed-up
+remedy and review deadline metadata. It records a policy/profile-bound pending
+measure-run status without claiming acceptance. The 30-second goal remains separate.
 
 Strict mypy checks every maintained Python root, including tests and scripts. Its
 finding-specific debt is tracked in `.omp/baselines/mypy.json`: new findings,

@@ -161,6 +161,7 @@ help:
 	@echo "  make test-evidence-check [TEST_EVIDENCE_BASE=origin/main] Check added tests map to changed behavior and reject duplicate paths"
 	@echo "  make test-budget-check                                Validate this invocation's fast report; CI timing enforcement after calibration"
 	@echo "  make test-budget-record RUNS=\"<GitHub run ids>\"         Import successful same-revision measurement artifacts as tracked baselines"
+	@echo "  make test-budget-limits EXCEPTION_METADATA=<path>      Compute provisional limits from imported baselines and owned remedies"
 	@echo "  make identity-record                                   Explicitly record current identities; requires separate reviewed identity-change commit"
 	@echo "  make ruff-baseline                                    Explicitly record current Full Ruff findings (gates never refresh)"
 	@echo "  make ruff-check                                       Check Full Ruff against the finding-specific shrink-only baseline"
@@ -807,7 +808,7 @@ test-evidence-check:
 	@$(REPO_RUNTIME_ENV) uv run --project orchestrator --extra dev \
 		python scripts/checks/check-test-evidence.py --repo-root "$(CURDIR)" --base-ref "$(TEST_EVIDENCE_BASE)"
 
-.PHONY: test-budget-check test-budget-record
+.PHONY: test-budget-check test-budget-record test-budget-limits
 test-budget-check:
 	@$(REPO_RUNTIME_ENV) uv run --project orchestrator --extra dev \
 		python scripts/checks/check-test-budgets.py --report "$(RAIDAR_TEST_BUDGET_REPORT)" \
@@ -816,6 +817,11 @@ test-budget-check:
 test-budget-record:
 	@$(REPO_RUNTIME_ENV) uv run --project orchestrator --extra dev \
 		python scripts/checks/test_budget_evidence.py record --runs "$(RUNS)"
+
+test-budget-limits:
+	$(call require_var,EXCEPTION_METADATA)
+	@$(REPO_RUNTIME_ENV) uv run --project orchestrator --extra dev \
+		python scripts/checks/test_budget_evidence.py write-limits --exception-metadata "$(EXCEPTION_METADATA)"
 
 gate-commit:
 	@$(REPO_RUNTIME_ENV) uv run --project orchestrator --extra dev \

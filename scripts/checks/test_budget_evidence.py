@@ -12,6 +12,7 @@ import re
 import subprocess
 import sys
 import zipfile
+from collections.abc import Callable
 from pathlib import Path
 from types import ModuleType
 from typing import Any
@@ -240,6 +241,61 @@ def import_measurements(root: Path, run_ids: list[str], record_reports: Any) -> 
     return [path for path, _ in pending]
 
 
+def write_limits(
+    records: list[dict[str, Any]],
+    exception_metadata: dict[str, Any],
+    *,
+    checker: ModuleType,
+    now: Callable[[], datetime.date],
+    write: Callable[[bytes], None],
+) -> None:
+    """Validate imported evidence and metadata before writing a provisional policy."""
+    if len(records) < 5:
+        raise ValueError(f"{RULE}: retain at least 5 comparable measurement records")
+    records = checker.record_reports(
+        records, revision=records[0]["revision"], profile=records[0]["profile"]
+    )
+    computed = checker.compute_limits(records)
+    ceilings = computed["exceptionCeilings"]
+    missing = sorted(set(ceilings) - exception_metadata.keys())
+    if missing:
+        raise ValueError(f"{RULE}: supply exception metadata for: {', '.join(missing)}")
+    malformed = sorted(node for node in ceilings if not isinstance(exception_metadata[node], dict))
+    if malformed:
+        raise ValueError(f"{RULE}: supply metadata objects for: {', '.join(malformed)}")
+    exceptions = {
+        node: {
+            "owner": exception_metadata[node].get("owner"),
+            "remedy": exception_metadata[node].get("remedy"),
+            "reviewDeadline": exception_metadata[node].get("reviewDeadline"),
+            "limitSeconds": ceiling,
+        }
+        for node, ceiling in ceilings.items()
+    }
+    findings = checker.evaluate_exceptions(exceptions, now=now())
+    if findings:
+        names = ", ".join(str(finding["test"]) for finding in findings)
+        raise ValueError(f"{RULE}: supply valid owner, remedy and reviewDeadline for: {names}")
+    policy = {
+        "schemaVersion": 1,
+        "profile": records[0]["profile"],
+        "formulas": dict(checker.FORMULAS),
+        "status": "provisional",
+        "goal": {"wallSeconds": 30, "perTestSeconds": 0.1},
+        "wallSeconds": computed["wallSeconds"],
+        "perTestSeconds": computed["perTestSeconds"],
+        "exceptions": exceptions,
+    }
+    policy["measureRun"] = {
+        "status": "pending",
+        "revision": records[0]["revision"],
+        "runIds": sorted({str(record["measurement"]["runId"]) for record in records}),
+        "profileDigest": hashlib.sha256(_canonical(policy["profile"])).hexdigest(),
+        "policyDigest": hashlib.sha256(_canonical(policy)).hexdigest(),
+    }
+    write((json.dumps(policy, indent=2, sort_keys=True, ensure_ascii=False) + "\n").encode())
+
+
 def seal_measurement(root: Path, report_path: Path, index: str) -> None:
     repository = _repository(root)
     run_id = int(os.environ["GITHUB_RUN_ID"])
@@ -382,9 +438,29 @@ def _check_command(args: argparse.Namespace, checker: ModuleType) -> int:
     return int(result["exitCode"])
 
 
+def _write_limits_command(args: argparse.Namespace, checker: ModuleType) -> int:
+    if args.exception_metadata is None:
+        raise ValueError(f"{RULE}: write-limits requires --exception-metadata")
+    records = [
+        _json(path)
+        for path in sorted((args.root / ".omp/test-budgets/baselines").glob("*.json"))
+    ]
+    write_limits(
+        records,
+        _json(args.exception_metadata),
+        checker=checker,
+        now=datetime.date.today,
+        write=(args.root / POLICY_PATH).write_bytes,
+    )
+    print(POLICY_PATH)
+    return 0
+
+
 def main(checker: ModuleType) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("command", nargs="?", choices=("check", "record", "seal"), default="check")
+    parser.add_argument(
+        "command", nargs="?", choices=("check", "record", "seal", "write-limits"), default="check"
+    )
     parser.add_argument("--root", type=Path, default=Path(__file__).resolve().parents[2])
     parser.add_argument("--report", type=Path)
     parser.add_argument("--revision")
@@ -392,8 +468,11 @@ def main(checker: ModuleType) -> int:
     parser.add_argument("--ci", action="store_true")
     parser.add_argument("--runs", nargs="+", default=[])
     parser.add_argument("--index")
+    parser.add_argument("--exception-metadata", type=Path)
     args = parser.parse_args()
     try:
+        if args.command == "write-limits":
+            return _write_limits_command(args, checker)
         if args.command == "record":
             run_ids = [item for value in args.runs for item in re.split(r"[\s,]+", value) if item]
             for path in import_measurements(args.root, run_ids, checker.record_reports):

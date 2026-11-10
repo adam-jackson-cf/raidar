@@ -27,6 +27,7 @@ def test_first_calibration_is_not_a_budget_increase(calibrated: bool) -> None:
     spec.loader.exec_module(checker)
     policy = json.loads((ROOT / ".omp/test-budgets/limits.json").read_text())
     base = copy.deepcopy(policy)
+    base.update(wallSeconds=None, perTestSeconds=None, exceptions={})
     cases = {
         f"test_measure.py::test_case_{index}": {
             "outcome": "passed",

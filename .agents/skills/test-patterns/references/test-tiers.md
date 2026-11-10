@@ -48,7 +48,11 @@ no repeated artifact download after retention expires.
 Policy increases require an owner GitHub review bound to the exact policy diff
 digest and commit, verified through the API; a committed approval boolean is
 not authorization. Status remains provisional until verified measure evidence.
-The first baseline campaign follows in Unit 6b after this tooling merges.
+Generate the policy with `make test-budget-limits EXCEPTION_METADATA=<path>`.
+The tracked metadata maps each computed outlier's exact nodeid to its owner,
+concrete remedy and review deadline; ceilings always come from the baselines.
+The generated provisional policy records a pending, policy/profile-bound
+measure run, not an externally verified acceptance.
 The first calibrated limits and their recomputed outlier ceilings need no
 approval when replacing null limits under an unchanged profile and formulas.
 Later exception additions, ceiling increases and deadline extensions do.

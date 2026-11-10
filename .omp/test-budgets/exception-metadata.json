@@ -1,0 +1,842 @@
+{
+  "tests/test_analysis_effects.py::test_a_lock_without_outcome_type_declarations_refuses_every_verdict": {
+    "owner": "@adamjackson",
+    "remedy": "Build the shared outcomes once per module and reuse across the three _run calls.",
+    "reviewDeadline": "2027-02-08"
+  },
+  "tests/test_analysis_effects.py::test_an_intractable_exact_enumeration_is_insufficient_never_approximated": {
+    "owner": "@adamjackson",
+    "remedy": "Inject a small sign_flip_state_limit via replace(SETTINGS) instead of 30 default-limit terms.",
+    "reviewDeadline": "2027-02-08"
+  },
+  "tests/test_analysis_effects.py::test_bootstrap_from_ten_pairs_is_seeded_and_replays": {
+    "owner": "@adamjackson",
+    "remedy": "Set bootstrap_samples to the 100 floor; assertions check replay and seed difference only.",
+    "reviewDeadline": "2027-02-08"
+  },
+  "tests/test_analysis_effects.py::test_several_problems_get_an_equal_weight_aggregate": {
+    "owner": "@adamjackson",
+    "remedy": "Run the three-problem analysis once and share it across both orientation checks.",
+    "reviewDeadline": "2027-02-08"
+  },
+  "tests/test_analysis_effects.py::test_the_exact_enumeration_limit_is_a_visible_resource_refusal_not_an_approximation": {
+    "owner": "@adamjackson",
+    "remedy": "Keep the 14-term case; compute the default-limit reference value once, not per _run.",
+    "reviewDeadline": "2027-02-08"
+  },
+  "tests/test_analysis_primary_outcome.py::test_a_job_directory_reads_its_manifest_plan_and_records": {
+    "owner": "@adamjackson",
+    "remedy": "Write the job JSON fixtures in a module-scoped tmp directory, not per test.",
+    "reviewDeadline": "2027-02-08"
+  },
+  "tests/test_analysis_primary_outcome.py::test_a_job_resolves_only_the_lock_its_manifest_names_and_otherwise_asks_for_one": {
+    "owner": "@adamjackson",
+    "remedy": "Define the analysis_lock dict once at module scope and deep-copy per case.",
+    "reviewDeadline": "2027-02-08"
+  },
+  "tests/test_analysis_primary_outcome.py::test_a_lock_that_pins_thresholds_labels_every_command_line_override": {
+    "owner": "@adamjackson",
+    "remedy": "Write the pinned lock file once in a module-scoped fixture for all override cases.",
+    "reviewDeadline": "2027-02-08"
+  },
+  "tests/test_analysis_primary_outcome.py::test_primary_outcome_is_validated_against_known_trial_outcomes": {
+    "owner": "@adamjackson",
+    "remedy": "Write the two experiment YAMLs once per module and reuse the four loaded documents.",
+    "reviewDeadline": "2027-02-08"
+  },
+  "tests/test_analysis_stats.py::test_exact_mcnemar_counts_only_discordant_pairs": {
+    "owner": "@adamjackson",
+    "remedy": "Compute each pair's mcnemar_exact value once and reuse it for both orientations.",
+    "reviewDeadline": "2027-02-08"
+  },
+  "tests/test_analysis_stats.py::test_sign_flip_gives_up_rather_than_approximating": {
+    "owner": "@adamjackson",
+    "remedy": "Pass a small state_limit to sign_flip_exact instead of enumerating 30 terms.",
+    "reviewDeadline": "2027-02-08"
+  },
+  "tests/test_analysis_verification_effort.py::test_a_lock_reports_the_fix_round_delta_and_the_process_stall_rate": {
+    "owner": "@adamjackson",
+    "remedy": "Build the _outcomes trial set once per module and reuse it across lock reports.",
+    "reviewDeadline": "2027-02-08"
+  },
+  "tests/test_analysis_verification_effort.py::test_a_lock_without_process_compliance_has_no_process_section": {
+    "owner": "@adamjackson",
+    "remedy": "Share the _outcomes trial set with sibling tests via a module-scoped fixture.",
+    "reviewDeadline": "2027-02-08"
+  },
+  "tests/test_analysis_verification_effort.py::test_arms_too_large_to_enumerate_are_sampled_not_approximated_silently": {
+    "owner": "@adamjackson",
+    "remedy": "Monkeypatch manipulation.SAMPLES to a smaller count for this sampled-permutation check.",
+    "reviewDeadline": "2027-02-08"
+  },
+  "tests/test_analysis_verification_effort.py::test_the_report_runs_the_gate_check_from_the_verification_effort_scorer": {
+    "owner": "@adamjackson",
+    "remedy": "Reuse the module-scoped trial set and a single analyse result for the gate check.",
+    "reviewDeadline": "2027-02-08"
+  },
+  "tests/test_analysis_verification_effort.py::test_two_gated_arms_get_paired_gate_effects_with_verdicts": {
+    "owner": "@adamjackson",
+    "remedy": "Reuse the module-scoped _outcomes trial set instead of rebuilding it.",
+    "reviewDeadline": "2027-02-08"
+  },
+  "tests/test_assessment_store_behaviors.py::test_a_job_assesses_every_trial_with_each_scorer_under_its_own_config": {
+    "owner": "@adamjackson",
+    "remedy": "Build the two trial trees once in a module-scoped fixture for all registrations.",
+    "reviewDeadline": "2027-02-08"
+  },
+  "tests/test_benchmark_ranking.py::test_ab_tests_have_no_ranking_and_smoke_reports_are_not_citable": {
+    "owner": "@adamjackson",
+    "remedy": "Build the 3-agent benchmark once per module and reuse across the three analyse calls.",
+    "reviewDeadline": "2027-02-08"
+  },
+  "tests/test_code_quality_boundaries.py::test_malformed_symbol_rows_make_erosion_evidence_invalid[changes7]": {
+    "owner": "@adamjackson",
+    "remedy": "Materialise the shop checkpoint once per module; vary only the symbol rows.",
+    "reviewDeadline": "2027-02-08"
+  },
+  "tests/test_code_quality_boundaries.py::test_ruff_syntax_error_diagnostics_are_ignored_like_the_fork": {
+    "owner": "@adamjackson",
+    "remedy": "Share the shop checkpoint snapshot with sibling _produce tests via a module fixture.",
+    "reviewDeadline": "2027-02-08"
+  },
+  "tests/test_code_quality_boundaries.py::test_the_evaluator_program_reports_the_fork_source_lines_and_clone_occurrences": {
+    "owner": "@adamjackson",
+    "remedy": "Memoise the synthetic_shop checkpoint-0 file map in a module-scoped fixture.",
+    "reviewDeadline": "2027-02-08"
+  },
+  "tests/test_code_quality_boundaries.py::test_trusted_measurement_output_becomes_verbosity_and_erosion": {
+    "owner": "@adamjackson",
+    "remedy": "Share the shop checkpoint snapshot with sibling boundary tests via a module fixture.",
+    "reviewDeadline": "2027-02-08"
+  },
+  "tests/test_code_quality_fork_parity.py::test_measurement_adapters_match_the_fork_rows_symbols_and_call_graph[forge]": {
+    "owner": "@adamjackson",
+    "remedy": "Cache case_snapshots materialisation per case name in a session-scoped fixture.",
+    "reviewDeadline": "2027-02-08"
+  },
+  "tests/test_code_quality_fork_parity.py::test_measurement_adapters_match_the_fork_rows_symbols_and_call_graph[synthetic_shop]": {
+    "owner": "@adamjackson",
+    "remedy": "Use the same session-scoped, case-keyed snapshot cache as the forge case.",
+    "reviewDeadline": "2027-02-08"
+  },
+  "tests/test_code_quality_fork_parity.py::test_rework_lineage_and_regression_equal_the_fork_live_producers": {
+    "owner": "@adamjackson",
+    "remedy": "Index goldens by name once instead of linear golden_case search per call.",
+    "reviewDeadline": "2027-02-08"
+  },
+  "tests/test_code_quality_scorer.py::test_an_entry_file_absent_from_the_snapshot_makes_architecture_ineligible_never_best[../app.py]": {
+    "owner": "@adamjackson",
+    "remedy": "Share the golden_case and memory_context build across the three entry-file cases.",
+    "reviewDeadline": "2027-02-08"
+  },
+  "tests/test_code_quality_scorer.py::test_an_entry_file_absent_from_the_snapshot_makes_architecture_ineligible_never_best[renamed_missing.py]": {
+    "owner": "@adamjackson",
+    "remedy": "Share the golden_case and memory_context build across the three entry-file cases.",
+    "reviewDeadline": "2027-02-08"
+  },
+  "tests/test_code_quality_scorer.py::test_an_entry_file_absent_from_the_snapshot_makes_architecture_ineligible_never_best[shop]": {
+    "owner": "@adamjackson",
+    "remedy": "Share the golden_case and memory_context build across the three entry-file cases.",
+    "reviewDeadline": "2027-02-08"
+  },
+  "tests/test_code_quality_scorer.py::test_an_ungraded_step_blocks_regression_but_not_rework": {
+    "owner": "@adamjackson",
+    "remedy": "Build the shop memory_context once per module; vary only the ungraded step.",
+    "reviewDeadline": "2027-02-08"
+  },
+  "tests/test_code_quality_scorer.py::test_architecture_is_unavailable_without_an_entry_file_and_other_components_still_score": {
+    "owner": "@adamjackson",
+    "remedy": "Share the golden_case lookup and memory_context build via a module fixture.",
+    "reviewDeadline": "2027-02-08"
+  },
+  "tests/test_code_quality_scorer.py::test_every_checkpoint_and_transition_carries_the_fork_values_and_traceable_evidence": {
+    "owner": "@adamjackson",
+    "remedy": "Score the shop context once per module, not per assertion group.",
+    "reviewDeadline": "2027-02-08"
+  },
+  "tests/test_code_quality_scorer.py::test_rework_needs_verbosity_evidence_at_both_ends_while_regression_does_not": {
+    "owner": "@adamjackson",
+    "remedy": "Share the memory_context build via a module fixture; vary only verbosity evidence.",
+    "reviewDeadline": "2027-02-08"
+  },
+  "tests/test_code_quality_scorer.py::test_unreached_and_unmeasurable_checkpoints_are_statused_and_block_their_transitions": {
+    "owner": "@adamjackson",
+    "remedy": "Use the name-indexed golden lookup shared with sibling scorer tests.",
+    "reviewDeadline": "2027-02-08"
+  },
+  "tests/test_code_quality_scorer.py::test_unreached_checkpoints_leave_problem_means_unavailable_unlike_a_one_shot_problem": {
+    "owner": "@adamjackson",
+    "remedy": "Share the golden_case lookup and memory_context build via a module fixture.",
+    "reviewDeadline": "2027-02-08"
+  },
+  "tests/test_coverage_scorers.py::test_definition_coverage_retries_then_records_the_undecided": {
+    "owner": "@adamjackson",
+    "remedy": "Compute _unit_count() once; it re-reads definition-a-cp1.md per call.",
+    "reviewDeadline": "2027-02-08"
+  },
+  "tests/test_define_compact_replay.py::test_a_recorded_retirement_is_granted_from_the_structured_list": {
+    "owner": "@adamjackson",
+    "remedy": "Share the compact.units result for this issue with test_replay via a module cache.",
+    "reviewDeadline": "2027-02-08"
+  },
+  "tests/test_define_compact_replay.py::test_replay[a-1]": {
+    "owner": "@adamjackson",
+    "remedy": "Memoise compact.units and normative.units per issue text; cohorts share issue files.",
+    "reviewDeadline": "2027-02-08"
+  },
+  "tests/test_define_compact_replay.py::test_replay[a-2]": {
+    "owner": "@adamjackson",
+    "remedy": "Memoise compact.units and normative.units per issue text; cohorts share issue files.",
+    "reviewDeadline": "2027-02-08"
+  },
+  "tests/test_define_compact_replay.py::test_replay[a-3]": {
+    "owner": "@adamjackson",
+    "remedy": "Memoise compact.units and normative.units per issue text; heaviest case, reuse the same results.",
+    "reviewDeadline": "2027-02-08"
+  },
+  "tests/test_define_compact_replay.py::test_replay[b-1]": {
+    "owner": "@adamjackson",
+    "remedy": "Reuse the memoised units from cohort a; issue-cp1.md text is identical.",
+    "reviewDeadline": "2027-02-08"
+  },
+  "tests/test_define_compact_replay.py::test_replay[b-2]": {
+    "owner": "@adamjackson",
+    "remedy": "Reuse the memoised units from cohort a; issue-cp2.md text is identical.",
+    "reviewDeadline": "2027-02-08"
+  },
+  "tests/test_define_compact_replay.py::test_replay[b-3]": {
+    "owner": "@adamjackson",
+    "remedy": "Reuse the memoised units from cohort a; issue-cp3.md text is identical.",
+    "reviewDeadline": "2027-02-08"
+  },
+  "tests/test_execution_boundary_rules.py::test_update_pyproject_only_rewrites_project_version": {
+    "owner": "@adamjackson",
+    "remedy": "Load the bump-version module once per module, not per test.",
+    "reviewDeadline": "2027-02-08"
+  },
+  "tests/test_experiment_lock_behaviors.py::test_a_checkpoint_selection_binds_the_first_checkpoints_of_a_multi_checkpoint_problem": {
+    "owner": "@adamjackson",
+    "remedy": "Share the immutable multi-checkpoint fixture inputs across lock builds; retain the selected-prefix assertions.",
+    "reviewDeadline": "2027-02-08"
+  },
+  "tests/test_experiment_lock_behaviors.py::test_a_lock_inside_a_referenced_task_directory_is_not_hashed_into_itself": {
+    "owner": "@adamjackson",
+    "remedy": "Write only the referenced task directory instead of a fuller tree.",
+    "reviewDeadline": "2027-02-08"
+  },
+  "tests/test_experiment_lock_behaviors.py::test_a_lock_records_package_and_primitive_identity_without_stage_code": {
+    "owner": "@adamjackson",
+    "remedy": "Build one lock_bytes result in a module-scoped fixture for identity assertions.",
+    "reviewDeadline": "2027-02-08"
+  },
+  "tests/test_experiment_lock_behaviors.py::test_assessment_and_analysis_changes_keep_the_run_identity": {
+    "owner": "@adamjackson",
+    "remedy": "Build the base lock once and derive the two override locks from it.",
+    "reviewDeadline": "2027-02-08"
+  },
+  "tests/test_experiment_lock_behaviors.py::test_declared_policy_must_support_every_problem_k": {
+    "owner": "@adamjackson",
+    "remedy": "Reuse the fixture resolver inputs across policy variants while retaining every problem checkpoint count.",
+    "reviewDeadline": "2027-02-08"
+  },
+  "tests/test_experiment_lock_behaviors.py::test_draft_locks_keep_distinct_smoke_experiments_separate": {
+    "owner": "@adamjackson",
+    "remedy": "Write both smoke experiment documents once per module under one RAIDAR_VAR.",
+    "reviewDeadline": "2027-02-08"
+  },
+  "tests/test_experiment_lock_behaviors.py::test_headline_policy_defaults_by_checkpoint_count[1-scb-canonical-oneshot@1]": {
+    "owner": "@adamjackson",
+    "remedy": "Use fixture_resolvers(checkpoints=1), matching this one-shot case.",
+    "reviewDeadline": "2027-02-08"
+  },
+  "tests/test_experiment_lock_behaviors.py::test_headline_policy_defaults_by_checkpoint_count[8-scb-canonical@1]": {
+    "owner": "@adamjackson",
+    "remedy": "Share the pin_spec_digest and fixture_resolvers setup with the one-checkpoint case.",
+    "reviewDeadline": "2027-02-08"
+  },
+  "tests/test_experiment_lock_behaviors.py::test_local_task_problems_are_hashed_and_counted": {
+    "owner": "@adamjackson",
+    "remedy": "Write only the single task file the count assertion needs.",
+    "reviewDeadline": "2027-02-08"
+  },
+  "tests/test_experiment_lock_behaviors.py::test_lock_command_write_and_check_cycle": {
+    "owner": "@adamjackson",
+    "remedy": "Reuse the fixture ResolverSet and parsed experiment across CLI write/check calls while preserving every transition.",
+    "reviewDeadline": "2027-02-08"
+  },
+  "tests/test_experiment_lock_behaviors.py::test_lock_command_writes_then_checks_and_reports_pending_resolvers": {
+    "owner": "@adamjackson",
+    "remedy": "Write the lock once in a module fixture and check it without rewriting.",
+    "reviewDeadline": "2027-02-08"
+  },
+  "tests/test_experiment_lock_behaviors.py::test_mixed_k_without_declared_policy_is_rejected": {
+    "owner": "@adamjackson",
+    "remedy": "Share immutable problem resolver fixtures across lock builds while retaining distinct checkpoint counts.",
+    "reviewDeadline": "2027-02-08"
+  },
+  "tests/test_experiment_lock_behaviors.py::test_overrides_are_recorded_and_change_the_lock": {
+    "owner": "@adamjackson",
+    "remedy": "Share one base lock_bytes result via a module fixture for the override comparison.",
+    "reviewDeadline": "2027-02-08"
+  },
+  "tests/test_experiment_lock_behaviors.py::test_relocking_unchanged_inputs_is_byte_identical": {
+    "owner": "@adamjackson",
+    "remedy": "Use checkpoints=1 for the byte-identity relock check; determinism needs no 8 checkpoints.",
+    "reviewDeadline": "2027-02-08"
+  },
+  "tests/test_experiment_lock_behaviors.py::test_the_lock_declares_outcome_types_from_the_bound_checkpoints": {
+    "owner": "@adamjackson",
+    "remedy": "Use the minimal fixture_resolvers set; only outcome-type declaration is asserted.",
+    "reviewDeadline": "2027-02-08"
+  },
+  "tests/test_experiment_lock_behaviors.py::test_the_lock_file_check_accepts_exactly_the_current_lock": {
+    "owner": "@adamjackson",
+    "remedy": "Write the current lock once in a module fixture and check it without relocking.",
+    "reviewDeadline": "2027-02-08"
+  },
+  "tests/test_experiment_lock_behaviors.py::test_the_lock_file_check_names_what_a_changed_input_makes_stale": {
+    "owner": "@adamjackson",
+    "remedy": "Share the base lock via a module fixture; vary only the changed input.",
+    "reviewDeadline": "2027-02-08"
+  },
+  "tests/test_experiment_lock_behaviors.py::test_the_lock_file_check_refuses_a_lock_that_is_not_in_canonical_form": {
+    "owner": "@adamjackson",
+    "remedy": "Reuse the shared base lock bytes and rewrite only the non-canonical form.",
+    "reviewDeadline": "2027-02-08"
+  },
+  "tests/test_experiment_lock_behaviors.py::test_the_lock_file_check_refuses_a_missing_or_unusable_file[None-does not exist]": {
+    "owner": "@adamjackson",
+    "remedy": "Share one parametrised tmp-file fixture across the five unusable-file cases.",
+    "reviewDeadline": "2027-02-08"
+  },
+  "tests/test_experiment_lock_behaviors.py::test_the_lock_file_check_refuses_a_missing_or_unusable_file[[1]-not a JSON object]": {
+    "owner": "@adamjackson",
+    "remedy": "Share one parametrised tmp-file fixture across the five unusable-file cases.",
+    "reviewDeadline": "2027-02-08"
+  },
+  "tests/test_experiment_lock_behaviors.py::test_the_lock_file_check_refuses_a_missing_or_unusable_file[{\"lock_version\": 4}-relock]": {
+    "owner": "@adamjackson",
+    "remedy": "Share one parametrised tmp-file fixture across the five unusable-file cases.",
+    "reviewDeadline": "2027-02-08"
+  },
+  "tests/test_experiment_lock_behaviors.py::test_the_lock_file_check_refuses_a_missing_or_unusable_file[{\"lock_version\": 5}-missing section]": {
+    "owner": "@adamjackson",
+    "remedy": "Share one parametrised tmp-file fixture across the five unusable-file cases.",
+    "reviewDeadline": "2027-02-08"
+  },
+  "tests/test_experiment_lock_behaviors.py::test_the_lock_file_check_refuses_a_missing_or_unusable_file[{not json-not readable JSON]": {
+    "owner": "@adamjackson",
+    "remedy": "Share one parametrised tmp-file fixture across the five unusable-file cases.",
+    "reviewDeadline": "2027-02-08"
+  },
+  "tests/test_experiment_schema_rules.py::test_a_benchmark_compares_agents_under_one_workflow": {
+    "owner": "@adamjackson",
+    "remedy": "Build the _benchmark() document once per module; deep-copy per test.",
+    "reviewDeadline": "2027-02-08"
+  },
+  "tests/test_experiment_schema_rules.py::test_an_experiment_declares_the_factors_it_varies_beyond_its_agents": {
+    "owner": "@adamjackson",
+    "remedy": "Share the _benchmark() document via a module constant with deep-copy.",
+    "reviewDeadline": "2027-02-08"
+  },
+  "tests/test_experiment_schema_rules.py::test_name1_the_path_names_the_kind_and_the_id": {
+    "owner": "@adamjackson",
+    "remedy": "Share the _benchmark() document via a module constant with deep-copy.",
+    "reviewDeadline": "2027-02-08"
+  },
+  "tests/test_experiment_schema_rules.py::test_rank_by_is_a_benchmark_setting_naming_an_outcome_metric": {
+    "owner": "@adamjackson",
+    "remedy": "Share the _benchmark() document via a module constant with deep-copy.",
+    "reviewDeadline": "2027-02-08"
+  },
+  "tests/test_experiment_schema_rules.py::test_small_benchmarks_and_smoke_runs_validate_with_warnings": {
+    "owner": "@adamjackson",
+    "remedy": "Derive the small variants from one base document via experiment_document.",
+    "reviewDeadline": "2027-02-08"
+  },
+  "tests/test_experiment_schema_rules.py::test_the_kind_is_part_of_the_execution_identity": {
+    "owner": "@adamjackson",
+    "remedy": "Derive both kind variants from one base document via experiment_document.",
+    "reviewDeadline": "2027-02-08"
+  },
+  "tests/test_experiment_spec_behaviors.py::test_agent_entries_are_checked_against_their_release[reasoning-required]": {
+    "owner": "@adamjackson",
+    "remedy": "Load the base experiment_document once per module; change only the agent entry.",
+    "reviewDeadline": "2027-02-08"
+  },
+  "tests/test_experiment_spec_behaviors.py::test_verdict_thresholds_are_pinned_in_the_analysis_block": {
+    "owner": "@adamjackson",
+    "remedy": "Build the base once and derive four variants via experiment_document, loading each once.",
+    "reviewDeadline": "2027-02-08"
+  },
+  "tests/test_forge_ordering_sensitivities.py::test_no_committed_errata_excludes_a_case_recorded_as_spec_determined": {
+    "owner": "@adamjackson",
+    "remedy": "Cache the walked sensitivities file list and parsed YAML in a module-scoped fixture.",
+    "reviewDeadline": "2027-02-08"
+  },
+  "tests/test_imports.py::test_different_existing_folder_and_frozen_release_are_refused": {
+    "owner": "@adamjackson",
+    "remedy": "Build the package tree once per module and copy it; compute the digest once.",
+    "reviewDeadline": "2027-02-08"
+  },
+  "tests/test_jev_calibration_workflow.py::test_promote_refuses_to_write_while_the_scorer_bump_is_pending": {
+    "owner": "@adamjackson",
+    "remedy": "Share a module-scoped calibration store fixture with the audit test.",
+    "reviewDeadline": "2027-02-08"
+  },
+  "tests/test_jev_calibration_workflow.py::test_promote_writes_enforce_only_when_the_audit_verifies": {
+    "owner": "@adamjackson",
+    "remedy": "Share the calibration store fixture with the refusal test.",
+    "reviewDeadline": "2027-02-08"
+  },
+  "tests/test_jev_calibration_workflow.py::test_superseded_labels_leave_calibration_but_stay_on_file": {
+    "owner": "@adamjackson",
+    "remedy": "Share the 40-decision _promotable store per module; keep record-split and promote CLI calls.",
+    "reviewDeadline": "2027-02-08"
+  },
+  "tests/test_jev_client_and_cache.py::test_invalid_cache_entries_are_audited_failures_never_replays[<lambda>1]": {
+    "owner": "@adamjackson",
+    "remedy": "Build one RecordedTransport and runtime per module; keep the single-call and CACHE_INVALID assertions.",
+    "reviewDeadline": "2027-02-08"
+  },
+  "tests/test_jev_client_and_cache.py::test_invalid_cache_entries_are_audited_failures_never_replays[<lambda>2]": {
+    "owner": "@adamjackson",
+    "remedy": "Build one RecordedTransport and runtime per module; keep the single-call and CACHE_INVALID assertions.",
+    "reviewDeadline": "2027-02-08"
+  },
+  "tests/test_jev_policies_and_audit.py::test_label_import_validates_and_readiness_applies_the_promotion_gate": {
+    "owner": "@adamjackson",
+    "remedy": "Share one module-scoped labelled store with the import-validation check.",
+    "reviewDeadline": "2027-02-08"
+  },
+  "tests/test_jev_question_sets.py::test_codebase_scope_criteria_get_a_bounded_whole_codebase_state": {
+    "owner": "@adamjackson",
+    "remedy": "Shrink the written snapshot to the single file the assertion inspects.",
+    "reviewDeadline": "2027-02-08"
+  },
+  "tests/test_jev_question_sets.py::test_rubric_question_set_is_the_pinned_scb_criteria_as_noul_questions": {
+    "owner": "@adamjackson",
+    "remedy": "Load the pinned question set once at module scope.",
+    "reviewDeadline": "2027-02-08"
+  },
+  "tests/test_jev_question_sets.py::test_shadow_rubric_cli_writes_the_report_for_a_trial_layout": {
+    "owner": "@adamjackson",
+    "remedy": "Build only the trial layout the test asserts, not both flat and trial layouts.",
+    "reviewDeadline": "2027-02-08"
+  },
+  "tests/test_ledger.py::test_malformed_frontmatter_refuses_indexing_without_overwriting[---\\nkey: [\\n---\\n]": {
+    "owner": "@adamjackson",
+    "remedy": "Share the valid ledger fixture at module scope; each case rewrites only FCR-001.md, keeping the CLI index call.",
+    "reviewDeadline": "2027-02-08"
+  },
+  "tests/test_offline_coverage_decisions.py::test_a_step_whose_grading_failed_on_the_submission_gets_no_coverage_run": {
+    "owner": "@adamjackson",
+    "remedy": "Use the injected oracle fixture; skip building a full trial.",
+    "reviewDeadline": "2027-02-08"
+  },
+  "tests/test_package_identity.py::test_release_issues_name_an_unreleased_or_edited_package": {
+    "owner": "@adamjackson",
+    "remedy": "Reuse digests for unchanged agent and one-shot files across release_issues calls; invalidate edited or deleted stage paths.",
+    "reviewDeadline": "2027-02-08"
+  },
+  "tests/test_package_never_runs_on_host.py::test_static_loading_the_lock_check_and_a_containerless_check_never_import_the_tool": {
+    "owner": "@adamjackson",
+    "remedy": "Stub uv.find_uv_bin to a constant path so no real uv lookup runs.",
+    "reviewDeadline": "2027-02-08"
+  },
+  "tests/test_primitive_payload_boundaries.py::test_a_tampered_staged_file_or_wheel_stops_the_install_before_anything_is_written": {
+    "owner": "@adamjackson",
+    "remedy": "Stage only the one file and one wheel the tamper checks need; keep both InstallError matches and rollback assertions.",
+    "reviewDeadline": "2027-02-08"
+  },
+  "tests/test_primitive_setup.py::test_transport_failure_during_setup_is_an_integrity_failure": {
+    "owner": "@adamjackson",
+    "remedy": "Reuse the module-scoped rig fixture instead of rebuilding it.",
+    "reviewDeadline": "2027-02-08"
+  },
+  "tests/test_primitive_stop.py::test_an_unusable_result_gets_one_repair_then_the_package_closes[junk14]": {
+    "owner": "@adamjackson",
+    "remedy": "Keep the overflow=True outcome; share the stop rig per module since build_rig is per-test state only in monkeypatch.",
+    "reviewDeadline": "2027-02-08"
+  },
+  "tests/test_problem_record_decisions.py::test_a_validated_problem_resolves_with_verdict_grader_and_errata": {
+    "owner": "@adamjackson",
+    "remedy": "Load the manifest and write validation once; keep both _resolve calls and the errata digest-change assertion.",
+    "reviewDeadline": "2027-02-08"
+  },
+  "tests/test_problem_spec_determinacy.py::test_error_text_rules_separate_stated_from_unstated_values": {
+    "owner": "@adamjackson",
+    "remedy": "Scan the body once and reuse the _scan result for every classify call; keep all five rule assertions.",
+    "reviewDeadline": "2027-02-08"
+  },
+  "tests/test_problem_validation_behaviors.py::test_content_digests_cover_directories_a_workspace_snapshot_excludes[build-oracle]": {
+    "owner": "@adamjackson",
+    "remedy": "Reuse the module-scoped fixture store and a minimal directory tree containing only the excluded entry.",
+    "reviewDeadline": "2027-02-08"
+  },
+  "tests/test_problem_validation_behaviors.py::test_content_digests_cover_directories_a_workspace_snapshot_excludes[build-task]": {
+    "owner": "@adamjackson",
+    "remedy": "Reuse the module-scoped fixture store and a minimal directory tree containing only the excluded entry.",
+    "reviewDeadline": "2027-02-08"
+  },
+  "tests/test_problem_validation_behaviors.py::test_one_shot_import_keeps_only_the_first_checkpoint": {
+    "owner": "@adamjackson",
+    "remedy": "Share the scripted fixture's fake store and repo across both import tests; keep the first-checkpoint assertion.",
+    "reviewDeadline": "2027-02-08"
+  },
+  "tests/test_problem_validation_behaviors.py::test_reimport_reproduces_the_manifest_and_refuses_drift_unless_updating": {
+    "owner": "@adamjackson",
+    "remedy": "Share the scripted fixture's fake store and repo across both import tests; keep the drift-refusal assertion.",
+    "reviewDeadline": "2027-02-08"
+  },
+  "tests/test_process_compliance.py::test_its_implementation_digest_covers_no_jev_code": {
+    "owner": "@adamjackson",
+    "remedy": "Reuse the process-compliance scorer registration across tests while retaining digest_json capture of the exact module closure.",
+    "reviewDeadline": "2027-02-08"
+  },
+  "tests/test_process_manipulation_check.py::test_large_arms_use_a_deterministic_sampled_permutation": {
+    "owner": "@adamjackson",
+    "remedy": "Reduce arms to the smallest size that still triggers the sampled branch; keep the determinism check.",
+    "reviewDeadline": "2027-02-08"
+  },
+  "tests/test_quality_projection.py::test_a_baseline_with_no_counted_trials_is_named_in_the_notes": {
+    "owner": "@adamjackson",
+    "remedy": "Pass only the baseline and guided trials via trials=.",
+    "reviewDeadline": "2027-02-08"
+  },
+  "tests/test_quality_projection.py::test_a_component_missing_only_in_the_compared_arm_is_an_ineligible_pair": {
+    "owner": "@adamjackson",
+    "remedy": "Project only the b00-p0 guided/baseline pair via trials=.",
+    "reviewDeadline": "2027-02-08"
+  },
+  "tests/test_quality_projection.py::test_agent_override_trials_render_but_stay_out_of_arm_statistics": {
+    "owner": "@adamjackson",
+    "remedy": "Pass only the overridden b00 guided trial and its baseline via trials=.",
+    "reviewDeadline": "2027-02-08"
+  },
+  "tests/test_quality_projection.py::test_assessments_are_matched_by_snapshot_content_not_trial_name": {
+    "owner": "@adamjackson",
+    "remedy": "Project only the first trial and its shadow copy via trials=.",
+    "reviewDeadline": "2027-02-08"
+  },
+  "tests/test_quality_projection.py::test_every_cell_is_statused_and_never_a_silent_zero": {
+    "owner": "@adamjackson",
+    "remedy": "Cache synthetic_quality() at session scope in tests/review_fixtures/quality/generate.py.",
+    "reviewDeadline": "2027-02-08"
+  },
+  "tests/test_quality_projection.py::test_evidence_of_metrics_without_a_component_is_not_drilled_down": {
+    "owner": "@adamjackson",
+    "remedy": "Restrict both projections to data.trials[0] via trials=.",
+    "reviewDeadline": "2027-02-08"
+  },
+  "tests/test_quality_projection.py::test_gate_records_without_an_assessment_or_with_a_broken_record_say_so": {
+    "owner": "@adamjackson",
+    "remedy": "Restrict the rebuilt projection to the b01-p0-guided source via trials=.",
+    "reviewDeadline": "2027-02-08"
+  },
+  "tests/test_quality_projection.py::test_jev_decisions_never_attach_to_a_run_they_may_not_belong_to": {
+    "owner": "@adamjackson",
+    "remedy": "Clone only the b00/b01 baseline sources in _clone_run, not every trial.",
+    "reviewDeadline": "2027-02-08"
+  },
+  "tests/test_quality_projection.py::test_one_arm_has_no_head_to_head_and_small_samples_have_no_correlation": {
+    "owner": "@adamjackson",
+    "remedy": "Already restricted to attempts under 2; share the data fixture and keep the n=2 assertion.",
+    "reviewDeadline": "2027-02-08"
+  },
+  "tests/test_quality_projection.py::test_the_locks_headline_policy_takes_precedence_over_the_default": {
+    "owner": "@adamjackson",
+    "remedy": "Project only the b00-p0 baseline pair via trials=.",
+    "reviewDeadline": "2027-02-08"
+  },
+  "tests/test_quality_projection.py::test_zero_correctness_remains_scored_when_sensitivity_components_are_unmeasured[ineligible]": {
+    "owner": "@adamjackson",
+    "remedy": "Project only the b00-p0 baseline and its counterpart via trials=.",
+    "reviewDeadline": "2027-02-08"
+  },
+  "tests/test_registry_inspection_commands.py::test_init_writes_a_validating_two_arm_starter_and_refuses_to_overwrite": {
+    "owner": "@adamjackson",
+    "remedy": "Assert the overwrite refusal by calling the experiment_init writer directly, not a second CLI run.",
+    "reviewDeadline": "2027-02-08"
+  },
+  "tests/test_registry_inspection_commands.py::test_problem_list_reports_validation_and_import_state": {
+    "owner": "@adamjackson",
+    "remedy": "Build the three-manifest store once at module scope; the list assertions do not mutate it.",
+    "reviewDeadline": "2027-02-08"
+  },
+  "tests/test_registry_inspection_commands.py::test_registered_refuses_an_entry_that_is_not_a_problem_reference": {
+    "owner": "@adamjackson",
+    "remedy": "Use a bare ProblemStore root with a registry directory instead of build_fixture_store.",
+    "reviewDeadline": "2027-02-08"
+  },
+  "tests/test_release_cutover.py::test_removing_release_version_from_toolchain_preserves_execution_identity": {
+    "owner": "@adamjackson",
+    "remedy": "Compute the current lock_document once per module from a shared experiment file; keep the monkeypatched previous-toolchain comparison.",
+    "reviewDeadline": "2027-02-08"
+  },
+  "tests/test_release_register.py::test_releases_cli_refuses_history_drift_and_accepts_an_explicit_base_without_main": {
+    "owner": "@adamjackson",
+    "remedy": "Build the release tree once per module and reuse it; keep all four CliRunner invoke calls for releases check.",
+    "reviewDeadline": "2027-02-08"
+  },
+  "tests/test_repository_seam_evidence.py::test_current_content_addressed_seam_evidence_is_accepted": {
+    "owner": "@adamjackson",
+    "remedy": "Build the define package template once at module scope and copy it per case.",
+    "reviewDeadline": "2027-02-08"
+  },
+  "tests/test_repository_seam_evidence.py::test_missing_stale_or_inconsistent_seam_evidence_is_rejected[changed-package]": {
+    "owner": "@adamjackson",
+    "remedy": "Copy a module-scoped define package template per case instead of re-copying the full package and reloading it each time.",
+    "reviewDeadline": "2027-02-08"
+  },
+  "tests/test_repository_seam_evidence.py::test_missing_stale_or_inconsistent_seam_evidence_is_rejected[empty-installed]": {
+    "owner": "@adamjackson",
+    "remedy": "Copy a module-scoped define package template per case instead of re-copying the full package and reloading it each time.",
+    "reviewDeadline": "2027-02-08"
+  },
+  "tests/test_repository_seam_evidence.py::test_missing_stale_or_inconsistent_seam_evidence_is_rejected[invalid-output-digest]": {
+    "owner": "@adamjackson",
+    "remedy": "Copy a module-scoped define package template per case instead of re-copying the full package and reloading it each time.",
+    "reviewDeadline": "2027-02-08"
+  },
+  "tests/test_repository_seam_evidence.py::test_missing_stale_or_inconsistent_seam_evidence_is_rejected[malformed-installed]": {
+    "owner": "@adamjackson",
+    "remedy": "Copy a module-scoped define package template per case instead of re-copying the full package and reloading it each time.",
+    "reviewDeadline": "2027-02-08"
+  },
+  "tests/test_repository_seam_evidence.py::test_missing_stale_or_inconsistent_seam_evidence_is_rejected[missing-canary]": {
+    "owner": "@adamjackson",
+    "remedy": "Copy a module-scoped define package template per case instead of re-copying the full package and reloading it each time.",
+    "reviewDeadline": "2027-02-08"
+  },
+  "tests/test_repository_seam_evidence.py::test_missing_stale_or_inconsistent_seam_evidence_is_rejected[missing-installed]": {
+    "owner": "@adamjackson",
+    "remedy": "Copy a module-scoped define package template per case instead of re-copying the full package and reloading it each time.",
+    "reviewDeadline": "2027-02-08"
+  },
+  "tests/test_repository_seam_evidence.py::test_missing_stale_or_inconsistent_seam_evidence_is_rejected[missing-output]": {
+    "owner": "@adamjackson",
+    "remedy": "Copy the shared define template; mutate only the canary record.",
+    "reviewDeadline": "2027-02-08"
+  },
+  "tests/test_repository_seam_evidence.py::test_missing_stale_or_inconsistent_seam_evidence_is_rejected[missing-wheels]": {
+    "owner": "@adamjackson",
+    "remedy": "Copy a module-scoped define package template per case instead of re-copying the full package and reloading it each time.",
+    "reviewDeadline": "2027-02-08"
+  },
+  "tests/test_repository_seam_evidence.py::test_missing_stale_or_inconsistent_seam_evidence_is_rejected[stale-runtime]": {
+    "owner": "@adamjackson",
+    "remedy": "Copy a module-scoped define package template per case instead of re-copying the full package and reloading it each time.",
+    "reviewDeadline": "2027-02-08"
+  },
+  "tests/test_repository_seam_evidence.py::test_missing_stale_or_inconsistent_seam_evidence_is_rejected[unknown-output]": {
+    "owner": "@adamjackson",
+    "remedy": "Copy a module-scoped define package template per case instead of re-copying the full package and reloading it each time.",
+    "reviewDeadline": "2027-02-08"
+  },
+  "tests/test_repository_seam_evidence.py::test_missing_stale_or_inconsistent_seam_evidence_is_rejected[unregistered-record]": {
+    "owner": "@adamjackson",
+    "remedy": "Copy the shared define template; write only the one extra installed record.",
+    "reviewDeadline": "2027-02-08"
+  },
+  "tests/test_repository_seam_evidence.py::test_missing_stale_or_inconsistent_seam_evidence_is_rejected[wrong-package]": {
+    "owner": "@adamjackson",
+    "remedy": "Copy a module-scoped define package template per case instead of re-copying the full package and reloading it each time.",
+    "reviewDeadline": "2027-02-08"
+  },
+  "tests/test_repository_seam_evidence.py::test_registered_historical_records_are_not_orphan_findings": {
+    "owner": "@adamjackson",
+    "remedy": "Copy the shared define template; rewrite only releases.yaml and one installed record.",
+    "reviewDeadline": "2027-02-08"
+  },
+  "tests/test_review_projection_contracts.py::test_a_trial_without_harbors_result_takes_its_timing_from_the_job": {
+    "owner": "@adamjackson",
+    "remedy": "Pass only the synthetic-bugfix source via sources=.",
+    "reviewDeadline": "2027-02-08"
+  },
+  "tests/test_review_projection_contracts.py::test_an_experiment_without_its_task_document_is_labelled_by_its_problem": {
+    "owner": "@adamjackson",
+    "remedy": "Pass only the affected source via sources=.",
+    "reviewDeadline": "2027-02-08"
+  },
+  "tests/test_review_projection_contracts.py::test_an_unusable_harbor_result_is_treated_as_absent[[1, 2]]": {
+    "owner": "@adamjackson",
+    "remedy": "Pass only the one affected source via sources=.",
+    "reviewDeadline": "2027-02-08"
+  },
+  "tests/test_review_projection_contracts.py::test_an_unusable_harbor_result_is_treated_as_absent[{not json]": {
+    "owner": "@adamjackson",
+    "remedy": "Pass only the one affected source via sources=.",
+    "reviewDeadline": "2027-02-08"
+  },
+  "tests/test_review_projection_contracts.py::test_merging_fails_closed_without_projectable_runs_or_with_duplicate_ids": {
+    "owner": "@adamjackson",
+    "remedy": "Pass the empty and duplicate source tuples directly instead of loading the full review.",
+    "reviewDeadline": "2027-02-08"
+  },
+  "tests/test_review_projection_contracts.py::test_missing_assessments_leave_runs_unscored_never_zero": {
+    "owner": "@adamjackson",
+    "remedy": "Pass one source via sources= together with the storeless lookup.",
+    "reviewDeadline": "2027-02-08"
+  },
+  "tests/test_review_projection_contracts.py::test_projection_wire_contract_uses_problem_and_arm": {
+    "owner": "@adamjackson",
+    "remedy": "Dump one run's JSON rather than the whole projection artifact.",
+    "reviewDeadline": "2027-02-08"
+  },
+  "tests/test_review_projection_contracts.py::test_truncated_dev_run_is_withheld_and_never_pooled_with_arm_evidence": {
+    "owner": "@adamjackson",
+    "remedy": "Pass the truncated dev source plus one arm source via sources=.",
+    "reviewDeadline": "2027-02-08"
+  },
+  "tests/test_review_projection_contracts.py::test_unassessable_trial_inputs_are_reported_per_scorer": {
+    "owner": "@adamjackson",
+    "remedy": "Pass only the unreadable source via sources=.",
+    "reviewDeadline": "2027-02-08"
+  },
+  "tests/test_review_projection_contracts.py::test_unassessed_hint_names_the_lock_whose_settings_key_the_assessment": {
+    "owner": "@adamjackson",
+    "remedy": "Pass only the synthetic-bugfix source via sources=.",
+    "reviewDeadline": "2027-02-08"
+  },
+  "tests/test_review_projection_contracts.py::test_unreadable_trajectory_is_one_error_span": {
+    "owner": "@adamjackson",
+    "remedy": "Pass only the synthetic-skill source via sources=.",
+    "reviewDeadline": "2027-02-08"
+  },
+  "tests/test_runtime_gate_refusals.py::test_a_compatible_design_locks_without_recording_gate_facts": {
+    "owner": "@adamjackson",
+    "remedy": "Share one module-scoped ResolverSet and python pack across _lock calls instead of rebuilding per call.",
+    "reviewDeadline": "2027-02-08"
+  },
+  "tests/test_runtime_gate_refusals.py::test_rt0_an_unvalidated_binding_is_refused": {
+    "owner": "@adamjackson",
+    "remedy": "Reuse a module-scoped ResolverSet and runtime pack while retaining the complete lock refusal path.",
+    "reviewDeadline": "2027-02-08"
+  },
+  "tests/test_runtime_gate_refusals.py::test_rt1_a_binding_without_a_runtime_is_refused": {
+    "owner": "@adamjackson",
+    "remedy": "Reuse a module-scoped ResolverSet and runtime pack while retaining the complete lock refusal path.",
+    "reviewDeadline": "2027-02-08"
+  },
+  "tests/test_runtime_gate_refusals.py::test_rt1_a_local_path_task_must_declare_the_experiments_runtime[-declares no runtime; add [metadata] raidar_runtime]": {
+    "owner": "@adamjackson",
+    "remedy": "Pass a shared module-scoped ResolverSet into _lock so each parametrised case skips resolver construction.",
+    "reviewDeadline": "2027-02-08"
+  },
+  "tests/test_runtime_gate_refusals.py::test_rt1_a_local_path_task_must_declare_the_experiments_runtime[[metadata]\\nraidar_runtime = \"node-ts\"\\n-is for runtime node-ts]": {
+    "owner": "@adamjackson",
+    "remedy": "Pass a shared module-scoped ResolverSet into _lock so each parametrised case skips resolver construction.",
+    "reviewDeadline": "2027-02-08"
+  },
+  "tests/test_runtime_gate_refusals.py::test_rt1_a_local_task_of_the_right_runtime_locks": {
+    "owner": "@adamjackson",
+    "remedy": "Pass a shared module-scoped ResolverSet into _lock instead of rebuilding it per call.",
+    "reviewDeadline": "2027-02-08"
+  },
+  "tests/test_runtime_gate_refusals.py::test_rt1_a_set_override_cannot_swap_in_another_runtimes_binding[scb-node-ts/circuit_eval.checkpoint_1@abc123]": {
+    "owner": "@adamjackson",
+    "remedy": "Memoise _resolvers() and load_runtime_pack('python') per module; reuse across override cases.",
+    "reviewDeadline": "2027-02-08"
+  },
+  "tests/test_runtime_gate_refusals.py::test_rt1_a_set_override_cannot_swap_in_another_runtimes_binding[scb-node-ts/forge@abc123]": {
+    "owner": "@adamjackson",
+    "remedy": "Memoise _resolvers() and load_runtime_pack('python') per module; reuse across override cases.",
+    "reviewDeadline": "2027-02-08"
+  },
+  "tests/test_runtime_gate_refusals.py::test_rt2_a_binding_of_another_pack_contract_is_stale": {
+    "owner": "@adamjackson",
+    "remedy": "Derive the stale binding from one shared base ResolverSet rather than rebuilding all resolvers.",
+    "reviewDeadline": "2027-02-08"
+  },
+  "tests/test_runtime_gate_refusals.py::test_rt4_scorers_and_the_metric_must_cover_the_runtime": {
+    "owner": "@adamjackson",
+    "remedy": "Memoise load_runtime_pack('python') inside _node_pack so the pack loads once per module.",
+    "reviewDeadline": "2027-02-08"
+  },
+  "tests/test_runtime_gate_refusals.py::test_rt5_an_agent_pin_that_differs_from_the_pack_pin_is_refused": {
+    "owner": "@adamjackson",
+    "remedy": "Load the python pack once per module and derive the drifted pin from that cached copy.",
+    "reviewDeadline": "2027-02-08"
+  },
+  "tests/test_runtime_gate_refusals.py::test_rt5_an_agent_the_pack_does_not_bake_in_is_refused": {
+    "owner": "@adamjackson",
+    "remedy": "Load the python pack once per module; vary only the harness dict per test.",
+    "reviewDeadline": "2027-02-08"
+  },
+  "tests/test_runtime_gate_refusals.py::test_rt6_and_every_other_issue_of_a_runtime_override_are_reported_at_once": {
+    "owner": "@adamjackson",
+    "remedy": "Keep the single lock call; share the module-scoped experiment fixture.",
+    "reviewDeadline": "2027-02-08"
+  },
+  "tests/test_runtime_gate_refusals.py::test_rt6_plan_loads_the_pack_of_the_lock_runtime_and_refuses_drift": {
+    "owner": "@adamjackson",
+    "remedy": "Compute image_tag(load_runtime_pack('python')) once at module scope.",
+    "reviewDeadline": "2027-02-08"
+  },
+  "tests/test_runtime_gate_refusals.py::test_rt7_a_matching_or_unrecorded_implementation_locks": {
+    "owner": "@adamjackson",
+    "remedy": "Build _resolvers() once outside the grader loop; swap only the binding per iteration.",
+    "reviewDeadline": "2027-02-08"
+  },
+  "tests/test_runtime_gate_refusals.py::test_rt7_a_validated_grader_implementation_other_than_this_checkouts_is_refused": {
+    "owner": "@adamjackson",
+    "remedy": "Reuse a module-scoped ResolverSet base and inject only the grader binding for this case.",
+    "reviewDeadline": "2027-02-08"
+  },
+  "tests/test_stage_authoring_cli.py::test_no_authoring_path_runs_package_code_on_the_host": {
+    "owner": "@adamjackson",
+    "remedy": "Share the stages fixture at module scope instead of copying docs-check per test.",
+    "reviewDeadline": "2027-02-08"
+  },
+  "tests/test_stage_authoring_cli.py::test_stage_new_renames_scalar_without_damaging_yaml_or_permissions[anchor]": {
+    "owner": "@adamjackson",
+    "remedy": "Compute the stripped docs-check manifest document once per module, not per parametrised case.",
+    "reviewDeadline": "2027-02-08"
+  },
+  "tests/test_stage_check_outcomes.py::test_a_verifier_whose_output_changes_between_identical_runs_fails_those_cases": {
+    "owner": "@adamjackson",
+    "remedy": "Add a case-subset option to CheckRig so the flaky-tool test runs only its asserted cases.",
+    "reviewDeadline": "2027-02-08"
+  },
+  "tests/test_stage_check_outcomes.py::test_state_outside_the_bounds_must_be_rejected_before_authored_code_runs": {
+    "owner": "@adamjackson",
+    "remedy": "Share one install_rig and run_check result with the sibling bounds test via a module fixture.",
+    "reviewDeadline": "2027-02-08"
+  },
+  "tests/test_stage_package.py::test_special_files_are_refused": {
+    "owner": "@adamjackson",
+    "remedy": "Copy only the tool directory for the FIFO case instead of the full note-state fixture package.",
+    "reviewDeadline": "2027-02-08"
+  },
+  "tests/test_test_evidence.py::test_growth_includes_async_tests_and_class_methods[class TestProbe:\\n    def test_value(self):\\n        assert probe(2) == 4\\n-TestProbe::test_value]": {
+    "owner": "@adamjackson",
+    "remedy": "Cache immutable AST snapshots by source text so mapped and unmapped assertions reuse parsing.",
+    "reviewDeadline": "2027-02-08"
+  },
+  "tests/test_verification_effort_consumers.py::test_an_invalid_or_mismatched_sensitivities_file_raises": {
+    "owner": "@adamjackson",
+    "remedy": "Read the repository sensitivities file once in a module-scoped fixture, not per test run.",
+    "reviewDeadline": "2027-02-08"
+  },
+  "tests/test_verification_effort_scorer.py::test_a_cached_grade_with_different_provenance_is_not_fix_correctness[kind-raidar-prefix-grade]": {
+    "owner": "@adamjackson",
+    "remedy": "Build the pre-fix grade store once per module and copy it into each parametrised case.",
+    "reviewDeadline": "2027-02-08"
+  },
+  "tests/test_verifier_copy_sandbox.py::test_extract_out_tar_refuses_a_link_that_leaves_the_directory": {
+    "owner": "@adamjackson",
+    "remedy": "Build the in-memory tar with only the escaping symlink member.",
+    "reviewDeadline": "2027-02-08"
+  },
+  "tests/test_verifier_plugin_behaviors.py::test_the_environment_probe_names_the_interpreter_and_normalises_tools": {
+    "owner": "@adamjackson",
+    "remedy": "Hash sys.executable once and reuse that digest for both probe assertions.",
+    "reviewDeadline": "2027-02-08"
+  },
+  "tests/test_workflow_package.py::test_an_error_seal_with_no_budget_stands_as_an_error_not_a_refusal": {
+    "owner": "@adamjackson",
+    "remedy": "Build the gated rig with the fast_lab copytree stub so no repository tree is copied.",
+    "reviewDeadline": "2027-02-08"
+  }
+}

@@ -4,6 +4,8 @@ All notable changes to this project are documented in this file.
 
 ## Unreleased
 
+- ci: import five pinned CI fast-test baselines and derive provisional limits
+  with owned, expiring speed-up remedies through `make test-budget-limits`.
 - ci: retain invocation-bound fast-test phase reports and enforce their validity
   through both gates; add CI-only calibrated timing checks, externally verified
   policy approvals and sequential baseline measurement/import tooling.

@@ -1,6 +1,82 @@
 {
   "schemaVersion": 1,
   "tests": {
+    "orchestrator/tests/test_test_budget_rules.py::test_limits_writer_refuses_fewer_than_five_records_without_writing[0]": {
+      "source": "scripts/checks/test_budget_evidence.py",
+      "behavior": "Require five comparable complete measurements before writing provisional policy"
+    },
+    "orchestrator/tests/test_test_budget_rules.py::test_limits_writer_refuses_fewer_than_five_records_without_writing[1]": {
+      "source": "scripts/checks/test_budget_evidence.py",
+      "behavior": "Require five comparable complete measurements before writing provisional policy"
+    },
+    "orchestrator/tests/test_test_budget_rules.py::test_limits_writer_refuses_fewer_than_five_records_without_writing[4]": {
+      "source": "scripts/checks/test_budget_evidence.py",
+      "behavior": "Require five comparable complete measurements before writing provisional policy"
+    },
+    "orchestrator/tests/test_test_budget_rules.py::test_missing_exception_metadata_names_all_tests_and_never_writes[missing0]": {
+      "source": "scripts/checks/test_budget_evidence.py",
+      "behavior": "Refuse all missing named exception metadata before writing any policy bytes"
+    },
+    "orchestrator/tests/test_test_budget_rules.py::test_missing_exception_metadata_names_all_tests_and_never_writes[missing1]": {
+      "source": "scripts/checks/test_budget_evidence.py",
+      "behavior": "Refuse all missing named exception metadata before writing any policy bytes"
+    },
+    "orchestrator/tests/test_test_budget_rules.py::test_incomplete_exception_metadata_never_writes[owner]": {
+      "source": "scripts/checks/test_budget_evidence.py",
+      "behavior": "Refuse missing owner, remedy or review deadline before writing policy"
+    },
+    "orchestrator/tests/test_test_budget_rules.py::test_incomplete_exception_metadata_never_writes[remedy]": {
+      "source": "scripts/checks/test_budget_evidence.py",
+      "behavior": "Refuse missing owner, remedy or review deadline before writing policy"
+    },
+    "orchestrator/tests/test_test_budget_rules.py::test_incomplete_exception_metadata_never_writes[reviewDeadline]": {
+      "source": "scripts/checks/test_budget_evidence.py",
+      "behavior": "Refuse missing owner, remedy or review deadline before writing policy"
+    },
+    "orchestrator/tests/test_test_budget_rules.py::test_written_policy_passes_checker_but_mutated_limit_fails[wallSeconds]": {
+      "source": "scripts/checks/test_budget_evidence.py",
+      "behavior": "Write checker-consistent evidence-derived wall, common and exception limits"
+    },
+    "orchestrator/tests/test_test_budget_rules.py::test_written_policy_passes_checker_but_mutated_limit_fails[perTestSeconds]": {
+      "source": "scripts/checks/test_budget_evidence.py",
+      "behavior": "Write checker-consistent evidence-derived wall, common and exception limits"
+    },
+    "orchestrator/tests/test_test_budget_rules.py::test_written_policy_passes_checker_but_mutated_limit_fails[exception]": {
+      "source": "scripts/checks/test_budget_evidence.py",
+      "behavior": "Write checker-consistent evidence-derived wall, common and exception limits"
+    },
+    "orchestrator/tests/test_test_budget_rules.py::test_written_limits_and_every_outlier_equal_recomputation": {
+      "source": "scripts/checks/test_budget_evidence.py",
+      "behavior": "Write recomputed limits and exactly the named outliers with supplied ownership metadata"
+    },
+    "orchestrator/tests/test_test_budget_rules.py::test_missing_exception_metadata_names_all_tests_and_never_writes": {
+      "source": "scripts/checks/test_budget_evidence.py",
+      "behavior": "Refuse all missing named exception metadata before writing any policy bytes"
+    },
+    "orchestrator/tests/test_test_budget_rules.py::test_incomplete_exception_metadata_never_writes": {
+      "source": "scripts/checks/test_budget_evidence.py",
+      "behavior": "Refuse missing owner, remedy or review deadline before writing policy"
+    },
+    "orchestrator/tests/test_test_budget_rules.py::test_expired_metadata_uses_injected_clock_and_never_writes": {
+      "source": "scripts/checks/test_budget_evidence.py",
+      "behavior": "Validate exception review deadlines against an injected clock before writing"
+    },
+    "orchestrator/tests/test_test_budget_rules.py::test_unchanged_records_write_identical_canonical_bytes_without_input_mutation": {
+      "source": "scripts/checks/test_budget_evidence.py",
+      "behavior": "Generate deterministic canonical policy bytes without mutating records or metadata"
+    },
+    "orchestrator/tests/test_test_budget_rules.py::test_written_policy_passes_checker_but_mutated_limit_fails": {
+      "source": "scripts/checks/test_budget_evidence.py",
+      "behavior": "Write checker-consistent evidence-derived wall, common and exception limits"
+    },
+    "orchestrator/tests/test_test_budget_rules.py::test_limits_writer_refuses_fewer_than_five_records_without_writing": {
+      "source": "scripts/checks/test_budget_evidence.py",
+      "behavior": "Require five comparable complete measurements before writing provisional policy"
+    },
+    "orchestrator/tests/test_test_budget_rules.py::test_written_status_is_provisional_and_pending_measure_run_binds_policy_and_profile": {
+      "source": "scripts/checks/test_budget_evidence.py",
+      "behavior": "Bind pending measure status to provisional policy and profile without claiming external acceptance"
+    },
     "orchestrator/tests/test_test_budget_provenance.py": {
       "source": "scripts/checks/test_budget_evidence.py",
       "behavior": "Authenticate new baseline observations against external artifacts and preserve trusted immutable evidence without repeat downloads"

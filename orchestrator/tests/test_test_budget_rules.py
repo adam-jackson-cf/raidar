@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import copy
+import hashlib
 import importlib.util
+import json
 import math
 import sys
 from collections.abc import Callable
@@ -61,6 +63,31 @@ class BudgetApi(Protocol):
     def record_reports(
         self, reports: list[Json], *, revision: str, profile: Json
     ) -> list[Json]: ...
+
+
+class LimitsWriter(Protocol):
+    def write_limits(
+        self,
+        records: list[Json],
+        exception_metadata: Json,
+        *,
+        checker: BudgetApi,
+        now: Callable[[], date],
+        write: Callable[[bytes], None],
+    ) -> None: ...
+
+
+@pytest.fixture
+def limits_writer() -> LimitsWriter:
+    spec = importlib.util.spec_from_file_location(
+        "test_budget_limits_writer", ROOT / "scripts/checks/test_budget_evidence.py"
+    )
+    assert spec is not None
+    assert spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return cast("LimitsWriter", module)
 
 
 @pytest.fixture
@@ -428,3 +455,201 @@ def test_importer_promotes_only_comparable_successful_measurements(
         assert len(promoted) == 5
         assert [record["wallSeconds"] for record in promoted] == [10.0] * 5
         assert promoted[0]["cases"][NODE]["phases"]["call"] == 0.98
+
+
+SECOND_OUTLIER = "test_sample.py::test_40"
+
+
+def _writer_records() -> list[Json]:
+    records = _baselines()
+    for index, record in enumerate(records):
+        record["measurement"].update(runId=str(100 + index), jobId=str(200 + index))
+        for case_index in range(21, 41):
+            node = f"test_sample.py::test_{case_index:02}"
+            record["cases"][node] = {
+                "outcome": "passed",
+                "phases": {"setup": 0.01, "call": 0.02, "teardown": 0.01},
+            }
+            record["inventory"].append(node)
+    records[0]["cases"][NODE]["phases"]["call"] = 0.981
+    records[1]["cases"][SECOND_OUTLIER]["phases"]["call"] = 0.481
+    records[2]["wallSeconds"] = 10.01
+    return records
+
+
+def _exception_metadata() -> Json:
+    return {
+        NODE: {
+            "owner": "fixture-owner",
+            "remedy": "Replace the repeated fixture scan with one indexed lookup",
+            "reviewDeadline": TODAY.isoformat(),
+        },
+        SECOND_OUTLIER: {
+            "owner": "runner-owner",
+            "remedy": "Inject the process runner and remove redundant invocations",
+            "reviewDeadline": "2026-12-10",
+        },
+    }
+
+
+def _write_policy(
+    limits_writer: LimitsWriter,
+    budgets: BudgetApi,
+    records: list[Json],
+    metadata: Json,
+    *,
+    today: date = TODAY,
+) -> bytes:
+    writes: list[bytes] = []
+    limits_writer.write_limits(
+        records, metadata, checker=budgets, now=lambda: today, write=writes.append
+    )
+    assert len(writes) == 1
+    return writes[0]
+
+
+def _canonical_digest(value: Json) -> str:
+    canonical = json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
+def test_written_limits_and_every_outlier_equal_recomputation(
+    limits_writer: LimitsWriter, budgets: BudgetApi
+) -> None:
+    records = _writer_records()
+    metadata = _exception_metadata()
+    policy = json.loads(_write_policy(limits_writer, budgets, records, metadata))
+    computed = budgets.compute_limits(records)
+    assert policy["wallSeconds"] == computed["wallSeconds"] == 13
+    assert policy["perTestSeconds"] == computed["perTestSeconds"] == 0.06
+    assert computed["exceptionCeilings"] == {NODE: 1.51, SECOND_OUTLIER: 0.76}
+    assert policy["exceptions"] == {
+        node: {**metadata[node], "limitSeconds": ceiling}
+        for node, ceiling in computed["exceptionCeilings"].items()
+    }
+    assert policy["profile"] == PROFILE
+    assert policy["schemaVersion"] == 1
+    assert policy["formulas"] == _policy()["formulas"]
+    assert policy["goal"] == {"wallSeconds": 30, "perTestSeconds": 0.1}
+
+
+@pytest.mark.parametrize("missing", [(NODE,), (NODE, SECOND_OUTLIER)])
+def test_missing_exception_metadata_names_all_tests_and_never_writes(
+    limits_writer: LimitsWriter, budgets: BudgetApi, missing: tuple[str, ...]
+) -> None:
+    metadata = _exception_metadata()
+    for node in missing:
+        del metadata[node]
+    writes: list[bytes] = []
+    with pytest.raises(ValueError, match=r"TEST\.budget\.") as refusal:
+        limits_writer.write_limits(
+            _writer_records(), metadata, checker=budgets, now=lambda: TODAY, write=writes.append
+        )
+    assert FAST_RULE in str(refusal.value) or CASE_RULE in str(refusal.value)
+    assert all(node in str(refusal.value) for node in missing)
+    assert writes == []
+
+
+@pytest.mark.parametrize("field", ["owner", "remedy", "reviewDeadline"])
+def test_incomplete_exception_metadata_never_writes(
+    limits_writer: LimitsWriter, budgets: BudgetApi, field: str
+) -> None:
+    metadata = _exception_metadata()
+    del metadata[NODE][field]
+    writes: list[bytes] = []
+    with pytest.raises(ValueError, match=r"TEST\.budget\.") as refusal:
+        limits_writer.write_limits(
+            _writer_records(), metadata, checker=budgets, now=lambda: TODAY, write=writes.append
+        )
+    assert NODE in str(refusal.value)
+    assert writes == []
+
+
+def test_expired_metadata_uses_injected_clock_and_never_writes(
+    limits_writer: LimitsWriter, budgets: BudgetApi
+) -> None:
+    writes: list[bytes] = []
+    with pytest.raises(ValueError, match=r"TEST\.budget\.") as refusal:
+        limits_writer.write_limits(
+            _writer_records(),
+            _exception_metadata(),
+            checker=budgets,
+            now=lambda: date(2026, 11, 11),
+            write=writes.append,
+        )
+    assert NODE in str(refusal.value)
+    assert writes == []
+
+
+def test_unchanged_records_write_identical_canonical_bytes_without_input_mutation(
+    limits_writer: LimitsWriter, budgets: BudgetApi
+) -> None:
+    records = _writer_records()
+    metadata = _exception_metadata()
+    originals = copy.deepcopy((records, metadata))
+    first = _write_policy(limits_writer, budgets, records, metadata)
+    second = _write_policy(limits_writer, budgets, records, metadata, today=date(2026, 11, 9))
+    assert first == second
+    assert (records, metadata) == originals
+    assert first == (
+        json.dumps(json.loads(first), indent=2, sort_keys=True, ensure_ascii=False) + "\n"
+    ).encode("utf-8")
+
+
+@pytest.mark.parametrize("field", ["wallSeconds", "perTestSeconds", "exception"])
+def test_written_policy_passes_checker_but_mutated_limit_fails(
+    limits_writer: LimitsWriter, budgets: BudgetApi, field: str
+) -> None:
+    records = _writer_records()
+    policy = json.loads(_write_policy(limits_writer, budgets, records, _exception_metadata()))
+    report = copy.deepcopy(records[0])
+    report["invocationId"] = "current"
+    assert _check(budgets, report, policy=policy, baselines=records)["exitCode"] == 0
+    if field == "exception":
+        policy["exceptions"][SECOND_OUTLIER]["limitSeconds"] += 0.01
+    else:
+        policy[field] += 1
+    refused = _check(budgets, report, policy=policy, baselines=records)
+    assert refused["exitCode"] == 1
+    assert any(finding["kind"] == "policy" for finding in refused["findings"])
+
+
+@pytest.mark.parametrize("count", [0, 1, 4])
+def test_limits_writer_refuses_fewer_than_five_records_without_writing(
+    limits_writer: LimitsWriter, budgets: BudgetApi, count: int
+) -> None:
+    writes: list[bytes] = []
+    with pytest.raises(ValueError, match=r"TEST\.budget\.") as refusal:
+        limits_writer.write_limits(
+            _writer_records()[:count],
+            _exception_metadata(),
+            checker=budgets,
+            now=lambda: TODAY,
+            write=writes.append,
+        )
+    assert FAST_RULE in str(refusal.value)
+    assert "5" in str(refusal.value)
+    assert writes == []
+
+
+def test_written_status_is_provisional_and_pending_measure_run_binds_policy_and_profile(
+    limits_writer: LimitsWriter, budgets: BudgetApi
+) -> None:
+    records = _writer_records()
+    policy = json.loads(_write_policy(limits_writer, budgets, records, _exception_metadata()))
+    assert policy["status"] == "provisional"
+    assert "measurementApproval" not in policy
+    unsigned = {key: value for key, value in policy.items() if key != "measureRun"}
+    assert policy["measureRun"] == {
+        "status": "pending",
+        "revision": "revision-a",
+        "runIds": ["100", "101", "102", "103", "104"],
+        "profileDigest": _canonical_digest(PROFILE),
+        "policyDigest": _canonical_digest(unsigned),
+    }
+    policy["status"] = "accepted"
+    report = copy.deepcopy(records[0])
+    report["invocationId"] = "current"
+    refused = _check(budgets, report, policy=policy, baselines=records)
+    assert refused["exitCode"] == 1
+    assert any(finding["kind"] == "policy" for finding in refused["findings"])
