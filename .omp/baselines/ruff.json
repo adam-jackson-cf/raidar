@@ -3123,48 +3123,6 @@
       "count": 1
     },
     {
-      "path": "scripts/checks/check-repository-paths.py",
-      "code": "C901",
-      "fingerprint": "00872f6e90b13760fc68acbf5b103e89477baabb1c460d60ef2c54d3196efad1",
-      "count": 1
-    },
-    {
-      "path": "scripts/checks/check-repository-paths.py",
-      "code": "PERF401",
-      "fingerprint": "374bf4631c8510f7cceb898870c105451da27ccd85dd248447c300d8a6abc58c",
-      "count": 1
-    },
-    {
-      "path": "scripts/checks/check-repository-paths.py",
-      "code": "PERF401",
-      "fingerprint": "3a16464affae2f2acbebd1474f84aecd4acc43d7c1657f5965cb95cc5a73a396",
-      "count": 1
-    },
-    {
-      "path": "scripts/checks/check-repository-paths.py",
-      "code": "PERF401",
-      "fingerprint": "c3f0752b3cb7ccaf6befc1d3695402d16474c8c2b20d1ecf1fe526535e511529",
-      "count": 1
-    },
-    {
-      "path": "scripts/checks/check-repository-paths.py",
-      "code": "PERF401",
-      "fingerprint": "e6b9b68c655cfa19379b4f5ce6e8ec5cec3e86015777f72cba115450fd5566f9",
-      "count": 1
-    },
-    {
-      "path": "scripts/checks/check-repository-paths.py",
-      "code": "PLR0912",
-      "fingerprint": "28090358be8e10ce0c42d391addde679feeb207d68e11054f89e7aec00d36084",
-      "count": 1
-    },
-    {
-      "path": "scripts/checks/check-repository-paths.py",
-      "code": "SIM105",
-      "fingerprint": "2b4a65c4a0b18eb797e6de9ebbc5937d42d558c6bc7999474cd1bd35575e022a",
-      "count": 1
-    },
-    {
       "path": "scripts/checks/check-ruff-suppressions.py",
       "code": "E501",
       "fingerprint": "169f3ccfb545754face7d523514022621a5a902c420b5d80b2c8f7a933cdd283",

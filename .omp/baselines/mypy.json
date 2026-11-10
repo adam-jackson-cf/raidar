@@ -4461,24 +4461,6 @@
       "count": 1
     },
     {
-      "path": "scripts/checks/check-repository-paths.py",
-      "code": "no-untyped-def",
-      "fingerprint": "45395479b75cfb4aa55706258615d78d78c0994642c56b405c9f7a001eab2526",
-      "count": 1
-    },
-    {
-      "path": "scripts/checks/check-repository-paths.py",
-      "code": "no-untyped-def",
-      "fingerprint": "47d04498ddde71520dd2c6773e1e7e755400c682721cc9dfde2c0e08c46809b2",
-      "count": 1
-    },
-    {
-      "path": "scripts/checks/check-repository-paths.py",
-      "code": "no-untyped-def",
-      "fingerprint": "b667e06d3cdb91f86185ab5e4fbcc9312c87799d707516ba01d5b4e3c5a0bf60",
-      "count": 1
-    },
-    {
       "path": "scripts/checks/check_toolchain_pins.py",
       "code": "var-annotated",
       "fingerprint": "6f25aa5b4db9ec255d1dd694001c36047e935ea0ab3fc80f31ae95c404321a24",

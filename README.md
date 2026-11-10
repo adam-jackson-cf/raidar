@@ -46,6 +46,13 @@ part of `make quality`; regenerate a release after rebasing onto newer main.
 Experiment toolchains record Python, LiteLLM and `raidar_spec`, not the release
 version, so a version-only release does not require relocking.
 
+The commit gate runs static checks, all fast tests and affected slow/quality seams.
+`scripts/checks/repository-owners.json` declares file ownership, test tiers and seam
+owners. New tests must declare their behavior and tier there; new capability data
+must declare its exact owner. Unknown changes or stale seam destinations run all
+local T2 seams rather than skipping coverage. CI always runs the full slow and
+quality tiers.
+
 The grading digest includes the exact host Python version; a different patch version
 changes the digest and fails RT7 against the current validation pins. Package compatibility
 remains `requires-python = ">=3.12"`; validated grading requires the pinned interpreter.

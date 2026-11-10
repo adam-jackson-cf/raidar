@@ -192,7 +192,7 @@ def test_path_policy_accepts_owned_paths(tmp_path: Path) -> None:
     sources = {
         "README.md": "# Repository\n",
         "orchestrator/src/raidar/engine/trial/probe.py": "VALUE = 1\n",
-        "orchestrator/tests/test_probe.py": "def test_probe():\n    assert True\n",
+        "orchestrator/tests/test_repository_gate_rules.py": "def test_probe():\n    assert True\n",
     }
     for relative, source in sources.items():
         candidate = tmp_path / relative
@@ -212,7 +212,7 @@ def test_path_policy_accepts_owned_paths(tmp_path: Path) -> None:
             "TEST.placement",
         ),
         (
-            "orchestrator/tests/test_probe.py",
+            "orchestrator/tests/test_repository_gate_rules.py",
             "import pytest\n\n@pytest.mark.slow\ndef test_probe():\n    pass\n",
             "TEST.placement",
         ),
@@ -226,8 +226,9 @@ def test_path_policy_reports_actionable_rule_findings(
     candidate.parent.mkdir(parents=True, exist_ok=True)
     candidate.write_text(source)
     found = paths.path_findings(tmp_path, [relative])
-    assert len(found) == 1
-    _assert_finding(found[0], relative, rule)
+    matches = [line for line in found if f": {rule}: " in line]
+    assert len(matches) == 1
+    _assert_finding(matches[0], relative, rule)
 
 
 @pytest.mark.parametrize("relative", ["/outside.py", "../outside.py", "orchestrator/../outside.py"])
@@ -246,7 +247,7 @@ def test_path_policy_skips_documentation_and_generated_files(tmp_path: Path, rel
 
 
 def test_stage_fixture_programs_are_not_tests(tmp_path: Path) -> None:
-    relative = "lab/stages/x/y/fixtures/program.py"
+    relative = "lab/stages/raidar/define/fixtures/program.py"
     candidate = tmp_path / relative
     candidate.parent.mkdir(parents=True)
     candidate.write_text("def test_input():\n    return 1\n")
