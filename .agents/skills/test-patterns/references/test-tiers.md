@@ -17,10 +17,44 @@ overlay `docker`.
 Budgets are measured wall time with dependencies and images provisioned
 (provisioning recorded separately). They are proposals, not measured
 feasibility claims; never raise a performance threshold to pass.
-The host-tier timing reference is the existing CI runner (`ubuntu-latest`,
+The host-tier timing reference is the pinned CI runner (`ubuntu-24.04`,
 Python 3.13.7). Record local baselines with their platform, Python version and
 wall time; they are not CI feasibility evidence. Docker phase-exit proof uses
 the trusted remote `mbp` target.
+
+## Fast-tier measured limits
+
+The single fast run in `make quality` writes an invocation-bound JSON report
+under `var/tmp/tests/budgets/`. `make gate-commit` consumes that report with
+`make test-budget-check`: invalid, skipped or truncated measurements fail on
+every host; timing breaches are advisory locally and blocking on matching CI.
+CI profile mismatches fail as infrastructure errors. No second fast run occurs.
+
+Tracked `.omp/test-budgets/` holds policy, imported baselines and external
+approval references. Before five complete same-revision CI measurements exist,
+the status is `no limits (0/5)` (or the actual count); report validity still
+blocks. Limits are recomputed from evidence, not hand-entered: wall is
+`ceil(1.25 * max)`, and common per-case is p95 of each case's maximum total
+setup/call/teardown time times 1.5, rounded up to 10 ms. Named outliers need
+owners, concrete remedies and review deadlines. The 30-second wall and
+100-ms per-case goals remain separate from calibrated limits.
+
+Dispatch `test-budget-measure.yml` at a fixed revision (default five sequential
+jobs), then run `make test-budget-record RUNS="<GitHub run ids>"` to import
+successful complete artifacts. Ordinary reports are never baseline records.
+Policy increases require an owner GitHub review bound to the exact policy diff
+digest and commit, verified through the API; a committed approval boolean is
+not authorization. Status remains provisional until verified measure evidence.
+The first baseline campaign follows in Unit 6b after this tooling merges.
+
+For an increase, request the owner's review with one body line
+`Policy-Diff-SHA256: <policy_diff_digest(base, proposed)>`. Record its
+`repository`, `pullNumber`, `reviewId`, `commit` and `policyDiffDigest` in
+`approvals/<id>.json` in a later commit without changing `limits.json`.
+The checker fetches the review and verifies owner identity, approved state,
+digest, commit, and identical policy bytes at that reviewed commit.
+An accepted policy additionally references externally verified measurement
+completion through `measurementApproval`; hand-editing status cannot accept it.
 
 ## Process guard
 

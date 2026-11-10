@@ -4,6 +4,9 @@ All notable changes to this project are documented in this file.
 
 ## Unreleased
 
+- ci: retain invocation-bound fast-test phase reports and enforce their validity
+  through both gates; add CI-only calibrated timing checks, externally verified
+  policy approvals and sequential baseline measurement/import tooling.
 - ci: enforce installer/metadata parity, locked Prettier 3.6.2 checks outside
   consent-excluded and frozen paths, and strict locked dependency audits.
 - build(deps): update identity-neutral vulnerable dependencies; retain

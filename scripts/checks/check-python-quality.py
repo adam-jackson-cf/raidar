@@ -41,6 +41,8 @@ CANONICAL_TEST_GROUPS = {
 SCRIPT_NAME_EXCEPTIONS = {
     "scripts/checks/check_toolchain_pins.py",
     "scripts/checks/ruff_baseline.py",
+    "scripts/checks/guardrail_test_report.py",
+    "scripts/checks/test_budget_evidence.py",
 }
 GENERIC_NAME_ALLOWLIST: set[str] = set()
 SOURCE_ROOTS = ("orchestrator/src/raidar/", "contract/src/raidar_contract/", "lab/stages/")
@@ -126,6 +128,12 @@ SEAM_SUBPROCESS_WRAPPERS: dict[str, set[str]] = {
     "scripts/checks/check-python-quality.py": {"_check_baseline"},
     "scripts/checks/check-structure.py": {"repo_paths"},
     "scripts/checks/check-test-evidence.py": {"_git_bytes"},
+    "scripts/checks/run-budgeted-fast.py": {
+        "machine_details",
+        "run_pytest",
+        "current_revision",
+    },
+    "scripts/checks/test_budget_evidence.py": {"_run"},
     "scripts/checks/check_toolchain_pins.py": {"_registry_resolver_violations"},
     "scripts/release/bump-version.py": {
         "git_output",
@@ -157,6 +165,8 @@ ALLOWED_TEST_ROOT_FILES = {
     "orchestrator/tests/conftest.py",
 }
 SCRIPT_NAME_ALLOWLIST = {
+    "check-test-budgets.py",
+    "run-budgeted-fast.py",
     "bump-version.py",
     "check-identity.py",
     "check-finding-baseline.py",

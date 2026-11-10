@@ -1,6 +1,390 @@
 {
   "schemaVersion": 1,
   "tests": {
+    "orchestrator/tests/test_quality_gate_commands.py": {
+      "source": "orchestrator/src/raidar/cli/quality.py",
+      "behavior": "Run the budget report producer once with unchanged coverage floor and failure/staging behavior"
+    },
+    "orchestrator/tests/test_quality_gate_commands.py::test_a_failed_child_command_stops_the_quality_runner": {
+      "source": "orchestrator/src/raidar/cli/quality.py",
+      "behavior": "Run the budget report producer once with unchanged coverage floor and failure/staging behavior"
+    },
+    "orchestrator/tests/test_quality_gate_commands.py::test_coverage_gate_fails_below_the_floor_at_any_precision": {
+      "source": "orchestrator/src/raidar/cli/quality.py",
+      "behavior": "Run the budget report producer once with unchanged coverage floor and failure/staging behavior"
+    },
+    "orchestrator/tests/test_quality_gate_commands.py::test_coverage_gate_fails_below_the_floor_at_any_precision[9499996-10000000-False-branch]": {
+      "source": "orchestrator/src/raidar/cli/quality.py",
+      "behavior": "Run the budget report producer once with unchanged coverage floor and failure/staging behavior"
+    },
+    "orchestrator/tests/test_quality_gate_commands.py::test_coverage_gate_fails_below_the_floor_at_any_precision[9499996-10000000-False-line]": {
+      "source": "orchestrator/src/raidar/cli/quality.py",
+      "behavior": "Run the budget report producer once with unchanged coverage floor and failure/staging behavior"
+    },
+    "orchestrator/tests/test_quality_gate_commands.py::test_coverage_gate_fails_below_the_floor_at_any_precision[covered0-100000-False-branch]": {
+      "source": "orchestrator/src/raidar/cli/quality.py",
+      "behavior": "Run the budget report producer once with unchanged coverage floor and failure/staging behavior"
+    },
+    "orchestrator/tests/test_quality_gate_commands.py::test_coverage_gate_fails_below_the_floor_at_any_precision[covered0-100000-False-line]": {
+      "source": "orchestrator/src/raidar/cli/quality.py",
+      "behavior": "Run the budget report producer once with unchanged coverage floor and failure/staging behavior"
+    },
+    "orchestrator/tests/test_quality_gate_commands.py::test_coverage_gate_fails_below_the_floor_at_any_precision[covered2-100000-True-branch]": {
+      "source": "orchestrator/src/raidar/cli/quality.py",
+      "behavior": "Run the budget report producer once with unchanged coverage floor and failure/staging behavior"
+    },
+    "orchestrator/tests/test_quality_gate_commands.py::test_coverage_gate_fails_below_the_floor_at_any_precision[covered2-100000-True-line]": {
+      "source": "orchestrator/src/raidar/cli/quality.py",
+      "behavior": "Run the budget report producer once with unchanged coverage floor and failure/staging behavior"
+    },
+    "orchestrator/tests/test_quality_gate_commands.py::test_coverage_gate_fails_below_the_floor_at_any_precision[covered3-100000-True-branch]": {
+      "source": "orchestrator/src/raidar/cli/quality.py",
+      "behavior": "Run the budget report producer once with unchanged coverage floor and failure/staging behavior"
+    },
+    "orchestrator/tests/test_quality_gate_commands.py::test_coverage_gate_fails_below_the_floor_at_any_precision[covered3-100000-True-line]": {
+      "source": "orchestrator/src/raidar/cli/quality.py",
+      "behavior": "Run the budget report producer once with unchanged coverage floor and failure/staging behavior"
+    },
+    "orchestrator/tests/test_quality_gate_commands.py::test_coverage_gate_fails_when_nothing_was_measured": {
+      "source": "orchestrator/src/raidar/cli/quality.py",
+      "behavior": "Run the budget report producer once with unchanged coverage floor and failure/staging behavior"
+    },
+    "orchestrator/tests/test_quality_gate_commands.py::test_fast_command_enforces_configured_floors_from_the_generated_report": {
+      "source": "orchestrator/src/raidar/cli/quality.py",
+      "behavior": "Run the budget report producer once with unchanged coverage floor and failure/staging behavior"
+    },
+    "orchestrator/tests/test_quality_gate_commands.py::test_fast_command_enforces_configured_floors_from_the_generated_report[measurements0-0-None]": {
+      "source": "orchestrator/src/raidar/cli/quality.py",
+      "behavior": "Run the budget report producer once with unchanged coverage floor and failure/staging behavior"
+    },
+    "orchestrator/tests/test_quality_gate_commands.py::test_fast_command_enforces_configured_floors_from_the_generated_report[measurements1-1-line coverage 94/100]": {
+      "source": "orchestrator/src/raidar/cli/quality.py",
+      "behavior": "Run the budget report producer once with unchanged coverage floor and failure/staging behavior"
+    },
+    "orchestrator/tests/test_quality_gate_commands.py::test_fast_command_enforces_configured_floors_from_the_generated_report[measurements2-1-branch coverage 95/100]": {
+      "source": "orchestrator/src/raidar/cli/quality.py",
+      "behavior": "Run the budget report producer once with unchanged coverage floor and failure/staging behavior"
+    },
+    "orchestrator/tests/test_quality_gate_commands.py::test_fast_command_enforces_configured_floors_from_the_generated_report[measurements3-1-no branch measurements]": {
+      "source": "orchestrator/src/raidar/cli/quality.py",
+      "behavior": "Run the budget report producer once with unchanged coverage floor and failure/staging behavior"
+    },
+    "orchestrator/tests/test_quality_gate_commands.py::test_fast_command_preserves_the_callers_coverage_artifacts": {
+      "source": "orchestrator/src/raidar/cli/quality.py",
+      "behavior": "Run the budget report producer once with unchanged coverage floor and failure/staging behavior"
+    },
+    "orchestrator/tests/test_quality_gate_commands.py::test_insufficient_coverage_prevents_staging_and_success": {
+      "source": "orchestrator/src/raidar/cli/quality.py",
+      "behavior": "Run the budget report producer once with unchanged coverage floor and failure/staging behavior"
+    },
+    "orchestrator/tests/test_quality_gate_commands.py::test_line_and_branch_floors_are_enforced_independently": {
+      "source": "orchestrator/src/raidar/cli/quality.py",
+      "behavior": "Run the budget report producer once with unchanged coverage floor and failure/staging behavior"
+    },
+    "orchestrator/tests/test_quality_gate_commands.py::test_quality_gate_helpers_validate_requirements_and_commands": {
+      "source": "orchestrator/src/raidar/cli/quality.py",
+      "behavior": "Run the budget report producer once with unchanged coverage floor and failure/staging behavior"
+    },
+    "orchestrator/tests/test_quality_gate_commands.py::test_quality_gates_refuse_unsafe_options_before_running_tools": {
+      "source": "orchestrator/src/raidar/cli/quality.py",
+      "behavior": "Run the budget report producer once with unchanged coverage floor and failure/staging behavior"
+    },
+    "orchestrator/tests/test_quality_gate_commands.py::test_quality_gates_refuse_unsafe_options_before_running_tools[options0-False---stage is only supported]": {
+      "source": "orchestrator/src/raidar/cli/quality.py",
+      "behavior": "Run the budget report producer once with unchanged coverage floor and failure/staging behavior"
+    },
+    "orchestrator/tests/test_quality_gate_commands.py::test_quality_gates_refuse_unsafe_options_before_running_tools[options1-True-Unstaged changes detected]": {
+      "source": "orchestrator/src/raidar/cli/quality.py",
+      "behavior": "Run the budget report producer once with unchanged coverage floor and failure/staging behavior"
+    },
+    "orchestrator/tests/test_quality_gate_commands.py::test_quality_gates_stage_only_after_success_when_explicitly_requested": {
+      "source": "orchestrator/src/raidar/cli/quality.py",
+      "behavior": "Run the budget report producer once with unchanged coverage floor and failure/staging behavior"
+    },
+    "orchestrator/tests/test_quality_gate_commands.py::test_quality_gates_stage_only_after_success_when_explicitly_requested[options0-False]": {
+      "source": "orchestrator/src/raidar/cli/quality.py",
+      "behavior": "Run the budget report producer once with unchanged coverage floor and failure/staging behavior"
+    },
+    "orchestrator/tests/test_quality_gate_commands.py::test_quality_gates_stage_only_after_success_when_explicitly_requested[options1-False]": {
+      "source": "orchestrator/src/raidar/cli/quality.py",
+      "behavior": "Run the budget report producer once with unchanged coverage floor and failure/staging behavior"
+    },
+    "orchestrator/tests/test_quality_gate_commands.py::test_quality_gates_stage_only_after_success_when_explicitly_requested[options2-True]": {
+      "source": "orchestrator/src/raidar/cli/quality.py",
+      "behavior": "Run the budget report producer once with unchanged coverage floor and failure/staging behavior"
+    },
+    "orchestrator/tests/test_quality_gate_commands.py::test_quality_gates_stop_on_a_failed_tool_without_staging": {
+      "source": "orchestrator/src/raidar/cli/quality.py",
+      "behavior": "Run the budget report producer once with unchanged coverage floor and failure/staging behavior"
+    },
+    "orchestrator/tests/test_quality_gate_commands.py::test_quality_gates_stop_on_a_failed_tool_without_staging[check]": {
+      "source": "orchestrator/src/raidar/cli/quality.py",
+      "behavior": "Run the budget report producer once with unchanged coverage floor and failure/staging behavior"
+    },
+    "orchestrator/tests/test_quality_gate_commands.py::test_quality_gates_stop_on_a_failed_tool_without_staging[failed_tool2]": {
+      "source": "orchestrator/src/raidar/cli/quality.py",
+      "behavior": "Run the budget report producer once with unchanged coverage floor and failure/staging behavior"
+    },
+    "orchestrator/tests/test_quality_gate_commands.py::test_quality_gates_stop_on_a_failed_tool_without_staging[failed_tool3]": {
+      "source": "orchestrator/src/raidar/cli/quality.py",
+      "behavior": "Run the budget report producer once with unchanged coverage floor and failure/staging behavior"
+    },
+    "orchestrator/tests/test_quality_gate_commands.py::test_quality_gates_stop_on_a_failed_tool_without_staging[failed_tool6]": {
+      "source": "orchestrator/src/raidar/cli/quality.py",
+      "behavior": "Run the budget report producer once with unchanged coverage floor and failure/staging behavior"
+    },
+    "orchestrator/tests/test_quality_gate_commands.py::test_quality_gates_stop_on_a_failed_tool_without_staging[failed_tool7]": {
+      "source": "orchestrator/src/raidar/cli/quality.py",
+      "behavior": "Run the budget report producer once with unchanged coverage floor and failure/staging behavior"
+    },
+    "orchestrator/tests/test_quality_gate_commands.py::test_quality_gates_stop_on_a_failed_tool_without_staging[format]": {
+      "source": "orchestrator/src/raidar/cli/quality.py",
+      "behavior": "Run the budget report producer once with unchanged coverage floor and failure/staging behavior"
+    },
+    "orchestrator/tests/test_quality_gate_commands.py::test_quality_gates_stop_on_a_failed_tool_without_staging[lint-imports]": {
+      "source": "orchestrator/src/raidar/cli/quality.py",
+      "behavior": "Run the budget report producer once with unchanged coverage floor and failure/staging behavior"
+    },
+    "orchestrator/tests/test_quality_gate_commands.py::test_quality_gates_stop_on_a_failed_tool_without_staging[lizard]": {
+      "source": "orchestrator/src/raidar/cli/quality.py",
+      "behavior": "Run the budget report producer once with unchanged coverage floor and failure/staging behavior"
+    },
+    "orchestrator/tests/test_test_budget_rules.py": {
+      "source": "scripts/checks/check-test-budgets.py",
+      "behavior": "Enforce complete invocation-bound reports, calibrated limits and externally verified policy authorization"
+    },
+    "orchestrator/tests/test_test_budget_rules.py::test_breaches_are_ci_only_and_have_actionable_phase_diagnostics": {
+      "source": "scripts/checks/check-test-budgets.py",
+      "behavior": "Enforce complete invocation-bound reports, calibrated limits and externally verified policy authorization"
+    },
+    "orchestrator/tests/test_test_budget_rules.py::test_breaches_are_ci_only_and_have_actionable_phase_diagnostics[False]": {
+      "source": "scripts/checks/check-test-budgets.py",
+      "behavior": "Enforce complete invocation-bound reports, calibrated limits and externally verified policy authorization"
+    },
+    "orchestrator/tests/test_test_budget_rules.py::test_breaches_are_ci_only_and_have_actionable_phase_diagnostics[True]": {
+      "source": "scripts/checks/check-test-budgets.py",
+      "behavior": "Enforce complete invocation-bound reports, calibrated limits and externally verified policy authorization"
+    },
+    "orchestrator/tests/test_test_budget_rules.py::test_complete_report_is_valid": {
+      "source": "scripts/checks/check-test-budgets.py",
+      "behavior": "Enforce complete invocation-bound reports, calibrated limits and externally verified policy authorization"
+    },
+    "orchestrator/tests/test_test_budget_rules.py::test_every_policy_increase_requires_external_owner_approval": {
+      "source": "scripts/checks/check-test-budgets.py",
+      "behavior": "Enforce complete invocation-bound reports, calibrated limits and externally verified policy authorization"
+    },
+    "orchestrator/tests/test_test_budget_rules.py::test_every_policy_increase_requires_external_owner_approval[deadline]": {
+      "source": "scripts/checks/check-test-budgets.py",
+      "behavior": "Enforce complete invocation-bound reports, calibrated limits and externally verified policy authorization"
+    },
+    "orchestrator/tests/test_test_budget_rules.py::test_every_policy_increase_requires_external_owner_approval[formula]": {
+      "source": "scripts/checks/check-test-budgets.py",
+      "behavior": "Enforce complete invocation-bound reports, calibrated limits and externally verified policy authorization"
+    },
+    "orchestrator/tests/test_test_budget_rules.py::test_every_policy_increase_requires_external_owner_approval[limit]": {
+      "source": "scripts/checks/check-test-budgets.py",
+      "behavior": "Enforce complete invocation-bound reports, calibrated limits and externally verified policy authorization"
+    },
+    "orchestrator/tests/test_test_budget_rules.py::test_every_policy_increase_requires_external_owner_approval[new-exception]": {
+      "source": "scripts/checks/check-test-budgets.py",
+      "behavior": "Enforce complete invocation-bound reports, calibrated limits and externally verified policy authorization"
+    },
+    "orchestrator/tests/test_test_budget_rules.py::test_exception_deadline_uses_injected_date": {
+      "source": "scripts/checks/check-test-budgets.py",
+      "behavior": "Enforce complete invocation-bound reports, calibrated limits and externally verified policy authorization"
+    },
+    "orchestrator/tests/test_test_budget_rules.py::test_exception_deadline_uses_injected_date[2026-11-09-False]": {
+      "source": "scripts/checks/check-test-budgets.py",
+      "behavior": "Enforce complete invocation-bound reports, calibrated limits and externally verified policy authorization"
+    },
+    "orchestrator/tests/test_test_budget_rules.py::test_exception_deadline_uses_injected_date[2026-11-10-True]": {
+      "source": "scripts/checks/check-test-budgets.py",
+      "behavior": "Enforce complete invocation-bound reports, calibrated limits and externally verified policy authorization"
+    },
+    "orchestrator/tests/test_test_budget_rules.py::test_exception_requires_accountable_remediation": {
+      "source": "scripts/checks/check-test-budgets.py",
+      "behavior": "Enforce complete invocation-bound reports, calibrated limits and externally verified policy authorization"
+    },
+    "orchestrator/tests/test_test_budget_rules.py::test_exception_requires_accountable_remediation[owner]": {
+      "source": "scripts/checks/check-test-budgets.py",
+      "behavior": "Enforce complete invocation-bound reports, calibrated limits and externally verified policy authorization"
+    },
+    "orchestrator/tests/test_test_budget_rules.py::test_exception_requires_accountable_remediation[remedy]": {
+      "source": "scripts/checks/check-test-budgets.py",
+      "behavior": "Enforce complete invocation-bound reports, calibrated limits and externally verified policy authorization"
+    },
+    "orchestrator/tests/test_test_budget_rules.py::test_exception_requires_accountable_remediation[reviewDeadline]": {
+      "source": "scripts/checks/check-test-budgets.py",
+      "behavior": "Enforce complete invocation-bound reports, calibrated limits and externally verified policy authorization"
+    },
+    "orchestrator/tests/test_test_budget_rules.py::test_hand_edited_limits_must_equal_recomputation": {
+      "source": "scripts/checks/check-test-budgets.py",
+      "behavior": "Enforce complete invocation-bound reports, calibrated limits and externally verified policy authorization"
+    },
+    "orchestrator/tests/test_test_budget_rules.py::test_hand_edited_limits_must_equal_recomputation[exception]": {
+      "source": "scripts/checks/check-test-budgets.py",
+      "behavior": "Enforce complete invocation-bound reports, calibrated limits and externally verified policy authorization"
+    },
+    "orchestrator/tests/test_test_budget_rules.py::test_hand_edited_limits_must_equal_recomputation[perTestSeconds]": {
+      "source": "scripts/checks/check-test-budgets.py",
+      "behavior": "Enforce complete invocation-bound reports, calibrated limits and externally verified policy authorization"
+    },
+    "orchestrator/tests/test_test_budget_rules.py::test_hand_edited_limits_must_equal_recomputation[wallSeconds]": {
+      "source": "scripts/checks/check-test-budgets.py",
+      "behavior": "Enforce complete invocation-bound reports, calibrated limits and externally verified policy authorization"
+    },
+    "orchestrator/tests/test_test_budget_rules.py::test_importer_promotes_only_comparable_successful_measurements": {
+      "source": "scripts/checks/check-test-budgets.py",
+      "behavior": "Enforce complete invocation-bound reports, calibrated limits and externally verified policy authorization"
+    },
+    "orchestrator/tests/test_test_budget_rules.py::test_importer_promotes_only_comparable_successful_measurements[incomplete]": {
+      "source": "scripts/checks/check-test-budgets.py",
+      "behavior": "Enforce complete invocation-bound reports, calibrated limits and externally verified policy authorization"
+    },
+    "orchestrator/tests/test_test_budget_rules.py::test_importer_promotes_only_comparable_successful_measurements[none]": {
+      "source": "scripts/checks/check-test-budgets.py",
+      "behavior": "Enforce complete invocation-bound reports, calibrated limits and externally verified policy authorization"
+    },
+    "orchestrator/tests/test_test_budget_rules.py::test_importer_promotes_only_comparable_successful_measurements[profile]": {
+      "source": "scripts/checks/check-test-budgets.py",
+      "behavior": "Enforce complete invocation-bound reports, calibrated limits and externally verified policy authorization"
+    },
+    "orchestrator/tests/test_test_budget_rules.py::test_importer_promotes_only_comparable_successful_measurements[revision]": {
+      "source": "scripts/checks/check-test-budgets.py",
+      "behavior": "Enforce complete invocation-bound reports, calibrated limits and externally verified policy authorization"
+    },
+    "orchestrator/tests/test_test_budget_rules.py::test_importer_promotes_only_comparable_successful_measurements[unsuccessful]": {
+      "source": "scripts/checks/check-test-budgets.py",
+      "behavior": "Enforce complete invocation-bound reports, calibrated limits and externally verified policy authorization"
+    },
+    "orchestrator/tests/test_test_budget_rules.py::test_incomplete_or_unbound_measurements_fail_everywhere": {
+      "source": "scripts/checks/check-test-budgets.py",
+      "behavior": "Enforce complete invocation-bound reports, calibrated limits and externally verified policy authorization"
+    },
+    "orchestrator/tests/test_test_budget_rules.py::test_incomplete_or_unbound_measurements_fail_everywhere[duplicate-inventory]": {
+      "source": "scripts/checks/check-test-budgets.py",
+      "behavior": "Enforce complete invocation-bound reports, calibrated limits and externally verified policy authorization"
+    },
+    "orchestrator/tests/test_test_budget_rules.py::test_incomplete_or_unbound_measurements_fail_everywhere[extra-case]": {
+      "source": "scripts/checks/check-test-budgets.py",
+      "behavior": "Enforce complete invocation-bound reports, calibrated limits and externally verified policy authorization"
+    },
+    "orchestrator/tests/test_test_budget_rules.py::test_incomplete_or_unbound_measurements_fail_everywhere[infinity]": {
+      "source": "scripts/checks/check-test-budgets.py",
+      "behavior": "Enforce complete invocation-bound reports, calibrated limits and externally verified policy authorization"
+    },
+    "orchestrator/tests/test_test_budget_rules.py::test_incomplete_or_unbound_measurements_fail_everywhere[invocation]": {
+      "source": "scripts/checks/check-test-budgets.py",
+      "behavior": "Enforce complete invocation-bound reports, calibrated limits and externally verified policy authorization"
+    },
+    "orchestrator/tests/test_test_budget_rules.py::test_incomplete_or_unbound_measurements_fail_everywhere[missing-case]": {
+      "source": "scripts/checks/check-test-budgets.py",
+      "behavior": "Enforce complete invocation-bound reports, calibrated limits and externally verified policy authorization"
+    },
+    "orchestrator/tests/test_test_budget_rules.py::test_incomplete_or_unbound_measurements_fail_everywhere[missing-phase]": {
+      "source": "scripts/checks/check-test-budgets.py",
+      "behavior": "Enforce complete invocation-bound reports, calibrated limits and externally verified policy authorization"
+    },
+    "orchestrator/tests/test_test_budget_rules.py::test_incomplete_or_unbound_measurements_fail_everywhere[missing-report]": {
+      "source": "scripts/checks/check-test-budgets.py",
+      "behavior": "Enforce complete invocation-bound reports, calibrated limits and externally verified policy authorization"
+    },
+    "orchestrator/tests/test_test_budget_rules.py::test_incomplete_or_unbound_measurements_fail_everywhere[nan-wall]": {
+      "source": "scripts/checks/check-test-budgets.py",
+      "behavior": "Enforce complete invocation-bound reports, calibrated limits and externally verified policy authorization"
+    },
+    "orchestrator/tests/test_test_budget_rules.py::test_incomplete_or_unbound_measurements_fail_everywhere[nan]": {
+      "source": "scripts/checks/check-test-budgets.py",
+      "behavior": "Enforce complete invocation-bound reports, calibrated limits and externally verified policy authorization"
+    },
+    "orchestrator/tests/test_test_budget_rules.py::test_incomplete_or_unbound_measurements_fail_everywhere[negative-wall]": {
+      "source": "scripts/checks/check-test-budgets.py",
+      "behavior": "Enforce complete invocation-bound reports, calibrated limits and externally verified policy authorization"
+    },
+    "orchestrator/tests/test_test_budget_rules.py::test_incomplete_or_unbound_measurements_fail_everywhere[negative]": {
+      "source": "scripts/checks/check-test-budgets.py",
+      "behavior": "Enforce complete invocation-bound reports, calibrated limits and externally verified policy authorization"
+    },
+    "orchestrator/tests/test_test_budget_rules.py::test_incomplete_or_unbound_measurements_fail_everywhere[revision]": {
+      "source": "scripts/checks/check-test-budgets.py",
+      "behavior": "Enforce complete invocation-bound reports, calibrated limits and externally verified policy authorization"
+    },
+    "orchestrator/tests/test_test_budget_rules.py::test_incomplete_or_unbound_measurements_fail_everywhere[skipped]": {
+      "source": "scripts/checks/check-test-budgets.py",
+      "behavior": "Enforce complete invocation-bound reports, calibrated limits and externally verified policy authorization"
+    },
+    "orchestrator/tests/test_test_budget_rules.py::test_incomplete_or_unbound_measurements_fail_everywhere[truncated]": {
+      "source": "scripts/checks/check-test-budgets.py",
+      "behavior": "Enforce complete invocation-bound reports, calibrated limits and externally verified policy authorization"
+    },
+    "orchestrator/tests/test_test_budget_rules.py::test_incomplete_or_unbound_measurements_fail_everywhere[unexecuted]": {
+      "source": "scripts/checks/check-test-budgets.py",
+      "behavior": "Enforce complete invocation-bound reports, calibrated limits and externally verified policy authorization"
+    },
+    "orchestrator/tests/test_test_budget_rules.py::test_limits_use_population_percentile_of_test_maxima_and_round_up": {
+      "source": "scripts/checks/check-test-budgets.py",
+      "behavior": "Enforce complete invocation-bound reports, calibrated limits and externally verified policy authorization"
+    },
+    "orchestrator/tests/test_test_budget_rules.py::test_profile_mismatch_on_ci_is_infrastructure_failure": {
+      "source": "scripts/checks/check-test-budgets.py",
+      "behavior": "Enforce complete invocation-bound reports, calibrated limits and externally verified policy authorization"
+    },
+    "orchestrator/tests/test_test_budget_rules.py::test_summary_keeps_measured_limit_goal_and_gap_visible": {
+      "source": "scripts/checks/check-test-budgets.py",
+      "behavior": "Enforce complete invocation-bound reports, calibrated limits and externally verified policy authorization"
+    },
+    "orchestrator/tests/test_test_budget_rules.py::test_tightening_needs_no_approval": {
+      "source": "scripts/checks/check-test-budgets.py",
+      "behavior": "Enforce complete invocation-bound reports, calibrated limits and externally verified policy authorization"
+    },
+    "orchestrator/tests/test_test_budget_rules.py::test_uncalibrated_policy_reports_progress_and_enforces_validity_only": {
+      "source": "scripts/checks/check-test-budgets.py",
+      "behavior": "Enforce complete invocation-bound reports, calibrated limits and externally verified policy authorization"
+    },
+    "orchestrator/tests/test_test_budget_rules.py::test_uncalibrated_policy_reports_progress_and_enforces_validity_only[0]": {
+      "source": "scripts/checks/check-test-budgets.py",
+      "behavior": "Enforce complete invocation-bound reports, calibrated limits and externally verified policy authorization"
+    },
+    "orchestrator/tests/test_test_budget_rules.py::test_uncalibrated_policy_reports_progress_and_enforces_validity_only[1]": {
+      "source": "scripts/checks/check-test-budgets.py",
+      "behavior": "Enforce complete invocation-bound reports, calibrated limits and externally verified policy authorization"
+    },
+    "orchestrator/tests/test_test_budget_rules.py::test_uncalibrated_policy_reports_progress_and_enforces_validity_only[4]": {
+      "source": "scripts/checks/check-test-budgets.py",
+      "behavior": "Enforce complete invocation-bound reports, calibrated limits and externally verified policy authorization"
+    },
+    "orchestrator/tests/test_test_budget_rules.py::test_unverified_or_unbound_reviews_cannot_authorize": {
+      "source": "scripts/checks/check-test-budgets.py",
+      "behavior": "Enforce complete invocation-bound reports, calibrated limits and externally verified policy authorization"
+    },
+    "orchestrator/tests/test_test_budget_rules.py::test_unverified_or_unbound_reviews_cannot_authorize[commit]": {
+      "source": "scripts/checks/check-test-budgets.py",
+      "behavior": "Enforce complete invocation-bound reports, calibrated limits and externally verified policy authorization"
+    },
+    "orchestrator/tests/test_test_budget_rules.py::test_unverified_or_unbound_reviews_cannot_authorize[digest]": {
+      "source": "scripts/checks/check-test-budgets.py",
+      "behavior": "Enforce complete invocation-bound reports, calibrated limits and externally verified policy authorization"
+    },
+    "orchestrator/tests/test_test_budget_rules.py::test_unverified_or_unbound_reviews_cannot_authorize[reviewer]": {
+      "source": "scripts/checks/check-test-budgets.py",
+      "behavior": "Enforce complete invocation-bound reports, calibrated limits and externally verified policy authorization"
+    },
+    "orchestrator/tests/test_test_budget_rules.py::test_unverified_or_unbound_reviews_cannot_authorize[self-attested]": {
+      "source": "scripts/checks/check-test-budgets.py",
+      "behavior": "Enforce complete invocation-bound reports, calibrated limits and externally verified policy authorization"
+    },
+    "orchestrator/tests/test_test_budget_rules.py::test_unverified_or_unbound_reviews_cannot_authorize[state]": {
+      "source": "scripts/checks/check-test-budgets.py",
+      "behavior": "Enforce complete invocation-bound reports, calibrated limits and externally verified policy authorization"
+    },
+    "orchestrator/tests/test_test_budget_report_quality.py": {
+      "source": "scripts/checks/run-budgeted-fast.py",
+      "behavior": "Retain selected inventory and real phase evidence for complete and truncated subprocess runs"
+    },
+    "orchestrator/tests/test_test_budget_report_quality.py::test_fast_report_producer_records_inventory_phases_and_early_stop": {
+      "source": "scripts/checks/run-budgeted-fast.py",
+      "behavior": "Retain selected inventory and real phase evidence for complete and truncated subprocess runs"
+    },
     "orchestrator/tests/test_test_evidence.py": {
       "source": "scripts/checks/check-test-evidence.py",
       "behavior": "Enforce changed-source behavior evidence for test growth and reject normalized duplicate behavior paths"
