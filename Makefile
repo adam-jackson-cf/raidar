@@ -140,7 +140,7 @@ help:
 	@echo "  make toolchain-parity-check                             Check installer, README, metadata/lock and exact maintenance tool pins"
 	@echo "  make prettier-check                                    Check maintained Markdown/YAML outside docs/ and I2 byte-frozen scope"
 	@echo "  make dependency-audit-check [AUDIT_ARGS=--ci]            Strict locked audit on dependency changes (always with --ci)"
-	@echo "  make gate-commit                                       Whole-tree path policy, identity equality, then make quality (check-only commit hook)"
+	@echo "  make gate-commit                                       Whole-tree policy, identity, static/T1 checks and affected local T2 seams"
 	@echo "  make gate-ci                                           Commit gate, slow tier, then quality tier (every push and pull request)"
 	@echo "  make analyzer-scope-check                              Check analyzer I/O boundaries and CODEOWNERS with finding-level debt ratchets"
 	@echo "  make version-release                                   Prepare an on-demand release PR from HEAD at origin/main; refuses no-bump histories"
@@ -799,6 +799,8 @@ gate-commit:
 	@$(MAKE) --no-print-directory identity-check
 	@$(MAKE) --no-print-directory quality
 	@$(MAKE) --no-print-directory dependency-audit-check
+	@$(REPO_RUNTIME_ENV) uv run --project orchestrator --extra dev \
+		python scripts/checks/run-affected-seams.py
 
 gate-ci:
 	@$(MAKE) --no-print-directory gate-commit AUDIT_ARGS=--ci
