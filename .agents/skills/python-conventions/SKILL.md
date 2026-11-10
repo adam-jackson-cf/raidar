@@ -20,6 +20,8 @@ Complements Python quality checks; does not replace deterministic gates.
 - Keep folders grouped by responsibility and import boundary, not by incidental file type.
 - Add a new package only when it owns a stable concept, API boundary, or workflow slice.
 - Avoid catch-all directories unless Raidar already has a specific established convention for them.
+- Nothing under `orchestrator/src` or `lab/stages` may be shaped to one
+  problem or experiment.
 
 ## Object Choice
 

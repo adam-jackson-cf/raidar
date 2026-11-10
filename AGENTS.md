@@ -11,5 +11,5 @@
 - Exclude `var/` from source analysis and quality reviews unless explicitly requested.
 - Keep README as the human entrypoint; use `make help` for the exhaustive command catalogue.
 - Before completing repository changes, run `make quality` and report its result.
-- Tests follow `.agents/skills/test-patterns`; regression and verification per coding-guidance
+- Tests follow global `test-guidance` and `.omp/test-profile.md`; regression and verification per coding-guidance
   `regression-coverage.md` and `verification.md`.

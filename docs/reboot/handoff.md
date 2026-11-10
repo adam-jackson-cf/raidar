@@ -9,7 +9,7 @@ You are continuing Raidar's redesign into a neutral, open-source evaluation lab.
 Before changing anything, read:
 1. `AGENTS.md` and `CLAUDE.md` (repository rules);
 2. `split-design.md`, the binding design: the status entries at the top, §5.8 Contract, and §9 Implementation plan (the phase table is the progress record);
-3. `.agents/skills/test-patterns/SKILL.md` and its `references/test-tiers.md` (binding for every test).
+3. `.omp/test-profile.md` and global `test-guidance` (binding for every test).
 
 Run `make help` to see the public interface.
 
@@ -22,7 +22,8 @@ Run `make help` to see the public interface.
 - **The contract is extracted as `contract/` (`raidar-contract`).**
   - Tags: `contract-v1.0.0` (the frozen `stage/1`), `contract-v1.1.0` (call-protocol models and 63 conformance cases) and `contract-v2.0.0` (lab policy moved to the orchestrator).
   - Hash pins are in `contract/releases/`. The built artefacts were under `var/contract/` and did not travel: run `git fetch origin --tags` before `env -u AGENT make contract-build`, and check the hashes against the pins.
-- **The test suite follows the test-patterns tiers** (fast, slow, quality, docker, security, perf). The fast-tier coverage floors are 99.43% line and 98.72% branch, compared as integer counts. Never lower them.
+- **The test suite follows `.omp/test-profile.md` tiers** (fast, slow, quality, docker, security, perf) and global `test-guidance`. The fast-tier coverage floors are 99.43% line and 98.72% branch, compared as integer counts. Never lower them.
+  Budget measurement and approval operations are owned by `scripts/checks/` and the profile's Fast-tier budget section: dispatch `test-budget-measure.yml` at a fixed revision, import successful artifacts with `env -u AGENT make test-budget-record RUNS="<GitHub run ids>"`, and obtain an owner GitHub review bound to the exact policy diff and commit before policy increases.
 - **All nine SCB problems are `validated_partial`**, revalidated with 5 repeats on the **`mbp`** target under grading digest `4cf6e9b2…` (2026-11-05, after the locked-uv change). Verdicts, check statuses and solvable-set sizes match the earlier runs. mocked_http's one varying hidden test changes which test is in its solvable sets from run to run (checkpoints 3–6 and 8); the vote accepted this as `mbp` evidence, see `CHANGELOG.md`. The grader pins are `mbp`'s image IDs (see below). All experiment locks are current.
 - **The new machine uses the remote `mbp` Docker target.** The full no-model check sequence passed there on 2026-11-04, and again on 2026-11-05 after the locked-uv change (see [Set up the `mbp` Docker target](#set-up-the-mbp-docker-target)). The first run found and fixed a security defect. `mbp`'s `docker exec` runs with umask 0000, which left the installed tool tree world-writable. Now the root payload entry sets umask 022, every trusted exec and provision command is prefixed with `umask 022;`, and installs chmod the directories they create (PR #7, an identity change to all nine primitives).
 - **Stage-check evidence travels with the checkout** in tracked `lab/stage-checks/`, outside

@@ -159,7 +159,7 @@ asyncio_mode = "auto"
 addopts = "--strict-markers --ignore-glob=.env* --ignore-glob=**/.env*"
 testpaths = ["tests"]
 pythonpath = ["../lab/stages/raidar/define/tool/src"]
-# Tiers are applied at file level only (pytestmark); see .agents/skills/test-patterns.
+# Tiers are applied at file level only (pytestmark); see .omp/test-profile.md.
 markers = [
     "slow: real processes or I/O beyond the fast tier's budget",
     "quality: repository-wide quality and guardrail checks",

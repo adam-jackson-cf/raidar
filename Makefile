@@ -574,7 +574,7 @@ security-gate: docker-check
 		cd orchestrator && $(REPO_RUNTIME_ENV) uv run --project . --extra dev \
 		python -m pytest -m security -v -rs
 
-# Test tiers (selectors: .agents/skills/test-patterns/references/test-tiers.md).
+# Test tiers (selectors: .omp/test-profile.md).
 test-fast:
 	@$(RAIDAR_DEV) quality test-fast
 

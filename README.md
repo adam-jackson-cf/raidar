@@ -537,7 +537,7 @@ not applicable to the structural Scorer Protocol and inherited coverage entrypoi
 the [adopted decision](docs/reboot/evidence/decide-analyzer-sol.md) records why no
 nominal analyzer hierarchy is imposed. This check is part of `make quality`.
 
-Tests are tiered (fast, slow, quality, docker, security, perf) with their own targets (`make test-fast`, `test-slow`, `test-quality`, `test-docker`); see [test tiers](.agents/skills/test-patterns/references/test-tiers.md).
+Tests are tiered (fast, slow, quality, docker, security, perf) with their own targets (`make test-fast`, `test-slow`, `test-quality`, `test-docker`); see the [repo test profile](.omp/test-profile.md) and global `test-guidance` for generic rules.
 
 The fast run writes a unique, complete phase-level budget report under `var/`;
 both gates consume it without rerunning pytest. Invalid measurements always
