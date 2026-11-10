@@ -9,7 +9,6 @@ import shlex
 import shutil
 import subprocess
 import sys
-import tempfile
 from pathlib import Path
 
 import pytest
@@ -143,12 +142,12 @@ def test_path_check_accepts_a_clean_owned_path() -> None:
 
 def test_path_check_refuses_a_misplaced_file_with_one_actionable_line() -> None:
     # This canary must be at the root to exercise real folder-placement policy.
-    with tempfile.NamedTemporaryFile(
-        dir=ROOT, prefix="gate-canary-", suffix=".txt", mode="w", encoding="utf-8"
-    ) as candidate:
-        candidate.write("misplaced file\n")
-        candidate.flush()
-        relative = Path(candidate.name).relative_to(ROOT).as_posix()
+    relative = "gate-canary.txt"
+    candidate = ROOT / relative
+    # A random basename can itself violate the independent version-name rule.
+    with candidate.open("x", encoding="utf-8") as stream:
+        stream.write("misplaced file\n")
+    try:
         result = subprocess.run(
             [sys.executable, str(ROOT / "scripts/checks/check-repository-paths.py"), relative],
             cwd=ROOT,
@@ -157,6 +156,8 @@ def test_path_check_refuses_a_misplaced_file_with_one_actionable_line() -> None:
             check=False,
             timeout=30,
         )
+    finally:
+        candidate.unlink()
 
     assert result.returncode == 1, result.stderr
     assert result.stdout == ""
