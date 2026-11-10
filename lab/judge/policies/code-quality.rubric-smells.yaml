@@ -14,7 +14,6 @@ description: SCB rubric smells per changed Python symbol, with carry-forward.
 mode: "off"
 question_set: scb-rubric@2
 runtimes: [python]
-
 # Calibration status of version 2 (2026-10-02; NOT promoted, see gate packet
 # §11.17). This trailing note is dropped by `make jev-promote`, whose promotion block records
 # reviewers itself:

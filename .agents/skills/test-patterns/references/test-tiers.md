@@ -5,14 +5,14 @@ Markers (`slow`, `quality`, `docker`, `security`, `perf`) are registered in
 to a whole file through `pytestmark`; no file mixes tiers. `security` and `perf`
 overlay `docker`.
 
-| Tier | Markers | Selector | Permitted work | Budget (prospective) | Target |
-|---|---|---|---|---|---|
-| Fast | none | `not slow and not quality and not docker and not security and not perf` | In-memory decisions, injected runners and clocks, a few small temp files; no processes, network (loopback fakes aside), sleeps or run-directory construction | < 30 s incl. collection and coverage | `make test-fast` |
-| Slow | `slow` | `slow and not quality and not docker` | Real local processes, git repositories, run directories, loopback servers, real-clock seams; no Docker | < 300 s | `make test-slow` |
-| Quality | `quality` | `quality and not docker` | Canaries proving quality rules accept and refuse correctly; isolated tool processes and workspaces | < 600 s | `make test-quality` |
-| Docker | `docker` | `docker and not security and not perf` | Real container/Harbor seams on a ready target; no real models | < 1800 s | `make test-docker TARGET=<name>` |
-| Security | `docker`, `security` | `security` | Planted-code and container security scenarios | < 1800 s | `make security-gate` |
-| Perf | `docker`, `perf` | `perf` | No-model fixture at concurrency 1 and 3; accepted N1 budgets unchanged | < 1800 s | `make perf-gate` |
+| Tier     | Markers              | Selector                                                                | Permitted work                                                                                                                                               | Budget (prospective)                 | Target                           |
+| -------- | -------------------- | ----------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------ | -------------------------------- |
+| Fast     | none                 | `not slow and not quality and not docker and not security and not perf` | In-memory decisions, injected runners and clocks, a few small temp files; no processes, network (loopback fakes aside), sleeps or run-directory construction | < 30 s incl. collection and coverage | `make test-fast`                 |
+| Slow     | `slow`               | `slow and not quality and not docker`                                   | Real local processes, git repositories, run directories, loopback servers, real-clock seams; no Docker                                                       | < 300 s                              | `make test-slow`                 |
+| Quality  | `quality`            | `quality and not docker`                                                | Canaries proving quality rules accept and refuse correctly; isolated tool processes and workspaces                                                           | < 600 s                              | `make test-quality`              |
+| Docker   | `docker`             | `docker and not security and not perf`                                  | Real container/Harbor seams on a ready target; no real models                                                                                                | < 1800 s                             | `make test-docker TARGET=<name>` |
+| Security | `docker`, `security` | `security`                                                              | Planted-code and container security scenarios                                                                                                                | < 1800 s                             | `make security-gate`             |
+| Perf     | `docker`, `perf`     | `perf`                                                                  | No-model fixture at concurrency 1 and 3; accepted N1 budgets unchanged                                                                                       | < 1800 s                             | `make perf-gate`                 |
 
 Budgets are measured wall time with dependencies and images provisioned
 (provisioning recorded separately). They are proposals, not measured
@@ -47,9 +47,11 @@ selected target fails instead of skipping. Runs use the `mbp` target
   against its floor; precision is for display only (`[tool.coverage.report]`
   has no `fail_under`). Floors are `line_floor` and `branch_floor` in
   `[tool.raidar.coverage]` of `orchestrator/pyproject.toml`, the single source.
-- Ratchet: after each accepted slice, floor = `max(previous, floor(measured *
-  100) / 100)`; never lowered. A measured baseline below 95 is recorded as the
-  temporary floor with its gap. "All green" requires both >= 95.00. Target 100.
+- Ratchet: after each accepted slice, floor = `max(previous, floor(measured \*
+
+100. / 100)`; never lowered. A measured baseline below 95 is recorded as the
+     temporary floor with its gap. "All green" requires both >= 95.00. Target 100.
+
 - Newly introduced or extracted decision logic requires complete fast-tier line
   and branch coverage.
 

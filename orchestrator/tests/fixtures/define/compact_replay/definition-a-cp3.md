@@ -11,6 +11,7 @@ Extend `python tally.py report` with category expressions, assertions about requ
 Outcome: The existing report command accepts the complete part 3 invocation while preserving earlier commands and resolving option values before validation.
 
 Acceptance criteria:
+
 - F1.AC1: All accepted parts 1 and 2 behavior remains unchanged when no new option is used.
   Source: "Extend the `report` command from parts 1 and 2."
   Source: "Everything from parts 1 and 2 keeps working exactly as before: when none of the new options below is used, the output, exit codes and error messages are unchanged."
@@ -38,6 +39,7 @@ Acceptance criteria:
 Outcome: The existing category limit continues to select the highest totals with the accepted tie-break, defaults and value validation.
 
 Acceptance criteria:
+
 - F2.AC1: Preserve existing explicit top limits, validation and category ordering.
   Source: "Everything from parts 1 and 2 keeps working exactly as before: when none of the new options below is used, the output, exit codes and error messages are unchanged."
   Kind: regression
@@ -48,6 +50,7 @@ Acceptance criteria:
 Outcome: Existing text and JSON report formats retain their byte-level contracts outside summary mode.
 
 Acceptance criteria:
+
 - F3.AC1: Preserve accepted format validation, text output, JSON output and empty-report behavior.
   Source: "Everything from parts 1 and 2 keeps working exactly as before: when none of the new options below is used, the output, exit codes and error messages are unchanged."
   Kind: regression
@@ -58,6 +61,7 @@ Acceptance criteria:
 Outcome: The existing inclusive cutoff retains its validation and combines with the new category filter.
 
 Acceptance criteria:
+
 - F4.AC1: Preserve inclusive date filtering, cutoff validation, validation of amounts before filtering and filtered-empty output.
   Source: "Everything from parts 1 and 2 keeps working exactly as before: when none of the new options below is used, the output, exit codes and error messages are unchanged."
   Kind: regression
@@ -68,6 +72,7 @@ Acceptance criteria:
 Outcome: The existing environment-based top default retains its precedence and validation.
 
 Acceptance criteria:
+
 - F5.AC1: Preserve environment fallback, the empty-or-absent default and explicit-option precedence.
   Source: "Everything from parts 1 and 2 keeps working exactly as before: when none of the new options below is used, the output, exit codes and error messages are unchanged."
   Kind: regression
@@ -78,6 +83,7 @@ Acceptance criteria:
 Outcome: A validated Boolean expression filters exact category names, independently of formatting and in conjunction with the inclusive date cutoff.
 
 Acceptance criteria:
+
 - F6.AC1: Keep only rows satisfying the expression and, when supplied, the date cutoff; category comparisons remain case-sensitive.
   Source: "`--where EXPR` keeps only the rows whose category satisfies the expression `EXPR`."
   Source: "It combines with `--since`: a row is kept when it passes both."
@@ -87,8 +93,8 @@ Acceptance criteria:
   Verification: `tests/test_tally_part3.py::test_where_exact_identity_and_since` runs both entry-point cases and asserts exact category output and totals.
 - F6.AC2: Parse exactly the supplied grammar with ASCII name characters, grouping, recursive negation and the stated operator precedence.
   Source: "An expression follows this grammar:"
-  Source: "expr   := term ( "|" term )*"
-  Source: "term   := factor ( "&" factor )*"
+  Source: "expr := term ( "|" term )_"
+  Source: "term := factor ( "&" factor )_"
   Source: "factor := "!" factor | "(" expr ")" | NAME"
   Source: "`NAME` is one or more of the characters `A-Z`, `a-z`, `0-9` and `_`."
   Source: "A row satisfies `NAME` when its category is exactly `NAME`."
@@ -128,6 +134,7 @@ Acceptance criteria:
 Outcome: Every supplied category is checked against the kept rows without changing the report selection; the first missing category is reported.
 
 Acceptance criteria:
+
 - F7.AC1: Retain every require value in command-line order and require at least one kept row with its exact category name, without filtering report output.
   Source: "`--require` is the exception: it may be given any number of times and every value is used, in command-line order."
   Source: "`--require NAME` asserts that the category `NAME` has at least one row among the rows kept by `--since` and `--where`."
@@ -136,7 +143,7 @@ Acceptance criteria:
   Aspect: `report FILE --require food --require books --require food` supplies each exact `NAME` through `--require NAME` and reads kept `food` and `books` rows -> the command exits with code `0`
   Aspect: `report FILE --require food --require books --require food` reads kept `food`, `books` and `rent` rows -> stdout equals the report without any `--require` options
   Aspect: `report FILE --top 1 --require books` reads a kept `books` row below the reported top category -> the command exits with code `0`
-  Aspect: `report FILE --require " café "` reads a kept category exactly named ` café ` -> the command exits with code `0`
+  Aspect: `report FILE --require " café "` reads a kept category exactly named `café` -> the command exits with code `0`
   Aspect: `report FILE --require Food` reads only a kept `food` category -> stderr is `error: category 'Food' not found\n`
   Aspect: `report FILE --since 2024-03-03 --where !rent --require books` reads a `books` row before the cutoff and a later `rent` row -> stderr is `error: category 'books' not found\n`
   Aspect: `report FILE --where food --require books` reads `food` and `books` rows, with the `books` row excluded by the expression -> stderr is `error: category 'books' not found\n`
@@ -163,6 +170,7 @@ Acceptance criteria:
 Outcome: Errors retain their plain text defaults or become precisely serialized JSON errors on stderr, without changing status or producing stdout.
 
 Acceptance criteria:
+
 - F8.AC1: Accept text and json modes; absent mode defaults to the exact plain form for old and new errors.
   Source: "`--errors` is `text` or `json`."
   Source: "The default is `text`: errors are printed exactly as in the earlier parts and above."
@@ -198,6 +206,7 @@ Acceptance criteria:
 Outcome: All old and new reported errors have the single semantic code specified by the issue, observable in JSON error mode.
 
 Acceptance criteria:
+
 - F9.AC1: Classify unacceptable requests as INVALID_OPTION, unreadable input as UNREADABLE_FILE, invalid row amounts as INVALID_AMOUNT and absent dependencies on categories as MISSING_CATEGORY.
   Source: "Every error the tool reports (from this part and from parts 1 and 2) is reported with exactly one of these codes, chosen by what the error means:"
   Source: "`INVALID_OPTION`: the request itself is not acceptable as written."
@@ -219,6 +228,7 @@ Acceptance criteria:
 Outcome: JSON errors identify the precise row or require argument responsible using its original zero-based position, omitting location for errors without a list element.
 
 Acceptance criteria:
+
 - F10.AC1: Include zero-based locations for row and require-element errors, counted in the original list rather than filtered or reported data.
   Source: "An error caused by one element of a list carries a `location` that names the element by its zero-based position in its list, written `<list>[<index>]`."
   Source: "The lists are `rows` (the data rows of the file in file order, not counting the header) and `require` (the `--require` values in command-line order)."
@@ -240,6 +250,7 @@ Acceptance criteria:
 Outcome: The flag replaces the normal report with complete kept-row counts and totals plus the existing limited category array.
 
 Acceptance criteria:
+
 - F11.AC1: Treat summary as a valueless flag and replace normal output with one JSON object describing only kept rows, with exactly the specified ordered keys and serialization.
   Source: "`--summary` is a flag: it has no value word."
   Source: "`--summary` replaces the normal output with a summary of the rows kept by `--since` and `--where`."
@@ -280,6 +291,7 @@ Acceptance criteria:
 Outcome: Only the first error in the specified semantic check order is emitted; option errors are resolved without opening the input and use the final errors mode.
 
 Acceptance criteria:
+
 - F12.AC1: Apply the complete specified first-error ordering independently of argument order.
   Source: "Only the first error is reported, in this order: `--errors`, the top value (`--top`, or `TALLY_TOP` when `--top` is absent), `--format`, `--since`, `--where`, the `--require` values (each must be non-empty, in command-line order), FILE cannot be read, invalid amounts, and finally the `--require` categories that are absent (in command-line order)."
   Aspect: `report` has failures at multiple stages, with option pairs in varied order -> stderr reports only the earliest failure in `--errors`, `--top` or fallback `TALLY_TOP`, `--format`, `--since`, `--where`, empty `--require` values, unreadable FILE, invalid amounts, missing `--require` categories order
@@ -313,6 +325,7 @@ date,category,amount
 ```
 
 Acceptance criteria:
+
 - F13.AC1: The sample summary reports four rows, three categories, the full kept total and the specified two-category tie order with successful status.
   Source: "Given `sample.csv`:"
   Source: "date,category,amount"
@@ -356,4 +369,4 @@ Acceptance criteria:
 - Add new automated tests only under root `tests/`, in `tests/test_tally_part3.py`, following the subprocess and monitored runpy patterns. Each aspect needs mapped assertions, each child process needs `timeout=10`, and any custom child environment extends `os.environ`. Keep all existing tests, exercise every changed production line, and pass ruff, strict mypy and the repository gate without suppressions, skipped tests or weakened configurations. (source: rung 1: `tests/test_tally.py:26`, `tests/test_tally.py:37`, `tests/test_tally_part2.py:32`, `AGENTS.md:14`, `AGENTS.md:20`, `AGENTS.md:23`, `AGENTS.md:30`, `AGENTS.md:72`.)
 - Include read-versus-invalid-amount collision, zero-amount required-category presence, repeated summary flags and malformed invocation with JSON mode in the relevant mapped new tests because they verify the decisions above. These are implementation verification details rather than additional issue acceptance criteria. (source: rung 1: `AGENTS.md:23`; rung 2: "Only the first error is reported, in this order: `--errors`, the top value (`--top`, or `TALLY_TOP` when `--top` is absent), `--format`, `--since`, `--where`, the `--require` values (each must be non-empty, in command-line order), FILE cannot be read, invalid amounts, and finally the `--require` categories that are absent (in command-line order).".)
 - This intake changes only `.factory-x/feature-definition.md`; the builder implements and verifies the change separately. Do not create branches, push, commit or open a pull request in this fixture. (source: rung 2: "This is a fixture workspace for a benchmark task: there is no branch, no remote
-and no pull request, so do not branch or push anything.".)
+  and no pull request, so do not branch or push anything.".)

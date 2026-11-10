@@ -281,7 +281,7 @@
     },
     "tools": {}
   },
-  "document_sha256": "c84bdb5b6ad9f7f86322cde0feb0bd6d4a1d5396e40367c498ff6ec33a862fad",
+  "document_sha256": "625cf182fdb4c7b59f9bf21fcb33765ce87a70788d4d6f67d1ffd4e939977340",
   "execution": {
     "arms": {
       "codex": {
@@ -511,7 +511,7 @@
     "analysis": "33aede75abee4373a36e88c3e4bad96deaadffcf5db85e1efadee2a8414fd67b",
     "assessment": "05fc802b766d3e7351e9470b3ad7d78c4d7bfbf1defcdb073a327001a5f4a028",
     "execution": "529c914624bcf27cdbdff1d62810ecc2cbafc4f7fd0f5a752ee13ad33cf0e4bd",
-    "toolchain": "fac63dc826016b72cc40989870754bbad7e424396d6bdd202f70669f527a8b2c"
+    "toolchain": "fb4b6931121194fd15ba36ed4e0a003c58944caa8e4429c1f0dd385895bcf9ac"
   },
   "spec": {
     "agents": [
@@ -575,7 +575,7 @@
     "schema_version": 3
   },
   "toolchain": {
-    "litellm": "1.102.1",
+    "litellm": "1.102.2",
     "python": "3.13.7",
     "raidar_spec": "9b7d44f0ffb0994114916c0c49f86e37122e3754d5c6d8c295b021d00b0279f1"
   }

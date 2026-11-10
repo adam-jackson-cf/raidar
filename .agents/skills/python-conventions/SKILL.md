@@ -2,6 +2,7 @@
 name: "python-conventions"
 description: "USE WHEN writing or refactoring Python code."
 ---
+
 # Guidance
 
 Complements Python quality checks; does not replace deterministic gates.
@@ -36,4 +37,3 @@ Complements Python quality checks; does not replace deterministic gates.
 - Honor problem, runtime-pack, generated-artifact, and caller-provided exclusions end to end.
 - Label proxy evidence explicitly when direct retained evidence is unavailable.
 - Prefer small scorer-owned evidence helpers over shared catch-all utility modules.
-

@@ -668,7 +668,7 @@
     },
     "tools": {}
   },
-  "document_sha256": "f3538813bce1777144efc47fbfcc43b50ed85b1239e7220c85000f4950bc998b",
+  "document_sha256": "444459a90f1673dc945f6ef783108a39f0de303b6883db2b0f30564275c0ad81",
   "execution": {
     "arms": {
       "docs-fix": {
@@ -917,7 +917,7 @@
     "analysis": "2165078bb3edf1fd89313bb7b0fdb121366bd76e9a351568321984d79da72faa",
     "assessment": "c9441304cf5dfd637b293b49a884fc1886936dc55291e9a2490cd5747ffed2ee",
     "execution": "a152e955749a0343ec84cc5556bedb5708c3af585bc66728a888c106714c4151",
-    "toolchain": "fac63dc826016b72cc40989870754bbad7e424396d6bdd202f70669f527a8b2c"
+    "toolchain": "fb4b6931121194fd15ba36ed4e0a003c58944caa8e4429c1f0dd385895bcf9ac"
   },
   "spec": {
     "agents": [
@@ -982,7 +982,7 @@
     "schema_version": 3
   },
   "toolchain": {
-    "litellm": "1.102.1",
+    "litellm": "1.102.2",
     "python": "3.13.7",
     "raidar_spec": "9b7d44f0ffb0994114916c0c49f86e37122e3754d5c6d8c295b021d00b0279f1"
   }

@@ -1,0 +1,72 @@
+{
+  "schemaVersion": 1,
+  "tool": "dependency-audit",
+  "findings": [
+    {
+      "path": "orchestrator/uv.lock",
+      "code": "SECURITY.dependency-audit",
+      "fingerprint": "d9896d6e24bf5ef3812f2aec624c83ed6fab29972488476ea58a33df56cb5674",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/uv.lock",
+      "code": "SECURITY.dependency-audit",
+      "fingerprint": "03b450917563b8597eaae9eeff6b5f1a47e673df71f387add6ee146cee77cc08",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/uv.lock",
+      "code": "SECURITY.dependency-audit",
+      "fingerprint": "2e7b7d06086a6f21e593649f4368d32c3cc53c7e19432b07600296110ec3237d",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/uv.lock",
+      "code": "SECURITY.dependency-audit",
+      "fingerprint": "318e56919fcf8172e1bbaea19bdf9085fbe73bc0ddd3f40d37a417be4427a040",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/uv.lock",
+      "code": "SECURITY.dependency-audit",
+      "fingerprint": "b54dcc878e5dc766021782af663b3924212d9598676e7e36491db4ba2151d8e1",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/uv.lock",
+      "code": "SECURITY.dependency-audit",
+      "fingerprint": "8b3e35cb58a118bf08a9b387695192a539cd5a048134dacf35f389e2627cde9f",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/uv.lock",
+      "code": "SECURITY.dependency-audit",
+      "fingerprint": "7d79912857becdab111e0766be6a4b92a40e54d0102c2c4ea34833239654f034",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/uv.lock",
+      "code": "SECURITY.dependency-audit",
+      "fingerprint": "a45791d4ed9dcd8dc28e11f228c950e0ad437de165e6c46ce722700db98ae986",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/uv.lock",
+      "code": "SECURITY.dependency-audit",
+      "fingerprint": "1deba287be37a4e087fac6db0c12a052502ad6008802f68284a82703c72c00c9",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/uv.lock",
+      "code": "SECURITY.dependency-audit",
+      "fingerprint": "c7409784e4ed2c4ad0704ce47500831f9e2bc4d74c4d4f361269c73d0acf74a2",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/uv.lock",
+      "code": "SECURITY.dependency-audit",
+      "fingerprint": "2e4fc16207050b1cbc03cc6b50355b863f18d9cf2157f9f411b5cf4c6e6680f7",
+      "count": 1
+    }
+  ]
+}

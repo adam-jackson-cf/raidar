@@ -69,17 +69,23 @@ interface ExperimentRecord {
     quality_score?: StatBlock;
     duration_sec?: StatBlock;
     uncached_input_tokens?: StatBlock;
-    metric_outcomes?: Record<string, {
-      pass_count: number;
-      fail_count: number;
-      sample_size: number;
-      pass_rate: number;
-      mean_score: number;
-    }>;
-    scorer_outcomes?: Record<string, {
-      sample_size: number;
-      mean_score: number;
-    }>;
+    metric_outcomes?: Record<
+      string,
+      {
+        pass_count: number;
+        fail_count: number;
+        sample_size: number;
+        pass_rate: number;
+        mean_score: number;
+      }
+    >;
+    scorer_outcomes?: Record<
+      string,
+      {
+        sample_size: number;
+        mean_score: number;
+      }
+    >;
   };
   sample: {
     sample_adequacy?: number;
@@ -89,7 +95,7 @@ interface ExperimentRecord {
   };
   findings: Array<{
     id: string;
-    kind: 'issue' | 'good' | 'note';
+    kind: "issue" | "good" | "note";
     category: string;
     title: string;
     detail: string;
@@ -108,7 +114,7 @@ interface RunRecord {
   arm: string;
   agent_spec: string;
   duration_ms: number;
-  status: 'OK' | 'ERROR' | 'UNSET';
+  status: "OK" | "ERROR" | "UNSET";
   total_input_tokens: number;
   total_output_tokens: number;
   composite_score: number | null;
@@ -136,24 +142,24 @@ interface ArmDiff {
 
 ```ts
 const C = {
-  bg: '#000000',
-  surface: '#0a0a0a',
-  elevated: '#111111',
-  border: 'rgba(255,255,255,0.06)',
-  borderLight: 'rgba(255,255,255,0.1)',
-  fg0: '#5a6a72',
-  fg1: '#7d8a90',
-  fg2: '#a0acb2',
-  fg3: '#c8d5dc',
-  fg4: '#e1e8ec',
-  fg5: '#f2f5f7',
-  accent: '#5B8DEF',
-  green: '#60E36D',
-  red: '#EB1414',
-  orange: '#F0AD4E',
-  cyan: '#4FCAE3',
-  selected: 'rgba(91,141,239,0.08)',
-  selectedBorder: 'rgba(91,141,239,0.2)',
+  bg: "#000000",
+  surface: "#0a0a0a",
+  elevated: "#111111",
+  border: "rgba(255,255,255,0.06)",
+  borderLight: "rgba(255,255,255,0.1)",
+  fg0: "#5a6a72",
+  fg1: "#7d8a90",
+  fg2: "#a0acb2",
+  fg3: "#c8d5dc",
+  fg4: "#e1e8ec",
+  fg5: "#f2f5f7",
+  accent: "#5B8DEF",
+  green: "#60E36D",
+  red: "#EB1414",
+  orange: "#F0AD4E",
+  cyan: "#4FCAE3",
+  selected: "rgba(91,141,239,0.08)",
+  selectedBorder: "rgba(91,141,239,0.2)",
 };
 ```
 

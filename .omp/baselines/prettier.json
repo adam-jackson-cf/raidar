@@ -1,0 +1,48 @@
+{
+  "schemaVersion": 1,
+  "tool": "prettier",
+  "findings": [
+    {
+      "path": "lab/experiments/smoke/python__forge__claude-define-spike/experiment.yaml",
+      "code": "PRETTIER.format",
+      "fingerprint": "2ddc8811966fc9f695a40b4b23f18db5d544b05c408b811948ad70609e7ab82e",
+      "count": 1
+    },
+    {
+      "path": "lab/experiments/smoke/python__forge__claude-mechanics/experiment.yaml",
+      "code": "PRETTIER.format",
+      "fingerprint": "455fce6c5ec9e357fab46e88f0c9302f9d615770446e246b2ff68d8e1b215074",
+      "count": 1
+    },
+    {
+      "path": "lab/experiments/smoke/python__forge__claude-verify-spike/experiment.yaml",
+      "code": "PRETTIER.format",
+      "fingerprint": "5af4fb5fd341218e0c4f8e35b74f447135d05cd10409247767bbdbf5fcc4d8b4",
+      "count": 1
+    },
+    {
+      "path": "lab/experiments/smoke/python__forge__define-spike/experiment.yaml",
+      "code": "PRETTIER.format",
+      "fingerprint": "dbb2c3e9024bd4595701df9396b0f0a661a9cea5c8e1d9937313400673bbc5ad",
+      "count": 1
+    },
+    {
+      "path": "lab/experiments/smoke/python__forge__mechanics/experiment.yaml",
+      "code": "PRETTIER.format",
+      "fingerprint": "9ed1d03ff52e3c4ba62040601b7fe5ac2ef9f9706595770f390e355f05077beb",
+      "count": 1
+    },
+    {
+      "path": "lab/experiments/smoke/python__forge__verify-spike/experiment.yaml",
+      "code": "PRETTIER.format",
+      "fingerprint": "f0b84e096e9870979ebd8cd057185b68c57175c3ef712f6e56870791eb16f44d",
+      "count": 1
+    },
+    {
+      "path": "lab/problems/registry/scb/forge/38d627ecf668.errata.yaml",
+      "code": "PRETTIER.format",
+      "fingerprint": "68b1a3c897adfb94bf35b490d993e7f5d760dd76fc6a4be14746d93e807490de",
+      "count": 1
+    }
+  ]
+}

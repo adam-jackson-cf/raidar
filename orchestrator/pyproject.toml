@@ -21,7 +21,7 @@ dependencies = [
     "harbor==0.23.0",
     # LiteLLM is a transitive Harbor dependency; AGENTS.md requires an exact,
     # known-safe pin (never 1.82.7 or 1.82.8).
-    "litellm==1.102.1",
+    "litellm==1.102.2",
     "jsonschema>=4.0",
     # The portable contract (one implementation: a path dependency, never published from here).
     "raidar-contract==2.0.0",
@@ -36,6 +36,7 @@ dev = [
     "pre-commit>=3.0",
     "lizard>=1.17.10",
     "mypy>=1.11",
+    "pip-audit==2.9.0",
     "import-linter>=2.0",
     # code-quality@1 tool-env modules are imported in-process by the tests. These
     # pins equal the Python pack tool lock's scb-python-quality entry (a test

@@ -137,6 +137,9 @@ help:
 	@echo "  make codex-auth-setup [DEVICE_AUTH=1]                 Create or validate file-backed Codex ChatGPT auth"
 	@echo "  make harbor-cleanup [JOB=<job-dir>] [DRY_RUN=1]        Remove trial environments a stopped job left behind"
 	@echo "  make quality                                           Run repo quality gates"
+	@echo "  make toolchain-parity-check                             Check installer, README, metadata/lock and exact maintenance tool pins"
+	@echo "  make prettier-check                                    Check maintained Markdown/YAML outside docs/ and I2 byte-frozen scope"
+	@echo "  make dependency-audit-check [AUDIT_ARGS=--ci]            Strict locked audit on dependency changes (always with --ci)"
 	@echo "  make gate-commit                                       Whole-tree path policy, identity equality, then make quality (check-only commit hook)"
 	@echo "  make gate-ci                                           Commit gate, slow tier, then quality tier (every push and pull request)"
 	@echo "  make analyzer-scope-check                              Check analyzer I/O boundaries and CODEOWNERS with finding-level debt ratchets"
@@ -383,7 +386,7 @@ review-surface-test: quality-fixture-synthetic
 		&& npx playwright install chromium && npm test
 
 env-setup:
-	@$(RAIDAR_DEV) env setup --sync-arg --extra --sync-arg dev
+	@$(RAIDAR_DEV) env setup --sync-arg --all-extras
 
 agent-list:
 	@$(RAIDAR) agent list
@@ -795,9 +798,10 @@ gate-commit:
 		python scripts/checks/check-repository-paths.py
 	@$(MAKE) --no-print-directory identity-check
 	@$(MAKE) --no-print-directory quality
+	@$(MAKE) --no-print-directory dependency-audit-check
 
 gate-ci:
-	@$(MAKE) --no-print-directory gate-commit
+	@$(MAKE) --no-print-directory gate-commit AUDIT_ARGS=--ci
 	@$(MAKE) --no-print-directory test-slow
 	@$(MAKE) --no-print-directory test-quality
 
@@ -809,6 +813,8 @@ version-check:
 
 quality:
 	@$(MAKE) --no-print-directory toolchain-pin-check
+	@$(MAKE) --no-print-directory toolchain-parity-check
+	@$(MAKE) --no-print-directory prettier-check
 	@$(MAKE) --no-print-directory version-check
 	@$(MAKE) --no-print-directory structure-check
 	@$(MAKE) --no-print-directory test-hygiene-check
@@ -818,3 +824,13 @@ quality:
 	@$(MAKE) --no-print-directory experiment-locks-check
 	@$(MAKE) --no-print-directory ledger-check
 	@$(RAIDAR_DEV) quality gates
+
+.PHONY: toolchain-parity-check prettier-check dependency-audit-check
+toolchain-parity-check:
+	@$(REPO_RUNTIME_ENV) uv run --project orchestrator --extra dev --locked python scripts/checks/check-toolchain-parity.py static
+
+prettier-check:
+	@$(REPO_RUNTIME_ENV) uv run --project orchestrator --extra dev --locked python scripts/checks/check-toolchain-parity.py prettier --baseline
+
+dependency-audit-check:
+	@$(REPO_RUNTIME_ENV) uv run --project orchestrator --extra dev --locked python scripts/checks/check-toolchain-parity.py audit --baseline $(AUDIT_ARGS)

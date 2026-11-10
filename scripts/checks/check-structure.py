@@ -55,6 +55,8 @@ ROOT_FILES = frozenset(
         "CODEOWNERS",
         "Makefile",
         "README.md",
+        "package.json",
+        "package-lock.json",
         "skills-lock.json",
         "split-design.md",
     }

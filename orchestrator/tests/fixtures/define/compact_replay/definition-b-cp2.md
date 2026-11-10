@@ -12,6 +12,7 @@ Outcome: Users can supply the three separate-word options in any order, with las
 Risk: requires review
 
 Acceptance criteria:
+
 - F1.AC1: The report entry point accepts the expanded usage with options in any order.
   Source: "Extend the `report` command from part 1."
   Source: "The full usage is now:"
@@ -41,6 +42,7 @@ Acceptance criteria:
 Outcome: Explicit top limits retain their accepted digit syntax, bounds, sorting and truncation semantics for both formats.
 
 Acceptance criteria:
+
 - F2.AC1: The existing explicit top option continues to work.
   Source: "Everything from part 1 keeps working exactly as before: when none of `--format`, `--since` or the `TALLY_TOP` environment variable is used, the output, exit codes and error messages are unchanged."
   Kind: regression
@@ -51,6 +53,7 @@ Acceptance criteria:
 Outcome: Reports default to the accepted text representation and can instead produce an exact UTF-8 JSON line.
 
 Acceptance criteria:
+
 - F3.AC1: The default format and explicit text format have the same part 1 output.
   Source: "`--format` is `text` or `json`."
   Source: "The default is `text`, which is the part 1 output; `--format text` given explicitly behaves identically."
@@ -103,6 +106,7 @@ Acceptance criteria:
 Outcome: A valid calendar threshold filters rows inclusively before aggregation, while every input amount is still validated.
 
 Acceptance criteria:
+
 - F4.AC1: The date filter keeps rows on or after the threshold and excludes earlier rows before calculating totals.
   Source: "`--since DATE` keeps only the rows whose date is on or after DATE."
   Source: "The comparison is inclusive: a row dated exactly DATE is kept."
@@ -145,6 +149,7 @@ Acceptance criteria:
 Outcome: A nonempty environment setting supplies the category limit only when the command has no explicit top option.
 
 Acceptance criteria:
+
 - F5.AC1: A nonempty environment default obeys the same top syntax and bounds as an explicit option.
   Source: "The environment variable `TALLY_TOP` sets the default for `--top`:"
   Source: "- If `--top` is not given and `TALLY_TOP` is set to a non-empty value, that value is used as N, and it must be valid by the same rule as `--top` (only digits, value 1 to 10)."
@@ -181,6 +186,7 @@ Acceptance criteria:
 Outcome: The command reports one error using the prescribed option and input priority before producing any report.
 
 Acceptance criteria:
+
 - F6.AC1: Top, format and since validation precede file reads, in that order; file-read and amount diagnostics retain their order after valid options.
   Source: "Option errors are reported before FILE is read, and only the first error is reported, in this order: the top value (`--top`, or `TALLY_TOP` when `--top` is absent), then `--format`, then `--since`, then FILE cannot be read, then invalid amounts."
   Source: "For example `--format xml --since nope` reports the `--format` error."
@@ -199,6 +205,7 @@ Acceptance criteria:
 Outcome: Combining filtering, JSON and truncation reproduces the issue's complete sample exactly.
 
 Acceptance criteria:
+
 - F7.AC1: The supplied sample produces food then travel after inclusive filtering and top-two truncation.
   Source: "Given `sample.csv`:"
   Source: "date,category,amount"

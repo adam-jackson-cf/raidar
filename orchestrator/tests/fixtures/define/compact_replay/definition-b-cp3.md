@@ -11,6 +11,7 @@ Extend the existing Python `tally.py report` command with category-expression fi
 Outcome: The report command accepts the extended usage while retaining the established behavior of `--top`, `TALLY_TOP`, `--format`, and `--since`.
 
 Acceptance criteria:
+
 - F1.AC1: All earlier report behavior remains unchanged when no new option is supplied.
   Source: "Extend the `report` command from parts 1 and 2."
   Source: "Everything from parts 1 and 2 keeps working exactly as before: when none of the new options below is used, the output, exit codes and error messages are unchanged."
@@ -38,6 +39,7 @@ Acceptance criteria:
 Outcome: A valid expression filters rows by their exact category before aggregation, in conjunction with the existing date filter.
 
 Acceptance criteria:
+
 - F2.AC1: Expression matching and date filtering jointly determine the kept rows, with case-sensitive category identity.
   Source: "`--where EXPR` keeps only the rows whose category satisfies the expression `EXPR`."
   Source: "It combines with `--since`: a row is kept when it passes both."
@@ -47,8 +49,8 @@ Acceptance criteria:
   Verification: Create `tests/test_where.py` with CLI tests that assert exact output in text and JSON formats, including the inclusive date boundary and case distinctions.
 - F2.AC2: Parse the complete grammar, including recursive negation, parentheses, ASCII names, and the stated operator precedence.
   Source: "An expression follows this grammar:"
-  Source: "expr   := term ( "|" term )*"
-  Source: "term   := factor ( "&" factor )*"
+  Source: "expr := term ( "|" term )_"
+  Source: "term := factor ( "&" factor )_"
   Source: "factor := "!" factor | "(" expr ")" | NAME"
   Source: "`NAME` is one or more of the characters `A-Z`, `a-z`, `0-9` and `_`."
   Source: "A row satisfies `NAME` when its category is exactly `NAME`."
@@ -83,6 +85,7 @@ Acceptance criteria:
 Outcome: Required categories must occur in the filtered row set, without restricting or otherwise changing the report.
 
 Acceptance criteria:
+
 - F3.AC1: Each required category is checked by exact identity against kept rows, independently of the report's top limit.
   Source: "`--require NAME` asserts that the category `NAME` has at least one row among the rows kept by `--since` and `--where`."
   Source: "It does not change which rows are reported."
@@ -116,6 +119,7 @@ Acceptance criteria:
 Outcome: All reported errors have semantic codes; selecting JSON errors exposes their code, original diagnostic message, and list-element location when applicable.
 
 Acceptance criteria:
+
 - F4.AC1: Error mode defaults to text; explicit text preserves earlier and newly specified plain diagnostics.
   Source: "`--errors` is `text` or `json`."
   Source: "The default is `text`: errors are printed exactly as in the earlier parts and above."
@@ -177,6 +181,7 @@ Acceptance criteria:
 Outcome: Summary mode returns counts and the exact overall total for every kept row, alongside the established top-category JSON array.
 
 Acceptance criteria:
+
 - F5.AC1: Summary mode replaces ordinary report output with one ordered JSON object and newline.
   Source: "`--summary` replaces the normal output with a summary of the rows kept by `--since` and `--where`."
   Source: "Standard output is one JSON object followed by a newline, with exactly the keys `rows`, `categories`, `total` and `top`, in that order:"
@@ -218,6 +223,7 @@ Acceptance criteria:
 Outcome: Exactly the first error in the stated validation sequence is emitted, with option failures resolved before opening the input file.
 
 Acceptance criteria:
+
 - F6.AC1: For structurally valid requests, value and data validation follow the complete stated order, independent of option placement.
   Source: "Only the first error is reported, in this order: `--errors`, the top value (`--top`, or `TALLY_TOP` when `--top` is absent), `--format`, `--since`, `--where`, the `--require` values (each must be non-empty, in command-line order), FILE cannot be read, invalid amounts, and finally the `--require` categories that are absent (in command-line order)."
   Aspect: `report FILE` has several failing checks among `--errors`, `--top` or `TALLY_TOP`, `--format`, `--since`, `--where`, `--require` values, file reading, amounts, and absent categories -> stderr contains exactly the diagnostic of the earliest failing check in the stated sequence
@@ -241,6 +247,7 @@ Acceptance criteria:
 Outcome: The supplied sample produces the issue's exact summary and missing-category diagnostic.
 
 Acceptance criteria:
+
 - F7.AC1: The worked summary invocation has the exact stated output and succeeds.
   Source: "Given `sample.csv`:"
   Source: "date,category,amount"
