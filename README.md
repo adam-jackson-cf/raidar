@@ -524,6 +524,19 @@ nominal analyzer hierarchy is imposed. This check is part of `make quality`.
 
 Tests are tiered (fast, slow, quality, docker, security, perf) with their own targets (`make test-fast`, `test-slow`, `test-quality`, `test-docker`); see [test tiers](.agents/skills/test-patterns/references/test-tiers.md).
 
+The fast run writes a unique, complete phase-level budget report under `var/`;
+both gates consume it without rerunning pytest. Invalid measurements always
+fail; timing is advisory locally and enforced only for the matching pinned
+`ubuntu-24.04` CI profile. Until five successful baseline measurements exist,
+the checker prints `no limits (0/5)` and still enforces report validity.
+Dispatch `.github/workflows/test-budget-measure.yml` at a fixed revision, then
+`make test-budget-record RUNS="<GitHub run ids>"` imports verified artifacts
+into `.omp/test-budgets/`. `make test-budget-check` consumes only the current
+invocation's report. Baselines and formulas determine limits; owner approval
+for increases is verified using GitHub reviews bound to the policy diff and
+commit, never a committed boolean. Unit 6b records the first five baselines
+after the tooling merges; the 30-second goal remains separate.
+
 Strict mypy checks every maintained Python root, including tests and scripts. Its
 finding-specific debt is tracked in `.omp/baselines/mypy.json`: new findings,
 stale entries and baseline growth against `origin/main` fail the gate. Fixes

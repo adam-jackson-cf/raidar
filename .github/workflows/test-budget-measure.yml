@@ -1,0 +1,96 @@
+name: test-budget-measure
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: Exact repository revision to measure
+        required: true
+        type: string
+      run_count:
+        description: Number of sequential complete fast-tier observations
+        required: true
+        default: "5"
+        type: string
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  prepare:
+    runs-on: ubuntu-24.04
+    outputs:
+      matrix: ${{ steps.matrix.outputs.matrix }}
+      revision: ${{ steps.revision.outputs.revision }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
+      - name: Resolve exact revision
+        id: revision
+        run: echo "revision=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+      - name: Expand sequential measurement jobs
+        id: matrix
+        env:
+          RUN_COUNT: ${{ inputs.run_count }}
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          count = int(os.environ["RUN_COUNT"])
+          if not 1 <= count <= 256:
+              raise SystemExit("run_count must be between 1 and 256")
+          with open(os.environ["GITHUB_OUTPUT"], "a") as output:
+              output.write("matrix=" + json.dumps(list(range(1, count + 1))) + "\n")
+          PY
+
+  measure:
+    name: measure-${{ matrix.index }}
+    needs: prepare
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      max-parallel: 1
+      matrix:
+        index: ${{ fromJSON(needs.prepare.outputs.matrix) }}
+    env:
+      RAIDAR_TEST_BUDGET_RUNNER_CLASS: ubuntu-24.04
+      RAIDAR_TEST_BUDGET_OS_IMAGE_FAMILY: ubuntu24
+      GH_TOKEN: ${{ github.token }}
+      INVOCATION: measure-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.index }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.prepare.outputs.revision }}
+          fetch-depth: 0
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          version: "0.10.0"
+          python-version: "3.13.7"
+      - name: Install Python
+        run: uv python install
+      - name: Provision locked test dependencies
+        run: env -u AGENT uv sync --project orchestrator --all-extras --frozen --python 3.13.7
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Install locked formatter
+        run: npm ci --ignore-scripts
+      - name: Measure fast tier exactly once
+        run: env -u AGENT make test-fast TEST_BUDGET_INVOCATION="$INVOCATION"
+      - name: Bind report to repository job and policy
+        run: |
+          env -u AGENT uv run --project orchestrator --extra dev python scripts/checks/test_budget_evidence.py seal --report "var/tmp/tests/budgets/$INVOCATION/report.json" --index "${{ matrix.index }}"
+      - name: Upload immutable measurement evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-budget-report-${{ matrix.index }}
+          path: |
+            var/tmp/tests/budgets/${{ env.INVOCATION }}/report.json
+            var/tmp/tests/budgets/${{ env.INVOCATION }}/completion.json
+          if-no-files-found: error
+          retention-days: 90

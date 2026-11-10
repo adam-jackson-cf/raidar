@@ -27,8 +27,6 @@ def report(*, line: tuple[int, int], branch: tuple[int, int]) -> dict:
 FLOORS = {"line": FLOOR, "branch": FLOOR}
 # Of 100000 measured items: below, exactly at, above the 95% floor.
 BELOW, EQUAL, ABOVE = 94_999, 95_000, 95_001
-# 94.9996% displays as 95.00 at precision 2 yet is below the floor.
-ROUNDS_UP_BELOW = (9_499_996, 10_000_000)
 PASSING = (EQUAL, 100_000)
 
 
@@ -37,7 +35,8 @@ PASSING = (EQUAL, 100_000)
     ("covered", "total", "passes"),
     [
         (BELOW, 100_000, False),
-        (*ROUNDS_UP_BELOW, False),
+        # 94.9996% displays as 95.00 but remains below the floor.
+        (9_499_996, 10_000_000, False),
         (EQUAL, 100_000, True),
         (ABOVE, 100_000, True),
     ],
@@ -135,7 +134,7 @@ def quality_children(monkeypatch):
                 return subprocess.CompletedProcess(command, returncode=7)
             if command[0] == "git":
                 state["staged"] = True
-            elif command[1:3] == ["-m", "pytest"]:
+            elif str(quality.BUDGET_PRODUCER) in command:
                 state["tested"] = True
                 destination = Path(kwargs["env"]["COVERAGE_FILE"]).with_name("coverage.json")
                 destination.write_text(
@@ -180,7 +179,7 @@ def test_quality_gates_stage_only_after_success_when_explicitly_requested(
         "lint-imports",
         "lizard",
         str(quality.MYPY_CHECK_SCRIPT),
-        "pytest",
+        str(quality.BUDGET_PRODUCER),
     ],
 )
 def test_quality_gates_stop_on_a_failed_tool_without_staging(

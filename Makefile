@@ -7,6 +7,11 @@ override RAIDAR_VAR := $(abspath $(RAIDAR_VAR))
 export RAIDAR_VAR
 REPO_TMP_DIR ?= $(RAIDAR_VAR)/tmp
 REPO_CACHE_DIR ?= $(CURDIR)/.cache
+TEST_BUDGET_INVOCATION ?= $(shell python3 -c 'import uuid; print(uuid.uuid4().hex)')
+export TEST_BUDGET_INVOCATION := $(TEST_BUDGET_INVOCATION)
+RAIDAR_TEST_BUDGET_INVOCATION ?= $(TEST_BUDGET_INVOCATION)
+RAIDAR_TEST_BUDGET_REPORT ?= $(REPO_TMP_DIR)/tests/budgets/$(TEST_BUDGET_INVOCATION)/report.json
+export RAIDAR_TEST_BUDGET_INVOCATION RAIDAR_TEST_BUDGET_REPORT
 REPO_UV_CACHE_DIR ?= $(REPO_CACHE_DIR)/uv
 REPO_RUNTIME_ENV := mkdir -p "$(REPO_TMP_DIR)" "$(REPO_UV_CACHE_DIR)" && env \
 	TMPDIR="$(REPO_TMP_DIR)" \
@@ -54,7 +59,7 @@ RENAMED_VARS := RUN:JOB RUNS:JOBS RUN_ID:JOB_ID RUNS_DIR:JOBS_DIR HARNESS:AGENT 
 	BLOCK:ATTEMPT SMOKE_BLOCKS:SMOKE_ATTEMPTS \
 	ORACLE_BUNDLE:VERIFIER_BUNDLE REVIEW_RUNS_ROOT:REVIEW_JOBS_ROOT QUALITY_RUNS:QUALITY_JOBS \
 	ALLOW_DEV_RUNS:ALLOW_DEV_JOBS SMOKE_RUNS_DIR:SMOKE_JOBS_DIR
-$(foreach pair,$(RENAMED_VARS),$(if $(filter command line environment environment override,$(origin $(firstword $(subst :, ,$(pair))))),$(error $(firstword $(subst :, ,$(pair)))= was renamed $(lastword $(subst :, ,$(pair)))= (schema v2 uses Harbor's vocabulary; see README Concepts))))
+$(foreach pair,$(RENAMED_VARS),$(if $(and $(filter command line environment environment override,$(origin $(firstword $(subst :, ,$(pair))))),$(if $(and $(filter RUNS:JOBS,$(pair)),$(filter test-budget-record,$(MAKECMDGOALS))),,yes)),$(error $(firstword $(subst :, ,$(pair)))= was renamed $(lastword $(subst :, ,$(pair)))= (schema v2 uses Harbor's vocabulary; see README Concepts))))
 
 # Shared public workflow defaults.
 comma := ,
@@ -154,6 +159,8 @@ help:
 	@echo "  make test-hygiene-check                                Check bounded test processes, skill metadata/support links, and registered stage evidence"
 	@echo "  make identity-check                                    Refuse execution identity changes against .omp/identity.json"
 	@echo "  make test-evidence-check [TEST_EVIDENCE_BASE=origin/main] Check added tests map to changed behavior and reject duplicate paths"
+	@echo "  make test-budget-check                                Validate this invocation's fast report; CI timing enforcement after calibration"
+	@echo "  make test-budget-record RUNS=\"<GitHub run ids>\"         Import successful same-revision measurement artifacts as tracked baselines"
 	@echo "  make identity-record                                   Explicitly record current identities; requires separate reviewed identity-change commit"
 	@echo "  make ruff-baseline                                    Explicitly record current Full Ruff findings (gates never refresh)"
 	@echo "  make ruff-check                                       Check Full Ruff against the finding-specific shrink-only baseline"
@@ -800,12 +807,23 @@ test-evidence-check:
 	@$(REPO_RUNTIME_ENV) uv run --project orchestrator --extra dev \
 		python scripts/checks/check-test-evidence.py --repo-root "$(CURDIR)" --base-ref "$(TEST_EVIDENCE_BASE)"
 
+.PHONY: test-budget-check test-budget-record
+test-budget-check:
+	@$(REPO_RUNTIME_ENV) uv run --project orchestrator --extra dev \
+		python scripts/checks/check-test-budgets.py --report "$(RAIDAR_TEST_BUDGET_REPORT)" \
+		--invocation "$(RAIDAR_TEST_BUDGET_INVOCATION)"
+
+test-budget-record:
+	@$(REPO_RUNTIME_ENV) uv run --project orchestrator --extra dev \
+		python scripts/checks/test_budget_evidence.py record --runs "$(RUNS)"
+
 gate-commit:
 	@$(REPO_RUNTIME_ENV) uv run --project orchestrator --extra dev \
 		python scripts/checks/check-repository-paths.py
 	@$(MAKE) --no-print-directory identity-check
 	@$(MAKE) --no-print-directory test-evidence-check
 	@$(MAKE) --no-print-directory quality
+	@$(MAKE) --no-print-directory test-budget-check
 	@$(MAKE) --no-print-directory dependency-audit-check
 	@$(REPO_RUNTIME_ENV) uv run --project orchestrator --extra dev \
 		python scripts/checks/run-affected-seams.py
