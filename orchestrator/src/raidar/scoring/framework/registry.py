@@ -238,11 +238,15 @@ def tool_lock_for(manifest: ScorerManifest) -> LockedTools:
 
 def tool_versions(tool_lock: LockedTools) -> dict[str, str]:
     versions: dict[str, str] = {}
+
+    def record_packages(spec: dict[str, Any]) -> None:
+        for package in spec["packages"]:
+            name, version = package.split("==", 1)
+            versions[name] = version
+
     for tools in tool_lock.values():
         for spec in tools.values():
-            for package in spec["packages"]:
-                name, version = package.split("==", 1)
-                versions[name] = version
+            record_packages(spec)
     return versions
 
 

@@ -352,11 +352,17 @@ class _FunctionScan:
             for node in ast.walk(self.function):
                 if not isinstance(node, ast.Assign) or not self._reads_error_text(node.value):
                     continue
-                for target in node.targets:
-                    if isinstance(target, ast.Name) and target.id not in self.text_names:
-                        self.text_names.add(target.id)
-                        changed = True
+                if self._add_error_text_names(node):
+                    changed = True
         return self.text_names
+
+    def _add_error_text_names(self, node: ast.Assign) -> bool:
+        changed = False
+        for target in node.targets:
+            if isinstance(target, ast.Name) and target.id not in self.text_names:
+                self.text_names.add(target.id)
+                changed = True
+        return changed
 
     def _reads_error_text(self, node: ast.AST) -> bool:
         if any(text in ERROR_TEXT_KEYS for text in _strings(node)):

@@ -34,7 +34,7 @@ def _finding(*, path: str = PATH, code: str = "F841", fingerprint: str = "abc", 
     return {"path": path, "code": code, "fingerprint": fingerprint, "count": count}
 
 
-def _baseline(*findings, tool="ruff"):
+def _baseline(*findings: dict[str, object], tool: str = "ruff") -> dict[str, object]:
     return {"schemaVersion": 1, "tool": tool, "findings": list(findings)}
 
 
@@ -239,7 +239,7 @@ def test_baseline_may_only_shrink_and_matches_each_finding_not_rule_totals() -> 
     [
         {},
         {"schemaVersion": 2, "tool": "ruff", "findings": []},
-        _baseline(tool="unknown"),
+        _baseline(tool="invalid_tool"),
         _baseline(_finding(count=0)),
         _baseline(_finding(count=-1)),
         _baseline(_finding(count=True)),
@@ -299,3 +299,100 @@ def test_existing_base_baseline_is_read_instead_of_refreshing_it() -> None:
     assert baseline.read_base_baseline(result, _baseline(_finding()), "baseline.json", "main") == (
         _baseline()
     )
+
+
+def test_generic_reports_keep_finding_identity_and_ratchet_custom_tools() -> None:
+    item = {"path": PATH, "code": "PYS250", "symbol": "build", "source_line": "for x in rows:"}
+    findings = baseline.parse_findings_json(json.dumps([item, item]), root="/repo")
+    expected = _finding(
+        code="PYS250",
+        fingerprint=baseline.fingerprint("PYS250", "build", "for x in rows:"),
+        count=2,
+    )
+    assert findings == [expected]
+    record = _baseline(expected, tool="python-policy")
+    assert baseline.evaluate_baseline(record, findings, record) == (0, [])
+    shrunk = _finding(code="PYS250", fingerprint=expected["fingerprint"])
+    assert baseline.evaluate_baseline(
+        _baseline(shrunk, tool="python-policy"), [shrunk], record
+    ) == (0, [])
+    status, lines = baseline.evaluate_baseline(
+        record, findings, _baseline(shrunk, tool="python-policy")
+    )
+    assert status == 1
+    assert any("BASELINE.refresh" in line for line in lines)
+    assert baseline.parse_findings_json("[]", root="/repo") == []
+
+
+@pytest.mark.parametrize(
+    "item",
+    [
+        {},
+        {"path": "../outside.py", "code": "X", "symbol": "", "source_line": "x"},
+        {"path": PATH, "code": "", "symbol": "", "source_line": "x"},
+        {"path": PATH, "code": "X", "symbol": None, "source_line": "x"},
+        {"path": PATH, "code": "X", "symbol": "", "source_line": "x\ny"},
+        {"path": PATH, "code": "X", "symbol": "", "source_line": None},
+    ],
+)
+def test_generic_reports_refuse_incomplete_or_unsafe_findings(item: dict[str, object]) -> None:
+    with pytest.raises(baseline.ScanInputError):
+        baseline.parse_findings_json(json.dumps([item]), root="/repo")
+
+
+@pytest.mark.parametrize(
+    "scenario",
+    [
+        ("python-policy", "for x in rows:", 0),
+        ("python-policy", "for y in rows:", 1),
+        ("invalid_tool", "for x in rows:", 2),
+    ],
+)
+def test_generic_cli_checks_reports_and_rejects_invalid_tool_names(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    scenario: tuple[str, str, int],
+) -> None:
+    tool, source_line, expected = scenario
+    original = {"path": PATH, "code": "PYS250", "symbol": "build", "source_line": "for x in rows:"}
+    record = {
+        "schemaVersion": 1,
+        "tool": "python-policy",
+        "findings": baseline.parse_findings_json(json.dumps([original]), root=str(tmp_path)),
+    }
+    (tmp_path / "baseline.json").write_text(json.dumps(record), encoding="utf-8")
+    (tmp_path / "base.json").write_text(json.dumps(record), encoding="utf-8")
+    (tmp_path / "report.json").write_text(
+        json.dumps([original | {"source_line": source_line}]), encoding="utf-8"
+    )
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "check-finding-baseline.py",
+            "--tool",
+            tool,
+            "--format",
+            "findings-json",
+            "--root",
+            str(tmp_path),
+            "--baseline",
+            "baseline.json",
+            "--base-baseline",
+            "base.json",
+            "--report",
+            "report.json",
+        ],
+    )
+    assert baseline.main() == expected
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    if expected == 0:
+        assert captured.err == ""
+    elif expected == 1:
+        assert PATH in captured.err
+        assert "PYS250" in captured.err
+        assert "fix the new finding" in captured.err
+    else:
+        assert "--tool" in captured.err

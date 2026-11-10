@@ -1,0 +1,138 @@
+{
+  "schemaVersion": 1,
+  "tool": "python-policy",
+  "findings": [
+    {
+      "path": "contract/src/raidar_contract/agent.py",
+      "code": "PYQ231",
+      "fingerprint": "846b6fe5082bb8ac5ca1e86d70ad69f0ac8227bde18ad77b49314d714e188b9c",
+      "count": 1
+    },
+    {
+      "path": "lab/stages/raidar/define/tool/src/define_tool/aspects.py",
+      "code": "PYS250",
+      "fingerprint": "0623da19364f60f2dc6060f928992f813847f3414cbf58096b6f40e96caebce5",
+      "count": 1
+    },
+    {
+      "path": "lab/stages/raidar/define/tool/src/define_tool/aspects.py",
+      "code": "PYS250",
+      "fingerprint": "5425007626abc274147704394467a8c42f6d530143ce14a11937335cbb93091c",
+      "count": 1
+    },
+    {
+      "path": "lab/stages/raidar/define/tool/src/define_tool/compact.py",
+      "code": "PYS250",
+      "fingerprint": "c5c81412d719c5b23cd5332e2097956f7bdbc53a3a9ed96270d06adf0da7ef9f",
+      "count": 1
+    },
+    {
+      "path": "lab/stages/raidar/define/tool/src/define_tool/draft.py",
+      "code": "PYS250",
+      "fingerprint": "6dcf260adc46f452fb7bb11bd7e2cba7395ae59828fbf091c92d7ad21a4eecc1",
+      "count": 1
+    },
+    {
+      "path": "lab/stages/raidar/define/tool/src/define_tool/owed.py",
+      "code": "PYS250",
+      "fingerprint": "7e66fb8d11d15c5726f3582a4b4ab24a95cc61441e0efe6c31239042e0170c07",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/contract/source_digest.py",
+      "code": "PYS250",
+      "fingerprint": "1466b65f329034996406b2ae0a5922c849c14b39de12a13c3720249724f42905",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/scoring/code_quality/diffs.py",
+      "code": "PYS250",
+      "fingerprint": "2068559682e34dd0baae80b1e0fb1b38b4ccbc3bd3a5dee885b734a0d84d219b",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/scoring/code_quality/diffs.py",
+      "code": "PYS250",
+      "fingerprint": "957c7d568219a499b5bc0c57f6c041f51b1a3c0f92e32415e4d578a06d6f3d7f",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/scoring/code_quality/evidence.py",
+      "code": "PYS250",
+      "fingerprint": "abe037a6d0f29cfd13e4ab06b8642956a5186981219b5068e9fbc7665b185ed9",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/scoring/code_quality/quality.py",
+      "code": "PYS250",
+      "fingerprint": "b160879ec3e26e6c7ac961c5f93bf9186925bae73080e8a7929c90d17d2e693b",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/scoring/code_quality/snapshot_tool/evaluator.py",
+      "code": "PYS250",
+      "fingerprint": "33b7f09b164288fa3d3081d2f29acb7c15f619a185dc59b6da95411c217484ea",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/scoring/code_quality/snapshot_tool/evaluator.py",
+      "code": "PYS250",
+      "fingerprint": "807152d4e9a210fd50f6bec39be22ffe59e8d79fe630fea00d4f88450a07dc0e",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/scoring/process_checks/outputs.py",
+      "code": "PYS250",
+      "fingerprint": "b000a296b03ce6247b444498a1fb7d701a419eaeb81d4da3863e806c6b2ff9d7",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/scoring/process_checks/trace_events.py",
+      "code": "PYS250",
+      "fingerprint": "71da01f9dc8aa5b6e9fff02dbb23c625f6318b2dca128ad20cb1304fbdb389db",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/subject/agent/adapters/base.py",
+      "code": "PYS250",
+      "fingerprint": "65a24fdff2f4664a39330c16b6b2ba254e96dd1033e77455b58dd67d99b997fc",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/subject/agent/adapters/codex_audit.py",
+      "code": "PYS250",
+      "fingerprint": "4cbfff4024ffb98084d5d4f17f85fc14fd32c461ad2ab78ccb5fca8a70a7ecf8",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/subject/agent/protocol.py",
+      "code": "PYQ230",
+      "fingerprint": "4c9eed5b88d13fb7d1a28156f393412e795f4405812ddd9e4232b14222857c5c",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/subject/agent/protocol.py",
+      "code": "PYQ231",
+      "fingerprint": "bce6d4d6f7362a04fa2ca62f5db0e5312b5dfe766f888309da66e74c07e41497",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/subject/primitive/gate.py",
+      "code": "PYS250",
+      "fingerprint": "8a1fdfd608fa2888d04807acb668d154a419998cf7de714e06f6b2afbb09f7c2",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/subject/primitive/gate.py",
+      "code": "PYS250",
+      "fingerprint": "e6eaa66cc654924c3874b23695fcc3b042c6424dc0cf3cbba67b220530e9b57f",
+      "count": 1
+    },
+    {
+      "path": "orchestrator/src/raidar/subject/workflow/acceptance.py",
+      "code": "PYS250",
+      "fingerprint": "c8ec6283b15d6aaf72fd7a0b4660688f8668b4e071d481fc0fefd71d85b6ab9b",
+      "count": 2
+    }
+  ]
+}

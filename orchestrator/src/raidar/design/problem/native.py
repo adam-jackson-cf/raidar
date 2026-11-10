@@ -70,6 +70,12 @@ def stage_catalog(problem_dir: Path, catalog: Path, *, run: Runner = subprocess.
     return dest
 
 
+def _record_bucket_outcomes(origin: str, bucket: dict[str, Any], outcomes: dict[str, str]) -> None:
+    for status in _STATUSES:
+        for test_id in bucket.get(status, []):
+            outcomes[f"{origin}::{test_id}"] = status
+
+
 def grade_from_evaluation(data: dict[str, Any], step: str) -> Grade:
     """Reduce the fork's ``evaluation.json`` to a comparable ``Grade``."""
     groups = {
@@ -82,9 +88,7 @@ def grade_from_evaluation(data: dict[str, Any], step: str) -> Grade:
     outcomes: dict[str, str] = {}
     for key, bucket in data["tests"].items():
         origin = key.rsplit("-", 1)[0]
-        for status in _STATUSES:
-            for test_id in bucket.get(status, []):
-                outcomes[f"{origin}::{test_id}"] = status
+        _record_bucket_outcomes(origin, bucket, outcomes)
     infra = "native_infrastructure_failure" if data.get("infrastructure_failure") else None
     return Grade("native", step, groups, outcomes, infra)
 

@@ -7,7 +7,7 @@ they do not call Jev or import the workflow's closure implementation.
 from __future__ import annotations
 
 import json
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Iterator, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -283,13 +283,20 @@ def _judge_steps(steps: Sequence[tuple[str, Path]]) -> tuple[list[JudgeStep], li
     return found, unread
 
 
-def _undecided_ids(step: JudgeStep) -> list[Any]:
-    return [
+def _pass_undecided_ids(passed: dict[str, Any]) -> Iterator[Any]:
+    return (
         aspect.get("id")
-        for passed in _objects(step.verify.get("judged"))
         for criterion in _objects(passed.get("criteria"))
         for aspect in _objects(criterion.get("aspects"))
         if aspect.get("status") == "undecided"
+    )
+
+
+def _undecided_ids(step: JudgeStep) -> list[Any]:
+    return [
+        aspect_id
+        for passed in _objects(step.verify.get("judged"))
+        for aspect_id in _pass_undecided_ids(passed)
     ]
 
 

@@ -148,32 +148,43 @@ def _curve_point(
     )
 
 
+def _append_trial_curve_values(
+    trial: ReviewedTrial, values: dict[tuple[str, str], list[float]]
+) -> None:
+    for row in trial.detail.rows:
+        for component, cell in row.cells.items():
+            if cell.value is not None:
+                values[(component, row.checkpoint)].append(cell.value)
+
+
+def _arm_curves(
+    trials: Sequence[ReviewedTrial],
+    arm: str,
+    checkpoints: Sequence[str],
+    settings: Settings,
+) -> dict[str, tuple[CurvePoint, ...]]:
+    values: dict[tuple[str, str], list[float]] = defaultdict(list)
+    for trial in trials:
+        if trial.arm == arm:
+            _append_trial_curve_values(trial, values)
+    return {
+        component: tuple(
+            _curve_point(
+                checkpoint, values[(component, checkpoint)], f"{arm}:{component}", settings
+            )
+            for checkpoint in checkpoints
+        )
+        for component in COMPONENTS
+    }
+
+
 def _curves(
     trials: Sequence[ReviewedTrial],
     arms: Sequence[str],
     checkpoints: Sequence[str],
     settings: Settings,
 ) -> dict[str, dict[str, tuple[CurvePoint, ...]]]:
-    curves: dict[str, dict[str, tuple[CurvePoint, ...]]] = {}
-    for arm in arms:
-        values: dict[tuple[str, str], list[float]] = defaultdict(list)
-        for trial in trials:
-            if trial.arm != arm:
-                continue
-            for row in trial.detail.rows:
-                for component, cell in row.cells.items():
-                    if cell.value is not None:
-                        values[(component, row.checkpoint)].append(cell.value)
-        curves[arm] = {
-            component: tuple(
-                _curve_point(
-                    checkpoint, values[(component, checkpoint)], f"{arm}:{component}", settings
-                )
-                for checkpoint in checkpoints
-            )
-            for component in COMPONENTS
-        }
-    return curves
+    return {arm: _arm_curves(trials, arm, checkpoints, settings) for arm in arms}
 
 
 def _metric(component: str) -> MetricDef:
@@ -364,24 +375,21 @@ def _signal_values(trial: ReviewedTrial, signal: str) -> list[float]:
     return values
 
 
+def _arm_distribution(trials: Sequence[ReviewedTrial], arm: str, signal: str) -> Distribution:
+    values = [
+        value for trial in trials if trial.arm == arm for value in _signal_values(trial, signal)
+    ]
+    return Distribution(
+        arm=arm, n=len(values), values=tuple(values), quantiles=stats.quantiles(values)
+    )
+
+
 def _distributions(
     trials: Sequence[ReviewedTrial], arms: Sequence[str]
 ) -> tuple[SignalDistributions, ...]:
     result = []
     for signal, label, unit, source in _SIGNALS:
-        per_arm = []
-        for arm in arms:
-            values = [
-                value
-                for trial in trials
-                if trial.arm == arm
-                for value in _signal_values(trial, signal)
-            ]
-            per_arm.append(
-                Distribution(
-                    arm=arm, n=len(values), values=tuple(values), quantiles=stats.quantiles(values)
-                )
-            )
+        per_arm = [_arm_distribution(trials, arm, signal) for arm in arms]
         result.append(
             SignalDistributions(
                 signal=signal, label=label, unit=unit, source=source, arms=tuple(per_arm)
