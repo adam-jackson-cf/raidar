@@ -1,5 +1,8 @@
 {
   "files": {
+    ".omp/test-behavior-map.json": "test evidence policy",
+    "scripts/checks/check-test-evidence.py": "test evidence policy",
+    "orchestrator/tests/test_test_evidence.py": "test evidence policy",
     ".omp/baselines/dependency-audit.json": "dependency audit adoption",
     ".omp/baselines/prettier.json": "maintained prose formatting adoption",
     ".omp/baselines/toolchain-debt.json": "toolchain parity adoption",
@@ -1307,6 +1310,7 @@
     "orchestrator/tests/fixtures/stages/acme/note-state/tool/src/note_state/": "orchestrator/tests/fixtures/stages/acme/note-state/tool/src/note_state"
   },
   "test_tiers": {
+    "orchestrator/tests/test_test_evidence.py": [],
     "orchestrator/tests/test_toolchain_parity.py": [],
     "orchestrator/tests/test_analyzer_scope_ratchet.py": [],
     "orchestrator/tests/test_analyzer_scope_reports.py": [],
@@ -1798,6 +1802,13 @@
     ]
   },
   "external_callback_names": {
+    "scripts/checks/check-test-evidence.py": [
+      "visit_Name",
+      "visit_FunctionDef",
+      "visit_AsyncFunctionDef",
+      "visit_JoinedStr",
+      "visit_Call"
+    ],
     "scripts/checks/check-analyzer-scope.py": [
       "visit_Import",
       "visit_ImportFrom",
