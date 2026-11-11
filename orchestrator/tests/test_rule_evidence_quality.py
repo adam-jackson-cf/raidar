@@ -96,7 +96,7 @@ def isolated_repository(tmp_path: Path) -> Path:
     )
     # The binding contract explicitly authorizes these exclusion decision records.
     decisions = ROOT / "docs/reboot/evidence"
-    for family in ("guardrails", "release", "analyzer", "budget"):
+    for family in ("guardrails", "release", "analyzer"):
         for source in decisions.glob(f"decide-{family}-*.md"):
             target = destination / source.relative_to(ROOT)
             target.parent.mkdir(parents=True, exist_ok=True)

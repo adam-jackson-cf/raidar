@@ -1,617 +1,301 @@
 {
   "schemaVersion": 1,
   "tests": {
-    "orchestrator/tests/test_test_budget_provenance.py": {
-      "source": "scripts/checks/test_budget_evidence.py",
-      "behavior": "Authenticate new baseline observations against external artifacts and preserve trusted immutable evidence without repeat downloads"
-    },
-    "orchestrator/tests/test_test_budget_provenance.py::test_authentic_new_jobs_share_one_external_run_download": {
-      "source": "scripts/checks/test_budget_evidence.py",
-      "behavior": "Authenticate new baseline observations against external artifacts and preserve trusted immutable evidence without repeat downloads"
-    },
-    "orchestrator/tests/test_test_budget_provenance.py::test_new_record_identity_must_bind_its_immutable_filename": {
-      "source": "scripts/checks/test_budget_evidence.py",
-      "behavior": "Authenticate new baseline observations against external artifacts and preserve trusted immutable evidence without repeat downloads"
-    },
-    "orchestrator/tests/test_test_budget_provenance.py::test_new_record_identity_must_bind_its_immutable_filename[10-bad.json-10-bad]": {
-      "source": "scripts/checks/test_budget_evidence.py",
-      "behavior": "Authenticate new baseline observations against external artifacts and preserve trusted immutable evidence without repeat downloads"
-    },
-    "orchestrator/tests/test_test_budget_provenance.py::test_new_record_identity_must_bind_its_immutable_filename[bad-21.json-bad-21]": {
-      "source": "scripts/checks/test_budget_evidence.py",
-      "behavior": "Authenticate new baseline observations against external artifacts and preserve trusted immutable evidence without repeat downloads"
-    },
-    "orchestrator/tests/test_test_budget_provenance.py::test_new_record_identity_must_bind_its_immutable_filename[renamed.json-10-21]": {
-      "source": "scripts/checks/test_budget_evidence.py",
-      "behavior": "Authenticate new baseline observations against external artifacts and preserve trusted immutable evidence without repeat downloads"
-    },
-    "orchestrator/tests/test_test_budget_provenance.py::test_new_record_must_equal_external_observations": {
-      "source": "scripts/checks/test_budget_evidence.py",
-      "behavior": "Authenticate new baseline observations against external artifacts and preserve trusted immutable evidence without repeat downloads"
-    },
-    "orchestrator/tests/test_test_budget_provenance.py::test_new_record_must_equal_external_observations[False]": {
-      "source": "scripts/checks/test_budget_evidence.py",
-      "behavior": "Authenticate new baseline observations against external artifacts and preserve trusted immutable evidence without repeat downloads"
-    },
-    "orchestrator/tests/test_test_budget_provenance.py::test_new_record_must_equal_external_observations[True]": {
-      "source": "scripts/checks/test_budget_evidence.py",
-      "behavior": "Authenticate new baseline observations against external artifacts and preserve trusted immutable evidence without repeat downloads"
-    },
-    "orchestrator/tests/test_test_budget_provenance.py::test_retained_trusted_record_cannot_be_rewritten": {
-      "source": "scripts/checks/test_budget_evidence.py",
-      "behavior": "Authenticate new baseline observations against external artifacts and preserve trusted immutable evidence without repeat downloads"
-    },
-    "orchestrator/tests/test_test_budget_provenance.py::test_retained_trusted_record_cannot_be_rewritten[cases]": {
-      "source": "scripts/checks/test_budget_evidence.py",
-      "behavior": "Authenticate new baseline observations against external artifacts and preserve trusted immutable evidence without repeat downloads"
-    },
-    "orchestrator/tests/test_test_budget_provenance.py::test_retained_trusted_record_cannot_be_rewritten[measurement]": {
-      "source": "scripts/checks/test_budget_evidence.py",
-      "behavior": "Authenticate new baseline observations against external artifacts and preserve trusted immutable evidence without repeat downloads"
-    },
-    "orchestrator/tests/test_test_budget_provenance.py::test_retained_trusted_record_cannot_be_rewritten[wallSeconds]": {
-      "source": "scripts/checks/test_budget_evidence.py",
-      "behavior": "Authenticate new baseline observations against external artifacts and preserve trusted immutable evidence without repeat downloads"
-    },
-    "orchestrator/tests/test_test_budget_provenance.py::test_trusted_records_survive_artifact_expiry_without_network": {
-      "source": "scripts/checks/test_budget_evidence.py",
-      "behavior": "Authenticate new baseline observations against external artifacts and preserve trusted immutable evidence without repeat downloads"
-    },
-    "orchestrator/tests/test_test_budget_provenance.py::test_trusted_snapshot_reads_baseline_bytes_from_base_not_worktree": {
-      "source": "scripts/checks/test_budget_evidence.py",
-      "behavior": "Authenticate new baseline observations against external artifacts and preserve trusted immutable evidence without repeat downloads"
-    },
-    "orchestrator/tests/test_test_budget_provenance.py::test_unavailable_external_evidence_cannot_authorize_new_baseline": {
-      "source": "scripts/checks/test_budget_evidence.py",
-      "behavior": "Authenticate new baseline observations against external artifacts and preserve trusted immutable evidence without repeat downloads"
-    },
-    "orchestrator/tests/test_test_budget_calibration.py": {
-      "source": "scripts/checks/check-test-budgets.py",
-      "behavior": "Establish the first evidence-derived limits without approval while preserving approval for later exceptions"
-    },
-    "orchestrator/tests/test_test_budget_calibration.py::test_first_calibration_is_not_a_budget_increase": {
-      "source": "scripts/checks/check-test-budgets.py",
-      "behavior": "Distinguish first calibration from adding an exception to an existing budget"
-    },
-    "orchestrator/tests/test_test_budget_calibration.py::test_first_calibration_is_not_a_budget_increase[False]": {
-      "source": "scripts/checks/check-test-budgets.py",
-      "behavior": "Establish the first evidence-derived bounded exceptions without an approval requirement"
-    },
-    "orchestrator/tests/test_test_budget_calibration.py::test_first_calibration_is_not_a_budget_increase[True]": {
-      "source": "scripts/checks/check-test-budgets.py",
-      "behavior": "Require approval when a named exception is added after a budget already exists"
-    },
     "orchestrator/tests/test_quality_gate_commands.py": {
       "source": "orchestrator/src/raidar/cli/quality.py",
-      "behavior": "Run the budget report producer once with unchanged coverage floor and failure/staging behavior"
+      "behavior": "Run the fast tier once through pytest with unchanged coverage floor and failure/staging behavior"
     },
     "orchestrator/tests/test_quality_gate_commands.py::test_a_failed_child_command_stops_the_quality_runner": {
       "source": "orchestrator/src/raidar/cli/quality.py",
-      "behavior": "Run the budget report producer once with unchanged coverage floor and failure/staging behavior"
+      "behavior": "Run the fast tier once through pytest with unchanged coverage floor and failure/staging behavior"
     },
     "orchestrator/tests/test_quality_gate_commands.py::test_coverage_gate_fails_below_the_floor_at_any_precision": {
       "source": "orchestrator/src/raidar/cli/quality.py",
-      "behavior": "Run the budget report producer once with unchanged coverage floor and failure/staging behavior"
+      "behavior": "Run the fast tier once through pytest with unchanged coverage floor and failure/staging behavior"
     },
     "orchestrator/tests/test_quality_gate_commands.py::test_coverage_gate_fails_below_the_floor_at_any_precision[9499996-10000000-False-branch]": {
       "source": "orchestrator/src/raidar/cli/quality.py",
-      "behavior": "Run the budget report producer once with unchanged coverage floor and failure/staging behavior"
+      "behavior": "Run the fast tier once through pytest with unchanged coverage floor and failure/staging behavior"
     },
     "orchestrator/tests/test_quality_gate_commands.py::test_coverage_gate_fails_below_the_floor_at_any_precision[9499996-10000000-False-line]": {
       "source": "orchestrator/src/raidar/cli/quality.py",
-      "behavior": "Run the budget report producer once with unchanged coverage floor and failure/staging behavior"
+      "behavior": "Run the fast tier once through pytest with unchanged coverage floor and failure/staging behavior"
     },
     "orchestrator/tests/test_quality_gate_commands.py::test_coverage_gate_fails_below_the_floor_at_any_precision[covered0-100000-False-branch]": {
       "source": "orchestrator/src/raidar/cli/quality.py",
-      "behavior": "Run the budget report producer once with unchanged coverage floor and failure/staging behavior"
+      "behavior": "Run the fast tier once through pytest with unchanged coverage floor and failure/staging behavior"
     },
     "orchestrator/tests/test_quality_gate_commands.py::test_coverage_gate_fails_below_the_floor_at_any_precision[covered0-100000-False-line]": {
       "source": "orchestrator/src/raidar/cli/quality.py",
-      "behavior": "Run the budget report producer once with unchanged coverage floor and failure/staging behavior"
+      "behavior": "Run the fast tier once through pytest with unchanged coverage floor and failure/staging behavior"
     },
     "orchestrator/tests/test_quality_gate_commands.py::test_coverage_gate_fails_below_the_floor_at_any_precision[covered2-100000-True-branch]": {
       "source": "orchestrator/src/raidar/cli/quality.py",
-      "behavior": "Run the budget report producer once with unchanged coverage floor and failure/staging behavior"
+      "behavior": "Run the fast tier once through pytest with unchanged coverage floor and failure/staging behavior"
     },
     "orchestrator/tests/test_quality_gate_commands.py::test_coverage_gate_fails_below_the_floor_at_any_precision[covered2-100000-True-line]": {
       "source": "orchestrator/src/raidar/cli/quality.py",
-      "behavior": "Run the budget report producer once with unchanged coverage floor and failure/staging behavior"
+      "behavior": "Run the fast tier once through pytest with unchanged coverage floor and failure/staging behavior"
     },
     "orchestrator/tests/test_quality_gate_commands.py::test_coverage_gate_fails_below_the_floor_at_any_precision[covered3-100000-True-branch]": {
       "source": "orchestrator/src/raidar/cli/quality.py",
-      "behavior": "Run the budget report producer once with unchanged coverage floor and failure/staging behavior"
+      "behavior": "Run the fast tier once through pytest with unchanged coverage floor and failure/staging behavior"
     },
     "orchestrator/tests/test_quality_gate_commands.py::test_coverage_gate_fails_below_the_floor_at_any_precision[covered3-100000-True-line]": {
       "source": "orchestrator/src/raidar/cli/quality.py",
-      "behavior": "Run the budget report producer once with unchanged coverage floor and failure/staging behavior"
+      "behavior": "Run the fast tier once through pytest with unchanged coverage floor and failure/staging behavior"
     },
     "orchestrator/tests/test_quality_gate_commands.py::test_coverage_gate_fails_when_nothing_was_measured": {
       "source": "orchestrator/src/raidar/cli/quality.py",
-      "behavior": "Run the budget report producer once with unchanged coverage floor and failure/staging behavior"
+      "behavior": "Run the fast tier once through pytest with unchanged coverage floor and failure/staging behavior"
     },
     "orchestrator/tests/test_quality_gate_commands.py::test_fast_command_enforces_configured_floors_from_the_generated_report": {
       "source": "orchestrator/src/raidar/cli/quality.py",
-      "behavior": "Run the budget report producer once with unchanged coverage floor and failure/staging behavior"
+      "behavior": "Run the fast tier once through pytest with unchanged coverage floor and failure/staging behavior"
     },
     "orchestrator/tests/test_quality_gate_commands.py::test_fast_command_enforces_configured_floors_from_the_generated_report[measurements0-0-None]": {
       "source": "orchestrator/src/raidar/cli/quality.py",
-      "behavior": "Run the budget report producer once with unchanged coverage floor and failure/staging behavior"
+      "behavior": "Run the fast tier once through pytest with unchanged coverage floor and failure/staging behavior"
     },
     "orchestrator/tests/test_quality_gate_commands.py::test_fast_command_enforces_configured_floors_from_the_generated_report[measurements1-1-line coverage 94/100]": {
       "source": "orchestrator/src/raidar/cli/quality.py",
-      "behavior": "Run the budget report producer once with unchanged coverage floor and failure/staging behavior"
+      "behavior": "Run the fast tier once through pytest with unchanged coverage floor and failure/staging behavior"
     },
     "orchestrator/tests/test_quality_gate_commands.py::test_fast_command_enforces_configured_floors_from_the_generated_report[measurements2-1-branch coverage 95/100]": {
       "source": "orchestrator/src/raidar/cli/quality.py",
-      "behavior": "Run the budget report producer once with unchanged coverage floor and failure/staging behavior"
+      "behavior": "Run the fast tier once through pytest with unchanged coverage floor and failure/staging behavior"
     },
     "orchestrator/tests/test_quality_gate_commands.py::test_fast_command_enforces_configured_floors_from_the_generated_report[measurements3-1-no branch measurements]": {
       "source": "orchestrator/src/raidar/cli/quality.py",
-      "behavior": "Run the budget report producer once with unchanged coverage floor and failure/staging behavior"
+      "behavior": "Run the fast tier once through pytest with unchanged coverage floor and failure/staging behavior"
     },
     "orchestrator/tests/test_quality_gate_commands.py::test_fast_command_preserves_the_callers_coverage_artifacts": {
       "source": "orchestrator/src/raidar/cli/quality.py",
-      "behavior": "Run the budget report producer once with unchanged coverage floor and failure/staging behavior"
+      "behavior": "Run the fast tier once through pytest with unchanged coverage floor and failure/staging behavior"
     },
     "orchestrator/tests/test_quality_gate_commands.py::test_insufficient_coverage_prevents_staging_and_success": {
       "source": "orchestrator/src/raidar/cli/quality.py",
-      "behavior": "Run the budget report producer once with unchanged coverage floor and failure/staging behavior"
+      "behavior": "Run the fast tier once through pytest with unchanged coverage floor and failure/staging behavior"
     },
     "orchestrator/tests/test_quality_gate_commands.py::test_line_and_branch_floors_are_enforced_independently": {
       "source": "orchestrator/src/raidar/cli/quality.py",
-      "behavior": "Run the budget report producer once with unchanged coverage floor and failure/staging behavior"
+      "behavior": "Run the fast tier once through pytest with unchanged coverage floor and failure/staging behavior"
     },
     "orchestrator/tests/test_quality_gate_commands.py::test_quality_gate_helpers_validate_requirements_and_commands": {
       "source": "orchestrator/src/raidar/cli/quality.py",
-      "behavior": "Run the budget report producer once with unchanged coverage floor and failure/staging behavior"
+      "behavior": "Run the fast tier once through pytest with unchanged coverage floor and failure/staging behavior"
     },
     "orchestrator/tests/test_quality_gate_commands.py::test_quality_gates_refuse_unsafe_options_before_running_tools": {
       "source": "orchestrator/src/raidar/cli/quality.py",
-      "behavior": "Run the budget report producer once with unchanged coverage floor and failure/staging behavior"
+      "behavior": "Run the fast tier once through pytest with unchanged coverage floor and failure/staging behavior"
     },
     "orchestrator/tests/test_quality_gate_commands.py::test_quality_gates_refuse_unsafe_options_before_running_tools[options0-False---stage is only supported]": {
       "source": "orchestrator/src/raidar/cli/quality.py",
-      "behavior": "Run the budget report producer once with unchanged coverage floor and failure/staging behavior"
+      "behavior": "Run the fast tier once through pytest with unchanged coverage floor and failure/staging behavior"
     },
     "orchestrator/tests/test_quality_gate_commands.py::test_quality_gates_refuse_unsafe_options_before_running_tools[options1-True-Unstaged changes detected]": {
       "source": "orchestrator/src/raidar/cli/quality.py",
-      "behavior": "Run the budget report producer once with unchanged coverage floor and failure/staging behavior"
+      "behavior": "Run the fast tier once through pytest with unchanged coverage floor and failure/staging behavior"
     },
     "orchestrator/tests/test_quality_gate_commands.py::test_quality_gates_stage_only_after_success_when_explicitly_requested": {
       "source": "orchestrator/src/raidar/cli/quality.py",
-      "behavior": "Run the budget report producer once with unchanged coverage floor and failure/staging behavior"
+      "behavior": "Run the fast tier once through pytest with unchanged coverage floor and failure/staging behavior"
     },
     "orchestrator/tests/test_quality_gate_commands.py::test_quality_gates_stage_only_after_success_when_explicitly_requested[options0-False]": {
       "source": "orchestrator/src/raidar/cli/quality.py",
-      "behavior": "Run the budget report producer once with unchanged coverage floor and failure/staging behavior"
+      "behavior": "Run the fast tier once through pytest with unchanged coverage floor and failure/staging behavior"
     },
     "orchestrator/tests/test_quality_gate_commands.py::test_quality_gates_stage_only_after_success_when_explicitly_requested[options1-False]": {
       "source": "orchestrator/src/raidar/cli/quality.py",
-      "behavior": "Run the budget report producer once with unchanged coverage floor and failure/staging behavior"
+      "behavior": "Run the fast tier once through pytest with unchanged coverage floor and failure/staging behavior"
     },
     "orchestrator/tests/test_quality_gate_commands.py::test_quality_gates_stage_only_after_success_when_explicitly_requested[options2-True]": {
       "source": "orchestrator/src/raidar/cli/quality.py",
-      "behavior": "Run the budget report producer once with unchanged coverage floor and failure/staging behavior"
+      "behavior": "Run the fast tier once through pytest with unchanged coverage floor and failure/staging behavior"
     },
     "orchestrator/tests/test_quality_gate_commands.py::test_quality_gates_stop_on_a_failed_tool_without_staging": {
       "source": "orchestrator/src/raidar/cli/quality.py",
-      "behavior": "Run the budget report producer once with unchanged coverage floor and failure/staging behavior"
+      "behavior": "Run the fast tier once through pytest with unchanged coverage floor and failure/staging behavior"
     },
     "orchestrator/tests/test_quality_gate_commands.py::test_quality_gates_stop_on_a_failed_tool_without_staging[check]": {
       "source": "orchestrator/src/raidar/cli/quality.py",
-      "behavior": "Run the budget report producer once with unchanged coverage floor and failure/staging behavior"
+      "behavior": "Run the fast tier once through pytest with unchanged coverage floor and failure/staging behavior"
     },
     "orchestrator/tests/test_quality_gate_commands.py::test_quality_gates_stop_on_a_failed_tool_without_staging[failed_tool2]": {
       "source": "orchestrator/src/raidar/cli/quality.py",
-      "behavior": "Run the budget report producer once with unchanged coverage floor and failure/staging behavior"
+      "behavior": "Run the fast tier once through pytest with unchanged coverage floor and failure/staging behavior"
     },
     "orchestrator/tests/test_quality_gate_commands.py::test_quality_gates_stop_on_a_failed_tool_without_staging[failed_tool3]": {
       "source": "orchestrator/src/raidar/cli/quality.py",
-      "behavior": "Run the budget report producer once with unchanged coverage floor and failure/staging behavior"
+      "behavior": "Run the fast tier once through pytest with unchanged coverage floor and failure/staging behavior"
     },
     "orchestrator/tests/test_quality_gate_commands.py::test_quality_gates_stop_on_a_failed_tool_without_staging[failed_tool6]": {
       "source": "orchestrator/src/raidar/cli/quality.py",
-      "behavior": "Run the budget report producer once with unchanged coverage floor and failure/staging behavior"
+      "behavior": "Run the fast tier once through pytest with unchanged coverage floor and failure/staging behavior"
     },
-    "orchestrator/tests/test_quality_gate_commands.py::test_quality_gates_stop_on_a_failed_tool_without_staging[failed_tool7]": {
+    "orchestrator/tests/test_quality_gate_commands.py::test_quality_gates_stop_on_a_failed_tool_without_staging[pytest]": {
       "source": "orchestrator/src/raidar/cli/quality.py",
-      "behavior": "Run the budget report producer once with unchanged coverage floor and failure/staging behavior"
+      "behavior": "Run the fast tier once through pytest with unchanged coverage floor and failure/staging behavior"
     },
     "orchestrator/tests/test_quality_gate_commands.py::test_quality_gates_stop_on_a_failed_tool_without_staging[format]": {
       "source": "orchestrator/src/raidar/cli/quality.py",
-      "behavior": "Run the budget report producer once with unchanged coverage floor and failure/staging behavior"
+      "behavior": "Run the fast tier once through pytest with unchanged coverage floor and failure/staging behavior"
     },
     "orchestrator/tests/test_quality_gate_commands.py::test_quality_gates_stop_on_a_failed_tool_without_staging[lint-imports]": {
       "source": "orchestrator/src/raidar/cli/quality.py",
-      "behavior": "Run the budget report producer once with unchanged coverage floor and failure/staging behavior"
+      "behavior": "Run the fast tier once through pytest with unchanged coverage floor and failure/staging behavior"
     },
     "orchestrator/tests/test_quality_gate_commands.py::test_quality_gates_stop_on_a_failed_tool_without_staging[lizard]": {
       "source": "orchestrator/src/raidar/cli/quality.py",
-      "behavior": "Run the budget report producer once with unchanged coverage floor and failure/staging behavior"
-    },
-    "orchestrator/tests/test_test_budget_rules.py": {
-      "source": "scripts/checks/check-test-budgets.py",
-      "behavior": "Enforce complete invocation-bound reports, calibrated limits and externally verified policy authorization"
-    },
-    "orchestrator/tests/test_test_budget_rules.py::test_breaches_are_ci_only_and_have_actionable_phase_diagnostics": {
-      "source": "scripts/checks/check-test-budgets.py",
-      "behavior": "Enforce complete invocation-bound reports, calibrated limits and externally verified policy authorization"
-    },
-    "orchestrator/tests/test_test_budget_rules.py::test_breaches_are_ci_only_and_have_actionable_phase_diagnostics[False]": {
-      "source": "scripts/checks/check-test-budgets.py",
-      "behavior": "Enforce complete invocation-bound reports, calibrated limits and externally verified policy authorization"
-    },
-    "orchestrator/tests/test_test_budget_rules.py::test_breaches_are_ci_only_and_have_actionable_phase_diagnostics[True]": {
-      "source": "scripts/checks/check-test-budgets.py",
-      "behavior": "Enforce complete invocation-bound reports, calibrated limits and externally verified policy authorization"
-    },
-    "orchestrator/tests/test_test_budget_rules.py::test_complete_report_is_valid": {
-      "source": "scripts/checks/check-test-budgets.py",
-      "behavior": "Enforce complete invocation-bound reports, calibrated limits and externally verified policy authorization"
-    },
-    "orchestrator/tests/test_test_budget_rules.py::test_every_policy_increase_requires_external_owner_approval": {
-      "source": "scripts/checks/check-test-budgets.py",
-      "behavior": "Enforce complete invocation-bound reports, calibrated limits and externally verified policy authorization"
-    },
-    "orchestrator/tests/test_test_budget_rules.py::test_every_policy_increase_requires_external_owner_approval[deadline]": {
-      "source": "scripts/checks/check-test-budgets.py",
-      "behavior": "Enforce complete invocation-bound reports, calibrated limits and externally verified policy authorization"
-    },
-    "orchestrator/tests/test_test_budget_rules.py::test_every_policy_increase_requires_external_owner_approval[formula]": {
-      "source": "scripts/checks/check-test-budgets.py",
-      "behavior": "Enforce complete invocation-bound reports, calibrated limits and externally verified policy authorization"
-    },
-    "orchestrator/tests/test_test_budget_rules.py::test_every_policy_increase_requires_external_owner_approval[limit]": {
-      "source": "scripts/checks/check-test-budgets.py",
-      "behavior": "Enforce complete invocation-bound reports, calibrated limits and externally verified policy authorization"
-    },
-    "orchestrator/tests/test_test_budget_rules.py::test_every_policy_increase_requires_external_owner_approval[new-exception]": {
-      "source": "scripts/checks/check-test-budgets.py",
-      "behavior": "Enforce complete invocation-bound reports, calibrated limits and externally verified policy authorization"
-    },
-    "orchestrator/tests/test_test_budget_rules.py::test_exception_deadline_uses_injected_date": {
-      "source": "scripts/checks/check-test-budgets.py",
-      "behavior": "Enforce complete invocation-bound reports, calibrated limits and externally verified policy authorization"
-    },
-    "orchestrator/tests/test_test_budget_rules.py::test_exception_deadline_uses_injected_date[2026-11-09-False]": {
-      "source": "scripts/checks/check-test-budgets.py",
-      "behavior": "Enforce complete invocation-bound reports, calibrated limits and externally verified policy authorization"
-    },
-    "orchestrator/tests/test_test_budget_rules.py::test_exception_deadline_uses_injected_date[2026-11-10-True]": {
-      "source": "scripts/checks/check-test-budgets.py",
-      "behavior": "Enforce complete invocation-bound reports, calibrated limits and externally verified policy authorization"
-    },
-    "orchestrator/tests/test_test_budget_rules.py::test_exception_requires_accountable_remediation": {
-      "source": "scripts/checks/check-test-budgets.py",
-      "behavior": "Enforce complete invocation-bound reports, calibrated limits and externally verified policy authorization"
-    },
-    "orchestrator/tests/test_test_budget_rules.py::test_exception_requires_accountable_remediation[owner]": {
-      "source": "scripts/checks/check-test-budgets.py",
-      "behavior": "Enforce complete invocation-bound reports, calibrated limits and externally verified policy authorization"
-    },
-    "orchestrator/tests/test_test_budget_rules.py::test_exception_requires_accountable_remediation[remedy]": {
-      "source": "scripts/checks/check-test-budgets.py",
-      "behavior": "Enforce complete invocation-bound reports, calibrated limits and externally verified policy authorization"
-    },
-    "orchestrator/tests/test_test_budget_rules.py::test_exception_requires_accountable_remediation[reviewDeadline]": {
-      "source": "scripts/checks/check-test-budgets.py",
-      "behavior": "Enforce complete invocation-bound reports, calibrated limits and externally verified policy authorization"
-    },
-    "orchestrator/tests/test_test_budget_rules.py::test_hand_edited_limits_must_equal_recomputation": {
-      "source": "scripts/checks/check-test-budgets.py",
-      "behavior": "Enforce complete invocation-bound reports, calibrated limits and externally verified policy authorization"
-    },
-    "orchestrator/tests/test_test_budget_rules.py::test_hand_edited_limits_must_equal_recomputation[exception]": {
-      "source": "scripts/checks/check-test-budgets.py",
-      "behavior": "Enforce complete invocation-bound reports, calibrated limits and externally verified policy authorization"
-    },
-    "orchestrator/tests/test_test_budget_rules.py::test_hand_edited_limits_must_equal_recomputation[perTestSeconds]": {
-      "source": "scripts/checks/check-test-budgets.py",
-      "behavior": "Enforce complete invocation-bound reports, calibrated limits and externally verified policy authorization"
-    },
-    "orchestrator/tests/test_test_budget_rules.py::test_hand_edited_limits_must_equal_recomputation[wallSeconds]": {
-      "source": "scripts/checks/check-test-budgets.py",
-      "behavior": "Enforce complete invocation-bound reports, calibrated limits and externally verified policy authorization"
-    },
-    "orchestrator/tests/test_test_budget_rules.py::test_importer_promotes_only_comparable_successful_measurements": {
-      "source": "scripts/checks/check-test-budgets.py",
-      "behavior": "Enforce complete invocation-bound reports, calibrated limits and externally verified policy authorization"
-    },
-    "orchestrator/tests/test_test_budget_rules.py::test_importer_promotes_only_comparable_successful_measurements[incomplete]": {
-      "source": "scripts/checks/check-test-budgets.py",
-      "behavior": "Enforce complete invocation-bound reports, calibrated limits and externally verified policy authorization"
-    },
-    "orchestrator/tests/test_test_budget_rules.py::test_importer_promotes_only_comparable_successful_measurements[none]": {
-      "source": "scripts/checks/check-test-budgets.py",
-      "behavior": "Enforce complete invocation-bound reports, calibrated limits and externally verified policy authorization"
-    },
-    "orchestrator/tests/test_test_budget_rules.py::test_importer_promotes_only_comparable_successful_measurements[profile]": {
-      "source": "scripts/checks/check-test-budgets.py",
-      "behavior": "Enforce complete invocation-bound reports, calibrated limits and externally verified policy authorization"
-    },
-    "orchestrator/tests/test_test_budget_rules.py::test_importer_promotes_only_comparable_successful_measurements[revision]": {
-      "source": "scripts/checks/check-test-budgets.py",
-      "behavior": "Enforce complete invocation-bound reports, calibrated limits and externally verified policy authorization"
-    },
-    "orchestrator/tests/test_test_budget_rules.py::test_importer_promotes_only_comparable_successful_measurements[unsuccessful]": {
-      "source": "scripts/checks/check-test-budgets.py",
-      "behavior": "Enforce complete invocation-bound reports, calibrated limits and externally verified policy authorization"
-    },
-    "orchestrator/tests/test_test_budget_rules.py::test_incomplete_or_unbound_measurements_fail_everywhere": {
-      "source": "scripts/checks/check-test-budgets.py",
-      "behavior": "Enforce complete invocation-bound reports, calibrated limits and externally verified policy authorization"
-    },
-    "orchestrator/tests/test_test_budget_rules.py::test_incomplete_or_unbound_measurements_fail_everywhere[duplicate-inventory]": {
-      "source": "scripts/checks/check-test-budgets.py",
-      "behavior": "Enforce complete invocation-bound reports, calibrated limits and externally verified policy authorization"
-    },
-    "orchestrator/tests/test_test_budget_rules.py::test_incomplete_or_unbound_measurements_fail_everywhere[extra-case]": {
-      "source": "scripts/checks/check-test-budgets.py",
-      "behavior": "Enforce complete invocation-bound reports, calibrated limits and externally verified policy authorization"
-    },
-    "orchestrator/tests/test_test_budget_rules.py::test_incomplete_or_unbound_measurements_fail_everywhere[infinity]": {
-      "source": "scripts/checks/check-test-budgets.py",
-      "behavior": "Enforce complete invocation-bound reports, calibrated limits and externally verified policy authorization"
-    },
-    "orchestrator/tests/test_test_budget_rules.py::test_incomplete_or_unbound_measurements_fail_everywhere[invocation]": {
-      "source": "scripts/checks/check-test-budgets.py",
-      "behavior": "Enforce complete invocation-bound reports, calibrated limits and externally verified policy authorization"
-    },
-    "orchestrator/tests/test_test_budget_rules.py::test_incomplete_or_unbound_measurements_fail_everywhere[missing-case]": {
-      "source": "scripts/checks/check-test-budgets.py",
-      "behavior": "Enforce complete invocation-bound reports, calibrated limits and externally verified policy authorization"
-    },
-    "orchestrator/tests/test_test_budget_rules.py::test_incomplete_or_unbound_measurements_fail_everywhere[missing-phase]": {
-      "source": "scripts/checks/check-test-budgets.py",
-      "behavior": "Enforce complete invocation-bound reports, calibrated limits and externally verified policy authorization"
-    },
-    "orchestrator/tests/test_test_budget_rules.py::test_incomplete_or_unbound_measurements_fail_everywhere[missing-report]": {
-      "source": "scripts/checks/check-test-budgets.py",
-      "behavior": "Enforce complete invocation-bound reports, calibrated limits and externally verified policy authorization"
-    },
-    "orchestrator/tests/test_test_budget_rules.py::test_incomplete_or_unbound_measurements_fail_everywhere[nan-wall]": {
-      "source": "scripts/checks/check-test-budgets.py",
-      "behavior": "Enforce complete invocation-bound reports, calibrated limits and externally verified policy authorization"
-    },
-    "orchestrator/tests/test_test_budget_rules.py::test_incomplete_or_unbound_measurements_fail_everywhere[nan]": {
-      "source": "scripts/checks/check-test-budgets.py",
-      "behavior": "Enforce complete invocation-bound reports, calibrated limits and externally verified policy authorization"
-    },
-    "orchestrator/tests/test_test_budget_rules.py::test_incomplete_or_unbound_measurements_fail_everywhere[negative-wall]": {
-      "source": "scripts/checks/check-test-budgets.py",
-      "behavior": "Enforce complete invocation-bound reports, calibrated limits and externally verified policy authorization"
-    },
-    "orchestrator/tests/test_test_budget_rules.py::test_incomplete_or_unbound_measurements_fail_everywhere[negative]": {
-      "source": "scripts/checks/check-test-budgets.py",
-      "behavior": "Enforce complete invocation-bound reports, calibrated limits and externally verified policy authorization"
-    },
-    "orchestrator/tests/test_test_budget_rules.py::test_incomplete_or_unbound_measurements_fail_everywhere[revision]": {
-      "source": "scripts/checks/check-test-budgets.py",
-      "behavior": "Enforce complete invocation-bound reports, calibrated limits and externally verified policy authorization"
-    },
-    "orchestrator/tests/test_test_budget_rules.py::test_incomplete_or_unbound_measurements_fail_everywhere[skipped]": {
-      "source": "scripts/checks/check-test-budgets.py",
-      "behavior": "Enforce complete invocation-bound reports, calibrated limits and externally verified policy authorization"
-    },
-    "orchestrator/tests/test_test_budget_rules.py::test_incomplete_or_unbound_measurements_fail_everywhere[truncated]": {
-      "source": "scripts/checks/check-test-budgets.py",
-      "behavior": "Enforce complete invocation-bound reports, calibrated limits and externally verified policy authorization"
-    },
-    "orchestrator/tests/test_test_budget_rules.py::test_incomplete_or_unbound_measurements_fail_everywhere[unexecuted]": {
-      "source": "scripts/checks/check-test-budgets.py",
-      "behavior": "Enforce complete invocation-bound reports, calibrated limits and externally verified policy authorization"
-    },
-    "orchestrator/tests/test_test_budget_rules.py::test_limits_use_population_percentile_of_test_maxima_and_round_up": {
-      "source": "scripts/checks/check-test-budgets.py",
-      "behavior": "Enforce complete invocation-bound reports, calibrated limits and externally verified policy authorization"
-    },
-    "orchestrator/tests/test_test_budget_rules.py::test_profile_mismatch_on_ci_is_infrastructure_failure": {
-      "source": "scripts/checks/check-test-budgets.py",
-      "behavior": "Enforce complete invocation-bound reports, calibrated limits and externally verified policy authorization"
-    },
-    "orchestrator/tests/test_test_budget_rules.py::test_summary_keeps_measured_limit_goal_and_gap_visible": {
-      "source": "scripts/checks/check-test-budgets.py",
-      "behavior": "Enforce complete invocation-bound reports, calibrated limits and externally verified policy authorization"
-    },
-    "orchestrator/tests/test_test_budget_rules.py::test_tightening_needs_no_approval": {
-      "source": "scripts/checks/check-test-budgets.py",
-      "behavior": "Enforce complete invocation-bound reports, calibrated limits and externally verified policy authorization"
-    },
-    "orchestrator/tests/test_test_budget_rules.py::test_uncalibrated_policy_reports_progress_and_enforces_validity_only": {
-      "source": "scripts/checks/check-test-budgets.py",
-      "behavior": "Enforce complete invocation-bound reports, calibrated limits and externally verified policy authorization"
-    },
-    "orchestrator/tests/test_test_budget_rules.py::test_uncalibrated_policy_reports_progress_and_enforces_validity_only[0]": {
-      "source": "scripts/checks/check-test-budgets.py",
-      "behavior": "Enforce complete invocation-bound reports, calibrated limits and externally verified policy authorization"
-    },
-    "orchestrator/tests/test_test_budget_rules.py::test_uncalibrated_policy_reports_progress_and_enforces_validity_only[1]": {
-      "source": "scripts/checks/check-test-budgets.py",
-      "behavior": "Enforce complete invocation-bound reports, calibrated limits and externally verified policy authorization"
-    },
-    "orchestrator/tests/test_test_budget_rules.py::test_uncalibrated_policy_reports_progress_and_enforces_validity_only[4]": {
-      "source": "scripts/checks/check-test-budgets.py",
-      "behavior": "Enforce complete invocation-bound reports, calibrated limits and externally verified policy authorization"
-    },
-    "orchestrator/tests/test_test_budget_rules.py::test_unverified_or_unbound_reviews_cannot_authorize": {
-      "source": "scripts/checks/check-test-budgets.py",
-      "behavior": "Enforce complete invocation-bound reports, calibrated limits and externally verified policy authorization"
-    },
-    "orchestrator/tests/test_test_budget_rules.py::test_unverified_or_unbound_reviews_cannot_authorize[commit]": {
-      "source": "scripts/checks/check-test-budgets.py",
-      "behavior": "Enforce complete invocation-bound reports, calibrated limits and externally verified policy authorization"
-    },
-    "orchestrator/tests/test_test_budget_rules.py::test_unverified_or_unbound_reviews_cannot_authorize[digest]": {
-      "source": "scripts/checks/check-test-budgets.py",
-      "behavior": "Enforce complete invocation-bound reports, calibrated limits and externally verified policy authorization"
-    },
-    "orchestrator/tests/test_test_budget_rules.py::test_unverified_or_unbound_reviews_cannot_authorize[reviewer]": {
-      "source": "scripts/checks/check-test-budgets.py",
-      "behavior": "Enforce complete invocation-bound reports, calibrated limits and externally verified policy authorization"
-    },
-    "orchestrator/tests/test_test_budget_rules.py::test_unverified_or_unbound_reviews_cannot_authorize[self-attested]": {
-      "source": "scripts/checks/check-test-budgets.py",
-      "behavior": "Enforce complete invocation-bound reports, calibrated limits and externally verified policy authorization"
-    },
-    "orchestrator/tests/test_test_budget_rules.py::test_unverified_or_unbound_reviews_cannot_authorize[state]": {
-      "source": "scripts/checks/check-test-budgets.py",
-      "behavior": "Enforce complete invocation-bound reports, calibrated limits and externally verified policy authorization"
-    },
-    "orchestrator/tests/test_test_budget_report_quality.py": {
-      "source": "scripts/checks/run-budgeted-fast.py",
-      "behavior": "Retain selected inventory and real phase evidence for complete and truncated subprocess runs"
-    },
-    "orchestrator/tests/test_test_budget_report_quality.py::test_fast_report_producer_records_inventory_phases_and_early_stop": {
-      "source": "scripts/checks/run-budgeted-fast.py",
-      "behavior": "Retain selected inventory and real phase evidence for complete and truncated subprocess runs"
+      "behavior": "Run the fast tier once through pytest with unchanged coverage floor and failure/staging behavior"
     },
     "orchestrator/tests/test_rule_evidence_freshness.py": {
-        "source": "scripts/checks/validate-rule-coverage.py",
-        "behavior": "Reject stale host scope and corrupted exact vendored validator bytes before evidence execution"
+      "source": "scripts/checks/validate-rule-coverage.py",
+      "behavior": "Reject stale host scope and corrupted exact vendored validator bytes before evidence execution"
     },
     "orchestrator/tests/test_rule_evidence_freshness.py::test_invalid_retained_evidence_fails_before_validation": {
-        "source": "scripts/checks/validate-rule-coverage.py",
-        "behavior": "Reject stale host scope and corrupted exact vendored validator bytes before evidence execution"
+      "source": "scripts/checks/validate-rule-coverage.py",
+      "behavior": "Reject stale host scope and corrupted exact vendored validator bytes before evidence execution"
     },
     "orchestrator/tests/test_rule_evidence_freshness.py::test_invalid_retained_evidence_fails_before_validation[stale]": {
-        "source": "scripts/checks/validate-rule-coverage.py",
-        "behavior": "Reject stale host scope and corrupted exact vendored validator bytes before evidence execution"
+      "source": "scripts/checks/validate-rule-coverage.py",
+      "behavior": "Reject stale host scope and corrupted exact vendored validator bytes before evidence execution"
     },
     "orchestrator/tests/test_rule_evidence_freshness.py::test_invalid_retained_evidence_fails_before_validation[vendor]": {
-        "source": "scripts/checks/validate-rule-coverage.py",
-        "behavior": "Reject stale host scope and corrupted exact vendored validator bytes before evidence execution"
+      "source": "scripts/checks/validate-rule-coverage.py",
+      "behavior": "Reject stale host scope and corrupted exact vendored validator bytes before evidence execution"
     },
     "orchestrator/tests/test_rule_evidence.py::test_all_catalogue_ids_with_matching_evidence_kinds_pass": {
-        "source": "scripts/checks/check-rule-evidence.py",
-        "behavior": "Reject missing or changed catalogue bytes and incomplete, ambiguous or unapproved rule evidence"
+      "source": "scripts/checks/check-rule-evidence.py",
+      "behavior": "Reject missing or changed catalogue bytes and incomplete, ambiguous or unapproved rule evidence"
     },
     "orchestrator/tests/test_rule_evidence.py::test_any_catalogue_byte_change_fails": {
-        "source": "scripts/checks/check-rule-evidence.py",
-        "behavior": "Reject missing or changed catalogue bytes and incomplete, ambiguous or unapproved rule evidence"
+      "source": "scripts/checks/check-rule-evidence.py",
+      "behavior": "Reject missing or changed catalogue bytes and incomplete, ambiguous or unapproved rule evidence"
     },
     "orchestrator/tests/test_rule_evidence.py::test_any_catalogue_byte_change_fails[0]": {
-        "source": "scripts/checks/check-rule-evidence.py",
-        "behavior": "Reject missing or changed catalogue bytes and incomplete, ambiguous or unapproved rule evidence"
+      "source": "scripts/checks/check-rule-evidence.py",
+      "behavior": "Reject missing or changed catalogue bytes and incomplete, ambiguous or unapproved rule evidence"
     },
     "orchestrator/tests/test_rule_evidence.py::test_any_catalogue_byte_change_fails[1]": {
-        "source": "scripts/checks/check-rule-evidence.py",
-        "behavior": "Reject missing or changed catalogue bytes and incomplete, ambiguous or unapproved rule evidence"
+      "source": "scripts/checks/check-rule-evidence.py",
+      "behavior": "Reject missing or changed catalogue bytes and incomplete, ambiguous or unapproved rule evidence"
     },
     "orchestrator/tests/test_rule_evidence.py::test_any_catalogue_byte_change_fails[2]": {
-        "source": "scripts/checks/check-rule-evidence.py",
-        "behavior": "Reject missing or changed catalogue bytes and incomplete, ambiguous or unapproved rule evidence"
+      "source": "scripts/checks/check-rule-evidence.py",
+      "behavior": "Reject missing or changed catalogue bytes and incomplete, ambiguous or unapproved rule evidence"
     },
     "orchestrator/tests/test_rule_evidence.py::test_any_catalogue_byte_change_fails[3]": {
-        "source": "scripts/checks/check-rule-evidence.py",
-        "behavior": "Reject missing or changed catalogue bytes and incomplete, ambiguous or unapproved rule evidence"
+      "source": "scripts/checks/check-rule-evidence.py",
+      "behavior": "Reject missing or changed catalogue bytes and incomplete, ambiguous or unapproved rule evidence"
     },
     "orchestrator/tests/test_rule_evidence.py::test_any_catalogue_byte_change_fails[4]": {
-        "source": "scripts/checks/check-rule-evidence.py",
-        "behavior": "Reject missing or changed catalogue bytes and incomplete, ambiguous or unapproved rule evidence"
+      "source": "scripts/checks/check-rule-evidence.py",
+      "behavior": "Reject missing or changed catalogue bytes and incomplete, ambiguous or unapproved rule evidence"
     },
     "orchestrator/tests/test_rule_evidence.py::test_any_catalogue_byte_change_fails[5]": {
-        "source": "scripts/checks/check-rule-evidence.py",
-        "behavior": "Reject missing or changed catalogue bytes and incomplete, ambiguous or unapproved rule evidence"
+      "source": "scripts/checks/check-rule-evidence.py",
+      "behavior": "Reject missing or changed catalogue bytes and incomplete, ambiguous or unapproved rule evidence"
     },
     "orchestrator/tests/test_rule_evidence.py::test_any_catalogue_byte_change_fails[6]": {
-        "source": "scripts/checks/check-rule-evidence.py",
-        "behavior": "Reject missing or changed catalogue bytes and incomplete, ambiguous or unapproved rule evidence"
+      "source": "scripts/checks/check-rule-evidence.py",
+      "behavior": "Reject missing or changed catalogue bytes and incomplete, ambiguous or unapproved rule evidence"
     },
     "orchestrator/tests/test_rule_evidence.py::test_any_catalogue_byte_change_fails[7]": {
-        "source": "scripts/checks/check-rule-evidence.py",
-        "behavior": "Reject missing or changed catalogue bytes and incomplete, ambiguous or unapproved rule evidence"
+      "source": "scripts/checks/check-rule-evidence.py",
+      "behavior": "Reject missing or changed catalogue bytes and incomplete, ambiguous or unapproved rule evidence"
     },
     "orchestrator/tests/test_rule_evidence.py::test_any_catalogue_byte_change_fails[8]": {
-        "source": "scripts/checks/check-rule-evidence.py",
-        "behavior": "Reject missing or changed catalogue bytes and incomplete, ambiguous or unapproved rule evidence"
+      "source": "scripts/checks/check-rule-evidence.py",
+      "behavior": "Reject missing or changed catalogue bytes and incomplete, ambiguous or unapproved rule evidence"
     },
     "orchestrator/tests/test_rule_evidence.py::test_any_catalogue_byte_change_fails[9]": {
-        "source": "scripts/checks/check-rule-evidence.py",
-        "behavior": "Reject missing or changed catalogue bytes and incomplete, ambiguous or unapproved rule evidence"
+      "source": "scripts/checks/check-rule-evidence.py",
+      "behavior": "Reject missing or changed catalogue bytes and incomplete, ambiguous or unapproved rule evidence"
     },
     "orchestrator/tests/test_rule_evidence.py::test_approved_conditional_exclusion_passes_completeness": {
-        "source": "scripts/checks/check-rule-evidence.py",
-        "behavior": "Reject missing or changed catalogue bytes and incomplete, ambiguous or unapproved rule evidence"
+      "source": "scripts/checks/check-rule-evidence.py",
+      "behavior": "Reject missing or changed catalogue bytes and incomplete, ambiguous or unapproved rule evidence"
     },
     "orchestrator/tests/test_rule_evidence.py::test_catalogue_length_drift_fails": {
-        "source": "scripts/checks/check-rule-evidence.py",
-        "behavior": "Reject missing or changed catalogue bytes and incomplete, ambiguous or unapproved rule evidence"
+      "source": "scripts/checks/check-rule-evidence.py",
+      "behavior": "Reject missing or changed catalogue bytes and incomplete, ambiguous or unapproved rule evidence"
     },
     "orchestrator/tests/test_rule_evidence.py::test_catalogue_length_drift_fails[snapshot0]": {
-        "source": "scripts/checks/check-rule-evidence.py",
-        "behavior": "Reject missing or changed catalogue bytes and incomplete, ambiguous or unapproved rule evidence"
+      "source": "scripts/checks/check-rule-evidence.py",
+      "behavior": "Reject missing or changed catalogue bytes and incomplete, ambiguous or unapproved rule evidence"
     },
     "orchestrator/tests/test_rule_evidence.py::test_catalogue_length_drift_fails[snapshot1]": {
-        "source": "scripts/checks/check-rule-evidence.py",
-        "behavior": "Reject missing or changed catalogue bytes and incomplete, ambiguous or unapproved rule evidence"
+      "source": "scripts/checks/check-rule-evidence.py",
+      "behavior": "Reject missing or changed catalogue bytes and incomplete, ambiguous or unapproved rule evidence"
     },
     "orchestrator/tests/test_rule_evidence.py::test_each_catalogue_row_defect_has_one_actionable_line": {
-        "source": "scripts/checks/check-rule-evidence.py",
-        "behavior": "Reject missing or changed catalogue bytes and incomplete, ambiguous or unapproved rule evidence"
+      "source": "scripts/checks/check-rule-evidence.py",
+      "behavior": "Reject missing or changed catalogue bytes and incomplete, ambiguous or unapproved rule evidence"
     },
     "orchestrator/tests/test_rule_evidence.py::test_each_catalogue_row_defect_has_one_actionable_line[blocked]": {
-        "source": "scripts/checks/check-rule-evidence.py",
-        "behavior": "Reject missing or changed catalogue bytes and incomplete, ambiguous or unapproved rule evidence"
+      "source": "scripts/checks/check-rule-evidence.py",
+      "behavior": "Reject missing or changed catalogue bytes and incomplete, ambiguous or unapproved rule evidence"
     },
     "orchestrator/tests/test_rule_evidence.py::test_each_catalogue_row_defect_has_one_actionable_line[duplicate]": {
-        "source": "scripts/checks/check-rule-evidence.py",
-        "behavior": "Reject missing or changed catalogue bytes and incomplete, ambiguous or unapproved rule evidence"
+      "source": "scripts/checks/check-rule-evidence.py",
+      "behavior": "Reject missing or changed catalogue bytes and incomplete, ambiguous or unapproved rule evidence"
     },
     "orchestrator/tests/test_rule_evidence.py::test_each_catalogue_row_defect_has_one_actionable_line[exclusion]": {
-        "source": "scripts/checks/check-rule-evidence.py",
-        "behavior": "Reject missing or changed catalogue bytes and incomplete, ambiguous or unapproved rule evidence"
+      "source": "scripts/checks/check-rule-evidence.py",
+      "behavior": "Reject missing or changed catalogue bytes and incomplete, ambiguous or unapproved rule evidence"
     },
     "orchestrator/tests/test_rule_evidence.py::test_each_catalogue_row_defect_has_one_actionable_line[kind]": {
-        "source": "scripts/checks/check-rule-evidence.py",
-        "behavior": "Reject missing or changed catalogue bytes and incomplete, ambiguous or unapproved rule evidence"
+      "source": "scripts/checks/check-rule-evidence.py",
+      "behavior": "Reject missing or changed catalogue bytes and incomplete, ambiguous or unapproved rule evidence"
     },
     "orchestrator/tests/test_rule_evidence.py::test_each_catalogue_row_defect_has_one_actionable_line[missing]": {
-        "source": "scripts/checks/check-rule-evidence.py",
-        "behavior": "Reject missing or changed catalogue bytes and incomplete, ambiguous or unapproved rule evidence"
+      "source": "scripts/checks/check-rule-evidence.py",
+      "behavior": "Reject missing or changed catalogue bytes and incomplete, ambiguous or unapproved rule evidence"
     },
     "orchestrator/tests/test_rule_evidence.py::test_identical_catalogue_bytes_pass": {
-        "source": "scripts/checks/check-rule-evidence.py",
-        "behavior": "Reject missing or changed catalogue bytes and incomplete, ambiguous or unapproved rule evidence"
+      "source": "scripts/checks/check-rule-evidence.py",
+      "behavior": "Reject missing or changed catalogue bytes and incomplete, ambiguous or unapproved rule evidence"
     },
     "orchestrator/tests/test_rule_evidence.py::test_missing_repository_snapshot_fails": {
-        "source": "scripts/checks/check-rule-evidence.py",
-        "behavior": "Reject missing or changed catalogue bytes and incomplete, ambiguous or unapproved rule evidence"
+      "source": "scripts/checks/check-rule-evidence.py",
+      "behavior": "Reject missing or changed catalogue bytes and incomplete, ambiguous or unapproved rule evidence"
     },
     "orchestrator/tests/test_rule_evidence.py::test_owner_approval_cannot_exclude_an_always_applicable_rule": {
-        "source": "scripts/checks/check-rule-evidence.py",
-        "behavior": "Reject missing or changed catalogue bytes and incomplete, ambiguous or unapproved rule evidence"
+      "source": "scripts/checks/check-rule-evidence.py",
+      "behavior": "Reject missing or changed catalogue bytes and incomplete, ambiguous or unapproved rule evidence"
     },
     "orchestrator/tests/test_test_evidence.py::test_growth_expands_static_range_and_length_without_executing_code": {
-        "source": "scripts/checks/check-test-evidence.py",
-        "behavior": "Resolve finite static range/len parameter rows without executing test expressions and require every expanded case mapping"
+      "source": "scripts/checks/check-test-evidence.py",
+      "behavior": "Resolve finite static range/len parameter rows without executing test expressions and require every expanded case mapping"
     },
     "orchestrator/tests/test_rule_evidence.py": {
-        "source": "scripts/checks/check-rule-evidence.py",
-        "behavior": "Reject missing or changed catalogue bytes and incomplete, ambiguous or unapproved rule evidence"
+      "source": "scripts/checks/check-rule-evidence.py",
+      "behavior": "Reject missing or changed catalogue bytes and incomplete, ambiguous or unapproved rule evidence"
     },
     "orchestrator/tests/test_rule_evidence_quality.py": {
-        "source": "scripts/checks/validate-rule-coverage.py",
-        "behavior": "Require real checker canaries, fixtures, host required status and installed hook failure propagation"
+      "source": "scripts/checks/validate-rule-coverage.py",
+      "behavior": "Require real checker canaries, fixtures, host required status and installed hook failure propagation"
     },
     "orchestrator/tests/test_rule_evidence_quality.py::test_disabled_checker_fails_its_violating_canary": {
-        "source": "scripts/checks/validate-rule-coverage.py",
-        "behavior": "Require real checker canaries, fixtures, host required status and installed hook failure propagation"
+      "source": "scripts/checks/validate-rule-coverage.py",
+      "behavior": "Require real checker canaries, fixtures, host required status and installed hook failure propagation"
     },
     "orchestrator/tests/test_rule_evidence_quality.py::test_hook_installation_requires_installed_manager_in_isolated_clone": {
-        "source": "scripts/checks/validate-rule-coverage.py",
-        "behavior": "Require real checker canaries, fixtures, host required status and installed hook failure propagation"
+      "source": "scripts/checks/validate-rule-coverage.py",
+      "behavior": "Require real checker canaries, fixtures, host required status and installed hook failure propagation"
     },
     "orchestrator/tests/test_rule_evidence_quality.py::test_host_stdout_without_gate_required_check_fails": {
-        "source": "scripts/checks/validate-rule-coverage.py",
-        "behavior": "Require real checker canaries, fixtures, host required status and installed hook failure propagation"
+      "source": "scripts/checks/validate-rule-coverage.py",
+      "behavior": "Require real checker canaries, fixtures, host required status and installed hook failure propagation"
     },
     "orchestrator/tests/test_rule_evidence_quality.py::test_missing_fixture_refuses_rule_evidence": {
-        "source": "scripts/checks/validate-rule-coverage.py",
-        "behavior": "Require real checker canaries, fixtures, host required status and installed hook failure propagation"
+      "source": "scripts/checks/validate-rule-coverage.py",
+      "behavior": "Require real checker canaries, fixtures, host required status and installed hook failure propagation"
     },
     "orchestrator/tests/test_rule_evidence_quality.py::test_real_repository_ledger_passes_executed_validator": {
-        "source": "scripts/checks/validate-rule-coverage.py",
-        "behavior": "Require real checker canaries, fixtures, host required status and installed hook failure propagation"
+      "source": "scripts/checks/validate-rule-coverage.py",
+      "behavior": "Require real checker canaries, fixtures, host required status and installed hook failure propagation"
     },
     "orchestrator/tests/test_test_evidence.py": {
       "source": "scripts/checks/check-test-evidence.py",
@@ -742,16 +426,16 @@
       "behavior": "Fail closed on unsupported schema, malformed mappings, missing behavior or blank behavior"
     },
     "orchestrator/tests/test_test_evidence.py::test_a_renamed_file_with_unchanged_cases_is_neither_growth_nor_duplicate": {
-        "source": "scripts/checks/check-test-evidence.py",
-        "behavior": "Treat a test file renamed with unchanged case names and behavior as neither growth nor a duplicate"
+      "source": "scripts/checks/check-test-evidence.py",
+      "behavior": "Treat a test file renamed with unchanged case names and behavior as neither growth nor a duplicate"
     },
     "orchestrator/tests/test_test_evidence.py::test_a_renamed_file_that_changes_a_case_is_growth": {
-        "source": "scripts/checks/check-test-evidence.py",
-        "behavior": "Treat a test file renamed with unchanged case names and behavior as neither growth nor a duplicate"
+      "source": "scripts/checks/check-test-evidence.py",
+      "behavior": "Treat a test file renamed with unchanged case names and behavior as neither growth nor a duplicate"
     },
     "orchestrator/tests/test_test_evidence.py::test_a_renamed_file_copied_twice_keeps_one_duplicate": {
-        "source": "scripts/checks/check-test-evidence.py",
-        "behavior": "Treat a test file renamed with unchanged case names and behavior as neither growth nor a duplicate"
+      "source": "scripts/checks/check-test-evidence.py",
+      "behavior": "Treat a test file renamed with unchanged case names and behavior as neither growth nor a duplicate"
     },
     "orchestrator/tests/test_test_evidence.py::test_growth_refuses_untracked_behavior_map": {
       "source": "scripts/checks/check-test-evidence.py",

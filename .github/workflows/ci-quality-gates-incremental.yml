@@ -6,16 +6,10 @@ on:
 
 permissions:
   contents: read
-  actions: read
-  pull-requests: read
 
 jobs:
   gate:
     runs-on: ubuntu-24.04
-    env:
-      RAIDAR_TEST_BUDGET_RUNNER_CLASS: ubuntu-24.04
-      RAIDAR_TEST_BUDGET_OS_IMAGE_FAMILY: ubuntu24
-      GH_TOKEN: ${{ github.token }}
     timeout-minutes: 40
     steps:
       - name: Checkout

@@ -7,11 +7,10 @@ override RAIDAR_VAR := $(abspath $(RAIDAR_VAR))
 export RAIDAR_VAR
 REPO_TMP_DIR ?= $(RAIDAR_VAR)/tmp
 REPO_CACHE_DIR ?= $(CURDIR)/.cache
-TEST_BUDGET_INVOCATION ?= $(shell python3 -c 'import uuid; print(uuid.uuid4().hex)')
-export TEST_BUDGET_INVOCATION := $(TEST_BUDGET_INVOCATION)
-RAIDAR_TEST_BUDGET_INVOCATION ?= $(TEST_BUDGET_INVOCATION)
-RAIDAR_TEST_BUDGET_REPORT ?= $(REPO_TMP_DIR)/tests/budgets/$(TEST_BUDGET_INVOCATION)/report.json
-export RAIDAR_TEST_BUDGET_INVOCATION RAIDAR_TEST_BUDGET_REPORT
+# One id per top-level make invocation (exported, so sub-makes share it): the guardrail
+# reference writes this invocation's T1 run report and findings under GUARDRAILS_DIR.
+GUARDRAILS_INVOCATION ?= $(shell python3 -c 'import uuid; print(uuid.uuid4().hex)')
+export GUARDRAILS_INVOCATION := $(GUARDRAILS_INVOCATION)
 REPO_UV_CACHE_DIR ?= $(REPO_CACHE_DIR)/uv
 REPO_RUNTIME_ENV := mkdir -p "$(REPO_TMP_DIR)" "$(REPO_UV_CACHE_DIR)" && env \
 	TMPDIR="$(REPO_TMP_DIR)" \
@@ -59,7 +58,7 @@ RENAMED_VARS := RUN:JOB RUNS:JOBS RUN_ID:JOB_ID RUNS_DIR:JOBS_DIR HARNESS:AGENT 
 	BLOCK:ATTEMPT SMOKE_BLOCKS:SMOKE_ATTEMPTS \
 	ORACLE_BUNDLE:VERIFIER_BUNDLE REVIEW_RUNS_ROOT:REVIEW_JOBS_ROOT QUALITY_RUNS:QUALITY_JOBS \
 	ALLOW_DEV_RUNS:ALLOW_DEV_JOBS SMOKE_RUNS_DIR:SMOKE_JOBS_DIR
-$(foreach pair,$(RENAMED_VARS),$(if $(and $(filter command line environment environment override,$(origin $(firstword $(subst :, ,$(pair))))),$(if $(and $(filter RUNS:JOBS,$(pair)),$(filter test-budget-record,$(MAKECMDGOALS))),,yes)),$(error $(firstword $(subst :, ,$(pair)))= was renamed $(lastword $(subst :, ,$(pair)))= (schema v2 uses Harbor's vocabulary; see README Concepts))))
+$(foreach pair,$(RENAMED_VARS),$(if $(filter command line environment environment override,$(origin $(firstword $(subst :, ,$(pair))))),$(error $(firstword $(subst :, ,$(pair)))= was renamed $(lastword $(subst :, ,$(pair)))= (schema v2 uses Harbor's vocabulary; see README Concepts))))
 
 # Shared public workflow defaults.
 comma := ,
@@ -148,7 +147,7 @@ help:
 	@echo "  make gate-commit                                       Whole-tree policy, identity, static/T1 checks and affected local T2 seams"
 	@echo "  make gate-ci                                           Commit gate, slow tier, then quality tier (every push and pull request)"
 	@echo "  make rule-coverage                                     Execute fail-closed evidence for every guardrail catalogue ID"
-	@echo "  make guardrails-reference                              Pinned omp-guardrails checks (new rule IDs block; the rest is shadow output)"
+	@echo "  make guardrails-reference                              Pinned omp-guardrails checks (new rule IDs and TEST.budget.* block; the rest is shadow)"
 	@echo "  make guardrails-mutation                               T3 phase exit: TEST.mutation-sensitivity over the mutation report"
 	@echo "  make record-host-readback                              Record live default-branch rules and merge settings (refresh within 30 days)"
 	@echo "  make analyzer-scope-check                              Check analyzer I/O boundaries and CODEOWNERS with finding-level debt ratchets"
@@ -163,8 +162,6 @@ help:
 	@echo "  make test-hygiene-check                                Check bounded test processes, skill metadata/support links, and registered stage evidence"
 	@echo "  make identity-check                                    Refuse execution identity changes against .omp/identity.json"
 	@echo "  make test-evidence-check [TEST_EVIDENCE_BASE=origin/main] Check added tests map to changed behavior and reject duplicate paths"
-	@echo "  make test-budget-check                                Validate this invocation's fast report; CI timing enforcement after calibration"
-	@echo "  make test-budget-record RUNS=\"<GitHub run ids>\"         Import successful same-revision measurement artifacts as tracked baselines"
 	@echo "  make identity-record                                   Explicitly record current identities; requires separate reviewed identity-change commit"
 	@echo "  make ruff-baseline                                    Explicitly record current Full Ruff findings (gates never refresh)"
 	@echo "  make ruff-check                                       Check Full Ruff against the finding-specific shrink-only baseline"
@@ -811,16 +808,6 @@ test-evidence-check:
 	@$(REPO_RUNTIME_ENV) uv run --project orchestrator --extra dev \
 		python scripts/checks/check-test-evidence.py --repo-root "$(CURDIR)" --base-ref "$(TEST_EVIDENCE_BASE)"
 
-.PHONY: test-budget-check test-budget-record
-test-budget-check:
-	@$(REPO_RUNTIME_ENV) uv run --project orchestrator --extra dev \
-		python scripts/checks/check-test-budgets.py --report "$(RAIDAR_TEST_BUDGET_REPORT)" \
-		--invocation "$(RAIDAR_TEST_BUDGET_INVOCATION)"
-
-test-budget-record:
-	@$(REPO_RUNTIME_ENV) uv run --project orchestrator --extra dev \
-		python scripts/checks/test_budget_evidence.py record --runs "$(RUNS)"
-
 # Pinned guardrail reference (omp-guardrails from orchestrator/pyproject.toml [dependency-groups]
 # dev), configured only by .omp/test-profile.md. Findings print as `path: RULE: message; fix`. The
 # rule IDs in GUARDRAILS_BLOCKING have no other implementation here, so their findings block. Every
@@ -828,12 +815,15 @@ test-budget-record:
 # GUARDRAILS_DIR, never failing) until the step-4 cutover. A subcommand that cannot run (exit 2)
 # always fails, so missing evidence never passes.
 GUARDRAILS := $(REPO_RUNTIME_ENV) uv run --project orchestrator --extra dev omp-guardrails
-GUARDRAILS_DIR ?= $(REPO_TMP_DIR)/guardrails/$(TEST_BUDGET_INVOCATION)
+GUARDRAILS_DIR ?= $(REPO_TMP_DIR)/guardrails/$(GUARDRAILS_INVOCATION)
 GUARDRAILS_T1_JUNIT ?= $(GUARDRAILS_DIR)/t1-junit.xml
 GUARDRAILS_BASE ?= $(TEST_EVIDENCE_BASE)
-# local blocks on an owner-approved machine's budget breach; ci reports timing only.
+# TEST.budget.* (report-check over the T1 report): local blocks on a breach of the limits the
+# owner approved for this machine (profile fast_tier_budget.machines); ci reports timing only. A
+# missing, invalid or stale report fails in both modes, and gate-commit requires the T1 report.
 GUARDRAILS_MODE ?= local
-GUARDRAILS_BLOCKING := PYQ201|NAME\.test-files|PROFILE\.complete|SURFACE\.feature-map|SURFACE\.journeys|SURFACE\.lever-isolation|TEST\.no-self-mocking|TEST\.no-test-hooks|TEST\.no-evasion|TEST\.fast-tier-isolation|TEST\.user-data-guard|TEST\.tier-selectors|TEST\.coverage-ratchet|TEST\.golden-change-record|TEST\.identity-artefacts|TEST\.property-seed|TEST\.mutation-sensitivity
+GUARDRAILS_T1_REQUIRED ?=
+GUARDRAILS_BLOCKING := PYQ201|NAME\.test-files|PROFILE\.complete|SURFACE\.feature-map|SURFACE\.journeys|SURFACE\.lever-isolation|TEST\.no-self-mocking|TEST\.no-test-hooks|TEST\.no-evasion|TEST\.fast-tier-isolation|TEST\.user-data-guard|TEST\.tier-selectors|TEST\.coverage-ratchet|TEST\.golden-change-record|TEST\.identity-artefacts|TEST\.property-seed|TEST\.mutation-sensitivity|TEST\.budget\.per-test-time|TEST\.budget\.fast-tier-time
 # T2 files the pytest adapter cannot list: the Playwright project, and the journeys the lever runs
 # (the profile's verification_surface.journey_file_pattern).
 GUARDRAILS_PLAYWRIGHT_DIR := review-surface
@@ -886,6 +876,8 @@ guardrails-reference:
 		$(MAKE) --no-print-directory guardrails-diff GUARDRAILS_DIFF_RANGE="--base $$base --head $$head"
 	$(call guardrails_run,lever-selftest,lever-selftest)
 	@if [ -f "$(GUARDRAILS_T1_JUNIT)" ]; then $(MAKE) --no-print-directory guardrails-t1-report; \
+	elif [ -n "$(GUARDRAILS_T1_REQUIRED)" ]; then \
+		echo "guardrails-reference: no T1 report at $(GUARDRAILS_T1_JUNIT); TEST.budget.* need it"; exit 1; \
 	else echo "guardrails-reference: no T1 report at $(GUARDRAILS_T1_JUNIT); run-report checks skipped"; fi
 
 # The staged tree (the commit being made; HEAD's tree in CI) against the merge base.
@@ -917,8 +909,7 @@ gate-commit:
 	@$(MAKE) --no-print-directory test-evidence-check
 	@$(MAKE) --no-print-directory rule-coverage
 	@$(MAKE) --no-print-directory quality
-	@$(MAKE) --no-print-directory test-budget-check
-	@$(MAKE) --no-print-directory guardrails-reference
+	@$(MAKE) --no-print-directory guardrails-reference GUARDRAILS_T1_REQUIRED=1
 	@$(MAKE) --no-print-directory dependency-audit-check
 	@$(REPO_RUNTIME_ENV) uv run --project orchestrator --extra dev \
 		python scripts/checks/run-affected-seams.py

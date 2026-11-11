@@ -10,7 +10,6 @@ import json
 import subprocess
 import sys
 import tempfile
-from datetime import date
 from pathlib import Path
 from types import ModuleType
 from typing import Any, cast
@@ -87,30 +86,10 @@ def run_fanout_checker(checker: ModuleType, root: Path) -> list[str]:
     return [reason for result in results for reason in result.reasons]
 
 
-def inspect_budget_fixture(checker: ModuleType, fixture: dict[str, Any]) -> list[str]:
-    """Exercise calibrated boundaries with explicit synthetic reports, never whole tiers."""
-    findings = []
-    for report in fixture["reports"]:
-        result = checker.check_budget(
-            report,
-            fixture["policy"],
-            fixture["baselines"],
-            revision=fixture["revision"],
-            invocation_id=fixture["invocation"],
-            ci=True,
-            now=lambda: date.fromisoformat(fixture["today"]),
-        )
-        if result["exitCode"]:
-            findings.extend(result["lines"])
-    return findings
-
-
 def inspect_fixture(
     rule: str, checker: ModuleType, root: Path, fixture: dict[str, Any]
 ) -> list[str]:
     """Delegate each fixture to the same decision used by the repository gate."""
-    if rule.startswith("TEST.budget."):
-        return inspect_budget_fixture(checker, fixture)
     if rule.startswith(("STRUCT.", "NAME.", "TEST.growth.", "TEST.duplicate-")) or rule in {
         "TEST.placement",
         "TEST.tiers",

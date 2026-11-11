@@ -21,7 +21,7 @@
 ### 2.1 Test-runner vocabulary in raidar's product code (TEST.no-test-hooks)
 
 - Raidar is a coding-agent benchmark. Its product code builds, runs and scores the subject's test suites, so strings such as `"pytest"`, `PYTEST_DISABLE_PLUGIN_AUTOLOAD`, `WORK_TESTS*` and `TEST_COVERAGE` name product inputs and metric names, not test-only branches.
-- `orchestrator/src/raidar/cli/quality.py` is raidar's own test-runner command (`raidar quality test-fast`); `RAIDAR_TEST_BUDGET_*` are its inputs from `make test-fast`.
+- `orchestrator/src/raidar/cli/quality.py` is raidar's own test-runner command (`raidar quality test-fast`).
 - Waived: the 11 files where every TEST.no-test-hooks finding is a test-marker string (`grading/bundle.py`, `grading/payload.py`, `grading/sandbox.py`, `subject/primitive/gate.py`, `subject/primitive/gate_tool.py`, `subject/workflow/judgeloop.py`, `subject/workflow/package_checks.py`, `scoring/process_checks/work_session.py`, `scoring/process_checks/work_tests.py`, `scoring/test_coverage/__init__.py`, `cli/quality.py`).
 
 ### 2.2 Verify-stage fixture states (TEST.no-test-hooks)
@@ -47,10 +47,10 @@
 - Waived: each named file, by exact path. New test files and new production files are checked in full.
 - The waivers are a burn-down list, not a standing policy. Each removal of an entry is a normal PR that passes the gate.
 
-### 2.6 Old checker module with a test-like name (NAME.test-files)
+### 2.6 Old checker module with a test-like name (NAME.test-files): withdrawn
 
-- `scripts/checks/test_budget_evidence.py` is a module of the old budget checker, not a test. The R2 cutover deletes it with the other replaced checkers.
-- Waived: that path, until R2.
+- The waived path was the evidence module of raidar's old budget checker under `scripts/checks/`, not a test; its `test_` prefix tripped NAME.test-files.
+- By owner decision (2026-11-11), R1 brings the budget cutover forward from R2 and deletes the module, so no waiver remains.
 
 ## 3. Consequences
 

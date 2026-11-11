@@ -1,15 +1,5 @@
 {
   "files": {
-    "orchestrator/tests/test_test_budget_provenance.py": "test-time budget evidence",
-    "orchestrator/tests/test_test_budget_calibration.py": "test-time budget calibration",
-    ".github/workflows/test-budget-measure.yml": "test-time budget measurement",
-    ".omp/test-budgets/limits.json": "test-time budget policy",
-    "scripts/checks/check-test-budgets.py": "test-time budget policy",
-    "scripts/checks/test_budget_evidence.py": "test-time budget evidence",
-    "scripts/checks/run-budgeted-fast.py": "test-time budget measurement",
-    "scripts/checks/guardrail_test_report.py": "test-time budget measurement",
-    "orchestrator/tests/test_test_budget_rules.py": "test-time budget policy",
-    "orchestrator/tests/test_test_budget_report_quality.py": "test-time budget measurement",
     "docs/reboot/evidence/decide-budget-opus.md": "test-time budget decision",
     "docs/reboot/evidence/decide-budget-astra.md": "test-time budget decision",
     "docs/reboot/evidence/decide-budget-sol.md": "test-time budget decision",
@@ -1577,10 +1567,6 @@
     "orchestrator/tests/fixtures/stages/acme/note-state/tool/src/note_state/": "orchestrator/tests/fixtures/stages/acme/note-state/tool/src/note_state"
   },
   "test_tiers": {
-    "orchestrator/tests/test_test_budget_provenance.py": [],
-    "orchestrator/tests/test_test_budget_calibration.py": [],
-    "orchestrator/tests/test_test_budget_rules.py": [],
-    "orchestrator/tests/test_test_budget_report_quality.py": ["quality"],
     "orchestrator/tests/test_rule_evidence.py": [],
     "orchestrator/tests/test_rule_evidence_quality.py": ["quality"],
     "orchestrator/tests/test_rule_evidence_freshness.py": ["quality"],
@@ -2060,12 +2046,6 @@
     "orchestrator/tests/workflow_support.py": []
   },
   "seam_owners": {
-    "scripts/checks/run-budgeted-fast.py": [
-      "orchestrator/tests/test_test_budget_report_quality.py"
-    ],
-    "scripts/checks/guardrail_test_report.py": [
-      "orchestrator/tests/test_test_budget_report_quality.py"
-    ],
     "scripts/checks/run-affected-seams.py": [
       "orchestrator/tests/test_affected_seam_gate_quality.py",
       "orchestrator/tests/test_make_targets.py",
