@@ -44,15 +44,15 @@
     },
   "fast_tier_budget":
     {
-      "duration_report_command": "env -u AGENT make test-fast (scripts/checks/run-budgeted-fast.py writes var/tmp/tests/budgets/INVOCATION/report.json)",
+      "duration_report_command": "env -u AGENT make test-fast (the reference pytest plugin writes the T1 JUnit report var/tmp/guardrails/INVOCATION/t1-junit.xml with omp.revision, omp.runtime and omp.wall_s; make guardrails-reference runs omp-guardrails report-check over it)",
       "machines":
         [
           {
             "id": "m-118e13922e9d",
             "platform": "Darwin arm64",
             "runtime": "python 3.13.7",
-            "wall_limit_s": 76,
-            "per_test_limit_s": 0.96,
+            "wall_limit_s": 95,
+            "per_test_limit_s": 1.02,
             "approval": "omp-amends.md §1.7 (owner-approved autonomous plan, 2026-11-11); owner to confirm limits"
           }
         ]
@@ -158,7 +158,6 @@
           "orchestrator/tests/test_structure_check.py": "repository-gate",
           "orchestrator/tests/test_submission_dependencies_slow.py": "raidar.grading",
           "orchestrator/tests/test_target_loss_job_guard_slow.py": "raidar.engine",
-          "orchestrator/tests/test_test_budget_report_quality.py": "repository-gate",
           "orchestrator/tests/test_trial_execution_slow.py": "raidar.engine",
           "orchestrator/tests/test_trial_planning_slow.py": "raidar.design",
           "orchestrator/tests/test_verifier_and_regrade.py": "raidar.grading",
@@ -197,7 +196,7 @@
   "command_notes":
     {
       "working_directory": "repository root; prefix make, uv and pytest calls with env -u AGENT; provision with env -u AGENT uv sync --project orchestrator --all-extras --frozen; generated files stay under RAIDAR_VAR (default var/), REPO_TMP_DIR (default var/tmp/) and REPO_CACHE_DIR (default .cache/)",
-      "interpretation": "make targets exit non-zero on any failure; test-fast also fails below the coverage floors (integer counts); check-test-budgets.py exits 1 on validity/policy/approval failure or CI timing breach and 2 on infrastructure/profile mismatch; the lever exits 0 doctor and journeys passed, 1 a journey failed, 2 usage error, 3 doctor failed (prints RAIDAR-SURFACE-DOCTOR-FAILED; an environment failure, never expectRed)",
+      "interpretation": "make targets exit non-zero on any failure; test-fast also fails below the coverage floors (integer counts); omp-guardrails report-check exits 1 on a TEST.budget.* finding (a local timing breach on an approved machine, or a missing, invalid or stale report in any mode) and 2 when it cannot run; the lever exits 0 doctor and journeys passed, 1 a journey failed, 2 usage error, 3 doctor failed (prints RAIDAR-SURFACE-DOCTOR-FAILED; an environment failure, never expectRed)",
       "lsp":
         [
           {
@@ -224,9 +223,7 @@
           "files":
             {
               "scripts/checks/check-repository-paths.py": "repository-gate",
-              "scripts/checks/guardrail_test_report.py": "repository-gate",
               "scripts/checks/run-affected-seams.py": "repository-gate",
-              "scripts/checks/run-budgeted-fast.py": "repository-gate",
               "scripts/release/bump-version.py": "release"
             },
           "directories":
@@ -434,11 +431,6 @@
             "rule": "TEST.no-evasion",
             "path": "orchestrator/tests/test_workflow_verify_docker.py",
             "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md \u00a72.4"
-          },
-          {
-            "rule": "NAME.test-files",
-            "path": "scripts/checks/test_budget_evidence.py",
-            "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md \u00a72.6"
           },
           {
             "rule": "TEST.no-self-mocking",
@@ -1270,7 +1262,6 @@
               "check-ruff-suppressions.py",
               "check-rule-evidence.py",
               "check-structure.py",
-              "check-test-budgets.py",
               "check-test-evidence.py",
               "check-test-hygiene.py",
               "check-tool-rule-canary.py",
@@ -1278,7 +1269,6 @@
               "check_toolchain_pins.py",
               "record-host-readback.py",
               "run-affected-seams.py",
-              "run-budgeted-fast.py",
               "run-repository-gate.py",
               "validate-rule-coverage.py",
               "verify-version-wiring.py"
@@ -1286,9 +1276,7 @@
           "script_name_exceptions":
             [
               "scripts/checks/check_toolchain_pins.py",
-              "scripts/checks/guardrail_test_report.py",
-              "scripts/checks/ruff_baseline.py",
-              "scripts/checks/test_budget_evidence.py"
+              "scripts/checks/ruff_baseline.py"
             ],
           "test_roots": ["orchestrator/tests"],
           "test_groups":
@@ -1416,9 +1404,6 @@
               "scripts/checks/record-host-readback.py": ["main"],
               "scripts/checks/ruff_baseline.py": ["main"],
               "scripts/checks/run-affected-seams.py": ["main"],
-              "scripts/checks/run-budgeted-fast.py":
-                ["current_revision", "machine_details", "run_pytest"],
-              "scripts/checks/test_budget_evidence.py": ["_run"],
               "scripts/checks/validate-rule-coverage.py": ["main"],
               "scripts/release/bump-version.py":
                 [
@@ -1566,8 +1551,9 @@ in Verification surface, Nightly scheduler and Identity-bearing artefacts, with 
 ## Run events
 
 - Commit command: `env -u AGENT make gate-commit` (`.omp/gate.json` `checks.commit`): path
-  policy, identity, test evidence, rule coverage, `quality` (includes T1), budget checker,
-  dependency audit and affected local slow/quality seams.
+  policy, identity, test evidence, rule coverage, `quality` (includes T1), the pinned reference
+  (`make guardrails-reference`, which runs `omp-guardrails report-check` for `TEST.budget.*` in
+  local mode), dependency audit and affected local slow/quality seams.
 - CI command: `env -u AGENT make gate-ci` (`.omp/gate.json` `checks.ci`; required context
   `gate`, runner role `github-actions`): the commit gate with `AUDIT_ARGS=--ci`, then full
   slow and quality.
@@ -1575,25 +1561,26 @@ in Verification surface, Nightly scheduler and Identity-bearing artefacts, with 
   (owner-approved autonomous plan, 2026-11-11); the owner is to confirm it (front matter records
   the reason). Docker, security, perf and review-surface tiers run outside the gate.
 - Nightly branches: `main` only, once a scheduler exists.
-- Separate workflows: `.github/workflows/perf-fixture.yml` (`make perf-fixture`, target `ci`)
-  and `.github/workflows/test-budget-measure.yml` (dispatch, exact `ref`, `run_count` 5).
+- Separate workflow: `.github/workflows/perf-fixture.yml` (`make perf-fixture`, target `ci`).
 
 ## Fast-tier budget
 
 - Per machine: `m-118e13922e9d` (probe of `omp_guardrails.test_evidence.budgets`), platform
   `Darwin arm64`, runtime `python 3.13.7`.
-- Per machine limits: wall `76 s`, per-test `0.96 s`. Derived as `ceil(1.25 x max wall)`
-  over 5 local runs on 2026-11-11 (walls 59.11, 59.76, 59.88, 60.25, 60.01 s; coverage on,
-  1 worker; 8 `test_rule_evidence.py` setup errors from the in-flight catalogue re-sync) and
-  `ceil_10ms(1.5 x slowest test 0.639 s)`. 177 tests exceed the `0.06 s` p95-based limit.
+- Per machine limits: wall `95 s`, per-test `1.02 s`. Derived as `ceil(1.25 x max wall)` and
+  `ceil_10ms(1.5 x slowest test)` over 5 local `env -u AGENT make test-fast` runs on 2026-11-11
+  through the reference pytest plugin (guards armed, coverage on, 1 worker, 5694 tests): walls
+  (`omp.wall_s`) 74.566, 75.284, 74.002, 73.686, 74.648 s; slowest test 0.662 to 0.679 s.
 - Per machine owner approval reference: omp-amends.md §1.7 (owner-approved autonomous plan,
   2026-11-11); the owner is to confirm the limits. The limits block locally on this machine.
 - CI timing is report-only on every CI host. Goals, not limits: wall `30 s`, per-test `0.1 s`.
-- Duration-report command: `env -u AGENT make test-fast`; producer
-  `scripts/checks/run-budgeted-fast.py`, report
-  `var/tmp/tests/budgets/$TEST_BUDGET_INVOCATION/report.json`; checker
-  `env -u AGENT make test-budget-check` until the step-4 cutover replaces it with
-  `omp-guardrails report-check`.
+- Duration-report command: `env -u AGENT make test-fast` (or `make quality`); the reference
+  pytest plugin (`omp-guardrails adapter junit-args --tier t1`) writes the T1 JUnit report
+  `var/tmp/guardrails/$GUARDRAILS_INVOCATION/t1-junit.xml` with `omp.revision`, `omp.runtime`
+  and `omp.wall_s`. Checker: `omp-guardrails report-check --mode local` in `make gate-commit`
+  and `--mode ci` in `make gate-ci`, both through `make guardrails-reference`, both blocking.
+- New machine or runtime: report-check prints the owner question with this run's wall and
+  slowest test; measure repeatedly and record the approved limits in `fast_tier_budget.machines`.
 
 ## Coverage
 

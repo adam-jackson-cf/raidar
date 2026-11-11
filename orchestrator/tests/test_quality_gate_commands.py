@@ -134,7 +134,7 @@ def quality_children(monkeypatch):
                 return subprocess.CompletedProcess(command, returncode=7)
             if command[0] == "git":
                 state["staged"] = True
-            elif str(quality.BUDGET_PRODUCER) in command:
+            elif command[1:3] == ["-m", "pytest"]:
                 state["tested"] = True
                 destination = Path(kwargs["env"]["COVERAGE_FILE"]).with_name("coverage.json")
                 destination.write_text(
@@ -179,7 +179,7 @@ def test_quality_gates_stage_only_after_success_when_explicitly_requested(
         "lint-imports",
         "lizard",
         str(quality.MYPY_CHECK_SCRIPT),
-        str(quality.BUDGET_PRODUCER),
+        "pytest",
     ],
 )
 def test_quality_gates_stop_on_a_failed_tool_without_staging(

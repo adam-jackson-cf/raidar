@@ -10,76 +10,58 @@
       "evidence_kind": "local_ci",
       "status": "implemented",
       "implementation_paths": [
-        "scripts/checks/check-test-budgets.py",
-        "scripts/checks/test_budget_evidence.py",
-        "scripts/checks/run-budgeted-fast.py",
-        "scripts/checks/guardrail_test_report.py",
-        ".omp/test-budgets/limits.json",
-        "orchestrator/tests/test_test_budget_rules.py",
-        "orchestrator/tests/test_test_budget_report_quality.py"
+        "orchestrator/pyproject.toml",
+        "orchestrator/uv.lock",
+        ".omp/test-profile.md",
+        "Makefile",
+        "orchestrator/tests/fixtures/guardrails/TEST.budget.fast-tier-time/passing.json",
+        "orchestrator/tests/fixtures/guardrails/TEST.budget.fast-tier-time/violating.json"
       ],
       "local_runner": "Makefile",
-      "local_marker": "test-budget-check:",
+      "local_marker": "$(call guardrails_run,report-check,",
       "ci_runner": "Makefile",
-      "ci_marker": "gate-ci:",
+      "ci_marker": "GUARDRAILS_MODE=ci",
       "canary": {
         "command": [
-          "python",
-          "scripts/checks/check-bespoke-rule-canary.py",
-          "--rule",
-          "TEST.budget.fast-tier-time",
-          "--checker",
-          "scripts/checks/check-test-budgets.py",
+          "omp-guardrails",
+          "canaries",
           "{fixture}"
         ],
         "passing": "orchestrator/tests/fixtures/guardrails/TEST.budget.fast-tier-time/passing.json",
         "violating": "orchestrator/tests/fixtures/guardrails/TEST.budget.fast-tier-time/violating.json",
         "diagnostic": "TEST.budget.fast-tier-time",
-        "timeout_seconds": 30
+        "timeout_seconds": 60
       },
-      "decision": {
-        "path": "docs/reboot/evidence/decide-budget-sol.md",
-        "marker": "**Q1 \u2014 Astra:** CI-only timing enforcement"
-      },
-      "notes": "U6a merged checker validates invocation-bound measurements in both gates. Live policy remains no limits (0/5), validity enforced, per adopted decision. Canary inputs are explicitly synthetic five-record calibration plus below/equal/over boundaries, never retained baseline observations or real timings."
+      "notes": "Pinned omp-guardrails (orchestrator/pyproject.toml [dependency-groups] dev, commit 397a456). Invocation: omp-guardrails report-check --junit <T1 JUnit report> --tier t1 --mode local|ci; module omp_guardrails.test_evidence.budgets. The T1 report comes from the reference pytest plugin (omp.revision, omp.runtime, omp.wall_s). Limits: profile fast_tier_budget.machines, per machine and owner-approved. Local mode (make gate-commit) blocks on an approved machine; ci mode (make gate-ci) reports timing only; a missing, invalid or stale report fails in both. Replaces raidar's old bespoke budget checker by owner decision 2026-11-11 (budget cutover brought forward from R2 into R1). Canaries approve the scratch machine's probe id with synthetic limits and feed at-limit and over-limit reports to report-check in local mode."
     },
     {
       "id": "TEST.budget.per-test-time",
       "evidence_kind": "local_ci",
       "status": "implemented",
       "implementation_paths": [
-        "scripts/checks/check-test-budgets.py",
-        "scripts/checks/test_budget_evidence.py",
-        "scripts/checks/run-budgeted-fast.py",
-        "scripts/checks/guardrail_test_report.py",
-        ".omp/test-budgets/limits.json",
-        "orchestrator/tests/test_test_budget_rules.py",
-        "orchestrator/tests/test_test_budget_report_quality.py"
+        "orchestrator/pyproject.toml",
+        "orchestrator/uv.lock",
+        ".omp/test-profile.md",
+        "Makefile",
+        "orchestrator/tests/fixtures/guardrails/TEST.budget.per-test-time/passing.json",
+        "orchestrator/tests/fixtures/guardrails/TEST.budget.per-test-time/violating.json"
       ],
       "local_runner": "Makefile",
-      "local_marker": "test-budget-check:",
+      "local_marker": "$(call guardrails_run,report-check,",
       "ci_runner": "Makefile",
-      "ci_marker": "gate-ci:",
+      "ci_marker": "GUARDRAILS_MODE=ci",
       "canary": {
         "command": [
-          "python",
-          "scripts/checks/check-bespoke-rule-canary.py",
-          "--rule",
-          "TEST.budget.per-test-time",
-          "--checker",
-          "scripts/checks/check-test-budgets.py",
+          "omp-guardrails",
+          "canaries",
           "{fixture}"
         ],
         "passing": "orchestrator/tests/fixtures/guardrails/TEST.budget.per-test-time/passing.json",
         "violating": "orchestrator/tests/fixtures/guardrails/TEST.budget.per-test-time/violating.json",
         "diagnostic": "TEST.budget.per-test-time",
-        "timeout_seconds": 30
+        "timeout_seconds": 60
       },
-      "decision": {
-        "path": "docs/reboot/evidence/decide-budget-sol.md",
-        "marker": "**Q1 \u2014 Astra:** CI-only timing enforcement"
-      },
-      "notes": "U6a merged checker validates invocation-bound measurements in both gates. Live policy remains no limits (0/5), validity enforced, per adopted decision. Canary inputs are explicitly synthetic five-record calibration plus below/equal/over boundaries, never retained baseline observations or real timings."
+      "notes": "Pinned omp-guardrails (orchestrator/pyproject.toml [dependency-groups] dev, commit 397a456). Invocation: omp-guardrails report-check --junit <T1 JUnit report> --tier t1 --mode local|ci; module omp_guardrails.test_evidence.budgets. The T1 report comes from the reference pytest plugin (omp.revision, omp.runtime, omp.wall_s). Limits: profile fast_tier_budget.machines, per machine and owner-approved. Local mode (make gate-commit) blocks on an approved machine; ci mode (make gate-ci) reports timing only; a missing, invalid or stale report fails in both. Replaces raidar's old bespoke budget checker by owner decision 2026-11-11 (budget cutover brought forward from R2 into R1). Canaries approve the scratch machine's probe id with synthetic limits and feed at-limit and over-limit reports to report-check in local mode."
     },
     {
       "id": "FANOUT.general",

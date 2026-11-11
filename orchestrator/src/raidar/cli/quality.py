@@ -7,7 +7,6 @@ import os
 import shutil
 import sys
 import tomllib
-import uuid
 from decimal import Decimal
 from pathlib import Path
 from typing import Any
@@ -27,7 +26,6 @@ MYPY_CHECK_SCRIPT = REPO_ROOT / "scripts" / "checks" / "check-mypy-coverage.py"
 FAST_SELECTOR = "not slow and not quality and not docker and not security and not perf"
 PYPROJECT = ORCHESTRATOR_ROOT / "pyproject.toml"
 COVERAGE_KINDS = ("line", "branch")
-BUDGET_PRODUCER = REPO_ROOT / "scripts/checks/run-budgeted-fast.py"
 
 
 def package_tool_sources() -> list[str]:
@@ -143,20 +141,11 @@ def run_fast_tier() -> None:
     tools = package_tool_sources()
     env = coverage_env()
     report_path = Path(env["COVERAGE_FILE"]).with_name("coverage.json")
-    invocation = os.environ.get("RAIDAR_TEST_BUDGET_INVOCATION", uuid.uuid4().hex)
-    budget_report = os.environ.get(
-        "RAIDAR_TEST_BUDGET_REPORT",
-        str(tmp_root() / "tests" / "budgets" / invocation / "report.json"),
-    )
     run_or_raise(
         [
             PYTHON,
-            str(BUDGET_PRODUCER),
-            "--report",
-            budget_report,
-            "--invocation",
-            invocation,
-            "--",
+            "-m",
+            "pytest",
             "tests",
             "-m",
             FAST_SELECTOR,
