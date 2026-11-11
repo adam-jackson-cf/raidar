@@ -12,7 +12,7 @@ persona: eval-engineer
 # Run detail
 
 Rendered by `RunDetailView` inside the [Runs page](./runs-index.md) when a
-`:runId` is present. It is the spine of the [customer journey's](../journeys/customer-journey.md)
+`:runId` is present. It is the spine of the [Explain and trace feature's](../../feature-map/explain-and-trace-a-trial.md)
 Explain and Trace stages, stacked top-to-bottom from verdict to raw evidence.
 
 ## Regions, questions, and data
