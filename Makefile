@@ -828,6 +828,14 @@ GUARDRAILS_BLOCKING := PYQ201|NAME\.test-files|PROFILE\.complete|SURFACE\.featur
 # (the profile's verification_surface.journey_file_pattern).
 GUARDRAILS_PLAYWRIGHT_DIR := review-surface
 GUARDRAILS_JOURNEY_GLOB := review-surface/journeys/*.journey.mjs
+# Prints `file::title` for each spec in Playwright's JSON list. A variable, so make joins the lines
+# with spaces: GNU make 4 passes recipe backslash-newlines into single-quoted shell strings.
+GUARDRAILS_PLAYWRIGHT_IDS_JS := const fs = require("fs"), path = require("path"); \
+	const data = JSON.parse(fs.readFileSync(process.argv[1], "utf8")); \
+	const walk = (suite) => { for (const spec of suite.specs || []) \
+		console.log(path.relative(process.cwd(), path.join(data.config.rootDir, spec.file)) + "::" + spec.title); \
+		(suite.suites || []).forEach(walk); }; \
+	data.suites.forEach(walk);
 # The T1 run arms the adapter's fast-tier and user-data guards and writes the JUnit run report.
 # The user-data guard allows writes only under pytest's rootdir (orchestrator/) and temporary
 # directories. The interpreter, lab/stages and scripts/checks can sit under $HOME (a CI runner's
@@ -863,12 +871,7 @@ guardrails-reference:
 	@cd "$(GUARDRAILS_PLAYWRIGHT_DIR)" && npx --no-install playwright test --list --reporter=json \
 		> "$(GUARDRAILS_DIR)/playwright-list.json" \
 		|| { echo "guardrails-reference: cannot list the $(GUARDRAILS_PLAYWRIGHT_DIR) Playwright tests (npm ci there first)"; exit 1; }
-	@node -e 'const fs = require("fs"), path = require("path"); \
-		const data = JSON.parse(fs.readFileSync(process.argv[1], "utf8")); \
-		const walk = (suite) => { for (const spec of suite.specs || []) \
-			console.log(path.relative(process.cwd(), path.join(data.config.rootDir, spec.file)) + "::" + spec.title); \
-			(suite.suites || []).forEach(walk); }; \
-		data.suites.forEach(walk);' "$(GUARDRAILS_DIR)/playwright-list.json" >> "$(GUARDRAILS_DIR)/tiers/t2.txt"
+	@node -e '$(GUARDRAILS_PLAYWRIGHT_IDS_JS)' "$(GUARDRAILS_DIR)/playwright-list.json" >> "$(GUARDRAILS_DIR)/tiers/t2.txt"
 	@git ls-files --cached --others --exclude-standard -- '$(GUARDRAILS_JOURNEY_GLOB)' | sed 's/$$/::journey/' >> "$(GUARDRAILS_DIR)/tiers/t2.txt"
 	$(call guardrails_run,collection-check,collection-check --tier t1="$(GUARDRAILS_DIR)/tiers/t1.txt" --tier t2="$(GUARDRAILS_DIR)/tiers/t2.txt" --tier t3="$(GUARDRAILS_DIR)/tiers/t3.txt")
 	@base=$$(git merge-base "$(GUARDRAILS_BASE)" HEAD) && head=$$(git write-tree) \
