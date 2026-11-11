@@ -44,11 +44,13 @@ jobs:
         run: npm ci --ignore-scripts --prefix review-surface
 
       # guardrails-reference runs lever-selftest (SURFACE.lever-isolation): the lever's doctor
-      # serves review-surface/dist and renders it in headless Chromium.
+      # serves review-surface/dist and renders it in headless Chromium. The gate sets
+      # XDG_CACHE_HOME to the repository's .cache (Makefile REPO_CACHE_DIR), where Playwright
+      # looks for its browsers on Linux, so Chromium is installed there.
       - name: Build review surface and install Chromium for the lever
         run: |
           npm run build --prefix review-surface
-          cd review-surface && npx --no-install playwright install --with-deps chromium
+          cd review-surface && XDG_CACHE_HOME="$GITHUB_WORKSPACE/.cache" npx --no-install playwright install --with-deps chromium
 
       - name: Run repository CI gate
         run: env -u AGENT uv run --project orchestrator --extra dev python scripts/checks/run-repository-gate.py ci
