@@ -73,8 +73,8 @@
   "guards":
     {
       "process": "orchestrator/tests/process_guard.py, loaded by orchestrator/tests/conftest.py (audit hook; exempt markers slow, quality, docker, security, perf)",
-      "network": "gap: no fast-tier network denial today; the pinned reference's pytest adapter guard (omp_guardrails.adapters.pytest.guards fast-tier, IP sockets) arms it from the step-4 shadow PR",
-      "user_data": "gap: no session-wide guard today; omp-guardrails guard-run --tier t1 (TEST.user-data-guard) wraps the T1 command from the step-4 shadow PR"
+      "network": "pinned reference pytest adapter plugin (--omp-guard fast-tier; omp_guardrails.adapters.pytest.guards, IP sockets), armed for every T1 run by make test-fast and make quality through PYTEST_ADDOPTS from omp-guardrails adapter junit-args --tier t1; adapter guard-evidence checks the T1 JUnit report",
+      "user_data": "same plugin (--omp-guard user-data, TEST.user-data-guard), armed in the same T1 runs through adapter junit-args; points HOME and XDG_* at a temporary directory"
     },
   "environments":
     {
