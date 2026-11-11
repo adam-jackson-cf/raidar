@@ -304,7 +304,6 @@
     ".agents/skills/fault-catalog/references/reconciliation-result-schema.md": ".agents/skills/fault-catalog/references",
     ".agents/skills/fault-catalog/references/select-experiment-target-runbook.md": ".agents/skills/fault-catalog/references",
     ".agents/skills/fault-catalog/references/update-fault-status-runbook.md": ".agents/skills/fault-catalog/references",
-    ".agents/skills/python-conventions/SKILL.md": ".agents/skills/python-conventions",
     ".agents/skills/raidar-onboarding/SKILL.md": ".agents/skills/raidar-onboarding",
     ".agents/skills/raidar-performance/SKILL.md": ".agents/skills/raidar-performance",
     ".agents/skills/raidar-release/SKILL.md": ".agents/skills/raidar-release",

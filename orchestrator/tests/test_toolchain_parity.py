@@ -301,7 +301,7 @@ def test_prettier_selects_maintained_markdown_yaml_without_protected_docs(
         [
             "README.md",
             ".github/workflows/gate.yml",
-            ".agents/skills/python-conventions/SKILL.md",
+            ".agents/skills/raidar-release/SKILL.md",
             "lab/workflows/example.yaml",
             "docs/private.md",
             "docs/reboot/handoff.md",
@@ -313,7 +313,7 @@ def test_prettier_selects_maintained_markdown_yaml_without_protected_docs(
             "orchestrator/src/example.py",
         ]
     ) == [
-        ".agents/skills/python-conventions/SKILL.md",
+        ".agents/skills/raidar-release/SKILL.md",
         ".github/workflows/gate.yml",
         "README.md",
         "lab/workflows/example.yaml",
