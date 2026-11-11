@@ -43,5 +43,12 @@ jobs:
       - name: Install locked review-surface test runner
         run: npm ci --ignore-scripts --prefix review-surface
 
+      # guardrails-reference runs lever-selftest (SURFACE.lever-isolation): the lever's doctor
+      # serves review-surface/dist and renders it in headless Chromium.
+      - name: Build review surface and install Chromium for the lever
+        run: |
+          npm run build --prefix review-surface
+          cd review-surface && npx --no-install playwright install --with-deps chromium
+
       - name: Run repository CI gate
         run: env -u AGENT uv run --project orchestrator --extra dev python scripts/checks/run-repository-gate.py ci
