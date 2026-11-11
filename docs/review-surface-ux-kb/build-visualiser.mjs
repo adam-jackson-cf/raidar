@@ -73,9 +73,9 @@ const inbound = new Map(docs.map((d) => [d.id, []]));
 for (const doc of docs) for (const t of doc.outlinks) inbound.get(t).push(doc.id);
 for (const doc of docs) doc.inlinks = inbound.get(doc.id);
 
-const SECTION_ORDER = ['.', 'personas', 'journeys', 'pages', 'components', 'data', 'concepts'];
+const SECTION_ORDER = ['.', 'personas', 'pages', 'components', 'data', 'concepts'];
 const SECTION_LABEL = {
-  '.': 'Overview', personas: 'Personas', journeys: 'Journeys', pages: 'Pages',
+  '.': 'Overview', personas: 'Personas', pages: 'Pages',
   components: 'Components', data: 'Data lineage', concepts: 'Concepts',
 };
 
