@@ -839,9 +839,13 @@ GUARDRAILS_BLOCKING := PYQ201|NAME\.test-files|PROFILE\.complete|SURFACE\.featur
 GUARDRAILS_PLAYWRIGHT_DIR := review-surface
 GUARDRAILS_JOURNEY_GLOB := review-surface/journeys/*.journey.mjs
 # The T1 run arms the adapter's fast-tier and user-data guards and writes the JUnit run report.
+# The user-data guard allows writes only under pytest's rootdir (orchestrator/) and temporary
+# directories. The interpreter, lab/stages and scripts/checks can sit under $HOME (a CI runner's
+# checkout always does), so T1 writes no bytecode caches there: PYTHONDONTWRITEBYTECODE=1.
 GUARDRAILS_T1_ENV = args=$$($(GUARDRAILS) adapter junit-args --tier t1 --out "$(GUARDRAILS_T1_JUNIT)" 2>/dev/null) \
 	|| { echo "guardrails-reference: cannot arm the T1 guards"; exit 1; }; \
-	mkdir -p "$(GUARDRAILS_DIR)" && export PYTEST_ADDOPTS="$${PYTEST_ADDOPTS:+$$PYTEST_ADDOPTS }$$args" &&
+	mkdir -p "$(GUARDRAILS_DIR)" && export PYTHONDONTWRITEBYTECODE=1 \
+	PYTEST_ADDOPTS="$${PYTEST_ADDOPTS:+$$PYTEST_ADDOPTS }$$args" &&
 
 # $(1) label, $(2) subcommand and arguments, $(3) "all" when any finding blocks (evidence steps).
 define guardrails_run
