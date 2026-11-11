@@ -1,11 +1,43 @@
 {
   "schemaVersion": 2,
   "checks": {
-    "commit": ["env", "-u", "AGENT", "make", "gate-commit"],
-    "ci": ["env", "-u", "AGENT", "make", "gate-ci"]
+    "commit": [
+      "env",
+      "-u",
+      "AGENT",
+      "make",
+      "gate-commit"
+    ],
+    "ci": [
+      "env",
+      "-u",
+      "AGENT",
+      "make",
+      "gate-ci"
+    ]
   },
-  "pathCheck": ["env", "-u", "AGENT", "uv", "run", "--project", "orchestrator", "--extra", "dev", "python", "scripts/checks/check-repository-paths.py"],
+  "pathCheck": [
+    "env",
+    "-u",
+    "AGENT",
+    "uv",
+    "run",
+    "--project",
+    "orchestrator",
+    "--extra",
+    "dev",
+    "python",
+    "scripts/checks/check-repository-paths.py"
+  ],
   "pathCheckTimeoutMs": 180000,
-  "testGlobs": ["orchestrator/tests/**/*.py", "contract/conformance/**/*.py", "lab/stages/**/tests/**/*.py"],
-  "ciHost": "github"
+  "testGlobs": [
+    "orchestrator/tests/**/*.py",
+    "contract/conformance/**/*.py",
+    "lab/stages/**/tests/**/*.py"
+  ],
+  "ci": {
+    "requiredContext": "gate",
+    "runner": "github-actions"
+  },
+  "dynaflowsContract": 2
 }

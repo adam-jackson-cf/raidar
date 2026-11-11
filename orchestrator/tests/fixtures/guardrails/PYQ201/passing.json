@@ -1,0 +1,13 @@
+{
+  "rule": "PYQ201",
+  "expect": "pass",
+  "check": {
+    "subcommand": "python-quality",
+    "argv": [
+      "orchestrator/src/raidar/engine/canary.py"
+    ]
+  },
+  "files": {
+    "orchestrator/src/raidar/engine/canary.py": "\"\"\"Canary module.\"\"\"\n\n\nclass Planner:\n    \"\"\"Plans.\"\"\"\n\n    def action_0(self) -> int:\n        return 0\n\n    def action_1(self) -> int:\n        return 1\n\n    def action_2(self) -> int:\n        return 2\n\n    def action_3(self) -> int:\n        return 3\n\n    def action_4(self) -> int:\n        return 4\n\n    def action_5(self) -> int:\n        return 5\n\n    def action_6(self) -> int:\n        return 6\n\n    def action_7(self) -> int:\n        return 7\n\n    def action_8(self) -> int:\n        return 8\n\n    def action_9(self) -> int:\n        return 9\n\n    def action_10(self) -> int:\n        return 10\n\n    def action_11(self) -> int:\n        return 11\n\n    def action_12(self) -> int:\n        return 12\n\n    def action_13(self) -> int:\n        return 13\n\n    def action_14(self) -> int:\n        return 14\n\n    def action_15(self) -> int:\n        return 15\n\n    def action_16(self) -> int:\n        return 16\n\n    def action_17(self) -> int:\n        return 17\n\n    def action_18(self) -> int:\n        return 18\n\n    def action_19(self) -> int:\n        return 19\n\n"
+  }
+}

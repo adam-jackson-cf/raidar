@@ -45,5 +45,9 @@ jobs:
       - name: Install locked formatter
         run: npm ci --ignore-scripts
 
+      # guardrails-reference lists the review-surface Playwright tests (TEST.tier-selectors).
+      - name: Install locked review-surface test runner
+        run: npm ci --ignore-scripts --prefix review-surface
+
       - name: Run repository CI gate
         run: env -u AGENT uv run --project orchestrator --extra dev python scripts/checks/run-repository-gate.py ci

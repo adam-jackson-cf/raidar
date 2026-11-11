@@ -39,6 +39,17 @@ def workflow_matches(workflow: str) -> bool:
     )
 
 
+def ci_contract_matches(ci: object) -> bool:
+    """Require the host-neutral CI contract: the gate context and a named runner role."""
+    return (
+        isinstance(ci, dict)
+        and set(ci) == {"requiredContext", "runner"}
+        and ci["requiredContext"] == "gate"
+        and isinstance(ci["runner"], str)
+        and bool(ci["runner"].strip())
+    )
+
+
 def wiring_findings(gate: dict[str, Any], workflow: str, hook: str) -> list[str]:
     """Keep the declared argv, installed entry and always-running CI gate aligned."""
     errors = []
@@ -49,7 +60,7 @@ def wiring_findings(gate: dict[str, Any], workflow: str, hook: str) -> list[str]
     if (
         gate.get("schemaVersion") != 2
         or gate.get("checks") != expected
-        or gate.get("ciHost") != "github"
+        or not ci_contract_matches(gate.get("ci"))
     ):
         errors.append("GATE.local-ci-parity: restore the declared commit/CI make argv")
     if not workflow_matches(workflow):

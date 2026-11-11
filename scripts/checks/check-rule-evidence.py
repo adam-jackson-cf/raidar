@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import sys
 from pathlib import Path
@@ -10,19 +11,19 @@ from typing import Any
 
 SNAPSHOT = ".omp/guardrail-rules.json"
 LEDGER = ".omp/rule-coverage.json"
-REFERENCE = (
-    Path.home() / ".omp/agent/skills/setup-repository-guardrails/assets/guardrail-rules.json"
-)
+# SHA-256 of agent/skills/setup-repository-guardrails/assets/guardrail-rules.json at the
+# omp-guardrails commit pinned in orchestrator/pyproject.toml; bump it with that pin.
+CATALOGUE_SHA256 = "4aa882af9ef3d783a71bd64c3cfb1dc2d3edb3af2d0561c18e5a59fc07f49f98"
 
 
-def compare_catalogue(snapshot: bytes | None, reference: bytes | None) -> list[str]:
-    """Require the tracked snapshot, comparing the installed reference when available."""
+def compare_catalogue(snapshot: bytes | None, pinned_sha256: str) -> list[str]:
+    """Require the tracked snapshot to be the catalogue of the pinned reference commit."""
     if snapshot is None:
         return [f"{SNAPSHOT}: catalogue snapshot missing; restore the tracked catalogue snapshot"]
-    if reference is not None and snapshot != reference:
+    if hashlib.sha256(snapshot).hexdigest() != pinned_sha256:
         return [
             f"{SNAPSHOT}: catalogue snapshot differs; "
-            "copy the referenced skill catalogue byte-for-byte"
+            "copy the pinned reference catalogue byte-for-byte"
         ]
     return []
 
@@ -71,8 +72,7 @@ def main() -> int:
     root = Path(__file__).resolve().parents[2]
     snapshot = root / SNAPSHOT
     errors = compare_catalogue(
-        snapshot.read_bytes() if snapshot.is_file() else None,
-        REFERENCE.read_bytes() if REFERENCE.is_file() else None,
+        snapshot.read_bytes() if snapshot.is_file() else None, CATALOGUE_SHA256
     )
     if not errors:
         try:

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import importlib.util
 import json
 from copy import deepcopy
@@ -35,26 +36,27 @@ def catalogue() -> dict[str, Any]:
     path = ROOT / SNAPSHOT
     assert path.is_file(), f"missing tracked catalogue snapshot: {path}"
     catalog: dict[str, Any] = json.loads(path.read_text(encoding="utf-8"))
-    assert len(catalog["rules"]) == 104
+    ids = [rule["id"] for rule in catalog["rules"]]
+    assert ids, f"{SNAPSHOT} names no rules"
+    assert len(set(ids)) == len(ids), f"{SNAPSHOT} repeats a rule ID"
+    ledger = json.loads((ROOT / LEDGER).read_text(encoding="utf-8"))
+    assert len(ledger["rules"]) == len(ids), f"{LEDGER} needs one row per {SNAPSHOT} rule"
     return catalog
+
+
+def _sha256(data: bytes) -> str:
+    return hashlib.sha256(data).hexdigest()
 
 
 def test_identical_catalogue_bytes_pass(evidence: ModuleType) -> None:
     snapshot = b'{"schema_version":1,"rules":[]}\n'
-    assert evidence.compare_catalogue(snapshot, snapshot) == []
+    assert evidence.compare_catalogue(snapshot, _sha256(snapshot)) == []
 
 
-@pytest.mark.parametrize("reference", [None, b"catalogue\n"])
-def test_missing_repository_snapshot_fails(evidence: ModuleType, reference: bytes | None) -> None:
-    assert evidence.compare_catalogue(None, reference) == [
+def test_missing_repository_snapshot_fails(evidence: ModuleType) -> None:
+    assert evidence.compare_catalogue(None, evidence.CATALOGUE_SHA256) == [
         f"{SNAPSHOT}: catalogue snapshot missing; restore the tracked catalogue snapshot"
     ]
-
-
-def test_offline_skill_absence_keeps_repository_snapshot_authoritative(
-    evidence: ModuleType,
-) -> None:
-    assert evidence.compare_catalogue(b"catalogue\n", None) == []
 
 
 @pytest.mark.parametrize("offset", range(len(b"catalogue\n")))
@@ -62,15 +64,15 @@ def test_any_catalogue_byte_change_fails(evidence: ModuleType, offset: int) -> N
     reference = b"catalogue\n"
     changed = bytearray(reference)
     changed[offset] ^= 1
-    assert evidence.compare_catalogue(bytes(changed), reference) == [
-        f"{SNAPSHOT}: catalogue snapshot differs; copy the referenced skill catalogue byte-for-byte"
+    assert evidence.compare_catalogue(bytes(changed), _sha256(reference)) == [
+        f"{SNAPSHOT}: catalogue snapshot differs; copy the pinned reference catalogue byte-for-byte"
     ]
 
 
 @pytest.mark.parametrize("snapshot", [b"catalogue", b"catalogue\n\n"])
 def test_catalogue_length_drift_fails(evidence: ModuleType, snapshot: bytes) -> None:
-    assert evidence.compare_catalogue(snapshot, b"catalogue\n") == [
-        f"{SNAPSHOT}: catalogue snapshot differs; copy the referenced skill catalogue byte-for-byte"
+    assert evidence.compare_catalogue(snapshot, _sha256(b"catalogue\n")) == [
+        f"{SNAPSHOT}: catalogue snapshot differs; copy the pinned reference catalogue byte-for-byte"
     ]
 
 

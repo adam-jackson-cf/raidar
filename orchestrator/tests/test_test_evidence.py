@@ -320,3 +320,25 @@ def test_duplicate_compares_parameter_bound_behavior_not_row_labels() -> None:
         old,
         new,
     )
+
+
+def test_a_renamed_file_with_unchanged_cases_is_neither_growth_nor_duplicate() -> None:
+    assert _findings({OTHER_TEST: SIMPLE}, base={TEST: SIMPLE}) == []
+
+
+def test_a_renamed_file_that_changes_a_case_is_growth() -> None:
+    changed = SIMPLE.replace("probe(2) == 4", "probe(3) == 9")
+    _assert_finding(
+        _findings({OTHER_TEST: changed}, base={TEST: SIMPLE}),
+        "TEST.growth.justified",
+        f"{OTHER_TEST}::test_probe",
+    )
+
+
+def test_a_renamed_file_copied_twice_keeps_one_duplicate() -> None:
+    _assert_finding(
+        _findings(
+            {OTHER_TEST: SIMPLE, TEST.replace("probe", "third"): SIMPLE}, base={TEST: SIMPLE}
+        ),
+        "TEST.duplicate-path",
+    )

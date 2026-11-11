@@ -1,0 +1,14 @@
+{
+  "rule": "TEST.no-test-hooks",
+  "expect": "pass",
+  "check": {
+    "subcommand": "adapter",
+    "argv": [
+      "lint",
+      "orchestrator/src/raidar/engine/canary.py"
+    ]
+  },
+  "files": {
+    "orchestrator/src/raidar/engine/canary.py": "import os\n\n\ndef workers() -> str:\n    return os.environ.get('RAIDAR_WORKERS', '1')\n"
+  }
+}

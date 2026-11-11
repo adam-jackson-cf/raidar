@@ -510,10 +510,15 @@ other added case; map missing evidence or merge/remove duplicate tests.
 Parameter rows and IDs must be statically collectable; changed files with dynamic
 collection fail closed rather than executing test code during this static check.
 
-Both gates run `make rule-coverage`: all 104 catalogue IDs in
+Both gates run `make rule-coverage`: all 121 catalogue IDs in
 `.omp/guardrail-rules.json` need executed evidence in `.omp/rule-coverage.json`.
 Each local rule runs its real checker on passing and violating fixtures; hooks
 prove installation and commit-failure propagation in disposable repositories.
+The 17 rule IDs that only the pinned `omp-guardrails` reference implements
+(`make guardrails-reference`) prove themselves through `omp-guardrails canaries`
+on the fixtures under `orchestrator/tests/fixtures/guardrails/<ID>/`. Their
+waivers are `house_style.exceptions` in `.omp/test-profile.md`, each backed by
+`docs/adr/adr-003-guardrails-reference-exceptions.md`.
 PYQ210/PYQ211 retain the approved architectural exclusions above. Configuration
 deviations and finding-level debt remain explicit implemented enforcement, not
 claims of a debt-free tree.
@@ -523,7 +528,9 @@ claims of a debt-free tree.
 within 30 days; missing, malformed or stale records fail coverage. The upstream
 validator is vendored unchanged under `scripts/vendor/setup-repository-guardrails/`;
 its provenance records the source and update procedure. The maintained launcher
-checks its recorded SHA-256 and installed skill bytes before full execution.
+checks its recorded SHA-256 before full execution, and `check-rule-evidence.py`
+checks the catalogue snapshot against the SHA-256 of the pinned reference commit's
+catalogue. Neither reads an installed skill, so local and CI runs agree.
 
 Docker-backed tests (`make test-docker`), the N1 overhead gate (`make perf-gate`) and `make security-gate` remain separate checks on a ready Docker target.
 

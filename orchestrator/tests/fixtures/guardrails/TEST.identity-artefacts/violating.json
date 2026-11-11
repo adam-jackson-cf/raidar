@@ -1,0 +1,21 @@
+{
+  "rule": "TEST.identity-artefacts",
+  "expect": "fail",
+  "check": {
+    "command": [
+      "sh",
+      "-c",
+      "out=$({python} -m omp_guardrails.cli diff-check --base HEAD --head \"$(git write-tree)\" 2>&1); status=$?; printf \"%s\\n\" \"$out\"; [ $status -ge 2 ] && exit 2; printf \"%s\\n\" \"$out\" | grep -q \": TEST.identity-artefacts: \" && exit 1; exit 0"
+    ],
+    "timeout_s": 60
+  },
+  "base": {
+    ".omp/identity.json": "{\"digest\": \"a\"}\n",
+    "orchestrator/src/raidar/engine/canary.py": "VALUE = 1\n",
+    "orchestrator/tests/test_canary_outcomes.py": "def test_total_of_two_items_is_their_sum() -> None:\n    assert 2 + 3 == 5\n"
+  },
+  "files": {
+    ".omp/identity.json": "{\"digest\": \"b\"}\n",
+    "orchestrator/tests/test_canary_outcomes.py": "def test_total_of_two_items_is_their_sum() -> None:\n    assert 3 + 2 == 5\n"
+  }
+}

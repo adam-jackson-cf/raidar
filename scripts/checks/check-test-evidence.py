@@ -537,6 +537,36 @@ def _duplicate_findings(
     return findings
 
 
+def _named_cases(path: str, text: str) -> dict[str, str]:
+    """Case fingerprints keyed by selector without the file path; empty when uncollectable."""
+    try:
+        file_cases, _ = _cases(path, text)
+    except (SyntaxError, ValueError, TypeError):
+        return {}
+    return {case.selector.split("::", 1)[1]: case.fingerprint for case in file_cases}
+
+
+def _renamed_files(
+    base_sources: Mapping[str, str], current_sources: Mapping[str, str]
+) -> dict[str, str]:
+    """Map removed base test files to the added file that keeps every case and its behavior."""
+    removed = {
+        path: _named_cases(path, text)
+        for path, text in base_sources.items()
+        if path not in current_sources
+    }
+    renames: dict[str, str] = {}
+    for path, text in sorted(current_sources.items()):
+        if path in base_sources:
+            continue
+        cases = _named_cases(path, text)
+        for old, old_cases in sorted(removed.items()):
+            if cases and cases == old_cases and old not in renames:
+                renames[old] = path
+                break
+    return renames
+
+
 def evidence_findings(
     *,
     base_sources: Mapping[str, str],
@@ -546,6 +576,9 @@ def evidence_findings(
     map_is_tracked: bool,
 ) -> list[str]:
     """Return actionable growth and duplicate findings for in-memory snapshots."""
+    # A renamed file whose cases keep their names and behavior is neither growth nor a duplicate.
+    renames = _renamed_files(base_sources, current_sources)
+    base_sources = {renames.get(path, path): text for path, text in base_sources.items()}
     base_cases, base_selectors, _ = _snapshot(base_sources)
     current_cases, current_selectors, current_errors = _snapshot(current_sources)
     findings = [

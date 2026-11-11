@@ -1,170 +1,1708 @@
+---
+{
+  "tiers":
+    {
+      "t1":
+        {
+          "selector": "-m 'not slow and not quality and not docker and not security and not perf'",
+          "location": "orchestrator/tests",
+          "command": "env -u AGENT make test-fast"
+        },
+      "t2":
+        {
+          "selector": "-m '(slow or quality or docker) and not security and not perf'",
+          "location":
+            [
+              "orchestrator/tests",
+              "review-surface/tests",
+              "review-surface/journeys"
+            ],
+          "command": "env -u AGENT make test-slow test-quality test-docker review-surface-test; each journey: node scripts/surface/lever.mjs --data-dir DATA --evidence-dir EVIDENCE --journey review-surface/journeys/NAME.journey.mjs"
+        },
+      "t3":
+        {
+          "selector": "-m 'security or perf'",
+          "location": "orchestrator/tests",
+          "command": "env -u AGENT make security-gate perf-gate"
+        }
+    },
+  "public_entry_points":
+    {
+      "raidar": "raidar.cli:main",
+      "review-surface": "review-surface/server.mjs"
+    },
+  "run_events":
+    {
+      "commit": "env -u AGENT make gate-commit",
+      "ci": "env -u AGENT make gate-ci",
+      "nightly_scheduler":
+        {
+          "none": "no scheduled workflow exists in .github/workflows; T2 runs in full on every push and pull request through gate-ci, and Docker/security/perf run at phase exit",
+          "approval": "omp-amends.md §1.7 (owner-approved autonomous plan, 2026-11-11); owner to confirm limits"
+        },
+      "nightly_branches": "main only (no scheduler today; see nightly_scheduler)"
+    },
+  "fast_tier_budget":
+    {
+      "duration_report_command": "env -u AGENT make test-fast (scripts/checks/run-budgeted-fast.py writes var/tmp/tests/budgets/INVOCATION/report.json)",
+      "machines":
+        [
+          {
+            "id": "m-118e13922e9d",
+            "platform": "Darwin arm64",
+            "runtime": "python 3.13.7",
+            "wall_limit_s": 76,
+            "per_test_limit_s": 0.96,
+            "approval": "omp-amends.md §1.7 (owner-approved autonomous plan, 2026-11-11); owner to confirm limits"
+          }
+        ]
+    },
+  "coverage":
+    {
+      "scope":
+        [
+          "orchestrator/src",
+          "contract/src",
+          "lab/stages/raidar/define/tool/src",
+          "lab/stages/raidar/verify/tool/src"
+        ],
+      "line_floor": 99.43,
+      "branch_floor": 98.72,
+      "where": "orchestrator/pyproject.toml [tool.raidar.coverage]; integer-count enforcement in orchestrator/src/raidar/cli/quality.py"
+    },
+  "guards":
+    {
+      "process": "orchestrator/tests/process_guard.py, loaded by orchestrator/tests/conftest.py (audit hook; exempt markers slow, quality, docker, security, perf)",
+      "network": "gap: no fast-tier network denial today; the pinned reference's pytest adapter guard (omp_guardrails.adapters.pytest.guards fast-tier, IP sockets) arms it from the step-4 shadow PR",
+      "user_data": "gap: no session-wide guard today; omp-guardrails guard-run --tier t1 (TEST.user-data-guard) wraps the T1 command from the step-4 shadow PR"
+    },
+  "environments":
+    {
+      "required":
+        [
+          "host Python 3.13.7 with uv 0.10.0 and orchestrator dev extras",
+          "Node 22 with root npm ci --ignore-scripts; review-surface npm install and Playwright Chromium",
+          "Docker target from ~/.config/raidar/targets.toml (override RAIDAR_TARGETS_FILE) with the built Python pack image, for docker/security/perf"
+        ],
+      "require_flag": "RAIDAR_REQUIRE_DOCKER=1",
+      "readiness_probe": "env -u AGENT make docker-check (raidar target ensure); in tests tests.docker_trial_support.docker_target_ready(), 30 s; review surface: the lever's doctor step"
+    },
+  "verification_surface":
+    {
+      "lever_command": "node scripts/surface/lever.mjs",
+      "doctor_marker": "RAIDAR-SURFACE-DOCTOR-FAILED",
+      "feature_map_path": "docs/feature-map",
+      "journey_file_pattern": "review-surface/journeys/*.journey.mjs",
+      "data_dir_arg": "--data-dir",
+      "evidence_dir_arg": "--evidence-dir"
+    },
+  "ownership_areas":
+    {
+      "map":
+        {
+          "orchestrator/tests/test_affected_seam_gate_quality.py": "repository-gate",
+          "orchestrator/tests/test_agent_liveness_monitor_docker.py": "raidar.engine",
+          "orchestrator/tests/test_agent_liveness_monitor_slow.py": "raidar.engine",
+          "orchestrator/tests/test_analysis_bound_prefix.py": "raidar.scoring",
+          "orchestrator/tests/test_analysis_command.py": "raidar.scoring",
+          "orchestrator/tests/test_analysis_solvable_excluded_steps.py": "raidar.scoring",
+          "orchestrator/tests/test_assessment_store_concurrency.py": "raidar.scoring",
+          "orchestrator/tests/test_code_quality_boundaries_slow.py": "raidar.scoring",
+          "orchestrator/tests/test_code_quality_coverage_slow.py": "raidar.scoring",
+          "orchestrator/tests/test_code_quality_fork_parity_slow.py": "raidar.scoring",
+          "orchestrator/tests/test_code_quality_scorer_slow.py": "raidar.scoring",
+          "orchestrator/tests/test_define_shim.py": "define_tool",
+          "orchestrator/tests/test_dependency_resolver_slow.py": "raidar.grading",
+          "orchestrator/tests/test_experiment_schema_rules_quality.py": "raidar.design",
+          "orchestrator/tests/test_framework_evidence_safety_slow.py": "raidar.scoring",
+          "orchestrator/tests/test_gate_base_context.py": "raidar.subject",
+          "orchestrator/tests/test_grader_identity_and_canary_slow.py": "raidar.grading",
+          "orchestrator/tests/test_grading_execution_identity_slow.py": "raidar.contract",
+          "orchestrator/tests/test_health_evidence.py": "raidar.engine",
+          "orchestrator/tests/test_identity_baseline_quality.py": "repository-gate",
+          "orchestrator/tests/test_jev_client_and_cache_slow.py": "raidar.judge",
+          "orchestrator/tests/test_make_targets.py": "repository-gate",
+          "orchestrator/tests/test_mypy_guardrails_quality.py": "repository-gate",
+          "orchestrator/tests/test_offline_coverage_runs_slow.py": "raidar.grading",
+          "orchestrator/tests/test_overhead_budget_check.py": "raidar.engine",
+          "orchestrator/tests/test_package_lock_slow.py": "raidar.subject",
+          "orchestrator/tests/test_pre_fix_snapshot_grading_slow.py": "raidar.grading",
+          "orchestrator/tests/test_primitive_calls.py": "raidar.subject",
+          "orchestrator/tests/test_primitive_gate.py": "raidar.subject",
+          "orchestrator/tests/test_primitive_install.py": "raidar.contract",
+          "orchestrator/tests/test_primitive_payload_supervisor_slow.py": "raidar.subject",
+          "orchestrator/tests/test_problem_bulk.py": "raidar.design",
+          "orchestrator/tests/test_problem_dependencies.py": "raidar.design",
+          "orchestrator/tests/test_problem_errata_slow.py": "raidar.engine",
+          "orchestrator/tests/test_problem_import_behaviors.py": "raidar.design",
+          "orchestrator/tests/test_problem_spec_determinacy_slow.py": "raidar.design",
+          "orchestrator/tests/test_problem_validation_behaviors_slow.py": "raidar.design",
+          "orchestrator/tests/test_process_guard_quality.py": "repository-gate",
+          "orchestrator/tests/test_python_fanout_check.py": "repository-gate",
+          "orchestrator/tests/test_records_manifest.py": "raidar.engine",
+          "orchestrator/tests/test_release_bump_version.py": "release",
+          "orchestrator/tests/test_release_register_quality.py": "release",
+          "orchestrator/tests/test_release_register_slow.py": "release",
+          "orchestrator/tests/test_repository_gate_quality.py": "repository-gate",
+          "orchestrator/tests/test_review_projection_from_runs.py": "raidar.evaluation",
+          "orchestrator/tests/test_review_projection_integrity.py": "raidar.evaluation",
+          "orchestrator/tests/test_ruff_full_quality.py": "repository-gate",
+          "orchestrator/tests/test_rule_evidence_freshness.py": "repository-gate",
+          "orchestrator/tests/test_rule_evidence_quality.py": "repository-gate",
+          "orchestrator/tests/test_run_scoped_docker_environment_slow.py": "raidar.engine",
+          "orchestrator/tests/test_smoke_admission_stored_slow.py": "raidar.engine",
+          "orchestrator/tests/test_stage_authoring_cli_slow.py": "raidar.cli",
+          "orchestrator/tests/test_stage_container_lifecycle.py": "raidar.subject",
+          "orchestrator/tests/test_step_reset_docker.py": "raidar.engine",
+          "orchestrator/tests/test_step_reset_script.py": "raidar.engine",
+          "orchestrator/tests/test_structure_check.py": "repository-gate",
+          "orchestrator/tests/test_submission_dependencies_slow.py": "raidar.grading",
+          "orchestrator/tests/test_target_loss_job_guard_slow.py": "raidar.engine",
+          "orchestrator/tests/test_test_budget_report_quality.py": "repository-gate",
+          "orchestrator/tests/test_trial_execution_slow.py": "raidar.engine",
+          "orchestrator/tests/test_trial_planning_slow.py": "raidar.design",
+          "orchestrator/tests/test_verifier_and_regrade.py": "raidar.grading",
+          "orchestrator/tests/test_verifier_bundle_and_isolation_slow.py": "raidar.grading",
+          "orchestrator/tests/test_verifier_copy_sandbox_docker.py": "raidar.grading",
+          "orchestrator/tests/test_verifier_docker_boundary.py": "raidar.grading",
+          "orchestrator/tests/test_verifier_grading_behaviors_slow.py": "raidar.grading",
+          "orchestrator/tests/test_verifier_plugin_behaviors_slow.py": "raidar.grading",
+          "orchestrator/tests/test_workflow_package_runner.py": "raidar.subject",
+          "orchestrator/tests/test_workflow_runner_slow.py": "raidar.subject",
+          "orchestrator/tests/test_workspace_seed_slow.py": "raidar.engine",
+          "review-surface/journeys/plan-experiment.journey.mjs": "raidar.cli",
+          "review-surface/journeys/*.journey.mjs": "review-surface",
+          "review-surface/tests/*.spec.ts": "review-surface"
+        },
+      "affected_t2_selection": "omp-guardrails affected --base origin/main (reads this map and structure.owners; from the step-4 shadow PR); until cutover gate-commit runs scripts/checks/run-affected-seams.py (seam_owners, local slow/quality only)"
+    },
+  "identity_artefacts":
+    {
+      ".omp/identity.json": "execution identity record; check env -u AGENT make identity-check; test-only work leaves it unchanged",
+      "orchestrator/src/raidar/grading/": "grading digest scope (grading_execution_digest() in grading/records.py, inventory grading/identity.py); test-only work leaves the import closure and shipped payload bytes unchanged",
+      "orchestrator/src/raidar/subject/workflow/identity.py": "primitive_code identity (primitive and native-adapter import closures, payload sources, Harbor version); test-only work leaves it unchanged",
+      "lab/stages/*/*/": "released stage bytes registered in lab/releases.yaml (stage-tree/1); frozen per .agents/skills/raidar-release; prove package behaviour with env -u AGENT make stage-check NAME=raidar/define"
+    },
+  "layout":
+    {
+      "support_dir": "orchestrator/tests (reusable modules named *_support.py; tests/process_guard.py)",
+      "fixtures_dir": "orchestrator/tests/fixtures",
+      "test_file_patterns":
+        [
+          "orchestrator/tests/test_*.py",
+          "review-surface/tests/*.spec.ts",
+          "review-surface/journeys/*.journey.mjs"
+        ]
+    },
+  "command_notes":
+    {
+      "working_directory": "repository root; prefix make, uv and pytest calls with env -u AGENT; provision with env -u AGENT uv sync --project orchestrator --all-extras --frozen; generated files stay under RAIDAR_VAR (default var/), REPO_TMP_DIR (default var/tmp/) and REPO_CACHE_DIR (default .cache/)",
+      "interpretation": "make targets exit non-zero on any failure; test-fast also fails below the coverage floors (integer counts); check-test-budgets.py exits 1 on validity/policy/approval failure or CI timing breach and 2 on infrastructure/profile mismatch; the lever exits 0 doctor and journeys passed, 1 a journey failed, 2 usage error, 3 doctor failed (prints RAIDAR-SURFACE-DOCTOR-FAILED; an environment failure, never expectRed)",
+      "lsp":
+        [
+          {
+            "stack": "typescript",
+            "server": "typescript-language-server",
+            "install": "npm install -g typescript typescript-language-server",
+            "root": "repository root (package.json): init canary FAILED on 2026-11-11, no TypeScript in the root workspace and the global TypeScript 7 install ships no tsserver",
+            "canary": "review-surface/ (own package.json and typescript devDependency): references src/api/client.ts:20 api -> 1 location, ok on 2026-11-11"
+          },
+          {
+            "stack": "python",
+            "server": "pyright-langserver",
+            "install": "npm install -g pyright, or uv tool install pyright",
+            "root": "not detected at the repository root (no root pyproject.toml); run lsp from orchestrator/",
+            "canary": "orchestrator/: references src/raidar/cli/__init__.py:25 main -> 3 locations, ok on 2026-11-11"
+          }
+        ]
+    },
+  "adapter": "pytest",
+  "structure":
+    {
+      "owners":
+        {
+          "files":
+            {
+              "scripts/checks/check-repository-paths.py": "repository-gate",
+              "scripts/checks/guardrail_test_report.py": "repository-gate",
+              "scripts/checks/run-affected-seams.py": "repository-gate",
+              "scripts/checks/run-budgeted-fast.py": "repository-gate",
+              "scripts/release/bump-version.py": "release"
+            },
+          "directories":
+            {
+              "contract/src/raidar_contract/": "raidar_contract",
+              "contract/src/raidar_contract/package/": "raidar_contract",
+              "lab/stages/raidar/define/tool/src/define_tool/": "define_tool",
+              "lab/stages/raidar/verify/tool/src/verify_tool/": "verify_tool",
+              "orchestrator/src/raidar/cli/": "raidar.cli",
+              "orchestrator/src/raidar/contract/": "raidar.contract",
+              "orchestrator/src/raidar/design/": "raidar.design",
+              "orchestrator/src/raidar/design/experiment/": "raidar.design",
+              "orchestrator/src/raidar/design/problem/": "raidar.design",
+              "orchestrator/src/raidar/engine/": "raidar.engine",
+              "orchestrator/src/raidar/engine/health/": "raidar.engine",
+              "orchestrator/src/raidar/engine/job/": "raidar.engine",
+              "orchestrator/src/raidar/engine/perf/": "raidar.engine",
+              "orchestrator/src/raidar/engine/target/": "raidar.engine",
+              "orchestrator/src/raidar/engine/trial/": "raidar.engine",
+              "orchestrator/src/raidar/evaluation/": "raidar.evaluation",
+              "orchestrator/src/raidar/evaluation/analysis/": "raidar.evaluation",
+              "orchestrator/src/raidar/evaluation/ledger/": "raidar.evaluation",
+              "orchestrator/src/raidar/evaluation/review/": "raidar.evaluation",
+              "orchestrator/src/raidar/evaluation/review/projection/": "raidar.evaluation",
+              "orchestrator/src/raidar/evaluation/review/quality/": "raidar.evaluation",
+              "orchestrator/src/raidar/grading/": "raidar.grading",
+              "orchestrator/src/raidar/grading/coverage/": "raidar.grading",
+              "orchestrator/src/raidar/grading/pre_fix/": "raidar.grading",
+              "orchestrator/src/raidar/grading/runtime/": "raidar.grading",
+              "orchestrator/src/raidar/judge/": "raidar.judge",
+              "orchestrator/src/raidar/scoring/": "raidar.scoring",
+              "orchestrator/src/raidar/scoring/catalog/": "raidar.scoring",
+              "orchestrator/src/raidar/scoring/code_quality/": "raidar.scoring",
+              "orchestrator/src/raidar/scoring/code_quality/snapshot_tool/": "raidar.scoring",
+              "orchestrator/src/raidar/scoring/correctness/": "raidar.scoring",
+              "orchestrator/src/raidar/scoring/coverage_inputs/": "raidar.scoring",
+              "orchestrator/src/raidar/scoring/definition_coverage/": "raidar.scoring",
+              "orchestrator/src/raidar/scoring/framework/": "raidar.scoring",
+              "orchestrator/src/raidar/scoring/judge/": "raidar.scoring",
+              "orchestrator/src/raidar/scoring/process_checks/": "raidar.scoring",
+              "orchestrator/src/raidar/scoring/resource_usage/": "raidar.scoring",
+              "orchestrator/src/raidar/scoring/test_coverage/": "raidar.scoring",
+              "orchestrator/src/raidar/scoring/verification_effort/": "raidar.scoring",
+              "orchestrator/src/raidar/subject/": "raidar.subject",
+              "orchestrator/src/raidar/subject/agent/": "raidar.subject",
+              "orchestrator/src/raidar/subject/agent/adapters/": "raidar.subject",
+              "orchestrator/src/raidar/subject/environment/": "raidar.subject",
+              "orchestrator/src/raidar/subject/environment/python/": "raidar.subject",
+              "orchestrator/src/raidar/subject/package/": "raidar.subject",
+              "orchestrator/src/raidar/subject/primitive/": "raidar.subject",
+              "orchestrator/src/raidar/subject/primitive/payload/": "raidar.subject",
+              "orchestrator/src/raidar/subject/workflow/": "raidar.subject",
+              "review-surface/": "review-surface",
+              "review-surface/src/": "review-surface",
+              "review-surface/src/api/": "review-surface",
+              "review-surface/src/components/": "review-surface",
+              "review-surface/src/pages/": "review-surface",
+              "review-surface/src/pages/wireframe-components/": "review-surface",
+              "review-surface/src/presentation/": "review-surface",
+              "review-surface/src/quality/": "review-surface",
+              "review-surface/src/quality/components/": "review-surface",
+              "scripts/checks/": "repository-gate",
+              "scripts/release/": "release",
+              "scripts/setup/": "repository-gate",
+              "scripts/surface/": "review-surface",
+              "scripts/vendor/setup-repository-guardrails/": "repository-gate"
+            }
+        },
+      "tiers":
+        [
+          "raidar.contract",
+          "raidar.judge",
+          "raidar.subject",
+          "raidar.grading",
+          "raidar.scoring",
+          "raidar.design",
+          "raidar.engine",
+          "raidar.evaluation",
+          "raidar.cli"
+        ],
+      "import_direction":
+        {
+          "package": "raidar",
+          "source_root": "orchestrator/src",
+          "native":
+            {
+              "command":
+                ["lint-imports", "--config", ".importlinter", "--no-cache"],
+              "cwd": "orchestrator",
+              "timeout_s": 120
+            }
+        }
+    },
+  "house_style":
+    {
+      "version": 1,
+      "exceptions":
+        [
+          {
+            "rule": "TEST.no-test-hooks",
+            "path": "orchestrator/src/raidar/cli/quality.py",
+            "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md \u00a72.1"
+          },
+          {
+            "rule": "TEST.no-test-hooks",
+            "path": "orchestrator/src/raidar/grading/bundle.py",
+            "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md \u00a72.1"
+          },
+          {
+            "rule": "TEST.no-test-hooks",
+            "path": "orchestrator/src/raidar/grading/payload.py",
+            "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md \u00a72.1"
+          },
+          {
+            "rule": "TEST.no-test-hooks",
+            "path": "orchestrator/src/raidar/grading/sandbox.py",
+            "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md \u00a72.1"
+          },
+          {
+            "rule": "TEST.no-test-hooks",
+            "path": "orchestrator/src/raidar/scoring/process_checks/work_session.py",
+            "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md \u00a72.1"
+          },
+          {
+            "rule": "TEST.no-test-hooks",
+            "path": "orchestrator/src/raidar/scoring/process_checks/work_tests.py",
+            "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md \u00a72.1"
+          },
+          {
+            "rule": "TEST.no-test-hooks",
+            "path": "orchestrator/src/raidar/scoring/test_coverage/__init__.py",
+            "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md \u00a72.1"
+          },
+          {
+            "rule": "TEST.no-test-hooks",
+            "path": "orchestrator/src/raidar/subject/primitive/gate.py",
+            "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md \u00a72.1"
+          },
+          {
+            "rule": "TEST.no-test-hooks",
+            "path": "orchestrator/src/raidar/subject/primitive/gate_tool.py",
+            "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md \u00a72.1"
+          },
+          {
+            "rule": "TEST.no-test-hooks",
+            "path": "orchestrator/src/raidar/subject/workflow/judgeloop.py",
+            "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md \u00a72.1"
+          },
+          {
+            "rule": "TEST.no-test-hooks",
+            "path": "orchestrator/src/raidar/subject/workflow/package_checks.py",
+            "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md \u00a72.1"
+          },
+          {
+            "rule": "TEST.no-test-hooks",
+            "path": "lab/stages/raidar/verify/fixtures/*",
+            "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md \u00a72.2"
+          },
+          {
+            "rule": "TEST.no-test-hooks",
+            "path": "orchestrator/src/raidar/engine/trial/environment.py",
+            "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md \u00a72.3"
+          },
+          {
+            "rule": "TEST.no-test-hooks",
+            "path": "orchestrator/src/raidar/grading/verifier.py",
+            "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md \u00a72.3"
+          },
+          {
+            "rule": "TEST.no-evasion",
+            "path": "orchestrator/tests/process_guard.py",
+            "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md \u00a72.4"
+          },
+          {
+            "rule": "TEST.no-evasion",
+            "path": "orchestrator/tests/test_make_targets.py",
+            "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md \u00a72.4"
+          },
+          {
+            "rule": "TEST.no-evasion",
+            "path": "orchestrator/tests/test_overhead_fixture_run.py",
+            "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md \u00a72.4"
+          },
+          {
+            "rule": "TEST.no-evasion",
+            "path": "orchestrator/tests/test_primitive_calls.py",
+            "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md \u00a72.4"
+          },
+          {
+            "rule": "TEST.no-evasion",
+            "path": "orchestrator/tests/test_primitive_payload_supervisor_slow.py",
+            "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md \u00a72.4"
+          },
+          {
+            "rule": "TEST.no-evasion",
+            "path": "orchestrator/tests/test_step_reset_script.py",
+            "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md \u00a72.4"
+          },
+          {
+            "rule": "TEST.no-evasion",
+            "path": "orchestrator/tests/test_verifier_bundle_and_isolation_slow.py",
+            "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md \u00a72.4"
+          },
+          {
+            "rule": "TEST.no-evasion",
+            "path": "orchestrator/tests/test_workflow_verify_docker.py",
+            "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md \u00a72.4"
+          },
+          {
+            "rule": "NAME.test-files",
+            "path": "scripts/checks/test_budget_evidence.py",
+            "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md \u00a72.6"
+          },
+          {
+            "rule": "TEST.no-self-mocking",
+            "path": "orchestrator/tests/conftest.py",
+            "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md \u00a72.5"
+          },
+          {
+            "rule": "TEST.no-self-mocking",
+            "path": "orchestrator/tests/experiment_spec_support.py",
+            "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md \u00a72.5"
+          },
+          {
+            "rule": "TEST.no-self-mocking",
+            "path": "orchestrator/tests/package_support.py",
+            "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md \u00a72.5"
+          },
+          {
+            "rule": "TEST.no-self-mocking",
+            "path": "orchestrator/tests/primitive_support.py",
+            "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md \u00a72.5"
+          },
+          {
+            "rule": "TEST.no-self-mocking",
+            "path": "orchestrator/tests/stage_check_support.py",
+            "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md \u00a72.5"
+          },
+          {
+            "rule": "TEST.no-self-mocking",
+            "path": "orchestrator/tests/test_agent_boundary_outcomes.py",
+            "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md \u00a72.5"
+          },
+          {
+            "rule": "TEST.no-self-mocking",
+            "path": "orchestrator/tests/test_agent_process_reaping.py",
+            "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md \u00a72.5"
+          },
+          {
+            "rule": "TEST.no-self-mocking",
+            "path": "orchestrator/tests/test_analysis_cli_coverage.py",
+            "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md \u00a72.5"
+          },
+          {
+            "rule": "TEST.no-self-mocking",
+            "path": "orchestrator/tests/test_analysis_outcomes.py",
+            "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md \u00a72.5"
+          },
+          {
+            "rule": "TEST.no-self-mocking",
+            "path": "orchestrator/tests/test_analysis_primary_outcome.py",
+            "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md \u00a72.5"
+          },
+          {
+            "rule": "TEST.no-self-mocking",
+            "path": "orchestrator/tests/test_analysis_reporting_boundaries.py",
+            "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md \u00a72.5"
+          },
+          {
+            "rule": "TEST.no-self-mocking",
+            "path": "orchestrator/tests/test_analysis_verification_effort.py",
+            "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md \u00a72.5"
+          },
+          {
+            "rule": "TEST.no-self-mocking",
+            "path": "orchestrator/tests/test_assessment_store_behaviors.py",
+            "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md \u00a72.5"
+          },
+          {
+            "rule": "TEST.no-self-mocking",
+            "path": "orchestrator/tests/test_assessment_store_concurrency.py",
+            "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md \u00a72.5"
+          },
+          {
+            "rule": "TEST.no-self-mocking",
+            "path": "orchestrator/tests/test_claude_code_cli_adapter.py",
+            "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md \u00a72.5"
+          },
+          {
+            "rule": "TEST.no-self-mocking",
+            "path": "orchestrator/tests/test_cli_commands.py",
+            "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md \u00a72.5"
+          },
+          {
+            "rule": "TEST.no-self-mocking",
+            "path": "orchestrator/tests/test_cli_execution_outcomes.py",
+            "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md \u00a72.5"
+          },
+          {
+            "rule": "TEST.no-self-mocking",
+            "path": "orchestrator/tests/test_code_quality_measurement_closure.py",
+            "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md \u00a72.5"
+          },
+          {
+            "rule": "TEST.no-self-mocking",
+            "path": "orchestrator/tests/test_code_quality_scorer.py",
+            "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md \u00a72.5"
+          },
+          {
+            "rule": "TEST.no-self-mocking",
+            "path": "orchestrator/tests/test_codex_cli_adapter.py",
+            "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md \u00a72.5"
+          },
+          {
+            "rule": "TEST.no-self-mocking",
+            "path": "orchestrator/tests/test_coverage_scorer_readings.py",
+            "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md \u00a72.5"
+          },
+          {
+            "rule": "TEST.no-self-mocking",
+            "path": "orchestrator/tests/test_declared_wheels_docker.py",
+            "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md \u00a72.5"
+          },
+          {
+            "rule": "TEST.no-self-mocking",
+            "path": "orchestrator/tests/test_dependency_resolver.py",
+            "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md \u00a72.5"
+          },
+          {
+            "rule": "TEST.no-self-mocking",
+            "path": "orchestrator/tests/test_detached_supervisor_outcomes.py",
+            "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md \u00a72.5"
+          },
+          {
+            "rule": "TEST.no-self-mocking",
+            "path": "orchestrator/tests/test_experiment_lock_behaviors.py",
+            "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md \u00a72.5"
+          },
+          {
+            "rule": "TEST.no-self-mocking",
+            "path": "orchestrator/tests/test_gate_tool_witness.py",
+            "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md \u00a72.5"
+          },
+          {
+            "rule": "TEST.no-self-mocking",
+            "path": "orchestrator/tests/test_generated_artifact_guard.py",
+            "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md \u00a72.5"
+          },
+          {
+            "rule": "TEST.no-self-mocking",
+            "path": "orchestrator/tests/test_grading_execution_identity.py",
+            "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md \u00a72.5"
+          },
+          {
+            "rule": "TEST.no-self-mocking",
+            "path": "orchestrator/tests/test_harness_contracts.py",
+            "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md \u00a72.5"
+          },
+          {
+            "rule": "TEST.no-self-mocking",
+            "path": "orchestrator/tests/test_health_coverage_close.py",
+            "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md \u00a72.5"
+          },
+          {
+            "rule": "TEST.no-self-mocking",
+            "path": "orchestrator/tests/test_health_judge.py",
+            "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md \u00a72.5"
+          },
+          {
+            "rule": "TEST.no-self-mocking",
+            "path": "orchestrator/tests/test_imports.py",
+            "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md \u00a72.5"
+          },
+          {
+            "rule": "TEST.no-self-mocking",
+            "path": "orchestrator/tests/test_inventory_invalid_evidence.py",
+            "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md \u00a72.5"
+          },
+          {
+            "rule": "TEST.no-self-mocking",
+            "path": "orchestrator/tests/test_jev_coverage_closure.py",
+            "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md \u00a72.5"
+          },
+          {
+            "rule": "TEST.no-self-mocking",
+            "path": "orchestrator/tests/test_jev_judge_parity.py",
+            "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md \u00a72.5"
+          },
+          {
+            "rule": "TEST.no-self-mocking",
+            "path": "orchestrator/tests/test_job_admission_outcomes.py",
+            "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md \u00a72.5"
+          },
+          {
+            "rule": "TEST.no-self-mocking",
+            "path": "orchestrator/tests/test_job_completion_outcomes.py",
+            "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md \u00a72.5"
+          },
+          {
+            "rule": "TEST.no-self-mocking",
+            "path": "orchestrator/tests/test_mypy_guardrails_quality.py",
+            "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md \u00a72.5"
+          },
+          {
+            "rule": "TEST.no-self-mocking",
+            "path": "orchestrator/tests/test_native_agent_api.py",
+            "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md \u00a72.5"
+          },
+          {
+            "rule": "TEST.no-self-mocking",
+            "path": "orchestrator/tests/test_native_agents.py",
+            "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md \u00a72.5"
+          },
+          {
+            "rule": "TEST.no-self-mocking",
+            "path": "orchestrator/tests/test_offline_coverage_decisions.py",
+            "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md \u00a72.5"
+          },
+          {
+            "rule": "TEST.no-self-mocking",
+            "path": "orchestrator/tests/test_offline_coverage_runs_slow.py",
+            "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md \u00a72.5"
+          },
+          {
+            "rule": "TEST.no-self-mocking",
+            "path": "orchestrator/tests/test_offline_grading_concurrency.py",
+            "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md \u00a72.5"
+          },
+          {
+            "rule": "TEST.no-self-mocking",
+            "path": "orchestrator/tests/test_overhead_report_gate.py",
+            "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md \u00a72.5"
+          },
+          {
+            "rule": "TEST.no-self-mocking",
+            "path": "orchestrator/tests/test_package_identity.py",
+            "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md \u00a72.5"
+          },
+          {
+            "rule": "TEST.no-self-mocking",
+            "path": "orchestrator/tests/test_package_lock.py",
+            "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md \u00a72.5"
+          },
+          {
+            "rule": "TEST.no-self-mocking",
+            "path": "orchestrator/tests/test_package_never_runs_on_host.py",
+            "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md \u00a72.5"
+          },
+          {
+            "rule": "TEST.no-self-mocking",
+            "path": "orchestrator/tests/test_package_stage_install.py",
+            "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md \u00a72.5"
+          },
+          {
+            "rule": "TEST.no-self-mocking",
+            "path": "orchestrator/tests/test_plan_outcomes.py",
+            "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md \u00a72.5"
+          },
+          {
+            "rule": "TEST.no-self-mocking",
+            "path": "orchestrator/tests/test_pooling_gate.py",
+            "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md \u00a72.5"
+          },
+          {
+            "rule": "TEST.no-self-mocking",
+            "path": "orchestrator/tests/test_pre_fix_grading_decisions.py",
+            "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md \u00a72.5"
+          },
+          {
+            "rule": "TEST.no-self-mocking",
+            "path": "orchestrator/tests/test_primitive_calls_shape.py",
+            "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md \u00a72.5"
+          },
+          {
+            "rule": "TEST.no-self-mocking",
+            "path": "orchestrator/tests/test_primitive_install.py",
+            "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md \u00a72.5"
+          },
+          {
+            "rule": "TEST.no-self-mocking",
+            "path": "orchestrator/tests/test_primitive_outputs.py",
+            "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md \u00a72.5"
+          },
+          {
+            "rule": "TEST.no-self-mocking",
+            "path": "orchestrator/tests/test_primitive_payload_boundaries.py",
+            "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md \u00a72.5"
+          },
+          {
+            "rule": "TEST.no-self-mocking",
+            "path": "orchestrator/tests/test_primitive_payload_supervisor_slow.py",
+            "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md \u00a72.5"
+          },
+          {
+            "rule": "TEST.no-self-mocking",
+            "path": "orchestrator/tests/test_primitive_stop.py",
+            "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md \u00a72.5"
+          },
+          {
+            "rule": "TEST.no-self-mocking",
+            "path": "orchestrator/tests/test_problem_bulk.py",
+            "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md \u00a72.5"
+          },
+          {
+            "rule": "TEST.no-self-mocking",
+            "path": "orchestrator/tests/test_problem_cli_decisions.py",
+            "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md \u00a72.5"
+          },
+          {
+            "rule": "TEST.no-self-mocking",
+            "path": "orchestrator/tests/test_problem_errata_slow.py",
+            "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md \u00a72.5"
+          },
+          {
+            "rule": "TEST.no-self-mocking",
+            "path": "orchestrator/tests/test_problem_record_decisions.py",
+            "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md \u00a72.5"
+          },
+          {
+            "rule": "TEST.no-self-mocking",
+            "path": "orchestrator/tests/test_problem_validation_behaviors.py",
+            "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md \u00a72.5"
+          },
+          {
+            "rule": "TEST.no-self-mocking",
+            "path": "orchestrator/tests/test_problem_validation_behaviors_slow.py",
+            "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md \u00a72.5"
+          },
+          {
+            "rule": "TEST.no-self-mocking",
+            "path": "orchestrator/tests/test_problem_validation_decisions.py",
+            "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md \u00a72.5"
+          },
+          {
+            "rule": "TEST.no-self-mocking",
+            "path": "orchestrator/tests/test_process_compliance.py",
+            "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md \u00a72.5"
+          },
+          {
+            "rule": "TEST.no-self-mocking",
+            "path": "orchestrator/tests/test_python_pack_image.py",
+            "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md \u00a72.5"
+          },
+          {
+            "rule": "TEST.no-self-mocking",
+            "path": "orchestrator/tests/test_python_pack_provisioning.py",
+            "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md \u00a72.5"
+          },
+          {
+            "rule": "TEST.no-self-mocking",
+            "path": "orchestrator/tests/test_quality_gate_commands.py",
+            "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md \u00a72.5"
+          },
+          {
+            "rule": "TEST.no-self-mocking",
+            "path": "orchestrator/tests/test_registry_inspection_commands.py",
+            "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md \u00a72.5"
+          },
+          {
+            "rule": "TEST.no-self-mocking",
+            "path": "orchestrator/tests/test_release_cutover.py",
+            "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md \u00a72.5"
+          },
+          {
+            "rule": "TEST.no-self-mocking",
+            "path": "orchestrator/tests/test_release_register.py",
+            "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md \u00a72.5"
+          },
+          {
+            "rule": "TEST.no-self-mocking",
+            "path": "orchestrator/tests/test_repository_contract_boundaries.py",
+            "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md \u00a72.5"
+          },
+          {
+            "rule": "TEST.no-self-mocking",
+            "path": "orchestrator/tests/test_rescore_store_bindings.py",
+            "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md \u00a72.5"
+          },
+          {
+            "rule": "TEST.no-self-mocking",
+            "path": "orchestrator/tests/test_run_scoped_docker_environment.py",
+            "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md \u00a72.5"
+          },
+          {
+            "rule": "TEST.no-self-mocking",
+            "path": "orchestrator/tests/test_run_scoped_docker_environment_slow.py",
+            "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md \u00a72.5"
+          },
+          {
+            "rule": "TEST.no-self-mocking",
+            "path": "orchestrator/tests/test_runtime_gate_refusals.py",
+            "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md \u00a72.5"
+          },
+          {
+            "rule": "TEST.no-self-mocking",
+            "path": "orchestrator/tests/test_scorer_store_and_trial_ids.py",
+            "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md \u00a72.5"
+          },
+          {
+            "rule": "TEST.no-self-mocking",
+            "path": "orchestrator/tests/test_stage_authoring_cli.py",
+            "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md \u00a72.5"
+          },
+          {
+            "rule": "TEST.no-self-mocking",
+            "path": "orchestrator/tests/test_stage_command_outcomes.py",
+            "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md \u00a72.5"
+          },
+          {
+            "rule": "TEST.no-self-mocking",
+            "path": "orchestrator/tests/test_stage_package.py",
+            "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md \u00a72.5"
+          },
+          {
+            "rule": "TEST.no-self-mocking",
+            "path": "orchestrator/tests/test_submission_dependencies.py",
+            "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md \u00a72.5"
+          },
+          {
+            "rule": "TEST.no-self-mocking",
+            "path": "orchestrator/tests/test_submission_dependencies_slow.py",
+            "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md \u00a72.5"
+          },
+          {
+            "rule": "TEST.no-self-mocking",
+            "path": "orchestrator/tests/test_target_loss_job_guard.py",
+            "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md \u00a72.5"
+          },
+          {
+            "rule": "TEST.no-self-mocking",
+            "path": "orchestrator/tests/test_target_selection_and_trust.py",
+            "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md \u00a72.5"
+          },
+          {
+            "rule": "TEST.no-self-mocking",
+            "path": "orchestrator/tests/test_target_tunnel_and_ensure.py",
+            "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md \u00a72.5"
+          },
+          {
+            "rule": "TEST.no-self-mocking",
+            "path": "orchestrator/tests/test_tool_tree_hashing.py",
+            "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md \u00a72.5"
+          },
+          {
+            "rule": "TEST.no-self-mocking",
+            "path": "orchestrator/tests/test_trial_configuration_outcomes.py",
+            "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md \u00a72.5"
+          },
+          {
+            "rule": "TEST.no-self-mocking",
+            "path": "orchestrator/tests/test_trial_execution.py",
+            "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md \u00a72.5"
+          },
+          {
+            "rule": "TEST.no-self-mocking",
+            "path": "orchestrator/tests/test_trial_execution_slow.py",
+            "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md \u00a72.5"
+          },
+          {
+            "rule": "TEST.no-self-mocking",
+            "path": "orchestrator/tests/test_trial_health_audit.py",
+            "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md \u00a72.5"
+          },
+          {
+            "rule": "TEST.no-self-mocking",
+            "path": "orchestrator/tests/test_trial_lifecycle_outcomes.py",
+            "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md \u00a72.5"
+          },
+          {
+            "rule": "TEST.no-self-mocking",
+            "path": "orchestrator/tests/test_trial_materialisation_outcomes.py",
+            "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md \u00a72.5"
+          },
+          {
+            "rule": "TEST.no-self-mocking",
+            "path": "orchestrator/tests/test_trial_provision_outcomes.py",
+            "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md \u00a72.5"
+          },
+          {
+            "rule": "TEST.no-self-mocking",
+            "path": "orchestrator/tests/test_verifier_and_regrade.py",
+            "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md \u00a72.5"
+          },
+          {
+            "rule": "TEST.no-self-mocking",
+            "path": "orchestrator/tests/test_verifier_copy_sandbox.py",
+            "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md \u00a72.5"
+          },
+          {
+            "rule": "TEST.no-self-mocking",
+            "path": "orchestrator/tests/test_verifier_docker_boundary.py",
+            "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md \u00a72.5"
+          },
+          {
+            "rule": "TEST.no-self-mocking",
+            "path": "orchestrator/tests/test_verifier_grading_behaviors.py",
+            "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md \u00a72.5"
+          },
+          {
+            "rule": "TEST.no-self-mocking",
+            "path": "orchestrator/tests/test_verifier_regrade_decisions.py",
+            "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md \u00a72.5"
+          },
+          {
+            "rule": "TEST.no-self-mocking",
+            "path": "orchestrator/tests/test_workflow_judging.py",
+            "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md \u00a72.5"
+          },
+          {
+            "rule": "TEST.no-self-mocking",
+            "path": "orchestrator/tests/test_workflow_package.py",
+            "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md \u00a72.5"
+          },
+          {
+            "rule": "TEST.no-self-mocking",
+            "path": "orchestrator/tests/test_workflow_package_runner.py",
+            "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md \u00a72.5"
+          },
+          {
+            "rule": "TEST.no-self-mocking",
+            "path": "orchestrator/tests/test_workflow_runner.py",
+            "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md \u00a72.5"
+          },
+          {
+            "rule": "TEST.no-self-mocking",
+            "path": "orchestrator/tests/verifier_support.py",
+            "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md \u00a72.5"
+          },
+          {
+            "rule": "TEST.no-test-hooks",
+            "path": "lab/stages/raidar/define/tool/src/define_tool/compact.py",
+            "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md \u00a72.5"
+          },
+          {
+            "rule": "TEST.no-test-hooks",
+            "path": "lab/stages/raidar/define/tool/src/define_tool/enumerated.py",
+            "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md \u00a72.5"
+          },
+          {
+            "rule": "TEST.no-test-hooks",
+            "path": "lab/stages/raidar/define/tool/src/define_tool/featuredef.py",
+            "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md \u00a72.5"
+          },
+          {
+            "rule": "TEST.no-test-hooks",
+            "path": "lab/stages/raidar/define/tool/src/define_tool/normative.py",
+            "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md \u00a72.5"
+          },
+          {
+            "rule": "TEST.no-test-hooks",
+            "path": "lab/stages/raidar/define/tool/src/define_tool/tool.py",
+            "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md \u00a72.5"
+          },
+          {
+            "rule": "TEST.no-test-hooks",
+            "path": "orchestrator/src/raidar/cli/stage.py",
+            "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md \u00a72.5"
+          },
+          {
+            "rule": "TEST.no-test-hooks",
+            "path": "orchestrator/src/raidar/design/problem/resolver.py",
+            "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md \u00a72.5"
+          },
+          {
+            "rule": "TEST.no-test-hooks",
+            "path": "orchestrator/src/raidar/engine/health/admission.py",
+            "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md \u00a72.5"
+          },
+          {
+            "rule": "TEST.no-test-hooks",
+            "path": "orchestrator/src/raidar/engine/perf/budgets.py",
+            "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md \u00a72.5"
+          },
+          {
+            "rule": "TEST.no-test-hooks",
+            "path": "orchestrator/src/raidar/evaluation/analysis/manipulation.py",
+            "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md \u00a72.5"
+          },
+          {
+            "rule": "TEST.no-test-hooks",
+            "path": "orchestrator/src/raidar/evaluation/analysis/stats.py",
+            "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md \u00a72.5"
+          },
+          {
+            "rule": "TEST.no-test-hooks",
+            "path": "orchestrator/src/raidar/evaluation/review/quality/projection.py",
+            "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md \u00a72.5"
+          },
+          {
+            "rule": "TEST.no-test-hooks",
+            "path": "orchestrator/src/raidar/scoring/catalog/builtin.py",
+            "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md \u00a72.5"
+          },
+          {
+            "rule": "TEST.no-test-hooks",
+            "path": "orchestrator/src/raidar/scoring/code_quality/arithmetic.py",
+            "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md \u00a72.5"
+          },
+          {
+            "rule": "TEST.no-test-hooks",
+            "path": "orchestrator/src/raidar/scoring/code_quality/lineage.py",
+            "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md \u00a72.5"
+          },
+          {
+            "rule": "TEST.no-test-hooks",
+            "path": "orchestrator/src/raidar/scoring/judge/gating.py",
+            "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md \u00a72.5"
+          },
+          {
+            "rule": "TEST.no-test-hooks",
+            "path": "orchestrator/src/raidar/scoring/judge/ledger.py",
+            "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md \u00a72.5"
+          },
+          {
+            "rule": "TEST.no-test-hooks",
+            "path": "orchestrator/src/raidar/subject/agent/harness.py",
+            "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md \u00a72.5"
+          },
+          {
+            "rule": "TEST.no-test-hooks",
+            "path": "orchestrator/src/raidar/subject/workflow/identity.py",
+            "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md \u00a72.5"
+          }
+        ]
+    },
+  "guardrails":
+    {
+      "structure":
+        {
+          "root_directories":
+            [
+              ".agents",
+              ".claude",
+              ".github",
+              ".omp",
+              "contract",
+              "docs",
+              "lab",
+              "orchestrator",
+              "review-surface",
+              "scripts",
+              "var"
+            ],
+          "root_files":
+            [
+              ".gitignore",
+              ".mailmap",
+              ".pre-commit-config.yaml",
+              ".python-version",
+              "AGENTS.md",
+              "CHANGELOG.md",
+              "CLAUDE.md",
+              "CODEOWNERS",
+              "Makefile",
+              "README.md",
+              "package-lock.json",
+              "package.json",
+              "skills-lock.json",
+              "split-design.md"
+            ],
+          "areas":
+            {
+              "lab":
+                {
+                  "directories":
+                    [
+                      "agents",
+                      "environments",
+                      "experiments",
+                      "judge",
+                      "ledger",
+                      "problems",
+                      "stage-checks",
+                      "stages",
+                      "workflows"
+                    ],
+                  "files": ["imports.yaml", "releases.yaml"]
+                }
+            },
+          "packages":
+            [
+              {
+                "root": "orchestrator/src/raidar",
+                "children":
+                  {
+                    "cli": [],
+                    "contract": [],
+                    "judge": [],
+                    "design": ["experiment", "problem"],
+                    "subject":
+                      [
+                        "agent",
+                        "environment",
+                        "package",
+                        "primitive",
+                        "workflow"
+                      ],
+                    "engine": ["health", "job", "perf", "target", "trial"],
+                    "grading": ["coverage", "pre_fix", "runtime"],
+                    "scoring":
+                      [
+                        "catalog",
+                        "code_quality",
+                        "correctness",
+                        "coverage_inputs",
+                        "definition_coverage",
+                        "framework",
+                        "judge",
+                        "process_checks",
+                        "resource_usage",
+                        "test_coverage",
+                        "verification_effort"
+                      ],
+                    "evaluation": ["analysis", "ledger", "review"]
+                  },
+                "max_depth": 3
+              }
+            ],
+          "instances":
+            [
+              {
+                "root": "lab/workflows",
+                "depth": 2,
+                "marker": "workflow.yaml"
+              },
+              {
+                "root": "lab/stages",
+                "depth": 2,
+                "marker": "stage.yaml",
+                "exempt": ["lab/stages/README.md"]
+              }
+            ],
+          "forbidden_imports":
+            [{ "root": "contract/src", "modules": ["harbor", "raidar"] }]
+        },
+      "naming":
+        {
+          "ecosystems":
+            {
+              "python":
+                [
+                  "orchestrator/src",
+                  "contract/src",
+                  "lab/stages/raidar/define/tool/src",
+                  "lab/stages/raidar/verify/tool/src"
+                ],
+              "asset_id": [".agents/skills"]
+            },
+          "skip":
+            [
+              "scripts/vendor",
+              "orchestrator/tests/fixtures/guardrails",
+              "lab/stages/raidar/verify/fixtures"
+            ],
+          "version_exempt": ["docs"],
+          "symbol_exceptions":
+            {
+              "scripts/checks/check-test-evidence.py":
+                [
+                  "visit_Name",
+                  "visit_FunctionDef",
+                  "visit_AsyncFunctionDef",
+                  "visit_JoinedStr",
+                  "visit_Call"
+                ],
+              "scripts/checks/check-analyzer-scope.py":
+                [
+                  "visit_Import",
+                  "visit_ImportFrom",
+                  "visit_Assign",
+                  "visit_AnnAssign",
+                  "visit_FunctionDef",
+                  "visit_AsyncFunctionDef",
+                  "visit_ClassDef",
+                  "visit_Call",
+                  "visit_Attribute",
+                  "visit_Name"
+                ],
+              "scripts/checks/check-test-hygiene.py":
+                [
+                  "visit_Import",
+                  "visit_ImportFrom",
+                  "visit_FunctionDef",
+                  "visit_AsyncFunctionDef",
+                  "visit_AnnAssign",
+                  "visit_Assign",
+                  "visit_With",
+                  "visit_Call"
+                ],
+              "orchestrator/src/raidar/scoring/judge/codebase.py":
+                [
+                  "visit_Module",
+                  "visit_ClassDef",
+                  "visit_Call",
+                  "visit_Attribute",
+                  "visit_Name"
+                ],
+              "orchestrator/tests/test_jev_client_and_cache_slow.py":
+                ["do_POST"]
+            }
+        },
+      "python":
+        {
+          "maintained_roots":
+            [
+              "contract/src/raidar_contract",
+              "contract/conformance",
+              "orchestrator/src/raidar",
+              "orchestrator/tests",
+              "scripts/checks",
+              "scripts/release",
+              ".agents/skills",
+              "lab/stages/*/*/tool/src"
+            ],
+          "excluded_paths":
+            [
+              "scripts/vendor/setup-repository-guardrails/validate_rule_coverage.py",
+              "orchestrator/tests/fixtures/guardrails",
+              "lab/stages/raidar/verify/fixtures",
+              "docs",
+              "lab/experiments",
+              "var",
+              ".cache",
+              "orchestrator/.cache",
+              "orchestrator/.venv"
+            ],
+          "script_roots": ["scripts/checks", "scripts/release"],
+          "script_names":
+            [
+              "bump-version.py",
+              "check-analyzer-scope.py",
+              "check-bespoke-rule-canary.py",
+              "check-finding-baseline.py",
+              "check-gate-rule-canary.py",
+              "check-hook-installation.py",
+              "check-identity.py",
+              "check-mypy-coverage.py",
+              "check-python-fanout.py",
+              "check-python-quality.py",
+              "check-repository-paths.py",
+              "check-ruff-suppressions.py",
+              "check-rule-evidence.py",
+              "check-structure.py",
+              "check-test-budgets.py",
+              "check-test-evidence.py",
+              "check-test-hygiene.py",
+              "check-tool-rule-canary.py",
+              "check-toolchain-parity.py",
+              "check_toolchain_pins.py",
+              "record-host-readback.py",
+              "run-affected-seams.py",
+              "run-budgeted-fast.py",
+              "run-repository-gate.py",
+              "validate-rule-coverage.py",
+              "verify-version-wiring.py"
+            ],
+          "script_name_exceptions":
+            [
+              "scripts/checks/check_toolchain_pins.py",
+              "scripts/checks/guardrail_test_report.py",
+              "scripts/checks/ruff_baseline.py",
+              "scripts/checks/test_budget_evidence.py"
+            ],
+          "test_roots": ["orchestrator/tests"],
+          "test_groups":
+            {
+              "behaviour": ["orchestrator/tests/test_*.py"],
+              "support":
+                [
+                  "orchestrator/tests/*_support.py",
+                  "orchestrator/tests/process_guard.py"
+                ],
+              "fixtures":
+                [
+                  "orchestrator/tests/fixtures/**",
+                  "orchestrator/tests/review_fixtures/**"
+                ]
+            },
+          "test_root_files":
+            [
+              "orchestrator/tests/__init__.py",
+              "orchestrator/tests/conftest.py"
+            ],
+          "generic_name_allowlist": [],
+          "non_package_dirs":
+            [
+              "checks",
+              "orchestrator",
+              "raidar",
+              "release",
+              "scripts",
+              "src",
+              "tests"
+            ],
+          "data_label_dirs":
+            [
+              "lab/stages/*",
+              "lab/stages/*/*",
+              "orchestrator/tests/fixtures/stages/*",
+              "orchestrator/tests/fixtures/stages/*/*"
+            ],
+          "skill_roots": [".agents/skills"],
+          "class_limits":
+            {
+              "max_lines": 700,
+              "max_init_args": 8,
+              "max_instance_attributes": 12,
+              "max_public_methods": 20
+            },
+          "process_roots":
+            [
+              "orchestrator/src/raidar",
+              "contract/src/raidar_contract",
+              "lab/stages",
+              "scripts/checks",
+              "scripts/release"
+            ],
+          "subprocess_wrappers":
+            {
+              "lab/stages/raidar/verify/tool/src/verify_tool/checks.py":
+                ["run"],
+              "orchestrator/src/raidar/cli/agent.py": ["agent_setup_auth"],
+              "orchestrator/src/raidar/cli/env_harbor.py":
+                ["compose_preflight_reason", "env_setup"],
+              "orchestrator/src/raidar/cli/process.py": ["run_or_raise"],
+              "orchestrator/src/raidar/cli/repo_state.py":
+                [
+                  "has_unstaged_changes",
+                  "repo_name_status_from_git_cmd",
+                  "repo_paths_from_git_cmd"
+                ],
+              "orchestrator/src/raidar/cli/stage_lock.py": ["_uv"],
+              "orchestrator/src/raidar/design/problem/variant_shim.py":
+                ["main"],
+              "orchestrator/src/raidar/engine/job/detach.py":
+                ["launch", "supervise"],
+              "orchestrator/src/raidar/engine/target/transport.py":
+                ["run_command", "spawn_detached"],
+              "orchestrator/src/raidar/engine/trial/cleanup.py": ["_run"],
+              "orchestrator/src/raidar/engine/trial/environment.py":
+                [
+                  "RunScopedDockerEnvironment._resolve_main_container",
+                  "RunScopedDockerEnvironment._run_engine_command",
+                  "RunScopedDockerEnvironment.download_dir_with_exclusions"
+                ],
+              "orchestrator/src/raidar/grading/closure.py": ["run_docker"],
+              "orchestrator/src/raidar/grading/resolver.py":
+                ["UvResolver._compile", "UvResolver.identity"],
+              "orchestrator/src/raidar/grading/sandbox.py":
+                [
+                  "DockerCopySandbox._exec",
+                  "DockerCopySandbox._start_and_wait",
+                  "sweep_grader_orphans"
+                ],
+              "orchestrator/src/raidar/scoring/code_quality/measurement.py":
+                ["run_process"],
+              "orchestrator/src/raidar/subject/environment/python/image.py":
+                ["run_docker"],
+              "orchestrator/src/raidar/subject/environment/python/provisioner.py":
+                ["run_command"],
+              "orchestrator/src/raidar/subject/primitive/gate_tool.py":
+                ["_git", "_spawn", "_version", "prerequisites"],
+              "orchestrator/src/raidar/subject/primitive/payload/install_tree.py":
+                ["_run"],
+              "orchestrator/src/raidar/subject/release_check.py": ["_git"],
+              "orchestrator/src/raidar/subject/workflow/package_checks.py":
+                ["uv_lock_stale"],
+              "orchestrator/src/raidar/subject/workflow/stage_container.py":
+                ["PackContainer._run"],
+              "scripts/checks/check-bespoke-rule-canary.py":
+                ["run_fanout_checker"],
+              "scripts/checks/check-finding-baseline.py": ["main"],
+              "scripts/checks/check-gate-rule-canary.py": ["run_process"],
+              "scripts/checks/check-hook-installation.py": ["run_process"],
+              "scripts/checks/check-mypy-coverage.py": ["main"],
+              "scripts/checks/check-python-fanout.py": ["_run_git"],
+              "scripts/checks/check-python-quality.py": ["_check_baseline"],
+              "scripts/checks/check-repository-paths.py":
+                ["dependency_findings", "main"],
+              "scripts/checks/check-ruff-suppressions.py": ["main"],
+              "scripts/checks/check-structure.py": ["repo_paths"],
+              "scripts/checks/check-test-evidence.py": ["_git_bytes"],
+              "scripts/checks/check-tool-rule-canary.py": ["analyzer_canary"],
+              "scripts/checks/check-toolchain-parity.py": ["run_process"],
+              "scripts/checks/check_toolchain_pins.py":
+                ["_registry_resolver_violations"],
+              "scripts/checks/record-host-readback.py": ["main"],
+              "scripts/checks/ruff_baseline.py": ["main"],
+              "scripts/checks/run-affected-seams.py": ["main"],
+              "scripts/checks/run-budgeted-fast.py":
+                ["current_revision", "machine_details", "run_pytest"],
+              "scripts/checks/test_budget_evidence.py": ["_run"],
+              "scripts/checks/validate-rule-coverage.py": ["main"],
+              "scripts/release/bump-version.py":
+                [
+                  "get_commits_since_last_bump",
+                  "git_output",
+                  "render_lock_update"
+                ],
+              "scripts/release/verify-version-wiring.py": ["_git"]
+            },
+          "dynamic_import_roots":
+            [
+              "orchestrator/src/raidar",
+              "contract/src/raidar_contract",
+              "lab/stages"
+            ],
+          "dynamic_import_adapters":
+            [
+              "orchestrator/src/raidar/grading/runtime/raidar_oracle_plugin.py",
+              "orchestrator/src/raidar/scoring/code_quality/measurement.py",
+              "orchestrator/src/raidar/scoring/framework/registry.py"
+            ],
+          "contract_files":
+            [
+              "contract/src/raidar_contract/agent.py",
+              "contract/src/raidar_contract/call.py",
+              "orchestrator/src/raidar/judge/protocol.py",
+              "orchestrator/src/raidar/subject/agent/protocol.py",
+              "orchestrator/src/raidar/scoring/framework/context.py"
+            ],
+          "contract_data_annotations":
+            {
+              "orchestrator/src/raidar/judge/protocol.py":
+                { "parse_questions.raw": "Any", "parse_answers.raw": "Any" },
+              "orchestrator/src/raidar/scoring/framework/context.py":
+                {
+                  "StepInputs.agent_result": "Mapping[str, Any] | None",
+                  "AssessContext.config": "Mapping[str, Any]",
+                  "AssessContext.problem_config": "Mapping[str, Any]"
+                },
+              "orchestrator/src/raidar/subject/agent/protocol.py":
+                { "NativeAgent.harness_isolation": "dict[str, Any] | None" }
+            },
+          "loop_roots":
+            [
+              "orchestrator/src/raidar",
+              "contract/src/raidar_contract",
+              "lab/stages",
+              "scripts/checks",
+              "scripts/release"
+            ],
+          "max_loop_depth": 2,
+          "analyzer_like_roots":
+            [
+              "orchestrator/src/raidar/scoring",
+              "orchestrator/src/raidar/evaluation/analysis",
+              "orchestrator/src/raidar/engine/health"
+            ],
+          "ownership_markers": ["CODEOWNERS"],
+          "source_roots":
+            ["orchestrator/src", "contract/src", "lab/stages/*/*/tool/src"],
+          "fanout":
+            {
+              "root_packages":
+                ["define_tool", "raidar", "raidar_contract", "verify_tool"],
+              "architectural_max": 10,
+              "large_module_nloc": 800,
+              "large_module_architectural_max": 3
+            }
+        },
+      "test_evidence":
+        { "fast_tier": "t1", "approved_skips": [], "unselected_exempt": [] },
+      "coverage_ratchet":
+        {
+          "floor_keys":
+            [
+              "fail_under",
+              "fail-under",
+              "cov-fail-under",
+              "lines",
+              "branches",
+              "statements",
+              "functions",
+              "line_floor",
+              "branch_floor"
+            ],
+          "exclusion_keys":
+            ["omit", "exclude_lines", "exclude_also", "partial_branches"],
+          "approvals": []
+        },
+      "golden_record": {},
+      "identity_artefacts":
+        { "non_production": ["docs", "*.md", "CHANGELOG.md"] },
+      "test_growth": { "map_path": ".omp/test-behavior-map.json" },
+      "feature_map": { "index_files": [] },
+      "journeys": {},
+      "guarded_run": { "watch": [".config/raidar"] },
+      "lever_selftest": { "timeout_s": 120 },
+      "adapter_pytest": { "collect_timeout_s": 300 }
+    }
+}
+---
+
 # Repo test profile
 
-Fill every section with values. `none: <owner-approved reason>` is allowed only in Verification
-surface, Nightly scheduler (a Run events field), and Identity-bearing artefacts; elsewhere a
-missing value is a reported gap.
+Global `test-guidance` sets the test rules; this profile holds Raidar's values. The front matter
+above holds the machine-readable values that `omp-guardrails profile-check` (`PROFILE.complete`)
+and the reference checkers read; keep it and the sections below in step. `none` is allowed only
+in Verification surface, Nightly scheduler and Identity-bearing artefacts, with an owner approval.
 
 ## Tiers
 
 - T1 fast: no marker; selector
   `not slow and not quality and not docker and not security and not perf`;
-  location `orchestrator/tests/`; command `env -u AGENT make test-fast`.
-- T2 slow: marker `slow`; selector `slow and not quality and not docker`;
-  location `orchestrator/tests/`; command `env -u AGENT make test-slow`.
-- T2 quality: marker `quality`; selector `quality and not docker`;
-  location `orchestrator/tests/`; command `env -u AGENT make test-quality`.
-- T2 Docker: marker `docker`; selector `docker and not security and not perf`;
-  location `orchestrator/tests/`; command `env -u AGENT make test-docker TARGET=mbp`.
-- T2 review surface: location `review-surface/tests/`; selector Playwright `chromium` project;
+  location `orchestrator/tests/`; command `env -u AGENT make test-fast` (coverage on, floors
+  enforced, `--durations=10`). Drives logic, schemas, decisions, the CLI through `CliRunner`,
+  and process, git or Docker shells through an injected runner. A few small files in `tmp_path`
+  are fine.
+- T2 slow (`slow`): selector `slow and not quality and not docker`; command
+  `env -u AGENT make test-slow`. Real `git`, `bash`, `sh`, `python`, `uv` or `make` processes,
+  `supervise` forks, real run directories, loopback servers and real-clock waits. Never Docker.
+- T2 quality (`quality`): selector `quality and not docker`; command
+  `env -u AGENT make test-quality`. Canaries proving a quality rule accepts and refuses, in
+  isolated tool processes and workspaces.
+- T2 Docker (`docker`): selector `docker and not security and not perf`; command
+  `env -u AGENT make test-docker` (a ready target and the pack image; no real models).
+- T2 review surface: Playwright `chromium` project in `review-surface/tests/*.spec.ts`;
   command `env -u AGENT make review-surface-test`.
-- T3 security: markers `docker`, `security`; selector `security`;
-  location `orchestrator/tests/`; command `env -u AGENT make security-gate TARGET=mbp`.
-- T3 perf: markers `docker`, `perf`; selector `perf`;
-  location `orchestrator/tests/`; command `env -u AGENT make perf-gate TARGET=mbp`.
-- Perf target selection: `orchestrator/tests/test_overhead_fixture_run.py`, concurrency `1`, `3`;
-  output `var/tmp/perf-gate/concurrency-1`, `var/tmp/perf-gate/concurrency-3`.
-- Marker registry: `orchestrator/pyproject.toml`, `--strict-markers`;
-  file inventory: `scripts/checks/repository-owners.json` field `test_tiers`.
-- Public entry point per package: `raidar`: `raidar.cli:main` (`raidar` CLI);
-  `raidar-review-surface`: `node server.mjs`, browser `http://localhost:5950`.
-- Public entry point per package: gap: approved `raidar-contract` and stage-package entry points.
+- T2 journeys: `review-surface/journeys/*.journey.mjs`, each run through the lever (see
+  Verification surface).
+- T3 security and perf (`security`, `perf`, both on top of `docker`): commands
+  `env -u AGENT make security-gate` and `env -u AGENT make perf-gate`, at phase exit.
+  Perf targets `orchestrator/tests/test_overhead_fixture_run.py` at concurrency `1` and `3`.
+- Tier selection for `TEST.tier-selectors`: each front-matter `tiers.<tier>.selector` holds the
+  pytest arguments that `omp-guardrails adapter tiers` collects with. The pytest adapter cannot
+  list the Playwright specs or the journeys, so `make guardrails-reference` appends the
+  Playwright `--list` output for `review-surface/tests/*.spec.ts` and every
+  `review-surface/journeys/*.journey.mjs` file to the T2 list before
+  `omp-guardrails collection-check`.
+- Markers apply per file (`pytestmark`); never mix tiers in one file. Marker registry:
+  `orchestrator/pyproject.toml` (`--strict-markers`); file inventory
+  `scripts/checks/repository-owners.json` field `test_tiers`.
+- Public entry point per package: `raidar`: `raidar.cli:main` (the `raidar` CLI);
+  `review-surface`: `review-surface/server.mjs` (HTTP API under `/api/` plus the built SPA).
 
 ## Run events
 
-- Commit command: `env -u AGENT make gate-commit` (`.omp/gate.json` field `checks.commit`).
-- CI command: `env -u AGENT make gate-ci` (`.omp/gate.json` field `checks.ci`).
-- Commit gate: path policy, identity, test evidence, rule coverage, `quality`, budget checker,
+- Commit command: `env -u AGENT make gate-commit` (`.omp/gate.json` `checks.commit`): path
+  policy, identity, test evidence, rule coverage, `quality` (includes T1), budget checker,
   dependency audit and affected local slow/quality seams.
-- CI event: every push and pull request; commit gate with `AUDIT_ARGS=--ci`, full slow and quality.
-- Additional boundary gate: gap: Docker and review-surface inclusion in commit/CI event commands.
-- Nightly scheduler: gap: no scheduled workflow or owner-approved exemption recorded.
-- Nightly branches: gap: active-branch enumeration for a nightly event.
-- Separate performance workflow: `.github/workflows/perf-fixture.yml`, dispatch and path-filtered
-  pull requests to `main`, `master`; `make perf-fixture`, target `ci`, not the full perf gate.
+- CI command: `env -u AGENT make gate-ci` (`.omp/gate.json` `checks.ci`; required context
+  `gate`, runner role `github-actions`): the commit gate with `AUDIT_ARGS=--ci`, then full
+  slow and quality.
+- Nightly scheduler: none. No scheduled workflow exists. Approval: omp-amends.md §1.7
+  (owner-approved autonomous plan, 2026-11-11); the owner is to confirm it (front matter records
+  the reason). Docker, security, perf and review-surface tiers run outside the gate.
+- Nightly branches: `main` only, once a scheduler exists.
+- Separate workflows: `.github/workflows/perf-fixture.yml` (`make perf-fixture`, target `ci`)
+  and `.github/workflows/test-budget-measure.yml` (dispatch, exact `ref`, `run_count` 5).
 
 ## Fast-tier budget
 
-- Per machine: current calibration profile `ubuntu-24.04`, platform `ubuntu24`, architecture
-  `X64`, runtime Python `3.13.7`, workers `1`; policy `.omp/test-budgets/limits.json`.
-- Per machine limits: wall `null`, per-test `null`, status `provisional`, exceptions `{}`;
-  baseline files `0`; checker calibration minimum `5` complete same-revision observations.
-- Goals, not enforced limits: wall `30 s`, per-test `0.1 s`.
-- Calibration formulas: wall `ceil_s(1.25*max)`;
-  per-test `ceil_10ms(1.5*p95(test_maxima))`; exception `ceil_10ms(1.5*test_max)`.
-- Per machine owner approval reference: gap: no approved local-machine baseline or limits.
-- gap: current limits are CI-calibrated, local timing advisory and CI timing blocking;
-  global local-machine blocking/report-only-CI rule is not implemented by this tooling.
-- Duration-report command: `env -u AGENT make test-fast` (`--durations=10`);
-  producer `scripts/checks/run-budgeted-fast.py`;
-  report `var/tmp/tests/budgets/$TEST_BUDGET_INVOCATION/report.json`.
-- Checker command: `env -u AGENT make test-budget-check`;
-  invocation-bound producer/checker pair within `env -u AGENT make gate-commit`.
-- Measurement workflow: `.github/workflows/test-budget-measure.yml`, `workflow_dispatch`,
-  exact `ref`, `run_count` default `5`, sequential jobs, artifact retention `90 days`.
-- Import target: `make test-budget-record`, variable `RUNS` containing GitHub measurement run IDs;
-  records `.omp/test-budgets/baselines/`, approvals `.omp/test-budgets/approvals/`.
-- Approval binding: `repository`, `pullNumber`, `reviewId`, `commit`, `policyDiffDigest`;
-  accepted measurement reference `measurementApproval`.
-- Other tier limits: gap: no enforced slow/quality/Docker/security wall caps in tier targets;
-  affected local T2 invocation timeout `900 s`.
+- Per machine: `m-118e13922e9d` (probe of `omp_guardrails.test_evidence.budgets`), platform
+  `Darwin arm64`, runtime `python 3.13.7`.
+- Per machine limits: wall `76 s`, per-test `0.96 s`. Derived as `ceil(1.25 x max wall)`
+  over 5 local runs on 2026-11-11 (walls 59.11, 59.76, 59.88, 60.25, 60.01 s; coverage on,
+  1 worker; 8 `test_rule_evidence.py` setup errors from the in-flight catalogue re-sync) and
+  `ceil_10ms(1.5 x slowest test 0.639 s)`. 177 tests exceed the `0.06 s` p95-based limit.
+- Per machine owner approval reference: omp-amends.md §1.7 (owner-approved autonomous plan,
+  2026-11-11); the owner is to confirm the limits. The limits block locally on this machine.
+- CI timing is report-only on every CI host. Goals, not limits: wall `30 s`, per-test `0.1 s`.
+- Duration-report command: `env -u AGENT make test-fast`; producer
+  `scripts/checks/run-budgeted-fast.py`, report
+  `var/tmp/tests/budgets/$TEST_BUDGET_INVOCATION/report.json`; checker
+  `env -u AGENT make test-budget-check` until the step-4 cutover replaces it with
+  `omp-guardrails report-check`.
 
 ## Coverage
 
-- Scope: fast tier `orchestrator/src`, `contract/src`, every existing
-  `lab/stages/*/*/tool/src` beside a `stage.yaml`; fixture programs outside the denominator.
-- Line floor: `99.43%`; branch floor: `98.72%`.
-- Where defined: `orchestrator/pyproject.toml` section `[tool.raidar.coverage]`;
-  integer-count enforcement `orchestrator/src/raidar/cli/quality.py`.
-- Ratchet: upward after each accepted change; fast-only configured floors;
-  diagnostic T1+T2 coverage: gap: no combined diagnostic command in current tier targets.
-- Coverage artefacts: `var/tmp/tests/coverage/.coverage`, `var/tmp/tests/coverage/coverage.json`;
-  relocation through `RAIDAR_VAR`.
+- Scope: T1 over `orchestrator/src`, `contract/src` and every `lab/stages/*/*/tool/src` beside a
+  `stage.yaml`; fixture programs are inputs, outside the denominator.
+- Line floor: `99.43`; branch floor: `98.72`.
+- Where defined: `orchestrator/pyproject.toml` `[tool.raidar.coverage]`; integer-count
+  enforcement in `orchestrator/src/raidar/cli/quality.py`. Artefacts under
+  `var/tmp/tests/coverage/`.
+- Floors are met only by outcome or property cases or deleting unreachable code; never a pragma,
+  a wider `omit` or a lower floor. Stage tool sources stay in coverage.
 
 ## Guards
 
-- Fast-tier process guard location: `orchestrator/tests/conftest.py` loads
-  `tests.process_guard`; `orchestrator/tests/process_guard.py` audit hook covers full protocol.
-- Denied events: `subprocess.Popen`, `os.system`, `os.posix_spawn`, `os.fork`, `os.forkpty`,
-  `os.exec`, `os.spawn`, `pty.spawn`; exempt markers `slow`, `quality`, `docker`, `security`, `perf`.
-- Fast-tier network guard location: gap: no network denial in the process-guard plugin.
-- User-data guard: gap: no session-wide live-user-file mutation guard established.
+- Fast-tier process guard location: `orchestrator/tests/process_guard.py`, loaded by
+  `orchestrator/tests/conftest.py`; denies `subprocess.Popen`, `os.system`, `os.posix_spawn`,
+  `os.fork`, `os.forkpty`, `os.exec*`, `os.spawn*`, `pty.spawn` outside `slow`, `quality`,
+  `docker`, `security`, `perf`, fixtures and teardown included.
+- Fast-tier network guard location: the pinned reference's pytest adapter plugin
+  (`--omp-guard fast-tier`), armed for every T1 run by `make test-fast` and `make quality`
+  through `PYTEST_ADDOPTS` from `omp-guardrails adapter junit-args --tier t1`. It denies IP
+  network traffic and process creation; `adapter guard-evidence` checks the T1 JUnit report.
+- User-data guard: the same plugin (`--omp-guard user-data`), armed in the same T1 runs; it
+  points `HOME` and `XDG_*` at a temporary directory.
 
 ## Environments
 
-- Required environments: host Python `3.13.7`, uv `0.10.0`, orchestrator dev dependencies;
-  CI Node `22` and root `npm ci --ignore-scripts`; review surface Chromium.
-- Docker environment: trusted target `mbp`, ready data check and built Python pack image;
-  target definitions `~/.config/raidar/targets.toml`, override `RAIDAR_TARGETS_FILE`.
-- Require flag: `RAIDAR_REQUIRE_DOCKER=1` (Docker, security and perf fixture targets).
-- Readiness probe: `tests.docker_trial_support.docker_target_ready()`;
-  `ensure_target(docker_target())` plus Docker image inspection, timeout `30 s`.
-- Readiness timing: first selected `docker` item's autouse fixture, once per session;
-  missing environment fails with require flag, otherwise skips.
-- Provisioning command: `env -u AGENT make docker-check TARGET=mbp`;
-  image provisioning in Docker/security/perf-fixture targets: `raidar pack build python`.
-- Review-surface readiness: `http://localhost:5950/api/runs`, timeout `30 s`;
-  `REVIEW_SURFACE_PORT`, optional `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH`.
+- Required environments: host Python `3.13.7`, uv `0.10.0`, orchestrator dev extras; Node `22`
+  with root `npm ci --ignore-scripts`; review surface npm packages and Playwright Chromium;
+  a Docker target and the built Python pack image for Docker, security and perf.
+- Docker targets: `~/.config/raidar/targets.toml`, override `RAIDAR_TARGETS_FILE`; select one
+  with `TARGET=` on the make command.
+- Require flag: `RAIDAR_REQUIRE_DOCKER=1` (a missing target fails instead of skipping).
+- Readiness probe: `env -u AGENT make docker-check` (`raidar target ensure`); in tests
+  `tests.docker_trial_support.docker_target_ready()`, `30 s`, once per session. Review surface:
+  the lever's doctor step.
 
 ## Verification surface
 
-- Lever command: existing `env -u AGENT make review-surface-test`;
-  gap: designated verification lever covering all app features.
-- Feature map path: gap: executable feature-to-test map not established.
-- Journey file pattern: existing `review-surface/tests/*.spec.ts`;
-  gap: feature-map journey registration.
-- Data directory argument: existing `REVIEW_FIXTURE_DIR`, default `var/tmp/review-fixture`;
-  gap: isolated whole-surface data-root argument.
-- Evidence directory argument: gap: explicit isolated evidence-directory argument;
-  existing Playwright trace setting `retain-on-failure`.
+- Lever command: `node scripts/surface/lever.mjs` (launch, doctor, drive, evidence, cleanup for
+  the review surface UI and the orchestrator CLI).
+- Doctor failure marker: `RAIDAR-SURFACE-DOCTOR-FAILED` (exit `3`); never `expectRed`.
+- Feature map path: `docs/feature-map/`.
+- Journey file pattern: `review-surface/journeys/*.journey.mjs`.
+- Data directory argument: `--data-dir` (empty or absent; `RAIDAR_VAR` and `TMPDIR` point there).
+- Evidence directory argument: `--evidence-dir`.
 
 ## Ownership areas
 
-- Map of T2 files to areas: `scripts/checks/repository-owners.json`, fields `files`,
-  `source_directories`, `test_tiers`, `seam_owners`.
-- Affected T2 test selection: `scripts/checks/run-affected-seams.py`, invoked by `gate-commit`;
-  file-level `(slow or quality) and not docker`, union of boundary-matched `seam_owners`.
-- Selection input: changed paths against `HEAD` plus untracked paths;
-  unknown, unsafe, empty or stale ownership selects all discovered local T2 seams.
-- gap: `seam_owners` has only five script keys; complete boundary-area mapping, including Docker
-  and review-surface tests, is not established by this local slow/quality selector.
+- Map of T2 files to areas: front matter `ownership_areas.map`. Areas are the
+  `raidar.<group>` packages, `raidar_contract`, `define_tool`, `verify_tool`, `review-surface`,
+  `repository-gate` and `release`. Seeded from `scripts/checks/repository-owners.json`:
+  `seam_owners` first, then each test file's most-imported group, then reviewed overrides for
+  canaries with no package import.
+- Production owners: front matter `structure.owners.directories`, from `source_directories`
+  plus the review surface and scripts.
+- Affected T2 test selection: `omp-guardrails affected --base origin/main` from the step-4
+  shadow PR. Until cutover `gate-commit` runs `scripts/checks/run-affected-seams.py`.
+- Unknown ownership never narrows a run: an unowned changed production file selects all T2.
 
 ## Identity-bearing artefacts
 
-- Record `.omp/identity.json`; check `env -u AGENT make identity-check`.
-- Grading digest: `grading_execution_digest()` in `orchestrator/src/raidar/grading/records.py`;
-  inventory `orchestrator/src/raidar/grading/identity.py`: grading import closure,
-  shipped payload bytes, host Python and dependency versions.
-- `primitive_code`: `orchestrator/src/raidar/subject/workflow/identity.py`;
-  primitive/native-adapter import closures, payload Python sources, Harbor version;
-  implicit `frame/1`, `install/1`, `runner/1`.
-- Released stage bytes: `lab/stages/*/*/`, registered in `lab/releases.yaml`, `stage-tree/1`;
-  identity check also records spec and registered scorer digests.
-- Test-only preservation: grading scope, primitive closures and released package bytes unchanged;
-  changed-identity procedure owner `.agents/skills/raidar-release/SKILL.md`.
-- Package boundary check: `env -u AGENT make stage-check NAME=raidar/define TARGET=mbp`;
-  package selection variable `NAME`; fixtures/replay offline in pack container, UID `1000`.
+- Artefacts and preservation rules: front matter `identity_artefacts`. Record
+  `.omp/identity.json`, check `env -u AGENT make identity-check`.
+- Test-only work keeps the grading digest scope, `primitive_code` closures and released stage
+  bytes unchanged. Reach that code through existing interfaces or injected runners.
+- An identity change needs its own reviewed commit with before and after values, a reason and
+  scheduled revalidation (`.agents/skills/raidar-release/SKILL.md`).
+- Nothing under `orchestrator/src` or `lab/stages` may be shaped to one problem or experiment.
 
 ## Layout and naming
 
 - Support directory: `orchestrator/tests/`, reusable modules `*_support.py`.
 - Fixtures directory: `orchestrator/tests/fixtures/`; stage inputs `lab/stages/*/*/fixtures/`;
   review fixture builder `orchestrator/tests/review_fixtures/`.
-- Test file patterns: `orchestrator/tests/test_*.py`, `contract/conformance/**/*.py`,
-  `lab/stages/**/tests/**/*.py`, `review-surface/tests/*.spec.ts`.
-- Placement inventory/check: `scripts/checks/repository-owners.json` field `test_tiers`,
-  `scripts/checks/check-repository-paths.py`.
+- Test file patterns: `orchestrator/tests/test_*.py`, `review-surface/tests/*.spec.ts`,
+  `review-surface/journeys/*.journey.mjs`.
+- Placement check until cutover: `scripts/checks/check-repository-paths.py`.
+
+## Structure and house style
+
+- Capability owners: front matter `structure.owners`.
+- Tiers, lowest first, and import direction: `raidar.contract`, `raidar.judge`,
+  `raidar.subject`, `raidar.grading`, `raidar.scoring`, `raidar.design`, `raidar.engine`,
+  `raidar.evaluation`, `raidar.cli`; source root `orchestrator/src`; native engine
+  `lint-imports --config .importlinter` in `orchestrator/`.
+- House-style version and ADR-backed exceptions: version `1`; front matter
+  `house_style.exceptions` lists exact `(rule, path)` waivers for the R1 findings of the new
+  rule IDs, each backed by `docs/adr/adr-003-guardrails-reference-exceptions.md`.
 
 ## Command notes
 
-- Working directory: repository root; prefix `make`, `uv`, `pytest` calls with `env -u AGENT`.
-- Host provisioning: `env -u AGENT uv sync --project orchestrator --all-extras --frozen`;
-  CI adds `--python 3.13.7`.
-- Hook install command:
-  `env -u AGENT uv run --project orchestrator --extra dev pre-commit install --hook-type pre-commit`.
-- Hook dispatch: `.omp/gate.json`, check-only `scripts/checks/run-repository-gate.py`.
-- Report validity: schema `1`, current revision and invocation ID, complete successful inventory,
-  every case passed, finite setup/call/teardown and wall durations, profile and actual machine facts.
-- Budget checker exit codes: `1` validity/policy/approval failure or CI timing breach;
-  `2` infrastructure/profile mismatch; local timing breaches advisory.
-- Generated roots: `RAIDAR_VAR` default `var/`, `REPO_TMP_DIR` default `var/tmp/`,
-  `REPO_CACHE_DIR` default `.cache/`; make exports repo-local temp/cache directories.
+- Working directory and prerequisites: repository root; prefix `make`, `uv` and `pytest` with
+  `env -u AGENT`; provision with `env -u AGENT uv sync --project orchestrator --all-extras
+--frozen` (CI adds `--python 3.13.7`); install the hook with `env -u AGENT uv run --project
+orchestrator --extra dev pre-commit install --hook-type pre-commit`.
+- Flags, exit codes, and interpretation: front matter `command_notes.interpretation`.
+- LSP (init, 2026-11-11): `typescript-language-server` fails the canary at the repository root
+  because the root workspace has no TypeScript and the global TypeScript 7 install has no
+  tsserver. It passes from `review-surface/` (`src/api/client.ts:20 api`, 1 reference).
+  `pyright-langserver` is not detected at the root (no root `pyproject.toml`); from
+  `orchestrator/` it passes (`src/raidar/cli/__init__.py:25 main`, 3 references).
+- Find pilot (`omp find`, cwd repository root, 2026-11-11, judge role `openrouter/typesafe/jev-1.14` from the omp config):
+
+  | Query (scope, keywords)                                                                                                                                          | Expected files                                                                                  | Recall                       | Cost                            |
+  | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- | ---------------------------- | ------------------------------- |
+  | Where reviewer annotations on a run are created, saved and loaded (`review-surface`; `annotation`, `note`, `label`, `comment`)                                   | `server.mjs`, `src/api/client.ts` (both badly named), `src/components/AnnotationCreateForm.tsx` | 3/3                          | $0.0015, 10 requests, 92 judged |
+  | Keep the judge API key out of agent and grading sandbox containers (`orchestrator/src`; `OPENROUTER_API_KEY`, `secret`, `key`, `leak`, `sandbox`, `environment`) | `judge/secrets.py`, `grading/sandbox.py`, `engine/trial/environment.py` (badly named)           | 2/3; missed `environment.py` | $0.0014, 9 requests, 128 judged |
+  | Kill an idle agent that produces no output and uses no CPU (`orchestrator/src`; `idle`, `liveness`, `heartbeat`, `kill`, `stall`, `hung`, `timeout`)             | `engine/health/liveness.py`, `engine/trial/driver.py` (installs the monitor)                    | 1/2; missed `driver.py`      | $0.0015, 8 requests, 128 judged |
+
+  Total recall 6/8 at $0.0044. Every miss is a caller of a found symbol (`require_key_absent`,
+  `install_liveness_monitor`), which the usage rule's follow-up `lsp references` step covers.

@@ -148,6 +148,8 @@ help:
 	@echo "  make gate-commit                                       Whole-tree policy, identity, static/T1 checks and affected local T2 seams"
 	@echo "  make gate-ci                                           Commit gate, slow tier, then quality tier (every push and pull request)"
 	@echo "  make rule-coverage                                     Execute fail-closed evidence for every guardrail catalogue ID"
+	@echo "  make guardrails-reference                              Pinned omp-guardrails checks (new rule IDs block; the rest is shadow output)"
+	@echo "  make guardrails-mutation                               T3 phase exit: TEST.mutation-sensitivity over the mutation report"
 	@echo "  make record-host-readback                              Record live default-branch rules and merge settings (refresh within 30 days)"
 	@echo "  make analyzer-scope-check                              Check analyzer I/O boundaries and CODEOWNERS with finding-level debt ratchets"
 	@echo "  make version-release                                   Prepare an on-demand release PR from HEAD at origin/main; refuses no-bump histories"
@@ -576,7 +578,7 @@ security-gate: docker-check
 
 # Test tiers (selectors: .omp/test-profile.md).
 test-fast:
-	@$(RAIDAR_DEV) quality test-fast
+	@$(GUARDRAILS_T1_ENV) $(RAIDAR_DEV) quality test-fast
 
 test-slow:
 	@cd orchestrator && $(REPO_RUNTIME_ENV) uv run --project . --extra dev \
@@ -819,6 +821,91 @@ test-budget-record:
 	@$(REPO_RUNTIME_ENV) uv run --project orchestrator --extra dev \
 		python scripts/checks/test_budget_evidence.py record --runs "$(RUNS)"
 
+# Pinned guardrail reference (omp-guardrails from orchestrator/pyproject.toml [dependency-groups]
+# dev), configured only by .omp/test-profile.md. Findings print as `path: RULE: message; fix`. The
+# rule IDs in GUARDRAILS_BLOCKING have no other implementation here, so their findings block. Every
+# other reference finding duplicates a scripts/checks checker and stays shadow output (kept under
+# GUARDRAILS_DIR, never failing) until the step-4 cutover. A subcommand that cannot run (exit 2)
+# always fails, so missing evidence never passes.
+GUARDRAILS := $(REPO_RUNTIME_ENV) uv run --project orchestrator --extra dev omp-guardrails
+GUARDRAILS_DIR ?= $(REPO_TMP_DIR)/guardrails/$(TEST_BUDGET_INVOCATION)
+GUARDRAILS_T1_JUNIT ?= $(GUARDRAILS_DIR)/t1-junit.xml
+GUARDRAILS_BASE ?= $(TEST_EVIDENCE_BASE)
+# local blocks on an owner-approved machine's budget breach; ci reports timing only.
+GUARDRAILS_MODE ?= local
+GUARDRAILS_BLOCKING := PYQ201|NAME\.test-files|PROFILE\.complete|SURFACE\.feature-map|SURFACE\.journeys|SURFACE\.lever-isolation|TEST\.no-self-mocking|TEST\.no-test-hooks|TEST\.no-evasion|TEST\.fast-tier-isolation|TEST\.user-data-guard|TEST\.tier-selectors|TEST\.coverage-ratchet|TEST\.golden-change-record|TEST\.identity-artefacts|TEST\.property-seed|TEST\.mutation-sensitivity
+# T2 files the pytest adapter cannot list: the Playwright project, and the journeys the lever runs
+# (the profile's verification_surface.journey_file_pattern).
+GUARDRAILS_PLAYWRIGHT_DIR := review-surface
+GUARDRAILS_JOURNEY_GLOB := review-surface/journeys/*.journey.mjs
+# The T1 run arms the adapter's fast-tier and user-data guards and writes the JUnit run report.
+GUARDRAILS_T1_ENV = args=$$($(GUARDRAILS) adapter junit-args --tier t1 --out "$(GUARDRAILS_T1_JUNIT)" 2>/dev/null) \
+	|| { echo "guardrails-reference: cannot arm the T1 guards"; exit 1; }; \
+	mkdir -p "$(GUARDRAILS_DIR)" && export PYTEST_ADDOPTS="$${PYTEST_ADDOPTS:+$$PYTEST_ADDOPTS }$$args" &&
+
+# $(1) label, $(2) subcommand and arguments, $(3) "all" when any finding blocks (evidence steps).
+define guardrails_run
+	@mkdir -p "$(GUARDRAILS_DIR)"; out="$(GUARDRAILS_DIR)/$(1).txt"; \
+	$(GUARDRAILS) $(2) > "$$out" 2>&1; status=$$?; \
+	if [ $$status -ge 2 ]; then cat "$$out"; echo "guardrails-reference: $(1) could not run (exit $$status)"; exit 1; fi; \
+	if [ "$(3)" = all ] && [ $$status -ne 0 ]; then cat "$$out"; echo "guardrails-reference: $(1) failed"; exit 1; fi; \
+	if grep -E '^[^ ]+: ($(GUARDRAILS_BLOCKING)): ' "$$out"; then echo "guardrails-reference: $(1) has blocking findings"; exit 1; fi; \
+	echo "guardrails-reference: $(1) ok ($$(grep -c -E '^[^ ]+: [A-Za-z][A-Za-z0-9.-]*: ' "$$out") shadow findings in $$out)"
+endef
+
+# Static, collection, diff and lever checks, then the run-report checks over the T1 report that
+# `quality` or `test-fast` wrote in this invocation (skipped, and said so, when there is none).
+.PHONY: guardrails-reference guardrails-diff guardrails-t1-report
+guardrails-reference:
+	$(call guardrails_run,profile-check,profile-check,all)
+	$(call guardrails_run,structure,structure)
+	$(call guardrails_run,naming,naming)
+	$(call guardrails_run,python-quality,python-quality)
+	$(call guardrails_run,python-fanout,python-fanout)
+	$(call guardrails_run,python-scalability,python-scalability)
+	$(call guardrails_run,surface-lint,surface-lint)
+	$(call guardrails_run,adapter-lint,adapter lint)
+	$(call guardrails_run,adapter-tiers,adapter tiers --out "$(GUARDRAILS_DIR)/tiers",all)
+	@cd "$(GUARDRAILS_PLAYWRIGHT_DIR)" && npx --no-install playwright test --list --reporter=json \
+		> "$(GUARDRAILS_DIR)/playwright-list.json" \
+		|| { echo "guardrails-reference: cannot list the $(GUARDRAILS_PLAYWRIGHT_DIR) Playwright tests (npm ci there first)"; exit 1; }
+	@node -e 'const fs = require("fs"), path = require("path"); \
+		const data = JSON.parse(fs.readFileSync(process.argv[1], "utf8")); \
+		const walk = (suite) => { for (const spec of suite.specs || []) \
+			console.log(path.relative(process.cwd(), path.join(data.config.rootDir, spec.file)) + "::" + spec.title); \
+			(suite.suites || []).forEach(walk); }; \
+		data.suites.forEach(walk);' "$(GUARDRAILS_DIR)/playwright-list.json" >> "$(GUARDRAILS_DIR)/tiers/t2.txt"
+	@git ls-files --cached --others --exclude-standard -- '$(GUARDRAILS_JOURNEY_GLOB)' | sed 's/$$/::journey/' >> "$(GUARDRAILS_DIR)/tiers/t2.txt"
+	$(call guardrails_run,collection-check,collection-check --tier t1="$(GUARDRAILS_DIR)/tiers/t1.txt" --tier t2="$(GUARDRAILS_DIR)/tiers/t2.txt" --tier t3="$(GUARDRAILS_DIR)/tiers/t3.txt")
+	@base=$$(git merge-base "$(GUARDRAILS_BASE)" HEAD) && head=$$(git write-tree) \
+		|| { echo "guardrails-reference: cannot resolve the diff range from $(GUARDRAILS_BASE)"; exit 1; }; \
+		$(MAKE) --no-print-directory guardrails-diff GUARDRAILS_DIFF_RANGE="--base $$base --head $$head"
+	$(call guardrails_run,lever-selftest,lever-selftest)
+	@if [ -f "$(GUARDRAILS_T1_JUNIT)" ]; then $(MAKE) --no-print-directory guardrails-t1-report; \
+	else echo "guardrails-reference: no T1 report at $(GUARDRAILS_T1_JUNIT); run-report checks skipped"; fi
+
+# The staged tree (the commit being made; HEAD's tree in CI) against the merge base.
+guardrails-diff:
+	$(call guardrails_run,diff-check,diff-check $(GUARDRAILS_DIFF_RANGE))
+
+guardrails-t1-report:
+	$(call guardrails_run,guard-evidence,adapter guard-evidence "$(GUARDRAILS_T1_JUNIT)" --tier t1,all)
+	$(call guardrails_run,report-check,report-check --junit "$(GUARDRAILS_T1_JUNIT)" --tier t1 --mode $(GUARDRAILS_MODE))
+
+# TEST.mutation-sensitivity is a T3 check. The profile has no nightly scheduler, so it runs at phase
+# exit with the other T3 checks, never in gate-commit or gate-ci. It reads the normalised report
+# that the T3 mutation run writes (`omp-guardrails adapter mutation-report`) and the diff from the
+# merge base. A missing or malformed report is a finding, so it never passes without evidence.
+GUARDRAILS_MUTATION_REPORT ?= $(REPO_TMP_DIR)/guardrails/mutation.json
+.PHONY: guardrails-mutation guardrails-mutation-check
+guardrails-mutation:
+	@base=$$(git merge-base "$(GUARDRAILS_BASE)" HEAD) \
+		|| { echo "guardrails-mutation: cannot resolve the diff range from $(GUARDRAILS_BASE)"; exit 1; }; \
+		$(MAKE) --no-print-directory guardrails-mutation-check GUARDRAILS_DIFF_RANGE="--base $$base --head HEAD"
+
+guardrails-mutation-check:
+	$(call guardrails_run,mutation-check,mutation-check --report "$(GUARDRAILS_MUTATION_REPORT)" $(GUARDRAILS_DIFF_RANGE))
+
 gate-commit:
 	@$(REPO_RUNTIME_ENV) uv run --project orchestrator --extra dev \
 		python scripts/checks/check-repository-paths.py
@@ -827,12 +914,13 @@ gate-commit:
 	@$(MAKE) --no-print-directory rule-coverage
 	@$(MAKE) --no-print-directory quality
 	@$(MAKE) --no-print-directory test-budget-check
+	@$(MAKE) --no-print-directory guardrails-reference
 	@$(MAKE) --no-print-directory dependency-audit-check
 	@$(REPO_RUNTIME_ENV) uv run --project orchestrator --extra dev \
 		python scripts/checks/run-affected-seams.py
 
 gate-ci:
-	@$(MAKE) --no-print-directory gate-commit AUDIT_ARGS=--ci
+	@$(MAKE) --no-print-directory gate-commit AUDIT_ARGS=--ci GUARDRAILS_MODE=ci
 	@$(MAKE) --no-print-directory test-slow
 	@$(MAKE) --no-print-directory test-quality
 
@@ -863,7 +951,7 @@ quality:
 	@$(MAKE) --no-print-directory releases-check
 	@$(MAKE) --no-print-directory experiment-locks-check
 	@$(MAKE) --no-print-directory ledger-check
-	@$(RAIDAR_DEV) quality gates
+	@$(GUARDRAILS_T1_ENV) $(RAIDAR_DEV) quality gates
 
 .PHONY: toolchain-parity-check prettier-check dependency-audit-check
 toolchain-parity-check:

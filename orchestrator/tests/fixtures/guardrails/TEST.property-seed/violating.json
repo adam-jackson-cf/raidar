@@ -1,0 +1,14 @@
+{
+  "rule": "TEST.property-seed",
+  "expect": "fail",
+  "check": {
+    "subcommand": "adapter",
+    "argv": [
+      "lint",
+      "orchestrator/tests/test_canary_outcomes.py"
+    ]
+  },
+  "files": {
+    "orchestrator/tests/test_canary_outcomes.py": "from hypothesis import given, strategies as st\n\n\n@given(st.integers())\ndef test_double_is_even(value: int) -> None:\n    assert (2 * value) % 2 == 0\n"
+  }
+}

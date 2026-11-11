@@ -1,0 +1,14 @@
+{
+  "rule": "TEST.no-self-mocking",
+  "expect": "fail",
+  "check": {
+    "subcommand": "adapter",
+    "argv": [
+      "lint",
+      "orchestrator/tests/test_canary_outcomes.py"
+    ]
+  },
+  "files": {
+    "orchestrator/tests/test_canary_outcomes.py": "def test_patches_owned_code(monkeypatch) -> None:\n    monkeypatch.setattr('raidar.engine.canary.plan', lambda: None)\n"
+  }
+}

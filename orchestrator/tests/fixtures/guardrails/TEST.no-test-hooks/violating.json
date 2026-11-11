@@ -1,0 +1,14 @@
+{
+  "rule": "TEST.no-test-hooks",
+  "expect": "fail",
+  "check": {
+    "subcommand": "adapter",
+    "argv": [
+      "lint",
+      "orchestrator/src/raidar/engine/canary.py"
+    ]
+  },
+  "files": {
+    "orchestrator/src/raidar/engine/canary.py": "import os\n\n\ndef workers() -> str:\n    if os.environ.get('RAIDAR_TEST_MODE'):\n        return '0'\n    return '1'\n"
+  }
+}
