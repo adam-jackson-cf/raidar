@@ -10,6 +10,7 @@ from raidar.evaluation.analysis.effects import ArmExclusions, Effect, Exclusions
 from raidar.evaluation.analysis.manipulation import ManipulationReport
 from raidar.evaluation.analysis.ranking import Ranking, RankingRow
 from raidar.evaluation.analysis.report import AnalysisReport, ArmSummary, Comparison
+from raidar.evaluation.analysis.stats import confidence_label
 from raidar.evaluation.analysis.verification_effort import GateDescriptive
 from raidar.scoring.catalog.outcomes import (
     ALL_METRICS,
@@ -395,7 +396,7 @@ def _primary_lines(comparison: Comparison) -> list[str]:
 def _comparison(comparison: Comparison, confidence: float) -> list[str]:
     header = (
         "Metric", "Better", "View", "Problem", "n", "Baseline", "Treatment", "Δ",
-        f"{round(confidence * 100, 4):g}% CI",
+        f"{confidence_label(confidence)} CI",
         "Verdict", "Excluded", "Cost Δ USD",
     )  # fmt: skip
     lines = [

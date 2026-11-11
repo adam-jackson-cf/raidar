@@ -247,7 +247,7 @@ def docker_spawner(monkeypatch: pytest.MonkeyPatch) -> None:
     async def spawn(*argv: str, **options: Any) -> _Proc:
         return await _SPAWNER[0](*argv, **options)
 
-    monkeypatch.setattr(sandbox_module.asyncio, "create_subprocess_exec", spawn)
+    monkeypatch.setattr(asyncio, "create_subprocess_exec", spawn)
 
 
 def _sandbox(docker: _FakeDocker) -> DockerCopySandbox:

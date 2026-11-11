@@ -12,7 +12,6 @@ from pathlib import Path
 
 import pytest
 
-from raidar.scoring.framework import inventory as inventory_module
 from raidar.scoring.framework.inventory import FileRole, build_inventory
 
 
@@ -67,7 +66,7 @@ def test_a_file_that_vanishes_between_listing_and_reading_is_invalid_evidence(
     def listing(root: Path, **_: object) -> Iterator[tuple[str, list[str], list[str]]]:
         yield str(root), [], ["gone.py"]
 
-    monkeypatch.setattr(inventory_module.os, "walk", listing)
+    monkeypatch.setattr(os, "walk", listing)
 
     assert _issues(tmp_path) == {"gone.py": "unreadable: No such file or directory"}
 
@@ -78,7 +77,7 @@ def test_paths_that_are_not_utf8_are_invalid_evidence_and_excluded(
     def listing(root: Path, **_: object) -> Iterator[tuple[str, list[str], list[str]]]:
         yield str(root), ["\udcffdir"], ["\udcff.py"]
 
-    monkeypatch.setattr(inventory_module.os, "walk", listing)
+    monkeypatch.setattr(os, "walk", listing)
     inventory = build_inventory(tmp_path)
 
     assert not inventory.eligible

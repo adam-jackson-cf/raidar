@@ -248,7 +248,7 @@ def test_model_summary_lists_every_supported_model_under_the_provider() -> None:
 def test_the_harbor_cli_is_the_one_installed_next_to_the_interpreter(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    monkeypatch.setattr(executables.sys, "executable", str(tmp_path / "python"))
+    monkeypatch.setattr(sys, "executable", str(tmp_path / "python"))
     with pytest.raises(FileNotFoundError, match="Harbor CLI not found"):
         executables.harbor_executable()
 

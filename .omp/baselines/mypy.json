@@ -1305,12 +1305,6 @@
       "count": 1
     },
     {
-      "path": "orchestrator/tests/test_code_quality_measurement_closure.py",
-      "code": "attr-defined",
-      "fingerprint": "2f245af3394239303d90799a787cb9959640a303187fb3a22d67f95533e4d02c",
-      "count": 1
-    },
-    {
       "path": "orchestrator/tests/test_code_quality_scorer.py",
       "code": "operator",
       "fingerprint": "b178644cd829042f7fb88af037980993c6cc61f772e08c35e1244729f9fdfbdb",
@@ -1326,12 +1320,6 @@
       "path": "orchestrator/tests/test_code_quality_transition_closure.py",
       "code": "arg-type",
       "fingerprint": "9fa377640d1f157fa0eaf7963e8436e5fe419ff23e6b9935cc4e0f54db47098a",
-      "count": 1
-    },
-    {
-      "path": "orchestrator/tests/test_codex_cli_adapter.py",
-      "code": "attr-defined",
-      "fingerprint": "e29f72a855b79453571f34ad9cb0762c003eb5d66ed9ff22ab5652f64c715dd1",
       "count": 1
     },
     {
@@ -2040,18 +2028,6 @@
       "path": "orchestrator/tests/test_imports.py",
       "code": "no-untyped-def",
       "fingerprint": "ea12a64dd226ef50f8b4e2e7c861a101882e66ab3e5ee26e32dc099e683053eb",
-      "count": 1
-    },
-    {
-      "path": "orchestrator/tests/test_inventory_invalid_evidence.py",
-      "code": "attr-defined",
-      "fingerprint": "0f63ec12ffbcdbea5450dd6ca4ea896a9be25c4b1451f6a84dca53e505f62578",
-      "count": 1
-    },
-    {
-      "path": "orchestrator/tests/test_inventory_invalid_evidence.py",
-      "code": "attr-defined",
-      "fingerprint": "3838703c0aedeed84c1b616ed1c29aa9944c7d2bb568bdd05fe1e47da4000cdb",
       "count": 1
     },
     {
@@ -3747,12 +3723,6 @@
       "count": 1
     },
     {
-      "path": "orchestrator/tests/test_run_scoped_docker_environment_slow.py",
-      "code": "attr-defined",
-      "fingerprint": "71e2f425243d82d18d9b6bc466813d32dfcb222b90f89a8ad07dd4325feca798",
-      "count": 1
-    },
-    {
       "path": "orchestrator/tests/test_runtime_gate_refusals.py",
       "code": "no-any-return",
       "fingerprint": "56881c26614bfaadd0db014022c257ff3cd84e7f79d67027d6b5d8c82abed668",
@@ -3834,18 +3804,6 @@
       "path": "orchestrator/tests/test_scorer_sdk_contract.py",
       "code": "no-untyped-def",
       "fingerprint": "deb903936313ea8d90b346ca733cb3f28550cc174832559b4ca1cd3ad6310215",
-      "count": 1
-    },
-    {
-      "path": "orchestrator/tests/test_scorer_store_and_trial_ids.py",
-      "code": "attr-defined",
-      "fingerprint": "52dcede7a236569ca17dfea01762de81d41b5b7eb0dd726ec123969011dfa98f",
-      "count": 1
-    },
-    {
-      "path": "orchestrator/tests/test_scorer_store_and_trial_ids.py",
-      "code": "attr-defined",
-      "fingerprint": "c520bf4367cb6d0ad05c4c68eb2fe0726133b6edd1e1484285d5e9cb5db88960",
       "count": 1
     },
     {
@@ -4116,12 +4074,6 @@
       "path": "orchestrator/tests/test_verifier_bundle_and_isolation.py",
       "code": "type-var",
       "fingerprint": "0c63089bc0f4619af443a51e7e8ac2b73f2f1e10c77684fdef102fe2109d5ad4",
-      "count": 1
-    },
-    {
-      "path": "orchestrator/tests/test_verifier_copy_sandbox.py",
-      "code": "attr-defined",
-      "fingerprint": "35cadf524576b333dcec3970d25b0440c3f365d22491c8df6cc32128e1f23c17",
       "count": 1
     },
     {

@@ -9,7 +9,6 @@ from typing import Any
 
 import pytest
 
-from raidar.scoring.code_quality import measurement
 from raidar.scoring.code_quality.measurement import (
     MeasurementError,
     run_process,
@@ -25,7 +24,7 @@ def _fake_run(monkeypatch: pytest.MonkeyPatch, outcome: Any) -> list[dict[str, A
             raise outcome
         return outcome
 
-    monkeypatch.setattr(measurement.subprocess, "run", run)
+    monkeypatch.setattr(subprocess, "run", run)
     return calls
 
 

@@ -94,11 +94,6 @@ def label_history(audit: AuditLog, policy: str) -> list[LabelRecord]:
     return _read(audit.labels_path(policy), LabelRecord)
 
 
-def superseded_request_ids(audit: AuditLog, policy: str) -> set[str]:
-    """Decisions that ever had a label superseded."""
-    return {record.request_id for record in supersessions(audit, policy)}
-
-
 def splits(audit: AuditLog, policy: str) -> list[SplitRecord]:
     return _read(_path(audit, policy, SPLITS_FILE), SplitRecord)
 

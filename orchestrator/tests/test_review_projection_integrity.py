@@ -16,7 +16,8 @@ import pytest
 from raidar.engine.health.records_manifest import seal_trial
 from raidar.evaluation.analysis.pooling import PoolingError
 from raidar.evaluation.review.projection import merge_review_projections
-from raidar.evaluation.review.quality.projection import build_quality_projection
+from raidar.evaluation.review.quality.models import QualityProjection
+from raidar.evaluation.review.quality.projection import build_quality_projection_from
 from tests.capability_support import CAPABILITIES
 from tests.review_fixtures.projection.generate import REVIEW_ONLY_DIR, generate_review_fixture
 
@@ -72,9 +73,16 @@ def _modern(job: Path, **changes: object) -> None:
     manifest_path.write_text(json.dumps(manifest))
 
 
+def _quality(
+    jobs: Path, store: Path, *, synthetic: bool = False, locks: tuple[Path, ...] = ()
+) -> QualityProjection:
+    """The quality projection of one jobs root and its store."""
+    return build_quality_projection_from([(jobs, store)], synthetic=synthetic, locks=locks)
+
+
 def _project(pipeline: str, jobs: Path, store: Path):
     if pipeline == "quality":
-        return build_quality_projection(jobs, store)
+        return _quality(jobs, store)
     return merge_review_projections(job_roots=[jobs], stores=[store])
 
 
@@ -175,9 +183,7 @@ def test_quality_producer_projects_a_real_run_directory_as_the_in_memory_design_
     from raidar.evaluation.review.quality.projection import assemble_projection, review_trials
     from tests.review_fixtures.quality.generate import synthetic_quality
 
-    disk = build_quality_projection(
-        quality_fixture / "jobs", quality_fixture / "store", synthetic=True
-    )
+    disk = _quality(quality_fixture / "jobs", quality_fixture / "store", synthetic=True)
     design = synthetic_quality()
     memory = assemble_projection(
         review_trials(design.trials, design.find, design.audit(), design.read_gate),
@@ -224,7 +230,7 @@ def test_only_the_locked_exact_assessment_is_used_even_when_a_newer_one_has_the_
     target = _quality_copy(quality_fixture, tmp_path)
     store = AssessmentStore(target / "store")
     job_id = f"{EXPERIMENT}.{RUN_ID}.b00-p0-baseline"
-    before = build_quality_projection(target / "jobs", target / "store").run_details[job_id]
+    before = _quality(target / "jobs", target / "store").run_details[job_id]
     original = store.get(before.run.sources["correctness@10"] or "")
     assert original is not None
     if changed == "config":
@@ -268,11 +274,11 @@ def test_only_the_locked_exact_assessment_is_used_even_when_a_newer_one_has_the_
         outcome="added",
         stats=RunStats(duration_s=0),
     )
-    after = build_quality_projection(target / "jobs", target / "store").run_details[job_id]
+    after = _quality(target / "jobs", target / "store").run_details[job_id]
     assert after.run.sources["correctness@10"] == original.key
     assert after.problem["C"] == before.problem["C"]
     store.path_for(original.key).unlink()
-    missing = build_quality_projection(target / "jobs", target / "store").run_details[job_id]
+    missing = _quality(target / "jobs", target / "store").run_details[job_id]
     assert missing.run.sources["correctness@10"] is None
     assert missing.problem["C"].value is None
 
@@ -288,7 +294,7 @@ def test_relocking_assessment_settings_requires_the_new_exact_assessment(
 
     target = _quality_copy(quality_fixture, tmp_path)
     run_id = f"{EXPERIMENT}.{RUN_ID}.b00-p0-baseline"
-    before = build_quality_projection(target / "jobs", target / "store").run_details[run_id]
+    before = _quality(target / "jobs", target / "store").run_details[run_id]
     store = AssessmentStore(target / "store")
     original = store.get(before.run.sources["correctness@10"] or "")
     assert original is not None
@@ -299,14 +305,14 @@ def test_relocking_assessment_settings_requires_the_new_exact_assessment(
         lock.pop(derived)
     lock = seal_lock(lock)
     lock_path.write_text(json.dumps(lock))
-    unassessed = build_quality_projection(target / "jobs", target / "store").run_details[run_id]
+    unassessed = _quality(target / "jobs", target / "store").run_details[run_id]
     assert unassessed.run.sources["correctness@10"] is None
     trial = target / "jobs" / EXPERIMENT / RUN_ID / "trials" / "b00-p0-baseline"
     exact = FixtureAssessments(lock_rescore_config(lock)).assessment(
         "correctness@10", trial, original.result
     )
     store.put(exact)
-    assessed = build_quality_projection(target / "jobs", target / "store").run_details[run_id]
+    assessed = _quality(target / "jobs", target / "store").run_details[run_id]
     assert assessed.run.sources["correctness@10"] == exact.key
 
 
@@ -327,8 +333,8 @@ def test_a_lock_named_by_flag_is_read_from_its_file_for_runs_whose_own_lock_move
         problem=PROBLEM,
         checkpoints=len(CHECKPOINTS),
     )
-    plain = build_quality_projection(target / "jobs", target / "store")
-    flagged = build_quality_projection(target / "jobs", target / "store", locks=(executed,))
+    plain = _quality(target / "jobs", target / "store")
+    flagged = _quality(target / "jobs", target / "store", locks=(executed,))
     assert plain.experiments[0].problems[0].baseline_arm is None
     assert all(key is None for run in plain.runs for key in run.sources.values())
     assert flagged.experiments[0].problems[0].baseline_arm == "baseline"
@@ -349,7 +355,7 @@ def test_gate_records_on_disk_without_an_assessment_or_with_a_broken_record_say_
     trial = target / "jobs" / EXPERIMENT / RUN_ID / "trials" / "b01-p0-guided" / "steps"
     (trial / "checkpoint_2" / "agent" / "workflow" / "workflow.json").write_text("[")
 
-    rebuilt = build_quality_projection(target / "jobs", target / "store", synthetic=True)
+    rebuilt = _quality(target / "jobs", target / "store", synthetic=True)
 
     gate = rebuilt.run_details[f"{EXPERIMENT}.{RUN_ID}.b01-p0-guided"].gate
     assert gate is not None
@@ -371,7 +377,7 @@ def test_runs_found_by_discovery_share_no_trial_identity_and_non_runs_are_ignore
         (target / "jobs" / name).mkdir()
         (target / "jobs" / name / "job.json").write_text(text)
 
-    result = build_quality_projection(target / "jobs", target / "store")
+    result = _quality(target / "jobs", target / "store")
 
     assert {run.job for run in result.runs} == {RUN_ID, other.name}
     assert len(result.runs) == 24

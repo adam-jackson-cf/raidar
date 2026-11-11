@@ -10,10 +10,12 @@
 ## 1. Context
 
 - R1 pins `omp-guardrails` and runs 17 new catalogue rule IDs blocking in `make gate-commit` and `make gate-ci`. Those rules had no implementation in raidar before R1.
-- On the R1 tree, `omp-guardrails adapter lint` reported 658 findings: 595 TEST.no-self-mocking in 103 test files, 55 TEST.no-test-hooks in 40 production files and 8 TEST.no-evasion in 8 test files. `omp-guardrails naming` reported 2 NAME.test-files findings.
+- Before the fixes below, `omp-guardrails adapter lint` reported 658 findings on the R1 tree: 595 TEST.no-self-mocking in 103 test files, 55 TEST.no-test-hooks in 40 production files and 8 TEST.no-evasion in 8 test files. `omp-guardrails naming` reported 2 NAME.test-files findings.
 - R1 fixes what it can fix without changing product behaviour:
   - `orchestrator/tests/test_package_at3_docker.py` is renamed to `orchestrator/tests/test_package_failure_attribution_docker.py` (NAME.test-files numbered token);
-  - the profile's tier selectors become pytest arguments, so `omp-guardrails collection-check` (TEST.tier-selectors) selects every test file in exactly one tier, including the Playwright specs and journeys.
+  - the profile's tier selectors become pytest arguments, so `omp-guardrails collection-check` (TEST.tier-selectors) selects every test file in exactly one tier, including the Playwright specs and journeys;
+  - six test files patched a standard-library module through a raidar module's namespace (for example `measurement.subprocess.run`). They now patch the standard-library module directly; the patched object is the same, so the tests are unchanged in effect (TEST.no-self-mocking);
+  - four production files defined symbols only tests used (TEST.no-test-hooks). `markdown.py` now prints the interval level through `stats.confidence_label` instead of a copy of its format; the test-only wrappers `checks_pass`, `superseded_request_ids` and `build_quality_projection` are deleted, and their tests read the production paths they wrapped.
 - The remaining findings fall into the groups below. A waiver is an exact `(rule, path)` pair: a new file with the same violation still fails.
 
 ## 2. Decision
@@ -29,10 +31,13 @@
 - `lab/stages/raidar/verify/fixtures/*/state/test_calc.py` are fixture workspaces the verify stage grades. The adapter treats them as production because the path holds the owned package name `raidar`.
 - Waived: `lab/stages/raidar/verify/fixtures/*`. The reference should not treat fixture data as production; this is reported upstream.
 
-### 2.3 Classes Harbor loads by import path (TEST.no-test-hooks)
+### 2.3 Symbols loaded by name (TEST.no-test-hooks)
 
-- `RaidarVerifier` (`raidar.grading.verifier:RaidarVerifier`, `design/problem/rewrite.py`) and `RunScopedDockerEnvironment` (`RUN_SCOPED_DOCKER_IMPORT_PATH`, `engine/trial/environment.py`) are loaded by Harbor from `module:Symbol` strings. The adapter's symbol-usage scan does not resolve those strings, so it reports the classes as used only by tests.
-- Waived: `orchestrator/src/raidar/grading/verifier.py` and `orchestrator/src/raidar/engine/trial/environment.py`. This is reported upstream.
+- `RaidarVerifier` (`raidar.grading.verifier:RaidarVerifier`, `design/problem/rewrite.py`) and `RunScopedDockerEnvironment` (`RUN_SCOPED_DOCKER_IMPORT_PATH`, `engine/trial/environment.py`) are loaded by Harbor from `module:Symbol` strings.
+- `resolver_factory` and `scorer_resolver` are the `raidar.contract.resolvers` entry points in `orchestrator/pyproject.toml`.
+- `stage_lock` is the `raidar stage lock` command, registered by its `@stage.command("lock")` decorator.
+- The adapter's symbol-usage scan does not resolve import-path strings, entry points or decorator registration, so it reports these symbols as used only by tests.
+- Waived: `orchestrator/src/raidar/grading/verifier.py`, `orchestrator/src/raidar/engine/trial/environment.py`, `orchestrator/src/raidar/design/problem/resolver.py`, `orchestrator/src/raidar/scoring/catalog/builtin.py` and `orchestrator/src/raidar/cli/stage.py`. This is reported upstream.
 
 ### 2.4 Environment-capability skips (TEST.no-evasion)
 
@@ -42,8 +47,11 @@
 
 ### 2.5 Legacy debt recorded at R1 (TEST.no-self-mocking, TEST.no-test-hooks)
 
-- 103 existing test files patch or mock raidar's own modules (595 findings), and 19 production files define symbols only tests use.
-- Fixing them rewrites most of the test suite and changes production modules, which is outside the shadow PR's behaviour-preserving scope.
+- 97 existing test files patch or mock raidar's own modules (587 findings), and 12 production files define symbols only tests use.
+- Fixing them rewrites most of the test suite and changes production modules, which is outside the shadow PR's behaviour-preserving scope. Examples:
+  - most patches replace a collaborator that production code reaches by module global (for example `dependencies_module.load_health`), so a fix injects that collaborator through the public entry point;
+  - `subject/agent/harness.py` is in the primitive identity inventory: removing its two test-only functions changes all 18 `primitive_code` digests, which needs its own `.omp/identity.json` commit and revalidation (`make identity-check`);
+  - `scoring/judge/gating.py` (`verdict_observations`, `uncalibrated_observations`, `jev_policy_modes`) is the plan-H2 gate that keeps shadow Jev observations out of verdicts, and no production path calls it yet. Wiring it in changes analysis output, so it needs its own product PR.
 - Waived: each named file, by exact path. New test files and new production files are checked in full.
 - The waivers are a burn-down list, not a standing policy. Each removal of an entry is a normal PR that passes the gate.
 

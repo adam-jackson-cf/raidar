@@ -13,7 +13,6 @@ from typing import Any
 
 import pytest
 
-from raidar.engine.trial import environment as env_module
 from tests.test_run_scoped_docker_environment import _resolvable_env
 
 pytestmark = pytest.mark.slow
@@ -33,7 +32,7 @@ async def test_a_real_discovery_process_that_never_answers_is_terminated_and_rea
         spawned.append(process)
         return process
 
-    monkeypatch.setattr(env_module.asyncio, "create_subprocess_exec", spawn_blocker)
+    monkeypatch.setattr(asyncio, "create_subprocess_exec", spawn_blocker)
 
     with pytest.raises(RuntimeError, match="discovery timed out"):
         await env._run_docker_compose_command(  # noqa: SLF001

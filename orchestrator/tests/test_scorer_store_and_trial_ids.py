@@ -14,7 +14,6 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
-from raidar.scoring.framework import store as store_module
 from raidar.scoring.framework.atif import TrajectoryError, load_trajectory
 from raidar.scoring.framework.rescore import RescoreError, qualified_trial_id
 from raidar.scoring.framework.result import AssessResult, AssessStatus, Observation
@@ -74,7 +73,7 @@ def test_losing_the_write_race_for_identical_bytes_is_not_a_conflict(
         real_link(source, target)
         raise FileExistsError(17, "File exists", str(target))
 
-    monkeypatch.setattr(store_module.os, "link", other_writer_wins)
+    monkeypatch.setattr(os, "link", other_writer_wins)
 
     assert store.put(assessment) is PutOutcome.IDENTICAL
     assert store.get(KEY) == assessment
@@ -89,7 +88,7 @@ def test_a_failed_supersede_keeps_the_provisional_assessment_and_leaves_no_temp_
     def refuse(source: object, target: object) -> None:
         raise OSError(28, "No space left on device")
 
-    monkeypatch.setattr(store_module.os, "replace", refuse)
+    monkeypatch.setattr(os, "replace", refuse)
     with pytest.raises(OSError, match="No space left"):
         store.put(_assessment())
 

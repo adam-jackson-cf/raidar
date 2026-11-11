@@ -32,15 +32,6 @@ from raidar.scoring.catalog.outcomes import (
 from raidar.scoring.framework.store import Assessment
 
 
-def build_quality_projection(
-    jobs_root: Path, store_root: Path, *, synthetic: bool = False, locks: Sequence[Path] = ()
-) -> QualityProjection:
-    """Every trial under ``jobs_root`` with its store Assessments and Jev decisions."""
-    return build_quality_projection_from(
-        [(jobs_root, store_root)], synthetic=synthetic, locks=locks
-    )
-
-
 def review_trials(
     trials: Sequence[TrialSource],
     find: Callable[[str, TrialSource], Assessment | None],
