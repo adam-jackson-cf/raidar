@@ -148,7 +148,7 @@ help:
 	@echo "  make gate-ci                                           Commit gate, slow tier, then quality tier (every push and pull request)"
 	@echo "  make rule-coverage                                     Execute fail-closed evidence for every guardrail catalogue ID"
 	@echo "  make guardrails-reference                              Pinned omp-guardrails checks (new rule IDs and TEST.budget.* block; the rest is shadow)"
-	@echo "  make guardrails-mutation                               T3 phase exit: TEST.mutation-sensitivity over the mutation report"
+	@echo "  make guardrails-mutation                               T3: TEST.mutation-sensitivity over a mutation report (no producer yet)"
 	@echo "  make record-host-readback                              Record live default-branch rules and merge settings (refresh within 30 days)"
 	@echo "  make analyzer-scope-check                              Check analyzer I/O boundaries and CODEOWNERS with finding-level debt ratchets"
 	@echo "  make version-release                                   Prepare an on-demand release PR from HEAD at origin/main; refuses no-bump histories"
@@ -894,8 +894,9 @@ guardrails-t1-report:
 	$(call guardrails_run,guard-evidence,adapter guard-evidence "$(GUARDRAILS_T1_JUNIT)" --tier t1,all)
 	$(call guardrails_run,report-check,report-check --junit "$(GUARDRAILS_T1_JUNIT)" --tier t1 --mode $(GUARDRAILS_MODE))
 
-# TEST.mutation-sensitivity is a T3 check. The profile has no nightly scheduler, so it runs at phase
-# exit with the other T3 checks, never in gate-commit or gate-ci. It reads the normalised report
+# TEST.mutation-sensitivity is a T3 check, never in gate-commit or gate-ci. Nothing runs it yet: the
+# profile has no nightly scheduler and no target produces the mutation report (owner decision
+# pending; see its .omp/rule-coverage.json row). It reads the normalised report
 # that the T3 mutation run writes (`omp-guardrails adapter mutation-report`) and the diff from the
 # merge base. A missing or malformed report is a finding, so it never passes without evidence.
 GUARDRAILS_MUTATION_REPORT ?= $(REPO_TMP_DIR)/guardrails/mutation.json

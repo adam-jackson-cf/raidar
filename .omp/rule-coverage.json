@@ -4278,7 +4278,7 @@
         "diagnostic": "TEST.mutation-sensitivity",
         "timeout_seconds": 60
       },
-      "notes": "Pinned omp-guardrails (orchestrator/pyproject.toml [dependency-groups] dev, commit 397a456). Invocation: omp-guardrails adapter mutation-tool and mutation-report, then mutation-check (T3, phase exit); module omp_guardrails.test_evidence.mutation. Settings: the pytest adapter's mutation tool (mutmut). T3 only: make guardrails-mutation runs mutation-check over the T3 mutation report at phase exit (run_events.nightly_scheduler is none, pending owner confirmation); it is not part of gate-commit or gate-ci (omp-amends.md section 1.11 group B). Canaries run through omp-guardrails canaries in a disposable repository."
+      "notes": "Pinned omp-guardrails (orchestrator/pyproject.toml [dependency-groups] dev, commit 397a456). Invocation: omp-guardrails adapter mutation-tool and mutation-report, then mutation-check (T3, phase exit); module omp_guardrails.test_evidence.mutation. Settings: the pytest adapter's mutation tool (mutmut). T3 only (catalogue run_event t3_nightly, applicability conditional; omp-amends.md section 1.11): it is not part of gate-commit or gate-ci. NOT YET EXECUTED ANYWHERE: raidar has no T3 report producer (mutmut run plus adapter mutation-report) and no nightly scheduler (run_events.nightly_scheduler is none). local_marker and ci_marker name the standalone make guardrails-mutation target, not a gate or CI invocation, so they are not CI evidence. Owner decision pending: wire a T3 producer and scheduled run, or approve this row as conditional not_applicable. Canaries run through omp-guardrails canaries in a disposable repository."
     },
     {
       "id": "NAME.test-files",
