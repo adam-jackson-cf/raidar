@@ -3,5 +3,15 @@
   "private": true,
   "devDependencies": {
     "prettier": "3.6.2"
+  },
+  "prettier": {
+    "overrides": [
+      {
+        "files": ".omp/test-profile.md",
+        "options": {
+          "trailingComma": "none"
+        }
+      }
+    ]
   }
 }

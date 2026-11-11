@@ -1,0 +1,13 @@
+{
+  "rule": "NAME.test-files",
+  "expect": "fail",
+  "check": {
+    "subcommand": "naming",
+    "argv": [
+      "orchestrator/tests/test_package_at3_docker.py"
+    ]
+  },
+  "files": {
+    "orchestrator/tests/test_package_at3_docker.py": "def test_total_of_two_items_is_their_sum() -> None:\n    assert 2 + 3 == 5\n"
+  }
+}

@@ -108,7 +108,8 @@ def test_real_repository_ledger_passes_executed_validator() -> None:
     """The real ledger must prove all rules, not merely pass structure-only planning."""
     result = _validate(ROOT)
     assert result.returncode == 0, result.stdout + result.stderr
-    assert "104 rules" in result.stdout
+    catalogue = json.loads((ROOT / ".omp/guardrail-rules.json").read_text(encoding="utf-8"))
+    assert f"{len(catalogue['rules'])} rules" in result.stdout
     assert "STRUCTURE_ONLY" not in result.stdout
 
 

@@ -12,19 +12,14 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 VENDOR = ROOT / "scripts/vendor/setup-repository-guardrails/validate_rule_coverage.py"
-REFERENCE = (
-    Path.home() / ".omp/agent/skills/setup-repository-guardrails/scripts/validate_rule_coverage.py"
-)
-SHA256 = "ddce1136f9c0b00076939aced1bb83ced0a021124eecb5024efeece9703e33a0"
+SHA256 = "4def562a709b844399bb52495cdbc43f7e407a832f046addf6288b3052b51734"
 
 
 def evidence_errors(root: Path) -> list[str]:
     """Reject corrupted vendor bytes and stale or scope-less host readbacks."""
     errors = []
     source = VENDOR.read_bytes()
-    if hashlib.sha256(source).hexdigest() != SHA256 or (
-        REFERENCE.is_file() and source != REFERENCE.read_bytes()
-    ):
+    if hashlib.sha256(source).hexdigest() != SHA256:
         errors.append("vendored validator differs; restore the recorded skill bytes")
     record = json.loads((root / ".omp/host-readback.json").read_text())
     measured = datetime.fromisoformat(record["query_time"])

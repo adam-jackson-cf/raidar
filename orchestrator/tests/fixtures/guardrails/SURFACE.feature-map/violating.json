@@ -1,0 +1,13 @@
+{
+  "rule": "SURFACE.feature-map",
+  "expect": "fail",
+  "check": {
+    "subcommand": "surface-lint",
+    "argv": []
+  },
+  "files": {
+    "docs/feature-map/canary-feature.md": "# Canary feature\n\n## Sub-features\n\n- One sub-feature.\n\n## How to get to it (user POV)\n\n- Open the canary page.\n\n## Driving it with node scripts/surface/lever.mjs\n\n- Journey: [canary.journey.mjs](../../review-surface/journeys/canary.journey.mjs)\n\n",
+    "review-surface/journeys/canary.journey.mjs": "import { surface } from '../../scripts/surface/lever.mjs';\nsurface();\n",
+    "scripts/surface/lever.mjs": "import fs from 'node:fs';\nconst arg = (name) => process.argv[process.argv.indexOf(name) + 1];\nconst data = arg('--data-dir');\nconst evidence = arg('--evidence-dir');\nfs.mkdirSync(evidence, { recursive: true });\nif (fs.existsSync(data) && !fs.statSync(data).isDirectory()) {\n  console.error('RAIDAR-SURFACE-DOCTOR-FAILED: data dir is not a directory');\n  process.exit(3);\n}\nprocess.exit(0);\n"
+  }
+}

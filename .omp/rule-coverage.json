@@ -1539,9 +1539,9 @@
         ".omp/baselines/ruff.json"
       ],
       "local_runner": "Makefile",
-      "local_marker": "@$(RAIDAR_DEV) quality gates",
+      "local_marker": "$(GUARDRAILS_T1_ENV) $(RAIDAR_DEV) quality gates",
       "ci_runner": "Makefile",
-      "ci_marker": "@$(RAIDAR_DEV) quality gates",
+      "ci_marker": "$(GUARDRAILS_T1_ENV) $(RAIDAR_DEV) quality gates",
       "canary": {
         "command": [
           "uv",
@@ -1587,9 +1587,9 @@
         ".omp/baselines/ruff.json"
       ],
       "local_runner": "Makefile",
-      "local_marker": "@$(RAIDAR_DEV) quality gates",
+      "local_marker": "$(GUARDRAILS_T1_ENV) $(RAIDAR_DEV) quality gates",
       "ci_runner": "Makefile",
-      "ci_marker": "@$(RAIDAR_DEV) quality gates",
+      "ci_marker": "$(GUARDRAILS_T1_ENV) $(RAIDAR_DEV) quality gates",
       "canary": {
         "command": [
           "uv",
@@ -1630,9 +1630,9 @@
         ".omp/baselines/ruff.json"
       ],
       "local_runner": "Makefile",
-      "local_marker": "@$(RAIDAR_DEV) quality gates",
+      "local_marker": "$(GUARDRAILS_T1_ENV) $(RAIDAR_DEV) quality gates",
       "ci_runner": "Makefile",
-      "ci_marker": "@$(RAIDAR_DEV) quality gates",
+      "ci_marker": "$(GUARDRAILS_T1_ENV) $(RAIDAR_DEV) quality gates",
       "canary": {
         "command": [
           "uv",
@@ -1673,9 +1673,9 @@
         ".omp/baselines/ruff.json"
       ],
       "local_runner": "Makefile",
-      "local_marker": "@$(RAIDAR_DEV) quality gates",
+      "local_marker": "$(GUARDRAILS_T1_ENV) $(RAIDAR_DEV) quality gates",
       "ci_runner": "Makefile",
-      "ci_marker": "@$(RAIDAR_DEV) quality gates",
+      "ci_marker": "$(GUARDRAILS_T1_ENV) $(RAIDAR_DEV) quality gates",
       "canary": {
         "command": [
           "uv",
@@ -1764,9 +1764,9 @@
         ".omp/baselines/ruff.json"
       ],
       "local_runner": "Makefile",
-      "local_marker": "@$(RAIDAR_DEV) quality gates",
+      "local_marker": "$(GUARDRAILS_T1_ENV) $(RAIDAR_DEV) quality gates",
       "ci_runner": "Makefile",
-      "ci_marker": "@$(RAIDAR_DEV) quality gates",
+      "ci_marker": "$(GUARDRAILS_T1_ENV) $(RAIDAR_DEV) quality gates",
       "canary": {
         "command": [
           "uv",
@@ -1807,9 +1807,9 @@
         ".omp/baselines/ruff.json"
       ],
       "local_runner": "Makefile",
-      "local_marker": "@$(RAIDAR_DEV) quality gates",
+      "local_marker": "$(GUARDRAILS_T1_ENV) $(RAIDAR_DEV) quality gates",
       "ci_runner": "Makefile",
-      "ci_marker": "@$(RAIDAR_DEV) quality gates",
+      "ci_marker": "$(GUARDRAILS_T1_ENV) $(RAIDAR_DEV) quality gates",
       "canary": {
         "command": [
           "uv",
@@ -1850,9 +1850,9 @@
         ".omp/baselines/ruff.json"
       ],
       "local_runner": "Makefile",
-      "local_marker": "@$(RAIDAR_DEV) quality gates",
+      "local_marker": "$(GUARDRAILS_T1_ENV) $(RAIDAR_DEV) quality gates",
       "ci_runner": "Makefile",
-      "ci_marker": "@$(RAIDAR_DEV) quality gates",
+      "ci_marker": "$(GUARDRAILS_T1_ENV) $(RAIDAR_DEV) quality gates",
       "canary": {
         "command": [
           "uv",
@@ -1893,9 +1893,9 @@
         ".omp/baselines/ruff.json"
       ],
       "local_runner": "Makefile",
-      "local_marker": "@$(RAIDAR_DEV) quality gates",
+      "local_marker": "$(GUARDRAILS_T1_ENV) $(RAIDAR_DEV) quality gates",
       "ci_runner": "Makefile",
-      "ci_marker": "@$(RAIDAR_DEV) quality gates",
+      "ci_marker": "$(GUARDRAILS_T1_ENV) $(RAIDAR_DEV) quality gates",
       "canary": {
         "command": [
           "uv",
@@ -1936,9 +1936,9 @@
         ".omp/baselines/ruff.json"
       ],
       "local_runner": "Makefile",
-      "local_marker": "@$(RAIDAR_DEV) quality gates",
+      "local_marker": "$(GUARDRAILS_T1_ENV) $(RAIDAR_DEV) quality gates",
       "ci_runner": "Makefile",
-      "ci_marker": "@$(RAIDAR_DEV) quality gates",
+      "ci_marker": "$(GUARDRAILS_T1_ENV) $(RAIDAR_DEV) quality gates",
       "canary": {
         "command": [
           "uv",
@@ -1979,9 +1979,9 @@
         ".omp/baselines/ruff.json"
       ],
       "local_runner": "Makefile",
-      "local_marker": "@$(RAIDAR_DEV) quality gates",
+      "local_marker": "$(GUARDRAILS_T1_ENV) $(RAIDAR_DEV) quality gates",
       "ci_runner": "Makefile",
-      "ci_marker": "@$(RAIDAR_DEV) quality gates",
+      "ci_marker": "$(GUARDRAILS_T1_ENV) $(RAIDAR_DEV) quality gates",
       "canary": {
         "command": [
           "uv",
@@ -2022,9 +2022,9 @@
         ".omp/baselines/ruff.json"
       ],
       "local_runner": "Makefile",
-      "local_marker": "@$(RAIDAR_DEV) quality gates",
+      "local_marker": "$(GUARDRAILS_T1_ENV) $(RAIDAR_DEV) quality gates",
       "ci_runner": "Makefile",
-      "ci_marker": "@$(RAIDAR_DEV) quality gates",
+      "ci_marker": "$(GUARDRAILS_T1_ENV) $(RAIDAR_DEV) quality gates",
       "canary": {
         "command": [
           "uv",
@@ -2065,9 +2065,9 @@
         ".omp/baselines/ruff.json"
       ],
       "local_runner": "Makefile",
-      "local_marker": "@$(RAIDAR_DEV) quality gates",
+      "local_marker": "$(GUARDRAILS_T1_ENV) $(RAIDAR_DEV) quality gates",
       "ci_runner": "Makefile",
-      "ci_marker": "@$(RAIDAR_DEV) quality gates",
+      "ci_marker": "$(GUARDRAILS_T1_ENV) $(RAIDAR_DEV) quality gates",
       "canary": {
         "command": [
           "uv",
@@ -2108,9 +2108,9 @@
         ".omp/baselines/ruff.json"
       ],
       "local_runner": "Makefile",
-      "local_marker": "@$(RAIDAR_DEV) quality gates",
+      "local_marker": "$(GUARDRAILS_T1_ENV) $(RAIDAR_DEV) quality gates",
       "ci_runner": "Makefile",
-      "ci_marker": "@$(RAIDAR_DEV) quality gates",
+      "ci_marker": "$(GUARDRAILS_T1_ENV) $(RAIDAR_DEV) quality gates",
       "canary": {
         "command": [
           "uv",
@@ -2151,9 +2151,9 @@
         ".omp/baselines/ruff.json"
       ],
       "local_runner": "Makefile",
-      "local_marker": "@$(RAIDAR_DEV) quality gates",
+      "local_marker": "$(GUARDRAILS_T1_ENV) $(RAIDAR_DEV) quality gates",
       "ci_runner": "Makefile",
-      "ci_marker": "@$(RAIDAR_DEV) quality gates",
+      "ci_marker": "$(GUARDRAILS_T1_ENV) $(RAIDAR_DEV) quality gates",
       "canary": {
         "command": [
           "uv",
@@ -2194,9 +2194,9 @@
         ".omp/baselines/ruff.json"
       ],
       "local_runner": "Makefile",
-      "local_marker": "@$(RAIDAR_DEV) quality gates",
+      "local_marker": "$(GUARDRAILS_T1_ENV) $(RAIDAR_DEV) quality gates",
       "ci_runner": "Makefile",
-      "ci_marker": "@$(RAIDAR_DEV) quality gates",
+      "ci_marker": "$(GUARDRAILS_T1_ENV) $(RAIDAR_DEV) quality gates",
       "canary": {
         "command": [
           "uv",
@@ -2237,9 +2237,9 @@
         ".omp/baselines/ruff.json"
       ],
       "local_runner": "Makefile",
-      "local_marker": "@$(RAIDAR_DEV) quality gates",
+      "local_marker": "$(GUARDRAILS_T1_ENV) $(RAIDAR_DEV) quality gates",
       "ci_runner": "Makefile",
-      "ci_marker": "@$(RAIDAR_DEV) quality gates",
+      "ci_marker": "$(GUARDRAILS_T1_ENV) $(RAIDAR_DEV) quality gates",
       "canary": {
         "command": [
           "uv",
@@ -2280,9 +2280,9 @@
         ".omp/baselines/ruff.json"
       ],
       "local_runner": "Makefile",
-      "local_marker": "@$(RAIDAR_DEV) quality gates",
+      "local_marker": "$(GUARDRAILS_T1_ENV) $(RAIDAR_DEV) quality gates",
       "ci_runner": "Makefile",
-      "ci_marker": "@$(RAIDAR_DEV) quality gates",
+      "ci_marker": "$(GUARDRAILS_T1_ENV) $(RAIDAR_DEV) quality gates",
       "canary": {
         "command": [
           "uv",
@@ -2325,9 +2325,9 @@
         ".omp/baselines/ruff.json"
       ],
       "local_runner": "Makefile",
-      "local_marker": "@$(RAIDAR_DEV) quality gates",
+      "local_marker": "$(GUARDRAILS_T1_ENV) $(RAIDAR_DEV) quality gates",
       "ci_runner": "Makefile",
-      "ci_marker": "@$(RAIDAR_DEV) quality gates",
+      "ci_marker": "$(GUARDRAILS_T1_ENV) $(RAIDAR_DEV) quality gates",
       "canary": {
         "command": [
           "uv",
@@ -2368,9 +2368,9 @@
         ".omp/baselines/ruff.json"
       ],
       "local_runner": "Makefile",
-      "local_marker": "@$(RAIDAR_DEV) quality gates",
+      "local_marker": "$(GUARDRAILS_T1_ENV) $(RAIDAR_DEV) quality gates",
       "ci_runner": "Makefile",
-      "ci_marker": "@$(RAIDAR_DEV) quality gates",
+      "ci_marker": "$(GUARDRAILS_T1_ENV) $(RAIDAR_DEV) quality gates",
       "canary": {
         "command": [
           "uv",
@@ -2411,9 +2411,9 @@
         ".omp/baselines/ruff.json"
       ],
       "local_runner": "Makefile",
-      "local_marker": "@$(RAIDAR_DEV) quality gates",
+      "local_marker": "$(GUARDRAILS_T1_ENV) $(RAIDAR_DEV) quality gates",
       "ci_runner": "Makefile",
-      "ci_marker": "@$(RAIDAR_DEV) quality gates",
+      "ci_marker": "$(GUARDRAILS_T1_ENV) $(RAIDAR_DEV) quality gates",
       "canary": {
         "command": [
           "uv",
@@ -2458,9 +2458,9 @@
         ".omp/baselines/ruff.json"
       ],
       "local_runner": "Makefile",
-      "local_marker": "@$(RAIDAR_DEV) quality gates",
+      "local_marker": "$(GUARDRAILS_T1_ENV) $(RAIDAR_DEV) quality gates",
       "ci_runner": "Makefile",
-      "ci_marker": "@$(RAIDAR_DEV) quality gates",
+      "ci_marker": "$(GUARDRAILS_T1_ENV) $(RAIDAR_DEV) quality gates",
       "canary": {
         "command": [
           "uv",
@@ -2501,9 +2501,9 @@
         ".omp/baselines/ruff.json"
       ],
       "local_runner": "Makefile",
-      "local_marker": "@$(RAIDAR_DEV) quality gates",
+      "local_marker": "$(GUARDRAILS_T1_ENV) $(RAIDAR_DEV) quality gates",
       "ci_runner": "Makefile",
-      "ci_marker": "@$(RAIDAR_DEV) quality gates",
+      "ci_marker": "$(GUARDRAILS_T1_ENV) $(RAIDAR_DEV) quality gates",
       "canary": {
         "command": [
           "uv",
@@ -2544,9 +2544,9 @@
         ".omp/baselines/ruff.json"
       ],
       "local_runner": "Makefile",
-      "local_marker": "@$(RAIDAR_DEV) quality gates",
+      "local_marker": "$(GUARDRAILS_T1_ENV) $(RAIDAR_DEV) quality gates",
       "ci_runner": "Makefile",
-      "ci_marker": "@$(RAIDAR_DEV) quality gates",
+      "ci_marker": "$(GUARDRAILS_T1_ENV) $(RAIDAR_DEV) quality gates",
       "canary": {
         "command": [
           "uv",
@@ -2587,9 +2587,9 @@
         ".omp/baselines/ruff.json"
       ],
       "local_runner": "Makefile",
-      "local_marker": "@$(RAIDAR_DEV) quality gates",
+      "local_marker": "$(GUARDRAILS_T1_ENV) $(RAIDAR_DEV) quality gates",
       "ci_runner": "Makefile",
-      "ci_marker": "@$(RAIDAR_DEV) quality gates",
+      "ci_marker": "$(GUARDRAILS_T1_ENV) $(RAIDAR_DEV) quality gates",
       "canary": {
         "command": [
           "uv",
@@ -2630,9 +2630,9 @@
         ".omp/baselines/ruff.json"
       ],
       "local_runner": "Makefile",
-      "local_marker": "@$(RAIDAR_DEV) quality gates",
+      "local_marker": "$(GUARDRAILS_T1_ENV) $(RAIDAR_DEV) quality gates",
       "ci_runner": "Makefile",
-      "ci_marker": "@$(RAIDAR_DEV) quality gates",
+      "ci_marker": "$(GUARDRAILS_T1_ENV) $(RAIDAR_DEV) quality gates",
       "canary": {
         "command": [
           "uv",
@@ -2673,9 +2673,9 @@
         ".omp/baselines/ruff.json"
       ],
       "local_runner": "Makefile",
-      "local_marker": "@$(RAIDAR_DEV) quality gates",
+      "local_marker": "$(GUARDRAILS_T1_ENV) $(RAIDAR_DEV) quality gates",
       "ci_runner": "Makefile",
-      "ci_marker": "@$(RAIDAR_DEV) quality gates",
+      "ci_marker": "$(GUARDRAILS_T1_ENV) $(RAIDAR_DEV) quality gates",
       "canary": {
         "command": [
           "uv",
@@ -2716,9 +2716,9 @@
         ".omp/baselines/ruff.json"
       ],
       "local_runner": "Makefile",
-      "local_marker": "@$(RAIDAR_DEV) quality gates",
+      "local_marker": "$(GUARDRAILS_T1_ENV) $(RAIDAR_DEV) quality gates",
       "ci_runner": "Makefile",
-      "ci_marker": "@$(RAIDAR_DEV) quality gates",
+      "ci_marker": "$(GUARDRAILS_T1_ENV) $(RAIDAR_DEV) quality gates",
       "canary": {
         "command": [
           "uv",
@@ -2759,9 +2759,9 @@
         ".omp/baselines/ruff.json"
       ],
       "local_runner": "Makefile",
-      "local_marker": "@$(RAIDAR_DEV) quality gates",
+      "local_marker": "$(GUARDRAILS_T1_ENV) $(RAIDAR_DEV) quality gates",
       "ci_runner": "Makefile",
-      "ci_marker": "@$(RAIDAR_DEV) quality gates",
+      "ci_marker": "$(GUARDRAILS_T1_ENV) $(RAIDAR_DEV) quality gates",
       "canary": {
         "command": [
           "uv",
@@ -2802,9 +2802,9 @@
         ".omp/baselines/ruff.json"
       ],
       "local_runner": "Makefile",
-      "local_marker": "@$(RAIDAR_DEV) quality gates",
+      "local_marker": "$(GUARDRAILS_T1_ENV) $(RAIDAR_DEV) quality gates",
       "ci_runner": "Makefile",
-      "ci_marker": "@$(RAIDAR_DEV) quality gates",
+      "ci_marker": "$(GUARDRAILS_T1_ENV) $(RAIDAR_DEV) quality gates",
       "canary": {
         "command": [
           "uv",
@@ -2845,9 +2845,9 @@
         ".omp/baselines/ruff.json"
       ],
       "local_runner": "Makefile",
-      "local_marker": "@$(RAIDAR_DEV) quality gates",
+      "local_marker": "$(GUARDRAILS_T1_ENV) $(RAIDAR_DEV) quality gates",
       "ci_runner": "Makefile",
-      "ci_marker": "@$(RAIDAR_DEV) quality gates",
+      "ci_marker": "$(GUARDRAILS_T1_ENV) $(RAIDAR_DEV) quality gates",
       "canary": {
         "command": [
           "uv",
@@ -2888,9 +2888,9 @@
         ".omp/baselines/ruff.json"
       ],
       "local_runner": "Makefile",
-      "local_marker": "@$(RAIDAR_DEV) quality gates",
+      "local_marker": "$(GUARDRAILS_T1_ENV) $(RAIDAR_DEV) quality gates",
       "ci_runner": "Makefile",
-      "ci_marker": "@$(RAIDAR_DEV) quality gates",
+      "ci_marker": "$(GUARDRAILS_T1_ENV) $(RAIDAR_DEV) quality gates",
       "canary": {
         "command": [
           "uv",
@@ -2931,9 +2931,9 @@
         ".omp/baselines/ruff.json"
       ],
       "local_runner": "Makefile",
-      "local_marker": "@$(RAIDAR_DEV) quality gates",
+      "local_marker": "$(GUARDRAILS_T1_ENV) $(RAIDAR_DEV) quality gates",
       "ci_runner": "Makefile",
-      "ci_marker": "@$(RAIDAR_DEV) quality gates",
+      "ci_marker": "$(GUARDRAILS_T1_ENV) $(RAIDAR_DEV) quality gates",
       "canary": {
         "command": [
           "uv",
@@ -2974,9 +2974,9 @@
         ".omp/baselines/ruff.json"
       ],
       "local_runner": "Makefile",
-      "local_marker": "@$(RAIDAR_DEV) quality gates",
+      "local_marker": "$(GUARDRAILS_T1_ENV) $(RAIDAR_DEV) quality gates",
       "ci_runner": "Makefile",
-      "ci_marker": "@$(RAIDAR_DEV) quality gates",
+      "ci_marker": "$(GUARDRAILS_T1_ENV) $(RAIDAR_DEV) quality gates",
       "canary": {
         "command": [
           "uv",
@@ -3017,9 +3017,9 @@
         ".omp/baselines/ruff.json"
       ],
       "local_runner": "Makefile",
-      "local_marker": "@$(RAIDAR_DEV) quality gates",
+      "local_marker": "$(GUARDRAILS_T1_ENV) $(RAIDAR_DEV) quality gates",
       "ci_runner": "Makefile",
-      "ci_marker": "@$(RAIDAR_DEV) quality gates",
+      "ci_marker": "$(GUARDRAILS_T1_ENV) $(RAIDAR_DEV) quality gates",
       "canary": {
         "command": [
           "uv",
@@ -3060,9 +3060,9 @@
         ".omp/baselines/ruff.json"
       ],
       "local_runner": "Makefile",
-      "local_marker": "@$(RAIDAR_DEV) quality gates",
+      "local_marker": "$(GUARDRAILS_T1_ENV) $(RAIDAR_DEV) quality gates",
       "ci_runner": "Makefile",
-      "ci_marker": "@$(RAIDAR_DEV) quality gates",
+      "ci_marker": "$(GUARDRAILS_T1_ENV) $(RAIDAR_DEV) quality gates",
       "canary": {
         "command": [
           "uv",
@@ -3103,9 +3103,9 @@
         ".omp/baselines/ruff.json"
       ],
       "local_runner": "Makefile",
-      "local_marker": "@$(RAIDAR_DEV) quality gates",
+      "local_marker": "$(GUARDRAILS_T1_ENV) $(RAIDAR_DEV) quality gates",
       "ci_runner": "Makefile",
-      "ci_marker": "@$(RAIDAR_DEV) quality gates",
+      "ci_marker": "$(GUARDRAILS_T1_ENV) $(RAIDAR_DEV) quality gates",
       "canary": {
         "command": [
           "uv",
@@ -3146,9 +3146,9 @@
         ".omp/baselines/ruff.json"
       ],
       "local_runner": "Makefile",
-      "local_marker": "@$(RAIDAR_DEV) quality gates",
+      "local_marker": "$(GUARDRAILS_T1_ENV) $(RAIDAR_DEV) quality gates",
       "ci_runner": "Makefile",
-      "ci_marker": "@$(RAIDAR_DEV) quality gates",
+      "ci_marker": "$(GUARDRAILS_T1_ENV) $(RAIDAR_DEV) quality gates",
       "canary": {
         "command": [
           "uv",
@@ -3189,9 +3189,9 @@
         ".omp/baselines/ruff.json"
       ],
       "local_runner": "Makefile",
-      "local_marker": "@$(RAIDAR_DEV) quality gates",
+      "local_marker": "$(GUARDRAILS_T1_ENV) $(RAIDAR_DEV) quality gates",
       "ci_runner": "Makefile",
-      "ci_marker": "@$(RAIDAR_DEV) quality gates",
+      "ci_marker": "$(GUARDRAILS_T1_ENV) $(RAIDAR_DEV) quality gates",
       "canary": {
         "command": [
           "uv",
@@ -3232,9 +3232,9 @@
         ".omp/baselines/ruff.json"
       ],
       "local_runner": "Makefile",
-      "local_marker": "@$(RAIDAR_DEV) quality gates",
+      "local_marker": "$(GUARDRAILS_T1_ENV) $(RAIDAR_DEV) quality gates",
       "ci_runner": "Makefile",
-      "ci_marker": "@$(RAIDAR_DEV) quality gates",
+      "ci_marker": "$(GUARDRAILS_T1_ENV) $(RAIDAR_DEV) quality gates",
       "canary": {
         "command": [
           "uv",
@@ -3275,9 +3275,9 @@
         ".omp/baselines/ruff.json"
       ],
       "local_runner": "Makefile",
-      "local_marker": "@$(RAIDAR_DEV) quality gates",
+      "local_marker": "$(GUARDRAILS_T1_ENV) $(RAIDAR_DEV) quality gates",
       "ci_runner": "Makefile",
-      "ci_marker": "@$(RAIDAR_DEV) quality gates",
+      "ci_marker": "$(GUARDRAILS_T1_ENV) $(RAIDAR_DEV) quality gates",
       "canary": {
         "command": [
           "uv",
@@ -3318,9 +3318,9 @@
         ".omp/baselines/ruff.json"
       ],
       "local_runner": "Makefile",
-      "local_marker": "@$(RAIDAR_DEV) quality gates",
+      "local_marker": "$(GUARDRAILS_T1_ENV) $(RAIDAR_DEV) quality gates",
       "ci_runner": "Makefile",
-      "ci_marker": "@$(RAIDAR_DEV) quality gates",
+      "ci_marker": "$(GUARDRAILS_T1_ENV) $(RAIDAR_DEV) quality gates",
       "canary": {
         "command": [
           "uv",
@@ -3361,9 +3361,9 @@
         ".omp/baselines/ruff.json"
       ],
       "local_runner": "Makefile",
-      "local_marker": "@$(RAIDAR_DEV) quality gates",
+      "local_marker": "$(GUARDRAILS_T1_ENV) $(RAIDAR_DEV) quality gates",
       "ci_runner": "Makefile",
-      "ci_marker": "@$(RAIDAR_DEV) quality gates",
+      "ci_marker": "$(GUARDRAILS_T1_ENV) $(RAIDAR_DEV) quality gates",
       "canary": {
         "command": [
           "uv",
@@ -3404,9 +3404,9 @@
         ".omp/baselines/ruff.json"
       ],
       "local_runner": "Makefile",
-      "local_marker": "@$(RAIDAR_DEV) quality gates",
+      "local_marker": "$(GUARDRAILS_T1_ENV) $(RAIDAR_DEV) quality gates",
       "ci_runner": "Makefile",
-      "ci_marker": "@$(RAIDAR_DEV) quality gates",
+      "ci_marker": "$(GUARDRAILS_T1_ENV) $(RAIDAR_DEV) quality gates",
       "canary": {
         "command": [
           "uv",
@@ -3451,9 +3451,9 @@
         ".omp/baselines/ruff.json"
       ],
       "local_runner": "Makefile",
-      "local_marker": "@$(RAIDAR_DEV) quality gates",
+      "local_marker": "$(GUARDRAILS_T1_ENV) $(RAIDAR_DEV) quality gates",
       "ci_runner": "Makefile",
-      "ci_marker": "@$(RAIDAR_DEV) quality gates",
+      "ci_marker": "$(GUARDRAILS_T1_ENV) $(RAIDAR_DEV) quality gates",
       "canary": {
         "command": [
           "uv",
@@ -3494,9 +3494,9 @@
         ".omp/baselines/ruff.json"
       ],
       "local_runner": "Makefile",
-      "local_marker": "@$(RAIDAR_DEV) quality gates",
+      "local_marker": "$(GUARDRAILS_T1_ENV) $(RAIDAR_DEV) quality gates",
       "ci_runner": "Makefile",
-      "ci_marker": "@$(RAIDAR_DEV) quality gates",
+      "ci_marker": "$(GUARDRAILS_T1_ENV) $(RAIDAR_DEV) quality gates",
       "canary": {
         "command": [
           "uv",
@@ -3949,6 +3949,499 @@
         "violating": "orchestrator/tests/fixtures/guardrails/TEST.tiers/violating.json",
         "diagnostic": "TEST.placement"
       }
+    },
+    {
+      "id": "PYQ201",
+      "evidence_kind": "local_ci",
+      "status": "implemented",
+      "implementation_paths": [
+        "orchestrator/pyproject.toml",
+        "orchestrator/uv.lock",
+        ".omp/test-profile.md",
+        "Makefile",
+        "orchestrator/tests/fixtures/guardrails/PYQ201/passing.json",
+        "orchestrator/tests/fixtures/guardrails/PYQ201/violating.json"
+      ],
+      "local_runner": "Makefile",
+      "local_marker": "$(call guardrails_run,python-quality,",
+      "ci_runner": "Makefile",
+      "ci_marker": "GUARDRAILS_MODE=ci",
+      "canary": {
+        "command": [
+          "omp-guardrails",
+          "canaries",
+          "{fixture}"
+        ],
+        "passing": "orchestrator/tests/fixtures/guardrails/PYQ201/passing.json",
+        "violating": "orchestrator/tests/fixtures/guardrails/PYQ201/violating.json",
+        "diagnostic": "PYQ201",
+        "timeout_seconds": 60
+      },
+      "notes": "Pinned omp-guardrails (orchestrator/pyproject.toml [dependency-groups] dev, commit 397a456). Invocation: omp-guardrails python-quality; module omp_guardrails.python_policy.quality. Settings: guardrails.python.class_limits.max_public_methods (20). Blocking in make guardrails-reference from R1 (omp-amends.md section 1.7 step 4 PR 1 and section 1.11 group B). Canaries run through omp-guardrails canaries in a disposable repository."
+    },
+    {
+      "id": "TEST.no-self-mocking",
+      "evidence_kind": "local_ci",
+      "status": "implemented",
+      "implementation_paths": [
+        "orchestrator/pyproject.toml",
+        "orchestrator/uv.lock",
+        ".omp/test-profile.md",
+        "Makefile",
+        "orchestrator/tests/fixtures/guardrails/TEST.no-self-mocking/passing.json",
+        "orchestrator/tests/fixtures/guardrails/TEST.no-self-mocking/violating.json"
+      ],
+      "local_runner": "Makefile",
+      "local_marker": "$(call guardrails_run,adapter-lint,",
+      "ci_runner": "Makefile",
+      "ci_marker": "GUARDRAILS_MODE=ci",
+      "canary": {
+        "command": [
+          "omp-guardrails",
+          "canaries",
+          "{fixture}"
+        ],
+        "passing": "orchestrator/tests/fixtures/guardrails/TEST.no-self-mocking/passing.json",
+        "violating": "orchestrator/tests/fixtures/guardrails/TEST.no-self-mocking/violating.json",
+        "diagnostic": "TEST.no-self-mocking",
+        "timeout_seconds": 60
+      },
+      "notes": "Pinned omp-guardrails (orchestrator/pyproject.toml [dependency-groups] dev, commit 397a456). Invocation: omp-guardrails adapter lint; module omp_guardrails.adapters.pytest. Settings: public_entry_points (owned packages) and house_style.exceptions (docs/adr/adr-003-guardrails-reference-exceptions.md). Blocking in make guardrails-reference from R1 (omp-amends.md section 1.7 step 4 PR 1 and section 1.11 group B). Canaries run through omp-guardrails canaries in a disposable repository."
+    },
+    {
+      "id": "TEST.no-test-hooks",
+      "evidence_kind": "local_ci",
+      "status": "implemented",
+      "implementation_paths": [
+        "orchestrator/pyproject.toml",
+        "orchestrator/uv.lock",
+        ".omp/test-profile.md",
+        "Makefile",
+        "orchestrator/tests/fixtures/guardrails/TEST.no-test-hooks/passing.json",
+        "orchestrator/tests/fixtures/guardrails/TEST.no-test-hooks/violating.json"
+      ],
+      "local_runner": "Makefile",
+      "local_marker": "$(call guardrails_run,adapter-lint,",
+      "ci_runner": "Makefile",
+      "ci_marker": "GUARDRAILS_MODE=ci",
+      "canary": {
+        "command": [
+          "omp-guardrails",
+          "canaries",
+          "{fixture}"
+        ],
+        "passing": "orchestrator/tests/fixtures/guardrails/TEST.no-test-hooks/passing.json",
+        "violating": "orchestrator/tests/fixtures/guardrails/TEST.no-test-hooks/violating.json",
+        "diagnostic": "TEST.no-test-hooks",
+        "timeout_seconds": 60
+      },
+      "notes": "Pinned omp-guardrails (orchestrator/pyproject.toml [dependency-groups] dev, commit 397a456). Invocation: omp-guardrails adapter lint; module omp_guardrails.adapters.pytest. Settings: public_entry_points (owned packages) and house_style.exceptions (docs/adr/adr-003-guardrails-reference-exceptions.md). Blocking in make guardrails-reference from R1 (omp-amends.md section 1.7 step 4 PR 1 and section 1.11 group B). Canaries run through omp-guardrails canaries in a disposable repository."
+    },
+    {
+      "id": "TEST.no-evasion",
+      "evidence_kind": "local_ci",
+      "status": "implemented",
+      "implementation_paths": [
+        "orchestrator/pyproject.toml",
+        "orchestrator/uv.lock",
+        ".omp/test-profile.md",
+        "Makefile",
+        "orchestrator/tests/fixtures/guardrails/TEST.no-evasion/passing.json",
+        "orchestrator/tests/fixtures/guardrails/TEST.no-evasion/violating.json"
+      ],
+      "local_runner": "Makefile",
+      "local_marker": "$(call guardrails_run,adapter-lint,",
+      "ci_runner": "Makefile",
+      "ci_marker": "GUARDRAILS_MODE=ci",
+      "canary": {
+        "command": [
+          "omp-guardrails",
+          "canaries",
+          "{fixture}"
+        ],
+        "passing": "orchestrator/tests/fixtures/guardrails/TEST.no-evasion/passing.json",
+        "violating": "orchestrator/tests/fixtures/guardrails/TEST.no-evasion/violating.json",
+        "diagnostic": "TEST.no-evasion",
+        "timeout_seconds": 60
+      },
+      "notes": "Pinned omp-guardrails (orchestrator/pyproject.toml [dependency-groups] dev, commit 397a456). Invocation: omp-guardrails adapter lint, report-check and diff-check; module omp_guardrails.adapters.pytest, omp_guardrails.test_evidence.collection, omp_guardrails.diffs.timeouts. Settings: guardrails.test_evidence.approved_skips and house_style.exceptions (docs/adr/adr-003-guardrails-reference-exceptions.md). Blocking in make guardrails-reference from R1 (omp-amends.md section 1.7 step 4 PR 1 and section 1.11 group B). Canaries run through omp-guardrails canaries in a disposable repository."
+    },
+    {
+      "id": "TEST.fast-tier-isolation",
+      "evidence_kind": "local_ci",
+      "status": "implemented",
+      "implementation_paths": [
+        "orchestrator/pyproject.toml",
+        "orchestrator/uv.lock",
+        ".omp/test-profile.md",
+        "Makefile",
+        "orchestrator/tests/fixtures/guardrails/TEST.fast-tier-isolation/passing.json",
+        "orchestrator/tests/fixtures/guardrails/TEST.fast-tier-isolation/violating.json"
+      ],
+      "local_runner": "Makefile",
+      "local_marker": "$(call guardrails_run,guard-evidence,",
+      "ci_runner": "Makefile",
+      "ci_marker": "GUARDRAILS_MODE=ci",
+      "canary": {
+        "command": [
+          "omp-guardrails",
+          "canaries",
+          "{fixture}"
+        ],
+        "passing": "orchestrator/tests/fixtures/guardrails/TEST.fast-tier-isolation/passing.json",
+        "violating": "orchestrator/tests/fixtures/guardrails/TEST.fast-tier-isolation/violating.json",
+        "diagnostic": "TEST.fast-tier-isolation",
+        "timeout_seconds": 90
+      },
+      "notes": "Pinned omp-guardrails (orchestrator/pyproject.toml [dependency-groups] dev, commit 397a456). Invocation: omp-guardrails adapter junit-args (arms the guard on make test-fast and make quality) and adapter guard-evidence; module omp_guardrails.adapters.pytest.guards. Settings: guards.network and guards.process. Blocking in make guardrails-reference from R1 (omp-amends.md section 1.7 step 4 PR 1 and section 1.11 group B). Canaries run through omp-guardrails canaries in a disposable repository."
+    },
+    {
+      "id": "TEST.user-data-guard",
+      "evidence_kind": "local_ci",
+      "status": "implemented",
+      "implementation_paths": [
+        "orchestrator/pyproject.toml",
+        "orchestrator/uv.lock",
+        ".omp/test-profile.md",
+        "Makefile",
+        "orchestrator/tests/fixtures/guardrails/TEST.user-data-guard/passing.json",
+        "orchestrator/tests/fixtures/guardrails/TEST.user-data-guard/violating.json"
+      ],
+      "local_runner": "Makefile",
+      "local_marker": "$(call guardrails_run,guard-evidence,",
+      "ci_runner": "Makefile",
+      "ci_marker": "GUARDRAILS_MODE=ci",
+      "canary": {
+        "command": [
+          "omp-guardrails",
+          "canaries",
+          "{fixture}"
+        ],
+        "passing": "orchestrator/tests/fixtures/guardrails/TEST.user-data-guard/passing.json",
+        "violating": "orchestrator/tests/fixtures/guardrails/TEST.user-data-guard/violating.json",
+        "diagnostic": "TEST.user-data-guard",
+        "timeout_seconds": 90
+      },
+      "notes": "Pinned omp-guardrails (orchestrator/pyproject.toml [dependency-groups] dev, commit 397a456). Invocation: omp-guardrails adapter junit-args (arms the guard on make test-fast and make quality) and adapter guard-evidence; module omp_guardrails.adapters.pytest.guards. Settings: guards.user_data and guardrails.guarded_run.watch. Blocking in make guardrails-reference from R1 (omp-amends.md section 1.7 step 4 PR 1 and section 1.11 group B). Canaries run through omp-guardrails canaries in a disposable repository."
+    },
+    {
+      "id": "TEST.tier-selectors",
+      "evidence_kind": "local_ci",
+      "status": "implemented",
+      "implementation_paths": [
+        "orchestrator/pyproject.toml",
+        "orchestrator/uv.lock",
+        ".omp/test-profile.md",
+        "Makefile",
+        "orchestrator/tests/fixtures/guardrails/TEST.tier-selectors/passing.json",
+        "orchestrator/tests/fixtures/guardrails/TEST.tier-selectors/violating.json"
+      ],
+      "local_runner": "Makefile",
+      "local_marker": "$(call guardrails_run,collection-check,",
+      "ci_runner": "Makefile",
+      "ci_marker": "GUARDRAILS_MODE=ci",
+      "canary": {
+        "command": [
+          "omp-guardrails",
+          "canaries",
+          "{fixture}"
+        ],
+        "passing": "orchestrator/tests/fixtures/guardrails/TEST.tier-selectors/passing.json",
+        "violating": "orchestrator/tests/fixtures/guardrails/TEST.tier-selectors/violating.json",
+        "diagnostic": "TEST.tier-selectors",
+        "timeout_seconds": 60
+      },
+      "notes": "Pinned omp-guardrails (orchestrator/pyproject.toml [dependency-groups] dev, commit 397a456). Invocation: omp-guardrails adapter tiers then collection-check (Playwright specs and journeys appended to T2); module omp_guardrails.test_evidence.collection. Settings: tiers.<tier>.selector and layout.test_file_patterns. Blocking in make guardrails-reference from R1 (omp-amends.md section 1.7 step 4 PR 1 and section 1.11 group B). Canaries run through omp-guardrails canaries in a disposable repository."
+    },
+    {
+      "id": "TEST.coverage-ratchet",
+      "evidence_kind": "local_ci",
+      "status": "implemented",
+      "implementation_paths": [
+        "orchestrator/pyproject.toml",
+        "orchestrator/uv.lock",
+        ".omp/test-profile.md",
+        "Makefile",
+        "orchestrator/tests/fixtures/guardrails/TEST.coverage-ratchet/passing.json",
+        "orchestrator/tests/fixtures/guardrails/TEST.coverage-ratchet/violating.json"
+      ],
+      "local_runner": "Makefile",
+      "local_marker": "$(call guardrails_run,diff-check,",
+      "ci_runner": "Makefile",
+      "ci_marker": "GUARDRAILS_MODE=ci",
+      "canary": {
+        "command": [
+          "omp-guardrails",
+          "canaries",
+          "{fixture}"
+        ],
+        "passing": "orchestrator/tests/fixtures/guardrails/TEST.coverage-ratchet/passing.json",
+        "violating": "orchestrator/tests/fixtures/guardrails/TEST.coverage-ratchet/violating.json",
+        "diagnostic": "TEST.coverage-ratchet",
+        "timeout_seconds": 60
+      },
+      "notes": "Pinned omp-guardrails (orchestrator/pyproject.toml [dependency-groups] dev, commit 397a456). Invocation: omp-guardrails diff-check against the merge base; module omp_guardrails.diffs.coverage_ratchet. Settings: coverage floors and guardrails.coverage_ratchet. Blocking in make guardrails-reference from R1 (omp-amends.md section 1.7 step 4 PR 1 and section 1.11 group B). Canaries run through omp-guardrails canaries in a disposable repository."
+    },
+    {
+      "id": "TEST.golden-change-record",
+      "evidence_kind": "local_ci",
+      "status": "implemented",
+      "implementation_paths": [
+        "orchestrator/pyproject.toml",
+        "orchestrator/uv.lock",
+        ".omp/test-profile.md",
+        "Makefile",
+        "orchestrator/tests/fixtures/guardrails/TEST.golden-change-record/passing.json",
+        "orchestrator/tests/fixtures/guardrails/TEST.golden-change-record/violating.json"
+      ],
+      "local_runner": "Makefile",
+      "local_marker": "$(call guardrails_run,diff-check,",
+      "ci_runner": "Makefile",
+      "ci_marker": "GUARDRAILS_MODE=ci",
+      "canary": {
+        "command": [
+          "omp-guardrails",
+          "canaries",
+          "{fixture}"
+        ],
+        "passing": "orchestrator/tests/fixtures/guardrails/TEST.golden-change-record/passing.json",
+        "violating": "orchestrator/tests/fixtures/guardrails/TEST.golden-change-record/violating.json",
+        "diagnostic": "TEST.golden-change-record",
+        "timeout_seconds": 60
+      },
+      "notes": "Pinned omp-guardrails (orchestrator/pyproject.toml [dependency-groups] dev, commit 397a456). Invocation: omp-guardrails diff-check against the merge base; module omp_guardrails.diffs.golden_record. Settings: guardrails.golden_record (globs and change_record). Blocking in make guardrails-reference from R1 (omp-amends.md section 1.7 step 4 PR 1 and section 1.11 group B). Canaries run through omp-guardrails canaries in a disposable repository."
+    },
+    {
+      "id": "TEST.identity-artefacts",
+      "evidence_kind": "local_ci",
+      "status": "implemented",
+      "implementation_paths": [
+        "orchestrator/pyproject.toml",
+        "orchestrator/uv.lock",
+        ".omp/test-profile.md",
+        "Makefile",
+        "orchestrator/tests/fixtures/guardrails/TEST.identity-artefacts/passing.json",
+        "orchestrator/tests/fixtures/guardrails/TEST.identity-artefacts/violating.json"
+      ],
+      "local_runner": "Makefile",
+      "local_marker": "$(call guardrails_run,diff-check,",
+      "ci_runner": "Makefile",
+      "ci_marker": "GUARDRAILS_MODE=ci",
+      "canary": {
+        "command": [
+          "omp-guardrails",
+          "canaries",
+          "{fixture}"
+        ],
+        "passing": "orchestrator/tests/fixtures/guardrails/TEST.identity-artefacts/passing.json",
+        "violating": "orchestrator/tests/fixtures/guardrails/TEST.identity-artefacts/violating.json",
+        "diagnostic": "TEST.identity-artefacts",
+        "timeout_seconds": 60
+      },
+      "notes": "Pinned omp-guardrails (orchestrator/pyproject.toml [dependency-groups] dev, commit 397a456). Invocation: omp-guardrails diff-check against the merge base; module omp_guardrails.diffs.identity_artefacts. Settings: identity_artefacts and guardrails.identity_artefacts.non_production. Blocking in make guardrails-reference from R1 (omp-amends.md section 1.7 step 4 PR 1 and section 1.11 group B). Canaries run through omp-guardrails canaries in a disposable repository."
+    },
+    {
+      "id": "TEST.property-seed",
+      "evidence_kind": "local_ci",
+      "status": "implemented",
+      "implementation_paths": [
+        "orchestrator/pyproject.toml",
+        "orchestrator/uv.lock",
+        ".omp/test-profile.md",
+        "Makefile",
+        "orchestrator/tests/fixtures/guardrails/TEST.property-seed/passing.json",
+        "orchestrator/tests/fixtures/guardrails/TEST.property-seed/violating.json"
+      ],
+      "local_runner": "Makefile",
+      "local_marker": "$(call guardrails_run,adapter-lint,",
+      "ci_runner": "Makefile",
+      "ci_marker": "GUARDRAILS_MODE=ci",
+      "canary": {
+        "command": [
+          "omp-guardrails",
+          "canaries",
+          "{fixture}"
+        ],
+        "passing": "orchestrator/tests/fixtures/guardrails/TEST.property-seed/passing.json",
+        "violating": "orchestrator/tests/fixtures/guardrails/TEST.property-seed/violating.json",
+        "diagnostic": "TEST.property-seed",
+        "timeout_seconds": 60
+      },
+      "notes": "Pinned omp-guardrails (orchestrator/pyproject.toml [dependency-groups] dev, commit 397a456). Invocation: omp-guardrails adapter lint; module omp_guardrails.adapters.pytest. Settings: none: raidar has no Hypothesis property tests today, so the lint has nothing to report until one is added. Blocking in make guardrails-reference from R1 (omp-amends.md section 1.7 step 4 PR 1 and section 1.11 group B). Canaries run through omp-guardrails canaries in a disposable repository."
+    },
+    {
+      "id": "TEST.mutation-sensitivity",
+      "evidence_kind": "local_ci",
+      "status": "implemented",
+      "implementation_paths": [
+        "orchestrator/pyproject.toml",
+        "orchestrator/uv.lock",
+        ".omp/test-profile.md",
+        "Makefile",
+        "orchestrator/tests/fixtures/guardrails/TEST.mutation-sensitivity/passing.json",
+        "orchestrator/tests/fixtures/guardrails/TEST.mutation-sensitivity/violating.json"
+      ],
+      "local_runner": "Makefile",
+      "local_marker": "guardrails-mutation:",
+      "ci_runner": "Makefile",
+      "ci_marker": "guardrails-mutation:",
+      "canary": {
+        "command": [
+          "omp-guardrails",
+          "canaries",
+          "{fixture}"
+        ],
+        "passing": "orchestrator/tests/fixtures/guardrails/TEST.mutation-sensitivity/passing.json",
+        "violating": "orchestrator/tests/fixtures/guardrails/TEST.mutation-sensitivity/violating.json",
+        "diagnostic": "TEST.mutation-sensitivity",
+        "timeout_seconds": 60
+      },
+      "notes": "Pinned omp-guardrails (orchestrator/pyproject.toml [dependency-groups] dev, commit 397a456). Invocation: omp-guardrails adapter mutation-tool and mutation-report, then mutation-check (T3, phase exit); module omp_guardrails.test_evidence.mutation. Settings: the pytest adapter's mutation tool (mutmut). T3 only: make guardrails-mutation runs mutation-check over the T3 mutation report at phase exit (run_events.nightly_scheduler is none, pending owner confirmation); it is not part of gate-commit or gate-ci (omp-amends.md section 1.11 group B). Canaries run through omp-guardrails canaries in a disposable repository."
+    },
+    {
+      "id": "NAME.test-files",
+      "evidence_kind": "local_ci",
+      "status": "implemented",
+      "implementation_paths": [
+        "orchestrator/pyproject.toml",
+        "orchestrator/uv.lock",
+        ".omp/test-profile.md",
+        "Makefile",
+        "orchestrator/tests/fixtures/guardrails/NAME.test-files/passing.json",
+        "orchestrator/tests/fixtures/guardrails/NAME.test-files/violating.json"
+      ],
+      "local_runner": "Makefile",
+      "local_marker": "$(call guardrails_run,naming,",
+      "ci_runner": "Makefile",
+      "ci_marker": "GUARDRAILS_MODE=ci",
+      "canary": {
+        "command": [
+          "omp-guardrails",
+          "canaries",
+          "{fixture}"
+        ],
+        "passing": "orchestrator/tests/fixtures/guardrails/NAME.test-files/passing.json",
+        "violating": "orchestrator/tests/fixtures/guardrails/NAME.test-files/violating.json",
+        "diagnostic": "NAME.test-files",
+        "timeout_seconds": 60
+      },
+      "notes": "Pinned omp-guardrails (orchestrator/pyproject.toml [dependency-groups] dev, commit 397a456). Invocation: omp-guardrails naming; module omp_guardrails.structure.naming. Settings: layout.test_file_patterns plus house-style test roots. Blocking in make guardrails-reference from R1 (omp-amends.md section 1.7 step 4 PR 1 and section 1.11 group B). Canaries run through omp-guardrails canaries in a disposable repository."
+    },
+    {
+      "id": "PROFILE.complete",
+      "evidence_kind": "local_ci",
+      "status": "implemented",
+      "implementation_paths": [
+        "orchestrator/pyproject.toml",
+        "orchestrator/uv.lock",
+        ".omp/test-profile.md",
+        "Makefile",
+        "orchestrator/tests/fixtures/guardrails/PROFILE.complete/passing.json",
+        "orchestrator/tests/fixtures/guardrails/PROFILE.complete/violating.json"
+      ],
+      "local_runner": "Makefile",
+      "local_marker": "$(call guardrails_run,profile-check,",
+      "ci_runner": "Makefile",
+      "ci_marker": "GUARDRAILS_MODE=ci",
+      "canary": {
+        "command": [
+          "omp-guardrails",
+          "canaries",
+          "{fixture}"
+        ],
+        "passing": "orchestrator/tests/fixtures/guardrails/PROFILE.complete/passing.json",
+        "violating": "orchestrator/tests/fixtures/guardrails/PROFILE.complete/violating.json",
+        "diagnostic": "PROFILE.complete",
+        "timeout_seconds": 60
+      },
+      "notes": "Pinned omp-guardrails (orchestrator/pyproject.toml [dependency-groups] dev, commit 397a456). Invocation: omp-guardrails profile-check; module omp_guardrails.config.profile. Settings: the whole front matter of .omp/test-profile.md. Blocking in make guardrails-reference from R1 (omp-amends.md section 1.7 step 4 PR 1 and section 1.11 group B). Canaries run through omp-guardrails canaries in a disposable repository."
+    },
+    {
+      "id": "SURFACE.feature-map",
+      "evidence_kind": "local_ci",
+      "status": "implemented",
+      "implementation_paths": [
+        "orchestrator/pyproject.toml",
+        "orchestrator/uv.lock",
+        ".omp/test-profile.md",
+        "Makefile",
+        "orchestrator/tests/fixtures/guardrails/SURFACE.feature-map/passing.json",
+        "orchestrator/tests/fixtures/guardrails/SURFACE.feature-map/violating.json"
+      ],
+      "local_runner": "Makefile",
+      "local_marker": "$(call guardrails_run,surface-lint,",
+      "ci_runner": "Makefile",
+      "ci_marker": "GUARDRAILS_MODE=ci",
+      "canary": {
+        "command": [
+          "omp-guardrails",
+          "canaries",
+          "{fixture}"
+        ],
+        "passing": "orchestrator/tests/fixtures/guardrails/SURFACE.feature-map/passing.json",
+        "violating": "orchestrator/tests/fixtures/guardrails/SURFACE.feature-map/violating.json",
+        "diagnostic": "SURFACE.feature-map",
+        "timeout_seconds": 60
+      },
+      "notes": "Pinned omp-guardrails (orchestrator/pyproject.toml [dependency-groups] dev, commit 397a456). Invocation: omp-guardrails surface-lint; module omp_guardrails.surface.feature_map. Settings: verification_surface.feature_map_path. Blocking in make guardrails-reference from R1 (omp-amends.md section 1.7 step 4 PR 1 and section 1.11 group B). Canaries run through omp-guardrails canaries in a disposable repository."
+    },
+    {
+      "id": "SURFACE.journeys",
+      "evidence_kind": "local_ci",
+      "status": "implemented",
+      "implementation_paths": [
+        "orchestrator/pyproject.toml",
+        "orchestrator/uv.lock",
+        ".omp/test-profile.md",
+        "Makefile",
+        "orchestrator/tests/fixtures/guardrails/SURFACE.journeys/passing.json",
+        "orchestrator/tests/fixtures/guardrails/SURFACE.journeys/violating.json"
+      ],
+      "local_runner": "Makefile",
+      "local_marker": "$(call guardrails_run,surface-lint,",
+      "ci_runner": "Makefile",
+      "ci_marker": "GUARDRAILS_MODE=ci",
+      "canary": {
+        "command": [
+          "omp-guardrails",
+          "canaries",
+          "{fixture}"
+        ],
+        "passing": "orchestrator/tests/fixtures/guardrails/SURFACE.journeys/passing.json",
+        "violating": "orchestrator/tests/fixtures/guardrails/SURFACE.journeys/violating.json",
+        "diagnostic": "SURFACE.journeys",
+        "timeout_seconds": 60
+      },
+      "notes": "Pinned omp-guardrails (orchestrator/pyproject.toml [dependency-groups] dev, commit 397a456). Invocation: omp-guardrails surface-lint; module omp_guardrails.surface.journeys. Settings: verification_surface.journey_file_pattern and lever_command. Blocking in make guardrails-reference from R1 (omp-amends.md section 1.7 step 4 PR 1 and section 1.11 group B). Canaries run through omp-guardrails canaries in a disposable repository."
+    },
+    {
+      "id": "SURFACE.lever-isolation",
+      "evidence_kind": "local_ci",
+      "status": "implemented",
+      "implementation_paths": [
+        "orchestrator/pyproject.toml",
+        "orchestrator/uv.lock",
+        ".omp/test-profile.md",
+        "Makefile",
+        "orchestrator/tests/fixtures/guardrails/SURFACE.lever-isolation/passing.json",
+        "orchestrator/tests/fixtures/guardrails/SURFACE.lever-isolation/violating.json"
+      ],
+      "local_runner": "Makefile",
+      "local_marker": "$(call guardrails_run,lever-selftest,",
+      "ci_runner": "Makefile",
+      "ci_marker": "GUARDRAILS_MODE=ci",
+      "canary": {
+        "command": [
+          "omp-guardrails",
+          "canaries",
+          "{fixture}"
+        ],
+        "passing": "orchestrator/tests/fixtures/guardrails/SURFACE.lever-isolation/passing.json",
+        "violating": "orchestrator/tests/fixtures/guardrails/SURFACE.lever-isolation/violating.json",
+        "diagnostic": "SURFACE.lever-isolation",
+        "timeout_seconds": 90
+      },
+      "notes": "Pinned omp-guardrails (orchestrator/pyproject.toml [dependency-groups] dev, commit 397a456). Invocation: omp-guardrails lever-selftest; module omp_guardrails.surface.lever_selftest. Settings: verification_surface lever_command, doctor_marker, data and evidence args; guardrails.lever_selftest. Blocking in make guardrails-reference from R1 (omp-amends.md section 1.7 step 4 PR 1 and section 1.11 group B). Canaries run through omp-guardrails canaries in a disposable repository."
     }
   ]
 }

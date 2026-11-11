@@ -1,0 +1,14 @@
+{
+  "rule": "TEST.no-self-mocking",
+  "expect": "pass",
+  "check": {
+    "subcommand": "adapter",
+    "argv": [
+      "lint",
+      "orchestrator/tests/test_canary_outcomes.py"
+    ]
+  },
+  "files": {
+    "orchestrator/tests/test_canary_outcomes.py": "import subprocess\n\n\ndef test_fakes_the_os_boundary(monkeypatch) -> None:\n    monkeypatch.setattr(subprocess, 'run', lambda *a, **k: None)\n"
+  }
+}

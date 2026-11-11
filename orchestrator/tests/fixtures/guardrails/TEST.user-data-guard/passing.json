@@ -1,0 +1,15 @@
+{
+  "rule": "TEST.user-data-guard",
+  "expect": "pass",
+  "check": {
+    "command": [
+      "sh",
+      "-c",
+      "args=$({python} -m omp_guardrails.cli adapter junit-args --tier t1 --out report.xml 2>/dev/null) || exit 2; out=$({python} -m pytest -q -p no:cacheprovider $args orchestrator/tests/test_canary_outcomes.py 2>&1); status=$?; printf \"%s\\n\" \"$out\"; printf \"%s\\n\" \"$out\" | grep -q \"TEST.user-data-guard: a test may not\\|TEST.user-data-guard: the fast tier may not\" && exit 1; [ $status -ne 0 ] && exit 2; exit 0"
+    ],
+    "timeout_s": 60
+  },
+  "files": {
+    "orchestrator/tests/test_canary_outcomes.py": "def test_total_of_two_items_is_their_sum() -> None:\n    assert 2 + 3 == 5\n"
+  }
+}

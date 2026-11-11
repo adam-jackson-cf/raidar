@@ -47,6 +47,14 @@ dev = [
     "radon==6.0.1",
 ]
 
+# The setup-repository-guardrails reference checkers: a commit pin of the public skill
+# repository, never a branch and never a local path. The default `dev` group installs with every
+# `uv sync` and `uv run` (CI: `uv sync --all-extras --frozen`); upgrade by bumping the commit.
+[dependency-groups]
+dev = [
+    "omp-guardrails[pytest] @ git+https://github.com/adam-jackson-cf/oh-mi-pi-config@397a456381d678909df9b207b54a6f8e2c72e9ca#subdirectory=agent/skills/setup-repository-guardrails/assets/python-reference",
+]
+
 [project.scripts]
 raidar = "raidar.cli:main"
 

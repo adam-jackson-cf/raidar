@@ -1,0 +1,14 @@
+{
+  "rule": "TEST.no-evasion",
+  "expect": "fail",
+  "check": {
+    "subcommand": "adapter",
+    "argv": [
+      "lint",
+      "orchestrator/tests/test_canary_outcomes.py"
+    ]
+  },
+  "files": {
+    "orchestrator/tests/test_canary_outcomes.py": "import pytest\n\n\n@pytest.mark.skip(reason='flaky')\ndef test_total_of_two_items_is_their_sum() -> None:\n    assert 2 + 3 == 5\n"
+  }
+}
