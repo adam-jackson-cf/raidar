@@ -30,7 +30,6 @@ from raidar.evaluation.review.quality.models import COMPONENTS, QualityProjectio
 from raidar.evaluation.review.quality.projection import (
     _portable,
     assemble_projection,
-    build_quality_projection,
     build_quality_projection_from,
     main,
     review_trials,
@@ -1099,7 +1098,7 @@ def test_a_projection_round_trips_through_the_cli_and_names_its_inputs_portably(
     assert loaded.runs == ()
     assert loaded.experiments == ()
     assert str(tmp_path) not in output.read_text()
-    assert build_quality_projection(runs, store).runs == ()
+    assert build_quality_projection_from([(runs, store)]).runs == ()
 
 
 def test_cli_refuses_unpaired_runs_roots_and_stores(tmp_path: Path) -> None:

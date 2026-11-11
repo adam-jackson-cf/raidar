@@ -519,17 +519,7 @@
           },
           {
             "rule": "TEST.no-self-mocking",
-            "path": "orchestrator/tests/test_code_quality_measurement_closure.py",
-            "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md \u00a72.5"
-          },
-          {
-            "rule": "TEST.no-self-mocking",
             "path": "orchestrator/tests/test_code_quality_scorer.py",
-            "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md \u00a72.5"
-          },
-          {
-            "rule": "TEST.no-self-mocking",
-            "path": "orchestrator/tests/test_codex_cli_adapter.py",
             "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md \u00a72.5"
           },
           {
@@ -590,11 +580,6 @@
           {
             "rule": "TEST.no-self-mocking",
             "path": "orchestrator/tests/test_imports.py",
-            "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md \u00a72.5"
-          },
-          {
-            "rule": "TEST.no-self-mocking",
-            "path": "orchestrator/tests/test_inventory_invalid_evidence.py",
             "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md \u00a72.5"
           },
           {
@@ -804,17 +789,7 @@
           },
           {
             "rule": "TEST.no-self-mocking",
-            "path": "orchestrator/tests/test_run_scoped_docker_environment_slow.py",
-            "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md \u00a72.5"
-          },
-          {
-            "rule": "TEST.no-self-mocking",
             "path": "orchestrator/tests/test_runtime_gate_refusals.py",
-            "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md \u00a72.5"
-          },
-          {
-            "rule": "TEST.no-self-mocking",
-            "path": "orchestrator/tests/test_scorer_store_and_trial_ids.py",
             "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md \u00a72.5"
           },
           {
@@ -904,11 +879,6 @@
           },
           {
             "rule": "TEST.no-self-mocking",
-            "path": "orchestrator/tests/test_verifier_copy_sandbox.py",
-            "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md \u00a72.5"
-          },
-          {
-            "rule": "TEST.no-self-mocking",
             "path": "orchestrator/tests/test_verifier_docker_boundary.py",
             "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md \u00a72.5"
           },
@@ -975,21 +945,16 @@
           {
             "rule": "TEST.no-test-hooks",
             "path": "orchestrator/src/raidar/cli/stage.py",
-            "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md \u00a72.5"
+            "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md \u00a72.3"
           },
           {
             "rule": "TEST.no-test-hooks",
             "path": "orchestrator/src/raidar/design/problem/resolver.py",
-            "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md \u00a72.5"
+            "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md \u00a72.3"
           },
           {
             "rule": "TEST.no-test-hooks",
             "path": "orchestrator/src/raidar/engine/health/admission.py",
-            "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md \u00a72.5"
-          },
-          {
-            "rule": "TEST.no-test-hooks",
-            "path": "orchestrator/src/raidar/engine/perf/budgets.py",
             "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md \u00a72.5"
           },
           {
@@ -999,18 +964,8 @@
           },
           {
             "rule": "TEST.no-test-hooks",
-            "path": "orchestrator/src/raidar/evaluation/analysis/stats.py",
-            "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md \u00a72.5"
-          },
-          {
-            "rule": "TEST.no-test-hooks",
-            "path": "orchestrator/src/raidar/evaluation/review/quality/projection.py",
-            "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md \u00a72.5"
-          },
-          {
-            "rule": "TEST.no-test-hooks",
             "path": "orchestrator/src/raidar/scoring/catalog/builtin.py",
-            "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md \u00a72.5"
+            "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md \u00a72.3"
           },
           {
             "rule": "TEST.no-test-hooks",
@@ -1025,11 +980,6 @@
           {
             "rule": "TEST.no-test-hooks",
             "path": "orchestrator/src/raidar/scoring/judge/gating.py",
-            "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md \u00a72.5"
-          },
-          {
-            "rule": "TEST.no-test-hooks",
-            "path": "orchestrator/src/raidar/scoring/judge/ledger.py",
             "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md \u00a72.5"
           },
           {

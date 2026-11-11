@@ -874,7 +874,8 @@ guardrails-reference:
 	@node -e '$(GUARDRAILS_PLAYWRIGHT_IDS_JS)' "$(GUARDRAILS_DIR)/playwright-list.json" >> "$(GUARDRAILS_DIR)/tiers/t2.txt"
 	@git ls-files --cached --others --exclude-standard -- '$(GUARDRAILS_JOURNEY_GLOB)' | sed 's/$$/::journey/' >> "$(GUARDRAILS_DIR)/tiers/t2.txt"
 	$(call guardrails_run,collection-check,collection-check --tier t1="$(GUARDRAILS_DIR)/tiers/t1.txt" --tier t2="$(GUARDRAILS_DIR)/tiers/t2.txt" --tier t3="$(GUARDRAILS_DIR)/tiers/t3.txt")
-	@base=$$(git merge-base "$(GUARDRAILS_BASE)" HEAD) && head=$$(git write-tree) \
+	@index="$(GUARDRAILS_DIR)/index" && cp "$${GIT_INDEX_FILE:-$$(git rev-parse --git-path index)}" "$$index" \
+		&& base=$$(git merge-base "$(GUARDRAILS_BASE)" HEAD) && head=$$(GIT_INDEX_FILE="$$index" git write-tree) \
 		|| { echo "guardrails-reference: cannot resolve the diff range from $(GUARDRAILS_BASE)"; exit 1; }; \
 		$(MAKE) --no-print-directory guardrails-diff GUARDRAILS_DIFF_RANGE="--base $$base --head $$head"
 	$(call guardrails_run,lever-selftest,lever-selftest)
@@ -883,7 +884,9 @@ guardrails-reference:
 		echo "guardrails-reference: no T1 report at $(GUARDRAILS_T1_JUNIT); TEST.budget.* need it"; exit 1; \
 	else echo "guardrails-reference: no T1 report at $(GUARDRAILS_T1_JUNIT); run-report checks skipped"; fi
 
-# The staged tree (the commit being made; HEAD's tree in CI) against the merge base.
+# The staged tree (the commit being made; HEAD's tree in CI) against the merge base. write-tree reads
+# a copy of the index (the hook's index during a commit), so another git process holding
+# index.lock cannot fail the gate.
 guardrails-diff:
 	$(call guardrails_run,diff-check,diff-check $(GUARDRAILS_DIFF_RANGE))
 

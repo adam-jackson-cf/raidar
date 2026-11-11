@@ -23,17 +23,17 @@ from raidar.engine.perf.budgets import (
     Budget,
     JobSamples,
     PerfInputError,
+    PhaseCheck,
     TrialSamples,
     Verdict,
     budget_set_for,
     check_budgets,
-    checks_pass,
     load_job_samples,
     percentile,
 )
 from raidar.engine.perf.contention import Contention, TrialWindow, peak_during, peak_overlap
 from raidar.engine.perf.phases import phase_samples, trial_phases
-from raidar.engine.perf.report import build_report, report_from_samples
+from raidar.engine.perf.report import PerfReport, build_report, report_from_samples
 from raidar.grading.records import PRE_AGENT_LEAK_FILE, RECORD_FILE, step_record_dir
 from tests.execution_support import StepOutcome, _record
 
@@ -137,6 +137,11 @@ def test_missing_timestamps_do_not_invent_durations_or_complete_aggregates() -> 
     assert {s.phase for s in samples} == {"environment_start", "agent_setup", "arm_apply"}
 
 
+def _passes(checks: list[PhaseCheck]) -> bool:
+    """Whether the perf report over ``checks`` passes, with no contention splits."""
+    return PerfReport(checks, _contention(), {}).passed
+
+
 def test_p95_over_enough_samples_decides_the_verdict() -> None:
     budget = (Budget("per_step_reset", 2.0),)
     under = check_budgets(_samples("per_step_reset", [1.0] * 9 + [2.5]), budgets=budget)
@@ -146,8 +151,8 @@ def test_p95_over_enough_samples_decides_the_verdict() -> None:
     assert over[0].verdict is Verdict.FAIL
     few = check_budgets(_samples("per_step_reset", [1.0] * 9), budgets=budget)
     assert few[0].verdict is Verdict.INSUFFICIENT
-    assert not checks_pass(few)
-    assert checks_pass(
+    assert not _passes(few)
+    assert _passes(
         check_budgets(_samples("per_step_reset", [1.0] * 9), budgets=budget, min_samples=5)
     )
     assert (
@@ -179,10 +184,10 @@ def test_between_step_budgets_apply_only_when_a_trial_ran_two_checkpoints() -> N
     samples = _samples("per_step_reset", [1.0] * 10)
     one_shot = check_budgets(samples, budgets=budgets, multi_step=False)
     assert [c.verdict for c in one_shot] == [Verdict.PASS, Verdict.NOT_APPLICABLE]
-    assert checks_pass(one_shot)
+    assert _passes(one_shot)
     multi = check_budgets(samples, budgets=budgets, multi_step=True)
     assert multi[1].verdict is Verdict.MISSING
-    assert not checks_pass(multi)
+    assert not _passes(multi)
 
 
 def _window(start: float, end: float, trial: str = "t") -> TrialWindow:

@@ -302,7 +302,3 @@ def load_job_samples(job_dirs: Sequence[Path]) -> JobSamples:
             )
             multi_step = multi_step or len(record.trial.steps) >= 2
     return JobSamples(samples, len(trials), multi_step, tuple(trials), _shared_target(job_dirs))
-
-
-def checks_pass(checks: Sequence[PhaseCheck]) -> bool:
-    return all(check.verdict in PASSING for check in checks)

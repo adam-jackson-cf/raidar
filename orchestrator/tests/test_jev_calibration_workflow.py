@@ -19,7 +19,7 @@ from raidar.scoring.judge.calibration import (
     promotion_readiness,
     supersede_labels,
 )
-from raidar.scoring.judge.ledger import current_labels, label_history, superseded_request_ids
+from raidar.scoring.judge.ledger import current_labels, label_history, supersessions
 from raidar.scoring.judge.policies import CalibrationSplit, PolicyMode, load_policy
 from raidar.scoring.judge.promotion import (
     PromotionError,
@@ -381,7 +381,7 @@ def test_superseded_labels_leave_calibration_but_stay_on_file(tmp_path: Path) ->
     assert promotion_readiness(runtime.audit, RUBRIC).labelled == 30
     assert len(label_history(runtime.audit, RUBRIC)) == 40  # nothing deleted
     assert len(runtime.audit.decisions(RUBRIC)) == 40  # supersessions are not decisions
-    assert superseded_request_ids(runtime.audit, RUBRIC) == set(old)
+    assert {item.request_id for item in supersessions(runtime.audit, RUBRIC)} == set(old)
     # Superseding again finds no current label; the decision can be relabelled.
     with pytest.raises(LabelImportError, match="no current"):
         supersede_labels(runtime.audit, RUBRIC, reason="again", request_ids=old[:1])
