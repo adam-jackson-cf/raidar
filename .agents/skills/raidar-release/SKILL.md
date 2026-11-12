@@ -11,15 +11,13 @@ description: "Use when changing a released Raidar agent, workflow, stage package
 - Preserve released bytes first with `make release-archive REF=<name>@<N>` for each affected agent, workflow, stage package or scorer.
   Edit its single implementation in place and bump the manifest @N for behaviour changes.
   Recover old implementations from archive tags, never a parallel module.
-- Treat agent/workflow fingerprints, stage-tree/1 shipped bytes, primitive_code inventories,
+- Agent/workflow fingerprints, stage-tree/1 shipped bytes, primitive_code inventories,
   scorer manifest descriptions, observation subject trajectory, evidence input oracle.cases
-  and problem oracle/ bundles as identity-bearing.
-- Test-only work must not change identity-bearing bytes: the grading digest
-  scope, `primitive_code` import closures, or released package bytes. Reach
-  that code through existing interfaces or monkeypatched runners instead.
-  An identity change requires its own reviewed commit with before/after
-  values, a reason, and any required revalidation scheduled; a test slice
-  that moves identity fails review.
+  and problem oracle/ bundles feed experiment locks: changing them needs a release and relock.
+- Raidar keeps no execution-identity record and versions no implementation code to keep
+  experiments valid. A code change that invalidates an experiment means rerunning it.
+  Each job's `job.json` records the Raidar commit and dirty flag it ran on (`runner.commit`,
+  `runner.dirty`), so results that predate a change are knowable.
 - Preserve legacy wire names including Harness CLI ids, raidar_oracle_plugin.py,
   raidar-oracle/, oracle_leak, oracle_bundle and oracle-bundle.json unless deliberately releasing them.
 
@@ -55,7 +53,7 @@ description: "Use when changing a released Raidar agent, workflow, stage package
 - Semantic changes under design/experiment/, to contract/canonical.py, references.py, source_digest.py,
   scoring/framework/metrics.py or any scorer implementation/import require relocking all tracked experiments.
 - Run `make experiment-lock EXPERIMENT=<path>` for each affected definition, then `make experiment-locks-check`.
-- An unchanged lock_sha256 permits offline rescoring of existing jobs; changed execution identity needs a new experiment.
+- An unchanged lock_sha256 permits offline rescoring of existing jobs. A code change that invalidates results means rerunning the experiment.
 - Run `make perf-gate TARGET=<name>` before a release/phase gate and after execution-path changes.
   Respect the accepted target budgets; a budget change requires a user decision.
 - Return archived refs, version changes, affected locks, validation results and any unresolved release conditions.

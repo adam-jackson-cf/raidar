@@ -444,6 +444,10 @@
     "orchestrator/tests/test_test_evidence.py::test_growth_requires_only_added_case_in_existing_file": {
       "source": "scripts/checks/check-test-evidence.py",
       "behavior": "Require added-function evidence without remapping an existing file or unchanged function"
+    },
+    "orchestrator/tests/test_toolchain_parity.py::test_frozen_exclusions_require_latest_release_digest_equality": {
+      "source": "scripts/checks/check-toolchain-parity.py",
+      "behavior": "Freeze the grading payload and only packages whose bytes equal their latest release, now owned by the toolchain parity check"
     }
   }
 }

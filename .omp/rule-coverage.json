@@ -4196,31 +4196,11 @@
     {
       "id": "TEST.identity-artefacts",
       "evidence_kind": "local_ci",
-      "status": "implemented",
-      "implementation_paths": [
-        "orchestrator/pyproject.toml",
-        "orchestrator/uv.lock",
-        ".omp/test-profile.md",
-        "Makefile",
-        "orchestrator/tests/fixtures/guardrails/TEST.identity-artefacts/passing.json",
-        "orchestrator/tests/fixtures/guardrails/TEST.identity-artefacts/violating.json"
-      ],
-      "local_runner": "Makefile",
-      "local_marker": "$(call guardrails_run,diff-check,",
-      "ci_runner": "Makefile",
-      "ci_marker": "GUARDRAILS_MODE=ci",
-      "canary": {
-        "command": [
-          "omp-guardrails",
-          "canaries",
-          "{fixture}"
-        ],
-        "passing": "orchestrator/tests/fixtures/guardrails/TEST.identity-artefacts/passing.json",
-        "violating": "orchestrator/tests/fixtures/guardrails/TEST.identity-artefacts/violating.json",
-        "diagnostic": "TEST.identity-artefacts",
-        "timeout_seconds": 60
-      },
-      "notes": "Pinned omp-guardrails (orchestrator/pyproject.toml [dependency-groups] dev, commit 397a456). Invocation: omp-guardrails diff-check against the merge base; module omp_guardrails.diffs.identity_artefacts. Settings: identity_artefacts and guardrails.identity_artefacts.non_production. Blocking in make guardrails-reference from R1 (omp-amends.md section 1.7 step 4 PR 1 and section 1.11 group B). Canaries run through omp-guardrails canaries in a disposable repository."
+      "status": "not_applicable",
+      "reason": "Raidar tracks no execution identity: a code change that invalidates experiments means rerunning them, and each experiment run records the raidar git commit it ran on (owner decision 2026-11-12). The profile's identity_artefacts is an approved none exemption, so the reference check has no artefacts to guard.",
+      "user_approval": "approved",
+      "evidence_path": ".omp/test-profile.md",
+      "evidence_marker": "Identity-bearing artefacts is `none`: Raidar tracks no execution identity."
     },
     {
       "id": "TEST.property-seed",

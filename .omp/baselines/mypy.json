@@ -1935,18 +1935,6 @@
       "count": 1
     },
     {
-      "path": "orchestrator/tests/test_identity_guard.py",
-      "code": "no-untyped-call",
-      "fingerprint": "2455bc2cdfad4f329d9e147573d009550070dc3e3d686fbbec7eb0bfe0c35eda",
-      "count": 1
-    },
-    {
-      "path": "orchestrator/tests/test_identity_guard.py",
-      "code": "no-untyped-def",
-      "fingerprint": "11672f914b64286e95f51debe12a642492c0a432a15c4c169a9d5e64a2995694",
-      "count": 1
-    },
-    {
       "path": "orchestrator/tests/test_imports.py",
       "code": "no-untyped-def",
       "fingerprint": "1c7f0d0639e19de1274355d8608d19447c8f33a6e7f081d059e22411e6a54b7c",
@@ -4398,12 +4386,6 @@
       "path": "scripts/checks/check-finding-baseline.py",
       "code": "type-arg",
       "fingerprint": "ed48bf5f044125fcb3930d21d2abb1c811b0f672798ee2496bc2f8a23e84f7db",
-      "count": 1
-    },
-    {
-      "path": "scripts/checks/check-identity.py",
-      "code": "assignment",
-      "fingerprint": "fbcd789a3862c6a790e2d68571936d7dfc894b020bdbfb0e281c0c33457a5184",
       "count": 1
     },
     {

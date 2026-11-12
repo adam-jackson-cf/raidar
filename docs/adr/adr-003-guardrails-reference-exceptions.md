@@ -50,7 +50,7 @@
 - 97 existing test files patch or mock raidar's own modules (587 findings), and 12 production files define symbols only tests use.
 - Fixing them rewrites most of the test suite and changes production modules, which is outside the shadow PR's behaviour-preserving scope. Examples:
   - most patches replace a collaborator that production code reaches by module global (for example `dependencies_module.load_health`), so a fix injects that collaborator through the public entry point;
-  - `subject/agent/harness.py` is in the primitive identity inventory: removing its two test-only functions changes all 18 `primitive_code` digests, which needs its own `.omp/identity.json` commit and revalidation (`make identity-check`);
+  - `subject/agent/harness.py` is in the `primitive_code` import inventory: removing its two test-only functions changes all 18 `primitive_code` digests, so every experiment must be relocked;
   - `scoring/judge/gating.py` (`verdict_observations`, `uncalibrated_observations`, `jev_policy_modes`) is the plan-H2 gate that keeps shadow Jev observations out of verdicts, and no production path calls it yet. Wiring it in changes analysis output, so it needs its own product PR.
 - Waived: each named file, by exact path. New test files and new production files are checked in full.
 - The waivers are a burn-down list, not a standing policy. Each removal of an entry is a normal PR that passes the gate.

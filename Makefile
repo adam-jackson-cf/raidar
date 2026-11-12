@@ -120,7 +120,7 @@ AGENT_SMOKE_EFFECTIVE_REASONING = $(if $(filter command line environment,$(origi
 	review-surface-quality-data quality-fixture-synthetic \
 	toolchain-pin-check structure-check release-archive \
 	test-fast test-slow test-quality test-docker \
-	quality gate-commit gate-ci identity-check identity-record test-evidence-check version-release version-check analyzer-scope-check \
+	quality gate-commit gate-ci test-evidence-check version-release version-check analyzer-scope-check \
 	ruff-baseline ruff-check ruff-suppressions-check mypy-check mypy-baseline
 
 define require_var
@@ -144,7 +144,7 @@ help:
 	@echo "  make toolchain-parity-check                             Check installer, README, metadata/lock and exact maintenance tool pins"
 	@echo "  make prettier-check                                    Check maintained Markdown/YAML outside docs/ and I2 byte-frozen scope"
 	@echo "  make dependency-audit-check [AUDIT_ARGS=--ci]            Strict locked audit on dependency changes (always with --ci)"
-	@echo "  make gate-commit                                       Whole-tree policy, identity, static/T1 checks and affected local T2 seams"
+	@echo "  make gate-commit                                       Whole-tree policy, static/T1 checks and affected local T2 seams"
 	@echo "  make gate-ci                                           Commit gate, slow tier, then quality tier (every push and pull request)"
 	@echo "  make rule-coverage                                     Execute fail-closed evidence for every guardrail catalogue ID"
 	@echo "  make guardrails-reference                              Pinned omp-guardrails checks (new rule IDs and TEST.budget.* block; the rest is shadow)"
@@ -160,9 +160,7 @@ help:
 	@echo "  make toolchain-pin-check                               Check Python pins/interpreter and declared/locked/resolver uv alignment; first step of make quality"
 	@echo "  make structure-check                                   Check the repository layout (no versions in names, root and package allowlists, depth); part of make quality"
 	@echo "  make test-hygiene-check                                Check bounded test processes, skill metadata/support links, and registered stage evidence"
-	@echo "  make identity-check                                    Refuse execution identity changes against .omp/identity.json"
 	@echo "  make test-evidence-check [TEST_EVIDENCE_BASE=origin/main] Check added tests map to changed behavior and reject duplicate paths"
-	@echo "  make identity-record                                   Explicitly record current identities; requires separate reviewed identity-change commit"
 	@echo "  make ruff-baseline                                    Explicitly record current Full Ruff findings (gates never refresh)"
 	@echo "  make ruff-check                                       Check Full Ruff against the finding-specific shrink-only baseline"
 	@echo "  make ruff-suppressions-check                           Refuse added Ruff suppressions relative to origin/main"
@@ -761,12 +759,6 @@ ruff-suppressions-check:
 test-hygiene-check:
 	@$(REPO_RUNTIME_ENV) uv run --project orchestrator --extra dev python scripts/checks/check-test-hygiene.py --repo-root "$(CURDIR)"
 
-identity-check:
-	@$(REPO_RUNTIME_ENV) uv run --project orchestrator --extra dev python scripts/checks/check-identity.py
-
-identity-record:
-	@$(REPO_RUNTIME_ENV) uv run --project orchestrator --extra dev python scripts/checks/check-identity.py --write
-
 mypy-check:
 	@$(REPO_RUNTIME_ENV) uv run --project orchestrator --extra dev python scripts/checks/check-mypy-coverage.py
 
@@ -823,7 +815,7 @@ GUARDRAILS_BASE ?= $(TEST_EVIDENCE_BASE)
 # missing, invalid or stale report fails in both modes, and gate-commit requires the T1 report.
 GUARDRAILS_MODE ?= local
 GUARDRAILS_T1_REQUIRED ?=
-GUARDRAILS_BLOCKING := PYQ201|NAME\.test-files|PROFILE\.complete|SURFACE\.feature-map|SURFACE\.journeys|SURFACE\.lever-isolation|TEST\.no-self-mocking|TEST\.no-test-hooks|TEST\.no-evasion|TEST\.fast-tier-isolation|TEST\.user-data-guard|TEST\.tier-selectors|TEST\.coverage-ratchet|TEST\.golden-change-record|TEST\.identity-artefacts|TEST\.property-seed|TEST\.mutation-sensitivity|TEST\.budget\.per-test-time|TEST\.budget\.fast-tier-time
+GUARDRAILS_BLOCKING := PYQ201|NAME\.test-files|PROFILE\.complete|SURFACE\.feature-map|SURFACE\.journeys|SURFACE\.lever-isolation|TEST\.no-self-mocking|TEST\.no-test-hooks|TEST\.no-evasion|TEST\.fast-tier-isolation|TEST\.user-data-guard|TEST\.tier-selectors|TEST\.coverage-ratchet|TEST\.golden-change-record|TEST\.property-seed|TEST\.mutation-sensitivity|TEST\.budget\.per-test-time|TEST\.budget\.fast-tier-time
 # T2 files the pytest adapter cannot list: the Playwright project, and the journeys the lever runs
 # (the profile's verification_surface.journey_file_pattern).
 GUARDRAILS_PLAYWRIGHT_DIR := review-surface
@@ -912,7 +904,6 @@ guardrails-mutation-check:
 gate-commit:
 	@$(REPO_RUNTIME_ENV) uv run --project orchestrator --extra dev \
 		python scripts/checks/check-repository-paths.py
-	@$(MAKE) --no-print-directory identity-check
 	@$(MAKE) --no-print-directory test-evidence-check
 	@$(MAKE) --no-print-directory rule-coverage
 	@$(MAKE) --no-print-directory quality
