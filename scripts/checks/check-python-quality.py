@@ -174,7 +174,6 @@ SCRIPT_NAME_ALLOWLIST = {
     "check-tool-rule-canary.py",
     "check-bespoke-rule-canary.py",
     "bump-version.py",
-    "check-identity.py",
     "check-finding-baseline.py",
     "check-ruff-suppressions.py",
     "check-mypy-coverage.py",

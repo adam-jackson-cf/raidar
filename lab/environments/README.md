@@ -54,7 +54,7 @@ is part of onboarding. Nonempty solvable sets permit the corresponding validated
 steps; an empty set is `excluded`, and missing evidence is not a zero solve rate.
 
 A pack image release changes its content-addressed image tag. Task binding fields
-such as entry-file templates are separate identity-bearing contracts: do not claim
+such as entry-file templates are separate contract inputs: do not claim
 that they change the image tag. Follow the `raidar-release` skill: preserve released
 bytes, reimport and revalidate affected pins with native parity, refresh optional
 errata bindings, then regenerate experiment locks with `make experiment-lock`.

@@ -84,6 +84,13 @@ class ParityChecker(Protocol):
         self, changed_paths: Sequence[str], *, ci: bool, run: AuditRunner
     ) -> list[str]: ...
 
+    def frozen_exclusions(
+        self,
+        released: Mapping[str, str],
+        current: Mapping[str, str],
+        payload_paths: Sequence[str],
+    ) -> list[str]: ...
+
 
 @pytest.fixture
 def checker() -> ParityChecker:
@@ -480,3 +487,29 @@ def test_dependency_audit_fails_closed_on_tool_or_export_failure(
     _assert_finding(checker.audit_findings([], ci=True, run=runner), LOCK_PATH, AUDIT_RULE)
     if failure.startswith("export-"):
         assert len(runner.calls) == 1
+
+
+def test_frozen_exclusions_require_latest_release_digest_equality(checker: ParityChecker) -> None:
+    payloads = [
+        "orchestrator/src/raidar/grading/runtime/sitecustomize.py",
+        "orchestrator/src/raidar/grading/runtime/raidar_oracle_plugin.py",
+        "orchestrator/src/raidar/grading/runtime/coverage.rc",
+        "orchestrator/src/raidar/grading/runtime/pytest.ini",
+    ]
+    released = {
+        "lab/stages/raidar/verify": "released-verify",
+        "lab/stages/raidar/define": "released-define",
+        "lab/stages/raidar/docs-check": "released-docs",
+    }
+    current = {
+        "lab/stages/raidar/verify": "released-verify",
+        "lab/stages/raidar/define": "new-release-in-progress",
+        "lab/stages/local/draft": "unreleased",
+    }
+    assert checker.frozen_exclusions(released, current, payloads) == sorted(
+        ["lab/stages/raidar/verify", *payloads]
+    )
+    assert checker.frozen_exclusions({}, {}, payloads) == sorted(payloads)
+    assert checker.frozen_exclusions(released, current, payloads + payloads) == sorted(
+        ["lab/stages/raidar/verify", *payloads]
+    )

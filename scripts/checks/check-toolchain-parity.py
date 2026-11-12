@@ -7,14 +7,13 @@ import argparse
 import hashlib
 import json
 import re
-import runpy
 import shlex
 import subprocess
 import sys
 import tomllib
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import Mapping, Sequence
 from pathlib import Path
-from typing import Protocol, cast
+from typing import Protocol
 
 from packaging.requirements import Requirement
 from packaging.utils import canonicalize_name
@@ -23,9 +22,6 @@ ROOT = Path(__file__).resolve().parents[2]
 LOCK = "orchestrator/uv.lock"
 AUDIT = "SECURITY.dependency-audit"
 PRETTIER = "3.6.2"
-FrozenExclusions = Callable[
-    [Mapping[str, str], Mapping[str, str], Sequence[str]], list[str]
-]
 
 
 class AuditRunner(Protocol):
@@ -472,8 +468,18 @@ def static_findings(paths: list[str]) -> list[str]:
     ]
 
 
+def frozen_exclusions(
+    released: Mapping[str, str], current: Mapping[str, str], payload_paths: Sequence[str]
+) -> list[str]:
+    """Freeze the grading payload and every package whose bytes match its latest release."""
+    return sorted(
+        set(payload_paths)
+        | {folder for folder, digest in released.items() if current.get(folder) == digest}
+    )
+
+
 def formatter_scope(paths: Sequence[str]) -> list[str]:
-    """Exclude I2's byte-frozen packages and grading payload via its shared policy."""
+    """Exclude I2's byte-frozen packages and grading payload."""
     from raidar.contract.paths import agents_root, releases_file, workflows_root
     from raidar.contract.releases import ReleaseKind, load_register
     from raidar.grading.payload import runtime_files
@@ -481,8 +487,6 @@ def formatter_scope(paths: Sequence[str]) -> list[str]:
     from raidar.subject.package.registry import load_stage_package
     from raidar.subject.releases import tree_workflow_digest
 
-    policy = runpy.run_path(str(ROOT / "scripts/checks/check-identity.py"))
-    exclusions = cast("FrozenExclusions", policy["frozen_exclusions"])
     register = load_register(releases_file(ROOT))
     released: dict[str, str] = {}
     current: dict[str, str] = {}
@@ -504,7 +508,7 @@ def formatter_scope(paths: Sequence[str]) -> list[str]:
             released[relative] = register.of(kind)[latest]
             current[relative] = digest
     payload = [path.relative_to(ROOT).as_posix() for path in runtime_files().values()]
-    frozen = exclusions(released, current, payload)
+    frozen = frozen_exclusions(released, current, payload)
     return [
         path
         for path in prettier_paths(paths)

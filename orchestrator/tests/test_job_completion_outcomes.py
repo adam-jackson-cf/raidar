@@ -1,4 +1,8 @@
-"""Job completion keeps a truthful manifest even when admission or a trial fails."""
+"""Job completion keeps a truthful manifest even when admission or a trial fails.
+
+Every ``job.json``, finished or aborted, names the Raidar commit and dirty flag the job ran on,
+so results that predate a code change are knowable.
+"""
 
 from __future__ import annotations
 
@@ -12,7 +16,7 @@ import pytest
 
 from raidar.contract.job_layout import DETACH_DIR, JOB_LOCK_FILE, JOB_MANIFEST
 from raidar.contract.trial import CheckpointState
-from raidar.engine.job import manifest, run
+from raidar.engine.job import manifest, provenance, run
 from raidar.engine.target.config import Selection, Target
 from raidar.engine.target.job import JobTarget
 
@@ -54,7 +58,13 @@ def _memory_job(monkeypatch: pytest.MonkeyPatch, ending: str) -> tuple[Any, ...]
 
     monkeypatch.setattr(Path, "write_text", persist)
     monkeypatch.setattr(manifest, "write_assessment_config", lambda *_args: None)
-    monkeypatch.setattr(manifest, "runner_provenance", dict)
+    monkeypatch.setattr(
+        provenance,
+        "git_state",
+        lambda _cwd, **_kwargs: {"commit": "c0ffee", "dirty": False, "error": None},
+    )
+    monkeypatch.setattr(provenance, "spec_source_digest", lambda: "spec")
+    monkeypatch.setattr(provenance, "execution_source_digest", lambda: "execution")
     monkeypatch.setattr(manifest, "recipe_digests", lambda *_args: {})
     monkeypatch.setattr(manifest, "effective_limits", lambda *_args: {})
     monkeypatch.setattr(run, "create_job_dir", lambda _path: None)
@@ -155,6 +165,7 @@ async def test_completion_records_only_finished_trials_and_preserves_abort_reaso
     assert result["partial"] is True
     assert result["finished_at"] >= result["started_at"]
     assert result["execution_target"]["effective_concurrency"] == 1
+    assert (result["runner"]["commit"], result["runner"]["dirty"]) == ("c0ffee", False)
     assert (job_dir / JOB_LOCK_FILE in files) is bool(plan.lock)
     if selected:
         assert result["admission"]["decision"] == "admitted"

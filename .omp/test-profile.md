@@ -119,7 +119,6 @@
           "orchestrator/tests/test_grader_identity_and_canary_slow.py": "raidar.grading",
           "orchestrator/tests/test_grading_execution_identity_slow.py": "raidar.contract",
           "orchestrator/tests/test_health_evidence.py": "raidar.engine",
-          "orchestrator/tests/test_identity_baseline_quality.py": "repository-gate",
           "orchestrator/tests/test_jev_client_and_cache_slow.py": "raidar.judge",
           "orchestrator/tests/test_make_targets.py": "repository-gate",
           "orchestrator/tests/test_mypy_guardrails_quality.py": "repository-gate",
@@ -177,10 +176,8 @@
     },
   "identity_artefacts":
     {
-      ".omp/identity.json": "execution identity record; check env -u AGENT make identity-check; test-only work leaves it unchanged",
-      "orchestrator/src/raidar/grading/": "grading digest scope (grading_execution_digest() in grading/records.py, inventory grading/identity.py); test-only work leaves the import closure and shipped payload bytes unchanged",
-      "orchestrator/src/raidar/subject/workflow/identity.py": "primitive_code identity (primitive and native-adapter import closures, payload sources, Harbor version); test-only work leaves it unchanged",
-      "lab/stages/*/*/": "released stage bytes registered in lab/releases.yaml (stage-tree/1); frozen per .agents/skills/raidar-release; prove package behaviour with env -u AGENT make stage-check NAME=raidar/define"
+      "none": "Raidar keeps no execution-identity record and no identity-bearing artefacts. A code change that invalidates experiments means those experiments are rerun, and every experiment run records the raidar git commit it ran on, so results that predate a change are knowable (owner decision 2026-11-12).",
+      "approval": "Owner merge of Raidar PR A (remove execution-identity tracking), explicitly authorised by the owner on 2026-11-12."
     },
   "layout":
     {
@@ -1204,7 +1201,6 @@
               "check-finding-baseline.py",
               "check-gate-rule-canary.py",
               "check-hook-installation.py",
-              "check-identity.py",
               "check-mypy-coverage.py",
               "check-python-fanout.py",
               "check-python-quality.py",
@@ -1444,8 +1440,6 @@
           "approvals": []
         },
       "golden_record": {},
-      "identity_artefacts":
-        { "non_production": ["docs", "*.md", "CHANGELOG.md"] },
       "test_growth": { "map_path": ".omp/test-behavior-map.json" },
       "feature_map": { "index_files": [] },
       "journeys": {},
@@ -1462,6 +1456,7 @@ Global `test-guidance` sets the test rules; this profile holds Raidar's values. 
 above holds the machine-readable values that `omp-guardrails profile-check` (`PROFILE.complete`)
 and the reference checkers read; keep it and the sections below in step. `none` is allowed only
 in Verification surface, Nightly scheduler and Identity-bearing artefacts, with an owner approval.
+Identity-bearing artefacts is `none`: Raidar tracks no execution identity.
 
 ## Tiers
 
@@ -1501,7 +1496,7 @@ in Verification surface, Nightly scheduler and Identity-bearing artefacts, with 
 ## Run events
 
 - Commit command: `env -u AGENT make gate-commit` (`.omp/gate.json` `checks.commit`): path
-  policy, identity, test evidence, rule coverage, `quality` (includes T1), the pinned reference
+  policy, test evidence, rule coverage, `quality` (includes T1), the pinned reference
   (`make guardrails-reference`, which runs `omp-guardrails report-check` for `TEST.budget.*` in
   local mode), dependency audit and affected local slow/quality seams.
 - CI command: `env -u AGENT make gate-ci` (`.omp/gate.json` `checks.ci`; required context
@@ -1593,12 +1588,13 @@ in Verification surface, Nightly scheduler and Identity-bearing artefacts, with 
 
 ## Identity-bearing artefacts
 
-- Artefacts and preservation rules: front matter `identity_artefacts`. Record
-  `.omp/identity.json`, check `env -u AGENT make identity-check`.
-- Test-only work keeps the grading digest scope, `primitive_code` closures and released stage
-  bytes unchanged. Reach that code through existing interfaces or injected runners.
-- An identity change needs its own reviewed commit with before and after values, a reason and
-  scheduled revalidation (`.agents/skills/raidar-release/SKILL.md`).
+- None (front matter `identity_artefacts`: `none` with the owner's approval). Raidar keeps no
+  execution-identity record and versions no implementation code to keep experiments valid.
+- A code change that invalidates an experiment makes that experiment invalid; rerun it. Each
+  experiment run records the raidar git commit it ran on, so results that predate a change are
+  knowable.
+- Approval: the owner's merge of Raidar PR A (remove execution-identity tracking), explicitly
+  authorised by the owner on 2026-11-12.
 - Nothing under `orchestrator/src` or `lab/stages` may be shaped to one problem or experiment.
 
 ## Layout and naming
