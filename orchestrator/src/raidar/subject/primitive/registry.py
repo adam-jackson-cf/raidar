@@ -1,4 +1,4 @@
-"""Primitive entry modules included in execution identity.
+"""Primitive entry modules whose code digests the experiment lock pins.
 
 Packages may require only ``SUPPORTED_CONTRACTS``; workflow-selected reply and judge contracts
 have their own inventory. Package validation refuses unsupported ids before execution.

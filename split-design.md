@@ -722,8 +722,8 @@ Migration, in order:
 **Rules for every phase:**
 
 - Each phase lands as one cutover.
-- `env -u AGENT make quality` stays green at the fast-only line/branch floors in `orchestrator/pyproject.toml` (never lowered), import-linter contracts, the structure allowlist and experiment locks. A grading-identity batch may report precisely identified RT7 refusals until its single scheduled revalidation; no trials run under stale validation.
-- Whenever an execution identity changes, attempt every experiment relock in the same cutover batch. If RT7 refuses lock creation, retain the old lock and record the blocker; revalidate once, then regenerate through `make experiment-lock`, never by editing pins or locks.
+- `env -u AGENT make quality` stays green at the fast-only line/branch floors in `orchestrator/pyproject.toml` (never lowered), import-linter contracts, the structure allowlist and experiment locks. A batch that changes grading code may report precisely identified RT7 refusals until the affected problems are re-validated; no trials run under stale validation.
+- A code change that invalidates an experiment means rerunning it (owner decision 2026-11-12; no identity record or revalidation ceremony). Relock the affected experiments through `make experiment-lock`, re-validating any problem RT7 refuses, never by editing pins or locks, then rerun them.
 - A phase that changes a run is smoke-proved. Real runs use codex `gpt-6-luna` at `low` with `DETACH=1`, after the user approves.
 - A phase that changes a primitive, the runner or `engine/trial` passes `make security-gate` on `mbp` before it closes.
 

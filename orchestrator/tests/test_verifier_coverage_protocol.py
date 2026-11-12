@@ -2,7 +2,7 @@
 
 Left at ``trial`` it is omitted from every dump, so the locks and plans of
 experiments that do not set it keep their bytes; ``offline`` is part of the
-execution identity. ``code-quality`` reads the deferred pass from the store.
+experiment lock. ``code-quality`` reads the deferred pass from the store.
 """
 
 from __future__ import annotations

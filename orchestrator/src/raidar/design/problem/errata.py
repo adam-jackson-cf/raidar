@@ -10,7 +10,7 @@ a disposition:
 
 The file is pre-registered: it is committed, it names the manifest it is for
 (``manifest_sha256``), and the lock pins the sha256 of its bytes in the problem
-reference's metadata, which is part of the execution identity. Tests are never
+reference's metadata, so it is part of the experiment lock. Tests are never
 patched: the raw SCB grade is computed and kept exactly as before.
 """
 

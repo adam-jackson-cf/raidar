@@ -14,8 +14,9 @@ description: "Use when changing a released Raidar agent, workflow, stage package
 - Agent/workflow fingerprints, stage-tree/1 shipped bytes, primitive_code inventories,
   scorer manifest descriptions, observation subject trajectory, evidence input oracle.cases
   and problem oracle/ bundles feed experiment locks: changing them needs a release and relock.
-- Raidar keeps no execution-identity record and versions no implementation code to keep
-  experiments valid. A code change that invalidates an experiment means rerunning it.
+- Raidar keeps no execution-identity record and no identity review or revalidation ceremony.
+  Locks still pin code digests, so a checkout whose code differs is refused (RT7). A code
+  change that invalidates an experiment means relocking and rerunning it.
   Each job's `job.json` records the Raidar commit and dirty flag it ran on (`runner.commit`,
   `runner.dirty`), so results that predate a change are knowable.
 - Preserve legacy wire names including Harness CLI ids, raidar_oracle_plugin.py,

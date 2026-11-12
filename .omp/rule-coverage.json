@@ -4197,10 +4197,10 @@
       "id": "TEST.identity-artefacts",
       "evidence_kind": "local_ci",
       "status": "not_applicable",
-      "reason": "Raidar tracks no execution identity: a code change that invalidates experiments means rerunning them, and each experiment run records the raidar git commit it ran on (owner decision 2026-11-12). The profile's identity_artefacts is an approved none exemption, so the reference check has no artefacts to guard.",
+      "reason": "Raidar keeps no execution-identity record or identity review ceremony: a code change that invalidates experiments means relocking and rerunning them, and each experiment run records the raidar git commit it ran on (owner decision 2026-11-12). The profile's identity_artefacts is an approved none exemption, so the reference check has no artefacts to guard.",
       "user_approval": "approved",
       "evidence_path": ".omp/test-profile.md",
-      "evidence_marker": "Identity-bearing artefacts is `none`: Raidar tracks no execution identity."
+      "evidence_marker": "Identity-bearing artefacts is `none`: Raidar keeps no execution-identity record or review ceremony."
     },
     {
       "id": "TEST.property-seed",
