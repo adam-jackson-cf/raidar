@@ -282,7 +282,7 @@ def _checked_snapshot(
 def _record_digest(record_dir: Path, record: StepRecord) -> str:
     """Content digest of an oracle record; the bundle's host location is not content.
 
-    Retained grading evidence and the current offline grading execution identity
+    Retained grading evidence and the current offline grading implementation digest
     participate even before an offline answer exists. Otherwise a finalized
     Assessment could hide a coverage-cache invalidation caused by changed raw
     evidence, grader image, timeout or plugin bytes. The optional fork-shaped G

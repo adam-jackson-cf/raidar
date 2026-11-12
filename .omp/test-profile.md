@@ -1456,7 +1456,7 @@ Global `test-guidance` sets the test rules; this profile holds Raidar's values. 
 above holds the machine-readable values that `omp-guardrails profile-check` (`PROFILE.complete`)
 and the reference checkers read; keep it and the sections below in step. `none` is allowed only
 in Verification surface, Nightly scheduler and Identity-bearing artefacts, with an owner approval.
-Identity-bearing artefacts is `none`: Raidar tracks no execution identity.
+Identity-bearing artefacts is `none`: Raidar keeps no execution-identity record or review ceremony.
 
 ## Tiers
 
@@ -1589,10 +1589,13 @@ Identity-bearing artefacts is `none`: Raidar tracks no execution identity.
 ## Identity-bearing artefacts
 
 - None (front matter `identity_artefacts`: `none` with the owner's approval). Raidar keeps no
-  execution-identity record and versions no implementation code to keep experiments valid.
-- A code change that invalidates an experiment makes that experiment invalid; rerun it. Each
-  experiment run records the raidar git commit it ran on, so results that predate a change are
-  knowable.
+  execution-identity record and no identity review or revalidation ceremony.
+- Experiment locks and problem validations still pin the code digests they ran under (grader
+  implementation, `primitive_code`). A checkout whose code differs is refused (RT7, plan
+  checks); that refusal is how an invalidating change shows up.
+- A code change that invalidates an experiment makes that experiment invalid: re-validate the
+  refused problems, relock through `make experiment-lock` and rerun it. Each experiment run
+  records the raidar git commit it ran on, so results that predate a change are knowable.
 - Approval: the owner's merge of Raidar PR A (remove execution-identity tracking), explicitly
   authorised by the owner on 2026-11-12.
 - Nothing under `orchestrator/src` or `lab/stages` may be shaped to one problem or experiment.

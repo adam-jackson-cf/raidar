@@ -1,4 +1,4 @@
-"""Import refusal boundaries and provenance isolation from execution identity."""
+"""Import refusal boundaries and provenance isolation from experiment lock digests."""
 
 from __future__ import annotations
 
