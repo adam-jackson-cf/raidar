@@ -448,6 +448,30 @@
     "orchestrator/tests/test_toolchain_parity.py::test_frozen_exclusions_require_latest_release_digest_equality": {
       "source": "scripts/checks/check-toolchain-parity.py",
       "behavior": "Freeze the grading payload and only packages whose bytes equal their latest release, now owned by the toolchain parity check"
+    },
+    "orchestrator/tests/test_package_identity.py::test_the_register_holds_stage_releases_and_never_drops_one": {
+      "source": "orchestrator/src/raidar/contract/releases.py",
+      "behavior": "Update a registered release's digest in place: releases-check refuses only a stale digest (printing the line to update) or a removed release, never a re-hash"
+    },
+    "orchestrator/tests/test_release_register.py::test_hash_drift_is_reported_with_the_line_to_update": {
+      "source": "orchestrator/src/raidar/contract/releases.py",
+      "behavior": "Update a registered release's digest in place: releases-check refuses only a stale digest (printing the line to update) or a removed release, never a re-hash"
+    },
+    "orchestrator/tests/test_release_register.py::test_re_hashing_a_registered_version_in_place_is_allowed": {
+      "source": "orchestrator/src/raidar/subject/release_check.py",
+      "behavior": "Update a registered release's digest in place: releases-check refuses only a stale digest (printing the line to update) or a removed release, never a re-hash"
+    },
+    "orchestrator/tests/test_release_register.py::test_releases_cli_refuses_a_removed_release_and_accepts_an_explicit_base_without_main": {
+      "source": "orchestrator/src/raidar/cli/releases.py",
+      "behavior": "Update a registered release's digest in place: releases-check refuses only a stale digest (printing the line to update) or a removed release, never a re-hash"
+    },
+    "orchestrator/tests/test_release_register_slow.py::test_a_stale_registered_digest_still_fails_and_names_the_line": {
+      "source": "orchestrator/src/raidar/contract/releases.py",
+      "behavior": "Update a registered release's digest in place: releases-check refuses only a stale digest (printing the line to update) or a removed release, never a re-hash"
+    },
+    "orchestrator/tests/test_release_register_slow.py::test_re_hashing_a_registered_version_in_place_is_allowed": {
+      "source": "orchestrator/src/raidar/subject/release_check.py",
+      "behavior": "Update a registered release's digest in place: releases-check refuses only a stale digest (printing the line to update) or a removed release, never a re-hash"
     }
   }
 }

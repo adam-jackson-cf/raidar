@@ -8,7 +8,7 @@ A package-driven checkpoint lifecycle inside one primary agent session.
 
 ## 1 · Choose or author packages
 
-_Workflow data composes immutable package releases with a build frame._
+_Workflow data composes registered package releases with a build frame._
 
 | Workflow                       | Packages / policy                                                                                   | Role                                                |
 | ------------------------------ | --------------------------------------------------------------------------------------------------- | --------------------------------------------------- |

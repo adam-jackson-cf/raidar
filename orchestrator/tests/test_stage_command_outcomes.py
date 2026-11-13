@@ -115,12 +115,12 @@ def test_release_state_distinguishes_unreleased_released_and_changed(
     )
     assert stage_package.release_state("acme/seen", new, register) == (
         "changed since acme/seen@1",
-        f"register stages: acme/seen@2: {new}",
+        f"register stages: acme/seen@1: {new}",
     )
     # only the highest registered version is "the one the tree must hold"
     assert stage_package.release_state("acme/moved", old, register) == (
         "changed since acme/moved@2",
-        f"register stages: acme/moved@3: {old}",
+        f"register stages: acme/moved@2: {old}",
     )
     assert stage_package.release_state("acme/moved", new, register)[1] is None
 

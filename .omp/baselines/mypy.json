@@ -3496,12 +3496,6 @@
     },
     {
       "path": "orchestrator/tests/test_release_register.py",
-      "code": "no-untyped-def",
-      "fingerprint": "90e2e674e5e6d55ccdfce762eb372b17c72a0c8f487e7e6818cd87d00e66d7ef",
-      "count": 1
-    },
-    {
-      "path": "orchestrator/tests/test_release_register.py",
       "code": "type-arg",
       "fingerprint": "098918b9f960106da29a5125f6b91e8f4d73a7a77f639da7b63bf8645db6f880",
       "count": 1

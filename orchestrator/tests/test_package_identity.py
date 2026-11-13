@@ -11,13 +11,9 @@ from typing import Any
 
 import pytest
 import yaml
-from raidar_contract.package import StagePackageError
-from raidar_contract.package.digest import read_stage_tree, stage_tree_digest
-from raidar_contract.references import Release, ReleaseError
-from raidar_contract.workflow import PackageWorkflowDefinition
 
 from raidar.contract.paths import agents_root, releases_file, stages_root, workflows_root
-from raidar.contract.releases import ReleaseKind, parse_register, rewritten_releases
+from raidar.contract.releases import ReleaseKind, parse_register, removed_releases
 from raidar.subject.agent.definition import load_agent
 from raidar.subject.package.registry import load_stage_package
 from raidar.subject.release_check import release_issues
@@ -26,6 +22,10 @@ from raidar.subject.stages import released_stage, stage_names
 from raidar.subject.workflow import package_checks
 from raidar.subject.workflow.identity import workflow_contracts
 from raidar.subject.workflow.package_checks import ResolvedStage, package_issues
+from raidar_contract.package import StagePackageError
+from raidar_contract.package.digest import read_stage_tree, stage_tree_digest
+from raidar_contract.references import Release, ReleaseError
+from raidar_contract.workflow import PackageWorkflowDefinition
 from tests.package_support import fixture_package, write_package
 from tests.release_support import one_shot_digest, release_tree
 
@@ -103,7 +103,7 @@ def _package_file(root: Path, relative: str) -> Path:
 # ---- the register and the reference grammar ------------------------------------------------
 
 
-def test_the_register_holds_stage_releases_and_history_is_append_only() -> None:
+def test_the_register_holds_stage_releases_and_never_drops_one() -> None:
     digest = "a" * 64
     earlier = parse_register(
         f"stages:\n  acme/gate-check@1: {digest}\n  acme/docs@1: {digest}\n", "base"
@@ -116,14 +116,14 @@ def test_the_register_holds_stage_releases_and_history_is_append_only() -> None:
         f"  acme/gate-check@2: {'b' * 64}\n",
         "now",
     )
-    assert rewritten_releases(earlier, grown) == []
+    assert removed_releases(earlier, grown) == []
 
     rehashed = parse_register(
         f"stages:\n  acme/gate-check@1: {'c' * 64}\n  acme/docs@1: {digest}\n", "x"
     )
     removed = parse_register(f"stages:\n  acme/gate-check@1: {digest}\n", "x")
-    assert "re-hashed" in rewritten_releases(earlier, rehashed)[0]
-    assert "removed" in rewritten_releases(earlier, removed)[0]
+    assert removed_releases(earlier, rehashed) == []
+    assert "removed" in removed_releases(earlier, removed)[0]
 
 
 @pytest.mark.parametrize(
@@ -216,7 +216,8 @@ def test_release_issues_name_an_unreleased_or_edited_package(tree: Path) -> None
     issues = release_issues(tree)
     assert any(
         i.startswith(
-            "stages/acme/gate-check changed since acme/gate-check@1: register acme/gate-check@2:"
+            "stages/acme/gate-check changed since acme/gate-check@1 was registered: "
+            "update acme/gate-check@1:"
         )
         for i in issues
     )

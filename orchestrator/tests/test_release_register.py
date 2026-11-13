@@ -11,8 +11,6 @@ from pathlib import Path
 import pytest
 import yaml
 from click.testing import CliRunner
-from raidar_contract.canonical import digest_json
-from raidar_contract.references import Release, ReleaseError
 
 from raidar.cli import main
 from raidar.contract.paths import agents_root
@@ -22,9 +20,12 @@ from raidar.subject.agent.definition import load_agent
 from raidar.subject.package.registry import load_stage_package
 from raidar.subject.release_check import history_issues, release_base, release_issues
 from raidar.subject.releases import released_agent, released_workflow
+from raidar_contract.canonical import digest_json
+from raidar_contract.references import Release, ReleaseError
 from tests.release_support import (
     REAL_PACKAGE,
     edit_agent,
+    one_shot_digest,
     release_tree,
     write_register,
     write_workflow,
@@ -87,7 +88,7 @@ def test_only_the_latest_version_of_a_name_resolves(tree: Path) -> None:
 def test_a_definition_changed_since_its_release_is_refused(tree: Path) -> None:
     edit_agent(tree, lambda doc: doc["models"]["gpt-6-luna"].update(reasoning=[]))
 
-    with pytest.raises(ReleaseError, match="changed since codex@1 was released"):
+    with pytest.raises(ReleaseError, match="changed since codex@1 was registered"):
         released_agent("codex@1", repo_root=tree)
 
 
@@ -97,7 +98,7 @@ def test_a_workflow_changed_since_its_release_is_refused(tree: Path) -> None:
         {"schema": 2, "name": "one-shot", "build": {"prompt": "Different %%%TASK%%%"}},
     )
 
-    with pytest.raises(ReleaseError, match=r"changed since raidar/one-shot@1 was released"):
+    with pytest.raises(ReleaseError, match=r"changed since raidar/one-shot@1 was registered"):
         released_workflow("raidar/one-shot@1", repo_root=tree)
 
 
@@ -364,7 +365,7 @@ def test_a_definition_with_no_registration_is_reported(tree: Path) -> None:
     assert "extra@1" in issues[0]
 
 
-def test_hash_drift_is_reported_with_the_next_version(tree: Path) -> None:
+def test_hash_drift_is_reported_with_the_line_to_update(tree: Path) -> None:
     write_workflow(
         tree,
         {"schema": 2, "name": "one-shot", "build": {"prompt": "Different %%%TASK%%%"}},
@@ -374,7 +375,8 @@ def test_hash_drift_is_reported_with_the_next_version(tree: Path) -> None:
 
     assert len(issues) == 1
     assert "workflows/raidar/one-shot changed since raidar/one-shot@1" in issues[0]
-    assert "raidar/one-shot@2" in issues[0]
+    assert f"update raidar/one-shot@1: {one_shot_digest(tree)}" in issues[0]
+    assert "raidar/one-shot@2" not in issues[0]
 
 
 def test_a_registered_name_with_no_definition_is_reported(tree: Path) -> None:
@@ -440,7 +442,7 @@ def test_an_unreadable_register_is_reported(tree: Path) -> None:
 # ---- raidar releases check -----------------------------------------------------------------
 
 
-def test_releases_cli_refuses_history_drift_and_accepts_an_explicit_base_without_main(
+def test_releases_cli_refuses_a_removed_release_and_accepts_an_explicit_base_without_main(
     tree: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     path = tree / "lab" / "releases.yaml"
@@ -451,17 +453,17 @@ def test_releases_cli_refuses_history_drift_and_accepts_an_explicit_base_without
         lambda *, base: release_issues(tree, base=base, git=_git(at_base=original)),
     )
     document = yaml.safe_load(original)
-    document["agents"]["codex@1"] = "b" * 64
+    del document["agents"]["codex@1"]
     path.write_text(yaml.safe_dump(document))
     failed = CliRunner().invoke(main, ["releases", "check"])
     assert failed.exit_code == 1
-    assert "release codex@1 was re-hashed" in failed.output
+    assert "release codex@1 was removed" in failed.output
     path.write_text(original)
     sound = CliRunner().invoke(main, ["releases", "check"])
     assert sound.exit_code == 0
     assert "releases: ok" in sound.output
 
-    def no_main():
+    def no_main() -> str:
         raise ReleaseError("no main branch")
 
     monkeypatch.setattr("raidar.cli.releases.release_base", no_main)
@@ -529,11 +531,10 @@ def _agents(versions: dict[int, str]) -> str:
     return yaml.safe_dump({"agents": {f"codex@{n}": d for n, d in versions.items()}})
 
 
-def test_a_rehashed_released_version_is_refused(tmp_path: Path) -> None:
+def test_re_hashing_a_registered_version_in_place_is_allowed(tmp_path: Path) -> None:
     issues = _history(tmp_path, _agents({1: "b" * 64}), _git(at_base=_agents({1: "a" * 64})))
 
-    assert len(issues) == 1
-    assert "release codex@1 was re-hashed" in issues[0]
+    assert issues == []
 
 
 def test_a_removed_released_version_is_refused(tmp_path: Path) -> None:

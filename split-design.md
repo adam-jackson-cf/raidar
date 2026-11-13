@@ -48,7 +48,7 @@
   - credential preflight and host auth join the agent protocol;
   - in-tree packages stay under `make quality` (ruff, mypy, coverage);
   - `make security-gate` is a required phase-exit check, run on `mbp`;
-  - released versions are append-only, checked against `main`'s history.
+  - registered versions are never removed, checked against `main`'s history; since 2026-11-12 (owner decision) a version is re-hashed in place when its bytes change, and affected experiments are relocked and rerun.
 - **Supersedes:** the earlier versions of this file, which lived at `docs/reboot/split-design.md`. The first version had open decisions O1–O9 and "arm = agent + workflow owned by its provider". The 2026-10-26 version had fixed stage types in code.
 - **Background:**
   - [docs/reboot/split-exploration.md](docs/reboot/split-exploration.md);
@@ -481,10 +481,10 @@ The rule is therefore attribution by control run, from `stage-stop-failure-opus.
   packages missing installed-tree evidence for architectures pinned by committed locks.
   `make structure-check` permits this tracked evidence store.
 - **Releases** go in a new `stages:` section of `lab/releases.yaml` (`name@N` → digest). The rules are the same as for agents and workflows:
-  - a released number is frozen;
+  - a released number keeps its name; since 2026-11-12 (owner decision) its digest is updated in place when its bytes change;
   - only the latest release of a name resolves;
-  - older bytes live in `archive/<name>@N` tags;
-  - there is no release writer: `releases-check` prints the line to add.
+  - `archive/<name>@N` tags are optional history;
+  - there is no release writer: `releases-check` prints the line to put in the register.
 
   To compare two versions of a method in one experiment, give the variant its own name.
 

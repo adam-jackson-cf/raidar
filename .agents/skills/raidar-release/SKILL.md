@@ -8,9 +8,11 @@ description: "Use when changing a released Raidar agent, workflow, stage package
 ## Establish release impact
 
 - Identify manifest versions, fingerprint sources and affected experiment locks before editing.
-- Preserve released bytes first with `make release-archive REF=<name>@<N>` for each affected agent, workflow, stage package or scorer.
-  Edit its single implementation in place and bump the manifest @N for behaviour changes.
-  Recover old implementations from archive tags, never a parallel module.
+- Edit the single implementation of each affected agent, workflow, stage package or scorer in place.
+  Keep its registered @N and update its digest in `lab/releases.yaml` to the current bytes;
+  `make releases-check` prints the line. Never add a parallel module or a new @N for a behaviour change.
+- Released bytes are not immutable: experiments that used the old bytes are invalid and get relocked and rerun.
+  `make release-archive REF=<name>@<N>` is optional history, not a required step.
 - Agent/workflow fingerprints, stage-tree/1 shipped bytes, primitive_code inventories,
   scorer manifest descriptions, observation subject trajectory, evidence input oracle.cases
   and problem oracle/ bundles feed experiment locks: changing them needs a release and relock.
@@ -42,8 +44,9 @@ description: "Use when changing a released Raidar agent, workflow, stage package
   stale/non-wheel/incomplete closures, missing frame slots and colliding claims.
 - Run `make stage-check NAME=<ns>/<name> TARGET=mbp`: fixtures and replay execute offline as UID 1000
   in the pack container, never on the host. Preserve its exact package/pack/primitive check record.
-- Add the next immutable stage release to `lab/releases.yaml` (checks print the line; no writer).
-  Re-release dependent workflows and relock every affected experiment. Fixtures are excluded
+- Update the package's registered digest in `lab/releases.yaml` in place (checks print the line; no writer).
+  Update dependent workflow digests the same way, then relock and rerun every affected experiment.
+  Remove stage-check records whose digest is no longer registered. Fixtures are excluded
   from stage-tree/1; shipped prompts, source, skills and tool locks are not.
 - `make experiment-lock EXPERIMENT=<smoke-yaml> DRAFT=1` writes development locks under `var/tmp/`;
   drafts never admit measured comparisons. Run `make security-gate TARGET=mbp` for primitive,
