@@ -20,6 +20,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from .parser import get_python_parser
+from .reader import SourceReader
 
 if TYPE_CHECKING:
     from tree_sitter import Node
@@ -286,9 +287,9 @@ class _Extractor:
                 self.walk(child, parent_class, at_module_level=False)
 
 
-def get_symbols(source: Path) -> list[SymbolRow]:
+def get_symbols(source: Path, reader: SourceReader) -> list[SymbolRow]:
     """Every symbol in a Python file, in the fork's traversal order."""
-    code = source.read_text(encoding="utf-8")
+    code = reader.load_text(source, encoding="utf-8")
     if not code.strip():
         return []
     tree = get_python_parser().parse(code.encode("utf-8"))

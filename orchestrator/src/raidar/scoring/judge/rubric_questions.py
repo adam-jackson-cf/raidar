@@ -20,6 +20,7 @@ from typing import Any
 import yaml
 from pydantic import BaseModel, ConfigDict, Field
 
+from raidar.contract.file_io import load_bytes, load_text
 from raidar.contract.paths import judge_root
 from raidar.judge.protocol import NoulCriteria, NoulQuestion
 from raidar.scoring.judge.symbols import SymbolKind
@@ -129,10 +130,12 @@ def _criterion(raw: dict[str, Any], overlay: _CriterionOverlay) -> Criterion:
 
 def load_rubric_question_set(path: Path = SCB_RUBRIC_FILE) -> RubricQuestionSet:
     try:
-        definition = _QuestionSetFile.model_validate(yaml.safe_load(path.read_text("utf-8")))
+        definition = _QuestionSetFile.model_validate(
+            yaml.safe_load(load_text(path, encoding="utf-8"))
+        )
     except (OSError, yaml.YAMLError, ValueError) as error:
         raise QuestionSetError(f"{path}: {error}") from error
-    data = (path.parent / definition.source.file).read_bytes()
+    data = load_bytes(path.parent / definition.source.file)
     actual = hashlib.sha256(data).hexdigest()
     if actual != definition.source.sha256:
         raise QuestionSetError(

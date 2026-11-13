@@ -26,6 +26,7 @@ from typing import Any
 
 from pydantic import ValidationError
 
+from raidar.contract.file_io import load_text
 from raidar.grading.coverage.store import read_offline_coverage
 from raidar.grading.models import ParityVerdict
 from raidar.grading.records import FORK_EVIDENCE_FILE, coverage_identity
@@ -124,7 +125,7 @@ def _in_trial_fork(step: StepInputs) -> dict[str, Any] | None:
     if path is None or not path.is_file():
         return None
     try:
-        payload = json.loads(path.read_text())
+        payload = json.loads(load_text(path))
     except (OSError, ValueError):
         return None
     return payload if isinstance(payload, dict) else None

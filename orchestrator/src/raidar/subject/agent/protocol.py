@@ -37,9 +37,15 @@ from typing import Any, Protocol, cast
 
 from harbor.environments.base import BaseEnvironment
 from harbor.models.agent.context import AgentContext
+from pydantic import JsonValue
 from raidar_contract.agent_records import Tokens
 
 from raidar.subject.agent.records import Credentials, StatePath
+
+type JsonRecord = dict[str, JsonValue]
+"""One JSON-lines row an audit parsed: a JSON object."""
+type RowUnderstood = Callable[[JsonRecord], bool]
+"""Whether an adapter's audit parser reads a row of this shape."""
 
 
 class IsolationError(RuntimeError):
@@ -105,7 +111,7 @@ def digest(text: str) -> str:
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
 
-def unread_json_lines(path: Path, understood: Callable[[dict[str, Any]], bool]) -> int:
+def unread_json_lines(path: Path, understood: RowUnderstood) -> int:
     """Non-blank lines of a JSON-lines record that are not JSON objects the adapter understands.
 
     ``understood`` accepts only the record shapes the adapter's parser reads. An audit that skips

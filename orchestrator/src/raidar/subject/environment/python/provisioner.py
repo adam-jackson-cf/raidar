@@ -28,11 +28,12 @@ import os
 import shutil
 import subprocess
 import time
-from collections.abc import Callable, Iterator, Mapping, Sequence
+from collections.abc import Callable, Collection, Iterator, Mapping, Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import TypedDict, Unpack
 
 from raidar.contract.paths import var_root
 from raidar.contract.uv import locked_uv
@@ -67,10 +68,34 @@ print(json.dumps({
 CommandRunner = Callable[[Sequence[str], Mapping[str, str]], subprocess.CompletedProcess[str]]
 
 
-def run_command(argv: Sequence[str], env: Mapping[str, str]) -> subprocess.CompletedProcess[str]:
+class RunOptions(TypedDict, total=False):
+    """Optional ``subprocess.run`` settings a caller of ``run_command`` may add."""
+
+    cwd: Path | None
+    input: str | None
+    timeout: float | None
+    encoding: str
+
+
+def run_command(
+    argv: Sequence[str], env: Mapping[str, str], **options: Unpack[RunOptions]
+) -> subprocess.CompletedProcess[str]:
+    """Run a provisioned tool's ``argv`` with captured text streams; the child sees exactly ``env``.
+
+    A timeout raises ``subprocess.TimeoutExpired`` and a program that cannot start raises
+    ``OSError``; the caller decides what those mean.
+    """
     return subprocess.run(  # noqa: S603 - argv built from the tool lock
-        list(argv), capture_output=True, text=True, env=dict(env), check=False
+        list(argv), capture_output=True, text=True, env=dict(env), check=False, **options
     )
+
+
+def inherited_environment(inherit: Collection[str], overrides: Mapping[str, str]) -> dict[str, str]:
+    """The ``inherit`` variables of this process's environment, then ``overrides``."""
+    return {
+        **{name: value for name, value in os.environ.items() if name in inherit},
+        **overrides,
+    }
 
 
 def default_cache_root() -> Path:

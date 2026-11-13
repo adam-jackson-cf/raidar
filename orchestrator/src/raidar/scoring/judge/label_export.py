@@ -28,6 +28,7 @@ from pathlib import Path
 
 from pydantic import BaseModel, ConfigDict, ValidationError, field_validator, model_validator
 
+from raidar.contract.file_io import load_text, store_text
 from raidar.scoring.judge.audit import AuditLog, ReviewerKind, reviewer_kind
 from raidar.scoring.judge.ledger import current_labels
 from raidar.scoring.judge.policies import LABELS
@@ -96,7 +97,7 @@ class LabelExport:
 
 def load_review_labels(path: Path) -> list[ReviewLabel]:
     try:
-        payload = json.loads(path.read_text(encoding="utf-8"))
+        payload = json.loads(load_text(path, encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as error:
         raise LabelExportError(f"cannot read review labels {path}: {error}") from error
     if not isinstance(payload, list):
@@ -161,6 +162,8 @@ def export_labels(
 
 def write_rows(export: LabelExport, output: Path) -> None:
     output.parent.mkdir(parents=True, exist_ok=True)
-    output.write_text(
-        "".join(json.dumps(row, sort_keys=True) + "\n" for row in export.rows), encoding="utf-8"
+    store_text(
+        output,
+        "".join(json.dumps(row, sort_keys=True) + "\n" for row in export.rows),
+        encoding="utf-8",
     )

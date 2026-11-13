@@ -8,6 +8,7 @@ from typing import Any
 import yaml
 from pydantic import Field, ValidationError
 
+from raidar.contract.file_io import load_text
 from raidar.scoring.framework.inventory import InventoryPolicy
 from raidar.scoring.framework.manifest import SdkModel
 from raidar.scoring.framework.rescore import RescoreError
@@ -27,7 +28,7 @@ class RescoreConfig(SdkModel):
 def load_rescore_config(path: Path) -> RescoreConfig:
     """Read a YAML (or JSON) rescore config file."""
     try:
-        loaded = yaml.safe_load(path.read_text()) or {}
+        loaded = yaml.safe_load(load_text(path)) or {}
         return RescoreConfig.model_validate(loaded)
     except (OSError, yaml.YAMLError, ValidationError) as exc:
         raise RescoreError(f"invalid rescore config {path}: {exc}") from exc

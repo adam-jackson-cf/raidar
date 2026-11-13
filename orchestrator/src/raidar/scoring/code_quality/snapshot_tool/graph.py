@@ -27,6 +27,7 @@ import networkx as nx
 
 from .imports import trace_source_files
 from .parser import get_python_parser
+from .reader import SourceReader
 
 if TYPE_CHECKING:
     from tree_sitter import Node
@@ -38,10 +39,10 @@ def _text(source: bytes, node: Node) -> str:
     return source[node.start_byte : node.end_byte].decode("utf-8")
 
 
-def _extract_functions_from_file(file_path: Path) -> list[tuple[str, Node]]:
+def _extract_functions_from_file(file_path: Path, reader: SourceReader) -> list[tuple[str, Node]]:
     """``(qualified_name, node)`` for each function and direct class method."""
     try:
-        source = file_path.read_bytes()
+        source = reader.load_bytes(file_path)
     except OSError:
         return []
     tree = get_python_parser().parse(source)
@@ -67,10 +68,10 @@ def _extract_functions_from_file(file_path: Path) -> list[tuple[str, Node]]:
     return functions
 
 
-def _extract_class_hierarchy(file_path: Path) -> dict[str, list[str]]:
+def _extract_class_hierarchy(file_path: Path, reader: SourceReader) -> dict[str, list[str]]:
     """Class name mapped to its simple-identifier base classes."""
     try:
-        source = file_path.read_bytes()
+        source = reader.load_bytes(file_path)
     except OSError:
         return {}
     tree = get_python_parser().parse(source)
@@ -168,9 +169,11 @@ class _ImportMap:
             self.visit(child)
 
 
-def _extract_imports(file_path: Path, file_rel_path: Path | None = None) -> dict[str, str]:
+def _extract_imports(
+    file_path: Path, reader: SourceReader, file_rel_path: Path | None = None
+) -> dict[str, str]:
     try:
-        source = file_path.read_bytes()
+        source = reader.load_bytes(file_path)
     except OSError:
         return {}
     mapping = _ImportMap(source, file_rel_path)
@@ -355,7 +358,9 @@ class _CallResolver:
         return None
 
 
-def build_dependency_graph(snapshot_dir: Path, entrypoint: Path) -> nx.DiGraph:
+def build_dependency_graph(
+    snapshot_dir: Path, entrypoint: Path, reader: SourceReader
+) -> nx.DiGraph:
     """Weighted call graph over the files reachable from ``entrypoint``."""
     snapshot_dir = snapshot_dir.resolve()
     entrypoint_abs = (
@@ -364,14 +369,14 @@ def build_dependency_graph(snapshot_dir: Path, entrypoint: Path) -> nx.DiGraph:
     if not entrypoint_abs.exists():
         return nx.DiGraph()
     try:
-        source_files = sorted(trace_source_files(entrypoint_abs, snapshot_dir))
+        source_files = sorted(trace_source_files(entrypoint_abs, snapshot_dir, reader))
     except Exception:  # the fork logs and returns an empty graph
         return nx.DiGraph()
     graph = nx.DiGraph()
     functions: dict[Path, list[tuple[str, Node]]] = {}
     index: FunctionIndex = {}
     for file_path in source_files:
-        functions[file_path] = _extract_functions_from_file(snapshot_dir / file_path)
+        functions[file_path] = _extract_functions_from_file(snapshot_dir / file_path, reader)
         for qual_name, node in functions[file_path]:
             graph.add_node(
                 _node_id(file_path, qual_name),
@@ -380,22 +385,31 @@ def build_dependency_graph(snapshot_dir: Path, entrypoint: Path) -> nx.DiGraph:
             )
             index.setdefault(qual_name.split(".")[-1], []).append((file_path, qual_name))
     for file_path, defined in functions.items():
-        _add_call_edges(graph, snapshot_dir, file_path, defined, index)
+        absolute = snapshot_dir / file_path
+        resolver = _file_resolver(absolute, file_path, index, reader)
+        _add_call_edges(graph, file_path, defined, resolver, reader.load_bytes(absolute))
     return graph
+
+
+def _file_resolver(
+    absolute: Path, file_path: Path, index: FunctionIndex, reader: SourceReader
+) -> _CallResolver:
+    """The call resolver for one file: its imports, the index and its class hierarchy."""
+    return _CallResolver(
+        file_path,
+        _extract_imports(absolute, reader, file_path),
+        index,
+        _extract_class_hierarchy(absolute, reader),
+    )
 
 
 def _add_call_edges(
     graph: nx.DiGraph,
-    snapshot_dir: Path,
     file_path: Path,
     defined: list[tuple[str, Node]],
-    index: FunctionIndex,
+    resolver: _CallResolver,
+    source: bytes,
 ) -> None:
-    absolute = snapshot_dir / file_path
-    resolver = _CallResolver(
-        file_path, _extract_imports(absolute, file_path), index, _extract_class_hierarchy(absolute)
-    )
-    source = absolute.read_bytes()
     for qual_name, func_node in defined:
         local_types = _extract_local_types(func_node, source)
         calls: Counter[tuple[str, str | None]] = Counter(_extract_function_calls(func_node, source))

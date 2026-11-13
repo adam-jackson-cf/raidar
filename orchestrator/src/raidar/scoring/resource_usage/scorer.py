@@ -28,6 +28,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Any
 
+from raidar.contract.file_io import load_bytes, load_text
 from raidar.scoring.framework.atif import Trajectory, TrajectoryError, load_trajectory
 from raidar.scoring.framework.builtin_manifests import RESOURCE_USAGE
 from raidar.scoring.framework.context import AssessContext, StepInputs
@@ -116,7 +117,7 @@ def _judge_calls(inputs: StepInputs) -> list[Any] | Measured:
             return _unavailable("the judged step's workflow record is missing: judge spend unknown")
         return []
     try:
-        record = json.loads(path.read_text())
+        record = json.loads(load_text(path))
     except (OSError, ValueError):
         return _unavailable("the step's workflow record is unreadable: judge spend is unknown")
     return _recorded_judge_calls(record, inputs.judged)
@@ -218,7 +219,7 @@ def total(parts: Sequence[str], steps: Sequence[dict[str, Measured]]) -> Measure
 def _turns_evidence(inputs: StepInputs, trajectory: Trajectory | Measured) -> Evidence | None:
     if not isinstance(trajectory, Trajectory):
         return None
-    data = trajectory.path.read_bytes()
+    data = load_bytes(trajectory.path)
     # The validator counts newline-terminated lines; str.splitlines also splits on U+2028 etc.
     lines = data.count(b"\n") + (1 if data and not data.endswith(b"\n") else 0)
     if lines == 0:

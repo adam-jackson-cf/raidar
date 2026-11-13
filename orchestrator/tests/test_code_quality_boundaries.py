@@ -17,6 +17,7 @@ from typing import Any
 
 import pytest
 
+from raidar.contract import file_io
 from raidar.scoring.code_quality.architecture import (
     ProductionGraphError,
     produce_production_graph,
@@ -116,7 +117,7 @@ def test_the_evaluator_program_reports_the_fork_source_lines_and_clone_occurrenc
         {"path": row["path"], "bytes": checkpoint["files"][row["path"]].encode().hex()}
         for row in expected["files"]
     ]
-    payload = evaluate(files)
+    payload = evaluate(files, file_io)
     assert [
         {"path": row["path"], "hash": row["hash"], "source_lines": row["source_lines"]}
         for row in payload["files"]
@@ -126,7 +127,7 @@ def test_the_evaluator_program_reports_the_fork_source_lines_and_clone_occurrenc
     )
     assert len(payload["parser_tokenizer_schema_id"]) == 64
     with pytest.raises(EvaluatorInputError):
-        evaluate([{"path": "bad.py", "bytes": b"def f(:\n".hex()}])
+        evaluate([{"path": "bad.py", "bytes": b"def f(:\n".hex()}], file_io)
 
 
 class _Stream:
@@ -145,17 +146,17 @@ class _Stream:
 def test_the_tool_cli_reports_parser_failures_usage_and_graphless_measures(tmp_path: Path) -> None:
     bad = json.dumps({"files": [{"path": "bad.py", "bytes": b"def f(:\n".hex()}]})
     out = _Stream()
-    assert cli.main(["evaluate"], _Stream(bad), out) == cli.EXIT_INPUT_INVALID  # type: ignore[arg-type]
+    assert cli.main(["evaluate"], file_io, _Stream(bad), out) == cli.EXIT_INPUT_INVALID  # type: ignore[arg-type]
     assert "error" in json.loads(out.written)
     good = json.dumps({"files": [{"path": "ok.py", "bytes": b"x = 1\n".hex()}]})
     out = _Stream()
-    assert cli.main(["evaluate"], _Stream(good), out) == 0  # type: ignore[arg-type]
+    assert cli.main(["evaluate"], file_io, _Stream(good), out) == 0  # type: ignore[arg-type]
     assert json.loads(out.written)["files"][0]["source_lines"] == [1]
     snapshot = materialise(tmp_path / "s", {"a.py": "def f():\n    return 1\n"})
     out = _Stream()
-    assert cli.main(["measure", str(snapshot)], _Stream(), out) == 0  # type: ignore[arg-type]
+    assert cli.main(["measure", str(snapshot)], file_io, _Stream(), out) == 0  # type: ignore[arg-type]
     assert json.loads(out.written)["graph"] is None
-    assert cli.main(["unknown"], _Stream(), _Stream()) == cli.EXIT_USAGE  # type: ignore[arg-type]
+    assert cli.main(["unknown"], file_io, _Stream(), _Stream()) == cli.EXIT_USAGE  # type: ignore[arg-type]
 
 
 @pytest.mark.parametrize(
@@ -201,7 +202,7 @@ def _diagnostic(**overrides: Any) -> str:
 def _shop(tmp_path: Path) -> dict[str, Any]:
     checkpoint = golden_case("synthetic_shop")["checkpoints"][0]
     snapshot = materialise(tmp_path / "snapshot", checkpoint["files"])
-    measured = cli.measure(snapshot, "app.py")
+    measured = cli.measure(snapshot, "app.py", file_io)
     return {
         "snapshot": snapshot,
         "inventory": build_inventory(snapshot).files,

@@ -23,6 +23,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from raidar.contract.file_io import load_text
+
 WORKFLOW_RECORD = "workflow/workflow.json"
 GATE_KEY = "gate/1"
 GATE_FIX = "gate_fix"
@@ -192,7 +194,7 @@ def _fixes(record: dict[str, Any]) -> tuple[FixTurn, ...]:
 
 def _load(path: Path) -> dict[str, Any] | None:
     try:
-        text = path.read_text(encoding="utf-8")
+        text = load_text(path, encoding="utf-8")
     except FileNotFoundError:
         return None
     except (OSError, UnicodeDecodeError) as exc:

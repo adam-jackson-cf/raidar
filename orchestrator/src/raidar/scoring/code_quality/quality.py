@@ -25,6 +25,7 @@ from decimal import ROUND_HALF_EVEN, Decimal, localcontext
 from pathlib import Path
 from typing import Any, Literal, TypeGuard
 
+from raidar.contract.file_io import load_bytes
 from raidar.scoring.code_quality.contract import (
     EXPECTED_INTERPRETER,
     EXPECTED_RUFF_VERSION,
@@ -276,7 +277,7 @@ def _read_sources(root: Path, paths: Sequence[str]) -> dict[str, bytes]:
         target = (root / path).resolve()
         try:
             target.relative_to(root)
-            sources[path] = target.read_bytes()
+            sources[path] = load_bytes(target)
         except (OSError, ValueError) as error:
             raise ProductionQualityError(
                 "score_evidence_invalid: production source unreadable"
@@ -318,10 +319,13 @@ def _flagged_lines(
         )
     for group in groups:
         for path, start, end in group["occurrences"]:
-            clone_lines.update(
-                (path, line) for line in range(start, end + 1) if line in source_by_path[path]
-            )
+            clone_lines.update(_eligible_lines(path, start, end, source_by_path[path]))
     return verbosity, clone_lines
+
+
+def _eligible_lines(path: str, start: int, end: int, eligible: set[int]) -> set[tuple[str, int]]:
+    """``(path, line)`` for the eligible lines of the inclusive range ``start..end``."""
+    return {(path, line) for line in range(start, end + 1) if line in eligible}
 
 
 def _int_field(value: object) -> TypeGuard[int]:

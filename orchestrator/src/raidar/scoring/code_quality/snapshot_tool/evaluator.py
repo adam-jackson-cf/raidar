@@ -23,7 +23,10 @@ import sys
 import tokenize
 from collections.abc import Iterable
 from io import BytesIO
-from typing import Any
+from pathlib import Path
+from typing import Any, TypeGuard
+
+from .reader import SourceReader
 
 MIN_STATEMENTS = 6
 PROBE = b"x = 1\nif x:\n    y = 'z'\n"
@@ -40,16 +43,15 @@ class EvaluatorInputError(ValueError):
     """A source file cannot be tokenized or parsed by the evaluator interpreter."""
 
 
-def digest(path: str) -> str:
-    with open(path, "rb") as handle:
-        return hashlib.sha256(handle.read()).hexdigest()
+def digest(path: str, reader: SourceReader) -> str:
+    return hashlib.sha256(reader.load_bytes(Path(path))).hexdigest()
 
 
 def _dump(node: ast.AST) -> str:
     return ast.dump(node, annotate_fields=True, include_attributes=False)
 
 
-def parser_tokenizer_schema_id() -> str:
+def parser_tokenizer_schema_id(reader: SourceReader) -> str:
     tokens = repr(
         [
             (token.type, token.string, token.start, token.end)
@@ -60,8 +62,8 @@ def parser_tokenizer_schema_id() -> str:
         sys.implementation.name,
         sys.version,
         sys.implementation.cache_tag or "",
-        digest(ast.__file__),
-        digest(tokenize.__file__),
+        digest(ast.__file__, reader),
+        digest(tokenize.__file__, reader),
         PROBE.hex(),
         tokens,
         _dump(ast.parse(PROBE)),
@@ -69,15 +71,15 @@ def parser_tokenizer_schema_id() -> str:
     return hashlib.sha256("|".join(parts).encode()).hexdigest()
 
 
-def interpreter_identity() -> dict[str, str]:
+def interpreter_identity(reader: SourceReader) -> dict[str, str]:
     return {
         "executable": sys.executable,
         "implementation": sys.implementation.name,
         "version": sys.version,
         "cache_tag": sys.implementation.cache_tag or "",
-        "executable_sha256": digest(sys.executable),
-        "ast_sha256": digest(ast.__file__),
-        "tokenize_sha256": digest(tokenize.__file__),
+        "executable_sha256": digest(sys.executable, reader),
+        "ast_sha256": digest(ast.__file__, reader),
+        "tokenize_sha256": digest(tokenize.__file__, reader),
     }
 
 
@@ -89,15 +91,20 @@ def loc(data: bytes) -> list[int]:
     return sorted(line for line in lines if line > 0)
 
 
+def _is_statement_list(value: object) -> TypeGuard[list[ast.stmt]]:
+    """A non-empty field value made only of statements."""
+    return (
+        isinstance(value, list)
+        and bool(value)
+        and all(isinstance(item, ast.stmt) for item in value)
+    )
+
+
 def stmt_lists(node: ast.AST) -> list[list[ast.stmt]]:
     result = []
     for parent in ast.walk(node):
         for _, value in ast.iter_fields(parent):
-            if (
-                isinstance(value, list)
-                and value
-                and all(isinstance(item, ast.stmt) for item in value)
-            ):
+            if _is_statement_list(value):
                 result.append(value)
     return result
 
@@ -143,9 +150,13 @@ class _CloneSearch:
                 (path, list_id, start)
             )
         for records in repeated.values():
-            for first in range(len(records)):
-                for second in range(first + 1, len(records)):
-                    self._extend(records[first], records[second])
+            self._extend_pairs(records)
+
+    def _extend_pairs(self, records: list[tuple[str, int, int]]) -> None:
+        """Extend every pair of occurrences of one window, in index order."""
+        for first in range(len(records)):
+            for second in range(first + 1, len(records)):
+                self._extend(records[first], records[second])
 
     def _extend(self, left: tuple[str, int, int], right: tuple[str, int, int]) -> None:
         left_path, left_list, left_start = left
@@ -221,9 +232,9 @@ def clone_groups(
     ]
 
 
-def evaluate(files: list[dict[str, str]]) -> dict[str, Any]:
+def evaluate(files: list[dict[str, str]], reader: SourceReader) -> dict[str, Any]:
     """The fork's evaluator payload for ``files`` (``{path, bytes}`` with hex bytes)."""
-    schema = parser_tokenizer_schema_id()
+    schema = parser_tokenizer_schema_id(reader)
     rows = []
     sources: dict[str, bytes] = {}
     index: dict[bytes, list[tuple[str, int, int]]] = {}
@@ -243,7 +254,7 @@ def evaluate(files: list[dict[str, str]]) -> dict[str, Any]:
             }
         )
     return {
-        "interpreter": interpreter_identity(),
+        "interpreter": interpreter_identity(reader),
         "parser_tokenizer_probe": PROBE.hex(),
         "parser_tokenizer_schema_id": schema,
         "files": rows,

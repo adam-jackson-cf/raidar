@@ -16,6 +16,8 @@ import ast
 from dataclasses import dataclass
 from pathlib import Path
 
+from raidar.contract.file_io import load_text
+
 _SKIPS = frozenset({"skip", "skipif", "xfail", "skipTest"})
 _Def = ast.FunctionDef | ast.AsyncFunctionDef | ast.ClassDef
 
@@ -45,7 +47,7 @@ class _Module:
 
 def _load(path: Path) -> _Module | None:
     try:
-        text = path.read_text(encoding="utf-8")
+        text = load_text(path, encoding="utf-8")
         return _Module(path, text, ast.parse(text))
     except (OSError, SyntaxError, ValueError):
         return None

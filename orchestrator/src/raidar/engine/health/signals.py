@@ -12,6 +12,7 @@ from collections.abc import Callable, Mapping
 from pathlib import Path
 from typing import Any
 
+from raidar.contract.file_io import load_text
 from raidar.contract.job_layout import TRIAL_RECORDS_DIR, TRIALS_DIR
 from raidar.engine.health.base import Audit, make_check
 from raidar.engine.health.liveness import LIVENESS_REPORT
@@ -29,7 +30,7 @@ def _load_json(path: Path) -> dict[str, Any] | None:
     if not path.is_file():
         return None
     try:
-        loaded = json.loads(path.read_text())
+        loaded = json.loads(load_text(path))
     except ValueError:
         return None
     return loaded if isinstance(loaded, dict) else None

@@ -24,9 +24,9 @@ workflows:
   raidar/define-build-verify@1: 52190a8da774cd846bb283dc71363ca2e9cb7dbd6bda140d1eccc9ff95fb3d91
   raidar/one-shot@2: 39e672e9c1c14311757c5d3393b74d5d3f50d1f209d4abf4943445ed6f83fb40
   raidar/one-shot-verify@2: 1e126c13cd59d709df90b385081b3cbf28d30d03412a9f60950cebdf6de0a041
-  raidar/define-build-verify@2: 6bf8b572f496306b61cc446ae9cc1eef5ce4c73f88ef719235ed4fb264d23b8b
+  raidar/define-build-verify@2: 8aec0a93da33b0fdd58f32184bb8b84d33f97ea611854832609787776c324663
   raidar/docs-fix-smoke@1: cf64eb48aee085137a96cdd2a5a365868263defc5fe7664c773fe27393d44297
 stages:
   raidar/verify@1: 8b8a9af4e2f57491e0a9fabecfd9c8301ca5bbdb8982d6638ace605337d43128
-  raidar/define@1: 2dc004c3683e4ee4d71f897c8cb41c759660b9bbfe3a563d6956f8c881efc028
+  raidar/define@1: a9477ea74a043bc4ce9815a34bb71e8900775e9025e32920188aa0f0d5f89193
   raidar/docs-check@1: 517b57850d1ef748cf5985320ce6d805be5b5fd0a2fa2971983b97de0df5a827

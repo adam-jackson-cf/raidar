@@ -18,6 +18,7 @@ from functools import cache
 from pathlib import Path
 from typing import Any
 
+from raidar.contract import file_io
 from raidar.grading.models import CaseStatus, ParityVerdict
 from raidar.grading.records import (
     FORK_EVIDENCE_FILE,
@@ -81,9 +82,6 @@ def materialise(root: Path, files: Mapping[str, str | bytes]) -> Path:
     return root
 
 
-FORK_CASES = ("synthetic_shop", "language_features", "forge")
-
-
 def case_snapshots(tmp_path: Path, case: dict[str, Any]) -> list[Path]:
     return [
         materialise(tmp_path / checkpoint["checkpoint"], checkpoint["files"])
@@ -119,7 +117,7 @@ def _tool_answer(argv: Sequence[str], stdin: str | None) -> ProcessResult:
     start = argv.index("evaluate") if "evaluate" in argv else argv.index("measure")
     command = list(argv[start:])
     out = _Text()
-    code = cli.main(command, _Text(stdin or ""), out)  # type: ignore[arg-type]
+    code = cli.main(command, file_io, _Text(stdin or ""), out)  # type: ignore[arg-type]
     if code == 0 and command[0] == "evaluate":
         payload = json.loads(out.written)
         # The host's identity (binary, stdlib digests) with the contract's language level.
@@ -321,7 +319,7 @@ def _production_paths(snapshot: Path) -> list[str]:
 
 def _rework_symbols(snapshot: Path, case: Mapping[str, Any], tools: ToolEnvironment) -> Any:
     """R's identities as the fork's live producer projects them: V/E's eligible symbols."""
-    measured = cli.measure(snapshot, case["entry_file"])
+    measured = cli.measure(snapshot, case["entry_file"], file_io)
     quality = produce_production_quality(
         "checkpoint",
         snapshot,
@@ -383,7 +381,7 @@ def assert_lineage_and_regression_equal_the_fork(
         prior_production = _production_paths(snapshots[index - 1])
         production = _production_paths(snapshots[index])
         owners = production_symbols(
-            cli.measure(snapshots[index], case["entry_file"])["symbols"], production
+            cli.measure(snapshots[index], case["entry_file"], file_io)["symbols"], production
         )
         _, added = changed_lines(
             snapshots[index - 1],

@@ -27,6 +27,7 @@ from typing import Any
 from harbor.trial.hooks import TrialEvent, TrialHookEvent
 from harbor.trial.trial import Trial
 
+from raidar.contract.file_io import load_text, store_text
 from raidar.contract.snapshot import APP_SOURCE
 from raidar.engine.health.setup_script import AGENT_SETUP_STASH, SETUP_SCRIPT_NAME
 from raidar.grading.bundle import VerifierBundle, load_bundle
@@ -125,14 +126,14 @@ async def reap_agent_processes(environment: Any, user: str | None) -> ReapReport
 
 def write_reap_report(record_dir: Path, report: ReapReport) -> None:
     record_dir.mkdir(parents=True, exist_ok=True)
-    (record_dir / REAP_REPORT).write_text(json.dumps(report.as_json(), indent=2, sort_keys=True))
+    store_text(record_dir / REAP_REPORT, json.dumps(report.as_json(), indent=2, sort_keys=True))
 
 
 def load_reap_report(record_dir: Path) -> dict[str, Any] | None:
     path = record_dir / REAP_REPORT
     if not path.is_file():
         return None
-    loaded = json.loads(path.read_text())
+    loaded = json.loads(load_text(path))
     return loaded if isinstance(loaded, dict) else None
 
 

@@ -14,6 +14,7 @@ import json
 from pathlib import Path
 from typing import Any
 
+from raidar.contract.file_io import load_text
 from raidar.engine.health.model import VIOLATION, HealthCheck, HealthReport
 
 FAULT_CANDIDATES = "fault-candidates.jsonl"
@@ -78,7 +79,7 @@ def _existing(path: Path) -> set[tuple[Any, ...]]:
     if not path.is_file():
         return set()
     keys = set()
-    for raw in path.read_text().splitlines():
+    for raw in load_text(path).splitlines():
         try:
             keys.add(_key(json.loads(raw)))
         except ValueError:

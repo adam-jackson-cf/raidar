@@ -170,6 +170,23 @@ class Case:
         return "\n".join(self.parts)
 
 
+def _criterion_cases(criterion: JsonObject) -> list[Case]:
+    """Return every example of one behaviour criterion, in order (none for a regression)."""
+    if text(criterion, "kind") == aspects.REGRESSION:
+        return []
+    units = cited(" ".join(strings(criterion, "sources")))
+    return [
+        Case(
+            text(criterion, "id"),
+            units,
+            text(example, "input"),
+            text(example, "expected"),
+            number,
+        )
+        for number, example in enumerate(rows(criterion, "examples"), start=1)
+    ]
+
+
 def cases(reply: JsonObject) -> tuple[Case, ...]:
     """Return every example of a reply's behaviour criteria, in order."""
     found: list[Case] = []
@@ -177,19 +194,7 @@ def cases(reply: JsonObject) -> tuple[Case, ...]:
     body = definition if isinstance(definition, dict) else {}
     for feature in rows(body, "features"):
         for criterion in rows(feature, "criteria"):
-            if text(criterion, "kind") == aspects.REGRESSION:
-                continue
-            units = cited(" ".join(strings(criterion, "sources")))
-            found += [
-                Case(
-                    text(criterion, "id"),
-                    units,
-                    text(example, "input"),
-                    text(example, "expected"),
-                    number,
-                )
-                for number, example in enumerate(rows(criterion, "examples"), start=1)
-            ]
+            found += _criterion_cases(criterion)
     return tuple(found)
 
 

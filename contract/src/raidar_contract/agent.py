@@ -8,7 +8,7 @@ Harbor ids, isolation requirements and admission rules are not part of this dist
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Annotated, Any, Literal
+from typing import Annotated, Literal, overload
 
 import yaml
 from pydantic import BaseModel, ConfigDict, Field, JsonValue, ValidationError
@@ -76,19 +76,39 @@ def agent_path(root: Path, name: str) -> Path:
     return root / f"{name}{AGENT_SUFFIX}"
 
 
-def load_agent(
+type PortableAgentDefinition = AgentDefinition[dict[str, JsonValue], dict[str, JsonValue]]
+"""An agent definition whose settings and capabilities are plain JSON objects."""
+
+
+@overload
+def load_agent(root: Path, name: str) -> PortableAgentDefinition: ...
+
+
+@overload
+def load_agent[Settings, Capability](
+    root: Path, name: str, *, definition_type: type[AgentDefinition[Settings, Capability]]
+) -> AgentDefinition[Settings, Capability]: ...
+
+
+def load_agent[Settings, Capability](
     root: Path,
     name: str,
     *,
-    definition_type: type[AgentDefinition[Any, Any]] = AgentDefinition[
-        dict[str, JsonValue], dict[str, JsonValue]
-    ],
-) -> AgentDefinition[Any, Any]:
-    """Load and validate ``<root>/<name>.yaml``; its ``name`` must equal the file name."""
+    definition_type: type[AgentDefinition[Settings, Capability]] | None = None,
+) -> AgentDefinition[Settings, Capability] | PortableAgentDefinition:
+    """Load and validate ``<root>/<name>.yaml``; its ``name`` must equal the file name.
+
+    ``definition_type`` is the consumer's schema; without one the definition is portable.
+    """
     path = agent_path(root, name)
+    schema = (
+        AgentDefinition[dict[str, JsonValue], dict[str, JsonValue]]
+        if definition_type is None
+        else definition_type
+    )
     try:
         document = yaml.safe_load(path.read_text(encoding="utf-8"))
-        definition = definition_type.model_validate(document)
+        definition = schema.model_validate(document)
     except (OSError, yaml.YAMLError) as exc:
         raise AgentDefinitionError(f"{path}: unreadable agent definition: {exc}") from exc
     except ValidationError as exc:

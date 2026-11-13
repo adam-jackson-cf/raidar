@@ -28,8 +28,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from raidar_contract.canonical import digest_json
-
+from raidar.contract.file_io import load_bytes, load_text
 from raidar.contract.job_layout import TRIAL_RECORDS_DIR
 from raidar.contract.snapshot import tree_digest
 from raidar.contract.trial import TrialRecord
@@ -46,6 +45,7 @@ from raidar.grading.records import (
 )
 from raidar.scoring.framework.context import AssessContext, StepInputs
 from raidar.scoring.framework.inventory import InventoryPolicy
+from raidar_contract.canonical import digest_json
 
 RESULT_FILE = "result.json"
 _VERIFIER_CONFIG_FILES = ("lock.json", "config.json")
@@ -88,7 +88,7 @@ class _Executed:
 
 def _read_json(path: Path) -> Mapping[str, Any]:
     try:
-        loaded = json.loads(path.read_text())
+        loaded = json.loads(load_text(path))
     except json.JSONDecodeError as exc:
         raise TrialInputError(f"{path} is not valid JSON: {exc}") from exc
     if not isinstance(loaded, dict):
@@ -295,7 +295,7 @@ def _record_digest(record_dir: Path, record: StepRecord) -> str:
         {
             "record": payload,
             "grading_evidence": coverage_identity(record, record_dir),
-            FORK_EVIDENCE_FILE: hashlib.sha256(fork.read_bytes()).hexdigest()
+            FORK_EVIDENCE_FILE: hashlib.sha256(load_bytes(fork)).hexdigest()
             if fork.is_file()
             else None,
         }

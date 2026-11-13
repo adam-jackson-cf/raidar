@@ -21,6 +21,7 @@ from typing import Any
 from harbor.trial.hooks import TrialEvent, TrialHookEvent
 from harbor.trial.trial import Trial
 
+from raidar.contract.file_io import load_text, store_text
 from raidar.grading.bundle import VerifierBundle, load_bundle
 from raidar.grading.guard import current_step
 
@@ -114,7 +115,7 @@ class ToolTreeWatch:
     def write(self) -> None:
         self.path.parent.mkdir(parents=True, exist_ok=True)
         payload = {"kind": "raidar-tool-hashes", "root": TOOLS_ROOT, "points": self.points}
-        self.path.write_text(json.dumps(payload, indent=1, sort_keys=True) + "\n")
+        store_text(self.path, json.dumps(payload, indent=1, sort_keys=True) + "\n")
 
     async def measure(self, label: str, event: TrialHookEvent) -> None:
         reading, error = await hash_tool_tree(self.trial.agent_environment)
@@ -145,5 +146,5 @@ def load_tool_hashes(trial_dir: Path) -> dict[str, Any] | None:
     path = trial_dir / TOOL_HASHES
     if not path.is_file():
         return None
-    loaded = json.loads(path.read_text())
+    loaded = json.loads(load_text(path))
     return loaded if isinstance(loaded, dict) else None

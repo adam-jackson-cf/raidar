@@ -29,6 +29,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from raidar.contract.file_io import load_text
 from raidar.contract.job_layout import JOB_LOCK_FILE, JOB_MANIFEST, TRIAL_RECORDS_DIR
 from raidar.contract.trial import TrialRecord
 from raidar.engine.health.model import HealthReport, load_health
@@ -106,7 +107,7 @@ def mismatches(wanted: Identity, smoke: Identity) -> list[str]:
 
 def _read(path: Path) -> dict[str, Any] | None:
     try:
-        loaded = json.loads(path.read_text())
+        loaded = json.loads(load_text(path))
     except (OSError, ValueError):
         return None
     return loaded if isinstance(loaded, dict) else None
@@ -134,9 +135,10 @@ def _stored_job(
         if not record_file.is_file():
             return f"trial {trial_id} has no record"
         try:
-            return TrialRecord.model_validate_json(record_file.read_text())
+            parsed: TrialRecord = TrialRecord.model_validate_json(load_text(record_file))
         except ValueError as error:
             return f"trial {trial_id} has an unreadable record ({type(error).__name__})"
+        return parsed
 
     return SmokeJob(name, manifest, lock, record, lambda r: load_health(job_dir / r.trial_dir))
 

@@ -22,8 +22,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from pydantic import ValidationError
-
+from raidar.contract.file_io import load_bytes, load_text
 from raidar.contract.job_layout import JOB_MANIFEST, PLAN_FILE, TRIAL_RECORDS_DIR
 from raidar.contract.trial import TrialRecord
 from raidar.design.experiment.lock import default_lock_path, lock_integrity_issues
@@ -96,7 +95,7 @@ class JobDir:
 
 def read_json_object(path: Path) -> dict[str, Any]:
     try:
-        loaded = json.loads(path.read_text())
+        loaded = json.loads(load_text(path))
     except (OSError, json.JSONDecodeError) as exc:
         raise AnalysisInputError(f"cannot read {path}: {exc}") from exc
     if not isinstance(loaded, dict):
@@ -108,8 +107,8 @@ def read_trial_records(job_dir: Path) -> tuple[TrialRecord, ...]:
     records = []
     for path in sorted((job_dir / TRIAL_RECORDS_DIR).glob("*.json")):
         try:
-            records.append(TrialRecord.model_validate_json(path.read_bytes()))
-        except ValidationError as exc:
+            records.append(TrialRecord.model_validate_json(load_bytes(path)))
+        except ValueError as exc:  # pydantic's ValidationError is a ValueError
             raise AnalysisInputError(f"invalid trial record {path}: {exc}") from exc
     return tuple(records)
 
@@ -171,7 +170,7 @@ def default_lock(job: JobDir) -> Path:
 
 def _lock_digest(path: Path) -> object:
     try:
-        return json.loads(path.read_text()).get("lock_sha256")
+        return json.loads(load_text(path)).get("lock_sha256")
     except (OSError, ValueError, AttributeError):
         return None
 

@@ -12,6 +12,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from raidar.contract.file_io import load_text
 from raidar.engine.health.base import Audit, make_check
 from raidar.engine.health.model import PASS, UNMEASURED, VIOLATION, HealthCheck
 
@@ -25,7 +26,7 @@ class JudgeStep:
 
 def _json(path: Path) -> Any:
     try:
-        return json.loads(path.read_text(encoding="utf-8"))
+        return json.loads(load_text(path, encoding="utf-8"))
     except (OSError, ValueError):
         return None
 

@@ -14,6 +14,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from raidar.contract.file_io import load_bytes, load_text
 from raidar_contract.criteria import validate_criteria
 
 WORKFLOW_RECORD = "workflow/workflow.json"
@@ -101,7 +102,7 @@ def _inside(root: Path, relative: object) -> Path | None:
 
 def _json(path: Path) -> Any:
     try:
-        return json.loads(path.read_text(encoding="utf-8"))
+        return json.loads(load_text(path, encoding="utf-8"))
     except (OSError, ValueError):
         return None
 
@@ -154,7 +155,7 @@ def _criteria(trace_dir: Path, output: dict[str, Any]) -> tuple[Criterion, ...] 
     if path is None:
         return Unreadable("the criteria output has no safe retained path")
     try:
-        data = path.read_bytes()
+        data = load_bytes(path)
         if len(data) != output.get("bytes") or hashlib.sha256(data).hexdigest() != output.get(
             "sha256"
         ):

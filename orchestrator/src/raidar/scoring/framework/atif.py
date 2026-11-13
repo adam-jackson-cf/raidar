@@ -23,9 +23,10 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from harbor.models.trajectories import Step as HarborStep
-from harbor.models.trajectories import Trajectory as HarborTrajectory
+from harbor.models.trajectories import Step as HarborStep, Trajectory as HarborTrajectory
 from pydantic import ValidationError
+
+from raidar.contract.file_io import load_bytes
 
 TRAJECTORY_FILE = "trajectory.json"
 AGENT_SOURCE = "agent"
@@ -125,7 +126,7 @@ def load_trajectory(trace_dir: Path | None) -> Trajectory | None:
         return None
     path = trace_dir / TRAJECTORY_FILE
     try:
-        document = HarborTrajectory.model_validate_json(path.read_bytes())
+        document = HarborTrajectory.model_validate_json(load_bytes(path))
     except ValidationError as exc:
         kind = "not valid JSON" if _json_invalid(exc) else "not an ATIF trajectory"
         raise TrajectoryError(f"{path} is {kind}: {exc}") from exc

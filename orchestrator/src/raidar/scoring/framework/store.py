@@ -48,14 +48,15 @@ from pathlib import Path
 from typing import Annotated, Any, Literal
 
 from pydantic import Field, field_validator
+
+from raidar.contract.file_io import load_bytes, load_text
+from raidar.scoring.framework.manifest import SdkModel
+from raidar.scoring.framework.result import AssessResult, RunStats
 from raidar_contract.canonical import (
     canonical_json_bytes,
     digest_json,
     pretty_canonical_json_bytes,
 )
-
-from raidar.scoring.framework.manifest import SdkModel
-from raidar.scoring.framework.result import AssessResult, RunStats
 
 OBJECTS_DIR = "assessments"
 RAW_DIR = "raw"
@@ -143,7 +144,8 @@ class AssessmentStore:
         path = self.path_for(key)
         if not path.is_file():
             return None
-        return Assessment.model_validate_json(path.read_bytes())
+        assessment: Assessment = Assessment.model_validate_json(load_bytes(path))
+        return assessment
 
     def raw_path(self, digest: str) -> Path:
         return self.root / RAW_DIR / digest[:2] / digest
@@ -159,7 +161,7 @@ class AssessmentStore:
 
     def get_raw(self, digest: str) -> bytes | None:
         path = self.raw_path(digest)
-        return path.read_bytes() if path.is_file() else None
+        return load_bytes(path) if path.is_file() else None
 
     def stored_keys(self) -> Iterator[str]:
         for path in sorted((self.root / OBJECTS_DIR).glob("*/*.json")):
@@ -186,7 +188,7 @@ class AssessmentStore:
         data = assessment.render()
         path = self.path_for(assessment.key)
         if path.is_file():
-            stored = path.read_bytes()
+            stored = load_bytes(path)
             if stored == data:
                 return PutOutcome.IDENTICAL
             if Assessment.model_validate_json(stored).provisional and not assessment.provisional:
@@ -251,4 +253,4 @@ class AssessmentStore:
         path = self.root / LOG_FILE
         if not path.is_file():
             return []
-        return [json.loads(line) for line in path.read_text().splitlines() if line]
+        return [json.loads(line) for line in load_text(path).splitlines() if line]

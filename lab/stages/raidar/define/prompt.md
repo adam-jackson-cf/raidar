@@ -28,30 +28,31 @@ The tool writes each cited unit's words verbatim as the criterion's
 
 ### What to call, and when
 
-1. `define put`, once, with everything you decided: the block below on standard
-   input through a quoted heredoc, which the shell passes through untouched, so
-   JSON, quotes, backticks and braces in a value need no escaping:
+1.  `define put`, once, with everything you decided: the block below on standard
+    input through a quoted heredoc, which the shell passes through untouched, so
+    JSON, quotes, backticks and braces in a value need no escaping:
 
-       define put <<'EOF'
-       title: ...
-       EOF
+        define put <<'EOF'
+        title: ...
+        EOF
 
-   (`define put FILE` reads the block from a file instead.) It applies every
-   line it can read, and prints what is wrong, by item: `F2.AC1 line 5: ...`
-   for a line it could not read, and the tool's checks of the definition for
-   the rest.
-2. `define put` again with only the items to fix. A `put` replaces each item it
-   names by its id (a question's id is the feature it blocks and its `kind`),
-   adds new ones and keeps the rest, so repeating an item is
-   safe and a fix is a few lines, never the whole definition. `define show`
-   prints the definition as it stands, in the same lines; `define check` lists
-   what is wrong with it; `define drop <id>` removes `F2` (with its criteria),
-   `F2.AC1`, `decision 3`, `named <name>` or `question F2 <kind>`; a `drop` that
-   names nothing lists what the draft holds.
-3. `define done ready` when the definition is complete, or `define done ask`
-   when you ask questions instead. It refuses while anything blocks, and says
-   what. A definition that is not sealed with `define done` when you stop is
-   sent back to you once, then the definition is unusable.
+    (`define put FILE` reads the block from a file instead.) It applies every
+    line it can read, and prints what is wrong, by item: `F2.AC1 line 5: ...`
+    for a line it could not read, and the tool's checks of the definition for
+    the rest.
+
+2.  `define put` again with only the items to fix. A `put` replaces each item it
+    names by its id (a question's id is the feature it blocks and its `kind`),
+    adds new ones and keeps the rest, so repeating an item is
+    safe and a fix is a few lines, never the whole definition. `define show`
+    prints the definition as it stands, in the same lines; `define check` lists
+    what is wrong with it; `define drop <id>` removes `F2` (with its criteria),
+    `F2.AC1`, `decision 3`, `named <name>` or `question F2 <kind>`; a `drop` that
+    names nothing lists what the draft holds.
+3.  `define done ready` when the definition is complete, or `define done ask`
+    when you ask questions instead. It refuses while anything blocks, and says
+    what. A definition that is not sealed with `define done` when you stop is
+    sent back to you once, then the definition is unusable.
 
 Define comes first: `define done ready` precedes every `git commit`. Once it is
 sealed, build the issue from `/app/.raidar/feature-definition.md`.

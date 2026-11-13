@@ -41,6 +41,7 @@ from harbor.trial.hooks import LogEntry, TrialEvent, TrialHookEvent
 from harbor.trial.trial import Trial
 
 from raidar.contract.activity import HostActivity, observe_host_activity
+from raidar.contract.file_io import load_text, store_text
 from raidar.engine.health.reaper import ReapReport, reap_agent_processes
 
 LIVENESS_REPORT = "raidar-liveness.json"
@@ -407,7 +408,8 @@ class TrialLiveness:
         phases = [*self.phases, *([self.active.as_json()] if self.active else [])]
         path = Path(self.trial.paths.trial_dir) / LIVENESS_REPORT
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(
+        store_text(
+            path,
             json.dumps(
                 {
                     "kind": "raidar-liveness",
@@ -416,7 +418,7 @@ class TrialLiveness:
                 },
                 indent=1,
                 sort_keys=True,
-            )
+            ),
         )
 
     async def on_output(self, entry: LogEntry) -> None:
@@ -466,7 +468,7 @@ def install_liveness_monitor(trial: Trial, config: LivenessConfig | None = None)
 def idle_killed_steps(trial_dir: Path) -> frozenset[str]:
     """Steps whose agent phase ended in an enforce-mode idle kill (``idle_killed``)."""
     try:
-        phases = json.loads((trial_dir / LIVENESS_REPORT).read_text()).get("phases", [])
+        phases = json.loads(load_text(trial_dir / LIVENESS_REPORT)).get("phases", [])
     except (OSError, ValueError, AttributeError):
         return frozenset()
     return frozenset(

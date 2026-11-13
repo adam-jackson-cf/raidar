@@ -28,6 +28,7 @@ from typing import Any
 from packaging.requirements import InvalidRequirement, Requirement
 from packaging.utils import canonicalize_name
 
+from raidar.contract.file_io import load_text
 from raidar.engine.health.base import Audit, make_check
 from raidar.engine.health.model import PASS, UNMEASURED, HealthCheck
 from raidar.grading.records import step_record_dir
@@ -109,7 +110,7 @@ def _undeclared(a: Audit, step: str) -> list[dict[str, str]] | None:
     if ledger is None or dependencies is None or not log.is_file():
         return None
     try:
-        text = log.read_text(errors="replace")
+        text = load_text(log, errors="replace")
     except OSError:
         return None
     return undeclared_modules(text, dependencies.declared, _local(a, ledger.snapshot.stored_path))

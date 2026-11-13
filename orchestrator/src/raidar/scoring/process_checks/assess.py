@@ -17,6 +17,7 @@ from itertools import chain
 
 from pydantic import Field, field_validator
 
+from raidar.contract.file_io import load_bytes
 from raidar.scoring.framework.atif import Trajectory, TrajectoryError, load_trajectory
 from raidar.scoring.framework.context import AssessContext, StepInputs
 from raidar.scoring.framework.manifest import SdkModel
@@ -154,7 +155,7 @@ def _snapshot_evidence(inputs: StepInputs, outcome: CheckOutcome) -> Iterable[Ev
         path = inputs.snapshot / event.path if inputs.snapshot and event.path else None
         if path is None or not path.is_file():
             continue
-        data = path.read_bytes()
+        data = load_bytes(path)
         if not data:
             continue
         yield Evidence(
@@ -172,7 +173,7 @@ def step_evidence(
     inputs: StepInputs, outcomes: Sequence[CheckOutcome], trajectory: Trajectory
 ) -> tuple[Evidence, ...]:
     """Evidence at the deciding tool call (and a passing plan file) of each decided check."""
-    data = trajectory.path.read_bytes()
+    data = load_bytes(trajectory.path)
     sha256 = hashlib.sha256(data).hexdigest()
     lines = data.decode("utf-8", errors="replace").split("\n")
     evidence: list[Evidence] = []

@@ -23,6 +23,7 @@ from typing import Any
 
 import pytest
 
+from raidar.contract import file_io
 from raidar.scoring.code_quality import arithmetic
 from raidar.scoring.code_quality.diffs import production_symbols
 from raidar.scoring.code_quality.lineage import calculate_transition_rework
@@ -37,7 +38,6 @@ from raidar.scoring.code_quality.regression import calculate_regression_breadth
 from raidar.scoring.code_quality.snapshot_tool.cli import measure
 from raidar.scoring.framework.inventory import FileRole, build_inventory
 from tests.code_quality_support import (
-    FORK_CASES,
     assert_lineage_and_regression_equal_the_fork,
     case_snapshots,
     fork_goldens,
@@ -75,7 +75,7 @@ def _graph_view(graph: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-@pytest.mark.parametrize("name", FORK_CASES)
+@pytest.mark.parametrize("name", ["synthetic_shop", "language_features", "forge"])
 def test_measurement_adapters_match_the_fork_rows_symbols_and_call_graph(
     tmp_path: Path, name: str
 ) -> None:
@@ -83,7 +83,7 @@ def test_measurement_adapters_match_the_fork_rows_symbols_and_call_graph(
     for snapshot, checkpoint in zip(
         case_snapshots(tmp_path, case), case["checkpoints"], strict=True
     ):
-        measured = measure(snapshot, case["entry_file"])
+        measured = measure(snapshot, case["entry_file"], file_io)
         inventory = build_inventory(snapshot)
         assert {item.path: item.role.value for item in inventory.files} == checkpoint["roles"]
         assert (

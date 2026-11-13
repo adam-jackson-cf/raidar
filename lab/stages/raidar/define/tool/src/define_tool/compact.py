@@ -663,14 +663,14 @@ def _rendered_findings(rendered: str, source: str) -> tuple[list[Finding], list[
     return findings, notes
 
 
+def _feature_cites(feature: JsonObject) -> set[str]:
+    """Return the unit ids any criterion of one ``feature`` cites."""
+    return {ident for item in rows(feature, "criteria") for ident in _sources(item)}
+
+
 def _cited(definition: JsonObject) -> set[str]:
     """Return the unit ids any criterion of ``definition`` cites."""
-    return {
-        ident
-        for feature in rows(definition, "features")
-        for item in rows(feature, "criteria")
-        for ident in _sources(item)
-    }
+    return {ident for feature in rows(definition, "features") for ident in _feature_cites(feature)}
 
 
 def check(definition: JsonObject, found: Units, source: str) -> Checked:

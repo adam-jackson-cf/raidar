@@ -7,6 +7,7 @@ from pathlib import Path
 
 import pytest
 from raidar_contract.agent import AgentDefinitionError
+from raidar_contract.agent import load_agent as load_portable_agent
 
 from raidar.subject.agent.config import AgentSpec, Harness, ModelTarget
 from raidar.subject.agent.definition import harness_of, load_agent, provider_of
@@ -15,6 +16,8 @@ from raidar.subject.agent.native import (
     credentials,
     resolve_adapter,
 )
+from raidar.subject.agent.schema import AgentDefinition
+from raidar.subject.agent.schema import load_agent as load_lab_agent
 from tests.capability_support import CAPABILITIES
 
 KEY = "test-key"
@@ -132,3 +135,31 @@ def test_declared_models_must_all_be_runnable_by_the_registered_adapter(
         definition = load_agent(tmp_path, "fixture")
         assert harness_of(definition) == Harness.CODEX_CLI
         assert provider_of(definition) == "openai"
+
+
+def test_the_portable_loader_keeps_settings_as_json_and_a_schema_types_them(
+    tmp_path: Path,
+) -> None:
+    # behaviour: without a schema an agent's settings and capabilities stay plain JSON objects;
+    # with the lab schema the same file loads as the lab's typed definition
+    document = {
+        "schema": 1,
+        "name": "fixture",
+        "adapter": "codex",
+        "tool": {"package": "test-cli", "binary": "test", "version": "1.0"},
+        "settings": {"isolated_home": True, "ignore_user_config": True},
+        "placement": {"skills": "{home}/skills", "instructions": "{home}/AGENTS.md"},
+        "resume": True,
+        "models": {"first": {"canonical": "gpt-5.4", "reasoning": ["low"]}},
+        "capabilities": CAPABILITIES,
+    }
+    (tmp_path / "fixture.yaml").write_text(json.dumps(document))
+
+    portable = load_portable_agent(tmp_path, "fixture")
+    typed = load_lab_agent(tmp_path, "fixture")
+
+    assert portable.settings == document["settings"]
+    assert portable.capabilities == CAPABILITIES
+    assert isinstance(typed, AgentDefinition)
+    assert typed.settings.isolated_home is True
+    assert typed.models == portable.models

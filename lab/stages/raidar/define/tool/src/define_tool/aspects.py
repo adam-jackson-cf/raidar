@@ -287,14 +287,8 @@ def _mentions(span: str, token: str) -> bool:
 
 def _literal_spans(item: Subject) -> list[str]:
     """Return the code literals the criterion's aspects and examples carry."""
-    return [
-        literal_value(span)
-        for line in (
-            *(a.text for a in item.aspects),
-            *(e.text for e in item.examples),
-        )
-        for span in issue_texts.code_spans(line)
-    ]
+    lines = [*(a.text for a in item.aspects), *(e.text for e in item.examples)]
+    return [literal_value(span) for line in lines for span in issue_texts.code_spans(line)]
 
 
 def _literal_findings(item: Subject, label: str) -> list[Finding]:

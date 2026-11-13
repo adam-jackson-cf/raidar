@@ -25,6 +25,7 @@ from collections.abc import Iterable, Mapping, Sequence
 from pathlib import Path
 from typing import Any, Literal
 
+from raidar.contract.file_io import load_text
 from raidar.scoring.code_quality.lineage_models import (
     LineageCandidate,
     PhysicalLineEvidence,
@@ -41,7 +42,12 @@ def _utf8(value: str) -> bytes:
 
 
 def _lines(path: Path) -> list[str]:
-    return path.read_text(encoding="utf-8").splitlines() if path.is_file() else []
+    return load_text(path, encoding="utf-8").splitlines() if path.is_file() else []
+
+
+def _line_keys(path: str, start: int, end: int) -> set[tuple[str, int]]:
+    """``(path, line)`` for the 1-based lines of a ``[start, end)`` opcode range."""
+    return {(path, line) for line in range(start + 1, end + 1)}
 
 
 def changed_lines(
@@ -56,8 +62,8 @@ def changed_lines(
         )
         for tag, prior_start, prior_end, current_start, current_end in matcher.get_opcodes():
             if tag != "equal":
-                removed.update((path, line) for line in range(prior_start + 1, prior_end + 1))
-                added.update((path, line) for line in range(current_start + 1, current_end + 1))
+                removed.update(_line_keys(path, prior_start, prior_end))
+                added.update(_line_keys(path, current_start, current_end))
 
     def ordered(
         lines: set[tuple[str, int]], side: Literal["added", "removed"]

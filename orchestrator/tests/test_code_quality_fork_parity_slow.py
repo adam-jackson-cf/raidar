@@ -22,13 +22,13 @@ from typing import Any
 
 import pytest
 
+from raidar.contract import file_io
 from raidar.scoring.code_quality.architecture import produce_production_graph
 from raidar.scoring.code_quality.checkpoint import eligibility_code
 from raidar.scoring.code_quality.quality import ProductionQualityError, produce_production_quality
 from raidar.scoring.code_quality.snapshot_tool.cli import measure
 from raidar.scoring.framework.inventory import build_inventory
 from tests.code_quality_support import (
-    FORK_CASES,
     assert_lineage_and_regression_equal_the_fork,
     case_snapshots,
     golden_case,
@@ -45,11 +45,11 @@ def test_the_tool_env_subprocess_measures_exactly_what_the_in_process_port_does(
     case = golden_case("synthetic_shop")
     snapshot = case_snapshots(tmp_path, case)[-1]
     assert quality_tools().measure(snapshot, case["entry_file"]) == measure(
-        snapshot, case["entry_file"]
+        snapshot, case["entry_file"], file_io
     )
 
 
-@pytest.mark.parametrize("name", FORK_CASES)
+@pytest.mark.parametrize("name", ["synthetic_shop", "language_features", "forge"])
 def test_verbosity_erosion_and_architecture_evidence_equal_the_fork(
     tmp_path: Path, name: str
 ) -> None:
@@ -58,7 +58,7 @@ def test_verbosity_erosion_and_architecture_evidence_equal_the_fork(
         case_snapshots(tmp_path, case), case["checkpoints"], strict=True
     ):
         inventory = build_inventory(snapshot)
-        measured = measure(snapshot, case["entry_file"])
+        measured = measure(snapshot, case["entry_file"], file_io)
         expected = checkpoint["production"]
         _assert_quality_parity(checkpoint, snapshot, inventory, measured)
         graph = produce_production_graph(
@@ -107,7 +107,7 @@ def test_a_snapshot_without_production_source_is_ineligible_like_the_fork(
     case = golden_case("no_production_code")
     [checkpoint] = case["checkpoints"]
     [snapshot] = case_snapshots(tmp_path, case)
-    measured = measure(snapshot, case["entry_file"])
+    measured = measure(snapshot, case["entry_file"], file_io)
     assert checkpoint["production"]["eligibility"]["reasons"] == ["production_source_loc_zero"]
     with pytest.raises(ProductionQualityError, match="^production_source_loc_zero$"):
         produce_production_quality(

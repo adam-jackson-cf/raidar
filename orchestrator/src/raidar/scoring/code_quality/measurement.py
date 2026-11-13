@@ -13,13 +13,13 @@ from __future__ import annotations
 
 import importlib
 import json
-import os
 import subprocess
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Protocol
 
+from raidar.contract import file_io
 from raidar.subject.environment.python.pack_definition import ProvisioningTiming, load_tool_lock
 
 
@@ -35,13 +35,21 @@ class _Provisioner(Protocol):
 
 
 QUALITY_TOOL = "scb-python-quality"
+# Loaded by name: provisioning and process mechanics stay outside the scorer's static import
+# closure and so outside its implementation digest.
+_PROVISIONER = "raidar.subject.environment.python.provisioner"
 DEFAULT_DEADLINE_S = 300.0
 _TOOL_ROOT = Path(__file__).resolve().parent / "snapshot_tool"
+# The program reads files only through the reader its entry is given: the bootstrap loads
+# ``raidar.contract.file_io`` (standard library only) from its file and passes it in.
+_FILE_IO = Path(file_io.__file__).resolve()
 _BOOTSTRAP = (
     "import importlib.util as u, sys; "
     "s = u.spec_from_file_location('snapshot_tool', sys.argv.pop(1) + '/__init__.py'); "
     "m = u.module_from_spec(s); sys.modules['snapshot_tool'] = m; s.loader.exec_module(m); "
-    "from snapshot_tool.cli import main; raise SystemExit(main(sys.argv[1:]))"
+    "r = u.spec_from_file_location('file_io', sys.argv.pop(1)); "
+    "f = u.module_from_spec(r); r.loader.exec_module(f); "
+    "from snapshot_tool.cli import main; raise SystemExit(main(sys.argv[1:], f))"
 )
 
 
@@ -72,21 +80,20 @@ ProcessRunner = Callable[[Sequence[str], Path | None, str | None, float], Proces
 def run_process(
     argv: Sequence[str], cwd: Path | None, stdin: str | None, deadline_s: float
 ) -> ProcessResult:
-    """Run one argv-only measurement process and collect its UTF-8 streams."""
+    """Run one argv-only measurement process and collect its UTF-8 streams.
+
+    The process call and the environment it inherits belong to the provisioner, loaded by name
+    like ``provisioned_environment`` does, so this analyzer module runs no process itself.
+    """
+    tools = importlib.import_module(_PROVISIONER)
     try:
-        completed = subprocess.run(  # noqa: S603 - argv is built from pinned tool paths
-            list(argv),
+        completed = tools.run_command(
+            argv,
+            tools.inherited_environment(_PROCESS_ENV_NAMES, _READ_ONLY_ENV),
             cwd=cwd,
             input=stdin,
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
             timeout=deadline_s,
-            check=False,
-            env={
-                **{name: value for name, value in os.environ.items() if name in _PROCESS_ENV_NAMES},
-                **_READ_ONLY_ENV,
-            },
+            encoding="utf-8",
         )
     except subprocess.TimeoutExpired as error:
         raise MeasurementError("measurement_environment_mismatch: measurement timed out") from error
@@ -110,7 +117,9 @@ class ToolEnvironment:
         return self.runner([str(self.python), *argv], cwd, stdin, self.deadline_s)
 
     def tool(self, *args: str, stdin: str | None = None) -> ProcessResult:
-        return self.run(["-I", "-B", "-c", _BOOTSTRAP, str(_TOOL_ROOT), *args], stdin=stdin)
+        return self.run(
+            ["-I", "-B", "-c", _BOOTSTRAP, str(_TOOL_ROOT), str(_FILE_IO), *args], stdin=stdin
+        )
 
     def evaluate(self, sources: Mapping[str, bytes]) -> ProcessResult:
         """The evaluator payload (source lines, clone groups, interpreter identity)."""
@@ -145,7 +154,7 @@ def provisioned_environment(provisioner: _Provisioner | None = None) -> ToolEnvi
     implementation digest.
     """
     if provisioner is None:
-        module = importlib.import_module("raidar.subject.environment.python.provisioner")
+        module = importlib.import_module(_PROVISIONER)
         provisioner = module.ToolProvisioner(load_tool_lock())
     tool = provisioner.ensure(QUALITY_TOOL)
     return ToolEnvironment(python=tool.python, provisioning=tool.first_use)

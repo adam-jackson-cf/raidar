@@ -21,7 +21,7 @@ from dataclasses import dataclass, field
 from decimal import Decimal
 from typing import Any
 
-from raidar_contract.criteria import Criteria
+from raidar_contract.criteria import Criteria, Criterion as CriterionItem
 
 REGRESSION = "regression"
 _NUMBER = re.compile(r"(?<![\w.])-?\d+(?:\.\d+)?(?![\w])")
@@ -125,28 +125,26 @@ class Feature:
 def features_of(criteria: Criteria) -> tuple[Feature, ...]:
     """The judge's reading of a validated ``criteria/1`` document, in document order."""
     return tuple(
-        Feature(
-            feature.id,
-            feature.name,
-            tuple(
-                Criterion(
-                    item.id,
-                    item.criterion,
-                    item.sources,
-                    tuple(
-                        Aspect(f"{item.id}.A{number}", probe.situation, probe.outcome)
-                        for number, probe in enumerate(item.aspects, start=1)
-                    ),
-                    tuple(
-                        Example(probe.situation, probe.outcome, literals(probe.outcome))
-                        for probe in item.examples
-                    ),
-                    REGRESSION if item.kind == "regression" else "",
-                )
-                for item in feature.criteria
-            ),
-        )
+        Feature(feature.id, feature.name, tuple(_criterion_of(item) for item in feature.criteria))
         for feature in criteria.features
+    )
+
+
+def _criterion_of(item: CriterionItem) -> Criterion:
+    """The judge's reading of one criterion: its numbered aspects and its examples."""
+    return Criterion(
+        item.id,
+        item.criterion,
+        item.sources,
+        tuple(
+            Aspect(f"{item.id}.A{number}", probe.situation, probe.outcome)
+            for number, probe in enumerate(item.aspects, start=1)
+        ),
+        tuple(
+            Example(probe.situation, probe.outcome, literals(probe.outcome))
+            for probe in item.examples
+        ),
+        REGRESSION if item.kind == "regression" else "",
     )
 
 
