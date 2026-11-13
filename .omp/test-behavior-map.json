@@ -449,6 +449,10 @@
       "source": "scripts/checks/check-toolchain-parity.py",
       "behavior": "Freeze the grading payload and only packages whose bytes equal their latest release, now owned by the toolchain parity check"
     },
+    "orchestrator/tests/test_dependency_resolver.py::test_a_recorded_pin_from_another_resolver_resolves_again_under_its_cutoff": {
+      "source": "orchestrator/src/raidar/design/problem/dependencies.py",
+      "behavior": "Reuse a recorded dependency pin only when the same resolver produced it; a pin from another uv version resolves again under its retained cutoff"
+    },
     "orchestrator/tests/test_package_identity.py::test_the_register_holds_stage_releases_and_never_drops_one": {
       "source": "orchestrator/src/raidar/contract/releases.py",
       "behavior": "Update a registered release's digest in place: releases-check refuses only a stale digest (printing the line to update) or a removed release, never a re-hash"

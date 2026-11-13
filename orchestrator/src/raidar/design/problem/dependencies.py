@@ -17,7 +17,13 @@ from raidar.grading.dependency_pins import (
     LockKey,
     set_sha256,
 )
-from raidar.grading.resolver import GRADER_TOOLS, DependencyUnresolvable, Resolver, resolve_pins
+from raidar.grading.resolver import (
+    GRADER_TOOLS,
+    DependencyUnresolvable,
+    Resolver,
+    UvResolver,
+    resolve_pins,
+)
 from raidar.grading.submission_deps import declared_requirements
 
 
@@ -73,20 +79,22 @@ def resolve_dependencies(
 ) -> ProblemDependencies:
     """Resolve every reference step's declared set and the grader's sets, both architectures.
 
-    Sets the recorded pin was resolved for are reused from its committed locks; anything else
-    resolves under the retained cutoff (or the import time). A set that does not resolve, or
+    Sets the recorded pin was resolved for, by the same resolver, are reused from its committed
+    locks; anything else (including a pin from another uv version) resolves under the retained
+    cutoff (or the import time). A set that does not resolve, or
     resolves to different versions per architecture, is a refusal (``dependency_unresolvable``).
     A resolver or index outage raises (infrastructure), it never becomes a refusal.
     """
     reference_sets = {step: declared_requirements(references / step) for step in steps}
+    chosen = resolver or UvResolver()
     reused = _unchanged_pins(recorded, reference_sets, test_dependencies)
-    if reused is not None:
+    if reused is not None and reused.resolver == chosen.identity:
         locks = DependencyLocks(store.deps_dir(problem)).read_pins(reused)
         return ProblemDependencies(pins=reused, locks=locks)
     cutoff = _retained_cutoff(recorded) or cutoff_now()
     try:
         pins, locks = resolve_pins(
-            reference_sets, test_dependencies, exclude_newer=cutoff, resolver=resolver
+            reference_sets, test_dependencies, exclude_newer=cutoff, resolver=chosen
         )
     except DependencyUnresolvable as exc:
         refusal = DependencyRefusal(
