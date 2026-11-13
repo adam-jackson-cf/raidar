@@ -26,8 +26,7 @@ and lock it, and dry-run its trial plan before spending any agent time.
 
 ## Driving it with node scripts/surface/lever.mjs
 
-- Journey: [plan-experiment.journey.mjs](../../review-surface/journeys/plan-experiment.journey.mjs)
-  (`preserve`).
+- Journey: [plan-experiment.journey.mjs](../../review-surface/journeys/plan-experiment.journey.mjs).
 - Command: `node scripts/surface/lever.mjs --data-dir "$(mktemp -d)/data" --evidence-dir <dir>
   --journey review-surface/journeys/plan-experiment.journey.mjs`.
 - The journey runs `raidar` through the lever's `raidar()` helper (`uv run --project

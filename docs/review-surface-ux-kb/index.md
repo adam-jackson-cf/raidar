@@ -44,7 +44,7 @@ Tagline in the app header: *Compare agent specs · Explain scores · Trace failu
 | Section | What it covers |
 |---|---|
 | [Personas](./personas/index.md) | Who uses the surface, their role, and the activities they perform |
-| [Feature map](../feature-map/compare-experiments.md) | The compare → explain → trace path as verified features, each with its lever journey (`docs/feature-map/`) |
+| [Feature map](../features/compare-experiments.md) | The compare → explain → trace path as verified features, each with its lever journey (`docs/features/`) |
 | [Pages](./pages/index.md) | The two pages / three page-views, the questions each answers, the data behind them |
 | [Components](./components/index.md) | Every UI component, its question, its data, its interactions |
 | [Data lineage](./data/index.md) | Source artifacts → projections → API → owned data |
