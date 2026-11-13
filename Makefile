@@ -149,7 +149,7 @@ help:
 	@echo "  make rule-coverage                                     Execute fail-closed evidence for every guardrail catalogue ID"
 	@echo "  make guardrails-reference                              Pinned omp-guardrails checks (new rule IDs and TEST.budget.* block; the rest is shadow)"
 	@echo "  make guardrails-mutation                               T3: TEST.mutation-sensitivity over a mutation report (no producer yet)"
-	@echo "  make record-host-readback                              Record live default-branch rules and merge settings (refresh within 30 days)"
+	@echo "  make record-host-readback                              Record live default-branch rules and merge settings"
 	@echo "  make analyzer-scope-check                              Check analyzer I/O boundaries and CODEOWNERS with finding-level debt ratchets"
 	@echo "  make version-release                                   Prepare an on-demand release PR from HEAD at origin/main; refuses no-bump histories"
 	@echo "  make version-check                                     Check CLI, lock and CHANGELOG versions and release-entry history; part of make quality"

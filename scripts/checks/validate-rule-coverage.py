@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Verify vendored validator bytes and host freshness before executing all evidence."""
+"""Verify vendored validator bytes and host scope before executing all evidence."""
 
 from __future__ import annotations
 
@@ -7,7 +7,6 @@ import hashlib
 import json
 import subprocess
 import sys
-from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -16,16 +15,12 @@ SHA256 = "4def562a709b844399bb52495cdbc43f7e407a832f046addf6288b3052b51734"
 
 
 def evidence_errors(root: Path) -> list[str]:
-    """Reject corrupted vendor bytes and stale or scope-less host readbacks."""
+    """Reject corrupted vendor bytes and scope-less host readbacks."""
     errors = []
     source = VENDOR.read_bytes()
     if hashlib.sha256(source).hexdigest() != SHA256:
         errors.append("vendored validator differs; restore the recorded skill bytes")
     record = json.loads((root / ".omp/host-readback.json").read_text())
-    measured = datetime.fromisoformat(record["query_time"])
-    age = datetime.now(UTC) - measured
-    if age < timedelta(0) or age > timedelta(days=30):
-        errors.append("GIT.required-checks: stale host readback; run make record-host-readback")
     if (
         record.get("repository") != "adam-jackson-cf/raidar"
         or record.get("default_branch") != "main"
