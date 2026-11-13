@@ -15,6 +15,7 @@ from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Protocol
 
+from git_inventory import repo_paths
 from packaging.requirements import Requirement
 from packaging.utils import canonicalize_name
 
@@ -396,12 +397,6 @@ def run_process(
     )
 
 
-def tracked_paths() -> list[str]:
-    result = run_process(["git", "ls-files", "-z"], timeout=30)
-    result.check_returncode()
-    return [path for path in result.stdout.split("\0") if path]
-
-
 def changed_paths() -> list[str]:
     result = run_process(
         ["git", "diff", "--cached", "--name-only", "-z", "--diff-filter=ACDMRTUXB"],
@@ -577,7 +572,7 @@ def main() -> int:
     parser.add_argument("paths", nargs="*")
     args = parser.parse_args()
     try:
-        paths = tracked_paths()
+        paths = repo_paths(ROOT)
         if args.mode == "static":
             findings = static_findings(paths)
         elif args.mode == "audit":

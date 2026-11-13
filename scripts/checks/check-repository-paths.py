@@ -13,6 +13,8 @@ from collections.abc import Sequence
 from pathlib import Path, PurePosixPath
 from typing import Literal, Protocol, TypedDict, Unpack, cast
 
+from git_inventory import repo_paths
+
 ROOT = Path(__file__).resolve().parents[2]
 
 
@@ -393,15 +395,7 @@ def dependency_findings(
 def main(paths: Sequence[str], *, root: Path) -> int:
     """Check supplied paths, or the complete maintained repository inventory."""
     if not paths:
-        result = subprocess.run(
-            ["git", "ls-files", "-z", "--cached", "--others", "--exclude-standard"],
-            cwd=root,
-            capture_output=True,
-            check=True,
-            text=True,
-            timeout=30,
-        )
-        paths = sorted(set(result.stdout.split("\0")) - {""})
+        paths = repo_paths(root)
     sources = [
         normalized for path in paths if (normalized := normalized_path(root, path)) is not None
     ]

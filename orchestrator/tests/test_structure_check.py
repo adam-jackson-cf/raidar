@@ -8,6 +8,7 @@ import sys
 from pathlib import Path
 
 import pytest
+from git_inventory import repo_paths
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
@@ -36,10 +37,8 @@ def test_repo_paths_list_tracked_and_unignored_files_but_not_ignored_ones(tmp_pa
     (tmp_path / "stray").mkdir()
     (tmp_path / "stray" / "a.txt").write_text("", encoding="utf-8")
 
-    assert structure.repo_paths(tmp_path) == [".gitignore", "stray/a.txt"]
-    assert structure.violations(structure.repo_paths(tmp_path)) == [
-        "unexpected top-level directory: stray/"
-    ]
+    assert repo_paths(tmp_path) == [".gitignore", "stray/a.txt"]
+    assert structure.violations(repo_paths(tmp_path)) == ["unexpected top-level directory: stray/"]
 
 
 def test_main_exits_zero_on_a_clean_layout_and_one_on_a_violation(tmp_path: Path) -> None:
@@ -58,6 +57,6 @@ def test_main_exits_zero_on_a_clean_layout_and_one_on_a_violation(tmp_path: Path
 
 
 def test_this_repository_has_no_legacy_top_level_directories() -> None:
-    top_level = {path.split("/", 1)[0] for path in structure.repo_paths(REPO_ROOT) if "/" in path}
+    top_level = {path.split("/", 1)[0] for path in repo_paths(REPO_ROOT) if "/" in path}
 
     assert top_level <= structure.ROOT_DIRECTORIES

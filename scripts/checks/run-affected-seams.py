@@ -10,6 +10,8 @@ import sys
 from collections.abc import Mapping, Sequence
 from pathlib import Path, PurePosixPath
 
+from git_inventory import repo_paths
+
 ROOT = Path(__file__).resolve().parents[2]
 
 
@@ -82,17 +84,7 @@ def discover_seams(paths: Sequence[str], root: Path) -> list[str]:
 
 def main() -> int:
     """Read staged/worktree changes and invoke pytest once for the selected seams."""
-    inventory = (
-        subprocess.run(
-            ["git", "ls-files", "-z", "--cached", "--others", "--exclude-standard"],
-            cwd=ROOT,
-            capture_output=True,
-            check=True,
-            timeout=30,
-        )
-        .stdout.decode()
-        .split("\0")
-    )
+    inventory = repo_paths(ROOT)
     changed = (
         subprocess.run(
             ["git", "diff", "--name-only", "-z", "HEAD"],

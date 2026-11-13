@@ -1,6 +1,6 @@
 {
   "files": {
-    "scripts/checks/git_inventory.py": "repository Python inventory",
+    "scripts/checks/git_inventory.py": "repository file inventory",
     "docs/reboot/evidence/decide-budget-opus.md": "test-time budget decision",
     "docs/reboot/evidence/decide-budget-astra.md": "test-time budget decision",
     "docs/reboot/evidence/decide-budget-sol.md": "test-time budget decision",

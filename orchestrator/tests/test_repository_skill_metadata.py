@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import importlib.util
 import sys
+from collections.abc import Sequence
 from pathlib import Path
 from typing import Protocol, cast
 
@@ -13,7 +14,7 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 class Checker(Protocol):
-    def skill_findings(self, root: Path) -> list[str]: ...
+    def skill_findings(self, root: Path, inventory: Sequence[str]) -> list[str]: ...
 
 
 @pytest.fixture
@@ -41,7 +42,12 @@ def test_valid_skill_metadata_and_existing_support_links_are_accepted(
         "[Support](support.txt#section) [Web](https://example.org/missing) [Here](#section)\n",
         encoding="utf-8",
     )
-    assert checker.skill_findings(tmp_path) == []
+    assert (
+        checker.skill_findings(
+            tmp_path, [".agents/skills/probe/SKILL.md", ".agents/skills/probe/support.txt"]
+        )
+        == []
+    )
 
 
 @pytest.mark.parametrize(
@@ -63,7 +69,7 @@ def test_invalid_metadata_or_missing_support_is_rejected(
     path = tmp_path / ".agents/skills/probe/SKILL.md"
     path.parent.mkdir(parents=True)
     path.write_text(contents, encoding="utf-8")
-    found = checker.skill_findings(tmp_path)
+    found = checker.skill_findings(tmp_path, [path.relative_to(tmp_path).as_posix()])
     assert found
     assert all("SKILL.metadata" in line for line in found)
     assert any(".agents/skills/probe/SKILL.md" in line for line in found)

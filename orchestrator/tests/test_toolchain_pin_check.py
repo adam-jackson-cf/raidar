@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import importlib.util
 import json
-import subprocess
 import sys
 from pathlib import Path
 
@@ -118,15 +117,10 @@ def test_pin_check_accepts_only_equal_present_pins_and_the_exact_interpreter(
                 "other": {"resolver": f"uv@{locked_uv or '0.10.0'}"},
             }
         ),
-        repo_root / "lab/problems/registry/untracked.json": '{"resolver":"uv@99.0.0"}',
     }
 
     def read_text(path: Path, **_kwargs: object) -> str:
         return texts[path]
-
-    def run(command: list[str], **_kwargs: object) -> subprocess.CompletedProcess[str]:
-        assert command[0] == "git"
-        return subprocess.CompletedProcess(command, 0, record + "\0")
 
     def read_pin(path: Path) -> bytes:
         pin = pins[path]
@@ -136,7 +130,7 @@ def test_pin_check_accepts_only_equal_present_pins_and_the_exact_interpreter(
 
     monkeypatch.setattr(Path, "read_bytes", read_pin)
     monkeypatch.setattr(Path, "read_text", read_text)
-    monkeypatch.setattr(checker.subprocess, "run", run)
+    monkeypatch.setattr(checker, "repo_paths", lambda root: [record])
     monkeypatch.setattr(checker.platform, "python_version", lambda: interpreter)
 
     assert checker.main(["--repo-root", str(repo_root)]) == exit_code

@@ -21,9 +21,10 @@ from __future__ import annotations
 import argparse
 import ast
 import re
-import subprocess
 import sys
 from pathlib import Path, PurePosixPath
+
+from git_inventory import repo_paths
 
 from raidar.subject.package.registry import load_stage_package
 from raidar_contract.package import StagePackageError
@@ -110,27 +111,6 @@ MAX_PACKAGE_DEPTH = 3
 VERSION_TOKEN = re.compile(r"(?<![A-Za-z0-9])v\d+(?![A-Za-z0-9])")
 # Dated design records keep their historical file names (the docs tree is not product layout).
 VERSION_EXEMPT_PREFIXES = ("docs/",)
-
-
-def repo_paths(repo_root: Path) -> list[str]:
-    """Tracked files plus untracked, not-ignored files, as repo-relative posix paths."""
-    result = subprocess.run(
-        [
-            "git",
-            "-C",
-            str(repo_root),
-            "ls-files",
-            "--cached",
-            "--others",
-            "--exclude-standard",
-        ],
-        capture_output=True,
-        text=True,
-        check=False,
-    )
-    if result.returncode != 0:
-        raise SystemExit(result.stderr.strip() or "git ls-files failed")
-    return sorted({line for line in result.stdout.splitlines() if line})
 
 
 def version_violations(paths: list[str]) -> list[str]:
