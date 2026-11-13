@@ -1,5 +1,6 @@
 {
   "files": {
+    "scripts/checks/git_inventory.py": "repository Python inventory",
     "docs/reboot/evidence/decide-budget-opus.md": "test-time budget decision",
     "docs/reboot/evidence/decide-budget-astra.md": "test-time budget decision",
     "docs/reboot/evidence/decide-budget-sol.md": "test-time budget decision",
@@ -1308,7 +1309,7 @@
   "test_tiers": {
     "orchestrator/tests/test_toolchain_parity.py": [],
     "orchestrator/tests/test_analyzer_scope_ratchet.py": [],
-    "orchestrator/tests/test_analyzer_scope_reports.py": [],
+    "orchestrator/tests/test_analyzer_scope_reports.py": ["quality"],
     "orchestrator/tests/test_analyzer_scope_rules.py": [],
     "orchestrator/tests/test_execution_boundary_rules.py": [],
     "orchestrator/tests/test_python_policy_rules.py": [],
@@ -1777,6 +1778,18 @@
     "orchestrator/tests/workflow_support.py": []
   },
   "seam_owners": {
+    "scripts/checks/git_inventory.py": [
+      "orchestrator/tests/test_repository_gate_quality.py"
+    ],
+    "scripts/checks/check-python-quality.py": [
+      "orchestrator/tests/test_repository_gate_quality.py"
+    ],
+    "scripts/checks/check-analyzer-scope.py": [
+      "orchestrator/tests/test_repository_gate_quality.py"
+    ],
+    "scripts/checks/check-mypy-coverage.py": [
+      "orchestrator/tests/test_repository_gate_quality.py"
+    ],
     "scripts/checks/run-affected-seams.py": [
       "orchestrator/tests/test_affected_seam_gate_quality.py",
       "orchestrator/tests/test_make_targets.py",

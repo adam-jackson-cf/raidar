@@ -14,6 +14,8 @@ from dataclasses import dataclass
 from fnmatch import fnmatchcase
 from pathlib import Path
 
+from git_inventory import python_paths
+
 CLASS_MAX_LINES = 700
 CLASS_MAX_PUBLIC_METHODS = 20
 CLASS_MAX_INIT_ARGS = 8
@@ -41,6 +43,7 @@ CANONICAL_TEST_GROUPS = {
 SCRIPT_NAME_EXCEPTIONS = {
     "scripts/checks/check_toolchain_pins.py",
     "scripts/checks/ruff_baseline.py",
+    "scripts/checks/git_inventory.py",
 }
 GENERIC_NAME_ALLOWLIST: set[str] = set()
 SOURCE_ROOTS = ("orchestrator/src/raidar/", "contract/src/raidar_contract/", "lab/stages/")
@@ -123,6 +126,7 @@ SEAM_SUBPROCESS_WRAPPERS: dict[str, set[str]] = {
     "scripts/checks/check-ruff-suppressions.py": {"main"},
     "scripts/checks/ruff_baseline.py": {"main"},
     "scripts/checks/check-python-fanout.py": {"_run_git"},
+    "scripts/checks/git_inventory.py": {"python_paths"},
     "scripts/checks/check-python-quality.py": {"_check_baseline"},
     "scripts/checks/check-structure.py": {"repo_paths"},
     "scripts/checks/check_toolchain_pins.py": {"_registry_resolver_violations"},
@@ -137,18 +141,9 @@ SEAM_SUBPROCESS_WRAPPERS: dict[str, set[str]] = {
     "scripts/checks/check-repository-paths.py": {"main", "dependency_findings"},
 }
 EXCLUDED_PREFIXES = (
-    ".cache/",
-    ".git/",
-    ".mypy_cache/",
-    ".pytest_cache/",
-    ".ruff_cache/",
-    ".venv/",
     "docs/",
     "lab/experiments/",
-    "orchestrator/.cache/",
     "lab/stages/raidar/verify/fixtures/",
-    "orchestrator/.venv/",
-    "var/",
 )
 GENERIC_NAME_PARTS = {"common", "helpers", "misc", "stuff", "temp"}
 ALLOWED_TEST_ROOT_FILES = {
@@ -201,7 +196,7 @@ class Diagnostic:
 
 
 def repo_relative_path(repo_root: Path, path: Path) -> str:
-    return path.resolve().relative_to(repo_root.resolve()).as_posix()
+    return path.relative_to(repo_root).as_posix()
 
 
 def path_matches_prefix(relpath: str, prefix: str) -> bool:
@@ -211,7 +206,7 @@ def path_matches_prefix(relpath: str, prefix: str) -> bool:
 
 def is_excluded_relpath(relpath: str) -> bool:
     normalized = Path(relpath).as_posix()
-    return normalized.startswith(EXCLUDED_PREFIXES) or "/__pycache__/" in f"/{normalized}/"
+    return normalized.startswith(EXCLUDED_PREFIXES)
 
 
 def _is_maintained_root(relpath: str) -> bool:
@@ -229,9 +224,9 @@ def is_maintained_python_relpath(relpath: str) -> bool:
 
 def discover_maintained_python_files(repo_root: Path) -> list[Path]:
     return sorted(
-        path
-        for path in repo_root.rglob("*.py")
-        if not is_excluded_relpath(repo_relative_path(repo_root, path))
+        repo_root / relpath
+        for relpath in python_paths(repo_root)
+        if not is_excluded_relpath(relpath)
     )
 
 
@@ -445,7 +440,7 @@ def _skill_directory_selected(directory: Path, selected: Sequence[Path]) -> bool
 
 
 def _skill_directory_diagnostics(repo_root: Path, raw_paths: Sequence[str]) -> list[Diagnostic]:
-    selected = [(repo_root / raw).resolve() for raw in raw_paths]
+    selected = [repo_root / raw for raw in raw_paths]
     findings: list[Diagnostic] = []
     for root in SKILL_ROOTS:
         skill_root = repo_root / root
@@ -896,19 +891,15 @@ def class_interface_diagnostics(repo_root: Path, paths: Sequence[Path]) -> list[
 def _selected_paths(repo_root: Path, raw_paths: Sequence[str]) -> list[Path]:
     if not raw_paths:
         return discover_maintained_python_files(repo_root)
-    selected: list[Path] = []
-    for raw in raw_paths:
-        path = (repo_root / raw).resolve()
-        if path.is_dir():
-            selected.extend(
-                child
-                for child in path.rglob("*.py")
-                if not is_excluded_relpath(repo_relative_path(repo_root, child))
-            )
-            continue
-        if path.suffix == ".py" and not is_excluded_relpath(repo_relative_path(repo_root, path)):
-            selected.append(path)
-    return sorted(set(selected))
+    prefixes = [repo_relative_path(repo_root, repo_root / raw) for raw in raw_paths]
+    return [
+        path
+        for path in discover_maintained_python_files(repo_root)
+        if any(
+            prefix == "." or path_matches_prefix(repo_relative_path(repo_root, path), prefix)
+            for prefix in prefixes
+        )
+    ]
 
 
 def _filter_checks(checks: Sequence[str]) -> set[str]:
@@ -1005,7 +996,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     if args.baseline is not None and (args.format != "text" or args.paths or args.check):
         parser.error("--baseline requires a complete default scan in text format")
 
-    repo_root = args.repo_root.resolve()
+    repo_root = args.repo_root.absolute()
     paths = _selected_paths(repo_root, args.paths)
     checks = _filter_checks(args.check or ["all"])
     diagnostics: list[Diagnostic] = []

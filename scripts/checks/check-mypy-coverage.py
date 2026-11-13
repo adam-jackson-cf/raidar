@@ -13,6 +13,8 @@ import tomllib
 from collections.abc import Sequence
 from pathlib import Path, PurePosixPath
 
+from git_inventory import python_paths
+
 ROOT = Path(__file__).resolve().parents[2]
 
 
@@ -47,24 +49,18 @@ def coverage_findings(discovered: Sequence[str], targets: Sequence[str]) -> list
 
 def inventory(root: Path) -> list[str]:
     """Discover maintained roots independently from the configured target list."""
-    roots = [
-        root / path
-        for path in (
-            "orchestrator/src",
-            "orchestrator/tests",
-            "contract/src",
-            "scripts",
-        )
-    ]
-    roots.extend(root.glob("lab/stages/*/*/tool/src"))
-    discovered = []
-    for source in roots:
-        if source.is_dir():
-            discovered.append(source.relative_to(root).as_posix())
-            discovered.extend(
-                path.parent.relative_to(root).as_posix() for path in source.rglob("__init__.py")
-            )
-    return discovered
+    roots = ("orchestrator/src", "orchestrator/tests", "contract/src", "scripts")
+    discovered: set[str] = set()
+    for path in python_paths(root):
+        parts = PurePosixPath(path).parts
+        source = next((prefix for prefix in roots if path.startswith(f"{prefix}/")), None)
+        if len(parts) >= 7 and parts[:2] == ("lab", "stages") and parts[4:6] == ("tool", "src"):
+            source = "/".join(parts[:6])
+        if source is not None:
+            discovered.add(source)
+            if parts[-1] == "__init__.py":
+                discovered.add(PurePosixPath(path).parent.as_posix())
+    return sorted(discovered)
 
 
 def main() -> int:
@@ -73,12 +69,12 @@ def main() -> int:
     parser.add_argument("--config", type=Path)
     parser.add_argument("--write-baseline", action="store_true")
     args = parser.parse_args()
-    root = args.root.resolve()
+    root = args.root.absolute()
     config = args.config or root / "orchestrator/pyproject.toml"
     try:
         settings = tomllib.loads(config.read_text())["tool"]["mypy"]
         targets = [
-            (config.parent / path).resolve().relative_to(root).as_posix()
+            Path(os.path.abspath(config.parent / path)).relative_to(root).as_posix()
             for path in settings["files"]
         ]
         findings = coverage_findings(inventory(root), targets)

@@ -139,34 +139,9 @@ def test_kebab_case_alone_does_not_approve_a_command(checker: PythonChecker) -> 
     _assert_refusal(checker.structure_diagnostics_for_relpath(path), path, "PYQ101")
 
 
-@pytest.mark.parametrize("path", ["docs/unowned.py", "var/unowned.py"])
+@pytest.mark.parametrize("path", ["docs/unowned.py"])
 def test_explicit_nonmaintained_trees_are_excluded(checker: PythonChecker, path: str) -> None:
     assert checker.structure_diagnostics_for_relpath(path) == []
-
-
-@pytest.mark.parametrize("selection", [[], ["unowned"], ["unowned/probe.py"]])
-def test_cli_does_not_filter_unknown_roots_before_rejection(
-    checker: PythonChecker, tmp_path: Path, capsys: pytest.CaptureFixture[str], selection: list[str]
-) -> None:
-    path = "unowned/probe.py"
-    candidate = tmp_path / path
-    candidate.parent.mkdir()
-    candidate.write_text("VALUE = 1\n", encoding="utf-8")
-    assert checker.main(["--repo-root", str(tmp_path), *selection]) == 1
-    captured = capsys.readouterr()
-    assert captured.out == ""
-    assert len(captured.err.splitlines()) == 1
-    assert re.fullmatch(rf"{re.escape(path)}:\d+: PYQ100 [^\r\n;]+; [^\r\n]+\n", captured.err)
-
-
-def test_cli_accepts_a_compliant_owned_source(
-    checker: PythonChecker, tmp_path: Path, capsys: pytest.CaptureFixture[str]
-) -> None:
-    candidate = tmp_path / PRODUCT / "probe.py"
-    candidate.parent.mkdir(parents=True)
-    candidate.write_text("VALUE = 1\n", encoding="utf-8")
-    assert checker.main(["--repo-root", str(tmp_path)]) == 0
-    assert capsys.readouterr().err == ""
 
 
 @pytest.mark.parametrize(

@@ -154,7 +154,7 @@ quote-style = "double"
 asyncio_mode = "auto"
 addopts = "--strict-markers --ignore-glob=.env* --ignore-glob=**/.env*"
 testpaths = ["tests"]
-pythonpath = ["../lab/stages/raidar/define/tool/src"]
+pythonpath = ["../lab/stages/raidar/define/tool/src", "../scripts/checks"]
 # Tiers are applied at file level only (pytestmark).
 markers = [
     "slow: real processes or I/O beyond the fast tier's budget",
@@ -195,6 +195,7 @@ mypy_path = [
     "$MYPY_CONFIG_FILE_DIR/src",
     "$MYPY_CONFIG_FILE_DIR",
     "$MYPY_CONFIG_FILE_DIR/../scripts",
+    "$MYPY_CONFIG_FILE_DIR/../scripts/checks",
     "$MYPY_CONFIG_FILE_DIR/../contract/src",
     "$MYPY_CONFIG_FILE_DIR/../lab/stages/raidar/define/tool/src",
     "$MYPY_CONFIG_FILE_DIR/../lab/stages/raidar/verify/tool/src",
