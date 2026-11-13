@@ -14,7 +14,7 @@ from dataclasses import dataclass
 from fnmatch import fnmatchcase
 from pathlib import Path
 
-from git_inventory import python_paths
+from git_inventory import python_paths, repo_paths
 
 CLASS_MAX_LINES = 700
 CLASS_MAX_PUBLIC_METHODS = 20
@@ -125,11 +125,8 @@ SEAM_SUBPROCESS_WRAPPERS: dict[str, set[str]] = {
     "scripts/checks/check-mypy-coverage.py": {"main"},
     "scripts/checks/check-ruff-suppressions.py": {"main"},
     "scripts/checks/ruff_baseline.py": {"main"},
-    "scripts/checks/check-python-fanout.py": {"_run_git"},
-    "scripts/checks/git_inventory.py": {"python_paths"},
+    "scripts/checks/git_inventory.py": {"repo_paths"},
     "scripts/checks/check-python-quality.py": {"_check_baseline"},
-    "scripts/checks/check-structure.py": {"repo_paths"},
-    "scripts/checks/check_toolchain_pins.py": {"_registry_resolver_violations"},
     "scripts/release/bump-version.py": {
         "git_output",
         "get_commits_since_last_bump",
@@ -138,7 +135,7 @@ SEAM_SUBPROCESS_WRAPPERS: dict[str, set[str]] = {
     "scripts/release/verify-version-wiring.py": {"_git"},
     "scripts/checks/check-toolchain-parity.py": {"run_process"},
     "scripts/checks/run-affected-seams.py": {"main"},
-    "scripts/checks/check-repository-paths.py": {"main", "dependency_findings"},
+    "scripts/checks/check-repository-paths.py": {"dependency_findings"},
 }
 EXCLUDED_PREFIXES = (
     "docs/",
@@ -442,15 +439,18 @@ def _skill_directory_selected(directory: Path, selected: Sequence[Path]) -> bool
 def _skill_directory_diagnostics(repo_root: Path, raw_paths: Sequence[str]) -> list[Diagnostic]:
     selected = [repo_root / raw for raw in raw_paths]
     findings: list[Diagnostic] = []
-    for root in SKILL_ROOTS:
-        skill_root = repo_root / root
-        if not skill_root.is_dir():
-            continue
-        for directory in sorted(skill_root.iterdir()):
-            if not directory.is_dir():
-                continue
-            if _skill_directory_selected(directory, selected):
-                findings.extend(_policy_path_diagnostics(repo_relative_path(repo_root, directory)))
+    directories = sorted(
+        {
+            repo_root / root / relative.removeprefix(root).split("/", 1)[0]
+            for relative in repo_paths(repo_root)
+            for root in SKILL_ROOTS
+            if relative.startswith(root)
+            and "/" in relative.removeprefix(root)
+        }
+    )
+    for directory in directories:
+        if _skill_directory_selected(directory, selected):
+            findings.extend(_policy_path_diagnostics(repo_relative_path(repo_root, directory)))
     return findings
 
 

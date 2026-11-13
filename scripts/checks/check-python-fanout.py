@@ -5,10 +5,11 @@ from __future__ import annotations
 
 import argparse
 import ast
-import subprocess
 import sys
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
+
+from git_inventory import python_paths
 
 DEFAULT_EXCLUDED_PREFIXES = (
     ".cache/",
@@ -60,38 +61,6 @@ class FanoutResult:
     reasons: tuple[str, ...]
 
 
-def _run_git(
-    repo_root: Path,
-    args: list[str],
-    *,
-    input_text: str | None = None,
-    allowed_return_codes: tuple[int, ...] = (0,),
-) -> str:
-    result = subprocess.run(
-        ["git", *args],
-        cwd=repo_root,
-        input=input_text,
-        text=True,
-        capture_output=True,
-        check=False,
-    )
-    if result.returncode not in allowed_return_codes:
-        raise SystemExit(result.stderr.strip() or f"git {' '.join(args)} failed")
-    return result.stdout
-
-
-def _gitignored_paths(repo_root: Path, relpaths: list[str]) -> set[str]:
-    if not relpaths:
-        return set()
-    stdout = _run_git(
-        repo_root,
-        ["check-ignore", "--no-index", "--stdin"],
-        input_text="\n".join(relpaths),
-        allowed_return_codes=(0, 1),
-    )
-    return {line.strip() for line in stdout.splitlines() if line.strip()}
-
-
 def _canonical_relpath(repo_root: Path, path: Path) -> str:
     resolved = path.resolve()
     try:
@@ -134,25 +103,13 @@ def discover_python_files(
             else ["."]
         )
         source_roots = _normalise_source_roots(repo_root.resolve(), default_values)
-    pathspecs = [f"{root.relpath}/**/*.py" for root in source_roots]
-    output = _run_git(
-        repo_root,
-        [
-            "ls-files",
-            "-z",
-            "--cached",
-            "--others",
-            "--exclude-standard",
-            "--",
-            *pathspecs,
-        ],
-    )
-    relpaths = sorted(path for path in output.split("\0") if path)
-    ignored = _gitignored_paths(repo_root, relpaths)
     return [
         repo_root / relpath
-        for relpath in relpaths
-        if relpath not in ignored
+        for relpath in python_paths(repo_root)
+        if any(
+            root.relpath == "." or relpath.startswith(root.relpath + "/")
+            for root in source_roots
+        )
         and not _is_excluded(relpath)
         and (repo_root / relpath).is_file()
     ]

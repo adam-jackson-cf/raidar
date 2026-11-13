@@ -7,10 +7,12 @@ import argparse
 import ast
 import json
 import re
+from collections.abc import Sequence
 from pathlib import Path
 from urllib.parse import unquote, urlsplit
 
 import yaml
+from git_inventory import repo_paths
 
 from raidar.subject.package.registry import load_stage_package
 from raidar.subject.workflow.identity import package_primitives
@@ -149,11 +151,17 @@ class ProcessWaits(ast.NodeVisitor):
         return _positive_timeout(timeout)
 
 
-def subprocess_findings(root: Path) -> list[str]:
+def subprocess_findings(root: Path, inventory: Sequence[str]) -> list[str]:
     findings: list[str] = []
-    paths = sorted(
-        {*root.glob("orchestrator/tests/**/*.py"), *root.glob("lab/stages/*/*/tests/**/*.py")}
-    )
+    paths = [
+        root / relative
+        for relative in inventory
+        if relative.endswith(".py")
+        and (
+            relative.startswith("orchestrator/tests/")
+            or re.match(r"^lab/stages/[^/]+/[^/]+/tests/", relative)
+        )
+    ]
     for path in paths:
         try:
             tree = ast.parse(path.read_text(encoding="utf-8"))
@@ -181,9 +189,12 @@ def subprocess_findings(root: Path) -> list[str]:
     return findings
 
 
-def skill_findings(root: Path) -> list[str]:
+def skill_findings(root: Path, inventory: Sequence[str]) -> list[str]:
     findings: list[str] = []
-    for path in sorted(root.glob(".agents/skills/*/SKILL.md")):
+    for relative in inventory:
+        if not re.fullmatch(r"\.agents/skills/[^/]+/SKILL\.md", relative):
+            continue
+        path = root / relative
         text = path.read_text(encoding="utf-8")
         frontmatter = re.match(r"\A---\s*\n(.*?)\n---(?:\s*\n|\Z)", text, re.DOTALL)
         try:
@@ -314,7 +325,7 @@ def _package_findings(root: Path, name: str, digest: str) -> list[str]:
     return findings
 
 
-def seam_findings(root: Path) -> list[str]:
+def seam_findings(root: Path, inventory: Sequence[str]) -> list[str]:
     register = root / "lab/releases.yaml"
     if not register.exists():
         return []
@@ -342,7 +353,6 @@ def seam_findings(root: Path) -> list[str]:
     latest: dict[str, tuple[int, str]] = {}
     registered: set[str] = set()
     findings: list[str] = []
-    store = root / "lab/stage-checks"
     for reference, digest in stages.items():
         match = re.fullmatch(r"([^@]+)@([1-9][0-9]*)", str(reference))
         if match is None or not _sha256(digest):
@@ -361,7 +371,12 @@ def seam_findings(root: Path) -> list[str]:
             latest[name] = version, digest
     for name, (_, digest) in sorted(latest.items()):
         findings.extend(_package_findings(root, name, digest))
-    for path in sorted(store.glob("*.json")):
+    paths = (
+        root / relative
+        for relative in inventory
+        if re.fullmatch(r"lab/stage-checks/[^/]+\.json", relative)
+    )
+    for path in paths:
         digest = path.name.removesuffix(".installed.json").removesuffix(".json")
         if digest not in registered:
             findings.append(
@@ -380,10 +395,11 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--repo-root", type=Path, default=ROOT)
     args = parser.parse_args()
+    inventory = repo_paths(args.repo_root)
     findings = [
-        *subprocess_findings(args.repo_root),
-        *skill_findings(args.repo_root),
-        *seam_findings(args.repo_root),
+        *subprocess_findings(args.repo_root, inventory),
+        *skill_findings(args.repo_root, inventory),
+        *seam_findings(args.repo_root, inventory),
     ]
     for finding in findings:
         print(finding)

@@ -4,6 +4,9 @@ All notable changes to this project are documented in this file.
 
 ## Unreleased
 
+- refactor(checks): use one fail-closed git inventory for maintained repository
+  files across checkers, including skills and stage-check evidence. Mypy directory
+  discovery remains unchanged; mypy itself does not honour `.gitignore`.
 - fix(checks): inventory Python files through git, including maintained untracked
   files without walking ignored trees or resolving source symlinks.
 - chore: remove the external guardrail harness coupling: the harness dependency pin,

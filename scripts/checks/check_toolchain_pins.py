@@ -12,11 +12,12 @@ import argparse
 import json
 import platform
 import re
-import subprocess
 import sys
 import tomllib
 from collections.abc import Iterator
 from pathlib import Path
+
+from git_inventory import repo_paths
 
 
 def pin_violations(
@@ -78,16 +79,9 @@ def _uv_pin_violations(repo_root: Path) -> list[str]:
 
 
 def _registry_resolver_violations(repo_root: Path, pin: str) -> list[str]:
-    tracked = subprocess.run(
-        ["git", "ls-files", "-z", "--", "lab/problems/registry"],
-        cwd=repo_root,
-        check=True,
-        capture_output=True,
-        text=True,
-    ).stdout
     found = []
-    for relative in tracked.split("\0"):
-        if relative.endswith(".json"):
+    for relative in repo_paths(repo_root):
+        if relative.startswith("lab/problems/registry/") and relative.endswith(".json"):
             record = json.loads((repo_root / relative).read_text(encoding="utf-8"))
             found.extend(
                 f"{relative}: resolver {resolver!r} differs from declared uv@{pin}"

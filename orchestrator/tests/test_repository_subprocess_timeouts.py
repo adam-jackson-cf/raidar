@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import importlib.util
 import sys
+from collections.abc import Sequence
 from pathlib import Path
 from typing import Protocol, cast
 
@@ -13,7 +14,7 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 class Checker(Protocol):
-    def subprocess_findings(self, root: Path) -> list[str]: ...
+    def subprocess_findings(self, root: Path, inventory: Sequence[str]) -> list[str]: ...
 
 
 @pytest.fixture
@@ -48,7 +49,7 @@ def test_bounded_process_waits_and_unrelated_methods_are_accepted(
     path = tmp_path / "orchestrator/tests/test_probe.py"
     path.parent.mkdir(parents=True)
     path.write_text(source, encoding="utf-8")
-    assert checker.subprocess_findings(tmp_path) == []
+    assert checker.subprocess_findings(tmp_path, [path.relative_to(tmp_path).as_posix()]) == []
 
 
 @pytest.mark.parametrize("root", ["orchestrator/tests", "lab/stages/acme/probe/tests"])
@@ -72,7 +73,7 @@ def test_unbounded_process_waits_are_rejected_in_both_test_roots(
     path = tmp_path / root / "test_probe.py"
     path.parent.mkdir(parents=True)
     path.write_text(source, encoding="utf-8")
-    found = checker.subprocess_findings(tmp_path)
+    found = checker.subprocess_findings(tmp_path, [path.relative_to(tmp_path).as_posix()])
     assert found
     assert all("TEST.subprocess-timeouts" in line for line in found)
     assert any(f"{root}/test_probe.py" in line for line in found)
@@ -84,4 +85,4 @@ def test_application_processes_are_not_test_timeout_findings(
     path = tmp_path / "orchestrator/src/raidar/probe.py"
     path.parent.mkdir(parents=True)
     path.write_text("import subprocess\nsubprocess.run(['tool'])\n", encoding="utf-8")
-    assert checker.subprocess_findings(tmp_path) == []
+    assert checker.subprocess_findings(tmp_path, [path.relative_to(tmp_path).as_posix()]) == []

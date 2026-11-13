@@ -6,6 +6,7 @@ import importlib.util
 import json
 import shutil
 import sys
+from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Protocol, cast
@@ -19,7 +20,7 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 class Checker(Protocol):
-    def seam_findings(self, root: Path) -> list[str]: ...
+    def seam_findings(self, root: Path, inventory: Sequence[str]) -> list[str]: ...
 
 
 @pytest.fixture
@@ -42,6 +43,14 @@ class Evidence:
     installed: Path
     canary: Path
     record: dict[str, object]
+
+    @property
+    def inventory(self) -> list[str]:
+        return [
+            path.relative_to(self.root).as_posix()
+            for path in (self.installed, self.canary)
+            if path.exists()
+        ]
 
 
 def _evidence(root: Path, name: str = "define") -> Evidence:
@@ -78,13 +87,13 @@ def test_current_content_addressed_seam_evidence_is_accepted(
 ) -> None:
     evidence = _evidence(tmp_path)
     assert not (tmp_path / "var").exists()
-    assert checker.seam_findings(evidence.root) == []
+    assert checker.seam_findings(evidence.root, evidence.inventory) == []
 
 
 def test_stage_without_stop_does_not_require_canary(tmp_path: Path, checker: Checker) -> None:
     evidence = _evidence(tmp_path, "docs-check")
     assert not evidence.canary.exists()
-    assert checker.seam_findings(tmp_path) == []
+    assert checker.seam_findings(tmp_path, evidence.inventory) == []
 
 
 @pytest.mark.parametrize(
@@ -108,6 +117,7 @@ def test_missing_stale_or_inconsistent_seam_evidence_is_rejected(
     tmp_path: Path, checker: Checker, damage: str
 ) -> None:
     evidence = _evidence(tmp_path)
+    inventory = evidence.inventory
     if damage == "missing-installed":
         evidence.installed.unlink()
     elif damage == "malformed-installed":
@@ -124,6 +134,7 @@ def test_missing_stale_or_inconsistent_seam_evidence_is_rejected(
         (evidence.installed.parent / f"{'f' * 64}.installed.json").write_text(
             evidence.installed.read_text(encoding="utf-8"), encoding="utf-8"
         )
+        inventory.append(f"lab/stage-checks/{'f' * 64}.installed.json")
     elif damage == "changed-package":
         (tmp_path / "lab/stages/raidar/define/prompt.md").write_text(
             "Changed package prompt.\n", encoding="utf-8"
@@ -141,7 +152,7 @@ def test_missing_stale_or_inconsistent_seam_evidence_is_rejected(
         }
         record.update(changes[damage])
         evidence.canary.write_text(json.dumps(record), encoding="utf-8")
-    found = checker.seam_findings(tmp_path)
+    found = checker.seam_findings(tmp_path, inventory)
     assert found
     assert all("SEAM.evidence" in line for line in found)
     assert any("lab/" in line for line in found)
@@ -159,4 +170,9 @@ def test_registered_historical_records_are_not_orphan_findings(
     (evidence.installed.parent / f"{'f' * 64}.installed.json").write_text(
         evidence.installed.read_text(encoding="utf-8"), encoding="utf-8"
     )
-    assert checker.seam_findings(tmp_path) == []
+    assert (
+        checker.seam_findings(
+            tmp_path, [*evidence.inventory, f"lab/stage-checks/{'f' * 64}.installed.json"]
+        )
+        == []
+    )
