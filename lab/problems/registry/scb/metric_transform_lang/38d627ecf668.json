@@ -69,13 +69,13 @@
     "image": "raidar/pack-python:2b91a52663e099f2"
   },
   "task_sha256": "262ba12dff357d1c48d1189ceb78902e4bae41272deac1640591720d1fb8b99d",
-  "bundle_sha256": "326819ed14a3560b2ce8247f838ae3219762c279edbca33a1f7eca099ac809e3",
+  "bundle_sha256": "0a384719e19afccb8efd7967cf942a9751c9b381952942a8d930f1603d1a0096",
   "references_sha256": "eee76f5b413e59038cca6f92201bbad977a3b54f98a86ca9d94f7c248e457ca6",
   "entry_file": "mtl.py",
   "entry_command": "uv run --project /app mtl.py",
   "dependencies": {
     "policy": "declared-wheels/1",
-    "resolver": "uv@0.10.0",
+    "resolver": "uv@0.13.7",
     "index": "https://pypi.org/simple",
     "python": "3.12",
     "platforms": [

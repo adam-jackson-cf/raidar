@@ -57,10 +57,10 @@
       },
       "scorer": {
         "code-quality@9": {
-          "digest": "707c9425737f4677fcec1e8a18c4e2ff8e6f3d5b4fe9ca31a8caba83a42b1efd",
+          "digest": "b91e2d574719206ce0bb7da85c825f268b59b15791ac37545641408a853ff3a8",
           "metadata": {
             "implementation": "raidar.scoring.code_quality:code_quality_scorer",
-            "implementation_digest": "c225ec7fb47a5cfbdd6d92530a9872e1cc1456cc13488dbd95b8d3f469dc8286",
+            "implementation_digest": "8412a7b004c249318ac71e6a775f389c5826251cee115c8049073462ededfe65",
             "manifest": {
               "description": "SCB-fork code-quality and inertia components over the per-step snapshots; a step graded without the in-trial coverage pass reads G's coverage run from the offline run in the Assessment store, and G leaves out at most 3 cases whose outcome differs between the grading and coverage runs instead of reading the step as ineligible.",
               "evidence_required": [
@@ -279,10 +279,10 @@
           }
         },
         "correctness@10": {
-          "digest": "2c54418ea915e0aa482f3c346c80d4780a6369d6c0bbcea3e396ddcf718e5aad",
+          "digest": "17d457918b3d30de3f2f5ac19732afe3769772caf9d3d2eadaca53e7bc99a71f",
           "metadata": {
             "implementation": "raidar.scoring.correctness:correctness_scorer",
-            "implementation_digest": "548bce26fd1c748df709c77f26c9f1b134635f6e924878bc29fc314895894f7d",
+            "implementation_digest": "2900aca403f9c25c7d17f9e3319726daa85ed0ebe45df4855eb8fe01f0535e3d",
             "manifest": {
               "description": "Reference-solvable SCB success and raw SCB verdicts per checkpoint and trajectory.",
               "evidence_required": [
@@ -482,10 +482,10 @@
           }
         },
         "process-compliance@12": {
-          "digest": "941bf026c0f292bbd7de9930e3e7fed8baee2c63bf42ac95c377b9801cdeb86f",
+          "digest": "9bc8d160d045bcf8d75fa4b94576ae1adf551e0926d30ac5650016fca0c796c4",
           "metadata": {
             "implementation": "raidar.scoring.process_checks:deterministic_process_compliance_scorer",
-            "implementation_digest": "bac4dd559f9d06af1dfae1c6f8035257c9da58384dcac8fe19872ad7a2705122",
+            "implementation_digest": "318ebf59b3c5dd088b018625c0de551fe98c045b6854ca5a9702212b260091be",
             "manifest": {
               "description": "Deterministic trace checks of agent process (stall outcomes, a test command counts only when it ran, the step's work session's own test run after its last edit, a compliance rate without the plan check unless the condition asks for a plan); a check the trace cannot decide is undetermined, never judged by a model. Adds whether the work session ran the tests at all, and whether it ran them after its last edit to a non-test file.",
               "evidence_required": [
@@ -686,10 +686,10 @@
           }
         },
         "resource-usage@8": {
-          "digest": "8c0e5b87c27504bf78bcc5126497cdab48022c0aae21966f1d902746bf228683",
+          "digest": "a3ce02e62c9f810838d9ba561b25b1afb09635d80ee1d4d28f5dbca25367da78",
           "metadata": {
             "implementation": "raidar.scoring.resource_usage:resource_usage_scorer",
-            "implementation_digest": "c2a78bd9bc9bb58712b5a4c4a75312bd6cfbc9c2f52e802f3d11a802bd1cd89e",
+            "implementation_digest": "a57970ff1499d86bec37e2c3bca1f2e4f516a2db4eb41bf20d0af71aa90ac694",
             "manifest": {
               "description": "Tokens, canonical-table agent cost plus host judge spend, turns and agent wall time.",
               "evidence_required": [
@@ -841,7 +841,7 @@
       "tree-sitter-language-pack": "0.13.0"
     }
   },
-  "document_sha256": "96e1220029da12f71d4d12fc9de2e3fb4f8ebf50e7e12c6815556d063e5453a2",
+  "document_sha256": "af8d8587d2806b2efa7f27d6a7a608dba1a213c1afd9825b3e7194643812b4c2",
   "execution": {
     "arms": {
       "baseline": {
@@ -859,13 +859,13 @@
           "version_pin": "2.1.285",
           "workflow_skills": "placement.skills .claude/skills in the workspace /app"
         },
-        "digest": "d295d56105f23e78702bc053c1b032e845b149dd6052525d769f4671793ef4b7",
+        "digest": "28ab803c69fca466e8106e69b7e9a406f462f2cf40a31aa9a3e4bd07ff542046",
         "model": "claude-sonnet-4-6",
         "packages": {},
         "primitive_code": {
           "frame/1": "99679eda101c95ae4cc9ff63ae7f421fba73f1108a1c3385db0ac1826a58ec11",
           "install/1": "c048280abac6975ccfdb97a07ef3c237dc8a78826cb0cc9b84f18f94657ca98d",
-          "runner/1": "faf02364c7643c7761d54d1c7f7304cf1135be1f7a59cb0ffb8fb9f2e95aee9c"
+          "runner/1": "2f862fd0887b538b9dd719de6007eaa23f1508bfa9c187710ec589ab3ea0811f"
         },
         "provider": "anthropic",
         "reasoning": "low",
@@ -921,7 +921,7 @@
     "problems": [
       {
         "checkpoints": 8,
-        "digest": "e710fc7da3e363605e9b0b78cd45eb8bdf6dbe87295a2707b36d013763341dfb",
+        "digest": "c182a25fd23504cd3303c9e96a1167aa7f6bbc6d3334f845e36f8bc6db9f48d4",
         "label": "scb/forge@38d627ecf668"
       }
     ],
@@ -948,11 +948,11 @@
       },
       "problem": {
         "scb/forge@38d627ecf668": {
-          "digest": "e710fc7da3e363605e9b0b78cd45eb8bdf6dbe87295a2707b36d013763341dfb",
+          "digest": "c182a25fd23504cd3303c9e96a1167aa7f6bbc6d3334f845e36f8bc6db9f48d4",
           "metadata": {
-            "bundle_sha256": "fc79461c25dfb1fb4660e9fd3a688a55f6587ff88ed3b3b12d1ec6d804977040",
+            "bundle_sha256": "9d5cd0bb9f27fc906de1ed6a963d229341f916461d4df98f484d037eddf67626",
             "checkpoints": 8,
-            "dependencies_sha256": "c4c71b394551c34e93d709c5f038f353a9d859fde73a13f6062d0f4d25f456a6",
+            "dependencies_sha256": "115560c3d1df67e82eccf97f0e2c7cf71edcba1bb3a506a78906014e7b40cc9a",
             "entry_command": "uv run --project /app forge.py",
             "entry_file": "forge.py",
             "errata": {
@@ -984,7 +984,7 @@
                 "test_checkpoint_7.py::test_unit_missing_parent_not_found[1.2]"
               ],
               "informational": [],
-              "sha256": "68a2416b0cc51b56dbe8393fc6c64dd74400f60bc8422ab28474d96b7959b168"
+              "sha256": "919fd480e8787fd5722aeb7da6920c877b5a278e4f07d04ceb259aa5d76a0955"
             },
             "mode": "multi_checkpoint",
             "pack_image": "raidar/pack-python:2b91a52663e099f2",
@@ -1617,7 +1617,7 @@
               "grader": {
                 "environment_id": "sha256:e0044b07679a3b973081c381f8d3a64d6b0b32e84c0debb82069887ab984a8c1",
                 "image": "raidar-oracle-grader:963c14e63ff5e15d",
-                "implementation_sha256": "4cf6e9b2d6fe550a1c94485e527c4932f1981ba3fda827e74532749b12bc48d0"
+                "implementation_sha256": "1ffc118d4f969c604192a6c6589fb2bfbfcf67b047290cb53a61ae63eca6e6c7"
               },
               "not_run": [
                 "native_parity_positive",
@@ -1687,10 +1687,10 @@
   "experiment": {
     "id": "python__forge__claude-mechanics",
     "source": "experiment.yaml",
-    "source_sha256": "9c725c156c8c2d9710debb42b0d677212c041015025d71ae9a4cd9bb31f311c3",
+    "source_sha256": "3e5f3def9bc794b16900848fb82b37ba490575e42bc7ee6157fe1678601440c5",
     "spec_sha256": "ae99368e7ab29bb6b6732afa0360c09645230d2124a21f84c72a7b0179236bed"
   },
-  "lock_sha256": "337f5cf9bbd86f3dbf99e3c1bcab059f61a53abda489c04a94a84c7b64672e5a",
+  "lock_sha256": "8ececb7a99a928e311019c6d31f5b16881a40f364c39d71fdfb4e54f31d47f64",
   "lock_version": 5,
   "overrides": {
     "flags": {},
@@ -1698,9 +1698,9 @@
   },
   "sections": {
     "analysis": "1b12d4c79118b1962282a0c33350352b893d39995117c241bba045eff2a1d044",
-    "assessment": "bc063460d8df1960c2f0b10b6c3d37bed4901f7db878f24c339e8be6bb5347b1",
-    "execution": "337f5cf9bbd86f3dbf99e3c1bcab059f61a53abda489c04a94a84c7b64672e5a",
-    "toolchain": "c4ea0a8e96b37e2581767b682e71ba1181644e9e3829723e81bcf4329823ab62"
+    "assessment": "8fd225d4d7c5d54ed06b015e83249cd02c08830bf55424fa527382df048f6217",
+    "execution": "8ececb7a99a928e311019c6d31f5b16881a40f364c39d71fdfb4e54f31d47f64",
+    "toolchain": "129f8f25205745e44f064a8ec6bc05f3e3eee84b8483b3ff1f46ba04edb33c57"
   },
   "spec": {
     "agents": [
@@ -1769,6 +1769,6 @@
   "toolchain": {
     "litellm": "1.102.2",
     "python": "3.13.7",
-    "raidar_spec": "8a0d4102843301b3a0bca38c9f6939582deffc587af12a7a9dd188b86a39d6a1"
+    "raidar_spec": "cb49142ad8d81b71a9d38af6b91da93d6b5d47ace924ff54352ecaafbbe2d1fa"
   }
 }

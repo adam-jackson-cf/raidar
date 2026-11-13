@@ -80,7 +80,7 @@
     {
       "required":
         [
-          "host Python 3.13.7 with uv 0.10.0 and orchestrator dev extras",
+          "host Python 3.13.7 with uv 0.13.7 and orchestrator dev extras",
           "Node 22 with root npm ci --ignore-scripts; review-surface npm install and Playwright Chromium",
           "Docker target from ~/.config/raidar/targets.toml (override RAIDAR_TARGETS_FILE) with the built Python pack image, for docker/security/perf"
         ],
@@ -1553,7 +1553,7 @@ Identity-bearing artefacts is `none`: Raidar keeps no execution-identity record 
 
 ## Environments
 
-- Required environments: host Python `3.13.7`, uv `0.10.0`, orchestrator dev extras; Node `22`
+- Required environments: host Python `3.13.7`, uv `0.13.7`, orchestrator dev extras; Node `22`
   with root `npm ci --ignore-scripts`; review surface npm packages and Playwright Chromium;
   a Docker target and the built Python pack image for Docker, security and perf.
 - Docker targets: `~/.config/raidar/targets.toml`, override `RAIDAR_TARGETS_FILE`; select one

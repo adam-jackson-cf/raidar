@@ -100,13 +100,13 @@
     "image": "raidar/pack-python:2b91a52663e099f2"
   },
   "task_sha256": "a37f0243af42ecda8f186045282e7016ee9f86646be52c107738c63787bd0875",
-  "bundle_sha256": "7a7040749f965436966b5d2052618be1c1ee6e6e30f30a5232788419b3fb3d5b",
+  "bundle_sha256": "fb495070898ccfdfed851a66fa084b8c0f701b83231d5fa499a4265311cda1b3",
   "references_sha256": "5f05cb33d22ea1dc2949993f3a3d04b504d0b384404bb8a33120429b54773bc9",
   "entry_file": "datagate.py",
   "entry_command": "uv run --project /app datagate.py",
   "dependencies": {
     "policy": "declared-wheels/1",
-    "resolver": "uv@0.10.0",
+    "resolver": "uv@0.13.7",
     "index": "https://pypi.org/simple",
     "python": "3.12",
     "platforms": [

@@ -15,7 +15,7 @@
 
 Run commands from the repository root. Prerequisites:
 
-- Host Python **3.13.7** and host `uv >=0.10.0` for bootstrap only.
+- Host Python **3.13.7** and host `uv >=0.13.7` for bootstrap only.
   Result-affecting calls use the exact uv dependency in `orchestrator/uv.lock`.
 - Docker with `docker compose` **2.40.1 or newer**, for execution and grading.
 - Node **18 or newer**, for the review surface and maintenance formatter.

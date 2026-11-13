@@ -73,13 +73,13 @@
     "image": "raidar/pack-python:2b91a52663e099f2"
   },
   "task_sha256": "16fb5433fa151aa7722ed60f6dc8ff1ac174035784628dcad84f2b9e8b383e69",
-  "bundle_sha256": "beb554cdf81be40fd331826842315a1e03e4cbada01969a918651c82e09145b8",
+  "bundle_sha256": "7f37b16df9759df5e237f175b5f05fe497d7c15a23740219f87d571be60e772b",
   "references_sha256": "cb20c18ab8a5780afd181aefb98b52713169b8b7de63ddd12bf855b80ec08cde",
   "entry_file": "code_search.py",
   "entry_command": "uv run --project /app code_search.py",
   "dependencies": {
     "policy": "declared-wheels/1",
-    "resolver": "uv@0.10.0",
+    "resolver": "uv@0.13.7",
     "index": "https://pypi.org/simple",
     "python": "3.12",
     "platforms": [

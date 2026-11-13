@@ -115,13 +115,13 @@
     "image": "raidar/pack-python:2b91a52663e099f2"
   },
   "task_sha256": "70e93e9882fd776df49d4ae9fe3d9f9cef30c5dba69916db6b398cb942ad55c2",
-  "bundle_sha256": "fc79461c25dfb1fb4660e9fd3a688a55f6587ff88ed3b3b12d1ec6d804977040",
+  "bundle_sha256": "9d5cd0bb9f27fc906de1ed6a963d229341f916461d4df98f484d037eddf67626",
   "references_sha256": "1451f566df2cdd5e9b9c0550056cbf051eeaa70cde8f91dbbbf7f0b1988aebb8",
   "entry_file": "forge.py",
   "entry_command": "uv run --project /app forge.py",
   "dependencies": {
     "policy": "declared-wheels/1",
-    "resolver": "uv@0.10.0",
+    "resolver": "uv@0.13.7",
     "index": "https://pypi.org/simple",
     "python": "3.12",
     "platforms": [

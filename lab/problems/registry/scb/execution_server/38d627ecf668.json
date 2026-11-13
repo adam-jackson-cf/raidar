@@ -81,13 +81,13 @@
     "image": "raidar/pack-python:2b91a52663e099f2"
   },
   "task_sha256": "f70027c95a82f2b6076f75b2442772a0be2735b9d55ae7094e91c4d392e6795b",
-  "bundle_sha256": "89e0c0f5ad5a509379ace62c7327ff58e0c6d0b962a9454e7e03c1b509477abb",
+  "bundle_sha256": "92594cb41b5e7f2bc79c6fb039e7ed94d51a4dc0231f2cbd5f6c17a6d9dc3e0e",
   "references_sha256": "5204eb4329ddb3fc37f491ee18b2e8a05a280252834ba78649766a49c244c0fa",
   "entry_file": "execution_server.py",
   "entry_command": "uv run --project /app execution_server.py",
   "dependencies": {
     "policy": "declared-wheels/1",
-    "resolver": "uv@0.10.0",
+    "resolver": "uv@0.13.7",
     "index": "https://pypi.org/simple",
     "python": "3.12",
     "platforms": [

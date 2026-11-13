@@ -45,7 +45,7 @@
     "engine": "direct",
     "grader_environment_id": "sha256:e0044b07679a3b973081c381f8d3a64d6b0b32e84c0debb82069887ab984a8c1",
     "grader_image": "raidar-oracle-grader:963c14e63ff5e15d",
-    "grader_implementation_sha256": "4cf6e9b2d6fe550a1c94485e527c4932f1981ba3fda827e74532749b12bc48d0",
+    "grader_implementation_sha256": "1ffc118d4f969c604192a6c6589fb2bfbfcf67b047290cb53a61ae63eca6e6c7",
     "harbor": "0.23.0",
     "pack_image": "raidar/pack-python:2b91a52663e099f2"
   },
@@ -847,7 +847,7 @@
     "selection": "default_by_k"
   },
   "kind": "raidar-problem-validation",
-  "manifest_sha256": "5611aa25b74d8949f3adf02198dd5de4c12d1f26c7127631aedc7aaba811949a",
+  "manifest_sha256": "b37120cce9456f0417621764f9588bd9a79618ff1af3e694a3ef70245ea14471",
   "mode": "multi_checkpoint",
   "not_run": [
     "native_parity_positive",
