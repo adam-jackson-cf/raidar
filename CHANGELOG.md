@@ -4,6 +4,8 @@ All notable changes to this project are documented in this file.
 
 ## Unreleased
 
+- fix(checks): inventory Python files through git, including maintained untracked
+  files without walking ignored trees or resolving source symlinks.
 - chore: remove the external guardrail harness coupling: the harness dependency pin,
   rule-coverage evidence and per-rule canaries, hook installation proof, live
   GitHub readback, vendored rule validation, test-evidence mapping, the fast-test

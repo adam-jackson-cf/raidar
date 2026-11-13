@@ -13,6 +13,8 @@ import fnmatch
 import json
 from pathlib import Path
 
+from git_inventory import python_paths
+
 ROOT = Path(__file__).resolve().parents[2]
 SCOPE_ROOTS = (
     "orchestrator/src/raidar/scoring/",
@@ -237,11 +239,7 @@ def main() -> int:
     parser.add_argument("--repo-root", type=Path, default=ROOT)
     parser.add_argument("--format", choices=("text", "findings-json"), default="text")
     arguments = parser.parse_args()
-    paths = [
-        path.relative_to(arguments.repo_root).as_posix()
-        for scope in SCOPE_ROOTS
-        for path in (arguments.repo_root / scope).rglob("*.py")
-    ]
+    paths = [path for path in python_paths(arguments.repo_root) if path.startswith(SCOPE_ROOTS)]
     diagnostics, findings = _scan(arguments.repo_root, paths)
     if arguments.format == "findings-json":
         # Ownership and parse failures must never disappear behind an I/O baseline.

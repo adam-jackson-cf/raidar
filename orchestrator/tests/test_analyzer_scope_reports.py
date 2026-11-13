@@ -4,11 +4,14 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import subprocess
 import sys
 from pathlib import Path
 from typing import Protocol, cast
 
 import pytest
+
+pytestmark = pytest.mark.quality
 
 ROOT = Path(__file__).resolve().parents[2]
 SOURCE = "orchestrator/src/raidar/scoring/comparison.py"
@@ -33,6 +36,7 @@ def checker() -> Checker:
 
 
 def _workspace(root: Path, source: str) -> None:
+    subprocess.run(["git", "init", "-q", str(root)], check=True, timeout=10)
     (root / "CODEOWNERS").write_text("* @owner\n", encoding="utf-8")
     path = root / SOURCE
     path.parent.mkdir(parents=True)

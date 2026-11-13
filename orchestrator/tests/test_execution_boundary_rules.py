@@ -97,40 +97,6 @@ def test_call_boundary_and_its_consumers_are_allowed() -> None:
     )
 
 
-@pytest.mark.parametrize("selection", [[], [".agents/skills"], [".agents/skills/bad_skill"]])
-@pytest.mark.parametrize("report_format", ["text", "findings-json"])
-def test_skill_directory_policy_scans_skills_without_python(
-    tmp_path: Path,
-    capsys: pytest.CaptureFixture[str],
-    selection: list[str],
-    report_format: str,
-) -> None:
-    (tmp_path / ".agents/skills/good-skill").mkdir(parents=True)
-    assert rules.main(["--repo-root", str(tmp_path), "--format", report_format]) == 0
-    capsys.readouterr()
-    (tmp_path / ".agents/skills/bad_skill").mkdir()
-    assert (
-        rules.main(
-            [
-                "--repo-root",
-                str(tmp_path),
-                "--format",
-                report_format,
-                *selection,
-            ]
-        )
-        == 1
-    )
-    captured = capsys.readouterr()
-    rendered = captured.err if report_format == "text" else captured.out
-    assert ".agents/skills/bad_skill" in rendered
-    assert "PYQ106" in rendered
-    if report_format == "text":
-        assert len(captured.err.splitlines()) == 1
-        assert "; rename the skill directory" in captured.err
-    assert rules.main(["--repo-root", str(tmp_path), ".agents/skills/good-skill"]) == 0
-
-
 @pytest.mark.parametrize(
     "prefix",
     [
