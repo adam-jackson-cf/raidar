@@ -4,16 +4,21 @@ All notable changes to this project are documented in this file.
 
 ## Unreleased
 
-- ci: retain invocation-bound fast-test phase reports and enforce their validity
-  through both gates; add CI-only calibrated timing checks, externally verified
-  policy approvals and sequential baseline measurement/import tooling.
-- ci: fail closed on all 104 guardrail evidence rows with real per-rule canaries,
-  isolated hook installation proof, live GitHub readback, and hash-checked
-  vendored validation; preserve approved exclusions, debt ratchets and identities.
+- chore: remove the external guardrail harness coupling: the harness dependency pin,
+  rule-coverage evidence and per-rule canaries, hook installation proof, live
+  GitHub readback, vendored rule validation, test-evidence mapping, the fast-test
+  JUnit phase report and its timing budgets. Harness checks now run from outside
+  the repository; Raidar keeps its own build, tests, linters and lab, release and
+  lock checks.
+- chore: drop execution-identity tracking; experiments rerun after invalidating
+  changes.
 - ci: enforce installer/metadata parity, locked Prettier 3.6.2 checks outside
   consent-excluded and frozen paths, and strict locked dependency audits.
-- build(deps): update identity-neutral vulnerable dependencies; retain
-  finding-specific security and formatting debt for identity-bound changes.
+- ci: clear the python-scalability and python-quality findings; drop the
+  host-readback freshness expiry.
+- build(deps): upgrade uv to 0.13.7 and virtualenv to 21.15.6 past their
+  advisories; revalidate and relock.
+- docs: add a feature map under `docs/features`.
 
 ## 1.0.1 - 2026-11-09
 

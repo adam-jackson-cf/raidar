@@ -2,7 +2,7 @@
 
 Status: decision memo (innovation council: own analysis + independent adversarial challenger, synthesized).
 Scope: design only. No code was changed in any repository.
-Evidence shorthand: **R** = `/Users/adamjackson/Projects/complete/raidar`, **S** = `/Users/adamjackson/Projects/inflight/slop-code-bench`, **P** = `/Users/adamjackson/Projects/inflight/scb-problems`, **J** = `~/.omp/agent`. `[INFERENCE]` marks claims that were not directly observed.
+Evidence shorthand: **R** = the Raidar repository, **S** = the slop-code-bench repository, **P** = the scb-problems repository, **J** = the external agent configuration that holds the Jev client. `[INFERENCE]` marks claims that were not directly observed.
 
 ---
 
@@ -185,9 +185,9 @@ When two tiers could answer the same metric, they publish **separate metric IDs*
 
 ### 3.5 Jev integration (replacing LLM-as-judge)
 
-- **Client:** a small Python port of the local contract (`J/extensions/lib/jev.ts:17-23,62-135`): POST to `https://openrouter.ai/api/alpha/decisions`, `~typesafe/jev-latest` with the **resolved model checked against a pin** (`typesafe/jev-1.13-20260917`); `noul`/`choice`/`score` validation; ≤96k-char state; timeout; redaction. It lives in Raidar with no dependency on a personal OMP install.
+- **Client:** a small Python port of the local contract (`J/extensions/lib/jev.ts:17-23,62-135`): POST to `https://openrouter.ai/api/alpha/decisions`, `~typesafe/jev-latest` with the **resolved model checked against a pin** (`typesafe/jev-1.13-20260917`); `noul`/`choice`/`score` validation; ≤96k-char state; timeout; redaction. It lives in Raidar with no dependency on a personal agent-harness install.
 - **Cache:** decisions are cached by `hash(state, questions, resolved_model)`, which makes rescoring reproducible and nearly free.
-- **Audit:** decision records go into the run's assessment artifacts (not `~/.omp`), in the same record shape as `appendDecision`/`appendLabel`.
+- **Audit:** decision records go into the run's assessment artifacts (not the user's agent configuration directory), in the same record shape as `appendDecision`/`appendLabel`.
 - **Policy per question-set,** versioned in the repo: `off | shadow | enforce`. In shadow, observations are stored and shown as *uncalibrated*, and they are excluded from ScorePolicies and verdicts.
 - **Promotion to enforce** follows `J/skills/evaluate-jev/references/policies.md`, applied per policy and per runtime:
   - ≥30 labeled decisions with ≥5 minority labels, with input sufficiency ≥80% (otherwise fix the state template first).
@@ -637,7 +637,7 @@ So SCB's lightweight mode is unisolated. Raidar adopts its lightness and synthet
 ```jsonc
 {
   "filesystem": {
-    "denyRead":  ["/Users", "/Volumes", "/private/var/folders"],  // all homes, incl. real ~/.claude, ~/.omp, keys
+    "denyRead":  ["/Users", "/Volumes", "/private/var/folders"],  // all homes, incl. real ~/.claude, agent configuration, keys
     "allowRead": ["<workspace>", "<synthetic_home>", "<pack_cache>/<lockhash>", "<harness_bin_cache>"],
     "allowWrite": ["<workspace>", "<synthetic_home>", "<trajectory_tmp>"]
   },
