@@ -4,6 +4,8 @@ All notable changes to this project are documented in this file.
 
 ## Unreleased
 
+- fix(checks): omit deleted worktree paths with non-following presence checks;
+  share untracked discovery while keeping suppression checks scoped to changes.
 - refactor(checks): use one fail-closed git inventory for maintained repository
   files across checkers, including skills and stage-check evidence. Mypy directory
   discovery remains unchanged; mypy itself does not honour `.gitignore`.

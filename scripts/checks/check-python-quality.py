@@ -125,7 +125,7 @@ SEAM_SUBPROCESS_WRAPPERS: dict[str, set[str]] = {
     "scripts/checks/check-mypy-coverage.py": {"main"},
     "scripts/checks/check-ruff-suppressions.py": {"main"},
     "scripts/checks/ruff_baseline.py": {"main"},
-    "scripts/checks/git_inventory.py": {"repo_paths"},
+    "scripts/checks/git_inventory.py": {"_git_paths"},
     "scripts/checks/check-python-quality.py": {"_check_baseline"},
     "scripts/release/bump-version.py": {
         "git_output",
