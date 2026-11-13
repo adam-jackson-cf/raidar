@@ -11,11 +11,11 @@ A reference-based admission process that pins usable checkpoint tests before an 
 _Commit generated problem pins and validation reports; keep materialized content outside tracked definitions._
 
 ```bash
-env -u AGENT make problem-list SOURCE=scb@38d627ecf668
-env -u AGENT make problem-import SOURCE=scb@38d627ecf668 PROBLEMS=dag_execution,log_query
-env -u AGENT make problem-validate PROBLEMS=dag_execution,log_query REPEATS=5 TARGET=mbp
-env -u AGENT make problem-list
-env -u AGENT make pack-build
+make problem-list SOURCE=scb@38d627ecf668
+make problem-import SOURCE=scb@38d627ecf668 PROBLEMS=dag_execution,log_query
+make problem-validate PROBLEMS=dag_execution,log_query REPEATS=5 TARGET=mbp
+make problem-list
+make pack-build
 ```
 
 - **Discovery:** `problem-info SOURCE=scb@<commit> PROBLEM=<ref>` inspects a candidate; without `SOURCE`, `problem-list` reports registered verdicts, solvable sizes and varying-case counts.

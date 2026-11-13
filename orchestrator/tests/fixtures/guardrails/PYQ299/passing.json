@@ -1,6 +1,0 @@
-{
-  "path": "orchestrator/src/raidar/engine/canary.py",
-  "files": {
-    "orchestrator/src/raidar/engine/canary.py": "value = 1\n"
-  }
-}

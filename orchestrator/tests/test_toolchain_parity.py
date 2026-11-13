@@ -49,7 +49,7 @@ version = "9.0.3"
 name = "networkx"
 version = "3.6.1"
 """
-SYNC = "env -u AGENT uv sync --project orchestrator --all-extras --locked"
+SYNC = "uv sync --project orchestrator --all-extras --locked"
 AUDIT_RULE = "SECURITY.dependency-audit"
 LOCK_PATH = "orchestrator/uv.lock"
 
@@ -151,8 +151,8 @@ def test_dependency_inventory_checks_each_installer_not_their_union(checker: Par
 @pytest.mark.parametrize(
     "documented",
     [
-        "env -u AGENT uv sync --frozen --all-extras --project orchestrator",
-        "env -u AGENT make env-setup",
+        "uv sync --frozen --all-extras --project orchestrator",
+        "make env-setup",
     ],
 )
 def test_install_guidance_accepts_equivalent_resolution_and_public_make_target(

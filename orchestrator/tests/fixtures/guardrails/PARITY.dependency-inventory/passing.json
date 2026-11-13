@@ -1,6 +1,0 @@
-{
-  "project": "[project]\nname = \"canary\"\nversion = \"1.0.0\"\n[project.optional-dependencies]\ndev = [\"pip-audit==2.9.0\"]\nanalysis = [\"networkx==3.6.1\"]\n",
-  "installers": {
-    "Makefile": "uv sync --project orchestrator --all-extras --locked"
-  }
-}

@@ -125,7 +125,6 @@ SEAM_SUBPROCESS_WRAPPERS: dict[str, set[str]] = {
     "scripts/checks/check-python-fanout.py": {"_run_git"},
     "scripts/checks/check-python-quality.py": {"_check_baseline"},
     "scripts/checks/check-structure.py": {"repo_paths"},
-    "scripts/checks/check-test-evidence.py": {"_git_bytes"},
     "scripts/checks/check_toolchain_pins.py": {"_registry_resolver_violations"},
     "scripts/release/bump-version.py": {
         "git_output",
@@ -136,17 +135,8 @@ SEAM_SUBPROCESS_WRAPPERS: dict[str, set[str]] = {
     "scripts/checks/check-toolchain-parity.py": {"run_process"},
     "scripts/checks/run-affected-seams.py": {"main"},
     "scripts/checks/check-repository-paths.py": {"main", "dependency_findings"},
-    "scripts/checks/record-host-readback.py": {"main"},
-    "scripts/checks/check-hook-installation.py": {"run_process"},
-    "scripts/checks/check-gate-rule-canary.py": {"run_process"},
-    "scripts/checks/validate-rule-coverage.py": {"main"},
-    "scripts/checks/check-tool-rule-canary.py": {"analyzer_canary"},
-    "scripts/checks/check-bespoke-rule-canary.py": {"run_fanout_checker"},
 }
 EXCLUDED_PREFIXES = (
-    # Exact upstream bytes and canary inputs are not maintained source.
-    "scripts/vendor/setup-repository-guardrails/validate_rule_coverage.py",
-    "orchestrator/tests/fixtures/guardrails/",
     ".cache/",
     ".git/",
     ".mypy_cache/",
@@ -166,13 +156,6 @@ ALLOWED_TEST_ROOT_FILES = {
     "orchestrator/tests/conftest.py",
 }
 SCRIPT_NAME_ALLOWLIST = {
-    "check-rule-evidence.py",
-    "validate-rule-coverage.py",
-    "check-hook-installation.py",
-    "check-gate-rule-canary.py",
-    "record-host-readback.py",
-    "check-tool-rule-canary.py",
-    "check-bespoke-rule-canary.py",
     "bump-version.py",
     "check-finding-baseline.py",
     "check-ruff-suppressions.py",
@@ -182,10 +165,8 @@ SCRIPT_NAME_ALLOWLIST = {
     "check-structure.py",
     "check-test-hygiene.py",
     "check-repository-paths.py",
-    "run-repository-gate.py",
     "verify-version-wiring.py",
     "check_toolchain_pins.py",
-    "check-test-evidence.py",
     "check-toolchain-parity.py",
     "check-analyzer-scope.py",
     "run-affected-seams.py",

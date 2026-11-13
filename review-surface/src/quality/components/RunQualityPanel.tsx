@@ -13,7 +13,7 @@ import { QualityStrip, Ring, StatusBadge } from '@/quality/components/QualityStr
 import { POLICY_SOURCE_TITLE, fmtComponent } from '@/quality/format';
 import { qualityExperimentHref, qualityRunHref, useQualityIndex } from '@/quality/links';
 import type { RunRecord } from '@/api/types';
-import '@/quality/quality.css';
+import '@/quality/styles.css';
 
 function Shell({ children }: { children: React.ReactNode }) {
   return (

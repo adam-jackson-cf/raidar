@@ -1,6 +1,0 @@
-{
-  "files": {
-    "orchestrator/src/probe.py": "\"\"\"Expose a documented function.\"\"\"\n\n\ndef probe(value: int) -> int:\n    \"\"\"Compute a value.\n\n    Parameters\n    value : int\n        Input value.\n    \"\"\"\n    return value\n"
-  },
-  "format": false
-}

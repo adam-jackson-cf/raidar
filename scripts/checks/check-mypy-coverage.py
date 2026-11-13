@@ -19,11 +19,6 @@ ROOT = Path(__file__).resolve().parents[2]
 def maintained(path: PurePosixPath) -> bool:
     """Whether a path belongs to the maintained Python inventory."""
     parts = path.parts
-    # This exact upstream program is vendored and hash-checked, not maintained.
-    if path == PurePosixPath(
-        "scripts/vendor/setup-repository-guardrails/validate_rule_coverage.py"
-    ):
-        return False
     if "fixtures" in parts or parts[:1] in (("docs",), ("var",)):
         return False
     return any(
@@ -128,7 +123,7 @@ def main() -> int:
                 return self[path]
 
         entries = checker.parse_mypy(scan.stdout, root=str(root), sources=Sources())
-        baseline = root / ".omp/baselines/mypy.json"
+        baseline = root / "scripts/checks/baselines/mypy.json"
         if args.write_baseline:
             baseline.parent.mkdir(parents=True, exist_ok=True)
             baseline.write_text(
@@ -153,7 +148,7 @@ def main() -> int:
                 "--root",
                 str(root),
                 "--baseline",
-                ".omp/baselines/mypy.json",
+                "scripts/checks/baselines/mypy.json",
                 "--report",
                 str(report),
                 "--base-ref",

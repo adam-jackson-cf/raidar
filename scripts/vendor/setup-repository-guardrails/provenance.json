@@ -1,5 +1,0 @@
-{
-  "source": "https://github.com/adam-jackson-cf/oh-mi-pi-config/blob/397a456381d678909df9b207b54a6f8e2c72e9ca/agent/skills/setup-repository-guardrails/scripts/validate_rule_coverage.py",
-  "sha256": "4def562a709b844399bb52495cdbc43f7e407a832f046addf6288b3052b51734",
-  "maintenance": "Vendored, non-maintained byte copy. Update by copying the skill source byte-for-byte, review its checks and update this recorded sha256 atomically. The wrapper checks this hash before full execution. Copy from the omp-guardrails commit pinned in orchestrator/pyproject.toml."
-}

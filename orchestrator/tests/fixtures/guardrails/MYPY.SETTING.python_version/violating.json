@@ -1,6 +1,0 @@
-{
-  "files": {
-    "orchestrator/src/probe.py": "import copy\n\nVALUE = copy.replace(object())\n"
-  },
-  "format": false
-}

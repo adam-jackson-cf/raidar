@@ -2,7 +2,7 @@
 
 Audit records go to ``<store>/jev-audit`` and cached decisions to
 ``<store>/jev-cache``, both beside the Assessment objects, never in the run
-directory and never in ``~/.omp``. The key comes from ``OPENROUTER_API_KEY``;
+directory and never in the user's home directory. The key comes from ``OPENROUTER_API_KEY``;
 without it, uncached decisions fail as ``missing_key`` and are audited as such.
 ``replay_only`` never calls the provider: uncached decisions fail as
 ``cache_miss``, which is how a rescore proves it costs $0.

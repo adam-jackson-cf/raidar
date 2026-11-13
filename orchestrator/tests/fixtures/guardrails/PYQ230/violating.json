@@ -1,4 +1,0 @@
-{
-  "path": "contract/src/raidar_contract/call.py",
-  "source": "from typing import Callable\ndef execute(runner: Callable[[], int]): pass\n"
-}

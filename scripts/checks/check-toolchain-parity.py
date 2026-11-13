@@ -329,10 +329,6 @@ def audit_findings(
                 "--format",
                 "requirements-txt",
                 "--no-emit-local",
-                # The pinned guardrails reference is a hash-less git requirement that
-                # pip-audit --no-deps refuses; its locked dependencies are still exported.
-                "--no-emit-package",
-                "omp-guardrails",
             ],
             timeout=120,
         )
@@ -564,7 +560,7 @@ def baseline_findings(mode: str, findings: Sequence[str]) -> int:
             "--report",
             str(report),
             "--baseline",
-            f".omp/baselines/{tool}.json",
+            f"scripts/checks/baselines/{tool}.json",
         ],
         timeout=60,
     )

@@ -17,7 +17,7 @@ import { StatusBadge } from '@/quality/components/QualityStrip';
 import { POLICY_SOURCE_TITLE, experimentKey, experimentLabel, fmtComponent } from '@/quality/format';
 import { matchesTarget } from '@/quality/links';
 import type { ProblemQuality, QualityExperiment, QualityRunSummary } from '@/quality/types';
-import '@/quality/quality.css';
+import '@/quality/styles.css';
 
 function Section({ title, children, testId }: { title: string; children: React.ReactNode; testId: string }) {
   return (

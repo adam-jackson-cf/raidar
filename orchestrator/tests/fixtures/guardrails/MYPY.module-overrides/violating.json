@@ -1,6 +1,0 @@
-{
-  "files": {
-    "orchestrator/src/probe.py": "import missing_canary_without_stubs\n"
-  },
-  "format": false
-}

@@ -17,11 +17,11 @@ _Workflow data composes registered package releases with a build frame._
 | `raidar/define-build-verify@2` | Define then verify; two gate fixes; `acceptance-reply/1`, `criteria/1`, judge at most three passes. | Method judgement, separate from hidden correctness. |
 
 ```bash
-env -u AGENT make stage-new NAME=acme/my-check
+make stage-new NAME=acme/my-check
 # FROM=ns/name selects another real source package.
-env -u AGENT make stage-lock NAME=acme/my-check
-env -u AGENT make stage-check NAME=acme/my-check TARGET=local
-env -u AGENT make workflow-new NAME=acme/my-workflow
+make stage-lock NAME=acme/my-check
+make stage-check NAME=acme/my-check TARGET=local
+make workflow-new NAME=acme/my-workflow
 ```
 
 > [!IMPORTANT]

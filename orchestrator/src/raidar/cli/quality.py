@@ -210,7 +210,7 @@ def run_orchestrator_quality_gates() -> None:
             "--repo-root",
             str(REPO_ROOT),
             "--baseline",
-            ".omp/baselines/python-policy.json",
+            "scripts/checks/baselines/python-policy.json",
         ],
         REPO_ROOT,
     )

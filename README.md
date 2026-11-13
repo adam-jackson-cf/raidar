@@ -21,8 +21,8 @@ Run commands from the repository root. Prerequisites:
 - Node **18 or newer**, for the review surface and maintenance formatter.
 
 ```bash
-env -u AGENT uv sync --project orchestrator --python 3.13.7 --all-extras --frozen
-env -u AGENT make env-setup
+uv sync --project orchestrator --python 3.13.7 --all-extras --frozen
+make env-setup
 npm ci --ignore-scripts
 ```
 
@@ -32,16 +32,16 @@ interpreter, not merely a compatible Python version.
 
 Set up a Docker target and provider credentials:
 
-- **Target:** run `env -u AGENT make target-init`, edit `~/.config/raidar/targets.toml`,
-  then run `env -u AGENT make target-up TARGET=<name>` and
-  `env -u AGENT make target-status TARGET=<name>`.
+- **Target:** run `make target-init`, edit `~/.config/raidar/targets.toml`,
+  then run `make target-up TARGET=<name>` and
+  `make target-status TARGET=<name>`.
 - **Selection:** `TARGET` → `RAIDAR_TARGET` → file default; the current Docker context is not a fallback.
 - **Trust:** set `trusted = true` only for a target approved to receive agent credentials and hidden tests.
 - **Secrets:** `SECRETS=auto|infisical|dotenv`; auto tries accessible Infisical, `orchestrator/.env`, then shell/file login. Infisical project `mac-os-cf`, environment `dev`, is bound by `orchestrator/.infisical.json`; use `orchestrator/.env.example` for dotenv.
-- **Codex:** file-backed login (`env -u AGENT make codex-auth-setup`) or `OPENAI_API_KEY`; OS-keyring-only login cannot enter Harbor.
+- **Codex:** file-backed login (`make codex-auth-setup`) or `OPENAI_API_KEY`; OS-keyring-only login cannot enter Harbor.
 - **Claude Code:** `ANTHROPIC_API_KEY`, `ANTHROPIC_AUTH_TOKEN` or `CLAUDE_CODE_OAUTH_TOKEN`.
 
-Use `env -u AGENT make help` for the exhaustive public command catalogue.
+Use `make help` for the exhaustive public command catalogue.
 
 ## Quick Start
 
@@ -49,8 +49,8 @@ First, inspect the shipped one-trial smoke without calling a model:
 
 ```bash
 E=lab/experiments/smoke/python__circuit_eval-cp1__agent-health/experiment.yaml
-env -u AGENT make experiment-validate EXPERIMENT="$E"
-env -u AGENT make experiment-plan EXPERIMENT="$E"
+make experiment-validate EXPERIMENT="$E"
+make experiment-plan EXPERIMENT="$E"
 ```
 
 The plan lists the selected trial and its hashes; it does not execute the agent.
@@ -60,7 +60,7 @@ and the one-shot workflow.
 With credentials and a ready Docker target, the operational first run is:
 
 ```bash
-env -u AGENT make orchestrator-smoke
+make orchestrator-smoke
 ```
 
 This calls a real model and incurs provider usage. It writes a smoke lock under

@@ -119,7 +119,7 @@ def main(argv: list[str] | None = None) -> int:
     print(
         "Restore byte-equal pin files, then run:\n"
         f"  uv python install {pin}\n"
-        "  env -u AGENT uv sync --project orchestrator --all-extras --frozen",
+        "  uv sync --project orchestrator --all-extras --frozen",
         file=sys.stderr,
     )
     return 1

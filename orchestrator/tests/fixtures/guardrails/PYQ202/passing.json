@@ -1,4 +1,0 @@
-{
-  "path": "orchestrator/src/raidar/engine/canary.py",
-  "source": "class Canary:\n    def __init__(self, first): pass\n"
-}

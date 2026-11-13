@@ -1,6 +1,0 @@
-{
-  "files": {
-    "orchestrator/src/probe.py": "\"\"\"Expose a canary function.\"\"\"\n\n\ndef probe(value: int) -> int:\n    \"\"\"Compute a value.\"\"\"\n    local0 = value + 0\n    local1 = value + 1\n    local2 = value + 2\n    local3 = value + 3\n    local4 = value + 4\n    local5 = value + 5\n    local6 = value + 6\n    local7 = value + 7\n    local8 = value + 8\n    local9 = value + 9\n    local10 = value + 10\n    local11 = value + 11\n    local12 = value + 12\n    local13 = value + 13\n    local14 = value + 14\n    local15 = value + 15\n    return local0 + local1 + local2 + local3 + local4 + local5 + local6 + local7 + local8 + local9 + local10 + local11 + local12 + local13 + local14 + local15\n"
-  },
-  "format": false
-}

@@ -8,7 +8,7 @@ and ``countsTowardVerdicts``, which is true only for a successful ``enforce``
 decision. Records are redacted before they are written.
 
 The layout is the ``jev.ts`` one, rooted beside the Assessment store instead
-of ``~/.omp``: decisions append to ``<store>/jev-audit/<policy>/<YYYY-MM-DD>.jsonl``
+of the user's home directory: decisions append to ``<store>/jev-audit/<policy>/<YYYY-MM-DD>.jsonl``
 (UTC date of the record) and labels to ``<store>/jev-audit/<policy>/labels.jsonl``,
 mode 0600. Absent optional fields are omitted, never written as ``null``,
 because the lab's schema treats them as ``optional`` and rejects ``null``.

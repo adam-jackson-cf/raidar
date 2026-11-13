@@ -1,6 +1,0 @@
-{
-  "path": "orchestrator/src/raidar/engine/job/__init__.py",
-  "files": {
-    "orchestrator/src/raidar/engine/job/__init__.py": "import raidar.contract\n"
-  }
-}

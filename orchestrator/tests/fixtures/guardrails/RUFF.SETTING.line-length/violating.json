@@ -1,6 +1,0 @@
-{
-  "files": {
-    "orchestrator/src/probe.py": "\"\"\"Expose a message.\"\"\"\n\nMESSAGE = 'word word word word word word word word word word word word word word word word word word word word word word word word '\n"
-  },
-  "format": false
-}

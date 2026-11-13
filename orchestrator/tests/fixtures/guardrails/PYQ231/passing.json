@@ -1,4 +1,0 @@
-{
-  "path": "contract/src/raidar_contract/call.py",
-  "source": "def execute(runner: str): pass\n"
-}
