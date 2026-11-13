@@ -19,7 +19,7 @@ _Set the objective before collecting evidence._
 > [!IMPORTANT]
 > **Change boundary:** a Raidar or workflow change starts a new confirm experiment. Objectives are separate from `ab-test` and `benchmark` kinds.
 
-Use [README](../../README.md) for installation, [problem onboarding](problem-onboarding.md) for bindings, and `env -u AGENT make help` for options. Real-model runs require owner approval.
+Use [README](../../README.md) for installation, [problem onboarding](problem-onboarding.md) for bindings, and `make help` for options. Real-model runs require owner approval.
 
 Sources: `README.md@52441c363fb1a1f076df6b87bd455d925d783b0c (historical)`; [lab/stages/README.md](../../lab/stages/README.md) (`Contract history`).
 
@@ -43,11 +43,11 @@ A["<b>Author</b><br/>experiment.yaml"]:::human --> V["<b>Validate</b><br/>Schema
 
 ```bash
 E=lab/experiments/ab-test/python__circuit_eval-cp1__review-trial/experiment.yaml
-env -u AGENT make experiment-init EXPERIMENT=$E
+make experiment-init EXPERIMENT=$E
 # Edit the treatment arm and pre-register the analysis plan.
-env -u AGENT make experiment-validate EXPERIMENT=$E
-env -u AGENT make experiment-lock EXPERIMENT=$E
-env -u AGENT make experiment-plan EXPERIMENT=$E
+make experiment-validate EXPERIMENT=$E
+make experiment-lock EXPERIMENT=$E
+make experiment-plan EXPERIMENT=$E
 ```
 
 - **Starter:** current Codex and one-shot releases, two identical arms, one pinned checkpoint; set the treatment to the registered workflow or agent under test.
@@ -97,7 +97,7 @@ J["<b>Non-smoke job</b>"]:::store --> L{"<b>Current lock?</b>"}:::det
 - **Match:** recorded `runner.execution_sha256` / `runner.toolchain_sha256`, pack recipe, target name and Docker facts, plus each arm’s agent/tool, model/reasoning, workflow and package/primitive pins must be covered.
 - **Clean:** a finished smoke must retain valid trials and violation-free `health.json`, and change `/app` at every executed checkpoint relative to its parent snapshot; checkpoint 1 compares with the seeded workspace.
 - **Refusal:** draft locks, agent overrides and no-work trials cannot clear admission. Grader-recipe matching belongs to pooling, not smoke identity; an admission override cannot lift capability incompatibility.
-- **Choose:** `env -u AGENT make orchestrator-smoke` exercises the default agent; `env -u AGENT make agent-smoke RELEASE=… MODEL=…` selects a release; `env -u AGENT make smoke-agents` covers registered smoke arms. `make help` owns options.
+- **Choose:** `make orchestrator-smoke` exercises the default agent; `make agent-smoke RELEASE=… MODEL=…` selects a release; `make smoke-agents` covers registered smoke arms. `make help` owns options.
 
 Use [health and pooling](health-and-pooling.md) after execution.
 
@@ -108,15 +108,15 @@ Sources: [orchestrator/src/raidar/design/experiment/runtime_gate.py](../../orche
 _Launch long jobs detached and wait for completion before assessment._
 
 ```bash
-env -u AGENT make experiment-execute EXPERIMENT=$E JOB_ID=first DETACH=1
+make experiment-execute EXPERIMENT=$E JOB_ID=first DETACH=1
 J=var/jobs/python__circuit_eval-cp1__review-trial/first
-env -u AGENT make experiment-status JOB=$J
+make experiment-status JOB=$J
 ```
 
 - **Supervisor:** `DETACH=1` survives the launching shell; pid, log and exit record live in `<job>/detach/`.
 - **Status:** reports `running`, `finished`, `failed` or `died` without changing the job.
 - **Job:** retains step results, validity, N1 phases and executed `job.lock.json`.
-- **Interrupted trials:** use `env -u AGENT make harbor-cleanup JOB=$J` for leftover environments.
+- **Interrupted trials:** use `make harbor-cleanup JOB=$J` for leftover environments.
 
 For report-only `perf-check`, enforced `perf-gate` and accepted budgets, see [health and pooling](health-and-pooling.md).
 
@@ -128,11 +128,11 @@ _Offline interpretation never rewrites the executed job._
 
 ```bash
 S=var/stores/review-trial
-env -u AGENT make experiment-assess JOB=$J STORE=$S \
+make experiment-assess JOB=$J STORE=$S \
   SCORERS="correctness@10 code-quality@9 resource-usage@8"
-env -u AGENT make experiment-analyze JOBS="$J" STORE=$S ANALYSIS_OUT=var/analysis/review-trial
-env -u AGENT make review-surface-quality-data QUALITY_JOBS="$J" QUALITY_STORE=$S
-env -u AGENT make review-surface-serve REVIEW_JOBS_ROOT="$J" REVIEW_STORE=$S
+make experiment-analyze JOBS="$J" STORE=$S ANALYSIS_OUT=var/analysis/review-trial
+make review-surface-quality-data QUALITY_JOBS="$J" QUALITY_STORE=$S
+make review-surface-serve REVIEW_JOBS_ROOT="$J" REVIEW_STORE=$S
 ```
 
 - **Assessment lock:** supply `LOCK=` or retain the experiment’s current lock with the job’s `lock_sha256`; assessment-only relocks may apply. The executed `job.lock.json` is not a fallback.

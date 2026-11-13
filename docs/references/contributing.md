@@ -25,22 +25,21 @@ C["<b>Change</b><br/>Working tree"]:::human --> P{"<b>Policy valid?</b><br/>Whol
 ```
 
 ```bash
-env -u AGENT uv run --project orchestrator --extra dev pre-commit install --hook-type pre-commit
-env -u AGENT make gate-commit
-# CI uses: env -u AGENT make gate-ci
+uv run --project orchestrator --extra dev pre-commit install --hook-type pre-commit
+make gate-commit
+# CI uses: make gate-ci
 ```
 
 | Change                 | Automated evidence                                                                                          | Contributor action                                                                                          |
 | ---------------------- | ----------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
-| Tests and capabilities | Ownership, tier, changed-behavior evidence and duplicate-case checks block changes that fail their requirements. | Declare each new behavior and capability's owner; map added tests and parameter cases to changed source.    |
+| Tests and capabilities | Ownership and tier checks block changes that fail their requirements.                                       | Declare each new capability's owner and each test file's tier.                                              |
 | Python and analysis    | Ruff, strict mypy, import contracts, complexity, policy and I/O boundary checks block new or stale debt. | Use owning seams and remove resolved baseline entries; never refresh baselines to make a change pass.       |
-| Guardrails             | `rule-coverage` blocks missing passing/violating evidence; timing checks consume the fast-tier JUnit report. | Follow [test profile](../../.omp/test-profile.md) for machine budgets, reference exceptions and test tiers. |
 | Toolchain              | Exact tool-pin, installer/lock agreement and maintained Markdown/YAML formatting checks block changes that fail their requirements. | Use the locked formatter; dependency changes also run the pinned audit (CI always audits).                  |
 
 > [!IMPORTANT]
-> **Owning policies:** [test profile](../../.omp/test-profile.md) defines budgets and exceptions; [ownership map](../../scripts/checks/repository-owners.json) defines tiers and seams. Unknown local ownership runs all T2 seams rather than skipping tests. Docker, performance and security checks are separate gates.
+> **Owning policies:** [ownership map](../../scripts/checks/repository-owners.json) defines owners, tiers and seams; [baselines](../../scripts/checks/baselines/) hold the shrink-only Ruff, mypy and analyzer debt. Unknown local ownership runs all T2 seams rather than skipping tests. Docker, performance and security checks are separate gates.
 
-Sources: [.omp/gate.json](../../.omp/gate.json); [Makefile](../../Makefile) (`quality`); [scripts/checks/repository-owners.json](../../scripts/checks/repository-owners.json); [.omp/test-behavior-map.json](../../.omp/test-behavior-map.json); [.omp/test-profile.md](../../.omp/test-profile.md); [scripts/checks/check-python-quality.py](../../scripts/checks/check-python-quality.py); [scripts/checks/check-analyzer-scope.py](../../scripts/checks/check-analyzer-scope.py); [.omp/rule-coverage.json](../../.omp/rule-coverage.json).
+Sources: [.pre-commit-config.yaml](../../.pre-commit-config.yaml); [Makefile](../../Makefile) (`gate-commit`, `gate-ci`, `quality`); [scripts/checks/repository-owners.json](../../scripts/checks/repository-owners.json); [scripts/checks/check-python-quality.py](../../scripts/checks/check-python-quality.py); [scripts/checks/check-analyzer-scope.py](../../scripts/checks/check-analyzer-scope.py).
 
 ## 2 · Find the owning source
 
@@ -61,7 +60,7 @@ _Edit the definition in place and update its registered digest; relock and rerun
 
 - **Agent, workflow or stage:** edit in place and update the registered digest of its existing `@N` in `lab/releases.yaml` (`make releases-check` prints the line); update dependent workflow digests the same way. `make release-archive REF=<name>@<N>` is optional history.
 - **Stage evidence:** run `stage-check NAME=<namespace/name>` for the current installed tree and declared stop/output obligations.
-- **Application version:** fetch origin, branch from `origin/main`, then run `env -u AGENT make version-release`; commit its three generated files in the printed release subject through normal gated review. Regenerate after rebasing onto newer main.
+- **Application version:** fetch origin, branch from `origin/main`, then run `make version-release`; commit its three generated files in the printed release subject through normal gated review. Regenerate after rebasing onto newer main.
 - **Version-only release:** does not require experiment relocks; execution toolchains pin result-affecting versions separately.
 - **Invalidating code change:** rerun affected experiments. Experiment locks and problem validations still pin grader and `primitive_code` digests and refuse mismatches: relock through `make experiment-lock`, re-validating any problem RT7 refuses, then rerun. There is no repository identity record or revalidation ceremony; `job.json` retains `runner.commit` and `runner.dirty`.
 
@@ -72,7 +71,7 @@ Sources: [Makefile](../../Makefile) (`release-archive,version-release`); [split-
 _Distribute exact wheel and sdist bytes, not a build from a Git tag._
 
 ```bash
-env -u AGENT make contract-build CONTRACT_DIST_DIR=var/contract/v<version>
+make contract-build CONTRACT_DIST_DIR=var/contract/v<version>
 # In the consumer environment with the exact hash-pinned artifact installed:
 python -m raidar_contract.conformance.check
 ```

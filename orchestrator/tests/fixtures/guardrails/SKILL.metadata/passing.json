@@ -1,5 +1,0 @@
-{
-  "files": {
-    ".agents/skills/canary-check/SKILL.md": "---\nname: canary-check\ndescription: Use when checking a canary\n---\n"
-  }
-}

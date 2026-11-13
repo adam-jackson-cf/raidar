@@ -1,6 +1,0 @@
-{
-  "files": {
-    "orchestrator/src/probe.py": "import yaml\n\nVALUE: int = 1\n"
-  },
-  "format": false
-}

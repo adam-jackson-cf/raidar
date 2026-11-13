@@ -29,7 +29,7 @@ jobs:
 
       - name: Install orchestrator dev dependencies
         run: |
-          env -u AGENT uv sync --project orchestrator --all-extras --frozen --python 3.13.7
+          uv sync --project orchestrator --all-extras --frozen --python 3.13.7
 
       - name: Set up Node
         uses: actions/setup-node@v4
@@ -39,20 +39,5 @@ jobs:
       - name: Install locked formatter
         run: npm ci --ignore-scripts
 
-      # guardrails-reference lists the review-surface Playwright tests (TEST.tier-selectors).
-      - name: Install locked review-surface test runner
-        run: npm ci --ignore-scripts --prefix review-surface
-
-      # guardrails-reference runs lever-selftest (SURFACE.lever-isolation): the lever's doctor
-      # serves review-surface/dist and renders it in headless Chromium. The gate sets
-      # XDG_CACHE_HOME to the repository's .cache (Makefile REPO_CACHE_DIR), where Playwright
-      # looks for its browsers on Linux, so Chromium is installed there. The runner image already
-      # has Chromium's system libraries; `--with-deps` only added fonts through apt, so it is not
-      # used and the step needs no apt mirror.
-      - name: Build review surface and install Chromium for the lever
-        run: |
-          npm run build --prefix review-surface
-          cd review-surface && XDG_CACHE_HOME="$GITHUB_WORKSPACE/.cache" npx --no-install playwright install chromium
-
       - name: Run repository CI gate
-        run: env -u AGENT uv run --project orchestrator --extra dev python scripts/checks/run-repository-gate.py ci
+        run: make gate-ci

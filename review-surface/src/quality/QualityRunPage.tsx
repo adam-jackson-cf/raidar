@@ -15,7 +15,7 @@ import { JevHistoryPanel } from '@/quality/components/JevHistoryPanel';
 import { QualityStrip, type Selection } from '@/quality/components/QualityStrip';
 import { POLICY_SOURCE_TITLE } from '@/quality/format';
 import { qualityExperimentHref, selectionFromParams, useQualityIndex } from '@/quality/links';
-import '@/quality/quality.css';
+import '@/quality/styles.css';
 
 export function QualityRunPage() {
   const { runId = '' } = useParams();

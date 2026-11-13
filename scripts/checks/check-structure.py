@@ -39,7 +39,6 @@ ROOT_DIRECTORIES = frozenset(
         ".agents",
         ".claude",
         ".github",
-        ".omp",
         "var",
     }
 )

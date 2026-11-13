@@ -6,7 +6,7 @@ provider body (bodies can echo the input). Question blocks are validated before
 any network call and malformed ones raise, because they are programmer errors.
 
 The key is read from ``OPENROUTER_API_KEY`` only. Raidar does not reach into a
-personal OMP install for it (design memo §3.5).
+personal agent-harness install for it (design memo §3.5).
 """
 
 from __future__ import annotations
@@ -44,7 +44,7 @@ _HTTP_PAYMENT_REQUIRED = 402
 
 
 class FailureReason(StrEnum):
-    """Why no usable decision exists; mirrors the OMP watchdog failure vocabulary."""
+    """Why no usable decision exists; mirrors the ``jev.ts`` watchdog failure vocabulary."""
 
     MISSING_KEY = "missing_key"
     STATE_TOO_LARGE = "state_too_large"

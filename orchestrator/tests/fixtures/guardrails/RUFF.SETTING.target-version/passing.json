@@ -1,6 +1,0 @@
-{
-  "files": {
-    "orchestrator/src/probe.py": "\"\"\"Expose a generator.\"\"\"\n\nfrom collections.abc import Generator\n\n\ndef samples() -> Generator[int, None, None]:\n    \"\"\"Yield a value.\"\"\"\n    yield 1\n"
-  },
-  "format": false
-}

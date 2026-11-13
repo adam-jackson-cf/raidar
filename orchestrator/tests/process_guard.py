@@ -43,7 +43,8 @@ def _audit(event: str, args: tuple[Any, ...]) -> None:
     if _state["deny"] and event in PROCESS_EVENTS:
         raise ProcessGuardError(
             f"{_state['test']}: {event} starts a real process in the fast tier; "
-            "inject a fake, or mark the file slow/quality/docker (see .omp/test-profile.md)"
+            "inject a fake, or mark the file slow/quality/docker "
+            "(pytest markers in orchestrator/pyproject.toml)"
         )
 
 

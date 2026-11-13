@@ -47,14 +47,6 @@ dev = [
     "radon==6.0.1",
 ]
 
-# The setup-repository-guardrails reference checkers: a commit pin of the public skill
-# repository, never a branch and never a local path. The default `dev` group installs with every
-# `uv sync` and `uv run` (CI: `uv sync --all-extras --frozen`); upgrade by bumping the commit.
-[dependency-groups]
-dev = [
-    "omp-guardrails[pytest] @ git+https://github.com/adam-jackson-cf/oh-mi-pi-config@397a456381d678909df9b207b54a6f8e2c72e9ca#subdirectory=agent/skills/setup-repository-guardrails/assets/python-reference",
-]
-
 [project.scripts]
 raidar = "raidar.cli:main"
 
@@ -91,10 +83,6 @@ exclude = [
 # The define package's tool unit tests import its source in place (a test-only path).
 src = [".", "src", "../lab/stages/raidar/define/tool/src"]
 extend-exclude = [
-    # Exact upstream bytes are hash-checked and executed, not repository-maintained.
-    "**/scripts/vendor/setup-repository-guardrails/validate_rule_coverage.py",
-    # Canary inputs are not maintained Python sources.
-    "tests/fixtures/guardrails",
     "../lab/experiments",
     "../var",
     "**/node_modules",
@@ -167,7 +155,7 @@ asyncio_mode = "auto"
 addopts = "--strict-markers --ignore-glob=.env* --ignore-glob=**/.env*"
 testpaths = ["tests"]
 pythonpath = ["../lab/stages/raidar/define/tool/src"]
-# Tiers are applied at file level only (pytestmark); see .omp/test-profile.md.
+# Tiers are applied at file level only (pytestmark).
 markers = [
     "slow: real processes or I/O beyond the fast tier's budget",
     "quality: repository-wide quality and guardrail checks",
@@ -212,9 +200,8 @@ mypy_path = [
     "$MYPY_CONFIG_FILE_DIR/../lab/stages/raidar/verify/tool/src",
 ]
 explicit_package_bases = true
-# Fixture programs are tool inputs; the exact upstream validator is non-maintained,
-# hash-checked vendored code (scripts/vendor/setup-repository-guardrails/provenance.json).
-exclude = '(^|/)fixtures/|(^|/)scripts/vendor/setup-repository-guardrails/validate_rule_coverage\.py$'
+# Fixture programs are tool inputs, not maintained sources.
+exclude = '(^|/)fixtures/'
 
 [[tool.mypy.overrides]]
 # Mypy reports missing stubs; types-PyYAML/types-jsonschema/types-networkx are not dependencies.

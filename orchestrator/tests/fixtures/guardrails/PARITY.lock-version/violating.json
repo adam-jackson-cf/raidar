@@ -1,6 +1,0 @@
-{
-  "projects": {
-    "orchestrator/pyproject.toml": "[project]\nname = \"canary\"\nversion = \"1.0.0\"\n"
-  },
-  "lock": "version = 1\n[[package]]\nname = \"canary\"\nversion = \"2.0.0\"\n"
-}

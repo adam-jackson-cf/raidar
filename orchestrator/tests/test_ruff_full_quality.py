@@ -25,7 +25,7 @@ def lint_tree(tmp_path: Path) -> Path:
     checker = tmp_path / "scripts/checks/check-finding-baseline.py"
     checker.parent.mkdir(parents=True)
     shutil.copyfile(ROOT / "scripts/checks/check-finding-baseline.py", checker)
-    baseline = tmp_path / ".omp/baselines/ruff.json"
+    baseline = tmp_path / "scripts/checks/baselines/ruff.json"
     baseline.parent.mkdir(parents=True)
     baseline.write_text(json.dumps({"schemaVersion": 1, "tool": "ruff", "findings": []}))
     source = tmp_path / SOURCE
@@ -70,9 +70,9 @@ def _lint_and_baseline(root: Path, source: str, *options: str):
             "--report",
             "ruff-report.json",
             "--baseline",
-            ".omp/baselines/ruff.json",
+            "scripts/checks/baselines/ruff.json",
             "--base-baseline",
-            ".omp/baselines/ruff.json",
+            "scripts/checks/baselines/ruff.json",
         ],
         cwd=root,
         capture_output=True,

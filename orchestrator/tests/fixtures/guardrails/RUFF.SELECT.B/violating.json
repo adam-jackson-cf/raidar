@@ -1,6 +1,0 @@
-{
-  "files": {
-    "orchestrator/src/probe.py": "\"\"\"Expose a canary function.\"\"\"\n\n\ndef probe(value: int) -> int:\n    \"\"\"Compute a value.\"\"\"\n    return value == 1 or value == 2 or value == 3\n\n\nfor item in []:\n    1\n"
-  },
-  "format": false
-}

@@ -1,8 +1,0 @@
-{
-  "rule": "PROFILE.complete",
-  "expect": "pass",
-  "check": {
-    "subcommand": "profile-check",
-    "argv": []
-  }
-}

@@ -1,54 +1,32 @@
-"""Real-process canaries for repository gate exit codes and path diagnostics."""
+"""Real-process canaries for the commit hook entry and path diagnostics."""
 
 from __future__ import annotations
 
-import json
 import os
 import re
 import shlex
-import shutil
 import subprocess
 import sys
 from pathlib import Path
 
 import pytest
+import yaml
 
 pytestmark = pytest.mark.quality
 
 ROOT = Path(__file__).resolve().parents[2]
 
 
-@pytest.mark.parametrize("returncode", [0, 17])
-def test_dispatcher_preserves_child_exit_status(tmp_path: Path, returncode: int) -> None:
-    script = tmp_path / "scripts/checks/run-repository-gate.py"
-    script.parent.mkdir(parents=True)
-    shutil.copyfile(ROOT / "scripts/checks/run-repository-gate.py", script)
-    gate_directory = tmp_path / ".omp"
-    gate_directory.mkdir()
-    (gate_directory / "gate.json").write_text(
-        json.dumps(
-            {
-                "schemaVersion": 2,
-                "checks": {"commit": [sys.executable, "-c", f"raise SystemExit({returncode})"]},
-            }
-        )
-    )
-
-    result = subprocess.run(
-        [sys.executable, str(script), "commit"],
-        cwd=tmp_path,
-        capture_output=True,
-        text=True,
-        check=False,
-        timeout=30,
-    )
-
-    assert result.returncode == returncode, result.stderr
-    assert result.stdout == ""
-    assert result.stderr == ""
+def _hook_entry_prefix() -> list[str]:
+    """The repository-gate hook entry without its trailing `make gate-commit`."""
+    config = yaml.safe_load((ROOT / ".pre-commit-config.yaml").read_text(encoding="utf-8"))
+    hooks = [hook for repo in config["repos"] for hook in repo["hooks"]]
+    entry = shlex.split(next(hook["entry"] for hook in hooks if hook["id"] == "repository-gate"))
+    assert entry[-2:] == ["make", "gate-commit"]
+    return entry[:-2]
 
 
-def test_dispatcher_hook_keeps_linked_worktree_repository_non_bare(tmp_path: Path) -> None:
+def test_hook_entry_keeps_linked_worktree_repository_non_bare(tmp_path: Path) -> None:
     environment = os.environ.copy()
     for variable in (
         "GIT_DIR",
@@ -88,28 +66,17 @@ def test_dispatcher_hook_keeps_linked_worktree_repository_non_bare(tmp_path: Pat
     added = git("worktree", "add", "-b", "linked", str(worktree), cwd=repository)
     assert added.returncode == 0, added.stderr
 
-    dispatcher = worktree / "scripts/checks/run-repository-gate.py"
-    dispatcher.parent.mkdir(parents=True)
-    shutil.copyfile(ROOT / "scripts/checks/run-repository-gate.py", dispatcher)
-    gate_directory = worktree / ".omp"
-    gate_directory.mkdir()
     scratch_init = (
         "import os, subprocess, tempfile\n"
         "with tempfile.TemporaryDirectory() as scratch:\n"
         "    os.chdir(scratch)\n"
         "    subprocess.run(['git', 'init', '-q', '--bare'], check=True, timeout=10)\n"
     )
-    (gate_directory / "gate.json").write_text(
-        json.dumps(
-            {
-                "schemaVersion": 2,
-                "checks": {"commit": [sys.executable, "-c", scratch_init]},
-            }
-        )
-    )
     hook = repository / ".git/hooks/pre-commit"
     hook.write_text(
-        "#!/bin/sh\nexec " + shlex.join([sys.executable, str(dispatcher), "commit"]) + "\n"
+        "#!/bin/sh\nexec "
+        + shlex.join([*_hook_entry_prefix(), sys.executable, "-c", scratch_init])
+        + "\n"
     )
     hook.chmod(0o755)
     (worktree / "tracked.txt").write_text("Worktree commit exercises the gate hook.\n")

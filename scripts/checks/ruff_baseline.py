@@ -11,7 +11,7 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
-BASELINE = ".omp/baselines/ruff.json"
+BASELINE = "scripts/checks/baselines/ruff.json"
 
 
 def main() -> int:

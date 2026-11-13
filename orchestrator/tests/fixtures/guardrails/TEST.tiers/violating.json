@@ -1,4 +1,0 @@
-{
-  "path": "orchestrator/tests/test_test_evidence.py",
-  "source": "import pytest\npytestmark = pytest.mark.slow\ndef test_canary(): pass\n"
-}

@@ -1,6 +1,0 @@
-{
-  "files": {
-    "orchestrator/src/probe.py": "\"\"\"Expose a canary value.\"\"\"\n\nVALUE = 1  \n"
-  },
-  "format": false
-}

@@ -1,7 +1,0 @@
-{
-  "files": {
-    "orchestrator/src/probe.py": "from raidar_contract import VALUE\n\nRESULT: int = VALUE\n",
-    "contract/src/raidar_contract/__init__.py": "VALUE: int = 1\n"
-  },
-  "format": false
-}

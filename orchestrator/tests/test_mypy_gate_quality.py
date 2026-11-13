@@ -81,12 +81,12 @@ def test_mypy_baseline_gate_refuses_a_new_real_type_error(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capfd: pytest.CaptureFixture[str]
 ) -> None:
     orchestrator = _workspace(tmp_path)
-    baseline = tmp_path / ".omp/baselines/mypy.json"
+    baseline = tmp_path / "scripts/checks/baselines/mypy.json"
     baseline.parent.mkdir(parents=True)
     baseline.write_text(json.dumps({"schemaVersion": 1, "tool": "mypy", "findings": []}))
     for argv in [
         ["git", "init", "-q"],
-        ["git", "add", ".omp/baselines/mypy.json"],
+        ["git", "add", "scripts/checks/baselines/mypy.json"],
         [
             "git",
             "-c",

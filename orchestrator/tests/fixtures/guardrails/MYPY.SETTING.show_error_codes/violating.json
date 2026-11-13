@@ -1,6 +1,0 @@
-{
-  "files": {
-    "orchestrator/src/probe.py": "VALUE: int = \"wrong\"\n"
-  },
-  "format": false
-}

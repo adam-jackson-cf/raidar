@@ -180,19 +180,19 @@ Lock refusals: **ST1** unsupported/invalid package contract; **ST2** unsupported
 
 ## Author commands
 
-Use the repository-root public interface (`env -u AGENT` is required when running from an OMP session):
+Use the repository-root public interface:
 
 ```sh
-env -u AGENT make stage-new NAME=acme/my-check FROM=raidar/docs-check  # default source
-env -u AGENT make stage-lock NAME=acme/my-check
-env -u AGENT make stage-check NAME=acme/my-check TARGET=local
-env -u AGENT make stage-check NAME=acme/my-check REPLAY=<trial> TARGET=local
-env -u AGENT make stage-list
-env -u AGENT make stage-info NAME=acme/my-check
-env -u AGENT make workflow-new NAME=acme/my-workflow            # FROM=raidar/one-shot-verify by default
-env -u AGENT make experiment-lock EXPERIMENT=<smoke-yaml> DRAFT=1
-env -u AGENT make stage-import SRC=<dir> NAME=acme/my-check SHA256=<digest> SOURCE='<repo>@<commit>:<path>'
-env -u AGENT make workflow-import SRC=<dir> NAME=acme/my-workflow SHA256=<digest> SOURCE='<repo>@<commit>:<path>'
+make stage-new NAME=acme/my-check FROM=raidar/docs-check  # default source
+make stage-lock NAME=acme/my-check
+make stage-check NAME=acme/my-check TARGET=local
+make stage-check NAME=acme/my-check REPLAY=<trial> TARGET=local
+make stage-list
+make stage-info NAME=acme/my-check
+make workflow-new NAME=acme/my-workflow            # FROM=raidar/one-shot-verify by default
+make experiment-lock EXPERIMENT=<smoke-yaml> DRAFT=1
+make stage-import SRC=<dir> NAME=acme/my-check SHA256=<digest> SOURCE='<repo>@<commit>:<path>'
+make workflow-import SRC=<dir> NAME=acme/my-workflow SHA256=<digest> SOURCE='<repo>@<commit>:<path>'
 ```
 
 Creation copies a real `FROM=<ns>/<name>` package, defaulting to `raidar/docs-check`, and refuses
