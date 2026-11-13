@@ -59,11 +59,15 @@ def _missing_required_group(
     for group, alternatives in sorted(grouped.items()):
         if any(credential.id in resolved_ids for credential in alternatives):
             continue
-        names = tuple(
-            dict.fromkeys(name for credential in alternatives for name in credential.accepted_names)
-        )
-        return group, names
+        return group, _accepted_names(alternatives)
     return None
+
+
+def _accepted_names(alternatives: list[CredentialSpec]) -> tuple[str, ...]:
+    """Every name the alternatives accept, first occurrence first."""
+    return tuple(
+        dict.fromkeys(name for credential in alternatives for name in credential.accepted_names)
+    )
 
 
 class HarnessAdapter:

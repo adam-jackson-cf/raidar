@@ -44,8 +44,8 @@ from pathlib import Path
 from typing import Any, Literal
 
 import yaml
-from raidar_contract.canonical import digest_json
 
+from raidar.contract.file_io import load_text, store_text
 from raidar.scoring.judge.audit import AuditLog, DecisionRecord, LabelRecord, ReviewerKind
 from raidar.scoring.judge.calibration import (
     PROVISIONAL_THRESHOLD,
@@ -63,6 +63,7 @@ from raidar.scoring.judge.policies import (
     SplitMetrics,
     load_policy,
 )
+from raidar_contract.canonical import digest_json
 
 THRESHOLD_DIGITS = 6
 METRIC_DIGITS = 4
@@ -409,7 +410,7 @@ def plan_promotion(
 def promoted_yaml(path: Path, policy: JevPolicy) -> str:
     """The policy file for ``policy``, keeping the original file's leading comments."""
     header = []
-    for line in path.read_text(encoding="utf-8").splitlines():
+    for line in load_text(path, encoding="utf-8").splitlines():
         if not line.startswith("#"):
             break
         header.append(line)
@@ -425,6 +426,6 @@ def write_promotion(path: Path, plan: PromotionPlan) -> None:
     if not plan.ok:
         raise PromotionError(f"promotion of {plan.policy.id} does not verify: {plan.failures}")
     text = promoted_yaml(path, plan.policy)
-    path.write_text(text, encoding="utf-8")
+    store_text(path, text, encoding="utf-8")
     if load_policy(path) != plan.policy:
         raise PromotionError(f"{path} did not round-trip the promoted policy")

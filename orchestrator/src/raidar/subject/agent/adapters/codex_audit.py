@@ -128,10 +128,8 @@ def codex_session_audit(turn_dir: Path) -> dict[str, Any]:
         for row in _rows(rollout):
             records += 1
             version = version or _row_version(row)
-            for role, text in _row_messages(row):
-                if role in DIGESTED_ROLES:
-                    messages.append({"role": str(role), "sha256": digest(text)})
-                _classify(text, roots, instructions, violations, unmeasured)
+            messages.extend(_digested_messages(row))
+            _classify_row(row, roots, instructions, violations, unmeasured)
     return session_audit_record(
         HARNESS,
         version=version,
@@ -143,6 +141,27 @@ def codex_session_audit(turn_dir: Path) -> dict[str, Any]:
         violations=violations,
         unmeasured=unmeasured,
     )
+
+
+def _digested_messages(row: dict[str, Any]) -> list[dict[str, str]]:
+    """The role and digest of each of a rollout row's messages from a digested role."""
+    return [
+        {"role": str(role), "sha256": digest(text)}
+        for role, text in _row_messages(row)
+        if role in DIGESTED_ROLES
+    ]
+
+
+def _classify_row(
+    row: dict[str, Any],
+    roots: list[str],
+    instructions: list[dict[str, str | None]],
+    violations: list[str],
+    unmeasured: list[str],
+) -> None:
+    """Classify every message of a rollout row (``_classify``)."""
+    for _role, text in _row_messages(row):
+        _classify(text, roots, instructions, violations, unmeasured)
 
 
 def _classify(

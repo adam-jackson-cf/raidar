@@ -24,7 +24,6 @@ latency) and is never part of an Assessment key.
 
 from __future__ import annotations
 
-import os
 import uuid
 from datetime import UTC, datetime
 from enum import StrEnum
@@ -34,6 +33,7 @@ from typing import Any, Literal, Self
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 from pydantic.alias_generators import to_camel
 
+from raidar.contract.file_io import append_private_line, load_text
 from raidar.scoring.judge.policies import LABELS, PolicyMode
 
 AUDIT_DIR = "jev-audit"
@@ -161,17 +161,6 @@ def utc_timestamp() -> str:
     return datetime.now(UTC).isoformat(timespec="milliseconds").replace("+00:00", "Z")
 
 
-def _append_line(path: Path, line: str) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
-    flags = os.O_WRONLY | os.O_CREAT | os.O_APPEND | os.O_NOFOLLOW
-    descriptor = os.open(path, flags, 0o600)
-    try:
-        os.fchmod(descriptor, 0o600)
-        os.write(descriptor, (line + "\n").encode("utf-8"))
-    finally:
-        os.close(descriptor)
-
-
 class AuditLog:
     """Append-only decision and label records for one assessment store."""
 
@@ -192,13 +181,13 @@ class AuditLog:
         return self.policy_dir(policy) / LABELS_FILE
 
     def append(self, record: DecisionRecord) -> DecisionRecord:
-        _append_line(self.decisions_path(record), _line(record))
+        append_private_line(self.decisions_path(record), _line(record))
         return record
 
     def append_label(self, record: LabelRecord) -> LabelRecord:
         if record.label not in LABELS:
             raise ValueError(f"unknown Jev label {record.label!r}; expected one of {LABELS}")
-        _append_line(self.labels_path(record.policy), _line(record))
+        append_private_line(self.labels_path(record.policy), _line(record))
         return record
 
     def decisions(self, policy: str) -> list[DecisionRecord]:
@@ -223,5 +212,5 @@ def _line(record: _Record) -> str:
 def _read[RecordT: _Record](path: Path, model: type[RecordT]) -> list[RecordT]:
     if not path.is_file():
         return []
-    lines = path.read_text(encoding="utf-8").splitlines()
+    lines = load_text(path, encoding="utf-8").splitlines()
     return [model.model_validate_json(line) for line in lines if line.strip()]

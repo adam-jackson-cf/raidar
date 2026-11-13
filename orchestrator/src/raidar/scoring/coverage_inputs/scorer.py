@@ -20,6 +20,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from raidar.contract.file_io import load_bytes
 from raidar.judge.live import RecordedJev
 from raidar.scoring.coverage_inputs.asking import Asker
 from raidar.scoring.framework.context import AssessContext, StepInputs
@@ -130,7 +131,7 @@ def _unmeasured(readings: Mapping[str, StepReading]) -> tuple[AssessStatus, str]
 
 def _payloads(root: Path) -> dict[str, bytes]:
     return {
-        f"{JEV_DIR}/{path.relative_to(root).as_posix()}": path.read_bytes()
+        f"{JEV_DIR}/{path.relative_to(root).as_posix()}": load_bytes(path)
         for path in sorted(root.rglob("*"))
         if path.is_file()
     }

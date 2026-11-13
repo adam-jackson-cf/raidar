@@ -15,6 +15,7 @@ from typing import Any, Literal
 
 from pydantic import Field
 
+from raidar.contract.file_io import load_text, store_text
 from raidar.contract.trial import ExecutionModel
 
 HEALTH_FILE = "health.json"
@@ -52,7 +53,7 @@ class HealthReport(ExecutionModel):
 def write_health(trial_dir: Path, report: HealthReport) -> Path:
     path = trial_dir / HEALTH_FILE
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(report.model_dump(mode="json"), indent=2, sort_keys=True) + "\n")
+    store_text(path, json.dumps(report.model_dump(mode="json"), indent=2, sort_keys=True) + "\n")
     return path
 
 
@@ -60,4 +61,5 @@ def load_health(trial_dir: Path) -> HealthReport | None:
     path = trial_dir / HEALTH_FILE
     if not path.is_file():
         return None
-    return HealthReport.model_validate_json(path.read_text())
+    report: HealthReport = HealthReport.model_validate_json(load_text(path))
+    return report

@@ -22,6 +22,7 @@ from dataclasses import dataclass, field
 from pathlib import Path, PurePosixPath
 from typing import Any
 
+from raidar.contract.file_io import load_bytes, load_text
 from raidar.contract.snapshot import APP_SOURCE
 from raidar.engine.health.base import Audit, make_check
 from raidar.engine.health.model import PASS, UNMEASURED, VIOLATION, HealthCheck
@@ -39,7 +40,7 @@ _ReadWorkspace = Callable[[PurePosixPath], str | None]
 
 def _json(path: Path) -> Any:
     try:
-        return json.loads(path.read_text(encoding="utf-8"))
+        return json.loads(load_text(path, encoding="utf-8"))
     except (OSError, ValueError):
         return None
 
@@ -63,7 +64,7 @@ def _before_snapshot(a: Audit, step: str) -> Path | None:
 def _snapshot_reader(root: Path) -> _ReadWorkspace:
     def read(file: PurePosixPath) -> str | None:
         path = root / file
-        return path.read_text(encoding="utf-8", errors="replace") if path.is_file() else None
+        return load_text(path, encoding="utf-8", errors="replace") if path.is_file() else None
 
     return read
 
@@ -71,7 +72,7 @@ def _snapshot_reader(root: Path) -> _ReadWorkspace:
 def _agent_reader(agent: Path) -> _ReadBytes:
     def read(path: PurePosixPath) -> bytes | None:
         try:
-            return (agent / path).read_bytes()
+            return load_bytes(agent / path)
         except OSError:
             return None
 

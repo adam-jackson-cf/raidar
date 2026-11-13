@@ -15,6 +15,7 @@ import json
 import os
 from pathlib import Path
 
+from raidar.contract.file_io import load_bytes, store_bytes
 from raidar.engine.health.model import HEALTH_FILE
 
 RECORDS_MANIFEST = "raidar-records-manifest.json"
@@ -54,7 +55,7 @@ def seal_trial(trial_dir: Path, record_file: Path, job_dir: Path) -> str:
         )
         + "\n"
     ).encode()
-    (trial_dir / RECORDS_MANIFEST).write_bytes(payload)
+    store_bytes(trial_dir / RECORDS_MANIFEST, payload)
     return hashlib.sha256(payload).hexdigest()
 
 
@@ -64,7 +65,7 @@ def _sealed_state(manifest: Path, expected: str | None) -> tuple[dict[str, str],
         return {}, "no records manifest digest in job.json"
     if not manifest.is_file():
         return {}, f"{RECORDS_MANIFEST} is missing"
-    raw = manifest.read_bytes()
+    raw = load_bytes(manifest)
     if hashlib.sha256(raw).hexdigest() != expected:
         return {}, f"{RECORDS_MANIFEST} differs from the digest in job.json"
     return json.loads(raw)["files"], None

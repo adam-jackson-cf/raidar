@@ -27,6 +27,7 @@ from collections.abc import Sequence
 from pathlib import Path
 from typing import Any
 
+from raidar.contract.file_io import load_text
 from raidar.scoring.framework.context import AssessContext, StepInputs
 from raidar.scoring.framework.manifest import (
     Direction,
@@ -100,7 +101,7 @@ def _records(trace_dir: Path | None) -> list[dict[str, Any]] | None:
     found = []
     for path in sorted(trace_dir.rglob(STALL_RECORD)):
         try:
-            payload = json.loads(path.read_text(encoding="utf-8"))
+            payload = json.loads(load_text(path, encoding="utf-8"))
         except (OSError, UnicodeDecodeError, json.JSONDecodeError):
             continue
         if isinstance(payload, dict) and isinstance(payload.get("stalled"), bool):

@@ -27,6 +27,7 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 
+from raidar.contract.file_io import load_bytes
 from raidar.scoring.framework.context import AssessContext, StepInputs
 from raidar.scoring.framework.manifest import EvidenceInput, MetricLevel, ScorerManifest
 from raidar.scoring.framework.ownership import merge_unique, ordered_complete, reject_unowned
@@ -101,7 +102,7 @@ def _evidence_problem(base: Path, item: Evidence) -> str | None:
     root = base.resolve()
     if not path.is_file() or not path.resolve().is_relative_to(root):
         return "no such file"
-    data = path.read_bytes()
+    data = load_bytes(path)
     if hashlib.sha256(data).hexdigest() != item.sha256:
         return "sha256 does not match the file"
     lines = _line_count(data)

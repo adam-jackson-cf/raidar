@@ -10,6 +10,7 @@ from typing import Any
 
 import pytest
 
+from raidar.contract import file_io
 from raidar.scoring.code_quality.architecture import (
     ProductionGraphError,
     produce_production_graph,
@@ -79,7 +80,7 @@ def _shop(tmp_path: Path) -> dict[str, Any]:
             "other.py": "def other():\n    return 2\n",
         },
     )
-    measured = cli.measure(snapshot, "app.py")
+    measured = cli.measure(snapshot, "app.py", file_io)
     return {
         "snapshot": snapshot,
         "inventory": build_inventory(snapshot).files,

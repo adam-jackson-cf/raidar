@@ -25,6 +25,7 @@ from pathlib import Path
 from harbor.models.trajectories import Trajectory as HarborTrajectory
 from pydantic import ValidationError
 
+from raidar.contract.file_io import load_bytes
 from raidar.scoring.framework.manifest import (
     Direction,
     Exactness,
@@ -84,18 +85,23 @@ def _documents(document: HarborTrajectory) -> Iterator[HarborTrajectory]:
 def call_outputs(path: Path) -> dict[str, str]:
     """Every tool call's recorded output, by ``tool_call_id`` (every session included)."""
     try:
-        document = HarborTrajectory.model_validate_json(path.read_bytes())
+        document = HarborTrajectory.model_validate_json(load_bytes(path))
     except (OSError, ValidationError):
         return {}
     outputs: dict[str, str] = {}
     for session in _documents(document):
-        for step in session.steps:
-            for result in step.observation.results if step.observation else ():
-                if result.source_call_id:
-                    outputs[result.source_call_id] = outputs.get(result.source_call_id, "") + _text(
-                        result.content
-                    )
+        _add_session_outputs(session, outputs)
     return outputs
+
+
+def _add_session_outputs(session: HarborTrajectory, outputs: dict[str, str]) -> None:
+    """Append each of one session's tool results to ``outputs``, in step order."""
+    for step in session.steps:
+        for result in step.observation.results if step.observation else ():
+            if result.source_call_id:
+                outputs[result.source_call_id] = outputs.get(result.source_call_id, "") + _text(
+                    result.content
+                )
 
 
 # ---- did a test command run ----------------------------------------------------------

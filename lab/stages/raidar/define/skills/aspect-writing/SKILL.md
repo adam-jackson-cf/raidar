@@ -2,6 +2,7 @@
 name: "aspect-writing"
 description: "USE WHEN writing the aspects, examples and kind of a feature definition's acceptance criteria."
 ---
+
 ## Aspects, examples and kind
 
 Every acceptance criterion carries what a test must set up and assert. The
@@ -26,6 +27,7 @@ aspect describes is not checked.
   test covers, gets aspects like any other criterion.
 
 Write each aspect by these rules, which are guidance:
+
 1. **Trace.** Restate a clause of the criterion or of its cited units. Never add
    a complementary case ("valid input is accepted" under a rejection criterion),
    a "non-X" case the units do not name, or a qualifier they do not give.
@@ -67,11 +69,20 @@ the two criteria of feature `F2` are:
     "sources": ["U7"],
     "kind": "behaviour",
     "aspects": [
-      {"situation": "`waterctl run` reads a plan that names the plant `fern`, which the garden does not have", "outcome": "the command exits with code `2`"},
-      {"situation": "`waterctl run` reads a plan that names the plant `fern`, which the garden does not have", "outcome": "stderr contains `unknown plant: fern`"}
+      {
+        "situation": "`waterctl run` reads a plan that names the plant `fern`, which the garden does not have",
+        "outcome": "the command exits with code `2`"
+      },
+      {
+        "situation": "`waterctl run` reads a plan that names the plant `fern`, which the garden does not have",
+        "outcome": "stderr contains `unknown plant: fern`"
+      }
     ],
     "examples": [
-      {"input": "`waterctl run` with a plan naming `fern`", "expected": "exit code `2`, stderr `unknown plant: fern`"}
+      {
+        "input": "`waterctl run` with a plan naming `fern`",
+        "expected": "exit code `2`, stderr `unknown plant: fern`"
+      }
     ]
   },
   {

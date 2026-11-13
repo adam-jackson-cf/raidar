@@ -27,8 +27,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from raidar_contract.canonical import digest_json
-
+from raidar.contract.file_io import load_bytes
 from raidar.contract.references import (
     RegistryReferenceError,
 )
@@ -37,6 +36,7 @@ from raidar.contract.source_digest import SOURCE_DIGEST_SCHEME, python_source_di
 from raidar.scoring.framework.context import Scorer
 from raidar.scoring.framework.manifest import ScorerManifest
 from raidar.subject.environment.python.pack_definition import ToolLock, load_tool_lock
+from raidar_contract.canonical import digest_json
 
 LockedTools = dict[str, dict[str, dict[str, Any]]]
 RUNTIME_TOOL_LOCKS: dict[str, Callable[[], ToolLock]] = {"python": load_tool_lock}
@@ -87,7 +87,7 @@ def _module_files(name: str) -> tuple[tuple[str, Path], ...] | None:
 def _imported(name: str, path: Path) -> Iterator[str]:
     """Absolute names of modules (or their attributes) imported by ``path``."""
     package = name if path.name == "__init__.py" else name.rpartition(".")[0]
-    for node in ast.walk(ast.parse(path.read_bytes(), filename=str(path))):
+    for node in ast.walk(ast.parse(load_bytes(path), filename=str(path))):
         if isinstance(node, ast.Import):
             yield from (alias.name for alias in node.names)
         elif isinstance(node, ast.ImportFrom):

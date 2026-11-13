@@ -25,8 +25,8 @@ from pathlib import Path
 from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
-from raidar_contract.canonical import digest_json, pretty_canonical_json_bytes
 
+from raidar.contract.file_io import load_bytes
 from raidar.judge.client import JevSuccess
 from raidar.judge.protocol import (
     JEV_PINNED_MODEL,
@@ -35,6 +35,7 @@ from raidar.judge.protocol import (
     parse_answers,
     questions_wire,
 )
+from raidar_contract.canonical import digest_json, pretty_canonical_json_bytes
 
 CACHE_DIR = "decisions"
 
@@ -88,7 +89,7 @@ class DecisionCache:
         if not path.is_file():
             return None
         try:
-            entry = CachedDecision.model_validate_json(path.read_bytes())
+            entry = CachedDecision.model_validate_json(load_bytes(path))
             parse_answers(entry.answers)
         except (OSError, ValidationError) as error:
             raise CacheInvalidError(f"cache entry {key} is unreadable") from error

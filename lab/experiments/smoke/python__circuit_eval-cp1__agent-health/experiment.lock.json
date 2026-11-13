@@ -64,10 +64,10 @@
       },
       "scorer": {
         "correctness@10": {
-          "digest": "e0ef561ca8aee7ebc43eb5bf09a97b9d6f83b18a1b9c33c1f8dc202239dd429c",
+          "digest": "2c54418ea915e0aa482f3c346c80d4780a6369d6c0bbcea3e396ddcf718e5aad",
           "metadata": {
             "implementation": "raidar.scoring.correctness:correctness_scorer",
-            "implementation_digest": "00d7db1485bf476bcca8265321a59310138c7733d08f6a565e4744cb37436e28",
+            "implementation_digest": "548bce26fd1c748df709c77f26c9f1b134635f6e924878bc29fc314895894f7d",
             "manifest": {
               "description": "Reference-solvable SCB success and raw SCB verdicts per checkpoint and trajectory.",
               "evidence_required": [
@@ -281,7 +281,7 @@
     },
     "tools": {}
   },
-  "document_sha256": "671099f74a39d209cc38d93d24aef2a428adef2155302139f5baffa7b093772a",
+  "document_sha256": "d3e85c90f5044f81c548b042c2e5f44f48ac3e720002363522082218e5a0d0ca",
   "execution": {
     "arms": {
       "baseline": {
@@ -299,13 +299,13 @@
           "version_pin": "0.156.1",
           "workflow_skills": "placement.skills .agents/skills in the workspace /app"
         },
-        "digest": "531e812bb037e063ee2b4227de237a186c8e7187a2890d3ed832c2e06864fd7c",
+        "digest": "8978409f47e68b98cf55fc874743a3f87d3a99aa2544fde9f78e457d7ad025ad",
         "model": "gpt-6-luna",
         "packages": {},
         "primitive_code": {
-          "frame/1": "c89c277bb146542f985499df52718e346e2ddaa57dd5530a441128ecb5da268c",
-          "install/1": "ef0f44adfc308bf5fd11d210ab28d92d935e6d0f6a631fd33e38ef01cb7634f8",
-          "runner/1": "4828ba856407dd1b52815091c4ba92c24242b44909514e2b9cc08af024a1d133"
+          "frame/1": "bd094130a042c8de32b94aa911b91f56319141741a8e21940224afc0115aa6f0",
+          "install/1": "88595ae363bfb01581276ddab0053eb3a1fad714d2af5e7864ffd56ae0d2e2a6",
+          "runner/1": "78db8ec3e62e91b3235fa6e9bd08e5110f9a3f5833cb35a833f4fcc516a2f026"
         },
         "provider": "openai",
         "reasoning": "low",
@@ -501,7 +501,7 @@
     "source_sha256": "0bff2a286fca5ecd28d140558aaa645381aaeb1c4eef5a53196aa3434b8bef42",
     "spec_sha256": "76f0308dd2c40ac3bf2b4c8a31ef3c3b8c4b2cc8f5edc338f7958d470215d27c"
   },
-  "lock_sha256": "ff2e97da6b96af2e413f0b8c0032a0778e1747426ea0d0885748bfe83dc84029",
+  "lock_sha256": "36a59bbbb9b92bc9d2f272bfcc1af88c5f163df07ccc51698f2239bc7238e5a0",
   "lock_version": 5,
   "overrides": {
     "flags": {},
@@ -509,9 +509,9 @@
   },
   "sections": {
     "analysis": "a9e70f16a3d8fde7db8251be753771af765c98ad0c0b01202934c7622c4976f4",
-    "assessment": "05fc802b766d3e7351e9470b3ad7d78c4d7bfbf1defcdb073a327001a5f4a028",
-    "execution": "ff2e97da6b96af2e413f0b8c0032a0778e1747426ea0d0885748bfe83dc84029",
-    "toolchain": "fb4b6931121194fd15ba36ed4e0a003c58944caa8e4429c1f0dd385895bcf9ac"
+    "assessment": "f5eedade797837267035983b3c5831f9eeba66ab44fcb165f6eeff4e3a861e45",
+    "execution": "36a59bbbb9b92bc9d2f272bfcc1af88c5f163df07ccc51698f2239bc7238e5a0",
+    "toolchain": "c4ea0a8e96b37e2581767b682e71ba1181644e9e3829723e81bcf4329823ab62"
   },
   "spec": {
     "agents": [
@@ -577,6 +577,6 @@
   "toolchain": {
     "litellm": "1.102.2",
     "python": "3.13.7",
-    "raidar_spec": "9b7d44f0ffb0994114916c0c49f86e37122e3754d5c6d8c295b021d00b0279f1"
+    "raidar_spec": "8a0d4102843301b3a0bca38c9f6939582deffc587af12a7a9dd188b86a39d6a1"
   }
 }

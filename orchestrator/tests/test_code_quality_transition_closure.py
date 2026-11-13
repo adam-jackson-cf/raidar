@@ -9,6 +9,7 @@ from pathlib import Path
 from types import SimpleNamespace
 from typing import Any, cast
 
+from raidar.contract import file_io
 from raidar.grading.models import ParityVerdict
 from raidar.grading.records import FORK_EVIDENCE_FILE, step_record_dir
 from raidar.scoring.code_quality.checkpoint import CheckpointMeasure, Gap, Measured
@@ -51,23 +52,22 @@ def _measured_pair(tmp_path: Path) -> Any:
         "checkpoint_1": {"app.py": "def f():\n    return 1\n"},
         "checkpoint_2": {"app.py": "def f():\n    return 2\n"},
     }
-    steps = tuple(
-        memory_step(name, materialise(tmp_path / name, content)) for name, content in files.items()
-    )
+    snapshots = {name: materialise(tmp_path / name, content) for name, content in files.items()}
     tools = in_memory_tools()
     measures = []
-    for step in steps:
-        rows = measure(step.snapshot, None)
+    for name, snapshot in snapshots.items():
+        step = memory_step(name, snapshot)
+        rows = measure(snapshot, None, file_io)
         quality = produce_production_quality(
             step.step,
-            step.snapshot,
+            snapshot,
             ({"path": "app.py", "role": "production"},),
             rows["files"],
             rows["symbols"],
             tools,
         )
         outcome = Measured(
-            step.snapshot,
+            snapshot,
             ("app.py",),
             production_symbols(rows["symbols"], ("app.py",)),
             quality,

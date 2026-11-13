@@ -1407,12 +1407,6 @@
       "count": 1
     },
     {
-      "path": "orchestrator/src/raidar/scoring/framework/atif.py",
-      "code": "I001",
-      "fingerprint": "6590ff2d12ba18b405dbcce5e08c85b2b082c516c664876d2cbcc4fb1552d68a",
-      "count": 1
-    },
-    {
       "path": "orchestrator/src/raidar/scoring/framework/builtin_manifests.py",
       "code": "PLR0913",
       "fingerprint": "5ced4164cb5fbb2a98593f77554765ebef5ee2228b677016330fadddaa26d21d",
@@ -1425,12 +1419,6 @@
       "count": 1
     },
     {
-      "path": "orchestrator/src/raidar/scoring/framework/inventory.py",
-      "code": "I001",
-      "fingerprint": "6590ff2d12ba18b405dbcce5e08c85b2b082c516c664876d2cbcc4fb1552d68a",
-      "count": 1
-    },
-    {
       "path": "orchestrator/src/raidar/scoring/framework/manifest.py",
       "code": "I001",
       "fingerprint": "6590ff2d12ba18b405dbcce5e08c85b2b082c516c664876d2cbcc4fb1552d68a",
@@ -1438,12 +1426,6 @@
     },
     {
       "path": "orchestrator/src/raidar/scoring/framework/metrics.py",
-      "code": "I001",
-      "fingerprint": "6590ff2d12ba18b405dbcce5e08c85b2b082c516c664876d2cbcc4fb1552d68a",
-      "count": 1
-    },
-    {
-      "path": "orchestrator/src/raidar/scoring/framework/registry.py",
       "code": "I001",
       "fingerprint": "6590ff2d12ba18b405dbcce5e08c85b2b082c516c664876d2cbcc4fb1552d68a",
       "count": 1
@@ -1464,24 +1446,6 @@
       "path": "orchestrator/src/raidar/scoring/framework/rescore.py",
       "code": "PLR0913",
       "fingerprint": "7ce56447be3a64645341c419222d129bb8781a56da452c0380fe9a29b45e839d",
-      "count": 1
-    },
-    {
-      "path": "orchestrator/src/raidar/scoring/framework/store.py",
-      "code": "I001",
-      "fingerprint": "6590ff2d12ba18b405dbcce5e08c85b2b082c516c664876d2cbcc4fb1552d68a",
-      "count": 1
-    },
-    {
-      "path": "orchestrator/src/raidar/scoring/framework/trial_inputs.py",
-      "code": "I001",
-      "fingerprint": "6590ff2d12ba18b405dbcce5e08c85b2b082c516c664876d2cbcc4fb1552d68a",
-      "count": 1
-    },
-    {
-      "path": "orchestrator/src/raidar/scoring/judge/cache.py",
-      "code": "I001",
-      "fingerprint": "6590ff2d12ba18b405dbcce5e08c85b2b082c516c664876d2cbcc4fb1552d68a",
       "count": 1
     },
     {
@@ -1512,18 +1476,6 @@
       "path": "orchestrator/src/raidar/scoring/judge/codebase.py",
       "code": "N815",
       "fingerprint": "a5d10e86bf6b8f0d880e055b0717ff3bd79fbe9cd8c2f30ef851bc093d7de40b",
-      "count": 1
-    },
-    {
-      "path": "orchestrator/src/raidar/scoring/judge/policies.py",
-      "code": "I001",
-      "fingerprint": "6590ff2d12ba18b405dbcce5e08c85b2b082c516c664876d2cbcc4fb1552d68a",
-      "count": 1
-    },
-    {
-      "path": "orchestrator/src/raidar/scoring/judge/promotion.py",
-      "code": "I001",
-      "fingerprint": "6590ff2d12ba18b405dbcce5e08c85b2b082c516c664876d2cbcc4fb1552d68a",
       "count": 1
     },
     {

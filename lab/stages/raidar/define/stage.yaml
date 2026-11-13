@@ -1,19 +1,31 @@
 contract: stage/1
 name: define
 summary: Build and seal a feature definition with the define tool before building; emit its criteria.
-requires: {setup: setup/1, gate: gate/1, stop: stop/1, outputs: outputs/1}
-params: {unit_rules: 2, max_refinement_rounds: 2}
+requires: { setup: setup/1, gate: gate/1, stop: stop/1, outputs: outputs/1 }
+params: { unit_rules: 2, max_refinement_rounds: 2 }
 tokens: [UNITS]
 tool:
   project: tool
   commands:
     define: [python, -I, -B, -m, define_tool]
     define-stage: [python, -I, -B, -m, define_tool.stage]
-setup: {run: [define-stage, setup], timeout_s: 60}
+setup: { run: [define-stage, setup], timeout_s: 60 }
 gate:
-  - {name: sealed, run: [define-stage, sealed], before: true, watch: /app/.raidar/define, timeout_s: 60}
-on_stop: {run: [define-stage, inspect], watch: /app/.raidar/define, timeout_s: 60, max_rounds: 3}
+  - {
+      name: sealed,
+      run: [define-stage, sealed],
+      before: true,
+      watch: /app/.raidar/define,
+      timeout_s: 60,
+    }
+on_stop:
+  {
+    run: [define-stage, inspect],
+    watch: /app/.raidar/define,
+    timeout_s: 60,
+    max_rounds: 3,
+  }
 outputs:
-  criteria: {path: /app/.raidar/define/criteria.json, contract: criteria/1}
-  definition: {path: /app/.raidar/feature-definition.md}
+  criteria: { path: /app/.raidar/define/criteria.json, contract: criteria/1 }
+  definition: { path: /app/.raidar/feature-definition.md }
 skills: [feature-definition, aspect-writing]

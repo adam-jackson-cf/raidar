@@ -354,9 +354,14 @@ def classify(trajectory: Trajectory, classifier: Classifier) -> tuple[TraceEvent
             )
             index += 1
         for call in step_calls(step):
-            for kind, detail, path in _classify_call(call, classifier):
-                events.append(
-                    TraceEvent(index, kind, call.session, call.tool, call.call_id, detail, path)
-                )
+            events.extend(_call_events(call, index, classifier))
             index += 1
     return tuple(events)
+
+
+def _call_events(call: Call, index: int, classifier: Classifier) -> list[TraceEvent]:
+    """The events one tool call produces, all at execution position ``index``."""
+    return [
+        TraceEvent(index, kind, call.session, call.tool, call.call_id, detail, path)
+        for kind, detail, path in _classify_call(call, classifier)
+    ]

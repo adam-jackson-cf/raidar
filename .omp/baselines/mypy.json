@@ -267,18 +267,6 @@
       "count": 1
     },
     {
-      "path": "orchestrator/src/raidar/engine/health/admission.py",
-      "code": "no-any-return",
-      "fingerprint": "896894ad6bfed4a5087bf2a02e391c0f4698fe46f4f523cb098ca92e0c237350",
-      "count": 1
-    },
-    {
-      "path": "orchestrator/src/raidar/engine/health/model.py",
-      "code": "no-any-return",
-      "fingerprint": "617f66af1dc909b3eb0d50496d58d1742fd134c6b36d14cc8a87f2332f5d4c57",
-      "count": 1
-    },
-    {
       "path": "orchestrator/src/raidar/engine/perf/budgets.py",
       "code": "no-any-return",
       "fingerprint": "45f876db1bf785234ef72a0aead90609f4d7fa133098385676e7317252bf6cd1",
@@ -534,12 +522,6 @@
       "path": "orchestrator/src/raidar/scoring/framework/rescore_config.py",
       "code": "no-any-return",
       "fingerprint": "e3d3d83858112d73de88140c1da80b77deab839a227c4f46a665e1c7ad060b6a",
-      "count": 1
-    },
-    {
-      "path": "orchestrator/src/raidar/scoring/framework/store.py",
-      "code": "no-any-return",
-      "fingerprint": "526f016dcc11b839ddc4438b3fb33dddf2b97596910129dd7120ee55dc942e65",
       "count": 1
     },
     {
@@ -1308,18 +1290,6 @@
       "path": "orchestrator/tests/test_code_quality_scorer.py",
       "code": "operator",
       "fingerprint": "b178644cd829042f7fb88af037980993c6cc61f772e08c35e1244729f9fdfbdb",
-      "count": 1
-    },
-    {
-      "path": "orchestrator/tests/test_code_quality_transition_closure.py",
-      "code": "arg-type",
-      "fingerprint": "914bd12c04897d950d4517ab8667a26e9f6a5ee1e2351fcfdc59cc8796f423ad",
-      "count": 2
-    },
-    {
-      "path": "orchestrator/tests/test_code_quality_transition_closure.py",
-      "code": "arg-type",
-      "fingerprint": "9fa377640d1f157fa0eaf7963e8436e5fe419ff23e6b9935cc4e0f54db47098a",
       "count": 1
     },
     {

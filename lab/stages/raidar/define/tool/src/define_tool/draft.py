@@ -112,18 +112,14 @@ class Draft:
         question."""
         return NEEDS_INPUT if self.kind(block.QUESTION) else READY
 
+    def _grouped(self, feature: Item) -> list[Item]:
+        """Return one ``feature`` followed by the criteria it owns, in draft order."""
+        return [feature, *(a for a in self.kind(block.AC) if a.owner == feature.key)]
+
     def ordered(self) -> list[Item]:
         """Return the items grouped as a reader wants them: scalars, named features, each feature
         with its criteria, the rest."""
-        features = self.kind(block.FEATURE)
-        grouped = [
-            item
-            for feature in features
-            for item in (
-                feature,
-                *(a for a in self.kind(block.AC) if a.owner == feature.key),
-            )
-        ]
+        grouped = [item for feature in self.kind(block.FEATURE) for item in self._grouped(feature)]
         decisions = sorted(self.kind(block.DECISION), key=lambda item: int(item.key))
         return [
             *self.kind(block.TITLE),

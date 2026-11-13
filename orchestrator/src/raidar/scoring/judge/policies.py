@@ -35,9 +35,10 @@ from typing import Literal, Self
 
 import yaml
 from pydantic import BaseModel, ConfigDict, Field, model_validator
-from raidar_contract.canonical import digest_json
 
+from raidar.contract.file_io import load_text
 from raidar.contract.paths import judge_root
+from raidar_contract.canonical import digest_json
 
 POLICY_DIR = judge_root() / "policies"
 LABELS = ("correct", "false_positive", "false_negative", "uncertain")
@@ -155,7 +156,7 @@ class JevPolicy(_Frozen):
 
 def load_policy(path: Path) -> JevPolicy:
     try:
-        raw = yaml.safe_load(path.read_text(encoding="utf-8"))
+        raw = yaml.safe_load(load_text(path, encoding="utf-8"))
         return JevPolicy.model_validate(raw)
     except (OSError, yaml.YAMLError, ValueError) as error:
         raise PolicyError(f"{path}: {error}") from error

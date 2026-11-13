@@ -47,10 +47,11 @@ from enum import StrEnum
 from pathlib import Path, PurePosixPath
 
 from pydantic import Field
-from raidar_contract.canonical import digest_json
 
+from raidar.contract.file_io import load_bytes, load_text
 from raidar.contract.snapshot import SNAPSHOT_EXCLUDES
 from raidar.scoring.framework.manifest import SdkModel
+from raidar_contract.canonical import digest_json
 
 RECOGNIZED_EXTENSIONS = frozenset(
     {
@@ -359,7 +360,7 @@ def _classify(
         reason = "symlink_invalid" if entry.is_symlink else "invalid_file"
         return _ignored(entry, target, reason, extension=extension), issue
     try:
-        data = target.path.read_bytes()
+        data = load_bytes(target.path)
     except OSError as exc:
         detail = f"unreadable: {exc.strerror or type(exc).__name__}"
         return _ignored(entry, target, "unreadable", extension=extension), InventoryIssue(
@@ -405,3 +406,16 @@ def build_inventory(root: Path, policy: InventoryPolicy | None = None) -> Invent
         exclusions=tuple(sorted(exclusions, key=lambda item: item.path.encode())),
         invalid=tuple(sorted(issues, key=lambda item: item.path.encode())),
     )
+
+
+def production_python(
+    root: Path, policy: InventoryPolicy | None = None
+) -> tuple[dict[str, str], tuple[str, ...]]:
+    """Each production ``.py`` file's UTF-8 text by path, and the other production paths."""
+    production = build_inventory(root, policy).with_role(FileRole.PRODUCTION)
+    files = {
+        item.path: load_text(root / item.path, encoding="utf-8")
+        for item in production
+        if item.path.endswith(".py")
+    }
+    return files, tuple(item.path for item in production if not item.path.endswith(".py"))

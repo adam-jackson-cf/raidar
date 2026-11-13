@@ -27,6 +27,7 @@ from pathlib import Path, PurePosixPath
 
 from pydantic import ValidationError
 
+from raidar.contract.file_io import load_text
 from raidar.grading.records import FORK_EVIDENCE_FILE, step_record_dir
 from raidar.scoring.code_quality.checkpoint import CheckpointMeasure, Gap, Measured
 from raidar.scoring.code_quality.diffs import changed_lines, regression_scope, rework_symbols
@@ -127,7 +128,7 @@ def in_trial_run_evidence(step: StepInputs) -> RunEvidences | Gap:
     if path is None or not path.is_file():
         return Gap(AssessStatus.INELIGIBLE, f"{PARITY_UNAVAILABLE}: {FORK_EVIDENCE_FILE} missing")
     try:
-        payload = json.loads(path.read_text())
+        payload = json.loads(load_text(path))
         return (
             RegressionRunEvidence.model_validate(payload["baseline"]),
             RegressionRunEvidence.model_validate(payload["produced"]),

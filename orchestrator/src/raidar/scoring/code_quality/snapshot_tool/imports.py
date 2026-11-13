@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from .parser import get_python_parser
+from .reader import SourceReader
 
 if TYPE_CHECKING:
     from tree_sitter import Node
@@ -107,9 +108,9 @@ def _extract_imports_from_node(node: Node, imports: list[ImportInfo]) -> None:
             _extract_imports_from_node(child, imports)
 
 
-def extract_imports(source: Path) -> list[ImportInfo]:
+def extract_imports(source: Path, reader: SourceReader) -> list[ImportInfo]:
     """Every import statement in a Python source file."""
-    code = source.read_text(encoding="utf-8")
+    code = reader.load_text(source, encoding="utf-8")
     if not code.strip():
         return []
     tree = get_python_parser().parse(code.encode("utf-8"))
@@ -209,17 +210,17 @@ def _resolve_import(
     return list(dict.fromkeys(paths))
 
 
-def _local_imports(current: Path, snapshot_dir: Path) -> list[Path]:
+def _local_imports(current: Path, snapshot_dir: Path, reader: SourceReader) -> list[Path]:
     if not current.exists() or not current.is_file() or current.suffix != ".py":
         return []
     try:
-        imports = extract_imports(current)
+        imports = extract_imports(current, reader)
     except Exception:  # the fork logs and skips a file it cannot read or parse
         return []
     return [path for imp in imports for path in _resolve_import(imp, current, snapshot_dir)]
 
 
-def trace_source_files(entrypoint: Path, snapshot_dir: Path) -> set[Path]:
+def trace_source_files(entrypoint: Path, snapshot_dir: Path, reader: SourceReader) -> set[Path]:
     """Files (relative to ``snapshot_dir``) reachable from the entrypoint via local imports."""
     entrypoint_abs = (
         entrypoint if entrypoint.is_absolute() else (snapshot_dir / entrypoint).resolve()
@@ -234,6 +235,6 @@ def trace_source_files(entrypoint: Path, snapshot_dir: Path) -> set[Path]:
             continue
         visited.add(current)
         to_visit.extend(
-            path for path in _local_imports(current, snapshot_dir) if path not in visited
+            path for path in _local_imports(current, snapshot_dir, reader) if path not in visited
         )
     return {path.relative_to(snapshot_dir) for path in visited if path.is_relative_to(snapshot_dir)}

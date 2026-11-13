@@ -1,17 +1,17 @@
 {
   "floors": {
-    "disk_free": 286508879872,
-    "memory_available": 20159332352
+    "disk_free": 209167912960,
+    "memory_available": 18564632576
   },
   "outputs": {
     "criteria": "cf771a792cbbc5e6439e247a0743e524ce792c981c862817147a76e658a0e91f",
     "definition": "e146392dd37c6fde317cdb38656db806a9ef16924db63b81c930f3a7e7b328cd"
   },
   "pack": "2b91a52663e099f2de9ea1a5ee041704005fd25e937b93dac72760249676ef1a",
-  "package": "2dc004c3683e4ee4d71f897c8cb41c759660b9bbfe3a563d6956f8c881efc028",
+  "package": "a9477ea74a043bc4ce9815a34bb71e8900775e9025e32920188aa0f0d5f89193",
   "primitives": {
     "frame/1": "652c9b5e0d44de3876852fbefd81e6c4db7b79260790e85cfbc7d6a5f85a3f30",
-    "gate/1": "f798194a60cc3dd53e601e24ef36ba031b9363c42d015c443be6aee8330f2049",
+    "gate/1": "2586c3e0488929cceb6ec2038a26b4c1143f28803d3f31cd38f0528f94c5938f",
     "install/1": "26f8b652c7d6f42da4276b2cb5261515d306f8e4e7c1b50502db4a9cddafe11f",
     "outputs/1": "42665fff111671166e829367d34aa7be39ffdd562ef651caad5dc785e60ec5fd",
     "setup/1": "ada355d77160d4055e911cc2d8837fea367f2d099764c37beef1599742680ec5",

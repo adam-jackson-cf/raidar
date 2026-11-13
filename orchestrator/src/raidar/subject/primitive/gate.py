@@ -185,6 +185,11 @@ def context_path(paths: GatePaths, package: GatePackage) -> str:
     return f"{paths.contexts}/{package.name}.json"
 
 
+def _output_paths(package: GatePackage) -> dict[str, str]:
+    """Where each of the package's declared outputs is written, by output name."""
+    return {name: output.path for name, output in package.outputs.items()}
+
+
 def _pytest_options(package: GatePackage, check: GateCheck) -> dict[str, int]:
     if check.kind != "pytest":
         return {}
@@ -218,7 +223,7 @@ def _check_entries(paths: GatePaths, packages: Sequence[GatePackage]) -> list[di
                 }
             ],
             "state": check.watch,
-            "outputs": {name: output.path for name, output in package.outputs.items()},
+            "outputs": _output_paths(package),
             "state_limits": dict(calls.STATE_LIMITS),
         }
         for package in packages
@@ -708,10 +713,7 @@ class GateRun:
         return [
             {
                 **{k: v for k, v in gate.items() if k not in ("output", "files")},
-                "checks": [
-                    {k: v for k, v in check.items() if k != "tests"}
-                    for check in gate.get("checks", [])
-                ],
+                "checks": [_recorded_check(check) for check in gate.get("checks", [])],
             }
             for gate in self.evidence.gates
         ]
@@ -748,6 +750,11 @@ class GateRun:
     def _write(self, name: str, document: Mapping[str, Any]) -> None:
         text = json.dumps(document, indent=2, sort_keys=True) + "\n"
         (self.records / name).write_text(text, encoding="utf-8")
+
+
+def _recorded_check(check: Mapping[str, Any]) -> dict[str, Any]:
+    """A gate check as the record keeps it: without its per-test results."""
+    return {k: v for k, v in check.items() if k != "tests"}
 
 
 def _sha256(text: str) -> str:

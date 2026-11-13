@@ -31,6 +31,7 @@ from typing import Any
 import radon.metrics
 import radon.raw
 
+from .reader import SourceReader
 from .symbols import get_symbols
 
 EXCLUDE_PATTERNS = frozenset(
@@ -60,18 +61,18 @@ def _key(path: Path, snapshot: Path) -> bytes:
     return path.relative_to(snapshot).as_posix().encode("utf-8")
 
 
-def _measured(path: Path) -> list[dict[str, Any]] | None:
+def _measured(path: Path, reader: SourceReader) -> list[dict[str, Any]] | None:
     """Symbol rows when the fork would measure the file, else None."""
     try:
-        code = path.read_text(encoding="utf-8")
+        code = reader.load_text(path, encoding="utf-8")
         radon.raw.analyze(code)
         radon.metrics.mi_visit(code, multi=False)
-        return get_symbols(path)
+        return get_symbols(path, reader)
     except _SKIPPED:
         return None
 
 
-def measure_snapshot(snapshot: Path) -> dict[str, list[dict[str, Any]]]:
+def measure_snapshot(snapshot: Path, reader: SourceReader) -> dict[str, list[dict[str, Any]]]:
     """``files`` rows and ``symbols`` rows (with ``file_path``) for every measured file."""
     file_rows: list[dict[str, Any]] = []
     symbol_rows: list[dict[str, Any]] = []
@@ -81,7 +82,7 @@ def measure_snapshot(snapshot: Path) -> dict[str, list[dict[str, Any]]]:
         relative = path.relative_to(snapshot)
         if path.is_dir() or path.suffix != ".py" or _excluded(relative):
             continue
-        symbols = _measured(path)
+        symbols = _measured(path, reader)
         if symbols is None:
             continue
         file_path = relative.as_posix()

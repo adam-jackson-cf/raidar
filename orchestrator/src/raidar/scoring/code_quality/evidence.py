@@ -19,6 +19,7 @@ from collections import defaultdict
 from collections.abc import Iterable, Iterator
 from pathlib import Path
 
+from raidar.contract.file_io import load_bytes
 from raidar.scoring.code_quality.architecture import ProductionGraphResult
 from raidar.scoring.code_quality.lineage_models import (
     RegressionAttribution,
@@ -39,7 +40,7 @@ class FileDigests:
 
     def sha256(self, path: Path) -> str:
         if path not in self._digests:
-            self._digests[path] = hashlib.sha256(path.read_bytes()).hexdigest()
+            self._digests[path] = hashlib.sha256(load_bytes(path)).hexdigest()
         return self._digests[path]
 
 
@@ -149,8 +150,13 @@ def _repeated_owners(transition: TransitionReworkEvidence) -> set[SymbolIdentity
             ambiguous_before[edge.ambiguous_set_id] |= entry.prior_modified_before
     for set_id, pairs in ambiguous.items():
         if ambiguous_before[set_id]:
-            owners.update(symbol for pair in pairs for symbol in pair)
+            owners.update(_endpoints(pairs))
     return owners
+
+
+def _endpoints(pairs: list[tuple[SymbolIdentity, SymbolIdentity]]) -> set[SymbolIdentity]:
+    """Both endpoints of every edge in one ambiguous set."""
+    return {symbol for pair in pairs for symbol in pair}
 
 
 def repeated_line_keys(transition: TransitionReworkEvidence) -> set[LineKey]:

@@ -82,6 +82,7 @@ from typing import Any
 from pydantic import ValidationError
 from raidar_contract.workflow import PACKAGE_SCHEMA, PackageWorkflowDefinition
 
+from raidar.contract.file_io import load_bytes, load_text
 from raidar.contract.harbor_result import RESULT_FILE
 from raidar.engine.health.base import make_check
 from raidar.engine.health.isolation import _agent_reader, _source_findings
@@ -198,7 +199,7 @@ class Step:
 
     def digest(self, relative: Any) -> str | None:
         path = self.file(relative)
-        return hashlib.sha256(path.read_bytes()).hexdigest() if path is not None else None
+        return hashlib.sha256(load_bytes(path)).hexdigest() if path is not None else None
 
     @property
     def cut(self) -> bool:
@@ -227,7 +228,7 @@ class Row:
 
 def _json(path: Path) -> Any:
     try:
-        return json.loads(path.read_text(encoding="utf-8"))
+        return json.loads(load_text(path, encoding="utf-8"))
     except (OSError, ValueError):
         return None
 
@@ -361,7 +362,7 @@ def _gap_hook(step: Step) -> str | None:
     if path is None:
         return "the hook's run log is missing"
     try:
-        lines = path.read_text(encoding="utf-8").splitlines()
+        lines = load_text(path, encoding="utf-8").splitlines()
         runs = [json.loads(line) for line in lines if line.strip()]
     except (OSError, ValueError):
         return "the hook's run log is unreadable"

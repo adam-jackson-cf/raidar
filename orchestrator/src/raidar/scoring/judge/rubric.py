@@ -38,7 +38,7 @@ from typing import Any
 
 from raidar.judge.client import state_text
 from raidar.judge.protocol import JEV_STATE_CHAR_LIMIT, JevAnswers, NoulAnswer
-from raidar.scoring.framework.inventory import FileRole, InventoryPolicy, build_inventory
+from raidar.scoring.framework.inventory import InventoryPolicy, production_python
 from raidar.scoring.judge.audit import DecisionStage, InputSufficiency, SufficiencyLevel
 from raidar.scoring.judge.carry_forward import (
     DiffHunk,
@@ -150,14 +150,7 @@ class _Snapshot:
 
 
 def _read_snapshot(root: Path, policy: InventoryPolicy | None) -> _Snapshot:
-    inventory = build_inventory(root, policy)
-    production = inventory.with_role(FileRole.PRODUCTION)
-    files = {
-        item.path: (root / item.path).read_text(encoding="utf-8")
-        for item in production
-        if item.path.endswith(".py")
-    }
-    unsupported = tuple(item.path for item in production if not item.path.endswith(".py"))
+    files, unsupported = production_python(root, policy)
     return _Snapshot(files, unsupported)
 
 

@@ -449,6 +449,74 @@
       "source": "scripts/checks/check-toolchain-parity.py",
       "behavior": "Freeze the grading payload and only packages whose bytes equal their latest release, now owned by the toolchain parity check"
     },
+    "orchestrator/tests/test_code_quality_fork_parity.py::test_lineage_kernel_scenarios_equal_the_fork": {
+      "source": "orchestrator/src/raidar/scoring/code_quality/snapshot_tool/cli.py",
+      "behavior": "Measure snapshots exactly like the fork while the snapshot tool reads files only through the reader its entry is given"
+    },
+    "orchestrator/tests/test_code_quality_fork_parity.py::test_measurement_adapters_match_the_fork_rows_symbols_and_call_graph": {
+      "source": "orchestrator/src/raidar/scoring/code_quality/snapshot_tool/cli.py",
+      "behavior": "Measure snapshots exactly like the fork while the snapshot tool reads files only through the reader its entry is given"
+    },
+    "orchestrator/tests/test_code_quality_fork_parity.py::test_measurement_adapters_match_the_fork_rows_symbols_and_call_graph[forge]": {
+      "source": "orchestrator/src/raidar/scoring/code_quality/snapshot_tool/cli.py",
+      "behavior": "Measure snapshots exactly like the fork while the snapshot tool reads files only through the reader its entry is given"
+    },
+    "orchestrator/tests/test_code_quality_fork_parity.py::test_measurement_adapters_match_the_fork_rows_symbols_and_call_graph[language_features]": {
+      "source": "orchestrator/src/raidar/scoring/code_quality/snapshot_tool/cli.py",
+      "behavior": "Measure snapshots exactly like the fork while the snapshot tool reads files only through the reader its entry is given"
+    },
+    "orchestrator/tests/test_code_quality_fork_parity.py::test_measurement_adapters_match_the_fork_rows_symbols_and_call_graph[synthetic_shop]": {
+      "source": "orchestrator/src/raidar/scoring/code_quality/snapshot_tool/cli.py",
+      "behavior": "Measure snapshots exactly like the fork while the snapshot tool reads files only through the reader its entry is given"
+    },
+    "orchestrator/tests/test_code_quality_fork_parity.py::test_problem_arithmetic_through_the_canonical_policy_equals_the_fork_scores": {
+      "source": "orchestrator/src/raidar/scoring/code_quality/snapshot_tool/cli.py",
+      "behavior": "Measure snapshots exactly like the fork while the snapshot tool reads files only through the reader its entry is given"
+    },
+    "orchestrator/tests/test_code_quality_fork_parity.py::test_regression_kernel_scenarios_equal_the_fork": {
+      "source": "orchestrator/src/raidar/scoring/code_quality/snapshot_tool/cli.py",
+      "behavior": "Measure snapshots exactly like the fork while the snapshot tool reads files only through the reader its entry is given"
+    },
+    "orchestrator/tests/test_code_quality_fork_parity.py::test_rework_is_unavailable_like_the_fork_when_a_checkpoint_has_no_ve_evidence": {
+      "source": "orchestrator/src/raidar/scoring/code_quality/snapshot_tool/cli.py",
+      "behavior": "Measure snapshots exactly like the fork while the snapshot tool reads files only through the reader its entry is given"
+    },
+    "orchestrator/tests/test_code_quality_fork_parity.py::test_rework_lineage_and_regression_equal_the_fork_live_producers": {
+      "source": "orchestrator/src/raidar/scoring/code_quality/snapshot_tool/cli.py",
+      "behavior": "Measure snapshots exactly like the fork while the snapshot tool reads files only through the reader its entry is given"
+    },
+    "orchestrator/tests/test_code_quality_fork_parity_slow.py::test_a_snapshot_without_production_source_is_ineligible_like_the_fork": {
+      "source": "orchestrator/src/raidar/scoring/code_quality/snapshot_tool/cli.py",
+      "behavior": "Measure snapshots exactly like the fork while the snapshot tool reads files only through the reader its entry is given"
+    },
+    "orchestrator/tests/test_code_quality_fork_parity_slow.py::test_rework_lineage_and_regression_equal_the_fork_over_the_large_case_with_the_real_tools": {
+      "source": "orchestrator/src/raidar/scoring/code_quality/snapshot_tool/cli.py",
+      "behavior": "Measure snapshots exactly like the fork while the snapshot tool reads files only through the reader its entry is given"
+    },
+    "orchestrator/tests/test_code_quality_fork_parity_slow.py::test_the_tool_env_subprocess_measures_exactly_what_the_in_process_port_does": {
+      "source": "orchestrator/src/raidar/scoring/code_quality/snapshot_tool/cli.py",
+      "behavior": "Measure snapshots exactly like the fork while the snapshot tool reads files only through the reader its entry is given"
+    },
+    "orchestrator/tests/test_code_quality_fork_parity_slow.py::test_verbosity_erosion_and_architecture_evidence_equal_the_fork": {
+      "source": "orchestrator/src/raidar/scoring/code_quality/snapshot_tool/cli.py",
+      "behavior": "Measure snapshots exactly like the fork while the snapshot tool reads files only through the reader its entry is given"
+    },
+    "orchestrator/tests/test_code_quality_fork_parity_slow.py::test_verbosity_erosion_and_architecture_evidence_equal_the_fork[forge]": {
+      "source": "orchestrator/src/raidar/scoring/code_quality/snapshot_tool/cli.py",
+      "behavior": "Measure snapshots exactly like the fork while the snapshot tool reads files only through the reader its entry is given"
+    },
+    "orchestrator/tests/test_code_quality_fork_parity_slow.py::test_verbosity_erosion_and_architecture_evidence_equal_the_fork[language_features]": {
+      "source": "orchestrator/src/raidar/scoring/code_quality/snapshot_tool/cli.py",
+      "behavior": "Measure snapshots exactly like the fork while the snapshot tool reads files only through the reader its entry is given"
+    },
+    "orchestrator/tests/test_code_quality_fork_parity_slow.py::test_verbosity_erosion_and_architecture_evidence_equal_the_fork[synthetic_shop]": {
+      "source": "orchestrator/src/raidar/scoring/code_quality/snapshot_tool/cli.py",
+      "behavior": "Measure snapshots exactly like the fork while the snapshot tool reads files only through the reader its entry is given"
+    },
+    "orchestrator/tests/test_native_agent_api.py::test_the_portable_loader_keeps_settings_as_json_and_a_schema_types_them": {
+      "source": "contract/src/raidar_contract/agent.py",
+      "behavior": "Load a portable agent with settings kept as JSON, or typed by the schema the caller passes"
+    },
     "orchestrator/tests/test_dependency_resolver.py::test_a_recorded_pin_from_another_resolver_resolves_again_under_its_cutoff": {
       "source": "orchestrator/src/raidar/design/problem/dependencies.py",
       "behavior": "Reuse a recorded dependency pin only when the same resolver produced it; a pin from another uv version resolves again under its retained cutoff"

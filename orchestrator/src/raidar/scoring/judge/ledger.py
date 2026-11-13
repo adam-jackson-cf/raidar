@@ -27,7 +27,8 @@ from typing import Literal, Self
 
 from pydantic import Field, model_validator
 
-from raidar.scoring.judge.audit import AuditLog, LabelRecord, _append_line, _line, _read, _Record
+from raidar.contract.file_io import append_private_line
+from raidar.scoring.judge.audit import AuditLog, LabelRecord, _line, _read, _Record
 
 LEDGER_DIR = "ledger"
 SUPERSESSIONS_FILE = "label-supersessions.jsonl"
@@ -75,7 +76,7 @@ def supersessions(audit: AuditLog, policy: str) -> list[LabelSupersession]:
 
 
 def append_supersession(audit: AuditLog, record: LabelSupersession) -> LabelSupersession:
-    _append_line(_path(audit, record.policy, SUPERSESSIONS_FILE), _line(record))
+    append_private_line(_path(audit, record.policy, SUPERSESSIONS_FILE), _line(record))
     return record
 
 
@@ -99,7 +100,7 @@ def splits(audit: AuditLog, policy: str) -> list[SplitRecord]:
 
 
 def append_split(audit: AuditLog, record: SplitRecord) -> SplitRecord:
-    _append_line(_path(audit, record.policy, SPLITS_FILE), _line(record))
+    append_private_line(_path(audit, record.policy, SPLITS_FILE), _line(record))
     return record
 
 

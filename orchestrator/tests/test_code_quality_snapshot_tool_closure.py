@@ -4,12 +4,13 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from raidar.contract import file_io
 from raidar.scoring.code_quality.snapshot_tool import graph, imports, symbols
 from tests.code_quality_support import materialise
 
 
 def _rows(tmp_path: Path, source: str) -> list[dict[str, object]]:
-    return symbols.get_symbols(materialise(tmp_path, {"m.py": source}) / "m.py")
+    return symbols.get_symbols(materialise(tmp_path, {"m.py": source}) / "m.py", file_io)
 
 
 def _names(rows: list[dict[str, object]]) -> list[tuple[object, object]]:
@@ -108,7 +109,7 @@ def test_calls_resolve_through_hierarchy_and_imports_and_never_guess_between_fil
     snapshot = materialise(tmp_path, _SNAPSHOT)
 
     traversal = graph.dependency_graph_traversal(
-        graph.build_dependency_graph(snapshot, Path("app.py"))
+        graph.build_dependency_graph(snapshot, Path("app.py"), file_io)
     )
 
     edges = {(edge["source"], edge["target"]) for edge in traversal["edges"]}
@@ -123,8 +124,8 @@ def test_calls_resolve_through_hierarchy_and_imports_and_never_guess_between_fil
 def test_a_missing_entrypoint_has_no_graph_and_no_files(tmp_path: Path) -> None:
     snapshot = materialise(tmp_path, {"app.py": "x = 1\n"})
 
-    assert graph.build_dependency_graph(snapshot, Path("gone.py")).number_of_nodes() == 0
-    assert imports.trace_source_files(Path("gone.py"), snapshot) == set()
+    assert graph.build_dependency_graph(snapshot, Path("gone.py"), file_io).number_of_nodes() == 0
+    assert imports.trace_source_files(Path("gone.py"), snapshot, file_io) == set()
 
 
 def test_tracing_follows_local_imports_and_skips_what_it_cannot_read(tmp_path: Path) -> None:
@@ -141,7 +142,7 @@ def test_tracing_follows_local_imports_and_skips_what_it_cannot_read(tmp_path: P
         },
     )
 
-    traced = imports.trace_source_files(Path("app.py"), snapshot)
+    traced = imports.trace_source_files(Path("app.py"), snapshot, file_io)
 
     assert traced == {
         Path(name)
@@ -159,10 +160,10 @@ def test_tracing_follows_local_imports_and_skips_what_it_cannot_read(tmp_path: P
 def test_a_non_python_entrypoint_is_traced_alone(tmp_path: Path) -> None:
     snapshot = materialise(tmp_path, {"notes.txt": "import helper\n", "helper.py": ""})
 
-    assert imports.trace_source_files(Path("notes.txt"), snapshot) == {Path("notes.txt")}
+    assert imports.trace_source_files(Path("notes.txt"), snapshot, file_io) == {Path("notes.txt")}
 
 
 def test_an_import_without_a_module_resolves_to_nothing(tmp_path: Path) -> None:
     snapshot = materialise(tmp_path, {"app.py": "from import *\n", "x.py": ""})
 
-    assert imports.trace_source_files(Path("app.py"), snapshot) == {Path("app.py")}
+    assert imports.trace_source_files(Path("app.py"), snapshot, file_io) == {Path("app.py")}

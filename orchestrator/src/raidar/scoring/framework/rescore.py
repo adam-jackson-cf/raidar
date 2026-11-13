@@ -35,6 +35,7 @@ from enum import StrEnum
 from pathlib import Path
 from typing import Any
 
+from raidar.contract.file_io import load_text
 from raidar.grading.regrade import RegradeError, trial_dirs
 from raidar.scoring.framework.context import (
     AssessContext,
@@ -89,7 +90,7 @@ def qualified_trial_id(trial_dir: Path) -> str:
         manifest = candidate / _JOB_MANIFEST
         if manifest.is_file():
             try:
-                run = json.loads(manifest.read_text(encoding="utf-8"))
+                run = json.loads(load_text(manifest, encoding="utf-8"))
             except (OSError, json.JSONDecodeError) as exc:
                 raise RescoreError(f"cannot read {manifest}: {exc}") from exc
             return review_trial_id(run, candidate.name, trial_dir.name)

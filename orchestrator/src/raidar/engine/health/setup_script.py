@@ -19,6 +19,7 @@ from dataclasses import dataclass
 from importlib.resources import files
 from pathlib import Path
 
+from raidar.contract.file_io import load_resource_text, load_text, store_bytes
 from raidar.subject.agent.native import state_paths
 
 SETUP_SCRIPT_NAME = "setup.sh"
@@ -31,7 +32,9 @@ AGENT_SETUP_STASH = "/tmp/.raidar-agent-setup.sh"
 
 def reset_body() -> str:
     """``step_reset.sh`` with every native agent's ``state_paths`` as its state targets."""
-    body = files("raidar.engine.health").joinpath("step_reset.sh").read_text(encoding="utf-8")
+    body = load_resource_text(
+        files("raidar.engine.health").joinpath("step_reset.sh"), encoding="utf-8"
+    )
     entries = "\n".join(f'  "{p.target}|{p.baseline}|{p.kind}"' for p in state_paths())
     if STATE_TARGETS_MARKER not in body:
         raise ValueError(f"step_reset.sh has no {STATE_TARGETS_MARKER} line")
@@ -71,7 +74,7 @@ def write_setup_scripts(task_dir: Path, step_names: list[str]) -> None:
         if target.exists():
             raise FileExistsError(f"{target} already exists; the task owns that path")
         target.parent.mkdir(parents=True, exist_ok=True)
-        target.write_bytes(script)
+        store_bytes(target, script)
         target.chmod(0o755)
 
 
@@ -84,7 +87,7 @@ class ResetOutcome:
 def reset_check(agent_dir: Path) -> ResetOutcome:
     """The step's reset ran, was not refused, and left no process or state behind."""
     try:
-        report = json.loads((agent_dir / RESET_REPORT).read_text())
+        report = json.loads(load_text(agent_dir / RESET_REPORT))
     except (OSError, ValueError):
         return ResetOutcome(False, f"no readable {RESET_REPORT}: setup.sh did not run")
     if report.get("error"):
