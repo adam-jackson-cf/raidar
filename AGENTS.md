@@ -1,7 +1,5 @@
 # Repository guidance
 
-- Do not search, read or surface files under `docs/` without explicit user consent.
-  A user reference to a file there grants consent for that file.
 - `split-design.md` (repository root) is the binding design: read it before changing workflows,
   stages, primitives, agents, problems, health, scoring or identity. Stages are packages under
   `lab/stages/` on Raidar-owned primitives; never add a stage type in `orchestrator/src`.
