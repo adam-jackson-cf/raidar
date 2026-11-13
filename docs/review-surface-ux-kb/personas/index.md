@@ -19,6 +19,6 @@ at three depths, and the UI hands a reviewer from one to the next.
 | [Scenario / eval engineer](./eval-engineer.md) | Why did this run score what it scored, and is the contract right? | [Run detail](../pages/run-detail.md) |
 | [Agent / harness debugger](./harness-debugger.md) | Where in the delivery process did it go wrong? | [Span tree](../components/span-tree.md) |
 
-The feature map ([compare](../../feature-map/compare-experiments.md) →
-[explain and trace](../../feature-map/explain-and-trace-a-trial.md)) shows how a single
+The feature map ([compare](../../features/compare-experiments.md) →
+[explain and trace](../../features/explain-and-trace-a-trial.md)) shows how a single
 investigation flows across all three.

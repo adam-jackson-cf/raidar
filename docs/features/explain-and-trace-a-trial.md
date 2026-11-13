@@ -41,8 +41,7 @@ annotations feed back to the reviewer's spec decision.
 
 ## Driving it with node scripts/surface/lever.mjs
 
-- Journey: [trace-and-annotate.journey.mjs](../../review-surface/journeys/trace-and-annotate.journey.mjs)
-  (`preserve`).
+- Journey: [trace-and-annotate.journey.mjs](../../review-surface/journeys/trace-and-annotate.journey.mjs).
 - Command: `node scripts/surface/lever.mjs --data-dir "$(mktemp -d)/data" --evidence-dir <dir>
   --journey review-surface/journeys/trace-and-annotate.journey.mjs`.
 - On `synthetic-bugfix-gpt-5.5-low-04` the journey cycles to the first error span

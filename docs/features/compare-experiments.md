@@ -42,8 +42,7 @@ works here and hands off to the eval engineer on run detail.
 
 ## Driving it with node scripts/surface/lever.mjs
 
-- Journey: [compare-experiments.journey.mjs](../../review-surface/journeys/compare-experiments.journey.mjs)
-  (`preserve`: the outcome exists today).
+- Journey: [compare-experiments.journey.mjs](../../review-surface/journeys/compare-experiments.journey.mjs).
 - Command, from the repo root:
   `node scripts/surface/lever.mjs --data-dir "$(mktemp -d)/data" --evidence-dir <dir>
   --journey review-surface/journeys/compare-experiments.journey.mjs`.
