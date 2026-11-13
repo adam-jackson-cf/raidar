@@ -32,7 +32,7 @@ fault, never as the model's.
 The state is a directory outside the workspace, ``/app/.raidar/define`` unless
 ``RAIDAR_DEFINE_STATE`` names another. The stage makes it empty at the start of each
 checkpoint and puts the ``Context`` (the issue, the earlier answers, the open question
-ids, the workspace) in it; the tool keeps the draft (``state.json``), a record of every
+ids, the workspace) in it; the tool keeps the draft (``draft.json``), a record of every
 call (``define-calls.jsonl``: its command and the findings it printed, in order) and
 beside it the trace of the same calls (``define-events.jsonl``: when, the arguments and
 input, and the digests of the context and of the state each call left).
@@ -74,7 +74,7 @@ STATE_ENV = "RAIDAR_DEFINE_STATE"
 OUTPUT_ENV = "RAIDAR_DEFINE_OUTPUT"
 DEFAULT_STATE = "/app/.raidar/define"
 CONTEXT_FILE = "context.json"
-STATE_FILE = "state.json"
+STATE_FILE = "draft.json"
 EVENTS_FILE = "define-events.jsonl"
 ROUNDS_DIR = "rounds"
 CALLS_FILE = "define-calls.jsonl"

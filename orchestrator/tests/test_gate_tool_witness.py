@@ -34,7 +34,7 @@ from raidar.subject.primitive.payload import walk as payload_walk
 
 
 def seen(sha: str, ctime: int) -> dict[str, Any]:
-    return {"files": {"state.json": {"sha256": sha, "ctime_ns": ctime}}}
+    return {"files": {"draft.json": {"sha256": sha, "ctime_ns": ctime}}}
 
 
 def test_a_watched_state_file_written_and_restored_or_changed_during_a_gate_run_is_named() -> None:
@@ -42,7 +42,7 @@ def test_a_watched_state_file_written_and_restored_or_changed_during_a_gate_run_
     touched = witness_findings("define", seen("a", 1), seen("a", 2), set(), "w")
     changed = witness_findings("define", seen("a", 1), seen("b", 2), set(), "w")
     added = witness_findings("define", {"files": {}}, seen("a", 1), set(), "w")
-    allowed = witness_findings("define", seen("a", 1), seen("b", 2), {"state.json"}, "w")
+    allowed = witness_findings("define", seen("a", 1), seen("b", 2), {"draft.json"}, "w")
 
     assert same == []
     assert allowed == []
@@ -921,7 +921,7 @@ def test_a_gate_run_that_rewrites_session_or_watched_state_is_recorded_in_the_ho
 
     def probe(argv: list[str], kw: dict[str, Any]) -> tuple[int, str]:
         session.write_bytes(b"xyz\n")
-        (watch / "state.json").write_text("new")
+        (watch / "draft.json").write_text("new")
         (watch / "ok.json").write_text("its own write")
         return 0, ""
 

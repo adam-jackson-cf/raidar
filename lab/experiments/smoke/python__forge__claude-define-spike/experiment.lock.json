@@ -1075,7 +1075,7 @@
       "tree-sitter-language-pack": "0.13.0"
     }
   },
-  "document_sha256": "61993293f034b20868e2190b49539a8894f321de1183a1f3c7bd73a1a76d8874",
+  "document_sha256": "681c6580a660102a350e97461018cdc6fd0dd4cc0ef2945ed79daba66aef1b81",
   "execution": {
     "arms": {
       "define": {
@@ -1093,16 +1093,16 @@
           "version_pin": "2.1.285",
           "workflow_skills": "placement.skills .claude/skills in the workspace /app"
         },
-        "digest": "72378c1fa4e362dba5831fa0da7e896d12bfb47c0f45205633c709209b1ac470",
+        "digest": "420c7c0b09be52c9b359dd7a0b6bc3785159a47c25f2f2ff5c649417fb90d4e1",
         "model": "claude-sonnet-4-6",
         "packages": {
           "raidar/define": {
-            "check": "92ea0393afe3e50e3f5e4466ed66707f96c8db1867516297e90c56d06ee558c4",
+            "check": "b4a3f8b9715143d9560360650ae5cfd3ea7a59013559f50b0d87b7199015c730",
             "installed": {
-              "arm64": "5438ebe6135c397e2d30cfd59c0f9d9dbead179ab296dc77d8edba09b6ca4da9"
+              "arm64": "cd78a2d02d66c38cb6225de220d44ef3d34397f4b70b6c28bde20032dd80ce4a"
             },
             "release": "raidar/define@1",
-            "sha256": "a9477ea74a043bc4ce9815a34bb71e8900775e9025e32920188aa0f0d5f89193"
+            "sha256": "4ca171006d37ae06434620f26d28bb6059deb1552085a241732ef73a526f25e8"
           },
           "raidar/verify": {
             "installed": {
@@ -1131,7 +1131,7 @@
           "version": "2.1.285"
         },
         "workflow": "raidar/define-build-verify@2",
-        "workflow_sha256": "8aec0a93da33b0fdd58f32184bb8b84d33f97ea611854832609787776c324663"
+        "workflow_sha256": "3452f484a8d2377f82204ce0eadcee510f0e9634f3730803a65dec0ba64b8d9d"
       }
     },
     "design": {
@@ -1922,7 +1922,7 @@
       },
       "workflow": {
         "raidar/define-build-verify@2": {
-          "digest": "8aec0a93da33b0fdd58f32184bb8b84d33f97ea611854832609787776c324663",
+          "digest": "3452f484a8d2377f82204ce0eadcee510f0e9634f3730803a65dec0ba64b8d9d",
           "metadata": {
             "stages": [
               "raidar/define",
@@ -1949,7 +1949,7 @@
     "source_sha256": "8ef92f82ecb8f490c0436f73852a82f5fca359f64a573cff5eacb6a18b25110c",
     "spec_sha256": "06aac1e03107800b8e8c668be7b5c394fddfdb942bd62f53ea7932231538977d"
   },
-  "lock_sha256": "b6c1aa2657b9618b7483cac96eda12bcbe34c77d111025da940c9e14750ec5c3",
+  "lock_sha256": "50fd20d4c1acd18d6542a42186c173f64c2798382e862243b1abfa31ebbee6f3",
   "lock_version": 5,
   "overrides": {
     "flags": {},
@@ -1958,7 +1958,7 @@
   "sections": {
     "analysis": "f7f0b52ed6909ba0f3864eb9e7f7d513625da8dc445234304b8aa033c4343cb6",
     "assessment": "89159accfd4736b40a309eb1ca91aeac6520e3a211a8c87616a5c22deb02df4c",
-    "execution": "b6c1aa2657b9618b7483cac96eda12bcbe34c77d111025da940c9e14750ec5c3",
+    "execution": "50fd20d4c1acd18d6542a42186c173f64c2798382e862243b1abfa31ebbee6f3",
     "toolchain": "129f8f25205745e44f064a8ec6bc05f3e3eee84b8483b3ff1f46ba04edb33c57"
   },
   "spec": {

@@ -1,14 +1,14 @@
 {
   "floors": {
-    "disk_free": 209167912960,
-    "memory_available": 18564632576
+    "disk_free": 208972816384,
+    "memory_available": 18484998144
   },
   "outputs": {
     "criteria": "cf771a792cbbc5e6439e247a0743e524ce792c981c862817147a76e658a0e91f",
     "definition": "e146392dd37c6fde317cdb38656db806a9ef16924db63b81c930f3a7e7b328cd"
   },
   "pack": "2b91a52663e099f2de9ea1a5ee041704005fd25e937b93dac72760249676ef1a",
-  "package": "a9477ea74a043bc4ce9815a34bb71e8900775e9025e32920188aa0f0d5f89193",
+  "package": "4ca171006d37ae06434620f26d28bb6059deb1552085a241732ef73a526f25e8",
   "primitives": {
     "frame/1": "652c9b5e0d44de3876852fbefd81e6c4db7b79260790e85cfbc7d6a5f85a3f30",
     "gate/1": "2586c3e0488929cceb6ec2038a26b4c1143f28803d3f31cd38f0528f94c5938f",
