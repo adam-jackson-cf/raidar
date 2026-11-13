@@ -1,6 +1,6 @@
 # Contributing
 
-A contributor guide that takes repository changes through local gates and immutable releases.
+A contributor guide that takes repository changes through local gates and registered releases.
 
 | Does                                                                                                                        | Does not                                                                                 |
 | --------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
@@ -55,11 +55,11 @@ _Follow enforced package boundaries instead of adding another extension path._
 
 Sources: [split-design.md](../../split-design.md) (`sections 1,5,7`); [orchestrator/.importlinter](../../orchestrator/.importlinter) (`tiers`); [orchestrator/src/raidar/contract/paths.py](../../orchestrator/src/raidar/contract/paths.py); [review-surface/README.md](../../review-surface/README.md).
 
-## 3 · Preserve released bytes
+## 3 · Update releases in place
 
-_Archive the replaced release before editing; register the new content in place._
+_Edit the definition in place and update its registered digest; relock and rerun affected experiments._
 
-- **Agent, workflow or stage:** run `env -u AGENT make release-archive REF=<name>@<N>` before editing; preserve frozen register entries and register the replacement hash in `lab/releases.yaml`.
+- **Agent, workflow or stage:** edit in place and update the registered digest of its existing `@N` in `lab/releases.yaml` (`make releases-check` prints the line); update dependent workflow digests the same way. `make release-archive REF=<name>@<N>` is optional history.
 - **Stage evidence:** run `stage-check NAME=<namespace/name>` for the current installed tree and declared stop/output obligations.
 - **Application version:** fetch origin, branch from `origin/main`, then run `env -u AGENT make version-release`; commit its three generated files in the printed release subject through normal gated review. Regenerate after rebasing onto newer main.
 - **Version-only release:** does not require experiment relocks; execution toolchains pin result-affecting versions separately.

@@ -3,9 +3,10 @@
 ``release_issues`` reports every agent, stage package and workflow that is unreleased or changed
 since its latest release (naming the line to add), every registered name the tree does not define,
 every agent CLI pin that differs from a runtime pack that bakes its harness in (the agent pin is
-the source) and, given a base commit, any release the base registered that was removed or
-re-hashed (released means frozen). ``release_base`` picks that base: the merge base with ``main``,
-or ``HEAD``'s parent when ``HEAD`` is on ``main`` itself.
+the source) and, given a base commit, any release the base registered that was removed.
+Re-hashing a registered version in place is allowed: definitions are edited in place and the
+affected experiments are relocked and rerun. ``release_base`` picks that base: the merge base
+with ``main``, or ``HEAD``'s parent when ``HEAD`` is on ``main`` itself.
 """
 
 from __future__ import annotations
@@ -13,9 +14,6 @@ from __future__ import annotations
 import subprocess
 from collections.abc import Callable
 from pathlib import Path
-
-from raidar_contract.agent import agent_names
-from raidar_contract.references import ReleaseError
 
 from raidar.contract.paths import (
     REPO_ROOT,
@@ -28,13 +26,15 @@ from raidar.contract.releases import (
     load_register,
     parse_register,
     registration_issues,
-    rewritten_releases,
+    removed_releases,
 )
 from raidar.subject.agent.definition import load_agent
 from raidar.subject.agent_checks import agent_pin_issues
 from raidar.subject.imports import import_issues
 from raidar.subject.package.release_check import stage_release_issues
 from raidar.subject.releases import tree_workflow_digest
+from raidar_contract.agent import agent_names
+from raidar_contract.references import ReleaseError
 
 MAIN_REFS = ("main", "origin/main")
 
@@ -68,7 +68,7 @@ def release_base(repo_root: Path = REPO_ROOT, *, git: GitRunner = _git) -> str |
 
 
 def history_issues(base: str, repo_root: Path = REPO_ROOT, *, git: GitRunner = _git) -> list[str]:
-    """Releases registered at commit ``base`` that the tree's register removed or re-hashed."""
+    """Releases registered at commit ``base`` that the tree's register removed."""
     path = releases_file(repo_root)
     relative = path.relative_to(repo_root).as_posix()
     text = git(repo_root, "show", f"{base}:{relative}")
@@ -81,7 +81,7 @@ def history_issues(base: str, repo_root: Path = REPO_ROOT, *, git: GitRunner = _
         now = load_register(path)
     except ReleaseError as exc:
         return [str(exc)]
-    return rewritten_releases(earlier, now)
+    return removed_releases(earlier, now)
 
 
 def release_issues(

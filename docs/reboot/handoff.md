@@ -41,7 +41,7 @@ Run `make help` to see the public interface.
 - File the vote records under `docs/reboot/evidence/decide-<topic>-<voter>.md`.
 
 ### Rules that bit us
-- **Released `@N` versions are frozen,** and `lab/releases.yaml` is append-only. Never hand-edit `*.lock.json`; relock only with `make experiment-lock EXPERIMENT=<path to experiment.yaml>`.
+- **Released `@N` versions are edited in place** (owner decision 2026-11-12): update the registered digest in `lab/releases.yaml`, relock and rerun affected experiments; a registered version is never removed. Never hand-edit `*.lock.json`; relock only with `make experiment-lock EXPERIMENT=<path to experiment.yaml>`.
 - **Identity-bearing bytes:** the grading digest closure (`grading_execution_digest()` in `orchestrator/src/raidar/grading/records.py`), `primitive_code`, and released package bytes.
   - Changing them invalidates the problem validations (RT7), and a revalidation takes about 6 h for 9 problems × 5 repeats.
   - Test-only work must never change them. Any identity change gets its own reviewed commit, with before/after values and a scheduled revalidation.

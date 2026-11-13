@@ -447,24 +447,6 @@
       "count": 1
     },
     {
-      "path": "orchestrator/src/raidar/cli/releases.py",
-      "code": "D205",
-      "fingerprint": "4f7bc17b075efc84468cdecfd88d982a001a7c312ef84e8547a7903acabd873f",
-      "count": 1
-    },
-    {
-      "path": "orchestrator/src/raidar/cli/releases.py",
-      "code": "D209",
-      "fingerprint": "99c1aba45487c4f0e06bfd706c8e87c0ea813a439058efa8de12835c7e75418a",
-      "count": 1
-    },
-    {
-      "path": "orchestrator/src/raidar/cli/releases.py",
-      "code": "I001",
-      "fingerprint": "6590ff2d12ba18b405dbcce5e08c85b2b082c516c664876d2cbcc4fb1552d68a",
-      "count": 1
-    },
-    {
       "path": "orchestrator/src/raidar/cli/stage.py",
       "code": "I001",
       "fingerprint": "6590ff2d12ba18b405dbcce5e08c85b2b082c516c664876d2cbcc4fb1552d68a",
@@ -472,18 +454,6 @@
     },
     {
       "path": "orchestrator/src/raidar/cli/stage_fixtures.py",
-      "code": "I001",
-      "fingerprint": "6590ff2d12ba18b405dbcce5e08c85b2b082c516c664876d2cbcc4fb1552d68a",
-      "count": 1
-    },
-    {
-      "path": "orchestrator/src/raidar/cli/stage_package.py",
-      "code": "I001",
-      "fingerprint": "6590ff2d12ba18b405dbcce5e08c85b2b082c516c664876d2cbcc4fb1552d68a",
-      "count": 1
-    },
-    {
-      "path": "orchestrator/src/raidar/contract/releases.py",
       "code": "I001",
       "fingerprint": "6590ff2d12ba18b405dbcce5e08c85b2b082c516c664876d2cbcc4fb1552d68a",
       "count": 1
@@ -2115,12 +2085,6 @@
       "count": 1
     },
     {
-      "path": "orchestrator/src/raidar/subject/release_check.py",
-      "code": "I001",
-      "fingerprint": "6590ff2d12ba18b405dbcce5e08c85b2b082c516c664876d2cbcc4fb1552d68a",
-      "count": 1
-    },
-    {
       "path": "orchestrator/src/raidar/subject/releases.py",
       "code": "D205",
       "fingerprint": "70b017096e9452a657e5d9eb219b9128aaf9fe3c330df076ecf1c4a822bba5bf",
@@ -2787,12 +2751,6 @@
       "count": 1
     },
     {
-      "path": "orchestrator/tests/test_package_identity.py",
-      "code": "I001",
-      "fingerprint": "6590ff2d12ba18b405dbcce5e08c85b2b082c516c664876d2cbcc4fb1552d68a",
-      "count": 1
-    },
-    {
       "path": "orchestrator/tests/test_package_lock.py",
       "code": "I001",
       "fingerprint": "6590ff2d12ba18b405dbcce5e08c85b2b082c516c664876d2cbcc4fb1552d68a",
@@ -2932,12 +2890,6 @@
     },
     {
       "path": "orchestrator/tests/test_release_definitions.py",
-      "code": "I001",
-      "fingerprint": "6590ff2d12ba18b405dbcce5e08c85b2b082c516c664876d2cbcc4fb1552d68a",
-      "count": 1
-    },
-    {
-      "path": "orchestrator/tests/test_release_register.py",
       "code": "I001",
       "fingerprint": "6590ff2d12ba18b405dbcce5e08c85b2b082c516c664876d2cbcc4fb1552d68a",
       "count": 1

@@ -149,7 +149,7 @@ A criteria output is a strict JSON object with `contract: criteria/1` and `featu
 
 `stage-tree/1` is `digest_json({scheme: 'stage-tree/1', files: [[path, sha256, exec], ...]})`: sorted package-relative POSIX paths, exact file bytes, executable-bit boolean. Fixtures do not ship and are excluded; `.git`, `__pycache__` and `.DS_Store` are ignored. Symlinks (including in excluded fixture trees), traversal, absolute paths and special files are refused. Dependency lock bytes, prompts, skills, instructions and own tool bytes are included. Transport and checkout location are not identity.
 
-`lab/releases.yaml` has a `stages:` mapping from `<ns>/<name>@N` to its digest. N starts at 1. Releases are append-only against main's history; only the latest release's current bytes resolve. Older bytes live in archive tags. No release writer exists: checks print the next line to add. Stage and workflow references require their namespace; bare references, paths, branches, tags and `latest` do not resolve, with no alias. Bare workflow register entries remain frozen history only. Agent references retain `name@N`. A changed package requires a new package release and dependent workflow release, then relocking.
+`lab/releases.yaml` has a `stages:` mapping from `<ns>/<name>@N` to its digest. N starts at 1. A package is edited in place: its registered digest is updated to the current bytes, keeping its `@N`. `releases-check` fails while a registered digest differs from the current bytes and prints the line to put in the register; it refuses a registered version removed against main's history, never a re-hash. Only the latest release's current bytes resolve. Archive tags are optional history, not required. No release writer exists: checks print the line to put in the register. Stage and workflow references require their namespace; bare references, paths, branches, tags and `latest` do not resolve, with no alias. Bare workflow register entries remain frozen history only. Agent references retain `name@N`. A changed package requires updating its registered digest and every dependent workflow's digest in place, then relocking and rerunning the affected experiments.
 
 Workflow identity folds in every package release, digest and effective params. Arm locks carry `packages` and `primitive_code` (`python-ast/1` inventories including transitive primitive imports, Harbor and native adapter code); neither field can be overridden in pooling. Trial evidence records installed-tree digests and wheels; a mismatch invalidates the trial. Prompt, tool-byte and param changes each change identity and stale locks are refused.
 
@@ -202,7 +202,7 @@ state path or fixture renaming. YAML comments, aliases, scalar styles and CRLF s
 The source package remains untouched. `raidar/docs-check` pins codespell 2.4.1 and has six
 fixtures. Fixtures/replay run offline in throwaway pack containers, never on the host.
 Draft locking is smoke-only, writes under `var/tmp/drafts/<experiment-id>/`, marks jobs as dev,
-and never admits a measured comparison. Normal locks require registered immutable references.
+and never admits a measured comparison. Normal locks require registered references whose digests match the current bytes.
 Generated artifacts belong under `var/` or `RAIDAR_VAR`. See `make help` for the exhaustive
 command catalogue.
 

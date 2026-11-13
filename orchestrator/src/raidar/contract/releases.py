@@ -13,8 +13,10 @@ name::
       docs-check@1: <sha256 stage-tree/1 digest of the package>
 
 Earlier versions stay in the register as history; the tree holds only the definition of each
-name's latest version, so only that version resolves (older ones live in archive tags). The
-register is append-only: a released ``name@N`` keeps its hash forever (``rewritten_releases``).
+name's latest version, so only that version resolves. A definition is edited in place: its
+registered hash is updated to the current bytes (the check prints the line to put in the
+register), then the affected experiments are relocked and rerun. A registered ``name@N`` may be
+re-hashed but never removed (``removed_releases``). Archive tags are optional history.
 
 Workflow and stage references require a namespace (``<ns>/<name>@<N>``). Bare workflow entries
 of the pre-namespace register stay as frozen history: they parse, never resolve (active
@@ -31,6 +33,7 @@ from typing import Annotated
 
 import yaml
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
+
 from raidar_contract.agent import AgentDefinitionError
 from raidar_contract.package import StagePackageError
 from raidar_contract.references import Release, ReleaseError
@@ -137,28 +140,21 @@ def resolve_registered(
 
 
 def changed_message(release: Release, registered: str, now: str) -> str:
-    """Why a release no longer matches its register entry, naming the next release to add."""
+    """Why a release no longer matches its register entry, naming the line to update."""
     return (
-        f"{release.name} changed since {release} was released (registered {registered[:12]}, "
-        f"now {now[:12]}): register {release.name}@{release.version + 1}"
+        f"{release.name} changed since {release} was registered (registered {registered[:12]}, "
+        f"now {now[:12]}): update {release}: {now} in lab/releases.yaml, then relock"
     )
 
 
-def rewritten_releases(earlier: ReleaseRegister, now: ReleaseRegister) -> list[str]:
-    """Every release of ``earlier`` that ``now`` removed or re-hashed (released means frozen)."""
-    issues = []
-    for kind in ReleaseKind:
-        current = now.of(kind)
-        for release, digest in sorted(earlier.of(kind).items()):
-            if release not in current:
-                issues.append(f"{kind.value} release {release} was removed: releases are frozen")
-            elif current[release] != digest:
-                issues.append(
-                    f"{kind.value} release {release} was re-hashed ({digest[:12]} -> "
-                    f"{current[release][:12]}): releases are frozen; register "
-                    f"{release.name}@<next> instead"
-                )
-    return issues
+def removed_releases(earlier: ReleaseRegister, now: ReleaseRegister) -> list[str]:
+    """Every release of ``earlier`` that ``now`` removed (re-hashing in place is allowed)."""
+    return [
+        f"{kind.value} release {release} was removed: registered versions stay as history"
+        for kind in ReleaseKind
+        for release in sorted(earlier.of(kind))
+        if release not in now.of(kind)
+    ]
 
 
 def registration_issues(
@@ -185,8 +181,8 @@ def registration_issues(
             issues.append(f"{kind.value}/{name} is not released: register {name}@1: {digest}")
         elif register.of(kind)[latest] != digest:
             issues.append(
-                f"{kind.value}/{name} changed since {latest}: register "
-                f"{name}@{latest.version + 1}: {digest}"
+                f"{kind.value}/{name} changed since {latest} was registered: update "
+                f"{latest}: {digest}"
             )
     issues.extend(
         f"{kind.value} release name {name!r} is registered but not defined in the tree"

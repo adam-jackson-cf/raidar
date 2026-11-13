@@ -10,14 +10,14 @@ from pathlib import Path
 
 import click
 import yaml
-from raidar_contract.canonical import IGNORED_TREE_NAMES
-from raidar_contract.package import StagePackageError
-from raidar_contract.package.manifest import StagePackage
-from raidar_contract.package.registry import MANIFEST_FILE
 
 from raidar.contract.paths import lab_root, releases_file
 from raidar.contract.releases import ReleaseKind, ReleaseRegister, load_register
 from raidar.subject.package.registry import STAGES_DIR, load_stage_package
+from raidar_contract.canonical import IGNORED_TREE_NAMES
+from raidar_contract.package import StagePackageError
+from raidar_contract.package.manifest import StagePackage
+from raidar_contract.package.registry import MANIFEST_FILE
 
 _NAME = re.compile(r"^[a-z0-9][a-z0-9-]*/[a-z0-9][a-z0-9-]*$")
 DEFAULT_SOURCE = "raidar/docs-check"
@@ -69,7 +69,7 @@ def release_state(name: str, digest: str, register: ReleaseRegister) -> tuple[st
         return "unreleased", f"register stages: {name}@1: {digest}"
     if register.of(ReleaseKind.STAGE)[latest] == digest:
         return f"released as {latest}", None
-    return f"changed since {latest}", f"register stages: {name}@{latest.version + 1}: {digest}"
+    return f"changed since {latest}", f"register stages: {latest}: {digest}"
 
 
 @click.command("new")

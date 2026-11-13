@@ -153,10 +153,10 @@
 
     <!-- R: release labels -->
     <g class="k-R">
-      <g class="node"><title>Release in place: make release-archive REF=name@N tags the replaced release, edit in place, bump @N, relock.</title>
+      <g class="node"><title>Release in place: edit in place, update the registered digest of the same @N, relock and rerun; an archive tag is optional.</title>
         <rect x="250" y="46" width="290" height="50" rx="8"/>
         <text class="nt" x="262" y="66">↻ Release in place</text>
-        <text class="ns" x="262" y="84">tag old · bump @N · relock</text></g>
+        <text class="ns" x="262" y="84">edit · re-hash @N · relock</text></g>
       <path class="wire" d="M540,71 H666 V198" marker-end="url(#a-R)"/>
       <g class="node"><title>14 components: rules-file@2, workspace-files@2, lint-config@2, lint-tool@2, skills@2, harness-settings@2, stop-hook@2, mcp-server@2, prompt-wrapper@1, review-loop@3, guardrail-gate@5, python-guardrails@8, continue-on-stall@3, transient-retry@2</title>
         <rect x="888" y="46" width="140" height="50" rx="8"/>
@@ -271,7 +271,7 @@
 
 <script>
 const KINDS = {
-  R: { name: 'Release label', what: 'Hand-maintained name@N, bumped when behaviour changes; archive/<name>@N preserves the replaced release.',
+  R: { name: 'Release label', what: 'Hand-maintained name@N; its registered digest is updated in place when bytes change; archive/<name>@N tags are optional history.',
        reset: 'Rename only. Content hashes beside each label carry the identity, so nothing becomes ambiguous; locks and Assessment keys re-key. Archive tag names collide with the bundle\u2019s old @1 tags unless namespaced.' },
   F: { name: 'Format version', what: 'kind + schema_version of a file Raidar writes or reads; readers refuse other values.',
        reset: 'Possible but risky: a new \u201c1\u201d would collide with archived files of an older format 1. A new mechanics_epoch separates runs instead.' },
@@ -294,7 +294,7 @@ const STAGES = [
   { n: 9, name: 'Analysis', cmd: 'make experiment-analyze JOBS=… STORE=… ANALYSIS_OUT=…', what: 'Headline score, paired effects and verdicts, after the pooling gate admits the jobs.' },
   { n: 10, name: 'Review surface', cmd: 'make review-surface-quality-data; review UI', what: 'Projections of jobs and Assessments for the human review UI.' },
   { n: 11, name: 'Fault ledger', side: true, cmd: 'fault-catalog skill; make ledger-check', what: 'Fault candidates from jobs and analysis become tracked fault (FCR) and remedy (M) records.' },
-  { n: 12, name: 'Release in place', side: true, cmd: 'make release-archive REF=<name>@<N>; bump @N; relock', what: 'Any definition change: tag the replaced release, edit in place, bump the label, relock (feeds back into stage 4).' },
+  { n: 12, name: 'Release in place', side: true, cmd: 'edit; update digest in lab/releases.yaml; relock', what: 'Any definition change: edit in place, update the registered digest of the same @N, relock and rerun (feeds back into stage 4).' },
 ];
 
 // kind, group, name, value, def, roles{stage: text}, effect, refs, archived
