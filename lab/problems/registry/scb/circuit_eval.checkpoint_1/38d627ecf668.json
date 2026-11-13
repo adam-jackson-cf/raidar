@@ -31,13 +31,13 @@
     "image": "raidar/pack-python:2b91a52663e099f2"
   },
   "task_sha256": "0cdda12fb5a2c68270f63581682b7f7e94a0cc8be0641a0ab1b78142cf278938",
-  "bundle_sha256": "f712d5e4607cb0983df0bc72dd7d5fd35da50e7dc67e867a71e95954e542005e",
+  "bundle_sha256": "8e0b0099b5c0a1f7371ebcd0968cd7afb93960399ebfd62ffbab7b557c6e9470",
   "references_sha256": "9b210f38d2bab40335ebd5060a88c589819889666256331d560ce6b1586b14fe",
   "entry_file": "circopt.py",
   "entry_command": "uv run --project /app circopt.py",
   "dependencies": {
     "policy": "declared-wheels/1",
-    "resolver": "uv@0.10.0",
+    "resolver": "uv@0.13.7",
     "index": "https://pypi.org/simple",
     "python": "3.12",
     "platforms": [

@@ -42,13 +42,18 @@ def _is_string_statement(node: ast.stmt) -> bool:
 def _strip_string_statements(tree: ast.AST) -> None:
     for node in ast.walk(tree):
         for name in _BODY_FIELDS:
-            body = getattr(node, name, None)
-            if not isinstance(body, list):
-                continue
-            kept = [statement for statement in body if not _is_string_statement(statement)]
-            if not kept and body and name == "body" and isinstance(node, _REQUIRES_BODY):
-                kept = [ast.Pass()]
-            setattr(node, name, kept)
+            _strip_body(node, name)
+
+
+def _strip_body(node: ast.AST, name: str) -> None:
+    """Drop the string statements from ``node``'s ``name`` body, keeping a required body."""
+    body = getattr(node, name, None)
+    if not isinstance(body, list):
+        return
+    kept = [statement for statement in body if not _is_string_statement(statement)]
+    if not kept and body and name == "body" and isinstance(node, _REQUIRES_BODY):
+        kept = [ast.Pass()]
+    setattr(node, name, kept)
 
 
 def _scalar(value: object) -> object:

@@ -73,13 +73,13 @@
     "image": "raidar/pack-python:2b91a52663e099f2"
   },
   "task_sha256": "87bf08fbb0332d2ab4378772a81af8ad771c8d8391641a7592772a6d84979cdc",
-  "bundle_sha256": "b6870d3216884482088753b4371aae54510c6fcc308092e60decd999479f9464",
+  "bundle_sha256": "cc73e25a3ec834160546cb20d224393dc6a377523f9df4d0bb44ca8e89933c18",
   "references_sha256": "3ebc5353d3e331c3d0721094799b4ed2a491746ae07f6600c86b1cb330004cf8",
   "entry_file": "logql.py",
   "entry_command": "uv run --project /app logql.py",
   "dependencies": {
     "policy": "declared-wheels/1",
-    "resolver": "uv@0.10.0",
+    "resolver": "uv@0.13.7",
     "index": "https://pypi.org/simple",
     "python": "3.12",
     "platforms": [

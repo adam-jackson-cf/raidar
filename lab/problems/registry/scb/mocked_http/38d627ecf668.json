@@ -115,13 +115,13 @@
     "image": "raidar/pack-python:2b91a52663e099f2"
   },
   "task_sha256": "821a4ae4a6b91174d4776e0f0d06e1296c3a6672326785eb14988540b24518ee",
-  "bundle_sha256": "7cfa045f83f371ef5bbef4dede950da11ae19bc84e4456ec836c9534dec97446",
+  "bundle_sha256": "45cb4c63ee52d866ad9b0fa5c02d1f5ba0f70e35240a78a862b8740689e8c3ed",
   "references_sha256": "670f59ddaf4a34efaab0103d36ad785d68dc1699da5c3291903c03479df55cb5",
   "entry_file": "hmock.py",
   "entry_command": "uv run --project /app hmock.py",
   "dependencies": {
     "policy": "declared-wheels/1",
-    "resolver": "uv@0.10.0",
+    "resolver": "uv@0.13.7",
     "index": "https://pypi.org/simple",
     "python": "3.12",
     "platforms": [

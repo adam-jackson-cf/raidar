@@ -22,7 +22,8 @@ arms:
     agent: agent
     workflow: raidar/one-shot-verify@2
 assessment:
-  scorers: [correctness@10, code-quality@9, resource-usage@8, process-compliance@12]
+  scorers:
+    [correctness@10, code-quality@9, resource-usage@8, process-compliance@12]
   metric: scb-canonical@2
 analysis:
   baseline_arm: verify

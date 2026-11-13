@@ -23,8 +23,6 @@
     },
     {
       "detail": [
-        "checkpoint_3: 1 nondeterministic",
-        "checkpoint_4: 1 nondeterministic",
         "checkpoint_5: 1 nondeterministic",
         "checkpoint_6: 1 nondeterministic",
         "checkpoint_7: 1 nondeterministic",
@@ -59,7 +57,7 @@
     "engine": "direct",
     "grader_environment_id": "sha256:9a697be7c29fef1c71febc56083dfbdb9aee20fbd80e1e129e093e532daf78d7",
     "grader_image": "raidar-oracle-grader:2cf4f359dd32f0b6",
-    "grader_implementation_sha256": "4cf6e9b2d6fe550a1c94485e527c4932f1981ba3fda827e74532749b12bc48d0",
+    "grader_implementation_sha256": "1ffc118d4f969c604192a6c6589fb2bfbfcf67b047290cb53a61ae63eca6e6c7",
     "harbor": "0.23.0",
     "pack_image": "raidar/pack-python:2b91a52663e099f2"
   },
@@ -834,12 +832,12 @@
                 21
               ],
               "regression": [
-                141,
+                140,
                 159
               ]
             },
             "infra_failure": null,
-            "passed": 169,
+            "passed": 168,
             "total": 194
           }
         },
@@ -1588,12 +1586,12 @@
                 13
               ],
               "regression": [
-                140,
+                141,
                 141
               ]
             },
             "infra_failure": null,
-            "passed": 140,
+            "passed": 141,
             "total": 159
           },
           "checkpoint_8": {
@@ -2061,7 +2059,7 @@
     "selection": "default_by_k"
   },
   "kind": "raidar-problem-validation",
-  "manifest_sha256": "326d878d158c224b5a85fc115a845cabb0925530faff5a083099e1930900a4e9",
+  "manifest_sha256": "cb67a9380be439995e73f765a2fee7e6d30960d4bbc444b80e599572ce6c91ae",
   "mode": "multi_checkpoint",
   "not_run": [
     "native_parity_positive",
@@ -2135,7 +2133,7 @@
         "status": "measured"
       },
       "checkpoint_8": {
-        "observation": "no variation observed in 5 runs for this reference and environment",
+        "observation": "variation observed in 5 runs for this reference and environment",
         "reference_sha256": "57dd62fe1fc1f7ba73817b56db225b0febc1b506f5b176fb4c78bc3d89bffac2",
         "runs": 5,
         "status": "measured"
@@ -2179,7 +2177,7 @@
         "status": "measured"
       },
       "checkpoint_7": {
-        "observation": "variation observed in 5 runs for this reference and environment",
+        "observation": "no variation observed in 5 runs for this reference and environment",
         "reference_sha256": "57dd62fe1fc1f7ba73817b56db225b0febc1b506f5b176fb4c78bc3d89bffac2",
         "runs": 5,
         "status": "measured"
@@ -2300,13 +2298,11 @@
       "verdict": "validated"
     },
     "checkpoint_3": {
-      "digest": "a3fc84629f3349a6fe41bcfd9bc2f1c64ce975b9b979b56a785e221ee4444e63",
+      "digest": "b86099d0dfcfe5b66a582c9e71e6b4518bfb0dcb19cfd25eef4bf4968a77364e",
       "exclusion": null,
-      "nondeterministic": [
-        "checkpoint_3::test_redis_state_lost_on_restart"
-      ],
-      "nondeterministic_count": 1,
-      "size": 76,
+      "nondeterministic": [],
+      "nondeterministic_count": 0,
+      "size": 77,
       "solvable": [
         "checkpoint_1::test_condition_false_string_does_not_match",
         "checkpoint_1::test_condition_render_error_fallback",
@@ -2367,6 +2363,7 @@
         "checkpoint_3::test_redis_array_semicolon_separator",
         "checkpoint_3::test_redis_hash_and_list_ops",
         "checkpoint_3::test_redis_persists_state_across_requests",
+        "checkpoint_3::test_redis_state_lost_on_restart",
         "checkpoint_3::test_redisdo_condition_stateful_routing",
         "checkpoint_3::test_redisdo_del_multiple_keys",
         "checkpoint_3::test_redisdo_empty_hash_and_keys",
@@ -2388,13 +2385,11 @@
       "verdict": "validated"
     },
     "checkpoint_4": {
-      "digest": "7e8ff6b861d0919ab7ea0181d87ce270e1bc037fb8b1f630d582e8359ed1955a",
+      "digest": "b2ea99c11cbf612df152f1376053eb18a6b360fcc3b61586fbe1914b2b93d412",
       "exclusion": null,
-      "nondeterministic": [
-        "checkpoint_3::test_redis_state_lost_on_restart"
-      ],
-      "nondeterministic_count": 1,
-      "size": 98,
+      "nondeterministic": [],
+      "nondeterministic_count": 0,
+      "size": 99,
       "solvable": [
         "checkpoint_1::test_condition_false_string_does_not_match",
         "checkpoint_1::test_condition_render_error_fallback",
@@ -2455,6 +2450,7 @@
         "checkpoint_3::test_redis_array_semicolon_separator",
         "checkpoint_3::test_redis_hash_and_list_ops",
         "checkpoint_3::test_redis_persists_state_across_requests",
+        "checkpoint_3::test_redis_state_lost_on_restart",
         "checkpoint_3::test_redisdo_condition_stateful_routing",
         "checkpoint_3::test_redisdo_del_multiple_keys",
         "checkpoint_3::test_redisdo_empty_hash_and_keys",
@@ -2498,10 +2494,10 @@
       "verdict": "validated"
     },
     "checkpoint_5": {
-      "digest": "d253883521caf1acb32ccc4c3d5ef1317f8070c5e347ae395f807b2675f8f87d",
+      "digest": "32d30c877828c82d0c40797cb7044ba87f8c5f3cdf68257460cb5bd5075fe1ec",
       "exclusion": null,
       "nondeterministic": [
-        "checkpoint_3::test_redis_state_lost_on_restart"
+        "checkpoint_5::test_delete_fs_only_key_returns_404"
       ],
       "nondeterministic_count": 1,
       "size": 113,
@@ -2565,6 +2561,7 @@
         "checkpoint_3::test_redis_array_semicolon_separator",
         "checkpoint_3::test_redis_hash_and_list_ops",
         "checkpoint_3::test_redis_persists_state_across_requests",
+        "checkpoint_3::test_redis_state_lost_on_restart",
         "checkpoint_3::test_redisdo_condition_stateful_routing",
         "checkpoint_3::test_redisdo_del_multiple_keys",
         "checkpoint_3::test_redisdo_empty_hash_and_keys",
@@ -2606,7 +2603,6 @@
         "checkpoint_4::test_values_in_expect_condition",
         "checkpoint_5::test_admin_server_disabled",
         "checkpoint_5::test_delete_all_preserves_filesystem",
-        "checkpoint_5::test_delete_fs_only_key_returns_404",
         "checkpoint_5::test_delete_key_reveals_filesystem_fallback",
         "checkpoint_5::test_delete_missing_key_returns_404",
         "checkpoint_5::test_delete_set_isolation",
@@ -2623,10 +2619,10 @@
       "verdict": "validated"
     },
     "checkpoint_6": {
-      "digest": "32ca632e5266e9d2dacf33b453ae812c2ae29fff38e80bd7bd0a77b1ffb1d8c3",
+      "digest": "45a0c5bd473542f2bdf2cc7c1e06c7cb9b647e968500b513742bb5901c94e3b2",
       "exclusion": null,
       "nondeterministic": [
-        "checkpoint_3::test_redis_state_lost_on_restart"
+        "checkpoint_5::test_delete_fs_only_key_returns_404"
       ],
       "nondeterministic_count": 1,
       "size": 140,
@@ -2690,6 +2686,7 @@
         "checkpoint_3::test_redis_array_semicolon_separator",
         "checkpoint_3::test_redis_hash_and_list_ops",
         "checkpoint_3::test_redis_persists_state_across_requests",
+        "checkpoint_3::test_redis_state_lost_on_restart",
         "checkpoint_3::test_redisdo_condition_stateful_routing",
         "checkpoint_3::test_redisdo_del_multiple_keys",
         "checkpoint_3::test_redisdo_empty_hash_and_keys",
@@ -2731,7 +2728,6 @@
         "checkpoint_4::test_values_in_expect_condition",
         "checkpoint_5::test_admin_server_disabled",
         "checkpoint_5::test_delete_all_preserves_filesystem",
-        "checkpoint_5::test_delete_fs_only_key_returns_404",
         "checkpoint_5::test_delete_key_reveals_filesystem_fallback",
         "checkpoint_5::test_delete_missing_key_returns_404",
         "checkpoint_5::test_delete_set_isolation",
@@ -2778,7 +2774,7 @@
       "digest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
       "exclusion": "no_new_scoreable_tests",
       "nondeterministic": [
-        "checkpoint_3::test_redis_state_lost_on_restart"
+        "checkpoint_5::test_delete_fs_only_key_returns_404"
       ],
       "nondeterministic_count": 1,
       "size": 0,
@@ -2786,10 +2782,10 @@
       "verdict": "excluded"
     },
     "checkpoint_8": {
-      "digest": "c428e242a012e638ac7dc7d67385e26deae2f58dd9d56e5d07c1df9985742c5c",
+      "digest": "ae65411381e8e70c187793242218f07b18b38be8fea7e1407650623f53e04e65",
       "exclusion": null,
       "nondeterministic": [
-        "checkpoint_3::test_redis_state_lost_on_restart"
+        "checkpoint_5::test_delete_fs_only_key_returns_404"
       ],
       "nondeterministic_count": 1,
       "size": 174,
@@ -2853,6 +2849,7 @@
         "checkpoint_3::test_redis_array_semicolon_separator",
         "checkpoint_3::test_redis_hash_and_list_ops",
         "checkpoint_3::test_redis_persists_state_across_requests",
+        "checkpoint_3::test_redis_state_lost_on_restart",
         "checkpoint_3::test_redisdo_condition_stateful_routing",
         "checkpoint_3::test_redisdo_del_multiple_keys",
         "checkpoint_3::test_redisdo_empty_hash_and_keys",
@@ -2894,7 +2891,6 @@
         "checkpoint_4::test_values_in_expect_condition",
         "checkpoint_5::test_admin_server_disabled",
         "checkpoint_5::test_delete_all_preserves_filesystem",
-        "checkpoint_5::test_delete_fs_only_key_returns_404",
         "checkpoint_5::test_delete_key_reveals_filesystem_fallback",
         "checkpoint_5::test_delete_missing_key_returns_404",
         "checkpoint_5::test_delete_set_isolation",

@@ -50,13 +50,13 @@
     "image": "raidar/pack-python:2b91a52663e099f2"
   },
   "task_sha256": "5a8c97c1a560dbd2b3f0a027b2bd4c56522506f4fe8d06e3856ac3f95b64721e",
-  "bundle_sha256": "1970822e505206f8b5fbd6a3ccae83c96a134400a09ef6295f9751307dc3ea98",
+  "bundle_sha256": "d59ddee3e7323d19dcd3df3a04960202e794a978faa2f0a1839d2c358a001183",
   "references_sha256": "b61dbc2d6434a90dcf75a4f2e24681228fd35dbcab7231da351a84db49929388",
   "entry_file": "launch.py",
   "entry_command": "uv run --project /app launch.py",
   "dependencies": {
     "policy": "declared-wheels/1",
-    "resolver": "uv@0.10.0",
+    "resolver": "uv@0.13.7",
     "index": "https://pypi.org/simple",
     "python": "3.12",
     "platforms": [

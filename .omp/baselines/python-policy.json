@@ -1,12 +1,5 @@
 {
   "schemaVersion": 1,
   "tool": "python-policy",
-  "findings": [
-    {
-      "path": "orchestrator/src/raidar/contract/source_digest.py",
-      "code": "PYS250",
-      "fingerprint": "1466b65f329034996406b2ae0a5922c849c14b39de12a13c3720249724f42905",
-      "count": 1
-    }
-  ]
+  "findings": []
 }
