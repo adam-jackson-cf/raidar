@@ -880,6 +880,28 @@ def test_a_recorded_pin_for_the_same_declarations_is_reused_with_its_committed_l
     assert reused.locks == first.locks
 
 
+def test_a_recorded_pin_from_another_resolver_resolves_again_under_its_cutoff(
+    tmp_path: Path, import_clock: list[str]
+) -> None:
+    store = ProblemStore(tmp_path / "store")
+    references = _references(tmp_path, {"checkpoint_1": ["flask"], "checkpoint_2": []})
+    first = resolve_dependencies(
+        store, PROBLEM, None, references, STEPS, ("pyyaml",), FakeResolver(identity="uv@0.1")
+    )
+    write_locks(store, PROBLEM, first)
+    import_clock[0] = "2027-01-01T00:00:00Z"
+    upgraded = FakeResolver(identity="uv@0.2")
+    result = resolve_dependencies(
+        store, PROBLEM, _manifest(dependencies=first.pins), references, STEPS, ("pyyaml",), upgraded
+    )
+    assert first.pins is not None
+    assert result.pins is not None
+    assert upgraded.calls
+    assert {call[2] for call in upgraded.calls} == {IMPORT_TIME}
+    assert result.pins.resolver == "uv@0.2"
+    assert result.pins.exclude_newer == first.pins.exclude_newer
+
+
 @pytest.mark.parametrize("changed", ["step", "seed"])
 def test_a_changed_declaration_resolves_again_under_the_retained_cutoff(
     tmp_path: Path, import_clock: list[str], changed: str
