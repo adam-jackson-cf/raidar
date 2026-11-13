@@ -352,6 +352,31 @@ def _observe_inventory_checkers(repository: Path) -> dict[str, Any]:
 
 def test_checker_inventory_ignores_external_symlinks_and_checks_git_files(tmp_path: Path) -> None:
     repository, paths = _inventory_repository(tmp_path)
+    deleted_fixtures = {
+        "orchestrator/src/raidar/scoring/deleted.py": "def BadName(:\n",
+        "orchestrator/tests/deleted/test_probe.py": (
+            "import pytest\nimport subprocess\n"
+            "pytestmark = pytest.mark.quality\nsubprocess.run(['probe'])  # noqa: F401\n"
+        ),
+        ".agents/skills/bad_deleted/SKILL.md": "missing frontmatter\n",
+        "lab/problems/registry/deleted/dependencies.json": '{"resolver":"uv@wrong"}',
+        "lab/stage-checks/deleted.json": "{}",
+        "deleted/installer.sh": (
+            "uv sync --project orchestrator --frozen --all-extras --extra inventory-missing\n"
+        ),
+    }
+    for relative, source in deleted_fixtures.items():
+        destination = repository / relative
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        destination.write_text(source)
+    subprocess.run(
+        ["git", "-C", str(repository), "add", "--", *deleted_fixtures],
+        check=True,
+        timeout=10,
+    )
+    # Leave deletions unstaged so Git's tracked inventory still names these files.
+    for relative in deleted_fixtures:
+        (repository / relative).unlink()
     ignored = repository / "orchestrator/src/raidar/scoring/ignored"
     ignored_selection = [ignored.relative_to(repository).as_posix()]
     for selection in ([], ["."], ["orchestrator/src"], paths, ignored_selection):
@@ -468,6 +493,8 @@ def test_checker_inventory_ignores_external_symlinks_and_checks_git_files(tmp_pa
         "parity",
     ):
         assert "ignored" not in json.dumps(observed[checker]), checker
+    for checker, findings in observed.items():
+        assert "deleted" not in json.dumps(findings), checker
 
 
 @pytest.mark.parametrize("selection", [[], [".agents/skills"], [".agents/skills/bad_skill"]])

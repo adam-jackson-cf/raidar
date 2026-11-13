@@ -10,7 +10,7 @@ import sys
 from collections.abc import Mapping, Sequence
 from pathlib import Path, PurePosixPath
 
-from git_inventory import repo_paths
+from git_inventory import repo_paths, untracked_paths
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -96,17 +96,7 @@ def main() -> int:
         .stdout.decode()
         .split("\0")
     )
-    untracked = (
-        subprocess.run(
-            ["git", "ls-files", "-z", "--others", "--exclude-standard"],
-            cwd=ROOT,
-            capture_output=True,
-            check=True,
-            timeout=30,
-        )
-        .stdout.decode()
-        .split("\0")
-    )
+    untracked = untracked_paths(ROOT)
     policy = json.loads((ROOT / "scripts/checks/repository-owners.json").read_text())
     seams = discover_seams([path for path in inventory if path], ROOT)
     selected = select_affected_tests(

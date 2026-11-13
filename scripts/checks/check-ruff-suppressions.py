@@ -14,7 +14,7 @@ from collections import Counter
 from collections.abc import Mapping, Sequence
 from pathlib import Path
 
-from git_inventory import repo_paths
+from git_inventory import repo_paths, untracked_paths
 
 # Snapshot of RUFF.IGNORES per-file contract; non-catalogue additions remain forbidden.
 CATALOGUE_PER_FILE = {
@@ -123,7 +123,13 @@ def main() -> int:
     parser.add_argument("--base-ref", default="origin/main")
     args = parser.parse_args()
     try:
-        paths = repo_paths(ROOT)
+        changed = subprocess.run(
+            ["git", "diff", "--name-only", "-z", "--diff-filter=ACMR", args.base_ref, "--"],
+            cwd=ROOT,
+            capture_output=True,
+            check=True,
+        ).stdout.decode(errors="surrogateescape").split("\0")
+        paths = sorted((set(changed) | set(untracked_paths(ROOT))) & set(repo_paths(ROOT)))
         base = {}
         head = {}
         for path in paths:
