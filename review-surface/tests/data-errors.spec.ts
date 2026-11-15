@@ -24,6 +24,19 @@ test.beforeAll(async () => {
     .toBeDefined();
 });
 
+// fetch() treats Host as a forbidden header and replaces it with the URL's host, so a
+// request that forges Host (a DNS-rebinding page) goes out through node:http instead.
+function send(method: string, target: string, headers: Record<string, string>, body?: string) {
+  return new Promise<number | undefined>((resolve, reject) => {
+    const request = http.request({ hostname: '127.0.0.1', port: PORT, path: target, method, headers }, (response) => {
+      response.resume();
+      response.on('end', () => resolve(response.statusCode));
+    });
+    request.on('error', reject);
+    request.end(body);
+  });
+}
+
 test.afterAll(() => {
   server.kill();
   fs.rmSync(dataRoot, { recursive: true, force: true });
@@ -71,11 +84,8 @@ test('untrusted browser requests cannot change annotations or labels', async () 
   ];
   for (const endpoint of ['/api/annotations', '/api/quality/labels']) {
     for (const headers of forbiddenHeaders) {
-      const response = await fetch(`${BASE}${endpoint}`, {
-        method: 'POST', headers,
-        body: JSON.stringify({ run_id: 'api-security-fixture', kind: 'note' }),
-      });
-      expect(response.status, JSON.stringify({ endpoint, headers })).toBe(403);
+      const status = await send('POST', endpoint, headers, JSON.stringify({ run_id: 'api-security-fixture', kind: 'note' }));
+      expect(status, JSON.stringify({ endpoint, headers })).toBe(403);
     }
     const plainText = await fetch(`${BASE}${endpoint}`, {
       method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: '{}',
@@ -86,8 +96,7 @@ test('untrusted browser requests cannot change annotations or labels', async () 
     });
     expect(deletion.status).toBe(403);
   }
-  const reboundRead = await fetch(`${BASE}/api/experiments`, { headers: { Host: `untrusted.example:${PORT}` } });
-  expect(reboundRead.status).toBe(403);
+  expect(await send('GET', '/api/experiments', { Host: `untrusted.example:${PORT}` })).toBe(403);
   expect(fs.existsSync(annotationPath) ? fs.readFileSync(annotationPath, 'utf8') : null).toBe(beforeAnnotations);
   expect(fs.existsSync(labelPath)).toBe(false);
 });

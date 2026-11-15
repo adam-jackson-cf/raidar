@@ -33,9 +33,11 @@ test.describe('quality navigation', () => {
 
   test('the experiment view names its pre-registered primary outcome', async ({ page }) => {
     await openQuality(page);
-    await expect(page.getByTestId('primary-outcome')).toContainText('Primary outcome: solve_rate');
+    // The default primary is the solvable-set solve rate, always reported beside its raw
+    // SCB counterpart (RAW_COUNTERPART in raidar.scoring.catalog.outcomes).
+    await expect(page.getByTestId('primary-outcome')).toContainText('Primary outcome: solve_rate_solvable');
     await expect(page.getByTestId('primary-outcome')).toContainText('default for continue progression');
-    await expect(page.getByTestId('primary-raw')).toHaveCount(0);
+    await expect(page.getByTestId('primary-raw')).toContainText('raw solve_rate reported beside it');
   });
 
   test('an errata-applied primary names the raw outcome reported beside it', async ({ page }) => {
@@ -95,9 +97,37 @@ test.describe('quality experiment view', () => {
     await openQuality(page);
     const table = page.getByTestId('paired-delta');
     await expect(table.getByTestId('paired-row')).toHaveCount(8);
-    await expect(table.getByText('Improved').first()).toBeVisible();
-    await expect(table.getByText('Insufficient').first()).toBeVisible();
+    // Six blocks less the invalid one leave five pairs, and five pairs cannot reach p < 0.05
+    // under the exact sign-flip test; the components that also lose the ineligible block
+    // fall under the lock's five-pair minimum (test_quality_projection pins both verdicts).
+    const row = (name: string) => table.getByTestId('paired-row').filter({ has: page.getByRole('rowheader', { name }) });
+    await expect(row('E Erosion')).toContainText('Inconclusive');
+    await expect(row('E Erosion')).toContainText('5 / −1');
+    await expect(row('S Score')).toContainText('Insufficient');
+    await expect(row('S Score')).toContainText('4 / −2');
     await expect(page.getByTestId('quality-exclusions')).toContainText('invalid trial (infra-excluded)');
+  });
+
+  test('a significant paired Δ shows its direction as the verdict', async ({ page }) => {
+    // The fixture's five pairs cannot reach significance, so the projection's verdict is set here.
+    await page.route('**/api/quality/experiments', async (route) => {
+      const response = await route.fetch();
+      const body = await response.json();
+      for (const experiment of body.experiments) {
+        for (const problem of experiment.problems) {
+          for (const item of problem.paired) {
+            if (item.component === 'E') item.verdict = 'improved';
+            if (item.component === 'G') item.verdict = 'worse';
+          }
+        }
+      }
+      await route.fulfill({ response, json: body });
+    });
+    await openQuality(page);
+    const table = page.getByTestId('paired-delta');
+    const row = (name: string) => table.getByTestId('paired-row').filter({ has: page.getByRole('rowheader', { name }) });
+    await expect(row('E Erosion')).toContainText('Improved');
+    await expect(row('G Regression')).toContainText('Worse');
   });
 
   test('SCB distributions, head-to-head scatter and sensitivity render with their sources', async ({ page }) => {

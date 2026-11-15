@@ -323,7 +323,7 @@ define review_projection
 endef
 
 review-fixture-synthetic:
-	@cd orchestrator && uv run --project . python -m tests.review_fixtures.projection "$(abspath $(REVIEW_FIXTURE_DIR))"
+	@cd orchestrator && $(REPO_RUNTIME_ENV) uv run --project . python -m tests.review_fixtures.projection "$(abspath $(REVIEW_FIXTURE_DIR))"
 
 review-surface-data:
 	$(call require_var,REVIEW_JOBS_ROOT)
@@ -353,7 +353,7 @@ define quality_projection
 endef
 
 quality-fixture-synthetic:
-	@$(REPO_RUNTIME_ENV) uv run --project orchestrator --directory orchestrator python -m tests.review_fixtures.quality "$(abspath $(QUALITY_FIXTURE_DIR))"
+	@cd orchestrator && $(REPO_RUNTIME_ENV) uv run --project . python -m tests.review_fixtures.quality "$(abspath $(QUALITY_FIXTURE_DIR))"
 
 review-surface-quality-data:
 	$(if $(QUALITY_JOBS),$(if $(filter $(words $(QUALITY_JOBS)),$(words $(QUALITY_STORE))),,$(error QUALITY_JOBS and QUALITY_STORE need one store per jobs root, in the same order)))

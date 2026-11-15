@@ -151,8 +151,8 @@ function ProblemView({
 }
 
 // The pre-registered primary outcome (analysis.primary_outcome in the lock, else the
-// progression's default), labelled as the analysis report labels it; an errata-applied
-// primary names the raw SCB outcome reported beside it.
+// progression's default), labelled as the analysis report labels it; a solvable-set or
+// errata-applied primary names the raw SCB outcome reported beside it.
 function PrimaryOutcome({ experiment }: { experiment: QualityExperiment }) {
   if (!experiment.primary_outcome) return null;
   return (
