@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import shutil
 from pathlib import Path
@@ -10,10 +11,11 @@ import pytest
 from click.testing import CliRunner
 
 from raidar.cli import main
+from raidar.contract.file_io import load_sha256
 from raidar.engine.health.fault_candidates import FAULT_CANDIDATES
 from raidar.engine.health.model import HealthReport, load_health, write_health
 from raidar.engine.health.reaper import REAP_REPORT
-from raidar.engine.health.records_manifest import seal_trial, tamper_findings
+from raidar.engine.health.records_manifest import RECORDS_MANIFEST, seal_trial, tamper_findings
 from raidar.engine.trial.finish import audit_and_write
 from raidar.grading.records import step_record_dir
 from tests.health_support import STEP, TRIAL_ID, audit, healthy_trial, status
@@ -31,6 +33,17 @@ def _trial(tmp_path: Path) -> tuple[Path, Path, Path]:
     record.parent.mkdir()
     record.write_text("{}")
     return job, trial, record
+
+
+def test_a_file_larger_than_one_chunk_hashes_as_its_whole_content(tmp_path: Path) -> None:
+    job, trial, record = _trial(tmp_path)
+    data = bytes(range(256)) * ((3 << 20) // 256 + 7)
+    (trial / "evidence" / "large.bin").write_bytes(data)
+    expected = hashlib.sha256(data).hexdigest()
+    assert load_sha256(trial / "evidence" / "large.bin") == expected
+    seal_trial(trial, record, job)
+    sealed = json.loads((trial / RECORDS_MANIFEST).read_text())["files"]
+    assert sealed["trials/t1/evidence/large.bin"] == expected
 
 
 def test_retargeting_a_symlinked_directory_is_a_tamper_finding(tmp_path: Path) -> None:

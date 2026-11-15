@@ -1,9 +1,8 @@
-"""Reports preserve operation identities and fail closed outside baseline debt."""
+"""The command blocks on every finding; there is no baseline of waived findings."""
 
 from __future__ import annotations
 
 import importlib.util
-import json
 import subprocess
 import sys
 from pathlib import Path
@@ -47,11 +46,11 @@ def _argv(monkeypatch: pytest.MonkeyPatch, root: Path) -> None:
     monkeypatch.setattr(
         sys,
         "argv",
-        ["check-analyzer-scope.py", "--repo-root", str(root), "--format", "findings-json"],
+        ["check-analyzer-scope.py", "--repo-root", str(root)],
     )
 
 
-def test_report_preserves_each_environment_operation_for_the_shared_ratchet(
+def test_every_environment_operation_blocks_without_a_baseline(
     checker: Checker,
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -62,16 +61,29 @@ def test_report_preserves_each_environment_operation_for_the_shared_ratchet(
         "import os\ndef compare():\n    return os.environ.get('OLD'), os.environ.get('NEW')\n",
     )
     _argv(monkeypatch, tmp_path)
-    assert checker.main() == 0
-    findings = json.loads(capsys.readouterr().out)
-    assert findings == [
-        {"path": SOURCE, "code": "PYS252", "symbol": "compare", "source_line": operation}
-        for operation in ("os.environ.get('OLD')", "os.environ.get('NEW')")
+    assert not (tmp_path / "scripts/checks/baselines").exists()
+    assert checker.main() == 1
+    lines = capsys.readouterr().out.splitlines()
+    assert [line.split("; ")[0] for line in lines] == [
+        f"{SOURCE}:3:12 PYS252 direct os.environ.get('OLD')",
+        f"{SOURCE}:3:35 PYS252 direct os.environ.get('NEW')",
     ]
 
 
+def test_a_clean_scope_passes(
+    checker: Checker,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    _workspace(tmp_path, "def compare(left, right):\n    return left == right\n")
+    _argv(monkeypatch, tmp_path)
+    assert checker.main() == 0
+    assert capsys.readouterr().out == ""
+
+
 @pytest.mark.parametrize("blocker", ["ownership", "syntax"])
-def test_invalid_scope_cannot_be_serialized_as_baselineable_io_debt(
+def test_invalid_scope_blocks(
     checker: Checker,
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -82,12 +94,8 @@ def test_invalid_scope_cannot_be_serialized_as_baselineable_io_debt(
     if blocker == "ownership":
         (tmp_path / "CODEOWNERS").write_text("", encoding="utf-8")
     _argv(monkeypatch, tmp_path)
-    with pytest.raises(SystemExit) as error:
-        checker.main()
-    assert error.value.code == 2
-    captured = capsys.readouterr()
-    assert captured.out == ""
-    assert ("PYS000" if blocker == "syntax" else "PYS253") in captured.err
+    assert checker.main() == 1
+    assert ("PYS000" if blocker == "syntax" else "PYS253") in capsys.readouterr().out
 
 
 def test_codeowners_single_star_does_not_cross_directory_separators(

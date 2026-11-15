@@ -9,6 +9,7 @@ it from its file and pass it to a program as that program's reader.
 
 from __future__ import annotations
 
+import hashlib
 import os
 from importlib.resources.abc import Traversable
 from pathlib import Path
@@ -27,6 +28,15 @@ def load_bytes(path: Path) -> bytes:
 def load_resource_text(resource: Traversable, *, encoding: str | None = None) -> str:
     """The text of a packaged resource (``importlib.resources``)."""
     return resource.read_text(encoding=encoding)
+
+
+def load_sha256(path: Path) -> str:
+    """The sha256 hex digest of the file at ``path``, read in 1 MiB chunks, never whole."""
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1 << 20), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
 
 
 def store_text(path: Path, text: str, *, encoding: str | None = None) -> None:

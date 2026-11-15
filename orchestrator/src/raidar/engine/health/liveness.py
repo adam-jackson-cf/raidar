@@ -28,7 +28,6 @@ from __future__ import annotations
 
 import asyncio
 import json
-import os
 import shlex
 import time
 from collections import deque
@@ -80,8 +79,8 @@ class LivenessConfig:
     max_samples: int = MAX_SAMPLES
 
     @classmethod
-    def from_env(cls, env: Mapping[str, str] | None = None) -> LivenessConfig:
-        env = os.environ if env is None else env
+    def from_env(cls, env: Mapping[str, str]) -> LivenessConfig:
+        """The settings ``env`` selects; the caller passes the environment in."""
         mode = (env.get(MODE_ENV) or "enforce").strip().lower()
         if mode not in {"off", "observe", "enforce"}:
             raise ValueError(f"{MODE_ENV} must be off, observe or enforce, not {mode!r}")
@@ -454,9 +453,8 @@ def _step_name(event: TrialHookEvent) -> str | None:
         return None
 
 
-def install_liveness_monitor(trial: Trial, config: LivenessConfig | None = None) -> None:
-    """Arm the monitor on a trial; a no-op only when ``RAIDAR_LIVENESS`` is ``off``."""
-    config = LivenessConfig.from_env() if config is None else config
+def install_liveness_monitor(trial: Trial, config: LivenessConfig) -> None:
+    """Arm the monitor on a trial; a no-op only when the config's mode is ``off``."""
     if config.mode == "off":
         return
     state = TrialLiveness(trial, config)

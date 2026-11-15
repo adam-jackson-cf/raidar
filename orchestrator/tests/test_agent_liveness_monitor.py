@@ -266,6 +266,13 @@ def test_config_from_env_enforces_by_default_and_observe_and_off_are_opt_outs() 
         LivenessConfig.from_env({"RAIDAR_LIVENESS": "maybe"})
 
 
+def test_config_reads_only_the_environment_it_is_given(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("RAIDAR_LIVENESS", "off")
+    monkeypatch.setenv("RAIDAR_LIVENESS_IDLE_S", "5")
+    config = LivenessConfig.from_env({})
+    assert (config.mode, config.idle_s) == ("enforce", 600.0)
+
+
 def fake_trial(tmp_path: Path, env: ScriptedEnv) -> tuple[Any, dict[Any, list[Any]], list[Any]]:
     hooks: dict[Any, list[Any]] = {}
     callbacks: list[Any] = []

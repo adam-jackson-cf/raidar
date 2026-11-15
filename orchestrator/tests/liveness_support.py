@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
 import shutil
 from pathlib import Path
 from typing import ClassVar
@@ -32,7 +33,7 @@ from harbor.models.trial.config import (
     VerifierConfig,
 )
 
-from raidar.engine.health.liveness import install_liveness_monitor
+from raidar.engine.health.liveness import LivenessConfig, install_liveness_monitor
 from raidar.engine.target.config import activate
 from raidar.engine.trial.cleanup import cleanup_trial_projects
 from raidar.engine.trial.environment import RUN_SCOPED_DOCKER_IMPORT_PATH, SCOPE_KWARG, run_scope
@@ -140,7 +141,7 @@ async def run_probe_trial(
     )
     try:
         trial = await Trial.create(config)
-        install_liveness_monitor(trial)
+        install_liveness_monitor(trial, LivenessConfig.from_env(os.environ))
         await trial.run()
     finally:
         cleanup_trial_projects(root, docker_context=docker_target().docker_context)
