@@ -534,25 +534,15 @@ function ExperimentGroup({ groupKey, experiments }: { groupKey: string; experime
 export function ExperimentsPage() {
   const experiments = useQuery({ queryKey: ['experiments'], queryFn: api.experiments });
 
+  // A family is one problem; its comparison group holds every arm projected for it.
   const families = useMemo(() => {
-    const map = new Map<string, Map<string, ExperimentRecord[]>>();
+    const map = new Map<string, ExperimentRecord[]>();
     for (const exp of experiments.data?.experiments ?? []) {
       const family = exp.problem ?? 'unknown';
-      const arm = exp.arm ?? 'unknown';
-      const arms = map.get(family) ?? new Map<string, ExperimentRecord[]>();
-      const list = arms.get(arm) ?? [];
-      list.push(exp);
-      arms.set(arm, list);
-      map.set(family, arms);
+      map.set(family, [...(map.get(family) ?? []), exp]);
     }
-    return [...map.entries()].map(([family, arms]) => ({
-      family,
-      arms: [...arms.entries()].sort(([a], [b]) => a.localeCompare(b)),
-      all: [...arms.values()].flat(),
-    }));
+    return [...map.entries()].map(([family, arms]) => ({ family, arms }));
   }, [experiments.data]);
-
-  const groups = families;
 
   if (experiments.isLoading) {
     return (
@@ -569,7 +559,7 @@ export function ExperimentsPage() {
     );
   }
 
-  if (groups.length === 0) {
+  if (families.length === 0) {
     return (
       <div className="flex flex-1 flex-col items-center justify-center gap-2 p-6 text-center">
         <span className="text-sm" style={{ color: C.fg2 }}>
@@ -607,41 +597,26 @@ export function ExperimentsPage() {
           ))}
         </nav>
       )}
-      {families.map(({ family, arms, all }) => (
-        <FamilySection
-          key={family}
-          family={family}
-          arms={arms}
-          all={all}
-        />
+      {families.map(({ family, arms }) => (
+        <FamilySection key={family} family={family} arms={arms} />
       ))}
     </div>
   );
 }
 
-function FamilySection({
-  family,
-  arms,
-  all,
-}: {
-  family: string;
-  arms: Array<[string, ExperimentRecord[]]>;
-  all: ExperimentRecord[];
-}) {
+function FamilySection({ family, arms }: { family: string; arms: ExperimentRecord[] }) {
   const runs = useQuery({ queryKey: ['runs'], queryFn: api.runs });
-  const familyRunIds = new Set(all.flatMap((exp) => exp.run_ids));
+  const familyRunIds = new Set(arms.flatMap((exp) => exp.run_ids));
   const familyRuns = (runs.data ?? []).filter((run) => familyRunIds.has(run.id));
   return (
     <div id={`family-${family}`} className="flex scroll-mt-4 flex-col gap-3">
-      <PolicyMismatchNotice mismatch={familyMismatch(all)} />
-      {arms.map(([arm, exps]) => (
-        <ExperimentGroup key={`${family}:${arm}`} groupKey={`${family}:${arm}`} experiments={exps} />
-      ))}
+      <PolicyMismatchNotice mismatch={familyMismatch(arms)} />
+      <ExperimentGroup groupKey={family} experiments={arms} />
       <div className="grid items-start gap-3 xl:grid-cols-2">
         <TradeoffScatter runs={familyRuns} />
         <FailurePatterns runs={familyRuns} />
       </div>
-      <ArmMovement experiments={all} />
+      <ArmMovement experiments={arms} />
     </div>
   );
 }
