@@ -178,8 +178,7 @@ class _Open:
         return [value for _, value in self.every(key) if value]
 
     def choice(self, key: str, allowed: Sequence[str], default: str = "") -> str:
-        """Return the value of ``key`` when it is one of ``allowed``, else ``default`` and a
-        note."""
+        """Return ``key``'s value when it is one of ``allowed``, else ``default`` and a note."""
         found = self.last(key)
         if found is None:
             return default
@@ -247,8 +246,10 @@ def _feature(o: _Open) -> Item:
 
 
 def _owner(o: _Open) -> str:
-    """Return the feature a criterion belongs to: the one its id names, else the one opened before
-    it."""
+    """Return the feature a criterion belongs to.
+
+    That is the one its id names, else the one opened before it.
+    """
     named = _CRITERION_OF.fullmatch(o.arg)
     return named["feature"] if named else o.feature
 

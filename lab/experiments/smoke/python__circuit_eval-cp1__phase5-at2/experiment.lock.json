@@ -668,7 +668,7 @@
     },
     "tools": {}
   },
-  "document_sha256": "22c89d9e1f457ffc9e6c996f55ced774e4e7cc65ed2f44c1abcb7aa969e57ab6",
+  "document_sha256": "bee11f06e0aae75c1ecfad6fcb6915b3f2a7499b0a69b41b02f407d1b43daf73",
   "execution": {
     "arms": {
       "define-build-verify": {
@@ -686,16 +686,16 @@
           "version_pin": "0.156.1",
           "workflow_skills": "placement.skills .agents/skills in the workspace /app"
         },
-        "digest": "39e2172c34f97e38a296e4619216f3f51137160d3117a80e8bb356e38663452e",
+        "digest": "3c2bd3e7c5f5a7adb2833bfc8604c086f709f94807e36f5ce396628d81672ed0",
         "model": "gpt-6-luna",
         "packages": {
           "raidar/define": {
-            "check": "fc7b240a36c45ba0783f58e8680303ffab0d4fb16a960456c2ad9b33757a90e4",
+            "check": "ec886e90e20f160120bb97540d7954083d72277386d408bf9d5d2671ed5ccc4f",
             "installed": {
-              "arm64": "cd78a2d02d66c38cb6225de220d44ef3d34397f4b70b6c28bde20032dd80ce4a"
+              "arm64": "87a661324809e016ebe23ae0c1a77f3730cfd05a7d89246f0c471d602990cf2c"
             },
             "release": "raidar/define@1",
-            "sha256": "4ca171006d37ae06434620f26d28bb6059deb1552085a241732ef73a526f25e8"
+            "sha256": "7eda6ae10aca7b23072d199d089bca05b973a64e9b226d8d76569e17e3e2e970"
           },
           "raidar/verify": {
             "installed": {
@@ -724,7 +724,7 @@
           "version": "0.156.1"
         },
         "workflow": "raidar/define-build-verify@2",
-        "workflow_sha256": "3452f484a8d2377f82204ce0eadcee510f0e9634f3730803a65dec0ba64b8d9d"
+        "workflow_sha256": "8aa0871f2031262c9854ece1b421f3df63bfb5fb47dc2b20d542cab3b386a40b"
       }
     },
     "design": {
@@ -886,7 +886,7 @@
       },
       "workflow": {
         "raidar/define-build-verify@2": {
-          "digest": "3452f484a8d2377f82204ce0eadcee510f0e9634f3730803a65dec0ba64b8d9d",
+          "digest": "8aa0871f2031262c9854ece1b421f3df63bfb5fb47dc2b20d542cab3b386a40b",
           "metadata": {
             "stages": [
               "raidar/define",
@@ -913,7 +913,7 @@
     "source_sha256": "696ee945a66e8b5f3a2f48deddaf768d66dcce2be503a867d8fa8eb51d9cdec8",
     "spec_sha256": "adb2e3e8535f4de6250f69daa8250a24f7d20808648ce74367c2e14cfd94a326"
   },
-  "lock_sha256": "e7016255eb782c3f5ef815676dbc2244ba512dd0f9545d4fc865eedd570d37e4",
+  "lock_sha256": "a6c2e4ac6348e079b7f280bec150a8203ad2e2e336ece7783d1171aa71d7fd26",
   "lock_version": 5,
   "overrides": {
     "flags": {},
@@ -922,7 +922,7 @@
   "sections": {
     "analysis": "21588ee2b7c9012065b4b874f8e6323a59a870ccdec3ddfdd44dbcb87796da8f",
     "assessment": "9cb4b9cb7ee0b3fbc72d3dbd62f074d43a663e222ae1cb4125556095d6c902aa",
-    "execution": "e7016255eb782c3f5ef815676dbc2244ba512dd0f9545d4fc865eedd570d37e4",
+    "execution": "a6c2e4ac6348e079b7f280bec150a8203ad2e2e336ece7783d1171aa71d7fd26",
     "toolchain": "b747039124d0905f43b914729ff4be9b47095e0e150f005ca1031cf4e6a83d52"
   },
   "spec": {

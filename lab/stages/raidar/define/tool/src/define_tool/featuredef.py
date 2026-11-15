@@ -63,11 +63,7 @@ from dataclasses import dataclass, field
 
 from . import (
     aspects as aspect_lines,
-)
-from . import (
     evidence,
-)
-from . import (
     sections as md,
 )
 from .core import JsonObject

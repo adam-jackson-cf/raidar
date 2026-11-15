@@ -197,8 +197,10 @@ def read_calls(directory: Path) -> list[Call]:
 
 
 def parse_calls(recorded: str) -> list[Call]:
-    """Return the calls a call log holds (``CALLS_FILE``), in order; a line that is no call is
-    skipped."""
+    """Return the calls a call log holds (``CALLS_FILE``), in order.
+
+    A line that is no call is skipped.
+    """
     calls = []
     for line in recorded.splitlines():
         try:
@@ -223,8 +225,10 @@ def _list(record: JsonObject, key: str) -> list[object]:
 
 
 def read_draft(directory: Path) -> Draft | None:
-    """Return the draft ``directory`` holds, ``None`` when none was written; raise
-    ``DraftError``."""
+    """Return the draft ``directory`` holds, ``None`` when none was written.
+
+    Raise ``DraftError``.
+    """
     path = directory / STATE_FILE
     if not path.is_file():
         return None

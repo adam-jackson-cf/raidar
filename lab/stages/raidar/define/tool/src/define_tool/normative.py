@@ -181,8 +181,7 @@ def _pattern_signals(said: str) -> list[str]:
 
 
 def signals(sentence: str, rules: UnitRules) -> tuple[str, ...]:
-    """Return the normative signals a sentence carries under ``rules`` (see the module
-    docstring)."""
+    """Return the normative signals a sentence carries under ``rules`` (see module docstring)."""
     said = sentence.strip()
     found = _pattern_signals(said)
     if rules.arrow_outcome and _ARROW.search(issuetext.blank_code(said)):
@@ -347,8 +346,10 @@ def code_lines(issue: str) -> list[str]:
 
 
 def enumerations(issue: str) -> list[enumerated.Listing]:
-    """Return the labelled lists the issue's units are, in order (rules 2's ``enumeration``
-    units)."""
+    """Return the labelled lists the issue's units are, in order.
+
+    These are rules 2's ``enumeration`` units.
+    """
     return [
         listing
         for unit in units(issue, unitrules.V2)

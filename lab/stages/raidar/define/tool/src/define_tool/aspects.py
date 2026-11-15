@@ -223,8 +223,10 @@ def read_example(text: str) -> Example:
 
 
 def read_kind(said: str) -> str:
-    """Return a ``Kind:`` value as compared: emphasis, code marks, case and a full stop set
-    aside."""
+    """Return a ``Kind:`` value as compared.
+
+    Emphasis, code marks, case and a full stop are set aside.
+    """
     return said.strip().strip("*_` ").rstrip(".").strip("*_` ").casefold()
 
 

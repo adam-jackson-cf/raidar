@@ -81,18 +81,6 @@
       "count": 1
     },
     {
-      "path": "lab/stages/raidar/define/tool/src/define_tool/status.py",
-      "code": "name-defined",
-      "fingerprint": "4635bb3bb36c6f4acfb04e4af88a1e8f94c531e32118de4dba53e2d4c9f306c6",
-      "count": 1
-    },
-    {
-      "path": "lab/stages/raidar/define/tool/src/define_tool/status.py",
-      "code": "name-defined",
-      "fingerprint": "de59a61d521ce5f159834aef92b085b2aa99446cd0d411fc577406ecf5a8e490",
-      "count": 1
-    },
-    {
       "path": "orchestrator/src/raidar/cli/agent.py",
       "code": "no-untyped-def",
       "fingerprint": "65f049180ff327f8da64e9f5e00f722f765422738b83870320b411f5423ff7b1",

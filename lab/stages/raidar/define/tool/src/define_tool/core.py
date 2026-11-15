@@ -1,5 +1,6 @@
-"""What every module of the payload shares: the JSON object type, the readers of its fields
-and the record keys.
+"""What every module of the payload shares.
+
+That is the JSON object type, the readers of its fields and the record keys.
 
 factory-x-loops' ``core.contracts`` (``JsonObject``), ``core.crossref`` and the three keys of
 ``core.recordnames`` the define capability reads, in one module.

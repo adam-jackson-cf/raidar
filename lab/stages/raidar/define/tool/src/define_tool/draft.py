@@ -52,8 +52,10 @@ class Draft:
     sealed: str = ""
 
     def put(self, parsed: Sequence[Item]) -> Put:
-        """Apply items, features first so a criterion finds its feature; return what was applied
-        and refused."""
+        """Apply items and return what was applied and refused.
+
+        Features go first so a criterion finds its feature.
+        """
         self.sealed = ""
         done = Put([], [])
         ordered = sorted(parsed, key=lambda item: item.kind != block.FEATURE)
@@ -108,8 +110,10 @@ class Draft:
         return [item for item in self.items if item.kind == kind]
 
     def presumed(self) -> str:
-        """Return the status the draft is checked as before it is sealed: asking when it holds a
-        question."""
+        """Return the status the draft is checked as before it is sealed.
+
+        It is asking when it holds a question.
+        """
         return NEEDS_INPUT if self.kind(block.QUESTION) else READY
 
     def _grouped(self, feature: Item) -> list[Item]:
@@ -117,8 +121,10 @@ class Draft:
         return [feature, *(a for a in self.kind(block.AC) if a.owner == feature.key)]
 
     def ordered(self) -> list[Item]:
-        """Return the items grouped as a reader wants them: scalars, named features, each feature
-        with its criteria, the rest."""
+        """Return the items grouped as a reader wants them.
+
+        The order is scalars, named features, each feature with its criteria, then the rest.
+        """
         grouped = [item for feature in self.kind(block.FEATURE) for item in self._grouped(feature)]
         decisions = sorted(self.kind(block.DECISION), key=lambda item: int(item.key))
         return [

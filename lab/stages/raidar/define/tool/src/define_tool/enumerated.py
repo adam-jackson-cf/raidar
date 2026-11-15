@@ -183,8 +183,10 @@ def _tokens(tree: ast.AST) -> tuple[list[str], set[str]]:
 
 
 def exercised(sources: Mapping[str, str]) -> Exercised:
-    """Return what the test files ``sources`` (path to text) say; one that does not parse is left
-    out."""
+    """Return what the test files ``sources`` (path to text) say.
+
+    A file that does not parse is left out.
+    """
     strings: list[str] = []
     names: set[str] = set()
     for text in sources.values():
@@ -236,15 +238,19 @@ def _incidental(item: str, text: str, start: int, end: int) -> bool:
 
 
 def _opens(text: str, index: int) -> bool:
-    """Whether the quote at ``index`` opens a quoted span: an even number of its kind came before
-    on the line."""
+    """Whether the quote at ``index`` opens a quoted span.
+
+    It does when an even number of its kind came before it on the line.
+    """
     line = text.rfind("\n", 0, index) + 1
     return text.count(text[index], line, index) % 2 == 0
 
 
 def _left(text: str, start: int) -> str:
-    """Return the character left of ``start`` past blanks; ``""`` where a line or a quoted value
-    begins."""
+    """Return the character left of ``start`` past blanks.
+
+    It is ``""`` where a line or a quoted value begins.
+    """
     index = start
     while index > 0:
         char = text[index - 1]
@@ -259,8 +265,10 @@ def _left(text: str, start: int) -> str:
 
 
 def _operand_follows(text: str, end: int) -> bool:
-    """Whether anything but the end of the line, a separator, a closing group or a closing quote
-    follows ``end``."""
+    """Whether anything but a closing mark follows ``end``.
+
+    The closing marks are the end of the line, a separator, a closing group and a closing quote.
+    """
     index = end
     while index < len(text) and text[index] in _BLANKS:
         index += 1
@@ -271,8 +279,10 @@ def _operand_follows(text: str, end: int) -> bool:
 
 
 def _prefix_form(text: str, start: int) -> bool:
-    """Whether a symbol at ``start`` has no operand to its left: nothing, an operator, a separator
-    or an opening group."""
+    """Whether a symbol at ``start`` has no operand to its left.
+
+    That is nothing, an operator, a separator or an opening group.
+    """
     char = _left(text, start)
     return (
         not char or char in _OPENING or not (_is_word(char) or char in _CLOSING or char in _QUOTES)
@@ -280,8 +290,10 @@ def _prefix_form(text: str, start: int) -> bool:
 
 
 def _punctuation(text: str, start: int, end: int) -> bool:
-    """Whether a symbol is glued behind a word and nothing follows it to operate on: punctuation of
-    a data string."""
+    """Whether a symbol is punctuation of a data string.
+
+    It is when glued behind a word with nothing following it to operate on.
+    """
     before = text[start - 1 : start]
     return bool(before) and _is_word(before) and not _operand_follows(text, end)
 
@@ -317,8 +329,10 @@ def _standing(
 
 
 def _symbol_said(item: str, text: str, listed: Iterable[str], version: int) -> bool:
-    """Whether a symbol ``item`` stands alone in ``text``, and at its start when only used in
-    prefix form (see the module docstring)."""
+    """Whether a symbol ``item`` stands alone in ``text`` (see the module docstring).
+
+    When it is only used in prefix form it must also stand at the start.
+    """
     spans = [start for start, _ in _standing(item, text, listed, version)]
     if version < 2 or not spans:
         return bool(spans)
@@ -333,8 +347,10 @@ def _symbolic(item: str) -> bool:
 def item_exercised(
     item: str, said: Exercised, listed: Iterable[str], version: int = LATEST
 ) -> bool:
-    """Whether the tests say ``item`` by rule ``version`` (see the module docstring); ``listed``
-    are its list's items."""
+    """Whether the tests say ``item`` by rule ``version`` (see the module docstring).
+
+    ``listed`` are its list's items.
+    """
     if item in _PAIRS:
         return item in said.strings or all(c in said.strings for c in _PAIRS[item])
     if _symbolic(item):

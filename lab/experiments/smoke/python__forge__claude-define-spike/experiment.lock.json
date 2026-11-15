@@ -1075,7 +1075,7 @@
       "tree-sitter-language-pack": "0.13.0"
     }
   },
-  "document_sha256": "da3cc90b051393ec63736e62e48b5c007a885ac3494e5b8c819d62bb5a373935",
+  "document_sha256": "cdc168132ad254c60606943daa5669fd27dbf496d11f81bcf8cd0852a491f0bf",
   "execution": {
     "arms": {
       "define": {
@@ -1093,16 +1093,16 @@
           "version_pin": "2.1.285",
           "workflow_skills": "placement.skills .claude/skills in the workspace /app"
         },
-        "digest": "207f0175de46e03e96a64ebe58f2573f28d96a70c51c15bf0811411069cd5512",
+        "digest": "be6e1a92e45fafafa3e73d62e2b2a9454d6a6e5b09b5c1281430e029480804a3",
         "model": "claude-sonnet-4-6",
         "packages": {
           "raidar/define": {
-            "check": "fc7b240a36c45ba0783f58e8680303ffab0d4fb16a960456c2ad9b33757a90e4",
+            "check": "ec886e90e20f160120bb97540d7954083d72277386d408bf9d5d2671ed5ccc4f",
             "installed": {
-              "arm64": "cd78a2d02d66c38cb6225de220d44ef3d34397f4b70b6c28bde20032dd80ce4a"
+              "arm64": "87a661324809e016ebe23ae0c1a77f3730cfd05a7d89246f0c471d602990cf2c"
             },
             "release": "raidar/define@1",
-            "sha256": "4ca171006d37ae06434620f26d28bb6059deb1552085a241732ef73a526f25e8"
+            "sha256": "7eda6ae10aca7b23072d199d089bca05b973a64e9b226d8d76569e17e3e2e970"
           },
           "raidar/verify": {
             "installed": {
@@ -1131,7 +1131,7 @@
           "version": "2.1.285"
         },
         "workflow": "raidar/define-build-verify@2",
-        "workflow_sha256": "3452f484a8d2377f82204ce0eadcee510f0e9634f3730803a65dec0ba64b8d9d"
+        "workflow_sha256": "8aa0871f2031262c9854ece1b421f3df63bfb5fb47dc2b20d542cab3b386a40b"
       }
     },
     "design": {
@@ -1922,7 +1922,7 @@
       },
       "workflow": {
         "raidar/define-build-verify@2": {
-          "digest": "3452f484a8d2377f82204ce0eadcee510f0e9634f3730803a65dec0ba64b8d9d",
+          "digest": "8aa0871f2031262c9854ece1b421f3df63bfb5fb47dc2b20d542cab3b386a40b",
           "metadata": {
             "stages": [
               "raidar/define",
@@ -1949,7 +1949,7 @@
     "source_sha256": "8ef92f82ecb8f490c0436f73852a82f5fca359f64a573cff5eacb6a18b25110c",
     "spec_sha256": "06aac1e03107800b8e8c668be7b5c394fddfdb942bd62f53ea7932231538977d"
   },
-  "lock_sha256": "4bc0433c2d23974115368980e3aaebec90eabf07b40de7c903eef934d12ce1f3",
+  "lock_sha256": "e65581122e0e3e7ed3195865573de0983660dfa2a371cd7cb050bdf78a0659fb",
   "lock_version": 5,
   "overrides": {
     "flags": {},
@@ -1958,7 +1958,7 @@
   "sections": {
     "analysis": "f7f0b52ed6909ba0f3864eb9e7f7d513625da8dc445234304b8aa033c4343cb6",
     "assessment": "06614d5f96e3b2530efe446bc27db16d8781c793d053be77c70c3e79d01d441b",
-    "execution": "4bc0433c2d23974115368980e3aaebec90eabf07b40de7c903eef934d12ce1f3",
+    "execution": "e65581122e0e3e7ed3195865573de0983660dfa2a371cd7cb050bdf78a0659fb",
     "toolchain": "b747039124d0905f43b914729ff4be9b47095e0e150f005ca1031cf4e6a83d52"
   },
   "spec": {
