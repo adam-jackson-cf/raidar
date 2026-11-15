@@ -25,19 +25,20 @@ from pathlib import Path
 from . import tool
 from .core import JsonObject
 from .draft import SEALS, Draft, DraftError
+from .intakecheck import ReplyChecked
 from .schemas import INTAKE_REPLY_SCHEMA, violations
 
 READY = "ready"
 
 
-def _findings(checked: tool.ReplyChecked) -> list[JsonObject]:
+def _findings(checked: ReplyChecked) -> list[JsonObject]:
     return [
         {"text": item.text, "kind": item.kind, "advisory": item.advisory}
         for item in checked.findings
     ]
 
 
-def _file(checked: tool.ReplyChecked) -> JsonObject | None:
+def _file(checked: ReplyChecked) -> JsonObject | None:
     file = checked.file
     if file is None:
         return None
@@ -61,8 +62,9 @@ def _state(held: bool, sealed: str, usable: bool) -> str:
 
 
 def assess(directory: Path, context: tool.Context | None = None) -> JsonObject:
-    """Return what the state in ``directory`` holds; raise ``DraftError``, ``OSError`` or
-    ``ValueError``.
+    """Return what the state in ``directory`` holds.
+
+    Raise ``DraftError``, ``OSError`` or ``ValueError``.
 
     The draft is checked under ``context``: the one given, else the state's own
     (``context.json``). A draft not sealed (or none yet) is checked as the tool's own

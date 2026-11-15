@@ -1,5 +1,6 @@
-"""The checks on the intake's reply as a whole: its named features, questions and replies, then its
-definition.
+"""The checks on the intake's reply as a whole.
+
+They cover its named features, questions and replies, then its definition.
 
 The intake builds its reply through the ``define`` tool (``capability.define.tool``);
 the engine and the tool run these same checks on the reply the tool's state

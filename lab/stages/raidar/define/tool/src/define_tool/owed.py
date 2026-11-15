@@ -1,5 +1,6 @@
-"""What a definition owes the acceptance probes: an example for every arrow outcome, list item and
-example section.
+"""What a definition owes the acceptance probes.
+
+It owes an example for every arrow outcome, list item and example section.
 
 The engine derives a probe from an issue's worked example blocks by itself
 (``capability.accept.golden``). It cannot derive the cases an issue states in
@@ -151,8 +152,10 @@ class Case:
 
     @property
     def parts(self) -> tuple[str, ...]:
-        """The program's input: one code span, or two joined by ``with``/``and``/``on``, else
-        none."""
+        """The program's input.
+
+        It is one code span, or two joined by ``with``/``and``/``on``, else none.
+        """
         spans = issuetext.code_spans(self.given)
         blanked = issuetext.blank_code(self.given).replace("\x00", " ")
         words = [word.lower() for word in _WORD.findall(blanked)]
@@ -239,8 +242,10 @@ def lists(units: Units) -> tuple[ListUnit, ...]:
 
 
 def carries_arrow(case: Case, arrow: Arrow) -> bool:
-    """Whether ``case`` cites the arrow's unit, has its left literal in the input and its right in
-    the expected side."""
+    """Whether ``case`` cites the arrow's unit and carries both of its literals.
+
+    The left literal must be in the input and the right one in the expected side.
+    """
     return (
         arrow.id in case.units
         and bool(case.parts)
