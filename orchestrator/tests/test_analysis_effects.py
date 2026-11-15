@@ -46,6 +46,7 @@ from tests.analysis_support import (
     BASELINE,
     GUIDED,
     OUTCOME_TYPES,
+    checkpoint_trial,
     gap,
     inputs,
     paired_arms,
@@ -339,11 +340,11 @@ def test_several_problems_get_an_equal_weight_aggregate() -> None:
 
 
 def test_curves_band_each_checkpoint_across_attempts_and_skip_invalid_trials() -> None:
-    outcomes = [trial(BASELINE, b, {}, solved=[1.0, 0.0, 0.0, None]) for b in range(5)] + [
-        trial(GUIDED, b, {}, solved=[1.0, 1.0, 0.0 if b else 1.0, None]) for b in range(5)
+    outcomes = [checkpoint_trial(BASELINE, b, [1.0, 0.0, 0.0, None]) for b in range(5)] + [
+        checkpoint_trial(GUIDED, b, [1.0, 1.0, 0.0 if b else 1.0, None]) for b in range(5)
     ]
-    outcomes.append(trial(GUIDED, 5, {}, infra=True, solved=[0.0, 0.0, 0.0, 0.0]))
-    outcomes.append(trial(BASELINE, 5, {}, solved=[1.0, 0.0, 0.0, 0.0]))
+    outcomes.append(checkpoint_trial(GUIDED, 5, [0.0, 0.0, 0.0, 0.0], infra=True))
+    outcomes.append(checkpoint_trial(BASELINE, 5, [1.0, 0.0, 0.0, 0.0]))
     (comparison,) = _run(outcomes, 6).comparisons
     curve = next(c for c in comparison.curves if c.series == "solved")
     first, second, third, fourth = curve.points

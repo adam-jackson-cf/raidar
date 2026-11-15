@@ -2349,72 +2349,6 @@
       "count": 1
     },
     {
-      "path": "orchestrator/tests/analysis_support.py",
-      "code": "I001",
-      "fingerprint": "6590ff2d12ba18b405dbcce5e08c85b2b082c516c664876d2cbcc4fb1552d68a",
-      "count": 1
-    },
-    {
-      "path": "orchestrator/tests/analysis_support.py",
-      "code": "PLR0913",
-      "fingerprint": "6e59c30f265675e025d47003254d07acff8800372109ef63427de702d7a0905f",
-      "count": 1
-    },
-    {
-      "path": "orchestrator/tests/analysis_support.py",
-      "code": "PLR0913",
-      "fingerprint": "c92ec294eda6e2e5a8d7c35bd11f43184dd5947199d4c9b83fe55b1ef3e0b493",
-      "count": 1
-    },
-    {
-      "path": "orchestrator/tests/at3_support.py",
-      "code": "I001",
-      "fingerprint": "6590ff2d12ba18b405dbcce5e08c85b2b082c516c664876d2cbcc4fb1552d68a",
-      "count": 1
-    },
-    {
-      "path": "orchestrator/tests/code_quality_support.py",
-      "code": "PLR0913",
-      "fingerprint": "3e5b8c211ab97cd4f6a6178c946157925ce8fbe63469d0ffe062d5d45c830d60",
-      "count": 1
-    },
-    {
-      "path": "orchestrator/tests/code_quality_support.py",
-      "code": "PLR0913",
-      "fingerprint": "93103c83f241a368920ea94c08267ad4a19625e6df99db58b1790fe487282731",
-      "count": 1
-    },
-    {
-      "path": "orchestrator/tests/criteria_support.py",
-      "code": "I001",
-      "fingerprint": "6590ff2d12ba18b405dbcce5e08c85b2b082c516c664876d2cbcc4fb1552d68a",
-      "count": 1
-    },
-    {
-      "path": "orchestrator/tests/execution_support.py",
-      "code": "PLR0913",
-      "fingerprint": "69153be5b13bdf817641e6a38394372958ae8486d01b7fd3b1e4fa857a446f27",
-      "count": 1
-    },
-    {
-      "path": "orchestrator/tests/experiment_spec_support.py",
-      "code": "I001",
-      "fingerprint": "6590ff2d12ba18b405dbcce5e08c85b2b082c516c664876d2cbcc4fb1552d68a",
-      "count": 1
-    },
-    {
-      "path": "orchestrator/tests/fixtures/code_quality/generate_fork_goldens.py",
-      "code": "I001",
-      "fingerprint": "5d0fdb1702b9dadf49f9eb1bcd15094a13fa64af140fc314183740609180b468",
-      "count": 1
-    },
-    {
-      "path": "orchestrator/tests/lifecycle_support.py",
-      "code": "I001",
-      "fingerprint": "6590ff2d12ba18b405dbcce5e08c85b2b082c516c664876d2cbcc4fb1552d68a",
-      "count": 1
-    },
-    {
       "path": "orchestrator/tests/package_support.py",
       "code": "I001",
       "fingerprint": "6590ff2d12ba18b405dbcce5e08c85b2b082c516c664876d2cbcc4fb1552d68a",
@@ -2500,20 +2434,8 @@
     },
     {
       "path": "orchestrator/tests/test_analysis_command.py",
-      "code": "I001",
-      "fingerprint": "6590ff2d12ba18b405dbcce5e08c85b2b082c516c664876d2cbcc4fb1552d68a",
-      "count": 1
-    },
-    {
-      "path": "orchestrator/tests/test_analysis_command.py",
       "code": "PLR0913",
       "fingerprint": "836158333a7a56c1a5a0259239d70d9a579a41d5e4a885af0d1b7f9518952dbf",
-      "count": 1
-    },
-    {
-      "path": "orchestrator/tests/test_analysis_primary_outcome.py",
-      "code": "I001",
-      "fingerprint": "6590ff2d12ba18b405dbcce5e08c85b2b082c516c664876d2cbcc4fb1552d68a",
       "count": 1
     },
     {
@@ -2524,12 +2446,6 @@
     },
     {
       "path": "orchestrator/tests/test_assessment_store_behaviors.py",
-      "code": "I001",
-      "fingerprint": "6590ff2d12ba18b405dbcce5e08c85b2b082c516c664876d2cbcc4fb1552d68a",
-      "count": 1
-    },
-    {
-      "path": "orchestrator/tests/test_code_quality_scorer.py",
       "code": "I001",
       "fingerprint": "6590ff2d12ba18b405dbcce5e08c85b2b082c516c664876d2cbcc4fb1552d68a",
       "count": 1

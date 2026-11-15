@@ -15,8 +15,7 @@ from typing import Any
 
 import pytest
 
-from raidar.scoring.code_quality import CodeQualityScorer
-from raidar.scoring.code_quality import scorer as scorer_module
+from raidar.scoring.code_quality import CodeQualityScorer, scorer as scorer_module
 from raidar.scoring.code_quality.checkpoint import Gap, Measured, measure_checkpoint
 from raidar.scoring.code_quality.contract import EXPECTED_RUFF_VERSION
 from raidar.scoring.code_quality.measurement import QUALITY_TOOL
@@ -33,6 +32,7 @@ from tests.code_quality_support import (
     golden_runs,
     in_memory_tools,
     memory_context,
+    with_files,
 )
 
 T12 = "checkpoint_1->checkpoint_2"
@@ -144,7 +144,7 @@ def test_rework_needs_verbosity_evidence_at_both_ends_while_regression_does_not(
 ) -> None:
     case = golden_case("synthetic_shop")
     first = {**case["checkpoints"][0]["files"], "shop/bad.py": "def x(:\n"}
-    ctx = memory_context(tmp_path, case, reached=2, files={"checkpoint_1": first})
+    ctx = memory_context(tmp_path, with_files(case, {"checkpoint_1": first}), reached=2)
     tools = in_memory_tools()
     measures = [measure_checkpoint(ctx, step, tools, "app.py") for step in ctx.steps]
 
@@ -176,7 +176,9 @@ def test_unreached_and_unmeasurable_checkpoints_are_statused_and_block_their_tra
 ) -> None:
     case = golden_case("synthetic_shop")
     second = {**case["checkpoints"][1]["files"], "shop/bad.py": b"\xff"}
-    ctx = memory_context(tmp_path, case, reached=2, planned=True, files={"checkpoint_2": second})
+    ctx = memory_context(
+        tmp_path, with_files(case, {"checkpoint_2": second}), reached=2, planned=True
+    )
     result = _scored(ctx)
     unreached = _observation(result, "verbosity", "checkpoint_3")
     assert unreached.status is AssessStatus.NOT_APPLICABLE

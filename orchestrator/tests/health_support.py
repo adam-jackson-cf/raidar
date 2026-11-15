@@ -7,7 +7,7 @@ import json
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import Any
+from typing import Any, TypedDict
 
 from raidar.contract.snapshot import tree_digest
 from raidar.contract.trial import (
@@ -64,7 +64,8 @@ class HealthyTrial:
         return self.job_dir / "job.json"
 
     def job(self) -> dict[str, Any]:
-        return json.loads(self.job_file.read_text())
+        job: dict[str, Any] = json.loads(self.job_file.read_text())
+        return job
 
     def set_job(self, **changes: Any) -> None:
         job = {**self.job(), **changes}
@@ -162,7 +163,7 @@ def write_agent_session(trial_dir: Path, step: str, rows: list[str] | None = Non
     rollout = sessions / "rollout-2026-10-26T00-00-00-abc.jsonl"
     rollout.write_text("\n".join(lines) + "\n")
     turns[0]["session_audit"] = session_audit(Harness.CODEX_CLI, agent / "workflow" / "build-1")
-    record = {"kind": "raidar-workflow", "stages": ["build"], "turns": turns}
+    record: dict[str, object] = {"kind": "raidar-workflow", "stages": ["build"], "turns": turns}
     # what a no-package schema-2 run's PackageCheckpoint.record emits (empty: no package)
     record |= {c: {} for c in ("frame/1", "install/1", "setup/1", "stop/1", "outputs/1")}
     (agent / "workflow" / "workflow.json").write_text(json.dumps(record))
@@ -251,7 +252,17 @@ BASE_PRIMITIVES = ("frame/1", "install/1", "runner/1")
 CRITERIA_FILE = "stages/raidar_define/outputs/close/criteria/criteria.json"
 DEFINITION_FILE = "stages/raidar_define/outputs/close/definition/feature-definition.md"
 LAST_MESSAGE = "workflow/build-1/last-message.txt"
-DECLARED = {
+
+
+class Declared(TypedDict):
+    """One locked package's declared primitives and outputs."""
+
+    setup: bool
+    stop: bool
+    outputs: list[str]
+
+
+DECLARED: dict[str, Declared] = {
     "define": {"setup": True, "stop": True, "outputs": ["criteria", "definition"]},
     "verify": {"setup": False, "stop": False, "outputs": []},
 }
