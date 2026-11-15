@@ -65,8 +65,11 @@ def test_the_quality_tool_pins_are_the_scb_contract_and_the_test_env_pins() -> N
     packages = set(load_tool_lock().tool(QUALITY_TOOL).packages)
     assert f"ruff=={EXPECTED_RUFF_VERSION}" in packages
     project = tomllib.loads((Path(__file__).parents[1] / "pyproject.toml").read_text())
-    dev = set(project["project"]["optional-dependencies"]["dev"])
-    assert packages - {f"ruff=={EXPECTED_RUFF_VERSION}"} <= dev
+    installed = {
+        *project["project"]["dependencies"],
+        *project["project"]["optional-dependencies"]["dev"],
+    }
+    assert packages - {f"ruff=={EXPECTED_RUFF_VERSION}"} <= installed
 
 
 class _GoldenReader:
