@@ -7,12 +7,13 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-from raidar_contract.package import StagePackageError
-from raidar_contract.references import Release, ReleaseError
-from raidar_contract.workflow import PackageWorkflowDefinition
 
 from raidar.subject import stages
 from raidar.subject.package.registry import load_stage_package
+from raidar_contract.package import StagePackageError
+from raidar_contract.package.manifest import ParamScalar
+from raidar_contract.references import Release, ReleaseError
+from raidar_contract.workflow import PackageWorkflowDefinition
 from tests.package_support import fixture_package, write_package
 
 
@@ -201,7 +202,9 @@ def test_manifest_yaml_errors_are_refused(tmp_path: Path) -> None:
     ("value", "expected"),
     [(True, "bool"), (7, "int"), (2.5, "float"), ("s", "str")],
 )
-def test_scalar_overrides_keep_their_type(tmp_path: Path, value: object, expected: str) -> None:
+def test_scalar_overrides_keep_their_type(
+    tmp_path: Path, value: ParamScalar, expected: str
+) -> None:
     defaults = {"a": False, "b": 1, "c": 1.5, "d": "x"}
     package = load_stage_package(write_package(tmp_path, {"params": defaults}))
     key = {"bool": "a", "int": "b", "float": "c", "str": "d"}[expected]
@@ -213,7 +216,7 @@ def test_scalar_overrides_keep_their_type(tmp_path: Path, value: object, expecte
 
 
 @pytest.mark.parametrize("override", [{"zzz": 1}, {"b": True}, {"b": 1.0}, {"b": "1"}, {"a": 1}])
-def test_bad_overrides_are_refused(tmp_path: Path, override: dict[str, object]) -> None:
+def test_bad_overrides_are_refused(tmp_path: Path, override: dict[str, ParamScalar]) -> None:
     package = load_stage_package(write_package(tmp_path, {"params": {"a": False, "b": 1}}))
     with pytest.raises(StagePackageError):
         package.effective_params(override)

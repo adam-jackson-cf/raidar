@@ -46,10 +46,11 @@ from tests.code_quality_support import fork_goldens, golden_case
 
 
 def _symbol(name: str = "f", **fields: Any) -> SymbolIdentity:
-    return SymbolIdentity.model_validate(
+    symbol: SymbolIdentity = SymbolIdentity.model_validate(
         {"path": "m.py", "qualified_name": name, "kind": "function", "start_line": 1, "end_line": 3}
         | fields
     )
+    return symbol
 
 
 def _candidate(**fields: Any) -> dict[str, Any]:

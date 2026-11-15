@@ -192,7 +192,9 @@ def config_echo() -> ConfigEcho:
 def _seen_config(store: AssessmentStore, key: str) -> dict[str, object]:
     assessment = store.get(key)
     assert assessment is not None
-    return json.loads(assessment.result.observations[0].reason or "{}")
+    seen = json.loads(assessment.result.observations[0].reason or "{}")
+    assert isinstance(seen, dict)
+    return seen
 
 
 def test_problem_facts_default_the_scorer_config_and_explicit_config_wins(
@@ -517,21 +519,21 @@ def test_a_jobs_lock_supplies_the_settings_narrowed_to_the_scorers_being_run(
 
 
 @pytest.mark.parametrize(
-    ("extra", "match", "ran", "exit_code"),
+    ("extra", "ran", "outcome"),
     [
-        ([], True, "regrade", 0),
-        ([], False, "regrade", 1),
-        (["--coverage-check"], True, "coverage_check", 0),
+        ([], "regrade", (True, 0)),
+        ([], "regrade", (False, 1)),
+        (["--coverage-check"], "coverage_check", (True, 0)),
     ],
 )
 def test_a_regrade_reports_and_fails_on_any_mismatch(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
     extra: list[str],
-    match: bool,
     ran: str,
-    exit_code: int,
+    outcome: tuple[bool, int],
 ) -> None:
+    match, exit_code = outcome
     ran_names: list[str] = []
 
     def report(name: str) -> Any:

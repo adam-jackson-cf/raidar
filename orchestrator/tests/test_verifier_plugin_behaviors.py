@@ -12,6 +12,7 @@ import json
 import os
 import runpy
 import sys
+from dataclasses import dataclass
 from pathlib import Path
 from types import ModuleType, SimpleNamespace
 from typing import Any
@@ -110,9 +111,9 @@ def test_coverage_rows_keep_only_submission_files_and_count_symlink_escapes(
 
 
 # ---------------------------------------------------------- hooks, driven in memory
+@dataclass
 class _Marker:
-    def __init__(self, name: str) -> None:
-        self.name = name
+    name: str
 
 
 class _Item:
@@ -400,7 +401,7 @@ def test_configure_strips_the_runtime_dir_and_enters_collection(
 ) -> None:
     monkeypatch.setenv("PYTHONPATH", "/runtime:/keep")
     instance = _configured(plugin, tmp_path)
-    instance._install_process_audit = lambda: None  # type: ignore[method-assign]
+    instance._install_process_audit = lambda: None
     instance.pytest_configure(_Config())
     assert os.environ["PYTHONPATH"] == "/keep"
     assert (tmp_path / "scratch" / "home").is_dir()
@@ -425,7 +426,7 @@ def test_child_interpreters_start_measuring_through_the_prepared_startup_dir(
     monkeypatch.setattr(plugin, "_current_coverage", lambda: None)
     instance = _configured(plugin, tmp_path)
     instance._coverage = True
-    instance._install_process_audit = lambda: None  # type: ignore[method-assign]
+    instance._install_process_audit = lambda: None
 
     instance.pytest_configure(_Config())
 

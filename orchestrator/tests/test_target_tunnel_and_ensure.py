@@ -431,7 +431,7 @@ def test_run_command_reports_a_missing_binary_or_a_timeout_as_a_failed_process(
             raise result
         return result
 
-    monkeypatch.setattr(transport_module.subprocess, "run", run)
+    monkeypatch.setattr(subprocess, "run", run)
     ok = subprocess.CompletedProcess(["x"], 0, stdout="fine", stderr="")
     outcome[:] = [ok, FileNotFoundError("no ssh"), subprocess.TimeoutExpired(["x"], 1)]
 
@@ -452,7 +452,7 @@ def test_the_tunnel_is_spawned_detached_into_its_log(
         seen.append((argv, kwargs))
         return SimpleNamespace(pid=9)
 
-    monkeypatch.setattr(transport_module.subprocess, "Popen", popen)
+    monkeypatch.setattr(subprocess, "Popen", popen)
     log = tmp_path / "state" / "mbp.log"
 
     process = spawn_detached(["ssh", "-N"], log)
@@ -735,13 +735,13 @@ def _raise(error: Exception) -> Callable[..., Any]:
 
 
 @pytest.mark.parametrize(
-    ("name", "outcome", "exit_code", "text"),
+    ("name", "outcome", "reported"),
     [
-        ("up", 41, 0, "mbp: up (ssh pid 41, context raidar-mbp)"),
-        ("up", RuntimeError("ssh tunnel exited"), 1, "ssh tunnel exited"),
-        ("up", OSError("no ssh"), 1, "no ssh"),
-        ("down", True, 0, "mbp: stopped"),
-        ("down", False, 0, "mbp: was not running"),
+        ("up", 41, (0, "mbp: up (ssh pid 41, context raidar-mbp)")),
+        ("up", RuntimeError("ssh tunnel exited"), (1, "ssh tunnel exited")),
+        ("up", OSError("no ssh"), (1, "no ssh")),
+        ("down", True, (0, "mbp: stopped")),
+        ("down", False, (0, "mbp: was not running")),
     ],
 )
 def test_up_and_down_report_what_happened_to_the_transport(
@@ -749,9 +749,9 @@ def test_up_and_down_report_what_happened_to_the_transport(
     target_cli: CliRunner,
     name: str,
     outcome: object,
-    exit_code: int,
-    text: str,
+    reported: tuple[int, str],
 ) -> None:
+    exit_code, text = reported
     action = _raise(outcome) if isinstance(outcome, Exception) else (lambda *_a, **_k: outcome)
     monkeypatch.setattr(f"raidar.cli.target.transport_{name}", action)
 

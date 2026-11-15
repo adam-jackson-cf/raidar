@@ -2,6 +2,7 @@
 
 import subprocess
 from pathlib import Path
+from typing import NoReturn
 
 import click
 import pytest
@@ -9,13 +10,15 @@ import pytest
 from raidar.cli import repo_state
 
 
-def test_git_output_parses_changes_and_renames_but_ignores_malformed_rows(monkeypatch):
+def test_git_output_parses_changes_and_renames_but_ignores_malformed_rows(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     output = " a.py \n\nb.py\n"
 
-    def run(*args, **kwargs):
-        return subprocess.CompletedProcess(args[0], 0, stdout=output, stderr="")
+    def run(args: list[str], **kwargs: object) -> subprocess.CompletedProcess[str]:
+        return subprocess.CompletedProcess(args, 0, stdout=output, stderr="")
 
-    monkeypatch.setattr(repo_state.subprocess, "run", run)
+    monkeypatch.setattr(subprocess, "run", run)
     assert repo_state.repo_paths_from_git_cmd(["git"]) == ["a.py", "b.py"]
     output = "\nM\tfile.py\nbad-line\nR100\told.py\tnew.py\n"
     assert repo_state.repo_name_status_from_git_cmd(["git"]) == [
@@ -25,9 +28,11 @@ def test_git_output_parses_changes_and_renames_but_ignores_malformed_rows(monkey
 
 
 @pytest.mark.parametrize("stderr", ["bad", ""])
-def test_git_failures_refuse_to_treat_unknown_state_as_clean(monkeypatch, stderr: str):
+def test_git_failures_refuse_to_treat_unknown_state_as_clean(
+    monkeypatch: pytest.MonkeyPatch, stderr: str
+) -> None:
     monkeypatch.setattr(
-        repo_state.subprocess,
+        subprocess,
         "run",
         lambda *a, **kw: subprocess.CompletedProcess(a[0], 1, stdout="", stderr=stderr),
     )
@@ -37,21 +42,23 @@ def test_git_failures_refuse_to_treat_unknown_state_as_clean(monkeypatch, stderr
     assert repo_state.has_unstaged_changes(Path("repo")) is True
 
 
-def test_git_timeouts_remain_errors_not_empty_change_lists(monkeypatch):
-    def timeout(*args, **kwargs):
-        raise subprocess.TimeoutExpired(args[0], 1)
+def test_git_timeouts_remain_errors_not_empty_change_lists(monkeypatch: pytest.MonkeyPatch) -> None:
+    def timeout(args: list[str], **kwargs: object) -> NoReturn:
+        raise subprocess.TimeoutExpired(args, 1)
 
-    monkeypatch.setattr(repo_state.subprocess, "run", timeout)
+    monkeypatch.setattr(subprocess, "run", timeout)
     for read in (repo_state.repo_paths_from_git_cmd, repo_state.repo_name_status_from_git_cmd):
         with pytest.raises(subprocess.TimeoutExpired):
             read(["git"])
 
 
-def test_changes_are_deduplicated_and_only_generated_additions_are_refused(monkeypatch):
-    def paths(args):
+def test_changes_are_deduplicated_and_only_generated_additions_are_refused(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def paths(args: list[str]) -> list[str]:
         return ["untracked.py", "var/stores/s/log.jsonl"]
 
-    def statuses(args):
+    def statuses(args: list[str]) -> list[tuple[str, str]]:
         if "--cached" in args:
             return [("M", "a.py"), ("D", "var/jobs/e/j/deleted.json")]
         return [("M", "a.py"), ("M", "var/jobs/e/j/job.json")]
@@ -75,7 +82,7 @@ def test_changes_are_deduplicated_and_only_generated_additions_are_refused(monke
         monkeypatch.setattr(repo_state, "changed_repo_entries", lambda _root, rows=clean: rows)
         repo_state.assert_no_generated_artifact_changes(Path("repo"))
     monkeypatch.setattr(
-        repo_state.subprocess,
+        subprocess,
         "run",
         lambda *a, **kw: subprocess.CompletedProcess(a[0], 0, stdout="", stderr=""),
     )
@@ -85,7 +92,7 @@ def test_changes_are_deduplicated_and_only_generated_additions_are_refused(monke
 @pytest.mark.parametrize(
     "path", ["var/jobs/j/result.json", "var/stores/s/log.jsonl", "var/analysis/a/report.md"]
 )
-def test_generated_output_is_distinct_from_source_and_similarly_named_paths(path: str):
+def test_generated_output_is_distinct_from_source_and_similarly_named_paths(path: str) -> None:
     assert repo_state.generated_artifact_paths(
         ["src/x.py", "variable/x", "lab/experiment.yaml", path]
     ) == [path]

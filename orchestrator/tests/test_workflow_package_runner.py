@@ -146,7 +146,7 @@ async def run_workflow(
         pack=PACK,
         skills_placement=PLACEMENT,
     )
-    await runner.run(TASK, lab.container, AgentContext())  # type: ignore[arg-type]
+    await runner.run(TASK, lab.container, AgentContext())
     return recorded(lab), runner
 
 
@@ -367,7 +367,7 @@ async def test_the_context_metadata_carries_the_same_portable_record(
         skills_placement=PLACEMENT,
     )
 
-    await runner.run(TASK, lab.container, context)  # type: ignore[arg-type]
+    await runner.run(TASK, lab.container, context)
 
     assert context.metadata is not None
     assert context.metadata["workflow"] == recorded(lab)

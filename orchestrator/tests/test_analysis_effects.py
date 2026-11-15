@@ -9,12 +9,14 @@ sample-size projection.
 from __future__ import annotations
 
 import dataclasses
+from collections.abc import Iterable, Sequence
 from fractions import Fraction
 
 import pytest
 
 from raidar.evaluation.analysis.effects import (
     ArmExclusions,
+    Effect,
     ExactTestName,
     Exclusions,
     Settings,
@@ -28,6 +30,7 @@ from raidar.evaluation.analysis.outcomes import (
     ParityComparison,
     PoolFinding,
     PoolingReport,
+    TrialOutcome,
     Value,
 )
 from raidar.evaluation.analysis.report import AnalysisReport, DevRun, analyse
@@ -63,12 +66,17 @@ SETTINGS = Settings(
 )
 
 
-def _effect(report: AnalysisReport, metric: str, problem: str = "toy@1"):
+def _effect(report: AnalysisReport, metric: str, problem: str = "toy@1") -> Effect:
     (comparison,) = report.comparisons
     return next(e for e in comparison.effects if e.metric == metric and e.problem == problem)
 
 
-def _run(outcomes, attempts, settings=SETTINGS, problems=("toy@1",)) -> AnalysisReport:
+def _run(
+    outcomes: Sequence[TrialOutcome],
+    attempts: int,
+    settings: Settings = SETTINGS,
+    problems: Sequence[str] = ("toy@1",),
+) -> AnalysisReport:
     return analyse(inputs(outcomes, attempts, problems), settings)
 
 
@@ -284,15 +292,22 @@ def test_trials_of_one_problem_must_cover_the_same_checkpoints() -> None:
         _run(outcomes, 5)
 
 
+def _measured_pair(values: Iterable[float | None]) -> tuple[float, float]:
+    """The two values of a two-problem comparison, each of which must have been measured."""
+    first, second = values
+    assert first is not None
+    assert second is not None
+    return first, second
+
+
 def test_several_problems_get_an_equal_weight_aggregate() -> None:
     outcomes = paired_arms("solve_rate", [0.2] * 5, [0.6, 0.7, 0.6, 0.7, 0.6], problem="a@1")
     outcomes += paired_arms("solve_rate", [0.5] * 5, [0.6, 0.55, 0.65, 0.6, 0.6], problem="b@1")
     report = _run(outcomes, 5, problems=("a@1", "b@1"))
     per_problem = [_effect(report, "solve_rate", p) for p in ("a@1", "b@1")]
     aggregate = _effect(report, "solve_rate", "*")
-    assert aggregate.mean_delta == pytest.approx(
-        (per_problem[0].mean_delta + per_problem[1].mean_delta) / 2
-    )
+    deltas = _measured_pair(effect.mean_delta for effect in per_problem)
+    assert aggregate.mean_delta == pytest.approx((deltas[0] + deltas[1]) / 2)
     assert aggregate.ci is not None
     assert aggregate.ci.method is IntervalMethod.PROBLEM_EQUAL_WEIGHT_T
     assert aggregate.exclusions.planned == 10
@@ -306,7 +321,7 @@ def test_several_problems_get_an_equal_weight_aggregate() -> None:
     # costed as one more attempt on every problem.
     size = aggregate.sample_size
     assert size is not None
-    sds = [effect.sd_delta for effect in per_problem]
+    sds = _measured_pair(effect.sd_delta for effect in per_problem)
     effective = (sds[0] ** 2 + sds[1] ** 2) ** 0.5 / 2
     assert size.pilot_sd == pytest.approx(effective)
     assert size.recommended_pairs == -(-7.84 * (effective / 0.125) ** 2 // 1)
@@ -385,7 +400,10 @@ def test_sample_size_projection_uses_pilot_sd_and_cost() -> None:
     )
     assert resized.sample_size is not None
     assert resized.sample_size.delta_source == "configured"
-    assert resized.sample_size.recommended_pairs < size.recommended_pairs
+    resized_pairs, default_pairs = resized.sample_size.recommended_pairs, size.recommended_pairs
+    assert resized_pairs is not None
+    assert default_pairs is not None
+    assert resized_pairs < default_pairs
     assert report.sample_size_basis.standardized == {"1": 8, "0.5": 32, "0.25": 126}
 
 
@@ -658,8 +676,10 @@ def test_a_single_checkpoint_problem_declares_its_rates_binary() -> None:
 
 def test_declared_outcome_types_follow_the_bound_checkpoint_count() -> None:
     declared = declared_outcome_types({"one@1": 1, "many@1": 4})
-    one = set(declared["problems"]["one@1"]["binary"])
-    many = set(declared["problems"]["many@1"]["binary"])
+    problems = declared["problems"]
+    assert isinstance(problems, dict)
+    one = set(problems["one@1"]["binary"])
+    many = set(problems["many@1"]["binary"])
     assert {"final_solved", "solve_rate", "solve_rate_solvable", "reached"} <= one
     assert many == {"final_solved", "final_solved_errata", "final_solved_solvable"}
     assert "headline_score" not in one

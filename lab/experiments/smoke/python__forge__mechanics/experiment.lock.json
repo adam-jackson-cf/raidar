@@ -841,7 +841,7 @@
       "tree-sitter-language-pack": "0.13.0"
     }
   },
-  "document_sha256": "f6012844d9d1df19dc8efe6d47b1e32f91d3e0ca832902b5523fd34b7ab3c6f7",
+  "document_sha256": "3ecf544ce04c14c7b91919d7d1becb7d8270b3fc7c0db34ad6ce7750930a55a3",
   "execution": {
     "arms": {
       "baseline": {
@@ -859,13 +859,13 @@
           "version_pin": "0.156.1",
           "workflow_skills": "placement.skills .agents/skills in the workspace /app"
         },
-        "digest": "377444a858e27f765baa72057d20d18091c06329c5d532b683cf35b3ec44e125",
+        "digest": "00ab0721812f5398c09af1e8de83228ad864ccbfd293ede8b39f600aa781d4e8",
         "model": "gpt-6-luna",
         "packages": {},
         "primitive_code": {
           "frame/1": "7c483c24e1d1bbb7ea51b8ce5ecd59bbc162d9a71096990db8edaa0b1bc5f894",
           "install/1": "b50a2e24aadef912d05136986848a0e14f75715c26665da5c24940c432493419",
-          "runner/1": "dd0206166ef4e7ac40e1503969285a996e1d6e84e0ab861db9fef3c398a18ba5"
+          "runner/1": "c9561faa31eb23f6250408f8daafa74eb602bf1db3491048943826d71d7d35e0"
         },
         "provider": "openai",
         "reasoning": "low",
@@ -1690,7 +1690,7 @@
     "source_sha256": "c2243d115027832291124003db91491281a539065759aa08b1a6e04ec4db7255",
     "spec_sha256": "3edb089ea1ee03462a5cd688e45c5fde0cf5015165d2eabd5f5a4023e6b52257"
   },
-  "lock_sha256": "48e786756de3b6fe19d4e02d5998088b59ff6b76624da3b17d9b517e641534a8",
+  "lock_sha256": "8b9c0cfb0eaa57956a66dcc9e71eed50468834af3ce14848ed6daa54d9013509",
   "lock_version": 5,
   "overrides": {
     "flags": {},
@@ -1699,7 +1699,7 @@
   "sections": {
     "analysis": "1b12d4c79118b1962282a0c33350352b893d39995117c241bba045eff2a1d044",
     "assessment": "e61075a3073c9e030edc1b88f8e27e8204bd05fca6889bb2e3510f6c6544d590",
-    "execution": "48e786756de3b6fe19d4e02d5998088b59ff6b76624da3b17d9b517e641534a8",
+    "execution": "8b9c0cfb0eaa57956a66dcc9e71eed50468834af3ce14848ed6daa54d9013509",
     "toolchain": "57caa99992c5b2bb5d4f0ac51dba5ab949f084361d7d255b3636fa6bbd0a7e8d"
   },
   "spec": {

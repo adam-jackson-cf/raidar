@@ -6,6 +6,7 @@ import importlib.util
 import subprocess
 import sys
 from pathlib import Path
+from types import ModuleType
 
 import pytest
 from git_inventory import repo_paths
@@ -15,7 +16,7 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 pytestmark = pytest.mark.quality
 
 
-def _load_structure_module():
+def _load_structure_module() -> ModuleType:
     script_path = REPO_ROOT / "scripts" / "checks" / "check-structure.py"
     spec = importlib.util.spec_from_file_location("check_structure", script_path)
     assert spec is not None

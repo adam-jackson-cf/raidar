@@ -103,17 +103,17 @@ def _plan(tmp_path: Path, fixture: ImportedFixture, **changes: Any) -> Any:
 
 
 @pytest.mark.parametrize(
-    ("protocol", "coverage", "timeout"),
-    [({}, True, 2 * 900 + 600), ({"verifier_coverage": "offline"}, False, 900 + 600)],
+    ("protocol", "verifier"),
+    [({}, (True, 2 * 900 + 600)), ({"verifier_coverage": "offline"}, (False, 900 + 600))],
 )
 def test_the_verifier_runs_the_coverage_pass_unless_the_protocol_defers_it(
     tmp_path: Path,
     fixture_problem: ImportedFixture,
     monkeypatch: pytest.MonkeyPatch,
     protocol: dict[str, str],
-    coverage: bool,
-    timeout: int,
+    verifier: tuple[bool, int],
 ) -> None:
+    coverage, timeout = verifier
     monkeypatch.setenv(ROOT_ENV, str(fixture_problem.store.root))
     monkeypatch.setattr("raidar.engine.trial.config.with_host_auth", lambda config, harness: config)
     plan = _plan(tmp_path, fixture_problem, protocol=protocol)

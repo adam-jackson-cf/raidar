@@ -14,6 +14,7 @@ from collections.abc import Callable, Mapping, Sequence
 from dataclasses import replace
 from decimal import Decimal
 from pathlib import Path
+from typing import TypedDict, Unpack
 
 import pytest
 
@@ -26,7 +27,11 @@ from raidar.evaluation.review.projection.assessments import TrialAssessments
 from raidar.evaluation.review.quality.experiment_view import ReviewedTrial, _primary
 from raidar.evaluation.review.quality.gate_view import GateReader, build_gate_view
 from raidar.evaluation.review.quality.labels import JevAudit
-from raidar.evaluation.review.quality.models import COMPONENTS, QualityProjection
+from raidar.evaluation.review.quality.models import (
+    COMPONENTS,
+    ProblemQuality,
+    QualityProjection,
+)
 from raidar.evaluation.review.quality.projection import (
     _portable,
     assemble_projection,
@@ -69,7 +74,7 @@ from tests.review_fixtures.quality.generate import (
     SyntheticQuality,
     synthetic_quality,
 )
-from tests.review_fixtures.quality.lock import write_synthetic_lock
+from tests.review_fixtures.quality.lock import synthetic_analysis, write_synthetic_lock
 
 RUN_PREFIX = f"{EXPERIMENT}.{RUN_ID}."
 LATER = "2026-10-01T00:00:00.000Z"
@@ -92,14 +97,13 @@ def _project(
     *,
     trials: Sequence[TrialSource] | None = None,
     find: Callable[[str, TrialSource], Assessment | None] | None = None,
-    audit: JevAudit | None = None,
     reader: GateReader | None = None,
     integrity: Mapping[Path, str] | None = None,
 ) -> QualityProjection:
     reviewed = review_trials(
         data.trials if trials is None else trials,
         find or data.find,
-        audit or data.audit(),
+        data.audit(),
         reader or data.read_gate,
     )
     return assemble_projection(
@@ -112,7 +116,17 @@ def projection(full: SyntheticQuality) -> QualityProjection:
     return _project(full)
 
 
-def _with_experiment(data: SyntheticQuality, **changes: object) -> tuple[TrialSource, ...]:
+class _ExperimentChanges(TypedDict, total=False):
+    """The lock fields a test re-states for every trial of a run."""
+
+    lock_sha256: str | None
+    metric: str | None
+    assessment: RescoreConfig | None
+
+
+def _with_experiment(
+    data: SyntheticQuality, **changes: Unpack[_ExperimentChanges]
+) -> tuple[TrialSource, ...]:
     return tuple(
         replace(source, experiment=replace(source.experiment, **changes)) for source in data.trials
     )
@@ -122,7 +136,9 @@ def _sha(*parts: str) -> str:
     return hashlib.sha256("|".join(parts).encode()).hexdigest()
 
 
-def _clone_run(data: SyntheticQuality, job_id: str, **changes: object) -> SyntheticQuality:
+def _clone_run(
+    data: SyntheticQuality, job_id: str, **changes: Unpack[_ExperimentChanges]
+) -> SyntheticQuality:
     """A second run of the same trials (same snapshots), finishing later."""
     experiment = replace(data.trials[0].experiment, **changes)
     clones = tuple(
@@ -153,7 +169,7 @@ def _source(data: SyntheticQuality, trial: str) -> TrialSource:
     return next(item for item in data.trials if item.record.trial.trial_id == trial)
 
 
-def _problem(projection: QualityProjection):
+def _problem(projection: QualityProjection) -> ProblemQuality:
     (experiment,) = projection.experiments
     (problem,) = experiment.problems
     return problem
@@ -538,7 +554,8 @@ def test_zero_correctness_remains_scored_when_sensitivity_components_are_unmeasu
                 )
             observations.append(observation)
         result = assessment.result.model_copy(update={"observations": tuple(observations)})
-        return assessment.model_copy(update={"result": result})
+        updated: Assessment = assessment.model_copy(update={"result": result})
+        return updated
 
     assessments = {
         key: adjusted(assessment)
@@ -858,10 +875,10 @@ def _lock_beside(
     digest = write_synthetic_lock(
         experiment_file,
         experiment=experiment,
-        baseline_arm="baseline",
         metric=metric,
-        problem=PROBLEM,
-        checkpoints=len(CHECKPOINTS),
+        analysis=synthetic_analysis(
+            baseline_arm="baseline", problem=PROBLEM, checkpoints=len(CHECKPOINTS)
+        ),
     )
     return default_lock_path(experiment_file), digest
 

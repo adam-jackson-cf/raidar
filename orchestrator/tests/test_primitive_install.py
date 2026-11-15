@@ -5,9 +5,10 @@ from __future__ import annotations
 import hashlib
 import os
 import shutil
-from collections.abc import Sequence
+from collections.abc import Awaitable, Callable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Concatenate
 
 import pytest
 
@@ -84,6 +85,19 @@ async def _install(
     )
 
 
+def _permissive[**P, R](
+    exec_: Callable[Concatenate[LocalEnvironment, str, P], Awaitable[R]],
+) -> Callable[Concatenate[LocalEnvironment, str, P], Awaitable[R]]:
+    """``exec_`` with every command run under ``umask 000`` first."""
+
+    async def permissive_exec(
+        self: LocalEnvironment, command: str, /, *args: P.args, **kwargs: P.kwargs
+    ) -> R:
+        return await exec_(self, f"umask 000; {command}", *args, **kwargs)
+
+    return permissive_exec
+
+
 @needs_uv
 async def test_fresh_installs_match_despite_different_uploaded_wheel_timestamps(
     container: Path, monkeypatch: pytest.MonkeyPatch
@@ -107,12 +121,7 @@ async def test_fresh_installs_match_despite_different_uploaded_wheel_timestamps(
     monkeypatch.setattr(install, "_stage", stage)
     first = await _install(container, files)
     shutil.rmtree(first.root)
-    original_exec = LocalEnvironment.exec
-
-    async def permissive_exec(self: LocalEnvironment, command: str, **kwargs: object) -> object:
-        return await original_exec(self, f"umask 000; {command}", **kwargs)
-
-    monkeypatch.setattr(LocalEnvironment, "exec", permissive_exec)
+    monkeypatch.setattr(LocalEnvironment, "exec", _permissive(LocalEnvironment.exec))
     second = await _install(container, files)
 
     assert first.digest == second.digest

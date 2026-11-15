@@ -9,6 +9,7 @@ the procfs view of adopted children.
 
 from __future__ import annotations
 
+import base64
 import os
 import subprocess
 import sys
@@ -19,8 +20,7 @@ from typing import Any
 import pytest
 
 from raidar.subject.primitive.payload import supervise, walk
-from tests.primitive_support import lay as _lay
-from tests.primitive_support import sha as _sha
+from tests.primitive_support import lay as _lay, sha as _sha
 
 pytestmark = pytest.mark.slow
 
@@ -103,7 +103,7 @@ def test_a_flood_on_stdout_is_cut_at_the_cap_and_flagged(tmp_path: Path) -> None
 
     assert result["overflow"]
     assert not result["timed_out"]
-    assert len(supervise.base64.b64decode(result["stdout_b64"])) == 1000
+    assert len(base64.b64decode(result["stdout_b64"])) == 1000
     assert result["stdout_bytes"] > 1000
 
 

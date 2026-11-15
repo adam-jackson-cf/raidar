@@ -15,8 +15,6 @@ import hashlib
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 
-from raidar_contract.canonical import digest_json
-
 from raidar.evaluation.review.projection.assessments import TrialAssessments
 from raidar.scoring.code_quality.observations import EXCLUDED_METRIC
 from raidar.scoring.correctness.scorer import CorrectnessScorer
@@ -36,6 +34,7 @@ from raidar.scoring.framework.result import (
 from raidar.scoring.framework.store import Assessment, ScorerIdentity, assessment_key
 from raidar.scoring.framework.trial_inputs import context_inputs
 from raidar.scoring.framework.validation import validate_result
+from raidar_contract.canonical import digest_json
 from tests.review_fixtures.projection.trials import MemoryTrial
 
 MEASURED_SCORERS = ("correctness@10", "resource-usage@8")

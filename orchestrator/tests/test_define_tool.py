@@ -6,6 +6,7 @@ import hashlib
 import io
 import json
 import runpy
+from collections.abc import Callable
 from pathlib import Path
 
 import pytest
@@ -727,12 +728,17 @@ FAULTY = [
 ]
 
 
+def _answering(text: str) -> Callable[[], str]:
+    """A stdin that reads ``text``."""
+    return lambda: text
+
+
 def test_findings_name_the_lines_of_the_block_not_the_file_it_is_rendered_to() -> None:
     said = []
     for text, commands in FAULTY:
         draft = Draft()
         context = tool.Context(dbv.BODY, (), "", ("Q1.1", "Q1.2"), "", 1)
-        said.append(tool._command(draft, context, ["put"], lambda source=text: source).output)
+        said.append(tool._command(draft, context, ["put"], _answering(text)).output)
         said += [
             tool._command(draft, context, command.split(), lambda: "").output
             for command in commands

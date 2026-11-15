@@ -50,6 +50,9 @@ def test_cost_is_computed_from_the_tokens_and_their_cache_split(
     written = price_tokens("m", prompt=100, completion=10, cache_read=0, cache_write=20)
     longer = price_tokens("m", prompt=100, completion=20, cache_read=0, cache_write=0)
 
+    assert plain is not None
+    assert cached is not None
+    assert written is not None
     assert plain == pytest.approx(0.14)
     assert cached == pytest.approx(0.1 * 60 / 1000 + 40 / 1000 + 0.04)
     assert cached < plain < written
@@ -91,15 +94,13 @@ def test_an_adapter_that_is_not_harbor_installed_is_refused_everywhere(
         credentials(Harness.CLAUDE_CODE, {})
 
 
-class _ProviderlessCodex(adapter_class_for_harness(Harness.CODEX_CLI)):
-    """An adapter without a declared model/provider catalog."""
-
-    REQUIRED_PROVIDER = ""
-    SUPPORTED_MODELS: dict[str, Any] = {}
-
-
-def test_a_harbor_adapter_without_a_provider_declares_no_model_coverage() -> None:
-    assert _ProviderlessCodex.supported_model_summary() == "(model coverage not declared)"
+def test_a_harbor_adapter_without_a_provider_declares_no_model_coverage(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    providerless_codex = adapter_class_for_harness(Harness.CODEX_CLI)
+    monkeypatch.setattr(providerless_codex, "REQUIRED_PROVIDER", "")
+    monkeypatch.setattr(providerless_codex, "SUPPORTED_MODELS", {})
+    assert providerless_codex.supported_model_summary() == "(model coverage not declared)"
 
 
 # ------------------------------------------------------------------ probe
@@ -198,7 +199,7 @@ def _fake_docker_process(argv: list[str], **kwargs: Any) -> subprocess.Completed
 def test_docker_results_are_returned_but_build_logs_stay_off_stdout(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    monkeypatch.setattr(image_module.subprocess, "run", _fake_docker_process)
+    monkeypatch.setattr(subprocess, "run", _fake_docker_process)
 
     captured = image_module.run_docker(["inspect"], check=True)
     streamed = image_module.run_docker(["build"], check=True, capture=False)
@@ -212,7 +213,7 @@ def test_docker_results_are_returned_but_build_logs_stay_off_stdout(
 def test_a_failing_docker_command_raises_only_when_checked(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setattr(image_module.subprocess, "run", _fake_docker_process)
+    monkeypatch.setattr(subprocess, "run", _fake_docker_process)
 
     assert image_module.run_docker(["fail"], check=False).returncode == 1
     with pytest.raises(subprocess.CalledProcessError):

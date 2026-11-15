@@ -135,7 +135,7 @@ def test_an_unreadable_job_manifest_is_a_rescore_error(tmp_path: Path) -> None:
         qualified_trial_id(job / "t1")
 
 
-def _load(tmp_path: Path, document: dict) -> list[tuple[str, str]]:
+def _load(tmp_path: Path, document: dict[str, object]) -> list[tuple[str, str]]:
     (tmp_path / "trajectory.json").write_text(json.dumps(document))
     loaded = load_trajectory(tmp_path)
     assert loaded is not None

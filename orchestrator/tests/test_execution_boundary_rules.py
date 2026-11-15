@@ -13,11 +13,12 @@ import shutil
 import subprocess
 import sys
 from pathlib import Path
+from types import ModuleType
 
 import pytest
 
 
-def _load_script(relative: str, name: str):
+def _load_script(relative: str, name: str) -> ModuleType:
     script = Path(__file__).resolve().parents[2] / relative
     spec = importlib.util.spec_from_file_location(name, script)
     assert spec is not None
@@ -375,7 +376,7 @@ def test_stage_structure_rejects_malformed_package_layouts(tmp_path: Path, mutat
     assert "invalid stage package lab/stages/team/note-state:" in issues[0]
 
 
-def _python_file(relpath: str, module: str):
+def _python_file(relpath: str, module: str) -> object:
     return fanout.PythonFile(path=Path(relpath), relpath=relpath, module=module, is_package=False)
 
 
@@ -435,7 +436,7 @@ def test_analyze_commits_treats_conventional_breaking_changes_as_major(commit: s
 def test_get_commits_since_last_bump_keeps_bodies_and_stops_at_release(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    def fake_run(*_args, **_kwargs):
+    def fake_run(*_args: object, **_kwargs: object) -> subprocess.CompletedProcess[str]:
         return subprocess.CompletedProcess(
             args=[],
             returncode=0,
@@ -512,7 +513,9 @@ def test_failed_lock_verification_leaves_all_release_files_unchanged(
     )
     monkeypatch.setattr(sys, "argv", ["bump-version.py"])
 
-    def resolve_then_fail_verification(command, **_kwargs):
+    def resolve_then_fail_verification(
+        command: list[str], **_kwargs: object
+    ) -> subprocess.CompletedProcess[str]:
         staging = Path(command[command.index("--project") + 1])
         if "--check" in command:
             raise subprocess.CalledProcessError(1, command)

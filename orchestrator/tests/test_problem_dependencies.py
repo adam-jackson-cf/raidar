@@ -36,7 +36,9 @@ def scb(tmp_path: Path) -> tuple[ProblemStore, Path, ProblemId]:
     return fake_store(tmp_path / "problems", commit), repo, problem
 
 
-def test_import_pins_dependencies_and_writes_locks_beside_the_manifest(scb) -> None:
+def test_import_pins_dependencies_and_writes_locks_beside_the_manifest(
+    scb: tuple[ProblemStore, Path, ProblemId],
+) -> None:
     store, repo, problem = scb
     result = import_problem(store, problem, source_checkout=repo, resolver=FakeResolver())
     pins = result.manifest.dependencies
@@ -51,7 +53,9 @@ def test_import_pins_dependencies_and_writes_locks_beside_the_manifest(scb) -> N
     assert store.load(problem).manifest.dependencies == pins
 
 
-def test_reimport_keeps_the_cutoff_and_reuses_the_committed_locks(scb) -> None:
+def test_reimport_keeps_the_cutoff_and_reuses_the_committed_locks(
+    scb: tuple[ProblemStore, Path, ProblemId],
+) -> None:
     store, repo, problem = scb
     first = import_problem(store, problem, source_checkout=repo, resolver=FakeResolver())
     resolver = FakeResolver()
@@ -61,10 +65,11 @@ def test_reimport_keeps_the_cutoff_and_reuses_the_committed_locks(scb) -> None:
     assert resolver.cutoffs == []
 
 
-def test_a_changed_pin_moves_the_manifest_digest(scb) -> None:
+def test_a_changed_pin_moves_the_manifest_digest(scb: tuple[ProblemStore, Path, ProblemId]) -> None:
     store, repo, problem = scb
     first = import_problem(store, problem, source_checkout=repo, resolver=FakeResolver())
     manifest = first.manifest
+    assert manifest.dependencies is not None
     other = manifest.model_copy(
         update={
             "dependencies": manifest.dependencies.model_copy(
@@ -82,7 +87,7 @@ def test_a_changed_pin_moves_the_manifest_digest(scb) -> None:
         import_problem(store, problem, source_checkout=repo, resolver=FakeResolver())
 
 
-def test_tampered_lock_is_refused_on_load(scb) -> None:
+def test_tampered_lock_is_refused_on_load(scb: tuple[ProblemStore, Path, ProblemId]) -> None:
     store, repo, problem = scb
     pins = import_problem(store, problem, source_checkout=repo, resolver=FakeResolver()).manifest
     path = next(store.deps_dir(problem).glob("*.toml"))
@@ -92,7 +97,7 @@ def test_tampered_lock_is_refused_on_load(scb) -> None:
     assert pins.dependencies is not None
 
 
-def test_unresolvable_set_excludes_the_problem(scb) -> None:
+def test_unresolvable_set_excludes_the_problem(scb: tuple[ProblemStore, Path, ProblemId]) -> None:
     store, repo, problem = scb
     resolver = FakeResolver((Unprovided(requirement="sdist-only", reason="no-wheel"),))
     result = import_problem(store, problem, source_checkout=repo, resolver=resolver)
@@ -112,7 +117,7 @@ def test_unresolvable_set_excludes_the_problem(scb) -> None:
     assert set(retry.cutoffs) == {refusal.exclude_newer}
 
 
-def test_infra_outage_is_not_an_exclusion(scb) -> None:
+def test_infra_outage_is_not_an_exclusion(scb: tuple[ProblemStore, Path, ProblemId]) -> None:
     store, repo, problem = scb
 
     with pytest.raises(DependencyInfraError):
@@ -120,7 +125,7 @@ def test_infra_outage_is_not_an_exclusion(scb) -> None:
     assert not store.manifest_path(problem).exists()
 
 
-def test_a_manifest_without_a_pin_is_not_usable(scb) -> None:
+def test_a_manifest_without_a_pin_is_not_usable(scb: tuple[ProblemStore, Path, ProblemId]) -> None:
     store, repo, problem = scb
     manifest = import_problem(
         store, problem, source_checkout=repo, resolver=FakeResolver()

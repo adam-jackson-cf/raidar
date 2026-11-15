@@ -39,6 +39,7 @@ def _context() -> str:
 
 def _phase(trial_dir: Path) -> dict[str, Any]:
     report = json.loads((trial_dir / LIVENESS_REPORT).read_text())
+    phase: dict[str, Any]
     (phase,) = report["phases"]
     return phase
 

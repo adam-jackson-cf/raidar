@@ -43,7 +43,7 @@ def _ran(step_id: int, call_id: str, cmd: str, output: str | None) -> dict[str, 
     return step
 
 
-def _ctx(tmp_path: Path, *traces: dict, **config: Any) -> AssessContext:
+def _ctx(tmp_path: Path, *traces: dict[str, Any], **config: Any) -> AssessContext:
     steps = [TracedStep(f"checkpoint_{i}", trace=trace) for i, trace in enumerate(traces, 1)]
     return traced_memory_context(tmp_path, steps, config=config)
 

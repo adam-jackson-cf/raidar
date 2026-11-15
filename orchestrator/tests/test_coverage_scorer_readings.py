@@ -14,8 +14,7 @@ from typing import Any
 
 import pytest
 
-from raidar.scoring import definition_coverage as definition
-from raidar.scoring import test_coverage as tests_scorer
+from raidar.scoring import definition_coverage as definition, test_coverage as tests_scorer
 from raidar.scoring.coverage_inputs.records import Criterion, Defined, Unit
 from raidar.scoring.coverage_inputs.testsource import ReadTest
 from raidar.scoring.framework.result import AssessStatus

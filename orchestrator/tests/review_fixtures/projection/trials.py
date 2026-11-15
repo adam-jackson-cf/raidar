@@ -10,7 +10,7 @@ marked ``synthetic`` and its problems live under ``synthetic/``.
 from __future__ import annotations
 
 import json
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -25,7 +25,6 @@ from harbor.models.trajectories import (
     ToolCall,
     Trajectory,
 )
-from raidar_contract.canonical import digest_json
 
 from raidar.contract.snapshot import tree_digest
 from raidar.contract.trial import (
@@ -53,6 +52,7 @@ from raidar.grading.records import (
     StepRecord,
     write_step_record,
 )
+from raidar_contract.canonical import digest_json
 
 Outcome = Literal["solved", "failed", "infra"]
 HARNESS_EXIT = "NonZeroAgentExitCodeError"
@@ -354,31 +354,35 @@ def _executed_step(trial_dir: Path, checkpoint: CheckpointScript) -> dict[str, o
     return _executed_from(checkpoint, tree_digest(trial_dir / _snapshot_path(checkpoint)))
 
 
-def _step_result(
+def _step_results(
     plan: TrialPlan,
     script: TrialScript,
-    index: int,
-    checkpoint: CheckpointScript,
-    graded: dict[str, object],
-    executed: dict[str, object] | None,
-) -> StepResult:
-    """``executed`` is None for a step Harbor never started."""
-    return StepResult.model_validate(
-        {
-            "trial_id": script.trial_id,
-            "arm": script.arm,
-            "attempt": script.attempt,
-            "problem": plan.problem,
-            "index": index,
-            "step": checkpoint.step,
-            "checkpoint": checkpoint.step,
-            "checkpoint_state": _state(checkpoint),
-            "infra_reasons": () if graded else _infra_reasons(executed is not None),
-            "termination": None if executed is not None else NOT_STARTED,
-            **graded,
-            **(executed or {}),
-        }
-    )
+    graded: Callable[[CheckpointScript], dict[str, object]],
+    executed: Callable[[CheckpointScript], dict[str, object] | None],
+) -> tuple[StepResult, ...]:
+    """One step_result per checkpoint; ``executed`` gives None for a step Harbor never started."""
+    step_results: list[StepResult] = []
+    for index, checkpoint in enumerate(script.checkpoints):
+        grade, execution = graded(checkpoint), executed(checkpoint)
+        step_results.append(
+            StepResult.model_validate(
+                {
+                    "trial_id": script.trial_id,
+                    "arm": script.arm,
+                    "attempt": script.attempt,
+                    "problem": plan.problem,
+                    "index": index,
+                    "step": checkpoint.step,
+                    "checkpoint": checkpoint.step,
+                    "checkpoint_state": _state(checkpoint),
+                    "infra_reasons": () if grade else _infra_reasons(execution is not None),
+                    "termination": None if execution is not None else NOT_STARTED,
+                    **grade,
+                    **(execution or {}),
+                }
+            )
+        )
+    return tuple(step_results)
 
 
 def _infra_reasons(ran: bool) -> tuple[str, ...]:
@@ -521,17 +525,14 @@ def write_trial(plan: TrialPlan, script: TrialScript) -> TrialRecord:
     )
     (trial_dir / "result.json").write_text(_result_json(script, steps, at))
     _task(plan, script)
-    ran = len(steps)
-    step_results = tuple(
-        _step_result(
-            plan,
-            script,
-            index,
-            checkpoint,
-            _graded(trial_dir, checkpoint),
-            _executed_step(trial_dir, checkpoint) if index < ran else None,
-        )
-        for index, checkpoint in enumerate(script.checkpoints)
+    ran = {checkpoint.step for checkpoint in _executed(script)}
+    step_results = _step_results(
+        plan,
+        script,
+        lambda checkpoint: _graded(trial_dir, checkpoint),
+        lambda checkpoint: (
+            _executed_step(trial_dir, checkpoint) if checkpoint.step in ran else None
+        ),
     )
     record = _trial_record(plan, script, step_results)
     path = plan.job_dir / "trial-records" / f"{script.trial_id}.json"
@@ -585,20 +586,19 @@ def memory_trial(plan: TrialPlan, script: TrialScript) -> MemoryTrial:
         steps.append(_step_timing(checkpoint, at))
         at += timedelta(seconds=4 * (_turns(checkpoint) + 2))
     files[trial_dir / "result.json"] = _result_json(script, steps, at)
-    step_results = tuple(
-        _step_result(
-            plan,
-            script,
-            index,
-            checkpoint,
+    step_results = _step_results(
+        plan,
+        script,
+        lambda checkpoint: (
             _graded_from(checkpoint, records[checkpoint.step].rewards)
             if checkpoint.step in records
-            else {},
+            else {}
+        ),
+        lambda checkpoint: (
             _executed_from(checkpoint, snapshots[checkpoint.step])
             if checkpoint.step in snapshots
-            else None,
-        )
-        for index, checkpoint in enumerate(script.checkpoints)
+            else None
+        ),
     )
     record = _trial_record(plan, script, step_results)
     return MemoryTrial(record, files, records, snapshots, sources)

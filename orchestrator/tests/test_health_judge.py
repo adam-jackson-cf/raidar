@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import json
 from collections.abc import Callable
+from dataclasses import replace
 from datetime import timedelta
 from pathlib import Path
 from types import SimpleNamespace
@@ -193,7 +194,7 @@ def _save(root: Path, verify: dict[str, Any]) -> None:
     _write(root, "workflow/workflow.json", {"stages": ["build"], "jev-judge/1": verify})
 
 
-def _checks(root: Path) -> dict[str, Any]:
+def _checks(root: Path) -> dict[str, HealthCheck]:
     return {c.id: c for c in judge_family([("checkpoint_1", root)])}
 
 
@@ -405,13 +406,17 @@ def _deadline_without_a_cut(agent: Path, workflow: Workflow) -> None:
 
 
 def _sidecar(verdict: str) -> Mutation:
-    return lambda agent, workflow: (agent / "gate/gate-1.json").write_text(
-        json.dumps({"verdict": verdict})
-    )
+    def write_sidecar(agent: Path, _workflow: Workflow) -> None:
+        (agent / "gate/gate-1.json").write_text(json.dumps({"verdict": verdict}))
+
+    return write_sidecar
 
 
 def _hook_log(text: str) -> Mutation:
-    return lambda agent, workflow: (agent / HOOK_LOG).write_text(text)
+    def write_hook_log(agent: Path, _workflow: Workflow) -> None:
+        (agent / HOOK_LOG).write_text(text)
+
+    return write_hook_log
 
 
 ROW_CASES: list[tuple[str, Mutation]] = [
@@ -665,7 +670,7 @@ def _relock(change: Callable[[dict[str, Any]], None]) -> dict[str, Any]:
     return config
 
 
-def _lock(name: str) -> Callable[[dict[str, Any]], None]:
+def _lock_primitive(name: str) -> Callable[[dict[str, Any]], None]:
     return lambda kwargs: kwargs["primitives"].update({name: "d" * 64})
 
 
@@ -694,9 +699,9 @@ def _unlist_package(kwargs: dict[str, Any]) -> None:
 
 
 UNKNOWN_LOCKS: list[tuple[str, Callable[[dict[str, Any]], None]]] = [
-    ("gate-version", _lock("gate/2")),
-    ("judge-version", _lock("jev-judge/2")),
-    ("stage-type", _lock("define")),
+    ("gate-version", _lock_primitive("gate/2")),
+    ("judge-version", _lock_primitive("jev-judge/2")),
+    ("stage-type", _lock_primitive("define")),
     ("no-judge-lock", _unlock("jev-judge/1")),
     ("no-reply-lock", _unlock("acceptance-reply/1")),
     ("undeclared-judge", _redefine(judge=None)),
@@ -795,7 +800,9 @@ PACKAGE_FREE = {"kwargs": {"definition": BASELINE_DEFINITION}}
 
 def _package_free(agent: Path) -> Workflow:
     """What a no-package schema-2 run's ``PackageCheckpoint.record`` emits (no package)."""
-    records = {name: {} for name in ("frame/1", "install/1", "setup/1", "stop/1", "outputs/1")}
+    records: Workflow = {
+        name: {} for name in ("frame/1", "install/1", "setup/1", "stop/1", "outputs/1")
+    }
     turns = [package_turn(agent)]
     return {"kind": "raidar-workflow", "stages": ["build"], "turns": turns} | records
 
@@ -1514,7 +1521,8 @@ def _with_deps(
 ) -> StepRecord:
     found = tuple(Unprovided(requirement=req, reason=why) for req, why in unprovided)
     deps = SubmissionDependencies(declared=declared, unprovided=found)
-    return ledger.model_copy(update={"submission_dependencies": deps})
+    updated: StepRecord = ledger.model_copy(update={"submission_dependencies": deps})
+    return updated
 
 
 def test_d1_lists_each_measured_steps_unprovided_requirements(tmp_path: Path) -> None:
@@ -1747,13 +1755,15 @@ def _smoke_record(
         for i, digest in enumerate(digests)
     )
     record = memory_trial(steps, **changes)
-    return record.model_copy(update={"trial": record.trial.model_copy(update={"arm": arm})})
+    smoked: TrialRecord = record.model_copy(
+        update={"trial": record.trial.model_copy(update={"arm": arm})}
+    )
+    return smoked
 
 
 def _smoke(
     trial: TrialRecord | str,
     *,
-    name: str = "exp/smoke",
     manifest: dict[str, Any] | None = None,
     without: tuple[str, ...] = (),
     lock: dict[str, Any] | None = None,
@@ -1767,7 +1777,9 @@ def _smoke(
         "finished_at": "2026-01-01T00:00:00+00:00",
     }
     merged = {k: v for k, v in {**base, **(manifest or {})}.items() if k not in without}
-    return SmokeJob(name, merged, lock or _lock("smoke"), lambda trial_id: trial, lambda r: health)
+    return SmokeJob(
+        "exp/smoke", merged, lock or _lock("smoke"), lambda trial_id: trial, lambda r: health
+    )
 
 
 def _admit(
@@ -1849,10 +1861,14 @@ def test_a_smoke_run_is_admitted_without_reading_any_earlier_smoke() -> None:
 def test_smokes_clear_a_run_together_and_a_smoke_adding_no_arm_is_not_recorded() -> None:
     luna, terra = _agent(), _agent("terra", model="gpt-6-terra")
     wanted = _wanted(luna, terra)
-    first = _smoke(_smoke_record("arm-luna"), name="exp/one", lock=_lock("smoke", luna))
-    repeat = _smoke(_smoke_record("arm-luna"), name="exp/two", lock=_lock("smoke", luna))
-    second = _smoke(_smoke_record("arm-terra"), name="exp/three", lock=_lock("smoke", terra))
-    broad = _smoke(_smoke_record("arm-luna"), name="exp/broad", lock=_lock("smoke", luna, terra))
+    first = replace(_smoke(_smoke_record("arm-luna"), lock=_lock("smoke", luna)), name="exp/one")
+    repeat = replace(_smoke(_smoke_record("arm-luna"), lock=_lock("smoke", luna)), name="exp/two")
+    second = replace(
+        _smoke(_smoke_record("arm-terra"), lock=_lock("smoke", terra)), name="exp/three"
+    )
+    broad = replace(
+        _smoke(_smoke_record("arm-luna"), lock=_lock("smoke", luna, terra)), name="exp/broad"
+    )
 
     cleared = _admit(first, repeat, second, wanted=wanted)
     narrower = _admit(broad, wanted=_wanted(luna))
@@ -1864,7 +1880,9 @@ def test_smokes_clear_a_run_together_and_a_smoke_adding_no_arm_is_not_recorded()
 
 
 @pytest.mark.parametrize(
-    "jobs", [(), (_smoke("trial t has no record", name="exp/a"),)], ids=["no-smoke", "unclean"]
+    "jobs",
+    [(), (replace(_smoke("trial t has no record"), name="exp/a"),)],
+    ids=["no-smoke", "unclean"],
 )
 def test_a_run_with_no_clean_smoke_is_refused_unless_overridden(jobs: tuple[SmokeJob, ...]) -> None:
     with pytest.raises(AdmissionError):

@@ -27,6 +27,22 @@ def closed_flag(rig: Rig) -> str:
     return f"/var/lib/raidar-calls/closed/{rig.site.scope}-note-state"
 
 
+def note_output(record: dict[str, object]) -> dict[str, object]:
+    """The ``note`` entry of a stage record's outputs."""
+    outputs = record["outputs"]
+    assert isinstance(outputs, dict)
+    note = outputs["note"]
+    assert isinstance(note, dict)
+    return note
+
+
+def copied_text(note: dict[str, object]) -> str:
+    """The text of the host-side copy a recorded output points at."""
+    host_path = note["host_path"]
+    assert isinstance(host_path, str)
+    return Path(host_path).read_text()
+
+
 @pytest.fixture
 def rig(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Rig:
     return build_rig(tmp_path, monkeypatch)
@@ -61,8 +77,7 @@ async def test_a_done_result_with_its_outputs_is_the_agents_outcome_as_reported(
     decision = await run_stop(rig.site, StopState(), rig.canary)
 
     assert (decision.action, decision.reason) == ("done", "reported")
-    copied = decision.record["outputs"]["note"]
-    assert Path(copied["host_path"]).read_text() == "a short note of words"
+    assert copied_text(note_output(decision.record)) == "a short note of words"
     assert rig.canary.runs == []
 
 
@@ -263,11 +278,11 @@ async def test_each_calls_output_copy_survives_later_calls_and_edits(rig: Rig) -
     rig.container.write_note("now a note of enough words")
     done = await run_stop(rig.site, state, rig.canary)
 
-    first = resumed.record["outputs"]["note"]
-    last = done.record["outputs"]["note"]
+    first = note_output(resumed.record)
+    last = note_output(done.record)
     assert (resumed.action, done.action) == ("resume", "done")
-    assert Path(first["host_path"]).read_text() == "one"
-    assert Path(last["host_path"]).read_text() == "now a note of enough words"
+    assert copied_text(first) == "one"
+    assert copied_text(last) == "now a note of enough words"
     assert first["host_path"] != last["host_path"]
     assert first["sha256"] != last["sha256"]
 
@@ -280,8 +295,8 @@ async def test_absent_outputs_do_not_invalidate_a_resume_or_a_close(rig: Rig) ->
     closed = await run_stop(rig.site, state, rig.canary)
 
     assert (resumed.action, closed.action) == ("resume", "closed")
-    assert resumed.record["outputs"]["note"]["error"] is not None
-    assert closed.record["outputs"]["note"]["sha256"] is None
+    assert note_output(resumed.record)["error"] is not None
+    assert note_output(closed.record)["sha256"] is None
 
 
 async def test_an_unusable_stop_result_still_keeps_the_outputs_it_saw(rig: Rig) -> None:
@@ -291,4 +306,4 @@ async def test_an_unusable_stop_result_still_keeps_the_outputs_it_saw(rig: Rig) 
     repair = await run_stop(rig.site, StopState(), rig.canary)
 
     assert repair.action == "repair"
-    assert Path(repair.record["outputs"]["note"]["host_path"]).read_text() == "partial work"
+    assert copied_text(note_output(repair.record)) == "partial work"

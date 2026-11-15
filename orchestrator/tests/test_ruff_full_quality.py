@@ -7,6 +7,7 @@ import shutil
 import subprocess
 import sys
 from pathlib import Path
+from subprocess import CompletedProcess
 
 import pytest
 
@@ -33,7 +34,9 @@ def lint_tree(tmp_path: Path) -> Path:
     return tmp_path
 
 
-def _lint_and_baseline(root: Path, source: str, *options: str):
+def _lint_and_baseline(
+    root: Path, source: str, *options: str
+) -> tuple[CompletedProcess[str], list[dict[str, object]], CompletedProcess[str]]:
     """Run the gate's check-only lint step and the real baseline CLI."""
     (root / SOURCE).write_text(source)
     lint = subprocess.run(
@@ -57,7 +60,8 @@ def _lint_and_baseline(root: Path, source: str, *options: str):
         timeout=30,
     )
     assert lint.returncode in (0, 1), lint.stderr
-    findings = json.loads(lint.stdout)
+    findings: list[dict[str, object]] = json.loads(lint.stdout)
+    assert isinstance(findings, list), lint.stdout
     (root / "ruff-report.json").write_text(lint.stdout)
     baseline = subprocess.run(
         [

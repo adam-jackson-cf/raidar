@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Callable
 from pathlib import Path
 
 import pytest
@@ -131,7 +132,7 @@ def test_offline_infrastructure_errors_are_refused_not_scored(
     }[operation]
     monkeypatch.setattr(offline, seam, unavailable)
     target, store, options = Path("job"), Path("store"), RegradeOptions(docker_context="ctx")
-    actions = {
+    actions: dict[str, Callable[[], object]] = {
         "regrade": lambda: offline.regrade(target, options, store),
         "grade_pre_fix": lambda: offline.grade_pre_fix(
             target, store, ["verification-effort@1"], options, replay=False

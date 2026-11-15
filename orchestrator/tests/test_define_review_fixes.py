@@ -509,39 +509,43 @@ def test_a_verbatim_quote_is_one_section_with_enough_words() -> None:
 
 
 @pytest.mark.parametrize(
-    ("reference", "shaped", "in_workspace", "read_error"),
+    ("reference", "shaped", "in_workspace"),
     [
-        ("pager.py:3", True, True, False),
-        (" pager.py:2-5 ", True, False, False),
-        ("pager.py:3-", False, False, False),
-        ("pager.py:a", False, False, False),
-        ("", False, False, False),
-        ("pager.py:0", True, False, False),
-        ("pager.py:3-2", True, False, False),
-        ("missing.py:1", True, False, False),
-        ("../outside.py:1", True, False, False),
-        ("pager.py:1", True, False, True),
+        ("pager.py:3", True, True),
+        (" pager.py:2-5 ", True, False),
+        ("pager.py:3-", False, False),
+        ("pager.py:a", False, False),
+        ("", False, False),
+        ("pager.py:0", True, False),
+        ("pager.py:3-2", True, False),
+        ("missing.py:1", True, False),
+        ("../outside.py:1", True, False),
     ],
 )
 def test_a_reference_is_a_path_then_a_line_or_a_range(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-    reference: str,
-    shaped: bool,
-    in_workspace: bool,
-    read_error: bool,
+    tmp_path: Path, reference: str, shaped: bool, in_workspace: bool
 ) -> None:
-    (tmp_path / "pager.py").write_bytes(b"first\nsecond\nthird\n")
-    (tmp_path.parent / "outside.py").write_bytes(b"outside\n")
+    _write_reference_files(tmp_path)
+    assert (evidence.reference_problem(reference, None) == "") is shaped
+    assert (evidence.reference_problem(reference, tmp_path) == "") is in_workspace
+
+
+def test_a_reference_to_an_unreadable_file_is_shaped_but_not_in_the_workspace(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _write_reference_files(tmp_path)
 
     def unreadable(_: Path) -> bytes:
         raise OSError("unreadable")
 
-    if read_error:
-        monkeypatch.setattr(Path, "read_bytes", unreadable)
+    monkeypatch.setattr(Path, "read_bytes", unreadable)
+    assert evidence.reference_problem("pager.py:1", None) == ""
+    assert evidence.reference_problem("pager.py:1", tmp_path) != ""
 
-    assert (evidence.reference_problem(reference, None) == "") is shaped
-    assert (evidence.reference_problem(reference, tmp_path) == "") is in_workspace
+
+def _write_reference_files(workspace: Path) -> None:
+    (workspace / "pager.py").write_bytes(b"first\nsecond\nthird\n")
+    (workspace.parent / "outside.py").write_bytes(b"outside\n")
 
 
 # --- aspects: the lines under a criterion -----------------------------------------------
@@ -705,7 +709,8 @@ def test_a_run_records_a_feature_at_the_depth_it_was_read() -> None:
     (anchored,) = featuredef.parse(quotes_only, True, True).features
     (criterion,) = anchored.traced
     assert criterion.sources == ("The tool lists names.",)
-    assert criterion.aspects == criterion.examples == ()
+    assert criterion.aspects == ()
+    assert criterion.examples == ()
 
     assert plain.record() == {
         "id": "F1",

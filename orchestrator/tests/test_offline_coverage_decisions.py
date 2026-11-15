@@ -15,6 +15,7 @@ from typing import Any
 import pytest
 
 from raidar.contract.snapshot import tree_digest
+from raidar.grading.bundle import VerifierBundle
 from raidar.grading.coverage import offline
 from raidar.grading.coverage.offline import (
     CoverageTarget,
@@ -59,6 +60,8 @@ from raidar.grading.records import (
     write_step_record,
 )
 from raidar.grading.regrade import RegradeError, RegradeOptions
+from raidar.grading.sandbox import GradingSandbox
+from tests.verifier_support import LocalProcessSandbox
 
 STEP = "checkpoint_2"
 ENVIRONMENT = "image-1"
@@ -122,9 +125,7 @@ def _run_payload(run: RunOutcome) -> dict[str, Any]:
 def _record(
     snapshot_digest: str,
     *,
-    enabled: bool = False,
-    parity: ParityVerdict | None = None,
-    differences: tuple[str, ...] = (),
+    coverage: CoverageRef | None = None,
     canary: CanaryRecord | None = None,
     environment: str = ENVIRONMENT,
     timeout_s: float = 30.0,
@@ -145,7 +146,7 @@ def _record(
         ),
         grade=grade,
         summary=grade.summary(),
-        coverage=CoverageRef(enabled=enabled, parity=parity, differences=differences),
+        coverage=coverage or CoverageRef(enabled=False),
         rewards=grade.rewards(),
         canary=canary or CanaryRecord(),
     )
@@ -209,12 +210,14 @@ def oracle(monkeypatch: pytest.MonkeyPatch) -> Oracle:
 
 
 def _options(tmp_path: Path, environment: str = ENVIRONMENT) -> RegradeOptions:
-    class Sandbox:
+    class Sandbox(LocalProcessSandbox):
+        """A sandbox that only reports its environment; the faked oracle never runs it."""
+
         async def environment_id(self) -> str:
             return environment
 
-    async def factory(bundle: Any) -> Sandbox:
-        return Sandbox()
+    async def factory(bundle: VerifierBundle) -> GradingSandbox:
+        return Sandbox(tmp_path / "sandbox")
 
     work = tmp_path / "work"
     work.mkdir(exist_ok=True)
@@ -229,8 +232,10 @@ def test_a_trial_without_verifier_records_has_no_targets(tmp_path: Path) -> None
 
 
 def test_a_target_is_deferred_exactly_when_the_trial_ran_no_coverage_pass(tmp_path: Path) -> None:
-    deferred = _trial(tmp_path, "a", enabled=False)
-    ran = _trial(tmp_path, "b", enabled=True, parity=ParityVerdict(eligible=True))
+    deferred = _trial(tmp_path, "a", coverage=CoverageRef(enabled=False))
+    ran = _trial(
+        tmp_path, "b", coverage=CoverageRef(enabled=True, parity=ParityVerdict(eligible=True))
+    )
 
     assert (deferred.deferred, ran.deferred) == (True, False)
 
@@ -501,7 +506,7 @@ async def test_a_job_produces_only_deferred_steps_in_trial_order(
     job = tmp_path / "job"
     job.mkdir()
     _trial(job, "a-trial")
-    _trial(job, "b-trial", enabled=True, parity=ParityVerdict(eligible=True))
+    _trial(job, "b-trial", coverage=CoverageRef(enabled=True, parity=ParityVerdict(eligible=True)))
     bad = _trial(job, "c-trial")
     (bad.trial_dir / "artifacts" / "app" / "main.py").write_text("edited\n")
     (job / "not-a-trial").mkdir()
@@ -534,7 +539,11 @@ async def _trial_with_own_pass(tmp_path: Path, oracle: Oracle) -> CoverageTarget
     """A trial whose in-trial coverage pass recorded exactly what the offline run reproduces."""
     probe = _trial(tmp_path, "probe")
     run = await run_offline_coverage(probe, _options(tmp_path))
-    target = _trial(tmp_path, "trial", enabled=True, parity=run.parity, differences=run.differences)
+    target = _trial(
+        tmp_path,
+        "trial",
+        coverage=CoverageRef(enabled=True, parity=run.parity, differences=run.differences),
+    )
     (target.record_dir / FORK_EVIDENCE_FILE).write_text(json.dumps(run.fork))
     return target
 
@@ -638,7 +647,11 @@ async def test_a_job_check_matches_only_when_every_step_matches(
     job.mkdir()
     probe = _trial(tmp_path, "probe")
     run = await run_offline_coverage(probe, _options(tmp_path))
-    own = _trial(job, "a-trial", enabled=True, parity=run.parity, differences=run.differences)
+    own = _trial(
+        job,
+        "a-trial",
+        coverage=CoverageRef(enabled=True, parity=run.parity, differences=run.differences),
+    )
     (own.record_dir / FORK_EVIDENCE_FILE).write_text(json.dumps(run.fork))
 
     matching = await check_coverage_path(job, None, _options(tmp_path))

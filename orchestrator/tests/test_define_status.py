@@ -97,7 +97,7 @@ def test_a_sealed_ask_hands_over_its_questions(memory: Callable[..., Any]) -> No
     code, held = memory(Draft(dbv.items(dbv.asks()), "ask"))
 
     assert (code, held["state"]) == (tool.FAULT, "asking")
-    questions = held["reply"]["questions"]  # type: ignore[index]
+    questions = held["reply"]["questions"]
     assert [item["proposal"] for item in questions] == ["F1 Greeting reports liveness only."]
 
 

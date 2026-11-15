@@ -140,7 +140,7 @@ async def test_excluded_download_is_one_streamed_tar_with_harbors_excludes(
         seen.append(argv)
         return FakeProcess(stdout)
 
-    monkeypatch.setattr(env_module.asyncio, "create_subprocess_exec", fake_exec)
+    monkeypatch.setattr(asyncio, "create_subprocess_exec", fake_exec)
     env = _bare_env("cid", tmp_path)
     monkeypatch.setattr(env, "_compose_env_vars", lambda include_os_env=True: {}, raising=False)
     await env.download_dir_with_exclusions(
@@ -179,7 +179,7 @@ async def test_a_failed_stream_raises_like_harbors_transfer(
     async def fake_exec(*_argv: str, **_: Any) -> FailedProcess:
         return FailedProcess()
 
-    monkeypatch.setattr(env_module.asyncio, "create_subprocess_exec", fake_exec)
+    monkeypatch.setattr(asyncio, "create_subprocess_exec", fake_exec)
     env = _bare_env("cid", tmp_path)
     monkeypatch.setattr(env, "_compose_env_vars", lambda include_os_env=True: {}, raising=False)
     with pytest.raises(RuntimeError, match="code 2: tar: /app: Cannot open"):
@@ -192,7 +192,7 @@ def test_the_environment_is_not_mounted_and_declares_no_volumes(tmp_path: Path) 
     env = _bare_env("cid", tmp_path)
     env._enable_egress_control = False  # noqa: SLF001
     env._mounts = [  # noqa: SLF001
-        {"type": "bind", "source": "/host/agent", "target": "/logs/agent"}  # type: ignore[list-item]
+        {"type": "bind", "source": "/host/agent", "target": "/logs/agent"}
     ]
     assert env.capabilities.mounted is False
     env._mounts_compose_temp_dir = None  # noqa: SLF001
@@ -307,7 +307,7 @@ def _resolvable_env(
         spawned.append(argv)
         return _FakeProcess(stdout, returncode)
 
-    monkeypatch.setattr(env_module.asyncio, "create_subprocess_exec", fake_exec)
+    monkeypatch.setattr(asyncio, "create_subprocess_exec", fake_exec)
     env = object.__new__(RunScopedDockerEnvironment)
     env._main_container = None  # noqa: SLF001
     env._is_windows_container = False  # noqa: SLF001

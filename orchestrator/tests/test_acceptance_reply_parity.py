@@ -13,7 +13,6 @@ from types import SimpleNamespace
 from typing import Any, cast
 
 import pytest
-from raidar_contract.workflow import PackageWorkflowDefinition
 
 from raidar.subject.workflow.acceptance_reply import AcceptanceReply
 from raidar.subject.workflow.package_stage import PackageStage
@@ -26,6 +25,7 @@ from raidar.subject.workflow.stage import (
     Resume,
     Spent,
 )
+from raidar_contract.workflow import PackageWorkflowDefinition
 from tests.criteria_support import (
     FILE,
     OBJECT,

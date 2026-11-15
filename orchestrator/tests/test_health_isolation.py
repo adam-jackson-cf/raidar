@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 from collections.abc import Mapping
+from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 from types import SimpleNamespace
 from typing import Any, cast
@@ -682,16 +683,24 @@ def test_a_codex_row_that_is_not_understood_leaves_p8_unmeasured(tmp_path: Path,
     assert "not JSON objects" in check.detail
 
 
+@dataclass(frozen=True)
+class ClaudeTails:
+    """Raw text appended after the generated rows of a Claude turn's logs."""
+
+    transcript: str = ""
+    stream: str = ""
+
+
 def claude_turn(
     turn_dir: Path,
     rule: str = "use uv",
     skills: list[str] | None = None,
     *,
     origin: str = "/app/CLAUDE.md",
-    transcript_tail: str = "",
-    stream_tail: str = "",
+    tails: ClaudeTails | None = None,
 ) -> None:
     """Write a Claude stream init and transcript with instruction and system rows."""
+    tails = tails or ClaudeTails()
     init = {
         "type": "system",
         "subtype": "init",
@@ -700,13 +709,13 @@ def claude_turn(
         "plugins": [{"name": "cc-plugin-agents-md", "path": "builtin"}],
         "mcp_servers": [],
     }
-    (turn_dir / "claude-code.txt").write_text(json.dumps(init) + "\n" + stream_tail)
+    (turn_dir / "claude-code.txt").write_text(json.dumps(init) + "\n" + tails.stream)
     transcript = turn_dir / "sessions" / "projects" / "-app" / "claude.jsonl"
     transcript.parent.mkdir(parents=True)
     content = f"Contents of {origin} (project instructions):\n\n{rule}"
     user = {"type": "user", "message": {"content": content}}
     system = {"type": "system", "content": "native harness instructions"}
-    transcript.write_text(json.dumps(user) + "\n" + json.dumps(system) + "\n" + transcript_tail)
+    transcript.write_text(json.dumps(user) + "\n" + json.dumps(system) + "\n" + tails.transcript)
 
 
 @pytest.mark.parametrize(
@@ -758,7 +767,7 @@ def test_claude_transcript_instructions_are_checked_against_their_own_file(tmp_p
 def test_a_claude_transcript_line_that_is_not_understood_leaves_p8_unmeasured(
     tmp_path: Path, tail: str
 ) -> None:
-    claude_turn(tmp_path, transcript_tail=tail)
+    claude_turn(tmp_path, tails=ClaudeTails(transcript=tail))
     check = p8_of(tmp_path, Harness.CLAUDE_CODE, before={"CLAUDE.md": "use uv\n"})
     assert check.status == "unmeasured"
     assert "not JSON objects" in check.detail
@@ -766,7 +775,7 @@ def test_a_claude_transcript_line_that_is_not_understood_leaves_p8_unmeasured(
 
 @pytest.mark.parametrize("tail", ['{"type": "future_event"}\n', "unparsed instruction text\n"])
 def test_a_malformed_claude_stream_line_leaves_p8_unmeasured(tmp_path: Path, tail: str) -> None:
-    claude_turn(tmp_path, stream_tail=tail)
+    claude_turn(tmp_path, tails=ClaudeTails(stream=tail))
     check = p8_of(tmp_path, Harness.CLAUDE_CODE, before={"CLAUDE.md": "use uv\n"})
     assert check.status == "unmeasured"
     assert "claude stream" in check.detail

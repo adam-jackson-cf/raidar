@@ -172,7 +172,9 @@ def test_validate_command_exits_nonzero_with_field_errors(tmp_path: Path) -> Non
     ],
     ids=["problem-two-sources", "duplicate-problem", "min-reward-in-continue", "dup-scorer"],
 )
-def test_structural_rules_are_field_located(tmp_path: Path, change: dict, loc: str) -> None:
+def test_structural_rules_are_field_located(
+    tmp_path: Path, change: dict[str, object], loc: str
+) -> None:
     issues = _issues(write_experiment(tmp_path, experiment_document(**change)))
 
     assert loc in issues
@@ -250,7 +252,7 @@ def test_set_overrides_change_only_the_addressed_yaml_alias(tmp_path: Path) -> N
     ids=["model", "reasoning", "reasoning-required", "unregistered-version", "unknown-agent"],
 )
 def test_agent_entries_are_checked_against_their_release(
-    tmp_path: Path, agent_change: dict, field: str
+    tmp_path: Path, agent_change: dict[str, object], field: str
 ) -> None:
     document = experiment_document()
     document["agents"][0].update(agent_change)
@@ -302,7 +304,8 @@ def test_lock_options_that_contradict_each_other_are_usage_errors(
 
 def _agent_entry(**changes: str | None) -> AgentEntry:
     fields = {"id": "luna", "release": "codex@3", "model": "gpt-6-luna", "reasoning": "low"}
-    return AgentEntry.model_validate({**fields, **changes})
+    entry: AgentEntry = AgentEntry.model_validate({**fields, **changes})
+    return entry
 
 
 def test_a_resolved_agent_runs_with_its_release_pin_and_the_entrys_choices() -> None:

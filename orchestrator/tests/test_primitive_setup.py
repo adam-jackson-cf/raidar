@@ -29,6 +29,13 @@ def _tokens(document: Any) -> ToolOutcome:
     return ToolOutcome(json.dumps(document).encode())
 
 
+def _section(record: dict[str, object], key: str) -> dict[str, object]:
+    """A nested mapping of a setup record, such as its outputs or state snapshots."""
+    section = record[key]
+    assert isinstance(section, dict)
+    return section
+
+
 @pytest.mark.parametrize("watch", [True, False])
 async def test_setup_copies_outputs_that_exist_and_tolerates_absent_ones(
     rig: Rig, watch: bool
@@ -41,9 +48,10 @@ async def test_setup_copies_outputs_that_exist_and_tolerates_absent_ones(
     rig.container.write_note("seeded by setup")
     present = await run_setup(rig.site)
 
-    assert absent.record["outputs"]["note"]["error"] is not None
-    copied = present.record["outputs"]["note"]
-    assert Path(copied["host_path"]).read_text() == "seeded by setup"
+    assert _section(_section(absent.record, "outputs"), "note")["error"] is not None
+    copied_path = _section(_section(present.record, "outputs"), "note")["host_path"]
+    assert isinstance(copied_path, str)
+    assert Path(copied_path).read_text() == "seeded by setup"
     assert present.tokens.keys() == {"GUIDANCE"}
     rig.site = replace(
         rig.site,
@@ -101,8 +109,9 @@ async def test_setup_keeps_host_side_state_snapshots_for_replay(rig: Rig, tmp_pa
 
     result = await run_setup(rig.site)
 
-    assert result.record["state"]["before"]
-    assert result.record["state"]["after"]
+    state = _section(result.record, "state")
+    assert state["before"]
+    assert state["after"]
     kept = list((tmp_path / "logs" / "stages").rglob("note.md"))
     assert {path.parent.name for path in kept} == {"setup-before", "setup-after", "note"}
 

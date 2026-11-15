@@ -10,11 +10,12 @@ from typing import Any
 
 import pytest
 from harbor.models.agent.context import AgentContext
-from raidar_contract.agent_records import Tokens
 
 from raidar.subject.agent.config import Harness
-from raidar.subject.agent.native import adapter_class_for_harness
+from raidar.subject.agent.definition import harbor_adapter
 from raidar.subject.agent.protocol import IsolationError
+from raidar.subject.agent.schema import AgentName
+from raidar_contract.agent_records import Tokens
 from tests.native_support import native_agent
 
 AUDIT_KEYS = {
@@ -50,7 +51,7 @@ def _codex(logs_dir: Path) -> Any:
 
 
 def _claude(logs_dir: Path, **kwargs: Any) -> Any:
-    isolation = adapter_class_for_harness(Harness.CLAUDE_CODE).isolation_kwargs(SimpleNamespace())
+    isolation = harbor_adapter(AgentName.CLAUDE_CODE).isolation_kwargs(SimpleNamespace())
     return native_agent(Harness.CLAUDE_CODE, logs_dir, **isolation, **kwargs)
 
 

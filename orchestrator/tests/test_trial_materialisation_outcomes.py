@@ -20,9 +20,11 @@ import pytest
 from harbor.models.task.config import TaskConfig
 
 from raidar.contract.trial import ProgressionRule
+from raidar.design.experiment.loader import CliOverrides, LoadedExperiment
+from raidar.design.experiment.schema import EnvironmentSpec, ExperimentSpec
+from raidar.design.problem.content import content_digest
 from raidar.engine.trial import lab_checks, materialise, task_config
-from raidar.engine.trial.lab_checks import lab_checks as run_lab_checks
-from raidar.engine.trial.lab_checks import seed_parent
+from raidar.engine.trial.lab_checks import lab_checks as run_lab_checks, seed_parent
 from raidar.engine.trial.materialise import (
     MaterialiseError,
     compose_init,
@@ -207,7 +209,7 @@ def vfs(monkeypatch: pytest.MonkeyPatch) -> VirtualFiles:
 
     monkeypatch.setattr(shutil, "copytree", copytree)
     monkeypatch.setattr(shutil, "rmtree", rmtree)
-    real_digest = materialise.content_digest
+    real_digest = content_digest
     monkeypatch.setattr(
         materialise,
         "content_digest",
@@ -336,9 +338,13 @@ class _Resolved:
         return {"digest": self._digest}
 
 
-def _arm(init: bool = False) -> SimpleNamespace:
-    spec = SimpleNamespace(environment=SimpleNamespace(compose_init=init), runtime="python")
-    return SimpleNamespace(spec=spec)
+def _arm(init: bool = False) -> LoadedExperiment:
+    spec = ExperimentSpec.model_construct(
+        environment=EnvironmentSpec(compose_init=init), runtime="python"
+    )
+    return LoadedExperiment(
+        spec=spec, path=Path("experiment.yaml"), source_sha256="", overrides=CliOverrides()
+    )
 
 
 class _Lab:
@@ -530,7 +536,9 @@ def _record(fs: VirtualFiles, agent_dir: Path, *records: dict[str, Any]) -> None
     fs.put(path, "\n".join(json.dumps(r) for r in records) + "\n")
 
 
-def _seed_record(*, seeded: str | None, found: str | None, pip: str | None = "enforced") -> dict:
+def _seed_record(
+    *, seeded: str | None, found: str | None, pip: str | None = "enforced"
+) -> dict[str, Any]:
     values = {SHA_KEY: found, PIP_KEY: pip}
     return {"facts": {SHA_KEY: seeded}, "check": {"values": values}}
 
@@ -735,7 +743,8 @@ def checks(monkeypatch: pytest.MonkeyPatch) -> dict[str, Any]:
 
     def seed(agent_dir: Path) -> tuple[bool, str]:
         state["seed_calls"] += 1
-        return state["seed"]
+        outcome: tuple[bool, str] = state["seed"]
+        return outcome
 
     monkeypatch.setattr(lab_checks, "seed_check", seed)
     monkeypatch.setattr(lab_checks, "seeded_digest", lambda agent_dir: state["digest"])

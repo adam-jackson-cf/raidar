@@ -10,6 +10,7 @@ from __future__ import annotations
 import json
 import re
 import signal
+from dataclasses import dataclass
 from types import SimpleNamespace
 from typing import Any
 
@@ -145,7 +146,8 @@ class World:
         self.handlers[signum] = handler
 
     def exit_record(self, detach_dir: MemPath) -> dict[str, Any]:
-        return json.loads((detach_dir / detach.EXIT_FILE).read_text())
+        record: dict[str, Any] = json.loads((detach_dir / detach.EXIT_FILE).read_text())
+        return record
 
 
 @pytest.fixture
@@ -318,16 +320,26 @@ def test_an_unreadable_or_malformed_experiment_file_is_refused(world: World) -> 
 # ---- status of a job directory ---------------------------------------------------------
 
 
+@dataclass(frozen=True)
+class _SupervisorFiles:
+    """What a detached supervisor left in the job's detach directory (None: no such file)."""
+
+    pid: str | None = "4242"
+    log: str | None = "one\ntwo\nthree\n"
+    exit_code: int | None = None
+
+
+_RUNNING_SUPERVISOR = _SupervisorFiles()
+
+
 def _job(
     world: World,
     *,
-    detached: bool = True,
-    pid: str | None = "4242",
-    exit_code: int | None = None,
+    supervisor: _SupervisorFiles | None = _RUNNING_SUPERVISOR,
     manifest: dict[str, Any] | str | None = None,
-    log: str | None = "one\ntwo\nthree\n",
     trials: int = 0,
 ) -> MemPath:
+    """A job directory; ``supervisor`` None is a job that was not launched detached."""
     job = world.path("/jobs/exp/job")
     (job / TRIAL_RECORDS_DIR).mkdir(parents=True)
     for number in range(trials):
@@ -336,16 +348,16 @@ def _job(
         (job / JOB_MANIFEST).write_text(
             manifest if isinstance(manifest, str) else json.dumps(manifest)
         )
-    if detached:
+    if supervisor is not None:
         (job / DETACH_DIR).mkdir(parents=True)
         (job / DETACH_DIR / detach.LAUNCH_FILE).write_text("{}")
-        if pid is not None:
-            (job / DETACH_DIR / detach.PID_FILE).write_text(pid)
-        if log is not None:
-            (job / DETACH_DIR / detach.LOG_FILE).write_text(log)
-        if exit_code is not None:
+        if supervisor.pid is not None:
+            (job / DETACH_DIR / detach.PID_FILE).write_text(supervisor.pid)
+        if supervisor.log is not None:
+            (job / DETACH_DIR / detach.LOG_FILE).write_text(supervisor.log)
+        if supervisor.exit_code is not None:
             (job / DETACH_DIR / detach.EXIT_FILE).write_text(
-                json.dumps({"exit_code": exit_code, "finished_at": NOW})
+                json.dumps({"exit_code": supervisor.exit_code, "finished_at": NOW})
             )
     return job
 
@@ -380,7 +392,7 @@ def test_a_finished_job_is_read_from_its_exit_record_without_looking_up_the_supe
     monkeypatch.setattr(detach, "_alive", unexpected)
     job = _job(
         world,
-        exit_code=0,
+        supervisor=_SupervisorFiles(exit_code=0),
         manifest={"finished_at": "t1", "summary": {"trials": 4, "valid": 3}},
     )
 
@@ -392,7 +404,7 @@ def test_a_finished_job_is_read_from_its_exit_record_without_looking_up_the_supe
 
 
 def test_a_job_missing_its_pid_and_log_is_not_started_and_has_no_log(world: World) -> None:
-    job = _job(world, pid=None, log=None, manifest="not json")
+    job = _job(world, supervisor=_SupervisorFiles(pid=None, log=None), manifest="not json")
 
     result = detach.status(job)  # type: ignore[arg-type]
 
@@ -406,14 +418,14 @@ def test_a_supervisor_that_vanished_without_an_exit_record_died(
 ) -> None:
     monkeypatch.setattr(detach, "_alive", lambda _pid: False)
 
-    result = detach.status(_job(world, pid="4242\n"))  # type: ignore[arg-type]
+    result = detach.status(_job(world, supervisor=_SupervisorFiles(pid="4242\n")))  # type: ignore[arg-type]
 
     assert result.state == "died"
     assert "left no exit record" in result.detail
 
 
 def test_an_undetached_unfinished_job_is_unknown_with_no_log(world: World) -> None:
-    job = _job(world, detached=False, manifest={"selected": [1]})
+    job = _job(world, supervisor=None, manifest={"selected": [1]})
 
     result = detach.status(job)  # type: ignore[arg-type]
 

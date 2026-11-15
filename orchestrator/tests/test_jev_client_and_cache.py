@@ -24,6 +24,7 @@ from raidar.judge.protocol import (
     JEV_PINNED_MODEL,
     JEV_STATE_CHAR_LIMIT,
     ChoiceQuestion,
+    JevQuestions,
     NoulQuestion,
     ScoreQuestion,
 )
@@ -78,7 +79,7 @@ def test_cached_replay_makes_no_provider_call_and_costs_nothing(tmp_path: Path) 
     assert cached.original_cost_usd == pytest.approx(0.0021)
 
 
-def _tamper(field: str, value: object) -> Callable[[dict], str]:
+def _tamper(field: str, value: object) -> Callable[[dict[str, object]], str]:
     return lambda entry: json.dumps({**entry, field: value})
 
 
@@ -93,7 +94,7 @@ def _tamper(field: str, value: object) -> Callable[[dict], str]:
     ],
 )
 def test_invalid_cache_entries_are_audited_failures_never_replays(
-    tmp_path: Path, rewrite: Callable[[dict], str]
+    tmp_path: Path, rewrite: Callable[[dict[str, object]], str]
 ) -> None:
     transport = RecordedTransport(answer_for=lambda _id, _q: noul_answer(0.91))
     runtime = make_runtime(tmp_path, transport=transport)
@@ -181,7 +182,7 @@ def test_cache_key_binds_state_questions_and_resolved_model() -> None:
 
 
 def _decide_with(
-    transport: RecordedTransport, questions: dict | None = None
+    transport: RecordedTransport, questions: JevQuestions | None = None
 ) -> JevSuccess | JevFailure:
     return JevClient(TEST_KEY, transport=transport).decide(
         STATE, QUESTIONS if questions is None else questions
@@ -211,7 +212,9 @@ def _decide_with(
         ),
     ],
 )
-def test_answers_that_do_not_fit_their_question_are_rejected(questions: dict, answer: dict) -> None:
+def test_answers_that_do_not_fit_their_question_are_rejected(
+    questions: JevQuestions, answer: dict[str, object]
+) -> None:
     result = _decide_with(RecordedTransport(answer_for=lambda _id, _q: answer), questions)
     assert isinstance(result, JevFailure)
     assert result.reason is FailureReason.INVALID_ANSWERS
@@ -283,7 +286,7 @@ def test_provider_and_transport_failures_are_typed_and_never_echo_the_body(
         {"many": ScoreQuestion(instructions="x", criteria=tuple(str(i) for i in range(11)))},
     ],
 )
-def test_malformed_questions_raise_before_any_network_call(questions: dict) -> None:
+def test_malformed_questions_raise_before_any_network_call(questions: JevQuestions) -> None:
     transport = RecordedTransport()
     with pytest.raises(ValueError, match="Jev"):
         _decide_with(transport, questions)

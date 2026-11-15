@@ -17,7 +17,6 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-from raidar_contract.package.fixtures import required_cases, static_problems
 
 from raidar.subject.package.registry import load_stage_package
 from raidar.subject.primitive.calls import ResourceFloors, TransportError
@@ -32,6 +31,7 @@ from raidar.subject.workflow.stage_check import (
     replay_trial,
 )
 from raidar.subject.workflow.stage_container import ContainerError, PackContainer
+from raidar_contract.package.fixtures import required_cases, static_problems
 from tests.lifecycle_support import FakeContainer, ToolOutcome, note_digest, stop_json
 from tests.package_support import write_package
 from tests.stage_check_support import (

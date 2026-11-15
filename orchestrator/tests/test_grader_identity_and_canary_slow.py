@@ -7,6 +7,7 @@ from pathlib import Path
 import pytest
 
 from raidar.contract.wheels import DependencyInfraError
+from raidar.grading.bundle import VerifierBundle
 from raidar.grading.grader import grade_step
 from raidar.grading.sandbox import LEDGER_NAME, SandboxResult, SandboxRun
 from tests.dependency_support import FakeResolver
@@ -40,12 +41,13 @@ class HangingSandbox(LocalProcessSandbox):
 
 
 @pytest.fixture(name="bundle")
-def bundle_fixture(tmp_path: Path):
-    return make_bundle(tmp_path / "fixture")
+def bundle_fixture(tmp_path: Path) -> VerifierBundle:
+    bundle: VerifierBundle = make_bundle(tmp_path / "fixture")
+    return bundle
 
 
 async def test_a_sandbox_that_cannot_grade_the_starter_is_infrastructure(
-    tmp_path: Path, bundle
+    tmp_path: Path, bundle: VerifierBundle
 ) -> None:
     sandbox = HangingSandbox(tmp_path / "sb")
     sandbox.always = True
@@ -83,7 +85,7 @@ async def test_a_resolver_outage_is_never_attributed_to_the_submission(tmp_path:
 
 
 async def test_a_timeout_the_starter_does_not_reproduce_is_a_failed_agent_outcome(
-    tmp_path: Path, bundle
+    tmp_path: Path, bundle: VerifierBundle
 ) -> None:
     app = write_app(tmp_path / "app")
     (app / "hang").write_text("")
@@ -104,7 +106,7 @@ async def test_a_timeout_the_starter_does_not_reproduce_is_a_failed_agent_outcom
     assert result.coverage is None
 
 
-async def test_a_graded_submission_runs_no_canary(tmp_path: Path, bundle) -> None:
+async def test_a_graded_submission_runs_no_canary(tmp_path: Path, bundle: VerifierBundle) -> None:
     sandbox = HangingSandbox(tmp_path / "sb")
     result = await grade_step(
         bundle, "checkpoint_1", write_app(tmp_path / "app"), sandbox, tmp_path / "w", coverage=False
@@ -121,7 +123,7 @@ async def test_a_graded_submission_runs_no_canary(tmp_path: Path, bundle) -> Non
     [("crash", "sandbox_error"), ("corrupt", "ledger_unreadable")],
 )
 async def test_a_crash_or_corrupted_ledger_the_starter_does_not_reproduce_is_a_failed_outcome(
-    tmp_path: Path, bundle, marker: str, trigger: str
+    tmp_path: Path, bundle: VerifierBundle, marker: str, trigger: str
 ) -> None:
     app = write_app(tmp_path / "app")
     (app / marker).write_text("")

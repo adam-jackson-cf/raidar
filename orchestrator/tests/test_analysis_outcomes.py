@@ -24,10 +24,7 @@ from raidar.contract.trial import (
 from raidar.engine.health.model import HealthCheck, HealthReport
 from raidar.evaluation.analysis import dependencies as dependencies_module
 from raidar.evaluation.analysis.assessed import (
-    CODE_QUALITY_REF,
-    CORRECTNESS_REF,
     EXCLUDED_CASES,
-    RESOURCE_USAGE_REF,
     build_outcome,
     headline_score,
 )
@@ -42,7 +39,10 @@ from raidar.evaluation.analysis.dependencies import (
 from raidar.evaluation.analysis.outcomes import TRUNCATED, UNASSESSED, Value
 from raidar.grading.solvable import EXCLUDED_STEP_REASON
 from raidar.scoring.catalog.outcomes import (
+    CODE_QUALITY_REF,
+    CORRECTNESS_REF,
     OUTCOME_METRICS,
+    RESOURCE_USAGE_REF,
     VERIFIER_DISAGREEMENT_SOURCE,
     VERIFIER_DISAGREEMENTS,
 )
@@ -113,7 +113,7 @@ def _record(
         ),
         trial_dir="trials/t0",
         progression=ProgressionRule(
-            mode=mode,  # type: ignore[arg-type]
+            mode=mode,
             reward_key="solved",
             threshold=1.0 if mode == "halt_on_failure" else None,
         ),

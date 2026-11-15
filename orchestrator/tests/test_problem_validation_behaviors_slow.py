@@ -11,7 +11,7 @@ import pytest
 from click.testing import CliRunner
 
 from raidar.cli import main
-from raidar.design.problem import validator
+from raidar.design.problem import direct, validator
 from raidar.design.problem.models import ProblemId, SourcePin
 from raidar.design.problem.native import stage_catalog
 from raidar.design.problem.source import PinnedCheckout, SourceError
@@ -35,11 +35,7 @@ from tests.problems_support import (
 )
 from tests.test_problem_validation_behaviors import (
     DownSandbox as DownSandbox,
-)
-from tests.test_problem_validation_behaviors import (
     _validate as _validate,
-)
-from tests.test_problem_validation_behaviors import (
     store_fixture as store_fixture,
 )
 from tests.verifier_support import LocalProcessSandbox
@@ -62,12 +58,15 @@ async def test_reference_trial_validates_with_oracle_grading(
     }
     assert report.verdict is Verdict.VALIDATED_PARTIAL
     assert report.to_json()["not_run"] == ["native_parity_positive", "native_parity_negative"]
-    positive = report.runs.oracle[POSITIVE][0]
+    runs = report.runs
+    assert runs is not None
+    positive = runs.oracle[POSITIVE][0]
     # Checkpoint 2 re-grades checkpoint 1's tests as regression; the skip leaves the denominator.
     assert positive["checkpoint_2"].groups["regression"] == (3, 3)
     assert positive["checkpoint_2"].total == 4
-    assert not report.runs.oracle[NEGATIVE][0]["checkpoint_1"].all_pass  # empty starter
+    assert not runs.oracle[NEGATIVE][0]["checkpoint_1"].all_pass  # empty starter
     observations = report.to_json()["reference_observations"]
+    assert isinstance(observations, dict)
     assert observations["positive"]["checkpoint_2"]["observation"] == (
         "no variation observed in 2 runs for this reference and environment"
     )
@@ -162,7 +161,7 @@ def test_validate_command_exit_codes_follow_the_verdict(
     async def local_sandbox(problem: Any, docker_context: str) -> tuple[Any, dict[str, object]]:
         return LocalProcessSandbox(tmp_path / "sandbox"), {"sandbox": "local"}
 
-    monkeypatch.setattr(validator.direct, "prepare_grader_sandbox", local_sandbox)
+    monkeypatch.setattr(direct, "prepare_grader_sandbox", local_sandbox)
     runner = CliRunner()
     base = [
         "problem",
@@ -193,7 +192,7 @@ def test_validate_command_exit_codes_follow_the_verdict(
     async def down(problem: Any, docker_context: str) -> tuple[Any, dict[str, object]]:
         return DownSandbox(tmp_path / "down"), {"sandbox": "down"}
 
-    monkeypatch.setattr(validator.direct, "prepare_grader_sandbox", down)
+    monkeypatch.setattr(direct, "prepare_grader_sandbox", down)
     outage = runner.invoke(main, [*base, NEGATIVE_REF])
     assert outage.exit_code == 2, outage.output
     assert written.read_bytes() == committed
@@ -237,6 +236,7 @@ async def test_report_records_solvable_sets_the_lock_pins(
     path = write_report(report, tmp_path / "report.json")
     record = read_validation_record(path)
 
+    assert report.runs is not None
     for step, one in solvable_sets(report.runs).items():
         assert record.solvable_cases(step) == one.solvable
         assert record.solvable_size(step) == len(one.solvable) > 0

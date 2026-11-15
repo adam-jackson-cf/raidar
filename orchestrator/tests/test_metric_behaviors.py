@@ -15,6 +15,7 @@ from raidar.scoring.framework.metrics import (
     SCB_CANONICAL_ONESHOT_V2,
     SCB_CANONICAL_V2,
     ComponentStatus,
+    ComponentValue,
     IneligibilityCode,
     Metric,
     MetricResolver,
@@ -127,7 +128,9 @@ def test_policy_outside_its_k_range_is_ineligible(policy: Metric, k: int) -> Non
         ({**FULL, "Z": 0.5}, ValueError),
     ],
 )
-def test_invalid_component_values_are_rejected(components: dict, error: type) -> None:
+def test_invalid_component_values_are_rejected(
+    components: dict[str, ComponentValue], error: type[Exception]
+) -> None:
     with pytest.raises(error):
         SCB_CANONICAL.score(checkpoints=8, components=components)
 
@@ -166,7 +169,7 @@ QUALITY_GAPS = [
 
 @pytest.mark.parametrize(("quality", "ineligible"), QUALITY_GAPS)
 def test_fork_exact_policy_c_zero_with_a_quality_gap_is_ineligible(
-    quality: dict, ineligible: dict
+    quality: dict[str, ComponentValue], ineligible: dict[str, list[str]]
 ) -> None:
     components = {**quality, "C": 0}
 
@@ -179,7 +182,7 @@ def test_fork_exact_policy_c_zero_with_a_quality_gap_is_ineligible(
 
 @pytest.mark.parametrize(("quality", "ineligible"), QUALITY_GAPS)
 def test_floor_policy_c_zero_scores_zero_even_with_a_quality_gap(
-    quality: dict, ineligible: dict
+    quality: dict[str, ComponentValue], ineligible: dict[str, list[str]]
 ) -> None:
     components = {**quality, "C": 0}
 
@@ -198,7 +201,7 @@ def test_floor_policy_c_zero_scores_zero_even_with_a_quality_gap(
 
 @pytest.mark.parametrize(("quality", "ineligible"), QUALITY_GAPS)
 def test_floor_policy_c_above_zero_with_a_quality_gap_stays_ineligible(
-    quality: dict, ineligible: dict
+    quality: dict[str, ComponentValue], ineligible: dict[str, list[str]]
 ) -> None:
     components = {**quality, "C": Decimal("0.000000000001")}
 

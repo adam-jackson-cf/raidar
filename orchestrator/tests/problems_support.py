@@ -20,8 +20,8 @@ import subprocess
 import sys
 import textwrap
 from collections.abc import Sequence
+from dataclasses import KW_ONLY, dataclass, field
 from pathlib import Path
-from typing import Any
 
 from packaging.requirements import Requirement
 from packaging.utils import canonicalize_name
@@ -396,6 +396,7 @@ def scripted_tree_id(path: str) -> str:
     return hashlib.sha1(path.encode()).hexdigest()
 
 
+@dataclass
 class ScriptedSource:
     """An injected ``subprocess.run`` standing in for git and the pinned converter.
 
@@ -405,22 +406,15 @@ class ScriptedSource:
     exit code, and ``hang`` makes the converter time out.
     """
 
-    def __init__(
-        self,
-        repo: Path,
-        commit: str,
-        *,
-        head: str | None = None,
-        dirty: str = "",
-        converter_exit: int = 0,
-        hang: bool = False,
-        clone_error: str | None = None,
-    ) -> None:
-        self.repo, self.commit = repo, commit
-        self.head = commit if head is None else head
-        self.dirty, self.converter_exit, self.hang = dirty, converter_exit, hang
-        self.clone_error = clone_error
-        self.calls: list[list[str]] = []
+    repo: Path
+    commit: str
+    _: KW_ONLY
+    head: str | None = None
+    dirty: str = ""
+    converter_exit: int = 0
+    hang: bool = False
+    clone_error: str | None = None
+    calls: list[list[str]] = field(default_factory=list, init=False)
 
     def __call__(self, argv: Sequence[str], **kwargs: object) -> subprocess.CompletedProcess[str]:
         args = list(argv)
@@ -431,12 +425,15 @@ class ScriptedSource:
             return self._clone(args)
         return self._git(args[3:])
 
-    def _done(self, args: list[str], code: int = 0, out: str = "", err: str = "") -> Any:
+    def _done(
+        self, args: list[str], code: int = 0, out: str = "", err: str = ""
+    ) -> subprocess.CompletedProcess[str]:
         return subprocess.CompletedProcess(args, code, out, err)
 
     def _git(self, args: list[str]) -> subprocess.CompletedProcess[str]:
         if args[0] == "rev-parse" and args[1] == "HEAD":
-            return self._done(args, out=self.head + "\n")
+            head = self.commit if self.head is None else self.head
+            return self._done(args, out=head + "\n")
         if args[0] == "rev-parse":
             path = args[1].split(":", 1)[1]
             if (self.repo / path).exists():

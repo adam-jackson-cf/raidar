@@ -384,7 +384,7 @@ async def test_a_cancelled_call_cleans_up_its_call_directory(
     assert container.cleaned(f"{calls.CALLS_ROOT}/")
 
 
-@pytest.mark.parametrize("timeout", [0, -1, calls.MAX_TIMEOUT_S + 1])
+@pytest.mark.parametrize("timeout", [0, -1, supervise.MAX_TIMEOUT_S + 1])
 async def test_timeouts_outside_the_contract_are_refused_before_the_container_is_touched(
     container: Container, tmp_path: Path, timeout: float
 ) -> None:
@@ -553,9 +553,13 @@ def _record(rows: list[dict[str, Any]]) -> calls.TreeManifest:
 
 def test_a_malformed_record_manifest_is_a_violation_not_a_raise() -> None:
     for document in ({"path": "x"}, {"path": "x", "entries": 5}, {"entries": [{"path": 1}]}):
-        assert calls.record_manifest(document).violation.startswith("malformed manifest")
+        malformed = calls.record_manifest(document).violation
+        assert malformed is not None
+        assert malformed.startswith("malformed manifest")
     wrong = _document([_row("a")], digest="0" * 64)
-    assert "does not match" in calls.record_manifest(wrong).violation
+    mismatch = calls.record_manifest(wrong).violation
+    assert mismatch is not None
+    assert "does not match" in mismatch
 
 
 def test_a_well_formed_record_manifest_is_the_trusted_shape() -> None:
@@ -571,7 +575,7 @@ def test_a_well_formed_record_manifest_is_the_trusted_shape() -> None:
 @pytest.mark.parametrize(
     ("kwargs", "limits", "entries"),
     [
-        ({}, calls.STATE_LIMITS, True),
+        ({}, supervise.STATE_LIMITS, True),
         (
             {"unbounded": calls.Unbounded(links=True, owner=0), "entries": False},
             {"links": True, "owner": 0},
@@ -670,7 +674,7 @@ async def test_a_manifest_name_that_leaves_the_destination_copies_nothing(
         [_row("a"), _row("a")],
         [_row("l", type="link", target="a")],
         [_row("s", type="special", sha256=None)],
-        [_row("a", size=calls.STATE_LIMITS["max_bytes"] + 1)],
+        [_row("a", size=supervise.STATE_LIMITS["max_bytes"] + 1)],
         [_row("a", size=-1)],
         [_row("a", sha256="not-a-digest")],
         [_row("a", sha256=None)],
@@ -689,28 +693,37 @@ async def test_a_manifest_with_repeats_links_or_numbers_past_the_bounds_is_refus
     assert not (tmp_path / "copy").exists()
 
 
+@dataclass(frozen=True)
+class StateBoundsCase:
+    """Rows past patched state limits, and the violation the copy must report."""
+
+    limits: dict[str, int]
+    rows: list[dict[str, Any]]
+    message: str
+
+
 @pytest.mark.parametrize(
-    ("limits", "rows", "message"),
+    "case",
     [
-        ({"max_files": 1}, [_row("a"), _row("b"), _row("c")], "too many entries"),
-        ({"max_files": 1}, [_row("a"), _row("b")], "beyond the state bounds"),
-        ({"max_bytes": 8}, [_row("a", b"12345"), _row("b", b"12345")], "beyond the state bounds"),
+        StateBoundsCase({"max_files": 1}, [_row("a"), _row("b"), _row("c")], "too many entries"),
+        StateBoundsCase({"max_files": 1}, [_row("a"), _row("b")], "beyond the state bounds"),
+        StateBoundsCase(
+            {"max_bytes": 8}, [_row("a", b"12345"), _row("b", b"12345")], "beyond the state bounds"
+        ),
     ],
 )
 async def test_counts_and_total_sizes_past_the_state_bounds_are_refused(
     container: Container,
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
-    limits: dict[str, int],
-    rows: list[dict[str, Any]],
-    message: str,
+    case: StateBoundsCase,
 ) -> None:
-    monkeypatch.setattr(calls, "STATE_LIMITS", {**calls.STATE_LIMITS, **limits})
+    monkeypatch.setattr(calls, "STATE_LIMITS", {**supervise.STATE_LIMITS, **case.limits})
 
-    found = await calls.copy_snapshot(container, _record(rows), "/r/none", tmp_path / "copy")
+    found = await calls.copy_snapshot(container, _record(case.rows), "/r/none", tmp_path / "copy")
 
     assert found.violation
-    assert message in found.violation
+    assert case.message in found.violation
     assert not (tmp_path / "copy").exists()
 
 
@@ -829,7 +842,7 @@ def _snapshot_payload(
     container: Container, members: Mapping[str, bytes], **over: Any
 ) -> Callable[[dict[str, Any]], dict[str, Any]]:
     def snapshot(spec: dict[str, Any]) -> dict[str, Any]:
-        assert spec["limits"] == calls.STATE_LIMITS
+        assert spec["limits"] == supervise.STATE_LIMITS
         container.files[spec["tar"]] = _tar(members)
         return _document([_row(n, d) for n, d in members.items()], path=spec["path"], **over)
 
@@ -1088,7 +1101,7 @@ async def test_a_package_is_installed_from_its_tool_files_and_recorded(
     assert package.commands == {"tool": ("python", "-m", "mod")}
     assert package.wheels == ()
     assert package.bin == f"{package.root}/bin"
-    assert package.path == f"{package.root}/bin:{calls.BASE_PATH}"
+    assert package.path == f"{package.root}/bin:{supervise.BASE_PATH}"
     assert package.python == f"{package.root}/venv/bin/python"
     assert (spec["root"], spec["venv"], spec["uv"]) == (package.root, True, "/usr/local/bin/uv")
     assert spec["python"] == calls.TRUSTED_PYTHON

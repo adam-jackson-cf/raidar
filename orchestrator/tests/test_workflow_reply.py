@@ -289,7 +289,7 @@ def test_a_schema_is_rendered_as_the_shape_of_the_object_it_asks_for() -> None:
 
 def test_the_builder_reply_names_each_schema_property_once_at_the_prompts_end() -> None:
     shown = skeleton(BUILD_SCHEMA)
-    properties = list(BUILD_SCHEMA["properties"])  # type: ignore[call-overload]
+    properties = list(BUILD_SCHEMA["properties"])
 
     assert [shown.index(f'"{name}":') for name in properties] == sorted(
         shown.index(f'"{name}":') for name in properties

@@ -13,7 +13,12 @@ from raidar.cli import main
 from raidar.judge.protocol import NoulQuestion
 from raidar.scoring.framework.builtin_manifests import PROCESS_COMPLIANCE
 from raidar.scoring.framework.result import AssessResult, AssessStatus, Observation, Provenance
-from raidar.scoring.judge.audit import DecisionStage, InputSufficiency, SufficiencyLevel
+from raidar.scoring.judge.audit import (
+    DecisionRecord,
+    DecisionStage,
+    InputSufficiency,
+    SufficiencyLevel,
+)
 from raidar.scoring.judge.calibration import (
     LabelImportError,
     import_labels,
@@ -33,7 +38,7 @@ from raidar.scoring.judge.policies import (
     load_policy,
 )
 from raidar.scoring.judge.promotion import build_promotion, verify_promotion
-from raidar.scoring.judge.runtime import RULE_INPUT_MISSING
+from raidar.scoring.judge.runtime import RULE_INPUT_MISSING, DecisionOutcome, JevRuntime
 from tests.jev_support import SUFFICIENT, RecordedTransport, make_runtime, noul_answer, policy
 
 RUBRIC = "code-quality.rubric-smells"
@@ -41,7 +46,12 @@ PROCESS = "synthetic.second-policy"
 QUESTIONS = {"stub": NoulQuestion(instructions="Is this a stub?")}
 
 
-def _decide(runtime, policy_id: str, state: object, sufficiency=SUFFICIENT):
+def _decide(
+    runtime: JevRuntime,
+    policy_id: str,
+    state: object,
+    sufficiency: InputSufficiency = SUFFICIENT,
+) -> DecisionOutcome:
     return runtime.decide(
         policy_id, subject="cp1:s", state=state, questions=QUESTIONS, sufficiency=sufficiency
     )
@@ -206,10 +216,12 @@ def test_policy_modes_for_metrics_follow_the_effective_registry() -> None:
     assert modes == {"jev_ambiguous_compliance": "off"}
 
 
-def _labelled_store(tmp_path: Path, answers: list[float], trials: tuple[str, ...] = ("t1",)):
+def _labelled_store(
+    tmp_path: Path, answers: list[float], trials: tuple[str, ...] = ("t1",)
+) -> tuple[JevRuntime, list[DecisionRecord]]:
     probabilities = iter(answers)
     transport = RecordedTransport(answer_for=lambda _id, _q: noul_answer(next(probabilities)))
-    records = []
+    records: list[DecisionRecord] = []
     for index in range(len(answers)):
         runtime = make_runtime(
             tmp_path, transport=transport, trial=trials[index * len(trials) // len(answers)]

@@ -8,6 +8,7 @@ import asyncio
 import hashlib
 import json
 import os
+from collections.abc import Callable, Iterator
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any, cast
@@ -17,8 +18,7 @@ import pytest
 from click.testing import CliRunner
 from harbor.trial.hooks import TrialEvent
 
-from raidar.cli import grading as grading_cli
-from raidar.cli import health as health_cli
+from raidar.cli import grading as grading_cli, health as health_cli
 from raidar.contract.harbor_result import RESULT_FILE
 from raidar.engine.health import liveness
 from raidar.engine.health.admission import (
@@ -69,7 +69,6 @@ from tests.test_agent_liveness_monitor import (
     NET_HEADER,
     ScriptedEnv,
     fake_trial,
-    net_line,
     poll_output,
     stat_line,
 )
@@ -196,7 +195,7 @@ def test_a_process_line_with_unreadable_cpu_counters_is_skipped_not_fatal() -> N
 
 def test_a_network_table_with_unreadable_counters_is_unmeasured() -> None:
     text = "\n".join(["@@CLK 100", "@@PROC", "@@NET", NET_HEADER.rstrip()])
-    text += "\n" + net_line("eth0", "x", 5) + "\n@@END\n"
+    text += "\n  eth0: x 1 0 0 0 0 0 0 5 1 0 0 0 0 0 0\n@@END\n"
 
     assert parse_poll_output(text) is None
 
@@ -295,7 +294,9 @@ def _event(result: Any) -> Any:
 
 
 def _report(tmp_path: Path) -> dict[str, Any]:
-    return json.loads((tmp_path / "trial" / LIVENESS_REPORT).read_text())
+    report = json.loads((tmp_path / "trial" / LIVENESS_REPORT).read_text())
+    assert isinstance(report, dict)
+    return report
 
 
 def test_output_outside_an_agent_phase_never_counts_and_the_phase_is_labelled_by_its_step(
@@ -458,7 +459,7 @@ def test_only_stored_smoke_jobs_with_readable_manifest_and_lock_are_searched(
             contents[job / "job.lock.json"] = json.dumps(lock)
     original_glob, original_read = Path.glob, Path.read_text
 
-    def glob(path: Path, pattern: str):
+    def glob(path: Path, pattern: str) -> Iterator[Path]:
         if path == root:
             return (item for item in contents if item.name == "job.json")
         return original_glob(path, pattern)
@@ -754,7 +755,7 @@ def test_a_job_without_violations_exits_clean_and_records_no_candidates(
 OPTIONS = RegradeOptions(docker_context="ctx")
 PATHS = (Path("target"), Path("store"))
 
-WRAPPERS = {
+WRAPPERS: dict[str, Callable[[], object]] = {
     "regrade": lambda: grading_cli.regrade(PATHS[0], OPTIONS, None),
     "grade_pre_fix": lambda: grading_cli.grade_pre_fix(
         *PATHS, ["ref"], OPTIONS, replay=False, concurrency=2

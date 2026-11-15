@@ -8,12 +8,15 @@ Nothing authored runs as root; the supervisor children are this file's own inter
 
 from __future__ import annotations
 
+import base64
 import contextlib
 import ctypes
 import errno
 import io
 import json
 import os
+import platform
+import selectors
 import signal
 import stat
 import subprocess
@@ -25,8 +28,7 @@ from typing import Any
 import pytest
 
 from raidar.subject.primitive.payload import install_tree, isolate, main, supervise, walk
-from tests.primitive_support import lay as _lay
-from tests.primitive_support import sha as _sha
+from tests.primitive_support import lay as _lay, sha as _sha
 
 # ------------------------------------------------------------------------------------ walk
 
@@ -97,7 +99,7 @@ def test_an_unreadable_file_is_a_violation_not_a_crash(
     def unreadable(*args: Any) -> int:
         raise PermissionError(errno.EACCES, "Permission denied")
 
-    monkeypatch.setattr(walk.os, "open", unreadable)
+    monkeypatch.setattr(os, "open", unreadable)
     found = walk.scan(str(root), walk.Limits())
 
     assert found["exists"]
@@ -110,7 +112,7 @@ def test_a_directory_listing_failure_is_recorded_as_unreadable(
     def unreadable(path: str) -> list[str]:
         raise PermissionError(errno.EACCES, "Permission denied")
 
-    monkeypatch.setattr(walk.os, "listdir", unreadable)
+    monkeypatch.setattr(os, "listdir", unreadable)
     found = walk.scan(str(tmp_path), walk.Limits())
 
     assert found["exists"]
@@ -399,7 +401,7 @@ def _fake_uv(
                 (venv / "lib" / f"python3.{12 + number}" / "site-packages").mkdir(parents=True)
         return SimpleNamespace(returncode=returncode, stderr=stderr)
 
-    monkeypatch.setattr(install_tree.subprocess, "run", run)
+    monkeypatch.setattr(subprocess, "run", run)
     return calls
 
 
@@ -453,7 +455,7 @@ def test_a_uv_that_times_out_fails_the_install_and_removes_the_partial_root(
     def hang(argv: list[str], **kwargs: Any) -> None:
         raise subprocess.TimeoutExpired(argv, kwargs["timeout"])
 
-    monkeypatch.setattr(install_tree.subprocess, "run", hang)
+    monkeypatch.setattr(subprocess, "run", hang)
     spec = _stage(tmp_path, {"a": (b"1", False)}, venv=True, uv="uv", python="python3", flags=[])
 
     reply = _run_main(tmp_path, capsys, "install", spec)
@@ -489,7 +491,9 @@ def _run_main(
     assert main.main([command, str(path)]) == 0
     lines = capsys.readouterr().out.splitlines()
     assert len(lines) == 1
-    return json.loads(lines[0])
+    report = json.loads(lines[0])
+    assert isinstance(report, dict)
+    return report
 
 
 def test_an_install_into_an_existing_root_is_refused_and_leaves_it_untouched(
@@ -639,19 +643,20 @@ def test_a_malformed_spec_file_fails_before_anything_runs(tmp_path: Path) -> Non
 
 # ------------------------------------------------------------------------------- isolation
 def test_isolation_refuses_platforms_without_a_filter(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(isolate.platform, "system", lambda: "Darwin")
+    monkeypatch.setattr(platform, "system", lambda: "Darwin")
     with pytest.raises(isolate.IsolationError, match="no seccomp filter"):
         isolate._architecture()
-    monkeypatch.setattr(isolate.platform, "system", lambda: "Linux")
-    monkeypatch.setattr(isolate.platform, "machine", lambda: "riscv64")
+    monkeypatch.setattr(platform, "system", lambda: "Linux")
+    monkeypatch.setattr(platform, "machine", lambda: "riscv64")
     with pytest.raises(isolate.IsolationError, match="no seccomp filter"):
         isolate._architecture()
-    monkeypatch.setattr(isolate.platform, "machine", lambda: "ARM64")
+    monkeypatch.setattr(platform, "machine", lambda: "ARM64")
     assert isolate._architecture() == "aarch64"
 
 
-class _Libc:
+class _Libc(ctypes.CDLL):
     def __init__(self, prctl: Any = None, syscall: Any = None) -> None:
+        super().__init__(None)
         self.prctl = prctl or (lambda *a: 0)
         self.syscall = syscall or (lambda *a: -1)
 
@@ -667,7 +672,7 @@ def test_a_failing_prctl_stops_before_a_filter_is_installed(
         return -1
 
     monkeypatch.setattr(isolate, "_architecture", lambda: "x86_64")
-    monkeypatch.setattr(isolate.ctypes, "CDLL", lambda *a, **k: _Libc(prctl))
+    monkeypatch.setattr(ctypes, "CDLL", lambda *a, **k: _Libc(prctl))
 
     with pytest.raises(isolate.IsolationError, match="prctl"):
         isolate.install_seccomp()
@@ -679,7 +684,7 @@ def test_an_installed_filter_still_refuses_execution_when_network_denial_is_unpr
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setattr(isolate, "_architecture", lambda: "aarch64")
-    monkeypatch.setattr(isolate.ctypes, "CDLL", lambda *a, **kw: _Libc())
+    monkeypatch.setattr(ctypes, "CDLL", lambda *a, **kw: _Libc())
     _socket_module(monkeypatch, lambda *a: SimpleNamespace(close=lambda: None))
 
     with pytest.raises(isolate.IsolationError, match="socket\\(\\) was not refused"):
@@ -1084,7 +1089,7 @@ def test_killing_descendants_gives_up_after_its_rounds(
 
 
 def test_reaping_stops_when_nothing_is_left_to_wait_for(monkeypatch: pytest.MonkeyPatch) -> None:
-    answers: list[Any] = [(5, 0), (6, 0), (0, 0)]
+    answers: list[tuple[int, int]] = [(5, 0), (6, 0), (0, 0)]
 
     def wait(pid: int, flags: int) -> tuple[int, int]:
         return answers.pop(0)
@@ -1179,8 +1184,12 @@ def _child_setup(monkeypatch: pytest.MonkeyPatch) -> list[Any]:
     def leave(code: int) -> None:
         raise _Done(code)
 
+    def umask(mask: int) -> int:
+        steps.append(("umask", mask))
+        return 0
+
     monkeypatch.setattr(os, "setsid", lambda: steps.append("setsid"))
-    monkeypatch.setattr(os, "umask", lambda mask: steps.append(("umask", mask)) or 0)
+    monkeypatch.setattr(os, "umask", umask)
     monkeypatch.setattr(os, "execve", lambda *a: steps.append(("execve", a)))
     monkeypatch.setattr(os, "_exit", leave)
     monkeypatch.setattr(supervise, "_prepare_stdio", lambda *a: steps.append(("stdio", a)))
@@ -1335,7 +1344,7 @@ def test_a_timed_out_child_is_reaped_and_flagged(
 
     assert result["timed_out"]
     assert (result["exit_code"], result["signal"]) == (None, 9)
-    assert supervise.base64.b64decode(result["stdout_b64"]) == b"partial"
+    assert base64.b64decode(result["stdout_b64"]) == b"partial"
     pipes.release()
 
 
@@ -1350,7 +1359,7 @@ def test_a_flood_is_cut_at_the_cap_and_flagged(
 
     assert result["overflow"]
     assert not result["timed_out"]
-    assert len(supervise.base64.b64decode(result["stdout_b64"])) == 1000
+    assert len(base64.b64decode(result["stdout_b64"])) == 1000
     assert result["stdout_bytes"] >= 1000
     pipes.release()
 
@@ -1538,22 +1547,22 @@ def test_the_payload_entry_reports_unsafe_state_without_running_and_destroys_cal
 def test_a_quiet_poll_while_setup_runs_keeps_waiting_for_its_report(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    real = supervise.selectors.DefaultSelector
+    real = selectors.DefaultSelector
 
     class Quiet:
         def __init__(self) -> None:
             self.inner, self.quiet = real(), 1
 
-        def register(self, *args: Any) -> Any:
+        def register(self, *args: Any) -> selectors.SelectorKey:
             return self.inner.register(*args)
 
-        def select(self, timeout: float) -> list[Any]:
+        def select(self, timeout: float) -> list[tuple[selectors.SelectorKey, int]]:
             if self.quiet:
                 self.quiet -= 1
                 return []
             return self.inner.select(0)
 
-    monkeypatch.setattr(supervise.selectors, "DefaultSelector", Quiet)
+    monkeypatch.setattr(selectors, "DefaultSelector", Quiet)
     read, write = os.pipe()
     os.write(write, b"late")
     os.close(write)

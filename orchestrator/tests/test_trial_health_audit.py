@@ -17,8 +17,7 @@ from raidar.contract.trial import (
     TrialRecord,
     ValidityCheck,
 )
-from raidar.engine.health import audit as checks
-from raidar.engine.health import signals
+from raidar.engine.health import audit as checks, signals
 from raidar.engine.health.base import Audit
 from raidar.engine.health.fault_candidates import FAULT_CANDIDATES, append_fault_candidates
 from raidar.engine.health.model import HealthCheck, HealthReport, load_health

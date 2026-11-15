@@ -1075,7 +1075,7 @@
       "tree-sitter-language-pack": "0.13.0"
     }
   },
-  "document_sha256": "fb5ea675bcf68dc5e2f22370249424dcf3de0b98aec5895f6dabc33db466a753",
+  "document_sha256": "2a61e2204fb944d935bc4f32320675d9e3d3921260b67ed0b09423dc40d6d917",
   "execution": {
     "arms": {
       "define": {
@@ -1093,11 +1093,11 @@
           "version_pin": "2.1.285",
           "workflow_skills": "placement.skills .claude/skills in the workspace /app"
         },
-        "digest": "abb2a0a2dbf5210b73bb6feea92d38621a94fd07034c02dd67eb6a371a540485",
+        "digest": "207f0175de46e03e96a64ebe58f2573f28d96a70c51c15bf0811411069cd5512",
         "model": "claude-sonnet-4-6",
         "packages": {
           "raidar/define": {
-            "check": "f99852558475c008083c2e87eabec717d383ddf89b35b66196c85c427566efac",
+            "check": "fc7b240a36c45ba0783f58e8680303ffab0d4fb16a960456c2ad9b33757a90e4",
             "installed": {
               "arm64": "cd78a2d02d66c38cb6225de220d44ef3d34397f4b70b6c28bde20032dd80ce4a"
             },
@@ -1115,11 +1115,11 @@
         "primitive_code": {
           "acceptance-reply/1": "79d8d6f5d215ed63ab98f5503f2aa933bf09476d47ed6109ad81e3692dc83db8",
           "frame/1": "222d8ec4406851d6b78f8a42e3e6b7086b3b2778be8e1463929cca30fc24ec5a",
-          "gate/1": "73128fc12e3177339a0cbe59938790d19c410008098b53f935e5b39817109fbb",
+          "gate/1": "4c150add1fd66259d98e2acb33beeb804e0d0a7150aaf0d472578de69ca1083b",
           "install/1": "988c3f18aee3231eb0fc3db6737e9d3cf68da17098e2969782d86d3ba83f81b4",
-          "jev-judge/1": "e302c390408cee2ea07633b71ee208b02bdd9eccab158fc46569657cadd97392",
+          "jev-judge/1": "70f539341426bd61e99a0014e60e141f2aabfaa8283e03dacd58c9a061e8f706",
           "outputs/1": "0bc42843957b9db52d0a825238a07a74d14080252578c2aea44f7e9926709737",
-          "runner/1": "a1c2f426559a00118048ffcb1f6d85808163c5a1cacdaccd150344be950db51a",
+          "runner/1": "58c99466a58e69ff69083a03ecd4556fbab4c144b3c457e555e0dbc4de3f6d4a",
           "setup/1": "891f072b55478df7506bb387ee01ea00a03b537c702abba14626381de2f35e68",
           "stop/1": "9bd3a1686ef981b0df5a90b3a5affb219ecfd32d5870102cca27806dc41c72a0"
         },
@@ -1949,7 +1949,7 @@
     "source_sha256": "8ef92f82ecb8f490c0436f73852a82f5fca359f64a573cff5eacb6a18b25110c",
     "spec_sha256": "06aac1e03107800b8e8c668be7b5c394fddfdb942bd62f53ea7932231538977d"
   },
-  "lock_sha256": "97a4ea980421a02326b794178566c070f5caa6e34426ff7de6e9a939b60b175e",
+  "lock_sha256": "4bc0433c2d23974115368980e3aaebec90eabf07b40de7c903eef934d12ce1f3",
   "lock_version": 5,
   "overrides": {
     "flags": {},
@@ -1958,7 +1958,7 @@
   "sections": {
     "analysis": "f7f0b52ed6909ba0f3864eb9e7f7d513625da8dc445234304b8aa033c4343cb6",
     "assessment": "0e6bfeddaae5ef503a5f2e307031ad02036569adac2b3485406baf3445bb7dfb",
-    "execution": "97a4ea980421a02326b794178566c070f5caa6e34426ff7de6e9a939b60b175e",
+    "execution": "4bc0433c2d23974115368980e3aaebec90eabf07b40de7c903eef934d12ce1f3",
     "toolchain": "57caa99992c5b2bb5d4f0ac51dba5ab949f084361d7d255b3636fa6bbd0a7e8d"
   },
   "spec": {

@@ -320,6 +320,16 @@ def test_assess_rescore_cli_refuses_scorers_that_cannot_run(
     assert not (tmp_path / "store").exists()
 
 
+def _drop_first_step_name(result: dict[str, object]) -> None:
+    steps = result["step_results"]
+    assert isinstance(steps, list)
+    steps[0].pop("step_name")
+
+
+def _make_step_results_a_string(result: dict[str, object]) -> None:
+    result["step_results"] = "checkpoint_1"
+
+
 def test_assess_rescore_cli_reports_malformed_trials_cleanly(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -327,11 +337,8 @@ def test_assess_rescore_cli_reports_malformed_trials_cleanly(
     runner = CliRunner()
     for index, (corrupt, message) in enumerate(
         (
-            (
-                lambda r: r["step_results"][0].pop("step_name"),
-                r"step_results\[0\] has no step_name",
-            ),
-            (lambda r: r.update(step_results="checkpoint_1"), "step_results is not a list"),
+            (_drop_first_step_name, r"step_results\[0\] has no step_name"),
+            (_make_step_results_a_string, "step_results is not a list"),
         )
     ):
         trial = two_step_trial(tmp_path / f"trial-{index}")

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import copy
 import json
 from pathlib import Path
@@ -9,7 +10,6 @@ from types import SimpleNamespace
 from typing import Any
 
 import pytest
-from raidar_contract.criteria import validate_criteria
 
 from raidar.judge.client import TransportResponse
 from raidar.judge.live import LIVE_MODEL, RecordedJev
@@ -30,6 +30,7 @@ from raidar.subject.workflow.acceptance import (
     rows,
 )
 from raidar.subject.workflow.stage import FIRST_BUILD, REWORK, Checkpoint, Spent
+from raidar_contract.criteria import validate_criteria
 from tests.criteria_support import (
     CRITERIA,
     ScriptShell,
@@ -318,7 +319,8 @@ def test_an_example_value_no_mapped_test_states_opens_the_criterion() -> None:
 def test_a_test_file_the_tree_lacks_or_cannot_parse_is_said_not_asked_about() -> None:
     item = criterion("F1.AC1", ("s", "o"))
 
-    absent = judging.assemble(subject(item, OBJECT), PASSING, {}.get, 32_000)
+    no_files: dict[str, str] = {}
+    absent = judging.assemble(subject(item, OBJECT), PASSING, no_files.get, 32_000)
     broken = judging.assemble(
         subject(item, OBJECT), PASSING, {"tests/test_app.py": "def (:\n"}.get, 32_000
     )
@@ -378,15 +380,13 @@ def test_an_aspect_is_closed_at_closed_at_open_at_open_at_and_undecided_between(
 
 
 def outcome_for(
-    item: Criterion,
-    tests: tuple[str, ...],
+    chosen: judging.Subject,
     answers: dict[str, float | None],
     *,
     record: Any = PASSING,
     gate_passed: bool = True,
     baseline: set[str] | None = None,
 ) -> judging.Outcome:
-    chosen = subject(item, *tests)
     context = judging.assemble(chosen, record, FILES.get, 32_000)
     given = {aspect: (p, (index,)) for index, (aspect, p) in enumerate(answers.items())}
     return judging.outcome_of(
@@ -397,7 +397,7 @@ def outcome_for(
 def test_a_criterion_closes_when_its_tests_passed_and_every_aspect_is_answered_high() -> None:
     item = criterion("F1.AC1", ("s1", "o1"), ("s2", "o2"))
 
-    found = outcome_for(item, (OBJECT,), {"F1.AC1.A1": 0.9, "F1.AC1.A2": 0.8})
+    found = outcome_for(subject(item, OBJECT), {"F1.AC1.A1": 0.9, "F1.AC1.A2": 0.8})
 
     assert (found.status, found.failing) == ("closed", ())
     assert [(a.id, a.p, a.status, a.calls) for a in found.aspects] == [
@@ -409,9 +409,9 @@ def test_a_criterion_closes_when_its_tests_passed_and_every_aspect_is_answered_h
 def test_one_low_aspect_opens_the_criterion_and_one_between_leaves_it_undecided() -> None:
     item = criterion("F1.AC1", ("s1", "o1"), ("s2", "o2"))
 
-    low = outcome_for(item, (OBJECT,), {"F1.AC1.A1": 0.9, "F1.AC1.A2": 0.1})
-    between = outcome_for(item, (OBJECT,), {"F1.AC1.A1": 0.9, "F1.AC1.A2": 0.5})
-    silent = outcome_for(item, (OBJECT,), {"F1.AC1.A1": 0.9, "F1.AC1.A2": None})
+    low = outcome_for(subject(item, OBJECT), {"F1.AC1.A1": 0.9, "F1.AC1.A2": 0.1})
+    between = outcome_for(subject(item, OBJECT), {"F1.AC1.A1": 0.9, "F1.AC1.A2": 0.5})
+    silent = outcome_for(subject(item, OBJECT), {"F1.AC1.A1": 0.9, "F1.AC1.A2": None})
 
     assert (low.status, low.failing) == ("open", ("F1.AC1.A2",))
     assert (between.status, between.failing) == ("undecided", ("F1.AC1.A2",))
@@ -422,8 +422,8 @@ def test_a_criterion_with_no_aspect_or_no_test_is_open_without_a_question() -> N
     plain = criterion("F1.AC1")
     one = criterion("F1.AC2", ("s", "o"))
 
-    no_aspect = outcome_for(plain, (OBJECT,), {})
-    no_test = outcome_for(one, (), {})
+    no_aspect = outcome_for(subject(plain, OBJECT), {})
+    no_test = outcome_for(subject(one), {})
 
     assert (no_aspect.status, no_aspect.failing) == ("open", ("no_aspects",))
     assert (no_test.status, no_test.failing) == ("open", ("unmapped",))
@@ -435,7 +435,7 @@ def test_a_criterion_whose_test_failed_is_open_by_its_precheck() -> None:
     item = criterion("F1.AC1", ("s", "o"))
     record = {"collected": COLLECTED, "outcomes": {OBJECT: "failed"}}
 
-    found = outcome_for(item, (OBJECT,), {}, record=record)
+    found = outcome_for(subject(item, OBJECT), {}, record=record)
 
     assert (found.status, found.failing) == ("open", ("precheck",))
     assert "failed at the gate" in found.notes[0]
@@ -461,7 +461,7 @@ def test_a_regression_criterion_closes_on_the_gate_and_a_test_that_passed_on_the
 ) -> None:
     item = criterion("F1.AC1", kind="regression")
 
-    found = outcome_for(item, tests, {}, gate_passed=gate_passed, baseline=baseline)
+    found = outcome_for(subject(item, *tests), {}, gate_passed=gate_passed, baseline=baseline)
 
     assert (found.status, found.failing) == (status, failing)
     assert found.aspects == ()
@@ -475,7 +475,7 @@ def result(number: int, *statuses: str, tests: tuple[str, ...] = (OBJECT,)) -> j
     for index, status in enumerate(statuses, start=1):
         item = criterion(f"F1.AC{index}", ("s", "o"))
         answer = {"closed": 0.9, "open": 0.1, "undecided": 0.5}[status]
-        outcomes.append(outcome_for(item, tests, {f"F1.AC{index}.A1": answer}))
+        outcomes.append(outcome_for(subject(item, *tests), {f"F1.AC{index}.A1": answer}))
     return judging.PassResult(number, tuple(outcomes))
 
 
@@ -527,8 +527,8 @@ def test_the_pushback_shows_the_issues_words_the_aspects_not_closed_and_the_test
     first = criterion("F1.AC1", ("a JSON array is parsed", "ValueError is raised"))
     second = criterion("F1.AC2", ("s", "o"))
     outcomes = (
-        outcome_for(first, (REJECTS,), {"F1.AC1.A1": 0.12}),
-        outcome_for(second, (OBJECT,), {"F1.AC2.A1": 0.95}),
+        outcome_for(subject(first, REJECTS), {"F1.AC1.A1": 0.12}),
+        outcome_for(subject(second, OBJECT), {"F1.AC2.A1": 0.95}),
     )
 
     text = judging.pushback_text(judging.PassResult(1, outcomes))
@@ -552,7 +552,7 @@ def test_the_pushback_shows_the_issues_words_the_aspects_not_closed_and_the_test
 
 def test_an_undecided_criterion_is_pushed_back_saying_it_counts_as_open() -> None:
     item = criterion("F1.AC1", ("s", "o"))
-    found = outcome_for(item, (OBJECT,), {"F1.AC1.A1": None})
+    found = outcome_for(subject(item, OBJECT), {"F1.AC1.A1": None})
 
     text = judging.pushback_text(judging.PassResult(1, (found,)))
 
@@ -764,7 +764,7 @@ def test_tests_too_short_to_halve_are_dropped_from_the_end_until_the_rest_fit() 
 
 
 def test_a_helper_that_does_not_fit_is_left_out_and_the_next_that_does_is_kept() -> None:
-    entry = {"id": "t", "source": "def test_t():\n    pass"}
+    entry: dict[str, Any] = {"id": "t", "source": "def test_t():\n    pass"}
     state: dict[str, Any] = {"tests": [entry]}
     big = {"name": "big", "source": "y" * 3_000}
     small = {"name": "small", "source": "z"}
@@ -780,8 +780,8 @@ def test_a_pushback_lists_only_the_aspects_not_closed_and_groups_criteria_by_fea
     first = criterion("F1.AC1", ("s1", "o1"), ("s2", "o2"))
     second = criterion("F1.AC2")
     outcomes = (
-        outcome_for(first, (OBJECT,), {"F1.AC1.A1": 0.95, "F1.AC1.A2": 0.1}),
-        outcome_for(second, (), {}),
+        outcome_for(subject(first, OBJECT), {"F1.AC1.A1": 0.95, "F1.AC1.A2": 0.1}),
+        outcome_for(subject(second), {}),
     )
 
     text = judging.pushback_text(judging.PassResult(1, outcomes))
@@ -840,7 +840,7 @@ def test_a_turn_is_scheduled_only_when_it_its_gate_and_a_judge_pass_fit_the_time
 ) -> None:
     held, _ = started_loop(tmp_path)
     held.seconds = 2.0
-    gates = [{"seconds": 5.0}, {"seconds": None}]
+    gates: list[dict[str, Any]] = [{"seconds": 5.0}, {"seconds": None}]
     built = Spent(FIRST_BUILD, 10.0)
 
     assert held.fits(at(tmp_path, NOW + 17.0, built), REWORK, gates)
@@ -945,13 +945,13 @@ async def test_the_sources_the_judge_reads_are_the_sealed_trees_files_and_no_oth
     assert not (logs / "pass-1" / "tests" / "changed.py").exists()
     assert not (logs / "pass-1" / "tests" / "absent.py").exists()
     assert held.acceptance.sources == "workflow/sources/final"
-    assert len(checkpoint.environment.commands) == 3  # type: ignore[attr-defined]
+    assert len(checkpoint.environment.commands) == 3
     assert gate["verdict"] == "passed"
 
 
 def test_the_open_criteria_go_back_to_the_builder_with_the_gate_text(tmp_path: Path) -> None:
     held, _ = started_loop(tmp_path)
-    found = outcome_for(criterion("F1.AC1", ("s", "o")), (OBJECT,), {"F1.AC1.A1": 0.1})
+    found = outcome_for(subject(criterion("F1.AC1", ("s", "o")), OBJECT), {"F1.AC1.A1": 0.1})
 
     resume = held.rework(judging.PassResult(1, (found,)), "GATE TEXT")
 
@@ -996,7 +996,7 @@ def asker_over(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, provider: Provid
     async def no_wait(seconds: float) -> None:
         return None
 
-    monkeypatch.setattr(asking.asyncio, "sleep", no_wait)
+    monkeypatch.setattr(asyncio, "sleep", no_wait)
     monkeypatch.setattr(
         asking,
         "new_jev",

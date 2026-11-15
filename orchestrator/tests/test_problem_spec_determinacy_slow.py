@@ -20,9 +20,8 @@ from raidar.design.problem.validator import ValidateOptions, audit_problem, merg
 from raidar.design.problem.variants import build_variant, original_name
 from tests.audit_support import KV_REF
 from tests.test_problem_spec_determinacy import (
+    KvProblem,
     _audit as _audit,
-)
-from tests.test_problem_spec_determinacy import (
     kv_fixture as kv_fixture,
 )
 from tests.verifier_support import LocalProcessSandbox
@@ -64,7 +63,7 @@ def test_shim_main_propagates_exit_code_in_process(
 
 
 def test_audit_flags_only_cases_a_conforming_variant_breaks_on_undetermined_values(
-    kv, tmp_path: Path
+    kv: KvProblem, tmp_path: Path
 ) -> None:
     report = _audit(kv, tmp_path)
     flagged = {entry["case"]: entry for entry in report["flagged"]}
@@ -104,7 +103,7 @@ def test_audit_flags_only_cases_a_conforming_variant_breaks_on_undetermined_valu
 
 @pytest.mark.parametrize("format_rule", ["JSON Lines", "compact JSON", "NDJSON"])
 def test_fixed_output_format_is_not_treated_as_a_conforming_reformat(
-    kv, tmp_path: Path, format_rule: str
+    kv: KvProblem, tmp_path: Path, format_rule: str
 ) -> None:
     _, problem = kv
     instruction = problem.task_dir / "steps" / "checkpoint_2" / "instruction.md"
@@ -115,7 +114,9 @@ def test_fixed_output_format_is_not_treated_as_a_conforming_reformat(
     assert report["summary"]["flagged_by_checkpoint"] == {"checkpoint_1": 2, "checkpoint_2": 2}
 
 
-def test_audit_only_merges_into_the_committed_report_and_drafts_errata(kv, tmp_path: Path) -> None:
+def test_audit_only_merges_into_the_committed_report_and_drafts_errata(
+    kv: KvProblem, tmp_path: Path
+) -> None:
     store, problem = kv
     problem_id = ProblemId.parse(KV_REF)
     committed = {

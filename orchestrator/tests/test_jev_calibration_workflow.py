@@ -7,11 +7,11 @@ import shutil
 from pathlib import Path
 
 import pytest
-from click.testing import CliRunner
+from click.testing import CliRunner, Result
 
 from raidar.cli import main
 from raidar.judge.protocol import ChoiceQuestion, NoulQuestion, ScoreQuestion
-from raidar.scoring.judge.audit import LabelRecord, ReviewerKind
+from raidar.scoring.judge.audit import DecisionRecord, LabelRecord, ReviewerKind
 from raidar.scoring.judge.blind import derive_blind_labels, export_blind
 from raidar.scoring.judge.calibration import (
     LabelImportError,
@@ -29,6 +29,7 @@ from raidar.scoring.judge.promotion import (
     regression_corpus,
     split_metrics,
 )
+from raidar.scoring.judge.runtime import JevRuntime
 from tests.jev_support import (
     SUFFICIENT,
     RecordedTransport,
@@ -45,7 +46,9 @@ QUESTIONS = {
 }
 
 
-def _store(root: Path, answers: list[tuple[float, float]], trials: tuple[str, ...]):
+def _store(
+    root: Path, answers: list[tuple[float, float]], trials: tuple[str, ...]
+) -> tuple[JevRuntime, list[DecisionRecord]]:
     """One decision per (stub, echo) answer pair, spread over ``trials`` in order."""
     asked: list[str] = []
 
@@ -55,7 +58,7 @@ def _store(root: Path, answers: list[tuple[float, float]], trials: tuple[str, ..
         return noul_answer(stub if question_id == "stub" else echo)
 
     transport = RecordedTransport(answer_for=answer_for)
-    records = []
+    records: list[DecisionRecord] = []
     for index in range(len(answers)):
         trial = trials[index * len(trials) // len(answers)]
         runtime = make_runtime(root, transport=transport, trial=trial)
@@ -223,7 +226,7 @@ def test_threshold_fit_metrics_and_split_are_deterministic() -> None:
     assert (next_minor("1"), next_minor("1.4")) == ("1.1", "1.5")
 
 
-def _promotable(root: Path):
+def _promotable(root: Path) -> tuple[JevRuntime, list[DecisionRecord]]:
     # 40 decisions over 4 trials; stub scores split cleanly at 0.6, echo stays low.
     answers = [(0.85, 0.1) if index % 4 == 0 else (0.15, 0.1) for index in range(40)]
     runtime, records = _store(root, answers, ("t1", "t2", "t3", "t4"))
@@ -236,6 +239,25 @@ def _promotable(root: Path):
     rows[1]["label"] = "false_negative"  # a 0.15 decision the reviewer called positive
     import_labels(runtime.audit, RUBRIC, rows)
     return runtime, records
+
+
+def _assert_promoted_to_enforce(policy_file: Path, runtime: JevRuntime) -> None:
+    """The written policy enforces with the promotion fitted on the t1+t2 calibration split."""
+    written = load_policy(policy_file)
+    promotion = written.promotion
+    assert (written.mode, written.version) == (PolicyMode.ENFORCE, "4")
+    assert promotion is not None
+    assert promotion.split == CalibrationSplit(calibration=("t1", "t2"), evaluation=("t3", "t4"))
+    assert (promotion.labelled, promotion.minority) == (40, 11)
+    assert promotion.reviewers == {"human": 26, "model": 14}
+    assert promotion.reviewer_models == (HAIKU,)
+    assert promotion.calibration_metrics is not None
+    # t1+t2: five 0.85 positives, fourteen 0.15 negatives and one 0.15 the reviewer
+    # called positive, so the fitted 0.5 cut misses exactly that one.
+    assert promotion.threshold == 0.5
+    metrics = promotion.calibration_metrics
+    assert (metrics.labelled, metrics.precision, metrics.recall) == (20, 1.0, 0.8333)
+    assert promotion.regression_corpus == regression_corpus(runtime.audit, RUBRIC, promotion.split)
 
 
 def test_promote_writes_enforce_only_when_the_audit_verifies(tmp_path: Path) -> None:
@@ -262,22 +284,7 @@ def test_promote_writes_enforce_only_when_the_audit_verifies(tmp_path: Path) -> 
     assert promoted.exit_code == 0, promoted.output
     report = json.loads(promoted.output)
     assert report["blocked_on_scorer_bump"] is False
-
-    written = load_policy(policies / f"{RUBRIC}.yaml")
-    promotion = written.promotion
-    assert (written.mode, written.version) == (PolicyMode.ENFORCE, "4")
-    assert promotion is not None
-    assert promotion.split == CalibrationSplit(calibration=("t1", "t2"), evaluation=("t3", "t4"))
-    assert (promotion.labelled, promotion.minority) == (40, 11)
-    assert promotion.reviewers == {"human": 26, "model": 14}
-    assert promotion.reviewer_models == (HAIKU,)
-    assert promotion.calibration_metrics is not None
-    # t1+t2: five 0.85 positives, fourteen 0.15 negatives and one 0.15 the reviewer
-    # called positive, so the fitted 0.5 cut misses exactly that one.
-    assert promotion.threshold == 0.5
-    metrics = promotion.calibration_metrics
-    assert (metrics.labelled, metrics.precision, metrics.recall) == (20, 1.0, 0.8333)
-    assert promotion.regression_corpus == regression_corpus(runtime.audit, RUBRIC, promotion.split)
+    _assert_promoted_to_enforce(policies / f"{RUBRIC}.yaml", runtime)
 
     # Everything re-derives; only the scorer version the promotion ships with is missing.
     verified = runner.invoke(main, ["jev", "verify-promotion", *base])
@@ -396,60 +403,40 @@ def test_superseded_labels_leave_calibration_but_stay_on_file(tmp_path: Path) ->
     with pytest.raises(LabelImportError, match="not unlabelled answered"):
         export_blind(runtime.audit, RUBRIC, request_ids=[old[0], *chosen])
 
+    _assert_recorded_split_drives_promote_and_supersede(store, policies)
+
+
+def _record_split(
+    runner: CliRunner, common: list[str], calibration: str, evaluation: str, reason: str
+) -> Result:
+    return runner.invoke(
+        main,
+        [
+            "jev",
+            "record-split",
+            *common,
+            "--split-id",
+            "r1",
+            "--calibration",
+            calibration,
+            "--evaluation",
+            evaluation,
+            "--reason",
+            reason,
+        ],
+    )
+
+
+def _assert_recorded_split_drives_promote_and_supersede(store: Path, policies: Path) -> None:
     # A split recorded ahead of labelling is what `jev promote` uses by default.
     runner = CliRunner()
     common = ["--store", str(store), "--policy", RUBRIC]
-    bad = runner.invoke(
-        main,
-        [
-            "jev",
-            "record-split",
-            *common,
-            "--split-id",
-            "r1",
-            "--calibration",
-            "t1 t9",
-            "--evaluation",
-            "t3",
-            "--reason",
-            "x",
-        ],
-    )
+    bad = _record_split(runner, common, "t1 t9", "t3", "x")
     assert bad.exit_code != 0
     assert "t9" in bad.output
-    recorded = runner.invoke(
-        main,
-        [
-            "jev",
-            "record-split",
-            *common,
-            "--split-id",
-            "r1",
-            "--calibration",
-            "t1,t2",
-            "--evaluation",
-            "t3 t4",
-            "--reason",
-            "stratified by arm",
-        ],
-    )
+    recorded = _record_split(runner, common, "t1,t2", "t3 t4", "stratified by arm")
     assert recorded.exit_code == 0, recorded.output
-    again = runner.invoke(
-        main,
-        [
-            "jev",
-            "record-split",
-            *common,
-            "--split-id",
-            "r1",
-            "--calibration",
-            "t1",
-            "--evaluation",
-            "t3",
-            "--reason",
-            "x",
-        ],
-    )
+    again = _record_split(runner, common, "t1", "t3", "x")
     assert again.exit_code != 0
     assert "already recorded" in again.output
     dry = runner.invoke(

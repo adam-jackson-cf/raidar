@@ -41,7 +41,10 @@ def _manifest(**changes: Any) -> dict[str, Any]:
 
 
 def _metric(**changes: Any) -> MetricSpec:
-    return MetricSpec.model_validate({**fake_manifest().metrics[2].model_dump(), **changes})
+    metric: MetricSpec = MetricSpec.model_validate(
+        {**fake_manifest().metrics[2].model_dump(), **changes}
+    )
+    return metric
 
 
 @pytest.mark.parametrize("bounds", [(2.0, 1.0), (0.0, math.inf), (math.nan, 1.0)])

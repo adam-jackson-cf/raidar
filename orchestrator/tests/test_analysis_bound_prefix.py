@@ -20,13 +20,13 @@ from raidar.scoring.catalog.builtin import default_scorer_registry
 from raidar.scoring.framework.rescore import rescore_path
 from raidar.scoring.framework.result import AssessStatus
 from raidar.scoring.framework.store import AssessmentStore
+from tests.analysis_support import analysis_lock as _lock
 from tests.scorer_support import APP_V1, APP_V2, StepFixture, write_trial
 from tests.test_analysis_command import (
     FAIL,
     PASS,
     _analyze,
     _effect,
-    _lock,
     _record,
 )
 
@@ -151,7 +151,8 @@ def _assess_and_analyze(
     extra = ("--allow-dev-jobs",) if max_checkpoints is not None else ()
     result = _analyze(job_dir, store, lock_path, output, *extra)
     assert result.exit_code == 0, result.output
-    return json.loads((output / "analysis.json").read_text())
+    report: dict[str, Any] = json.loads((output / "analysis.json").read_text())
+    return report
 
 
 @pytest.mark.parametrize("bound", [1, 2])

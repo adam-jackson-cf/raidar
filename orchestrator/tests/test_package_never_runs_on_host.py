@@ -73,7 +73,7 @@ def test_static_loading_the_lock_check_and_a_containerless_check_never_import_th
         (project / "uv.lock").write_text((package_root / "tool" / "uv.lock").read_text())
         return subprocess.CompletedProcess(argv, 0, "", "")
 
-    monkeypatch.setattr(stage_lock.subprocess, "run", run)
+    monkeypatch.setattr(subprocess, "run", run)
 
     package = load_stage_package(package_root)
     problems = stage_lock.lock_problems(package_root)

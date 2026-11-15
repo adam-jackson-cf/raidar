@@ -104,10 +104,7 @@ def test_import_splits_the_converted_task_into_agent_task_bundle_and_references(
     assert task.config.environment.docker_image == manifest.pack.image
     assert task.config.agent.user == "agent"
     assert [step.min_reward for step in task.config.steps or []] == [None, None]
-    assert all(
-        step.artifacts[0].source == APP_SOURCE  # type: ignore[union-attr]
-        for step in task.config.steps or []
-    )
+    assert all(step.artifacts[0].source == APP_SOURCE for step in task.config.steps or [])
     compose = yaml.safe_load((content / "task" / "environment" / "docker-compose.yaml").read_text())
     assert compose["services"]["main"]["init"] is True
     assert not (content / "task" / "environment" / "Dockerfile").exists()
@@ -189,8 +186,12 @@ def test_problem_resolver_reports_checkpoints_and_manifest_digest(tmp_path: Path
     assert oneshot.metadata["mode"] == "one_shot"
     assert multi.metadata["checkpoints"] == 2
     assert multi.digest == store.load_manifest(ProblemId.parse(POSITIVE_REF)).digest()
-    assert multi.metadata["validation"]["verdict"] == "validated_partial"
-    assert oneshot.metadata["validation"]["not_run"] == [
+    multi_validation = multi.metadata["validation"]
+    oneshot_validation = oneshot.metadata["validation"]
+    assert isinstance(multi_validation, dict)
+    assert isinstance(oneshot_validation, dict)
+    assert multi_validation["verdict"] == "validated_partial"
+    assert oneshot_validation["not_run"] == [
         "native_parity_positive",
         "native_parity_negative",
     ]

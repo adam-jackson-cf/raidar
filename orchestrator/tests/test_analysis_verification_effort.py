@@ -14,7 +14,7 @@ from pathlib import Path
 import pytest
 
 from raidar.evaluation.analysis import manipulation as manipulation_module
-from raidar.evaluation.analysis.assessed import VERIFICATION_EFFORT_REF, gate_metrics
+from raidar.evaluation.analysis.assessed import gate_metrics
 from raidar.evaluation.analysis.effects import Settings
 from raidar.evaluation.analysis.manipulation import (
     Separation,
@@ -27,7 +27,7 @@ from raidar.evaluation.analysis.markdown import render_markdown
 from raidar.evaluation.analysis.outcomes import TrialOutcome, Value
 from raidar.evaluation.analysis.report import AnalysisReport, analyse
 from raidar.scoring.catalog.checks import GATE_CLEAN, PROCESS_COMPLIANCE_REFS
-from raidar.scoring.catalog.outcomes import GATE_METRICS, outcome_metric
+from raidar.scoring.catalog.outcomes import GATE_METRICS, VERIFICATION_EFFORT_REF, outcome_metric
 from raidar.scoring.framework.result import (
     TRAJECTORY_SUBJECT,
     AssessResult,
@@ -91,10 +91,23 @@ def _signal(values: list[float | None]) -> AssessResult:
     )
 
 
-def _analyse(outcomes: list[TrialOutcome], attempts: int = 5, **changes: object) -> AnalysisReport:
-    gate = {outcome.trial_id: None for outcome in outcomes}
-    base = dataclasses.replace(inputs(outcomes, attempts), gate_results=gate)
-    return analyse(dataclasses.replace(base, **changes), SETTINGS)
+def _analyse(
+    outcomes: list[TrialOutcome],
+    attempts: int = 5,
+    *,
+    kind: str = "ab-test",
+    gate_scorer: str | None = None,
+    process_scorer: str | None = None,
+) -> AnalysisReport:
+    gate: dict[str, AssessResult | None] = {outcome.trial_id: None for outcome in outcomes}
+    analysed = dataclasses.replace(
+        inputs(outcomes, attempts),
+        gate_results=gate,
+        kind=kind,
+        gate_scorer=gate_scorer,
+        process_scorer=process_scorer,
+    )
+    return analyse(analysed, SETTINGS)
 
 
 def test_a_baseline_without_the_gate_is_described_not_paired() -> None:
@@ -145,10 +158,11 @@ def test_the_ranking_view_carries_each_arms_gate_means() -> None:
 
     assert report.ranking is not None
     rows = {row.arm: row for row in report.ranking.rows}
-    assert rows[GUIDED].gate_means is not None
-    assert rows[GUIDED].gate_means[FIRST_PASS] == pytest.approx(0.85)
-    assert rows[BASELINE].gate_means is not None
-    assert rows[BASELINE].gate_means[FIRST_PASS] is None
+    guided_means, baseline_means = rows[GUIDED].gate_means, rows[BASELINE].gate_means
+    assert guided_means is not None
+    assert guided_means[FIRST_PASS] == pytest.approx(0.85)
+    assert baseline_means is not None
+    assert baseline_means[FIRST_PASS] is None
     assert "gate.first_pass_clean_rate" in render_markdown(report)
     assert outcome_metric(FIRST_PASS).view.value == "gate"
 

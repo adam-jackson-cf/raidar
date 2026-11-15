@@ -7,8 +7,6 @@ from types import SimpleNamespace
 from typing import Any, cast
 
 import pytest
-from raidar_contract.package.manifest import StageManifest, StagePackage
-from raidar_contract.references import Release
 
 from raidar.contract.paths import stages_root
 from raidar.subject.package.registry import load_stage_package
@@ -17,6 +15,8 @@ from raidar.subject.primitive.install import InstallError
 from raidar.subject.primitive.site import TrialInvalidError
 from raidar.subject.workflow import package_trial
 from raidar.subject.workflow.package_trial import install_locked
+from raidar_contract.package.manifest import StageManifest, StagePackage
+from raidar_contract.references import Release
 from tests.package_support import fixture_package
 
 LOCKED_TREE = "t" * 64

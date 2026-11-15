@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+from collections.abc import Sequence
 from pathlib import Path
 from typing import Any
 
@@ -19,10 +20,11 @@ from raidar.design.problem.errata import (
 )
 from raidar.design.problem.models import ProblemId
 from raidar.design.problem.store import ROOT_ENV, ProblemStore, ProblemStoreError
-from raidar.evaluation.analysis.assessed import CORRECTNESS_REF, build_outcome
+from raidar.evaluation.analysis.assessed import build_outcome
 from raidar.grading.errata import ErrataOutcome, ErrataRef, errata_outcome
 from raidar.grading.models import CaseStatus
 from raidar.grading.records import load_step_record, step_record_dir, write_step_record
+from raidar.scoring.catalog.outcomes import CORRECTNESS_REF
 from raidar.scoring.correctness import correctness_scorer
 from raidar.scoring.framework.metrics import SCB_CANONICAL
 from raidar.scoring.framework.result import (
@@ -148,7 +150,8 @@ def test_a_lock_pinned_errata_is_only_honoured_while_the_store_still_holds_it(
 def test_problem_info_reports_the_errata_a_problem_carries(plain_store: ProblemStore) -> None:
     def info() -> str:
         args = ["problem", "info", POSITIVE_REF, "--store", str(plain_store.root)]
-        return CliRunner().invoke(main, args).output
+        output: str = CliRunner().invoke(main, args).output
+        return output
 
     write_errata(plain_store, POSITIVE_REF)
     assert "(1 exclude-from-solved, 1 informational)" in info()
@@ -171,7 +174,9 @@ def test_errata_outcome_has_no_verdict_without_a_raw_one() -> None:
 # ---- correctness dual reporting ---------------------------------------------------------
 
 
-def _trial(tmp_path: Path, statuses: list[tuple[CaseStatus, ...]], planned=()) -> Path:
+def _trial(
+    tmp_path: Path, statuses: list[tuple[CaseStatus, ...]], planned: Sequence[str] = ()
+) -> Path:
     return write_trial(
         tmp_path / "trial",
         [

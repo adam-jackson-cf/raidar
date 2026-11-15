@@ -15,11 +15,11 @@ from typing import Any
 import pytest
 import yaml
 from click.testing import CliRunner
-from raidar_contract.package.fixtures import static_problems
 
 from raidar.cli import main, stage, stage_fixtures, stage_lock, stage_package, workflow_new
 from raidar.subject.package.registry import load_stage_package
 from raidar.subject.workflow import stage_check
+from raidar_contract.package.fixtures import Expectation, static_problems
 from tests.release_support import REAL_PACKAGE, UV_LOCK_WITH_SDIST
 
 
@@ -495,7 +495,7 @@ def test_gate_runs_that_differ_in_an_output_digest_are_not_stable() -> None:
 
 
 def test_a_missing_or_invalid_expected_output_refuses_a_gate_fixture() -> None:
-    expected = stage_check.Expectation("pass", {"note": "a" * 64, "report": "c" * 64})
+    expected = Expectation("pass", {"note": "a" * 64, "report": "c" * 64})
     observed = {
         "outputs": {"note": "b" * 64, "report": None},
         "output_errors": {"report": "missing"},
@@ -505,7 +505,4 @@ def test_a_missing_or_invalid_expected_output_refuses_a_gate_fixture() -> None:
 
     assert any("note: expected" in item for item in problems)
     assert any("report is invalid: missing" in item for item in problems)
-    assert (
-        stage_check._output_problems(stage_check.Expectation("pass", {"note": "b" * 64}), observed)
-        == []
-    )
+    assert stage_check._output_problems(Expectation("pass", {"note": "b" * 64}), observed) == []

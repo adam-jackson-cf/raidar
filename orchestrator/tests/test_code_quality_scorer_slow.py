@@ -24,8 +24,12 @@ from raidar.scoring.framework.rescore import RescoreOutcome, assess
 from raidar.scoring.framework.result import AssessResult, AssessStatus, Observation
 from raidar.scoring.framework.store import AssessmentStore
 from raidar.scoring.framework.validation import validate_result
-from tests.code_quality_support import case_trial, golden_case, quality_tools
-from tests.code_quality_support import trial_context as _context
+from tests.code_quality_support import (
+    case_trial,
+    golden_case,
+    quality_tools,
+    trial_context as _context,
+)
 from tests.scorer_support import tree_state
 
 pytestmark = pytest.mark.slow
@@ -49,6 +53,23 @@ def _value(decimal_text: str) -> float:
     return float(Decimal(decimal_text))
 
 
+def _assert_checkpoint_values(result: AssessResult, checkpoints: list[dict[str, Any]]) -> None:
+    """Each checkpoint's observations carry the fork's production values."""
+    for checkpoint in checkpoints:
+        step, production = checkpoint["checkpoint"], checkpoint["production"]
+        quality, graph = production["production_quality"], production["production_graph"]
+        assert _observation(result, "verbosity", step).value == _value(quality["verbosity"])
+        assert _observation(result, "erosion", step).value == _value(quality["erosion"])
+        assert _observation(result, "architecture", step).value == _value(graph["architecture"])
+        assert (
+            _observation(result, "production_loc", step).value
+            == (quality["source_loc_denominator"])
+        )
+        assert _observation(result, "lint_findings", step).value == len(
+            quality["ruff"]["diagnostics"]
+        )
+
+
 def test_every_checkpoint_and_transition_carries_the_fork_values_and_traceable_evidence(
     tmp_path: Path,
 ) -> None:
@@ -63,19 +84,7 @@ def test_every_checkpoint_and_transition_carries_the_fork_values_and_traceable_e
     assert assessment is not None
     result = assessment.result
     assert result.status is AssessStatus.OK
-    for checkpoint in case["checkpoints"]:
-        step, production = checkpoint["checkpoint"], checkpoint["production"]
-        quality, graph = production["production_quality"], production["production_graph"]
-        assert _observation(result, "verbosity", step).value == _value(quality["verbosity"])
-        assert _observation(result, "erosion", step).value == _value(quality["erosion"])
-        assert _observation(result, "architecture", step).value == _value(graph["architecture"])
-        assert (
-            _observation(result, "production_loc", step).value
-            == (quality["source_loc_denominator"])
-        )
-        assert _observation(result, "lint_findings", step).value == len(
-            quality["ruff"]["diagnostics"]
-        )
+    _assert_checkpoint_values(result, case["checkpoints"])
     reworks = [_value(item["rework"]) for item in case["lineage"]["transitions"]]
     assert [_observation(result, "rework", key).value for key in (T12, T23)] == reworks
     assert _observation(result, "regression", T12).value == _value(

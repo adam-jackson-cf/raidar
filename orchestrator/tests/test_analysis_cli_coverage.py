@@ -42,6 +42,8 @@ def test_locked_defaults_preserve_pins_without_claiming_thresholds_changed(
     )
     assert result.exit_code == 0, result.output
     report = json.loads((output / "analysis.json").read_text())
+    assert loaded.errata is not None
+    assert loaded.solvable is not None
     assert report["errata"] == dict(loaded.errata)
     assert report["solvable"] == dict(loaded.solvable)
     assert report["settings"]["pinned_by_lock"]

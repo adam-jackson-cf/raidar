@@ -10,7 +10,7 @@ import pytest
 from raidar.evaluation.analysis.effects import Settings
 from raidar.evaluation.analysis.markdown import render_markdown
 from raidar.evaluation.analysis.ranking import pass_at_k
-from raidar.evaluation.analysis.report import DevRun, PlannedTrial, analyse
+from raidar.evaluation.analysis.report import AnalysisInputs, DevRun, PlannedTrial, analyse
 from tests.analysis_support import inputs, trial
 
 AGENTS = ("codex", "claude", "gemini")
@@ -22,7 +22,9 @@ SOLVED = {  # attempt -> final_solved per agent; codex solves most, gemini least
 RATE = {"codex": 0.8, "claude": 0.6, "gemini": 0.3}
 
 
-def _benchmark(attempts: int = 4, *, rank_by: str | None = None, infra: bool = False):
+def _benchmark(
+    attempts: int = 4, *, rank_by: str | None = None, infra: bool = False
+) -> AnalysisInputs:
     outcomes = [
         trial(
             agent,

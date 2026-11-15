@@ -155,10 +155,12 @@ def test_env_setup_stops_at_the_first_failed_install_step(
 ) -> None:
     ran: list[list[str]] = []
     monkeypatch.setattr(env_harbor, "compose_preflight_reason", lambda: None)
-    monkeypatch.setattr(
-        "raidar.cli.env_harbor.subprocess.run",
-        lambda command, **_: ran.append(command) or subprocess.CompletedProcess(command, 2),
-    )
+
+    def failing_run(command: list[str], **_: object) -> subprocess.CompletedProcess[str]:
+        ran.append(command)
+        return subprocess.CompletedProcess(command, 2)
+
+    monkeypatch.setattr("raidar.cli.env_harbor.subprocess.run", failing_run)
 
     result = CliRunner().invoke(main, ["env", "setup"])
 
@@ -465,7 +467,9 @@ def test_run_prints_each_trials_validity_reach_and_checkpoint_states(
         ],
     )
 
-    def prepare(plan_arg: Any, store: Any, target: Any, jobs_dir: Path, *, allow_unsmoked: bool):
+    def prepare(
+        plan_arg: Any, store: Any, target: Any, jobs_dir: Path, *, allow_unsmoked: bool
+    ) -> tuple[dict[int, str], dict[str, bool]]:
         seen.update(store=store, target=target, allow_unsmoked=allow_unsmoked)
         return {0: "problem"}, {"admitted": True}
 

@@ -7,7 +7,9 @@ import subprocess
 import urllib.error
 import uuid
 import zipfile
+from collections.abc import Sequence
 from pathlib import Path
+from typing import NoReturn
 
 import pytest
 
@@ -19,7 +21,7 @@ from raidar.grading.dependency_pins import lock_sha256, set_sha256
 from raidar.grading.grader import grade_step
 from raidar.grading.grader_image import ensure_grader_image
 from raidar.grading.provision import prepare_dependencies
-from raidar.grading.resolver import pylock_packages
+from raidar.grading.resolver import Resolution, pylock_packages
 from raidar.grading.sandbox import DockerCopySandbox, SandboxRun, sandbox_env
 from raidar.grading.submission_deps import SubmissionDependencies, python_path_entries
 from raidar.subject.environment.python.image import image_tag
@@ -27,6 +29,15 @@ from raidar.subject.environment.python.pack_definition import load_pack_spec
 from tests.docker_trial_support import docker_context
 
 pytestmark = [pytest.mark.docker, pytest.mark.security]
+
+
+class _NeverResolve:
+    """A resolver a regrade must never call: it replays its recorded lock."""
+
+    identity = "never-resolve"
+
+    def __call__(self, requirements: Sequence[str], *, arch: str, exclude_newer: str) -> Resolution:
+        raise pytest.fail.Exception("a regrade must not resolve its recorded lock")
 
 
 @pytest.fixture
@@ -170,11 +181,8 @@ async def test_regrade_with_empty_wheel_cache_and_blocked_pypi_is_infrastructure
     empty_cache.mkdir()
     monkeypatch.setattr(wheel_cache, "default_cache_root", lambda: empty_cache)
 
-    def blocked(url: str):
+    def blocked(url: str) -> NoReturn:
         raise urllib.error.URLError("PyPI blocked for outage acceptance")
-
-    def never_resolve(*args, **kwargs):
-        pytest.fail("a regrade must not resolve its recorded lock")
 
     monkeypatch.setattr(wheel_cache, "open_wheel", blocked)
     # A unique base alias ensures this proof cannot be satisfied by a cached image layer.
@@ -189,7 +197,7 @@ async def test_regrade_with_empty_wheel_cache_and_blocked_pypi_is_infrastructure
             DockerCopySandbox(image=alias, docker_context=ready_target),
             tmp_path / "regrade",
             coverage=False,
-            resolver=never_resolve,
+            resolver=_NeverResolve(),
             recorded=recorded,
         )
         assert outcome.grade.infra_failure is not None

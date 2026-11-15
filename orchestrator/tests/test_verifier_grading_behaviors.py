@@ -138,7 +138,7 @@ def test_a_run_with_every_case_skipped_has_no_verdict() -> None:
         ({"nodes": [{"node_id": "a", "ran": True}], "exit_status": 3}, "pytest_exit_status"),
     ],
 )
-def test_untrustworthy_runs_are_infra_failures(ledger: dict, code: str) -> None:
+def test_untrustworthy_runs_are_infra_failures(ledger: dict[str, object], code: str) -> None:
     failure = ledger_infra_failure(ledger)
     assert failure is not None
     assert failure.code == code
@@ -237,7 +237,8 @@ def _run(role: str, **changes: object) -> RunEvidence:
         ledger=(LedgerEntry(node_id="t::a", phase="call", outcome="passed"),),
         process_events=(ProcessEvent(node_id="t::a", phase="call", event="subprocess.Popen"),),
     )
-    return base.model_copy(update=changes)
+    changed: RunEvidence = base.model_copy(update=changes)
+    return changed
 
 
 @pytest.mark.parametrize(
@@ -262,7 +263,7 @@ def _run(role: str, **changes: object) -> RunEvidence:
     ],
 )
 def test_any_identity_or_ledger_difference_makes_coverage_ineligible(
-    changes: dict, reason: str
+    changes: dict[str, object], reason: str
 ) -> None:
     cases = [_case("t::a", CaseGroup.CORE, CaseStatus.PASSED)]
     assert check_parity(_run("grading"), _run("coverage"), cases, cases).eligible
@@ -338,7 +339,7 @@ def test_grading_budget_leaves_room_for_the_last_case(
 
 
 def test_coverage_rows_merge_into_sorted_per_test_line_sets() -> None:
-    rows = [
+    rows: list[dict[str, Any]] = [
         {"node_id": "t::b", "path": "a.py", "executed_line": 3},
         {"node_id": "t::a", "path": "b.py", "executed_line": "2"},
         {"node_id": "t::a", "path": "a.py", "executed_line": 9},

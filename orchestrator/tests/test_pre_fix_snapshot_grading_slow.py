@@ -27,12 +27,16 @@ from raidar.grading.records import grading_identity, load_step_record, step_reco
 from raidar.grading.regrade import RegradeOptions
 from tests.scorer_support import tree_state
 from tests.test_verifier_and_regrade import (
-    FakeAgentEnvironment,
     local_factory,
     make_verifier,
     place_step_artifact,
 )
-from tests.verifier_support import copy_grading_sources, make_bundle, write_app
+from tests.verifier_support import (
+    FakeAgentEnvironment,
+    copy_grading_sources,
+    make_bundle,
+    write_app,
+)
 
 pytestmark = pytest.mark.slow
 

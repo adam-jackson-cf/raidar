@@ -6,13 +6,14 @@ import importlib.util
 import subprocess
 import sys
 from pathlib import Path
+from types import ModuleType
 
 import pytest
 
 pytestmark = pytest.mark.quality
 
 
-def _load_fanout_module():
+def _load_fanout_module() -> ModuleType:
     script_path = (
         Path(__file__).resolve().parents[2] / "scripts" / "checks" / "check-python-fanout.py"
     )

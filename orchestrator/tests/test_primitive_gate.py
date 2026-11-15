@@ -16,12 +16,10 @@ from argparse import Namespace
 from collections.abc import AsyncIterator, Iterator
 from dataclasses import dataclass, field
 from pathlib import Path
-from types import SimpleNamespace
 from typing import Any
 
 import coverage
 import pytest
-from raidar_contract.package.manifest import GateCheck, Output, parse_manifest
 
 from raidar.contract.snapshot import tree_digest
 from raidar.subject.primitive import calls, gate_tool
@@ -38,7 +36,9 @@ from raidar.subject.primitive.gate import (
     context_path,
     gate_config,
 )
-from raidar.subject.primitive.payload import install_tree, walk
+from raidar.subject.primitive.install import TreeCheck
+from raidar.subject.primitive.payload import install_tree, supervise, walk
+from raidar_contract.package.manifest import GateCheck, Output, parse_manifest
 from tests.workflow_support import LocalEnvironment
 
 pytestmark = pytest.mark.slow
@@ -82,11 +82,11 @@ class FakeInstalled:
 
     @property
     def digest(self) -> str:
-        limits = walk.Limits.from_spec({**calls.TREE_LIMITS, "owner": os.getuid()})
+        limits = walk.Limits.from_spec({**supervise.TREE_LIMITS, "owner": os.getuid()})
         return str(walk.scan(self.root, limits, entries=False)["digest"])
 
-    async def verify(self) -> Any:
-        return SimpleNamespace(ok=self.ok, digest="now", expected="installed")
+    async def verify(self) -> TreeCheck:
+        return TreeCheck(ok=self.ok, digest="now", expected="installed")
 
 
 @dataclass
@@ -286,7 +286,7 @@ def test_pytest_arguments_come_from_run(tmp_path: Path) -> None:
 def test_agent_tests_that_exit_126_after_a_passing_canary_are_the_agents(tmp_path: Path) -> None:
     rig = make_rig(tmp_path, PASS)
     checks = fixture_checks(rig)
-    assert check_canary(rig.record(checks)) is None  # the starting workspace decides
+    check_canary(rig.record(checks))  # the starting workspace decides
 
     (rig.workspace / "conftest.py").write_text("import os\nos._exit(126)\n")
     record = rig.record(checks)
@@ -623,11 +623,12 @@ async def test_a_hostile_manifest_never_reaches_the_host_outside_its_folder(
     rig = make_rig(tmp_path, PASS)
     checks, outputs, _ = overwriting_checks(rig, tmp_path)
     run = await open_gate(rig, gate_env, checks, outputs=outputs)
-    forged = {"path": "x", "exists": True, "violation": None, "files": 1, "bytes": 1}
-    forged["entries"] = [
+    entries: list[dict[str, Any]] = [
         {"path": "../../escaped", "type": "file", "size": 1, "sha256": "0" * 64, "mode": 420}
     ]
-    forged["digest"] = calls._entry_digest(forged["entries"])
+    forged = {"path": "x", "exists": True, "violation": None, "files": 1, "bytes": 1}
+    forged["entries"] = entries
+    forged["digest"] = calls._entry_digest(entries)
     forged["tar"] = f"{rig.paths.scratch}/outputs/x/note.tar"
     copy = await run.outputs._copy("note", outputs["note"], forged, tmp_path / "dest")
     await run.close()
@@ -775,7 +776,11 @@ def test_changed_installed_tool_bytes_are_an_integrity_failure(tmp_path: Path) -
     config = rig.config([command("lint", "zorp", str(tmp_path / "seen.json"))])
     (rig.bin / "planted").write_text("changed after install")
     decision = gate_tool.decide(config, tmp_path / "decide")
-    record = {"verdict": decision.verdict, "checks": decision.summary(), "error": decision.error}
+    record: dict[str, Any] = {
+        "verdict": decision.verdict,
+        "checks": decision.summary(),
+        "error": decision.error,
+    }
     assert [c["cause"] for c in record["checks"]] == ["tool_changed"]
     assert attribute(record)[0] is Attribution.INTEGRITY
     assert not (tmp_path / "seen.json").exists()

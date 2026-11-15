@@ -22,8 +22,6 @@ from tests.execution_support import (
 )
 from tests.test_workspace_seed import (
     _LOCKS as _LOCKS,
-)
-from tests.test_workspace_seed import (
     CUTOFF as CUTOFF,
 )
 

@@ -6,6 +6,7 @@ import importlib.util
 import json
 import sys
 from pathlib import Path
+from types import ModuleType
 
 import pytest
 
@@ -14,7 +15,7 @@ RUNNER = ROOT / "contract" / "conformance" / "check.py"
 CASES = ROOT / "contract" / "conformance" / "cases.json"
 
 
-def _load_runner():
+def _load_runner() -> ModuleType:
     spec = importlib.util.spec_from_file_location("raidar_contract_conformance", RUNNER)
     assert spec is not None
     assert spec.loader is not None
@@ -25,16 +26,18 @@ def _load_runner():
 
 
 @pytest.fixture(scope="module")
-def conformance():
+def conformance() -> tuple[ModuleType, list[dict[str, object]]]:
     return _load_runner(), json.loads(CASES.read_text(encoding="utf-8"))
 
 
-def _ids():
+def _ids() -> list[str]:
     return [case["id"] for case in json.loads(CASES.read_text(encoding="utf-8"))]
 
 
 @pytest.mark.parametrize("case_id", _ids())
-def test_contract_conformance(case_id: str, conformance) -> None:
+def test_contract_conformance(
+    case_id: str, conformance: tuple[ModuleType, list[dict[str, object]]]
+) -> None:
     runner, cases = conformance
     case = next(item for item in cases if item["id"] == case_id)
     runner.check_case(case)

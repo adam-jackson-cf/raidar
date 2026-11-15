@@ -23,15 +23,19 @@ from raidar.scoring.judge.report import rubric_shadow_report
 from raidar.scoring.judge.rubric import (
     RUBRIC_POLICY,
     CheckpointSource,
+    Judgement,
     JudgementStatus,
+    RubricCheckpoint,
     RubricRunner,
 )
 from raidar.scoring.judge.rubric_questions import (
     SCB_RUBRIC_FILE,
     QuestionSetError,
     Requirement,
+    RubricQuestionSet,
     load_rubric_question_set,
 )
+from raidar.scoring.judge.runtime import JevRuntime
 from raidar.scoring.judge.session import open_runtime
 from raidar.scoring.judge.symbols import (
     MODULE_QUALNAME,
@@ -159,6 +163,25 @@ def _trajectory(root: Path) -> list[CheckpointSource]:
     ]
 
 
+def _judgements_of(checkpoint: RubricCheckpoint, qualname: str) -> list[Judgement]:
+    return [item for item in checkpoint.judgements if item.symbol.qualname == qualname]
+
+
+def _assert_audit_rebuilds_each_carry(runtime: JevRuntime, carried: list[Judgement]) -> None:
+    """The audit alone rebuilds each carry: its answers and its origin decision."""
+    audited = {record.request_id: record for record in runtime.audit.decisions(RUBRIC_POLICY)}
+    carry_records = [r for r in audited.values() if r.stage is DecisionStage.DETERMINISTIC]
+    assert len(carry_records) == len(carried)
+    for item in carried:
+        record = audited[item.request_id]
+        origin = audited[record.carried_from or ""]
+        assert record.rule == "carry_forward:checkpoint_1"
+        assert (origin.stage, origin.answers) == (DecisionStage.JEV, record.answers)
+        assert {name: answer["noul"] for name, answer in (record.answers or {}).items()} == dict(
+            item.answers or {}
+        )
+
+
 def test_rubric_asks_changed_symbols_carries_unchanged_ones_and_replays_for_free(
     tmp_path: Path,
 ) -> None:
@@ -172,35 +195,23 @@ def test_rubric_asks_changed_symbols_carries_unchanged_ones_and_replays_for_free
     question_set = load_rubric_question_set()
     first, second = RubricRunner(runtime, question_set).run(sources)
 
-    def by_symbol(checkpoint, qualname):
-        return [item for item in checkpoint.judgements if item.symbol.qualname == qualname]
-
     assert first.python_files == 1  # .gitignore does not hide app.py from the assessor
     # Every requirement, codebase scope included, has its input: all are asked.
     assert {item.status for item in first.judgements} == {JudgementStatus.ANSWERED}
-    stable = by_symbol(second, "stable")
+    stable = _judgements_of(second, "stable")
     carried = [item for item in stable if item.status is JudgementStatus.CARRIED]
     # Only changed symbols are asked (memo §3.5): an unchanged span carries every
     # settled request, although the file and the cumulative spec both changed.
     assert {item.requires for item in carried} == set(Requirement)
     assert JudgementStatus.ANSWERED not in {item.status for item in stable}
     assert all(item.carried_from == "checkpoint_1" for item in carried)
-    assert all(not item.span_unchanged for item in by_symbol(second, "edited"))
-    assert all(item.status is not JudgementStatus.CARRIED for item in by_symbol(second, "added"))
+    assert all(not item.span_unchanged for item in _judgements_of(second, "edited"))
+    assert all(
+        item.status is not JudgementStatus.CARRIED for item in _judgements_of(second, "added")
+    )
     assert second.unsupported_files == ("x.js",)
 
-    # The audit alone rebuilds each carry: its answers and its origin decision.
-    audited = {record.request_id: record for record in runtime.audit.decisions(RUBRIC_POLICY)}
-    carry_records = [r for r in audited.values() if r.stage is DecisionStage.DETERMINISTIC]
-    assert len(carry_records) == len(carried)
-    for item in carried:
-        record = audited[item.request_id]
-        origin = audited[record.carried_from or ""]
-        assert record.rule == "carry_forward:checkpoint_1"
-        assert (origin.stage, origin.answers) == (DecisionStage.JEV, record.answers)
-        assert {name: answer["noul"] for name, answer in (record.answers or {}).items()} == dict(
-            item.answers or {}
-        )
+    _assert_audit_rebuilds_each_carry(runtime, carried)
     asked_questions = [q for call in transport.calls for q in call["body"]["questions"]]
     codebase = {c.name for c in question_set.criteria if c.requires is Requirement.CODEBASE}
     assert "implicit_default_parameters" in codebase & set(asked_questions)
@@ -336,6 +347,41 @@ def main():
 """
 
 
+def _assert_oversized_codebase_is_clipped(
+    tmp_path: Path,
+    snapshot: Path,
+    source: CheckpointSource,
+    question_set: RubricQuestionSet,
+    codebase: list[Judgement],
+) -> None:
+    """A codebase too large for the budget is clipped (partial) and stays under the cap."""
+    label = "x" * 2_000
+    big = "\n".join(
+        f"def helper_{i}(value, scale=1, label='{label}'):\n    return render([value])\n"
+        for i in range(60)
+    )
+    (snapshot / "big.py").write_text("from app import render\n\n" + big)
+    capped = make_runtime(
+        tmp_path / "s2", transport=RecordedTransport(), policies=(policy(RUBRIC_POLICY),)
+    )
+    render_criteria = {
+        name for item in codebase if item.symbol.qualname == "render" for name in item.criteria
+    }
+    narrowed = replace(
+        question_set,
+        criteria=tuple(item for item in question_set.criteria if item.name in render_criteria),
+    )
+    (large,) = RubricRunner(capped, narrowed).run([source])
+    render_requests = [
+        item
+        for item in large.judgements
+        if item.requires is Requirement.CODEBASE and item.symbol.qualname == "render"
+    ]
+    assert [item.sufficiency for item in render_requests] == [SufficiencyLevel.PARTIAL]
+    assert render_requests[0].status is JudgementStatus.ANSWERED
+    assert capped.totals.failures == {}
+
+
 def test_codebase_scope_criteria_get_a_bounded_whole_codebase_state(tmp_path: Path) -> None:
     snapshot = tmp_path / "snapshots" / "checkpoint_1"
     snapshot.mkdir(parents=True)
@@ -370,33 +416,7 @@ def test_codebase_scope_criteria_get_a_bounded_whole_codebase_state(tmp_path: Pa
     assert None not in result.expected_counts().values()
     report = rubric_shadow_report([result], runtime, policy_id=RUBRIC_POLICY)
     assert report["totals"]["input_sufficiency"]["value"] == 1.0
-
-    # A codebase too large for the budget is clipped (partial) and stays under the cap.
-    label = "x" * 2_000
-    big = "\n".join(
-        f"def helper_{i}(value, scale=1, label='{label}'):\n    return render([value])\n"
-        for i in range(60)
-    )
-    (snapshot / "big.py").write_text("from app import render\n\n" + big)
-    capped = make_runtime(
-        tmp_path / "s2", transport=RecordedTransport(), policies=(policy(RUBRIC_POLICY),)
-    )
-    render_criteria = {
-        name for item in codebase if item.symbol.qualname == "render" for name in item.criteria
-    }
-    narrowed = replace(
-        question_set,
-        criteria=tuple(item for item in question_set.criteria if item.name in render_criteria),
-    )
-    (large,) = RubricRunner(capped, narrowed).run([source])
-    render_requests = [
-        item
-        for item in large.judgements
-        if item.requires is Requirement.CODEBASE and item.symbol.qualname == "render"
-    ]
-    assert [item.sufficiency for item in render_requests] == [SufficiencyLevel.PARTIAL]
-    assert render_requests[0].status is JudgementStatus.ANSWERED
-    assert capped.totals.failures == {}
+    _assert_oversized_codebase_is_clipped(tmp_path, snapshot, source, question_set, codebase)
 
 
 def test_codebase_focus_for_module_statements_lists_uses_of_module_names() -> None:

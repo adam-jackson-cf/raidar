@@ -39,6 +39,7 @@ from raidar.scoring.process_checks import (
 )
 from raidar.scoring.process_checks.manifest import PROCESS_COMPLIANCE
 from raidar.scoring.process_checks.work_tests import is_test_file
+from raidar_contract.canonical import digest_json
 from tests.scorer_support import traced_memory_context
 from tests.test_process_compliance_work_session import GATE_PATTERN, PROMPT, _ran
 from tests.trace_trial_support import (
@@ -64,7 +65,7 @@ WORK = "work_session_tests_run_before_finish"
 CODE = codex_patch("e0", "/app/forge.py")
 
 
-def _ambiguous() -> dict:
+def _ambiguous() -> dict[str, Any]:
     """A message-only plan and an unparsed in-place write after the test run."""
     return trajectory(
         agent_step(1, message="Plan:\n1. edit main\n2. run tests"),
@@ -74,21 +75,21 @@ def _ambiguous() -> dict:
     )
 
 
-def _decided_pass() -> dict:
+def _decided_pass() -> dict[str, Any]:
     return trajectory(
         agent_step(1, PLAN), agent_step(2, EDIT), agent_step(3, codex_exec("t1", "pytest"))
     )
 
 
-def _decided_fail() -> dict:
+def _decided_fail() -> dict[str, Any]:
     return trajectory(agent_step(1, codex_exec("t1", "pytest")), agent_step(2, EDIT))
 
 
-def _no_edit() -> dict:
+def _no_edit() -> dict[str, Any]:
     return trajectory(agent_step(1, codex_exec("r1", "cat app/main.py")))
 
 
-def _plain_ctx(tmp_path: Path, *traces: dict, **config: Any) -> AssessContext:
+def _plain_ctx(tmp_path: Path, *traces: dict[str, Any], **config: Any) -> AssessContext:
     steps = [TracedStep(f"checkpoint_{i}", trace=trace) for i, trace in enumerate(traces, 1)]
     return traced_memory_context(tmp_path, steps, config=config)
 
@@ -114,7 +115,7 @@ def test_the_manifest_has_only_deterministic_metrics_and_no_jev_binding() -> Non
 
 def test_its_implementation_digest_covers_no_jev_code(monkeypatch: pytest.MonkeyPatch) -> None:
     modules: list[str] = []
-    original = registry.digest_json
+    original = digest_json
 
     def spy(value: Any) -> str:
         if isinstance(value, dict) and "modules" in value:
@@ -188,7 +189,7 @@ def test_an_invalid_config_is_an_error_on_every_metric(tmp_path: Path) -> None:
 # ---- the work session's test runs -----------------------------------------------------
 
 
-def _ctx(tmp_path: Path, *traces: dict, **config: Any) -> AssessContext:
+def _ctx(tmp_path: Path, *traces: dict[str, Any], **config: Any) -> AssessContext:
     steps = [TracedStep(f"checkpoint_{i}", trace=trace) for i, trace in enumerate(traces, 1)]
     return traced_memory_context(
         tmp_path, steps, config={"extra_test_patterns": [GATE_PATTERN], **config}

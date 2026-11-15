@@ -8,10 +8,10 @@ from pathlib import Path
 from typing import Any
 
 import yaml
-from raidar_contract.workflow import WORKFLOW_FILE, load_package_workflow, package_workflow_digest
 
 from raidar.contract.paths import agents_root, releases_file, workflows_root
 from raidar.subject.agent.definition import load_agent
+from raidar_contract.workflow import WORKFLOW_FILE, load_package_workflow, package_workflow_digest
 
 REAL_LAB = Path(__file__).resolve().parents[2] / "lab"
 REAL_PACKAGE = REAL_LAB / "stages" / "raidar" / "docs-check"

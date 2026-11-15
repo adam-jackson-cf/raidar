@@ -16,6 +16,7 @@ from typing import Any
 import pytest
 
 from raidar.contract.snapshot import tree_digest
+from raidar.grading.bundle import VerifierBundle
 from raidar.grading.models import (
     CaseGroup,
     CaseResult,
@@ -47,6 +48,8 @@ from raidar.grading.records import (
     write_step_record,
 )
 from raidar.grading.regrade import RegradeError, RegradeOptions
+from raidar.grading.sandbox import GradingSandbox
+from tests.verifier_support import LocalProcessSandbox
 
 STEP = "checkpoint_2"
 RETAINED = "gate/pre_fix_1/app"
@@ -113,12 +116,14 @@ def grader(monkeypatch: pytest.MonkeyPatch) -> Grader:
 
 
 def _options(tmp_path: Path, environment: str = ENVIRONMENT) -> RegradeOptions:
-    class Sandbox:
+    class Sandbox(LocalProcessSandbox):
+        """A sandbox that only reports its environment; the faked oracle never runs it."""
+
         async def environment_id(self) -> str:
             return environment
 
-    async def factory(bundle: Any) -> Sandbox:
-        return Sandbox()
+    async def factory(bundle: VerifierBundle) -> GradingSandbox:
+        return Sandbox(tmp_path / "sandbox")
 
     work = tmp_path / "work"
     work.mkdir(exist_ok=True)

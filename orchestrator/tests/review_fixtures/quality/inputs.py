@@ -77,4 +77,5 @@ def write_inputs(job: Path, record: TrialRecord, bundle_root: Path) -> TrialReco
         json.dumps({"step_results": [{"step_name": step.step} for step in record.step_results]}),
         encoding="utf-8",
     )
-    return record.model_copy(update={"step_results": tuple(results)})
+    updated: TrialRecord = record.model_copy(update={"step_results": tuple(results)})
+    return updated

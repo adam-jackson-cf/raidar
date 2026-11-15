@@ -14,8 +14,7 @@ import pytest
 
 from define_tool.stage import criteria_document
 from raidar.judge.live import RecordedJev
-from raidar.scoring import definition_coverage as definition
-from raidar.scoring import test_coverage as tests_scorer
+from raidar.scoring import definition_coverage as definition, test_coverage as tests_scorer
 from raidar.scoring.framework.context import AssessContext, StepInputs
 from raidar.scoring.framework.result import AssessResult, AssessStatus
 from tests.jev_support import TEST_KEY, RecordedTransport
@@ -146,7 +145,10 @@ def _trace(
 
 
 def _assess(scorer: Any, *steps: StepInputs) -> tuple[AssessResult, dict[str, bytes]]:
-    return scorer.assess_with_raw(AssessContext(problem="toy", steps=steps))
+    assessed: tuple[AssessResult, dict[str, bytes]] = scorer.assess_with_raw(
+        AssessContext(problem="toy", steps=steps)
+    )
+    return assessed
 
 
 def _value(result: AssessResult, metric: str, step: str = "checkpoint_1") -> float | None:
@@ -155,7 +157,8 @@ def _value(result: AssessResult, metric: str, step: str = "checkpoint_1") -> flo
 
 
 def _readings(raw: dict[str, bytes]) -> dict[str, Any]:
-    return json.loads(raw["readings.json"])["steps"]
+    steps: dict[str, Any] = json.loads(raw["readings.json"])["steps"]
+    return steps
 
 
 def test_definition_coverage_reads_each_required_unit_and_keeps_every_call(tmp_path: Path) -> None:

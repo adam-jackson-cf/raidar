@@ -10,8 +10,6 @@ from pathlib import Path
 import pytest
 import uv
 import yaml
-from raidar_contract.canonical import digest_json
-from raidar_contract.references import Release
 
 from raidar.contract import source_imports
 from raidar.contract.paths import releases_file, stage_checks_root, stages_root, workflows_root
@@ -44,11 +42,13 @@ from raidar.subject.workflow.package_runtime import (
     installed_trees,
     load_evidence,
 )
+from raidar_contract.canonical import digest_json
+from raidar_contract.references import Release
 from tests.package_support import STAGE_FIXTURES, fixture_package, note_state_package
 from tests.release_support import release_tree
 
 AGENT = "codex"
-REAL_DIGEST = identity._digest.__wrapped__  # type: ignore[attr-defined]
+REAL_DIGEST = identity._digest.__wrapped__
 
 
 @pytest.fixture(autouse=True)
@@ -166,7 +166,9 @@ def test_an_arm_without_packages_is_identified_by_the_runtime_primitives_alone(t
     identity = _arm(tree, "raidar/one-shot@1").identity()
 
     assert identity["packages"] == {}
-    assert set(identity["primitive_code"]) == {  # type: ignore[arg-type]
+    primitives = identity["primitive_code"]
+    assert isinstance(primitives, dict)
+    assert set(primitives) == {
         "frame/1",
         "install/1",
         "runner/1",
@@ -255,9 +257,8 @@ def test_a_normal_arm_needs_tracked_stage_check_proof_without_a_var_fallback(
 
 
 def test_a_stop_needs_its_check_record_and_the_lock_binds_it(tmp_path: Path) -> None:
-    from raidar_contract.references import Release
-
     from raidar.subject.workflow.package_checks import ResolvedStage
+    from raidar_contract.references import Release
 
     package = load_stage_package(fixture_package("note-state", tmp_path))
     stage = ResolvedStage(
@@ -329,7 +330,7 @@ def _uv(monkeypatch: pytest.MonkeyPatch, outcome: object) -> None:
             raise outcome
         return outcome
 
-    monkeypatch.setattr(package_checks.subprocess, "run", run)
+    monkeypatch.setattr(subprocess, "run", run)
 
 
 def _done(code: int, out: str = "", err: str = "") -> subprocess.CompletedProcess[str]:

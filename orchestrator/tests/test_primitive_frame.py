@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 import pytest
+
 from raidar_contract.package.tokens import FrameError, FramePart, render_frame
 
 BUILD = "Do the work.\n\n%%%TASK%%%\n\nMethod:\n%%%REVIEW_NOTES%%%\n\nAlso:\n%%%DOCS_CHECK%%%\n"

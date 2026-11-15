@@ -12,10 +12,6 @@ from typing import Any, ClassVar
 
 import pytest
 import yaml
-from raidar_contract.canonical import digest_json
-from raidar_contract.package.manifest import StagePackage
-from raidar_contract.references import Release
-from raidar_contract.workflow import PackageWorkflowDefinition
 
 from raidar.subject.package.registry import load_stage_package, stage_folder
 from raidar.subject.primitive import calls
@@ -23,11 +19,14 @@ from raidar.subject.primitive.calls import TreeManifest
 from raidar.subject.primitive.canary import StageCheckRecord
 from raidar.subject.primitive.gate import Attribution, GateOutcome
 from raidar.subject.primitive.install import InstalledPackage, InstallError
-from raidar.subject.workflow import identity, package_trial
-from raidar.subject.workflow import package as package_module
+from raidar.subject.workflow import identity, package as package_module, package_trial
 from raidar.subject.workflow.identity import package_primitives
 from raidar.subject.workflow.package_stage import PackageStage
 from raidar.subject.workflow.stage import Checkpoint
+from raidar_contract.canonical import digest_json
+from raidar_contract.package.manifest import StagePackage
+from raidar_contract.references import Release
+from raidar_contract.workflow import PackageWorkflowDefinition
 from tests.lifecycle_support import (
     NOTE_STATE,
     PACK,
@@ -252,7 +251,7 @@ def make_lab(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, env_class: type[En
     def check_record(digest: str, root: Path | None = None) -> dict[str, Any] | None:
         if not found.stored_check or digest != found.package.digest:
             return None
-        return found.expected_record().as_json()  # type: ignore[return-value]
+        return found.expected_record().as_json()
 
     async def upload_file(environment: Any, source: Path, target: str) -> None:
         destination = environment.host(target)

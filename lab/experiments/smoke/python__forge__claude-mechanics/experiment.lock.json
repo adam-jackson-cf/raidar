@@ -841,7 +841,7 @@
       "tree-sitter-language-pack": "0.13.0"
     }
   },
-  "document_sha256": "ced8cf681b4ddd96394be07be7db829bb4f25a8ecaaae412ed1bebbc466c441f",
+  "document_sha256": "8eb3a827271c8c214f945843a7cd915493f592cd55073b9da8bbabfe85fd2f48",
   "execution": {
     "arms": {
       "baseline": {
@@ -859,13 +859,13 @@
           "version_pin": "2.1.285",
           "workflow_skills": "placement.skills .claude/skills in the workspace /app"
         },
-        "digest": "6617d918d551b61948f18029efec3ea74a45459360d6a1fcbaf79c992890c6fe",
+        "digest": "e280a4d71881b9b00fae919f903aefd79f81a8707a92e7bae136719fce0729a7",
         "model": "claude-sonnet-4-6",
         "packages": {},
         "primitive_code": {
           "frame/1": "222d8ec4406851d6b78f8a42e3e6b7086b3b2778be8e1463929cca30fc24ec5a",
           "install/1": "988c3f18aee3231eb0fc3db6737e9d3cf68da17098e2969782d86d3ba83f81b4",
-          "runner/1": "a1c2f426559a00118048ffcb1f6d85808163c5a1cacdaccd150344be950db51a"
+          "runner/1": "58c99466a58e69ff69083a03ecd4556fbab4c144b3c457e555e0dbc4de3f6d4a"
         },
         "provider": "anthropic",
         "reasoning": "low",
@@ -1690,7 +1690,7 @@
     "source_sha256": "3e5f3def9bc794b16900848fb82b37ba490575e42bc7ee6157fe1678601440c5",
     "spec_sha256": "ae99368e7ab29bb6b6732afa0360c09645230d2124a21f84c72a7b0179236bed"
   },
-  "lock_sha256": "067ee9e45d25d21afba3ecc70eed9eca0b9a54be76162b46d74b6ede42bcf5dc",
+  "lock_sha256": "4fd954f331663c8f2ffa2948e29f57a60823d092fe4936f3d7e7a85ad3c694db",
   "lock_version": 5,
   "overrides": {
     "flags": {},
@@ -1699,7 +1699,7 @@
   "sections": {
     "analysis": "1b12d4c79118b1962282a0c33350352b893d39995117c241bba045eff2a1d044",
     "assessment": "e61075a3073c9e030edc1b88f8e27e8204bd05fca6889bb2e3510f6c6544d590",
-    "execution": "067ee9e45d25d21afba3ecc70eed9eca0b9a54be76162b46d74b6ede42bcf5dc",
+    "execution": "4fd954f331663c8f2ffa2948e29f57a60823d092fe4936f3d7e7a85ad3c694db",
     "toolchain": "57caa99992c5b2bb5d4f0ac51dba5ab949f084361d7d255b3636fa6bbd0a7e8d"
   },
   "spec": {

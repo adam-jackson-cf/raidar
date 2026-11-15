@@ -436,7 +436,9 @@ async def test_the_grader_image_is_built_offline_from_cached_wheels_and_then_reu
         *(f"wheels/{w.name}" for w in sorted(wheels.values(), key=lambda p: p.name)),
     ]
     assert "--hash=sha256:" in str(build["requirements"])
-    assert not any("tests" in str(name) for name in build["files"])  # type: ignore[union-attr]
+    files = build["files"]
+    assert isinstance(files, list)
+    assert not any("tests" in str(name) for name in files)
 
     def blocked(url: str) -> None:
         raise OSError("network blocked")
@@ -511,9 +513,14 @@ async def test_the_closure_image_is_built_once_per_base_and_lock(
     wheels = _wheeled(tmp_path, "pkg")
     lock = FakeResolver(wheels=wheels)(["pkg"], arch="amd64", exclude_newer=CUTOFF).lock_text
     sandbox = DockerCopySandbox(image="grader:base", docker_context="mbp")
-    options = {"cache_root": tmp_path / "cache"}
+    cache_root = tmp_path / "cache"
     first = await closure.ensure_closure_image(
-        "grader:base", lock, lock_sha256(lock), docker_context="mbp", python="/py", **options
+        "grader:base",
+        lock,
+        lock_sha256(lock),
+        docker_context="mbp",
+        python="/py",
+        cache_root=cache_root,
     )
     assert first.built
     assert first.image_id.startswith("sha256:")
@@ -523,7 +530,12 @@ async def test_the_closure_image_is_built_once_per_base_and_lock(
         "wheels/pkg-1.0-py3-none-any.whl",
     ]
     again = await closure.ensure_closure_image(
-        "grader:base", lock, lock_sha256(lock), docker_context="mbp", python="/py", **options
+        "grader:base",
+        lock,
+        lock_sha256(lock),
+        docker_context="mbp",
+        python="/py",
+        cache_root=cache_root,
     )
     assert not again.built
     assert again.tag == first.tag
