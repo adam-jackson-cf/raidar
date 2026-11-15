@@ -49,7 +49,12 @@ from raidar.scoring.judge.carry_forward import (
 from raidar.scoring.judge.codebase import CodebaseIndex
 from raidar.scoring.judge.redaction import Clipped, clip
 from raidar.scoring.judge.rubric_questions import Criterion, Requirement, RubricQuestionSet
-from raidar.scoring.judge.runtime import RULE_INPUT_MISSING, DecisionOutcome, JevRuntime
+from raidar.scoring.judge.runtime import (
+    RULE_INPUT_MISSING,
+    DecisionOutcome,
+    JevRuntime,
+    Settlement,
+)
 from raidar.scoring.judge.symbols import Symbol, SymbolParseError, extract_symbols
 
 RUBRIC_POLICY = "code-quality.rubric-smells"
@@ -326,17 +331,16 @@ class RubricRunner:
         def record_symbol(symbol: Symbol, text: str, hunks: list[DiffHunk], existed: bool) -> None:
             current.symbols[symbol.identity] = symbol
             unchanged = self._unchanged(symbol, prior, hunks, existed)
-            for requirement, criteria in _chunks(self.question_set, symbol):
+            for chunk in _chunks(self.question_set, symbol):
                 judgement = self._judge(
                     source,
                     symbol,
-                    requirement,
-                    criteria,
+                    chunk,
                     _Inputs(text, source.spec, codebase),
                     prior if unchanged else None,
                 )
                 judgement = replace(judgement, span_unchanged=unchanged)
-                key = (*symbol.identity, requirement.value, judgement.criteria)
+                key = (*symbol.identity, chunk[0].value, judgement.criteria)
                 current.judgements[key] = judgement
                 judgements.append(judgement)
 
@@ -371,11 +375,12 @@ class RubricRunner:
         self,
         source: CheckpointSource,
         symbol: Symbol,
-        requirement: Requirement,
-        criteria: tuple[Criterion, ...],
+        chunk: tuple[Requirement, tuple[Criterion, ...]],
         inputs: _Inputs,
         prior: _Prior | None,
     ) -> Judgement:
+        """Judge one requirement's chunk of criteria for ``symbol``, or carry its settled answer."""
+        requirement, criteria = chunk
         names = tuple(criterion.name for criterion in criteria)
         subject = f"{source.name}:{symbol.path}::{symbol.qualname}[{requirement.value}]"
         earlier = None
@@ -388,10 +393,12 @@ class RubricRunner:
             record = self.runtime.record_deterministic(
                 self.policy_id,
                 subject=subject,
-                rule=f"{RULE_CARRY_FORWARD}:{origin}",
-                verdict="carried",
-                answers=_as_noul_answers(earlier.answers),
-                carried_from=origin_request,
+                settlement=Settlement(
+                    rule=f"{RULE_CARRY_FORWARD}:{origin}",
+                    verdict="carried",
+                    answers=_as_noul_answers(earlier.answers),
+                    carried_from=origin_request,
+                ),
             )
             return Judgement(
                 checkpoint=source.name,

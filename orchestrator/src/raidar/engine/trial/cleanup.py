@@ -48,7 +48,7 @@ class TrialProject:
 
 
 def trial_projects(listing: str) -> list[TrialProject]:
-    """Raidar trial projects from ``docker ps -a`` lines of ``<project>\\t<state>``."""
+    r"""Raidar trial projects from ``docker ps -a`` lines of ``<project>\t<state>``."""
     states: dict[str, bool] = {}
     for line in listing.splitlines():
         project, _, state = line.strip().partition("\t")

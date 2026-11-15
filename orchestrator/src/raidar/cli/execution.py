@@ -13,9 +13,10 @@ from raidar.cli.plan_build import build_cli_plan
 from raidar.cli.target_options import job_target, run_guarded, target_option
 from raidar.contract.paths import jobs_root
 from raidar.engine.job.detach import default_job_id
-from raidar.engine.job.run import run_job
+from raidar.engine.job.run import execute
 from raidar.engine.job.run_checks import RunRefusedError, prepare_run
 from raidar.engine.trial.agent_config import AGENT_OVERRIDES
+from raidar.engine.trial.context import JobContext
 from raidar.engine.trial.plan import ExperimentPlan
 
 
@@ -155,7 +156,16 @@ def run_command(
     job_dir = jobs_dir.resolve() / plan.experiment_id / job_id
     records = run_guarded(
         job_dir,
-        run_job(plan, problems, job_dir=job_dir, job_id=job_id, target=jt, admission=admission),
+        execute(
+            JobContext(
+                plan=plan,
+                job_dir=job_dir,
+                job_id=job_id,
+                problems=problems,
+                target=jt,
+                admission=admission,
+            )
+        ),
     )
     click.echo(f"Job {job_dir}")
     for record in records:

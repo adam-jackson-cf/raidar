@@ -33,7 +33,7 @@ from raidar.engine.perf.budgets import (
     percentile,
 )
 from raidar.engine.perf.contention import Contention, TrialWindow, peak_during, peak_overlap
-from raidar.engine.perf.phases import phase_samples, trial_phases
+from raidar.engine.perf.phases import TrialTimeline, phase_samples, trial_phases
 from raidar.engine.perf.report import PerfReport, build_report, report_from_samples
 from raidar.grading.records import PRE_AGENT_LEAK_FILE, RECORD_FILE, step_record_dir
 from tests.execution_support import StepOutcome, _record
@@ -88,8 +88,7 @@ def _timeline(steps: int = 2) -> tuple[dict[str, Any], dict[str, PhaseReading]]:
 def _phases(*, steps: int = 2, seed: float | None = None, cold: bool = False) -> list[PhaseSample]:
     result, readings = _timeline(steps)
     return phase_samples(
-        result,
-        readings,
+        TrialTimeline(result, readings),
         arm_apply_s=0.25,
         environment_cold=cold,
         compose_init=not cold,
@@ -127,14 +126,14 @@ def test_phase_accounting_separates_leaks_seed_and_unbudgeted_work() -> None:
 
 
 def test_missing_timestamps_do_not_invent_durations_or_complete_aggregates() -> None:
-    assert phase_samples({}, {}, arm_apply_s=0.2, environment_cold=False, compose_init=True) == [
+    empty = TrialTimeline({}, {})
+    assert phase_samples(empty, arm_apply_s=0.2, environment_cold=False, compose_init=True) == [
         PhaseSample(phase="arm_apply", seconds=0.2)
     ]
     result, _ = _timeline()
     result["step_results"] = [None, {"step_name": "a"}, {"step_name": "b"}]
     samples = phase_samples(
-        result,
-        {"a": (0.0, None, []), "b": (0.0, None, [])},
+        TrialTimeline(result, {"a": (0.0, None, []), "b": (0.0, None, [])}),
         arm_apply_s=0,
         environment_cold=False,
         compose_init=True,

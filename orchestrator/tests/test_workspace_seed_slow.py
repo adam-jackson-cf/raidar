@@ -10,7 +10,12 @@ import pytest
 
 from raidar.contract.trial import CheckpointState, PlannedTrial, TrialHashes
 from raidar.design.experiment.schema import ProtocolSpec
-from raidar.engine.trial.collect import TrialContext, classify_trial, execution_validity
+from raidar.engine.trial.collect import (
+    TrialContext,
+    ValidityTerms,
+    classify_trial,
+    execution_validity,
+)
 from raidar.engine.trial.progression import progression_rule
 from raidar.engine.trial.workspace import SEED_SLUG, seed_check, seeded_digest, workspace_seed
 from tests.execution_support import (
@@ -120,7 +125,7 @@ def test_checkpoint_one_starts_from_the_seeded_workspace(tmp_path: Path) -> None
     assert first.parent_snapshot_digest == SEED_DIGEST
     assert first.snapshot is not None
     assert second.parent_snapshot_digest == first.snapshot.digest
-    validity = execution_validity(trial_dir, (first, second), PINNED, RULE)
+    validity = execution_validity(trial_dir, (first, second), ValidityTerms(PINNED, RULE))
     assert {check.name: check.passed for check in validity.checks}["lab_checks"] is True
 
 
@@ -145,7 +150,7 @@ def test_a_trial_whose_seed_is_missing_or_failed_is_an_infra_error_and_invalid(
     assert any(SEED_SLUG in reason for reason in first.infra_reasons)
     assert first.parent_snapshot_digest == (SEED_DIGEST if damage == "file-changed" else None)
     assert second.checkpoint_state is CheckpointState.SOLVED
-    validity = execution_validity(trial_dir, (first, second), PINNED, RULE)
+    validity = execution_validity(trial_dir, (first, second), ValidityTerms(PINNED, RULE))
     checks = {check.name: check for check in validity.checks}
     assert checks["lab_checks"].passed is False
     assert not validity.passed

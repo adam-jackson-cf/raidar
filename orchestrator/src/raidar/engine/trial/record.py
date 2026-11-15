@@ -20,6 +20,7 @@ from raidar.contract.trial import (
 from raidar.engine.perf.phases import trial_phases
 from raidar.engine.trial.collect import (
     TrialContext,
+    ValidityTerms,
     classify_trial,
     execution_validity,
     trial_exception,
@@ -44,6 +45,18 @@ class TrialEvidence:
     runner_exception: str | None
     image_id: str | None
     timeouts: Mapping[str, Any]
+
+
+@dataclass(frozen=True)
+class RecordScope:
+    """The job and plan facts every trial record of one job repeats."""
+
+    experiment: str
+    job_id: str
+    job_dir: Path
+    rule: ProgressionRule
+    max_checkpoints: int | None
+    agent_override: str | None
 
 
 def reached(
@@ -71,14 +84,9 @@ def _stored_dir(trial_dir: Path, job_dir: Path) -> str:
 
 def build_record(
     evidence: TrialEvidence,
-    *,
-    experiment: str,
-    job_id: str,
-    job_dir: Path,
-    rule: ProgressionRule,
-    max_checkpoints: int | None,
-    agent_override: str | None,
+    scope: RecordScope,
 ) -> TrialRecord:
+    rule, max_checkpoints = scope.rule, scope.max_checkpoints
     context = TrialContext(
         trial=evidence.trial,
         planned_steps=evidence.planned_steps,
@@ -97,22 +105,20 @@ def build_record(
         workspace_seed_s=seed_duration(evidence.trial_dir, evidence.trial.steps),
     )
     return TrialRecord(
-        experiment=experiment,
-        job_id=job_id,
+        experiment=scope.experiment,
+        job_id=scope.job_id,
         trial=evidence.trial,
-        trial_dir=_stored_dir(evidence.trial_dir, job_dir),
+        trial_dir=_stored_dir(evidence.trial_dir, scope.job_dir),
         progression=rule,
         truncated_to=max_checkpoints,
-        agent_override=agent_override,
+        agent_override=scope.agent_override,
         step_results=step_results,
         reached=reached_vector,
         reached_source=source,
         validity=execution_validity(
             evidence.trial_dir,
             step_results,
-            evidence.pinned_harness_version,
-            rule,
-            runnable=max_checkpoints,
+            ValidityTerms(evidence.pinned_harness_version, rule, max_checkpoints),
         ),
         phases=tuple(phases),
         trial_exception=trial_exception(evidence.trial_dir) or evidence.runner_exception,
@@ -169,13 +175,7 @@ def _unrun_step(
 
 def runner_failure_record(
     failure: RunnerFailure,
-    *,
-    experiment: str,
-    job_id: str,
-    job_dir: Path,
-    rule: ProgressionRule,
-    max_checkpoints: int | None,
-    agent_override: str | None,
+    scope: RecordScope,
 ) -> TrialRecord:
     """The record of a trial that could not run or be read: every planned step is infra.
 
@@ -183,6 +183,7 @@ def runner_failure_record(
     with the exception type, and the trial is invalid, so it is excluded
     as infrastructure rather than lost or counted as an agent failure.
     """
+    rule, max_checkpoints = scope.rule, scope.max_checkpoints
     error = type(failure.error).__name__
     reason = f"{RUNNER_EXCEPTION}:{error}"
     step_results = tuple(
@@ -192,13 +193,13 @@ def runner_failure_record(
     reached_vector, source = reached(rule, step_results, max_checkpoints)
     detail = f"{error}: {failure.error}"[:_DETAIL_LIMIT]
     return TrialRecord(
-        experiment=experiment,
-        job_id=job_id,
+        experiment=scope.experiment,
+        job_id=scope.job_id,
         trial=failure.trial,
-        trial_dir=_stored_dir(failure.trial_dir, job_dir),
+        trial_dir=_stored_dir(failure.trial_dir, scope.job_dir),
         progression=rule,
         truncated_to=max_checkpoints,
-        agent_override=agent_override,
+        agent_override=scope.agent_override,
         step_results=step_results,
         reached=reached_vector,
         reached_source=source,

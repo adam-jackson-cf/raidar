@@ -73,7 +73,8 @@ class TrialProvision:
 
 
 def provision_log(slug: str) -> PurePosixPath:
-    return PROVISION_DIR / f"{slug}.jsonl"
+    log: PurePosixPath = PROVISION_DIR / f"{slug}.jsonl"
+    return log
 
 
 def parse_check_output(stdout: str) -> dict[str, str]:

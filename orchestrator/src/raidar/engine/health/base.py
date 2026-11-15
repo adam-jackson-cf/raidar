@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
+from dataclasses import KW_ONLY, dataclass, field
 from pathlib import Path
 from typing import Any, cast
 
@@ -49,28 +50,27 @@ def read_ledger(trial_dir: Path, step: str) -> StepRecord | None:
         return None
 
 
+@dataclass(eq=False)
 class Audit:
-    """What one trial left behind, read once: the record, the job manifest, Harbor's result and
-    the step ledgers (``None`` for a step the verifier never graded)."""
+    """What one trial left behind, read once.
 
-    def __init__(
-        self,
-        job_dir: Path,
-        trial_dir: Path,
-        record: TrialRecord,
-        job: Mapping[str, Any],
-        *,
-        result: Mapping[str, Any] | None,
-        ledgers: Mapping[str, StepRecord | None],
-    ) -> None:
-        self.job_dir = job_dir
-        self.trial_dir = trial_dir
-        self.record = record
-        self.job = job
-        self.result = result
-        self.items = step_results(result)
-        self.attempted = attempted_steps(record)
-        self._ledgers = ledgers
+    Holds the record, the job manifest, Harbor's result and the step ledgers (``None`` for a step
+    the verifier never graded).
+    """
+
+    job_dir: Path
+    trial_dir: Path
+    record: TrialRecord
+    job: Mapping[str, Any]
+    _: KW_ONLY
+    result: Mapping[str, Any] | None
+    ledgers: Mapping[str, StepRecord | None]
+    items: dict[str, Mapping[str, Any]] = field(init=False)
+    attempted: tuple[StepResult, ...] = field(init=False)
+
+    def __post_init__(self) -> None:
+        self.items = step_results(self.result)
+        self.attempted = attempted_steps(self.record)
 
     @classmethod
     def from_disk(
@@ -87,7 +87,7 @@ class Audit:
         )
 
     def ledger(self, step: str) -> StepRecord | None:
-        return self._ledgers.get(step)
+        return self.ledgers.get(step)
 
     def graded(self) -> list[tuple[StepResult, StepRecord]]:
         pairs = ((r, self.ledger(r.step)) for r in self.attempted)

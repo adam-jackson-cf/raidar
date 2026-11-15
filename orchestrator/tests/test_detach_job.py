@@ -18,6 +18,7 @@ import pytest
 from raidar.engine.job.detach import (
     DetachError,
     JobFiles,
+    LaunchHost,
     SignalForwarder,
     _alive,
     detached_state,
@@ -142,10 +143,12 @@ def _plan(command: list[str], **changes: Any) -> Any:
         "experiment": Path("exp.yaml"),
         "job_dir": JOB,
         "job_id": "main-02",
-        "workdir": Path("/work"),
-        "launched_at": "2026-01-01T00:00:00+00:00",
-        "git": {"commit": "abc", "dirty": False, "error": None},
-        "python": "/usr/bin/python3",
+        "host": LaunchHost(
+            workdir=Path("/work"),
+            launched_at="2026-01-01T00:00:00+00:00",
+            git={"commit": "abc", "dirty": False, "error": None},
+            python="/usr/bin/python3",
+        ),
     } | changes
     return plan_launch(command, **arguments)
 

@@ -72,7 +72,7 @@ from raidar.evaluation.analysis.sources import (
 from raidar.grading.bundle import BundleError, load_bundle
 from raidar.scoring.catalog.builtin import default_scorer_registry
 from raidar.scoring.framework.registry import ScorerUnavailableError
-from raidar.scoring.framework.rescore import report_payload, rescore_path
+from raidar.scoring.framework.rescore import RescoreOptions, report_payload, rescore_path
 from raidar.scoring.framework.rescore_config import RescoreConfig, load_rescore_config
 from raidar.scoring.framework.store import AssessmentConflictError, AssessmentStore
 
@@ -269,10 +269,12 @@ def _rescore(request: _RescoreRequest, out: Path | None) -> None:
             request.scorer_refs,
             AssessmentStore(store),
             default_scorer_registry(),
-            config=settings.scorers,
-            inventory_policy=settings.inventory_policy,
-            bundle_override=request.bundle,
-            replay=request.replay,
+            options=RescoreOptions(
+                config=settings.scorers,
+                replay=request.replay,
+                inventory_policy=settings.inventory_policy,
+                bundle_override=request.bundle,
+            ),
         )
     except (ValueError, ScorerUnavailableError, AssessmentConflictError) as exc:
         # ValueError covers unknown references, invalid run inputs and rejected scorer output.

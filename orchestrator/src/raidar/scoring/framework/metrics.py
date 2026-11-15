@@ -33,14 +33,13 @@ from decimal import ROUND_HALF_EVEN, Decimal, localcontext
 from enum import StrEnum
 from pathlib import Path
 
-from raidar_contract.canonical import digest_json
-
 from raidar.contract.references import (
     RefKind,
     RegistryRef,
     RegistryReferenceError,
     ResolvedReference,
 )
+from raidar_contract.canonical import digest_json
 
 COMPONENT_IDS = ("C", "V", "E", "H", "R", "G")
 CORRECTNESS = "C"

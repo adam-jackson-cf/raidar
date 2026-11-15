@@ -20,8 +20,6 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import Any
 
-from raidar_contract.canonical import digest_json
-
 from raidar.contract.trial import PlannedTrial, ProgressionRule, TrialHashes
 from raidar.design.experiment.loader import LoadedExperiment
 from raidar.design.problem.models import ProblemId
@@ -31,6 +29,7 @@ from raidar.engine.trial.blueprint import ArmBlueprint, arm_blueprints
 from raidar.engine.trial.progression import progression_rule
 from raidar.grading.records import grading_execution_digest
 from raidar.subject.environment.python.pack_definition import PackSpec
+from raidar_contract.canonical import digest_json
 
 
 class PlanError(ValueError):
@@ -98,7 +97,7 @@ class ExperimentPlan:
 
     @property
     def concurrency(self) -> int:
-        """This machine's bound (``PlanOptions.concurrency``), else the experiment default."""
+        """The bound for this machine (``PlanOptions.concurrency``), else the experiment default."""
         return self.options.concurrency or self.loaded.spec.analysis.concurrency
 
     def selected_trials(self) -> list[PlannedTrial]:

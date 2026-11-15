@@ -38,7 +38,12 @@ from raidar.scoring.judge.policies import (
     load_policy,
 )
 from raidar.scoring.judge.promotion import build_promotion, verify_promotion
-from raidar.scoring.judge.runtime import RULE_INPUT_MISSING, DecisionOutcome, JevRuntime
+from raidar.scoring.judge.runtime import (
+    RULE_INPUT_MISSING,
+    DecisionOutcome,
+    JevRuntime,
+    Settlement,
+)
 from tests.jev_support import SUFFICIENT, RecordedTransport, make_runtime, noul_answer, policy
 
 RUBRIC = "code-quality.rubric-smells"
@@ -137,7 +142,7 @@ def test_every_decision_path_is_audited_exactly_once(tmp_path: Path) -> None:
         _decide(runtime, PROCESS, {"a": 4}),
     ]
     settled = runtime.record_deterministic(
-        PROCESS, subject="cp1:plan", rule="plan_file", verdict="complied"
+        PROCESS, subject="cp1:plan", settlement=Settlement(rule="plan_file", verdict="complied")
     )
     transport.status = 500
     failed = _decide(runtime, RUBRIC, {"a": 5})

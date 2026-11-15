@@ -134,7 +134,7 @@ def fit_threshold(points: Sequence[tuple[float, bool]]) -> float:
 
 
 def _floor(value: float) -> float:
-    scale = 10**METRIC_DIGITS
+    scale: int = 10**METRIC_DIGITS
     return math.floor(value * scale) / scale
 
 
@@ -418,7 +418,8 @@ def promoted_yaml(path: Path, policy: JevPolicy) -> str:
     body = yaml.safe_dump(
         policy.model_dump(mode="json", exclude_defaults=True), sort_keys=False, width=100
     )
-    return "\n".join(header) + "\n" + body
+    text: str = "\n".join(header) + "\n" + body
+    return text
 
 
 def write_promotion(path: Path, plan: PromotionPlan) -> None:

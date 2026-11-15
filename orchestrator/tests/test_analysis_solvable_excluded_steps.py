@@ -19,7 +19,7 @@ from raidar.design.experiment.lock import seal_lock
 from raidar.engine.job.assessment import lock_rescore_config
 from raidar.scoring.catalog.builtin import default_scorer_registry
 from raidar.scoring.catalog.outcomes import CORRECTNESS_REF
-from raidar.scoring.framework.rescore import rescore_path
+from raidar.scoring.framework.rescore import RescoreOptions, rescore_path
 from raidar.scoring.framework.store import AssessmentStore
 from tests.analysis_support import analysis_lock as _lock
 from tests.test_analysis_bound_prefix import ALL_STEPS, PROBLEM, _write_job
@@ -53,7 +53,7 @@ def _report(tmp_path: Path, excluded: set[str]) -> dict[str, Any]:
         (CORRECTNESS_REF,),
         AssessmentStore(store),
         default_scorer_registry(),
-        config=lock_rescore_config(lock).scorers,
+        options=RescoreOptions(config=lock_rescore_config(lock).scorers),
     )
     output = tmp_path / "out"
     result = _analyze(job_dir, store, lock_path, output)

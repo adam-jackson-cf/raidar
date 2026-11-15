@@ -39,6 +39,7 @@ from __future__ import annotations
 
 import json
 from collections.abc import Iterable, Mapping, Sequence
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -110,6 +111,19 @@ def _setup_sh_s(trial_dir: Path, step: str) -> float | None:
     return duration / 1000 if isinstance(duration, int | float) else None
 
 
+def _archive_gap(
+    step: str,
+    verifier_end: Any,
+    following: Mapping[str, Any],
+    readings: Mapping[str, tuple[float, float | None, list[PhaseSample]]],
+) -> list[PhaseSample]:
+    """From a step's verifier end to the next agent start, less the next leak check."""
+    next_start = parse_ts((following.get("agent_execution") or {}).get("started_at"))
+    archive = diff_s(next_start, verifier_end)
+    leak_next = readings[following["step_name"]][0]
+    return _sample("step_archive_gap", archive - leak_next if archive is not None else None, step)
+
+
 def _step_samples(
     steps: Sequence[Mapping[str, Any]],
     agent_setup_end: Any,
@@ -133,13 +147,7 @@ def _step_samples(
         )
         samples += recorded
         if index + 1 < len(steps):
-            following = steps[index + 1]
-            next_start = parse_ts((following.get("agent_execution") or {}).get("started_at"))
-            archive = diff_s(next_start, v_end)
-            leak_next = readings[following["step_name"]][0]
-            samples += _sample(
-                "step_archive_gap", archive - leak_next if archive is not None else None, name
-            )
+            samples += _archive_gap(name, v_end, steps[index + 1], readings)
         previous_end = v_end or a_end
     return samples, previous_end
 
@@ -169,9 +177,16 @@ def _aggregates(samples: Iterable[PhaseSample], condition: dict[str, str]) -> li
     return aggregates
 
 
+@dataclass(frozen=True)
+class TrialTimeline:
+    """A trial's Harbor result and its already-read per-step measurements, by step name."""
+
+    result: Mapping[str, Any]
+    readings: Mapping[str, tuple[float, float | None, list[PhaseSample]]]
+
+
 def phase_samples(
-    result: Mapping[str, Any],
-    readings: Mapping[str, tuple[float, float | None, list[PhaseSample]]],
+    timeline: TrialTimeline,
     *,
     arm_apply_s: float,
     environment_cold: bool,
@@ -179,6 +194,7 @@ def phase_samples(
     workspace_seed_s: float | None = None,
 ) -> list[PhaseSample]:
     """Derive timings from a result and already-read per-step measurements."""
+    result, readings = timeline.result, timeline.readings
     condition = {"environment": "cold" if environment_cold else "warm"}
     condition["teardown"] = "init" if compose_init else "no-init"
     steps = [item for item in result.get("step_results") or [] if isinstance(item, dict)]
@@ -222,8 +238,7 @@ def trial_phases(
         if isinstance(item, dict)
     }
     return phase_samples(
-        result,
-        readings,
+        TrialTimeline(result, readings),
         arm_apply_s=arm_apply_s,
         environment_cold=environment_cold,
         compose_init=compose_init,

@@ -18,7 +18,7 @@ import stat
 import time
 import tomllib
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 
 import yaml
@@ -71,7 +71,6 @@ def materialise_task(
     steps: tuple[str, ...],
     rule: ProgressionRule,
     arm: tuple[LoadedExperiment, str, str],
-    references: Mapping[str, Path] | None = None,
 ) -> MaterialisedTask:
     """Build the trial task at ``dest``.
 
@@ -104,9 +103,15 @@ def materialise_task(
         raise MaterialiseError(str(exc)) from exc
     write_setup_scripts(dest, list(steps))
     arm_apply_s = time.perf_counter() - started
-    if references is not None:
-        _write_solutions(dest, {step: references[step] for step in steps})
     return MaterialisedTask(dest, content_digest(dest), arm_apply_s)
+
+
+def with_solutions(
+    task: MaterialisedTask, steps: tuple[str, ...], references: Mapping[str, Path]
+) -> MaterialisedTask:
+    """Write each planned step's reference solution into ``task``; its digest covers them."""
+    _write_solutions(task.path, {step: references[step] for step in steps})
+    return replace(task, digest=content_digest(task.path))
 
 
 def _environment_image(task_dir: Path) -> str | None:

@@ -13,6 +13,7 @@ so the verifier reports the separate ``halt_gate`` signal, including pinned excl
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -37,8 +38,11 @@ def verifier_timeout_s(protocol: ProtocolSpec) -> float:
 
 
 def _pinned(plan: ExperimentPlan, trial: PlannedTrial) -> dict[str, Any]:
-    """The problem-bound lock evidence the verifier is built with: the validated ``grader``
-    identity, and the pinned ``errata`` and ``solvable`` sets when the lock has them."""
+    """The problem-bound lock evidence the verifier is built with.
+
+    That is the validated ``grader`` identity, and the pinned ``errata`` and ``solvable`` sets
+    when the lock has them.
+    """
     target = plan.problems[trial.problem_index]
     if target.grader is None:
         raise ValueError(f"problem {trial.problem_index} pins no validated grader identity")
@@ -50,15 +54,19 @@ def _pinned(plan: ExperimentPlan, trial: PlannedTrial) -> dict[str, Any]:
     return pinned
 
 
+@dataclass(frozen=True)
+class TrialSite:
+    """Where a trial runs: its trials directory, its oracle bundle and the grader's context."""
+
+    trials_dir: Path
+    bundle_root: Path
+    docker_context: str
+
+
 def harbor_trial_config(
-    plan: ExperimentPlan,
-    trial: PlannedTrial,
-    task: Path,
-    *,
-    trials_dir: Path,
-    bundle_root: Path,
-    docker_context: str,
+    plan: ExperimentPlan, trial: PlannedTrial, task: Path, *, site: TrialSite
 ) -> TrialConfig:
+    trials_dir = site.trials_dir
     spec = plan.loaded.spec
     harness = plan.arms[trial.arm].arm.agent.harness
     grader_timeout = float(spec.protocol.verifier_timeout_sec)
@@ -78,8 +86,8 @@ def harbor_trial_config(
             import_path=VERIFIER_IMPORT_PATH,
             override_timeout_sec=verifier_timeout_s(spec.protocol),
             kwargs={
-                "oracle_bundle": str(bundle_root),
-                "docker_context": docker_context,
+                "oracle_bundle": str(site.bundle_root),
+                "docker_context": site.docker_context,
                 "snapshot_source": spec.protocol.snapshot_source,
                 "coverage": coverage,
                 "grader_timeout_s": grader_timeout,

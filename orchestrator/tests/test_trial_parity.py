@@ -35,8 +35,7 @@ def test_the_parity_record_keeps_each_distinct_agent_process_and_the_limits() ->
         seed_digest=SEED_DIGEST,
         network=[{"network_mode": "allowlist", "allowed_hosts": []}],
         image_id="sha256:i",
-        timeouts={"agent_timeout_s": 1800.0},
-        liveness=LIVENESS,
+        limits={"agent_timeout_s": 1800.0, "liveness": LIVENESS},
     )
 
     assert record.seed_digest == SEED_DIGEST
@@ -48,7 +47,7 @@ def test_the_parity_record_keeps_each_distinct_agent_process_and_the_limits() ->
 
 def test_missing_evidence_leaves_the_parity_parts_empty() -> None:
     record = build_parity(
-        [], seed_digest=None, network=[], image_id=None, timeouts={}, liveness=LIVENESS
+        [], seed_digest=None, network=[], image_id=None, limits={"liveness": LIVENESS}
     )
 
     assert (record.seed_digest, record.agent_process, record.network) == (None, (), ())

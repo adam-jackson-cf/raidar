@@ -28,6 +28,7 @@ from raidar.engine.trial.context import JobContext
 from raidar.engine.trial.provision import TrialProvision
 from raidar.engine.trial.record import (
     RUNNER_EXCEPTION,
+    RecordScope,
     RunnerFailure,
     runner_failure_record,
     write_record,
@@ -116,12 +117,14 @@ def _infra_record(job_dir: Path, *, rule: ProgressionRule = CONTINUE) -> TrialRe
             job_dir / TRIALS_DIR / "t0",
             ValueError("bad"),
         ),
-        experiment="exp",
-        job_id="job",
-        job_dir=job_dir,
-        rule=rule,
-        max_checkpoints=2,
-        agent_override=None,
+        RecordScope(
+            experiment="exp",
+            job_id="job",
+            job_dir=job_dir,
+            rule=rule,
+            max_checkpoints=2,
+            agent_override=None,
+        ),
     )
 
 
@@ -254,7 +257,12 @@ async def test_a_runner_exception_is_kept_on_the_classified_trial_with_its_limit
         seen["bundle_root"] = bundle_root
         return SimpleNamespace(trial_dir=JOB / TRIALS_DIR / "t0", exception_type="Timeout")
 
+    def solutions(task: object, steps: object, refs: dict[str, Path]) -> object:
+        seen["references"] = refs
+        return task
+
     monkeypatch.setattr(run, "materialise_task", materialise)
+    monkeypatch.setattr(run, "with_solutions", solutions)
     monkeypatch.setattr(run, "environment_cold", lambda _: False)
     monkeypatch.setattr(run, "environment_image_id", lambda _: "sha256:image")
     monkeypatch.setattr(run, "harbor_trial_config", lambda *_, **__: _config())
@@ -266,7 +274,7 @@ async def test_a_runner_exception_is_kept_on_the_classified_trial_with_its_limit
 
     record = await run.run_trial(_ctx(JOB, override=override, runner=runner), _trial())
 
-    assert seen["references"] == references
+    assert seen.get("references") == references
     assert seen["provisions"] == ("seed",)
     assert seen["bundle_root"] == JOB / "bundle"
     assert record.trial_exception == "Timeout"
@@ -295,12 +303,14 @@ def test_a_failed_trials_detail_is_bounded_and_its_outside_directory_stays_absol
         RunnerFailure(
             _trial(), (("s1", "cp-s1"),), Path("/elsewhere/t0"), RuntimeError("x" * 2000)
         ),
-        experiment="exp",
-        job_id="job",
-        job_dir=JOB,
-        rule=CONTINUE,
-        max_checkpoints=None,
-        agent_override=None,
+        RecordScope(
+            experiment="exp",
+            job_id="job",
+            job_dir=JOB,
+            rule=CONTINUE,
+            max_checkpoints=None,
+            agent_override=None,
+        ),
     )
     assert record.trial_dir == "/elsewhere/t0"
     detail = record.validity.checks[0].detail

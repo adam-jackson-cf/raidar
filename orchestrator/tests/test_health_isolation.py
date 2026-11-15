@@ -18,6 +18,7 @@ from raidar.engine.health.isolation import (
     _audit_findings,
     _before_snapshot,
     _broken_components,
+    _Findings,
     _json,
     _origin_files,
     _placed_lines,
@@ -99,19 +100,9 @@ def run(
     before: Mapping[str, str] | None = None,
     step: str = STEP,
 ) -> HealthCheck:
-    violations: dict[str, str] = {}
-    unmeasured: list[str] = []
-    messages: dict[str, list[dict[str, str]]] = {}
-    checked = _step_findings(
-        step,
-        flow,
-        reader(FILES if files is None else files),
-        workspace(before),
-        violations,
-        unmeasured,
-        messages,
-    )
-    return _verdict(checked, violations, unmeasured, messages)
+    found = _Findings()
+    _step_findings(step, flow, reader(FILES if files is None else files), workspace(before), found)
+    return _verdict(found)
 
 
 # --- verdicts over whole steps ---------------------------------------------------------------
@@ -174,13 +165,13 @@ def test_many_findings_are_summarised() -> None:
 
 
 def test_no_checked_records_and_no_reason_is_unmeasured_for_no_attempted_step() -> None:
-    check = _verdict(0, {}, [], {})
+    check = _verdict(_Findings())
     assert check.status == "unmeasured"
     assert not check.evidence["unmeasured"]
 
 
 def test_unmeasured_reasons_are_deduplicated_in_the_verdict() -> None:
-    check = _verdict(1, {}, ["same", "same", "other"], {})
+    check = _verdict(_Findings(checked=1, unmeasured=["same", "same", "other"]))
     assert check.evidence["unmeasured"] == ["same", "other"]
 
 
@@ -521,17 +512,16 @@ def test_messages_are_grouped_by_harness_version_and_deduplicated() -> None:
 
 
 def test_step_findings_label_findings_by_step_stage_and_turn_and_sum_records() -> None:
-    violations: dict[str, str] = {}
-    unmeasured: list[str] = []
+    found = _Findings()
     flow = workflow(audit(records=2, skill_roots=["/x"]), audit(records=3, unmeasured=["gap"]))
-    checked = _step_findings(STEP, flow, reader(FILES), None, violations, unmeasured, {})
-    assert checked == 5
-    assert violations == {
+    _step_findings(STEP, flow, reader(FILES), None, found)
+    assert found.checked == 5
+    assert found.violations == {
         "skill root outside the workspace: /x": (
             f"skill root outside the workspace: /x ({STEP}/build/1)"
         )
     }
-    assert unmeasured == [f"{STEP}/build/2: gap"]
+    assert found.unmeasured == [f"{STEP}/build/2: gap"]
 
 
 # --- thin disk readers -----------------------------------------------------------------------

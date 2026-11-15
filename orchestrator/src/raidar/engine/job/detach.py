@@ -132,6 +132,16 @@ def _write_json(path: Path, payload: dict[str, Any]) -> None:
 
 
 @dataclass(frozen=True)
+class LaunchHost:
+    """Where and when a detached launch starts: its working directory, clock, git and Python."""
+
+    workdir: Path
+    launched_at: str
+    git: dict[str, Any]
+    python: str
+
+
+@dataclass(frozen=True)
 class LaunchPlan:
     """The launch record and supervisor argv of one detached launch."""
 
@@ -146,12 +156,9 @@ def plan_launch(
     experiment: Path,
     job_dir: Path,
     job_id: str,
-    workdir: Path,
-    launched_at: str,
-    git: dict[str, Any],
-    python: str,
+    host: LaunchHost,
 ) -> LaunchPlan:
-    """The launch record and supervisor argv for absolute ``job_dir`` and ``workdir``; pure."""
+    """The launch record and supervisor argv for absolute ``job_dir`` and workdir; pure."""
     detach = job_dir / DETACH_DIR
     full = [*command, f"JOB_ID={job_id}"]
     record = {
@@ -159,12 +166,12 @@ def plan_launch(
         "job_dir": str(job_dir),
         "experiment": str(experiment),
         "command": full,
-        "cwd": str(workdir),
-        "launched_at": launched_at,
+        "cwd": str(host.workdir),
+        "launched_at": host.launched_at,
         "log": str(detach / LOG_FILE),
-        "git": git,
+        "git": host.git,
     }
-    supervisor = [python, "-m", "raidar.engine.job.detach", "supervise", str(detach), "--"]
+    supervisor = [host.python, "-m", "raidar.engine.job.detach", "supervise", str(detach), "--"]
     return LaunchPlan(full, record, [*supervisor, *full])
 
 
@@ -191,10 +198,7 @@ def launch(
         experiment=experiment,
         job_dir=job_dir,
         job_id=job_id,
-        workdir=workdir,
-        launched_at=_now(),
-        git=git_state(workdir),
-        python=sys.executable,
+        host=LaunchHost(workdir, _now(), git_state(workdir), sys.executable),
     )
     _write_json(detach / LAUNCH_FILE, plan.record)
     with open(os.devnull, "rb") as stdin, (detach / LOG_FILE).open("ab") as log:

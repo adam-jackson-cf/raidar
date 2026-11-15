@@ -24,6 +24,7 @@ from raidar.engine.target.health import (
     ensure_target,
 )
 from raidar.engine.target.transport import (
+    HostSeams,
     TransportPaths,
     bounded_runner,
     docker_healthy,
@@ -148,7 +149,9 @@ def test_up_spawns_the_tunnel_creates_the_context_and_waits_for_the_daemon(
     docker = FakeDocker()
     tunnel = FakeTunnel(docker)
 
-    pid = transport_up(mbp, runner=docker, spawner=tunnel, base=tmp_path, sleep=lambda _: None)
+    pid = transport_up(
+        mbp, host=HostSeams(runner=docker, spawner=tunnel, base=tmp_path, sleep=lambda _: None)
+    )
 
     paths = TransportPaths.of(mbp, tmp_path)
     assert pid == tunnel.pid
@@ -170,7 +173,10 @@ def test_up_updates_an_existing_context_instead_of_creating_it(tmp_path: Path) -
     docker = FakeDocker(context_exists=True)
 
     transport_up(
-        mbp, runner=docker, spawner=FakeTunnel(docker), base=tmp_path, sleep=lambda _: None
+        mbp,
+        host=HostSeams(
+            runner=docker, spawner=FakeTunnel(docker), base=tmp_path, sleep=lambda _: None
+        ),
     )
 
     assert any(call[:3] == ["docker", "context", "update"] for call in docker.calls)
@@ -184,10 +190,12 @@ def test_up_reports_a_tunnel_that_exits(tmp_path: Path) -> None:
     with pytest.raises(RuntimeError, match="ssh tunnel to me@host exited"):
         transport_up(
             mbp,
-            runner=docker,
-            spawner=FakeTunnel(docker, dies=True),
-            base=tmp_path,
-            sleep=lambda _: None,
+            host=HostSeams(
+                runner=docker,
+                spawner=FakeTunnel(docker, dies=True),
+                base=tmp_path,
+                sleep=lambda _: None,
+            ),
         )
 
 
@@ -208,7 +216,10 @@ def test_up_does_not_leave_a_tunnel_behind_when_the_context_cannot_be_set(
 
     with pytest.raises(RuntimeError, match="docker context setup failed"):
         transport_up(
-            mbp, runner=failing_context, spawner=tunnel, base=tmp_path, sleep=lambda _: None
+            mbp,
+            host=HostSeams(
+                runner=failing_context, spawner=tunnel, base=tmp_path, sleep=lambda _: None
+            ),
         )
 
     assert tunnel.spawned == []
@@ -219,7 +230,10 @@ def test_the_state_directory_is_created_private(tmp_path: Path) -> None:
     docker = FakeDocker()
     base = tmp_path / "run"
 
-    transport_up(mbp, runner=docker, spawner=FakeTunnel(docker), base=base, sleep=lambda _: None)
+    transport_up(
+        mbp,
+        host=HostSeams(runner=docker, spawner=FakeTunnel(docker), base=base, sleep=lambda _: None),
+    )
 
     assert base.stat().st_mode & 0o777 == 0o700
 
@@ -241,12 +255,14 @@ def test_up_gives_up_when_the_daemon_never_answers(tmp_path: Path) -> None:
     with pytest.raises(RuntimeError, match="did not answer"):
         transport_up(
             mbp,
-            runner=docker,
-            spawner=Silent(docker),
-            base=tmp_path,
             timeout_s=1.0,
-            sleep=sleep,
-            clock=lambda: now[0],
+            host=HostSeams(
+                runner=docker,
+                spawner=Silent(docker),
+                base=tmp_path,
+                sleep=sleep,
+                clock=lambda: now[0],
+            ),
         )
 
 
@@ -275,12 +291,14 @@ def test_startup_bounds_slow_probes_and_cleans_up_the_failed_tunnel(
     with pytest.raises((RuntimeError, TimeoutError)):
         transport_up(
             mbp,
-            runner=runner,
-            spawner=tunnel,
-            base=tmp_path,
             timeout_s=4.0,
-            sleep=lambda seconds: now.__setitem__(0, now[0] + seconds),
-            clock=lambda: now[0],
+            host=HostSeams(
+                runner=runner,
+                spawner=tunnel,
+                base=tmp_path,
+                sleep=lambda seconds: now.__setitem__(0, now[0] + seconds),
+                clock=lambda: now[0],
+            ),
         )
 
     assert now[0] == pytest.approx(4.0)
@@ -295,7 +313,7 @@ def test_ensure_is_a_no_op_for_a_healthy_transport_target(tmp_path: Path) -> Non
     docker = FakeDocker(healthy=True)
     tunnel = FakeTunnel(docker)
 
-    ensure_target(mbp, runner=docker, spawner=tunnel, base=tmp_path)
+    ensure_target(mbp, host=HostSeams(runner=docker, spawner=tunnel, base=tmp_path))
 
     assert tunnel.spawned == []
 
@@ -305,7 +323,9 @@ def test_ensure_restarts_an_unhealthy_transport_target(tmp_path: Path) -> None:
     docker = FakeDocker()
     tunnel = FakeTunnel(docker)
 
-    ensure_target(mbp, runner=docker, spawner=tunnel, base=tmp_path, sleep=lambda _: None)
+    ensure_target(
+        mbp, host=HostSeams(runner=docker, spawner=tunnel, base=tmp_path, sleep=lambda _: None)
+    )
 
     assert len(tunnel.spawned) == 1
 
@@ -331,12 +351,14 @@ def test_ensure_bounds_all_subprocess_phases_by_the_shared_reconnect_budget(
     with pytest.raises(TargetUnavailableError):
         ensure_target(
             chosen,
-            runner=runner,
-            spawner=FakeTunnel(docker),
-            base=tmp_path,
             timeout_s=0.2,
-            sleep=lambda seconds: now.__setitem__(0, now[0] + seconds),
-            clock=lambda: now[0],
+            host=HostSeams(
+                runner=runner,
+                spawner=FakeTunnel(docker),
+                base=tmp_path,
+                sleep=lambda seconds: now.__setitem__(0, now[0] + seconds),
+                clock=lambda: now[0],
+            ),
         )
 
     assert now[0] <= 0.2
@@ -351,13 +373,15 @@ def test_ensure_wraps_a_failed_transport_and_an_unreachable_plain_target(tmp_pat
     with pytest.raises(TargetUnavailableError, match="transport to me@host failed"):
         ensure_target(
             items["mbp"],
-            runner=docker,
-            spawner=FakeTunnel(docker, dies=True),
-            base=tmp_path,
-            sleep=lambda _: None,
+            host=HostSeams(
+                runner=docker,
+                spawner=FakeTunnel(docker, dies=True),
+                base=tmp_path,
+                sleep=lambda _: None,
+            ),
         )
     with pytest.raises(TargetUnavailableError, match="'plain-ctx'.*unreachable"):
-        ensure_target(items["plain"], runner=docker)
+        ensure_target(items["plain"], host=HostSeams(runner=docker))
 
 
 def test_the_data_check_needs_exit_zero_and_the_expected_output(tmp_path: Path) -> None:
@@ -370,7 +394,7 @@ def test_the_data_check_needs_exit_zero_and_the_expected_output(tmp_path: Path) 
     docker.data_check = (3, "boom")
     assert "exited 3" in (data_check_failure(plain, docker) or "")
     with pytest.raises(TargetUnavailableError, match="exited 3"):
-        ensure_target(plain, runner=docker)
+        ensure_target(plain, host=HostSeams(runner=docker))
 
 
 def test_docker_facts_read_the_daemon_and_are_none_when_unreachable(tmp_path: Path) -> None:
@@ -507,7 +531,7 @@ def test_a_shared_deadline_bounds_every_subprocess(tmp_path: Path) -> None:
 
 def test_a_transport_less_target_cannot_be_brought_up(tmp_path: Path) -> None:
     with pytest.raises(ValueError, match="has no transport"):
-        transport_up(targets(tmp_path)["plain"], base=tmp_path)
+        transport_up(targets(tmp_path)["plain"], host=HostSeams(base=tmp_path))
 
 
 # ---- pid and tunnel liveness (os seams injected) ---------------------------------------
@@ -616,7 +640,10 @@ def test_down_terminates_a_running_tunnel_and_forgets_it(
     mbp, runner = _running_tunnel(monkeypatch, tmp_path, fake)
     paths = TransportPaths.of(mbp, tmp_path)
 
-    assert transport_down(mbp, base=tmp_path, runner=runner, sleep=lambda _s: None) is True
+    assert (
+        transport_down(mbp, host=HostSeams(base=tmp_path, runner=runner, sleep=lambda _s: None))
+        is True
+    )
 
     assert signal.SIGTERM in fake.signals
     assert signal.SIGKILL not in fake.signals
@@ -633,11 +660,13 @@ def test_down_kills_a_tunnel_that_ignores_terminate_once_the_wait_ends(
 
     stopped = transport_down(
         mbp,
-        base=tmp_path,
-        runner=runner,
-        sleep=lambda seconds: now.__setitem__(0, now[0] + seconds),
-        clock=lambda: now[0],
         deadline=2.0,
+        host=HostSeams(
+            base=tmp_path,
+            runner=runner,
+            sleep=lambda seconds: now.__setitem__(0, now[0] + seconds),
+            clock=lambda: now[0],
+        ),
     )
 
     assert stopped is True
@@ -652,7 +681,7 @@ def test_down_clears_stale_files_and_reports_nothing_was_running(
     mbp, runner = _running_tunnel(monkeypatch, tmp_path, fake)
     paths = TransportPaths.of(mbp, tmp_path)
 
-    assert transport_down(mbp, base=tmp_path, runner=runner) is False
+    assert transport_down(mbp, host=HostSeams(base=tmp_path, runner=runner)) is False
 
     assert fake.signals == [0]
     assert not paths.pidfile.exists()
@@ -673,7 +702,7 @@ def test_down_tolerates_a_tunnel_that_vanishes_before_the_terminate(
 
     monkeypatch.setattr(fake, "kill", kill)
 
-    assert transport_down(mbp, base=tmp_path, runner=runner) is True
+    assert transport_down(mbp, host=HostSeams(base=tmp_path, runner=runner)) is True
 
 
 # ---- health: malformed output and deadlines --------------------------------------------
@@ -713,7 +742,7 @@ def test_a_probe_past_the_deadline_makes_the_target_unavailable(tmp_path: Path) 
         raise TimeoutError("target operation deadline exceeded")
 
     with pytest.raises(TargetUnavailableError, match="target 'plain': .*deadline exceeded"):
-        ensure_target(targets(tmp_path)["plain"], runner=runner)
+        ensure_target(targets(tmp_path)["plain"], host=HostSeams(runner=runner))
 
 
 # ---- ``raidar target`` commands ---------------------------------------------------------

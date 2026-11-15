@@ -27,6 +27,7 @@ from raidar.engine.job import manifest, provenance, run
 from raidar.engine.target.config import Selection, Target
 from raidar.engine.target.guard import TargetGuard
 from raidar.engine.target.job import JobTarget
+from raidar.engine.trial.context import JobContext
 from raidar.engine.trial.plan import ExperimentPlan, PlanOptions, ProblemTarget
 from raidar.grading.bundle import BundleManifest, VerifierBundle
 from raidar.subject.environment.python.pack_definition import PackSpec
@@ -140,13 +141,15 @@ async def test_completion_records_only_finished_trials_and_preserves_abort_reaso
     plan, target, files, records, started = _memory_job(monkeypatch, ending)
     selected = plan.selected_trials()
     job_dir = Path("/memory-job")
-    invocation = run.run_job(
-        plan,
-        {},
-        job_dir=job_dir,
-        job_id="job",
-        target=target,
-        admission={"decision": "admitted"} if selected else None,
+    invocation = run.execute(
+        JobContext(
+            plan=plan,
+            job_dir=job_dir,
+            job_id="job",
+            problems={},
+            target=target,
+            admission={"decision": "admitted"} if selected else None,
+        )
     )
     if ending in {"trial_failure", "target_loss"}:
         error = RuntimeError if ending == "trial_failure" else ConnectionError

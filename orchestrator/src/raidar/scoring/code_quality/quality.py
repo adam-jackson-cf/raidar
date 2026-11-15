@@ -469,11 +469,11 @@ def _evidence(
     payload: Mapping[str, Any],
     ruff: tuple[str, tuple[dict[str, Any], ...], tuple[str, ...]],
     verbosity: tuple[Decimal, set[tuple[str, int]], set[tuple[str, int]], int, int],
-    ledger: _SymbolLedger,
-    erosion: Decimal,
+    erosion_ledger: tuple[_SymbolLedger, Decimal],
 ) -> ProductionQualityRawEvidence:
     version, diagnostics, invocation = ruff
     component, flagged, clone_lines, numerator, denominator = verbosity
+    ledger, erosion = erosion_ledger
     symbols, excluded = ledger.ordered()
     return ProductionQualityRawEvidence(
         checkpoint_id=checkpoint_id,
@@ -506,15 +506,23 @@ def _evidence(
     )
 
 
+@dataclass(frozen=True)
+class MeasuredRows:
+    """The file and symbol rows the measurement tool reported for one snapshot."""
+
+    files: Iterable[object]
+    symbols: Iterable[object]
+
+
 def produce_production_quality(
     checkpoint_id: str,
     root: Path,
     inventory: Iterable[object],
-    file_rows: Iterable[object],
-    symbol_rows: Iterable[object],
+    rows: MeasuredRows,
     tools: ToolEnvironment,
 ) -> ProductionQualityResult:
     """Produce V/E from the assessor inventory and the snapshot's measured rows."""
+    file_rows, symbol_rows = rows.files, rows.symbols
     if not checkpoint_id:
         raise ProductionQualityError("score_evidence_invalid: checkpoint identity missing")
     root = root.resolve()
@@ -529,5 +537,5 @@ def produce_production_quality(
     ledger, erosion = _erosion(symbol_rows, paths)
     if not (Decimal(0) <= verbosity[0] <= Decimal(1) and Decimal(0) <= erosion <= Decimal(1)):
         raise ProductionQualityError("score_evidence_invalid: component out of range")
-    evidence = _evidence(checkpoint_id, payload, ruff, verbosity, ledger, erosion)
+    evidence = _evidence(checkpoint_id, payload, ruff, verbosity, (ledger, erosion))
     return ProductionQualityResult(verbosity[0], erosion, evidence)

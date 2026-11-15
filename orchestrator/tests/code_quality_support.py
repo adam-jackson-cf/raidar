@@ -47,7 +47,7 @@ from raidar.scoring.code_quality.measurement import (
     ToolEnvironment,
     provisioned_environment,
 )
-from raidar.scoring.code_quality.quality import produce_production_quality
+from raidar.scoring.code_quality.quality import MeasuredRows, produce_production_quality
 from raidar.scoring.code_quality.regression import PARITY_UNAVAILABLE, calculate_regression_breadth
 from raidar.scoring.code_quality.snapshot_tool import cli
 from raidar.scoring.code_quality.transition import RunEvidences
@@ -332,8 +332,7 @@ def _rework_symbols(snapshot: Path, case: Mapping[str, Any], tools: ToolEnvironm
         "checkpoint",
         snapshot,
         build_inventory(snapshot).files,
-        measured["files"],
-        measured["symbols"],
+        MeasuredRows(measured["files"], measured["symbols"]),
         tools,
     )
     return rework_symbols(quality.evidence)

@@ -14,7 +14,6 @@ from typing import Any
 from harbor.models.task.config import EnvironmentConfig as TaskEnvironmentConfig
 from harbor.models.trial.config import TrialConfig
 from harbor.trial.trial import Trial
-from raidar_contract.canonical import digest_json
 
 from raidar.contract.source_digest import (
     SOURCE_DIGEST_SCHEME,
@@ -25,6 +24,7 @@ from raidar.design.experiment.lock import spec_source_digest
 from raidar.engine.job.detach import git_state
 from raidar.engine.trial.config import verifier_timeout_s
 from raidar.engine.trial.plan import ExperimentPlan
+from raidar_contract.canonical import digest_json
 
 # Changes here never reach a trial, so they do not make the runner dirty (the
 # user keeps untracked notes under docs/).
@@ -62,8 +62,11 @@ def runner_provenance() -> dict[str, Any]:
 
 
 def setup_limit(override: float | None) -> float:
-    """The agent-setup limit a trial runs with before multipliers: the arm's override, else
-    Harbor's own default, so H5 always has a limit to measure against."""
+    """The agent-setup limit a trial runs with before multipliers.
+
+    This is the arm's override, else Harbor's own default, so H5 always has a limit to measure
+    against.
+    """
     return float(Trial._AGENT_SETUP_TIMEOUT_SEC if override is None else override)  # noqa: SLF001
 
 

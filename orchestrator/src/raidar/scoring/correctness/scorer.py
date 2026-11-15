@@ -337,14 +337,22 @@ def _statused(
     ]
 
 
+@dataclass(frozen=True)
+class _AppliedVerdict:
+    """A derived verdict, the reason a step has none, and the verdict the progression gates on."""
+
+    verdict: Verdict
+    no_verdict: Callable[[StepInputs], str]
+    gate: Verdict = raw_verdict
+
+
 def _applied_observations(
     steps: tuple[StepInputs, ...],
     progression: str,
     applied: AppliedMetrics,
-    verdict: Verdict,
-    no_verdict: Callable[[StepInputs], str],
-    gate: Verdict = raw_verdict,
+    rule: _AppliedVerdict,
 ) -> list[Observation]:
+    verdict, no_verdict, gate = rule.verdict, rule.no_verdict, rule.gate
     observations = []
     for step in steps:
         gap = verdict_gap(step)
@@ -386,9 +394,9 @@ def errata_observations(ctx: AssessContext, config: CorrectnessConfig) -> list[O
         ctx.steps,
         config.progression,
         ERRATA,
-        errata_verdict(errata),
-        lambda step: "no oracle verdict",
-        halt_gate(ctx, config),
+        _AppliedVerdict(
+            errata_verdict(errata), lambda step: "no oracle verdict", halt_gate(ctx, config)
+        ),
     )
 
 
@@ -444,9 +452,11 @@ def solvable_observations(ctx: AssessContext, config: CorrectnessConfig) -> list
         ctx.steps,
         config.progression,
         SOLVABLE,
-        solvable_verdict(solvable),
-        lambda step: f"no solvable set is pinned for {ctx.problem} {step.step}",
-        solvable_verdict(solvable),
+        _AppliedVerdict(
+            solvable_verdict(solvable),
+            lambda step: f"no solvable set is pinned for {ctx.problem} {step.step}",
+            solvable_verdict(solvable),
+        ),
     )
     unpinned = [step.step for step in ctx.steps if step.step not in solvable.steps]
     if not unpinned:

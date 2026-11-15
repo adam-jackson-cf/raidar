@@ -7,17 +7,14 @@ layout is ``raidar.contract.job_layout``. One trial is ``raidar.engine.trial.run
 from __future__ import annotations
 
 import asyncio
-from collections.abc import Mapping
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
 
 from raidar.contract.job_layout import DETACH_DIR, JOB_MANIFEST, TRIAL_RECORDS_DIR
 from raidar.contract.trial import PlannedTrial, TrialRecord
 from raidar.design.problem.store import ImportedProblem, ProblemStore
 from raidar.engine.health.records_manifest import seal_trial
 from raidar.engine.job.manifest import start_job, write_json
-from raidar.engine.target.job import JobTarget
 from raidar.engine.trial.context import JobContext
 from raidar.engine.trial.driver import run_in_order
 from raidar.engine.trial.plan import ExperimentPlan
@@ -102,24 +99,3 @@ async def execute(ctx: JobContext) -> list[TrialRecord]:
             "records_manifests": dict(sorted(sealed.items())),
         }
         write_json(ctx.job_dir / JOB_MANIFEST, manifest)
-
-
-async def run_job(
-    plan: ExperimentPlan,
-    problems: Mapping[int, ImportedProblem],
-    *,
-    job_dir: Path,
-    job_id: str,
-    target: JobTarget,
-    admission: Mapping[str, Any] | None = None,
-) -> list[TrialRecord]:
-    """``execute`` a new job context for ``plan`` (what ``raidar run`` calls)."""
-    ctx = JobContext(
-        plan=plan,
-        job_dir=job_dir,
-        job_id=job_id,
-        problems=problems,
-        target=target,
-        admission=admission,
-    )
-    return await execute(ctx)

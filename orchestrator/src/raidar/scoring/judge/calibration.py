@@ -147,17 +147,23 @@ def supersede_labels(
     return records
 
 
+@dataclass(frozen=True)
+class SplitTrials:
+    """The audited trials a split assigns to calibration and to evaluation."""
+
+    calibration: Collection[str]
+    evaluation: Collection[str]
+
+
 def record_split(
-    audit: AuditLog,
-    policy: str,
-    *,
-    split_id: str,
-    calibration: Collection[str],
-    evaluation: Collection[str],
-    reason: str,
+    audit: AuditLog, policy: str, *, split_id: str, trials: SplitTrials, reason: str
 ) -> SplitRecord:
-    """Append a split of audited trials; refused when it names a trial the audit lacks
-    or reuses an id already recorded."""
+    """Append a split of audited trials.
+
+    The append is refused when the split names a trial the audit lacks or reuses an id already
+    recorded.
+    """
+    calibration, evaluation = trials.calibration, trials.evaluation
     known = {record.trial for record in audit.decisions(policy) if record.trial is not None}
     unknown = sorted((set(calibration) | set(evaluation)) - known)
     if unknown:

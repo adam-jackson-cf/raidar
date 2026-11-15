@@ -12,7 +12,6 @@ from __future__ import annotations
 from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
 
 from raidar.scoring.code_quality.architecture import (
     ProductionGraphError,
@@ -24,6 +23,7 @@ from raidar.scoring.code_quality.lineage_models import SymbolIdentity
 from raidar.scoring.code_quality.measurement import MeasurementError, ToolEnvironment
 from raidar.scoring.code_quality.models import ELIGIBILITY_CODES
 from raidar.scoring.code_quality.quality import (
+    MeasuredRows,
     ProductionQualityError,
     ProductionQualityResult,
     produce_production_quality,
@@ -159,15 +159,23 @@ def _measured(
     step: StepInputs,
     snapshot: Path,
     inventory: Inventory,
-    rows: Mapping[str, Any],
     tools: ToolEnvironment,
-    entry_gap: Gap | None,
-) -> Measured:
+    entry_file: str | None,
+) -> Measured | Gap:
+    entry_gap = _entry_gap(snapshot, entry_file)
+    try:
+        rows = tools.measure(snapshot, entry_file if entry_gap is None else None)
+    except MeasurementError as error:
+        return _ineligible(error)
     production = tuple(item.path for item in inventory.files if item.role is FileRole.PRODUCTION)
     quality: ProductionQualityResult | Gap
     try:
         quality = produce_production_quality(
-            step.checkpoint, snapshot, inventory.files, rows["files"], rows["symbols"], tools
+            step.checkpoint,
+            snapshot,
+            inventory.files,
+            MeasuredRows(rows["files"], rows["symbols"]),
+            tools,
         )
     except (ProductionQualityError, ValueError) as error:
         quality = _ineligible(error)
@@ -190,11 +198,6 @@ def measure_checkpoint(
         return CheckpointMeasure(
             step, gap or Gap(AssessStatus.UNAVAILABLE, "no snapshot"), inventory
         )
-    entry_gap = _entry_gap(step.snapshot, entry_file)
-    try:
-        rows = tools.measure(step.snapshot, entry_file if entry_gap is None else None)
-    except MeasurementError as error:
-        return CheckpointMeasure(step, _ineligible(error), inventory)
     return CheckpointMeasure(
-        step, _measured(step, step.snapshot, inventory, rows, tools, entry_gap), inventory
+        step, _measured(step, step.snapshot, inventory, tools, entry_file), inventory
     )

@@ -31,6 +31,7 @@ from raidar.engine.trial.materialise import (
     environment_cold,
     environment_image_id,
     materialise_task,
+    with_solutions,
 )
 from raidar.engine.trial.provision import PROVISION_DIR_NAME
 from raidar.engine.trial.task_config import configure_trial_task
@@ -402,13 +403,15 @@ def test_reference_solutions_are_written_as_executable_solve_scripts_for_planned
     vfs.put(unplanned / "other.py", "y = 2\n")
     dest = vfs.root / "trial"
 
-    materialise_task(
+    task = materialise_task(
         source,
         dest,
         steps=("checkpoint_1",),
         rule=CONTINUE,
         arm=(_arm(), "guided", "a" * 64),
-        references={"checkpoint_1": payload, "checkpoint_2": unplanned},
+    )
+    solved = with_solutions(
+        task, ("checkpoint_1",), {"checkpoint_1": payload, "checkpoint_2": unplanned}
     )
 
     solution = dest / "steps" / "checkpoint_1" / "solution"
@@ -420,6 +423,7 @@ def test_reference_solutions_are_written_as_executable_solve_scripts_for_planned
     assert mode & stat.S_IXOTH
     assert not (dest / "steps" / "checkpoint_2").exists()
     assert not any(p.name == "other.py" for p in vfs.files if dest in p.parents)
+    assert solved.digest != task.digest
 
 
 def test_a_trial_task_is_never_built_over_an_existing_directory(

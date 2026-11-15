@@ -3,20 +3,16 @@
 from __future__ import annotations
 
 import json
-import time
-from collections.abc import Callable
-from dataclasses import asdict, dataclass
-from pathlib import Path
+from dataclasses import asdict, dataclass, replace
 from typing import Any
 
 from raidar.engine.target.config import Target, TargetError
 from raidar.engine.target.transport import (
+    HostSeams,
     Runner,
-    Spawner,
     bounded_runner,
     docker_healthy,
     run_command,
-    spawn_detached,
     transport_up,
 )
 
@@ -77,63 +73,31 @@ def data_check_failure(target: Target, runner: Runner = run_command) -> str | No
 
 
 def ensure_target(
-    target: Target,
-    *,
-    runner: Runner = run_command,
-    spawner: Spawner = spawn_detached,
-    base: Path | None = None,
-    sleep: Callable[[float], None] | None = None,
-    timeout_s: float | None = None,
-    clock: Callable[[], float] = time.monotonic,
+    target: Target, *, host: HostSeams | None = None, timeout_s: float | None = None
 ) -> None:
     """Healthy: no-op. Unhealthy transport target: restart the tunnel. Then the data check."""
-    deadline = None if timeout_s is None else clock() + timeout_s
+    host = host or HostSeams()
+    deadline = None if timeout_s is None else host.clock() + timeout_s
     if deadline is not None:
-        runner = bounded_runner(runner, deadline, clock)
+        host = replace(host, runner=bounded_runner(host.runner, deadline, host.clock))
     try:
-        _ensure_target(
-            target,
-            runner=runner,
-            spawner=spawner,
-            base=base,
-            sleep=sleep,
-            clock=clock,
-            deadline=deadline,
-        )
+        _ensure_target(target, host, deadline)
     except TimeoutError as error:
         raise TargetUnavailableError(f"target {target.name!r}: {error}") from error
 
 
-def _ensure_target(
-    target: Target,
-    *,
-    runner: Runner,
-    spawner: Spawner,
-    base: Path | None,
-    sleep: Callable[[float], None] | None,
-    clock: Callable[[], float],
-    deadline: float | None,
-) -> None:
-    if not docker_healthy(target.docker_context, runner):
+def _ensure_target(target: Target, host: HostSeams, deadline: float | None) -> None:
+    if not docker_healthy(target.docker_context, host.runner):
         if target.transport is None:
             raise TargetUnavailableError(
                 f"docker context {target.docker_context!r} (target {target.name!r}) is unreachable"
             )
-        extra: dict[str, Any] = {} if sleep is None else {"sleep": sleep}
         try:
-            transport_up(
-                target,
-                runner=runner,
-                spawner=spawner,
-                base=base,
-                clock=clock,
-                deadline=deadline,
-                **extra,
-            )
+            transport_up(target, host=host, deadline=deadline)
         except (RuntimeError, OSError) as error:
             raise TargetUnavailableError(
                 f"target {target.name!r}: transport to {target.transport.host} failed: {error}"
             ) from error
-    failure = data_check_failure(target, runner)
+    failure = data_check_failure(target, host.runner)
     if failure is not None:
         raise TargetUnavailableError(f"target {target.name!r}: {failure}")

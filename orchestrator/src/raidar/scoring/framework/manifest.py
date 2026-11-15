@@ -13,10 +13,10 @@ from enum import StrEnum
 from typing import Self
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
-from raidar_contract.canonical import digest_json
 
 from raidar.contract.runtimes import ANY_RUNTIME
 from raidar.subject.environment.python.pack_definition import ToolExecution
+from raidar_contract.canonical import digest_json
 
 _ID_PATTERN = r"^[a-z0-9][a-z0-9-]*$"
 _METRIC_PATTERN = r"^[a-z0-9][a-z0-9_]*(\.[a-z0-9][a-z0-9_]*)*$"

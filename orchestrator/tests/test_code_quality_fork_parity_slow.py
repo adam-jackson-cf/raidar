@@ -25,7 +25,11 @@ import pytest
 from raidar.contract import file_io
 from raidar.scoring.code_quality.architecture import produce_production_graph
 from raidar.scoring.code_quality.checkpoint import eligibility_code
-from raidar.scoring.code_quality.quality import ProductionQualityError, produce_production_quality
+from raidar.scoring.code_quality.quality import (
+    MeasuredRows,
+    ProductionQualityError,
+    produce_production_quality,
+)
 from raidar.scoring.code_quality.snapshot_tool.cli import measure
 from raidar.scoring.framework.inventory import build_inventory
 from tests.code_quality_support import (
@@ -75,8 +79,7 @@ def _assert_quality_parity(
         checkpoint["checkpoint"],
         snapshot,
         inventory.files,
-        measured["files"],
-        measured["symbols"],
+        MeasuredRows(measured["files"], measured["symbols"]),
         quality_tools(),
     )
     if expected["production_quality"] is None:
@@ -114,8 +117,7 @@ def test_a_snapshot_without_production_source_is_ineligible_like_the_fork(
             "checkpoint_1",
             snapshot,
             build_inventory(snapshot).files,
-            measured["files"],
-            measured["symbols"],
+            MeasuredRows(measured["files"], measured["symbols"]),
             quality_tools(),
         )
     assert measured["graph"] == {"nodes": [], "edges": []}

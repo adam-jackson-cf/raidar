@@ -22,7 +22,7 @@ count.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import KW_ONLY, dataclass, field
 from typing import Any
 
 from raidar.judge.client import (
@@ -104,28 +104,34 @@ class _Request:
     sufficiency: InputSufficiency
 
 
+@dataclass(frozen=True)
+class Settlement:
+    """A decision a deterministic rule settled, and the answers it stands for.
+
+    A carry-forward repeats its origin's ``answers`` and names the origin decision's request id
+    in ``carried_from``.
+    """
+
+    rule: str
+    verdict: str
+    answers: JevAnswers | None = None
+    carried_from: str | None = None
+
+
+@dataclass(eq=False)
 class JevRuntime:
-    def __init__(
-        self,
-        policies: PolicyRegistry,
-        *,
-        audit: AuditLog,
-        cache: DecisionCache,
-        client: JevClient | None = None,
-        replay_only: bool = False,
-        trial: str | None = None,
-    ) -> None:
-        self.policies = policies
-        self.audit = audit
-        self.cache = cache
-        self._client = client
-        self._replay_only = replay_only
-        self._trial = trial
-        self.totals = RuntimeTotals()
+    policies: PolicyRegistry
+    _: KW_ONLY
+    audit: AuditLog
+    cache: DecisionCache
+    client: JevClient | None = field(default=None, repr=False)
+    replay_only: bool = False
+    trial: str | None = None
+    totals: RuntimeTotals = field(init=False, default_factory=RuntimeTotals)
 
     @property
     def has_client(self) -> bool:
-        return self._client is not None
+        return self.client is not None
 
     def decide(
         self,
@@ -137,7 +143,7 @@ class JevRuntime:
         sufficiency: InputSufficiency,
     ) -> DecisionOutcome:
         validate_questions(questions)
-        api_key = self._client.api_key if self._client else None
+        api_key = self.client.api_key if self.client else None
         request = _Request(
             policy=self.policies.get(policy_id),
             subject=redact(subject, api_key),
@@ -166,34 +172,26 @@ class JevRuntime:
         return self._settled(request, key, result, cache_hit=False)
 
     def record_deterministic(
-        self,
-        policy_id: str,
-        *,
-        subject: str,
-        rule: str,
-        verdict: str,
-        answers: JevAnswers | None = None,
-        carried_from: str | None = None,
+        self, policy_id: str, *, subject: str, settlement: Settlement
     ) -> DecisionRecord:
         """Audit a decision a deterministic rule settled before Jev was needed.
 
-        ``answers`` are the answers the settlement stands for (a carry-forward
-        repeats its origin's answers) and ``carried_from`` names the origin
-        decision's request id, so the audit alone can rebuild every ΣP. Under an
-        ``enforce`` policy the settlement counts toward verdicts like a Jev answer.
+        The settlement's ``answers`` and ``carried_from`` let the audit alone rebuild every ΣP.
+        Under an ``enforce`` policy the settlement counts toward verdicts like a Jev answer.
         """
+        answers = settlement.answers
         policy = self.policies.get(policy_id)
         self.totals.decisions += 1
         enforced = policy.mode is PolicyMode.ENFORCE
         return self.audit.append(
             self._record(
                 policy,
-                subject=redact(subject, self._client.api_key if self._client else None),
+                subject=redact(subject, self.client.api_key if self.client else None),
                 stage=DecisionStage.DETERMINISTIC,
-                rule=rule,
-                verdict=verdict,
+                rule=settlement.rule,
+                verdict=settlement.verdict,
                 answers=None if answers is None else answers_wire(answers),
-                carried_from=carried_from,
+                carried_from=settlement.carried_from,
                 enforced=enforced,
             )
         )
@@ -205,14 +203,14 @@ class JevRuntime:
                 f"Jev state is over {JEV_STATE_CHAR_LIMIT} characters.",
                 0,
             )
-        if self._client is None:
-            if self._replay_only:
+        if self.client is None:
+            if self.replay_only:
                 return JevFailure(FailureReason.CACHE_MISS, "No cached decision to replay.", 0)
             return JevFailure(
                 FailureReason.MISSING_KEY, "No OpenRouter API key is configured for Jev.", 0
             )
         self.totals.provider_calls += 1
-        return self._client.decide(request.state, request.questions)
+        return self.client.decide(request.state, request.questions)
 
     def _skipped(self, request: _Request, *, rule: str | None, verdict: str) -> DecisionOutcome:
         record = self._record(
@@ -284,7 +282,7 @@ class JevRuntime:
             mode=policy.mode,
             question_set=policy.question_set,
             stage=stage,
-            trial=self._trial,
+            trial=self.trial,
             input_sufficiency=sufficiency,
             verdict=verdict,
             enforced=enforced,

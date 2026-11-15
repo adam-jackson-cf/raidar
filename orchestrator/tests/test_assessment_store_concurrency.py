@@ -21,7 +21,12 @@ from raidar.grading.models import CaseStatus
 from raidar.grading.records import EVIDENCE_FILE, RECORD_FILE, step_record_dir
 from raidar.scoring.catalog.builtin import BUILTIN_IMPLEMENTATIONS, scorer_resolver
 from raidar.scoring.framework.metrics import MetricResolver
-from raidar.scoring.framework.rescore import RescoreError, RescoreOutcome, rescore_path
+from raidar.scoring.framework.rescore import (
+    RescoreError,
+    RescoreOptions,
+    RescoreOutcome,
+    rescore_path,
+)
 from raidar.scoring.framework.result import AssessResult, AssessStatus
 from raidar.scoring.framework.store import (
     Assessment,
@@ -218,7 +223,9 @@ def test_trials_that_stop_early_follow_the_bundle_plan_they_were_graded_with(
 
     plan = write_toy_bundle(tmp_path / "plan", ["checkpoint_1", "checkpoint_2"])
     with pytest.raises(RescoreError, match="does not match the digest"):
-        rescore_path(halted, [V1], store, fake_registry(), bundle_override=plan.root)
+        rescore_path(
+            halted, [V1], store, fake_registry(), options=RescoreOptions(bundle_override=plan.root)
+        )
     swapped = write_trial(tmp_path / "swapped", [StepFixture("checkpoint_2", APP_V1, None)])
     with pytest.raises(TrialInputError, match="not a prefix of the planned checkpoints"):
         load_trial_context(swapped, bundle_override=plan.root)

@@ -17,6 +17,7 @@ from __future__ import annotations
 import hashlib
 from collections import defaultdict
 from collections.abc import Iterable, Iterator
+from dataclasses import dataclass
 from pathlib import Path
 
 from raidar.contract.file_io import load_bytes
@@ -44,36 +45,34 @@ class FileDigests:
         return self._digests[path]
 
 
-def _item(
-    files: FileDigests,
-    metric: str,
-    subject: str,
-    root: Path,
-    path: str,
-    kind: str,
-    spans: Iterable[tuple[int, int]],
-    message: str,
-) -> Evidence:
-    return Evidence(
-        metric=metric,
-        subject=subject,
-        path=path,
-        sha256=files.sha256(root / path),
-        kind=kind,
-        spans=tuple(Span(line=start, end_line=end) for start, end in spans),
-        message=message,
-    )
+@dataclass(frozen=True)
+class _Cite:
+    """Cites one metric's evidence for ``subject`` in the snapshot files under ``root``."""
+
+    files: FileDigests
+    metric: str
+    subject: str
+    root: Path
+
+    def item(
+        self, path: str, kind: str, spans: Iterable[tuple[int, int]], message: str
+    ) -> Evidence:
+        return Evidence(
+            metric=self.metric,
+            subject=self.subject,
+            path=path,
+            sha256=self.files.sha256(self.root / path),
+            kind=kind,
+            spans=tuple(Span(line=start, end_line=end) for start, end in spans),
+            message=message,
+        )
 
 
 def ruff_evidence(
     files: FileDigests, metric: str, subject: str, root: Path, quality: ProductionQualityResult
 ) -> Iterator[Evidence]:
     for diagnostic in quality.evidence.ruff.diagnostics:
-        yield _item(
-            files,
-            metric,
-            subject,
-            root,
+        yield _Cite(files, metric, subject, root).item(
             diagnostic.path,
             f"ruff:{diagnostic.code}",
             [(diagnostic.start[0], diagnostic.end[0])],
@@ -86,11 +85,7 @@ def clone_evidence(
 ) -> Iterator[Evidence]:
     for number, group in enumerate(quality.evidence.clones, start=1):
         for path, start, end in group.occurrences:
-            yield _item(
-                files,
-                "verbosity",
-                subject,
-                root,
+            yield _Cite(files, "verbosity", subject, root).item(
                 path,
                 "clone",
                 [(start, end)],
@@ -105,11 +100,7 @@ def erosion_evidence(
     for symbol in quality.evidence.eligible_symbols:
         if symbol.high_complexity:
             path, name, kind, start, end = symbol.identity
-            yield _item(
-                files,
-                "erosion",
-                subject,
-                root,
+            yield _Cite(files, "erosion", subject, root).item(
                 path,
                 "high_complexity",
                 [(start, end)],
@@ -123,11 +114,7 @@ def architecture_evidence(
     for edge in graph.evidence.edges:
         span = graph.spans.get(edge.source)
         if edge.cyclic and span is not None:
-            yield _item(
-                files,
-                "architecture",
-                subject,
-                root,
+            yield _Cite(files, "architecture", subject, root).item(
                 span.path,
                 "cyclic_call",
                 [(span.line, span.end_line)],
@@ -184,11 +171,7 @@ def rework_evidence(
         grouped[(side, path)].append(line)
     for (side, path), lines in sorted(grouped.items()):
         root = prior_root if side == "removed" else current_root
-        yield _item(
-            files,
-            "rework",
-            subject,
-            root,
+        yield _Cite(files, "rework", subject, root).item(
             path,
             f"repeated_rework:{side}",
             [(line, line) for line in sorted(lines)],
@@ -205,11 +188,7 @@ def regression_evidence(
         lines[item.symbol].add(item.line)
         nodes[item.symbol].add(item.node_id)
     for symbol in sorted(lines, key=lambda value: value.stable_identity):
-        yield _item(
-            files,
-            "regression",
-            subject,
-            current_root,
+        yield _Cite(files, "regression", subject, current_root).item(
             symbol.path,
             "regression_attribution",
             [(line, line) for line in sorted(lines[symbol])],

@@ -41,7 +41,7 @@ from raidar.scoring.framework.manifest import (
     Tier,
 )
 from raidar.scoring.framework.registry import ScorerRegistration, ScorerRegistry
-from raidar.scoring.framework.rescore import AssessmentRecord, assess
+from raidar.scoring.framework.rescore import AssessmentRecord, AssessOptions, assess
 from raidar.scoring.framework.result import (
     TRAJECTORY_SUBJECT,
     AssessResult,
@@ -219,7 +219,7 @@ def assess_fixed(
 ) -> AssessmentRecord:
     """``rescore.assess`` under ``fixed_identity``."""
     identity = fixed_identity(registration)
-    return assess(store, registration, ctx, trial=trial, replay=replay, identity=identity)
+    return assess(store, registration, ctx, trial=trial, options=AssessOptions(replay, identity))
 
 
 def traced_memory_context(

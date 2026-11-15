@@ -16,6 +16,7 @@ from raidar.scoring.judge.audit import ReviewerKind
 from raidar.scoring.judge.blind import derive_blind_labels, export_blind
 from raidar.scoring.judge.calibration import (
     LabelImportError,
+    SplitTrials,
     import_labels,
     promotion_readiness,
     record_split,
@@ -199,8 +200,7 @@ def jev_record_split(
             runtime.audit,
             policy,
             split_id=split_id,
-            calibration=_trial_list(calibration),
-            evaluation=_trial_list(evaluation),
+            trials=SplitTrials(_trial_list(calibration), _trial_list(evaluation)),
             reason=reason,
         )
     except (PolicyError, LabelImportError) as error:

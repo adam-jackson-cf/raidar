@@ -18,6 +18,7 @@ composes the component means with that policy into the fork's
 from __future__ import annotations
 
 from collections.abc import Sequence
+from dataclasses import dataclass
 from decimal import ROUND_HALF_EVEN, Decimal, localcontext
 
 from raidar.scoring.code_quality.models import (
@@ -78,16 +79,25 @@ def _means(series: dict[str, tuple[Decimal, ...]]) -> dict[str, Decimal]:
     return {name: mean(values) for name, values in series.items()}
 
 
+@dataclass(frozen=True)
+class ComponentSeries:
+    """A problem's ordered per-checkpoint (V, E, H) and per-transition (R, G) component values."""
+
+    verbosity: Sequence[Decimal]
+    erosion: Sequence[Decimal]
+    architecture: Sequence[Decimal]
+    rework: Sequence[Decimal]
+    regression: Sequence[Decimal]
+
+
 def calculate_problem_score(
     problem_id: str,
     checkpoint_correctness: Sequence[CheckpointCorrectnessEvidence],
-    verbosity: Sequence[Decimal],
-    erosion: Sequence[Decimal],
-    architecture: Sequence[Decimal],
-    rework: Sequence[Decimal],
-    regression: Sequence[Decimal],
+    series: ComponentSeries,
 ) -> ProblemScore:
     """One problem's components, inertia and score from complete ordered evidence."""
+    verbosity, erosion, architecture = series.verbosity, series.erosion, series.architecture
+    rework, regression = series.rework, series.regression
     count = len(checkpoint_correctness)
     _check_counts(count, (verbosity, erosion, architecture), (rework, regression))
     if len({item.checkpoint_id for item in checkpoint_correctness}) != count:

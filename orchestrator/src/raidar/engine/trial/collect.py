@@ -101,6 +101,24 @@ class TrialContext:
 
 
 @dataclass(frozen=True)
+class _Progress:
+    """Where the trial stands as one planned step is classified."""
+
+    parent: str | None  # the snapshot digest the step started from
+    halted: bool = False
+    trial_error: str | None = None
+
+
+@dataclass(frozen=True)
+class ValidityTerms:
+    """What the plan held a trial to: the harness pin, the progression rule and the runnable cap."""
+
+    pinned: str | None
+    rule: ProgressionRule
+    runnable: int | None = None
+
+
+@dataclass(frozen=True)
 class StepEvidence:
     """What the trial directory holds for one step; the defaults are a step Harbor never ran."""
 
@@ -172,13 +190,12 @@ def _seed_parent(trial_dir: Path, ctx: TrialContext) -> str | None:
     return seed_parent(trial_dir / "steps" / ctx.planned_steps[0][0] / "agent", ctx.provisions)
 
 
-def _not_run(
-    ctx: TrialContext, base: Mapping[str, Any], halted: bool, trial_error: str | None
-) -> StepResult:
+def _not_run(ctx: TrialContext, base: Mapping[str, Any], progress: _Progress) -> StepResult:
     """A planned checkpoint Harbor never started: by design, or because infrastructure broke."""
+    trial_error = progress.trial_error
     if base["step"] not in ctx.trial.steps:
         reason = "truncated"
-    elif halted:
+    elif progress.halted:
         reason = "halted"
     else:
         cause = f"{NOT_STARTED}:{trial_error}" if trial_error else NOT_STARTED
@@ -196,10 +213,7 @@ def _step_result(
     index: int,
     item: Mapping[str, Any] | None,
     evidence: StepEvidence,
-    parent: str | None,
-    *,
-    halted: bool = False,
-    trial_error: str | None = None,
+    progress: _Progress,
 ) -> StepResult:
     step, checkpoint = ctx.planned_steps[index]
     base: dict[str, Any] = {
@@ -213,7 +227,7 @@ def _step_result(
         "instruction_sha256": evidence.instruction_sha256,
     }
     if item is None:
-        return _not_run(ctx, base, halted, trial_error)
+        return _not_run(ctx, base, progress)
     record = evidence.record
     exception = _exception_type(item)
     reasons = _infra_reasons(
@@ -237,7 +251,7 @@ def _step_result(
         snapshot=SnapshotInfo(path=record.snapshot.stored_path, digest=record.snapshot.digest)
         if record
         else None,
-        parent_snapshot_digest=parent,
+        parent_snapshot_digest=progress.parent,
         trace_dir=f"steps/{step}/agent",
         usage=_usage(item),
         agent_execution_s=span_s(item.get("agent_execution")),
@@ -295,9 +309,7 @@ def classify_evidence(ctx: TrialContext, evidence: TrialEvidence) -> tuple[StepR
             index,
             items.get(step),
             evidence.steps.get(step) or StepEvidence(),
-            parent,
-            halted=halted,
-            trial_error=trial_error,
+            _Progress(parent, halted, trial_error),
         )
         if step_result.snapshot is not None:
             parent = step_result.snapshot.digest
@@ -390,10 +402,7 @@ def validity_from_evidence(
     result: Mapping[str, Any] | None,
     installs: Sequence[str],
     step_results: Sequence[StepResult],
-    pinned: str | None,
-    rule: ProgressionRule,
-    *,
-    runnable: int | None = None,
+    terms: ValidityTerms,
 ) -> ExecutionValidity:
     """The execution-validity gate over parsed evidence (no I/O)."""
     trial_exception = _exception_type(result)
@@ -412,27 +421,20 @@ def validity_from_evidence(
         _reason_check("no_verifier_leak", step_results, "verifier_leak"),
         _reason_check("agent_infra", step_results, "step_exception"),
         _reason_check("lab_checks", step_results, LAB_CHECK),
-        _halt_check(step_results, rule, runnable),
-        agent_version_check(result, pinned, installs),
+        _halt_check(step_results, terms.rule, terms.runnable),
+        agent_version_check(result, terms.pinned, installs),
     ]
     return ExecutionValidity(checks=tuple(checks))
 
 
 def execution_validity(
-    trial_dir: Path,
-    step_results: Sequence[StepResult],
-    pinned: str | None,
-    rule: ProgressionRule,
-    *,
-    runnable: int | None = None,
+    trial_dir: Path, step_results: Sequence[StepResult], terms: ValidityTerms
 ) -> ExecutionValidity:
     return validity_from_evidence(
         read_result(trial_dir),
-        harness_installs(trial_dir) if pinned is not None else (),
+        harness_installs(trial_dir) if terms.pinned is not None else (),
         step_results,
-        pinned,
-        rule,
-        runnable=runnable,
+        terms,
     )
 
 

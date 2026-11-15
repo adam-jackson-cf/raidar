@@ -442,7 +442,7 @@ def test_run_reports_an_admission_refusal_without_starting_the_job(
         raise AssertionError("a refused run started its job")
 
     monkeypatch.setattr("raidar.cli.execution.prepare_run", refuse)
-    monkeypatch.setattr("raidar.cli.execution.run_job", never_started)
+    monkeypatch.setattr("raidar.cli.execution.execute", never_started)
 
     result = CliRunner().invoke(
         main, ["run", str(experiment_file), "--jobs-dir", str(tmp_path / "jobs")]
@@ -473,14 +473,14 @@ def test_run_prints_each_trials_validity_reach_and_checkpoint_states(
         seen.update(store=store, target=target, allow_unsmoked=allow_unsmoked)
         return {0: "problem"}, {"admitted": True}
 
-    async def run_job(plan_arg: Any, problems: Any, **kwargs: Any) -> list[Any]:
-        seen.update(job_id=kwargs["job_id"], job_dir=kwargs["job_dir"], problems=problems)
+    async def execute(ctx: Any) -> list[Any]:
+        seen.update(job_id=ctx.job_id, job_dir=ctx.job_dir, problems=ctx.problems)
         return [record]
 
     monkeypatch.setattr("raidar.cli.execution.build_cli_plan", lambda options: (plan, "store"))
     monkeypatch.setattr("raidar.cli.execution.job_target", lambda name: f"target:{name}")
     monkeypatch.setattr("raidar.cli.execution.prepare_run", prepare)
-    monkeypatch.setattr("raidar.cli.execution.run_job", run_job)
+    monkeypatch.setattr("raidar.cli.execution.execute", execute)
     jobs = tmp_path / "jobs"
 
     result = CliRunner().invoke(
@@ -509,10 +509,10 @@ def test_run_names_the_job_after_the_clock_when_no_id_is_given(
     monkeypatch.setattr("raidar.cli.execution.default_job_id", lambda: "20260101T000000Z")
     monkeypatch.setattr("raidar.cli.execution.prepare_run", lambda *a, **k: ({}, {}))
 
-    async def run_job(*_args: Any, **_kwargs: Any) -> list[Any]:
+    async def execute(*_args: Any, **_kwargs: Any) -> list[Any]:
         return []
 
-    monkeypatch.setattr("raidar.cli.execution.run_job", run_job)
+    monkeypatch.setattr("raidar.cli.execution.execute", execute)
 
     result = CliRunner().invoke(
         main, ["run", str(experiment_file), "--jobs-dir", str(tmp_path / "jobs")]

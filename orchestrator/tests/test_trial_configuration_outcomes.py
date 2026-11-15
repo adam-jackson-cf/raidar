@@ -21,6 +21,7 @@ from raidar.engine.trial.agent_config import (
 from raidar.engine.trial.blueprint import arm_blueprints
 from raidar.engine.trial.config import (
     VERIFIER_PHASE_MARGIN_S,
+    TrialSite,
     harbor_trial_config,
     verifier_timeout_s,
 )
@@ -69,9 +70,9 @@ def _trial_config(plan: Any, tmp_path: Path) -> Any:
         plan,
         _TRIAL,
         tmp_path / "task",
-        trials_dir=tmp_path / "trials",
-        bundle_root=tmp_path / "bundle",
-        docker_context="ctx",
+        site=TrialSite(
+            trials_dir=tmp_path / "trials", bundle_root=tmp_path / "bundle", docker_context="ctx"
+        ),
     )
 
 

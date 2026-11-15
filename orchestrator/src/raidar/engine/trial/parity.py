@@ -90,15 +90,14 @@ def build_parity(
     seed_digest: str | None,
     network: Sequence[Mapping[str, Any]],
     image_id: str | None,
-    timeouts: Mapping[str, Any],
-    liveness: Mapping[str, Any],
+    limits: Mapping[str, Any],
 ) -> ParityRecord:
     """The parity record from parsed evidence: turns, seed digest, network policies, limits."""
     processes = _distinct(turn.get("agent_process") for turn in turns)
     return ParityRecord(
         image_id=image_id,
         seed_digest=seed_digest,
-        limits={**timeouts, "liveness": dict(liveness)},
+        limits=dict(limits),
         network=tuple(dict(policy) for policy in network),
         agent_process=tuple(AgentProcess.model_validate(item) for item in processes),
     )
@@ -122,6 +121,5 @@ def parity_record(
         seed_digest=seeded_digest(trial_dir / "steps" / steps[0] / "agent") if steps else None,
         network=agent_network(task_dir),
         image_id=image_id,
-        timeouts=timeouts,
-        liveness=LivenessConfig.from_env(os.environ).as_json(),
+        limits={**timeouts, "liveness": LivenessConfig.from_env(os.environ).as_json()},
     )
