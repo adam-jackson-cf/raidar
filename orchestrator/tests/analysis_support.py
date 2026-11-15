@@ -3,12 +3,14 @@
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
+from dataclasses import dataclass, field
 from typing import Any
 
 from raidar.contract.trial import (
     ExecutionValidity,
     PlannedTrial as RecordedTrial,
     ProgressionRule,
+    StepResult,
     TrialHashes,
     TrialRecord,
     ValidityCheck,
@@ -66,10 +68,17 @@ def checkpoint_trial(
     points = tuple(
         Value.ok(v) if v is not None else gap("not_applicable", "not reached") for v in solved
     )
-    outcome: TrialOutcome = trial(arm, attempt, {}, infra=infra).model_copy(
-        update={"series": {"solved": points}}
+    return TrialOutcome(
+        trial_id=f"toy@1-{arm}-b{attempt}",
+        job_id="run-1",
+        arm=arm,
+        attempt=attempt,
+        problem="toy@1",
+        steps=STEPS,
+        infra_error=infra,
+        infra_reasons=("validity:steps_started",) if infra else (),
+        series={"solved": points},
     )
-    return outcome
 
 
 def paired_arms(
@@ -185,16 +194,24 @@ RECORD_HASHES = TrialHashes(
 )
 
 
+@dataclass(frozen=True)
+class RecordedRun:
+    """How a recorded trial ran: its validity, development options and step results."""
+
+    valid: bool = True
+    options: DevOptions = field(default_factory=DevOptions)
+    step_results: tuple[StepResult, ...] = ()
+
+
 def trial_record(
     trial_id: str,
     arm: str,
     attempt: int,
-    *,
-    valid: bool = True,
-    options: DevOptions | None = None,
+    run: RecordedRun | None = None,
 ) -> TrialRecord:
-    """A trial record built in memory that planned ``RECORD_STEPS`` and ran under ``options``."""
-    options = options or DevOptions()
+    """A trial record built in memory that planned ``RECORD_STEPS`` and ran as ``run`` says."""
+    run = run or RecordedRun()
+    options = run.options
     return TrialRecord(
         experiment="pilot",
         job_id="run-1",
@@ -213,8 +230,8 @@ def trial_record(
         progression=ProgressionRule(mode="continue", reward_key="solved"),
         truncated_to=options.max_checkpoints,
         agent_override=options.agent_override,
-        step_results=(),
+        step_results=run.step_results,
         reached=tuple(True for _ in RECORD_STEPS),
         reached_source="derived",
-        validity=ExecutionValidity(checks=(ValidityCheck(name="steps_started", passed=valid),)),
+        validity=ExecutionValidity(checks=(ValidityCheck(name="steps_started", passed=run.valid),)),
     )

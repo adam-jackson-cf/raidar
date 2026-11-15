@@ -72,6 +72,7 @@ from raidar.scoring.framework.result import (
 from raidar.scoring.framework.trial_inputs import BundleUnavailableError, TrialInputError
 from tests.analysis_support import (
     OUTCOME_TYPES,
+    RecordedRun,
     analysis_lock,
     inputs,
     paired_arms,
@@ -273,7 +274,7 @@ def _job(name: str, *records: Any) -> JobDir:
 
 
 def test_a_valid_rerun_replaces_an_invalid_trial_but_two_valid_ones_conflict() -> None:
-    first = _job("run-1", trial_record("t", "a", 0, valid=False))
+    first = _job("run-1", trial_record("t", "a", 0, RecordedRun(valid=False)))
     rerun = _job("run-2", trial_record("t", "a", 0))
     chosen, replaced = select_records([first, rerun])
     assert chosen["t"][0] is rerun
@@ -287,7 +288,7 @@ def test_a_valid_rerun_replaces_an_invalid_trial_but_two_valid_ones_conflict() -
 
 def _dev_job(name: str, plan: DevOptions, recorded: DevOptions | None = None) -> JobDir:
     recorded = plan if recorded is None else recorded
-    record = trial_record("t", "a", 0, options=recorded)
+    record = trial_record("t", "a", 0, RecordedRun(options=recorded))
     options = {"max_checkpoints": plan.max_checkpoints, "agent_override": plan.agent_override}
     return JobDir(Path(name), {"job_id": name}, {"options": options}, (record,))
 
@@ -623,8 +624,7 @@ def _toy_job(
             f"toy-{arm}-b{attempt}",
             arm,
             attempt,
-            valid=valid,
-            options=options,
+            RecordedRun(valid=valid, options=options),
         )
         for arm in ("baseline", "guided")
         for attempt in range(2)
