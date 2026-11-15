@@ -1,0 +1,674 @@
+{
+  "exceptions": [
+    {
+      "path": "lab/stages/raidar/define/tool/src/define_tool/compact.py",
+      "rule": "TEST.no-test-hooks",
+      "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md §2.5"
+    },
+    {
+      "path": "lab/stages/raidar/define/tool/src/define_tool/enumerated.py",
+      "rule": "TEST.no-test-hooks",
+      "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md §2.5"
+    },
+    {
+      "path": "lab/stages/raidar/define/tool/src/define_tool/featuredef.py",
+      "rule": "TEST.no-test-hooks",
+      "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md §2.5"
+    },
+    {
+      "path": "lab/stages/raidar/define/tool/src/define_tool/normative.py",
+      "rule": "TEST.no-test-hooks",
+      "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md §2.5"
+    },
+    {
+      "path": "lab/stages/raidar/define/tool/src/define_tool/tool.py",
+      "rule": "TEST.no-test-hooks",
+      "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md §2.5"
+    },
+    {
+      "path": "lab/stages/raidar/verify/fixtures/*",
+      "rule": "TEST.no-test-hooks",
+      "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md §2.2"
+    },
+    {
+      "path": "orchestrator/src/raidar/cli/quality.py",
+      "rule": "TEST.no-test-hooks",
+      "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md §2.1"
+    },
+    {
+      "path": "orchestrator/src/raidar/cli/stage.py",
+      "rule": "TEST.no-test-hooks",
+      "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md §2.3"
+    },
+    {
+      "path": "orchestrator/src/raidar/design/problem/resolver.py",
+      "rule": "TEST.no-test-hooks",
+      "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md §2.3"
+    },
+    {
+      "path": "orchestrator/src/raidar/engine/health/admission.py",
+      "rule": "TEST.no-test-hooks",
+      "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md §2.5"
+    },
+    {
+      "path": "orchestrator/src/raidar/engine/trial/environment.py",
+      "rule": "TEST.no-test-hooks",
+      "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md §2.3"
+    },
+    {
+      "path": "orchestrator/src/raidar/evaluation/analysis/manipulation.py",
+      "rule": "TEST.no-test-hooks",
+      "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md §2.5"
+    },
+    {
+      "path": "orchestrator/src/raidar/grading/bundle.py",
+      "rule": "TEST.no-test-hooks",
+      "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md §2.1"
+    },
+    {
+      "path": "orchestrator/src/raidar/grading/payload.py",
+      "rule": "TEST.no-test-hooks",
+      "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md §2.1"
+    },
+    {
+      "path": "orchestrator/src/raidar/grading/sandbox.py",
+      "rule": "TEST.no-test-hooks",
+      "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md §2.1"
+    },
+    {
+      "path": "orchestrator/src/raidar/grading/verifier.py",
+      "rule": "TEST.no-test-hooks",
+      "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md §2.3"
+    },
+    {
+      "path": "orchestrator/src/raidar/scoring/catalog/builtin.py",
+      "rule": "TEST.no-test-hooks",
+      "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md §2.3"
+    },
+    {
+      "path": "orchestrator/src/raidar/scoring/code_quality/arithmetic.py",
+      "rule": "TEST.no-test-hooks",
+      "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md §2.5"
+    },
+    {
+      "path": "orchestrator/src/raidar/scoring/code_quality/lineage.py",
+      "rule": "TEST.no-test-hooks",
+      "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md §2.5"
+    },
+    {
+      "path": "orchestrator/src/raidar/scoring/judge/gating.py",
+      "rule": "TEST.no-test-hooks",
+      "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md §2.5"
+    },
+    {
+      "path": "orchestrator/src/raidar/scoring/process_checks/work_session.py",
+      "rule": "TEST.no-test-hooks",
+      "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md §2.1"
+    },
+    {
+      "path": "orchestrator/src/raidar/scoring/process_checks/work_tests.py",
+      "rule": "TEST.no-test-hooks",
+      "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md §2.1"
+    },
+    {
+      "path": "orchestrator/src/raidar/scoring/test_coverage/__init__.py",
+      "rule": "TEST.no-test-hooks",
+      "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md §2.1"
+    },
+    {
+      "path": "orchestrator/src/raidar/subject/agent/harness.py",
+      "rule": "TEST.no-test-hooks",
+      "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md §2.5"
+    },
+    {
+      "path": "orchestrator/src/raidar/subject/primitive/gate.py",
+      "rule": "TEST.no-test-hooks",
+      "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md §2.1"
+    },
+    {
+      "path": "orchestrator/src/raidar/subject/primitive/gate_tool.py",
+      "rule": "TEST.no-test-hooks",
+      "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md §2.1"
+    },
+    {
+      "path": "orchestrator/src/raidar/subject/workflow/identity.py",
+      "rule": "TEST.no-test-hooks",
+      "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md §2.5"
+    },
+    {
+      "path": "orchestrator/src/raidar/subject/workflow/judgeloop.py",
+      "rule": "TEST.no-test-hooks",
+      "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md §2.1"
+    },
+    {
+      "path": "orchestrator/src/raidar/subject/workflow/package_checks.py",
+      "rule": "TEST.no-test-hooks",
+      "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md §2.1"
+    },
+    {
+      "path": "orchestrator/tests/process_guard.py",
+      "rule": "TEST.no-evasion",
+      "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md §2.4"
+    },
+    {
+      "path": "orchestrator/tests/test_make_targets.py",
+      "rule": "TEST.no-evasion",
+      "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md §2.4"
+    },
+    {
+      "path": "orchestrator/tests/test_overhead_fixture_run.py",
+      "rule": "TEST.no-evasion",
+      "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md §2.4"
+    },
+    {
+      "path": "orchestrator/tests/test_primitive_calls.py",
+      "rule": "TEST.no-evasion",
+      "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md §2.4"
+    },
+    {
+      "path": "orchestrator/tests/test_primitive_payload_supervisor_slow.py",
+      "rule": "TEST.no-evasion",
+      "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md §2.4"
+    },
+    {
+      "path": "orchestrator/tests/test_step_reset_script.py",
+      "rule": "TEST.no-evasion",
+      "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md §2.4"
+    },
+    {
+      "path": "orchestrator/tests/test_verifier_bundle_and_isolation_slow.py",
+      "rule": "TEST.no-evasion",
+      "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md §2.4"
+    },
+    {
+      "path": "orchestrator/tests/test_workflow_verify_docker.py",
+      "rule": "TEST.no-evasion",
+      "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md §2.4"
+    },
+    {
+      "path": "orchestrator/tests/conftest.py",
+      "rule": "TEST.no-self-mocking",
+      "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md §2.5"
+    },
+    {
+      "path": "orchestrator/tests/experiment_spec_support.py",
+      "rule": "TEST.no-self-mocking",
+      "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md §2.5"
+    },
+    {
+      "path": "orchestrator/tests/package_support.py",
+      "rule": "TEST.no-self-mocking",
+      "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md §2.5"
+    },
+    {
+      "path": "orchestrator/tests/primitive_support.py",
+      "rule": "TEST.no-self-mocking",
+      "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md §2.5"
+    },
+    {
+      "path": "orchestrator/tests/stage_check_support.py",
+      "rule": "TEST.no-self-mocking",
+      "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md §2.5"
+    },
+    {
+      "path": "orchestrator/tests/test_agent_boundary_outcomes.py",
+      "rule": "TEST.no-self-mocking",
+      "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md §2.5"
+    },
+    {
+      "path": "orchestrator/tests/test_agent_process_reaping.py",
+      "rule": "TEST.no-self-mocking",
+      "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md §2.5"
+    },
+    {
+      "path": "orchestrator/tests/test_analysis_cli_coverage.py",
+      "rule": "TEST.no-self-mocking",
+      "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md §2.5"
+    },
+    {
+      "path": "orchestrator/tests/test_analysis_outcomes.py",
+      "rule": "TEST.no-self-mocking",
+      "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md §2.5"
+    },
+    {
+      "path": "orchestrator/tests/test_analysis_primary_outcome.py",
+      "rule": "TEST.no-self-mocking",
+      "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md §2.5"
+    },
+    {
+      "path": "orchestrator/tests/test_analysis_reporting_boundaries.py",
+      "rule": "TEST.no-self-mocking",
+      "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md §2.5"
+    },
+    {
+      "path": "orchestrator/tests/test_analysis_verification_effort.py",
+      "rule": "TEST.no-self-mocking",
+      "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md §2.5"
+    },
+    {
+      "path": "orchestrator/tests/test_assessment_store_behaviors.py",
+      "rule": "TEST.no-self-mocking",
+      "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md §2.5"
+    },
+    {
+      "path": "orchestrator/tests/test_assessment_store_concurrency.py",
+      "rule": "TEST.no-self-mocking",
+      "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md §2.5"
+    },
+    {
+      "path": "orchestrator/tests/test_claude_code_cli_adapter.py",
+      "rule": "TEST.no-self-mocking",
+      "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md §2.5"
+    },
+    {
+      "path": "orchestrator/tests/test_cli_commands.py",
+      "rule": "TEST.no-self-mocking",
+      "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md §2.5"
+    },
+    {
+      "path": "orchestrator/tests/test_cli_execution_outcomes.py",
+      "rule": "TEST.no-self-mocking",
+      "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md §2.5"
+    },
+    {
+      "path": "orchestrator/tests/test_code_quality_scorer.py",
+      "rule": "TEST.no-self-mocking",
+      "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md §2.5"
+    },
+    {
+      "path": "orchestrator/tests/test_coverage_scorer_readings.py",
+      "rule": "TEST.no-self-mocking",
+      "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md §2.5"
+    },
+    {
+      "path": "orchestrator/tests/test_declared_wheels_docker.py",
+      "rule": "TEST.no-self-mocking",
+      "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md §2.5"
+    },
+    {
+      "path": "orchestrator/tests/test_dependency_resolver.py",
+      "rule": "TEST.no-self-mocking",
+      "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md §2.5"
+    },
+    {
+      "path": "orchestrator/tests/test_detached_supervisor_outcomes.py",
+      "rule": "TEST.no-self-mocking",
+      "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md §2.5"
+    },
+    {
+      "path": "orchestrator/tests/test_experiment_lock_behaviors.py",
+      "rule": "TEST.no-self-mocking",
+      "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md §2.5"
+    },
+    {
+      "path": "orchestrator/tests/test_gate_tool_witness.py",
+      "rule": "TEST.no-self-mocking",
+      "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md §2.5"
+    },
+    {
+      "path": "orchestrator/tests/test_generated_artifact_guard.py",
+      "rule": "TEST.no-self-mocking",
+      "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md §2.5"
+    },
+    {
+      "path": "orchestrator/tests/test_grading_execution_identity.py",
+      "rule": "TEST.no-self-mocking",
+      "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md §2.5"
+    },
+    {
+      "path": "orchestrator/tests/test_harness_contracts.py",
+      "rule": "TEST.no-self-mocking",
+      "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md §2.5"
+    },
+    {
+      "path": "orchestrator/tests/test_health_coverage_close.py",
+      "rule": "TEST.no-self-mocking",
+      "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md §2.5"
+    },
+    {
+      "path": "orchestrator/tests/test_health_judge.py",
+      "rule": "TEST.no-self-mocking",
+      "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md §2.5"
+    },
+    {
+      "path": "orchestrator/tests/test_imports.py",
+      "rule": "TEST.no-self-mocking",
+      "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md §2.5"
+    },
+    {
+      "path": "orchestrator/tests/test_jev_coverage_closure.py",
+      "rule": "TEST.no-self-mocking",
+      "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md §2.5"
+    },
+    {
+      "path": "orchestrator/tests/test_jev_judge_parity.py",
+      "rule": "TEST.no-self-mocking",
+      "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md §2.5"
+    },
+    {
+      "path": "orchestrator/tests/test_job_admission_outcomes.py",
+      "rule": "TEST.no-self-mocking",
+      "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md §2.5"
+    },
+    {
+      "path": "orchestrator/tests/test_job_completion_outcomes.py",
+      "rule": "TEST.no-self-mocking",
+      "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md §2.5"
+    },
+    {
+      "path": "orchestrator/tests/test_mypy_gate_quality.py",
+      "rule": "TEST.no-self-mocking",
+      "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md §2.5"
+    },
+    {
+      "path": "orchestrator/tests/test_native_agent_api.py",
+      "rule": "TEST.no-self-mocking",
+      "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md §2.5"
+    },
+    {
+      "path": "orchestrator/tests/test_native_agents.py",
+      "rule": "TEST.no-self-mocking",
+      "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md §2.5"
+    },
+    {
+      "path": "orchestrator/tests/test_offline_coverage_decisions.py",
+      "rule": "TEST.no-self-mocking",
+      "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md §2.5"
+    },
+    {
+      "path": "orchestrator/tests/test_offline_coverage_runs_slow.py",
+      "rule": "TEST.no-self-mocking",
+      "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md §2.5"
+    },
+    {
+      "path": "orchestrator/tests/test_offline_grading_concurrency.py",
+      "rule": "TEST.no-self-mocking",
+      "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md §2.5"
+    },
+    {
+      "path": "orchestrator/tests/test_overhead_report_gate.py",
+      "rule": "TEST.no-self-mocking",
+      "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md §2.5"
+    },
+    {
+      "path": "orchestrator/tests/test_package_identity.py",
+      "rule": "TEST.no-self-mocking",
+      "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md §2.5"
+    },
+    {
+      "path": "orchestrator/tests/test_package_lock.py",
+      "rule": "TEST.no-self-mocking",
+      "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md §2.5"
+    },
+    {
+      "path": "orchestrator/tests/test_package_never_runs_on_host.py",
+      "rule": "TEST.no-self-mocking",
+      "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md §2.5"
+    },
+    {
+      "path": "orchestrator/tests/test_package_stage_install.py",
+      "rule": "TEST.no-self-mocking",
+      "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md §2.5"
+    },
+    {
+      "path": "orchestrator/tests/test_plan_outcomes.py",
+      "rule": "TEST.no-self-mocking",
+      "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md §2.5"
+    },
+    {
+      "path": "orchestrator/tests/test_pooling_gate.py",
+      "rule": "TEST.no-self-mocking",
+      "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md §2.5"
+    },
+    {
+      "path": "orchestrator/tests/test_pre_fix_grading_decisions.py",
+      "rule": "TEST.no-self-mocking",
+      "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md §2.5"
+    },
+    {
+      "path": "orchestrator/tests/test_primitive_calls_shape.py",
+      "rule": "TEST.no-self-mocking",
+      "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md §2.5"
+    },
+    {
+      "path": "orchestrator/tests/test_primitive_install.py",
+      "rule": "TEST.no-self-mocking",
+      "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md §2.5"
+    },
+    {
+      "path": "orchestrator/tests/test_primitive_outputs.py",
+      "rule": "TEST.no-self-mocking",
+      "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md §2.5"
+    },
+    {
+      "path": "orchestrator/tests/test_primitive_payload_boundaries.py",
+      "rule": "TEST.no-self-mocking",
+      "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md §2.5"
+    },
+    {
+      "path": "orchestrator/tests/test_primitive_payload_supervisor_slow.py",
+      "rule": "TEST.no-self-mocking",
+      "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md §2.5"
+    },
+    {
+      "path": "orchestrator/tests/test_primitive_stop.py",
+      "rule": "TEST.no-self-mocking",
+      "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md §2.5"
+    },
+    {
+      "path": "orchestrator/tests/test_problem_bulk.py",
+      "rule": "TEST.no-self-mocking",
+      "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md §2.5"
+    },
+    {
+      "path": "orchestrator/tests/test_problem_cli_decisions.py",
+      "rule": "TEST.no-self-mocking",
+      "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md §2.5"
+    },
+    {
+      "path": "orchestrator/tests/test_problem_errata_slow.py",
+      "rule": "TEST.no-self-mocking",
+      "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md §2.5"
+    },
+    {
+      "path": "orchestrator/tests/test_problem_record_decisions.py",
+      "rule": "TEST.no-self-mocking",
+      "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md §2.5"
+    },
+    {
+      "path": "orchestrator/tests/test_problem_validation_behaviors.py",
+      "rule": "TEST.no-self-mocking",
+      "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md §2.5"
+    },
+    {
+      "path": "orchestrator/tests/test_problem_validation_behaviors_slow.py",
+      "rule": "TEST.no-self-mocking",
+      "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md §2.5"
+    },
+    {
+      "path": "orchestrator/tests/test_problem_validation_decisions.py",
+      "rule": "TEST.no-self-mocking",
+      "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md §2.5"
+    },
+    {
+      "path": "orchestrator/tests/test_process_compliance.py",
+      "rule": "TEST.no-self-mocking",
+      "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md §2.5"
+    },
+    {
+      "path": "orchestrator/tests/test_python_pack_image.py",
+      "rule": "TEST.no-self-mocking",
+      "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md §2.5"
+    },
+    {
+      "path": "orchestrator/tests/test_python_pack_provisioning.py",
+      "rule": "TEST.no-self-mocking",
+      "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md §2.5"
+    },
+    {
+      "path": "orchestrator/tests/test_quality_gate_commands.py",
+      "rule": "TEST.no-self-mocking",
+      "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md §2.5"
+    },
+    {
+      "path": "orchestrator/tests/test_registry_inspection_commands.py",
+      "rule": "TEST.no-self-mocking",
+      "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md §2.5"
+    },
+    {
+      "path": "orchestrator/tests/test_release_cutover.py",
+      "rule": "TEST.no-self-mocking",
+      "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md §2.5"
+    },
+    {
+      "path": "orchestrator/tests/test_release_register.py",
+      "rule": "TEST.no-self-mocking",
+      "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md §2.5"
+    },
+    {
+      "path": "orchestrator/tests/test_repository_contract_boundaries.py",
+      "rule": "TEST.no-self-mocking",
+      "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md §2.5"
+    },
+    {
+      "path": "orchestrator/tests/test_rescore_store_bindings.py",
+      "rule": "TEST.no-self-mocking",
+      "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md §2.5"
+    },
+    {
+      "path": "orchestrator/tests/test_run_scoped_docker_environment.py",
+      "rule": "TEST.no-self-mocking",
+      "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md §2.5"
+    },
+    {
+      "path": "orchestrator/tests/test_runtime_gate_refusals.py",
+      "rule": "TEST.no-self-mocking",
+      "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md §2.5"
+    },
+    {
+      "path": "orchestrator/tests/test_stage_authoring_cli.py",
+      "rule": "TEST.no-self-mocking",
+      "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md §2.5"
+    },
+    {
+      "path": "orchestrator/tests/test_stage_command_outcomes.py",
+      "rule": "TEST.no-self-mocking",
+      "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md §2.5"
+    },
+    {
+      "path": "orchestrator/tests/test_stage_package.py",
+      "rule": "TEST.no-self-mocking",
+      "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md §2.5"
+    },
+    {
+      "path": "orchestrator/tests/test_submission_dependencies.py",
+      "rule": "TEST.no-self-mocking",
+      "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md §2.5"
+    },
+    {
+      "path": "orchestrator/tests/test_submission_dependencies_slow.py",
+      "rule": "TEST.no-self-mocking",
+      "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md §2.5"
+    },
+    {
+      "path": "orchestrator/tests/test_target_loss_job_guard.py",
+      "rule": "TEST.no-self-mocking",
+      "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md §2.5"
+    },
+    {
+      "path": "orchestrator/tests/test_target_selection_and_trust.py",
+      "rule": "TEST.no-self-mocking",
+      "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md §2.5"
+    },
+    {
+      "path": "orchestrator/tests/test_target_tunnel_and_ensure.py",
+      "rule": "TEST.no-self-mocking",
+      "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md §2.5"
+    },
+    {
+      "path": "orchestrator/tests/test_tool_tree_hashing.py",
+      "rule": "TEST.no-self-mocking",
+      "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md §2.5"
+    },
+    {
+      "path": "orchestrator/tests/test_trial_configuration_outcomes.py",
+      "rule": "TEST.no-self-mocking",
+      "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md §2.5"
+    },
+    {
+      "path": "orchestrator/tests/test_trial_execution.py",
+      "rule": "TEST.no-self-mocking",
+      "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md §2.5"
+    },
+    {
+      "path": "orchestrator/tests/test_trial_execution_slow.py",
+      "rule": "TEST.no-self-mocking",
+      "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md §2.5"
+    },
+    {
+      "path": "orchestrator/tests/test_trial_health_audit.py",
+      "rule": "TEST.no-self-mocking",
+      "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md §2.5"
+    },
+    {
+      "path": "orchestrator/tests/test_trial_lifecycle_outcomes.py",
+      "rule": "TEST.no-self-mocking",
+      "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md §2.5"
+    },
+    {
+      "path": "orchestrator/tests/test_trial_materialisation_outcomes.py",
+      "rule": "TEST.no-self-mocking",
+      "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md §2.5"
+    },
+    {
+      "path": "orchestrator/tests/test_trial_provision_outcomes.py",
+      "rule": "TEST.no-self-mocking",
+      "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md §2.5"
+    },
+    {
+      "path": "orchestrator/tests/test_verifier_and_regrade.py",
+      "rule": "TEST.no-self-mocking",
+      "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md §2.5"
+    },
+    {
+      "path": "orchestrator/tests/test_verifier_docker_boundary.py",
+      "rule": "TEST.no-self-mocking",
+      "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md §2.5"
+    },
+    {
+      "path": "orchestrator/tests/test_verifier_grading_behaviors.py",
+      "rule": "TEST.no-self-mocking",
+      "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md §2.5"
+    },
+    {
+      "path": "orchestrator/tests/test_verifier_regrade_decisions.py",
+      "rule": "TEST.no-self-mocking",
+      "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md §2.5"
+    },
+    {
+      "path": "orchestrator/tests/test_workflow_judging.py",
+      "rule": "TEST.no-self-mocking",
+      "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md §2.5"
+    },
+    {
+      "path": "orchestrator/tests/test_workflow_package.py",
+      "rule": "TEST.no-self-mocking",
+      "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md §2.5"
+    },
+    {
+      "path": "orchestrator/tests/test_workflow_package_runner.py",
+      "rule": "TEST.no-self-mocking",
+      "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md §2.5"
+    },
+    {
+      "path": "orchestrator/tests/test_workflow_runner.py",
+      "rule": "TEST.no-self-mocking",
+      "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md §2.5"
+    },
+    {
+      "path": "orchestrator/tests/verifier_support.py",
+      "rule": "TEST.no-self-mocking",
+      "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md §2.5"
+    }
+  ]
+}

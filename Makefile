@@ -152,6 +152,8 @@ help:
 	@echo "  make toolchain-pin-check                               Check Python pins/interpreter and declared/locked/resolver uv alignment; first step of make quality"
 	@echo "  make structure-check                                   Check the repository layout (no versions in names, root and package allowlists, depth); part of make quality"
 	@echo "  make test-hygiene-check                                Check bounded test processes, skill metadata/support links, and registered stage evidence"
+	@echo "  make feature-map-check                                 Check feature-map documents, their links, and the review-surface journeys"
+	@echo "  make test-integrity-check                              Check tests use real code without skips or unseeded properties, and production has no test hooks"
 	@echo "  make ruff-baseline                                    Explicitly record current Full Ruff findings (gates never refresh)"
 	@echo "  make ruff-check                                       Check Full Ruff against the finding-specific shrink-only baseline"
 	@echo "  make ruff-suppressions-check                           Refuse added Ruff suppressions relative to origin/main"
@@ -750,6 +752,13 @@ ruff-suppressions-check:
 test-hygiene-check:
 	@$(REPO_RUNTIME_ENV) uv run --project orchestrator --extra dev python scripts/checks/check-test-hygiene.py --repo-root "$(CURDIR)"
 
+.PHONY: feature-map-check test-integrity-check
+feature-map-check:
+	@$(REPO_RUNTIME_ENV) uv run --project orchestrator --extra dev python scripts/checks/check-feature-map.py --repo-root "$(CURDIR)"
+
+test-integrity-check:
+	@$(REPO_RUNTIME_ENV) uv run --project orchestrator --extra dev python scripts/checks/check-test-integrity.py --repo-root "$(CURDIR)"
+
 mypy-check:
 	@$(REPO_RUNTIME_ENV) uv run --project orchestrator --extra dev python scripts/checks/check-mypy-coverage.py
 
@@ -811,6 +820,8 @@ quality:
 	@$(MAKE) --no-print-directory version-check
 	@$(MAKE) --no-print-directory structure-check
 	@$(MAKE) --no-print-directory test-hygiene-check
+	@$(MAKE) --no-print-directory feature-map-check
+	@$(MAKE) --no-print-directory test-integrity-check
 	@$(MAKE) --no-print-directory analyzer-scope-check
 	@$(MAKE) --no-print-directory smoke-dry-run-check
 	@$(MAKE) --no-print-directory releases-check

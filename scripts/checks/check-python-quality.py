@@ -156,6 +156,8 @@ SCRIPT_NAME_ALLOWLIST = {
     "check-python-quality.py",
     "check-structure.py",
     "check-test-hygiene.py",
+    "check-feature-map.py",
+    "check-test-integrity.py",
     "check-repository-paths.py",
     "verify-version-wiring.py",
     "check_toolchain_pins.py",
