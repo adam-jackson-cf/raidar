@@ -47,7 +47,7 @@ name = "networkx"
 version = "3.6.1"
 """
 SYNC = "uv sync --project orchestrator --all-extras --locked"
-AUDIT_RULE = "SECURITY.dependency-audit"
+AUDIT_RULE = r"SECURITY\.dependency-audit"
 LOCK_PATH = "orchestrator/uv.lock"
 
 
@@ -316,24 +316,29 @@ def test_prettier_selects_maintained_markdown_yaml_without_protected_docs(
     ]
 
 
+def _assert_auditor_failure(found: list[str], path: str) -> None:
+    assert len(found) == 1
+    assert re.fullmatch(
+        rf"{AUDIT_RULE} failure=auditor path={re.escape(path)} reason=\S[^\r\n]*", found[0]
+    )
+
+
 def test_dependency_audit_accepts_exact_dev_pin_and_matching_lock(checker: ParityChecker) -> None:
     assert checker.audit_pin_findings(PROJECT, LOCK) == []
 
 
 @pytest.mark.parametrize("declaration", ["pip-audit>=2.9.0", "other-tool==2.9.0"])
 def test_dependency_audit_requires_exact_dev_pin(checker: ParityChecker, declaration: str) -> None:
-    _assert_finding(
+    _assert_auditor_failure(
         checker.audit_pin_findings(PROJECT.replace("pip-audit==2.9.0", declaration), LOCK),
         "orchestrator/pyproject.toml",
-        AUDIT_RULE,
     )
 
 
 def test_dependency_audit_refuses_pin_lock_drift(checker: ParityChecker) -> None:
-    _assert_finding(
+    _assert_auditor_failure(
         checker.audit_pin_findings(PROJECT, LOCK.replace('version = "2.9.0"', 'version = "2.8.0"')),
         LOCK_PATH,
-        AUDIT_RULE,
     )
 
 

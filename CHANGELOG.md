@@ -9,8 +9,9 @@ All notable changes to this project are documented in this file.
   programs excluded), audits each `uv.lock` and `requirements*.txt` with pip-audit
   and each `package-lock.json` with `npm audit`, and reports a recognised lock
   format without an auditor or a manifest without a lock. The staged-file trigger
-  and `AUDIT_ARGS=--ci` are gone. Every advisory blocks; each line states lock,
-  ecosystem, package, version, advisory, aliases and fix versions. Owner-approved
+  and `AUDIT_ARGS=--ci` are gone. Every advisory blocks; each line starts with the
+  rule ID and states lock, OSV ecosystem, package, version, advisory, aliases and
+  fix versions, and every other finding is a `failure=<kind>` line. Owner-approved
   exceptions for advisories without a fixed release live in
   `scripts/checks/dependency-audit-exceptions.json`. Relock review-surface on
   Vite 6.4 to clear its npm advisories.

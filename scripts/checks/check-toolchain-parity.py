@@ -8,26 +8,35 @@ fails closed:
 - ``uv.lock`` is exported (``uv export --project <its directory> --locked``) and audited
   by the pinned pip-audit; ``requirements*.txt`` goes to pip-audit directly;
   ``package-lock.json``/``npm-shrinkwrap.json`` go to ``npm audit --package-lock-only``.
-- Any other recognised lock format is a ``no auditor for <path>`` finding.
+- Any other recognised lock format is an ``unknown-lock-format`` failure.
 - A manifest that declares dependencies with no lock of its ecosystem beside it, and
-  that no lock pins as a uv path source or npm workspace, is an
-  ``unpinned dependencies in <path>`` finding.
+  that no lock pins as a uv path source or npm workspace, is a
+  ``manifest-without-lock`` failure.
 - Every advisory blocks, fixable or not. Only a valid owner-approved entry in
   ``scripts/checks/dependency-audit-exceptions.json`` suppresses one advisory, and only
   while no fixed release exists.
 
-Every finding line is ``<path>: SECURITY.dependency-audit: <reason>; <action>``.
-An advisory finding's reason is machine-readable and matches ``ADVISORY_LINE``::
+Every audit line starts with the rule ID and takes one of two forms, fields in exactly
+this order and separated by single spaces (``ADVISORY_LINE`` and ``FAILURE_LINE``)::
 
-    <lock>: SECURITY.dependency-audit: vulnerability ecosystem=<pypi|npm>
-    package=<name> version=<exact> advisory=<id> aliases=<id,...> fix=<version,...>;
-    <action>
+    SECURITY.dependency-audit lock=<lock-path> ecosystem=<osv-ecosystem> package=<name>
+        version=<exact-locked-version> advisory=<advisory-id> aliases=<id>,<id>
+        fix=<version>,<version>
+    SECURITY.dependency-audit failure=<kind> path=<repo-path> reason=<text-to-end-of-line>
 
-on one line. ``aliases`` (other advisory IDs such as CVE or GHSA) and ``fix`` are
-comma-separated and empty when there are none; no value contains whitespace, ``,`` or
-``;``. pip-audit supplies the advisory ID, aliases and fixed versions. npm audit supplies
-the GHSA ID and its vulnerable range; ``fix`` is then the lowest published release above
-the locked version outside that range.
+(the advisory form is wrapped here; it prints as one line).
+
+- Values hold no whitespace, except ``reason``, which runs to the end of the line.
+- ``aliases`` (other advisory IDs such as CVE or GHSA) and ``fix`` are comma-separated
+  with no spaces and empty (``aliases=``, ``fix=``) when there are none.
+- ``ecosystem`` is the OSV ecosystem name (``PyPI``, ``npm``).
+- ``failure`` is ``unknown-lock-format``, ``manifest-without-lock``, ``exception`` (any
+  exceptions-file rule violation) or ``auditor`` (an auditor that failed, timed out or
+  gave malformed output, or a broken auditor pin).
+
+pip-audit supplies the advisory ID, aliases and fixed versions. npm audit supplies the
+GHSA ID and its vulnerable range; ``fix`` is then the lowest published release above the
+locked version outside that range.
 """
 
 from __future__ import annotations
@@ -60,10 +69,14 @@ EXCEPTION_FIELDS = frozenset(
     {"advisory", "package", "version", "lock", "reason", "exposure", "expires"}
 )
 ADVISORY_LINE = re.compile(
-    r"(?P<lock>.+?): SECURITY\.dependency-audit: vulnerability"
-    r" ecosystem=(?P<ecosystem>[^\s;,]+) package=(?P<package>[^\s;,]+)"
-    r" version=(?P<version>[^\s;,]+) advisory=(?P<advisory>[^\s;,]+)"
-    r" aliases=(?P<aliases>[^\s;]*) fix=(?P<fix>[^\s;]*); (?P<action>[^\r\n]+)"
+    r"SECURITY\.dependency-audit lock=(?P<lock>\S+) ecosystem=(?P<ecosystem>\S+)"
+    r" package=(?P<package>\S+) version=(?P<version>\S+) advisory=(?P<advisory>\S+)"
+    r" aliases=(?P<aliases>\S*) fix=(?P<fix>\S*)"
+)
+FAILURE_KINDS = ("unknown-lock-format", "manifest-without-lock", "exception", "auditor")
+FAILURE_LINE = re.compile(
+    r"SECURITY\.dependency-audit failure=(?P<kind>" + "|".join(FAILURE_KINDS) + r")"
+    r" path=(?P<path>\S+) reason=(?P<reason>\S[^\r\n]*)"
 )
 PRETTIER = "3.6.2"
 
@@ -72,6 +85,11 @@ class AuditRunner(Protocol):
     def __call__(
         self, command: list[str], *, stdin: str | None = None, timeout: float
     ) -> subprocess.CompletedProcess[str]: ...
+
+
+def failure(kind: str, path: str, reason: str) -> str:
+    """One non-advisory audit line; ``reason`` is collapsed onto the line."""
+    return f"{AUDIT} failure={kind} path={path} reason={' '.join(reason.split())}"
 
 
 def finding(path: str, rule: str, reason: str, fix: str) -> str:
@@ -269,11 +287,11 @@ def audit_pin_findings(project_toml: str, lock_toml: str) -> list[str]:
     ]
     if len(pins) != 1 or not re.fullmatch(r"==[^*,]+", str(pins[0].specifier)):
         return [
-            finding(
+            failure(
+                "auditor",
                 "orchestrator/pyproject.toml",
-                AUDIT,
-                "pip-audit lacks an exact dev pin",
-                "add pip-audit==VERSION to the dev extra and regenerate uv.lock",
+                "pip-audit lacks an exact dev pin: add pip-audit==VERSION to the dev extra "
+                "and regenerate uv.lock",
             )
         ]
     versions = [
@@ -283,11 +301,10 @@ def audit_pin_findings(project_toml: str, lock_toml: str) -> list[str]:
     ]
     if not versions or any(version not in pins[0].specifier for version in versions):
         return [
-            finding(
+            failure(
+                "auditor",
                 LOCK,
-                AUDIT,
-                "locked pip-audit differs from the dev pin",
-                "regenerate uv.lock to match the exact dev pin",
+                "locked pip-audit differs from the dev pin: regenerate uv.lock to match it",
             )
         ]
     return []
@@ -295,9 +312,9 @@ def audit_pin_findings(project_toml: str, lock_toml: str) -> list[str]:
 
 LOCAL_SOURCES = frozenset({"editable", "directory", "virtual"})
 LOCK_ECOSYSTEMS = {
-    "uv.lock": "pypi",
-    "poetry.lock": "pypi",
-    "Pipfile.lock": "pypi",
+    "uv.lock": "PyPI",
+    "poetry.lock": "PyPI",
+    "Pipfile.lock": "PyPI",
     "package-lock.json": "npm",
     "npm-shrinkwrap.json": "npm",
     "pnpm-lock.yaml": "npm",
@@ -305,17 +322,17 @@ LOCK_ECOSYSTEMS = {
     "bun.lock": "npm",
     "bun.lockb": "npm",
     "Cargo.lock": "crates.io",
-    "go.sum": "go",
-    "Gemfile.lock": "rubygems",
-    "composer.lock": "packagist",
+    "go.sum": "Go",
+    "Gemfile.lock": "RubyGems",
+    "composer.lock": "Packagist",
 }
 MANIFESTS = {
-    "pyproject.toml": "pypi",
+    "pyproject.toml": "PyPI",
     "package.json": "npm",
     "Cargo.toml": "crates.io",
-    "go.mod": "go",
-    "Gemfile": "rubygems",
-    "composer.json": "packagist",
+    "go.mod": "Go",
+    "Gemfile": "RubyGems",
+    "composer.json": "Packagist",
 }
 NPM_LOCKS = frozenset({"package-lock.json", "npm-shrinkwrap.json"})
 NPM_DEPENDENCY_KEYS = (
@@ -362,12 +379,12 @@ class LockReport:
 def lock_ecosystem(path: str) -> str | None:
     name = PurePosixPath(path).name
     if name.startswith("requirements") and name.endswith(".txt"):
-        return "pypi"
+        return "PyPI"
     return LOCK_ECOSYSTEMS.get(name)
 
 
 def package_key(ecosystem: str, name: str) -> str:
-    return canonicalize_name(name) if ecosystem == "pypi" else name
+    return canonicalize_name(name) if ecosystem == "PyPI" else name
 
 
 def parent(path: str) -> str:
@@ -435,16 +452,20 @@ def coverage_findings(root: Path, locks: Sequence[str], manifests: Sequence[str]
             declared = declares_dependencies(PurePosixPath(path).name, (root / path).read_text())
         except (OSError, ValueError, AttributeError, TypeError):
             findings.append(
-                finding(path, AUDIT, f"unreadable manifest {path}", "repair the manifest")
+                failure(
+                    "manifest-without-lock",
+                    path,
+                    "unreadable manifest with no lock of its ecosystem: repair the manifest",
+                )
             )
             continue
         if declared:
             findings.append(
-                finding(
+                failure(
+                    "manifest-without-lock",
                     path,
-                    AUDIT,
-                    f"unpinned dependencies in {path}",
-                    "commit a lock file beside the manifest or pin it from a workspace lock",
+                    "dependencies are declared with no lock of their ecosystem: commit a lock "
+                    "file beside the manifest or pin it from a workspace lock",
                 )
             )
     return findings
@@ -527,7 +548,7 @@ def pip_audit(lock: str, requirements: str, run: AuditRunner) -> LockReport:
         checked(
             Advisory(
                 lock,
-                "pypi",
+                "PyPI",
                 dependency["name"],
                 dependency["version"],
                 vulnerability["id"],
@@ -541,7 +562,7 @@ def pip_audit(lock: str, requirements: str, run: AuditRunner) -> LockReport:
     checked_exit(audited, advisories)
     inventory: dict[str, set[str]] = {}
     for dependency in dependencies:
-        key = package_key("pypi", dependency["name"])
+        key = package_key("PyPI", dependency["name"])
         inventory.setdefault(key, set()).add(dependency["version"])
     return LockReport(inventory, advisories)
 
@@ -727,17 +748,11 @@ def audit_lock(root: Path, lock: str, run: AuditRunner) -> LockReport:
 
 
 def advisory_finding(item: Advisory) -> str:
-    fields = (
-        f"vulnerability ecosystem={item.ecosystem} package={item.package}"
+    return (
+        f"{AUDIT} lock={item.lock} ecosystem={item.ecosystem} package={item.package}"
         f" version={item.version} advisory={item.advisory}"
         f" aliases={','.join(item.aliases)} fix={','.join(item.fixes)}"
     )
-    action = (
-        f"upgrade {item.package} to {item.fixes[0]} or later and relock"
-        if item.fixes
-        else f"remove or replace {item.package}, or ask the owner for an exception in {EXCEPTIONS}"
-    )
-    return finding(item.lock, AUDIT, fields, action)
 
 
 def exception_problem(entry: object, today: date) -> str:
@@ -765,7 +780,7 @@ def exception_findings(
     """Suppress advisories that a valid owner-approved exception names; report invalid ones."""
 
     def report(reason: str) -> str:
-        return finding(EXCEPTIONS, AUDIT, reason, "correct or remove the exception")
+        return failure("exception", EXCEPTIONS, reason)
 
     try:
         data = json.loads(text)
@@ -832,26 +847,12 @@ def audit_findings(root: Path, paths: Sequence[str], *, run: AuditRunner, today:
     for lock in locks:
         name = PurePosixPath(lock).name
         if name not in AUDITORS and not name.startswith("requirements"):
-            findings.append(
-                finding(
-                    lock,
-                    AUDIT,
-                    f"no auditor for {lock}",
-                    "add an auditor for this lock format",
-                )
-            )
+            findings.append(failure("unknown-lock-format", lock, f"no auditor for {name}: add one"))
             continue
         try:
             reports[lock] = audit_lock(root, lock, run)
         except AuditError as problem:
-            findings.append(
-                finding(
-                    lock,
-                    AUDIT,
-                    f"audit failed: {problem}",
-                    "repair the lock or auditor and rerun the strict locked audit",
-                )
-            )
+            findings.append(failure("auditor", lock, str(problem)))
     advisories = [item for report in reports.values() for item in report.advisories]
     try:
         text = (root / EXCEPTIONS).read_text()
@@ -1012,12 +1013,10 @@ def main() -> int:
         else:
             findings = formatter_findings(paths)
     except (OSError, ValueError, subprocess.SubprocessError) as error:
-        rules = {
-            "static": "PARITY.lock-version",
-            "prettier": "PRETTIER.version",
-            "audit": AUDIT,
-        }
-        rule = rules[args.mode]
+        if args.mode == "audit":
+            print(failure("auditor", "scripts/checks/check-toolchain-parity.py", str(error)))
+            return 1
+        rule = "PARITY.lock-version" if args.mode == "static" else "PRETTIER.version"
         print(
             finding(
                 "scripts/checks/check-toolchain-parity.py",
