@@ -112,7 +112,7 @@ class TreeCheck:
 class InstalledPackage:
     """An installed, immutable stage tool tree."""
 
-    environment: Any
+    environment: calls.Sandbox
     reference: str
     root: str
     digest: str
@@ -203,7 +203,7 @@ def _spec(stage: str, uv: str, tool: Sequence[ShippedFile], facts: _InstallFacts
     }
 
 
-async def _run_install(environment: Any, host: Path, spec: dict[str, Any]) -> None:
+async def _run_install(environment: calls.Sandbox, host: Path, spec: dict[str, Any]) -> None:
     """Upload the staged bytes and run the root install; the stage is always removed."""
     stage = spec["stage"]
     try:
@@ -239,7 +239,7 @@ def _record(facts: _InstallFacts, found: calls.TreeManifest) -> dict[str, Any]:
 
 
 async def install_package(
-    environment: Any,
+    environment: calls.Sandbox,
     logs_dir: Path,
     package: ShippedPackage,
     *,
@@ -272,7 +272,7 @@ async def install_package(
 
 
 async def _measured(
-    environment: Any, logs_dir: Path, facts: _InstallFacts, owner: int | None
+    environment: calls.Sandbox, logs_dir: Path, facts: _InstallFacts, owner: int | None
 ) -> InstalledPackage:
     """Measure the installed tree (no-follow, owner checked) and record it host-side."""
     reference, wheels, wanted = facts.reference, facts.wheels, facts.commands
@@ -300,7 +300,7 @@ async def _measured(
 
 
 async def reuse_installed(
-    environment: Any, logs_dir: Path, package: ShippedPackage
+    environment: calls.Sandbox, logs_dir: Path, package: ShippedPackage
 ) -> InstalledPackage | None:
     """The package an earlier checkpoint installed in this container, measured now; else ``None``.
 

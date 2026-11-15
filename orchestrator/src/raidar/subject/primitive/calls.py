@@ -27,7 +27,7 @@ import tarfile
 import tempfile
 import uuid
 import weakref
-from collections.abc import Mapping, Sequence
+from collections.abc import Awaitable, Mapping, Sequence
 from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime
 from pathlib import Path, PurePosixPath
@@ -36,6 +36,8 @@ from typing import Any, Protocol
 from harbor.environments.base import ExecResult
 from pydantic import JsonValue
 
+# The environment interfaces every primitive and workflow types its container with.
+from raidar.contract.sandbox import Sandbox as Sandbox, Shell as Shell
 from raidar.subject.primitive.payload.supervise import (
     BASE_PATH,
     MAX_TIMEOUT_S,
@@ -112,23 +114,8 @@ def _chown(owner: str, path: str, *, recursive: bool = False) -> str:
     return f'(chown {flag}{owner} {_q(path)} || [ "$(id -u)" != 0 ])'
 
 
-class Sandbox(Protocol):
-    """What a primitive needs of a Harbor environment to run one command in it."""
-
-    async def exec(
-        self,
-        command: str,
-        /,
-        *,
-        cwd: str | None = None,
-        env: dict[str, str] | None = None,
-        timeout_sec: int | None = None,
-        user: str | int | None = None,
-    ) -> ExecResult: ...
-
-
 async def trusted_exec(
-    environment: Sandbox,
+    environment: Shell,
     command: str,
     *,
     user: str | int | None = None,
@@ -145,7 +132,7 @@ async def trusted_exec(
         raise TransportError(f"exec failed: {type(error).__name__}: {error}") from error
 
 
-async def _root(environment: Any, command: str, *, timeout_sec: float = ROOT_TIMEOUT_S) -> str:
+async def _root(environment: Shell, command: str, *, timeout_sec: float = ROOT_TIMEOUT_S) -> str:
     """A root command that must succeed; its stdout."""
     result = await trusted_exec(environment, command, user="root", timeout_sec=timeout_sec)
     if result.return_code != 0:
@@ -155,37 +142,33 @@ async def _root(environment: Any, command: str, *, timeout_sec: float = ROOT_TIM
 
 
 async def root_command(
-    environment: Any, command: str, *, timeout_sec: float = ROOT_TIMEOUT_S
+    environment: Shell, command: str, *, timeout_sec: float = ROOT_TIMEOUT_S
 ) -> str:
     """A Raidar-authored root command (never authored code) that must succeed; its stdout."""
     return await _root(environment, command, timeout_sec=timeout_sec)
 
 
-async def _transfer(environment: Any, name: str, *args: Any) -> None:
+async def _transfer(name: str, transfer: Awaitable[None]) -> None:
     try:
-        await getattr(environment, name)(*args)
+        await transfer
     except Exception as error:
         raise TransportError(f"{name} failed: {type(error).__name__}: {error}") from error
 
 
-async def upload_file(environment: Any, source: Path, target: str) -> None:
-    await _transfer(environment, "upload_file", source, target)
+async def upload_file(environment: Sandbox, source: Path, target: str) -> None:
+    await _transfer("upload_file", environment.upload_file(source, target))
 
 
-async def upload_dir(environment: Any, source: Path, target: str) -> None:
-    await _transfer(environment, "upload_dir", source, target)
+async def upload_dir(environment: Sandbox, source: Path, target: str) -> None:
+    await _transfer("upload_dir", environment.upload_dir(source, target))
 
 
-async def download_file(environment: Any, source: str, target: Path) -> None:
-    await _transfer(environment, "download_file", source, target)
-
-
-async def download_dir(environment: Any, source: str, target: Path) -> None:
-    await _transfer(environment, "download_dir", source, target)
+async def download_file(environment: Sandbox, source: str, target: Path) -> None:
+    await _transfer("download_file", environment.download_file(source, target))
 
 
 async def download_dir_excluding(
-    environment: Any, source: str, target: Path, exclude: Sequence[str]
+    environment: Sandbox, source: str, target: Path, exclude: Sequence[str]
 ) -> None:
     """Harbor's streamed directory download with exclusions (workspace snapshots, unbounded)."""
     try:
@@ -196,14 +179,14 @@ async def download_dir_excluding(
         raise TransportError(f"download failed: {type(error).__name__}: {error}") from error
 
 
-async def _upload_bytes(environment: Any, data: bytes, target: str) -> None:
+async def _upload_bytes(environment: Sandbox, data: bytes, target: str) -> None:
     with tempfile.TemporaryDirectory(prefix="raidar-upload-") as scratch:
         source = Path(scratch) / "payload"
         source.write_bytes(data)
         await upload_file(environment, source, target)
 
 
-async def put_root_file(environment: Any, path: str, data: bytes, mode: int = 0o644) -> None:
+async def put_root_file(environment: Sandbox, path: str, data: bytes, mode: int = 0o644) -> None:
     """Write a root-owned file (parents created root-owned 0755), e.g. a closed flag."""
     parent = os.path.dirname(path)
     await _root(environment, f"mkdir -p -m 0755 {_q(parent)}")
@@ -211,7 +194,7 @@ async def put_root_file(environment: Any, path: str, data: bytes, mode: int = 0o
     await _root(environment, f"{_chown('0:0', path)} && chmod {mode:o} {_q(path)}")
 
 
-async def root_file_exists(environment: Any, path: str) -> bool:
+async def root_file_exists(environment: Shell, path: str) -> bool:
     result = await trusted_exec(environment, f"[ -e {_q(path)} ]", user="root", timeout_sec=30)
     if result.return_code not in (0, 1):
         raise TransportError(f"existence check of {path} exited {result.return_code}")
@@ -227,7 +210,7 @@ def _regular_only(root: Path) -> None:
                 raise ValueError(f"{Path(directory) / name} is not a regular file or directory")
 
 
-async def upload_state(environment: Any, source: Path, target: str) -> None:
+async def upload_state(environment: Sandbox, source: Path, target: str) -> None:
     """Copy a host directory (regular files only) to a new container directory owned by 1000."""
     _regular_only(source)
     parent = os.path.dirname(target)
@@ -237,7 +220,7 @@ async def upload_state(environment: Any, source: Path, target: str) -> None:
     await _root(environment, _chown(f"{CHILD_UID}:{CHILD_GID}", target, recursive=True))
 
 
-async def make_state_dir(environment: Any, target: str) -> None:
+async def make_state_dir(environment: Shell, target: str) -> None:
     """An empty directory the child's user can write (parents root-owned 0755)."""
     parent = os.path.dirname(target)
     await _root(
@@ -267,16 +250,16 @@ def _launcher_command(subcommand: str, spec_path: str) -> str:
     return f"{_q(TRUSTED_PYTHON)} -I -S -B {launcher} {subcommand} {_q(spec_path)}"
 
 
-_READY: weakref.WeakSet[Any] = weakref.WeakSet()
+_READY: weakref.WeakSet[Sandbox] = weakref.WeakSet()
 
 
-async def _installed_digest(environment: Any) -> str | None:
+async def _installed_digest(environment: Shell) -> str | None:
     command = f"{_q(TRUSTED_PYTHON)} -I -S -B -c {_q(_HASH_SCRIPT)} {_q(TRUSTED_ROOT)}"
     result = await trusted_exec(environment, command, user="root", timeout_sec=60)
     return (result.stdout or "").strip() if result.return_code == 0 else None
 
 
-async def _install_payload(environment: Any, files: Mapping[str, bytes]) -> None:
+async def _install_payload(environment: Sandbox, files: Mapping[str, bytes]) -> None:
     await _root(
         environment,
         f"rm -rf {_q(TRUSTED_ROOT)} && mkdir -p -m 0755 {_q(TRUSTED_ROOT)} {_q(STAGES_ROOT)} "
@@ -294,19 +277,19 @@ async def _install_payload(environment: Any, files: Mapping[str, bytes]) -> None
     )
 
 
-def _is_ready(environment: Any) -> bool:
+def _is_ready(environment: Sandbox) -> bool:
     try:
         return environment in _READY
     except TypeError:  # not hashable: verified on every use
         return False
 
 
-def _mark_ready(environment: Any) -> None:
+def _mark_ready(environment: Sandbox) -> None:
     with contextlib.suppress(TypeError):
         _READY.add(environment)
 
 
-async def ensure_trusted(environment: Any) -> str:
+async def ensure_trusted(environment: Sandbox) -> str:
     """Install and verify the immutable payload (idempotent per environment); its digest."""
     files = payload_files()
     expected = payload_digest(files)
@@ -321,7 +304,7 @@ async def ensure_trusted(environment: Any) -> str:
 
 
 async def run_payload(
-    environment: Any,
+    environment: Sandbox,
     command: str,
     spec: Mapping[str, Any],
     *,
@@ -420,7 +403,7 @@ def _limits(unbounded: Unbounded | None) -> dict[str, Any]:
 
 
 async def tree_manifest(
-    environment: Any,
+    environment: Sandbox,
     path: str,
     *,
     unbounded: Unbounded | None = None,
@@ -533,7 +516,7 @@ def _extract(archive: Path, destination: Path, manifest: TreeManifest) -> str | 
         return f"unreadable archive: {error}"
 
 
-async def _archive_problem(environment: Any, manifest: TreeManifest, remote: str) -> str | None:
+async def _archive_problem(environment: Sandbox, manifest: TreeManifest, remote: str) -> str | None:
     """Why the container's archive is not worth downloading (missing, or heavier than allowed)."""
     sized = await trusted_exec(environment, f"wc -c < {_q(remote)}", user="root", timeout_sec=30)
     try:
@@ -546,7 +529,7 @@ async def _archive_problem(environment: Any, manifest: TreeManifest, remote: str
 
 
 async def copy_snapshot(
-    environment: Any, manifest: TreeManifest, remote_archive: str, destination: Path
+    environment: Sandbox, manifest: TreeManifest, remote_archive: str, destination: Path
 ) -> TreeManifest:
     """Download the archive a trusted ``snapshot`` wrote and unpack it host-side, verified.
 
@@ -568,7 +551,7 @@ async def copy_snapshot(
     return replace(manifest, violation=problem)
 
 
-async def snapshot_state(environment: Any, path: str, destination: Path) -> TreeManifest:
+async def snapshot_state(environment: Sandbox, path: str, destination: Path) -> TreeManifest:
     """Bounded no-follow copy of a directory or file to ``destination``, verified host-side.
 
     A violation (link, special file, caps, changed while copied) is in the returned manifest.
@@ -593,7 +576,7 @@ class ResourceFloors:
     memory_available: int | None
 
 
-async def resource_floors(environment: Any, paths: Sequence[str]) -> ResourceFloors:
+async def resource_floors(environment: Sandbox, paths: Sequence[str]) -> ResourceFloors:
     document = await run_payload(environment, "probe", {"paths": list(paths)})
     return ResourceFloors(document["disk_free"], document["memory_available"])
 
@@ -753,7 +736,7 @@ class CallRunner:
     """Runs authored commands in one environment and records each call host-side."""
 
     def __init__(
-        self, environment: Any, logs_dir: Path, *, policy: ChildPolicy | None = None
+        self, environment: Sandbox, logs_dir: Path, *, policy: ChildPolicy | None = None
     ) -> None:
         self.environment = environment
         self.logs_dir = Path(logs_dir)

@@ -53,7 +53,7 @@ from raidar.grading.records import (
 )
 from raidar.grading.resolver import UvResolver
 from raidar.grading.solvable import SolvableRef
-from raidar.grading.verifier import step_rewards
+from raidar.grading.step import step_rewards
 from tests.experiment_spec_support import experiment_document, write_experiment
 from tests.problems_support import (
     POSITIVE_REF,

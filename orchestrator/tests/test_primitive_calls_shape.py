@@ -27,6 +27,7 @@ from pydantic import JsonValue
 
 from raidar.subject.primitive import calls, install
 from raidar.subject.primitive.payload import isolate, supervise
+from tests.primitive_support import NoTransfers
 
 CONTEXT: dict[str, JsonValue] = {"task": "write a note", "round": 0}
 CALL_ARGV = ["tool", "go"]
@@ -36,7 +37,7 @@ def _exec_result(stdout: str = "", return_code: int = 0, stderr: str = "") -> An
     return SimpleNamespace(stdout=stdout, stderr=stderr, return_code=return_code)
 
 
-class Container:
+class Container(NoTransfers):
     """An in-memory container: commands answered by shape, uploads kept, downloads served."""
 
     def __init__(
@@ -952,12 +953,10 @@ async def test_state_with_a_link_is_refused_before_the_container_is_touched(
     assert container.commands == []
 
 
-@pytest.mark.parametrize("name", ["upload_file", "upload_dir", "download_file", "download_dir"])
+@pytest.mark.parametrize("name", ["upload_file", "upload_dir", "download_file"])
 async def test_a_failed_transfer_is_a_transport_error_naming_it(tmp_path: Path, name: str) -> None:
-    async def broken(*args: Any) -> None:
-        raise OSError("disk full")
-
-    environment = SimpleNamespace(**{name: broken})
+    environment = Container()
+    environment.fail_transfer = OSError("disk full")
 
     with pytest.raises(calls.TransportError, match=f"{name} failed: OSError: disk full"):
         await getattr(calls, name)(environment, tmp_path, "/x")

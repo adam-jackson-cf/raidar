@@ -10,6 +10,7 @@ from typing import Any
 
 import pytest
 import yaml
+from harbor.models.task.config import ArtifactConfig
 from harbor.models.task.task import Task
 
 from raidar.contract.paths import VAR_ENV, problems_root
@@ -105,7 +106,10 @@ def test_import_splits_the_converted_task_into_agent_task_bundle_and_references(
     assert task.config.environment.docker_image == manifest.pack.image
     assert task.config.agent.user == "agent"
     assert [step.min_reward for step in task.config.steps or []] == [None, None]
-    assert all(step.artifacts[0].source == APP_SOURCE for step in task.config.steps or [])
+    assert all(
+        isinstance(artifact := step.artifacts[0], ArtifactConfig) and artifact.source == APP_SOURCE
+        for step in task.config.steps or []
+    )
     compose = yaml.safe_load((content / "task" / "environment" / "docker-compose.yaml").read_text())
     assert compose["services"]["main"]["init"] is True
     assert not (content / "task" / "environment" / "Dockerfile").exists()

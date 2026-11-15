@@ -26,34 +26,14 @@
       "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md §2.5"
     },
     {
-      "path": "lab/stages/raidar/verify/fixtures/*",
-      "rule": "TEST.no-test-hooks",
-      "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md §2.2"
-    },
-    {
       "path": "orchestrator/src/raidar/cli/quality.py",
       "rule": "TEST.no-test-hooks",
       "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md §2.1"
     },
     {
-      "path": "orchestrator/src/raidar/cli/stage.py",
-      "rule": "TEST.no-test-hooks",
-      "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md §2.3"
-    },
-    {
-      "path": "orchestrator/src/raidar/design/problem/resolver.py",
-      "rule": "TEST.no-test-hooks",
-      "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md §2.3"
-    },
-    {
       "path": "orchestrator/src/raidar/engine/health/admission.py",
       "rule": "TEST.no-test-hooks",
       "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md §2.5"
-    },
-    {
-      "path": "orchestrator/src/raidar/engine/trial/environment.py",
-      "rule": "TEST.no-test-hooks",
-      "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md §2.3"
     },
     {
       "path": "orchestrator/src/raidar/evaluation/analysis/manipulation.py",
@@ -74,16 +54,6 @@
       "path": "orchestrator/src/raidar/grading/sandbox.py",
       "rule": "TEST.no-test-hooks",
       "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md §2.1"
-    },
-    {
-      "path": "orchestrator/src/raidar/grading/verifier.py",
-      "rule": "TEST.no-test-hooks",
-      "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md §2.3"
-    },
-    {
-      "path": "orchestrator/src/raidar/scoring/catalog/builtin.py",
-      "rule": "TEST.no-test-hooks",
-      "adr": "docs/adr/adr-003-guardrails-reference-exceptions.md §2.3"
     },
     {
       "path": "orchestrator/src/raidar/scoring/code_quality/arithmetic.py",

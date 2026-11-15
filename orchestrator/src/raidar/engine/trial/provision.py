@@ -28,11 +28,14 @@ import time
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path, PurePosixPath
-from typing import Any
+from typing import Any, Protocol
 
 from harbor.models.trial.paths import EnvironmentPaths
+from harbor.trial.hooks import TrialEvent, TrialHookEvent
 
+from raidar.contract.sandbox import Sandbox, Shell
 from raidar.contract.snapshot import SNAPSHOT_EXCLUDES, tree_digest
+from raidar.grading.guard import AgentTrial
 
 PROVISION_RECORD_KIND = "raidar-provision"
 PROVISION_DIR_NAME = "raidar-provision"
@@ -118,7 +121,7 @@ def _write_payload(provision: TrialProvision, folder: Path) -> None:
         target.chmod(0o755 if support.executable else 0o644)
 
 
-async def _upload(environment: Any, provision: TrialProvision) -> None:
+async def _upload(environment: Sandbox, provision: TrialProvision) -> None:
     staging = shlex.quote(str(provision.staging))
     await environment.exec(
         f"umask 022; rm -rf {staging} && mkdir -p {staging} "
@@ -128,10 +131,10 @@ async def _upload(environment: Any, provision: TrialProvision) -> None:
     )
     with tempfile.TemporaryDirectory(prefix="raidar-provision-") as tmp:
         _write_payload(provision, Path(tmp))
-        await environment.upload_dir(tmp, str(provision.staging))
+        await environment.upload_dir(Path(tmp), str(provision.staging))
 
 
-async def _snapshot_digest(environment: Any, source: str) -> str:
+async def _snapshot_digest(environment: Sandbox, source: str) -> str:
     with tempfile.TemporaryDirectory(prefix="raidar-provision-snapshot-") as tmp:
         await environment.download_dir_with_exclusions(
             source_dir=source, target_dir=Path(tmp), exclude=list(SNAPSHOT_EXCLUDES)
@@ -140,7 +143,7 @@ async def _snapshot_digest(environment: Any, source: str) -> str:
 
 
 async def install_at_start(
-    environment: Any, provision: TrialProvision, user: str | None, state: _Installed
+    environment: Sandbox, provision: TrialProvision, user: str | None, state: _Installed
 ) -> None:
     """Upload the payload, run the install as root and take the snapshot; record into ``state``."""
     started = time.perf_counter()
@@ -159,7 +162,7 @@ async def install_at_start(
     state.duration_s = round(time.perf_counter() - started, 3)
 
 
-async def _check(environment: Any, provision: TrialProvision, user: str | None) -> dict[str, Any]:
+async def _check(environment: Shell, provision: TrialProvision, user: str | None) -> dict[str, Any]:
     try:
         result = await environment.exec(
             f"umask 022; {provision.check}", user=user, timeout_sec=CHECK_TIMEOUT_S
@@ -174,7 +177,11 @@ async def _check(environment: Any, provision: TrialProvision, user: str | None) 
 
 
 def _record(
-    provision: TrialProvision, step: str | None, user: str | None, state: _Installed, check: Any
+    provision: TrialProvision,
+    step: str | None,
+    user: str | None,
+    state: _Installed,
+    check: dict[str, Any] | None,
 ) -> dict[str, Any]:
     return {
         "kind": PROVISION_RECORD_KIND,
@@ -194,12 +201,19 @@ def _record(
     }
 
 
-def install_trial_provisioning(trial: Any, provisions: Sequence[TrialProvision]) -> None:
+class ProvisionedTrial(AgentTrial, Protocol):
+    """A trial whose agent environment Raidar uploads provisioning payloads into."""
+
+    @property
+    def agent_environment(self) -> Sandbox: ...
+
+
+def install_trial_provisioning(
+    trial: ProvisionedTrial, provisions: Sequence[TrialProvision]
+) -> None:
     """Install at environment start; check and record before every step's agent phase."""
     if not provisions:
         return
-    from harbor.trial.hooks import TrialEvent
-
     states = {provision.slug: _Installed() for provision in provisions}
     configured = trial.task.config.agent.user
     user = None if configured is None else str(configured)
@@ -218,7 +232,7 @@ def install_trial_provisioning(trial: Any, provisions: Sequence[TrialProvision])
                 f"{type(environment).__name__} cannot run an install at environment start"
             )
 
-    async def before_agent(event: Any) -> None:
+    async def before_agent(event: TrialHookEvent) -> None:
         steps = event.result.step_results
         step = steps[-1].step_name if steps else None
         for provision in provisions:

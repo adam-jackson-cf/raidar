@@ -192,5 +192,4 @@ def draft_errata(
         ),
         "cases": [_draft_case(entry, Disposition.EXCLUDE_FROM_SOLVED) for entry in flagged],
     }
-    text: str = yaml.safe_dump(document, sort_keys=False, width=100, allow_unicode=True)
-    return text
+    return yaml.safe_dump(document, sort_keys=False, width=100, allow_unicode=True)

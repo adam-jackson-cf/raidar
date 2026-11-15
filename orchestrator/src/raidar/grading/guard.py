@@ -21,10 +21,12 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Protocol
 
+from harbor.models.task.config import TaskConfig
 from harbor.models.trial.paths import TrialPaths
 from harbor.trial.hooks import TrialEvent, TrialHookEvent
 from harbor.trial.trial import TrialHookCallback
 
+from raidar.contract.sandbox import Shell
 from raidar.grading.bundle import VerifierBundle, load_bundle
 from raidar.grading.leak import LeakScanError, scan_agent_environment
 from raidar.grading.records import step_record_dir, write_pre_agent_leak
@@ -37,15 +39,29 @@ def current_step(event: TrialHookEvent, bundle: VerifierBundle) -> str:
 
 
 class GuardedTrial(Protocol):
-    """What the leak guard needs of a Harbor ``Trial``."""
+    """What the leak guard and the trial's other hooks need of a Harbor ``Trial``."""
 
     @property
     def paths(self) -> TrialPaths: ...
 
     @property
-    def agent_environment(self) -> object: ...
+    def agent_environment(self) -> Shell: ...
 
     def add_hook(self, event: TrialEvent, hook: TrialHookCallback) -> None: ...
+
+
+class TrialTask(Protocol):
+    """What Raidar's hooks read of a Harbor ``Task``: its configuration."""
+
+    @property
+    def config(self) -> TaskConfig: ...
+
+
+class AgentTrial(GuardedTrial, Protocol):
+    """A trial whose hooks act as the task's agent user."""
+
+    @property
+    def task(self) -> TrialTask: ...
 
 
 def install_leak_guard(trial: GuardedTrial, oracle_bundle: str | Path) -> None:

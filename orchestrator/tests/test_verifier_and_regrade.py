@@ -8,7 +8,7 @@ import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 from types import SimpleNamespace
-from typing import Any, cast
+from typing import Any
 
 import pytest
 from click.testing import CliRunner
@@ -27,13 +27,13 @@ from raidar.grading.records import (
 )
 from raidar.grading.regrade import RegradeError, RegradeOptions, SandboxFactory, regrade_path
 from raidar.grading.sandbox import GradingSandbox
-from raidar.grading.verifier import RaidarVerifier, SnapshotUnavailableError
+from raidar.grading.step import SnapshotUnavailableError, StepVerifier, VerifierSettings
 from tests.verifier_support import FakeAgentEnvironment, LocalProcessSandbox, make_bundle, write_app
 
 pytestmark = pytest.mark.slow
 
 
-class LocalVerifier(RaidarVerifier):
+class LocalVerifier(StepVerifier):
     """The production verifier with the grader container swapped for a host subprocess."""
 
     sandbox: LocalProcessSandbox
@@ -71,7 +71,7 @@ async def start_agent_behind_guard(
     tmp_path: Path, env: FakeAgentEnvironment, bundle: Path, step: str | None
 ) -> None:
     trial = FakeTrial(env, TrialPaths(trial_dir=tmp_path / "trial"))
-    install_leak_guard(cast(Any, trial), bundle)
+    install_leak_guard(trial, bundle)
     await trial.start_agent(step)
 
 
@@ -89,14 +89,12 @@ async def make_verifier(
         await start_agent_behind_guard(tmp_path, FakeAgentEnvironment(), bundle, step)
     pinned = {"grader": {}, **kwargs.pop("pinned", {})}
     verifier = LocalVerifier(
-        oracle_bundle=str(bundle),
-        docker_context="test-ctx",
-        task=cast(Any, None),
+        VerifierSettings(
+            oracle_bundle=str(bundle), docker_context="test-ctx", pinned=pinned, **kwargs
+        ),
         trial_paths=TrialPaths(trial_dir=tmp_path / "trial"),
-        environment=cast(Any, env),
+        environment=env,
         step_name=step,
-        pinned=pinned,
-        **kwargs,
     )
     verifier.sandbox = LocalProcessSandbox(tmp_path / "sandbox")
     return verifier
@@ -121,11 +119,9 @@ async def test_verifier_grades_the_artifact_and_never_uploads_to_the_agent_env(
     place_step_artifact(tmp_path, "checkpoint_1")
     verifier = await make_verifier(tmp_path, env)
 
-    result = await verifier.verify()
-
-    assert result.rewards is not None
-    assert result.rewards["solved"] == 1.0
-    assert result.rewards["oracle_leak"] == 0.0
+    rewards = await verifier.verify()
+    assert rewards["solved"] == 1.0
+    assert rewards["oracle_leak"] == 0.0
     assert env.calls == ["exec"]  # the leak assertion only; no upload, no download
     record = load_step_record(step_record_dir(tmp_path / "trial", "checkpoint_1"))
     assert record.snapshot.used == "artifact"
@@ -159,10 +155,8 @@ async def test_explicit_download_source_keeps_a_regradable_copy(tmp_path: Path) 
     env = FakeAgentEnvironment(app_source=write_app(tmp_path / "live-app"))
     verifier = await make_verifier(tmp_path, env, coverage=False, snapshot_source="download")
 
-    result = await verifier.verify()
-
-    assert result.rewards is not None
-    assert result.rewards["solved"] == 1.0
+    rewards = await verifier.verify()
+    assert rewards["solved"] == 1.0
     assert env.calls == ["exec", "download:/app"]
     record = load_step_record(step_record_dir(tmp_path / "trial", "checkpoint_1"))
     assert (record.snapshot.requested, record.snapshot.used) == ("download", "download")
@@ -218,10 +212,10 @@ async def test_a_leaked_hidden_test_forces_a_failing_reward(tmp_path: Path) -> N
     place_step_artifact(tmp_path, "checkpoint_1")
     verifier = await make_verifier(tmp_path, env, bundle_root=bundle.root, coverage=False)
 
-    result = await verifier.verify()
+    rewards = await verifier.verify()
 
     # No verdict or rate is reported for a leaked step, not even as 0.0.
-    assert result.rewards == {"infrastructure_failure": 0.0, "oracle_leak": 1.0}
+    assert rewards == {"infrastructure_failure": 0.0, "oracle_leak": 1.0}
     record = load_step_record(step_record_dir(tmp_path / "trial", "checkpoint_1"))
     assert record.grade.solved  # the evidence is kept; only the reward is withheld
     assert record.leak_check is not None
@@ -243,12 +237,11 @@ async def test_a_canary_attributed_grading_crash_is_a_valid_failed_outcome_end_t
     verifier = await make_verifier(tmp_path, FakeAgentEnvironment())
     verifier.sandbox = HangingSandbox(tmp_path / "sandbox")
 
-    result = await verifier.verify()
+    rewards = await verifier.verify()
 
     # The infrastructure flag collect.py excludes on is absent; the step scores as a failure.
-    assert result.rewards is not None
-    assert result.rewards["infrastructure_failure"] == 0.0
-    assert result.rewards["solved"] == 0.0
+    assert rewards["infrastructure_failure"] == 0.0
+    assert rewards["solved"] == 0.0
     record_dir = step_record_dir(tmp_path / "trial", "checkpoint_1")
     record = load_step_record(record_dir)
     assert record.grade.infra_failure is None
@@ -256,7 +249,7 @@ async def test_a_canary_attributed_grading_crash_is_a_valid_failed_outcome_end_t
     assert record.canary.trigger == "sandbox_timeout"
     assert record.coverage.parity is not None
     assert not record.coverage.parity.eligible
-    assert record.rewards == result.rewards
+    assert record.rewards == rewards
     assert record.summary == record.grade.summary()  # health V2 reads this
 
     async def hanging(bundle: Any) -> GradingSandbox:
@@ -285,11 +278,9 @@ async def test_hidden_tests_seen_before_the_agent_started_leak_the_step(tmp_path
         tmp_path, FakeAgentEnvironment(), bundle_root=bundle, guarded=False, coverage=False
     )
 
-    result = await verifier.verify()
-
-    assert result.rewards is not None
-    assert result.rewards["oracle_leak"] == 1.0
-    assert "solved" not in result.rewards
+    rewards = await verifier.verify()
+    assert rewards["oracle_leak"] == 1.0
+    assert "solved" not in rewards
     record = load_step_record(step_record_dir(tmp_path / "trial", "checkpoint_1"))
     assert record.leak_check is not None
     assert record.leak_check.clean  # the verify-time scan alone would have missed it

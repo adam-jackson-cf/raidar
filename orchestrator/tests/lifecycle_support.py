@@ -40,6 +40,7 @@ from raidar.subject.primitive.install import InstalledPackage
 from raidar.subject.primitive.payload.supervise import STATE_LIMITS
 from raidar.subject.primitive.site import PackageSite
 from raidar_contract.package.manifest import StagePackage
+from tests.primitive_support import NoTransfers
 
 FIXTURES = Path(__file__).parent / "fixtures" / "stages" / "acme"
 NOTE_STATE = FIXTURES / "note-state"
@@ -92,7 +93,7 @@ def note_tool(
 
 
 @dataclass
-class FakeContainer:
+class FakeContainer(NoTransfers):
     """The container's files and the behaviour of its tool."""
 
     root: Path

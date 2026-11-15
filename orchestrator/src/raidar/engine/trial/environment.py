@@ -51,6 +51,7 @@ import contextlib
 import hashlib
 import importlib
 import json
+import math
 import shutil
 import socket
 import sys
@@ -61,7 +62,7 @@ from pathlib import Path, PurePosixPath
 from typing import Any
 
 from harbor.constants import MAIN_SERVICE_NAME
-from harbor.environments.base import ExecResult
+from harbor.environments.base import ExecResult, OutputCallback
 from harbor.environments.capabilities import EnvironmentCapabilities
 from harbor.environments.docker import write_mounts_compose_file
 from harbor.environments.docker.docker import (
@@ -98,8 +99,7 @@ def run_scope(trials_dir: Path) -> str:
 
 def trial_project_name(trial_id: str, trials_dir: Path) -> str:
     """The Compose project Harbor names for a trial run under ``trials_dir``."""
-    project: str = _sanitize_docker_compose_project_name(f"{trial_id}__env-{run_scope(trials_dir)}")
-    return project
+    return _sanitize_docker_compose_project_name(f"{trial_id}__env-{run_scope(trials_dir)}")
 
 
 def _engine_cp(rest: Sequence[str], container: str) -> list[str] | None:
@@ -166,9 +166,6 @@ PostStartHook = Callable[[], Awaitable[None]]
 
 
 class RunScopedDockerEnvironment(DockerEnvironment):
-    _mounts_compose_temp_dir: tempfile.TemporaryDirectory[str] | None
-    """Harbor's temporary directory for the mounts compose file (None until it is written)."""
-
     def __init__(self, *, session_id: str, run_scope: str, **kwargs: Any) -> None:
         super().__init__(session_id=f"{session_id}-{run_scope}", **kwargs)
         self.run_scope = run_scope
@@ -187,8 +184,7 @@ class RunScopedDockerEnvironment(DockerEnvironment):
         self._cleanup_mounts_compose_file()
         self._mounts_compose_temp_dir = tempfile.TemporaryDirectory()
         path = Path(self._mounts_compose_temp_dir.name) / "docker-compose-mounts.json"
-        written: Path = write_mounts_compose_file(path, [])
-        return written
+        return write_mounts_compose_file(path, [])
 
     def add_post_start_hook(self, hook: PostStartHook) -> None:
         """Run ``hook`` once the container has started, inside ``start`` (module doc)."""
@@ -290,9 +286,9 @@ class RunScopedDockerEnvironment(DockerEnvironment):
         self,
         command: list[str],
         check: bool = True,
-        timeout_sec: float | None = None,
+        timeout_sec: int | None = None,
         stdin_data: bytes | None = None,
-        on_output: Any = None,
+        on_output: OutputCallback | None = None,
     ) -> ExecResult:
         if command and command[0] == "exec":
             require_key_absent(exec_env(command), "a sandbox command")
@@ -311,9 +307,11 @@ class RunScopedDockerEnvironment(DockerEnvironment):
                 translated = engine_command(command, container, stdin=stdin_data is not None)
         remaining = timeout_sec
         if timeout_sec is not None:
-            remaining = timeout_sec - (asyncio.get_running_loop().time() - started)
-            if remaining <= 0:
+            left = timeout_sec - (asyncio.get_running_loop().time() - started)
+            if left <= 0:
                 raise RuntimeError(f"Command timed out after {timeout_sec} seconds")
+            # Harbor takes whole seconds and reads 0 as no timeout: round up, never down.
+            remaining = math.ceil(left)
         if translated is None:
             return await super()._run_docker_compose_command(
                 command,
@@ -335,9 +333,9 @@ class RunScopedDockerEnvironment(DockerEnvironment):
         argv: list[str],
         *,
         check: bool,
-        timeout_sec: float | None,
+        timeout_sec: int | None,
         stdin_data: bytes | None,
-        on_output: Any,
+        on_output: OutputCallback | None,
     ) -> ExecResult:
         """``docker <argv>`` with Harbor's output handling and failure contract."""
         full_command = self._engine_cmd(*argv)

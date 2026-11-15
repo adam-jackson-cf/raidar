@@ -59,14 +59,18 @@ def _construct_unique_mapping(loader: yaml.SafeLoader, node: yaml.MappingNode) -
     return loader.construct_mapping(node)
 
 
+class _UniqueKeyLoader(yaml.SafeLoader):
+    """``yaml.SafeLoader`` that rejects duplicate mapping keys instead of keeping the last."""
+
+
+_UniqueKeyLoader.add_constructor(
+    yaml.resolver.BaseResolver.DEFAULT_MAPPING_TAG, _construct_unique_mapping
+)
+
+
 def _load_unique_keys(text: str) -> object:
     """``yaml.safe_load`` that rejects duplicate mapping keys instead of keeping the last."""
-    loader = yaml.SafeLoader(text)
-    # An instance-level table: the class-wide SafeLoader constructors stay untouched.
-    loader.yaml_constructors = {
-        **yaml.SafeLoader.yaml_constructors,
-        yaml.resolver.BaseResolver.DEFAULT_MAPPING_TAG: _construct_unique_mapping,
-    }
+    loader = _UniqueKeyLoader(text)
     try:
         return loader.get_single_data()
     finally:

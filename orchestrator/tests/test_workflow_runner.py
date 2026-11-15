@@ -131,6 +131,14 @@ def _runner(logs_dir: Path) -> WorkflowRunner:
     )
 
 
+def test_a_runner_built_without_its_options_refuses_to_name_its_agent(tmp_path: Path) -> None:
+    runner = _runner(tmp_path)
+    runner.options = None
+
+    with pytest.raises(TypeError, match="without its options"):
+        runner.version()
+
+
 def _run(logs_dir: Path) -> tuple[AgentContext, FakeEnvironment]:
     context = AgentContext()
     environment = FakeEnvironment()

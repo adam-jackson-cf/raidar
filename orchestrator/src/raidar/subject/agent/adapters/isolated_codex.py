@@ -116,8 +116,7 @@ class IsolatedCodex(Codex):
 
     @property
     def codex_home(self) -> str:
-        home: str = self._REMOTE_CODEX_HOME.as_posix()
-        return home
+        return self._REMOTE_CODEX_HOME.as_posix()
 
     def bundled_manifests(self) -> list[str]:
         home = self.codex_home

@@ -530,8 +530,7 @@ def _history(tmp_path: Path, now: str, git: Callable[..., str | None]) -> list[s
 
 
 def _agents(versions: dict[int, str]) -> str:
-    document: str = yaml.safe_dump({"agents": {f"codex@{n}": d for n, d in versions.items()}})
-    return document
+    return yaml.safe_dump({"agents": {f"codex@{n}": d for n, d in versions.items()}})
 
 
 def test_re_hashing_a_registered_version_in_place_is_allowed(tmp_path: Path) -> None:

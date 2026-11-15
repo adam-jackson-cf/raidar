@@ -54,7 +54,7 @@ import time
 from collections.abc import Sequence
 from contextlib import suppress
 from pathlib import Path
-from typing import Any, cast
+from typing import Any
 
 from harbor.agents.base import BaseAgent
 from harbor.environments.base import BaseEnvironment
@@ -207,7 +207,10 @@ class WorkflowRunner(BaseAgent):
 
     @property
     def runner_options(self) -> WorkflowRunnerOptions:
-        return cast(WorkflowRunnerOptions, self.options)
+        options = self.options
+        if not isinstance(options, WorkflowRunnerOptions):
+            raise TypeError("the workflow runner was built without its options")
+        return options
 
     def version(self) -> str | None:
         """The native agent's pinned CLI version (what the turns run)."""

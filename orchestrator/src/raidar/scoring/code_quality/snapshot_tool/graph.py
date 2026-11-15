@@ -360,7 +360,7 @@ class _CallResolver:
 
 def build_dependency_graph(
     snapshot_dir: Path, entrypoint: Path, reader: SourceReader
-) -> nx.DiGraph:
+) -> nx.DiGraph[str]:
     """Weighted call graph over the files reachable from ``entrypoint``."""
     snapshot_dir = snapshot_dir.resolve()
     entrypoint_abs = (
@@ -372,7 +372,7 @@ def build_dependency_graph(
         source_files = sorted(trace_source_files(entrypoint_abs, snapshot_dir, reader))
     except Exception:  # the fork logs and returns an empty graph
         return nx.DiGraph()
-    graph = nx.DiGraph()
+    graph: nx.DiGraph[str] = nx.DiGraph()
     functions: dict[Path, list[tuple[str, Node]]] = {}
     index: FunctionIndex = {}
     for file_path in source_files:
@@ -404,7 +404,7 @@ def _file_resolver(
 
 
 def _add_call_edges(
-    graph: nx.DiGraph,
+    graph: nx.DiGraph[str],
     file_path: Path,
     defined: list[tuple[str, Node]],
     resolver: _CallResolver,
@@ -419,7 +419,7 @@ def _add_call_edges(
                 graph.add_edge(_node_id(file_path, qual_name), callee, weight=count)
 
 
-def dependency_graph_traversal(graph: nx.DiGraph) -> dict[str, list[dict[str, Any]]]:
+def dependency_graph_traversal(graph: nx.DiGraph[str]) -> dict[str, list[dict[str, Any]]]:
     """Nodes and weighted edges in UTF-8 byte order, as the fork's traversal emits them."""
     nodes = [
         {

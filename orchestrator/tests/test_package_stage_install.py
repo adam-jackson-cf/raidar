@@ -18,6 +18,7 @@ from raidar.subject.workflow.package_trial import install_locked
 from raidar_contract.package.manifest import StageManifest, StagePackage
 from raidar_contract.references import Release
 from tests.package_support import fixture_package
+from tests.primitive_support import UntouchedSandbox
 
 LOCKED_TREE = "t" * 64
 
@@ -49,9 +50,9 @@ async def test_the_second_checkpoint_reuses_the_install_and_is_checked_against_t
     monkeypatch.setattr(package_trial, "reuse_installed", reuse)
     release, package, locked = _setup(tmp_path)
 
-    first = await install_locked(object(), tmp_path, release, package, locked)
+    first = await install_locked(UntouchedSandbox(), tmp_path, release, package, locked)
     present.append(_installed(LOCKED_TREE))  # the container now holds the install
-    second = await install_locked(object(), tmp_path, release, package, locked)
+    second = await install_locked(UntouchedSandbox(), tmp_path, release, package, locked)
 
     assert installs == ["acme/gate-check"]  # installed once
     assert first.digest == second.digest == LOCKED_TREE
@@ -71,7 +72,7 @@ async def test_a_reused_tree_that_changed_is_invalid_never_repaired(
     release, package, locked = _setup(tmp_path)
 
     with pytest.raises(TrialInvalidError, match="differs from the locked"):
-        await install_locked(object(), tmp_path, release, package, locked)
+        await install_locked(UntouchedSandbox(), tmp_path, release, package, locked)
 
 
 async def test_an_unmeasurable_existing_install_is_an_integrity_failure(
@@ -84,7 +85,7 @@ async def test_an_unmeasurable_existing_install_is_an_integrity_failure(
     release, package, locked = _setup(tmp_path)
 
     with pytest.raises(TrialInvalidError, match="integrity: acme/gate-check@1: installed tree"):
-        await install_locked(object(), tmp_path, release, package, locked)
+        await install_locked(UntouchedSandbox(), tmp_path, release, package, locked)
 
 
 def test_a_package_that_is_not_the_locked_bytes_is_invalid(tmp_path: Path) -> None:

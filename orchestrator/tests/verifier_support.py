@@ -19,6 +19,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+from harbor.environments.base import ExecResult
 
 from raidar.grading import identity, payload
 from raidar.grading.bundle import BundleManifest, GraderSpec, VerifierStepSpec, write_bundle
@@ -257,13 +258,6 @@ class LocalProcessSandbox:
 
 
 @dataclass
-class ExecResult:
-    stdout: str
-    stderr: str = ""
-    return_code: int = 0
-
-
-@dataclass
 class FakeAgentEnvironment:
     """Records every call a verifier makes against the agent environment."""
 
@@ -273,7 +267,7 @@ class FakeAgentEnvironment:
 
     async def exec(self, command: str, **kwargs: Any) -> ExecResult:
         self.calls.append("exec")
-        return ExecResult(stdout=self.leak_stdout)
+        return ExecResult(stdout=self.leak_stdout, return_code=0)
 
     async def download_dir_with_exclusions(
         self, *, source_dir: str, target_dir: Path, exclude: list[str]

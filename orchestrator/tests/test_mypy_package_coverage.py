@@ -62,12 +62,20 @@ def test_nonmaintained_paths_never_create_inventory_drift() -> None:
     excluded = [
         "docs/examples",
         "var/generated/tool/src",
-        "orchestrator/tests/fixtures/programs",
+        "orchestrator/tests/fixtures/stages/acme/probe/fixtures/case/state",
         "lab/stages/raidar/define/fixtures/tool/src",
-        "lab/stages/custom/new/tool/src/fixtures",
     ]
     assert _checker().coverage_findings([*ROOTS, *excluded], ROOTS) == []
     assert _checker().coverage_findings(excluded, []) == []
+
+
+def test_owned_code_beside_fixture_programs_stays_maintained() -> None:
+    owned = [
+        "orchestrator/tests/fixtures/stages/acme/probe/tool/src/probe",
+        "lab/stages/custom/new/tool/src/fixtures",
+    ]
+    findings = _checker().coverage_findings(owned, [])
+    assert [line.split(":", 1)[0] for line in findings] == sorted(owned)
 
 
 def test_multiple_omissions_are_reported_once_in_stable_order() -> None:

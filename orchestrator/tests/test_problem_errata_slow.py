@@ -114,11 +114,10 @@ async def test_the_verifier_records_raw_and_errata_applied_verdicts(tmp_path: Pa
         step="checkpoint_2",
         pinned={"errata": errata},
     )
-    result = await verifier.verify()
+    rewards = await verifier.verify()
     record = load_step_record(step_record_dir(tmp_path / "trial", "checkpoint_2"))
     # The reward and the grade stay the raw SCB verdict ...
-    assert result.rewards is not None
-    assert result.rewards["solved"] == 0.0
+    assert rewards["solved"] == 0.0
     assert not record.grade.solved
     # ... and the errata-applied one is recorded beside it.
     assert record.errata == ErrataOutcome(

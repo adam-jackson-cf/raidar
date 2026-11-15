@@ -6,7 +6,7 @@ import sys
 from pathlib import Path
 
 
-def main(argv):
+def main(argv: list[str]) -> int:
     context = json.loads(Path(os.environ["RAIDAR_STAGE_CONTEXT"]).read_text(encoding="utf-8"))
     command = argv[0] if argv else ""
     if command == "setup":

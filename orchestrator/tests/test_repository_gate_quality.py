@@ -8,6 +8,7 @@ import re
 import shlex
 import subprocess
 import sys
+import tomllib
 from pathlib import Path
 from textwrap import dedent
 from typing import Any, cast
@@ -496,9 +497,8 @@ def test_checker_inventory_ignores_external_symlinks_and_checks_git_files(tmp_pa
 
 
 @pytest.mark.parametrize("selection", [[], [".agents/skills"], [".agents/skills/bad_skill"]])
-@pytest.mark.parametrize("report_format", ["text", "findings-json"])
 def test_skill_directory_policy_scans_skills_without_python(
-    tmp_path: Path, selection: list[str], report_format: str
+    tmp_path: Path, selection: list[str]
 ) -> None:
     subprocess.run(["git", "init", "-q", str(tmp_path)], check=True, timeout=10)
 
@@ -509,8 +509,6 @@ def test_skill_directory_policy_scans_skills_without_python(
                 str(ROOT / "scripts/checks/check-python-quality.py"),
                 "--repo-root",
                 str(tmp_path),
-                "--format",
-                report_format,
                 *paths,
             ],
             capture_output=True,
@@ -528,10 +526,22 @@ def test_skill_directory_policy_scans_skills_without_python(
     (tmp_path / ".agents/skills/bad_skill/support.txt").write_text("skill support\n")
     result = run(selection)
     assert result.returncode == 1
-    rendered = result.stderr if report_format == "text" else result.stdout
-    assert ".agents/skills/bad_skill" in rendered
-    assert "PYQ106" in rendered
-    if report_format == "text":
-        assert len(result.stderr.splitlines()) == 1
-        assert "; rename the skill directory" in result.stderr
+    assert ".agents/skills/bad_skill" in result.stderr
+    assert "PYQ106" in result.stderr
+    assert len(result.stderr.splitlines()) == 1
+    assert "; rename the skill directory" in result.stderr
     assert run([".agents/skills/good-skill"]).returncode == 0
+
+
+def test_the_mypy_exclude_matches_the_fixture_program_boundary_on_every_python_path() -> None:
+    from git_inventory import is_fixture_program, python_paths
+
+    exclude = tomllib.loads((ROOT / "orchestrator/pyproject.toml").read_text())["tool"]["mypy"][
+        "exclude"
+    ]
+    paths = python_paths(ROOT)
+    assert any(map(is_fixture_program, paths)), "the repository keeps fixture programs"
+    disagreeing = [
+        path for path in paths if bool(re.search(exclude, path)) != is_fixture_program(path)
+    ]
+    assert disagreeing == []

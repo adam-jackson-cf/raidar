@@ -21,14 +21,18 @@ Rules:
   ``"unittest"``, ``PYTEST*``, ``TESTING``, ``TEST_MODE``, ``UNDER_TEST``, ``TEST``/``TESTS`` with
   optional ``_``-joined affixes); no identifier ending in a test-only hook name (``for_test``,
   ``test_hook``, ``test_only``, ``test_mode`` and the like); no public top-level function or
-  class that test files name and no other production file names (``public_entry_points``
-  symbols excepted).
+  class that test files name and no other production file names. Symbols a third party loads
+  are excepted: ``main``, a function registered by a Click ``command``/``group`` decorator, and a
+  symbol named by a ``module:Symbol`` string in production code or by a ``[project.scripts]``,
+  ``[project.gui-scripts]`` or ``[project.entry-points.*]`` value of the defining project's
+  ``pyproject.toml``.
 
 ``test-integrity-exceptions.json`` waives a rule for a path (exact or ``fnmatch`` glob); each
 entry names the ADR section that justifies it. An entry that waives nothing, or names a missing
 ADR, is itself a finding (TEST.exceptions).
 
-Paths are the tracked files plus untracked files that are not git-ignored.
+Paths are the tracked files plus untracked files that are not git-ignored, except fixture
+programs (``git_inventory.is_fixture_program``), which are tool inputs rather than sources.
 """
 
 from __future__ import annotations
@@ -40,12 +44,13 @@ import json
 import re
 import token
 import tokenize
+import tomllib
 from collections.abc import Iterator, Sequence
 from dataclasses import dataclass
 from fnmatch import fnmatchcase
 from pathlib import Path, PurePosixPath
 
-from git_inventory import python_paths
+from git_inventory import is_fixture_program, python_paths
 
 ROOT = Path(__file__).resolve().parents[2]
 EXCEPTIONS = "scripts/checks/test-integrity-exceptions.json"
@@ -81,6 +86,10 @@ HOOK_NAME = re.compile(
     r"(?i)(^|_)(for_tests?|for_testing|test_hooks?|testing_only|test_only|test_mode)$"
 )
 DEFINITIONS = (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)
+# ``module:Symbol``: how Harbor, setuptools entry points and similar loaders name an object.
+OBJECT_REFERENCE = re.compile(r"^([A-Za-z_]\w*(?:\.[A-Za-z_]\w*)*):([A-Za-z_]\w*)$")
+CLICK_REGISTRATION = re.compile(r"(^|\.)(command|group)$")
+ENTRY_POINT_TABLES = ("scripts", "gui-scripts")
 
 
 @dataclass(frozen=True)
@@ -281,19 +290,91 @@ def used_names(tree: ast.Module, skip: frozenset[int] = frozenset()) -> set[str]
     return names
 
 
+def source_split(path: str) -> tuple[str, str] | None:
+    """A ``src``-layout file's project folder and dotted module name."""
+    project, separator, inner = path.partition("/src/")
+    if not separator or not inner.endswith(".py"):
+        return None
+    parts = inner.removesuffix(".py").split("/")
+    return project, ".".join(parts[:-1] if parts[-1] == "__init__" else parts)
+
+
+def object_references(texts: Iterator[str]) -> set[tuple[str, str]]:
+    """``(module, symbol)`` for every text that is exactly a ``module:Symbol`` reference."""
+    return {(match[1], match[2]) for text in texts if (match := OBJECT_REFERENCE.match(text))}
+
+
+def project_entry_points(pyproject: Path) -> list[str]:
+    """The script and entry-point values one ``pyproject.toml`` declares (none when absent)."""
+    try:
+        metadata = tomllib.loads(pyproject.read_text())["project"]
+    except (OSError, KeyError):
+        return []
+    tables = [metadata.get(name, {}) for name in ENTRY_POINT_TABLES]
+    tables.extend(metadata.get("entry-points", {}).values())
+    return [str(value) for table in tables for value in table.values()]
+
+
+def entry_point_references(root: Path, projects: set[str]) -> set[tuple[str, str]]:
+    """Objects each project's ``pyproject.toml`` names as scripts or entry points."""
+    values = (
+        value
+        for project in sorted(projects)
+        for value in project_entry_points(root / project / "pyproject.toml")
+    )
+    return object_references(values)
+
+
+def click_registered(node: ast.FunctionDef | ast.AsyncFunctionDef) -> bool:
+    return any(
+        isinstance(item, ast.Call) and bool(CLICK_REGISTRATION.search(ast.unparse(item.func)))
+        for item in node.decorator_list
+    )
+
+
+def externally_loaded(root: Path, production: dict[str, ast.Module]) -> set[tuple[str, str]]:
+    """``(path, symbol)`` pairs a third party loads by name, so no production code names them."""
+    strings = (
+        node.value
+        for tree in production.values()
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Constant) and isinstance(node.value, str)
+    )
+    modules = {path: split for path in production if (split := source_split(path))}
+    named = object_references(strings) | entry_point_references(
+        root, {project for project, _ in modules.values()}
+    )
+    loaded = {
+        (path, node.name)
+        for path, tree in production.items()
+        for node in tree.body
+        if isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef) and click_registered(node)
+    }
+    loaded.update(
+        (path, symbol)
+        for path, (_, module) in modules.items()
+        for reference, symbol in named
+        if reference == module
+    )
+    return loaded
+
+
 def symbols_only_tests_use(
-    production: dict[str, ast.Module], tests: dict[str, ast.Module]
+    root: Path, production: dict[str, ast.Module], tests: dict[str, ast.Module]
 ) -> list[Finding]:
     """Public top-level production symbols that tests name and no other production file does."""
     defined: list[tuple[str, str, int]] = []
     production_uses: set[str] = set()
+    loaded = externally_loaded(root, production)
     for path, tree in production.items():
         own = frozenset(id(node) for node in tree.body if isinstance(node, DEFINITIONS))
         production_uses |= used_names(tree, own)
         defined.extend(
             (path, node.name, node.lineno)
             for node in tree.body
-            if isinstance(node, DEFINITIONS) and not node.name.startswith("_")
+            if isinstance(node, DEFINITIONS)
+            and not node.name.startswith("_")
+            and (path, node.name) not in loaded
         )
     test_uses: dict[str, str] = {}
     for path, tree in sorted(tests.items()):
@@ -328,7 +409,7 @@ def rule_findings(root: Path, inventory: Sequence[str]) -> list[Finding]:
     tests: dict[str, ast.Module] = {}
     for path in inventory:
         test = is_test_file(path)
-        if not test and not is_production_file(path):
+        if is_fixture_program(path) or (not test and not is_production_file(path)):
             continue
         parsed = parse(root, path)
         if isinstance(parsed, Finding):
@@ -343,7 +424,7 @@ def rule_findings(root: Path, inventory: Sequence[str]) -> list[Finding]:
         else:
             production[path] = tree
             found.extend(hook_tokens(path, source))
-    found.extend(symbols_only_tests_use(production, tests))
+    found.extend(symbols_only_tests_use(root, production, tests))
     return found
 
 

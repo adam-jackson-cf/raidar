@@ -19,11 +19,11 @@ from pathlib import Path
 from typing import Any
 
 from harbor.trial.hooks import TrialEvent, TrialHookEvent
-from harbor.trial.trial import Trial
 
 from raidar.contract.file_io import load_text, store_text
+from raidar.contract.sandbox import Shell
 from raidar.grading.bundle import VerifierBundle, load_bundle
-from raidar.grading.guard import current_step
+from raidar.grading.guard import GuardedTrial, current_step
 
 TOOL_HASHES = "raidar-tool-hashes.json"
 TOOLS_ROOT = "/opt/raidar-tools"
@@ -72,7 +72,7 @@ def parse_tool_output(output: str) -> ToolTreeReading | None:
     return None
 
 
-async def hash_tool_tree(environment: Any) -> tuple[ToolTreeReading | None, str | None]:
+async def hash_tool_tree(environment: Shell) -> tuple[ToolTreeReading | None, str | None]:
     """One reading and no error, or no reading and why."""
     try:
         result = await environment.exec(_SCRIPT, user="root", timeout_sec=HASH_TIMEOUT_S)
@@ -97,7 +97,7 @@ def _point(
 class ToolTreeWatch:
     """The host-held hash record of one trial."""
 
-    def __init__(self, trial: Trial, bundle: VerifierBundle) -> None:
+    def __init__(self, trial: GuardedTrial, bundle: VerifierBundle) -> None:
         self.trial = trial
         self.bundle = bundle
         self.points: list[dict[str, Any]] = []
@@ -130,7 +130,9 @@ class ToolTreeWatch:
         await self.measure("after_agent", event)
 
 
-def install_tool_tree_watch(trial: Trial, oracle_bundle: str | Path | VerifierBundle) -> None:
+def install_tool_tree_watch(
+    trial: GuardedTrial, oracle_bundle: str | Path | VerifierBundle
+) -> None:
     """Install after the provisioning hooks (the tree exists) and the reaper (agent is dead)."""
     bundle = (
         oracle_bundle

@@ -4,6 +4,15 @@ All notable changes to this project are documented in this file.
 
 ## Unreleased
 
+- refactor(checks)!: verify only owned code at the third-party boundary. Delete
+  the Harbor and payload stubs (mypy reads Harbor's own annotations; the gate tool
+  types its container import from the real payload package), add the PyYAML,
+  jsonschema and networkx stub packages, depend on owned `Shell`/`Sandbox` and
+  trial protocols instead of `Any`, split the Harbor verifier adapter from the
+  owned step grader, round remaining Docker timeouts up to Harbor's whole
+  seconds, recognise Click, `module:Symbol` and entry-point registrations in the
+  test-integrity check instead of waivers, and define the fixture-program
+  boundary once for every checker.
 - fix(checks): omit deleted worktree paths with non-following presence checks;
   share untracked discovery while keeping suppression checks scoped to changes.
 - refactor(checks): use one fail-closed git inventory for maintained repository

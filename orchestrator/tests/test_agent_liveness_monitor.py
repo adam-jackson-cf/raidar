@@ -5,9 +5,10 @@ from __future__ import annotations
 import asyncio
 from pathlib import Path
 from types import SimpleNamespace
-from typing import Any, cast
+from typing import Any
 
 import pytest
+from harbor.trial.hooks import TrialEvent
 
 from raidar.contract.activity import host_window
 from raidar.engine.health.liveness import (
@@ -17,6 +18,7 @@ from raidar.engine.health.liveness import (
     parse_poll_output,
 )
 from raidar.engine.health.reaper import _KILLED, _RESIDUAL
+from tests.health_support import FakeTrial, hooked_trial
 
 NET_HEADER = (
     "Inter-|   Receive\n face |bytes packets errs drop fifo frame compressed multicast|bytes\n"
@@ -273,22 +275,16 @@ def test_config_reads_only_the_environment_it_is_given(monkeypatch: pytest.Monke
     assert (config.mode, config.idle_s) == ("enforce", 600.0)
 
 
-def fake_trial(tmp_path: Path, env: ScriptedEnv) -> tuple[Any, dict[Any, list[Any]], list[Any]]:
-    hooks: dict[Any, list[Any]] = {}
-    callbacks: list[Any] = []
-    trial = SimpleNamespace(
-        task=SimpleNamespace(config=SimpleNamespace(agent=SimpleNamespace(user="agent"))),
-        agent_environment=env,
-        paths=SimpleNamespace(trial_dir=tmp_path / "trial"),
-        add_hook=lambda event, hook: hooks.setdefault(event, []).append(hook),
-        add_log_callback=callbacks.append,
-    )
-    return trial, hooks, callbacks
+def fake_trial(
+    tmp_path: Path, env: ScriptedEnv
+) -> tuple[FakeTrial[ScriptedEnv], dict[TrialEvent, list[Any]], list[Any]]:
+    trial = hooked_trial(tmp_path / "trial", env)
+    return trial, trial.hooks, trial.log_callbacks
 
 
 def test_off_installs_nothing(tmp_path: Path) -> None:
     trial, hooks, callbacks = fake_trial(tmp_path, ScriptedEnv([""]))
-    install_liveness_monitor(cast(Any, trial), LivenessConfig("off"))
+    install_liveness_monitor(trial, LivenessConfig("off"))
     assert hooks == {}
     assert callbacks == []
 

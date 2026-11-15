@@ -368,7 +368,7 @@ class Container(LocalEnvironment):
     """The test's shell as the container; a workspace download honours the exclusions."""
 
     async def download_dir_with_exclusions(
-        self, *, source_dir: str, target_dir: Path, exclude: list[str]
+        self, *, source_dir: str, target_dir: Path | str, exclude: list[str]
     ) -> None:
         shutil.copytree(source_dir, target_dir, ignore=shutil.ignore_patterns(*exclude))
 

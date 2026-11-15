@@ -11,7 +11,7 @@ import os
 from collections.abc import Callable, Iterator
 from pathlib import Path
 from types import SimpleNamespace
-from typing import Any, cast
+from typing import Any
 
 import click
 import pytest
@@ -303,9 +303,7 @@ def test_output_outside_an_agent_phase_never_counts_and_the_phase_is_labelled_by
     tmp_path: Path,
 ) -> None:
     trial, hooks, callbacks = fake_trial(tmp_path, ScriptedEnv([poll_output([])]))
-    install_liveness_monitor(
-        cast(Any, trial), LivenessConfig("observe", interval_s=0, idle_s=10**9)
-    )
+    install_liveness_monitor(trial, LivenessConfig("observe", interval_s=0, idle_s=10**9))
     start, end = hooks[TrialEvent.AGENT_START][0], hooks[TrialEvent.AGENT_END][0]
     done = _event(SimpleNamespace(step_results=[SimpleNamespace(step_name="checkpoint_1")]))
 
@@ -338,9 +336,7 @@ def test_a_phase_whose_step_cannot_be_named_is_recorded_without_a_label(
     tmp_path: Path, result: Any
 ) -> None:
     trial, hooks, _ = fake_trial(tmp_path, ScriptedEnv([poll_output([])]))
-    install_liveness_monitor(
-        cast(Any, trial), LivenessConfig("observe", interval_s=0, idle_s=10**9)
-    )
+    install_liveness_monitor(trial, LivenessConfig("observe", interval_s=0, idle_s=10**9))
 
     async def phase() -> None:
         await hooks[TrialEvent.AGENT_START][0](_event(result))
@@ -355,7 +351,7 @@ def test_a_phase_whose_step_cannot_be_named_is_recorded_without_a_label(
 
 def test_an_agent_end_without_a_start_writes_a_report_with_no_phases(tmp_path: Path) -> None:
     trial, hooks, _ = fake_trial(tmp_path, ScriptedEnv([poll_output([])]))
-    install_liveness_monitor(cast(Any, trial), LivenessConfig("observe"))
+    install_liveness_monitor(trial, LivenessConfig("observe"))
     asyncio.run(hooks[TrialEvent.AGENT_END][0](_event(None)))
 
     assert _report(tmp_path)["phases"] == []
@@ -365,9 +361,7 @@ def test_a_task_without_an_agent_user_is_sampled_as_unmeasured_never_idle(tmp_pa
     env = ScriptedEnv([poll_output([])])
     trial, hooks, _ = fake_trial(tmp_path, env)
     trial.task.config.agent.user = None
-    install_liveness_monitor(
-        cast(Any, trial), LivenessConfig("enforce", interval_s=0, idle_s=0.001)
-    )
+    install_liveness_monitor(trial, LivenessConfig("enforce", interval_s=0, idle_s=0.001))
 
     async def phase() -> None:
         await hooks[TrialEvent.AGENT_START][0](_event(None))
@@ -387,7 +381,7 @@ def test_an_enforcing_monitor_arms_the_output_callback_and_both_phase_hooks(
     tmp_path: Path,
 ) -> None:
     trial, hooks, callbacks = fake_trial(tmp_path, ScriptedEnv([""]))
-    install_liveness_monitor(cast(Any, trial), LivenessConfig("enforce"))
+    install_liveness_monitor(trial, LivenessConfig("enforce"))
 
     assert len(callbacks) == 1
     assert {event.name for event in hooks} == {"AGENT_START", "AGENT_END"}

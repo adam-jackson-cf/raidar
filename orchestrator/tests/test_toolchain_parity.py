@@ -318,6 +318,8 @@ def test_prettier_selects_maintained_markdown_yaml_without_protected_docs(
             "orchestrator/.venv/lib/README.md",
             "review-surface/dist/report.yaml",
             "orchestrator/src/example.py",
+            "lab/stages/raidar/define/fixtures/pass/expect.yaml",
+            "orchestrator/tests/fixtures/stages/acme/note-state/fixtures/done/state/note.md",
         ]
     ) == [
         ".agents/skills/python-conventions/SKILL.md",

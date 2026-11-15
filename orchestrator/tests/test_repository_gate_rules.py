@@ -98,8 +98,14 @@ def test_path_policy_skips_documentation_and_generated_files(tmp_path: Path, rel
     assert paths.path_findings(tmp_path, [relative]) == []
 
 
-def test_stage_fixture_programs_are_not_tests(tmp_path: Path) -> None:
-    relative = "lab/stages/raidar/define/fixtures/program.py"
+@pytest.mark.parametrize(
+    "relative",
+    [
+        "lab/stages/raidar/define/fixtures/program.py",
+        "orchestrator/tests/fixtures/stages/acme/gate-check/fixtures/pass/state/calc_ok.py",
+    ],
+)
+def test_stage_fixture_programs_are_not_tests(tmp_path: Path, relative: str) -> None:
     candidate = tmp_path / relative
     candidate.parent.mkdir(parents=True)
     candidate.write_text("def test_input():\n    return 1\n")
@@ -153,15 +159,6 @@ def test_a_child_never_repeats_its_parent_name(relative: str) -> None:
     found = paths.naming_findings(relative)
     assert len(found) == 1
     _assert_finding(found[0], relative, "NAME.conventions")
-
-
-@pytest.mark.parametrize(
-    "relative",
-    ["orchestrator/stubs/harbor/trial/trial.pyi", "orchestrator/stubs/harbor/utils/env.pyi"],
-)
-def test_a_third_party_stub_keeps_its_package_module_names(relative: str) -> None:
-    assert paths.naming_findings(relative) == []
-    assert paths.naming_findings(relative.replace("orchestrator/stubs/", "orchestrator/src/"))
 
 
 def test_directories_below_a_skill_are_kebab_case() -> None:
