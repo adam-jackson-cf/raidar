@@ -36,7 +36,10 @@ this order and separated by single spaces (``ADVISORY_LINE`` and ``FAILURE_LINE`
 
 pip-audit supplies the advisory ID, aliases and fixed versions. npm audit supplies the
 GHSA ID and its vulnerable range; ``fix`` is then the lowest published release above the
-locked version outside that range.
+locked version outside that range. A malicious package carries an advisory ID or alias
+starting with ``MAL-``: when an auditor marks an advisory malicious (npm: CWE-506 or a
+"Malicious ..." title) and no ``MAL-`` record exists for it, the checker adds the alias
+``MAL-<advisory-id>``.
 """
 
 from __future__ import annotations
@@ -644,11 +647,28 @@ def npm_published(name: str, directory: str, run: AuditRunner) -> list[str]:
     return [str(version) for version in versions]
 
 
-NpmSource = tuple[str, list[str], list[tuple[str, str]]]
+NpmAdvisory = tuple[str, str, tuple[str, ...]]
+NpmSource = tuple[str, list[str], list[NpmAdvisory]]
+MALICIOUS_CWE = "CWE-506"
+
+
+def malicious_aliases(ident: str, aliases: Sequence[str], marked: bool) -> tuple[str, ...]:
+    """Add ``MAL-<id>`` when an auditor marks an advisory malicious without a MAL- record."""
+    known = (ident, *aliases)
+    if marked and not any(item.startswith("MAL-") for item in known):
+        return (*aliases, f"MAL-{ident}")
+    return tuple(aliases)
+
+
+def npm_marks_malicious(via: Mapping[str, object]) -> bool:
+    """Npm marks malware advisories with CWE-506 (embedded malicious code) or their title."""
+    cwe = via.get("cwe", [])
+    title = str(via.get("title", ""))
+    return (isinstance(cwe, list) and MALICIOUS_CWE in cwe) or title.lower().startswith("malicious")
 
 
 def npm_sources(text: str) -> list[NpmSource]:
-    """Validated (package, lock nodes, [(GHSA ID, vulnerable range)]) per advisory source."""
+    """Validated (package, lock nodes, [(GHSA ID, vulnerable range, aliases)]) per source."""
     try:
         report = json.loads(text)
     except ValueError:
@@ -669,7 +689,8 @@ def npm_sources(text: str) -> list[NpmSource]:
             ghsa = GHSA.search(str(via.get("url", "")))
             if ghsa is None or not isinstance(via.get("range"), str):
                 raise AuditError("auditor returned a malformed vulnerability")
-            advisories.append((ghsa.group(), via["range"]))
+            aliases = malicious_aliases(ghsa.group(), (), npm_marks_malicious(via))
+            advisories.append((ghsa.group(), via["range"], aliases))
         if advisories and (not isinstance(entry["nodes"], list) or not entry["nodes"]):
             raise AuditError(f"auditor named no lock node for {name}")
         if advisories:
@@ -720,10 +741,16 @@ def audit_npm(root: Path, lock: str, run: AuditRunner) -> LockReport:
         advisories += [
             checked(
                 Advisory(
-                    lock, "npm", name, version, ghsa, (), npm_fixes(version, vulnerable, published)
+                    lock,
+                    "npm",
+                    name,
+                    version,
+                    ghsa,
+                    aliases,
+                    npm_fixes(version, vulnerable, published),
                 )
             )
-            for version, (ghsa, vulnerable) in itertools.product(versions, sources)
+            for version, (ghsa, vulnerable, aliases) in itertools.product(versions, sources)
         ]
     checked_exit(audited, advisories)
     return LockReport(inventory, advisories)

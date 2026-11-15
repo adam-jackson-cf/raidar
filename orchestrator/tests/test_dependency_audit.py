@@ -128,6 +128,10 @@ class AuditChecker(Protocol):
         self, root: Path, paths: Sequence[str], *, run: AuditRunner, today: date
     ) -> list[str]: ...
 
+    def malicious_aliases(
+        self, ident: str, aliases: Sequence[str], marked: bool
+    ) -> tuple[str, ...]: ...
+
     def npm_fixes(
         self, installed: str, vulnerable: str, published: Sequence[str]
     ) -> tuple[str, ...]: ...
@@ -320,6 +324,36 @@ def test_every_advisory_blocks_with_a_machine_readable_line(
     assert all(checker.FAILURE_LINE.fullmatch(line) for line in LAYOUT_FINDINGS)
     assert not any(checker.ADVISORY_LINE.fullmatch(line) for line in LAYOUT_FINDINGS)
     assert not any(checker.FAILURE_LINE.fullmatch(line) for line in found)
+
+
+@pytest.mark.parametrize(
+    ("mark", "aliases"),
+    [
+        ({"cwe": ["CWE-506"], "title": "Embedded code"}, "MAL-GHSA-2222-3333-4444"),
+        ({"cwe": [], "title": "Malicious code in left-pad"}, "MAL-GHSA-2222-3333-4444"),
+        ({"cwe": ["CWE-79"], "title": "Cross-site scripting"}, ""),
+    ],
+)
+def test_auditor_malicious_mark_adds_a_mal_alias(
+    checker: AuditChecker, repo: Path, mark: Mapping[str, object], aliases: str
+) -> None:
+    runner = ScriptedAuditors(npm=npm_report({**NPM_VIA, **mark}), npm_returncode=1)
+    assert audit(checker, repo, runner) == [
+        f"{RULE} lock=web/package-lock.json ecosystem=npm package=left-pad version=1.0.0 "
+        f"advisory=GHSA-2222-3333-4444 aliases={aliases} fix=1.0.3"
+    ]
+
+
+def test_existing_mal_record_is_not_duplicated(checker: AuditChecker, repo: Path) -> None:
+    vuln = {"id": "MAL-2026-7", "fix_versions": [], "aliases": ["GHSA-aaaa-bbbb-cccc"]}
+    runner = ScriptedAuditors(pip=pip_report(vuln), pip_returncode=1)
+    assert audit(checker, repo, runner) == [
+        f"{RULE} lock=app/uv.lock ecosystem=PyPI package=widget version=1.5.0 "
+        "advisory=MAL-2026-7 aliases=GHSA-aaaa-bbbb-cccc fix="
+    ]
+    assert checker.malicious_aliases("GHSA-x", ["MAL-2026-1"], True) == ("MAL-2026-1",)
+    assert checker.malicious_aliases("GHSA-x", [], True) == ("MAL-GHSA-x",)
+    assert checker.malicious_aliases("GHSA-x", [], False) == ()
 
 
 @pytest.mark.parametrize(
