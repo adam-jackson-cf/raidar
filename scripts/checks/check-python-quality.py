@@ -900,8 +900,9 @@ def _command_literals(tree: ast.AST) -> list[tuple[int, str]]:
             if id(node) not in docstrings:
                 found.append((node.lineno, node.value))
         elif isinstance(node, ast.List | ast.Tuple):
-            words = [item.value for item in node.elts if isinstance(item, ast.Constant)]
-            if all(isinstance(word, str) for word in words):
+            values = [item.value for item in node.elts if isinstance(item, ast.Constant)]
+            words = [value for value in values if isinstance(value, str)]
+            if len(words) == len(values):
                 found.append((node.lineno, " ".join(words)))
     return found
 

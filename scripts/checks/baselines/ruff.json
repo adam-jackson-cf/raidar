@@ -3,18 +3,6 @@
   "tool": "ruff",
   "findings": [
     {
-      "path": "contract/src/raidar_contract/__init__.py",
-      "code": "D205",
-      "fingerprint": "f5a77135ac4a5e715e7d10f3039997256d10a49a89c8011fde6667fae62285f3",
-      "count": 1
-    },
-    {
-      "path": "contract/src/raidar_contract/agent_records.py",
-      "code": "PLR0913",
-      "fingerprint": "d8307045cbdc1e55b3c6e29b28ff817629abb73bb8a96fe2b32347324ca22952",
-      "count": 1
-    },
-    {
       "path": "lab/stages/raidar/define/tool/src/define_tool/aspects.py",
       "code": "D205",
       "fingerprint": "dc79d6b0a312961874cd1e90c339754cebb76adcfb8b705e286550b8b84ec5cf",
@@ -3018,84 +3006,6 @@
       "path": "orchestrator/tests/test_workspace_seed_slow.py",
       "code": "I001",
       "fingerprint": "6590ff2d12ba18b405dbcce5e08c85b2b082c516c664876d2cbcc4fb1552d68a",
-      "count": 1
-    },
-    {
-      "path": "scripts/checks/check-python-fanout.py",
-      "code": "PLR0913",
-      "fingerprint": "e923c17b62309a65d0e49893489bfd9d879b4363e4b827cac502a305d367b012",
-      "count": 1
-    },
-    {
-      "path": "scripts/checks/check-ruff-suppressions.py",
-      "code": "E501",
-      "fingerprint": "169f3ccfb545754face7d523514022621a5a902c420b5d80b2c8f7a933cdd283",
-      "count": 1
-    },
-    {
-      "path": "scripts/checks/check-ruff-suppressions.py",
-      "code": "PERF401",
-      "fingerprint": "8fe22c1a4b32e69db06d4c29c89948bc9ffa681b883d767faa24c4ad77c26738",
-      "count": 1
-    },
-    {
-      "path": "scripts/checks/check-ruff-suppressions.py",
-      "code": "PERF401",
-      "fingerprint": "c2f15cc1b3144c63649b2eac2d8c10b62c31e592cd1e48b4fb381bc238839d71",
-      "count": 1
-    },
-    {
-      "path": "scripts/checks/check-ruff-suppressions.py",
-      "code": "PERF401",
-      "fingerprint": "c3ff9f56e0d02052c4f6d0b6a1dbde75c89d69f555953e81e91091b524373f87",
-      "count": 1
-    },
-    {
-      "path": "scripts/checks/check-structure.py",
-      "code": "D205",
-      "fingerprint": "228a74808e736733d6b51e9303edf2d1aef73c6342dbe970c28f266b8780f61b",
-      "count": 1
-    },
-    {
-      "path": "scripts/checks/check-structure.py",
-      "code": "D209",
-      "fingerprint": "69feaa15e58efae262bc82bda008a3fe698eca5562e6d86d2e06760cb8281bae",
-      "count": 1
-    },
-    {
-      "path": "scripts/checks/ruff_baseline.py",
-      "code": "PT018",
-      "fingerprint": "224097060ac20e69a6bb79a638d261dce2cf628d1c0a5c67abac32b8c6e61db3",
-      "count": 1
-    },
-    {
-      "path": "scripts/release/verify-version-wiring.py",
-      "code": "E501",
-      "fingerprint": "6f9aca145a9d2221150465dfe2ff63335750539d48f894c91b9dc850cb6b26be",
-      "count": 1
-    },
-    {
-      "path": "scripts/release/verify-version-wiring.py",
-      "code": "E501",
-      "fingerprint": "918732bd96645fa6f17fb7a11a2008672142fd07b553a02deb8ec0e92a1bb00c",
-      "count": 1
-    },
-    {
-      "path": "scripts/release/verify-version-wiring.py",
-      "code": "E501",
-      "fingerprint": "db50d017ce30a944d600aae2d4a166b976c769a1252941c3ceb64ba14530f0e2",
-      "count": 1
-    },
-    {
-      "path": "scripts/release/verify-version-wiring.py",
-      "code": "E501",
-      "fingerprint": "ea99b3269b1e9592a478bbc5918f512c526bf2204922faad2c8687243f2d1732",
-      "count": 1
-    },
-    {
-      "path": "scripts/release/verify-version-wiring.py",
-      "code": "E501",
-      "fingerprint": "fc18c4025719ed0a50aad2c6cf139c6fef1dda62137aa776072ffa9da4026221",
       "count": 1
     }
   ]

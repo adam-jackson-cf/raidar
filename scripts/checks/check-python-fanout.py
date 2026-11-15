@@ -303,22 +303,10 @@ def source_nloc(source: str) -> int:
 def analyse_fanout(
     repo_root: Path,
     *,
-    root_package: str | None = None,
-    root_packages: set[str] | None = None,
-    source_roots: tuple[SourceRoot, ...] | None = None,
-    architectural_max: int | None = None,
-    large_module_nloc: int | None = None,
-    large_module_architectural_max: int | None = None,
-    limits: FanoutLimits | None = None,
+    root_packages: set[str],
+    source_roots: tuple[SourceRoot, ...] | None,
+    limits: FanoutLimits,
 ) -> list[FanoutResult]:
-    if root_packages is None:
-        root_packages = {root_package or "raidar"}
-    if limits is None:
-        limits = FanoutLimits(
-            architectural_max=architectural_max or 10,
-            large_module_nloc=large_module_nloc or 800,
-            large_module_architectural_max=large_module_architectural_max or 3,
-        )
     files = collect_python_files(repo_root, source_roots=source_roots)
     known_modules = {python_file.module for python_file in files if python_file.module}
     known_modules.update(root_packages)

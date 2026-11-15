@@ -165,8 +165,11 @@ def lab_violations(paths: list[str]) -> list[str]:
 
 
 def workflow_violations(paths: list[str]) -> list[str]:
-    """Workflows live at ``lab/workflows/<ns>/<name>/``: nothing sits at the data root or a
-    namespace folder, and each workflow folder holds a ``workflow.yaml``."""
+    """Workflows live at ``lab/workflows/<ns>/<name>/``.
+
+    Nothing sits at the data root or a namespace folder, and each workflow folder holds a
+    ``workflow.yaml``.
+    """
     found = set()
     folders: set[tuple[str, ...]] = set()
     defined: set[tuple[str, ...]] = set()

@@ -43,7 +43,10 @@ def check_cli_version_wiring(cli_text: str) -> str | None:
             return None
     except (SyntaxError, StopIteration):
         pass
-    return 'CLI version wiring: use click.version_option(package_name="raidar") without a version value.'
+    return (
+        "CLI version wiring: use "
+        'click.version_option(package_name="raidar") without a version value.'
+    )
 
 
 def check_lock_version(pyproject_text: str, lock_text: str) -> str | None:
@@ -59,7 +62,10 @@ def check_lock_version(pyproject_text: str, lock_text: str) -> str | None:
             return None
     except (tomllib.TOMLDecodeError, KeyError):
         pass
-    return "uv.lock version mismatch: run uv lock --project orchestrator to align the editable raidar version."
+    return (
+        "uv.lock version mismatch: run uv lock --project orchestrator "
+        "to align the editable raidar version."
+    )
 
 
 def check_changelog_version(pyproject_text: str, changelog_text: str) -> str | None:
@@ -72,7 +78,10 @@ def check_changelog_version(pyproject_text: str, changelog_text: str) -> str | N
             return None
     except (tomllib.TOMLDecodeError, KeyError):
         pass
-    return "CHANGELOG version mismatch: regenerate the release entry to align it with [project].version."
+    return (
+        "CHANGELOG version mismatch: regenerate the release entry "
+        "to align it with [project].version."
+    )
 
 
 def check_release_entry(
@@ -85,7 +94,10 @@ def check_release_entry(
         end = headings[1].start() if len(headings) > 1 else len(changelog_text)
         if changelog_text[headings[0].start() : end].strip() == expected_entry.strip():
             return None
-    return "CHANGELOG release entry differs from parent history: regenerate the release from current origin/main."
+    return (
+        "CHANGELOG release entry differs from parent history: "
+        "regenerate the release from current origin/main."
+    )
 
 
 def _git(*arguments: str) -> str:
@@ -145,8 +157,10 @@ def main() -> int:
                 print(diagnostic)
                 return 1
     except (OSError, ValueError, subprocess.CalledProcessError) as error:
+        detail = " ".join(str(error).splitlines())
         print(
-            f"Version check failed: {' '.join(str(error).splitlines())}; restore release metadata and rerun make version-check."
+            f"Version check failed: {detail}; "
+            "restore release metadata and rerun make version-check."
         )
         return 1
     print("Version checks passed")

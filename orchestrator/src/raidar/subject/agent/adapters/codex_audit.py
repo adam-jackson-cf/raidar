@@ -16,7 +16,7 @@ from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
 
-from raidar_contract.agent_records import session_audit_record, source_record
+from raidar_contract.agent_records import SessionAudit, source_record
 
 from raidar.subject.agent.protocol import digest, unread_json_lines
 
@@ -130,8 +130,8 @@ def codex_session_audit(turn_dir: Path) -> dict[str, Any]:
             version = version or _row_version(row)
             messages.extend(_digested_messages(row))
             _classify_row(row, roots, instructions, violations, unmeasured)
-    return session_audit_record(
-        HARNESS,
+    return SessionAudit(
+        harness=HARNESS,
         version=version,
         records=records,
         sources=[source_record(turn_dir, rollout) for rollout in rollouts],
@@ -140,7 +140,7 @@ def codex_session_audit(turn_dir: Path) -> dict[str, Any]:
         messages=messages,
         violations=violations,
         unmeasured=unmeasured,
-    )
+    ).record()
 
 
 def _digested_messages(row: dict[str, Any]) -> list[dict[str, str]]:

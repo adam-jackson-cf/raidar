@@ -20,7 +20,7 @@ from collections.abc import Iterator
 from pathlib import Path, PurePosixPath
 from typing import Any, cast
 
-from raidar_contract.agent_records import Tokens, session_audit_record, source_record
+from raidar_contract.agent_records import SessionAudit, Tokens, source_record
 
 from raidar.subject.agent.pricing import price_tokens
 from raidar.subject.agent.protocol import digest, unread_json_lines
@@ -230,8 +230,8 @@ def claude_session_audit(turn_dir: Path) -> dict[str, Any]:
             records += 1
             version = version or _event_version(event)
             _transcript_findings(event, roots, instructions, messages)
-    return session_audit_record(
-        HARNESS,
+    return SessionAudit(
+        harness=HARNESS,
         version=version,
         records=records,
         sources=_sources(turn_dir, transcripts, stream is not None),
@@ -240,7 +240,7 @@ def claude_session_audit(turn_dir: Path) -> dict[str, Any]:
         messages=messages,
         violations=violations,
         unmeasured=unmeasured,
-    )
+    ).record()
 
 
 def _event_version(event: dict[str, Any]) -> str | None:
