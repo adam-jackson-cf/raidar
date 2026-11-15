@@ -34,12 +34,16 @@ make gate-commit
 | ---------------------- | ----------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
 | Tests and capabilities | Ownership and tier checks block changes that fail their requirements.                                       | Declare each new capability's owner and each test file's tier.                                              |
 | Python and analysis    | Ruff, strict mypy, import contracts, complexity, policy and I/O boundary checks block every finding.       | Use owning seams and fix each finding; there are no baselines or waivers.                                   |
-| Toolchain              | Exact tool-pin, installer/lock agreement and maintained Markdown/YAML formatting checks block changes that fail their requirements. | Use the locked formatter; dependency changes also run the pinned audit (CI always audits).                  |
+| Toolchain              | Exact tool-pin, installer/lock agreement and maintained Markdown/YAML formatting checks block changes that fail their requirements. | Use the locked formatter.                                                                                   |
+| Dependencies           | Every commit and CI run audits every lock file the git inventory holds outside fixture programs; every advisory blocks, fixable or not. | Upgrade and relock; a lock format without an auditor or a manifest without a lock is a finding.            |
 
 > [!IMPORTANT]
 > **Owning policies:** [ownership map](../../scripts/checks/repository-owners.json) defines owners, tiers and seams; Ruff, strict mypy, Prettier, the dependency audit and the analyzer I/O boundary check have no baselines and block on every finding. Unknown local ownership runs all T2 seams rather than skipping tests. Docker, performance and security checks are separate gates.
 
-Sources: [.pre-commit-config.yaml](../../.pre-commit-config.yaml); [Makefile](../../Makefile) (`gate-commit`, `gate-ci`, `quality`); [scripts/checks/repository-owners.json](../../scripts/checks/repository-owners.json); [scripts/checks/check-python-quality.py](../../scripts/checks/check-python-quality.py); [scripts/checks/check-analyzer-scope.py](../../scripts/checks/check-analyzer-scope.py).
+> [!NOTE]
+> **Dependency audit:** `uv.lock` goes through the pinned pip-audit, `package-lock.json` through `npm audit`. Each advisory line names lock, ecosystem, package, exact version, advisory ID, aliases and fix versions in the format the [checker](../../scripts/checks/check-toolchain-parity.py) documents. Only an owner-approved entry in [dependency-audit-exceptions.json](../../scripts/checks/dependency-audit-exceptions.json) suppresses one advisory, and only while no fixed release exists; expired, stale or fixable entries are findings.
+
+Sources: [.pre-commit-config.yaml](../../.pre-commit-config.yaml); [Makefile](../../Makefile) (`gate-commit`, `gate-ci`, `quality`); [scripts/checks/repository-owners.json](../../scripts/checks/repository-owners.json); [scripts/checks/check-python-quality.py](../../scripts/checks/check-python-quality.py); [scripts/checks/check-analyzer-scope.py](../../scripts/checks/check-analyzer-scope.py); [scripts/checks/check-toolchain-parity.py](../../scripts/checks/check-toolchain-parity.py) (`audit_findings`).
 
 ## 2 · Find the owning source
 

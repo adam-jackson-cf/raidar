@@ -1,15 +1,12 @@
-"""Fast behavioural proofs for toolchain parity and strict dependency auditing."""
+"""Fast behavioural proofs for toolchain parity and the dependency-audit pin."""
 
 from __future__ import annotations
 
 import importlib.util
 import json
-import math
 import re
-import subprocess
 import sys
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Protocol, cast
 
@@ -54,12 +51,6 @@ AUDIT_RULE = "SECURITY.dependency-audit"
 LOCK_PATH = "orchestrator/uv.lock"
 
 
-class AuditRunner(Protocol):
-    def __call__(
-        self, command: list[str], *, stdin: str | None = None, timeout: float
-    ) -> subprocess.CompletedProcess[str]: ...
-
-
 class ParityChecker(Protocol):
     def dependency_inventory_findings(
         self, project_toml: str, install_commands: Mapping[str, str]
@@ -79,10 +70,6 @@ class ParityChecker(Protocol):
     def prettier_paths(self, tracked_paths: Sequence[str]) -> list[str]: ...
 
     def audit_pin_findings(self, project_toml: str, lock_toml: str) -> list[str]: ...
-
-    def audit_findings(
-        self, changed_paths: Sequence[str], *, ci: bool, run: AuditRunner
-    ) -> list[str]: ...
 
     def frozen_exclusions(
         self,
@@ -348,147 +335,6 @@ def test_dependency_audit_refuses_pin_lock_drift(checker: ParityChecker) -> None
         LOCK_PATH,
         AUDIT_RULE,
     )
-
-
-CLEAN_REPORT = json.dumps(
-    {"dependencies": [{"name": "widget", "version": "1.5.0", "vulns": []}], "fixes": []}
-)
-EXPORTED = "widget==1.5.0 --hash=sha256:fixture\n"
-
-
-@dataclass
-class ScriptedAudit:
-    report: str = CLEAN_REPORT
-    audit_returncode: int = 0
-    failure: str = ""
-    calls: list[tuple[list[str], str | None, float]] = field(default_factory=list)
-
-    def __call__(
-        self, command: list[str], *, stdin: str | None = None, timeout: float
-    ) -> subprocess.CompletedProcess[str]:
-        self.calls.append((command, stdin, timeout))
-        assert math.isfinite(timeout)
-        assert timeout > 0
-        exporting = "export" in command
-        if self.failure == "export-nonzero" and exporting:
-            return subprocess.CompletedProcess(command, 2, "", "export failed")
-        if self.failure == "export-empty" and exporting:
-            return subprocess.CompletedProcess(command, 0, "", "")
-        if exporting:
-            return subprocess.CompletedProcess(command, 0, EXPORTED, "")
-        if self.failure == "timeout":
-            raise subprocess.TimeoutExpired(command, timeout)
-        if self.failure == "launch":
-            raise OSError("audit tool unavailable")
-        return subprocess.CompletedProcess(command, self.audit_returncode, self.report, "")
-
-
-def _never_run(
-    command: list[str], *, stdin: str | None = None, timeout: float
-) -> subprocess.CompletedProcess[str]:
-    raise AssertionError(f"Unrelated commit must not run audit: {command}")
-
-
-def test_dependency_audit_skips_unrelated_commit_changes(checker: ParityChecker) -> None:
-    assert (
-        checker.audit_findings(
-            ["README.md", "orchestrator/src/raidar/cli/main.py"], ci=False, run=_never_run
-        )
-        == []
-    )
-
-
-@pytest.mark.parametrize(
-    "changed",
-    [
-        "orchestrator/pyproject.toml",
-        "contract/pyproject.toml",
-        "orchestrator/uv.lock",
-        "review-surface/package.json",
-        "review-surface/package-lock.json",
-        "requirements-dev.txt",
-    ],
-)
-def test_dependency_audit_runs_for_dependency_changes_without_reading_changed_file(
-    checker: ParityChecker, changed: str
-) -> None:
-    runner = ScriptedAudit()
-    assert checker.audit_findings([changed], ci=False, run=runner) == []
-    assert len(runner.calls) == 2
-
-
-def test_dependency_audit_ci_always_audits_exported_locked_requirements(
-    checker: ParityChecker,
-) -> None:
-    runner = ScriptedAudit()
-    assert checker.audit_findings([], ci=True, run=runner) == []
-    assert len(runner.calls) == 2
-    export, audit = runner.calls
-    assert "export" in export[0]
-    assert "orchestrator" in export[0]
-    assert "--locked" in export[0]
-    assert "--all-extras" in export[0]
-    assert "pip-audit" in audit[0]
-    assert "--strict" in audit[0]
-    assert "--locked" in audit[0]
-    assert "--format" in audit[0]
-    assert "json" in audit[0]
-    assert audit[1] == EXPORTED
-    assert "--ignore-vuln" not in audit[0]
-
-
-@pytest.mark.parametrize(
-    "report",
-    [
-        json.dumps(
-            {
-                "dependencies": [
-                    {
-                        "name": "widget",
-                        "version": "1.5.0",
-                        "vulns": [{"id": "CVE-fixture", "fix_versions": ["1.5.1"]}],
-                    }
-                ],
-                "fixes": [],
-            }
-        ),
-        json.dumps(
-            {"dependencies": [{"name": "widget", "skip_reason": "not resolved"}], "fixes": []}
-        ),
-        "not-json",
-        "{}",
-        "null",
-        "",
-    ],
-)
-def test_dependency_audit_refuses_findings_or_unusable_report_even_with_zero_exit(
-    checker: ParityChecker, report: str
-) -> None:
-    _assert_finding(
-        checker.audit_findings([], ci=True, run=ScriptedAudit(report=report)),
-        LOCK_PATH,
-        AUDIT_RULE,
-    )
-
-
-def test_dependency_audit_nonzero_exit_cannot_be_hidden_by_clean_report(
-    checker: ParityChecker,
-) -> None:
-    _assert_finding(
-        checker.audit_findings([], ci=True, run=ScriptedAudit(audit_returncode=2)),
-        LOCK_PATH,
-        AUDIT_RULE,
-    )
-
-
-@pytest.mark.parametrize("failure", ["timeout", "launch", "export-nonzero", "export-empty"])
-def test_dependency_audit_fails_closed_on_tool_or_export_failure(
-    checker: ParityChecker, failure: str
-) -> None:
-    runner = ScriptedAudit(failure=failure)
-    _assert_finding(checker.audit_findings([], ci=True, run=runner), LOCK_PATH, AUDIT_RULE)
-    if failure.startswith("export-"):
-        assert len(runner.calls) == 1
 
 
 def test_frozen_exclusions_require_latest_release_digest_equality(checker: ParityChecker) -> None:

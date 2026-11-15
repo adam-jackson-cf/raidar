@@ -8,6 +8,8 @@
     "package-lock.json": "locked maintenance toolchain",
     "package.json": "maintenance toolchain",
     "scripts/checks/check-toolchain-parity.py": "toolchain parity policy",
+    "scripts/checks/dependency-audit-exceptions.json": "dependency audit exceptions",
+    "orchestrator/tests/test_dependency_audit.py": "dependency audit policy",
     "scripts/checks/check-analyzer-scope.py": "analyzer scope policy",
     "orchestrator/tests/test_analyzer_scope_reports.py": "analyzer finding reports",
     "orchestrator/tests/test_analyzer_scope_rules.py": "analyzer scope rules",
@@ -1305,6 +1307,7 @@
   },
   "test_tiers": {
     "orchestrator/tests/test_toolchain_parity.py": [],
+    "orchestrator/tests/test_dependency_audit.py": [],
     "orchestrator/tests/test_analyzer_scope_reports.py": ["quality"],
     "orchestrator/tests/test_analyzer_scope_rules.py": [],
     "orchestrator/tests/test_execution_boundary_rules.py": [],

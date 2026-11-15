@@ -139,7 +139,7 @@ help:
 	@echo "  make quality                                           Run repo quality gates"
 	@echo "  make toolchain-parity-check                             Check installer, README, metadata/lock and exact maintenance tool pins"
 	@echo "  make prettier-check                                    Check maintained Markdown/YAML outside docs/ and I2 byte-frozen scope"
-	@echo "  make dependency-audit-check [AUDIT_ARGS=--ci]            Strict locked audit on dependency changes (always with --ci)"
+	@echo "  make dependency-audit-check                             Audit every discovered lock file; every advisory blocks (whole repo, every run)"
 	@echo "  make gate-commit                                       Whole-tree policy, static/T1 checks and affected local T2 seams"
 	@echo "  make gate-ci                                           Commit gate, slow tier, then quality tier (every push and pull request)"
 	@echo "  make analyzer-scope-check                              Check analyzer I/O boundaries and CODEOWNERS; any finding blocks"
@@ -790,7 +790,7 @@ gate-commit:
 		python scripts/checks/run-affected-seams.py
 
 gate-ci:
-	@$(MAKE) --no-print-directory gate-commit AUDIT_ARGS=--ci
+	@$(MAKE) --no-print-directory gate-commit
 	@$(MAKE) --no-print-directory test-slow
 	@$(MAKE) --no-print-directory test-quality
 
@@ -824,4 +824,4 @@ prettier-check:
 	@$(REPO_RUNTIME_ENV) uv run --project orchestrator --extra dev --locked python scripts/checks/check-toolchain-parity.py prettier
 
 dependency-audit-check:
-	@$(REPO_RUNTIME_ENV) uv run --project orchestrator --extra dev --locked python scripts/checks/check-toolchain-parity.py audit $(AUDIT_ARGS)
+	@$(REPO_RUNTIME_ENV) uv run --project orchestrator --extra dev --locked python scripts/checks/check-toolchain-parity.py audit

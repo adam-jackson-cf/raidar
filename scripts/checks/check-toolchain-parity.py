@@ -1,17 +1,51 @@
 #!/usr/bin/env python3
-"""Check maintained installer, lock, formatter and dependency-audit parity."""
+"""Check maintained installer, lock, formatter and dependency-audit parity.
+
+``audit`` mode audits the whole repository on every run. It discovers dependency
+manifests and lock files from the git inventory, excluding only fixture programs, and
+fails closed:
+
+- ``uv.lock`` is exported (``uv export --project <its directory> --locked``) and audited
+  by the pinned pip-audit; ``requirements*.txt`` goes to pip-audit directly;
+  ``package-lock.json``/``npm-shrinkwrap.json`` go to ``npm audit --package-lock-only``.
+- Any other recognised lock format is a ``no auditor for <path>`` finding.
+- A manifest that declares dependencies with no lock of its ecosystem beside it, and
+  that no lock pins as a uv path source or npm workspace, is an
+  ``unpinned dependencies in <path>`` finding.
+- Every advisory blocks, fixable or not. Only a valid owner-approved entry in
+  ``scripts/checks/dependency-audit-exceptions.json`` suppresses one advisory, and only
+  while no fixed release exists.
+
+Every finding line is ``<path>: SECURITY.dependency-audit: <reason>; <action>``.
+An advisory finding's reason is machine-readable and matches ``ADVISORY_LINE``::
+
+    <lock>: SECURITY.dependency-audit: vulnerability ecosystem=<pypi|npm>
+    package=<name> version=<exact> advisory=<id> aliases=<id,...> fix=<version,...>;
+    <action>
+
+on one line. ``aliases`` (other advisory IDs such as CVE or GHSA) and ``fix`` are
+comma-separated and empty when there are none; no value contains whitespace, ``,`` or
+``;``. pip-audit supplies the advisory ID, aliases and fixed versions. npm audit supplies
+the GHSA ID and its vulnerable range; ``fix`` is then the lowest published release above
+the locked version outside that range.
+"""
 
 from __future__ import annotations
 
 import argparse
 import hashlib
+import itertools
 import json
+import operator
+import posixpath
 import re
 import shlex
 import subprocess
 import tomllib
 from collections.abc import Mapping, Sequence
-from pathlib import Path
+from dataclasses import dataclass, replace
+from datetime import date
+from pathlib import Path, PurePosixPath
 from typing import Protocol
 
 from git_inventory import is_fixture_program, repo_paths
@@ -21,6 +55,16 @@ from packaging.utils import canonicalize_name
 ROOT = Path(__file__).resolve().parents[2]
 LOCK = "orchestrator/uv.lock"
 AUDIT = "SECURITY.dependency-audit"
+EXCEPTIONS = "scripts/checks/dependency-audit-exceptions.json"
+EXCEPTION_FIELDS = frozenset(
+    {"advisory", "package", "version", "lock", "reason", "exposure", "expires"}
+)
+ADVISORY_LINE = re.compile(
+    r"(?P<lock>.+?): SECURITY\.dependency-audit: vulnerability"
+    r" ecosystem=(?P<ecosystem>[^\s;,]+) package=(?P<package>[^\s;,]+)"
+    r" version=(?P<version>[^\s;,]+) advisory=(?P<advisory>[^\s;,]+)"
+    r" aliases=(?P<aliases>[^\s;]*) fix=(?P<fix>[^\s;]*); (?P<action>[^\r\n]+)"
+)
 PRETTIER = "3.6.2"
 
 
@@ -36,12 +80,8 @@ def finding(path: str, rule: str, reason: str, fix: str) -> str:
 
 
 def option_values(tokens: list[str], option: str) -> set[str]:
-    values = {
-        token.split("=", 1)[1] for token in tokens if token.startswith(option + "=")
-    }
-    values.update(
-        tokens[index + 1] for index, token in enumerate(tokens[:-1]) if token == option
-    )
+    values = {token.split("=", 1)[1] for token in tokens if token.startswith(option + "=")}
+    values.update(tokens[index + 1] for index, token in enumerate(tokens[:-1]) if token == option)
     return values
 
 
@@ -62,9 +102,7 @@ def sync_signature(command: str) -> tuple[str, frozenset[str], frozenset[str], b
 def dependency_inventory_findings(
     project_toml: str, install_commands: Mapping[str, str]
 ) -> list[str]:
-    declared = set(
-        tomllib.loads(project_toml)["project"].get("optional-dependencies", {})
-    )
+    declared = set(tomllib.loads(project_toml)["project"].get("optional-dependencies", {}))
     findings = []
     for path, command in install_commands.items():
         _, extras, excluded, _ = sync_signature(command)
@@ -135,9 +173,7 @@ def project_requirements(project_toml: str) -> list[Requirement]:
 def lock_version_findings(projects: Mapping[str, str], lock_toml: str) -> list[str]:
     packages: dict[str, set[str]] = {}
     for package in tomllib.loads(lock_toml).get("package", []):
-        packages.setdefault(canonicalize_name(package["name"]), set()).add(
-            package["version"]
-        )
+        packages.setdefault(canonicalize_name(package["name"]), set()).add(package["version"])
     findings = []
     seen: set[str] = set()
     for path, text in projects.items():
@@ -172,8 +208,7 @@ def prettier_version_findings(sources: Mapping[str, str]) -> list[str]:
                 packages = metadata.get("packages", {})
                 locked = packages.get("node_modules/prettier", {})
                 valid = (
-                    packages.get("", {}).get("devDependencies", {}).get("prettier")
-                    == PRETTIER
+                    packages.get("", {}).get("devDependencies", {}).get("prettier") == PRETTIER
                     and locked.get("version") == PRETTIER
                     and bool(locked.get("integrity"))
                     and bool(locked.get("resolved"))
@@ -258,14 +293,169 @@ def audit_pin_findings(project_toml: str, lock_toml: str) -> list[str]:
     return []
 
 
-def dependency_path(path: str) -> bool:
-    name = Path(path).name
-    return name in {
-        "pyproject.toml",
-        "uv.lock",
-        "package.json",
-        "package-lock.json",
-    } or (name.startswith("requirements") and name.endswith(".txt"))
+LOCAL_SOURCES = frozenset({"editable", "directory", "virtual"})
+LOCK_ECOSYSTEMS = {
+    "uv.lock": "pypi",
+    "poetry.lock": "pypi",
+    "Pipfile.lock": "pypi",
+    "package-lock.json": "npm",
+    "npm-shrinkwrap.json": "npm",
+    "pnpm-lock.yaml": "npm",
+    "yarn.lock": "npm",
+    "bun.lock": "npm",
+    "bun.lockb": "npm",
+    "Cargo.lock": "crates.io",
+    "go.sum": "go",
+    "Gemfile.lock": "rubygems",
+    "composer.lock": "packagist",
+}
+MANIFESTS = {
+    "pyproject.toml": "pypi",
+    "package.json": "npm",
+    "Cargo.toml": "crates.io",
+    "go.mod": "go",
+    "Gemfile": "rubygems",
+    "composer.json": "packagist",
+}
+NPM_LOCKS = frozenset({"package-lock.json", "npm-shrinkwrap.json"})
+NPM_DEPENDENCY_KEYS = (
+    "dependencies",
+    "devDependencies",
+    "optionalDependencies",
+    "peerDependencies",
+)
+TOKEN = re.compile(r"[^\s;,]+")
+SEMVER = re.compile(r"v?(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z.-]+))?(?:\+[0-9A-Za-z.-]+)?")
+COMPARATOR = re.compile(r"(<=|>=|<|>|=)?(.+)")
+COMPARISONS = {
+    "<": operator.lt,
+    "<=": operator.le,
+    ">": operator.gt,
+    ">=": operator.ge,
+    "=": operator.eq,
+}
+GHSA = re.compile(r"GHSA(?:-[23456789cfghjmpqrvwx]{4}){3}")
+SemVer = tuple[int, int, int, bool, str]
+
+
+class AuditError(Exception):
+    """An auditor could not produce a complete, well-formed report for one lock."""
+
+
+@dataclass(frozen=True)
+class Advisory:
+    lock: str
+    ecosystem: str
+    package: str
+    version: str
+    advisory: str
+    aliases: tuple[str, ...]
+    fixes: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class LockReport:
+    inventory: dict[str, set[str]]
+    advisories: list[Advisory]
+
+
+def lock_ecosystem(path: str) -> str | None:
+    name = PurePosixPath(path).name
+    if name.startswith("requirements") and name.endswith(".txt"):
+        return "pypi"
+    return LOCK_ECOSYSTEMS.get(name)
+
+
+def package_key(ecosystem: str, name: str) -> str:
+    return canonicalize_name(name) if ecosystem == "pypi" else name
+
+
+def parent(path: str) -> str:
+    return PurePosixPath(path).parent.as_posix()
+
+
+def declares_dependencies(name: str, text: str) -> bool:
+    if name in {"package.json", "composer.json"}:
+        data = json.loads(text)
+        keys = ("require", "require-dev") if name == "composer.json" else NPM_DEPENDENCY_KEYS
+        return any(data.get(key) for key in keys)
+    if name == "go.mod":
+        return re.search(r"^\s*require\b", text, re.MULTILINE) is not None
+    if name == "Gemfile":
+        return re.search(r"^\s*gem\s", text, re.MULTILINE) is not None
+    data = tomllib.loads(text)
+    if name == "Cargo.toml":
+        tables = [data, data.get("workspace", {}), *data.get("target", {}).values()]
+        return any(v for table in tables for k, v in table.items() if k.endswith("dependencies"))
+    project = data.get("project", {})
+    poetry = data.get("tool", {}).get("poetry", {})
+    return any(
+        [
+            project.get("dependencies"),
+            *project.get("optional-dependencies", {}).values(),
+            *data.get("dependency-groups", {}).values(),
+            set(poetry.get("dependencies", {})) - {"python"},
+            *(group.get("dependencies") for group in poetry.get("group", {}).values()),
+        ]
+    )
+
+
+def local_paths(source: Mapping[str, str]) -> list[str]:
+    return [source[kind] for kind in sorted(LOCAL_SOURCES.intersection(source))]
+
+
+def lock_members(lock: str, text: str) -> set[str]:
+    """Other directories whose manifests a lock pins: uv path sources and npm workspaces."""
+    name = PurePosixPath(lock).name
+    if name == "uv.lock":
+        sources = [package.get("source", {}) for package in tomllib.loads(text).get("package", [])]
+        relative = [path for source in sources for path in local_paths(source)]
+    elif name in NPM_LOCKS:
+        relative = [key for key in json.loads(text).get("packages", {}) if key]
+        relative = [key for key in relative if "node_modules/" not in key]
+    else:
+        return set()
+    return {posixpath.normpath(posixpath.join(parent(lock), path)) for path in relative}
+
+
+def coverage_findings(root: Path, locks: Sequence[str], manifests: Sequence[str]) -> list[str]:
+    """Manifests with dependencies that no lock of their ecosystem pins."""
+    covered = {(parent(lock), lock_ecosystem(lock)) for lock in locks}
+    for lock in locks:
+        try:
+            members = lock_members(lock, (root / lock).read_text())
+        except (OSError, ValueError, AttributeError, TypeError):
+            continue  # The lock's own audit reports why it cannot be read.
+        covered |= {(member, lock_ecosystem(lock)) for member in members}
+    findings = []
+    for path in manifests:
+        if (parent(path), MANIFESTS[PurePosixPath(path).name]) in covered:
+            continue
+        try:
+            declared = declares_dependencies(PurePosixPath(path).name, (root / path).read_text())
+        except (OSError, ValueError, AttributeError, TypeError):
+            findings.append(
+                finding(path, AUDIT, f"unreadable manifest {path}", "repair the manifest")
+            )
+            continue
+        if declared:
+            findings.append(
+                finding(
+                    path,
+                    AUDIT,
+                    f"unpinned dependencies in {path}",
+                    "commit a lock file beside the manifest or pin it from a workspace lock",
+                )
+            )
+    return findings
+
+
+def checked(item: Advisory) -> Advisory:
+    """Refuse auditor values that would break the advisory line; drop the ID from aliases."""
+    values = [item.package, item.version, item.advisory, *item.aliases, *item.fixes]
+    if not all(isinstance(value, str) and TOKEN.fullmatch(value) for value in values):
+        raise AuditError("auditor returned a malformed advisory field")
+    return replace(item, aliases=tuple(sorted(set(item.aliases) - {item.advisory})))
 
 
 def audit_report_problem(text: str) -> str:
@@ -293,95 +483,382 @@ def audit_report_problem(text: str) -> str:
                 not isinstance(vulnerability, dict)
                 or not vulnerability.get("id")
                 or not isinstance(vulnerability.get("fix_versions"), list)
+                or not isinstance(vulnerability.get("aliases", []), list)
             ):
                 return "auditor returned a malformed vulnerability"
     return ""
 
 
-def vulnerability_findings(text: str) -> list[str]:
-    report = json.loads(text)
-    return [
-        finding(
-            LOCK,
-            AUDIT,
-            f"{dependency['name']}=={dependency['version']} has {vulnerability['id']}",
-            "upgrade to "
-            + (", ".join(vulnerability["fix_versions"]) or "a patched release"),
+def checked_exit(result: subprocess.CompletedProcess[str], advisories: list[Advisory]) -> None:
+    if result.returncode not in (0, 1) or (result.returncode and not advisories):
+        detail = result.stderr.strip()
+        raise AuditError(
+            "auditor returned a nonzero exit status" + (": " + detail if detail else "")
         )
-        for dependency in report["dependencies"]
+
+
+def pip_audit(lock: str, requirements: str, run: AuditRunner) -> LockReport:
+    audited = run(
+        [
+            "uv",
+            "run",
+            "--project",
+            "orchestrator",
+            "--extra",
+            "dev",
+            "--locked",
+            "pip-audit",
+            "--strict",
+            "--disable-pip",
+            "--no-deps",
+            "--format",
+            "json",
+            "--requirement",
+            "/dev/stdin",
+        ],
+        stdin=requirements,
+        timeout=300,
+    )
+    problem = audit_report_problem(audited.stdout)
+    if problem:
+        raise AuditError(problem)
+    dependencies = json.loads(audited.stdout)["dependencies"]
+    advisories = [
+        checked(
+            Advisory(
+                lock,
+                "pypi",
+                dependency["name"],
+                dependency["version"],
+                vulnerability["id"],
+                tuple(vulnerability.get("aliases", [])),
+                tuple(vulnerability["fix_versions"]),
+            )
+        )
+        for dependency in dependencies
         for vulnerability in dependency["vulns"]
     ]
+    checked_exit(audited, advisories)
+    inventory: dict[str, set[str]] = {}
+    for dependency in dependencies:
+        key = package_key("pypi", dependency["name"])
+        inventory.setdefault(key, set()).add(dependency["version"])
+    return LockReport(inventory, advisories)
 
 
-def audit_findings(
-    changed_paths: Sequence[str], *, ci: bool, run: AuditRunner
-) -> list[str]:
-    if not ci and not any(dependency_path(path) for path in changed_paths):
-        return []
-    problem = ""
-    try:
-        exported = run(
-            [
-                "uv",
-                "export",
-                "--project",
-                "orchestrator",
-                "--locked",
-                "--all-extras",
-                "--format",
-                "requirements-txt",
-                "--no-emit-local",
-            ],
-            timeout=120,
-        )
-        if exported.returncode or not exported.stdout.strip():
-            problem = "locked requirements export failed or was empty"
-        else:
-            audited = run(
-                [
-                    "uv",
-                    "run",
-                    "--project",
-                    "orchestrator",
-                    "--extra",
-                    "dev",
-                    "--locked",
-                    "pip-audit",
-                    "--strict",
-                    "--disable-pip",
-                    "--no-deps",
-                    "--format",
-                    "json",
-                    "--requirement",
-                    "/dev/stdin",
-                ],
-                stdin=exported.stdout,
-                timeout=300,
-            )
-            problem = audit_report_problem(audited.stdout)
-            if not problem:
-                vulnerabilities = vulnerability_findings(audited.stdout)
-                if audited.returncode in (0, 1) and vulnerabilities:
-                    return vulnerabilities
-            if audited.returncode:
-                problem = problem or "auditor returned a nonzero exit status"
-                if audited.stderr.strip():
-                    problem += ": " + audited.stderr.strip()
-    except (OSError, subprocess.TimeoutExpired) as error:
-        problem = f"audit tool failed ({type(error).__name__})"
-    return (
+def audit_uv(root: Path, lock: str, run: AuditRunner) -> LockReport:
+    packages = tomllib.loads((root / lock).read_text()).get("package", [])
+    if all(LOCAL_SOURCES.intersection(package.get("source", {})) for package in packages):
+        return LockReport({}, [])
+    exported = run(
         [
-            finding(
-                LOCK,
-                AUDIT,
-                problem,
-                "resolve dependency vulnerabilities or tool/report errors "
-                "and rerun the strict locked audit",
-            )
-        ]
-        if problem
-        else []
+            "uv",
+            "export",
+            "--project",
+            parent(lock),
+            "--locked",
+            "--all-extras",
+            "--all-groups",
+            "--all-packages",
+            "--format",
+            "requirements-txt",
+            "--no-emit-local",
+        ],
+        timeout=120,
     )
+    if exported.returncode or not exported.stdout.strip():
+        raise AuditError("locked requirements export failed or was empty")
+    return pip_audit(lock, exported.stdout, run)
+
+
+def audit_requirements(root: Path, lock: str, run: AuditRunner) -> LockReport:
+    return pip_audit(lock, (root / lock).read_text(), run)
+
+
+def semver(version: str) -> SemVer:
+    match = SEMVER.fullmatch(version.strip())
+    if match is None:
+        raise AuditError(f"auditor returned an unparseable version {version}")
+    major, minor, patch, pre = match.groups()
+    return int(major), int(minor), int(patch), pre is None, pre or ""
+
+
+def satisfies(version: SemVer, comparator: str) -> bool:
+    match = COMPARATOR.fullmatch(comparator)
+    if comparator == "*" or match is None:
+        return comparator == "*"
+    return bool(COMPARISONS[match.group(1) or "="](version, semver(match.group(2))))
+
+
+def in_range(version: SemVer, spec: str) -> bool:
+    """Evaluate an advisory's npm range: ``||`` of space-joined comparators."""
+    return any(
+        all(
+            satisfies(version, comparator)
+            for comparator in re.sub(r"(<=|>=|<|>|=)\s+", r"\1", alternative).split()
+        )
+        for alternative in spec.split("||")
+    )
+
+
+def npm_fixes(installed: str, vulnerable: str, published: Sequence[str]) -> tuple[str, ...]:
+    """The lowest published release above ``installed`` outside the advisory's range."""
+    current = semver(installed)
+    releases = sorted((semver(item), item) for item in published if SEMVER.fullmatch(item))
+    for key, version in releases:
+        if key[3] and key > current and not in_range(key, vulnerable):
+            return (version,)
+    return ()
+
+
+def npm_published(name: str, directory: str, run: AuditRunner) -> list[str]:
+    viewed = run(["npm", "view", name, "versions", "--json", "--prefix", directory], timeout=120)
+    try:
+        versions = json.loads(viewed.stdout)
+    except ValueError:
+        versions = None
+    versions = [versions] if isinstance(versions, str) else versions
+    if viewed.returncode or not isinstance(versions, list):
+        raise AuditError(f"npm view could not list published versions of {name}")
+    return [str(version) for version in versions]
+
+
+NpmSource = tuple[str, list[str], list[tuple[str, str]]]
+
+
+def npm_sources(text: str) -> list[NpmSource]:
+    """Validated (package, lock nodes, [(GHSA ID, vulnerable range)]) per advisory source."""
+    try:
+        report = json.loads(text)
+    except ValueError:
+        raise AuditError("auditor returned invalid JSON") from None
+    if (
+        not isinstance(report, dict)
+        or "error" in report
+        or report.get("auditReportVersion") != 2
+        or not isinstance(report.get("vulnerabilities"), dict)
+    ):
+        raise AuditError("auditor returned no usable audit report")
+    sources: list[NpmSource] = []
+    for name, entry in report["vulnerabilities"].items():
+        advisories = []
+        for via in entry["via"]:
+            if isinstance(via, str):
+                continue  # Vulnerable through a dependency, which carries its own advisory.
+            ghsa = GHSA.search(str(via.get("url", "")))
+            if ghsa is None or not isinstance(via.get("range"), str):
+                raise AuditError("auditor returned a malformed vulnerability")
+            advisories.append((ghsa.group(), via["range"]))
+        if advisories and (not isinstance(entry["nodes"], list) or not entry["nodes"]):
+            raise AuditError(f"auditor named no lock node for {name}")
+        if advisories:
+            sources.append((str(name), [str(node) for node in entry["nodes"]], advisories))
+    return sources
+
+
+def npm_inventory(lock: str, packages: object) -> tuple[dict[str, str], dict[str, set[str]]]:
+    if not isinstance(packages, dict):
+        raise AuditError(f"{lock} has no packages map (lockfileVersion 2 or later)")
+    nodes = {
+        str(key): str(entry["version"])
+        for key, entry in packages.items()
+        if "node_modules/" in key and "version" in entry
+    }
+    inventory: dict[str, set[str]] = {}
+    for key, version in nodes.items():
+        name = packages[key].get("name") or key.rsplit("node_modules/", 1)[1]
+        inventory.setdefault(str(name), set()).add(version)
+    return nodes, inventory
+
+
+def audit_npm(root: Path, lock: str, run: AuditRunner) -> LockReport:
+    directory = parent(lock)
+    nodes, inventory = npm_inventory(lock, json.loads((root / lock).read_text()).get("packages"))
+    if not inventory:
+        return LockReport({}, [])
+    audited = run(
+        [
+            "npm",
+            "audit",
+            "--json",
+            "--package-lock-only",
+            "--include=dev",
+            "--include=optional",
+            "--include=peer",
+            "--prefix",
+            directory,
+        ],
+        timeout=300,
+    )
+    advisories = []
+    for name, entry_nodes, sources in npm_sources(audited.stdout):
+        if not set(entry_nodes) <= set(nodes):
+            raise AuditError(f"auditor named {name} outside the lock inventory")
+        published = npm_published(name, directory, run)
+        versions = sorted({nodes[node] for node in entry_nodes})
+        advisories += [
+            checked(
+                Advisory(
+                    lock, "npm", name, version, ghsa, (), npm_fixes(version, vulnerable, published)
+                )
+            )
+            for version, (ghsa, vulnerable) in itertools.product(versions, sources)
+        ]
+    checked_exit(audited, advisories)
+    return LockReport(inventory, advisories)
+
+
+AUDITORS = {
+    "uv.lock": audit_uv,
+    "package-lock.json": audit_npm,
+    "npm-shrinkwrap.json": audit_npm,
+}
+
+
+def audit_lock(root: Path, lock: str, run: AuditRunner) -> LockReport:
+    name = PurePosixPath(lock).name
+    auditor = AUDITORS.get(name) or audit_requirements
+    try:
+        return auditor(root, lock, run)
+    except (OSError, subprocess.TimeoutExpired) as error:
+        raise AuditError(f"audit tool failed ({type(error).__name__})") from None
+    except (ValueError, KeyError, TypeError, AttributeError) as error:
+        raise AuditError(f"unreadable lock or report ({type(error).__name__})") from None
+
+
+def advisory_finding(item: Advisory) -> str:
+    fields = (
+        f"vulnerability ecosystem={item.ecosystem} package={item.package}"
+        f" version={item.version} advisory={item.advisory}"
+        f" aliases={','.join(item.aliases)} fix={','.join(item.fixes)}"
+    )
+    action = (
+        f"upgrade {item.package} to {item.fixes[0]} or later and relock"
+        if item.fixes
+        else f"remove or replace {item.package}, or ask the owner for an exception in {EXCEPTIONS}"
+    )
+    return finding(item.lock, AUDIT, fields, action)
+
+
+def exception_problem(entry: object, today: date) -> str:
+    if not isinstance(entry, dict):
+        return "is not an object"
+    missing = sorted(EXCEPTION_FIELDS - set(entry))
+    extra = sorted(set(entry) - EXCEPTION_FIELDS)
+    if missing or extra:
+        return f"fields differ: missing {missing or 'none'} extra {extra or 'none'}"
+    if not all(isinstance(value, str) and value.strip() for value in entry.values()):
+        return "fields must be non-empty strings"
+    try:
+        expires = date.fromisoformat(entry["expires"])
+    except ValueError:
+        return f"expires {entry['expires']} is not an ISO date"
+    return f"expired on {expires.isoformat()}" if expires < today else ""
+
+
+def exception_findings(
+    advisories: list[Advisory],
+    reports: Mapping[str, LockReport],
+    text: str,
+    today: date,
+) -> tuple[list[Advisory], list[str]]:
+    """Suppress advisories that a valid owner-approved exception names; report invalid ones."""
+
+    def report(reason: str) -> str:
+        return finding(EXCEPTIONS, AUDIT, reason, "correct or remove the exception")
+
+    try:
+        data = json.loads(text)
+    except ValueError:
+        return advisories, [report("exceptions file is not valid JSON")]
+    if (
+        not isinstance(data, dict)
+        or set(data) != {"schemaVersion", "exceptions"}
+        or data["schemaVersion"] != 1
+        or not isinstance(data["exceptions"], list)
+    ):
+        return advisories, [
+            report("exceptions file must hold schemaVersion 1 and an exceptions list")
+        ]
+    suppressed: set[Advisory] = set()
+    findings = []
+    for index, entry in enumerate(data["exceptions"]):
+        problem = exception_problem(entry, today)
+        if not problem:
+            problem, matched = exception_match(entry, advisories, reports, suppressed)
+            suppressed |= matched
+        if problem:
+            findings.append(report(f"exception {index} {problem}"))
+    return [item for item in advisories if item not in suppressed], findings
+
+
+def exception_match(
+    entry: Mapping[str, str],
+    advisories: Sequence[Advisory],
+    reports: Mapping[str, LockReport],
+    suppressed: set[Advisory],
+) -> tuple[str, set[Advisory]]:
+    lock, version = entry["lock"], entry["version"]
+    if lock not in reports:
+        return f"names {lock}, which has no completed audit", set()
+    key = package_key(lock_ecosystem(lock) or "", entry["package"])
+    if version not in reports[lock].inventory.get(key, set()):
+        return f"version {entry['package']}=={version} no longer matches {lock}", set()
+    matched = {
+        item
+        for item in advisories
+        if item.lock == lock
+        and package_key(item.ecosystem, item.package) == key
+        and item.version == version
+        and entry["advisory"] in (item.advisory, *item.aliases)
+    }
+    fixed = sorted({fix for item in matched for fix in item.fixes})
+    if not matched:
+        return f"{entry['advisory']} matches no current finding", set()
+    if fixed:
+        return f"{entry['advisory']} now has a fix ({', '.join(fixed)})", set()
+    if matched & suppressed:
+        return f"{entry['advisory']} duplicates another exception", set()
+    return "", matched
+
+
+def audit_findings(root: Path, paths: Sequence[str], *, run: AuditRunner, today: date) -> list[str]:
+    """Audit every discovered lock; see the module docstring for the finding format."""
+    maintained = [path for path in paths if not is_fixture_program(path)]
+    locks = sorted(path for path in maintained if lock_ecosystem(path))
+    manifests = sorted(path for path in maintained if PurePosixPath(path).name in MANIFESTS)
+    findings = coverage_findings(root, locks, manifests)
+    reports: dict[str, LockReport] = {}
+    for lock in locks:
+        name = PurePosixPath(lock).name
+        if name not in AUDITORS and not name.startswith("requirements"):
+            findings.append(
+                finding(
+                    lock,
+                    AUDIT,
+                    f"no auditor for {lock}",
+                    "add an auditor for this lock format",
+                )
+            )
+            continue
+        try:
+            reports[lock] = audit_lock(root, lock, run)
+        except AuditError as problem:
+            findings.append(
+                finding(
+                    lock,
+                    AUDIT,
+                    f"audit failed: {problem}",
+                    "repair the lock or auditor and rerun the strict locked audit",
+                )
+            )
+    advisories = [item for report in reports.values() for item in report.advisories]
+    try:
+        text = (root / EXCEPTIONS).read_text()
+    except OSError:
+        text = ""
+    remaining, invalid = exception_findings(advisories, reports, text, today)
+    return [*sorted(findings), *map(advisory_finding, remaining), *invalid]
 
 
 def run_process(
@@ -396,15 +873,6 @@ def run_process(
         timeout=timeout,
         check=False,
     )
-
-
-def changed_paths() -> list[str]:
-    result = run_process(
-        ["git", "diff", "--cached", "--name-only", "-z", "--diff-filter=ACDMRTUXB"],
-        timeout=30,
-    )
-    result.check_returncode()
-    return [path for path in result.stdout.split("\0") if path]
 
 
 def maintained_installers(sources: Mapping[str, str]) -> dict[str, str]:
@@ -425,9 +893,7 @@ def static_findings(paths: list[str]) -> list[str]:
             for path in paths
             if not path.startswith(("docs/", "var/"))
             and (
-                path.startswith(".github/workflows/")
-                or path.endswith(".sh")
-                or path == "Makefile"
+                path.startswith(".github/workflows/") or path.endswith(".sh") or path == "Makefile"
             )
         }
         | {"package.json", "package-lock.json"}
@@ -461,7 +927,9 @@ def static_findings(paths: list[str]) -> list[str]:
 
 
 def frozen_exclusions(
-    released: Mapping[str, str], current: Mapping[str, str], payload_paths: Sequence[str]
+    released: Mapping[str, str],
+    current: Mapping[str, str],
+    payload_paths: Sequence[str],
 ) -> list[str]:
     """Freeze the grading payload and every package whose bytes match its latest release."""
     return sorted(
@@ -505,9 +973,7 @@ def formatter_scope(paths: Sequence[str]) -> list[str]:
         path
         for path in prettier_paths(paths)
         if not (ROOT / path).is_symlink()
-        and not any(
-            path == prefix or path.startswith(prefix + "/") for prefix in frozen
-        )
+        and not any(path == prefix or path.startswith(prefix + "/") for prefix in frozen)
     ]
 
 
@@ -526,8 +992,7 @@ def formatter_findings(paths: Sequence[str]) -> list[str]:
         finding(
             path,
             "PRETTIER.format",
-            "unformatted bytes sha256="
-            + hashlib.sha256((ROOT / path).read_bytes()).hexdigest(),
+            "unformatted bytes sha256=" + hashlib.sha256((ROOT / path).read_bytes()).hexdigest(),
             "format with the locked Prettier unless an intentional identity change is required",
         )
         for path in different
@@ -537,18 +1002,13 @@ def formatter_findings(paths: Sequence[str]) -> list[str]:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("mode", choices=("static", "prettier", "audit"))
-    parser.add_argument("--ci", action="store_true")
-    parser.add_argument("paths", nargs="*")
     args = parser.parse_args()
     try:
         paths = repo_paths(ROOT)
         if args.mode == "static":
             findings = static_findings(paths)
         elif args.mode == "audit":
-            changed = args.paths or changed_paths()
-            if not args.ci and not any(dependency_path(path) for path in changed):
-                return 0
-            findings = audit_findings(changed, ci=args.ci, run=run_process)
+            findings = audit_findings(ROOT, paths, run=run_process, today=date.today())
         else:
             findings = formatter_findings(paths)
     except (OSError, ValueError, subprocess.SubprocessError) as error:
