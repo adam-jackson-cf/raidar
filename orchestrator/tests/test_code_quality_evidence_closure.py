@@ -17,7 +17,11 @@ from raidar.scoring.code_quality.architecture import (
 )
 from raidar.scoring.code_quality.evidence import FileDigests, repeated_line_keys, ruff_evidence
 from raidar.scoring.code_quality.lineage_models import TransitionReworkEvidence
-from raidar.scoring.code_quality.quality import ProductionQualityError, produce_production_quality
+from raidar.scoring.code_quality.quality import (
+    MeasuredRows,
+    ProductionQualityError,
+    produce_production_quality,
+)
 from raidar.scoring.code_quality.snapshot_tool import cli
 from raidar.scoring.framework.inventory import build_inventory
 from tests.code_quality_support import (
@@ -95,8 +99,7 @@ def _produce(shop: dict[str, Any], tools: Any = None, **overrides: Any) -> Any:
         "checkpoint_1",
         inputs["snapshot"],
         inputs["inventory"],
-        inputs["files"],
-        inputs["symbols"],
+        MeasuredRows(inputs["files"], inputs["symbols"]),
         tools or in_memory_tools(),
     )
 
@@ -126,7 +129,9 @@ def test_a_production_tree_without_source_lines_has_no_verbosity(tmp_path: Path)
     files = [{"file_path": "app.py", "success": True}]
 
     with pytest.raises(ProductionQualityError, match="^production_source_loc_zero$"):
-        produce_production_quality("c1", snapshot, inventory, files, [], in_memory_tools())
+        produce_production_quality(
+            "c1", snapshot, inventory, MeasuredRows(files, []), in_memory_tools()
+        )
 
 
 def test_a_diagnostic_for_a_file_the_evaluator_did_not_measure_is_refused(

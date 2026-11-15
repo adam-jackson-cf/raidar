@@ -17,7 +17,6 @@ from __future__ import annotations
 from typing import Literal
 
 from harbor.models.trial.config import AgentConfig, TrialConfig
-from raidar_contract.canonical import digest_json
 
 from raidar.design.experiment.arm import ResolvedArm
 from raidar.subject.agent.config import HARBOR_AGENT_NAMES
@@ -27,6 +26,7 @@ from raidar.subject.environment.python.image import image_lock_hash
 from raidar.subject.environment.python.pack_definition import PackSpec
 from raidar.subject.workflow.inner import INNER_KWARG, InnerAgentSpec
 from raidar.subject.workflow.runner import WorkflowRunner
+from raidar_contract.canonical import digest_json
 
 AgentOverride = Literal["oracle", "nop"]
 AGENT_OVERRIDES: tuple[AgentOverride, ...] = ("oracle", "nop")
@@ -47,11 +47,13 @@ def effective_agent_timeout_s(agent_timeout_sec: int) -> float:
 
 
 def _declared(arm: ResolvedArm) -> dict[str, dict[str, object]]:
-    """Each locked package's manifest declarations (setup, stop, output names), read from the
-    resolved ``StagePackage`` of the same package tree whose ``stage-tree/1`` digest the lock
-    guards. Written to the trial configuration only (never to the lock or any identity): health
-    reads them to know which setup, stop and output records a package owes, and treats a missing
-    or malformed declaration as unknown applicability."""
+    """Each locked package's manifest declarations (setup, stop, output names).
+
+    They are read from the resolved ``StagePackage`` of the same package tree whose
+    ``stage-tree/1`` digest the lock guards. Written to the trial configuration only (never to
+    the lock or any identity): health reads them to know which setup, stop and output records a
+    package owes, and treats a missing or malformed declaration as unknown applicability.
+    """
     return {
         stage.release.name: {
             "setup": stage.package.manifest.setup is not None,
@@ -63,9 +65,11 @@ def _declared(arm: ResolvedArm) -> dict[str, dict[str, object]]:
 
 
 def _package_kwargs(arm: ResolvedArm, pack: PackSpec) -> dict[str, object]:
-    """What a package workflow's runner needs beyond its definition: the locked packages (with
-    their declarations, which are not part of the lock's identity), the primitives' code
-    identities and the pack the trial's container is built from."""
+    """What a package workflow's runner needs beyond its definition.
+
+    That is the locked packages (with their declarations, which are not part of the lock's
+    identity), the primitives' code identities and the pack the trial's container is built from.
+    """
     if not arm.workflow.stages:
         return {}
     declared = _declared(arm)

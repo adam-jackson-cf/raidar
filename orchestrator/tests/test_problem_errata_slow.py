@@ -9,7 +9,7 @@ import pytest
 from raidar.design.experiment.lock import LockError
 from raidar.design.experiment.validation import semantic_issues
 from raidar.engine.job.assessment import lock_errata, lock_rescore_config
-from raidar.engine.trial.config import harbor_trial_config
+from raidar.engine.trial.config import TrialSite, harbor_trial_config
 from raidar.engine.trial.plan import PlanError, PlanOptions, build_plan
 from raidar.grading.errata import ErrataOutcome, ErrataRef
 from raidar.grading.records import load_step_record, step_record_dir
@@ -55,9 +55,11 @@ def test_the_lock_pins_the_errata_in_the_execution_identity(
         plan,
         trial,
         tmp_path / "task",
-        trials_dir=tmp_path / "trials",
-        bundle_root=tmp_path / "bundle",
-        docker_context="orbstack",
+        site=TrialSite(
+            trials_dir=tmp_path / "trials",
+            bundle_root=tmp_path / "bundle",
+            docker_context="orbstack",
+        ),
     )
     assert config.verifier.kwargs["pinned"]["errata"] == {
         "sha256": metadata["errata"]["sha256"],

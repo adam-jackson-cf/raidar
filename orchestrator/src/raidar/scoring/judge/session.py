@@ -13,7 +13,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from pathlib import Path
 
-from raidar.judge.client import JevClient, Transport, api_key_from_env
+from raidar.judge.client import JevClient, api_key_from_env
 from raidar.scoring.judge.audit import AuditLog
 from raidar.scoring.judge.cache import DecisionCache
 from raidar.scoring.judge.policies import POLICY_DIR, PolicyRegistry
@@ -25,16 +25,14 @@ CACHE_DIR = "jev-cache"
 def open_runtime(
     store_root: Path,
     *,
-    environ: Mapping[str, str] | None = None,
     replay_only: bool = False,
     trial: str | None = None,
     overrides: Mapping[str, str] | None = None,
     policy_dir: Path = POLICY_DIR,
-    transport: Transport | None = None,
 ) -> JevRuntime:
     registry = PolicyRegistry.from_dir(policy_dir).with_overrides(overrides or {})
-    api_key = None if replay_only else api_key_from_env(environ)
-    client = JevClient(api_key, transport=transport) if api_key else None
+    api_key = None if replay_only else api_key_from_env()
+    client = JevClient(api_key) if api_key else None
     return JevRuntime(
         registry,
         audit=AuditLog.for_store(store_root),

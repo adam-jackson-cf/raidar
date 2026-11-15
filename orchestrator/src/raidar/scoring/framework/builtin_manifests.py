@@ -28,37 +28,15 @@ _LOWER = Direction.LOWER_BETTER
 _DET = Tier.DETERMINISTIC
 
 
-def _metric(
-    metric_id: str,
-    description: str,
-    level: MetricLevel,
-    metric_type: MetricType,
-    direction: Direction,
-    exactness: Exactness,
-    *,
-    tier: Tier = _DET,
-    unit: str | None = None,
-) -> MetricSpec:
-    return MetricSpec(
-        id=metric_id,
-        description=description,
-        level=level,
-        type=metric_type,
-        direction=direction,
-        tier=tier,
-        exactness=exactness,
-        unit=unit,
-    )
-
-
 def _group_rate(group: str) -> MetricSpec:
-    return _metric(
-        f"{group}_pass_rate",
-        f"Passed / graded {group} cases at the checkpoint (SCB all-cases rule).",
-        _CHECKPOINT,
-        MetricType.RATIO,
-        _HIGHER,
-        Exactness.SCB_EXACT,
+    return MetricSpec(
+        id=f"{group}_pass_rate",
+        description=f"Passed / graded {group} cases at the checkpoint (SCB all-cases rule).",
+        level=_CHECKPOINT,
+        type=MetricType.RATIO,
+        direction=_HIGHER,
+        tier=_DET,
+        exactness=Exactness.SCB_EXACT,
     )
 
 
@@ -71,114 +49,136 @@ CORRECTNESS = ScorerManifest(
     runtimes=("*",),
     evidence_required=(EvidenceInput.ORACLE_CASES,),
     metrics=(
-        _metric(
-            "solved",
-            "Strict solve: every graded case passed and grading had no infrastructure failure.",
-            _CHECKPOINT,
-            MetricType.BOOLEAN,
-            _HIGHER,
-            Exactness.SCB_EXACT,
+        MetricSpec(
+            id="solved",
+            description=(
+                "Strict solve: every graded case passed and grading had no infrastructure failure."
+            ),
+            level=_CHECKPOINT,
+            type=MetricType.BOOLEAN,
+            direction=_HIGHER,
+            tier=_DET,
+            exactness=Exactness.SCB_EXACT,
         ),
-        _metric(
-            "strict_pass_rate",
-            "Passed / graded cases across all groups at the checkpoint.",
-            _CHECKPOINT,
-            MetricType.RATIO,
-            _HIGHER,
-            Exactness.SCB_EXACT,
+        MetricSpec(
+            id="strict_pass_rate",
+            description="Passed / graded cases across all groups at the checkpoint.",
+            level=_CHECKPOINT,
+            type=MetricType.RATIO,
+            direction=_HIGHER,
+            tier=_DET,
+            exactness=Exactness.SCB_EXACT,
         ),
         _group_rate("core"),
         _group_rate("functionality"),
         _group_rate("error"),
         _group_rate("regression"),
-        _metric(
-            "regression_failures",
-            "Graded regression cases (from earlier checkpoints) that did not pass.",
-            _CHECKPOINT,
-            MetricType.COUNT,
-            _LOWER,
-            Exactness.NATIVE,
+        MetricSpec(
+            id="regression_failures",
+            description="Graded regression cases (from earlier checkpoints) that did not pass.",
+            level=_CHECKPOINT,
+            type=MetricType.COUNT,
+            direction=_LOWER,
+            tier=_DET,
+            exactness=Exactness.NATIVE,
         ),
-        _metric(
-            "solved_checkpoints",
-            "Checkpoints solved in the trajectory (continue view); C = this / K.",
-            _TRAJECTORY,
-            MetricType.COUNT,
-            _HIGHER,
-            Exactness.SCB_EXACT,
+        MetricSpec(
+            id="solved_checkpoints",
+            description="Checkpoints solved in the trajectory (continue view); C = this / K.",
+            level=_TRAJECTORY,
+            type=MetricType.COUNT,
+            direction=_HIGHER,
+            tier=_DET,
+            exactness=Exactness.SCB_EXACT,
         ),
-        _metric(
-            "reached",
-            "Consecutive checkpoints solved from the first (strict view).",
-            _TRAJECTORY,
-            MetricType.COUNT,
-            _HIGHER,
-            Exactness.NATIVE,
+        MetricSpec(
+            id="reached",
+            description="Consecutive checkpoints solved from the first (strict view).",
+            level=_TRAJECTORY,
+            type=MetricType.COUNT,
+            direction=_HIGHER,
+            tier=_DET,
+            exactness=Exactness.NATIVE,
         ),
-        _metric(
-            "solved_errata",
-            "Errata-applied solve: the strict rule over the graded cases the lock's pinned "
-            "problem errata keeps (exclude-from-solved cases left out); not_applicable "
-            "without an errata.",
-            _CHECKPOINT,
-            MetricType.BOOLEAN,
-            _HIGHER,
-            Exactness.NATIVE,
+        MetricSpec(
+            id="solved_errata",
+            description=(
+                "Errata-applied solve: the strict rule over the graded cases the lock's pinned "
+                "problem errata keeps (exclude-from-solved cases left out); not_applicable without "
+                "an errata."
+            ),
+            level=_CHECKPOINT,
+            type=MetricType.BOOLEAN,
+            direction=_HIGHER,
+            tier=_DET,
+            exactness=Exactness.NATIVE,
         ),
-        _metric(
-            "solved_checkpoints_errata",
-            "Errata-applied solved checkpoints in the trajectory (continue view).",
-            _TRAJECTORY,
-            MetricType.COUNT,
-            _HIGHER,
-            Exactness.NATIVE,
+        MetricSpec(
+            id="solved_checkpoints_errata",
+            description="Errata-applied solved checkpoints in the trajectory (continue view).",
+            level=_TRAJECTORY,
+            type=MetricType.COUNT,
+            direction=_HIGHER,
+            tier=_DET,
+            exactness=Exactness.NATIVE,
         ),
-        _metric(
-            "reached_errata",
-            "Errata-applied consecutive checkpoints solved from the first (strict view).",
-            _TRAJECTORY,
-            MetricType.COUNT,
-            _HIGHER,
-            Exactness.NATIVE,
+        MetricSpec(
+            id="reached_errata",
+            description=(
+                "Errata-applied consecutive checkpoints solved from the first (strict view)."
+            ),
+            level=_TRAJECTORY,
+            type=MetricType.COUNT,
+            direction=_HIGHER,
+            tier=_DET,
+            exactness=Exactness.NATIVE,
         ),
-        _metric(
-            "solved_solvable",
-            "Reference-solvable SCB success: every case the reference passes in every "
-            "validation repeat passed; unavailable without a solvable set, never zero. "
-            "Not specification compliance.",
-            _CHECKPOINT,
-            MetricType.BOOLEAN,
-            _HIGHER,
-            Exactness.NATIVE,
+        MetricSpec(
+            id="solved_solvable",
+            description=(
+                "Reference-solvable SCB success: every case the reference passes in every "
+                "validation repeat passed; unavailable without a solvable set, never zero. Not "
+                "specification compliance."
+            ),
+            level=_CHECKPOINT,
+            type=MetricType.BOOLEAN,
+            direction=_HIGHER,
+            tier=_DET,
+            exactness=Exactness.NATIVE,
         ),
-        _metric(
-            "solved_checkpoints_solvable",
-            "Reference-solvable SCB successful checkpoints in the trajectory (continue view).",
-            _TRAJECTORY,
-            MetricType.COUNT,
-            _HIGHER,
-            Exactness.NATIVE,
+        MetricSpec(
+            id="solved_checkpoints_solvable",
+            description=(
+                "Reference-solvable SCB successful checkpoints in the trajectory (continue view)."
+            ),
+            level=_TRAJECTORY,
+            type=MetricType.COUNT,
+            direction=_HIGHER,
+            tier=_DET,
+            exactness=Exactness.NATIVE,
         ),
-        _metric(
-            "reached_solvable",
-            "Reference-solvable SCB consecutive successful checkpoints (strict view).",
-            _TRAJECTORY,
-            MetricType.COUNT,
-            _HIGHER,
-            Exactness.NATIVE,
+        MetricSpec(
+            id="reached_solvable",
+            description="Reference-solvable SCB consecutive successful checkpoints (strict view).",
+            level=_TRAJECTORY,
+            type=MetricType.COUNT,
+            direction=_HIGHER,
+            tier=_DET,
+            exactness=Exactness.NATIVE,
         ),
     ),
 )
 
 
 def _component(metric_id: str, name: str, level: MetricLevel) -> MetricSpec:
-    return _metric(
-        metric_id,
-        f"SCB {name} component in [0, 1] (1 is best).",
-        level,
-        MetricType.RATIO,
-        _HIGHER,
-        Exactness.SCB_EXACT,
+    return MetricSpec(
+        id=metric_id,
+        description=f"SCB {name} component in [0, 1] (1 is best).",
+        level=level,
+        type=MetricType.RATIO,
+        direction=_HIGHER,
+        tier=_DET,
+        exactness=Exactness.SCB_EXACT,
     )
 
 
@@ -205,21 +205,23 @@ CODE_QUALITY = ScorerManifest(
         _component("architecture", "architecture (H)", _CHECKPOINT),
         _component("rework", "rework (R)", _TRANSITION),
         _component("regression", "regression breadth (G)", _TRANSITION),
-        _metric(
-            "lint_findings",
-            "Ruff diagnostics under the SCB contract in production files.",
-            _CHECKPOINT,
-            MetricType.COUNT,
-            _LOWER,
-            Exactness.SCB_EXACT,
+        MetricSpec(
+            id="lint_findings",
+            description="Ruff diagnostics under the SCB contract in production files.",
+            level=_CHECKPOINT,
+            type=MetricType.COUNT,
+            direction=_LOWER,
+            tier=_DET,
+            exactness=Exactness.SCB_EXACT,
         ),
-        _metric(
-            "production_loc",
-            "Production lines of code in the assessor-owned inventory.",
-            _CHECKPOINT,
-            MetricType.COUNT,
-            Direction.NEUTRAL,
-            Exactness.SCB_EXACT,
+        MetricSpec(
+            id="production_loc",
+            description="Production lines of code in the assessor-owned inventory.",
+            level=_CHECKPOINT,
+            type=MetricType.COUNT,
+            direction=Direction.NEUTRAL,
+            tier=_DET,
+            exactness=Exactness.SCB_EXACT,
             unit="lines",
         ),
         _component("problem_verbosity", "problem-level verbosity mean (V)", _TRAJECTORY),
@@ -227,14 +229,17 @@ CODE_QUALITY = ScorerManifest(
         _component("problem_architecture", "problem-level architecture mean (H)", _TRAJECTORY),
         _component("problem_rework", "problem-level rework mean (R)", _TRAJECTORY),
         _component("problem_regression", "problem-level regression-breadth mean (G)", _TRAJECTORY),
-        _metric(
-            "regression_parity_excluded_cases",
-            "Grader cases G left out at the transition because their outcome differed "
-            "between the grading run and the coverage run (0 when parity held).",
-            _TRANSITION,
-            MetricType.COUNT,
-            Direction.NEUTRAL,
-            Exactness.NATIVE,
+        MetricSpec(
+            id="regression_parity_excluded_cases",
+            description=(
+                "Grader cases G left out at the transition because their outcome differed between "
+                "the grading run and the coverage run (0 when parity held)."
+            ),
+            level=_TRANSITION,
+            type=MetricType.COUNT,
+            direction=Direction.NEUTRAL,
+            tier=_DET,
+            exactness=Exactness.NATIVE,
             unit="cases",
         ),
     ),
@@ -243,7 +248,16 @@ CODE_QUALITY = ScorerManifest(
 
 def _usage(metric_id: str, description: str, level: MetricLevel, unit: str) -> MetricSpec:
     metric_type = MetricType.REAL if unit in {"usd", "seconds"} else MetricType.COUNT
-    return _metric(metric_id, description, level, metric_type, _LOWER, Exactness.NATIVE, unit=unit)
+    return MetricSpec(
+        id=metric_id,
+        description=description,
+        level=level,
+        type=metric_type,
+        direction=_LOWER,
+        tier=_DET,
+        exactness=Exactness.NATIVE,
+        unit=unit,
+    )
 
 
 RESOURCE_USAGE = ScorerManifest(
@@ -290,38 +304,41 @@ PROCESS_COMPLIANCE = ScorerManifest(
     runtimes=("*",),
     evidence_required=(EvidenceInput.TRACE, EvidenceInput.SNAPSHOT_CURRENT),
     metrics=(
-        _metric(
-            "tests_run_before_finish",
-            "The agent ran the project's tests after its last source edit in the step.",
-            _CHECKPOINT,
-            MetricType.BOOLEAN,
-            _HIGHER,
-            Exactness.NATIVE,
+        MetricSpec(
+            id="tests_run_before_finish",
+            description="The agent ran the project's tests after its last source edit in the step.",
+            level=_CHECKPOINT,
+            type=MetricType.BOOLEAN,
+            direction=_HIGHER,
+            tier=_DET,
+            exactness=Exactness.NATIVE,
         ),
-        _metric(
-            "plan_written",
-            "The agent wrote a plan before its first source edit in the step.",
-            _CHECKPOINT,
-            MetricType.BOOLEAN,
-            _HIGHER,
-            Exactness.NATIVE,
+        MetricSpec(
+            id="plan_written",
+            description="The agent wrote a plan before its first source edit in the step.",
+            level=_CHECKPOINT,
+            type=MetricType.BOOLEAN,
+            direction=_HIGHER,
+            tier=_DET,
+            exactness=Exactness.NATIVE,
         ),
-        _metric(
-            "compliance_rate",
-            "Share of deterministic checks passed over the trajectory.",
-            _TRAJECTORY,
-            MetricType.RATIO,
-            _HIGHER,
-            Exactness.NATIVE,
+        MetricSpec(
+            id="compliance_rate",
+            description="Share of deterministic checks passed over the trajectory.",
+            level=_TRAJECTORY,
+            type=MetricType.RATIO,
+            direction=_HIGHER,
+            tier=_DET,
+            exactness=Exactness.NATIVE,
         ),
-        _metric(
-            "jev_ambiguous_compliance",
-            "Jev probability that ambiguous steps complied (shadow; uncalibrated).",
-            _CHECKPOINT,
-            MetricType.PROBABILITY,
-            _HIGHER,
-            Exactness.NATIVE,
+        MetricSpec(
+            id="jev_ambiguous_compliance",
+            description="Jev probability that ambiguous steps complied (shadow; uncalibrated).",
+            level=_CHECKPOINT,
+            type=MetricType.PROBABILITY,
+            direction=_HIGHER,
             tier=Tier.JEV,
+            exactness=Exactness.NATIVE,
         ),
     ),
 )

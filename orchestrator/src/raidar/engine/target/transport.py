@@ -14,7 +14,7 @@ import signal
 import subprocess
 import time
 from collections.abc import Callable, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Protocol
 
@@ -74,6 +74,17 @@ def spawn_detached(argv: Sequence[str], log: Path) -> SpawnedProcess:
             stderr=sink,
             start_new_session=True,
         )
+
+
+@dataclass(frozen=True)
+class HostSeams:
+    """The process, clock and state-directory seams a transport operation runs against."""
+
+    runner: Runner = run_command
+    spawner: Spawner = spawn_detached
+    sleep: Callable[[float], None] = time.sleep
+    clock: Callable[[], float] = time.monotonic
+    base: Path | None = None
 
 
 def state_dir() -> Path:
@@ -172,25 +183,24 @@ def ensure_context(target: Target, paths: TransportPaths, runner: Runner = run_c
 def transport_up(
     target: Target,
     *,
-    runner: Runner = run_command,
-    spawner: Spawner = spawn_detached,
-    base: Path | None = None,
+    host: HostSeams | None = None,
     timeout_s: float = UP_TIMEOUT_S,
-    sleep: Callable[[float], None] = time.sleep,
-    clock: Callable[[], float] = time.monotonic,
     deadline: float | None = None,
 ) -> int:
     """Start (or restart) the tunnel and wait until the daemon answers; the tunnel's pid."""
     transport = target.transport
     if transport is None:
         raise ValueError(f"target {target.name!r} has no transport")
+    host = host or HostSeams()
+    sleep, clock = host.sleep, host.clock
     deadline = min(clock() + timeout_s, deadline) if deadline is not None else clock() + timeout_s
-    runner = bounded_runner(runner, deadline, clock)
-    paths = TransportPaths.of(target, base)
-    transport_down(target, base=base, sleep=sleep, runner=runner, deadline=deadline, clock=clock)
+    runner = bounded_runner(host.runner, deadline, clock)
+    host = replace(host, runner=runner)
+    paths = TransportPaths.of(target, host.base)
+    transport_down(target, host=host, deadline=deadline)
     paths.socket.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
     ensure_context(target, paths, runner)
-    process = spawner(ssh_argv(transport, paths.socket), paths.log)
+    process = host.spawner(ssh_argv(transport, paths.socket), paths.log)
     paths.pidfile.write_text(f"{process.pid}\n")
     try:
         while clock() < deadline:
@@ -216,18 +226,14 @@ def transport_up(
 
 
 def transport_down(
-    target: Target,
-    *,
-    base: Path | None = None,
-    sleep: Callable[[float], None] = time.sleep,
-    runner: Runner = run_command,
-    deadline: float | None = None,
-    clock: Callable[[], float] = time.monotonic,
+    target: Target, *, host: HostSeams | None = None, deadline: float | None = None
 ) -> bool:
     """Stop the tunnel; whether one was running."""
-    paths = TransportPaths.of(target, base)
+    host = host or HostSeams()
+    sleep, clock = host.sleep, host.clock
+    paths = TransportPaths.of(target, host.base)
     pid = read_pid(paths)
-    was_running = tunnel_running(paths, runner)
+    was_running = tunnel_running(paths, host.runner)
     if pid is not None and was_running:
         with contextlib.suppress(ProcessLookupError):
             os.kill(pid, signal.SIGTERM)

@@ -87,7 +87,7 @@ def evidence() -> Audit:
 
 def test_v1_a_timed_out_evaluator_is_never_a_pass(evidence: Audit) -> None:
     ledger = _record(STEP, StepOutcome(STEP, infra="sandbox_timeout"), Path("/trial"))
-    evidence._ledgers = {**evidence._ledgers, STEP: ledger}
+    evidence.ledgers = {**evidence.ledgers, STEP: ledger}
     evidence.attempted = (
         evidence.attempted[0].model_copy(
             update={
@@ -110,7 +110,7 @@ def test_v1_a_timed_out_evaluator_is_never_a_pass(evidence: Audit) -> None:
 
 
 def test_v_checks_without_a_verifier_record_are_unmeasured(evidence: Audit) -> None:
-    evidence._ledgers = {**evidence._ledgers, STEP: None}
+    evidence.ledgers = {**evidence.ledgers, STEP: None}
     assert {
         check(evidence).status for check in (checks.check_v1, checks.check_v2, checks.check_v3)
     } == {"unmeasured"}

@@ -19,6 +19,7 @@ from raidar.grading.records import VERIFIER_RECORD_DIR, StepRecord, step_record_
 from raidar.scoring.framework.context import AssessContext, StepInputs
 from raidar.scoring.framework.rescore import (
     RescoreError,
+    RescoreOptions,
     RescoreOutcome,
     _loaded_trials,
     assess_trials,
@@ -251,7 +252,11 @@ def test_a_job_assesses_every_trial_with_each_scorer_under_its_own_config(
     config = {V1: {"threshold": 3}}
 
     records = assess_trials(
-        store, registrations, trials.items(), config=config, identity_for=fixed_identity
+        store,
+        registrations,
+        trials.items(),
+        identity_for=fixed_identity,
+        options=RescoreOptions(config=config),
     )
 
     assert [(r.trial, r.scorer) for r in records] == [
@@ -277,7 +282,9 @@ def test_a_rescore_request_that_cannot_run_is_refused_before_any_trial_is_read(
     with pytest.raises(RescoreError, match="at least one scorer"):
         rescore_path(tmp_path, [], store, fake_registry())
     with pytest.raises(RescoreError, match="not being run"):
-        rescore_path(tmp_path, [V1], store, fake_registry(), config={V2: {}})
+        rescore_path(
+            tmp_path, [V1], store, fake_registry(), options=RescoreOptions(config={V2: {}})
+        )
     with pytest.raises(RescoreError, match="no .* records"):
         rescore_path(tmp_path, [V1], store, fake_registry())
 

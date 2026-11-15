@@ -335,8 +335,10 @@ class PhaseMonitor:
         verdict.decision = "kill_failed" if report.error or report.residual else "idle_killed"
 
     async def _reap(self) -> ReapReport:
-        """Kill the agent uid; a cancel (the phase ended, perhaps because of the kill) never
-        abandons the kill's report, so the decision is always recorded."""
+        """Kill the agent uid and always record the decision.
+
+        A cancel (the phase ended, perhaps because of the kill) never abandons the kill's report.
+        """
         reaping = asyncio.ensure_future(
             reap_agent_processes(self._host.environment, self._host.user)
         )

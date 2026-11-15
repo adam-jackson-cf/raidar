@@ -1,4 +1,4 @@
-"""``test-coverage``: per criterion, do the builder's final mapped tests exercise it?
+"""``test-coverage``: per criterion, whether the builder's final mapped tests exercise it.
 
 Stage B of FXL's process audit over a checkpoint's own records: the sealed definition's
 criteria (regression ones included), the build's final ``ac_tests`` map and the final test

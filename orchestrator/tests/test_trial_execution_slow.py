@@ -36,12 +36,13 @@ from raidar.engine.target.health import TargetUnavailableError
 from raidar.engine.target.job import JobTarget
 from raidar.engine.trial.collect import (
     TrialEvidence,
+    ValidityTerms,
     classify_evidence,
     classify_trial,
     execution_validity,
     harness_installs,
 )
-from raidar.engine.trial.config import harbor_trial_config
+from raidar.engine.trial.config import TrialSite, harbor_trial_config
 from raidar.engine.trial.context import JobContext
 from raidar.engine.trial.driver import TrialRun
 from raidar.engine.trial.environment import RUN_SCOPED_DOCKER_IMPORT_PATH, run_scope
@@ -122,9 +123,11 @@ def test_the_verifier_runs_the_coverage_pass_unless_the_protocol_defers_it(
         plan,
         plan.selected_trials()[0],
         tmp_path / "task",
-        trials_dir=tmp_path / "trials",
-        bundle_root=tmp_path / "bundle",
-        docker_context="orbstack",
+        site=TrialSite(
+            trials_dir=tmp_path / "trials",
+            bundle_root=tmp_path / "bundle",
+            docker_context="orbstack",
+        ),
     )
 
     assert config.verifier.kwargs["coverage"] is coverage
@@ -493,9 +496,9 @@ def test_materialising_refuses_drift_reuse_and_a_compose_mismatch(
         materialise_task(
             source,
             tmp_path / "b",
+            arm=(plan.loaded, trial.arm, trial.hashes.arm),
             steps=("checkpoint_9",),
             rule=plan.rule,
-            arm=(plan.loaded, trial.arm, trial.hashes.arm),
         )
     init_loaded, _, _ = locked_experiment(tmp_path / "init", fixture_problem.ref)
     with pytest.raises(MaterialiseError, match="compose init"):
@@ -514,9 +517,9 @@ def test_materialised_tasks_enforce_network_without_rewriting_the_pinned_source(
     materialised = materialise_task(
         source,
         tmp_path / "task",
+        arm=(plan.loaded, trial.arm, trial.hashes.arm),
         steps=trial.steps,
         rule=plan.rule,
-        arm=(plan.loaded, trial.arm, trial.hashes.arm),
     )
 
     task = tomllib.loads((materialised.path / "task.toml").read_text())
@@ -548,7 +551,7 @@ def test_run_command_runs_the_selection_into_the_runs_dir(
         seen_names.append(name)
         return JobTarget(SELECTION, None, TargetGuard.for_target(SELECTION.trial, reap=_no_reap))
 
-    monkeypatch.setattr("raidar.engine.job.run.execute", fake_execute)
+    monkeypatch.setattr("raidar.cli.execution.execute", fake_execute)
     monkeypatch.setattr("raidar.cli.execution.job_target", fake_job_target)
     runner = CliRunner()
     arguments = ["run", str(loaded.path), "--arm", "baseline", "--attempt", "1", "--target", "t"]
@@ -605,7 +608,7 @@ def test_the_trial_directory_reader_yields_the_evidence_classification_decides_o
     assert idle_killed_steps(trial_dir) == {"checkpoint_1"}
     assert harness_installs(trial_dir) == ["0.157.0"]
     rule = progression_rule(ProtocolSpec())
-    checks = execution_validity(trial_dir, read, "0.156.1", rule).checks
+    checks = execution_validity(trial_dir, read, ValidityTerms("0.156.1", rule)).checks
     assert not next(c for c in checks if c.name == "agent_version").passed
     never_started = tmp_path / "never-started"
     never_started.mkdir()

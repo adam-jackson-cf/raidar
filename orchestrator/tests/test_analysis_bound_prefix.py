@@ -17,7 +17,7 @@ from raidar.contract.trial import CheckpointState, StepResult, TrialRecord
 from raidar.design.experiment.lock import seal_lock
 from raidar.engine.job.assessment import lock_rescore_config
 from raidar.scoring.catalog.builtin import default_scorer_registry
-from raidar.scoring.framework.rescore import rescore_path
+from raidar.scoring.framework.rescore import RescoreOptions, rescore_path
 from raidar.scoring.framework.result import AssessStatus
 from raidar.scoring.framework.store import AssessmentStore
 from tests.analysis_support import analysis_lock as _lock
@@ -132,7 +132,7 @@ def _assess_and_analyze(
         ("correctness@10",),
         AssessmentStore(store),
         default_scorer_registry(),
-        config=lock_rescore_config(lock).scorers,
+        options=RescoreOptions(config=lock_rescore_config(lock).scorers),
     )
     for record in records:
         assessment = AssessmentStore(store).get(record.key)

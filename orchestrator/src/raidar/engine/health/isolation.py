@@ -144,8 +144,10 @@ class _PreTurn:
 
 
 def _broken_components(workflow: Any, read: _ReadBytes) -> list[tuple[PurePosixPath, str]]:
-    """The recorded components whose record is missing or does not hold its digest, or whose
-    path leaves the workspace."""
+    """The recorded components whose record is missing, lacks its digest or leaves the workspace.
+
+    A component leaves the workspace when its path resolves outside it.
+    """
     entries = workflow.get("components") if isinstance(workflow, dict) else None
     paths = [
         (PurePosixPath(entry["path"]), entry)
@@ -280,43 +282,46 @@ def _record_messages(audit: Any, messages: dict[str, list[dict[str, str]]]) -> N
             group.append(message)
 
 
+@dataclass
+class _Findings:
+    """P8's findings across a trial's steps, folded in one step at a time."""
+
+    checked: int = 0
+    violations: dict[str, str] = field(default_factory=dict)
+    unmeasured: list[str] = field(default_factory=list)
+    messages: dict[str, list[dict[str, str]]] = field(default_factory=dict)
+
+
 def _step_findings(
     step: str,
     workflow: Any,
     read: _ReadBytes,
     before: _ReadWorkspace | None,
-    violations: dict[str, str],
-    unmeasured: list[str],
-    messages: dict[str, list[dict[str, str]]],
-) -> int:
-    """Fold one step's workflow record into the findings; return its checked native records."""
+    found: _Findings,
+) -> None:
+    """Fold one step's workflow record and its checked native records into ``found``."""
     turns = workflow.get("turns") if isinstance(workflow, dict) else None
     if not isinstance(turns, list) or not turns:
-        unmeasured.append(f"{step}: no readable {WORKFLOW_FILE}")
-        return 0
+        found.unmeasured.append(f"{step}: no readable {WORKFLOW_FILE}")
+        return
     placed = _placed_lines(workflow, read)
+    violations = found.violations
     for path, why in _broken_components(workflow, read):
         violations.setdefault(f"component {path}: {why}", f"component {path}: {why} ({step})")
-    checked = 0
     for index, turn in enumerate(turns):
         label = f"{step}/{turn.get('stage')}/{turn.get('turn')}"
         pre = _PreTurn(placed, before, resumed=index > 0)
         records, bad, missing = _turn_findings(turn, pre, read)
-        checked += records
+        found.checked += records
         for finding in bad:
             violations.setdefault(finding, f"{finding} ({label})")
-        unmeasured += [f"{label}: {reason}" for reason in missing]
-        _record_messages(turn.get("session_audit"), messages)
-    return checked
+        found.unmeasured += [f"{label}: {reason}" for reason in missing]
+        _record_messages(turn.get("session_audit"), found.messages)
 
 
-def _verdict(
-    checked: int,
-    violations: dict[str, str],
-    unmeasured: list[str],
-    messages: dict[str, list[dict[str, str]]],
-) -> HealthCheck:
-    unmeasured = list(dict.fromkeys(unmeasured))
+def _verdict(findings: _Findings) -> HealthCheck:
+    checked, violations, messages = findings.checked, findings.violations, findings.messages
+    unmeasured = list(dict.fromkeys(findings.unmeasured))
     if violations:
         found = list(violations.values())
         more = f"; and {len(found) - _SHOWN} more" if len(found) > _SHOWN else ""
@@ -340,20 +345,15 @@ def check_p8(a: Audit) -> HealthCheck:
         return make_check(
             "P8", UNMEASURED, f"agent override {a.record.agent_override!r} runs no native session"
         )
-    violations: dict[str, str] = {}
-    unmeasured: list[str] = []
-    messages: dict[str, list[dict[str, str]]] = {}
-    checked = 0
+    found = _Findings()
     for attempted in a.attempted:
         agent = a.trial_dir / "steps" / attempted.step / "agent"
         snapshot = _before_snapshot(a, attempted.step)
-        checked += _step_findings(
+        _step_findings(
             attempted.step,
             _json(agent / WORKFLOW_FILE),
             _agent_reader(agent),
             None if snapshot is None else _snapshot_reader(snapshot),
-            violations,
-            unmeasured,
-            messages,
+            found,
         )
-    return _verdict(checked, violations, unmeasured, messages)
+    return _verdict(found)

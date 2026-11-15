@@ -21,7 +21,7 @@ from raidar.scoring.code_quality.lineage_models import (
     SymbolIdentity,
 )
 from raidar.scoring.code_quality.parity import parity_source
-from raidar.scoring.code_quality.quality import produce_production_quality
+from raidar.scoring.code_quality.quality import MeasuredRows, produce_production_quality
 from raidar.scoring.code_quality.regression import (
     PARITY_UNAVAILABLE,
     calculate_regression_breadth,
@@ -62,8 +62,7 @@ def _measured_pair(tmp_path: Path) -> Any:
             step.step,
             snapshot,
             ({"path": "app.py", "role": "production"},),
-            rows["files"],
-            rows["symbols"],
+            MeasuredRows(rows["files"], rows["symbols"]),
             tools,
         )
         outcome = Measured(

@@ -13,7 +13,7 @@ import traceback
 from raidar.contract.job_layout import TASKS_DIR
 from raidar.contract.trial import PlannedTrial, TrialRecord
 from raidar.engine.trial.agent_config import reported_harness_pin
-from raidar.engine.trial.config import harbor_trial_config
+from raidar.engine.trial.config import TrialSite, harbor_trial_config
 from raidar.engine.trial.context import JobContext
 from raidar.engine.trial.finish import finish_trial
 from raidar.engine.trial.materialise import (
@@ -21,9 +21,11 @@ from raidar.engine.trial.materialise import (
     environment_cold,
     environment_image_id,
     materialise_task,
+    with_solutions,
 )
 from raidar.engine.trial.provision import TrialProvision
 from raidar.engine.trial.record import (
+    RecordScope,
     RunnerFailure,
     TrialEvidence,
     build_record,
@@ -37,14 +39,16 @@ RUNNER_ERROR_FILE = "raidar-runner-error.txt"
 def _materialise(ctx: JobContext, trial: PlannedTrial) -> MaterialisedTask:
     problem = ctx.problems[trial.problem_index]
     override = ctx.plan.options.agent_override
-    return materialise_task(
+    task = materialise_task(
         problem.task_dir,
         ctx.job_dir / TASKS_DIR / trial.trial_id,
         steps=trial.steps,
         rule=ctx.plan.rule,
         arm=(ctx.plan.loaded, trial.arm, trial.hashes.arm),
-        references={s: problem.reference(s) for s in trial.steps} if override == "oracle" else None,
     )
+    if override != "oracle":
+        return task
+    return with_solutions(task, trial.steps, {s: problem.reference(s) for s in trial.steps})
 
 
 def _planned_steps(ctx: JobContext, trial: PlannedTrial) -> tuple[tuple[str, str], ...]:
@@ -81,9 +85,7 @@ async def _run_and_classify(ctx: JobContext, trial: PlannedTrial) -> TrialRecord
         plan,
         trial,
         task.path,
-        trials_dir=ctx.trials_dir,
-        bundle_root=problem.bundle.root,
-        docker_context=ctx.docker_context,
+        site=TrialSite(ctx.trials_dir, problem.bundle.root, ctx.docker_context),
     )
     provisions = _provisions(ctx, trial)
     outcome = await ctx.runner(config, problem.bundle.root, provisions)
@@ -106,6 +108,13 @@ async def _run_and_classify(ctx: JobContext, trial: PlannedTrial) -> TrialRecord
     )
     return build_record(
         evidence,
+        _record_scope(ctx),
+    )
+
+
+def _record_scope(ctx: JobContext) -> RecordScope:
+    plan = ctx.plan
+    return RecordScope(
         experiment=plan.experiment_id,
         job_id=ctx.job_id,
         job_dir=ctx.job_dir,
@@ -122,15 +131,9 @@ def _failure_record(ctx: JobContext, trial: PlannedTrial, error: Exception) -> T
     (trial_dir / RUNNER_ERROR_FILE).write_text(
         "".join(traceback.format_exception(type(error), error, error.__traceback__))
     )
-    plan = ctx.plan
     return runner_failure_record(
         RunnerFailure(trial, _planned_steps(ctx, trial), trial_dir, error),
-        experiment=plan.experiment_id,
-        job_id=ctx.job_id,
-        job_dir=ctx.job_dir,
-        rule=plan.rule,
-        max_checkpoints=plan.options.max_checkpoints,
-        agent_override=plan.options.agent_override,
+        _record_scope(ctx),
     )
 
 

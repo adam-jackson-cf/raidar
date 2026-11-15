@@ -20,7 +20,7 @@ from raidar.scoring.catalog.builtin import default_scorer_registry
 from raidar.scoring.code_quality import CodeQualityScorer
 from raidar.scoring.framework.builtin_manifests import CODE_QUALITY
 from raidar.scoring.framework.context import AssessContext
-from raidar.scoring.framework.rescore import RescoreOutcome, assess
+from raidar.scoring.framework.rescore import AssessOptions, RescoreOutcome, assess
 from raidar.scoring.framework.result import AssessResult, AssessStatus, Observation
 from raidar.scoring.framework.store import AssessmentStore
 from raidar.scoring.framework.validation import validate_result
@@ -105,7 +105,9 @@ def test_every_checkpoint_and_transition_carries_the_fork_values_and_traceable_e
         ("regression", "regression_attribution"),
     } <= kinds
     assert all(item.locations() for item in result.evidence)
-    replayed = assess(store, registration, _context(trial), trial="trial", replay=True)
+    replayed = assess(
+        store, registration, _context(trial), trial="trial", options=AssessOptions(replay=True)
+    )
     assert replayed.outcome is RescoreOutcome.REPLAYED_IDENTICAL
 
 

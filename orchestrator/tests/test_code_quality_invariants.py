@@ -326,6 +326,6 @@ def test_problem_arithmetic_refuses_incomplete_or_out_of_range_components(
 ) -> None:
     series = [tuple(Decimal(value) for value in column) for column in values]
     with pytest.raises(ValueError, match=message):
-        arithmetic.calculate_problem_score("p", correctness, *series)
+        arithmetic.calculate_problem_score("p", correctness, arithmetic.ComponentSeries(*series))
     with pytest.raises(ValueError, match="empty"):
         arithmetic.mean(())

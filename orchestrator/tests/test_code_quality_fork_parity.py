@@ -168,7 +168,9 @@ def test_problem_arithmetic_through_the_canonical_policy_equals_the_fork_scores(
         score = arithmetic.calculate_problem_score(
             case["name"],
             _correctness(case["checkpoint_correctness"]),
-            *(tuple(Decimal(value) for value in case[name]) for name in names),
+            arithmetic.ComponentSeries(
+                *(tuple(Decimal(value) for value in case[name]) for name in names)
+            ),
         )
         assert score.model_dump(mode="json") == case["result"], case["name"]
         assert str(score.score) == case["score"]

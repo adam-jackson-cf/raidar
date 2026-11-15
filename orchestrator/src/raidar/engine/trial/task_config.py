@@ -15,9 +15,11 @@ from raidar.engine.trial.network import restrict_trial_network
 def configure_trial_task(
     task_dir: Path, steps: tuple[str, ...], rule: ProgressionRule, *, runtime: str, provider: str
 ) -> None:
-    """Select checkpoints, pin progression, bound the task's native egress and give every
-    step the lab's current ``/app`` artifact (its exclude list grows without re-importing a
-    problem, e.g. when a workflow's own state was added to it)."""
+    """Select checkpoints, pin progression, bound native egress and share the ``/app`` artifact.
+
+    Every step gets the lab's current ``/app`` artifact (its exclude list grows without
+    re-importing a problem, e.g. when a workflow's own state was added to it).
+    """
     path = task_dir / "task.toml"
     config = TaskConfig.model_validate_toml(path.read_text())
     by_name = {step.name: step for step in config.steps or []}

@@ -80,7 +80,6 @@ from pathlib import Path, PurePosixPath
 from typing import Any
 
 from pydantic import ValidationError
-from raidar_contract.workflow import PACKAGE_SCHEMA, PackageWorkflowDefinition
 
 from raidar.contract.file_io import load_bytes, load_text
 from raidar.contract.harbor_result import RESULT_FILE
@@ -88,6 +87,7 @@ from raidar.engine.health.base import make_check
 from raidar.engine.health.isolation import _agent_reader, _source_findings
 from raidar.engine.health.judge import JudgeStep, _call_evidence, _closure, _undecided
 from raidar.engine.health.model import PASS, UNMEASURED, VIOLATION, HealthCheck
+from raidar_contract.workflow import PACKAGE_SCHEMA, PackageWorkflowDefinition
 
 CONFIG_FILE = "config.json"
 WORKFLOW_RECORD = "workflow/workflow.json"
@@ -133,8 +133,11 @@ _SHOWN = 3
 
 @dataclass(frozen=True)
 class Declared:
-    """What one locked package's manifest declares: the lab's authoritative account of which
-    setup, stop and output records the package owes (recorded in the trial configuration)."""
+    """What one locked package's manifest declares.
+
+    This is the lab's authoritative account of which setup, stop and output records the package
+    owes (recorded in the trial configuration).
+    """
 
     leaf: str
     release: str
@@ -217,7 +220,8 @@ class Row:
 
     A row applies when any of its ``primitives`` is locked; its reader reads only the locked ones.
     A row with no ``primitives`` is owed by every workflow. A ``reading`` row reports a gap as
-    ``unmeasured`` and never as a violation."""
+    ``unmeasured`` and never as a violation.
+    """
 
     id: str
     primitives: tuple[str, ...]
@@ -392,7 +396,8 @@ def _call_gap(call: Any, package: str, primitive: str) -> str | None:
     """Why ``call`` is not the host's ``call/1`` record of ``package``'s ``primitive``.
 
     ``package`` is the qualified release name the call record carries (``raidar/define``), never
-    the leaf the primitive records are keyed by."""
+    the leaf the primitive records are keyed by.
+    """
     if not isinstance(call, dict) or call.get("schema") != CALL_SCHEMA:
         return f"{package}: no {primitive} call record"
     if call.get("package") != package or call.get("primitive") != primitive:
@@ -405,9 +410,11 @@ def _call_gap(call: Any, package: str, primitive: str) -> str | None:
 def _owed(
     step: Step, primitive: str, owes: Callable[[Declared], bool]
 ) -> list[tuple[Declared, dict[str, Any]]] | str:
-    """The records of every locked package whose manifest declares ``primitive``, or why one is
-    absent or malformed. A package that declares it is owed its record; one the lock does not
-    list, or that does not declare it, owes none and leaves none."""
+    """The records of every locked package whose manifest declares ``primitive``.
+
+    Otherwise, why one is absent or malformed. A package that declares it is owed its record; one
+    the lock does not list, or that does not declare it, owes none and leaves none.
+    """
     record = step.record(primitive)
     if record is None:
         return f"no {primitive} record"
@@ -461,8 +468,10 @@ def _decision_gap(package: str, number: int, decision: Any) -> str | None:
 
 
 def _canary_gap(package: Declared, runs: list[Any]) -> str | None:
-    """Each canary run's expected output digests name exactly the manifest's declared outputs
-    (the stage-check record the runner held the package to)."""
+    """Each canary run's expected output digests name exactly the manifest's declared outputs.
+
+    The canary runs are the stage-check record the runner held the package to.
+    """
     if not runs:
         return f"{package.release}: no stop canary runs"
     for run in runs:
@@ -628,9 +637,12 @@ def _producer_closed(step: Step, judge: Mapping[str, Any]) -> bool:
 
 
 def _judge_excused(step: Step, judge: Mapping[str, Any]) -> bool:
-    """A cut checkpoint (the host-owned ``endings`` marker), or a closed define with no
-    criteria, owes no judge pass. A producer that claimed ``done`` is never excused: absent,
-    invalid or drifted criteria are a violation (the runner records an integrity error)."""
+    """A cut checkpoint or a closed define with no criteria owes no judge pass.
+
+    A cut checkpoint carries the host-owned ``endings`` marker. A producer that claimed ``done``
+    is never excused: absent, invalid or drifted criteria are a violation (the runner records an
+    integrity error).
+    """
     if step.cut:
         return True
     closed = judge.get("ending") == NO_CRITERIA and judge.get("criteria_sha256") is None
@@ -741,8 +753,11 @@ def _validity_findings(source: Mapping[str, Any]) -> list[str]:
 
 
 def _gap_integrity(step: Step) -> str | None:
-    """Any integrity finding the lab recorded (a rewritten session log or watched state) is a
-    violation; findings about the agent-writable hook log are readings and do not count."""
+    """Any integrity finding the lab recorded is a violation.
+
+    Such a finding is a rewritten session log or watched state; findings about the agent-writable
+    hook log are readings and do not count.
+    """
     found = [n for source in _integrity_sources(step) for n in _validity_findings(source)]
     return f"integrity finding(s): {', '.join(dict.fromkeys(found))}" if found else None
 
@@ -813,7 +828,8 @@ def _schema_two(definition: Any, kwargs: Mapping[str, Any]) -> Expected:
     under its leaf name that names that release. A definition the contract rejects, a package
     workflow whose kwargs omit its locked packages or runner identities, a locked contract id this
     table does not know (an unknown primitive version), or a definition whose reply or judge and
-    whose locked reply and judge primitives disagree has unknown applicability."""
+    whose locked reply and judge primitives disagree has unknown applicability.
+    """
     try:
         parsed = PackageWorkflowDefinition.model_validate(definition)
     except ValidationError:
@@ -829,8 +845,10 @@ def _schema_two(definition: Any, kwargs: Mapping[str, Any]) -> Expected:
 def _read_lock(
     parsed: PackageWorkflowDefinition, kwargs: Mapping[str, Any]
 ) -> tuple[frozenset[str], tuple[tuple[str, str], ...], tuple[Declared, ...]] | str:
-    """The locked primitives, packages and declarations of a package arm, or why the lab's
-    configuration cannot say what the trial owed."""
+    """The locked primitives, packages and declarations of a package arm.
+
+    Otherwise, why the lab's configuration cannot say what the trial owed.
+    """
     primitives = kwargs.get("primitives")
     locked = frozenset(primitives) if isinstance(primitives, dict) else frozenset()
     if locked - KNOWN_PRIMITIVES:
@@ -864,9 +882,12 @@ def _declaration(leaf: str, release: str, entry: Any) -> Declared | None:
 
 
 def _declarations(locked: Any, uses: tuple[tuple[str, str], ...]) -> tuple[Declared, ...] | None:
-    """Each listed package's declared setup, stop and outputs, as the lab wrote them to the trial
-    configuration (``locked_packages[release]["declared"]``) from the very package tree the lock's
-    ``stage-tree/1`` digest guards. ``None`` if any is missing or malformed: never inferred."""
+    """Each listed package's declared setup, stop and outputs.
+
+    The lab wrote them to the trial configuration (``locked_packages[release]["declared"]``) from
+    the very package tree the lock's ``stage-tree/1`` digest guards. ``None`` if any is missing or
+    malformed: never inferred.
+    """
     found = []
     for leaf, release in uses:
         entry = locked.get(release) if isinstance(locked, dict) else None

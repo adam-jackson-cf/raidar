@@ -29,7 +29,11 @@ from raidar.scoring.code_quality.measurement import (
     ProcessResult,
     ToolEnvironment,
 )
-from raidar.scoring.code_quality.quality import ProductionQualityError, produce_production_quality
+from raidar.scoring.code_quality.quality import (
+    MeasuredRows,
+    ProductionQualityError,
+    produce_production_quality,
+)
 from raidar.scoring.code_quality.snapshot_tool import cli
 from raidar.scoring.code_quality.snapshot_tool.evaluator import (
     EvaluatorInputError,
@@ -218,8 +222,7 @@ def _produce(shop: dict[str, Any], tools: ToolEnvironment | None = None, **overr
         inputs.get("checkpoint", "checkpoint_1"),
         inputs["snapshot"],
         inputs["inventory"],
-        inputs["files"],
-        inputs["symbols"],
+        MeasuredRows(inputs["files"], inputs["symbols"]),
         tools or in_memory_tools(),
     )
 

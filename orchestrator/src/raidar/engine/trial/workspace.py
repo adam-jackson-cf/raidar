@@ -229,8 +229,11 @@ def seeded_digest(agent_dir: Path) -> str | None:
 
 
 def seed_duration(trial_dir: Path, steps: Sequence[str]) -> float | None:
-    """The seed's install duration (the ``workspace_seed`` perf phase), from the first step's
-    provision record that has one; every step's record repeats the same install."""
+    """The seed's install duration (the ``workspace_seed`` perf phase).
+
+    It comes from the first step's provision record that has one; every step's record repeats
+    the same install.
+    """
     for step in steps:
         record = read_provision_record(trial_dir / "steps" / step / "agent", SEED_SLUG)
         duration = ((record or {}).get("install") or {}).get("duration_s")

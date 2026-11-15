@@ -98,7 +98,8 @@ def run_scope(trials_dir: Path) -> str:
 
 def trial_project_name(trial_id: str, trials_dir: Path) -> str:
     """The Compose project Harbor names for a trial run under ``trials_dir``."""
-    return _sanitize_docker_compose_project_name(f"{trial_id}__env-{run_scope(trials_dir)}")
+    project: str = _sanitize_docker_compose_project_name(f"{trial_id}__env-{run_scope(trials_dir)}")
+    return project
 
 
 def _engine_cp(rest: Sequence[str], container: str) -> list[str] | None:
@@ -186,7 +187,8 @@ class RunScopedDockerEnvironment(DockerEnvironment):
         self._cleanup_mounts_compose_file()
         self._mounts_compose_temp_dir = tempfile.TemporaryDirectory()
         path = Path(self._mounts_compose_temp_dir.name) / "docker-compose-mounts.json"
-        return write_mounts_compose_file(path, [])
+        written: Path = write_mounts_compose_file(path, [])
+        return written
 
     def add_post_start_hook(self, hook: PostStartHook) -> None:
         """Run ``hook`` once the container has started, inside ``start`` (module doc)."""

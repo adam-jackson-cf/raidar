@@ -1,4 +1,4 @@
-"""``definition-coverage``: per required unit, do the criteria citing it capture what it requires?
+"""``definition-coverage``: per required unit, whether the criteria citing it capture it.
 
 Stage A of FXL's process audit over a checkpoint's own define-stage records: the numbered issue
 units (``units.json``, the required ones) and the sealed ``feature-definition.md``. A criterion

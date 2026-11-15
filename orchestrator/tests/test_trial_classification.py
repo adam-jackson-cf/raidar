@@ -28,6 +28,7 @@ from raidar.engine.trial.collect import (
     installed_versions,
     read_evidence,
     trial_exception,
+    ValidityTerms,
     validity_from_evidence,
 )
 from raidar.engine.trial.progression import derive_reached, gate_passes, progression_rule
@@ -72,9 +73,8 @@ def _valid(
     runnable: int | None = None,
     installs: tuple[str, ...] = (),
 ) -> bool:
-    return validity_from_evidence(
-        gathered.result, installs, step_results, "0.156.1", rule, runnable=runnable
-    ).passed
+    terms = ValidityTerms("0.156.1", rule, runnable)
+    return validity_from_evidence(gathered.result, installs, step_results, terms).passed
 
 
 def _states(step_results: tuple[StepResult, ...]) -> list[str]:
@@ -184,7 +184,7 @@ def test_trial_level_failures_fail_the_validity_gate() -> None:
         checks = {
             c.name: c
             for c in validity_from_evidence(
-                gathered.result, (), step_results, "0.156.1", rule
+                gathered.result, (), step_results, ValidityTerms("0.156.1", rule)
             ).checks
         }
         assert not checks["trial_completed"].passed
@@ -195,7 +195,9 @@ def test_trial_level_failures_fail_the_validity_gate() -> None:
 
 def test_a_trial_that_started_no_step_is_not_completed() -> None:
     gathered = trial_evidence([])
-    checks = validity_from_evidence(gathered.result, (), (), "0.156.1", CONTINUE).checks
+    checks = validity_from_evidence(
+        gathered.result, (), (), ValidityTerms("0.156.1", CONTINUE)
+    ).checks
     completed = next(c for c in checks if c.name == "trial_completed")
     assert not completed.passed
     assert completed.detail == "no step started"
@@ -449,7 +451,7 @@ def test_the_reader_gathers_evidence_for_started_and_unstarted_steps(tmp_path: P
     assert harness_installs(tmp_path) == []
     (tmp_path / "trial.log").write_text("Running command: npm install -g @openai/codex@9.0; fi\n")
     for pinned in ("0.156.1", None):
-        validity = execution_validity(tmp_path, classified, pinned, CONTINUE)
+        validity = execution_validity(tmp_path, classified, ValidityTerms(pinned, CONTINUE))
         version = next(c for c in validity.checks if c.name == "agent_version")
         assert version.passed is (pinned is None)
     assert read_evidence(tmp_path, replace(ctx, planned_steps=())).seed_parent is None

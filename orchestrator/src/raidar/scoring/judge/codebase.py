@@ -164,8 +164,12 @@ class _Collector(ast.NodeVisitor):
         self.functions.append(FunctionInfo(self.path, qualname, ast.unparse(node.args)))
         self._nested(node.name, node)
 
-    visit_FunctionDef = _function
-    visit_AsyncFunctionDef = _function
+    def visit(self, node: ast.AST) -> None:
+        """Record function definitions here; dispatch every other node as ``NodeVisitor`` does."""
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            self._function(node)
+        else:
+            super().visit(node)
 
     def _nested(self, name: str, node: ast.AST) -> None:
         self._scope.append(name)

@@ -32,7 +32,7 @@ from raidar.grading.models import CaseStatus
 from raidar.scoring.catalog.builtin import default_scorer_registry
 from raidar.scoring.catalog.outcomes import SOLVE_RATE_ERRATA
 from raidar.scoring.framework.metrics import MetricResolver
-from raidar.scoring.framework.rescore import rescore_path
+from raidar.scoring.framework.rescore import RescoreOptions, rescore_path
 from raidar.scoring.framework.store import AssessmentStore
 from tests.analysis_support import (
     RECORD_STEPS as STEPS,
@@ -143,7 +143,7 @@ def pilot(tmp_path: Path) -> tuple[Path, Path, Path]:
         ("correctness@10", "resource-usage@8"),
         AssessmentStore(store),
         default_scorer_registry(),
-        config=LOCKED_SETTINGS.scorers,
+        options=RescoreOptions(config=LOCKED_SETTINGS.scorers),
     )
     return job_dir, store, lock_path
 
@@ -389,7 +389,7 @@ def test_verification_effort_and_its_default_gate_check_reach_the_report(tmp_pat
         tuple(scorers),
         AssessmentStore(store),
         default_scorer_registry(),
-        config=lock_rescore_config(lock).scorers,
+        options=RescoreOptions(config=lock_rescore_config(lock).scorers),
     )
 
     output = tmp_path / "analysis"

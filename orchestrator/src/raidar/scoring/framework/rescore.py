@@ -151,19 +151,38 @@ def _outcome(put: PutOutcome, *, replay: bool) -> RescoreOutcome:
     return RescoreOutcome.REPLAYED_IDENTICAL if replay else RescoreOutcome.EXISTING
 
 
+@dataclass(frozen=True)
+class AssessOptions:
+    """Whether to replay-verify a stored Assessment, and a scorer identity hashed in advance.
+
+    ``identity`` lets a caller assessing many trials hash the implementation once.
+    """
+
+    replay: bool = False
+    identity: ScorerIdentity | None = None
+
+
+@dataclass(frozen=True)
+class RescoreOptions:
+    """Each scorer's config, whether to replay, and how trial inputs are loaded."""
+
+    config: Mapping[str, Mapping[str, Any]] | None = None
+    replay: bool = False
+    inventory_policy: InventoryPolicy | None = None
+    bundle_override: Path | None = None
+
+
 def assess(
     store: AssessmentStore,
     registration: ScorerRegistration,
     ctx: AssessContext,
     *,
     trial: str,
-    replay: bool = False,
-    identity: ScorerIdentity | None = None,
+    options: AssessOptions | None = None,
 ) -> AssessmentRecord:
-    """Store (or reuse, or replay-verify) one scorer's Assessment of one trial.
-
-    ``identity`` lets a caller assessing many trials hash the implementation once.
-    """
+    """Store (or reuse, or replay-verify) one scorer's Assessment of one trial."""
+    options = options or AssessOptions()
+    replay, identity = options.replay, options.identity
     parts = store_key(registration, ctx.config, context_inputs(ctx), identity=identity)
     identity, key = parts.identity, parts.key
     stored = None if replay else store.get(key)
@@ -210,16 +229,18 @@ def assess_trials(
     registrations: Sequence[ScorerRegistration],
     trials: Iterable[tuple[str, AssessContext]],
     *,
-    config: Mapping[str, Mapping[str, Any]] | None = None,
-    replay: bool = False,
+    options: RescoreOptions | None = None,
     identity_for: Callable[[ScorerRegistration], ScorerIdentity] = scorer_identity,
 ) -> list[AssessmentRecord]:
     """Assess each loaded trial with every scorer, each under its own scorer config.
 
     ``trials`` is consumed lazily: a trial is assessed before the next one is loaded. A scorer's
     identity (it hashes the implementation source) is derived once, when the first trial reaches
-    it, so a run that fails to load its first trial never pays for it.
+    it, so a run that fails to load its first trial never pays for it. Only ``options.config``
+    and ``options.replay`` apply here; the trials are already loaded.
     """
+    options = options or RescoreOptions()
+    config, replay = options.config, options.replay
     identities: dict[str, ScorerIdentity] = {}
     records: list[AssessmentRecord] = []
     for trial_id, loaded in trials:
@@ -234,8 +255,7 @@ def assess_trials(
                     registration,
                     ctx,
                     trial=trial_id,
-                    replay=replay,
-                    identity=identities[ref],
+                    options=AssessOptions(replay=replay, identity=identities[ref]),
                 )
             )
     return records
@@ -261,13 +281,11 @@ def rescore_path(
     store: AssessmentStore,
     registry: ScorerRegistry,
     *,
-    config: Mapping[str, Mapping[str, Any]] | None = None,
-    inventory_policy: InventoryPolicy | None = None,
-    bundle_override: Path | None = None,
-    replay: bool = False,
+    options: RescoreOptions | None = None,
 ) -> list[AssessmentRecord]:
     """Assess every trial under ``target`` (a trial or job dir) with each scorer."""
-    registrations = _registrations(scorer_refs, registry, config or {})
+    options = options or RescoreOptions()
+    registrations = _registrations(scorer_refs, registry, options.config or {})
     try:
         trials = trial_dirs(target)
     except RegradeError as exc:
@@ -277,12 +295,12 @@ def rescore_path(
         trials,
         lambda trial_dir: load_trial_context(
             trial_dir,
-            inventory_policy=inventory_policy,
-            bundle_override=bundle_override,
+            inventory_policy=options.inventory_policy,
+            bundle_override=options.bundle_override,
             bundle_cache=bundles,
         ),
     )
-    return assess_trials(store, registrations, loaded, config=config, replay=replay)
+    return assess_trials(store, registrations, loaded, options=options)
 
 
 def report_payload(records: Sequence[AssessmentRecord]) -> dict[str, object]:

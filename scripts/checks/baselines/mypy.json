@@ -291,24 +291,6 @@
       "count": 1
     },
     {
-      "path": "orchestrator/src/raidar/engine/trial/environment.py",
-      "code": "no-any-return",
-      "fingerprint": "6a61ab7193ef6e8ff327ae9278bd7c8cc590aed7dedb3253fd2088f7fb380d5d",
-      "count": 1
-    },
-    {
-      "path": "orchestrator/src/raidar/engine/trial/environment.py",
-      "code": "no-any-return",
-      "fingerprint": "7d8e6932e35607176f3d604f118465082345baa0d5a4ad5d85a81b25631fdaa4",
-      "count": 1
-    },
-    {
-      "path": "orchestrator/src/raidar/engine/trial/provision.py",
-      "code": "no-any-return",
-      "fingerprint": "5e46badce0952a9514f85b903a75bb5635afaf6b4d501c8636543e0f2ba4c43e",
-      "count": 1
-    },
-    {
       "path": "orchestrator/src/raidar/engine/trial/record.py",
       "code": "no-any-return",
       "fingerprint": "6870dc0f072303e0d80d0ace49e85628c7009be4185a6ef6623f6ef0be7d5419",
@@ -576,18 +558,6 @@
       "path": "orchestrator/src/raidar/scoring/judge/policies.py",
       "code": "no-any-return",
       "fingerprint": "ab4b79f5a048fbaf1e55d22ed4ff6f9862ee910f8e0ebdb60530722262c06472",
-      "count": 1
-    },
-    {
-      "path": "orchestrator/src/raidar/scoring/judge/promotion.py",
-      "code": "no-any-return",
-      "fingerprint": "e4a9336106e831d94822ddc5ce611b3e0c12177949a0a8b5dba49a6197cd58fa",
-      "count": 1
-    },
-    {
-      "path": "orchestrator/src/raidar/scoring/judge/promotion.py",
-      "code": "no-any-return",
-      "fingerprint": "f90d86ae1688e11e9ba6d4dc7f031129511b642258151474d988c06535f8f33b",
       "count": 1
     },
     {

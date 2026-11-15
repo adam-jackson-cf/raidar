@@ -26,8 +26,10 @@ RUNTIME_PACKAGE_HOSTS = {
 
 
 def _host_intersection(first: str, second: str) -> str | None:
-    """The host both entries allow; the ceiling holds host names only, so an IP/CIDR entry
-    can never intersect it and is dropped."""
+    """The host both entries allow.
+
+    The ceiling holds host names only, so an IP/CIDR entry can never intersect it and is dropped.
+    """
     if first == second:
         return first
     for pattern, candidate in ((first, second), (second, first)):
