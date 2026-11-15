@@ -11,7 +11,7 @@ from typing import Any
 import pytest
 
 from raidar.subject.primitive.setup import run_setup
-from raidar.subject.primitive.site import TrialInvalid
+from raidar.subject.primitive.site import TrialInvalidError
 from tests.lifecycle_support import (
     WATCH,
     Rig,
@@ -79,7 +79,7 @@ async def test_a_failed_or_malformed_setup_invalidates_the_trial(
 ) -> None:
     rig.container.tool = lambda *_: outcome
 
-    with pytest.raises(TrialInvalid) as invalid:
+    with pytest.raises(TrialInvalidError) as invalid:
         await run_setup(rig.site)
 
     assert invalid.value.kind == "instrument"
@@ -90,7 +90,7 @@ async def test_setup_refuses_unsafe_state_without_calling_the_tool(rig: Rig) -> 
     state.mkdir(parents=True)
     os.mkfifo(state / "pipe")
 
-    with pytest.raises(TrialInvalid, match="state refused"):
+    with pytest.raises(TrialInvalidError, match="state refused"):
         await run_setup(rig.site)
 
     assert rig.container.calls == []
@@ -110,7 +110,7 @@ async def test_setup_keeps_host_side_state_snapshots_for_replay(rig: Rig, tmp_pa
 async def test_transport_failure_during_setup_is_an_integrity_failure(rig: Rig) -> None:
     rig.container.transport_down = True
 
-    with pytest.raises(TrialInvalid) as invalid:
+    with pytest.raises(TrialInvalidError) as invalid:
         await run_setup(rig.site)
 
     assert invalid.value.kind == "integrity"
@@ -119,7 +119,7 @@ async def test_transport_failure_during_setup_is_an_integrity_failure(rig: Rig) 
 async def test_changed_tool_bytes_during_setup_are_an_integrity_failure(rig: Rig) -> None:
     rig.container.tampered = True
 
-    with pytest.raises(TrialInvalid) as invalid:
+    with pytest.raises(TrialInvalidError) as invalid:
         await run_setup(rig.site)
 
     assert invalid.value.kind == "integrity"

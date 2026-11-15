@@ -26,6 +26,7 @@ import pytest
 from raidar.subject.package.registry import load_stage_package
 from raidar.subject.primitive import canary, outputs, site, stop
 from raidar.subject.primitive.calls import (
+    CallOptions,
     CallResult,
     CallRunner,
     ManifestEntry,
@@ -158,7 +159,12 @@ class ScriptedRunner(CallRunner):
         self.container = container
 
     async def run(
-        self, package: str, primitive: str, argv: Sequence[str], context: Any, **options: Any
+        self,
+        package: str,
+        primitive: str,
+        argv: Sequence[str],
+        context: Any,
+        options: CallOptions | None = None,
     ) -> CallResult:
         container = self.container
         if container.transport_down:
@@ -166,7 +172,7 @@ class ScriptedRunner(CallRunner):
         container.calls.append((primitive, list(argv), dict(context)))
         record = {"package": package, "primitive": primitive, "argv": list(argv)}
         path = self.logs_dir / "call.json"
-        state = options.get("state")
+        state = None if options is None else options.state
         if state is not None:
             found = _walk(container, state)
             if found.violation is not None:

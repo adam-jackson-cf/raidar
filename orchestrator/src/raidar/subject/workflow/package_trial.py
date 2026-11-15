@@ -1,6 +1,6 @@
 """A trial holds each package it runs to the lock: bytes, installed tree and check record.
 
-Every difference is an invalid instrument (``TrialInvalid``), never an agent outcome:
+Every difference is an invalid instrument (``TrialInvalidError``), never an agent outcome:
 
 - the package on disk must hash to the locked ``stage-tree/1`` digest;
 - the installed tree (``install/1``) must equal the locked digest for the container's
@@ -15,10 +15,6 @@ from collections.abc import Mapping, Sequence
 from pathlib import Path, PurePosixPath
 from typing import Any
 
-from raidar_contract.package import StagePackageError
-from raidar_contract.package.manifest import StagePackage
-from raidar_contract.references import Release
-
 from raidar.contract.paths import REPO_ROOT
 from raidar.subject.package.registry import load_stage_package, stage_folder
 from raidar.subject.primitive import calls
@@ -26,15 +22,19 @@ from raidar.subject.primitive.canary import StageCheckRecord
 from raidar.subject.primitive.install import (
     InstalledPackage,
     InstallError,
+    ShippedPackage,
     install_package,
     reuse_installed,
 )
-from raidar.subject.primitive.site import TrialInvalid
+from raidar.subject.primitive.site import TrialInvalidError
 from raidar.subject.workflow.package_runtime import (
     check_record,
     check_record_mismatch,
     installed_mismatch,
 )
+from raidar_contract.package import StagePackageError
+from raidar_contract.package.manifest import StagePackage
+from raidar_contract.references import Release
 
 
 def load_locked_package(
@@ -43,14 +43,14 @@ def load_locked_package(
     """The package at ``release`` from the tree, which must be exactly the locked bytes."""
     entry = locked.get(release.name)
     if entry is None:
-        raise TrialInvalid("integrity", f"{release} is not in the lock's packages")
+        raise TrialInvalidError("integrity", f"{release} is not in the lock's packages")
     folder = stage_folder(release, repo_root or REPO_ROOT)
     try:
         package = load_stage_package(folder)
     except (StagePackageError, OSError) as error:
-        raise TrialInvalid("integrity", f"{release}: {error}") from error
+        raise TrialInvalidError("integrity", f"{release}: {error}") from error
     if package.digest != entry["sha256"]:
-        raise TrialInvalid(
+        raise TrialInvalidError(
             "integrity",
             f"{release} is {package.digest[:12]} on disk, the lock holds "
             f"{str(entry['sha256'])[:12]}",
@@ -65,31 +65,26 @@ async def install_locked(
     package: StagePackage,
     locked: Mapping[str, Any],
 ) -> InstalledPackage:
-    """Install ``package`` once per container (or measure the earlier install) and hold the
-    installed tree to the locked digest for the container's architecture."""
+    """Install ``package`` once per container (or measure the earlier install).
+
+    The installed tree is held to the locked digest for the container's architecture.
+    """
     tool = package.manifest.tool
-    commands = tool.commands if tool else {}
+    shipped = ShippedPackage(
+        reference=release.name,
+        package_digest=package.digest,
+        files=package.files,
+        commands=tool.commands if tool else {},
+    )
     try:
-        installed = await reuse_installed(
-            environment,
-            logs_dir,
-            reference=release.name,
-            files=package.files,
-            package_digest=package.digest,
-            commands=commands,
-        ) or await install_package(
-            environment,
-            logs_dir,
-            reference=release.name,
-            package_digest=package.digest,
-            files=package.files,
-            commands=commands,
+        installed = await reuse_installed(environment, logs_dir, shipped) or await install_package(
+            environment, logs_dir, shipped
         )
     except InstallError as error:
-        raise TrialInvalid("integrity", f"{release}: {error}") from error
+        raise TrialInvalidError("integrity", f"{release}: {error}") from error
     mismatch = installed_mismatch(locked, str(installed.record["arch"]), installed.digest)
     if mismatch is not None:
-        raise TrialInvalid("integrity", f"{release}: {mismatch}", installed.record)
+        raise TrialInvalidError("integrity", f"{release}: {mismatch}", installed.record)
     return installed
 
 
@@ -102,7 +97,7 @@ def locked_check_record(
     record = check_record(package.digest)
     mismatch = check_record_mismatch(locked, record)
     if mismatch is not None or record is None:
-        raise TrialInvalid("instrument", f"{release}: {mismatch or 'no stage-check record'}")
+        raise TrialInvalidError("instrument", f"{release}: {mismatch or 'no stage-check record'}")
     return StageCheckRecord.from_json(record)
 
 
@@ -129,7 +124,7 @@ async def verify_installed(packages: Sequence[InstalledPackage]) -> None:
     for installed in packages:
         found = await installed.verify()
         if not found.ok:
-            raise TrialInvalid(
+            raise TrialInvalidError(
                 "integrity",
                 f"{installed.reference}: the installed tree changed during the trial "
                 f"({found.violation or found.digest[:12]})",

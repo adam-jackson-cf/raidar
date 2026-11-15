@@ -16,7 +16,7 @@ from raidar.subject.package.registry import load_stage_package
 from raidar.subject.primitive import outputs
 from raidar.subject.primitive.calls import TransportError
 from raidar.subject.primitive.outputs import collect_outputs
-from raidar.subject.primitive.site import TrialInvalid
+from raidar.subject.primitive.site import TrialInvalidError
 from tests.lifecycle_support import NOTE, NOTE_STATE, WATCH, Rig, build_rig
 
 REPORT = f"{WATCH}/report.json"
@@ -150,7 +150,7 @@ async def test_output_transport_failure_is_invalid_not_an_absent_output(
 
     monkeypatch.setattr("raidar.subject.primitive.outputs.snapshot_state", disconnected)
 
-    with pytest.raises(TrialInvalid) as invalid:
+    with pytest.raises(TrialInvalidError) as invalid:
         await collect_outputs(rig.site, "close")
 
     assert invalid.value.kind == "integrity"

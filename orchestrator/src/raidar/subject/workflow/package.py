@@ -13,7 +13,7 @@ the primitives in the contract's order and holds no branch for a named package:
 4. ``record``: host-written evidence grouped by primitive contract id, never by package name.
 
 Packages are installed by the caller (``install/1``); this module takes their ``InstalledPackage``.
-The invalidity of the instrument, in any primitive, surfaces as ``TrialInvalid``.
+The invalidity of the instrument, in any primitive, surfaces as ``TrialInvalidError``.
 """
 
 from __future__ import annotations
@@ -23,12 +23,10 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 from typing import Any
 
-from raidar_contract.package.tokens import Frame, FramePart, render_frame
-
 from raidar.subject.primitive.calls import CallRunner, TransportError
 from raidar.subject.primitive.gate import (
     Attribution,
-    GateInvalid,
+    GateInvalidError,
     GateOutcome,
     GatePackage,
     GateRun,
@@ -36,10 +34,11 @@ from raidar.subject.primitive.gate import (
 )
 from raidar.subject.primitive.outputs import collect_outputs
 from raidar.subject.primitive.setup import run_setup
-from raidar.subject.primitive.site import PackageSite, TrialInvalid
+from raidar.subject.primitive.site import PackageSite, TrialInvalidError
 from raidar.subject.primitive.stop import closed_flag_path, final_decision_record, run_stop
 from raidar.subject.workflow.package_member import PackageMember, PackageSpec
 from raidar.subject.workflow.stage import DEADLINE, GATE_FIX, REPAIR, REWORK, Checkpoint, Resume
+from raidar_contract.package.tokens import Frame, FramePart, render_frame
 
 GATE_PASSED = "gate_passed"
 GATE_REFUSED = "gate_refused"
@@ -68,13 +67,13 @@ class CheckpointPlan:
 
 @contextmanager
 def _invalidity() -> Iterator[None]:
-    """Container transport failure and the gate's invalidity are ``TrialInvalid`` here."""
+    """Container transport failure and the gate's invalidity are ``TrialInvalidError`` here."""
     try:
         yield
     except TransportError as error:
-        raise TrialInvalid("integrity", f"container transport failed: {error}") from error
-    except GateInvalid as error:
-        raise TrialInvalid(error.category, str(error)) from error
+        raise TrialInvalidError("integrity", f"container transport failed: {error}") from error
+    except GateInvalidError as error:
+        raise TrialInvalidError(error.category, str(error)) from error
 
 
 class PackageCheckpoint:
@@ -125,7 +124,7 @@ class PackageCheckpoint:
         """Set every package up, frame the prompt, start the gate and run the canaries.
 
         Returns the framed prompt and instruction text for the checkpoint's first turn.
-        Raises ``TrialInvalid`` for a failed setup, canary, gate start-up or tool integrity.
+        Raises ``TrialInvalidError`` for a failed setup, canary, gate start-up or tool integrity.
         """
         with _invalidity():
             for member in self.members:
@@ -225,14 +224,16 @@ class PackageCheckpoint:
         )
 
     def producer_closed(self, package: str) -> bool:
-        """Whether ``package``'s stop closed for good (a legitimate agent outcome: it owes no
-        outputs)."""
+        """Whether ``package``'s stop closed for good.
+
+        Closing is a legitimate agent outcome: the package owes no outputs.
+        """
         return any(member.stop.closed for member in self.members if member.name == package)
 
     async def _gate_fix(self, gate: GateRun, outcome: GateOutcome) -> Resume | None:
         self.sealed = outcome
         if outcome.attribution in (Attribution.INSTRUMENT, Attribution.INTEGRITY):
-            raise TrialInvalid(
+            raise TrialInvalidError(
                 "integrity" if outcome.attribution is Attribution.INTEGRITY else "instrument",
                 outcome.reason,
                 outcome.record,
@@ -276,9 +277,12 @@ class PackageCheckpoint:
         return Resume(decision.message, kind)
 
     def _fits(self, kind: str) -> bool:
-        """A resume turn starts only if the turn expected of its kind (``Checkpoint.
-        expected_seconds``), the gate run that follows it (the last gate's seconds) and the
-        workflow's judge pass (``reserve_seconds``) fit in the time left."""
+        """Whether a resume turn fits in the time left.
+
+        A resume turn starts only if the turn expected of its kind
+        (``Checkpoint.expected_seconds``), the gate run that follows it (the last gate's seconds)
+        and the workflow's judge pass (``reserve_seconds``) fit in the time left.
+        """
         left = self.checkpoint.remaining()
         if left is None:
             return True

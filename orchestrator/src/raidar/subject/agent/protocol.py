@@ -38,9 +38,9 @@ from typing import Any, Protocol, cast
 from harbor.environments.base import BaseEnvironment
 from harbor.models.agent.context import AgentContext
 from pydantic import JsonValue
-from raidar_contract.agent_records import Tokens
 
 from raidar.subject.agent.records import Credentials, StatePath
+from raidar_contract.agent_records import Tokens
 
 type JsonRecord = dict[str, JsonValue]
 """One JSON-lines row an audit parsed: a JSON object."""

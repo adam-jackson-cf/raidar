@@ -359,34 +359,51 @@ def supervise(spec: dict[str, Any]) -> dict[str, Any]:
     return result
 
 
+@dataclass(frozen=True)
+class ChildCommand:
+    """The child's command: its call directory, argv, clean environment, cwd and deadline."""
+
+    call_dir: str
+    argv: list[str]
+    env: dict[str, str]
+    cwd: str
+    timeout_s: float
+
+
+@dataclass(frozen=True)
+class Confinement:
+    """The user the child drops to and whether the seccomp network filter is installed.
+
+    ``uid``/``gid`` ``None`` means the caller already is the agent's user (no drop).
+    """
+
+    uid: int | None
+    gid: int | None
+    seccomp: bool
+
+
 def build_spec(
     *,
-    call_dir: str,
-    argv: list[str],
-    env: dict[str, str],
-    cwd: str,
-    timeout_s: float,
-    uid: int | None,
-    gid: int | None,
-    seccomp: bool,
+    command: ChildCommand,
+    confinement: Confinement,
     trees: list[dict[str, Any]],
     state: str | None = None,
     state_limits: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """The supervisor's spec; the one definition used by the host runner and the in-container gate.
 
-    ``uid``/``gid`` ``None`` means the caller already is the agent's user (no drop); the
-    seccomp filter, clean environment, caps, bounds and hashing are identical either way.
+    The seccomp filter, clean environment, caps, bounds and hashing are identical whether or not
+    ``confinement`` drops the child to another user.
     """
     return {
-        "call_dir": call_dir,
-        "argv": argv,
-        "env": env,
-        "cwd": cwd,
-        "timeout_s": timeout_s,
-        "uid": uid,
-        "gid": gid,
-        "seccomp": seccomp,
+        "call_dir": command.call_dir,
+        "argv": command.argv,
+        "env": command.env,
+        "cwd": command.cwd,
+        "timeout_s": command.timeout_s,
+        "uid": confinement.uid,
+        "gid": confinement.gid,
+        "seccomp": confinement.seccomp,
         "stdout_cap": STDOUT_CAP,
         "stderr_tail": STDERR_TAIL,
         "verify": trees,

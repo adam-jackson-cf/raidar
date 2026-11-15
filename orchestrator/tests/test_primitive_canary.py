@@ -15,7 +15,7 @@ from raidar.subject.primitive.canary import (
     StageCheckRecord,
     run_fixture,
 )
-from raidar.subject.primitive.site import TrialInvalid
+from raidar.subject.primitive.site import TrialInvalidError
 from tests.lifecycle_support import (
     PACK,
     PRIMITIVES,
@@ -61,7 +61,7 @@ async def test_a_changed_or_failing_fixture_result_invalidates_the_trial(
 ) -> None:
     rig.container.tool = lambda *_: outcome
 
-    with pytest.raises(TrialInvalid) as invalid:
+    with pytest.raises(TrialInvalidError) as invalid:
         await require(rig)
 
     assert invalid.value.kind == "instrument"
@@ -76,7 +76,7 @@ async def test_changed_output_bytes_invalidate_the_trial(rig: Rig) -> None:
 
     rig.container.tool = tool
 
-    with pytest.raises(TrialInvalid):
+    with pytest.raises(TrialInvalidError):
         await require(rig)
 
 
@@ -91,7 +91,7 @@ async def test_changed_output_bytes_invalidate_the_trial(rig: Rig) -> None:
 async def test_a_record_for_other_identities_is_refused(rig: Rig, mismatch: dict[str, Any]) -> None:
     rig.canary.expected = StageCheckRecord(**{**rig.expected.__dict__, **mismatch})
 
-    with pytest.raises(TrialInvalid, match="stage-check record"):
+    with pytest.raises(TrialInvalidError, match="stage-check record"):
         await require(rig)
 
     assert rig.container.calls == []
@@ -117,15 +117,15 @@ def test_a_primitive_the_record_names_must_be_present_and_equal(
 
 async def test_tool_tree_changes_and_failed_exec_are_integrity_failures(rig: Rig) -> None:
     rig.container.tampered = True
-    with pytest.raises(TrialInvalid) as tampered:
+    with pytest.raises(TrialInvalidError) as tampered:
         await require(rig)
     rig.container.tampered = False
     rig.container.transport_down = True
-    with pytest.raises(TrialInvalid) as exec_failed:
+    with pytest.raises(TrialInvalidError) as exec_failed:
         await require(rig)
     rig.container.transport_down = False
     rig.container.upload_down = True
-    with pytest.raises(TrialInvalid) as upload_failed:
+    with pytest.raises(TrialInvalidError) as upload_failed:
         await require(rig)
 
     kinds = (tampered.value.kind, exec_failed.value.kind, upload_failed.value.kind)
@@ -141,7 +141,7 @@ async def test_a_failure_with_a_failing_canary_is_the_instruments_above_the_floo
 ) -> None:
     rig.container.tool = lambda *_: ToolOutcome(b"junk")
 
-    with pytest.raises(TrialInvalid) as invalid:
+    with pytest.raises(TrialInvalidError) as invalid:
         await rig.canary.attribute_failure()
 
     assert invalid.value.kind == "instrument"
@@ -161,7 +161,7 @@ async def test_transport_failure_remains_invalid_below_resource_floors(
     setattr(rig.container, failure, True)
     rig.container.floors = ResourceFloors({"/app": 5}, 5)
 
-    with pytest.raises(TrialInvalid) as invalid:
+    with pytest.raises(TrialInvalidError) as invalid:
         await rig.canary.attribute_failure()
 
     assert invalid.value.kind == "integrity"
@@ -172,7 +172,7 @@ async def test_a_canary_that_cannot_be_staged_with_room_left_is_an_integrity_fai
 ) -> None:
     rig.container.upload_down = True
 
-    with pytest.raises(TrialInvalid) as invalid:
+    with pytest.raises(TrialInvalidError) as invalid:
         await rig.canary.attribute_failure()
 
     assert invalid.value.kind == "integrity"
@@ -211,7 +211,7 @@ async def test_run_fixture_replays_any_fixture_case_for_stage_check(
     package = replace(
         rig.package, manifest=rig.package.manifest.model_copy(update={"on_stop": None})
     )
-    with pytest.raises(TrialInvalid) as invalid:
+    with pytest.raises(TrialInvalidError) as invalid:
         await run_fixture(replace(rig.site, package=package), "resume", "no-stop")
     assert invalid.value.kind == "instrument"
 

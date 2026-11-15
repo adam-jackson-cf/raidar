@@ -86,9 +86,11 @@ GATE_HOOKS = ["/dev/null"]
 
 
 def git_options() -> list[str]:
-    """Options for every git call: nothing in a repository configuration is run (the agent's own
-    ``.git/config`` is read only where a call reads the repository's history or one of its
-    settings, with ``--local``)."""
+    """Options for every git call.
+
+    Nothing in a repository configuration is run (the agent's own ``.git/config`` is read only where
+    a call reads the repository's history or one of its settings, with ``--local``).
+    """
     return [
         "-c", "core.fsmonitor=", "-c", f"core.hooksPath={GATE_HOOKS[0]}",
         "-c", "core.attributesFile=/dev/null", "-c", "core.excludesFile=/dev/null",
@@ -353,8 +355,11 @@ def _run_check(
 
 
 def _package_command(config: dict[str, Any], check: dict[str, Any], outcomes: Path) -> list[str]:
-    """A package check's argv, run unmodified; the ``pytest`` kind is this payload's
-    ``pytest-run`` on the package's pinned tool interpreter (``argv``: pytest arguments)."""
+    """A package check's argv, run unmodified.
+
+    The ``pytest`` kind is this payload's ``pytest-run`` on the package's pinned tool interpreter
+    (``argv``: pytest arguments).
+    """
     if check["kind"] != "pytest":
         return list(check["argv"])
     sites = [arg for path in _project_sites(Path(config["root"])) for arg in ("--site", path)]
@@ -406,21 +411,19 @@ def _supervisor(config: dict[str, Any]) -> Any:
 
 
 def _confined_spec(
-    supervisor: Any,
-    config: dict[str, Any],
-    check: dict[str, Any],
-    argv: list[str],
-    env: dict[str, str],
-    work: Path,
+    supervisor: Any, config: dict[str, Any], check: dict[str, Any], command: object
 ) -> dict[str, Any]:
-    """The supervisor's own spec builder: this process already is the agent's user (no drop)."""
-    return supervisor.build_spec(
-        call_dir=str(work), argv=argv, env=env, cwd=config["root"],
-        timeout_s=float(check["timeout_s"]), uid=None, gid=None,
-        seccomp=bool(config.get("confine", True)),
+    """The supervisor's own spec builder: this process already is the agent's user (no drop).
+
+    ``command`` is the supervisor's ``ChildCommand`` for the check's call.
+    """
+    spec: dict[str, Any] = supervisor.build_spec(
+        command=command,
+        confinement=supervisor.Confinement(None, None, bool(config.get("confine", True))),
         trees=check.get("verify", []), state=check.get("state"),
         state_limits=check.get("state_limits"),
     )  # fmt: skip
+    return spec
 
 
 def _refusal(result: dict[str, Any]) -> tuple[str, str] | None:
@@ -441,7 +444,10 @@ def _supervised(
 ) -> tuple[str, int | None, str, str | None, dict[str, Any]]:
     """One call through the supervisor: status, exit, output, cause and the call's own record."""
     supervisor = _supervisor(config)
-    result = supervisor.supervise(_confined_spec(supervisor, config, check, argv, env, work))
+    command = supervisor.ChildCommand(
+        str(work), argv, env, config["root"], float(check["timeout_s"])
+    )
+    result = supervisor.supervise(_confined_spec(supervisor, config, check, command))
     call = {
         **result, "argv": argv, "uid": os.getuid(), "env_names": sorted(env),
         "env_sha256": hashlib.sha256(json.dumps(env, sort_keys=True).encode()).hexdigest(),
@@ -506,17 +512,18 @@ def _run_package_check(config: dict[str, Any], check: dict[str, Any], scratch: P
             status, code, cause = ERROR, None, "unrunnable"
             output = f"tool not installed: {command[0]}"
         else:
-            argv = [found, *command[1:]]
-            status, code, output, cause, call = _supervised(config, check, argv, env, work)
+            status, code, output, cause, call = _supervised(
+                config, check, [found, *command[1:]], env, work
+            )
         tests = _read_outcomes(outcomes, "tests") if pytest_kind else None
     finally:
         shutil.rmtree(work, ignore_errors=True)
     if pytest_kind:
         status = _pytest_status(status, tests)
     outputs = _capture_outputs(config, check)
-    seconds = round(time.monotonic() - started, 3)
     return CheckResult(
-        check["name"], check["kind"], True, status, code, seconds, output[-OUTPUT_CHARS:],
+        check["name"], check["kind"], True, status, code,
+        round(time.monotonic() - started, 3), output[-OUTPUT_CHARS:],
         tests=tests, cause=cause, call=call, outputs=outputs,
     )  # fmt: skip
 
@@ -697,8 +704,11 @@ def snapshot(directory: Path) -> dict[str, Any]:
 
 
 def watches(prerequisites: Sequence[dict[str, Any]]) -> list[tuple[str, str, set[str]]]:
-    """The directories workflow prerequisites keep state in: a prerequisite's name's first part,
-    its ``watch`` directory and the basenames it legitimately writes during a gate run."""
+    """The directories workflow prerequisites keep state in.
+
+    A prerequisite's name's first part, its ``watch`` directory and the basenames it legitimately
+    writes during a gate run.
+    """
     return [
         (str(item["name"]).split(".")[0], str(item["watch"]), set(item.get("writes", [])))
         for item in prerequisites
@@ -717,9 +727,12 @@ def _prefix_sha256(path: Path, size: int) -> str | None:
 def session_findings(
     before: dict[str, Any], after: dict[str, Any], where: str
 ) -> list[dict[str, str]]:
-    """What a gate run did to the native session store: a file removed, or whose first bytes (at
-    the size first seen) changed, or written without changing (a later ``ctime`` on identical
-    bytes and size). Appending is what a session legitimately does."""
+    """What a gate run did to the native session store.
+
+    A file removed, or whose first bytes (at the size first seen) changed, or written without
+    changing (a later ``ctime`` on identical bytes and size). Appending is what a session
+    legitimately does.
+    """
     found: list[dict[str, str]] = []
     now = after.get("files") or {}
     for name, was in sorted((before.get("files") or {}).items()):
@@ -746,10 +759,12 @@ def witness_findings(
     allowed: set[str],
     where: str,
 ) -> list[dict[str, str]]:
-    """What a gate run (the agent's pytest and conftest ran in it) did to a watched state
-    directory: a file added, removed or changed (``<label>_state_rewritten``) or written without
-    changing its bytes, which a write and restore leaves as a later ``ctime``
-    (``<label>_state_touched``). ``allowed`` basenames are the prerequisite's own writes."""
+    """What a gate run (the agent's pytest and conftest ran in it) did to a watched state directory.
+
+    A file added, removed or changed (``<label>_state_rewritten``) or written without changing its
+    bytes, which a write and restore leaves as a later ``ctime`` (``<label>_state_touched``).
+    ``allowed`` basenames are the prerequisite's own writes.
+    """
     was, now = before.get("files") or {}, after.get("files") or {}
     found: list[dict[str, str]] = []
     for name in sorted({*was, *now}):
@@ -772,10 +787,13 @@ def _write_text(path: Path, text: str) -> None:
 
 
 def workspace_setup(config: dict[str, Any]) -> dict[str, Any]:
-    """The workspace as a git repository with the rules in place, as the agent's user, before the
-    agent starts. Every git call is the gate's sanitized one (no system or global configuration,
-    ``core.fsmonitor=``, the gate-owned empty hooks directory) and the base commit is a raw tree
-    (no clean, smudge or process filter is run), so nothing the repository configures executes."""
+    """The workspace as a git repository with the rules in place, before the agent starts.
+
+    It runs as the agent's user. Every git call is the gate's sanitized one (no system or global
+    configuration, ``core.fsmonitor=``, the gate-owned empty hooks directory) and the base commit
+    is a raw tree (no clean, smudge or process filter is run), so nothing the repository
+    configures executes.
+    """
     root, scratch = Path(config["root"]), _scratch(config)
     git = root / ".git"
     if git.exists() and not git.is_dir():
@@ -822,8 +840,11 @@ def _workspace_rules(config: dict[str, Any], root: Path, git: Path) -> None:
 
 
 def _base_commit(config: dict[str, Any], root: Path, git: Path, scratch: Path) -> None:
-    """Commit the workspace before the agent as a raw tree built in the repository's own object
-    store through a temporary index, never ``git add`` (which would run configured filters)."""
+    """Commit the workspace before the agent as a raw tree.
+
+    The tree is built in the repository's own object store through a temporary index, never
+    ``git add`` (which would run configured filters).
+    """
     index = scratch / "setup-index"
     index.unlink(missing_ok=True)
     env = _git_env(
@@ -842,8 +863,11 @@ def _base_commit(config: dict[str, Any], root: Path, git: Path, scratch: Path) -
 
 
 def _commits(root: Path, base: str) -> tuple[list[dict[str, str]], bool]:
-    """Every commit from ``base`` (exclusive) to ``HEAD``, oldest first; and whether ``base``
-    is still an ancestor of ``HEAD`` (history the agent rewrote cannot be read)."""
+    """Every commit from ``base`` (exclusive) to ``HEAD``, oldest first.
+
+    And whether ``base`` is still an ancestor of ``HEAD`` (history the agent rewrote cannot be
+    read).
+    """
     if _repo_git_or_none(root, "merge-base", "--is-ancestor", base, "HEAD") is None:
         return [], False
     log = _repo_git(
@@ -877,8 +901,10 @@ def _private_git(config: dict[str, Any], scratch: Path) -> tuple[Path, dict[str,
 
 
 def _untracked_names(config: dict[str, Any], root: Path, env: dict[str, str]) -> list[str]:
-    """Every file of the work tree the Git ignore rules, the exclusions and the owned rules file
-    leave in, sorted."""
+    """Every file of the work tree that is left in, sorted.
+
+    A file is left in when the Git ignore rules, the exclusions and the owned rules file keep it.
+    """
     excludes = [f"--exclude={name}/" for name in config["excludes"]]
     rules = config.get("rules_file")
     if rules and config.get("rules_owned"):
@@ -927,9 +953,11 @@ def _hash_blobs(
 
 
 def _tree_of(config: dict[str, Any], scratch: Path, env: dict[str, str] | None = None) -> str:
-    """The Git tree of the work tree as it is: raw bytes, no filter, attribute or hook of the
-    agent's repository involved, built in a private Git directory (the stage's rules block is
-    taken out of the rules file the task already had)."""
+    """The Git tree of the work tree as it is.
+
+    Raw bytes, no filter, attribute or hook of the agent's repository involved, built in a private
+    Git directory (the stage's rules block is taken out of the rules file the task already had).
+    """
     root = Path(config["root"])
     if env is None:
         _, env = _private_git(config, scratch)
@@ -1179,8 +1207,11 @@ SETUP_TAIL: tuple[tuple[str, SetupCheck], ...] = (
 
 
 def setup_check(config: dict[str, Any]) -> dict[str, Any]:
-    """Deterministic setup facts, from root-owned installs only: no workspace code is imported or
-    run (no workspace configuration, conftest or interpreter) and nothing is written."""
+    """Deterministic setup facts, from root-owned installs only.
+
+    No workspace code is imported or run (no workspace configuration, conftest or interpreter) and
+    nothing is written.
+    """
     tools: list[tuple[str, SetupCheck]] = [
         (f"tool:{check['name']}", partial(_check_tool, check=check))
         for check in config.get("checks", [])
@@ -1196,9 +1227,9 @@ def setup_check(config: dict[str, Any]) -> dict[str, Any]:
 
 
 def strip_rules(text: str) -> str:
-    """``text`` without the rules block and the one newline the stage put before it.
+    r"""``text`` without the rules block and the one newline the stage put before it.
 
-    The stage appends ``"\\n" + block`` to a file (to an empty text when it creates the file),
+    The stage appends ``"\n" + block`` to a file (to an empty text when it creates the file),
     so stripping gives back the file's own bytes.
     """
     start = text.find(RULES_BEGIN)
@@ -1268,15 +1299,15 @@ def pytest_run(
     import pytest  # noqa: PLC0415 - from the tools environment, only in this subcommand
 
     class StopSlowTests:
-        @pytest.hookimpl(wrapper=True)
-        def pytest_runtest_call(self) -> Generator[None, object, object]:
+        @pytest.hookimpl(hookwrapper=True)
+        def pytest_runtest_call(self) -> Generator[None, object, None]:
             def expire(signum: int, frame: object) -> None:
                 pytest.fail(f"the test ran longer than {timeout} s", pytrace=False)
 
             previous = signal.signal(signal.SIGALRM, expire)
             signal.alarm(timeout)
             try:
-                return (yield)
+                yield
             finally:
                 signal.alarm(0)
                 signal.signal(signal.SIGALRM, previous)

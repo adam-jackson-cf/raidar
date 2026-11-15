@@ -13,7 +13,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 
 from raidar.subject.primitive.outputs import collect_outputs
-from raidar.subject.primitive.site import PackageSite, TrialInvalid, invoke
+from raidar.subject.primitive.site import PackageSite, TrialInvalidError, invoke
 
 PRIMITIVE = "setup/1"
 
@@ -45,7 +45,7 @@ def parse_tokens(stdout: bytes, declared: Sequence[str]) -> dict[str, str]:
 
 
 async def run_setup(site: PackageSite) -> SetupResult:
-    """Run the package's setup; ``TrialInvalid`` when it cannot be relied on.
+    """Run the package's setup; ``TrialInvalidError`` when it cannot be relied on.
 
     A package without setup returns no tokens.
     """
@@ -53,23 +53,19 @@ async def run_setup(site: PackageSite) -> SetupResult:
     if manifest.setup is None:
         return SetupResult({}, {"call": None})
     call = await invoke(
-        site,
-        PRIMITIVE,
-        manifest.setup.run,
-        manifest.setup.timeout_s,
-        round_=0,
-        carry={},
-        label="setup",
+        site, PRIMITIVE, manifest.setup, site.context(round_=0, carry={}), label="setup"
     )
     if call.result is None:
-        raise TrialInvalid("instrument", f"setup state refused: {call.bounds_violation}")
+        raise TrialInvalidError("instrument", f"setup state refused: {call.bounds_violation}")
     result = call.result
     record = call.record()
     record["outputs"] = (await collect_outputs(site, "setup")).record()
     if not result.usable:
-        raise TrialInvalid("instrument", "setup call failed (exit, timeout or output cap)", record)
+        raise TrialInvalidError(
+            "instrument", "setup call failed (exit, timeout or output cap)", record
+        )
     try:
         tokens = parse_tokens(result.stdout, manifest.token_names())
     except ValueError as error:
-        raise TrialInvalid("instrument", str(error), record) from error
+        raise TrialInvalidError("instrument", str(error), record) from error
     return SetupResult(tokens, record)

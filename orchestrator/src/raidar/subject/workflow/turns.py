@@ -16,9 +16,9 @@ from pathlib import Path
 from typing import Any, cast
 
 from harbor.models.agent.context import AgentContext
-from raidar_contract.agent_records import ZERO, Tokens
 
 from raidar.subject.agent.protocol import NativeAgent
+from raidar_contract.agent_records import ZERO, Tokens
 
 WORKFLOW_DIR = "workflow"
 TRAJECTORY_FILE = "trajectory.json"

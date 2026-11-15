@@ -116,7 +116,8 @@ class IsolatedCodex(Codex):
 
     @property
     def codex_home(self) -> str:
-        return self._REMOTE_CODEX_HOME.as_posix()
+        home: str = self._REMOTE_CODEX_HOME.as_posix()
+        return home
 
     def bundled_manifests(self) -> list[str]:
         home = self.codex_home
@@ -190,7 +191,7 @@ class IsolatedCodex(Codex):
 
     @override
     def _build_effective_config(self, openai_base_url: str | None = None) -> dict[str, Any]:
-        config = super()._build_effective_config(openai_base_url)
+        config: dict[str, Any] = super()._build_effective_config(openai_base_url)
         if config:
             raise CodexIsolationError(
                 f"Harbor would write config.toml ({sorted(config)}) into CODEX_HOME, which "

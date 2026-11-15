@@ -42,7 +42,7 @@ async def _python(
     runner: calls.CallRunner, root: Path, code: str, **options: Any
 ) -> calls.CallResult:
     return await runner.run(
-        "ns/pkg", "setup/1", [PY, "-c", code], CONTEXT, cwd=str(root), **options
+        "ns/pkg", "setup/1", [PY, "-c", code], CONTEXT, calls.CallOptions(cwd=str(root), **options)
     )
 
 
@@ -124,7 +124,7 @@ async def test_installed_tool_bytes_are_verified_before_and_after_the_call(
     tool.mkdir()
     (tool / "module.py").write_text("x = 1\n")
     recorded = await calls.tree_manifest(
-        environment, str(tool), bounds=False, links=True, entries=False
+        environment, str(tool), unbounded=calls.Unbounded(links=True), entries=False
     )
     tree = Tree("ns/pkg", str(tool), recorded.digest)
 

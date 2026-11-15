@@ -18,9 +18,6 @@ from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
-from raidar_contract.package.manifest import StagePackage
-from raidar_contract.workflow import PackageWorkflowDefinition, StageUse
-
 from raidar.subject.workflow.acceptance import Acceptance
 from raidar.subject.workflow.acceptance_reply import AcceptanceReply
 from raidar.subject.workflow.identity import package_primitives
@@ -35,6 +32,8 @@ from raidar.subject.workflow.package_trial import (
     verify_installed,
 )
 from raidar.subject.workflow.stage import Checkpoint, Resume
+from raidar_contract.package.manifest import StagePackage
+from raidar_contract.workflow import PackageWorkflowDefinition, StageUse
 
 WORKSPACE = "/app"
 REPLY_RECORD = "acceptance-reply/1"
@@ -72,7 +71,10 @@ class PackageStage:
         return self._prompt
 
     def load(self) -> None:
-        """Read every package from the tree and hold it to the lock (``TrialInvalid`` otherwise)."""
+        """Read every package from the tree and hold it to the lock.
+
+        A package that does not hold to it raises ``TrialInvalidError``.
+        """
         self.loaded = [
             (use, load_locked_package(use.release, self.locked, self.repo_root))
             for use in self.definition.stages

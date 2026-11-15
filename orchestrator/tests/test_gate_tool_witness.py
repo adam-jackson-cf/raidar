@@ -30,7 +30,7 @@ from raidar.subject.primitive.gate_tool import (
     watches,
     witness_findings,
 )
-from raidar.subject.primitive.payload import walk as payload_walk
+from raidar.subject.primitive.payload import supervise, walk as payload_walk
 
 
 def seen(sha: str, ctime: int) -> dict[str, Any]:
@@ -227,8 +227,11 @@ class Supervisor:
         self.reply = reply
         self.specs: list[dict[str, Any]] = []
 
+    ChildCommand = supervise.ChildCommand
+    Confinement = supervise.Confinement
+
     def build_spec(self, **spec: Any) -> dict[str, Any]:
-        return spec
+        return supervise.build_spec(**spec)
 
     def supervise(self, spec: dict[str, Any]) -> dict[str, Any]:
         self.specs.append(spec)

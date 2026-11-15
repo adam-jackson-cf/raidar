@@ -25,13 +25,12 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Protocol
 
-from raidar_contract.canonical import IGNORED_TREE_NAMES
-
 from raidar.subject.environment.python.harness import (
     harbor_reported_version,
     harbor_version_command,
 )
 from raidar.subject.environment.python.pack_definition import PackSpec, ToolLock
+from raidar_contract.canonical import IGNORED_TREE_NAMES
 
 LOCK_HASH_LABEL = "dev.raidar.pack.lock-hash"
 PACK_ID_LABEL = "dev.raidar.pack.id"

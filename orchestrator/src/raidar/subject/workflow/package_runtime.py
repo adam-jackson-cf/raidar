@@ -24,10 +24,9 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from raidar_contract.canonical import digest_json
-
 from raidar.contract.paths import stage_checks_root
 from raidar.subject.workflow.package_checks import ResolvedStage
+from raidar_contract.canonical import digest_json
 
 INSTALLED_SUFFIX = ".installed.json"
 CHECK_SUFFIX = ".json"

@@ -468,9 +468,7 @@ def test_a_replay_snapshot_without_a_recorded_context_is_refused(tmp_path: Path)
             stop_package,
             key,
             captured[:1],
-            image="unused",
-            docker_context="unused",
-            logs_dir=tmp_path / "logs",
+            stage_check.Rig("unused", "unused", tmp_path / "logs"),
         )
     )
     assert len(refused) == 1

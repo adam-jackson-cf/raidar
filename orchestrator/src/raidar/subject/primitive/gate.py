@@ -33,11 +33,11 @@ from enum import StrEnum
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal
 
-from raidar_contract.package.manifest import GateCheck, Output
-
 from raidar.contract.snapshot import SNAPSHOT_EXCLUDES, tree_digest
 from raidar.subject.primitive import calls, gate_tool
 from raidar.subject.primitive.gate_outputs import CheckOutputs
+from raidar.subject.primitive.payload.supervise import STATE_LIMITS, TREE_LIMITS
+from raidar_contract.package.manifest import GateCheck, Output
 
 if TYPE_CHECKING:
     from harbor.environments.base import BaseEnvironment
@@ -65,7 +65,7 @@ class Attribution(StrEnum):
     INTEGRITY = "integrity_invalid"
 
 
-class GateInvalid(RuntimeError):
+class GateInvalidError(RuntimeError):
     """The trial cannot be scored: the instrument failed or its integrity is in doubt."""
 
     def __init__(self, category: Literal["instrument", "integrity"], message: str) -> None:
@@ -219,12 +219,12 @@ def _check_entries(paths: GatePaths, packages: Sequence[GatePackage]) -> list[di
                 {
                     "root": package.installed.root,
                     "digest": package.installed.digest,
-                    "limits": {**calls.TREE_LIMITS, "owner": paths.tool_owner},
+                    "limits": {**TREE_LIMITS, "owner": paths.tool_owner},
                 }
             ],
             "state": check.watch,
             "outputs": _output_paths(package),
-            "state_limits": dict(calls.STATE_LIMITS),
+            "state_limits": dict(STATE_LIMITS),
         }
         for package in packages
         for check in package.checks
@@ -296,7 +296,9 @@ def check_canary(record: Mapping[str, Any]) -> None:
     errored = _errored_checks(record)
     detail = "; ".join(f"{c.get('name')}: {c.get('cause')}" for c in errored)
     reason = detail or str(record.get("error") or "the canary printed no verdict")
-    raise GateInvalid("instrument", f"the gate's canary failed on the starting workspace: {reason}")
+    raise GateInvalidError(
+        "instrument", f"the gate's canary failed on the starting workspace: {reason}"
+    )
 
 
 def _errored_attribution(record: Mapping[str, Any]) -> tuple[Attribution, str]:
@@ -329,8 +331,10 @@ def attribute(record: Mapping[str, Any], *, tools_intact: bool = True) -> tuple[
 
 @dataclass
 class HookLog:
-    """The hook's run log as copied host-side. The agent's user writes it: what it holds, and
-    what its findings say, are readings."""
+    """The hook's run log as copied host-side.
+
+    The agent's user writes it: what it holds, and what its findings say, are readings.
+    """
 
     seen: str = ""
     ctime: str | None = None
@@ -419,7 +423,7 @@ class GateRun:
     # before the agent starts ---------------------------------------------------------------
 
     async def prepare(self, session_paths: Sequence[str] = ()) -> None:
-        """Install the gate, check it and run the canary (``GateInvalid``)."""
+        """Install the gate, check it and run the canary (``GateInvalidError``)."""
         self.records.mkdir(parents=True, exist_ok=True)
         if self.paths.trusted_root == calls.TRUSTED_ROOT:
             await calls.ensure_trusted(self.environment)  # the supervisor every check runs under
@@ -432,7 +436,7 @@ class GateRun:
         await self._install(facts, hook, configuration)
         found = last_json(await self._agent(shlex.join(self._argv("workspace-setup"))))
         if found is None or "base" not in found:
-            raise GateInvalid("integrity", f"no base commit from the workspace setup: {found}")
+            raise GateInvalidError("integrity", f"no base commit from the workspace setup: {found}")
         self.base = str(found["base"])
         await self._contexts()
         await self._check_setup()
@@ -517,7 +521,7 @@ class GateRun:
         if found["status"] != PASSED:
             failed = [c for c in found["checks"] if c.get("status") != PASSED]
             names = ", ".join(f"{c['name']}: {c.get('detail', '')[:200]}" for c in failed)
-            raise GateInvalid("instrument", f"the gate's setup check failed: {names}")
+            raise GateInvalidError("instrument", f"the gate's setup check failed: {names}")
 
     async def _run_canary(self) -> None:
         """The gate over the starting workspace: it must be able to decide."""
@@ -656,7 +660,7 @@ class GateRun:
         try:
             await copying
         except calls.TransportError as error:
-            raise GateInvalid("integrity", f"a check's output copy failed: {error}") from error
+            raise GateInvalidError("integrity", f"a check's output copy failed: {error}") from error
 
     async def _tools_intact(self, when: str) -> bool:
         """Every installed tool tree still has the digest recorded at install."""
@@ -675,7 +679,7 @@ class GateRun:
 
     async def _verify_tools(self, when: str) -> None:
         if not await self._tools_intact(when):
-            raise GateInvalid("integrity", f"an installed tool tree changed {when}")
+            raise GateInvalidError("integrity", f"an installed tool tree changed {when}")
 
     # end of the checkpoint -------------------------------------------------------------------
 
@@ -688,7 +692,7 @@ class GateRun:
             await self._reap()
             await self._copy_hook_log(f"{RECORD_DIR}/hook-runs.jsonl", "close")
             await self._tools_intact("at close")
-        except (calls.TransportError, GateInvalid) as exc:
+        except (calls.TransportError, GateInvalidError) as exc:
             self.evidence.errors.append(f"{type(exc).__name__}: {exc}")
 
     def record(self) -> dict[str, Any]:
@@ -744,7 +748,7 @@ class GateRun:
         if result.return_code != 0:
             detail = (result.stderr or result.stdout or "").strip()[-1000:]
             message = f"exit {result.return_code}: {command[:120]!r}: {detail}"
-            raise GateInvalid("integrity", message)
+            raise GateInvalidError("integrity", message)
         return result.stdout or ""
 
     def _write(self, name: str, document: Mapping[str, Any]) -> None:

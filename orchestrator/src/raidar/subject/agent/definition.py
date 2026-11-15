@@ -10,14 +10,12 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
-from raidar_contract.agent import AgentDefinitionError, agent_path
-from raidar_contract.references import Release
-
 from raidar.subject.agent.adapters.harbor_cli import HarborCliAdapter
 from raidar.subject.agent.config import Harness, agent_cli
 from raidar.subject.agent.native import adapter_class_for_harness
-from raidar.subject.agent.schema import AgentDefinition, AgentName
-from raidar.subject.agent.schema import load_agent as load_lab_agent
+from raidar.subject.agent.schema import AgentDefinition, AgentName, load_agent as load_lab_agent
+from raidar_contract.agent import AgentDefinitionError, agent_path
+from raidar_contract.references import Release
 
 
 def harbor_adapter(name: AgentName) -> type[HarborCliAdapter]:

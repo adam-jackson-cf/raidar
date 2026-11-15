@@ -98,12 +98,10 @@ class HarnessAdapter:
     @property
     def definition(self) -> HarnessDefinition:
         """Return the canonical definition for this adapter's harness."""
-
         return harness_definition(self.config.harness.value)
 
     def credential_environment_sources(self) -> dict[str, str]:
         """Return available environment-backed sources declared by the harness."""
-
         names = {
             name
             for credential in self.definition.credentials
@@ -114,12 +112,10 @@ class HarnessAdapter:
 
     def credential_file_sources(self) -> dict[str, Path]:
         """Return available file-backed sources declared by the harness."""
-
         return {}
 
     def resolved_credentials(self) -> tuple[ResolvedCredential, ...]:
         """Resolve declared credential alternatives without duplicating policy."""
-
         environment_sources = self.credential_environment_sources()
         file_sources = self.credential_file_sources()
         resolved: list[ResolvedCredential] = []
@@ -145,7 +141,6 @@ class HarnessAdapter:
 
     def _validate_credentials(self) -> None:
         """Validate required credential groups from the harness definition."""
-
         resolved_ids = {credential.spec.id for credential in self.resolved_credentials()}
         missing_names = _missing_required_names(self.definition.credentials, resolved_ids)
         if missing_names:

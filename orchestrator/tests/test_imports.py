@@ -31,7 +31,9 @@ def tree(tmp_path: Path) -> tuple[Path, Path, str]:
 
 def _import(tree: tuple[Path, Path, str], source: str = " unknown origin ") -> Path:
     root, package, digest = tree
-    target, _ = import_folder(ReleaseKind.STAGE, package, "fxl/docs", digest, source, root)
+    target, _ = import_folder(
+        ReleaseKind.STAGE, package, {"name": "fxl/docs", "sha256": digest, "source": source}, root
+    )
     return target
 
 
@@ -63,14 +65,21 @@ def test_recorded_digest_cannot_change_source_or_name(tree) -> None:
     with pytest.raises(PackageImportError, match="different name or SOURCE"):
         _import(tree, "another source")
     with pytest.raises(PackageImportError, match="different name or SOURCE"):
-        import_folder(ReleaseKind.STAGE, package, "other/docs", digest, " unknown origin ", root)
+        import_folder(
+            ReleaseKind.STAGE,
+            package,
+            {"name": "other/docs", "sha256": digest, "source": " unknown origin "},
+            root,
+        )
 
 
 @pytest.mark.parametrize("name", ["raidar/docs", "../docs", "a/b/c", "/fxl/docs"])
 def test_reserved_or_traversing_name_is_refused(tree, name: str) -> None:
     root, package, digest = tree
     with pytest.raises((PackageImportError, ReleaseError)):
-        import_folder(ReleaseKind.STAGE, package, name, digest, "origin", root)
+        import_folder(
+            ReleaseKind.STAGE, package, {"name": name, "sha256": digest, "source": "origin"}, root
+        )
     assert not (root / "lab/stages").exists()
 
 
@@ -100,7 +109,12 @@ def test_unsafe_export_is_refused_including_fixtures(tree, unsafe: str) -> None:
 
             os.mkfifo(fixtures / "bad")
     with pytest.raises((PackageImportError, StagePackageError)):
-        import_folder(ReleaseKind.STAGE, package, "fxl/docs", digest, "origin", root)
+        import_folder(
+            ReleaseKind.STAGE,
+            package,
+            {"name": "fxl/docs", "sha256": digest, "source": "origin"},
+            root,
+        )
     assert not (root / "lab/stages").exists()
 
 
@@ -131,9 +145,19 @@ def test_workflow_requires_registered_dependencies_and_source_is_not_identity(tr
         definition, [{"use": "fxl/docs@1", "sha256": digest, "params": {}}]
     )
     with pytest.raises(ReleaseError):
-        import_folder(ReleaseKind.WORKFLOW, exported, "fxl/checked", expected, "local", root)
+        import_folder(
+            ReleaseKind.WORKFLOW,
+            exported,
+            {"name": "fxl/checked", "sha256": expected, "source": "local"},
+            root,
+        )
     (root / "lab/releases.yaml").write_text(f"stages:\n  fxl/docs@1: {digest}\n")
-    import_folder(ReleaseKind.WORKFLOW, exported, "fxl/checked", expected, "local", root)
+    import_folder(
+        ReleaseKind.WORKFLOW,
+        exported,
+        {"name": "fxl/checked", "sha256": expected, "source": "local"},
+        root,
+    )
     with (root / "lab/releases.yaml").open("a") as handle:
         handle.write(f"workflows:\n  fxl/checked@1: {expected}\n")
     assert released_workflow("fxl/checked@1", repo_root=root, draft=False).digest == expected
@@ -186,7 +210,12 @@ def test_malformed_ledger_is_a_release_issue(tree, document: str) -> None:
 def test_a_malformed_digest_argument_is_refused(tree) -> None:
     root, package, _ = tree
     with pytest.raises(PackageImportError, match="64 lowercase hexadecimal"):
-        import_folder(ReleaseKind.STAGE, package, "fxl/docs", "ABC", "origin", root)
+        import_folder(
+            ReleaseKind.STAGE,
+            package,
+            {"name": "fxl/docs", "sha256": "ABC", "source": "origin"},
+            root,
+        )
 
 
 def test_a_symlinked_install_folder_is_refused(tree) -> None:
@@ -195,7 +224,12 @@ def test_a_symlinked_install_folder_is_refused(tree) -> None:
     elsewhere.mkdir()
     (root / "lab/stages").symlink_to(elsewhere, target_is_directory=True)
     with pytest.raises(PackageImportError, match="symlinked folders are refused"):
-        import_folder(ReleaseKind.STAGE, package, "fxl/docs", digest, "origin", root)
+        import_folder(
+            ReleaseKind.STAGE,
+            package,
+            {"name": "fxl/docs", "sha256": digest, "source": "origin"},
+            root,
+        )
     assert list(elsewhere.iterdir()) == []
 
 

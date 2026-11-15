@@ -14,7 +14,7 @@ from raidar.contract.paths import stages_root
 from raidar.subject.package.registry import load_stage_package
 from raidar.subject.primitive.canary import StageCheckRecord
 from raidar.subject.primitive.install import InstallError
-from raidar.subject.primitive.site import TrialInvalid
+from raidar.subject.primitive.site import TrialInvalidError
 from raidar.subject.workflow import package_trial
 from raidar.subject.workflow.package_trial import install_locked
 from tests.package_support import fixture_package
@@ -38,8 +38,8 @@ async def test_the_second_checkpoint_reuses_the_install_and_is_checked_against_t
     installs: list[str] = []
     present: list[Any] = []
 
-    async def install(*_: Any, **kwargs: Any) -> Any:
-        installs.append(kwargs["reference"])
+    async def install(environment: Any, logs_dir: Path, package: Any) -> Any:
+        installs.append(package.reference)
         return _installed(LOCKED_TREE)
 
     async def reuse(*_: Any, **__: Any) -> Any:
@@ -70,7 +70,7 @@ async def test_a_reused_tree_that_changed_is_invalid_never_repaired(
     monkeypatch.setattr(package_trial, "reuse_installed", reuse)
     release, package, locked = _setup(tmp_path)
 
-    with pytest.raises(TrialInvalid, match="differs from the locked"):
+    with pytest.raises(TrialInvalidError, match="differs from the locked"):
         await install_locked(object(), tmp_path, release, package, locked)
 
 
@@ -83,7 +83,7 @@ async def test_an_unmeasurable_existing_install_is_an_integrity_failure(
     monkeypatch.setattr(package_trial, "reuse_installed", reuse)
     release, package, locked = _setup(tmp_path)
 
-    with pytest.raises(TrialInvalid, match="integrity: acme/gate-check@1: installed tree"):
+    with pytest.raises(TrialInvalidError, match="integrity: acme/gate-check@1: installed tree"):
         await install_locked(object(), tmp_path, release, package, locked)
 
 
@@ -91,9 +91,9 @@ def test_a_package_that_is_not_the_locked_bytes_is_invalid(tmp_path: Path) -> No
     fixture_package("gate-check", stages_root(tmp_path))
     release = Release.parse_stage("acme/gate-check@1")
 
-    with pytest.raises(TrialInvalid, match="is not in the lock's packages"):
+    with pytest.raises(TrialInvalidError, match="is not in the lock's packages"):
         package_trial.load_locked_package(release, {}, tmp_path)
-    with pytest.raises(TrialInvalid, match="the lock holds"):
+    with pytest.raises(TrialInvalidError, match="the lock holds"):
         package_trial.load_locked_package(
             release, {"acme/gate-check": {"sha256": "f" * 64}}, tmp_path
         )
@@ -143,7 +143,7 @@ class _Tree:
 async def test_every_installed_tree_is_measured_again_and_a_change_is_invalid() -> None:
     await package_trial.verify_installed([cast(Any, _Tree(True))])
 
-    with pytest.raises(TrialInvalid, match="changed during the trial \\(not root-owned\\)"):
+    with pytest.raises(TrialInvalidError, match="changed during the trial \\(not root-owned\\)"):
         await package_trial.verify_installed([cast(Any, _Tree(False, "not root-owned"))])
-    with pytest.raises(TrialInvalid, match="changed during the trial \\(dddddddddddd\\)"):
+    with pytest.raises(TrialInvalidError, match="changed during the trial \\(dddddddddddd\\)"):
         await package_trial.verify_installed([cast(Any, _Tree(False))])

@@ -4,7 +4,7 @@ A ``PackageSite`` is one package inside one checkpoint's container: the installe
 the effective params and where host-side evidence goes. ``invoke`` is the one way these primitives
 call a package: it snapshots the watched state before and after for replay, refuses state outside
 Raidar's bounds before the tool is called, and turns container-transport failure and changed tool
-bytes into an integrity ``TrialInvalid``.
+bytes into an integrity ``TrialInvalidError``.
 """
 
 from __future__ import annotations
@@ -12,16 +12,15 @@ from __future__ import annotations
 import hashlib
 import json
 import re
-from collections.abc import Mapping, Sequence
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Literal
 
 from pydantic import JsonValue
-from raidar_contract.call import CallContext
-from raidar_contract.package.manifest import StagePackage
 
 from raidar.subject.primitive.calls import (
+    CallOptions,
     CallResult,
     CallRunner,
     TransportError,
@@ -29,6 +28,8 @@ from raidar.subject.primitive.calls import (
     snapshot_state,
 )
 from raidar.subject.primitive.install import InstalledPackage
+from raidar_contract.call import CallContext
+from raidar_contract.package.manifest import Call, StagePackage, Stop
 
 STAGES_LOG = "stages"
 MISSING = "missing"
@@ -37,7 +38,7 @@ MISSING = "missing"
 Invalidity = Literal["instrument", "integrity"]
 
 
-class TrialInvalid(RuntimeError):
+class TrialInvalidError(RuntimeError):
     """The trial's instrument failed: ``instrument`` (the tool or its control run) or ``integrity``.
 
     Neither is an agent outcome, so the runner marks the trial invalid (the canary rule).
@@ -84,8 +85,11 @@ class PackageSite:
 
     @property
     def scope(self) -> str:
-        """A short key of this checkpoint's logs folder: container state of one checkpoint's
-        calls never collides with another checkpoint's in a reused container."""
+        """A short key of this checkpoint's logs folder.
+
+        Container state of one checkpoint's calls never collides with another checkpoint's in a
+        reused container.
+        """
         return hashlib.sha256(str(self.logs_dir).encode()).hexdigest()[:12]
 
     def context(self, *, round_: int, carry: Mapping[str, JsonValue]) -> dict[str, JsonValue]:
@@ -128,20 +132,18 @@ async def snapshot(site: PackageSite, label: str) -> TreeManifest | None:
 async def invoke(
     site: PackageSite,
     primitive: str,
-    argv: Sequence[str],
-    timeout_s: float,
+    call: Call | Stop,
+    context: Mapping[str, JsonValue],
     *,
-    round_: int,
-    carry: Mapping[str, JsonValue],
     label: str,
-    append_context: bool = True,
 ) -> Invocation:
     """Call the package once as ``primitive`` (contract id) with the state snapshotted around it.
 
-    State outside the bounds is returned as ``bounds_violation`` without calling the tool. A
-    transport failure or a changed tool tree raises ``TrialInvalid("integrity", ...)``.
+    ``call`` is the manifest's command and timeout; ``context`` is the call context file's
+    content (``PackageSite.context``). State outside the bounds is returned as
+    ``bounds_violation`` without calling the tool. A transport failure or a changed tool tree
+    raises ``TrialInvalidError("integrity", ...)``.
     """
-    context = site.context(round_=round_, carry=carry)
     site.evidence_dir.mkdir(parents=True, exist_ok=True)
     (site.evidence_dir / f"{label}-context.json").write_text(
         json.dumps(context, sort_keys=True), encoding="utf-8"
@@ -154,18 +156,21 @@ async def invoke(
         result = await site.runner.run(
             site.reference,
             primitive,
-            argv,
+            call.run,
             context,
-            timeout_s=timeout_s,
-            path=site.installed.path,
-            installed=[site.installed],
-            state=site.watch if bounded else None,
-            append_context=append_context,
+            CallOptions(
+                timeout_s=call.timeout_s,
+                path=site.installed.path,
+                installed=[site.installed],
+                state=site.watch if bounded else None,
+            ),
         )
     except TransportError as error:
-        raise TrialInvalid("integrity", f"{primitive} call transport failed: {error}") from error
+        raise TrialInvalidError(
+            "integrity", f"{primitive} call transport failed: {error}"
+        ) from error
     if result.integrity_error is not None:
-        raise TrialInvalid("integrity", result.integrity_error, result.record)
+        raise TrialInvalidError("integrity", result.integrity_error, result.record)
     after = await snapshot(site, f"{label}-after")
     return Invocation(
         result,

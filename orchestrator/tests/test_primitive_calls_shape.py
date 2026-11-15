@@ -157,7 +157,7 @@ async def _run(
     container: Container, tmp_path: Path, runner: calls.CallRunner | None = None, **options: Any
 ) -> calls.CallResult:
     runner = runner or calls.CallRunner(container, tmp_path / "logs")
-    return await runner.run("ns/pkg", "setup/1", CALL_ARGV, CONTEXT, **options)
+    return await runner.run("ns/pkg", "setup/1", CALL_ARGV, CONTEXT, calls.CallOptions(**options))
 
 
 @pytest.fixture
@@ -573,12 +573,16 @@ def test_a_well_formed_record_manifest_is_the_trusted_shape() -> None:
     [
         ({}, calls.STATE_LIMITS, True),
         (
-            {"bounds": False, "links": True, "owner": 0, "entries": False},
+            {"unbounded": calls.Unbounded(links=True, owner=0), "entries": False},
             {"links": True, "owner": 0},
             False,
         ),
-        ({"bounds": False}, {"links": False, "owner": None}, False),
-        ({"bounds": False, "entries": True}, {"links": False, "owner": None}, True),
+        ({"unbounded": calls.Unbounded()}, {"links": False, "owner": None}, False),
+        (
+            {"unbounded": calls.Unbounded(), "entries": True},
+            {"links": False, "owner": None},
+            True,
+        ),
     ],
 )
 async def test_a_manifest_request_is_bounded_unless_the_tree_is_a_trusted_install(
@@ -974,14 +978,10 @@ async def test_a_command_reaches_the_environment_as_given_with_whole_second_time
         "true",
         user=user,
         timeout_sec=2.7,
-        cwd="/w",
-        env_vars={"A": "1"},
     )
 
     assert seen == {
         "command": "umask 022; true",
-        "cwd": "/w",
-        "env": {"A": "1"},
         "timeout_sec": 2,
         "user": user,
     }
@@ -1066,10 +1066,12 @@ async def _install(
     return await install.install_package(
         container,
         tmp_path / "logs",
-        reference="ns/pkg",
-        package_digest="d" * 64,
-        files=_shipped() if files is None else files,
-        **options,
+        install.ShippedPackage(
+            reference="ns/pkg",
+            package_digest="d" * 64,
+            files=_shipped() if files is None else files,
+            **options,
+        ),
     )
 
 
@@ -1234,10 +1236,12 @@ async def test_a_bad_reference_is_refused_before_the_container_is_touched(
 ) -> None:
     with pytest.raises(install.InstallError, match="reference"):
         await install.install_package(
-            container, tmp_path, reference=reference, package_digest="d", files=[]
+            container, tmp_path, install.ShippedPackage(reference=reference, package_digest="d")
         )
     with pytest.raises(install.InstallError, match="reference"):
-        await install.reuse_installed(container, tmp_path, reference=reference, package_digest="d")
+        await install.reuse_installed(
+            container, tmp_path, install.ShippedPackage(reference=reference, package_digest="d")
+        )
 
     assert container.commands == []
 
@@ -1248,7 +1252,9 @@ async def test_nothing_is_reused_when_nothing_was_installed(
     container.codes["[ -e"] = 1
 
     reused = await install.reuse_installed(
-        container, tmp_path / "logs", reference="ns/pkg", package_digest="d" * 64
+        container,
+        tmp_path / "logs",
+        install.ShippedPackage(reference="ns/pkg", package_digest="d" * 64),
     )
 
     assert reused is None
@@ -1269,9 +1275,7 @@ async def test_a_later_checkpoint_measures_the_tree_as_found_and_repairs_nothing
     again = await install.reuse_installed(
         container,
         tmp_path / "logs-2",
-        reference="ns/pkg",
-        package_digest="d" * 64,
-        files=_shipped(),
+        install.ShippedPackage(reference="ns/pkg", package_digest="d" * 64, files=_shipped()),
     )
 
     assert again is not None
@@ -1288,7 +1292,9 @@ async def test_a_checkpoint_without_shipped_files_records_no_wheels(
     _installer(container)
 
     again = await install.reuse_installed(
-        container, tmp_path / "logs", reference="ns/pkg", package_digest="d" * 64
+        container,
+        tmp_path / "logs",
+        install.ShippedPackage(reference="ns/pkg", package_digest="d" * 64),
     )
 
     assert again is not None
@@ -1303,7 +1309,9 @@ async def test_an_installed_tree_that_is_not_root_owned_or_holds_a_special_file_
 
     with pytest.raises(install.InstallError, match="special file"):
         await install.reuse_installed(
-            container, tmp_path / "logs", reference="ns/pkg", package_digest="d" * 64
+            container,
+            tmp_path / "logs",
+            install.ShippedPackage(reference="ns/pkg", package_digest="d" * 64),
         )
 
 

@@ -512,22 +512,32 @@ class PassResult:
         }
 
 
+@dataclass(frozen=True)
+class RegressionBasis:
+    """What a regression criterion is decided from.
+
+    ``gate_passed`` is the gate's acceptance; ``baseline`` is the ids of the tests that passed on
+    the base, or None when a base test is not asked for.
+    """
+
+    gate_passed: bool
+    baseline: Collection[str] | None
+
+
 def outcome_of(
     subject: Subject,
     context: Context,
     answers: Mapping[str, tuple[float | None, tuple[int, ...]]],
     settings: JudgeConfig,
-    gate_passed: bool,
-    baseline: Collection[str] | None,
+    basis: RegressionBasis,
 ) -> Outcome:
     """Decide one criterion from its context and the answers its aspects got.
 
-    ``answers`` maps an aspect id to ``(probability, call indices)``; ``baseline`` is the ids of
-    the tests that passed on the base, or None when a base test is not asked for.
+    ``answers`` maps an aspect id to ``(probability, call indices)``.
     """
     criterion = subject.criterion
     if criterion.kind == REGRESSION:
-        status, failing = decide_regression(subject, gate_passed, baseline)
+        status, failing = decide_regression(subject, basis.gate_passed, basis.baseline)
         return Outcome(
             subject, status, failing, context, notes=tuple(MISSING[why] for why in failing)
         )

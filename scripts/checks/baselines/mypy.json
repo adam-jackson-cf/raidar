@@ -603,21 +603,9 @@
       "count": 1
     },
     {
-      "path": "orchestrator/src/raidar/subject/agent/adapters/codex_audit.py",
-      "code": "no-any-return",
-      "fingerprint": "9ebe03ebfcadbb92b3a80ebe61173f420f9d57dbeda7500c479a90a4601bbf81",
-      "count": 1
-    },
-    {
       "path": "orchestrator/src/raidar/subject/agent/adapters/isolated_claude.py",
       "code": "misc",
       "fingerprint": "43244fb2dbd918e7a6ad280f663c1d03c5865a982469205170fac7b4c8a730a7",
-      "count": 1
-    },
-    {
-      "path": "orchestrator/src/raidar/subject/agent/adapters/isolated_claude.py",
-      "code": "no-any-return",
-      "fingerprint": "e2dd4bd79847470f5a274cfdb6033f7f56ff2994115b16aecd25b7e91627e7ce",
       "count": 1
     },
     {
@@ -630,18 +618,6 @@
       "path": "orchestrator/src/raidar/subject/agent/adapters/isolated_codex.py",
       "code": "misc",
       "fingerprint": "d74239ff3340b90472302e5b196639c4235709e8a034f759286640c674dfc33c",
-      "count": 1
-    },
-    {
-      "path": "orchestrator/src/raidar/subject/agent/adapters/isolated_codex.py",
-      "code": "no-any-return",
-      "fingerprint": "5fc1f520001c33955b52a69b1a7d325adf2c033e5174588d6fa162957cb9aa0a",
-      "count": 1
-    },
-    {
-      "path": "orchestrator/src/raidar/subject/agent/adapters/isolated_codex.py",
-      "code": "no-any-return",
-      "fingerprint": "7d977dde02e35d5aa3d5ea078183e6709653eee43f22f8744885976802765f26",
       "count": 1
     },
     {
@@ -663,12 +639,6 @@
       "count": 1
     },
     {
-      "path": "orchestrator/src/raidar/subject/environment/python/harness.py",
-      "code": "no-any-return",
-      "fingerprint": "947311b5c32ef06a18d4f1968439dfbf430eb394cf32293f16e8d77963270c2e",
-      "count": 1
-    },
-    {
       "path": "orchestrator/src/raidar/subject/environment/python/pack_definition.py",
       "code": "misc",
       "fingerprint": "96c3e3bdf943fe7bb9e90e7bb99533ae2c888394227d746f7d8c75e41981e58a",
@@ -684,12 +654,6 @@
       "path": "orchestrator/src/raidar/subject/environment/python/pack_definition.py",
       "code": "no-any-return",
       "fingerprint": "eabeaec67f441fe58ed817163163e61cf02ac4b3bf8ccb7ac3714123e7ec2bf9",
-      "count": 1
-    },
-    {
-      "path": "orchestrator/src/raidar/subject/environment/python/provisioner.py",
-      "code": "no-any-return",
-      "fingerprint": "d262d8a8fb6e0ef9fe3934bfdd8078fdc8b67bdf8f0b2f88df507d9beeb7e8a4",
       "count": 1
     },
     {
@@ -729,45 +693,9 @@
       "count": 1
     },
     {
-      "path": "orchestrator/src/raidar/subject/primitive/calls.py",
-      "code": "no-any-return",
-      "fingerprint": "1a6bb44e019f370fd9aa03db5466eb5284e9f30290845f586e37efc66465a461",
-      "count": 1
-    },
-    {
-      "path": "orchestrator/src/raidar/subject/primitive/gate.py",
-      "code": "attr-defined",
-      "fingerprint": "808e0611e73c2a2d396cafd47c7d114948d2fdc17b66583fc003af5ae825dcc6",
-      "count": 1
-    },
-    {
-      "path": "orchestrator/src/raidar/subject/primitive/gate.py",
-      "code": "attr-defined",
-      "fingerprint": "8da860025b0348087110780eaa5fb58a1b8d3902048247e8201eb60785609e6d",
-      "count": 1
-    },
-    {
       "path": "orchestrator/src/raidar/subject/primitive/gate_tool.py",
       "code": "import-not-found",
       "fingerprint": "1058c55c87a2e50902bc9df00f672b70d829482a75178ff2d74ae93d1bcd0214",
-      "count": 1
-    },
-    {
-      "path": "orchestrator/src/raidar/subject/primitive/gate_tool.py",
-      "code": "no-any-return",
-      "fingerprint": "83ec808efe99a551f6732db2739b963775a6064e19f4b74cdd4883bae029e980",
-      "count": 1
-    },
-    {
-      "path": "orchestrator/src/raidar/subject/primitive/install.py",
-      "code": "attr-defined",
-      "fingerprint": "9a07906a4aedfea46ca5e8bf2f7d45abf859c35660a914cb01a2455cff8ca492",
-      "count": 1
-    },
-    {
-      "path": "orchestrator/src/raidar/subject/primitive/payload/walk.py",
-      "code": "unused-ignore",
-      "fingerprint": "daa1507c64ba0d78b3abb130454b4d64d1e8d9c406aeec9b9b651cbd4e307c98",
       "count": 1
     },
     {

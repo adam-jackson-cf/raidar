@@ -10,12 +10,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
-from raidar_contract.package import StagePackageError
-from raidar_contract.package.manifest import StagePackage
-from raidar_contract.package.registry import MANIFEST_FILE
-from raidar_contract.references import Release, ReleaseError
-from raidar_contract.workflow import PackageWorkflowDefinition
-
 from raidar.contract.paths import REPO_ROOT, releases_file, stages_root
 from raidar.contract.releases import (
     ReleaseKind,
@@ -27,6 +21,11 @@ from raidar.contract.releases import (
 from raidar.subject.draft import drafting
 from raidar.subject.package.registry import load_stage_package, stage_folder
 from raidar.subject.workflow.package_checks import ResolvedStage, package_issues
+from raidar_contract.package import StagePackageError
+from raidar_contract.package.manifest import StagePackage
+from raidar_contract.package.registry import MANIFEST_FILE
+from raidar_contract.references import Release, ReleaseError
+from raidar_contract.workflow import PackageWorkflowDefinition
 
 
 @dataclass(frozen=True)

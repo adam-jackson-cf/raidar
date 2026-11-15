@@ -4,12 +4,11 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from raidar.contract.paths import stages_root
 from raidar_contract.package import StagePackageError
 from raidar_contract.package.manifest import NAME_RE, StagePackage
 from raidar_contract.package.registry import load_stage_package as load_portable_package
 from raidar_contract.references import Release
-
-from raidar.contract.paths import stages_root
 
 STAGES_DIR = "stages"
 
@@ -26,8 +25,11 @@ def load_stage_package(root: Path) -> StagePackage:
 
 
 def _check_location(root: Path) -> None:
-    """Refuse a symlinked package root or ancestor below ``stages``, and a path that is not
-    exactly ``stages/<namespace>/<name>`` with valid components."""
+    """Refuse a package root that is not a plain ``stages/<namespace>/<name>`` directory.
+
+    A symlinked package root or ancestor below ``stages`` is refused, and so is a path that is not
+    exactly ``stages/<namespace>/<name>`` with valid components.
+    """
     if root.is_symlink():
         raise StagePackageError(f"{root}: a package root is never a symlink")
     if STAGES_DIR not in root.parts:

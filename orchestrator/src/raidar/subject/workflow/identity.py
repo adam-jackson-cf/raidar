@@ -20,14 +20,13 @@ from functools import cache
 from importlib.metadata import version
 from pathlib import Path
 
-from raidar_contract.canonical import digest_json
-from raidar_contract.package.manifest import StagePackage
-from raidar_contract.workflow import PackageWorkflowDefinition
-
 from raidar.contract import source_imports
 from raidar.contract.source_digest import SOURCE_DIGEST_SCHEME, python_source_digest
 from raidar.subject.agent.schema import AgentName
 from raidar.subject.primitive.registry import PRIMITIVE_MODULES, WORKFLOW_PRIMITIVE_MODULES
+from raidar_contract.canonical import digest_json
+from raidar_contract.package.manifest import StagePackage
+from raidar_contract.workflow import PackageWorkflowDefinition
 
 RAIDAR_DIR = Path(__file__).resolve().parents[2]
 CONTRACT_DIR = source_imports.CONTRACT_DIR
@@ -115,8 +114,10 @@ def _roots(contract: str) -> tuple[str, ...]:
 
 
 def primitive_code(contracts: Iterable[str], adapter: AgentName) -> dict[str, str]:
-    """``{contract id: digest}`` for the primitives a package arm uses, with ``frame/1``,
-    ``install/1`` and the package runner always included."""
+    """``{contract id: digest}`` for the primitives a package arm uses.
+
+    ``frame/1``, ``install/1`` and the package runner are always included.
+    """
     wanted = sorted({*IMPLICIT_CONTRACTS, *contracts, RUNNER_ID})
     return {contract: _digest(_roots(contract), adapter) for contract in wanted}
 
@@ -137,7 +138,10 @@ def workflow_contracts(definition: PackageWorkflowDefinition) -> set[str]:
 
 
 def package_primitives(packages: Iterable[StagePackage]) -> dict[str, str]:
-    """The adapter-independent code identity of the primitives ``packages`` exercise: what
-    ``stage-check`` records and a trial's canary compares (the packages' fixtures run no agent)."""
+    """The adapter-independent code identity of the primitives ``packages`` exercise.
+
+    What ``stage-check`` records and a trial's canary compares (the packages' fixtures run no
+    agent).
+    """
     wanted = sorted({*IMPLICIT_CONTRACTS, *package_contracts(packages)})
     return {contract: _digest(_roots(contract), None) for contract in wanted}

@@ -10,7 +10,7 @@ from typing import Any
 import pytest
 
 from raidar.subject.primitive.calls import ResourceFloors, TreeManifest
-from raidar.subject.primitive.site import TrialInvalid
+from raidar.subject.primitive.site import TrialInvalidError
 from raidar.subject.primitive.stop import StopState, run_stop
 from tests.lifecycle_support import (
     WATCH,
@@ -207,7 +207,7 @@ async def test_a_failure_with_a_failing_canary_above_the_floors_invalidates_the_
 ) -> None:
     rig.container.tool = always(ToolOutcome(b"junk"))
 
-    with pytest.raises(TrialInvalid) as invalid:
+    with pytest.raises(TrialInvalidError) as invalid:
         await run_stop(rig.site, StopState(), rig.canary)
 
     assert invalid.value.kind == "instrument"
@@ -235,11 +235,11 @@ async def test_a_failure_with_a_failing_canary_below_the_floors_is_environment_e
 
 async def test_tool_changes_and_transport_failures_are_integrity_failures(rig: Rig) -> None:
     rig.container.tampered = True
-    with pytest.raises(TrialInvalid) as tampered:
+    with pytest.raises(TrialInvalidError) as tampered:
         await run_stop(rig.site, StopState(), rig.canary)
     rig.container.tampered = False
     rig.container.transport_down = True
-    with pytest.raises(TrialInvalid) as down:
+    with pytest.raises(TrialInvalidError) as down:
         await run_stop(rig.site, StopState(), rig.canary)
 
     assert (tampered.value.kind, down.value.kind) == ("integrity", "integrity")

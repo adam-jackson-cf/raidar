@@ -119,7 +119,6 @@ class JudgeLoop:
             raise RuntimeError("the judge was not started before the agent")
         number = len(self.history) + 1
         started = time.monotonic()
-        tree = str(gate["tree"])
         files: dict[str, str] = gate.get("files") or {}
         mismatched: list[str] = []
         texts = await self._sources(checkpoint, files, mismatched, number)
@@ -128,19 +127,23 @@ class JudgeLoop:
         contexts = [
             judging.assemble(s, tests, texts.get, self.judge.context_tokens) for s in subjects
         ]
-        asked = [
-            (subject.criterion.id, request)
-            for subject, context in zip(subjects, contexts, strict=True)
-            for request in context.requests
-        ]
         before = len(asker.calls)
-        answers = await asker.ask(number, asked)
-        accepted = gate["verdict"] == ACCEPTED
-        baseline = set(self.baseline_passed) if self.judge.regression_needs_baseline else None
+        answers = await asker.ask(
+            number,
+            [
+                (subject.criterion.id, request)
+                for subject, context in zip(subjects, contexts, strict=True)
+                for request in context.requests
+            ],
+        )
+        basis = judging.RegressionBasis(
+            gate["verdict"] == ACCEPTED,
+            set(self.baseline_passed) if self.judge.regression_needs_baseline else None,
+        )
         result = judging.PassResult(
             number,
             tuple(
-                judging.outcome_of(s, c, answers, self.judge, accepted, baseline)
+                judging.outcome_of(s, c, answers, self.judge, basis)
                 for s, c in zip(subjects, contexts, strict=True)
             ),
         )
@@ -154,7 +157,7 @@ class JudgeLoop:
                 "gate": gate["run"],
                 "gate_verdict": gate["verdict"],
                 "source_mismatch": mismatched,
-                "tree": tree,
+                "tree": str(gate["tree"]),
                 "sources": f"{SOURCES_DIR}/pass-{number}",
                 "seconds": self.seconds,
                 "question_set": self.judge.question_set,
@@ -179,9 +182,11 @@ class JudgeLoop:
     async def _sources(
         self, checkpoint: Checkpoint, files: dict[str, str], mismatched: list[str], number: int
     ) -> dict[str, str | None]:
-        """The mapped tests' files, read as raw bytes from the work tree the seal judged (the
-        agent's processes were reaped and the file's digest must be the seal's), kept host-side
-        under ``workflow/sources``."""
+        """The mapped tests' files, kept host-side under ``workflow/sources``.
+
+        Each is read as raw bytes from the work tree the seal judged (the agent's processes were
+        reaped and the file's digest must be the seal's).
+        """
         found: dict[str, str | None] = {}
         root = checkpoint.logs_dir / SOURCES_DIR
         final = root / "final"

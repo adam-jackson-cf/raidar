@@ -30,7 +30,9 @@ def command(kind: ReleaseKind) -> click.Command:
     def import_command(name: str, src: Path, sha256: str, source: str) -> None:
         """Import an exported folder without changing its bytes or registering a release."""
         try:
-            target, release = import_folder(kind, src, name, sha256, source, REPO_ROOT)
+            target, release = import_folder(
+                kind, src, {"name": name, "sha256": sha256, "source": source}, REPO_ROOT
+            )
         except (
             PackageImportError,
             StagePackageError,

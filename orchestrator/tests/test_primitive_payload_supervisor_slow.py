@@ -49,14 +49,14 @@ def _only_test_owned_children(monkeypatch: pytest.MonkeyPatch) -> None:
 
 def _spec(tmp_path: Path, code: str, **over: Any) -> dict[str, Any]:
     spec = supervise.build_spec(
-        call_dir=str(tmp_path / "call"),
-        argv=[PY, "-c", code],
-        env={"PATH": supervise.BASE_PATH},
-        cwd=str(tmp_path),
-        timeout_s=20,
-        uid=None,
-        gid=None,
-        seccomp=False,
+        command=supervise.ChildCommand(
+            str(tmp_path / "call"),
+            [PY, "-c", code],
+            {"PATH": supervise.BASE_PATH},
+            str(tmp_path),
+            20,
+        ),
+        confinement=supervise.Confinement(None, None, False),
         trees=[],
     )
     spec.update(over)

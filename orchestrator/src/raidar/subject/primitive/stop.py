@@ -21,17 +21,18 @@ from dataclasses import dataclass, field
 from typing import Literal
 
 from pydantic import JsonValue
-from raidar_contract.call import (
-    STOP_NOT_CALLED,
-    StopResult,
-    judge_stop_result,
-    parse_stop_result,
-)
 
 from raidar.subject.primitive.calls import put_root_file
 from raidar.subject.primitive.canary import Canary
 from raidar.subject.primitive.outputs import OutputsResult, collect_outputs
-from raidar.subject.primitive.site import Invocation, PackageSite, invoke
+from raidar.subject.primitive.site import PackageSite, invoke
+from raidar_contract.call import (
+    STOP_NOT_CALLED,
+    StopResult,
+    StopStep,
+    judge_stop_result,
+    parse_stop_result,
+)
 
 PRIMITIVE = "stop/1"
 CLOSED_FLAGS = "/var/lib/raidar-calls/closed"
@@ -100,27 +101,15 @@ async def _judge(
     site: PackageSite,
     state: StopState,
     result: StopResult,
-    call: Invocation,
-    outputs: OutputsResult,
-    max_rounds: int,
+    step: StopStep,
+    record: dict[str, object],
 ) -> StopDecision | str:
-    """Apply a valid result to the state machine; a ``str`` is why ``done`` is unusable.
+    """Apply a valid result's ``step`` to the state machine; a ``str`` is why it is unusable.
 
     Only ``done`` owes outputs; a resume or close with absent outputs is still valid.
     """
     state.carry = result.carry
     state.tokens = result.tokens
-    record: dict[str, object] = {
-        "call": call.record(),
-        "status": result.status,
-        "outputs": outputs.record(),
-    }
-    step = judge_stop_result(
-        result,
-        rounds=state.rounds,
-        max_rounds=max_rounds,
-        outputs_problem=_missing(outputs) if outputs.problems else None,
-    )
     if step.action == "closed":
         return await _close(site, state, step.reason, record)
     if step.action == "resume":
@@ -140,21 +129,14 @@ def _missing(outputs: OutputsResult) -> str:
 async def run_stop(site: PackageSite, state: StopState, canary: Canary) -> StopDecision:
     """Run the package's stop once, after an agent turn, and decide what happens next.
 
-    Raises ``TrialInvalid`` when the failure is the instrument's or an integrity failure.
+    Raises ``TrialInvalidError`` when the failure is the instrument's or an integrity failure.
     """
     stop = site.package.manifest.on_stop
     if stop is None or state.closed:
         return _decided(state, StopDecision("closed", "", STOP_NOT_CALLED, {}))
     label = f"stop-{len(state.decisions)}"
-    call = await invoke(
-        site,
-        PRIMITIVE,
-        stop.run,
-        stop.timeout_s,
-        round_=state.rounds,
-        carry=state.carry,
-        label=label,
-    )
+    context = site.context(round_=state.rounds, carry=state.carry)
+    call = await invoke(site, PRIMITIVE, stop, context, label=label)
     if call.result is None:
         return await _unusable(
             site,
@@ -171,7 +153,18 @@ async def run_stop(site: PackageSite, state: StopState, canary: Canary) -> StopD
         except ValueError as error:
             why = str(error)
         else:
-            judged = await _judge(site, state, parsed, call, outputs, stop.max_rounds)
+            step = judge_stop_result(
+                parsed,
+                rounds=state.rounds,
+                max_rounds=stop.max_rounds,
+                outputs_problem=_missing(outputs) if outputs.problems else None,
+            )
+            record: dict[str, object] = {
+                "call": call.record(),
+                "status": parsed.status,
+                "outputs": outputs.record(),
+            }
+            judged = await _judge(site, state, parsed, step, record)
             if isinstance(judged, StopDecision):
                 return judged
             why = judged
