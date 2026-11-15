@@ -3,8 +3,8 @@
 
 Rules (docs/reboot/repo-structure-design.md §3.5):
 
-* no repository path carries a version token (``_v2``, ``-v2``, a ``v2`` segment); the
-  version is data (``name@N`` in a manifest);
+* no repository path carries a version token (``_v2``, ``-v2``, a ``v2`` segment) or a version
+  suffix attached to a name (``parserv2.py``); the version is data (``name@N`` in a manifest);
 * the repository root holds only the allowlisted directories and files;
 * ``lab/`` holds only the allowlisted data trees (experiments, problem pins, the ledger, agent
   and workflow definitions, runtime-pack recipes and judge policies);
@@ -13,7 +13,9 @@ Rules (docs/reboot/repo-structure-design.md §3.5):
 * packages nest at most three levels below ``raidar/`` (run-time data lives under ``lab/``, not
   in the package).
 
-Paths are the tracked files plus untracked files that are not git-ignored.
+Paths are the tracked files plus untracked files that are not git-ignored. Each finding names
+its rule: ``NAME.conventions`` (versions), ``STRUCT.dependency-direction`` (contract imports) or
+``STRUCT.folder-placement`` (everything else).
 """
 
 from __future__ import annotations
@@ -109,8 +111,15 @@ RAIDAR_PACKAGES: dict[str, frozenset[str]] = {
 CONTRACT_FORBIDDEN_IMPORTS = frozenset({"raidar", "harbor"})
 MAX_PACKAGE_DEPTH = 3
 VERSION_TOKEN = re.compile(r"(?<![A-Za-z0-9])v\d+(?![A-Za-z0-9])")
+# A version glued to the end of a name: ``parserv2``, ``parser-v2``, ``parser_v2``.
+ATTACHED_VERSION = re.compile(r"(?<=.)[-_]?v\d+$")
 # Dated design records keep their historical file names (the docs tree is not product layout).
 VERSION_EXEMPT_PREFIXES = ("docs/",)
+
+
+def name_stem(name: str) -> str:
+    """The part of a file name before its first dot; ``.hidden`` names keep their dot."""
+    return name if name.startswith(".") else name.split(".", 1)[0]
 
 
 def version_violations(paths: list[str]) -> list[str]:
@@ -120,7 +129,8 @@ def version_violations(paths: list[str]) -> list[str]:
             continue
         parts = PurePosixPath(path).parts
         for index, part in enumerate(parts):
-            if VERSION_TOKEN.search(part):
+            name = name_stem(part) if index == len(parts) - 1 else part
+            if VERSION_TOKEN.search(part) or ATTACHED_VERSION.search(name):
                 found.append(f"version in path name: {path}")
                 break
     return found
@@ -240,7 +250,11 @@ def contract_violations(paths: list[str], repo_root: Path) -> list[str]:
     for path in paths:
         if not (path.startswith("contract/src/") and path.endswith(".py")):
             continue
-        tree = ast.parse((repo_root / path).read_bytes(), filename=path)
+        try:
+            tree = ast.parse((repo_root / path).read_bytes(), filename=path)
+        except (SyntaxError, ValueError) as exc:
+            found.append(f"{path}: cannot parse Python source: {exc}")
+            continue
         found.extend(_contract_import_violations(path, tree))
     return found
 
@@ -272,16 +286,31 @@ def violations(paths: list[str]) -> list[str]:
     ]
 
 
+def rule_findings(paths: list[str], repo_root: Path) -> list[str]:
+    """Every layout finding, prefixed with the rule it breaks."""
+    placement = [
+        *root_violations(paths),
+        *lab_violations(paths),
+        *package_violations(paths),
+        *workflow_violations(paths),
+        *stage_violations(paths, repo_root),
+    ]
+    return [
+        *(f"STRUCT.folder-placement: {line}" for line in placement),
+        *(f"NAME.conventions: {line}" for line in version_violations(paths)),
+        *(
+            f"STRUCT.dependency-direction: {line}"
+            for line in contract_violations(paths, repo_root.resolve())
+        ),
+    ]
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--repo-root", default=".", type=Path)
     args = parser.parse_args(argv)
     paths = repo_paths(args.repo_root.resolve())
-    found = [
-        *violations(paths),
-        *stage_violations(paths, args.repo_root),
-        *contract_violations(paths, args.repo_root.resolve()),
-    ]
+    found = rule_findings(paths, args.repo_root)
     if not found:
         print("structure-check: ok")
         return 0

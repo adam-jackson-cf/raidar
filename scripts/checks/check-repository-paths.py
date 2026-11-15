@@ -1,9 +1,21 @@
 #!/usr/bin/env python3
-"""Apply layout, naming, dependency and test-placement owner policies."""
+"""Apply layout, naming, dependency and test-placement owner policies.
+
+Naming rules, each reported under its rule id:
+
+* ``NAME.conventions``: no directory or file stem is a catch-all word (the Python policy's
+  ``GENERIC_NAME_PARTS``; maintained Python owns these as PYQ103/PYQ104), no child repeats its
+  parent folder's name, directories below a skill root are kebab-case, no path carries a version,
+  and Python symbols use PascalCase classes and snake_case functions;
+* ``NAME.test-files``: a test-like file matches ``TEST_FILE_PATTERNS`` (otherwise the runner
+  skips it), and a test file's name carries no ticket, version, date or bare numbered token and
+  names a behaviour or owner.
+"""
 
 from __future__ import annotations
 
 import ast
+import fnmatch
 import importlib.util
 import json
 import re
@@ -46,6 +58,10 @@ class Diagnostic(Protocol):
 
 class PythonPolicy(Protocol):
     """Python placement and naming decisions."""
+
+    GENERIC_NAME_PARTS: frozenset[str]
+    SKILL_ROOTS: tuple[str, ...]
+    CANONICAL_TEST_GROUPS: dict[str, tuple[str, ...]]
 
     def is_maintained_python_relpath(self, path: str) -> bool: ...
     def structure_diagnostics_for_relpath(self, path: str) -> Sequence[Diagnostic]: ...
@@ -93,6 +109,57 @@ OWNERS = cast(
     "RepositoryOwners",
     json.loads((ROOT / "scripts/checks/repository-owners.json").read_text(encoding="utf-8")),
 )
+STAGE_FIXTURE = re.compile(r"^lab/stages/[^/]+/[^/]+/fixtures/")
+KEBAB_CASE = re.compile(r"[a-z][a-z0-9]*(?:-[a-z0-9]+)*")
+# Files the test runners collect; anything else that looks like a test is never run.
+TEST_FILE_PATTERNS = (
+    *QUALITY.CANONICAL_TEST_GROUPS["behaviour"],
+    "review-surface/tests/*.spec.ts",
+    "review-surface/journeys/*.journey.mjs",
+)
+TEST_LIKE_PATTERNS = (
+    "test_*.py",
+    "*_test.py",
+    *(
+        f"*.{kind}.{extension}"
+        for extension in ("ts", "tsx", "mts", "js", "jsx", "mjs")
+        for kind in ("test", "spec")
+    ),
+)
+TEST_NAME_IGNORED = frozenset({"test", "tests", "spec"})
+TEST_NAME_TOKENS = (
+    ("date", re.compile(r"(?:19|20)\d{2}(?:\d{4})?")),
+    ("ticket", re.compile(r"\d+|(?:issue|bug|ticket|pr|gh|jira)\d+")),
+    ("version", re.compile(r"v\d+|[a-z]+v\d+")),
+)
+TRAILING_NUMBER = re.compile(r"[a-z]+\d+")
+# Numbered words that name a format or algorithm, not a sequence.
+NUMBERED_WORDS = frozenset(
+    {
+        "base32",
+        "base64",
+        "float32",
+        "float64",
+        "http2",
+        "http3",
+        "int16",
+        "int32",
+        "int64",
+        "int8",
+        "ipv4",
+        "ipv6",
+        "md5",
+        "oauth2",
+        "s3",
+        "sha1",
+        "sha256",
+        "sha512",
+        "uint8",
+        "utf16",
+        "utf8",
+        "x509",
+    }
+)
 LAYERS = (
     "contract",
     "judge",
@@ -130,6 +197,100 @@ def file_markers(tree: ast.Module) -> set[str]:
             and ast.unparse(item.value) == "pytest.mark"
         )
     return markers & {"slow", "quality", "docker", "security", "perf"}
+
+
+def name_stem(name: str) -> str:
+    """The part of a file name before its first dot; ``.hidden`` names keep their dot."""
+    return name if name.startswith(".") else name.split(".", 1)[0]
+
+
+def name_matches(path: str, pattern: str) -> bool:
+    """A pattern with a slash matches the whole path; one without matches the file name."""
+    return fnmatch.fnmatchcase(path if "/" in pattern else PurePosixPath(path).name, pattern)
+
+
+def naming_findings(path: str) -> list[str]:
+    """Catch-all words, a child repeating its parent and skill directory casing."""
+    parts = PurePosixPath(path).parts
+    names = [*parts[:-1], name_stem(parts[-1])]
+    found: list[str] = []
+    if not QUALITY.is_maintained_python_relpath(path):
+        found.extend(
+            finding(
+                path,
+                "NAME.conventions",
+                f"generic catch-all name '{name}'",
+                "rename it for its owner or responsibility",
+            )
+            for name in names
+            if name in QUALITY.GENERIC_NAME_PARTS
+        )
+    repeated = next(
+        (parts[index] for index in range(1, len(parts)) if names[index] == parts[index - 1]),
+        None,
+    )
+    if repeated is not None:
+        found.append(
+            finding(
+                path,
+                "NAME.conventions",
+                f"'{repeated}' repeats its parent folder's name",
+                "name the child by its role",
+            )
+        )
+    for root in QUALITY.SKILL_ROOTS:
+        if path.startswith(root):
+            found.extend(
+                finding(
+                    path,
+                    "NAME.conventions",
+                    f"skill directory '{segment}' is not kebab-case",
+                    "rename the directory to kebab-case",
+                )
+                for segment in PurePosixPath(path.removeprefix(root)).parts[:-1]
+                if not segment.startswith(".") and not KEBAB_CASE.fullmatch(segment)
+            )
+    return found
+
+
+def name_token_problems(file_name: str) -> list[str]:
+    """Ticket, version, date and numbered tokens, or no behaviour word, in a test file name."""
+    tokens = [token for token in re.split(r"[-_.]+", name_stem(file_name).lower()) if token]
+    behaviour = [token for token in tokens if token not in TEST_NAME_IGNORED]
+    problems: list[str] = []
+    for token in behaviour:
+        kind = next((kind for kind, rule in TEST_NAME_TOKENS if rule.fullmatch(token)), None)
+        if kind is not None:
+            problems.append(f"{kind} token '{token}'")
+        elif TRAILING_NUMBER.fullmatch(token) and token not in NUMBERED_WORDS:
+            problems.append(f"numbered token '{token}'")
+    if all(token in QUALITY.GENERIC_NAME_PARTS for token in behaviour):
+        problems.append("no behaviour or owner name")
+    return problems
+
+
+def runner_file_findings(path: str) -> list[str]:
+    """Test files are collected by a runner and named for the behaviour they check."""
+    if not any(name_matches(path, pattern) for pattern in TEST_FILE_PATTERNS):
+        if any(name_matches(path, pattern) for pattern in TEST_LIKE_PATTERNS):
+            return [
+                finding(
+                    path,
+                    "NAME.test-files",
+                    "test-like file matches no test file pattern, so no runner collects it",
+                    f"rename it to match one of {', '.join(TEST_FILE_PATTERNS)}",
+                )
+            ]
+        return []
+    return [
+        finding(
+            path,
+            "NAME.test-files",
+            f"test file name has {problem}",
+            "name the file for the owner and behaviour it checks",
+        )
+        for problem in name_token_problems(PurePosixPath(path).name)
+    ]
 
 
 def ownership_findings(path: str) -> list[str]:
@@ -280,7 +441,9 @@ def path_findings(root: Path, paths: Sequence[str]) -> list[str]:
             finding(path, "NAME.conventions", problem, "put versions in manifest data, not paths")
             for problem in LAYOUT.version_violations([path])
         )
-        if not re.match(r"^lab/stages/[^/]+/[^/]+/fixtures/", path):
+        if not STAGE_FIXTURE.match(path):
+            found.extend(naming_findings(path))
+            found.extend(runner_file_findings(path))
             found.extend(python_findings(root, path))
     return found
 

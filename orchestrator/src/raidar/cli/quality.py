@@ -204,15 +204,7 @@ def run_orchestrator_quality_gates() -> None:
         REPO_ROOT,
     )
     run_or_raise(
-        [
-            PYTHON,
-            str(PYTHON_QUALITY_CHECK_SCRIPT),
-            "--repo-root",
-            str(REPO_ROOT),
-            "--baseline",
-            "scripts/checks/baselines/python-policy.json",
-        ],
-        REPO_ROOT,
+        [PYTHON, str(PYTHON_QUALITY_CHECK_SCRIPT), "--repo-root", str(REPO_ROOT)], REPO_ROOT
     )
     run_or_raise(["lint-imports", "--config", str(IMPORT_LINTER_CONFIG)], ORCHESTRATOR_ROOT)
     run_or_raise(

@@ -16,7 +16,6 @@
     "orchestrator/tests/test_analyzer_scope_ratchet.py": "analyzer baseline ratchet",
     "orchestrator/tests/test_analyzer_scope_reports.py": "analyzer finding reports",
     "orchestrator/tests/test_analyzer_scope_rules.py": "analyzer scope rules",
-    "scripts/checks/baselines/python-policy.json": "Python policy adoption",
     "orchestrator/tests/test_execution_boundary_rules.py": "Python collaborator boundaries",
     "orchestrator/tests/test_python_policy_rules.py": "Python structural policy",
     "scripts/checks/check-test-hygiene.py": "repository test hygiene",
