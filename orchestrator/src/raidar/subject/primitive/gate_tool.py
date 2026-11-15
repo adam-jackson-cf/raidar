@@ -68,7 +68,7 @@ from dataclasses import asdict, dataclass, field
 from datetime import UTC, datetime
 from functools import partial
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 PASSED, REFUSED, ERROR = "passed", "refused", "error"
 EXITS = {PASSED: 0, REFUSED: 1, ERROR: 126}
@@ -405,9 +405,12 @@ def _supervisor(config: dict[str, Any]) -> Any:
     root = config["trusted_root"]
     if root not in sys.path:
         sys.path.insert(0, root)
-    from payload import supervise  # noqa: PLC0415 - Raidar's own root-owned code, on demand
+    if TYPE_CHECKING:  # the container's top-level payload is this package
+        from raidar.subject.primitive import payload
+    else:
+        import payload  # noqa: PLC0415 - Raidar's own root-owned code, on demand
 
-    return supervise
+    return payload.supervise
 
 
 def _confined_spec(
@@ -476,17 +479,20 @@ def _capture_outputs(config: dict[str, Any], check: dict[str, Any]) -> dict[str,
     if not declared:
         return None
     _supervisor(config)  # puts the trusted payload on the path
-    from payload import walk  # noqa: PLC0415 - Raidar's own root-owned code, on demand
+    if TYPE_CHECKING:  # the container's top-level payload is this package
+        from raidar.subject.primitive import payload
+    else:
+        import payload  # noqa: PLC0415 - Raidar's own root-owned code, on demand
 
     root = Path(config["scratch"]) / "outputs"
     root.mkdir(parents=True, exist_ok=True)
     folder = Path(tempfile.mkdtemp(prefix=f"{check['name']}-", dir=root))
-    limits = walk.Limits.from_spec(check.get("state_limits"))
+    limits = payload.walk.Limits.from_spec(check.get("state_limits"))
     found: dict[str, Any] = {}
     for name, path in declared.items():
         tar = str(folder / f"{name}.tar")
         try:
-            found[name] = {**walk.snapshot(path, tar, limits), "tar": tar}
+            found[name] = {**payload.walk.snapshot(path, tar, limits), "tar": tar}
         except OSError as error:
             found[name] = {"path": path, "violation": f"snapshot failed: {error}"}
     return found

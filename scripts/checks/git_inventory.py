@@ -47,3 +47,22 @@ def untracked_paths(repo_root: Path) -> list[str]:
 def python_paths(repo_root: Path) -> list[str]:
     """Filter the maintained inventory to Python paths."""
     return [path for path in repo_paths(repo_root) if path.endswith(".py")]
+
+
+STAGE_PACKAGE_PARENTS = ("lab/stages", "orchestrator/tests/fixtures/stages")
+"""Folders holding stage packages as ``<parent>/<namespace>/<name>/``."""
+FIXTURE_PROGRAM_GLOBS = tuple(f"{parent}/*/*/fixtures/**" for parent in STAGE_PACKAGE_PARENTS)
+"""The fixture-program boundary as globs, for tools configured by pattern (Ruff, Prettier)."""
+
+
+def is_fixture_program(path: str) -> bool:
+    """Whether a repository path lies in a stage package's ``fixtures/`` folder.
+
+    Fixture programs are inputs a stage's tool runs against (some deliberately wrong), not
+    maintained sources: every checker excludes exactly these paths and nothing else.
+    """
+    for parent in STAGE_PACKAGE_PARENTS:
+        if path.startswith(f"{parent}/"):
+            parts = path[len(parent) + 1 :].split("/")
+            return len(parts) > 3 and parts[2] == "fixtures"
+    return False

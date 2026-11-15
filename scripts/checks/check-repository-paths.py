@@ -25,7 +25,7 @@ from collections.abc import Sequence
 from pathlib import Path, PurePosixPath
 from typing import Literal, Protocol, TypedDict, Unpack, cast
 
-from git_inventory import repo_paths
+from git_inventory import is_fixture_program, repo_paths
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -109,10 +109,7 @@ OWNERS = cast(
     "RepositoryOwners",
     json.loads((ROOT / "scripts/checks/repository-owners.json").read_text(encoding="utf-8")),
 )
-STAGE_FIXTURE = re.compile(r"^lab/stages/[^/]+/[^/]+/fixtures/")
 KEBAB_CASE = re.compile(r"[a-z][a-z0-9]*(?:-[a-z0-9]+)*")
-THIRD_PARTY_STUB_ROOT = "orchestrator/stubs/"
-"""Type stubs for packages that ship none: their paths are the package's own module names."""
 # Files the test runners collect; anything else that looks like a test is never run.
 TEST_FILE_PATTERNS = (
     *QUALITY.CANONICAL_TEST_GROUPS["behaviour"],
@@ -213,8 +210,6 @@ def name_matches(path: str, pattern: str) -> bool:
 
 def naming_findings(path: str) -> list[str]:
     """Catch-all words, a child repeating its parent and skill directory casing."""
-    if path.startswith(THIRD_PARTY_STUB_ROOT):
-        return []
     parts = PurePosixPath(path).parts
     names = [*parts[:-1], name_stem(parts[-1])]
     found: list[str] = []
@@ -445,7 +440,7 @@ def path_findings(root: Path, paths: Sequence[str]) -> list[str]:
             finding(path, "NAME.conventions", problem, "put versions in manifest data, not paths")
             for problem in LAYOUT.version_violations([path])
         )
-        if not STAGE_FIXTURE.match(path):
+        if not is_fixture_program(path):
             found.extend(naming_findings(path))
             found.extend(runner_file_findings(path))
             found.extend(python_findings(root, path))

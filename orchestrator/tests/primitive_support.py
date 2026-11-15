@@ -18,10 +18,48 @@ from types import SimpleNamespace
 from typing import Any
 
 import pytest
+from harbor.environments.base import ExecResult
 
 from raidar.subject.primitive import calls, install
 
 UNCONFINED = calls.ChildPolicy(uid=None, gid=None, seccomp=False, owner=None)
+
+
+class NoTransfers:
+    """The ``Sandbox`` file transfers a scenario never makes: reaching one fails the test.
+
+    A test double that stands in for a container defines the transfers its scenario makes
+    and inherits these for the rest, so it still implements the whole owned interface.
+    The signatures are Harbor's own, so a double may also extend a Harbor environment.
+    """
+
+    async def upload_file(self, source_path: Path | str, target_path: str) -> None:
+        raise AssertionError(f"this scenario never uploads the file {source_path}")
+
+    async def upload_dir(self, source_dir: Path | str, target_dir: str) -> None:
+        raise AssertionError(f"this scenario never uploads the directory {source_dir}")
+
+    async def download_file(self, source_path: str, target_path: Path | str) -> None:
+        raise AssertionError(f"this scenario never downloads the file {source_path}")
+
+    async def download_dir_with_exclusions(
+        self, *, source_dir: str, target_dir: Path | str, exclude: list[str]
+    ) -> None:
+        raise AssertionError(f"this scenario never downloads the directory {source_dir}")
+
+
+class UntouchedSandbox(NoTransfers):
+    """A container a scenario hands over but never reaches (its seams are patched)."""
+
+    async def exec(
+        self,
+        command: str,
+        cwd: str | None = None,
+        env: dict[str, str] | None = None,
+        timeout_sec: int | None = None,
+        user: str | int | None = None,
+    ) -> ExecResult:
+        raise AssertionError(f"this scenario never runs a command: {command}")
 
 
 class LocalEnvironment:
@@ -59,8 +97,11 @@ class LocalEnvironment:
     async def download_file(self, source: str, target: Path | str) -> None:
         shutil.copyfile(source, target)
 
-    async def download_dir(self, source: str, target: Path | str) -> None:
-        shutil.copytree(source, target, dirs_exist_ok=True)
+    async def download_dir_with_exclusions(
+        self, *, source_dir: str, target_dir: Path, exclude: list[str]
+    ) -> None:
+        ignore = shutil.ignore_patterns(*(pattern.strip("/") for pattern in exclude))
+        shutil.copytree(source_dir, target_dir, ignore=ignore, dirs_exist_ok=True)
 
 
 @dataclass(frozen=True)

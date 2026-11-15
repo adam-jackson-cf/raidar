@@ -35,9 +35,7 @@ async def test_a_real_discovery_process_that_never_answers_is_terminated_and_rea
     monkeypatch.setattr(asyncio, "create_subprocess_exec", spawn_blocker)
 
     with pytest.raises(RuntimeError, match="discovery timed out"):
-        await env._run_docker_compose_command(  # noqa: SLF001
-            ["exec", "main", "true"], timeout_sec=0.2
-        )
+        await env._run_docker_compose_command(["exec", "main", "true"], timeout_sec=1)
 
     assert spawned
     assert spawned[0].returncode is not None, "the blocked child must be reaped, not leaked"

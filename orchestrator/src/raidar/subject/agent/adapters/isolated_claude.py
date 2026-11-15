@@ -104,8 +104,7 @@ class IsolatedClaudeCode(ClaudeCode):
 
     @property
     def claude_home(self) -> str:
-        home: str = (self.environment_logs_dir / SESSIONS_DIR).as_posix()
-        return home
+        return (self.environment_logs_dir / SESSIONS_DIR).as_posix()
 
     @override
     async def run(

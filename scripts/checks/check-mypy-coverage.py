@@ -11,7 +11,7 @@ import tomllib
 from collections.abc import Sequence
 from pathlib import Path, PurePosixPath
 
-from git_inventory import python_paths
+from git_inventory import is_fixture_program, python_paths
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -19,7 +19,7 @@ ROOT = Path(__file__).resolve().parents[2]
 def maintained(path: PurePosixPath) -> bool:
     """Whether a path belongs to the maintained Python inventory."""
     parts = path.parts
-    if "fixtures" in parts or parts[:1] in (("docs",), ("var",)):
+    if is_fixture_program(path.as_posix()) or parts[:1] in (("docs",), ("var",)):
         return False
     return any(
         path == root or root in path.parents

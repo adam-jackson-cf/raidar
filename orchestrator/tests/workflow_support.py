@@ -18,6 +18,7 @@ from harbor.environments.capabilities import EnvironmentCapabilities
 from harbor.models.agent.context import AgentContext
 
 from tests.native_support import CodexNative
+from tests.primitive_support import NoTransfers
 
 CODE = "def add(a: int, b: int) -> int:\n    return a + b\n"
 PASSING = "from calc import add\n\n\ndef test_add() -> None:\n    assert add(2, 3) == 5\n"
@@ -77,7 +78,7 @@ AgentTurn = Callable[[Path, str], str | None]
 """A scripted turn: edits and commits in the workspace; a returned string is the turn's reply."""
 
 
-class LocalEnvironment:
+class LocalEnvironment(NoTransfers):
     """The container as the host's shell: commands run in a subprocess, uploads are copies."""
 
     capabilities = SimpleNamespace(mounted=True)

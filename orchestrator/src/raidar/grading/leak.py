@@ -25,8 +25,8 @@ from __future__ import annotations
 import shlex
 import time
 from pathlib import PurePosixPath
-from typing import Any
 
+from raidar.contract.sandbox import Shell
 from raidar.grading.bundle import VerifierBundle
 from raidar.grading.models import VerifierModel
 
@@ -90,7 +90,7 @@ def parse_leak_output(stdout: str, hashes: dict[str, str], seconds: float) -> Le
     )
 
 
-async def scan_agent_environment(environment: Any, bundle: VerifierBundle) -> LeakReport:
+async def scan_agent_environment(environment: Shell, bundle: VerifierBundle) -> LeakReport:
     """Run the leak assertion in the live agent environment (Harbor ``BaseEnvironment``)."""
     hashes = bundle.hidden_file_hashes()
     names = [PurePosixPath(relative).name for relative in hashes.values()]

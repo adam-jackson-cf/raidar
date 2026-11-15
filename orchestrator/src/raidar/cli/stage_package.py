@@ -124,7 +124,7 @@ def _refuse_unsafe(source: Path, target: Path) -> None:
 def _root_values(text: str) -> list[yaml.Event]:
     """Keep each root value's source span, including aliases resolved away by compose."""
     depth, value = 0, False
-    values = []
+    values: list[yaml.Event] = []
     for event in yaml.parse(text, Loader=yaml.SafeLoader):
         if isinstance(event, yaml.CollectionEndEvent):
             depth -= 1
@@ -139,16 +139,24 @@ def _root_values(text: str) -> list[yaml.Event]:
     return values
 
 
+def _event_span(event: yaml.Event) -> tuple[int, int]:
+    """The event's source offsets; only a hand-built event has no marks."""
+    if event.start_mark is None or event.end_mark is None:
+        raise click.ClickException("manifest value has no source position")
+    return event.start_mark.index, event.end_mark.index
+
+
 def _name_span(text: str, event: yaml.Event, old: str, leaf: str) -> tuple[int, int, str]:
+    first, last = _event_span(event)
     if isinstance(event, yaml.AliasEvent):
-        return event.start_mark.index, event.end_mark.index, leaf
+        return first, last, leaf
     token = next(
         (
             token
             for token in yaml.scan(text, Loader=yaml.SafeLoader)
             if isinstance(token, yaml.ScalarToken)
-            and token.start_mark.index >= event.start_mark.index
-            and token.end_mark.index <= event.end_mark.index
+            and token.start_mark.index >= first
+            and token.end_mark.index <= last
         ),
         None,
     )

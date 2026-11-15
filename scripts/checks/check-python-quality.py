@@ -5,7 +5,6 @@ from __future__ import annotations
 
 import argparse
 import ast
-import json
 import re
 import sys
 from collections.abc import Sequence
@@ -13,7 +12,7 @@ from dataclasses import dataclass
 from fnmatch import fnmatchcase
 from pathlib import Path
 
-from git_inventory import python_paths, repo_paths
+from git_inventory import is_fixture_program, python_paths, repo_paths
 
 CLASS_MAX_LINES = 700
 CLASS_MAX_PUBLIC_METHODS = 20
@@ -136,7 +135,6 @@ SEAM_SUBPROCESS_WRAPPERS: dict[str, set[str]] = {
 EXCLUDED_PREFIXES = (
     "docs/",
     "lab/experiments/",
-    "lab/stages/raidar/verify/fixtures/",
 )
 # Catch-all words never name a directory or a module stem (exact whole names only, so compound
 # names such as snapshot_compat stay valid).
@@ -229,7 +227,7 @@ def path_matches_prefix(relpath: str, prefix: str) -> bool:
 
 def is_excluded_relpath(relpath: str) -> bool:
     normalized = Path(relpath).as_posix()
-    return normalized.startswith(EXCLUDED_PREFIXES)
+    return normalized.startswith(EXCLUDED_PREFIXES) or is_fixture_program(normalized)
 
 
 def _is_maintained_root(relpath: str) -> bool:
@@ -1000,59 +998,9 @@ def _filter_checks(checks: Sequence[str]) -> set[str]:
     return requested
 
 
-def finding_records(repo_root: Path, diagnostics: Sequence[Diagnostic]) -> list[dict[str, str]]:
-    """Emit source/symbol identities, independent of wording and absolute line shifts."""
-    sources: dict[str, tuple[list[str], ast.Module]] = {}
-    records: list[dict[str, str]] = []
-    for diagnostic in diagnostics:
-        if (repo_root / diagnostic.relpath).is_dir():
-            records.append(
-                {
-                    "path": diagnostic.relpath,
-                    "code": diagnostic.code,
-                    "symbol": "",
-                    "source_line": "",
-                }
-            )
-            continue
-        if diagnostic.relpath not in sources:
-            raw = (repo_root / diagnostic.relpath).read_bytes()
-            text = raw.decode("utf-8", errors="replace")
-            readable = source_problem(raw, diagnostic.relpath) is None
-            sources[diagnostic.relpath] = (
-                text.splitlines(),
-                ast.parse(text) if readable else ast.Module(body=[], type_ignores=[]),
-            )
-        lines, tree = sources[diagnostic.relpath]
-        row = diagnostic.line
-
-        def enclosing(node: ast.AST, parents: tuple[str, ...], row: int = row) -> tuple[str, ...]:
-            for child in ast.iter_child_nodes(node):
-                if isinstance(child, (ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef)):
-                    start = min([child.lineno, *[d.lineno for d in child.decorator_list]])
-                    if start <= row <= (child.end_lineno or child.lineno):
-                        return enclosing(child, (*parents, child.name))
-                else:
-                    found = enclosing(child, parents)
-                    if found != parents:
-                        return found
-            return parents
-
-        records.append(
-            {
-                "path": diagnostic.relpath,
-                "code": diagnostic.code,
-                "symbol": ".".join(enclosing(tree, ())),
-                "source_line": lines[row - 1] if 0 < row <= len(lines) else "",
-            }
-        )
-    return records
-
-
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--repo-root", type=Path, default=Path.cwd())
-    parser.add_argument("--format", choices=("text", "findings-json"), default="text")
     parser.add_argument(
         "--check",
         action="append",
@@ -1071,10 +1019,6 @@ def main(argv: Sequence[str] | None = None) -> int:
         diagnostics.extend(_skill_directory_diagnostics(repo_root, args.paths))
     if "class-interface" in checks:
         diagnostics.extend(class_interface_diagnostics(repo_root, paths))
-    if args.format == "findings-json":
-        print(json.dumps(finding_records(repo_root, diagnostics)))
-        return int(bool(diagnostics))
-
     if diagnostics:
         # Each finding is independently actionable, including a single unknown root.
         for diagnostic in sorted(diagnostics, key=lambda item: item.render()):

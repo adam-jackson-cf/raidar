@@ -10,7 +10,7 @@ from collections.abc import Sequence
 from dataclasses import replace
 from pathlib import Path
 from types import SimpleNamespace
-from typing import Any, ClassVar, cast
+from typing import Any, ClassVar
 
 import pytest
 
@@ -66,6 +66,7 @@ from tests.package_support import (
     passed,
     refused,
 )
+from tests.primitive_support import UntouchedSandbox
 
 BUILD = "Build:\n%%%NOTE_STATE%%%\n%%%NOTE_TWO%%%\nTask: %%%TASK%%%"
 NOW = 1000.0
@@ -330,7 +331,7 @@ async def test_the_first_rework_is_expected_to_take_as_long_as_the_first_build_t
 
 
 def test_a_later_rework_is_expected_to_take_as_long_as_the_last_one() -> None:
-    checkpoint = Checkpoint(cast(Any, None), Path("."), "t")
+    checkpoint = Checkpoint(UntouchedSandbox(), Path("."), "t")
     checkpoint.turns.extend([Spent(FIRST_BUILD, 60.0), Spent(REWORK, 8.0), Spent(REPAIR, 2.0)])
 
     assert checkpoint.expected_seconds(REWORK) == 10.0  # the last rework and its repair

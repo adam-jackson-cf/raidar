@@ -11,10 +11,10 @@ import hashlib
 import json
 from pathlib import Path
 from types import SimpleNamespace
-from typing import Any, cast
+from typing import Any
 
 import pytest
-from harbor.environments.base import ExecResult
+from harbor.environments.base import ExecResult, OutputStream
 from harbor.models.trial.paths import TrialPaths
 from harbor.trial.hooks import TrialEvent
 
@@ -32,6 +32,8 @@ from raidar.engine.trial.provision import (
     parse_check_output,
     provision_record_check,
 )
+from tests.health_support import hooked_trial
+from tests.primitive_support import NoTransfers
 
 DOWNLOADED: dict[str, dict[str, bytes]] = {}
 
@@ -60,7 +62,7 @@ def memory_snapshots(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(provision_module, "tree_digest", digest)
 
 
-class _Env:
+class _Env(NoTransfers):
     """Execs answer from ``replies`` by their command; ``raises`` makes one command raise."""
 
     def __init__(self, *, replies: dict[str, Any] | None = None, raises: set[str] | None = None):
@@ -73,7 +75,12 @@ class _Env:
         self.snapshot_files: dict[str, bytes] | None = {"app/main.py": b"print(1)\n"}
 
     async def exec(
-        self, command: str, user: str | None = None, timeout_sec: int = 0, env: Any = None
+        self,
+        command: str,
+        cwd: str | None = None,
+        env: dict[str, str] | None = None,
+        timeout_sec: int | None = None,
+        user: str | int | None = None,
     ) -> Any:
         command = command.removeprefix("umask 022; ")
         if ">>" in command:
@@ -89,11 +96,11 @@ class _Env:
             self.checks.append(command)
         return self.replies.get(command, SimpleNamespace(return_code=0, stdout="", stderr=""))
 
-    async def upload_dir(self, source: str, target: str) -> None:
+    async def upload_dir(self, source_dir: Path | str, target_dir: str) -> None:
         return None
 
     async def download_dir_with_exclusions(
-        self, *, source_dir: str, target_dir: Path, exclude: list[str]
+        self, *, source_dir: str, target_dir: Path | str, exclude: list[str]
     ) -> None:
         if self.snapshot_files is None:
             raise RuntimeError("snapshot source missing")
@@ -113,13 +120,9 @@ def _provision(slug: str = "tool", **overrides: Any) -> TrialProvision:
 async def _run_one_step(
     env: _Env, provisions: list[TrialProvision], *, user: str = "agent"
 ) -> None:
-    hooks: dict[TrialEvent, list[Any]] = {}
-    trial = SimpleNamespace(
-        task=SimpleNamespace(config=SimpleNamespace(agent=SimpleNamespace(user=user))),
-        agent_environment=env,
-        add_hook=lambda event, hook: hooks.setdefault(event, []).append(hook),
-    )
-    install_trial_provisioning(cast(Any, trial), provisions)
+    trial = hooked_trial(Path("/virtual/trial"), env, user)
+    hooks = trial.hooks
+    install_trial_provisioning(trial, provisions)
     for at_start in env.hooks:
         await at_start()
     event = SimpleNamespace(result=SimpleNamespace(step_results=[SimpleNamespace(step_name="s1")]))
@@ -242,13 +245,13 @@ def _started_env(
     monkeypatch.setattr("harbor.environments.docker.docker.DockerEnvironment.start", compose_start)
     monkeypatch.setattr(env_module, "warm_agent_imports", warm)
     env = object.__new__(RunScopedDockerEnvironment)
-    env._main_container = None  # noqa: SLF001
-    env._is_windows_container = False  # noqa: SLF001
-    env._post_start = []  # noqa: SLF001
-    env._synced = {}  # noqa: SLF001
-    env._sandbox_env_names = {}  # noqa: SLF001
-    env._persistent_env = {}  # noqa: SLF001
-    env._compose_task_env = {}  # noqa: SLF001
+    env._main_container = None
+    env._is_windows_container = False
+    env._post_start = []
+    env._synced = {}
+    env._sandbox_env_names = {}
+    env._persistent_env = {}
+    env._compose_task_env = {}
     env.trial_paths = TrialPaths(trial_dir)
     monkeypatch.setattr(env, "_resolve_main_container", resolve)
     monkeypatch.setattr(env, "_run_engine_command", inspect)
@@ -296,12 +299,12 @@ def test_unchanged_environment_names_are_not_recorded_again(
     env = _started_env(monkeypatch, tmp_path, container="cid", order=[])
     record = tmp_path / "raidar-secret-isolation.json"
 
-    env._record_sandbox_env("task", {"B": "", "A": ""})  # noqa: SLF001
+    env._record_sandbox_env("task", {"B": "", "A": ""})
     first = record.read_text()
     record.write_text("kept")
-    env._record_sandbox_env("task", {"A": "", "B": ""})  # noqa: SLF001
+    env._record_sandbox_env("task", {"A": "", "B": ""})
     assert record.read_text() == "kept"
-    env._record_sandbox_env("task", {"A": ""})  # noqa: SLF001
+    env._record_sandbox_env("task", {"A": ""})
     assert record.read_text() != "kept"
     assert json.loads(first)["sandbox_env_names"]["task"] == ["A", "B"]
 
@@ -326,7 +329,7 @@ async def test_streamed_engine_output_is_returned_and_a_failing_command_still_ra
 
     monkeypatch.setattr(asyncio, "create_subprocess_exec", fake_exec)
     env = object.__new__(RunScopedDockerEnvironment)
-    env._is_windows_container = False  # noqa: SLF001
+    env._is_windows_container = False
     env.session_id = "b00-p0-baseline__env-abc"
     env.environment_name = "fixture"
     monkeypatch.setattr(env, "_compose_env_vars", lambda include_os_env=True: {}, raising=False)
@@ -339,10 +342,10 @@ async def test_streamed_engine_output_is_returned_and_a_failing_command_still_ra
 
     monkeypatch.setattr(env, "_collect_streamed_output", streamed, raising=False)
 
-    def sink(line: str) -> None:
+    async def sink(line: str, stream: OutputStream) -> None:
         return None
 
-    run = env._run_engine_command  # noqa: SLF001
+    run = env._run_engine_command
     done = await run(
         ["exec", "cid", "tail"], check=True, timeout_sec=None, stdin_data=None, on_output=sink
     )
@@ -369,11 +372,11 @@ def test_a_downloaded_directory_remembers_only_its_files_for_host_edit_detection
         lambda self: SimpleNamespace(st_mtime_ns=files[self][0], st_size=files[self][1]),
     )
     env = object.__new__(RunScopedDockerEnvironment)
-    env._synced = {}  # noqa: SLF001
+    env._synced = {}
 
-    env._record_synced(root)  # noqa: SLF001
+    env._record_synced(root)
 
-    assert env._synced == files  # noqa: SLF001
-    assert env._edited_on_host(root / "a.log") is False  # noqa: SLF001
+    assert env._synced == files
+    assert env._edited_on_host(root / "a.log") is False
     files[root / "a.log"] = (9, 10)
-    assert env._edited_on_host(root / "a.log") is True  # noqa: SLF001
+    assert env._edited_on_host(root / "a.log") is True

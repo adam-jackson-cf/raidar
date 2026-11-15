@@ -40,10 +40,6 @@ class PythonChecker(Protocol):
         self, repo_root: Path, paths: Sequence[Path]
     ) -> list[Finding]: ...
 
-    def finding_records(
-        self, repo_root: Path, diagnostics: Sequence[Finding]
-    ) -> list[dict[str, str]]: ...
-
     def main(self, argv: Sequence[str] | None = None) -> int: ...
 
 
@@ -163,7 +159,14 @@ def test_kebab_case_alone_does_not_approve_a_command(checker: PythonChecker) -> 
     _assert_refusal(checker.structure_diagnostics_for_relpath(path), path, "PYQ101")
 
 
-@pytest.mark.parametrize("path", ["docs/unowned.py"])
+@pytest.mark.parametrize(
+    "path",
+    [
+        "docs/unowned.py",
+        "lab/stages/raidar/verify/fixtures/refuse/state/utils.py",
+        "orchestrator/tests/fixtures/stages/acme/gate-check/fixtures/refuse/state/misc.py",
+    ],
+)
 def test_explicit_nonmaintained_trees_are_excluded(checker: PythonChecker, path: str) -> None:
     assert checker.structure_diagnostics_for_relpath(path) == []
 
@@ -340,4 +343,3 @@ def test_unreadable_source_is_a_finding_not_a_crash(
     candidate.write_bytes(source)
     found = checker.class_interface_diagnostics(tmp_path, [candidate])
     _assert_refusal(found, path, "PYQ299")
-    assert [record["code"] for record in checker.finding_records(tmp_path, found)] == ["PYQ299"]

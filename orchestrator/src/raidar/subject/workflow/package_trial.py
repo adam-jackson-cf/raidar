@@ -59,7 +59,7 @@ def load_locked_package(
 
 
 async def install_locked(
-    environment: Any,
+    environment: calls.Sandbox,
     logs_dir: Path,
     release: Release,
     package: StagePackage,
@@ -102,7 +102,7 @@ def locked_check_record(
 
 
 async def place_skills(
-    environment: Any, logs_dir: Path, package: StagePackage, placement: str
+    environment: calls.Sandbox, logs_dir: Path, package: StagePackage, placement: str
 ) -> list[dict[str, str]]:
     """Retain and place the installed package's skill files in the native agent's placement."""
     components = []

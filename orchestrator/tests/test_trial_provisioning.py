@@ -13,7 +13,7 @@ import base64
 import json
 from pathlib import Path
 from types import SimpleNamespace
-from typing import Any, cast
+from typing import Any
 
 from harbor.trial.hooks import TrialEvent
 
@@ -30,6 +30,8 @@ from raidar.engine.trial.provision import (
     provision_log,
     provision_record_check,
 )
+from tests.health_support import hooked_trial
+from tests.primitive_support import NoTransfers
 
 SLUG = "tool"
 PROVISION = TrialProvision(
@@ -40,7 +42,7 @@ PROVISION = TrialProvision(
 )
 
 
-class _Env:
+class _Env(NoTransfers):
     def __init__(self, *, install_rc: int = 0, start_hooks: bool = True) -> None:
         self.calls: list[dict[str, Any]] = []
         self.uploads: list[tuple[dict[str, bytes], str]] = []
@@ -53,9 +55,10 @@ class _Env:
     async def exec(
         self,
         command: str,
-        user: str | None = None,
-        timeout_sec: int = 0,
+        cwd: str | None = None,
         env: dict[str, str] | None = None,
+        timeout_sec: int | None = None,
+        user: str | int | None = None,
     ) -> Any:
         command = command.removeprefix("umask 022; ")
         kind = {"INSTALL": "install", "CHECK": "check"}.get(command)
@@ -69,24 +72,19 @@ class _Env:
             return SimpleNamespace(return_code=self.install_rc, stdout="", stderr="no pypi")
         return SimpleNamespace(return_code=0, stdout="tree_digest=abc\n", stderr="")
 
-    async def upload_dir(self, source: str, target: str) -> None:
+    async def upload_dir(self, source_dir: Path | str, target_dir: str) -> None:
         files = {
-            path.relative_to(source).as_posix(): path.read_bytes()
-            for path in Path(source).rglob("*")
+            path.relative_to(source_dir).as_posix(): path.read_bytes()
+            for path in Path(source_dir).rglob("*")
             if path.is_file()
         }
-        self.uploads.append((files, target))
+        self.uploads.append((files, target_dir))
 
 
 def _trial(env: _Env, provisions: list[Any]) -> dict[TrialEvent, list[Any]]:
-    hooks: dict[TrialEvent, list[Any]] = {}
-    trial = SimpleNamespace(
-        task=SimpleNamespace(config=SimpleNamespace(agent=SimpleNamespace(user="agent"))),
-        agent_environment=env,
-        add_hook=lambda event, hook: hooks.setdefault(event, []).append(hook),
-    )
-    install_trial_provisioning(cast(Any, trial), provisions)
-    return hooks
+    trial = hooked_trial(Path("/virtual/trial"), env)
+    install_trial_provisioning(trial, provisions)
+    return trial.hooks
 
 
 def _step(name: str) -> Any:

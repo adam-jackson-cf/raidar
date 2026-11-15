@@ -514,7 +514,9 @@ def _write_tree(root: Path, files: dict[str, str]) -> None:
         path.write_text(content)
 
 
-def _checkpoint(fork: Fork, work: Path, name: str, files: dict[str, str], entry: str) -> dict:
+def _checkpoint(
+    fork: Fork, work: Path, name: str, files: dict[str, str], entry: str
+) -> dict[str, Any]:
     checkpoint_dir = work / name
     snapshot = checkpoint_dir / fork.common.SNAPSHOT_DIR_NAME
     _write_tree(snapshot, files)
@@ -562,7 +564,7 @@ def _checkpoint(fork: Fork, work: Path, name: str, files: dict[str, str], entry:
     }
 
 
-def _rework_symbols(fork: Fork, produced: Any) -> list[dict] | None:
+def _rework_symbols(fork: Fork, produced: Any) -> list[dict[str, Any]] | None:
     """The fork's live R projection (``live_evidence._symbols_from_raw``): unhashed V/E symbols."""
     if produced.production_quality is None:
         return None
@@ -572,18 +574,18 @@ def _rework_symbols(fork: Fork, produced: Any) -> list[dict] | None:
     ]
 
 
-def _lineage(fork: Fork, work: Path, checkpoints: list[dict]) -> dict | None:
+def _lineage(fork: Fork, work: Path, checkpoints: list[dict[str, Any]]) -> dict[str, Any] | None:
     """R exactly as the fork's live producer (``live_evidence._produce_rework_evidence``)."""
     if any(checkpoint["rework_symbols"] is None for checkpoint in checkpoints):
         return None  # the fork's canonical_provenance_unavailable
     snapshot = fork.common.SNAPSHOT_DIR_NAME
-    inputs = []
+    inputs: list[Any] = []
     for index, checkpoint in enumerate(checkpoints):
         symbols = tuple(
             fork.models.SymbolIdentity.model_validate(row) for row in checkpoint["rework_symbols"]
         )
-        removed: tuple = ()
-        added: tuple = ()
+        removed: tuple[Any, ...] = ()
+        added: tuple[Any, ...] = ()
         if index:
             prior = inputs[-1]
             removed, added = fork.live_evidence._changed_lines(
@@ -599,12 +601,17 @@ def _lineage(fork: Fork, work: Path, checkpoints: list[dict]) -> dict | None:
                 added_lines=added,
             )
         )
-    return fork.calculate_problem_rework(inputs).model_dump(mode="json")
+    rework: dict[str, Any] = fork.calculate_problem_rework(inputs).model_dump(mode="json")
+    return rework
 
 
 def _regressions(
-    fork: Fork, work: Path, checkpoints: list[dict], lineage: dict, runs: dict[str, dict]
-) -> dict[str, dict]:
+    fork: Fork,
+    work: Path,
+    checkpoints: list[dict[str, Any]],
+    lineage: dict[str, Any],
+    runs: dict[str, dict[str, Any]],
+) -> dict[str, dict[str, Any]]:
     results = {}
     for index in range(1, len(checkpoints)):
         prior, current = checkpoints[index - 1]["checkpoint"], checkpoints[index]["checkpoint"]
@@ -641,8 +648,12 @@ def without_runs(attribution: dict[str, Any]) -> dict[str, Any]:
 
 
 def _case(
-    fork: Fork, name: str, snapshots: list[dict[str, str]], entry: str, runs: dict[str, dict]
-) -> dict:
+    fork: Fork,
+    name: str,
+    snapshots: list[dict[str, str]],
+    entry: str,
+    runs: dict[str, dict[str, Any]],
+) -> dict[str, Any]:
     with tempfile.TemporaryDirectory(prefix=f"fork-goldens-{name}-") as temporary:
         # Resolved, as the fork's live producer resolves checkpoint directories.
         work = Path(temporary).resolve()
@@ -678,7 +689,7 @@ def _environment(label: str) -> dict[str, str]:
 
 
 def _run(
-    outcomes: list[tuple[str, str, str]], coverage: list[dict], env: str = "env"
+    outcomes: list[tuple[str, str, str]], coverage: list[dict[str, Any]], env: str = "env"
 ) -> dict[str, Any]:
     return {
         "environment": _environment(env),
@@ -696,7 +707,7 @@ def _run(
     }
 
 
-def _lines_of(checkpoint: dict, path: str, name: str) -> list[int]:
+def _lines_of(checkpoint: dict[str, Any], path: str, name: str) -> list[int]:
     row = next(
         row
         for row in checkpoint["symbol_rows"]
@@ -707,7 +718,7 @@ def _lines_of(checkpoint: dict, path: str, name: str) -> list[int]:
     return list(range(row["start"], row["end"] + 1))
 
 
-def synthetic_runs(fork: Fork) -> dict[str, dict]:
+def synthetic_runs(fork: Fork) -> dict[str, dict[str, Any]]:
     """cp2: a failing regression covering changed code; cp3: a parity mismatch."""
     with tempfile.TemporaryDirectory(prefix="fork-goldens-lines-") as temporary:
         work = Path(temporary).resolve()
@@ -745,7 +756,7 @@ def synthetic_runs(fork: Fork) -> dict[str, dict]:
     }
 
 
-def forge_runs(trial: Path | None) -> dict[str, dict]:
+def forge_runs(trial: Path | None) -> dict[str, dict[str, Any]]:
     if trial is None:
         return {}
     runs = {}

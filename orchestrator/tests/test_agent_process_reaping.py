@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 from pathlib import Path
 from types import SimpleNamespace
-from typing import Any, cast
+from typing import Any
 
 import pytest
 from harbor.trial.hooks import TrialEvent
@@ -21,6 +21,7 @@ from raidar.engine.health.reaper import (
 )
 from raidar.engine.trial.collect import _infra_reasons
 from raidar.grading.records import step_record_dir
+from tests.health_support import hooked_trial
 
 KILLED_OUTPUT = (
     "@@RAIDAR_KILLED\n"
@@ -102,14 +103,9 @@ def test_reaper_hook_writes_the_step_report_after_every_agent_phase(
 ) -> None:
     bundle = SimpleNamespace(resolve_step=lambda name: name)
     monkeypatch.setattr("raidar.engine.health.reaper.load_bundle", lambda root: bundle)
-    hooks: dict[TrialEvent, list[Any]] = {}
-    trial = SimpleNamespace(
-        task=SimpleNamespace(config=SimpleNamespace(agent=SimpleNamespace(user="agent"))),
-        agent_environment=FakeEnv(KILLED_OUTPUT + "   5  1000 S  codex\n"),
-        paths=SimpleNamespace(trial_dir=tmp_path / "trial"),
-        add_hook=lambda event, hook: hooks.setdefault(event, []).append(hook),
-    )
-    install_agent_reaper(cast(Any, trial), tmp_path / "bundle")
+    trial = hooked_trial(tmp_path / "trial", FakeEnv(KILLED_OUTPUT + "   5  1000 S  codex\n"))
+    hooks = trial.hooks
+    install_agent_reaper(trial, tmp_path / "bundle")
     event = SimpleNamespace(
         result=SimpleNamespace(step_results=[SimpleNamespace(step_name="checkpoint_2")])
     )

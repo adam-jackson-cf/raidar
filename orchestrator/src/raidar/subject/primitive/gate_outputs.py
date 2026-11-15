@@ -29,7 +29,7 @@ class CheckOutputs:
 
     def __init__(
         self,
-        environment: Any,
+        environment: calls.Sandbox,
         scratch: str,
         folder: Path,
         declared: Mapping[str, Mapping[str, Output]],

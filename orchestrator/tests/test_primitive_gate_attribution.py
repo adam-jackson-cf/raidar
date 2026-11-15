@@ -38,6 +38,7 @@ from raidar.subject.primitive.gate import (
 from raidar.subject.primitive.gate_outputs import CheckOutputs
 from raidar.subject.primitive.install import TreeCheck
 from raidar_contract.package.manifest import GateCheck, Output
+from tests.primitive_support import NoTransfers, UntouchedSandbox
 
 FACTS = AgentFacts(owner="agent", trusted_uid=0)
 
@@ -237,7 +238,7 @@ def test_the_findings_a_hook_wrote_are_carried_once_and_tagged_with_the_turn() -
 # the checkpoint's gate over a scripted container -------------------------------------------------
 
 
-class Container:
+class Container(NoTransfers):
     """The container's shell as a script: each payload command answers as told."""
 
     def __init__(self, **replies: Any) -> None:
@@ -271,8 +272,8 @@ class Container:
         code, out, err = reply if isinstance(reply, tuple) else (0, reply, "")
         return SimpleNamespace(return_code=code, stdout=out, stderr=err)
 
-    async def upload_file(self, source: Path, target: str) -> None:
-        self.uploads.append(target)
+    async def upload_file(self, source_path: Path | str, target_path: str) -> None:
+        self.uploads.append(target_path)
 
 
 PASSING = {
@@ -625,7 +626,7 @@ DECLARED = {"pkg.lint": {"note": NOTE}}
 
 
 def outputs(tmp_path: Path) -> CheckOutputs:
-    return CheckOutputs(None, "/s/scratch", tmp_path / "out", DECLARED)
+    return CheckOutputs(UntouchedSandbox(), "/s/scratch", tmp_path / "out", DECLARED)
 
 
 def kept(check: dict[str, Any]) -> dict[str, Any]:
@@ -716,12 +717,12 @@ async def test_captured_output_is_retained_only_when_archive_bytes_match_the_man
         archive.addfile(member, io.BytesIO(b"bad note\n" if tampered else data))
     bundle = stream.getvalue()
 
-    class Snapshot:
+    class Snapshot(NoTransfers):
         async def exec(self, *args: Any, **kw: Any) -> Any:
             return SimpleNamespace(return_code=0, stdout=str(len(bundle)), stderr="")
 
-        async def download_file(self, source: str, target: Path) -> None:
-            target.write_bytes(bundle)
+        async def download_file(self, source_path: str, target_path: Path | str) -> None:
+            Path(target_path).write_bytes(bundle)
 
     copies = CheckOutputs(Snapshot(), "/s/scratch", tmp_path / "out", DECLARED)
     check = {"name": "pkg.lint", "outputs": {"note": captured}}
@@ -742,10 +743,10 @@ async def test_captured_output_is_retained_only_when_archive_bytes_match_the_man
 async def test_a_prefix_snapshot_retains_the_fix_input_and_its_digest(tmp_path: Path) -> None:
     class Workspace(Container):
         async def download_dir_with_exclusions(
-            self, *, source_dir: str, target_dir: Path, exclude: list[str]
+            self, *, source_dir: str, target_dir: Path | str, exclude: list[str]
         ) -> None:
-            target_dir.mkdir(parents=True)
-            (target_dir / "main.py").write_text("raise ValueError('not repaired yet')\n")
+            Path(target_dir).mkdir(parents=True)
+            (Path(target_dir) / "main.py").write_text("raise ValueError('not repaired yet')\n")
 
     run = GateRun(Workspace(), tmp_path, [], GateSettings(max_fix_rounds=2), PATHS)
     first = await run.retain_prefix(1)
@@ -761,7 +762,7 @@ async def test_a_prefix_snapshot_retains_the_fix_input_and_its_digest(tmp_path: 
 
 async def test_an_unverifiable_trusted_payload_prevents_gate_preparation(tmp_path: Path) -> None:
     class UnverifiablePayload(Container):
-        async def upload_dir(self, source: Path, target: str) -> None:
+        async def upload_dir(self, source_dir: Path | str, target_dir: str) -> None:
             pass
 
     run = GateRun(UnverifiablePayload(), tmp_path, [], paths=GatePaths())

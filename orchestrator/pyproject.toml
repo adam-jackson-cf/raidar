@@ -35,7 +35,7 @@ dev = [
     "ruff>=0.1",
     "pre-commit>=3.0",
     "lizard>=1.17.10",
-    "mypy>=1.11",
+    "mypy>=1.14",
     "pip-audit==2.9.0",
     "import-linter>=2.0",
     # code-quality@1 tool-env modules are imported in-process by the tests. These
@@ -45,6 +45,9 @@ dev = [
     "tree-sitter-language-pack==0.13.0",
     "networkx==3.6.1",
     "radon==6.0.1",
+    "types-PyYAML==6.0.12.20261030",
+    "types-jsonschema==4.26.0.20261006",
+    "types-networkx==3.6.1.20261031",
 ]
 
 [project.scripts]
@@ -119,8 +122,6 @@ ignore = ["D100", "D101", "D102", "D103", "D104", "D105", "D107", "D401"]
 "**/__init__.py" = ["F401", "D104"]
 "conftest.py" = ["D"]
 "setup.py" = ["D"]
-# Canary fixture generator: each fixture is one literal source text, kept on one line.
-"tests/fixtures/python_guardrails/make_fixtures.py" = ["E501", "PLR0915"]
 
 [tool.ruff.lint.mccabe]
 max-complexity = 10
@@ -192,7 +193,6 @@ files = [
     "../lab/stages/raidar/verify/tool/src",
 ]
 mypy_path = [
-    "$MYPY_CONFIG_FILE_DIR/stubs",
     "$MYPY_CONFIG_FILE_DIR/src",
     "$MYPY_CONFIG_FILE_DIR",
     "$MYPY_CONFIG_FILE_DIR/../scripts",
@@ -203,11 +203,16 @@ mypy_path = [
 ]
 explicit_package_bases = true
 # Fixture programs are tool inputs, not maintained sources.
-exclude = '(^|/)fixtures/'
+exclude = '(^|/)stages/[^/]+/[^/]+/fixtures/'
 
 [[tool.mypy.overrides]]
-# Mypy reports missing stubs; types-PyYAML/types-jsonschema/types-networkx are not dependencies.
-module = ["yaml", "jsonschema", "networkx"]
+# Harbor ships inline annotations without a py.typed marker: mypy reads them from the package.
+module = ["harbor", "harbor.*"]
+follow_untyped_imports = true
+
+[[tool.mypy.overrides]]
+# The SCB fork the golden generator imports from its own checkout; it is not installed here.
+module = ["slop_code", "slop_code.*"]
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]

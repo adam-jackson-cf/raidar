@@ -4,10 +4,15 @@ from __future__ import annotations
 
 import hashlib
 import json
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any, TypedDict
+
+from harbor.models.task.config import AgentConfig, TaskConfig
+from harbor.models.trial.paths import TrialPaths
+from harbor.trial.hooks import LogCallback, TrialEvent
+from harbor.trial.trial import TrialHookCallback
 
 from raidar.contract.snapshot import tree_digest
 from raidar.contract.trial import (
@@ -40,6 +45,39 @@ from raidar.grading.records import (
 from raidar.subject.agent.config import Harness
 from tests.execution_support import StepOutcome, verifier_grade, write_trial
 from tests.native_support import session_audit
+
+
+@dataclass
+class FakeTask:
+    """A Harbor ``Task`` as the trial hooks read it: its configuration."""
+
+    config: TaskConfig
+
+
+@dataclass
+class FakeTrial[Environment]:
+    """A Harbor ``Trial`` as Raidar's hooks use it; it records the hooks they add."""
+
+    agent_environment: Environment
+    paths: TrialPaths
+    task: FakeTask
+    hooks: dict[TrialEvent, list[Any]] = field(default_factory=dict)
+    log_callbacks: list[Any] = field(default_factory=list)
+
+    def add_hook(self, event: TrialEvent, hook: TrialHookCallback) -> None:
+        self.hooks.setdefault(event, []).append(hook)
+
+    def add_log_callback(self, callback: LogCallback) -> None:
+        self.log_callbacks.append(callback)
+
+
+def hooked_trial[Environment](
+    trial_dir: Path, environment: Environment, user: str | None = "agent"
+) -> FakeTrial[Environment]:
+    """A trial in ``trial_dir`` whose task's agent runs as ``user`` in ``environment``."""
+    task = FakeTask(TaskConfig(agent=AgentConfig(user=user)))
+    return FakeTrial(environment, TrialPaths(trial_dir=trial_dir), task)
+
 
 TRIAL_ID = "b00-p0-baseline"
 STEP = "checkpoint_1"

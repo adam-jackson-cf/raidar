@@ -13,6 +13,7 @@ from types import SimpleNamespace
 from typing import Any, cast
 
 import pytest
+from harbor.models.trial.paths import TrialPaths
 from pydantic import ValidationError
 
 from raidar.contract.snapshot import (
@@ -58,9 +59,10 @@ from raidar.grading.sandbox import (
     sandbox_argv,
     sandbox_env,
 )
-from raidar.grading.verifier import (
-    RaidarVerifier,
+from raidar.grading.step import (
     SnapshotUnavailableError,
+    StepVerifier,
+    VerifierSettings,
     _artifact_status,
     _plumbing,
     step_rewards,
@@ -491,20 +493,29 @@ def test_artifact_manifest_status_is_the_last_record_for_the_app_artifact(
 def test_only_a_collected_or_ok_artifact_is_gradable(
     tmp_path: Path, manifest: object, is_dir: bool, reason: str | None
 ) -> None:
-    artifacts = tmp_path / "artifacts"
-    artifacts.mkdir()
+    trial_paths = TrialPaths(trial_dir=tmp_path / "trial")
+    artifacts = trial_paths.step_artifacts_dir("checkpoint_1")
+    artifacts.mkdir(parents=True)
     if is_dir:
         (artifacts / "app").mkdir()
     if manifest is not None:
         text = manifest if isinstance(manifest, str) else json.dumps(manifest)
         (artifacts / "manifest.json").write_text(text)
-    paths = SimpleNamespace(step_artifacts_dir=lambda step: artifacts, artifacts_dir=artifacts)
-    verifier = cast(Any, SimpleNamespace(step_name="checkpoint_1", trial_paths=paths))
+    verifier = StepVerifier(
+        VerifierSettings(
+            oracle_bundle=str(make_bundle(tmp_path / "fixture").root),
+            docker_context="test-ctx",
+            pinned={"grader": {}},
+        ),
+        trial_paths=trial_paths,
+        environment=FakeAgentEnvironment(),
+        step_name="checkpoint_1",
+    )
     if reason is None:
-        assert RaidarVerifier._artifact_snapshot(verifier) == artifacts / "app"
+        assert verifier._artifact_snapshot() == artifacts / "app"
     else:
         with pytest.raises(SnapshotUnavailableError, match=reason):
-            RaidarVerifier._artifact_snapshot(verifier)
+            verifier._artifact_snapshot()
 
 
 def test_a_manifest_that_is_not_a_file_or_not_text_is_read_as_the_directory_says(

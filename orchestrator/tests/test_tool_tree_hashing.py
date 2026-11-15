@@ -6,7 +6,7 @@ import asyncio
 import json
 from pathlib import Path
 from types import SimpleNamespace
-from typing import Any, cast
+from typing import Any
 
 import pytest
 from harbor.trial.hooks import TrialEvent
@@ -19,6 +19,7 @@ from raidar.engine.health.tool_tree import (
     load_tool_hashes,
     parse_tool_output,
 )
+from tests.health_support import hooked_trial
 
 SHA = "ab" * 32
 
@@ -70,15 +71,11 @@ def test_hooks_take_one_baseline_and_a_hash_after_every_agent_phase(
 ) -> None:
     replies = [f"@@TOOLS present {SHA} 3", f"@@TOOLS present {SHA} 3", RuntimeError("blip")]
     env = Env(replies)
-    hooks: dict[Any, list[Any]] = {}
-    trial = SimpleNamespace(
-        agent_environment=env,
-        paths=SimpleNamespace(trial_dir=tmp_path / "trial"),
-        add_hook=lambda event, hook: hooks.setdefault(event, []).append(hook),
-    )
+    trial = hooked_trial(tmp_path / "trial", env)
+    hooks = trial.hooks
     bundle = SimpleNamespace(resolve_step=lambda name: f"resolved-{name}")
     monkeypatch.setattr("raidar.engine.health.tool_tree.load_bundle", lambda root: bundle)
-    install_tool_tree_watch(cast(Any, trial), tmp_path / "bundle")
+    install_tool_tree_watch(trial, tmp_path / "bundle")
     event = SimpleNamespace(
         result=SimpleNamespace(step_results=[SimpleNamespace(step_name="checkpoint_1")])
     )

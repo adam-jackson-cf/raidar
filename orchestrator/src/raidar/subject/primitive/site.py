@@ -15,7 +15,7 @@ import re
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Literal
+from typing import Literal
 
 from pydantic import JsonValue
 
@@ -23,6 +23,7 @@ from raidar.subject.primitive.calls import (
     CallOptions,
     CallResult,
     CallRunner,
+    Sandbox,
     TransportError,
     TreeManifest,
     snapshot_state,
@@ -55,7 +56,7 @@ class TrialInvalidError(RuntimeError):
 class PackageSite:
     """One package in one checkpoint's container."""
 
-    environment: Any
+    environment: Sandbox
     runner: CallRunner
     logs_dir: Path
     package: StagePackage

@@ -64,10 +64,14 @@ class LivenessProbeAgent(BaseAgent):
     async def setup(self, environment: BaseEnvironment) -> None:
         return None
 
-    def command(self) -> str:
+    @property
+    def probe(self) -> ProbeOptions:
         assert isinstance(self.options, ProbeOptions)
-        hold = self.options.hold_s
-        match self.options.mode:
+        return self.options
+
+    def command(self) -> str:
+        hold = self.probe.hold_s
+        match self.probe.mode:
             case "hung":
                 return f"sleep {hold}"
             case "hung_detached":
@@ -80,12 +84,12 @@ class LivenessProbeAgent(BaseAgent):
             case "chatty":
                 loop = f"end=$((SECONDS+{hold})); while [ $SECONDS -lt $end ]"
                 return f"{loop}; do echo tick; sleep 1; done"
-        raise ValueError(f"unknown mode {self.options.mode!r}")
+        raise ValueError(f"unknown mode {self.probe.mode!r}")
 
     async def run(
         self, instruction: str, environment: BaseEnvironment, context: AgentContext
     ) -> None:
-        result = await environment.exec(self.command(), timeout_sec=self.options.hold_s + 120)
+        result = await environment.exec(self.command(), timeout_sec=self.probe.hold_s + 120)
         await asyncio.sleep(2)  # an enforce-mode kill may still be reaping
         alive = await environment.exec(
             f"ps -e -o pid=,uid=,stat=,args= | grep -E '{DETACHED_MARKER}|sleep'"
@@ -96,7 +100,7 @@ class LivenessProbeAgent(BaseAgent):
         (self.logs_dir / AFTER_PHASE_REPORT).write_text(
             json.dumps({"main_return_code": result.return_code, "ps": alive.stdout or ""})
         )
-        context.metadata = {"mode": self.options.mode}
+        context.metadata = {"mode": self.probe.mode}
         if result.return_code != 0:
             # What Harbor's installed agents do (``exec_as_agent``): a failed command raises.
             raise NonZeroAgentExitCodeError(f"Command failed (exit {result.return_code})")

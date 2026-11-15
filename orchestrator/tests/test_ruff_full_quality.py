@@ -26,7 +26,8 @@ def lint_tree(tmp_path: Path) -> Path:
     checker = tmp_path / "scripts/checks/check-ruff.py"
     checker.parent.mkdir(parents=True)
     shutil.copyfile(ROOT / "scripts/checks/check-ruff.py", checker)
-    for root in ("orchestrator/stubs", "orchestrator/tests", "contract/src"):
+    shutil.copyfile(ROOT / "scripts/checks/git_inventory.py", checker.parent / "git_inventory.py")
+    for root in ("orchestrator/tests", "contract/src"):
         (tmp_path / root).mkdir(parents=True)
     source = tmp_path / SOURCE
     source.parent.mkdir(parents=True)
@@ -145,3 +146,23 @@ def test_py313_generator_defaults_are_not_required_for_py312(lint_tree: Path) ->
     newer, newer_findings, _ = _lint_and_gate(lint_tree, source, "--target-version=py313")
     assert "UP043" in {finding["code"] for finding in newer_findings}
     assert newer.returncode == 1
+
+
+def test_the_gate_skips_fixture_programs_but_lints_the_stage_tool_beside_them(
+    lint_tree: Path,
+) -> None:
+    package = lint_tree / "orchestrator/tests/fixtures/stages/acme/probe"
+    program = package / "fixtures/refuse/state/bad.py"
+    program.parent.mkdir(parents=True)
+    program.write_text("import os\n")
+    gate = [sys.executable, "scripts/checks/check-ruff.py"]
+    (lint_tree / SOURCE).write_text('"""Expose nothing."""\n')
+    skipped = subprocess.run(gate, cwd=lint_tree, capture_output=True, text=True, timeout=30)
+    assert skipped.returncode == 0, skipped.stdout
+    tool = package / "tool/src/probe/bad.py"
+    tool.parent.mkdir(parents=True)
+    tool.write_text("import os\n")
+    linted = subprocess.run(gate, cwd=lint_tree, capture_output=True, text=True, timeout=30)
+    assert linted.returncode == 1
+    assert "tool/src/probe/bad.py" in linted.stdout
+    assert "fixtures/refuse" not in linted.stdout

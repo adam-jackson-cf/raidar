@@ -18,6 +18,7 @@ from typing import Any
 
 from raidar.subject.workflow.acceptance import Acceptance
 from raidar_contract.criteria import validate_criteria
+from tests.primitive_support import NoTransfers
 
 TESTS = """\
 from app import parse
@@ -65,7 +66,7 @@ CRITERIA = {
 }
 
 
-class ScriptShell:
+class ScriptShell(NoTransfers):
     """The container's shell, for the ``python3 -c <script> <args>`` commands the host sends.
 
     The script is Raidar's own, run here against the real files of the workspace it names

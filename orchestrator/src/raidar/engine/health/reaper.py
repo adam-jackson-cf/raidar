@@ -25,13 +25,13 @@ from pathlib import Path
 from typing import Any
 
 from harbor.trial.hooks import TrialEvent, TrialHookEvent
-from harbor.trial.trial import Trial
 
 from raidar.contract.file_io import load_text, store_text
+from raidar.contract.sandbox import Shell
 from raidar.contract.snapshot import APP_SOURCE
 from raidar.engine.health.setup_script import AGENT_SETUP_STASH, SETUP_SCRIPT_NAME
 from raidar.grading.bundle import VerifierBundle, load_bundle
-from raidar.grading.guard import current_step
+from raidar.grading.guard import AgentTrial, current_step
 from raidar.grading.records import step_record_dir
 
 REAP_REPORT = "agent-reap.json"
@@ -109,12 +109,12 @@ def parse_reap_output(user: str, output: str) -> ReapReport:
     return ReapReport(user, tuple(sections[_KILLED]), tuple(sections[_RESIDUAL]), None)
 
 
-def _agent_user(trial: Trial) -> str | None:
+def _agent_user(trial: AgentTrial) -> str | None:
     user = trial.task.config.agent.user
     return None if user is None else str(user)
 
 
-async def reap_agent_processes(environment: Any, user: str | None) -> ReapReport:
+async def reap_agent_processes(environment: Shell, user: str | None) -> ReapReport:
     if user is None:
         return ReapReport("", (), (), "the task sets no agent user; nothing can be reaped")
     try:
@@ -148,7 +148,7 @@ def reap_infra_reason(report: dict[str, Any] | None) -> str | None:
     return None
 
 
-def install_agent_reaper(trial: Trial, oracle_bundle: str | Path | VerifierBundle) -> None:
+def install_agent_reaper(trial: AgentTrial, oracle_bundle: str | Path | VerifierBundle) -> None:
     bundle = (
         oracle_bundle
         if isinstance(oracle_bundle, VerifierBundle)

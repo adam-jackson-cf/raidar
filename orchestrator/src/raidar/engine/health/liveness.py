@@ -34,14 +34,15 @@ from collections import deque
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, Protocol
 
-from harbor.trial.hooks import LogEntry, TrialEvent, TrialHookEvent
-from harbor.trial.trial import Trial
+from harbor.trial.hooks import LogCallback, LogEntry, TrialEvent, TrialHookEvent
 
 from raidar.contract.activity import HostActivity, observe_host_activity
 from raidar.contract.file_io import load_text, store_text
+from raidar.contract.sandbox import Shell
 from raidar.engine.health.reaper import ReapReport, reap_agent_processes
+from raidar.grading.guard import AgentTrial
 
 LIVENESS_REPORT = "raidar-liveness.json"
 MODE_ENV = "RAIDAR_LIVENESS"
@@ -199,7 +200,7 @@ class Verdict:
 class AgentHost:
     """Where the agent runs: its container environment and the uid whose processes count."""
 
-    environment: Any
+    environment: Shell
     user: str | None
     activity: HostActivity
 
@@ -210,7 +211,7 @@ class PhaseMonitor:
     def __init__(
         self,
         config: LivenessConfig,
-        environment: Any,
+        environment: Shell,
         user: str | None,
         *,
         step: str | None = None,
@@ -395,10 +396,16 @@ class PhaseMonitor:
             self.error = f"{type(error).__name__}: {error}"
 
 
+class MonitoredTrial(AgentTrial, Protocol):
+    """A trial whose agent output the liveness monitor reads."""
+
+    def add_log_callback(self, callback: LogCallback) -> None: ...
+
+
 class TrialLiveness:
     """Per-trial hook state: the active phase monitor plus every finished phase."""
 
-    def __init__(self, trial: Trial, config: LivenessConfig) -> None:
+    def __init__(self, trial: MonitoredTrial, config: LivenessConfig) -> None:
         self.trial = trial
         self.config = config
         self.active: PhaseMonitor | None = None
@@ -455,7 +462,7 @@ def _step_name(event: TrialHookEvent) -> str | None:
         return None
 
 
-def install_liveness_monitor(trial: Trial, config: LivenessConfig) -> None:
+def install_liveness_monitor(trial: MonitoredTrial, config: LivenessConfig) -> None:
     """Arm the monitor on a trial; a no-op only when the config's mode is ``off``."""
     if config.mode == "off":
         return

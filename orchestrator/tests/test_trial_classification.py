@@ -34,7 +34,7 @@ from raidar.engine.trial.collect import (
 from raidar.engine.trial.progression import derive_reached, gate_passes, progression_rule
 from raidar.engine.trial.record import reached
 from raidar.grading.solvable import SolvableRef
-from raidar.grading.verifier import step_rewards
+from raidar.grading.step import step_rewards
 from tests.execution_support import (
     CLASSIFIED_STEPS as STEPS,
     StepOutcome,

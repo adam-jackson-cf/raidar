@@ -7,13 +7,14 @@ import subprocess
 import sys
 from pathlib import Path
 
+from git_inventory import FIXTURE_PROGRAM_GLOBS
+
 ROOT = Path(__file__).resolve().parents[2]
 
 
 def main() -> int:
     targets = [
         "orchestrator/src",
-        "orchestrator/stubs",
         "orchestrator/tests",
         "contract/src",
         "scripts",
@@ -32,6 +33,8 @@ def main() -> int:
             "orchestrator/pyproject.toml",
             "--force-exclude",
             "--output-format=concise",
+            # Fixture programs are tool inputs, some deliberately wrong; never maintained code.
+            *(f"--extend-exclude={ROOT / pattern}" for pattern in FIXTURE_PROGRAM_GLOBS),
             *targets,
         ],
         cwd=ROOT,

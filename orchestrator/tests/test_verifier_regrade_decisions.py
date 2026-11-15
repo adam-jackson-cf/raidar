@@ -10,10 +10,11 @@ from types import SimpleNamespace
 from typing import Any
 
 import pytest
+from harbor.models.task.task import Task
 from harbor.models.trial.paths import TrialPaths
 
 from raidar.contract.snapshot import tree_digest
-from raidar.grading import closure, offline, records, regrade, verifier
+from raidar.grading import closure, offline, records, regrade, step
 from raidar.grading.grader_image import GraderIdentityError
 from raidar.grading.leak import LeakReport, LeakScanError
 from raidar.grading.models import CaseGroup, CaseResult, CaseStatus, RunEvidence, VerifierGrade
@@ -26,6 +27,9 @@ from raidar.grading.records import (
     StepRecord,
 )
 from raidar.grading.solvable import solvable_ref_from_metadata
+from raidar.grading.verifier import RaidarVerifier
+from tests.verifier_support import FakeAgentEnvironment
+from tests.workflow_support import HarborEnvironmentDouble
 
 
 @pytest.fixture(name="record")
@@ -66,19 +70,67 @@ def _result(record: StepRecord) -> StepGrade:
 
 
 def _verifier(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, **options: Any
-) -> verifier.RaidarVerifier:
-    monkeypatch.setattr(verifier, "load_bundle", lambda _: SimpleNamespace())
-    return verifier.RaidarVerifier(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    environment: FakeAgentEnvironment | None = None,
+    **options: Any,
+) -> step.StepVerifier:
+    monkeypatch.setattr(step, "load_bundle", lambda _: SimpleNamespace())
+    return step.StepVerifier(
+        step.VerifierSettings(
+            oracle_bundle="/bundle", docker_context="fixture", pinned={"grader": {}}, **options
+        ),
+        trial_paths=TrialPaths(trial_dir=tmp_path),
+        environment=environment or FakeAgentEnvironment(),
+        step_name="checkpoint_1",
+    )
+
+
+class _GradedStep(step.StepVerifier):
+    """The owned step with its grading replaced by fixed rewards."""
+
+    async def verify(self) -> dict[str, float]:
+        return {"solved": 1.0, "oracle_leak": 0.0}
+
+
+def _harbor_task(root: Path) -> Task:
+    (root / "tests").mkdir(parents=True)
+    (root / "task.toml").write_text('schema_version = "1.1"\n')
+    (root / "instruction.md").write_text("Build the app.\n")
+    (root / "tests" / "test.sh").write_text("#!/bin/sh\n")
+    return Task(root)
+
+
+async def test_harbor_builds_the_verifier_from_its_kwargs_and_receives_the_step_rewards(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(step, "load_bundle", lambda _: SimpleNamespace())
+    adapter = RaidarVerifier(
+        task=_harbor_task(tmp_path / "task"),
+        trial_paths=TrialPaths(trial_dir=tmp_path / "trial"),
+        environment=HarborEnvironmentDouble(),
+        step_name="checkpoint_1",
+        override_env={"RAIDAR_PROBE": "1"},
         oracle_bundle="/bundle",
         docker_context="fixture",
-        task=None,
-        trial_paths=TrialPaths(trial_dir=tmp_path),
-        environment=SimpleNamespace(),
-        step_name="checkpoint_1",
         pinned={"grader": {}},
-        **options,
     )
+    # Raidar's settings reach the step; Harbor's own arguments reach BaseVerifier.
+    assert (adapter.step.settings.docker_context, adapter.step.step_name) == (
+        "fixture",
+        "checkpoint_1",
+    )
+    assert adapter.override_env == {"RAIDAR_PROBE": "1"}
+    adapter.step = _GradedStep(
+        adapter.step.settings,
+        trial_paths=adapter.trial_paths,
+        environment=FakeAgentEnvironment(),
+        step_name="checkpoint_1",
+    )
+
+    result = await adapter.verify()
+
+    assert result.rewards == {"solved": 1.0, "oracle_leak": 0.0}
 
 
 def test_unknown_snapshot_source_is_refused_before_bundle_access(
@@ -107,14 +159,11 @@ async def test_download_snapshot_keeps_an_independent_regradable_tree(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    subject = _verifier(tmp_path, monkeypatch, snapshot_source="download")
-
-    async def download(**kwargs: Any) -> None:
-        target = kwargs["target_dir"]
-        target.mkdir(parents=True)
-        (target / "app.py").write_text("print(42)\n")
-
-    subject.environment = SimpleNamespace(download_dir_with_exclusions=download)
+    app = tmp_path / "container-app"
+    app.mkdir()
+    (app / "app.py").write_text("print(42)\n")
+    environment = FakeAgentEnvironment(app_source=app)
+    subject = _verifier(tmp_path, monkeypatch, environment, snapshot_source="download")
     record_dir = tmp_path / "evidence"
     snapshot, ref = await subject._snapshot(tmp_path / "work", record_dir)
     retained = tmp_path / ref.stored_path
@@ -158,11 +207,11 @@ async def test_prepare_sandbox_refuses_a_rebuilt_grader(
     async def environment_id() -> str:
         return "sha256:rebuilt"
 
-    monkeypatch.setattr(verifier, "ensure_grader_image", image)
+    monkeypatch.setattr(step, "ensure_grader_image", image)
     monkeypatch.setattr(
-        verifier, "DockerCopySandbox", lambda **_: SimpleNamespace(environment_id=environment_id)
+        step, "DockerCopySandbox", lambda **_: SimpleNamespace(environment_id=environment_id)
     )
-    monkeypatch.setattr(verifier, "grading_execution_digest", lambda: "impl")
+    monkeypatch.setattr(step, "grading_execution_digest", lambda: "impl")
     with pytest.raises(GraderIdentityError, match="environment_id"):
         await subject.prepare_sandbox()
 
@@ -184,11 +233,11 @@ async def test_prepare_sandbox_records_admitted_image_and_timeout(
     async def environment_id() -> str:
         return "sha256:original"
 
-    monkeypatch.setattr(verifier, "ensure_grader_image", image)
+    monkeypatch.setattr(step, "ensure_grader_image", image)
     monkeypatch.setattr(
-        verifier, "DockerCopySandbox", lambda **_: SimpleNamespace(environment_id=environment_id)
+        step, "DockerCopySandbox", lambda **_: SimpleNamespace(environment_id=environment_id)
     )
-    monkeypatch.setattr(verifier, "grading_execution_digest", lambda: "impl")
+    monkeypatch.setattr(step, "grading_execution_digest", lambda: "impl")
     _, admitted = await subject.prepare_sandbox()
     assert admitted.environment_id == "sha256:original"
     assert admitted.image == "grader:1"
@@ -203,7 +252,7 @@ def test_verifier_retains_grading_and_isolation_logs(tmp_path: Path) -> None:
     out.mkdir(parents=True)
     (out / "sandbox.log").write_text("submission exited 1\n")
     (out / "secret-isolation.json").write_text('{"absent": true}')
-    verifier._keep_logs(source, target)
+    step._keep_logs(source, target)
     assert (target / "grading.log").read_text() == "submission exited 1\n"
     assert json.loads((target / "grading-secret-isolation.json").read_text()) == {"absent": True}
     assert not (target / "coverage.log").exists()

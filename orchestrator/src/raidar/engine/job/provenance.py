@@ -67,7 +67,7 @@ def setup_limit(override: float | None) -> float:
     This is the arm's override, else Harbor's own default, so H5 always has a limit to measure
     against.
     """
-    return float(Trial._AGENT_SETUP_TIMEOUT_SEC if override is None else override)  # noqa: SLF001
+    return float(Trial._AGENT_SETUP_TIMEOUT_SEC if override is None else override)
 
 
 def effective_limits(plan: ExperimentPlan) -> dict[str, Any]:

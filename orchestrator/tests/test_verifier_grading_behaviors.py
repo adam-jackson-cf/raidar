@@ -5,13 +5,14 @@ from __future__ import annotations
 import hashlib
 import json
 from pathlib import Path
-from typing import Any, cast
+from typing import Any
 
 import pytest
 from harbor.models.trial.paths import TrialPaths
 
 from raidar.contract.wheels import DependencyInfraError
 from raidar.grading import grader as grader_module
+from raidar.grading.closure import ClosureImage
 from raidar.grading.grader import (
     BUDGET_MARGIN_S,
     Oracle,
@@ -60,8 +61,8 @@ from raidar.grading.records import (
     parse_solvable,
 )
 from raidar.grading.sandbox import CONTAINER_LAYOUT, SandboxResult, SandboxRun
+from raidar.grading.step import StepVerifier, VerifierSettings
 from raidar.grading.submission_deps import SubmissionDependencies
-from raidar.grading.verifier import RaidarVerifier
 from tests.verifier_support import FakeAgentEnvironment, make_bundle, step_spec
 
 
@@ -552,6 +553,12 @@ class ScriptedSandbox:
     async def environment_id(self) -> str:
         return "img"
 
+    async def target_arch(self) -> str:
+        raise AssertionError("dependency provisioning is a patched seam in these scenarios")
+
+    async def closure_image(self, lock_text: str) -> ClosureImage:
+        raise AssertionError("dependency provisioning is a patched seam in these scenarios")
+
     async def run(self, run: SandboxRun) -> SandboxResult:
         self.runs.append(run)
         result, ledger = self.script[len(self.runs) - 1]
@@ -588,7 +595,7 @@ async def _grade(
 ) -> StepGrade:
     bundle = make_bundle(tmp_path / "fixture")
     return await grade_step(
-        Oracle(bundle, cast(Any, sandbox)),
+        Oracle(bundle, sandbox),
         "checkpoint_1",
         tmp_path / "snapshot",
         tmp_path / "work",
@@ -824,7 +831,7 @@ async def test_cases_left_when_the_budget_runs_out_fail_and_are_timing_sensitive
     assert sandbox.runs[0].timeout_s == BUDGET_MARGIN_S + 1.0
 
 
-class _FastVerifier(RaidarVerifier):
+class _FastVerifier(StepVerifier):
     """The production ``verify()`` with the grader, snapshot and pre-agent scan scripted."""
 
     sandbox: ScriptedSandbox
@@ -865,21 +872,20 @@ async def test_a_step_leaks_when_either_scan_found_the_hidden_tests(
     stdout = f"{digest}  /app/stolen.py\n" if verify_leaks else ""
     env = FakeAgentEnvironment(leak_stdout=stdout + "RAIDAR_LEAK_SCAN_DONE\n")
     verifier = _FastVerifier(
-        oracle_bundle=str(bundle.root),
-        docker_context="test-ctx",
-        task=cast(Any, None),
+        VerifierSettings(
+            oracle_bundle=str(bundle.root),
+            docker_context="test-ctx",
+            pinned={"grader": {}},
+            coverage=False,
+        ),
         trial_paths=TrialPaths(trial_dir=tmp_path / "trial"),
-        environment=cast(Any, env),
+        environment=env,
         step_name="checkpoint_1",
-        pinned={"grader": {}},
-        coverage=False,
     )
     verifier.sandbox = ScriptedSandbox(_ran(_ledger(PASSED)))
     verifier.pre_agent = None if pre_agent_clean is None else LeakReport(clean=pre_agent_clean)
 
-    result = await verifier.verify()
-
-    assert result.rewards is not None
-    assert (result.rewards["oracle_leak"] == 1.0) is leaked
-    assert ("solved" in result.rewards) is not leaked  # a leaked step reports no verdict at all
-    assert result.rewards["infrastructure_failure"] == 0.0
+    rewards = await verifier.verify()
+    assert (rewards["oracle_leak"] == 1.0) is leaked
+    assert ("solved" in rewards) is not leaked  # a leaked step reports no verdict at all
+    assert rewards["infrastructure_failure"] == 0.0

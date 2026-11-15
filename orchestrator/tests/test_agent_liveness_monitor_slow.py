@@ -6,7 +6,6 @@ import asyncio
 import json
 from pathlib import Path
 from types import SimpleNamespace
-from typing import Any, cast
 
 import pytest
 from harbor.trial.hooks import TrialEvent
@@ -21,7 +20,7 @@ def test_hooks_arm_the_phase_and_write_the_host_side_report(tmp_path: Path) -> N
     env = ScriptedEnv([poll_output([stat_line(5, "sleep", 3)])])
     trial, hooks, callbacks = fake_trial(tmp_path, env)
     config = LivenessConfig("observe", interval_s=0.01, idle_s=0.03)
-    install_liveness_monitor(cast(Any, trial), config)
+    install_liveness_monitor(trial, config)
     event = SimpleNamespace(
         result=SimpleNamespace(step_results=[SimpleNamespace(step_name="checkpoint_1")])
     )

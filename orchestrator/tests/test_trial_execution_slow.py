@@ -54,7 +54,7 @@ from raidar.engine.trial.provision import TrialProvision
 from raidar.engine.trial.workspace import SEED_SLUG
 from raidar.grading.guard import install_leak_guard
 from raidar.grading.records import load_pre_agent_leak, step_record_dir
-from raidar.grading.verifier import VerifierSettings
+from raidar.grading.step import VerifierSettings
 from raidar.subject.environment.python.pack_definition import load_pack_spec
 from raidar.subject.workflow.runner import WorkflowRunner
 from tests.execution_support import (

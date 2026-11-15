@@ -1,6 +1,0 @@
-from harbor.models.trajectories.observation_result import ObservationResult as ObservationResult
-from pydantic import BaseModel
-
-class Observation(BaseModel):
-    results: list[ObservationResult] = ...
-    ...

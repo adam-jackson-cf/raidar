@@ -4,17 +4,19 @@ import json
 import os
 import sys
 from pathlib import Path
+from typing import Any
 
 
-def _context(argv):
+def _context(argv: list[str]) -> dict[str, Any]:
     if "--context" in argv:
         path = argv[argv.index("--context") + 1]
     else:
         path = os.environ["RAIDAR_STAGE_CONTEXT"]
-    return json.loads(Path(path).read_text(encoding="utf-8"))
+    context: dict[str, Any] = json.loads(Path(path).read_text(encoding="utf-8"))
+    return context
 
 
-def _words(context):
+def _words(context: dict[str, Any]) -> int:
     try:
         text = (Path(context["state"]) / "note.md").read_text(encoding="utf-8")
     except (OSError, UnicodeDecodeError):
@@ -22,7 +24,7 @@ def _words(context):
     return len(text.split())
 
 
-def _stop(context):
+def _stop(context: dict[str, Any]) -> dict[str, Any]:
     state = Path(context["state"])
     needed = context["params"]["min_words"]
     words = _words(context)
@@ -35,7 +37,7 @@ def _stop(context):
     return {"status": status, "message": message, "tokens": {}, "carry": {"words": words}}
 
 
-def main(argv):
+def main(argv: list[str]) -> int:
     command = argv[0] if argv else ""
     context = _context(argv)
     if command == "setup":

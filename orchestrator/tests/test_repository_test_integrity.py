@@ -178,6 +178,56 @@ def test_production_symbols_with_a_production_caller_are_accepted(
     assert run(tmp_path, checker, files) == []
 
 
+@pytest.mark.parametrize(
+    "files",
+    [
+        {
+            "orchestrator/src/raidar/engine.py": "PLUGIN = 'raidar.probe:Peek'\n",
+        },
+        {
+            "orchestrator/pyproject.toml": "[project]\nname = 'raidar'\n"
+            "[project.entry-points.'raidar.plugins']\npeek = 'raidar.probe:Peek'\n",
+        },
+        {
+            "orchestrator/pyproject.toml": "[project]\nname = 'raidar'\n"
+            "[project.scripts]\npeek = 'raidar.probe:Peek'\n",
+        },
+    ],
+    ids=["module-symbol-string", "entry-point", "script"],
+)
+def test_symbols_a_third_party_loads_by_reference_are_accepted(
+    tmp_path: Path, checker: Checker, files: dict[str, str]
+) -> None:
+    production = {PRODUCTION: "class Peek:\n    pass\n"}
+    test = {TEST: "from raidar.probe import Peek\ndef test_x(): assert Peek()\n"}
+    assert run(tmp_path, checker, {**production, **test, **files}) == []
+
+
+def test_a_reference_to_another_module_or_symbol_does_not_excuse_a_test_only_symbol(
+    tmp_path: Path, checker: Checker
+) -> None:
+    files = {
+        PRODUCTION: "class Peek:\n    pass\n",
+        "orchestrator/src/raidar/engine.py": "A = 'raidar.other:Peek'\nB = 'raidar.probe:Look'\n",
+        TEST: "from raidar.probe import Peek\ndef test_x(): assert Peek()\n",
+    }
+    assert_rule(run(tmp_path, checker, files), PRODUCTION, "TEST.no-test-hooks")
+
+
+def test_click_registered_commands_are_accepted_and_plain_decorators_are_not(
+    tmp_path: Path, checker: Checker
+) -> None:
+    production = (
+        "import click\n@click.group()\ndef cli():\n    pass\n\n"
+        "@cli.command('peek')\ndef peek():\n    pass\n"
+    )
+    test = "from raidar.probe import cli, peek\ndef test_x(): assert cli and peek\n"
+    assert run(tmp_path, checker, {PRODUCTION: production, TEST: test}) == []
+    cached = "import functools\n@functools.cache\ndef peek():\n    pass\n"
+    found = run(tmp_path, checker, {PRODUCTION: cached, TEST: test})
+    assert_rule(found, PRODUCTION, "TEST.no-test-hooks")
+
+
 def test_exceptions_waive_their_path_and_rule_and_stale_ones_are_rejected(
     tmp_path: Path, checker: Checker
 ) -> None:
@@ -195,3 +245,8 @@ def test_exceptions_waive_their_path_and_rule_and_stale_ones_are_rejected(
         "orchestrator/tests/test_*.py names missing ADR docs/adr/adr-404.md §1; "
         "remove or correct the entry",
     ]
+
+
+def test_fixture_programs_are_never_judged(tmp_path: Path, checker: Checker) -> None:
+    program = "lab/stages/raidar/verify/fixtures/refuse/state/raidar/app.py"
+    assert run(tmp_path, checker, {program: "RUNNER = 'pytest'\n"}) == []

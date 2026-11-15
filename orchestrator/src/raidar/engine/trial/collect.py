@@ -57,7 +57,7 @@ from raidar.engine.trial.lab_checks import lab_checks, seed_parent
 from raidar.engine.trial.progression import derive_reached, gate_passes
 from raidar.grading.records import RECORD_FILE, StepRecord, load_step_record, step_record_dir
 from raidar.grading.solvable import EXCLUDED_REWARD_KEY
-from raidar.grading.verifier import LEAK_REWARD_KEY
+from raidar.grading.step import LEAK_REWARD_KEY
 
 LAB_CHECK = "lab_check"
 

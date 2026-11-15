@@ -119,10 +119,17 @@ class DockerExecEnv:
     def __init__(self, context: str, container: str) -> None:
         self.context, self.container = context, container
 
-    async def exec(self, command: str, user: str | None = None, **_: Any) -> Any:
+    async def exec(
+        self,
+        command: str,
+        cwd: str | None = None,
+        env: dict[str, str] | None = None,
+        timeout_sec: int | None = None,
+        user: str | int | None = None,
+    ) -> Any:
         done = await asyncio.to_thread(
             subprocess.run,
-            ["docker", "--context", self.context, "exec", "-u", user or "root", self.container]
+            ["docker", "--context", self.context, "exec", "-u", str(user or "root"), self.container]
             + ["bash", "-c", command],
             capture_output=True,
             text=True,

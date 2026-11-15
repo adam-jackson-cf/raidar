@@ -1,6 +1,0 @@
-from typing import Any
-
-IMPORT_PATH_FORMAT: str
-
-def import_symbol(import_path: str) -> Any: ...
-def import_class(import_path: str, *, base: type | None = None, label: str = "symbol") -> type: ...

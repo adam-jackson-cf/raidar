@@ -3,3 +3,5 @@
 ``calls.py`` uploads this directory to a root-owned location and invokes ``main`` through a tiny
 launcher; no module here imports Raidar, a package or anything outside the standard library.
 """
+
+from . import supervise as supervise, walk as walk
