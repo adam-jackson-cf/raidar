@@ -20,6 +20,7 @@ from raidar.contract.trial import CheckpointState, ProgressionRule, StepResult
 from raidar.design.experiment.schema import ProtocolSpec
 from raidar.engine.trial.collect import (
     TrialEvidence,
+    ValidityTerms,
     agent_version_check,
     classify_evidence,
     classify_trial,
@@ -28,7 +29,6 @@ from raidar.engine.trial.collect import (
     installed_versions,
     read_evidence,
     trial_exception,
-    ValidityTerms,
     validity_from_evidence,
 )
 from raidar.engine.trial.progression import derive_reached, gate_passes, progression_rule
