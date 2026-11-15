@@ -75,11 +75,14 @@ FILES = {
     EXCEPTIONS: json.dumps({"schemaVersion": 1, "exceptions": []}),
 }
 LAYOUT_FINDINGS = [
-    f"loose/pyproject.toml: {RULE}: unpinned dependencies in loose/pyproject.toml; "
-    "commit a lock file beside the manifest or pin it from a workspace lock",
-    f"rust/Cargo.lock: {RULE}: no auditor for rust/Cargo.lock; add an auditor for this lock format",
-    f"rust/package.json: {RULE}: unpinned dependencies in rust/package.json; "
-    "commit a lock file beside the manifest or pin it from a workspace lock",
+    f"{RULE} failure=manifest-without-lock path=loose/pyproject.toml reason=dependencies are "
+    "declared with no lock of their ecosystem: commit a lock file beside the manifest or pin "
+    "it from a workspace lock",
+    f"{RULE} failure=manifest-without-lock path=rust/package.json reason=dependencies are "
+    "declared with no lock of their ecosystem: commit a lock file beside the manifest or pin "
+    "it from a workspace lock",
+    f"{RULE} failure=unknown-lock-format path=rust/Cargo.lock reason=no auditor for Cargo.lock: "
+    "add one",
 ]
 
 
@@ -119,6 +122,7 @@ class AuditRunner(Protocol):
 
 class AuditChecker(Protocol):
     ADVISORY_LINE: re.Pattern[str]
+    FAILURE_LINE: re.Pattern[str]
 
     def audit_findings(
         self, root: Path, paths: Sequence[str], *, run: AuditRunner, today: date
@@ -293,15 +297,12 @@ def test_every_advisory_blocks_with_a_machine_readable_line(
     )
     found = audit(checker, repo, runner)
     assert found == [
-        f"app/uv.lock: {RULE}: vulnerability ecosystem=pypi package=widget version=1.5.0 "
-        "advisory=PYSEC-2026-1 aliases=CVE-2026-0001,GHSA-aaaa-bbbb-cccc fix=1.5.1,2.0.0; "
-        "upgrade widget to 1.5.1 or later and relock",
-        f"app/uv.lock: {RULE}: vulnerability ecosystem=pypi package=widget version=1.5.0 "
-        "advisory=PYSEC-2026-2 aliases= fix=; remove or replace widget, "
-        f"or ask the owner for an exception in {EXCEPTIONS}",
-        f"web/package-lock.json: {RULE}: vulnerability ecosystem=npm package=left-pad "
-        "version=1.0.0 advisory=GHSA-2222-3333-4444 aliases= fix=1.0.3; "
-        "upgrade left-pad to 1.0.3 or later and relock",
+        f"{RULE} lock=app/uv.lock ecosystem=PyPI package=widget version=1.5.0 "
+        "advisory=PYSEC-2026-1 aliases=CVE-2026-0001,GHSA-aaaa-bbbb-cccc fix=1.5.1,2.0.0",
+        f"{RULE} lock=app/uv.lock ecosystem=PyPI package=widget version=1.5.0 "
+        "advisory=PYSEC-2026-2 aliases= fix=",
+        f"{RULE} lock=web/package-lock.json ecosystem=npm package=left-pad version=1.0.0 "
+        "advisory=GHSA-2222-3333-4444 aliases= fix=1.0.3",
     ]
     parsed = [checker.ADVISORY_LINE.fullmatch(line) for line in found]
     assert all(parsed)
@@ -309,14 +310,16 @@ def test_every_advisory_blocks_with_a_machine_readable_line(
     assert first is not None
     assert first.group("lock", "ecosystem", "package", "version", "advisory") == (
         "app/uv.lock",
-        "pypi",
+        "PyPI",
         "widget",
         "1.5.0",
         "PYSEC-2026-1",
     )
     assert first.group("aliases").split(",") == ["CVE-2026-0001", "GHSA-aaaa-bbbb-cccc"]
     assert first.group("fix").split(",") == ["1.5.1", "2.0.0"]
+    assert all(checker.FAILURE_LINE.fullmatch(line) for line in LAYOUT_FINDINGS)
     assert not any(checker.ADVISORY_LINE.fullmatch(line) for line in LAYOUT_FINDINGS)
+    assert not any(checker.FAILURE_LINE.fullmatch(line) for line in found)
 
 
 @pytest.mark.parametrize(
@@ -371,16 +374,23 @@ def test_audit_fails_closed_on_unusable_report_or_exit(
 ) -> None:
     found = audit(checker, repo, runner)
     assert len(found) == 1
-    assert re.fullmatch(rf"{re.escape(lock)}: {RULE}: audit failed: [^\r\n;]+; [^\r\n]+", found[0])
+    assert re.fullmatch(
+        rf"{re.escape(RULE)} failure=auditor path={re.escape(lock)} reason=\S.*", found[0]
+    )
+    assert checker.FAILURE_LINE.fullmatch(found[0])
 
 
-@pytest.mark.parametrize("failure", ["timeout", "launch"])
+@pytest.mark.parametrize(
+    ("failure", "error"), [("timeout", "TimeoutExpired"), ("launch", "OSError")]
+)
 def test_audit_tool_failure_is_a_finding_for_each_audited_lock(
-    checker: AuditChecker, repo: Path, failure: str
+    checker: AuditChecker, repo: Path, failure: str, error: str
 ) -> None:
     found = audit(checker, repo, ScriptedAuditors(failure=failure))
-    assert [line.split(":")[0] for line in found] == ["app/uv.lock", "web/package-lock.json"]
-    assert all("audit failed: audit tool failed" in line for line in found)
+    assert found == [
+        f"{RULE} failure=auditor path={lock} reason=audit tool failed ({error})"
+        for lock in ("app/uv.lock", "web/package-lock.json")
+    ]
 
 
 VALID_EXCEPTION = {
@@ -416,8 +426,8 @@ def test_valid_exception_suppresses_only_its_unfixed_advisory(
     found = audit_with_exceptions(checker, repo, document, other)
     assert [line.split("advisory=")[1].split(" ")[0] for line in found[:1]] == ["PYSEC-2026-3"]
     assert found[1:] == [
-        f"{EXCEPTIONS}: {RULE}: exception 0 PYSEC-2026-2 matches no current finding; "
-        "correct or remove the exception"
+        f"{RULE} failure=exception path={EXCEPTIONS} reason=exception 0 PYSEC-2026-2 "
+        "matches no current finding"
     ]
 
 
@@ -447,16 +457,14 @@ def test_invalid_exception_is_a_finding_and_suppresses_nothing(
     found = audit_with_exceptions(checker, repo, {"schemaVersion": 1, "exceptions": [entry]}, vuln)
     assert len(found) == 2
     assert checker.ADVISORY_LINE.fullmatch(found[0])
-    assert (
-        found[1] == f"{EXCEPTIONS}: {RULE}: exception 0 {reason}; correct or remove the exception"
-    )
+    assert found[1] == f"{RULE} failure=exception path={EXCEPTIONS} reason=exception 0 {reason}"
 
 
 def test_duplicate_exception_is_a_finding(checker: AuditChecker, repo: Path) -> None:
     document = {"schemaVersion": 1, "exceptions": [VALID_EXCEPTION, VALID_EXCEPTION]}
     assert audit_with_exceptions(checker, repo, document) == [
-        f"{EXCEPTIONS}: {RULE}: exception 1 PYSEC-2026-2 duplicates another exception; "
-        "correct or remove the exception"
+        f"{RULE} failure=exception path={EXCEPTIONS} reason=exception 1 PYSEC-2026-2 "
+        "duplicates another exception"
     ]
 
 
@@ -478,4 +486,7 @@ def test_malformed_or_missing_exceptions_file_is_a_finding(
         (repo / EXCEPTIONS).write_text(json.dumps(document))
     found = audit(checker, repo, ScriptedAuditors())
     assert len(found) == 1
-    assert found[0].startswith(f"{EXCEPTIONS}: {RULE}: exceptions file ")
+    assert found[0].startswith(
+        f"{RULE} failure=exception path={EXCEPTIONS} reason=exceptions file "
+    )
+    assert checker.FAILURE_LINE.fullmatch(found[0])
