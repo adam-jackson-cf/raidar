@@ -7,7 +7,6 @@ import argparse
 import ast
 import json
 import re
-import subprocess
 import sys
 from collections.abc import Sequence
 from dataclasses import dataclass
@@ -126,7 +125,6 @@ SEAM_SUBPROCESS_WRAPPERS: dict[str, set[str]] = {
     "scripts/checks/check-ruff-suppressions.py": {"main"},
     "scripts/checks/ruff_baseline.py": {"main"},
     "scripts/checks/git_inventory.py": {"_git_paths"},
-    "scripts/checks/check-python-quality.py": {"_check_baseline"},
     "scripts/release/bump-version.py": {
         "git_output",
         "get_commits_since_last_bump",
@@ -142,7 +140,35 @@ EXCLUDED_PREFIXES = (
     "lab/experiments/",
     "lab/stages/raidar/verify/fixtures/",
 )
-GENERIC_NAME_PARTS = {"common", "helpers", "misc", "stuff", "temp"}
+# Catch-all words never name a directory or a module stem (exact whole names only, so compound
+# names such as snapshot_compat stay valid).
+GENERIC_NAME_PARTS = frozenset(
+    {
+        "common",
+        "compat",
+        "fallback",
+        "helpers",
+        "legacy",
+        "manager",
+        "misc",
+        "new",
+        "old",
+        "stuff",
+        "temp",
+        "utils",
+    }
+)
+SNAKE_CASE = re.compile(r"_*[a-z][a-z0-9_]*")
+# ``*Analyzer`` classes under these roots inherit an approved base (PYQ210) and implement the
+# base's entrypoint (PYQ211). Scorers use a structural Protocol and are not ``*Analyzer``
+# classes, so no base is approved: introducing a nominal analyzer hierarchy approves one here.
+ANALYZER_ROOTS = (
+    "orchestrator/src/raidar/scoring/",
+    "orchestrator/src/raidar/evaluation/analysis/",
+    "orchestrator/src/raidar/engine/health/",
+)
+ANALYZER_BASES: frozenset[str] = frozenset()
+ANALYZER_ENTRYPOINTS: dict[str, str] = {}
 ALLOWED_TEST_ROOT_FILES = {
     "orchestrator/tests/__init__.py",
     "orchestrator/tests/conftest.py",
@@ -230,11 +256,7 @@ def discover_maintained_python_files(repo_root: Path) -> list[Path]:
 
 
 def _is_snake_case_name(name: str) -> bool:
-    if name == "__init__":
-        return True
-    if not name or name[0].isdigit():
-        return False
-    return all(char == "_" or char.islower() or char.isdigit() for char in name)
+    return SNAKE_CASE.fullmatch(name) is not None
 
 
 def _root_diagnostics(relpath: str) -> list[Diagnostic]:
@@ -302,14 +324,15 @@ def _module_name_diagnostics(relpath: str) -> list[Diagnostic]:
     if any(path_matches_prefix(relpath, root) for root in SCRIPT_ROOTS):
         return []
     stem = Path(relpath).stem
-    if stem.startswith("test_") or _is_snake_case_name(stem):
+    if _is_snake_case_name(stem):
         return []
     return [
         Diagnostic(
             "PYQ107",
             relpath,
             1,
-            f"Python module '{Path(relpath).name}' must use snake_case",
+            f"Python module '{Path(relpath).name}' is not snake_case; "
+            "rename the module to snake_case",
         )
     ]
 
@@ -336,7 +359,8 @@ def _package_dir_diagnostics(relpath: str) -> list[Diagnostic]:
                 "PYQ105",
                 relpath,
                 1,
-                f"Python package directory '{part}' must use snake_case",
+                f"Python package directory '{part}' is not snake_case; "
+                "rename the directory to snake_case",
             )
         )
     return diagnostics
@@ -446,8 +470,7 @@ def _skill_directory_diagnostics(repo_root: Path, raw_paths: Sequence[str]) -> l
             repo_root / root / relative.removeprefix(root).split("/", 1)[0]
             for relative in repo_paths(repo_root)
             for root in SKILL_ROOTS
-            if relative.startswith(root)
-            and "/" in relative.removeprefix(root)
+            if relative.startswith(root) and "/" in relative.removeprefix(root)
         }
     )
     for directory in directories:
@@ -555,6 +578,52 @@ def _constructor_diagnostics(class_node: ast.ClassDef, relpath: str) -> list[Dia
     return diagnostics
 
 
+def _base_names(class_node: ast.ClassDef) -> set[str]:
+    """Each base as written and by its last dotted name; a subscripted generic by its origin."""
+    names: set[str] = set()
+    for base in class_node.bases:
+        target = base.value if isinstance(base, ast.Subscript) else base
+        dotted = ast.unparse(target)
+        names.update({dotted, dotted.rsplit(".", 1)[-1]})
+    return names
+
+
+def _analyzer_diagnostics(class_node: ast.ClassDef, relpath: str) -> list[Diagnostic]:
+    diagnostics: list[Diagnostic] = []
+    bases = _base_names(class_node)
+    if (
+        any(path_matches_prefix(relpath, root) for root in ANALYZER_ROOTS)
+        and class_node.name.endswith("Analyzer")
+        and not ANALYZER_BASES & bases
+    ):
+        diagnostics.append(
+            Diagnostic(
+                "PYQ210",
+                relpath,
+                class_node.lineno,
+                f"analyzer class '{class_node.name}' inherits no approved analyzer base; "
+                "inherit a base listed in ANALYZER_BASES",
+            )
+        )
+    defined = {
+        node.name
+        for node in class_node.body
+        if isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef)
+    }
+    for base, entrypoint in ANALYZER_ENTRYPOINTS.items():
+        if base in bases and entrypoint not in defined:
+            diagnostics.append(
+                Diagnostic(
+                    "PYQ211",
+                    relpath,
+                    class_node.lineno,
+                    f"analyzer class '{class_node.name}' does not define {entrypoint}; "
+                    f"implement {entrypoint} on the class",
+                )
+            )
+    return diagnostics
+
+
 def class_interface_diagnostics_for_source(source: str, relpath: str) -> list[Diagnostic]:
     diagnostics: list[Diagnostic] = []
     tree = ast.parse(source, filename=relpath)
@@ -563,6 +632,7 @@ def class_interface_diagnostics_for_source(source: str, relpath: str) -> list[Di
             continue
         diagnostics.extend(_class_shape_diagnostics(node, relpath))
         diagnostics.extend(_constructor_diagnostics(node, relpath))
+        diagnostics.extend(_analyzer_diagnostics(node, relpath))
     diagnostics.extend(_seam_diagnostics(tree, relpath))
     diagnostics.extend(_contract_diagnostics(tree, relpath))
     return diagnostics
@@ -875,15 +945,35 @@ def _transport_diagnostics(tree: ast.AST, relpath: str) -> list[Diagnostic]:
     return found
 
 
+def source_problem(source: bytes, relpath: str) -> Diagnostic | None:
+    """PYQ299 when maintained source is not readable UTF-8 Python, else None."""
+    try:
+        ast.parse(source.decode("utf-8"), filename=relpath)
+    except UnicodeDecodeError as exc:
+        line = source[: exc.start].count(b"\n") + 1
+        problem = f"could not decode source: {exc.reason}"
+    except SyntaxError as exc:
+        line = exc.lineno or 1
+        problem = f"could not parse source: {exc.msg}"
+    except ValueError as exc:
+        line = 1
+        problem = f"could not parse source: {exc}"
+    else:
+        return None
+    detail = " ".join(problem.split()).replace(";", ",")
+    return Diagnostic("PYQ299", relpath, line, f"{detail}; restore readable UTF-8 Python")
+
+
 def class_interface_diagnostics(repo_root: Path, paths: Sequence[Path]) -> list[Diagnostic]:
     diagnostics: list[Diagnostic] = []
     for path in paths:
         relpath = repo_relative_path(repo_root, path)
-        try:
-            source = path.read_text(encoding="utf-8")
-        except UnicodeDecodeError as exc:
-            diagnostics.append(Diagnostic("PYQ299", relpath, 1, f"could not decode source: {exc}"))
+        raw = path.read_bytes()
+        problem = source_problem(raw, relpath)
+        if problem is not None:
+            diagnostics.append(problem)
             continue
+        source = raw.decode("utf-8")
         diagnostics.extend(class_interface_diagnostics_for_source(source, relpath))
         diagnostics.extend(execution_boundary_diagnostics_for_source(source, relpath))
         diagnostics.extend(scalability_diagnostics_for_source(source, relpath))
@@ -927,8 +1017,13 @@ def finding_records(repo_root: Path, diagnostics: Sequence[Diagnostic]) -> list[
             )
             continue
         if diagnostic.relpath not in sources:
-            source = (repo_root / diagnostic.relpath).read_text(encoding="utf-8")
-            sources[diagnostic.relpath] = (source.splitlines(), ast.parse(source))
+            raw = (repo_root / diagnostic.relpath).read_bytes()
+            text = raw.decode("utf-8", errors="replace")
+            readable = source_problem(raw, diagnostic.relpath) is None
+            sources[diagnostic.relpath] = (
+                text.splitlines(),
+                ast.parse(text) if readable else ast.Module(body=[], type_ignores=[]),
+            )
         lines, tree = sources[diagnostic.relpath]
         row = diagnostic.line
 
@@ -949,44 +1044,16 @@ def finding_records(repo_root: Path, diagnostics: Sequence[Diagnostic]) -> list[
                 "path": diagnostic.relpath,
                 "code": diagnostic.code,
                 "symbol": ".".join(enclosing(tree, ())),
-                "source_line": lines[row - 1],
+                "source_line": lines[row - 1] if 0 < row <= len(lines) else "",
             }
         )
     return records
-
-
-def _check_baseline(repo_root: Path, diagnostics: Sequence[Diagnostic], baseline: Path) -> int:
-    report = repo_root / "var/tmp/quality/python-policy-report.json"
-    report.parent.mkdir(parents=True, exist_ok=True)
-    report.write_text(json.dumps(finding_records(repo_root, diagnostics)), encoding="utf-8")
-    return subprocess.run(
-        [
-            sys.executable,
-            str(repo_root / "scripts/checks/check-finding-baseline.py"),
-            "--root",
-            str(repo_root),
-            "--tool",
-            "python-policy",
-            "--format",
-            "findings-json",
-            "--baseline",
-            str(baseline),
-            "--report",
-            str(report),
-            "--base-ref",
-            "origin/main",
-        ],
-        cwd=repo_root,
-        check=False,
-        timeout=180,
-    ).returncode
 
 
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--repo-root", type=Path, default=Path.cwd())
     parser.add_argument("--format", choices=("text", "findings-json"), default="text")
-    parser.add_argument("--baseline", type=Path)
     parser.add_argument(
         "--check",
         action="append",
@@ -995,8 +1062,6 @@ def main(argv: Sequence[str] | None = None) -> int:
     )
     parser.add_argument("paths", nargs="*")
     args = parser.parse_args(argv)
-    if args.baseline is not None and (args.format != "text" or args.paths or args.check):
-        parser.error("--baseline requires a complete default scan in text format")
 
     repo_root = args.repo_root.absolute()
     paths = _selected_paths(repo_root, args.paths)
@@ -1010,8 +1075,6 @@ def main(argv: Sequence[str] | None = None) -> int:
     if args.format == "findings-json":
         print(json.dumps(finding_records(repo_root, diagnostics)))
         return int(bool(diagnostics))
-    if args.baseline is not None:
-        return _check_baseline(repo_root, diagnostics, args.baseline)
 
     if diagnostics:
         # Each finding is independently actionable, including a single unknown root.

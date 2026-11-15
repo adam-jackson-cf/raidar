@@ -525,3 +525,28 @@ def test_failed_lock_verification_leaves_all_release_files_unchanged(
         bump.main()
 
     assert all(path.read_text(encoding="utf-8") == contents for path, contents in originals.items())
+
+
+@pytest.mark.parametrize(
+    "path",
+    [
+        "orchestrator/src/raidar/subject/workflow/parserv2.py",
+        "orchestrator/src/raidar/grading/runnerv12/probe.py",
+        "lab/judge/policyv3.yaml",
+    ],
+)
+def test_version_suffixes_attached_to_a_name_are_refused(path: str) -> None:
+    assert structure.version_violations(["orchestrator/src/raidar/grading/environment.py"]) == []
+    assert structure.version_violations([path]) == [f"version in path name: {path}"]
+
+
+def test_structure_findings_name_their_rule(tmp_path: Path) -> None:
+    contract = "contract/src/raidar_contract/probe.py"
+    (tmp_path / contract).parent.mkdir(parents=True)
+    (tmp_path / contract).write_text("def broken(\n")
+    found = structure.rule_findings(["notes.txt", "lab/judge/policy_v2.yaml", contract], tmp_path)
+    assert [line.split(": ", 1)[0] for line in found] == [
+        "STRUCT.folder-placement",
+        "NAME.conventions",
+        "STRUCT.dependency-direction",
+    ]

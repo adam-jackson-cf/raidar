@@ -36,6 +36,14 @@ class PythonChecker(Protocol):
 
     def scalability_diagnostics_for_source(self, source: str, relpath: str) -> list[Finding]: ...
 
+    def class_interface_diagnostics(
+        self, repo_root: Path, paths: Sequence[Path]
+    ) -> list[Finding]: ...
+
+    def finding_records(
+        self, repo_root: Path, diagnostics: Sequence[Finding]
+    ) -> list[dict[str, str]]: ...
+
     def main(self, argv: Sequence[str] | None = None) -> int: ...
 
 
@@ -109,7 +117,23 @@ def test_structure_accepts_owned_paths_and_refuses_policy_violations(
     _assert_refusal(checker.structure_diagnostics_for_relpath(refused), refused, rule)
 
 
-@pytest.mark.parametrize("part", ["common", "helpers", "misc", "stuff", "temp"])
+@pytest.mark.parametrize(
+    "part",
+    [
+        "common",
+        "compat",
+        "fallback",
+        "helpers",
+        "legacy",
+        "manager",
+        "misc",
+        "new",
+        "old",
+        "stuff",
+        "temp",
+        "utils",
+    ],
+)
 @pytest.mark.parametrize("directory", [False, True])
 def test_every_restricted_name_requires_exact_path_approval(
     checker: PythonChecker, part: str, directory: bool
@@ -260,3 +284,60 @@ def test_nested_function_loop_depth_is_independent(checker: PythonChecker) -> No
         "            for c in values:\n                return c\n"
     )
     assert checker.scalability_diagnostics_for_source(source, f"{PRODUCT}scoring/compute.py") == []
+
+
+@pytest.mark.parametrize(
+    ("rule", "refused"),
+    [
+        ("PYQ105", f"{PRODUCT}_2engine/probe.py"),
+        ("PYQ105", f"{PRODUCT}engïne/probe.py"),
+        ("PYQ105", f"{PRODUCT}___/probe.py"),
+        ("PYQ107", f"{PRODUCT}engine/_2probe.py"),
+        ("PYQ107", f"{PRODUCT}engine/probé.py"),
+        ("PYQ107", "orchestrator/tests/test_Policy.py"),
+    ],
+)
+def test_snake_case_requires_a_leading_ascii_letter_after_underscores(
+    checker: PythonChecker, rule: str, refused: str
+) -> None:
+    for accepted in (f"{PRODUCT}_private/__init__.py", f"{PRODUCT}engine/_probe_2.py"):
+        assert checker.structure_diagnostics_for_relpath(accepted) == []
+    _assert_refusal(checker.structure_diagnostics_for_relpath(refused), refused, rule)
+
+
+def test_analyzer_classes_need_an_approved_base(checker: PythonChecker) -> None:
+    path = f"{PRODUCT}scoring/probe.py"
+    assert (
+        checker.class_interface_diagnostics_for_source("class ProbeScorer:\n    pass\n", path) == []
+    )
+    source = "class ProbeAnalyzer:\n    pass\n"
+    assert checker.class_interface_diagnostics_for_source(source, f"{PRODUCT}cli/probe.py") == []
+    _assert_refusal(checker.class_interface_diagnostics_for_source(source, path), path, "PYQ210")
+
+
+def test_analyzer_classes_implement_their_base_entrypoint(
+    checker: PythonChecker, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(checker, "ANALYZER_BASES", frozenset({"BaseAnalyzer"}))
+    monkeypatch.setattr(checker, "ANALYZER_ENTRYPOINTS", {"BaseAnalyzer": "analyze"})
+    path = f"{PRODUCT}scoring/probe.py"
+    header = "from probe import base\n\nclass ProbeAnalyzer(base.BaseAnalyzer):\n"
+    accepted = header + "    def analyze(self):\n        return 1\n"
+    assert checker.class_interface_diagnostics_for_source(accepted, path) == []
+    refused = header + "    def run(self):\n        return 1\n"
+    _assert_refusal(checker.class_interface_diagnostics_for_source(refused, path), path, "PYQ211")
+
+
+@pytest.mark.parametrize("source", [b"\xff\xfeVALUE = 1\n", b"VALUE = 1\ndef broken(\n"])
+def test_unreadable_source_is_a_finding_not_a_crash(
+    checker: PythonChecker, tmp_path: Path, source: bytes
+) -> None:
+    path = f"{PRODUCT}engine/probe.py"
+    candidate = tmp_path / path
+    candidate.parent.mkdir(parents=True)
+    candidate.write_bytes(b"VALUE = 1\n")
+    assert checker.class_interface_diagnostics(tmp_path, [candidate]) == []
+    candidate.write_bytes(source)
+    found = checker.class_interface_diagnostics(tmp_path, [candidate])
+    _assert_refusal(found, path, "PYQ299")
+    assert [record["code"] for record in checker.finding_records(tmp_path, found)] == ["PYQ299"]

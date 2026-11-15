@@ -132,3 +132,64 @@ def test_dependency_policy_does_not_launch_for_non_source_paths() -> None:
         )
         == []
     )
+
+
+@pytest.mark.parametrize("word", ["utils", "manager", "new", "old", "legacy", "compat", "fallback"])
+@pytest.mark.parametrize("template", ["review-surface/src/{}/client.ts", "lab/judge/{}.yaml"])
+def test_catch_all_words_never_name_a_directory_or_file(template: str, word: str) -> None:
+    assert paths.naming_findings(template.format("presentation")) == []
+    relative = template.format(word)
+    found = paths.naming_findings(relative)
+    assert len(found) == 1
+    _assert_finding(found[0], relative, "NAME.conventions")
+
+
+@pytest.mark.parametrize(
+    "relative",
+    ["lab/judge/judge/policy.yaml", "review-surface/src/api/api.ts", "scripts/checks/checks.md"],
+)
+def test_a_child_never_repeats_its_parent_name(relative: str) -> None:
+    assert paths.naming_findings("review-surface/src/api/client.ts") == []
+    found = paths.naming_findings(relative)
+    assert len(found) == 1
+    _assert_finding(found[0], relative, "NAME.conventions")
+
+
+def test_directories_below_a_skill_are_kebab_case() -> None:
+    assert paths.naming_findings(".agents/skills/probe-skill/references/guide.md") == []
+    relative = ".agents/skills/probe-skill/Reference_Notes/guide.md"
+    found = paths.naming_findings(relative)
+    assert len(found) == 1
+    _assert_finding(found[0], relative, "NAME.conventions")
+
+
+@pytest.mark.parametrize(
+    "relative",
+    [
+        "orchestrator/tests/test_probe_jira123.py",
+        "orchestrator/tests/test_probe_481.py",
+        "orchestrator/tests/test_probe_v2.py",
+        "orchestrator/tests/test_probe_2024.py",
+        "orchestrator/tests/test_probe7.py",
+        "orchestrator/tests/test_utils.py",
+        "review-surface/src/probe.test.ts",
+        "orchestrator/src/raidar/engine/probe_test.py",
+    ],
+)
+def test_test_files_are_collected_and_named_for_their_behaviour(relative: str) -> None:
+    for accepted in (
+        "orchestrator/tests/test_sha256_probe.py",
+        "review-surface/tests/probe.spec.ts",
+        "review-surface/journeys/plan-experiment.journey.mjs",
+        "orchestrator/src/raidar/engine/probe.py",
+    ):
+        assert paths.runner_file_findings(accepted) == []
+    found = paths.runner_file_findings(relative)
+    assert len(found) == 1
+    _assert_finding(found[0], relative, "NAME.test-files")
+
+
+def test_naming_rules_run_on_every_inventoried_path(tmp_path: Path) -> None:
+    relative = "review-surface/src/utils/probe.test.ts"
+    rules = {line.split(": ")[1] for line in paths.path_findings(tmp_path, [relative])}
+    assert {"NAME.conventions", "NAME.test-files"} <= rules

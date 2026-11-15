@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
-"""Check behavioral analyzer boundaries; PYQ210/211 are intentionally inapplicable.
+"""Check behavioral analyzer boundaries (filesystem, process and environment access).
 
-Scorers use a structural Protocol and CoverageScorer inherits its entrypoint.
+The nominal analyzer rules PYQ210/PYQ211 live in check-python-quality.py. Scorers use a
+structural Protocol and are not ``*Analyzer`` classes, so those rules find nothing today.
 See docs/reboot/evidence/decide-analyzer-sol.md for the adopted architecture.
 """
 

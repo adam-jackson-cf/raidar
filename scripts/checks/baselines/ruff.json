@@ -3052,12 +3052,6 @@
     },
     {
       "path": "scripts/checks/check-structure.py",
-      "code": "B007",
-      "fingerprint": "ed9838515c4327224550f9dcbe507583ff2ee43f4bc54be54b6f30ce650d0fe7",
-      "count": 1
-    },
-    {
-      "path": "scripts/checks/check-structure.py",
       "code": "D205",
       "fingerprint": "228a74808e736733d6b51e9303edf2d1aef73c6342dbe970c28f266b8780f61b",
       "count": 1
