@@ -79,7 +79,7 @@ def _uv_pin_violations(repo_root: Path) -> list[str]:
 
 
 def _registry_resolver_violations(repo_root: Path, pin: str) -> list[str]:
-    found = []
+    found: list[str] = []
     for relative in repo_paths(repo_root):
         if relative.startswith("lab/problems/registry/") and relative.endswith(".json"):
             record = json.loads((repo_root / relative).read_text(encoding="utf-8"))

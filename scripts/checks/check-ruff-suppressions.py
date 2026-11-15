@@ -11,7 +11,7 @@ import sys
 import tokenize
 import tomllib
 from collections import Counter
-from collections.abc import Mapping, Sequence
+from collections.abc import Iterator, Mapping, Sequence
 from pathlib import Path
 
 from git_inventory import repo_paths, untracked_paths
@@ -29,16 +29,20 @@ ROOT = Path(__file__).resolve().parents[2]
 SUPPRESSION = re.compile(r"#\s*(?:ruff:\s*)?noqa\b", re.IGNORECASE)
 
 
-def _comments(source: str) -> list[tuple[str, int]]:
-    comments = []
+def _tokens(source: str) -> Iterator[tokenize.TokenInfo]:
     try:
-        for token in tokenize.generate_tokens(io.StringIO(source).readline):
-            if token.type == tokenize.COMMENT and SUPPRESSION.match(token.string):
-                comments.append((token.string.strip(), token.start[0]))
+        yield from tokenize.generate_tokens(io.StringIO(source).readline)
     except (tokenize.TokenError, IndentationError):
         # Tokens already emitted retain their lexical identity even in incomplete files.
-        pass
-    return comments
+        return
+
+
+def _comments(source: str) -> list[tuple[str, int]]:
+    return [
+        (token.string.strip(), token.start[0])
+        for token in _tokens(source)
+        if token.type == tokenize.COMMENT and SUPPRESSION.match(token.string)
+    ]
 
 
 def _per_file_entries(patterns: Mapping[str, Sequence[str]]) -> list[tuple[str, str]]:
@@ -58,14 +62,15 @@ def _config_entries(path: str, source: str) -> list[tuple[str, int]]:
         if Path(path).name == "pyproject.toml"
         else document
     )
-    entries = []
+    entries: list[tuple[str, str]] = []
     for section in (config, config.get("lint", {})):
-        for code in section.get("extend-ignore", []):
-            entries.append((f"extend-ignore:{code}", code))
+        entries.extend(
+            (f"extend-ignore:{code}", code) for code in section.get("extend-ignore", [])
+        )
         entries.extend(_per_file_entries(section.get("per-file-ignores", {})))
     # TOML strings retain their spelling-independent identity in the parsed document.
     # Locate each rule in its setting, including multiline arrays and inline tables.
-    rows = []
+    rows: list[tuple[str, str, int]] = []
     section = ""
     setting = ""
     for row, line in enumerate(source.splitlines(), 1):
@@ -77,8 +82,10 @@ def _config_entries(path: str, source: str) -> list[tuple[str, int]]:
             key = line.split("=", 1)[0].strip().strip("\"'")
             setting = "per-file-ignores" if section.endswith("per-file-ignores") else key
         if setting in {"extend-ignore", "per-file-ignores"}:
-            for match in re.finditer(r"[\"']([A-Z]+[0-9]*)[\"']", line.split("#", 1)[0]):
-                rows.append((setting, match[1], row))
+            rows.extend(
+                (setting, match[1], row)
+                for match in re.finditer(r"[\"']([A-Z]+[0-9]*)[\"']", line.split("#", 1)[0])
+            )
     result = []
     for identity, code in entries:
         setting = identity.split(":", 1)[0]
@@ -113,7 +120,8 @@ def added_suppression_findings(
                 continue
             else:
                 findings.append(
-                    f"{path}:{row}: RUFF.IGNORES added suppression; remove the new suppression and fix the finding"
+                    f"{path}:{row}: RUFF.IGNORES added suppression; "
+                    "remove the new suppression and fix the finding"
                 )
     return findings
 

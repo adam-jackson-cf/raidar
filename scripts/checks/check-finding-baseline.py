@@ -72,21 +72,21 @@ def _identified(path: str, code: str, row: int, sources: Mapping[str, str]) -> t
     return path, code, fingerprint(code, ".".join(enclosing(tree, ())), lines[row - 1])
 
 
-def _findings(counts: Counter) -> list[dict]:
+def _findings(counts: Counter[tuple[str, str, str]]) -> list[dict[str, Any]]:
     return [
         {"path": path, "code": code, "fingerprint": mark, "count": count}
         for (path, code, mark), count in sorted(counts.items())
     ]
 
 
-def parse_ruff(text: str, *, root: str, sources: Mapping[str, str]) -> list[dict]:
+def parse_ruff(text: str, *, root: str, sources: Mapping[str, str]) -> list[dict[str, Any]]:
     try:
         diagnostics = json.loads(text)
     except (TypeError, ValueError) as exc:
         raise ScanInputError("missing, empty or malformed Ruff JSON scan") from exc
     if not isinstance(diagnostics, list):
         raise ScanInputError("Ruff scan must be a diagnostic list")
-    counts: Counter = Counter()
+    counts: Counter[tuple[str, str, str]] = Counter()
     for diagnostic in diagnostics:
         try:
             path = _path(diagnostic["filename"], root)
@@ -107,10 +107,10 @@ _MYPY_SUCCESS = re.compile(r"^Success: no issues found in \d+ source files?$")
 _MYPY_SUMMARY = re.compile(r"^Found (\d+) errors? in \d+ files? \(checked \d+ source files?\)$")
 
 
-def parse_mypy(text: str, *, root: str, sources: Mapping[str, str]) -> list[dict]:
+def parse_mypy(text: str, *, root: str, sources: Mapping[str, str]) -> list[dict[str, Any]]:
     if not isinstance(text, str) or not text.strip():
         raise ScanInputError("missing or empty mypy scan")
-    counts: Counter = Counter()
+    counts: Counter[tuple[str, str, str]] = Counter()
     success = False
     summary_count = None
     for line in text.splitlines():
@@ -197,7 +197,7 @@ def _entries(findings: list[dict[str, Any]]) -> dict[tuple[str, str, str], int]:
     return entries
 
 
-def _baseline(document: dict) -> dict[tuple[str, str, str], int]:
+def _baseline(document: dict[str, Any]) -> dict[tuple[str, str, str], int]:
     if (
         not isinstance(document, dict)
         or set(document) != {"schemaVersion", "tool", "findings"}
@@ -239,8 +239,8 @@ def evaluate_baseline(
 
 
 def read_base_baseline(
-    result: subprocess.CompletedProcess[str], baseline: dict, relative: str, ref: str
-) -> dict:
+    result: subprocess.CompletedProcess[str], baseline: dict[str, Any], relative: str, ref: str
+) -> dict[str, Any]:
     """Permit first adoption only when git identifies the exact missing baseline path."""
     missing = {
         f"fatal: path '{relative}' does not exist in '{ref}'",
@@ -250,7 +250,10 @@ def read_base_baseline(
         if result.stderr.strip() in missing:
             return baseline
         raise ScanInputError(f"cannot read base baseline: {result.stderr.strip()}")
-    return json.loads(result.stdout)
+    document = json.loads(result.stdout)
+    if not isinstance(document, dict):
+        raise ScanInputError("invalid baseline schema or tool")
+    return document
 
 
 def main() -> int:
@@ -291,8 +294,8 @@ def main() -> int:
         report = (root / args.report).read_text(encoding="utf-8")
 
         # Load only diagnostic sources, lazily through the parser's mapping seam.
-        class Sources(dict):
-            def __missing__(self, path):
+        class Sources(dict[str, str]):
+            def __missing__(self, path: str) -> str:
                 try:
                     source_path = (root / path).resolve()
                     source_path.relative_to(root)

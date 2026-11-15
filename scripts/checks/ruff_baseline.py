@@ -50,7 +50,8 @@ def main() -> int:
         spec = importlib.util.spec_from_file_location(
             "finding_baseline", ROOT / "scripts/checks/check-finding-baseline.py"
         )
-        assert spec is not None and spec.loader is not None
+        assert spec is not None
+        assert spec.loader is not None
         module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(module)
         diagnostics = json.loads(result.stdout)

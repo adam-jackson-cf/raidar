@@ -6,7 +6,7 @@ Credential handling and shell-based reset paths belong to each runtime, not this
 from __future__ import annotations
 
 import hashlib
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
@@ -65,19 +65,9 @@ def source_record(turn_dir: Path, path: Path) -> dict[str, str]:
     return {"path": relative, "sha256": hashlib.sha256(data).hexdigest()}
 
 
-def session_audit_record(
-    harness: str,
-    *,
-    version: str | None = None,
-    records: int = 0,
-    sources: list[dict[str, str]] | None = None,
-    skill_roots: list[str] | None = None,
-    instructions: list[dict[str, str | None]] | None = None,
-    messages: list[dict[str, str]] | None = None,
-    violations: list[str] | None = None,
-    unmeasured: list[str] | None = None,
-) -> dict[str, Any]:
-    """The normalized ``session_audit`` of one turn (every key always present).
+@dataclass(frozen=True, kw_only=True)
+class SessionAudit:
+    """The normalized ``session_audit`` of one turn; ``record`` always holds every key.
 
     ``skill_roots`` are the skill directories the harness recorded, ``instructions`` the
     instruction files it merged (``path`` when recorded, ``text``), ``messages`` the SHA-256 of
@@ -86,14 +76,26 @@ def session_audit_record(
     removed source from a clean one. ``violations`` are what the records themselves show reached
     the agent; ``unmeasured`` is what they could not show.
     """
-    return {
-        "harness": harness,
-        "version": version,
-        "records": records,
-        "sources": sources or [],
-        "skill_roots": sorted(set(skill_roots or [])),
-        "instructions": instructions or [],
-        "messages": messages or [],
-        "violations": list(dict.fromkeys(violations or [])),
-        "unmeasured": list(dict.fromkeys(unmeasured or [])),
-    }
+
+    harness: str
+    version: str | None = None
+    records: int = 0
+    sources: list[dict[str, str]] = field(default_factory=list)
+    skill_roots: list[str] = field(default_factory=list)
+    instructions: list[dict[str, str | None]] = field(default_factory=list)
+    messages: list[dict[str, str]] = field(default_factory=list)
+    violations: list[str] = field(default_factory=list)
+    unmeasured: list[str] = field(default_factory=list)
+
+    def record(self) -> dict[str, Any]:
+        return {
+            "harness": self.harness,
+            "version": self.version,
+            "records": self.records,
+            "sources": list(self.sources),
+            "skill_roots": sorted(set(self.skill_roots)),
+            "instructions": list(self.instructions),
+            "messages": list(self.messages),
+            "violations": list(dict.fromkeys(self.violations)),
+            "unmeasured": list(dict.fromkeys(self.unmeasured)),
+        }

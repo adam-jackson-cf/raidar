@@ -19,7 +19,7 @@ callers reach a native agent through ``raidar.subject.agent.native``).
 - ``session_store`` names what must stay in place, relative to the agent log root, for the next
   turn to resume. The runner copies logs and never moves or deletes these.
 - ``session_audit`` is what the isolation check needs, normalized from the harness's own
-  records; see ``session_audit_record``. Records that are missing or cannot show something are
+  records; see ``SessionAudit``. Records that are missing or cannot show something are
   ``unmeasured``, never a pass.
 - ``credentials`` (class-level, no instance) says whether a host environment can authenticate the
   harness and where a file-backed session login is kept; see ``Credentials``.

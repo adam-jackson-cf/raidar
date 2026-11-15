@@ -841,7 +841,7 @@
       "tree-sitter-language-pack": "0.13.0"
     }
   },
-  "document_sha256": "f0d509c05f5833e6836b44899dcd30b5f7ce292f6a3fe898e9a43f4dde35f1dd",
+  "document_sha256": "8b4e963859823bc60e940ddbf02e453ded87e821dae4c5081c217be4204e91b3",
   "execution": {
     "arms": {
       "baseline": {
@@ -859,13 +859,13 @@
           "version_pin": "0.156.1",
           "workflow_skills": "placement.skills .agents/skills in the workspace /app"
         },
-        "digest": "0fe67f3d8ef83c29b5de93cc22447914e153b2b538729a31c369165f71e3126e",
+        "digest": "0519080e930ae8858bd17219d25f4161b98b09a8be9246a54fe302e9be14287d",
         "model": "gpt-6-luna",
         "packages": {},
         "primitive_code": {
-          "frame/1": "bd094130a042c8de32b94aa911b91f56319141741a8e21940224afc0115aa6f0",
-          "install/1": "88595ae363bfb01581276ddab0053eb3a1fad714d2af5e7864ffd56ae0d2e2a6",
-          "runner/1": "35b2a0740eb822c397d3b30ae6839823f45b842110e6cc2f692a950700666cb5"
+          "frame/1": "eed58d99845ba445e6d435af924a4988c6a2a23c0e703deb9acf0151be6ae1c5",
+          "install/1": "cc5e21ce9aa0cf76e906b96cf4c03eb63f6c1f897f2a1c370d5140d4bc3715f6",
+          "runner/1": "1b555efaec4439c44d7690f73e75f9098b62446908d84f9471374c727eca27a4"
         },
         "provider": "openai",
         "reasoning": "low",
@@ -1690,7 +1690,7 @@
     "source_sha256": "c2243d115027832291124003db91491281a539065759aa08b1a6e04ec4db7255",
     "spec_sha256": "3edb089ea1ee03462a5cd688e45c5fde0cf5015165d2eabd5f5a4023e6b52257"
   },
-  "lock_sha256": "9b9e7e2275ca9aa2f8a9ab33bcadbc52280174062cb97a8b9cd5ea9dc695dd0f",
+  "lock_sha256": "0404a85824c65476d1c2bd1ec09f8a6159b3394eaeda0f812195c8b30c0ddd3c",
   "lock_version": 5,
   "overrides": {
     "flags": {},
@@ -1699,8 +1699,8 @@
   "sections": {
     "analysis": "1b12d4c79118b1962282a0c33350352b893d39995117c241bba045eff2a1d044",
     "assessment": "e61075a3073c9e030edc1b88f8e27e8204bd05fca6889bb2e3510f6c6544d590",
-    "execution": "9b9e7e2275ca9aa2f8a9ab33bcadbc52280174062cb97a8b9cd5ea9dc695dd0f",
-    "toolchain": "129f8f25205745e44f064a8ec6bc05f3e3eee84b8483b3ff1f46ba04edb33c57"
+    "execution": "0404a85824c65476d1c2bd1ec09f8a6159b3394eaeda0f812195c8b30c0ddd3c",
+    "toolchain": "57caa99992c5b2bb5d4f0ac51dba5ab949f084361d7d255b3636fa6bbd0a7e8d"
   },
   "spec": {
     "agents": [
@@ -1769,6 +1769,6 @@
   "toolchain": {
     "litellm": "1.102.2",
     "python": "3.13.7",
-    "raidar_spec": "cb49142ad8d81b71a9d38af6b91da93d6b5d47ace924ff54352ecaafbbe2d1fa"
+    "raidar_spec": "8f21798d553c0358ab5149a90a0c8db061f40cf9ab04a1b0fd29e72617edadb1"
   }
 }
