@@ -841,7 +841,7 @@
       "tree-sitter-language-pack": "0.13.0"
     }
   },
-  "document_sha256": "8452afc10a49103e031564e475591bbe929d5dbd9dd60ccd4edc37d689a44b62",
+  "document_sha256": "079c2712cac18b84c8e1838408f3a618eec8b63a2db151f295cf067f01a356aa",
   "execution": {
     "arms": {
       "verify": {
@@ -859,7 +859,7 @@
           "version_pin": "0.156.1",
           "workflow_skills": "placement.skills .agents/skills in the workspace /app"
         },
-        "digest": "de2f9991e19b5d7049d5806cb2de31b8d80e8e6299bd0c26679513db71ad06b0",
+        "digest": "ad15611bf1b2c54ee5131bff20b162a7d0db9fdc08dd157547a9703eff4b5854",
         "model": "gpt-6-luna",
         "packages": {
           "raidar/verify": {
@@ -872,9 +872,9 @@
         },
         "primitive_code": {
           "frame/1": "7c483c24e1d1bbb7ea51b8ce5ecd59bbc162d9a71096990db8edaa0b1bc5f894",
-          "gate/1": "79debc0809f2736c912c4e1143563ec799dd6b003f727b06beb183b896c96395",
+          "gate/1": "ac90ff727724798d39b4ffc8917a10d279f19b745548d07e523f8d5edafa4f8f",
           "install/1": "b50a2e24aadef912d05136986848a0e14f75715c26665da5c24940c432493419",
-          "runner/1": "dd0206166ef4e7ac40e1503969285a996e1d6e84e0ab861db9fef3c398a18ba5"
+          "runner/1": "c9561faa31eb23f6250408f8daafa74eb602bf1db3491048943826d71d7d35e0"
         },
         "provider": "openai",
         "reasoning": "low",
@@ -1701,7 +1701,7 @@
     "source_sha256": "91520c9f90040b74939a1402e54fd5342bc9bf05f51ea5be11e7b2899bdfb36d",
     "spec_sha256": "c54d25d1f584c1adf8515ffb8ead2941611a43c0cd6723e61c2cc6d44ea5db07"
   },
-  "lock_sha256": "861b853c8967e202db85e41f5fde0ba5d46e79ef193c9efd87621249cfbd0dcf",
+  "lock_sha256": "ec03d5c0a9e59872dc64aff78fa445de8760eb37b172c4053ecba4580bd46bb8",
   "lock_version": 5,
   "overrides": {
     "flags": {},
@@ -1710,7 +1710,7 @@
   "sections": {
     "analysis": "81cdc2d12aacc031bb70595c13973ff647ab49a68bebda4be7a9b65ba3127a78",
     "assessment": "e61075a3073c9e030edc1b88f8e27e8204bd05fca6889bb2e3510f6c6544d590",
-    "execution": "861b853c8967e202db85e41f5fde0ba5d46e79ef193c9efd87621249cfbd0dcf",
+    "execution": "ec03d5c0a9e59872dc64aff78fa445de8760eb37b172c4053ecba4580bd46bb8",
     "toolchain": "57caa99992c5b2bb5d4f0ac51dba5ab949f084361d7d255b3636fa6bbd0a7e8d"
   },
   "spec": {

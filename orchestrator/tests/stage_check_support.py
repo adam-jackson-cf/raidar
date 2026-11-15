@@ -19,7 +19,6 @@ from typing import Any
 
 import pytest
 import yaml
-from raidar_contract.package.manifest import StagePackage
 
 from raidar.subject.package.registry import load_stage_package
 from raidar.subject.primitive import calls
@@ -28,6 +27,7 @@ from raidar.subject.primitive.gate import Attribution, GateOutcome
 from raidar.subject.primitive.outputs import OutputsResult
 from raidar.subject.workflow import stage_check
 from raidar.subject.workflow.identity import IMPLICIT_CONTRACTS, package_contracts
+from raidar_contract.package.manifest import StagePackage
 from tests.lifecycle_support import (
     FakeContainer,
     ScriptedRunner,
@@ -112,7 +112,7 @@ class _Runner(ScriptedRunner):
         super().__init__(container, logs_dir)
         self.rig = rig
 
-    async def run(  # type: ignore[override]
+    async def run(
         self,
         package: str,
         primitive: str,

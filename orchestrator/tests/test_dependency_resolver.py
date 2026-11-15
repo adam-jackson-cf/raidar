@@ -10,7 +10,9 @@ import io
 import json
 import re
 import subprocess
+import time
 import urllib.error
+import urllib.request
 from collections.abc import Callable, Collection
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
@@ -38,7 +40,6 @@ from raidar.design.problem.models import (
     ProblemStep,
 )
 from raidar.design.problem.store import ProblemStore
-from raidar.grading import resolver as resolver_module
 from raidar.grading.dependency_pins import (
     DependencyLockError,
     DependencyLocks,
@@ -195,7 +196,7 @@ def scripted_shell(monkeypatch: pytest.MonkeyPatch) -> None:
     def run(argv: list[str], **options: Any) -> subprocess.CompletedProcess[str]:
         return _SHELL[0](argv, **options)
 
-    monkeypatch.setattr(resolver_module.subprocess, "run", run)
+    monkeypatch.setattr(subprocess, "run", run)
 
 
 def _answers(*outcomes: Outcome) -> Responder:
@@ -218,7 +219,7 @@ def _resolves(*, refuse: Collection[str] = (), conflict: Collection[str] = ()) -
 @pytest.fixture(name="clock")
 def clock_fixture(monkeypatch: pytest.MonkeyPatch) -> list[float]:
     now = [0.0]
-    monkeypatch.setattr(resolver_module.time, "monotonic", lambda: now[0])
+    monkeypatch.setattr(time, "monotonic", lambda: now[0])
     return now
 
 
@@ -497,7 +498,7 @@ def test_the_default_index_is_the_simple_api(monkeypatch: pytest.MonkeyPatch) ->
         seen.append(request.full_url)  # type: ignore[attr-defined]
         return io.BytesIO(json.dumps(document).encode())
 
-    monkeypatch.setattr(resolver_module.urllib.request, "urlopen", answer)
+    monkeypatch.setattr(urllib.request, "urlopen", answer)
     uv = ScriptedUv(_resolves(refuse={"solo"}))
     result = scripted(uv, index_url="https://index.example/simple")(
         ["solo"], arch="amd64", exclude_newer=CUTOFF
@@ -515,8 +516,8 @@ def test_index_metadata_cannot_outlive_its_remaining_resolution_budget(
         clock[0] += timeout
         raise TimeoutError
 
-    monkeypatch.setattr(resolver_module.time, "monotonic", lambda: clock[0])
-    monkeypatch.setattr(resolver_module.urllib.request, "urlopen", stalled)
+    monkeypatch.setattr(time, "monotonic", lambda: clock[0])
+    monkeypatch.setattr(urllib.request, "urlopen", stalled)
     with pytest.raises(DependencyInfraError):
         SimpleIndex("https://index.example", deadline=12.0).files("pkg")
     assert clock[0] <= 12.0
@@ -576,7 +577,7 @@ def test_the_simple_index_reads_files_and_upload_times(monkeypatch: pytest.Monke
         seen.append(request.full_url)  # type: ignore[attr-defined]
         return io.BytesIO(json.dumps(document).encode())
 
-    monkeypatch.setattr(resolver_module.urllib.request, "urlopen", answer)
+    monkeypatch.setattr(urllib.request, "urlopen", answer)
     files = SimpleIndex("https://index.example/simple/").files("P_Q")
     assert files is not None
     assert [f.filename for f in files] == ["p-1.0.tar.gz", "p-1.0-py3-none-any.whl"]
@@ -599,7 +600,7 @@ def test_the_simple_index_maps_http_failures(
     def refuse(request: object, timeout: float) -> None:
         raise failure
 
-    monkeypatch.setattr(resolver_module.urllib.request, "urlopen", refuse)
+    monkeypatch.setattr(urllib.request, "urlopen", refuse)
     if expected is None:
         assert SimpleIndex().files("p") is None
     else:

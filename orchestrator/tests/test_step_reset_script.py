@@ -24,13 +24,23 @@ pytestmark = pytest.mark.slow
 
 @pytest.fixture(scope="module")
 def bash5() -> str:
-    for path in ("/opt/homebrew/bin/bash", "/usr/local/bin/bash", "/bin/bash", "/usr/bin/bash"):
-        if (
-            Path(path).exists()
+    found = next(
+        (
+            path
+            for path in (
+                "/opt/homebrew/bin/bash",
+                "/usr/local/bin/bash",
+                "/bin/bash",
+                "/usr/bin/bash",
+            )
+            if Path(path).exists()
             and subprocess.run([path, "-c", "((BASH_VERSINFO[0]>=4))"], timeout=120).returncode == 0
-        ):
-            return path
-    pytest.skip("needs bash >= 4 (associative arrays)")
+        ),
+        "",
+    )
+    if not found:
+        pytest.skip("needs bash >= 4 (associative arrays)")
+    return found
 
 
 def _tree(root: Path) -> dict[str, str]:

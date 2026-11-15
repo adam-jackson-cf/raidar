@@ -12,7 +12,7 @@ from pathlib import Path
 import pytest
 
 from raidar.scoring.catalog.builtin import default_scorer_registry
-from raidar.scoring.framework.context import AssessContext
+from raidar.scoring.framework.context import AssessContext, StepInputs
 from raidar.scoring.framework.result import TRAJECTORY_SUBJECT, AssessStatus
 from raidar.scoring.verification_effort import (
     VERIFICATION_EFFORT,
@@ -50,7 +50,7 @@ UNAVAILABLE = AssessStatus.UNAVAILABLE
 INSUFFICIENT = AssessStatus.INSUFFICIENT_EVIDENCE
 
 
-def _refused_then_fixed(tmp_path: Path, name: str = CP1):
+def _refused_then_fixed(tmp_path: Path, name: str = CP1) -> StepInputs:
     item = step(tmp_path, name)
     write_gate(
         trace(item),
@@ -61,7 +61,7 @@ def _refused_then_fixed(tmp_path: Path, name: str = CP1):
     return item
 
 
-def _clean_first_time(tmp_path: Path, name: str = CP2):
+def _clean_first_time(tmp_path: Path, name: str = CP2) -> StepInputs:
     item = step(tmp_path, name)
     write_gate(trace(item), [seal(1, "passed")])
     return item
@@ -321,7 +321,7 @@ def test_a_cached_grade_with_different_provenance_is_not_fix_correctness(
     ],
 )
 def test_malformed_gate_evidence_never_becomes_zero_blocking_failures(
-    tmp_path: Path, keys: tuple, replacement: object
+    tmp_path: Path, keys: tuple[str | int, ...], replacement: object
 ) -> None:
     item = _refused_then_fixed(tmp_path)
     path = trace(item) / "workflow/workflow.json"

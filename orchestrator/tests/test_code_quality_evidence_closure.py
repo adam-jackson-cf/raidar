@@ -184,7 +184,8 @@ def test_each_ruff_diagnostic_becomes_evidence_pointing_at_its_file(shop: dict[s
 
 def _kernel(name: str) -> TransitionReworkEvidence:
     scenario = next(s for s in fork_goldens()["kernels"]["lineage"] if s["name"] == name)
-    return TransitionReworkEvidence.model_validate(scenario["result"])
+    kernel: TransitionReworkEvidence = TransitionReworkEvidence.model_validate(scenario["result"])
+    return kernel
 
 
 def test_ambiguous_lineage_repeats_earlier_modification_only_when_a_member_was_modified() -> None:

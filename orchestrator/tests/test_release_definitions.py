@@ -7,15 +7,15 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+
+from raidar.contract.paths import agents_root, workflows_root
+from raidar.subject.agent.definition import load_agent
 from raidar_contract.agent import AgentDefinitionError
 from raidar_contract.workflow import (
     TASK_TOKEN,
     PackageWorkflowError,
     load_package_workflow,
 )
-
-from raidar.contract.paths import agents_root, workflows_root
-from raidar.subject.agent.definition import load_agent
 from tests.release_support import edit_agent, release_tree, write_workflow
 
 ONE_SHOT = "raidar/one-shot"

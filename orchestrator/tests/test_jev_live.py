@@ -46,7 +46,7 @@ def test_success_records_raw_request_and_response(tmp_path: Path) -> None:
     live = _live(tmp_path, transport)
     result = live.decide(STATE, QUESTIONS)
     assert isinstance(result, JevSuccess)
-    assert result.answers["q1"].noul == 0.9  # type: ignore[union-attr]
+    assert result.answers["q1"].noul == 0.9
     (call,) = live.calls
     root = tmp_path / "judge"
     request = (root / call["request_file"]).read_bytes()

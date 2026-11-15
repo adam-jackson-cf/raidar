@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -147,7 +148,7 @@ def test_large_arms_use_a_deterministic_sampled_permutation() -> None:
     assert min_p < p_value
 
 
-def _trial_trace(tested: bool) -> dict:
+def _trial_trace(tested: bool) -> dict[str, Any]:
     calls = [agent_step(1, codex_patch("e1", "app/main.py"))]
     if tested:
         calls.append(agent_step(2, codex_exec("t1", "pytest")))

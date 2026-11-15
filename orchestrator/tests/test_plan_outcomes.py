@@ -3,20 +3,20 @@
 from __future__ import annotations
 
 import json
-from dataclasses import replace
+from collections.abc import Mapping
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
 
 import click
 import pytest
-from raidar_contract.canonical import digest_json
 
 from raidar.cli import plan_build
 from raidar.design.experiment.lock import LockError, StaleLockError
 from raidar.design.experiment.schema import FieldIssue
-from raidar.design.problem.models import ProblemId
-from raidar.design.problem.store import ProblemStoreError
+from raidar.design.problem.models import ProblemId, ProblemManifest
+from raidar.design.problem.store import ProblemStore, ProblemStoreError
 from raidar.engine.trial import plan as plan_module
 from raidar.engine.trial.plan import (
     ExperimentPlan,
@@ -29,7 +29,9 @@ from raidar.engine.trial.plan import (
     _problems,
     build_plan,
 )
+from raidar.subject.environment import load_runtime_pack
 from raidar.subject.environment.drift import LockedPackError
+from raidar_contract.canonical import digest_json
 
 REF = "scb/forge@38d627ecf668"
 GRADER = {"image": "grader:1", "environment_id": "env-1", "implementation_sha256": "impl-1"}
@@ -60,17 +62,27 @@ def test_only_a_lock_flagged_draft_is_a_smoke_draft(
     assert plan_build._is_draft(lock) is draft
 
 
+@dataclass
+class LockWorld:
+    """What the faked lock and plan collaborators read, and the draft flags they were given."""
+
+    loaded: SimpleNamespace
+    note: str | None = None
+    build_error: Exception | None = None
+    drafts: list[bool] = field(default_factory=list)
+    store: ProblemStore = field(default_factory=lambda: ProblemStore(Path("store")))
+    pack_error: Exception | None = None
+
+
 @pytest.fixture
-def lock_world(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, planned_inputs: None) -> Any:
+def lock_world(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, planned_inputs: None) -> LockWorld:
     """Relocking reproduces the current experiment; a lock on disk is current only if equal.
 
     ``build_lock`` yields the experiment's lock (flagged draft when asked to relock as a
     draft); ``check_lock_file`` accepts a file holding exactly that lock.
     """
-    loaded = _loaded(kind="smoke", path=tmp_path / "loaded.yaml")
-    world = SimpleNamespace(
-        loaded=loaded, note=None, build_error=None, drafts=[], store="store", pack_error=None
-    )
+    loaded = SimpleNamespace(spec=_loaded(kind="smoke").spec, path=tmp_path / "loaded.yaml")
+    world = LockWorld(loaded=loaded)
 
     def build(loaded_arg: Any, *, lock_path: Path, draft: bool) -> dict[str, Any]:
         if world.build_error is not None:
@@ -105,7 +117,7 @@ def _write_lock(path: Path, lock: dict[str, Any]) -> Path:
 
 
 def test_a_lock_on_disk_that_relocks_identically_is_the_lock_the_plan_uses(
-    tmp_path: Path, lock_world: Any, capsys: pytest.CaptureFixture[str]
+    tmp_path: Path, lock_world: LockWorld, capsys: pytest.CaptureFixture[str]
 ) -> None:
     path = _write_lock(tmp_path / "e.lock.json", _full_lock(lock_world.loaded))
 
@@ -116,7 +128,7 @@ def test_a_lock_on_disk_that_relocks_identically_is_the_lock_the_plan_uses(
 
 
 def test_a_lock_that_no_longer_relocks_to_the_same_bytes_is_refused(
-    tmp_path: Path, lock_world: Any
+    tmp_path: Path, lock_world: LockWorld
 ) -> None:
     stale = {**_full_lock(lock_world.loaded), "lock_sha256": "OLD"}
     path = _write_lock(tmp_path / "e.lock.json", stale)
@@ -128,7 +140,7 @@ def test_a_lock_that_no_longer_relocks_to_the_same_bytes_is_refused(
 
 
 def test_a_lock_is_current_as_a_draft_only_when_it_says_it_is_one(
-    tmp_path: Path, lock_world: Any
+    tmp_path: Path, lock_world: LockWorld
 ) -> None:
     loaded = lock_world.loaded
     draft = _write_lock(tmp_path / "draft.lock.json", _full_lock(loaded, draft=True))
@@ -146,7 +158,7 @@ def test_a_lock_is_current_as_a_draft_only_when_it_says_it_is_one(
 
 
 def test_an_ignored_host_difference_is_noted_on_stderr_but_does_not_refuse(
-    tmp_path: Path, lock_world: Any, capsys: pytest.CaptureFixture[str]
+    tmp_path: Path, lock_world: LockWorld, capsys: pytest.CaptureFixture[str]
 ) -> None:
     lock_world.note = "host python 3.12.9 differs from the locked 3.12.8"
     path = _write_lock(tmp_path / "e.lock.json", _full_lock(lock_world.loaded))
@@ -159,7 +171,7 @@ def test_an_ignored_host_difference_is_noted_on_stderr_but_does_not_refuse(
 
 
 def test_an_experiment_that_cannot_be_locked_refuses_the_plan(
-    tmp_path: Path, lock_world: Any
+    tmp_path: Path, lock_world: LockWorld
 ) -> None:
     lock_world.build_error = LockError("experiment.yaml", [FieldIssue("arms", "unresolved agent")])
 
@@ -187,7 +199,7 @@ def _options(tmp_path: Path, lock_path: Path | None = None, **overrides: Any) ->
 
 
 def test_the_cli_plan_selects_truncates_and_bounds_what_the_user_asked_for(
-    tmp_path: Path, lock_world: Any
+    tmp_path: Path, lock_world: LockWorld
 ) -> None:
     _write_lock(tmp_path / "loaded.lock.json", _full_lock(lock_world.loaded))
     options = _options(
@@ -196,7 +208,7 @@ def test_the_cli_plan_selects_truncates_and_bounds_what_the_user_asked_for(
 
     plan, store = plan_build.build_cli_plan(options)
 
-    assert store == "store"
+    assert store == ProblemStore(Path("store"))
     assert plan.selected == {"b01-p0-a"}
     assert {t.steps for t in plan.trials} == {("s1", "s2")}
     assert len(plan.trials) == 4, "the selection narrows what runs, not what is planned"
@@ -206,7 +218,7 @@ def test_the_cli_plan_selects_truncates_and_bounds_what_the_user_asked_for(
 
 
 def test_an_explicit_draft_lock_file_replaces_the_default_lock_and_plans_from_the_tree(
-    tmp_path: Path, lock_world: Any
+    tmp_path: Path, lock_world: LockWorld
 ) -> None:
     custom = _write_lock(tmp_path / "custom.lock.json", _full_lock(lock_world.loaded, draft=True))
 
@@ -216,13 +228,15 @@ def test_an_explicit_draft_lock_file_replaces_the_default_lock_and_plans_from_th
     assert lock_world.drafts == [True]
 
 
-def test_the_default_lock_must_sit_next_to_the_experiment(tmp_path: Path, lock_world: Any) -> None:
+def test_the_default_lock_must_sit_next_to_the_experiment(
+    tmp_path: Path, lock_world: LockWorld
+) -> None:
     with pytest.raises(click.ClickException, match="loaded.lock.json does not exist"):
         plan_build.build_cli_plan(_options(tmp_path))
 
 
 def test_a_selection_the_experiment_cannot_honour_is_a_command_error(
-    tmp_path: Path, lock_world: Any
+    tmp_path: Path, lock_world: LockWorld
 ) -> None:
     _write_lock(tmp_path / "loaded.lock.json", _full_lock(lock_world.loaded))
 
@@ -232,7 +246,7 @@ def test_a_selection_the_experiment_cannot_honour_is_a_command_error(
         plan_build.build_cli_plan(_options(tmp_path, attempts_selected=(5,)))
 
 
-def test_a_drifted_runtime_pack_refuses_the_plan(tmp_path: Path, lock_world: Any) -> None:
+def test_a_drifted_runtime_pack_refuses_the_plan(tmp_path: Path, lock_world: LockWorld) -> None:
     _write_lock(tmp_path / "loaded.lock.json", _full_lock(lock_world.loaded))
     lock_world.pack_error = LockedPackError("pack image drifted")
 
@@ -241,7 +255,7 @@ def test_a_drifted_runtime_pack_refuses_the_plan(tmp_path: Path, lock_world: Any
 
 
 def test_an_unopenable_problem_store_refuses_the_plan(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, lock_world: Any
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, lock_world: LockWorld
 ) -> None:
     _write_lock(tmp_path / "loaded.lock.json", _full_lock(lock_world.loaded))
 
@@ -261,19 +275,35 @@ def _manifest(digest: str = "d1", steps: tuple[str, ...] = ("s1", "s2", "s3")) -
     return SimpleNamespace(digest=lambda: digest, steps=[SimpleNamespace(name=n) for n in steps])
 
 
-class _Store:
-    def __init__(self, manifest: Any, errata: Any = None, error: Exception | None = None) -> None:
-        self.manifest, self.errata, self.error = manifest, errata, error
-        self.errata_asked: list[Any] = []
+@dataclass(frozen=True)
+class _Store(ProblemStore):
+    """A store holding one manifest and errata; it records the errata pins it was asked for."""
 
-    def load_manifest(self, problem: Any) -> Any:
+    manifest: ProblemManifest | None = None
+    errata: dict[str, Any] | None = None
+    error: Exception | None = None
+    errata_asked: list[Mapping[str, Any] | None] = field(default_factory=list)
+
+    def load_manifest(self, problem: ProblemId) -> ProblemManifest:
+        assert self.manifest is not None
         return self.manifest
 
-    def pinned_errata(self, problem: Any, manifest: Any, pinned: Any) -> Any:
+    def pinned_errata(
+        self, problem: ProblemId, manifest: ProblemManifest, pinned: Mapping[str, Any] | None
+    ) -> dict[str, Any] | None:
         self.errata_asked.append(pinned)
         if self.error is not None:
             raise self.error
         return self.errata
+
+
+def _store(
+    manifest: ProblemManifest,
+    *,
+    errata: dict[str, Any] | None = None,
+    error: Exception | None = None,
+) -> _Store:
+    return _Store(Path("store"), manifest=manifest, errata=errata, error=error)
 
 
 def _loaded(
@@ -282,11 +312,9 @@ def _loaded(
     checkpoints: int | None = None,
     progression: str = "continue",
     kind: str = "ab",
-    arms: tuple[str, ...] = ("a", "b"),
-    attempts: int = 2,
     problems: int = 1,
-    path: Path = Path("experiment.yaml"),
 ) -> Any:
+    arms = ("a", "b")
     spec = SimpleNamespace(
         id="exp-1",
         kind=kind,
@@ -297,10 +325,10 @@ def _loaded(
             model_dump=lambda mode: {"progression": progression},
         ),
         arms=[SimpleNamespace(id=arm) for arm in arms],
-        analysis=SimpleNamespace(attempts=attempts, seed=7, concurrency=4),
+        analysis=SimpleNamespace(attempts=2, seed=7, concurrency=4),
         to_json=lambda: {"id": "exp-1", "arms": list(arms)},
     )
-    return SimpleNamespace(spec=spec, path=path)
+    return SimpleNamespace(spec=spec, path=Path("experiment.yaml"))
 
 
 def _full_lock(loaded: Any, *, draft: bool = False) -> dict[str, Any]:
@@ -328,7 +356,7 @@ def this_checkout_grades_with_impl_1(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def test_a_locked_problem_resolves_to_its_pinned_steps_errata_solvable_sets_and_grader() -> None:
-    store = _Store(_manifest(), errata={"sha256": "er"})
+    store = _store(_manifest(), errata={"sha256": "er"})
 
     target = _problem_target(_loaded(), _lock(), store, 0, _lock()["execution"]["problems"])
 
@@ -349,7 +377,7 @@ def test_a_checkpoint_binding_selects_the_first_steps_the_lock_pinned() -> None:
     lock = _lock(checkpoints=2)
 
     target = _problem_target(
-        _loaded(checkpoints=2), lock, _Store(_manifest()), 0, lock["execution"]["problems"]
+        _loaded(checkpoints=2), lock, _store(_manifest()), 0, lock["execution"]["problems"]
     )
 
     assert target.steps == ("s1", "s2")
@@ -359,18 +387,18 @@ def test_a_checkpoint_binding_selects_the_first_steps_the_lock_pinned() -> None:
 
 def test_a_local_task_path_cannot_be_planned() -> None:
     with pytest.raises(PlanError, match="problems.0: a local task path has no host-only verifier"):
-        _problem_target(_loaded(None), _lock(), _Store(_manifest()), 0, [])
+        _problem_target(_loaded(None), _lock(), _store(_manifest()), 0, [])
 
 
 def test_a_problem_that_changed_since_the_lock_is_refused() -> None:
-    store = _Store(_manifest(digest="d2"))
+    store = _store(_manifest(digest="d2"))
 
     with pytest.raises(PlanError, match=rf"problems.0: {REF} changed since the lock; relock"):
         _problem_target(_loaded(), _lock(), store, 0, _lock()["execution"]["problems"])
 
 
 def test_a_binding_that_selects_other_checkpoints_than_the_lock_pinned_is_refused() -> None:
-    store = _Store(_manifest())
+    store = _store(_manifest())
     lock = _lock(checkpoints=2)
 
     with pytest.raises(PlanError, match=r"selects 3 checkpoint\(s\) but the lock pins 2"):
@@ -378,7 +406,7 @@ def test_a_binding_that_selects_other_checkpoints_than_the_lock_pinned_is_refuse
 
 
 def test_errata_the_store_cannot_pin_refuse_the_plan_naming_the_problem() -> None:
-    store = _Store(_manifest(), error=ProblemStoreError("errata file changed"))
+    store = _store(_manifest(), error=ProblemStoreError("errata file changed"))
 
     with pytest.raises(PlanError, match="problems.0: errata file changed"):
         _problem_target(_loaded(), _lock(), store, 0, _lock()["execution"]["problems"])
@@ -391,7 +419,7 @@ def test_a_halting_protocol_refuses_a_problem_with_no_solvable_sets() -> None:
         _problem_target(
             _loaded(progression="halt_on_failure"),
             lock,
-            _Store(_manifest()),
+            _store(_manifest()),
             0,
             lock["execution"]["problems"],
         )
@@ -426,14 +454,14 @@ def test_every_locked_problem_is_resolved_in_order() -> None:
     lock = _lock()
     lock["execution"]["problems"] *= 2
 
-    targets = _problems(_loaded(problems=2), lock, _Store(_manifest()))
+    targets = _problems(_loaded(problems=2), lock, _store(_manifest()))
 
     assert [t.index for t in targets] == [0, 1]
 
 
 def test_a_lock_without_problems_cannot_be_planned() -> None:
     with pytest.raises(PlanError, match="lock has no execution.problems"):
-        _problems(_loaded(), {"execution": {}}, _Store(_manifest()))
+        _problems(_loaded(), {"execution": {}}, _store(_manifest()))
 
 
 def test_an_arm_whose_identity_drifted_from_the_lock_is_named() -> None:
@@ -495,7 +523,13 @@ def planner(planned_inputs: None) -> Any:
         loaded = loaded or _loaded()
         lock = lock or _lock()
         lock["experiment"] = {"spec_sha256": digest_json(loaded.spec.to_json())}
-        return build_plan(loaded, lock, store=None, pack=None, options=PlanOptions(**options))
+        return build_plan(
+            loaded,
+            lock,
+            store=ProblemStore(Path("store")),
+            pack=load_runtime_pack("python"),
+            options=PlanOptions(**options),
+        )
 
     return build
 
@@ -562,7 +596,9 @@ def test_a_lock_built_from_another_experiment_spec_is_refused(planner: Any) -> N
     lock["experiment"] = {"spec_sha256": "stale"}
 
     with pytest.raises(PlanError, match="built from a different experiment spec; relock"):
-        build_plan(loaded, lock, store=None, pack=None)
+        build_plan(
+            loaded, lock, store=ProblemStore(Path("store")), pack=load_runtime_pack("python")
+        )
 
 
 def test_a_selection_naming_an_unknown_arm_is_refused_before_the_lock_is_read(

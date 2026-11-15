@@ -17,7 +17,6 @@ from types import SimpleNamespace
 from typing import Any
 
 import pytest
-from raidar_contract.package.manifest import GateCheck, Output
 
 from raidar.subject.primitive import calls, gate_tool
 from raidar.subject.primitive.gate import (
@@ -37,6 +36,8 @@ from raidar.subject.primitive.gate import (
     watched_state,
 )
 from raidar.subject.primitive.gate_outputs import CheckOutputs
+from raidar.subject.primitive.install import TreeCheck
+from raidar_contract.package.manifest import GateCheck, Output
 
 FACTS = AgentFacts(owner="agent", trusted_uid=0)
 
@@ -146,8 +147,8 @@ class FakeInstalled:
     digest: str = "deadbeef"
     ok: bool = True
 
-    async def verify(self) -> Any:
-        return SimpleNamespace(ok=self.ok, digest="now", expected=self.digest)
+    async def verify(self) -> TreeCheck:
+        return TreeCheck(ok=self.ok, digest="now", expected=self.digest)
 
 
 PATHS = GatePaths(
@@ -156,8 +157,9 @@ PATHS = GatePaths(
 )  # fmt: skip
 
 
-def package(*checks: GateCheck, **over: Any) -> GatePackage:
-    return GatePackage("pkg", FakeInstalled(), checks, **over)  # type: ignore[arg-type]
+def package(*checks: GateCheck, installed: FakeInstalled | None = None, **over: Any) -> GatePackage:
+    tool = installed or FakeInstalled()
+    return GatePackage("pkg", tool, checks, **over)
 
 
 def command(name: str, **extra: Any) -> GateCheck:
@@ -165,13 +167,16 @@ def command(name: str, **extra: Any) -> GateCheck:
 
 
 def pytest_package(params: dict[str, Any], *, kind: str = "pytest") -> GatePackage:
-    check = GateCheck(name="specs", kind=kind, run=("x",))  # type: ignore[arg-type]
+    check = GateCheck(name="specs", kind=kind, run=("x",))
     return package(check, context={"params": params})
 
 
 def test_a_pytest_check_may_set_a_per_test_timeout_from_the_stage_params() -> None:
     def entry(pkg: GatePackage) -> dict[str, Any]:
-        return gate_config(PATHS, [pkg], FACTS, hook_sha256="h")["package_checks"][0]
+        checks: list[dict[str, Any]] = gate_config(PATHS, [pkg], FACTS, hook_sha256="h")[
+            "package_checks"
+        ]
+        return checks[0]
 
     assert entry(pytest_package({"test_timeout": 12}))["test_timeout"] == 12
     assert "test_timeout" not in entry(pytest_package({}))
@@ -188,7 +193,7 @@ def test_watched_state_is_one_check_free_prerequisite_per_package_and_directory(
     watch = "/app/.raidar/state"
     a = package(command("one", watch=watch), command("two", watch=watch), command("three"))
     installed = FakeInstalled()
-    b = GatePackage("other", installed, (command("four", watch=watch),))  # type: ignore[arg-type]
+    b = GatePackage("other", installed, (command("four", watch=watch),))
     found = watched_state([a, b])
     pairs = [(w["name"], w["watch"]) for w in found]
     assert pairs == [("pkg.watch", watch), ("other.watch", watch)]
@@ -279,11 +284,12 @@ def gate(
     tmp_path: Path,
     pkg: GatePackage | None = None,
     settings: GateSettings | None = None,
+    /,
     **replies: Any,
 ) -> tuple[GateRun, Container]:
     container = Container(**{**PASSING, **replies})
     run = GateRun(
-        container,  # type: ignore[arg-type]
+        container,
         tmp_path / "logs",
         [pkg or package(command("lint"), context={"task": "x", "base": "forged"})],
         settings,
@@ -389,8 +395,9 @@ async def test_a_refusing_canary_is_still_a_working_instrument(tmp_path: Path) -
 
 
 async def test_a_changed_tool_tree_before_the_agent_invalidates_the_trial(tmp_path: Path) -> None:
-    pkg = package(command("lint"))
-    pkg.installed.ok = False  # type: ignore[misc]
+    installed = FakeInstalled()
+    pkg = package(command("lint"), installed=installed)
+    installed.ok = False
     run, _ = gate(tmp_path, pkg)
     with pytest.raises(GateInvalidError) as caught:
         await run.prepare()
@@ -401,7 +408,8 @@ async def test_a_changed_tool_tree_before_the_agent_invalidates_the_trial(tmp_pa
 async def test_the_baseline_is_evidence_whatever_it_found(tmp_path: Path) -> None:
     run, container = gate(
         tmp_path,
-        settings=GateSettings(baseline=True),
+        None,
+        GateSettings(baseline=True),
         baseline='{"status": "passed", "exit": 0, "output": "x", "tests": {"collected": []}}',
     )
     await run.prepare()
@@ -409,7 +417,7 @@ async def test_the_baseline_is_evidence_whatever_it_found(tmp_path: Path) -> Non
     assert record == {"status": "passed", "exit": 0, "record": "gate/baseline.json"}
     assert any(" baseline " in command for command in container.commands)
 
-    silent, _ = gate(tmp_path / "again", settings=GateSettings(baseline=True), baseline="")
+    silent, _ = gate(tmp_path / "again", None, GateSettings(baseline=True), baseline="")
     await silent.prepare()  # an unreadable baseline never invalidates the trial
     assert silent.record()["baseline"]["status"] == "error"
     assert "no record (exit 0)" in silent.record()["baseline"]["error"]
@@ -463,7 +471,7 @@ async def test_a_seal_that_printed_no_record_is_an_integrity_failure(
 ) -> None:
     run, _ = gate(tmp_path)
     await run.prepare()
-    run.environment.replies["seal"] = (4, reply, "out of memory")  # type: ignore[attr-defined]
+    run.environment.replies["seal"] = (4, reply, "out of memory")
     outcome = await run.seal("turn-1")
     assert outcome.attribution is Attribution.INTEGRITY
     assert fragment in outcome.reason
@@ -475,10 +483,11 @@ async def test_a_seal_that_printed_no_record_is_an_integrity_failure(
 async def test_a_tool_tree_changed_during_the_turn_makes_the_seal_an_integrity_failure(
     tmp_path: Path,
 ) -> None:
-    pkg = package(command("lint"))
+    installed = FakeInstalled()
+    pkg = package(command("lint"), installed=installed)
     run, _ = gate(tmp_path, pkg, seal=seal_record())
     await run.prepare()
-    pkg.installed.ok = False  # type: ignore[misc]
+    installed.ok = False
     outcome = await run.seal("turn-1")
     assert outcome.attribution is Attribution.INTEGRITY
     assert outcome.reason == "the installed tool tree changed"
@@ -568,7 +577,7 @@ async def test_leftover_processes_are_reaped_before_a_seal_when_enabled(tmp_path
     container = Container(**PASSING, seal=seal_record(), reap='{"killed": [1]}')
     paths = GatePaths(**{**PATHS.__dict__, "reap": True})
     pkgs = [package(command("lint"))]
-    run = GateRun(container, tmp_path / "logs", pkgs, paths=paths)  # type: ignore[arg-type]
+    run = GateRun(container, tmp_path / "logs", pkgs, paths=paths)
     await run.prepare()
     await run.seal("turn-1")
     container.replies["reap"] = "garbage"
@@ -583,7 +592,7 @@ async def test_leftover_processes_are_reaped_before_a_seal_when_enabled(tmp_path
 
 
 async def test_no_prefix_tree_is_kept_without_fix_rounds(tmp_path: Path) -> None:
-    run, container = gate(tmp_path, settings=GateSettings(max_fix_rounds=0))
+    run, container = gate(tmp_path, None, GateSettings(max_fix_rounds=0))
     assert await run.retain_prefix(1) is None
     assert container.commands == []
     assert run.record()["pre_fix_snapshots"] == []
@@ -618,7 +627,8 @@ def outputs(tmp_path: Path) -> CheckOutputs:
 
 
 def kept(check: dict[str, Any]) -> dict[str, Any]:
-    return check["outputs"]["note"]
+    note: dict[str, Any] = check["outputs"]["note"]
+    return note
 
 
 @pytest.mark.parametrize(
@@ -762,6 +772,6 @@ async def test_an_unverifiable_trusted_payload_prevents_gate_preparation(tmp_pat
 
 
 def test_a_requested_baseline_is_absent_until_the_instrument_has_run(tmp_path: Path) -> None:
-    run, _ = gate(tmp_path, settings=GateSettings(baseline=True))
+    run, _ = gate(tmp_path, None, GateSettings(baseline=True))
 
     assert run.record()["baseline"] is None

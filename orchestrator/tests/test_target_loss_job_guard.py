@@ -18,7 +18,7 @@ from raidar.contract.trial import (
     ValidityCheck,
 )
 from raidar.engine.target import guard as guard_module
-from raidar.engine.target.config import Selection
+from raidar.engine.target.config import Selection, TargetError
 from raidar.engine.target.guard import (
     ENV_RECONNECT_S,
     REAP_FILE,
@@ -288,7 +288,7 @@ def test_a_reconnect_budget_that_is_not_a_number_is_refused(
 ) -> None:
     monkeypatch.setenv(ENV_RECONNECT_S, "soon")
 
-    with pytest.raises(guard_module.TargetError, match="number of seconds"):
+    with pytest.raises(TargetError, match="number of seconds"):
         reconnect_budget_s()
 
 
@@ -297,9 +297,12 @@ def test_a_guard_for_a_target_probes_and_ensures_that_targets_context(
 ) -> None:
     seen: list[tuple[str, object]] = []
     target = fake_engine_target("ctx")
-    monkeypatch.setattr(
-        guard_module, "docker_healthy", lambda context: seen.append(("health", context)) or True
-    )
+
+    def docker_healthy(context: str) -> bool:
+        seen.append(("health", context))
+        return True
+
+    monkeypatch.setattr(guard_module, "docker_healthy", docker_healthy)
     monkeypatch.setattr(
         guard_module,
         "ensure_target",

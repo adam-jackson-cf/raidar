@@ -22,12 +22,14 @@ from raidar.design.problem.audit import (
 )
 from raidar.design.problem.determinacy import (
     AssertionKind,
+    AuditedAssertion,
     HelperIndex,
     SpecText,
     classify,
     scan_test_file,
 )
 from raidar.design.problem.models import ProblemId
+from raidar.design.problem.store import ImportedProblem, ProblemStore
 from raidar.design.problem.validator import merge_audit
 from raidar.design.problem.variants import build_variant, original_name, shim_source
 from tests.audit_support import KV_REF, build_kv_problem
@@ -52,7 +54,7 @@ SPEC = SpecText.from_markdown(
 )
 
 
-def _scan(body: str, helpers: str = "") -> list:
+def _scan(body: str, helpers: str = "") -> list[AuditedAssertion]:
     index = HelperIndex.scan([textwrap.dedent(helpers)])
     return scan_test_file("test_x.py", textwrap.dedent(body), index)
 
@@ -202,12 +204,15 @@ def test_reformatted_json_changes_only_whitespace() -> None:
 # ---- combined audit (real grading, local sandbox) -------------------------------------------
 
 
+KvProblem = tuple[ProblemStore, ImportedProblem]
+
+
 @pytest.fixture(name="kv")
-def kv_fixture(tmp_path: Path):
+def kv_fixture(tmp_path: Path) -> KvProblem:
     return build_kv_problem(tmp_path / "problems")
 
 
-def _audit(kv, tmp_path: Path) -> dict[str, Any]:
+def _audit(kv: KvProblem, tmp_path: Path) -> dict[str, Any]:
     _, problem = kv
     dynamic = asyncio.run(
         grade_audit_variants(
@@ -220,17 +225,21 @@ def _audit(kv, tmp_path: Path) -> dict[str, Any]:
     return cast(dict[str, Any], audit_report(problem, dynamic))
 
 
-def test_zero_assertion_coverage_is_unmeasured_not_zero_flags(kv) -> None:
+def test_zero_assertion_coverage_is_unmeasured_not_zero_flags(kv: KvProblem) -> None:
     _, problem = kv
     for name in {name for step in problem.manifest.steps for name in step.test_files}:
         (problem.bundle.tests_dir / name).write_text("def test_plain():\n    assert 1 == 1\n")
     report = audit_report(problem, DynamicEvidence({}))
     assert report["assertions"] == {"audited": 0, "total": 2, "by_rule": {}}
-    assert report["summary"]["status"] == "unmeasured"
-    assert report["summary"]["flagged"] is None
+    summary = report["summary"]
+    assert isinstance(summary, dict)
+    assert summary["status"] == "unmeasured"
+    assert summary["flagged"] is None
 
 
-def test_audit_without_an_entry_file_reports_static_findings_only(kv, tmp_path: Path) -> None:
+def test_audit_without_an_entry_file_reports_static_findings_only(
+    kv: KvProblem, tmp_path: Path
+) -> None:
     _, problem = kv
     stripped = problem.manifest.model_copy(update={"entry_file": None})
     no_entry = type(problem)(stripped, problem.task_dir, problem.bundle, problem.references_dir)
@@ -238,16 +247,20 @@ def test_audit_without_an_entry_file_reports_static_findings_only(kv, tmp_path: 
         grade_audit_variants(no_entry, LocalProcessSandbox(tmp_path / "s"), concurrency=1)
     )
     report = audit_report(no_entry, dynamic)
-    assert report["dynamic"]["status"] == "not_run"
+    dynamic_section = report["dynamic"]
+    static_undetermined = report["static_undetermined"]
+    assert isinstance(dynamic_section, dict)
+    assert isinstance(static_undetermined, list)
+    assert dynamic_section["status"] == "not_run"
     assert report["flagged"] == []
-    assert {entry["rule"] for entry in report["static_undetermined"]} == {
+    assert {entry["rule"] for entry in static_undetermined} == {
         "wording-unstated",
         "format-unstated",
         "exact-unstated",
     }
 
 
-def test_unconfirmed_and_unexplained_buckets(kv) -> None:
+def test_unconfirmed_and_unexplained_buckets(kv: KvProblem) -> None:
     _, problem = kv
     passed = {"test_checkpoint_1.py::test_empty_key_wording": "passed"}
     extra = {"test_checkpoint_1.py::test_get_known": "passed"}
@@ -272,12 +285,14 @@ def test_unconfirmed_and_unexplained_buckets(kv) -> None:
     assert report["sensitive_unexplained"] == [
         {"case": "test_checkpoint_1.py::test_get_known", "variants": ["neutral_error_text"]}
     ]
-    assert report["steps"]["checkpoint_1"]["variants"]["reformatted_json"]["infra_failure"] == (
+    steps = report["steps"]
+    assert isinstance(steps, dict)
+    assert steps["checkpoint_1"]["variants"]["reformatted_json"]["infra_failure"] == (
         "sandbox_error"
     )
 
 
-def test_merge_refuses_a_report_for_another_manifest(kv) -> None:
+def test_merge_refuses_a_report_for_another_manifest(kv: KvProblem) -> None:
     store, _ = kv
     problem_id = ProblemId.parse(KV_REF)
     store.validation_path(problem_id).write_text(

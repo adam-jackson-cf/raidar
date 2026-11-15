@@ -6,7 +6,9 @@ so results that predate a code change are knowable.
 
 from __future__ import annotations
 
+import asyncio
 import json
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 from types import SimpleNamespace
@@ -15,10 +17,19 @@ from typing import Any
 import pytest
 
 from raidar.contract.job_layout import DETACH_DIR, JOB_LOCK_FILE, JOB_MANIFEST
-from raidar.contract.trial import CheckpointState
+from raidar.contract.trial import CheckpointState, ProgressionRule
+from raidar.design.experiment.loader import CliOverrides, LoadedExperiment
+from raidar.design.experiment.schema import ExperimentSpec
+from raidar.design.problem.models import ProblemId, ProblemManifest
+from raidar.design.problem.store import ImportedProblem, ProblemStore
+from raidar.design.problem.validation import ValidationRecord, Verdict
 from raidar.engine.job import manifest, provenance, run
 from raidar.engine.target.config import Selection, Target
+from raidar.engine.target.guard import TargetGuard
 from raidar.engine.target.job import JobTarget
+from raidar.engine.trial.plan import ExperimentPlan, PlanOptions, ProblemTarget
+from raidar.grading.bundle import BundleManifest, VerifierBundle
+from raidar.subject.environment.python.pack_definition import PackSpec
 
 
 def _record(trial: Any, states: tuple[CheckpointState, ...], valid: bool) -> Any:
@@ -73,7 +84,7 @@ def _memory_job(monkeypatch: pytest.MonkeyPatch, ending: str) -> tuple[Any, ...]
     async def inline(function: Any, *args: Any) -> Any:
         return function(*args)
 
-    monkeypatch.setattr(run.asyncio, "to_thread", inline)
+    monkeypatch.setattr(asyncio, "to_thread", inline)
     started: list[str] = []
     states = (
         (CheckpointState.SOLVED, CheckpointState.EXCLUDED),
@@ -93,7 +104,7 @@ def _memory_job(monkeypatch: pytest.MonkeyPatch, ending: str) -> tuple[Any, ...]
 
     monkeypatch.setattr(run, "run_trial", run_trial)
 
-    class LosingTarget:
+    class LosingGuard(TargetGuard):
         async def admit(self, trial_id: str) -> None:
             if trial_id == "a":
                 raise ConnectionError("target unavailable")
@@ -109,9 +120,15 @@ def _memory_job(monkeypatch: pytest.MonkeyPatch, ending: str) -> tuple[Any, ...]
         data_check_expect=None,
         transport=None,
     )
+    losing = LosingGuard(
+        target=trial_target,
+        healthy=lambda: True,
+        ensure=lambda _budget_s: None,
+        reap=lambda _trial_id, _trial_dir: {},
+    )
     target = JobTarget(
         Selection(trial=trial_target, grader=trial_target),
-        guard=LosingTarget() if ending == "target_loss" else None,
+        guard=losing if ending == "target_loss" else None,
     )
     return plan, target, files, records, started
 
@@ -181,52 +198,75 @@ async def test_completion_records_only_finished_trials_and_preserves_abort_reaso
 
 @pytest.mark.parametrize("existing", [None, [], [DETACH_DIR], [DETACH_DIR, "plan.json"], ["other"]])
 def test_a_job_never_reuses_existing_work_except_its_detached_launch(
-    existing: list[str] | None,
+    tmp_path: Path, existing: list[str] | None
 ) -> None:
-    class Directory:
-        entries = existing
+    directory = tmp_path / "job"
+    if existing is not None:
+        directory.mkdir()
+        for name in existing:
+            (directory / name).mkdir()
 
-        def is_dir(self) -> bool:
-            return self.entries is not None
+    def entries() -> list[str] | None:
+        return sorted(path.name for path in directory.iterdir()) if directory.is_dir() else None
 
-        def iterdir(self) -> list[Path]:
-            return [Path(name) for name in self.entries or []]
-
-        def mkdir(self, **_kwargs: Any) -> None:
-            if self.entries is not None:
-                raise FileExistsError("already contains work")
-            self.entries = []
-
-    directory = Directory()
     if existing is not None and existing != [DETACH_DIR]:
         with pytest.raises(FileExistsError):
             run.create_job_dir(directory)
-        assert directory.entries == existing
+        assert entries() == sorted(existing)
     else:
         run.create_job_dir(directory)
-        assert directory.entries == ([] if existing is None else [DETACH_DIR])
+        assert entries() == ([] if existing is None else [DETACH_DIR])
+
+
+def _plan(targets: tuple[ProblemTarget, ...]) -> ExperimentPlan:
+    """A plan over ``targets``; nothing else in it is read when problems are admitted."""
+    loaded = LoadedExperiment(
+        spec=ExperimentSpec.model_construct(),
+        path=Path("experiment.yaml"),
+        source_sha256="",
+        overrides=CliOverrides(),
+    )
+    return ExperimentPlan(
+        loaded=loaded,
+        lock_sha256="",
+        options=PlanOptions(),
+        rule=ProgressionRule(mode="continue", reward_key="reward"),
+        arms={},
+        problems=targets,
+        trials=(),
+        pack=PackSpec.model_construct(),
+    )
+
+
+def _imported(name: str) -> ImportedProblem:
+    root = Path(name)
+    bundle = VerifierBundle(root=root / "bundle", manifest=BundleManifest.model_construct())
+    return ImportedProblem(ProblemManifest.model_construct(), root, bundle, root / "references")
 
 
 @pytest.mark.parametrize("validated", [True, False])
 def test_problem_content_is_not_admitted_without_validation(validated: bool) -> None:
-    targets = [SimpleNamespace(index=4, ref="first"), SimpleNamespace(index=1, ref="second")]
-    problems = {
-        ref: SimpleNamespace(manifest=SimpleNamespace(validated=validated))
-        for ref in ("first", "second")
-    }
+    first, second = ProblemId.parse("fixture/first@1"), ProblemId.parse("fixture/second@1")
+    targets = (ProblemTarget(4, first, "", ()), ProblemTarget(1, second, "", ()))
+    problems = {first: _imported("first"), second: _imported("second")}
 
-    class Store:
-        def load(self, ref: str) -> Any:
-            return problems[ref]
+    @dataclass(frozen=True)
+    class Store(ProblemStore):
+        def load(self, problem: ProblemId) -> ImportedProblem:
+            return problems[problem]
 
-        def require_validated(self, ref: str, record: Any) -> None:
-            if not record.validated:
-                raise ValueError(f"{ref} is unvalidated")
+        def require_validated(
+            self, problem: ProblemId, manifest: ProblemManifest
+        ) -> ValidationRecord:
+            if not validated:
+                raise ValueError(f"{problem} is unvalidated")
+            return ValidationRecord(Verdict.VALIDATED, "", ())
 
+    store = Store(Path("store"))
     if validated:
-        admitted = run.load_problems(SimpleNamespace(problems=targets), Store())
-        assert admitted == {4: problems["first"], 1: problems["second"]}
-        assert run.load_problems(SimpleNamespace(problems=[]), Store()) == {}
+        admitted = run.load_problems(_plan(targets), store)
+        assert admitted == {4: problems[first], 1: problems[second]}
+        assert run.load_problems(_plan(()), store) == {}
     else:
-        with pytest.raises(ValueError, match="first is unvalidated"):
-            run.load_problems(SimpleNamespace(problems=targets), Store())
+        with pytest.raises(ValueError, match="first@1 is unvalidated"):
+            run.load_problems(_plan(targets), store)

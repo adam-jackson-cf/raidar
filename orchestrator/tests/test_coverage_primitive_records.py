@@ -103,9 +103,15 @@ def test_symlinked_criteria_are_not_opened(tmp_path: Path) -> None:
     assert isinstance(read_define(trace), Unreadable)
 
 
-@pytest.mark.parametrize(
-    "setup", [None, [], {"acme/spec": []}, {"acme/spec": {"call": {"stdout": "changed"}}}]
-)
+_BROKEN_SETUPS: list[object] = [
+    None,
+    [],
+    {"acme/spec": []},
+    {"acme/spec": {"call": {"stdout": "changed"}}},
+]
+
+
+@pytest.mark.parametrize("setup", _BROKEN_SETUPS)
 def test_missing_or_changed_unit_evidence_is_not_zero_coverage(
     tmp_path: Path, setup: object
 ) -> None:
@@ -199,7 +205,10 @@ def test_bad_reply_maps_and_escaping_sources_are_not_test_coverage(
     trace = _trace(tmp_path)
     (trace / "sources").mkdir()
     path = trace / "workflow/workflow.json"
-    reply = {"ac_tests": {"F1.AC1": ["test_report.py::test_total"]}, "sources": "sources"}
+    reply: dict[str, object] = {
+        "ac_tests": {"F1.AC1": ["test_report.py::test_total"]},
+        "sources": "sources",
+    }
     record = json.loads(path.read_text())
     record["acceptance-reply/1"] = reply
     if field == "acceptance-reply/1":

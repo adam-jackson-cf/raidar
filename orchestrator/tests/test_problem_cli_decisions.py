@@ -432,9 +432,11 @@ def validating_fixture(
         return state.audit
 
     def merge(store: ProblemStore, problem: ProblemId, audit_: Any) -> Path:
-        if isinstance(state.merged, Exception):
-            raise state.merged
-        return state.merged
+        merged = state.merged
+        if isinstance(merged, Exception):
+            raise merged
+        assert isinstance(merged, Path)
+        return merged
 
     def write(report: Any, path: Path) -> Path:
         state.written.append(path)

@@ -35,7 +35,8 @@ from raidar.grading.records import (
 from raidar.scoring.catalog.builtin import default_scorer_registry
 from raidar.scoring.code_quality import CodeQualityScorer
 from raidar.scoring.code_quality.coverage_reader import OFFLINE_NOT_PRODUCED
-from raidar.scoring.code_quality.observations import CASE_EXCLUDED, EXCLUDED_METRIC
+from raidar.scoring.code_quality.observations import EXCLUDED_METRIC
+from raidar.scoring.code_quality.parity import CASE_EXCLUDED
 from raidar.scoring.framework.builtin_manifests import CODE_QUALITY
 from raidar.scoring.framework.context import AssessContext
 from raidar.scoring.framework.rescore import assess

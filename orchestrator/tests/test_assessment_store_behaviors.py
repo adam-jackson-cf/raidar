@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Callable
 from dataclasses import replace
 from pathlib import Path
 from types import SimpleNamespace
@@ -15,7 +16,7 @@ from raidar.contract.snapshot import tree_digest
 from raidar.grading.bundle import BundleError
 from raidar.grading.models import CaseStatus, VerifierGrade
 from raidar.grading.records import VERIFIER_RECORD_DIR, StepRecord, step_record_dir
-from raidar.scoring.framework.context import AssessContext
+from raidar.scoring.framework.context import AssessContext, StepInputs
 from raidar.scoring.framework.rescore import (
     RescoreError,
     RescoreOutcome,
@@ -29,6 +30,7 @@ from raidar.scoring.framework.trial_inputs import (
     BundleCache,
     BundleUnavailableError,
     TrialInputError,
+    _bundle as _bundle_of,
     _bundle_root,
     _check_problems,
     _checked_snapshot,
@@ -48,7 +50,6 @@ from raidar.scoring.framework.trial_inputs import (
     load_trial_context,
     problem_config,
 )
-from raidar.scoring.framework.trial_inputs import _bundle as _bundle_of
 from tests.scorer_support import (
     APP_V1,
     APP_V2,
@@ -160,24 +161,26 @@ def test_assessment_keys_follow_config_and_inputs(tmp_path: Path) -> None:
     assert copy.outcome is RescoreOutcome.EXISTING
 
 
-@pytest.mark.parametrize(
-    ("field", "changed"),
-    [
-        ("record_digest", "other-grading-evidence"),
-        ("record_digest", None),
-        ("snapshot_digest", "other-snapshot"),
-        ("trace_digest", "other-trace"),
-    ],
-)
+_RUN_INPUT_CHANGES: dict[str, Callable[[StepInputs], StepInputs]] = {
+    "record_digest-other-grading-evidence": lambda step: replace(
+        step, record_digest="other-grading-evidence"
+    ),
+    "record_digest-None": lambda step: replace(step, record_digest=None),
+    "snapshot_digest-other-snapshot": lambda step: replace(step, snapshot_digest="other-snapshot"),
+    "trace_digest-other-trace": lambda step: replace(step, trace_digest="other-trace"),
+}
+
+
+@pytest.mark.parametrize("change", list(_RUN_INPUT_CHANGES))
 def test_completed_assessments_are_rekeyed_when_any_run_input_changes(
-    tmp_path: Path, field: str, changed: str | None
+    tmp_path: Path, change: str
 ) -> None:
     store = AssessmentStore(tmp_path / "store")
     ctx = two_step_context(tmp_path / "trial")
     registration = fake_registry().get(V1)
     original = assess_fixed(store, registration, ctx, trial="t")
     original_bytes = original.path.read_bytes()
-    first = replace(ctx.steps[0], **{field: changed})
+    first = _RUN_INPUT_CHANGES[change](ctx.steps[0])
     updated = assess_fixed(
         store, registration, replace(ctx, steps=(first, *ctx.steps[1:])), trial="t"
     )
@@ -262,7 +265,9 @@ def test_a_job_assesses_every_trial_with_each_scorer_under_its_own_config(
     payload = report_payload(records)
     counts = {"added": 4, "existing": 0, "replayed_identical": 0, "superseded": 0}
     assert payload["counts"] == counts
-    assert [item["trial"] for item in payload["assessments"]][:2] == ["trial-a", "trial-a"]  # type: ignore[index]
+    assessments = payload["assessments"]
+    assert isinstance(assessments, list)
+    assert [item["trial"] for item in assessments][:2] == ["trial-a", "trial-a"]
 
 
 def test_a_rescore_request_that_cannot_run_is_refused_before_any_trial_is_read(

@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Mapping
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -35,7 +37,7 @@ def _by_key(result: AssessResult) -> dict[tuple[str, str], Observation]:
     return {(item.metric, item.subject): item for item in result.observations}
 
 
-def _review_loop_trace() -> dict:
+def _review_loop_trace() -> dict[str, Any]:
     """A review loop: the parent refers to an implement and a review session."""
     parent_steps = [
         {
@@ -78,7 +80,10 @@ def test_totals_reconcile_with_harbor_agent_results(tmp_path: Path) -> None:
     assert observed["turns", "checkpoint_2"].value == 5
     assert observed["agent_wall_s", "checkpoint_1"].value == pytest.approx(90.5)
 
-    agent_results = [step.usage for step in steps]
+    agent_results: list[Mapping[str, Any]] = []
+    for step in steps:
+        assert step.usage is not None
+        agent_results.append(step.usage)
     assert observed["total_tokens", "trajectory"].value == sum(
         item["n_input_tokens"] + item["n_output_tokens"] for item in agent_results
     )

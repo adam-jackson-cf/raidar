@@ -31,4 +31,5 @@ def native_agent(harness: Harness, logs_dir: Path, **kwargs: Any) -> Any:
 
 def session_audit(harness: Harness, turn_dir: Path) -> dict[str, Any]:
     """The normalized ``session_audit`` of one turn directory."""
-    return native_agent(harness, turn_dir).session_audit(turn_dir)
+    audit: dict[str, Any] = native_agent(harness, turn_dir).session_audit(turn_dir)
+    return audit

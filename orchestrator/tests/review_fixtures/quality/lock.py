@@ -47,15 +47,13 @@ def write_synthetic_lock(
     experiment_file: Path,
     *,
     experiment: str,
-    baseline_arm: str,
     metric: str,
-    problem: str,
-    checkpoints: int,
+    analysis: dict[str, object],
 ) -> str:
-    """Write the lock beside ``experiment_file`` and return its ``lock_sha256``."""
-    analysis = synthetic_analysis(
-        baseline_arm=baseline_arm, problem=problem, checkpoints=checkpoints
-    )
+    """Write the lock beside ``experiment_file`` and return its ``lock_sha256``.
+
+    ``analysis`` is the lock's analysis section, as ``synthetic_analysis`` builds it.
+    """
     lock = seal_lock(
         {
             "lock_version": LOCK_VERSION,

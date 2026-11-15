@@ -17,8 +17,6 @@ from raidar.grading.submission_deps import (
 from tests.dependency_support import FakeResolver
 from tests.test_submission_dependencies import (
     _declaring as _declaring,
-)
-from tests.test_submission_dependencies import (
     _grading_bundle as _grading_bundle,
 )
 from tests.verifier_support import LocalProcessSandbox

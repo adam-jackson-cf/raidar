@@ -5,6 +5,7 @@ The environment is an in-memory fake; nothing runs in a container.
 
 from __future__ import annotations
 
+import asyncio
 import base64
 import hashlib
 import json
@@ -17,8 +18,7 @@ from harbor.environments.base import ExecResult
 from harbor.models.trial.paths import TrialPaths
 from harbor.trial.hooks import TrialEvent
 
-from raidar.engine.trial import environment as env_module
-from raidar.engine.trial import provision as provision_module
+from raidar.engine.trial import environment as env_module, provision as provision_module
 from raidar.engine.trial.environment import (
     RunScopedDockerEnvironment,
     engine_command,
@@ -324,7 +324,7 @@ async def test_streamed_engine_output_is_returned_and_a_failing_command_still_ra
     async def fake_exec(*argv: str, **_: Any) -> object:
         return SimpleNamespace()
 
-    monkeypatch.setattr(env_module.asyncio, "create_subprocess_exec", fake_exec)
+    monkeypatch.setattr(asyncio, "create_subprocess_exec", fake_exec)
     env = object.__new__(RunScopedDockerEnvironment)
     env._is_windows_container = False  # noqa: SLF001
     env.session_id = "b00-p0-baseline__env-abc"

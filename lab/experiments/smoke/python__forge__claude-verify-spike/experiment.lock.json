@@ -841,7 +841,7 @@
       "tree-sitter-language-pack": "0.13.0"
     }
   },
-  "document_sha256": "5a99928d0942c8b9403437eb6f0b3201f86a2506fcc155ab451a031a3496714f",
+  "document_sha256": "436ab8567fc5fa846682af8e2a05a5e9595e76d180e9af0ad1d5ebcfb6d460b9",
   "execution": {
     "arms": {
       "verify": {
@@ -859,7 +859,7 @@
           "version_pin": "2.1.285",
           "workflow_skills": "placement.skills .claude/skills in the workspace /app"
         },
-        "digest": "dac386587c8996059e7fe48ef0d0252e2ef485da17c4e57f32b3a31092535781",
+        "digest": "5fdccd2abd983738aa81725e379ff1d55030cdbde4f0559e2fe09bc626399a49",
         "model": "claude-sonnet-4-6",
         "packages": {
           "raidar/verify": {
@@ -872,9 +872,9 @@
         },
         "primitive_code": {
           "frame/1": "222d8ec4406851d6b78f8a42e3e6b7086b3b2778be8e1463929cca30fc24ec5a",
-          "gate/1": "73128fc12e3177339a0cbe59938790d19c410008098b53f935e5b39817109fbb",
+          "gate/1": "4c150add1fd66259d98e2acb33beeb804e0d0a7150aaf0d472578de69ca1083b",
           "install/1": "988c3f18aee3231eb0fc3db6737e9d3cf68da17098e2969782d86d3ba83f81b4",
-          "runner/1": "a1c2f426559a00118048ffcb1f6d85808163c5a1cacdaccd150344be950db51a"
+          "runner/1": "58c99466a58e69ff69083a03ecd4556fbab4c144b3c457e555e0dbc4de3f6d4a"
         },
         "provider": "anthropic",
         "reasoning": "low",
@@ -1701,7 +1701,7 @@
     "source_sha256": "505c472339c85d15efec49caaff07326cf4eb36bbd93500a653e01ded048d3d5",
     "spec_sha256": "7d9d7b969cdec469737ba4a3f729040793b1b5845d251585afd7ad997ee999ca"
   },
-  "lock_sha256": "49c7d53bc13b19b4526d96722d6a2c08c5a09c36a6f2972c80b1e5792e5597e5",
+  "lock_sha256": "1d85e6ddef41355ac125a55897c6ca9fc11127743af08509e918978c16877c9e",
   "lock_version": 5,
   "overrides": {
     "flags": {},
@@ -1710,7 +1710,7 @@
   "sections": {
     "analysis": "81cdc2d12aacc031bb70595c13973ff647ab49a68bebda4be7a9b65ba3127a78",
     "assessment": "e61075a3073c9e030edc1b88f8e27e8204bd05fca6889bb2e3510f6c6544d590",
-    "execution": "49c7d53bc13b19b4526d96722d6a2c08c5a09c36a6f2972c80b1e5792e5597e5",
+    "execution": "1d85e6ddef41355ac125a55897c6ca9fc11127743af08509e918978c16877c9e",
     "toolchain": "57caa99992c5b2bb5d4f0ac51dba5ab949f084361d7d255b3636fa6bbd0a7e8d"
   },
   "spec": {

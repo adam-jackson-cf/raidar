@@ -9,7 +9,6 @@ from typing import Any
 
 import pytest
 from click.testing import CliRunner
-from raidar_contract.canonical import digest_json
 
 from raidar.cli import main
 from raidar.contract.references import (
@@ -37,15 +36,16 @@ from raidar.design.experiment.lock import (
 from raidar.scoring.framework.metrics import MetricResolver
 from raidar.subject.draft import draft_resolution, drafting, set_draft_resolution
 from raidar.subject.releases import released_agent
+from raidar_contract.canonical import digest_json
 from tests.experiment_spec_support import (
     InMemoryResolver,
     experiment_document,
     fixture_resolvers,
+    lock_bytes as _lock_bytes,
+    lock_document as _lock,
     pin_spec_digest,
     write_experiment,
 )
-from tests.experiment_spec_support import lock_bytes as _lock_bytes
-from tests.experiment_spec_support import lock_document as _lock
 
 PYTHON_TASK = '[metadata]\nraidar_runtime = "python"\n'
 """A local task declares its runtime (``RT1``)."""
@@ -125,7 +125,10 @@ def test_assessment_and_analysis_changes_keep_the_run_identity(tmp_path: Path) -
     def locked(implementation: str, experiment: Path = path) -> dict[str, Any]:
         loaded = load_experiment(experiment)
         resolvers = _scorer_resolvers(implementation)
-        return json.loads(render_lock(build_lock(loaded, lock_path=lock_path, resolvers=resolvers)))
+        lock: dict[str, Any] = json.loads(
+            render_lock(build_lock(loaded, lock_path=lock_path, resolvers=resolvers))
+        )
+        return lock
 
     base = locked("a" * 64)
     rescored = locked("b" * 64)
@@ -599,8 +602,10 @@ def test_a_lock_inside_a_referenced_task_directory_is_not_hashed_into_itself(
 
     lock = build_lock(load_experiment(path), lock_path=lock_file, resolvers=resolvers)
 
-    assert "tasks/forge/task.toml" in lock["execution"]["files"]
-    assert "tasks/forge/experiment.lock.json" not in lock["execution"]["files"]
+    execution = lock["execution"]
+    assert isinstance(execution, dict)
+    assert "tasks/forge/task.toml" in execution["files"]
+    assert "tasks/forge/experiment.lock.json" not in execution["files"]
 
 
 def test_process_draft_resolution_is_overridden_only_for_the_nested_context() -> None:

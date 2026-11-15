@@ -7,6 +7,7 @@ from pathlib import Path
 
 import pytest
 
+from raidar.grading.bundle import VerifierBundle
 from raidar.grading.grader import BUDGET_MARGIN_S, grade_step
 from raidar.grading.models import (
     CaseGroup,
@@ -57,8 +58,9 @@ def test_second():
 
 
 @pytest.fixture(name="bundle")
-def bundle_fixture(tmp_path: Path):
-    return make_bundle(tmp_path / "fixture")
+def bundle_fixture(tmp_path: Path) -> VerifierBundle:
+    bundle: VerifierBundle = make_bundle(tmp_path / "fixture")
+    return bundle
 
 
 @pytest.fixture(name="sandbox")
@@ -68,7 +70,7 @@ def sandbox_fixture(tmp_path: Path) -> LocalProcessSandbox:
 
 # ------------------------------------------------------- real pytest runs
 async def test_reference_solution_solves_and_prior_solution_fails_next_checkpoint(
-    tmp_path: Path, bundle, sandbox: LocalProcessSandbox
+    tmp_path: Path, bundle: VerifierBundle, sandbox: LocalProcessSandbox
 ) -> None:
     v1 = write_app(tmp_path / "v1")
     v2 = write_app(tmp_path / "v2", mul=True)
@@ -90,7 +92,7 @@ async def test_reference_solution_solves_and_prior_solution_fails_next_checkpoin
 
 
 async def test_submission_modules_cannot_replace_the_grader_tools(
-    tmp_path: Path, bundle, sandbox: LocalProcessSandbox
+    tmp_path: Path, bundle: VerifierBundle, sandbox: LocalProcessSandbox
 ) -> None:
     app = write_app(tmp_path / "app")  # checkpoint_2 is unsolved by this app
     for name in ("pytest.py", "coverage.py", "json.py"):
@@ -106,7 +108,7 @@ async def test_submission_modules_cannot_replace_the_grader_tools(
 
 
 async def test_submission_cannot_forge_the_grading_ledger(
-    tmp_path: Path, bundle, sandbox: LocalProcessSandbox
+    tmp_path: Path, bundle: VerifierBundle, sandbox: LocalProcessSandbox
 ) -> None:
     app = tmp_path / "app"
     app.mkdir()
@@ -128,7 +130,7 @@ async def test_submission_cannot_forge_the_grading_ledger(
     ids=["truncated", "node_without_status"],
 )
 async def test_a_malformed_ledger_is_an_infra_failure_not_a_crash(
-    tmp_path: Path, bundle, sandbox: LocalProcessSandbox, ledger_text: str
+    tmp_path: Path, bundle: VerifierBundle, sandbox: LocalProcessSandbox, ledger_text: str
 ) -> None:
     class BrokenLedger(LocalProcessSandbox):
         async def run(self, run: SandboxRun) -> SandboxResult:
@@ -168,7 +170,7 @@ async def test_cases_left_when_the_grading_budget_runs_out_fail_rather_than_infr
 
 
 async def test_regrading_the_same_snapshot_gives_identical_results(
-    tmp_path: Path, bundle, sandbox: LocalProcessSandbox
+    tmp_path: Path, bundle: VerifierBundle, sandbox: LocalProcessSandbox
 ) -> None:
     app = write_app(tmp_path / "app")
     first = await grade_step(bundle, "checkpoint_2", app, sandbox, tmp_path / "a", coverage=True)
@@ -179,7 +181,7 @@ async def test_regrading_the_same_snapshot_gives_identical_results(
 
 
 async def test_grading_never_modifies_the_snapshot(
-    tmp_path: Path, bundle, sandbox: LocalProcessSandbox
+    tmp_path: Path, bundle: VerifierBundle, sandbox: LocalProcessSandbox
 ) -> None:
     app = write_app(tmp_path / "app", mul=True)
     before = (app / "app.py").read_bytes()
@@ -189,7 +191,7 @@ async def test_grading_never_modifies_the_snapshot(
 
 
 async def test_coverage_pass_attributes_lines_per_test_with_parity(
-    tmp_path: Path, bundle, sandbox: LocalProcessSandbox
+    tmp_path: Path, bundle: VerifierBundle, sandbox: LocalProcessSandbox
 ) -> None:
     app = write_app(tmp_path / "app", mul=True)
     result = await grade_step(bundle, "checkpoint_2", app, sandbox, tmp_path / "w", coverage=True)
@@ -208,7 +210,7 @@ async def test_coverage_pass_attributes_lines_per_test_with_parity(
 
 
 async def test_verdict_flipped_by_instrumentation_makes_coverage_ineligible(
-    tmp_path: Path, bundle, sandbox: LocalProcessSandbox
+    tmp_path: Path, bundle: VerifierBundle, sandbox: LocalProcessSandbox
 ) -> None:
     app = write_app(tmp_path / "app", mul=True, coverage_sensitive=True)
     result = await grade_step(bundle, "checkpoint_2", app, sandbox, tmp_path / "w", coverage=True)
@@ -221,7 +223,7 @@ async def test_verdict_flipped_by_instrumentation_makes_coverage_ineligible(
 
 
 async def test_grading_infra_failure_skips_coverage_and_is_ineligible(
-    tmp_path: Path, bundle, sandbox: LocalProcessSandbox
+    tmp_path: Path, bundle: VerifierBundle, sandbox: LocalProcessSandbox
 ) -> None:
     (bundle.tests_dir / "conftest.py").write_text("raise RuntimeError('broken corpus')\n")
     app = write_app(tmp_path / "app")

@@ -83,7 +83,8 @@ def _node_pack(runtime: str) -> PackSpec:
     """A stand-in node-ts pack (same contract as python) so RT3/RT4 can be isolated."""
     if runtime not in {"python", "node-ts"}:
         raise UnknownPackError(f"no runtime pack for {runtime!r} (packs: node-ts, python)")
-    return load_runtime_pack("python").model_copy(update={"id": runtime})
+    pack: PackSpec = load_runtime_pack("python").model_copy(update={"id": runtime})
+    return pack
 
 
 def _lock(
@@ -256,9 +257,10 @@ def test_rt4_scorers_and_the_metric_must_cover_the_runtime(tmp_path: Path) -> No
 def _pack_with_harnesses(harnesses: dict[str, HarnessPin]) -> PackLoader:
     def load(runtime: str) -> PackSpec:
         pack = load_runtime_pack(runtime)
-        return pack.model_copy(
+        harnessed: PackSpec = pack.model_copy(
             update={"image": pack.image.model_copy(update={"harnesses": harnesses})}
         )
+        return harnessed
 
     return load
 
@@ -339,7 +341,7 @@ def test_the_importer_loads_the_pack_of_the_sources_runtime() -> None:
 # ---- AS1: assess-time ---------------------------------------------------------------
 
 
-def _assessment_lock(runtime: str, bundle_digest: str) -> dict:
+def _assessment_lock(runtime: str, bundle_digest: str) -> dict[str, Any]:
     lock = seal_lock(
         {
             "lock_version": LOCK_VERSION,

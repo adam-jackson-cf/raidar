@@ -16,8 +16,6 @@ from typing import Any
 
 import pytest
 from harbor.models.agent.context import AgentContext
-from raidar_contract.agent_records import ZERO
-from raidar_contract.workflow import load_package_workflow
 
 from raidar.subject.primitive.site import TrialInvalidError
 from raidar.subject.workflow.package_stage import PackageStage
@@ -37,6 +35,8 @@ from raidar.subject.workflow.turns import (
     native_account,
     session_id,
 )
+from raidar_contract.agent_records import ZERO
+from raidar_contract.workflow import load_package_workflow
 from tests.native_support import CodexNative
 from tests.release_support import REAL_LAB
 
@@ -128,7 +128,7 @@ def _runner(logs_dir: Path) -> WorkflowRunner:
 def _run(logs_dir: Path) -> tuple[AgentContext, FakeEnvironment]:
     context = AgentContext()
     environment = FakeEnvironment()
-    asyncio.run(_runner(logs_dir).run(INSTRUCTION, environment, context))  # type: ignore[arg-type]
+    asyncio.run(_runner(logs_dir).run(INSTRUCTION, environment, context))
     return context, environment
 
 
@@ -181,9 +181,7 @@ def test_a_failing_turn_is_recorded_and_the_error_still_reaches_harbor(tmp_path:
     context = AgentContext()
 
     with pytest.raises(RuntimeError, match="agent crashed"):
-        asyncio.run(
-            _runner(tmp_path).run(INSTRUCTION, FakeEnvironment(), context)  # type: ignore[arg-type]
-        )
+        asyncio.run(_runner(tmp_path).run(INSTRUCTION, FakeEnvironment(), context))
 
     record = json.loads((tmp_path / WORKFLOW_DIR / RECORD_FILE).read_text())
     assert record["turns"][0]["error"] == "RuntimeError: agent crashed"
@@ -254,9 +252,7 @@ class RemoteEnvironment(FakeEnvironment):
 def test_a_container_that_cannot_lock_the_logs_does_not_lose_the_record(tmp_path: Path) -> None:
     environment = RemoteEnvironment(refuse="rm -rf")
 
-    asyncio.run(
-        _runner(tmp_path).run(INSTRUCTION, environment, AgentContext())  # type: ignore[arg-type]
-    )
+    asyncio.run(_runner(tmp_path).run(INSTRUCTION, environment, AgentContext()))
 
     record = json.loads((tmp_path / WORKFLOW_DIR / RECORD_FILE).read_text())
     assert record["turns"][0]["error"] is None
@@ -379,7 +375,7 @@ def test_a_cancelled_turn_is_recorded_as_cut_and_the_cancellation_still_propagat
         asyncio.run(
             _runner(tmp_path).run(
                 INSTRUCTION,
-                FakeEnvironment(),  # type: ignore[arg-type]
+                FakeEnvironment(),
                 AgentContext(),
             )
         )
@@ -427,9 +423,7 @@ def test_logs_that_cannot_be_copied_are_recorded_on_the_turn_and_its_usage_stays
 ) -> None:
     context = AgentContext()
 
-    asyncio.run(
-        _runner(tmp_path).run(INSTRUCTION, BrokenDownload(), context)  # type: ignore[arg-type]
-    )
+    asyncio.run(_runner(tmp_path).run(INSTRUCTION, BrokenDownload(), context))
 
     (turn,) = _record(tmp_path)["turns"]
     assert turn["settle_error"] == "OSError: disk full"

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import shutil
 import subprocess
 from collections.abc import Mapping, Sequence
 from pathlib import Path
@@ -149,7 +150,7 @@ def test_first_use_is_timed_separately_and_the_cache_is_reused(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     locked_uv = uv.find_uv_bin()
-    monkeypatch.setattr(provisioner_module.shutil, "which", lambda _name: "/host/bin/uv")
+    monkeypatch.setattr(shutil, "which", lambda _name: "/host/bin/uv")
     runner = FakeUv(uv_executable=locked_uv)
     provisioner = ToolProvisioner(load_tool_lock(), cache_root=tmp_path / "cache", runner=runner)
 

@@ -9,6 +9,7 @@ from typing import Any
 import pytest
 from harbor.models.trial.config import AgentConfig
 
+from raidar.contract.trial import PlannedTrial
 from raidar.engine.trial import agent_config, blueprint, config, host_auth
 from raidar.engine.trial.agent_config import (
     agent_digest,
@@ -25,7 +26,7 @@ from raidar.engine.trial.config import (
 )
 from raidar.engine.trial.host_auth import CODEX_AUTH_ENV, with_host_auth
 from raidar.subject.agent.config import Harness
-from raidar.subject.agent.native import Credentials
+from raidar.subject.agent.records import Credentials
 from raidar.subject.workflow.inner import INNER_KWARG
 from raidar.subject.workflow.runner import WorkflowRunner
 
@@ -60,7 +61,7 @@ def _plan(
     )
 
 
-_TRIAL = SimpleNamespace(arm="guided", problem_index=1, trial_id="guided-p1-r0")
+_TRIAL = PlannedTrial.model_construct(arm="guided", problem_index=1, trial_id="guided-p1-r0")
 
 
 def _trial_config(plan: Any, tmp_path: Path) -> Any:
@@ -358,7 +359,10 @@ def _loaded(*ids: str) -> Any:
 def test_an_override_gives_every_arm_the_no_llm_agent_under_the_protocol_timeout(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    arms = {"plain": SimpleNamespace(tag="plain"), "guided": SimpleNamespace(tag="guided")}
+    arms: dict[str, object] = {
+        "plain": SimpleNamespace(tag="plain"),
+        "guided": SimpleNamespace(tag="guided"),
+    }
     monkeypatch.setattr(blueprint, "resolve_arm", lambda spec, arm_id: arms[arm_id])
 
     blueprints = arm_blueprints(_loaded("plain", "guided"), NO_PACK, agent_override="nop")

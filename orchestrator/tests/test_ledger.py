@@ -156,7 +156,9 @@ def test_legal_status_chains_pass_without_reading_files(kind: str, steps: list[s
         ("open", [("open", "2026-10-01"), ("unknown", "2026-10-02")], "unknown history status"),
     ],
 )
-def test_history_integrity_reports_the_broken_rule(status: str, steps: list, problem: str) -> None:
+def test_history_integrity_reports_the_broken_rule(
+    status: str, steps: list[tuple[str, str]], problem: str
+) -> None:
     fault = FaultRecord.model_validate(_fault(status=status, status_history=_history(*steps)))
     assert problem in "\n".join(record_problems({fault.id: fault}, {}))
 

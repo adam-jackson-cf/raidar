@@ -68,7 +68,8 @@ def _spec() -> ExperimentSpec:
         {"id": "second", "agent": "second", "workflow": "raidar/one-shot@2"},
     ]
     document["analysis"]["baseline_arm"] = "first"
-    return ExperimentSpec.model_validate(document)
+    spec: ExperimentSpec = ExperimentSpec.model_validate(document)
+    return spec
 
 
 class _Plan:

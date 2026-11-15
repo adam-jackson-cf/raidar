@@ -13,8 +13,6 @@ import pytest
 
 from tests.test_verifier_plugin_behaviors import (
     make_plugin as make_plugin,
-)
-from tests.test_verifier_plugin_behaviors import (
     plugin_fixture as plugin_fixture,
 )
 

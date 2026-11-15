@@ -13,17 +13,18 @@ from types import SimpleNamespace
 from typing import Any, ClassVar, cast
 
 import pytest
-from raidar_contract.package.manifest import Output, StagePackage
-from raidar_contract.workflow import PackageWorkflowDefinition
 
 from raidar.judge.live import LIVE_MODEL, RecordedJev
 from raidar.subject.package.registry import stage_folder
 from raidar.subject.primitive.calls import TransportError
 from raidar.subject.primitive.gate import Attribution, GateInvalidError, GateOutcome
 from raidar.subject.primitive.site import TrialInvalidError
-from raidar.subject.workflow import asking, package_stage
-from raidar.subject.workflow import package as package_module
-from raidar.subject.workflow import stage as stage_module
+from raidar.subject.workflow import (
+    asking,
+    package as package_module,
+    package_stage,
+    stage as stage_module,
+)
 from raidar.subject.workflow.package import CheckpointPlan, PackageCheckpoint
 from raidar.subject.workflow.package_member import PackageSpec
 from raidar.subject.workflow.package_stage import PackageStage
@@ -35,9 +36,9 @@ from raidar.subject.workflow.stage import (
     Checkpoint,
     Spent,
 )
-from tests import package_support
-from tests.criteria_support import CRITERIA, gate_record
-from tests.criteria_support import reply as builder_reply
+from raidar_contract.package.manifest import Output, StagePackage
+from raidar_contract.workflow import PackageWorkflowDefinition
+from tests.criteria_support import CRITERIA, gate_record, reply as builder_reply
 from tests.lifecycle_support import (
     NOTE_STATE,
     PACK,
@@ -74,6 +75,7 @@ NOW = 1000.0
 def package(name: str, gated: bool = False) -> StagePackage:
     """The note-state package without its gate (the gate runs in-container), under ``name``."""
     base = note_state_package()
+    assert base.manifest.on_stop is not None
     watch = f"/app/.raidar/{name}"
     manifest = base.manifest.model_copy(
         update={
@@ -485,7 +487,7 @@ def lab(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Lab:
 def fast_lab(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Lab:
     """A ``Lab`` over the cached fixture package without a copied repository tree."""
     with monkeypatch.context() as scoped:
-        scoped.setattr(package_support.shutil, "copytree", lambda *args, **kwargs: None)
+        scoped.setattr(shutil, "copytree", lambda *args, **kwargs: None)
         found = make_lab(tmp_path, monkeypatch)
     found.package = note_state_package()
     return found

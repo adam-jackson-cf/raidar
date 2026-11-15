@@ -35,7 +35,6 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import yaml
-from raidar_contract.canonical import digest_json
 
 from raidar.design.experiment.lock import default_lock_path
 from raidar.design.experiment.schema import ExperimentSpec
@@ -43,6 +42,7 @@ from raidar.engine.job.assessment import rescore_config
 from raidar.evaluation.review.projection.assessments import TrialAssessments
 from raidar.evaluation.review.projection.sources import JobSource, lock_from_document
 from raidar.scoring.framework.rescore_config import RescoreConfig
+from raidar_contract.canonical import digest_json
 from tests.review_fixtures.projection.assessments import (
     LintFinding,
     QualityPlan,
@@ -234,7 +234,7 @@ def _agent_entry(agent: str) -> dict[str, object]:
 
 def _spec(design: Design) -> ExperimentSpec:
     agents = sorted(set(design.arms.values()))
-    return ExperimentSpec.model_validate(
+    spec: ExperimentSpec = ExperimentSpec.model_validate(
         {
             "schema_version": 3,
             "kind": "benchmark",
@@ -252,6 +252,7 @@ def _spec(design: Design) -> ExperimentSpec:
             },
         }
     )
+    return spec
 
 
 def _locked_arm(arm: str, agent: str) -> dict[str, object]:

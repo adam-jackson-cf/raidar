@@ -129,7 +129,10 @@ def _manifest_json(*, one_shot: bool = False) -> dict[str, Any]:
 
 
 def _manifest(*, one_shot: bool = False, **changes: Any) -> ProblemManifest:
-    return ProblemManifest.model_validate({**_manifest_json(one_shot=one_shot), **changes})
+    manifest: ProblemManifest = ProblemManifest.model_validate(
+        {**_manifest_json(one_shot=one_shot), **changes}
+    )
+    return manifest
 
 
 @pytest.fixture(name="store")
@@ -194,21 +197,28 @@ def test_content_keys_separate_unpinned_pinned_and_refused_problems() -> None:
 # ---- resolution --------------------------------------------------------------------------
 
 
+@dataclasses.dataclass(frozen=True)
+class _Validation:
+    """What a written validation report records; the defaults make a usable validation."""
+
+    verdict: str = "validated"
+    not_run: tuple[str, ...] = ()
+    manifest_sha256: str | None = None
+    grader: bool = True
+
+
+_USABLE_VALIDATION = _Validation()
+
+
 def _write_validation(
-    store: ProblemStore,
-    ref: str = POSITIVE_REF,
-    *,
-    verdict: str = "validated",
-    not_run: tuple[str, ...] = (),
-    manifest_sha256: str | None = None,
-    grader: bool = True,
+    store: ProblemStore, validation: _Validation = _USABLE_VALIDATION, ref: str = POSITIVE_REF
 ) -> None:
     problem = ProblemId.parse(ref)
     cases = [ADDS]
     report: dict[str, Any] = {
-        "verdict": verdict,
-        "manifest_sha256": manifest_sha256 or store.load_manifest(problem).digest(),
-        "not_run": list(not_run),
+        "verdict": validation.verdict,
+        "manifest_sha256": validation.manifest_sha256 or store.load_manifest(problem).digest(),
+        "not_run": list(validation.not_run),
         "solvable": {
             "checkpoint_1": {
                 "verdict": "validated",
@@ -218,7 +228,7 @@ def _write_validation(
             }
         },
     }
-    if grader:
+    if validation.grader:
         report["environment"] = {
             "grader_image": "grader:fixture",
             "grader_environment_id": ENVIRONMENT_ID,
@@ -293,7 +303,7 @@ def test_a_validated_problem_resolves_with_verdict_grader_and_errata(
 def test_a_validation_without_a_grader_identity_binds_no_grader(
     store: ProblemStore, tmp_path: Path
 ) -> None:
-    _write_validation(store, grader=False)
+    _write_validation(store, _Validation(grader=False))
     assert _resolve(store, POSITIVE_REF, tmp_path).binding["grader"] is None
 
 
@@ -312,7 +322,7 @@ def test_a_validation_without_a_grader_identity_binds_no_grader(
 def test_an_unusable_or_stale_validation_reaches_the_gate_unvalidated(
     store: ProblemStore, tmp_path: Path, changes: dict[str, Any], issue: str
 ) -> None:
-    _write_validation(store, **changes)
+    _write_validation(store, _Validation(**changes))
     resolved = _resolve(store, POSITIVE_REF, tmp_path)
     assert resolved.binding["validated"] is False
     assert issue in resolved.binding["validation_issue"]
@@ -698,6 +708,25 @@ def _imported(root: Path) -> ImportedProblem:
     return ImportedProblem(_manifest(), root / "task", bundle, root / "references")
 
 
+def _at(value: object, *path: str | int) -> object:
+    """The value at ``path`` inside a nested JSON-shaped report, checking each step's shape."""
+    for key in path:
+        if isinstance(key, int):
+            assert isinstance(value, list)
+            value = value[key]
+        else:
+            assert isinstance(value, dict)
+            value = value[key]
+    return value
+
+
+def _entries(value: object, *path: str | int) -> list[object]:
+    """The list at ``path`` inside a nested JSON-shaped report."""
+    found = _at(value, *path)
+    assert isinstance(found, list)
+    return found
+
+
 @pytest.fixture(name="problem")
 def audit_problem_fixture(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Any:
     monkeypatch.setattr(audit, "static_findings", lambda _problem: FINDINGS)
@@ -710,9 +739,11 @@ def test_the_audit_buckets_each_case_by_what_the_static_and_dynamic_halves_agree
 ) -> None:
     report = audit_report(problem, evidence)
 
-    assert [entry["case"] for entry in report["flagged"]] == ["test_a.py::test_err[x]"]
-    assert report["flagged"][0]["variants"] == [NEUTRAL_ERROR_TEXT]
-    assert report["flagged"][0]["assertions"][0]["rule"] == "wording-unstated"
+    assert [_at(entry, "case") for entry in _entries(report, "flagged")] == [
+        "test_a.py::test_err[x]"
+    ]
+    assert _at(report, "flagged", 0, "variants") == [NEUTRAL_ERROR_TEXT]
+    assert _at(report, "flagged", 0, "assertions", 0, "rule") == "wording-unstated"
     # undetermined, but no variant changed the outcome
     assert report["unconfirmed"] == [
         {"case": "test_a.py::test_fmt", "reason": "no variant changed its outcome"}
@@ -721,17 +752,18 @@ def test_the_audit_buckets_each_case_by_what_the_static_and_dynamic_halves_agree
     assert report["sensitive_determined"] == [
         {"case": "test_a.py::test_det", "variants": [NEUTRAL_ERROR_TEXT]}
     ]
-    assert {entry["case"] for entry in report["sensitive_unexplained"]} == {
+    assert {_at(entry, "case") for entry in _entries(report, "sensitive_unexplained")} == {
         "test_a.py::test_mixed",
         "test_a.py::test_other",
     }
     summary = report["summary"]
+    assert isinstance(summary, dict)
     assert summary["status"] == "measured"
     assert summary["flagged"] == 1
     assert summary["flagged_by_checkpoint"] == {"checkpoint_1": 1}
     assert summary["flagged_by_rule"] == {"wording-unstated": 1}
-    assert report["assertions"]["by_rule"] == {"literal-in-spec": 1, "wording-unstated": 3}
-    assert [entry["function"] for entry in report["static_undetermined"]] == [
+    assert _at(report, "assertions", "by_rule") == {"literal-in-spec": 1, "wording-unstated": 3}
+    assert [_at(entry, "function") for entry in _entries(report, "static_undetermined")] == [
         "test_a.py::test_err",
         "test_a.py::test_fmt",
         "test_a.py::test_mixed",
@@ -742,30 +774,32 @@ def test_a_step_with_an_infrastructure_failure_has_no_sensitive_cases(
     problem: Any, evidence: DynamicEvidence
 ) -> None:
     steps = audit_report(problem, evidence)["steps"]
-    assert steps["checkpoint_2"]["variants"][NEUTRAL_ERROR_TEXT] == {
+    assert _at(steps, "checkpoint_2", "variants", NEUTRAL_ERROR_TEXT) == {
         "passed": 0,
         "total": 1,
         "infra_failure": "sandbox_crash",
         "sensitive": [],
     }
-    assert steps["checkpoint_1"]["variants"][NEUTRAL_ERROR_TEXT]["sensitive"] == [
+    assert _at(steps, "checkpoint_1", "variants", NEUTRAL_ERROR_TEXT, "sensitive") == [
         "test_a.py::test_det",
         "test_a.py::test_err[x]",
         "test_a.py::test_mixed",
         "test_a.py::test_other",
     ]
-    assert "sensitive" not in steps["checkpoint_1"][REFERENCE]
+    reference = _at(steps, "checkpoint_1", REFERENCE)
+    assert isinstance(reference, dict)
+    assert "sensitive" not in reference
 
 
 def test_an_audit_whose_dynamic_half_did_not_run_is_unmeasured_and_flags_nothing(
     problem: Any,
 ) -> None:
     report = audit_report(problem, DynamicEvidence({}, not_run="no entry_file"))
-    assert report["dynamic"]["status"] == "not_run"
-    assert report["dynamic"]["reason"] == "no entry_file"
+    assert _at(report, "dynamic", "status") == "not_run"
+    assert _at(report, "dynamic", "reason") == "no entry_file"
     assert report["flagged"] == []
-    assert report["summary"]["status"] == "unmeasured"
-    assert report["summary"]["flagged"] is None
+    assert _at(report, "summary", "status") == "unmeasured"
+    assert _at(report, "summary", "flagged") is None
     assert report["steps"] == {}
 
 
@@ -781,16 +815,7 @@ def test_the_spec_of_a_step_falls_back_to_the_tasks_single_instruction(
 
 
 def _fake_grader(calls: list[tuple[str, str]]) -> Any:
-    async def grade(
-        bundle: Any,
-        step: str,
-        snapshot: Path,
-        sandbox: Any,
-        run: Path,
-        *,
-        coverage: bool,
-        timeout_s: float,
-    ) -> Any:
+    async def grade(_bundle: object, step: str, snapshot: Path, *_rest: object, **_: object) -> Any:
         variant = REFERENCE if snapshot.parent.name == "references" else snapshot.parent.name
         calls.append((variant, step))
         status = CaseStatus.FAILED if variant == NEUTRAL_ERROR_TEXT else CaseStatus.PASSED

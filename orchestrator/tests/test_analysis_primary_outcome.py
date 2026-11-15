@@ -28,11 +28,7 @@ from raidar.design.experiment.lock import seal_lock
 from raidar.design.experiment.validation import SpecValidationError
 from raidar.engine.job.assessment import lock_rescore_config
 from raidar.evaluation.analysis import load as load_module, lookup as lookup_module
-from raidar.evaluation.analysis.assessed import (
-    PROCESS_COMPLIANCE_REF,
-    VERIFICATION_EFFORT_REF,
-    verification_effort_ref,
-)
+from raidar.evaluation.analysis.assessed import verification_effort_ref
 from raidar.evaluation.analysis.effects import Settings
 from raidar.evaluation.analysis.load import LoadRequest, load_inputs
 from raidar.evaluation.analysis.lookup import AssessmentLookup, assessment_config
@@ -55,10 +51,12 @@ from raidar.evaluation.analysis.sources import (
 )
 from raidar.scoring.catalog.outcomes import (
     PRIMARY_FROM_LOCK,
+    PROCESS_COMPLIANCE_REF,
     RAW_COUNTERPART,
     SOLVE_RATE,
     SOLVE_RATE_ERRATA,
     SOLVE_RATE_SOLVABLE,
+    VERIFICATION_EFFORT_REF,
     primary_metric,
     primary_source,
 )
@@ -110,11 +108,15 @@ def test_primary_outcome_is_validated_against_known_trial_outcomes(tmp_path: Pat
     document["analysis"]["primary_outcome"] = SOLVE_RATE_ERRATA
     spec = load_experiment(write_experiment(tmp_path / "ok", document)).spec
     assert spec.analysis.primary_outcome == SOLVE_RATE_ERRATA
-    assert spec.to_json()["analysis"]["primary_outcome"] == SOLVE_RATE_ERRATA
+    analysis = spec.to_json()["analysis"]
+    assert isinstance(analysis, dict)
+    assert analysis["primary_outcome"] == SOLVE_RATE_ERRATA
 
     plain = load_experiment(write_experiment(tmp_path / "plain", experiment_document())).spec
     assert plain.analysis.primary_outcome is None
-    assert "primary_outcome" not in plain.to_json()["analysis"]
+    plain_analysis = plain.to_json()["analysis"]
+    assert isinstance(plain_analysis, dict)
+    assert "primary_outcome" not in plain_analysis
 
     for bad in ("vibes", "gate.first_pass_clean_rate"):
         document["analysis"]["primary_outcome"] = bad
@@ -655,10 +657,19 @@ def _load(
     *,
     results: dict[str, dict[str, AssessResult | None]] | None = None,
     seen_refs: list[tuple[str, ...]] | None = None,
-    allow_dev_jobs: bool = False,
-    lock_path: Path | None = None,
 ) -> Any:
     """``load_inputs`` over in-memory jobs, an in-memory lock and stored results per trial."""
+    return load_inputs(_staged_request(monkeypatch, jobs, lock, results, seen_refs))
+
+
+def _staged_request(
+    monkeypatch: pytest.MonkeyPatch,
+    jobs: list[JobDir],
+    lock: dict[str, Any],
+    results: dict[str, dict[str, AssessResult | None]] | None = None,
+    seen_refs: list[tuple[str, ...]] | None = None,
+) -> LoadRequest:
+    """The ``load_inputs`` request over ``jobs``, with the job, lock and result reads staged."""
     by_path = {job.path: job for job in jobs}
     monkeypatch.setattr(load_module, "read_job", lambda path: by_path[path])
     monkeypatch.setattr(load_module, "read_lock", lambda path: lock)
@@ -672,14 +683,7 @@ def _load(
         return (results or {}).get(trial_id, {})
 
     monkeypatch.setattr(AssessmentLookup, "valid_results", valid_results)
-    request = LoadRequest(
-        job_dirs=tuple(by_path),
-        store_root=Path("store"),
-        registry=NO_REGISTRY,
-        lock_path=lock_path,
-        allow_dev_jobs=allow_dev_jobs,
-    )
-    return load_inputs(request)
+    return LoadRequest(job_dirs=tuple(by_path), store_root=Path("store"), registry=NO_REGISTRY)
 
 
 def test_loading_assembles_jobs_plan_and_the_pinned_sets_of_the_planned_steps(
@@ -687,7 +691,7 @@ def test_loading_assembles_jobs_plan_and_the_pinned_sets_of_the_planned_steps(
 ) -> None:
     other = "scb/other@1"
     pins = {step: [f"{step}::case_0"] for step in THREE_STEPS}
-    audit = {PROBLEM: {"audited": 4}}
+    audit: dict[str, dict[str, object]] = {PROBLEM: {"audited": 4}}
     lock = _pinned_lock(["correctness@10"], {PROBLEM: pins, other: pins}, audit)
     first = _toy_job("run-1", lock, valid=False)
     rerun = _toy_job("run-2", lock)
@@ -759,7 +763,8 @@ def test_development_jobs_are_loaded_only_when_allowed_and_labelled_not_scored(
 
     with pytest.raises(AnalysisInputError, match="not arm evidence"):
         _load(monkeypatch, [job], lock)
-    loaded, _ = _load(monkeypatch, [job], lock, allow_dev_jobs=True)
+    dev_request = _staged_request(monkeypatch, [job], lock)
+    loaded, _ = load_inputs(dataclasses.replace(dev_request, allow_dev_jobs=True))
 
     assert loaded.dev_job == DevRun(
         max_checkpoints=2, agent_override="noop", note=options.describe()
@@ -775,8 +780,9 @@ def test_loading_needs_a_job_and_a_lock_naming_its_headline_metric(
 
     lock = analysis_lock(["correctness@10"])
     headless = {**lock, "assessment": {**lock["assessment"], "metric": None}}
+    request = _staged_request(monkeypatch, [_toy_job("run-1", lock)], headless)
     with pytest.raises(AnalysisInputError, match="names no headline metric"):
-        _load(monkeypatch, [_toy_job("run-1", lock)], headless, lock_path=Path("pilot.lock.json"))
+        load_inputs(dataclasses.replace(request, lock_path=Path("pilot.lock.json")))
 
 
 # ---- the analyze command ----------------------------------------------------------------
@@ -841,7 +847,8 @@ def _analyze(
 
 
 def _written(tmp_path: Path) -> dict[str, Any]:
-    return json.loads((tmp_path / "out" / "analysis.json").read_text())
+    report: dict[str, Any] = json.loads((tmp_path / "out" / "analysis.json").read_text())
+    return report
 
 
 def test_a_lock_that_pins_thresholds_labels_every_command_line_override(

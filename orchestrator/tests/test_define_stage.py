@@ -179,7 +179,9 @@ def test_accepted_proposals_reach_the_next_turn_and_later_rounds(tmp_path: Path)
 
     assert result["status"] == "resume"
     assert result["carry"]["asked"] == 1
-    for question in reply["questions"]:
+    questions = reply["questions"]
+    assert isinstance(questions, list)
+    for question in questions:
         assert question["proposal"] in result["message"]
         assert any(question["proposal"] in answer for answer in result["carry"]["said"])
     assert not (state / "criteria.json").exists()

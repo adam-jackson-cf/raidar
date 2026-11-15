@@ -14,9 +14,9 @@ from types import SimpleNamespace
 from typing import Any
 
 import pytest
+from harbor.trial.trial import Trial
 
 from raidar.design.problem import direct, harbor_engine, validator, variant_shim
-from raidar.design.problem.audit import DynamicEvidence
 from raidar.design.problem.models import ProblemId, ProblemMode
 from raidar.design.problem.validation import (
     DEPENDENCY_CHECK,
@@ -376,7 +376,7 @@ def test_direct_validation_prepares_a_sandbox_and_runs_the_audit(
     async def audit_variants(problem: Any, box: object, **kw: Any) -> Any:
         return SimpleNamespace(grades={}, not_run={"x": "why"}, environment={"dyn": 1})
 
-    def audit_report(problem: Any, evidence: DynamicEvidence) -> dict[str, object]:
+    def audit_report(problem: Any, evidence: SimpleNamespace) -> dict[str, object]:
         return {"environment": dict(evidence.environment or {}), "not_run": dict(evidence.not_run)}
 
     monkeypatch.setattr(direct, "prepare_grader_sandbox", prepare)
@@ -403,7 +403,7 @@ def test_given_sandbox_is_used_without_preparing_one(
 
     monkeypatch.setattr(direct, "prepare_grader_sandbox", forbidden)
     monkeypatch.setattr(direct, "grade_references", grade_references)
-    report = _validate(FakeStore(tmp_path), _options(), sandbox=object())  # type: ignore[arg-type]
+    report = _validate(FakeStore(tmp_path), _options(), sandbox=object())
     assert report.spec_determinacy is None
     assert report.verdict is Verdict.VALIDATED_PARTIAL
     assert report.runs is not None
@@ -445,7 +445,9 @@ def test_harbor_validation_pins_the_grader_identity_it_prepared(
             "grader_implementation_sha256": "b" * 64,
         }
 
-    async def run_variant(problem: Any, variant: str, payloads: Any, work: Path, **kw: Any):
+    async def run_variant(
+        problem: Any, variant: str, payloads: Any, work: Path, **kw: Any
+    ) -> list[dict[str, Grade]]:
         pins.append(kw["grader"])
         if variant == NEGATIVE:
             negative_paths.update(payloads.values())
@@ -482,7 +484,9 @@ def test_native_runner_grades_the_same_snapshots_and_records_its_revision(
         def revision(self) -> dict[str, object]:
             return {"commit": "c0ffee", "dirty": False}
 
-        def grade(self, catalog: Path, problem: str, snapshot: Path, index: int, out: Path):
+        def grade(
+            self, catalog: Path, problem: str, snapshot: Path, index: int, out: Path
+        ) -> Grade:
             ok = index == 1
             return grade(f"checkpoint_{index}", {"a" if ok else "b": PASSED})
 
@@ -597,7 +601,7 @@ def test_grade_references_groups_grades_by_variant_and_repeat(
 
     async def grade_step(
         bundle: Any, step: str, snapshot: Path, sandbox: Any, out: Path, **kw: Any
-    ):
+    ) -> SimpleNamespace:
         passed = snapshot == problem.reference(step)
         status = CaseStatus.PASSED if passed else CaseStatus.FAILED
         case = CaseResult(
@@ -639,7 +643,7 @@ def test_prepare_grader_sandbox_records_the_image_and_environment(
     box, details = asyncio.run(
         direct.prepare_grader_sandbox(FakeProblem(tmp_path, FakeManifest()), "ctx")  # type: ignore[arg-type]
     )
-    assert box.image == "grader:ctx"  # type: ignore[attr-defined]
+    assert box.image == "grader:ctx"
     assert details == {
         "grader_image": "grader:ctx",
         "grader_environment_id": "sha256:env",
@@ -748,10 +752,10 @@ def test_trial_outcome_reports_the_trial_dir_and_exception_type(
     async def create(config: Any) -> FakeTrial:
         return FakeTrial(config)
 
-    monkeypatch.setattr(harbor_engine.Trial, "create", create)
+    monkeypatch.setattr(Trial, "create", create)
     monkeypatch.setattr(harbor_engine, "install_leak_guard", lambda trial, root: None)
-    assert asyncio.run(harbor_engine._run_trial(None, tmp_path)) == (tmp_path / "t", None)  # type: ignore[arg-type]
-    assert asyncio.run(harbor_engine._run_trial("Boom", tmp_path)) == (tmp_path / "t", "Boom")  # type: ignore[arg-type]
+    assert asyncio.run(harbor_engine._run_trial(None, tmp_path)) == (tmp_path / "t", None)
+    assert asyncio.run(harbor_engine._run_trial("Boom", tmp_path)) == (tmp_path / "t", "Boom")
 
 
 # ---- variant shim --------------------------------------------------------------------------
@@ -772,7 +776,7 @@ def test_shim_main_runs_the_reference_and_rewrites_only_its_stdout(
         body = json.dumps({"error": "bad", "detail": "secret"}).encode()
         return subprocess.CompletedProcess(command, 3, stdout=body)
 
-    monkeypatch.setattr(variant_shim.subprocess, "run", fake_run)
+    monkeypatch.setattr(subprocess, "run", fake_run)
     code = variant_shim.main("ref.py", "neutral_error_text", ["--x", "1"])
     assert code == 3
     out = capsysbinary.readouterr().out
@@ -781,7 +785,7 @@ def test_shim_main_runs_the_reference_and_rewrites_only_its_stdout(
 
 def test_shim_main_rejects_an_unknown_variant(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
-        variant_shim.subprocess,
+        subprocess,
         "run",
         lambda command, **kw: subprocess.CompletedProcess(command, 0, stdout=b"{}"),
     )

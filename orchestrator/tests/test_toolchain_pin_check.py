@@ -5,6 +5,7 @@ from __future__ import annotations
 import importlib.util
 import json
 import sys
+from dataclasses import dataclass
 from pathlib import Path
 
 import pytest
@@ -18,19 +19,24 @@ sys.modules[spec.name] = checker
 spec.loader.exec_module(checker)
 
 
+@dataclass(frozen=True)
+class _PinCase:
+    """One repository's pins and toolchain records, and the check's expected verdict."""
+
+    root_pin: bytes | None
+    project_pin: bytes | None
+    interpreter: str
+    declared_uv: str | tuple[str, ...] | None
+    locked_uv: str | None
+    resolver_uv: str
+    exit_code: int
+    source: str
+
+
 @pytest.mark.parametrize(
-    (
-        "root_pin",
-        "project_pin",
-        "interpreter",
-        "declared_uv",
-        "locked_uv",
-        "resolver_uv",
-        "exit_code",
-        "source",
-    ),
+    "case",
     [
-        (*pins, "uv==0.10.0", "0.10.0", "uv@0.10.0", code, source)
+        _PinCase(*pins, "uv==0.10.0", "0.10.0", "uv@0.10.0", code, source)
         for pins, code, source in [
             ((b"3.12.9\n", b"3.12.9\n", "3.12.9"), 0, ""),
             ((b"3.13.7\n", b"3.13.7\n", "3.13.7"), 0, ""),
@@ -45,7 +51,7 @@ spec.loader.exec_module(checker)
         ]
     ]
     + [
-        (b"3.13.7\n", b"3.13.7\n", "3.13.7", *versions, code, source)
+        _PinCase(b"3.13.7\n", b"3.13.7\n", "3.13.7", *versions, code, source)
         for versions, code, source in [
             (
                 ("uv==0.10.0", "0.10.0", "uv@0.13.7"),
@@ -77,32 +83,23 @@ spec.loader.exec_module(checker)
     ],
 )
 def test_pin_check_accepts_only_equal_present_pins_and_the_exact_interpreter(
-    monkeypatch: pytest.MonkeyPatch,
-    capsys: pytest.CaptureFixture[str],
-    root_pin: bytes | None,
-    project_pin: bytes | None,
-    interpreter: str,
-    declared_uv: str | tuple[str, ...] | None,
-    locked_uv: str | None,
-    resolver_uv: str,
-    exit_code: int,
-    source: str,
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], case: _PinCase
 ) -> None:
     repo_root = Path("pin-check-repo")
     pins = {
-        repo_root / ".python-version": root_pin,
-        repo_root / "orchestrator" / ".python-version": project_pin,
+        repo_root / ".python-version": case.root_pin,
+        repo_root / "orchestrator" / ".python-version": case.project_pin,
     }
-    if declared_uv is None:
+    if case.declared_uv is None:
         declarations: list[str] | tuple[str, ...] = []
-    elif isinstance(declared_uv, str):
-        declarations = [declared_uv]
+    elif isinstance(case.declared_uv, str):
+        declarations = [case.declared_uv]
     else:
-        declarations = declared_uv
+        declarations = case.declared_uv
     dependencies = ["packaging>=24", *declarations]
     lock = '[[package]]\nname = "packaging"\nversion = "24.0"\n'
-    if locked_uv is not None:
-        lock += f'[[package]]\nname = "uv"\nversion = "{locked_uv}"\n'
+    if case.locked_uv is not None:
+        lock += f'[[package]]\nname = "uv"\nversion = "{case.locked_uv}"\n'
     record = "lab/problems/registry/example/dependencies.json"
     texts = {
         repo_root / "orchestrator/pyproject.toml": (
@@ -112,9 +109,9 @@ def test_pin_check_accepts_only_equal_present_pins_and_the_exact_interpreter(
         repo_root / "orchestrator/uv.lock": lock,
         repo_root / record: json.dumps(
             {
-                "resolver": f"uv@{locked_uv or '0.10.0'}",
-                "nested": [{"dependencies": {"resolver": resolver_uv}}],
-                "other": {"resolver": f"uv@{locked_uv or '0.10.0'}"},
+                "resolver": f"uv@{case.locked_uv or '0.10.0'}",
+                "nested": [{"dependencies": {"resolver": case.resolver_uv}}],
+                "other": {"resolver": f"uv@{case.locked_uv or '0.10.0'}"},
             }
         ),
     }
@@ -131,12 +128,12 @@ def test_pin_check_accepts_only_equal_present_pins_and_the_exact_interpreter(
     monkeypatch.setattr(Path, "read_bytes", read_pin)
     monkeypatch.setattr(Path, "read_text", read_text)
     monkeypatch.setattr(checker, "repo_paths", lambda root: [record])
-    monkeypatch.setattr(checker.platform, "python_version", lambda: interpreter)
+    monkeypatch.setattr(checker.platform, "python_version", lambda: case.interpreter)
 
-    assert checker.main(["--repo-root", str(repo_root)]) == exit_code
+    assert checker.main(["--repo-root", str(repo_root)]) == case.exit_code
     captured = capsys.readouterr()
-    if exit_code:
-        assert source in captured.err
+    if case.exit_code:
+        assert case.source in captured.err
     else:
         assert "toolchain-pin-check: ok" in captured.out
         assert not captured.err

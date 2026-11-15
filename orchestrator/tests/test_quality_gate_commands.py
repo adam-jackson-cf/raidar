@@ -1,19 +1,24 @@
 import json
 import os
+import shutil
 import subprocess
 from decimal import Decimal
 from pathlib import Path
+from typing import Any, Protocol
 
 import click
 import pytest
 from click.testing import CliRunner
 
-from raidar.cli import process, quality
+from raidar.cli import process, quality, repo_state
 
 FLOOR = Decimal("95.00")
 
 
-def report(*, line: tuple[int, int], branch: tuple[int, int]) -> dict:
+CoverageReport = dict[str, dict[str, int]]
+
+
+def report(*, line: tuple[int, int], branch: tuple[int, int]) -> CoverageReport:
     return {
         "totals": {
             "covered_lines": line[0],
@@ -73,33 +78,35 @@ def test_coverage_gate_fails_when_nothing_was_measured() -> None:
         quality.enforce_coverage_report(report(line=PASSING, branch=(0, 0)), FLOORS)
 
 
-def test_quality_gate_helpers_validate_requirements_and_commands(monkeypatch) -> None:
+def test_quality_gate_helpers_validate_requirements_and_commands(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     with pytest.raises(click.ClickException, match="--stage is only supported"):
         quality.validate_quality_gate_options(fix=False, stage=True)
 
-    monkeypatch.setattr(quality.repo_state, "has_unstaged_changes", lambda _root: True)
+    monkeypatch.setattr(repo_state, "has_unstaged_changes", lambda _root: True)
     with pytest.raises(click.ClickException, match="Unstaged changes detected"):
         quality.validate_quality_gate_options(fix=True, stage=False)
 
+    monkeypatch.setattr(repo_state, "assert_no_generated_artifact_changes", lambda _root: None)
     monkeypatch.setattr(
-        quality.repo_state, "assert_no_generated_artifact_changes", lambda _root: None
-    )
-    monkeypatch.setattr(
-        quality.shutil, "which", lambda command: None if command == "lizard" else "/bin/tool"
+        shutil, "which", lambda command: None if command == "lizard" else "/bin/tool"
     )
     with pytest.raises(click.ClickException, match="Missing required command: lizard"):
         quality.assert_quality_gate_requirements()
 
     monkeypatch.setattr(
-        quality.shutil, "which", lambda command: None if command == "lint-imports" else "/bin/tool"
+        shutil, "which", lambda command: None if command == "lint-imports" else "/bin/tool"
     )
     with pytest.raises(click.ClickException, match="Missing required command: lint-imports"):
         quality.assert_quality_gate_requirements()
 
 
-def test_a_failed_child_command_stops_the_quality_runner(monkeypatch, tmp_path) -> None:
+def test_a_failed_child_command_stops_the_quality_runner(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
     monkeypatch.setattr(
-        process.subprocess,
+        subprocess,
         "run",
         lambda *args, **kwargs: subprocess.CompletedProcess(args[0], returncode=7),
     )
@@ -108,28 +115,36 @@ def test_a_failed_child_command_stops_the_quality_runner(monkeypatch, tmp_path) 
 
 
 @pytest.fixture
-def quality_workspace(monkeypatch, tmp_path: Path) -> Path:
+def quality_workspace(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Path:
     """Keep generated coverage and the configured floors local to each command."""
     pyproject = tmp_path / "pyproject.toml"
     pyproject.write_text("[tool.raidar.coverage]\nline_floor = 95.00\nbranch_floor = 96.00\n")
     monkeypatch.setattr(quality, "PYPROJECT", pyproject)
     monkeypatch.setattr(quality, "tmp_root", lambda: tmp_path)
-    monkeypatch.setattr(quality.repo_state, "has_unstaged_changes", lambda _root: False)
-    monkeypatch.setattr(
-        quality.repo_state, "assert_no_generated_artifact_changes", lambda _root: None
-    )
-    monkeypatch.setattr(quality.shutil, "which", lambda _command: "/bin/tool")
+    monkeypatch.setattr(repo_state, "has_unstaged_changes", lambda _root: False)
+    monkeypatch.setattr(repo_state, "assert_no_generated_artifact_changes", lambda _root: None)
+    monkeypatch.setattr(shutil, "which", lambda _command: "/bin/tool")
     return tmp_path
 
 
+class InstallChildren(Protocol):
+    """Install modelled tool outcomes; the returned state records what ran."""
+
+    def __call__(
+        self, *, measurements: CoverageReport | None = None, failure: str | None = None
+    ) -> dict[str, bool]: ...
+
+
 @pytest.fixture
-def quality_children(monkeypatch):
+def quality_children(monkeypatch: pytest.MonkeyPatch) -> InstallChildren:
     """Model tool outcomes without launching children or changing tracked files."""
 
-    def install(*, measurements=None, failure: str | None = None):
+    def install(
+        *, measurements: CoverageReport | None = None, failure: str | None = None
+    ) -> dict[str, bool]:
         state = {"staged": False, "tested": False}
 
-        def run(command, **kwargs):
+        def run(command: list[str], **kwargs: Any) -> subprocess.CompletedProcess[bytes]:
             if failure is not None and failure in command:
                 return subprocess.CompletedProcess(command, returncode=7)
             if command[0] == "git":
@@ -146,7 +161,7 @@ def quality_children(monkeypatch):
                 )
             return subprocess.CompletedProcess(command, returncode=0)
 
-        monkeypatch.setattr(process.subprocess, "run", run)
+        monkeypatch.setattr(subprocess, "run", run)
         return state
 
     return install
@@ -157,7 +172,7 @@ def quality_children(monkeypatch):
     [([], False), (["--fix"], False), (["--fix", "--stage"], True)],
 )
 def test_quality_gates_stage_only_after_success_when_explicitly_requested(
-    quality_workspace, quality_children, options, staged: bool
+    quality_workspace: Path, quality_children: InstallChildren, options: list[str], staged: bool
 ) -> None:
     state = quality_children()
 
@@ -182,8 +197,9 @@ def test_quality_gates_stage_only_after_success_when_explicitly_requested(
         "pytest",
     ],
 )
+@pytest.mark.usefixtures("quality_workspace")
 def test_quality_gates_stop_on_a_failed_tool_without_staging(
-    quality_workspace, quality_children, failed_tool: str
+    quality_children: InstallChildren, failed_tool: str
 ) -> None:
     state = quality_children(failure=failed_tool)
 
@@ -204,10 +220,15 @@ def test_quality_gates_stop_on_a_failed_tool_without_staging(
         (["--fix", "--stage"], True, "Unstaged changes detected"),
     ],
 )
+@pytest.mark.usefixtures("quality_workspace")
 def test_quality_gates_refuse_unsafe_options_before_running_tools(
-    monkeypatch, quality_workspace, quality_children, options, unstaged: bool, message: str
+    monkeypatch: pytest.MonkeyPatch,
+    quality_children: InstallChildren,
+    options: list[str],
+    unstaged: bool,
+    message: str,
 ) -> None:
-    monkeypatch.setattr(quality.repo_state, "has_unstaged_changes", lambda _root: unstaged)
+    monkeypatch.setattr(repo_state, "has_unstaged_changes", lambda _root: unstaged)
     state = quality_children()
 
     result = CliRunner().invoke(quality.quality, ["gates", *options])
@@ -227,8 +248,12 @@ def test_quality_gates_refuse_unsafe_options_before_running_tools(
         ({"totals": {"covered_lines": 95, "num_statements": 100}}, 1, "no branch measurements"),
     ],
 )
+@pytest.mark.usefixtures("quality_workspace")
 def test_fast_command_enforces_configured_floors_from_the_generated_report(
-    quality_workspace, quality_children, measurements, exit_code: int, message: str | None
+    quality_children: InstallChildren,
+    measurements: CoverageReport,
+    exit_code: int,
+    message: str | None,
 ) -> None:
     state = quality_children(measurements=measurements)
 
@@ -240,8 +265,9 @@ def test_fast_command_enforces_configured_floors_from_the_generated_report(
         assert message in result.output
 
 
+@pytest.mark.usefixtures("quality_workspace")
 def test_insufficient_coverage_prevents_staging_and_success(
-    quality_workspace, quality_children
+    quality_children: InstallChildren,
 ) -> None:
     state = quality_children(measurements=report(line=(94, 100), branch=(95, 100)))
 
@@ -255,7 +281,7 @@ def test_insufficient_coverage_prevents_staging_and_success(
 
 
 def test_fast_command_preserves_the_callers_coverage_artifacts(
-    monkeypatch, quality_workspace, quality_children
+    monkeypatch: pytest.MonkeyPatch, quality_workspace: Path, quality_children: InstallChildren
 ) -> None:
     caller_report = quality_workspace / "coverage.json"
     caller_report.write_text('{"caller": true}')

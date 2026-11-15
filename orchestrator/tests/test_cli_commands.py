@@ -8,6 +8,7 @@ import subprocess
 import sys
 import tomllib
 from pathlib import Path
+from typing import NoReturn
 
 import click
 import pytest
@@ -83,7 +84,7 @@ def test_agent_setup_auth_runs_codex_login_with_device_auth(
     monkeypatch.setenv("CODEX_HOME", str(auth_dir))
     monkeypatch.setenv("CODEX_CLI_PATH", sys.executable)
 
-    def fake_run(command, check=False):
+    def fake_run(command: list[str], check: bool = False) -> subprocess.CompletedProcess[str]:
         del check
         auth_path.write_text('{"access_token":"token"}', encoding="utf-8")
         return subprocess.CompletedProcess(command, 0)
@@ -108,7 +109,7 @@ def test_agent_setup_auth_fails_when_login_does_not_create_auth_json(
     monkeypatch.setenv("CODEX_HOME", str(auth_dir))
     monkeypatch.setenv("CODEX_CLI_PATH", sys.executable)
 
-    def fake_run(command, check=False):
+    def fake_run(command: list[str], check: bool = False) -> subprocess.CompletedProcess[str]:
         del check
         return subprocess.CompletedProcess(command, 0)
 
@@ -138,7 +139,7 @@ def test_agent_commands_explain_an_unusable_cli_override(
     assert "passed" not in result.output
 
 
-def test_env_setup_refuses_an_old_docker_compose(monkeypatch) -> None:
+def test_env_setup_refuses_an_old_docker_compose(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
         "raidar.cli.env_harbor.subprocess.run",
         lambda *args, **kwargs: subprocess.CompletedProcess(args[0], 0, stdout="2.30.0\n"),
@@ -150,7 +151,9 @@ def test_env_setup_refuses_an_old_docker_compose(monkeypatch) -> None:
     assert "Unsupported docker compose version 2.30.0. Require >= 2.40.1" in result.output
 
 
-def test_compose_preflight_accepts_new_unknown_or_missing_compose(monkeypatch) -> None:
+def test_compose_preflight_accepts_new_unknown_or_missing_compose(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     outputs = iter(["v2.40.1\n", "not a version\n"])
     monkeypatch.setattr(
         "raidar.cli.env_harbor.subprocess.run",
@@ -159,7 +162,7 @@ def test_compose_preflight_accepts_new_unknown_or_missing_compose(monkeypatch) -
     assert env_harbor.compose_preflight_reason() is None
     assert env_harbor.compose_preflight_reason() is None
 
-    def missing(*_args, **_kwargs):
+    def missing(*_args: object, **_kwargs: object) -> NoReturn:
         raise FileNotFoundError("docker")
 
     monkeypatch.setattr("raidar.cli.env_harbor.subprocess.run", missing)
@@ -167,9 +170,9 @@ def test_compose_preflight_accepts_new_unknown_or_missing_compose(monkeypatch) -
 
 
 def test_harbor_cleanup_reports_removed_trial_environments(
-    monkeypatch, tmp_path: Path, docker_target_offline: None
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, docker_target_offline: None
 ) -> None:
-    def fake_cleanup(job_dir, *, docker_context, dry_run):
+    def fake_cleanup(job_dir: Path | None, *, docker_context: str, dry_run: bool) -> list[str]:
         return ["b00-p0-baseline__env-0123456789"]
 
     monkeypatch.setattr("raidar.cli.env_harbor.cleanup_trial_projects", fake_cleanup)
@@ -181,8 +184,10 @@ def test_harbor_cleanup_reports_removed_trial_environments(
     assert "1 trial environment(s) would remove" in result.output
 
 
-def test_harbor_cleanup_surfaces_docker_failures(monkeypatch, docker_target_offline: None) -> None:
-    def failing(job_dir, *, docker_context, dry_run):
+def test_harbor_cleanup_surfaces_docker_failures(
+    monkeypatch: pytest.MonkeyPatch, docker_target_offline: None
+) -> None:
+    def failing(job_dir: Path | None, *, docker_context: str, dry_run: bool) -> NoReturn:
         raise RuntimeError("docker ps failed: no daemon")
 
     monkeypatch.setattr("raidar.cli.env_harbor.cleanup_trial_projects", failing)
@@ -242,7 +247,7 @@ def test_external_command_failure_stops_the_cli_before_completion(
     monkeypatch: pytest.MonkeyPatch, returncode: int
 ) -> None:
     monkeypatch.setattr(
-        process.subprocess,
+        subprocess,
         "run",
         lambda *args, **kwargs: subprocess.CompletedProcess(args[0], returncode),
     )

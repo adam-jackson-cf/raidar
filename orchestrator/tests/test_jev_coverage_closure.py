@@ -13,7 +13,7 @@ from typing import Any
 import pytest
 import requests
 import yaml
-from click.testing import CliRunner
+from click.testing import CliRunner, Result
 
 from raidar.cli import main
 from raidar.judge import client as client_module
@@ -382,7 +382,7 @@ TRIALS = ("t1", "t2", "t3", "t4")
 @pytest.fixture(scope="module")
 def promotable_store(tmp_path_factory: pytest.TempPathFactory) -> Path:
     """32 decisions over 4 trials; 30 carry a reference label, two are ``uncertain``."""
-    root = tmp_path_factory.mktemp("promotable")
+    root: Path = tmp_path_factory.mktemp("promotable")
     scores = iter([0.85 if i % 4 == 0 else 0.15 for i in range(32)])
     transport = RecordedTransport(answer_for=lambda _id, _q: noul_answer(next(scores)))
     runtimes = {trial: make_runtime(root, transport=transport, trial=trial) for trial in TRIALS}
@@ -502,7 +502,7 @@ def test_a_verified_promotion_is_written_under_the_files_leading_comments(
 # --- CLI ---
 
 
-def _invoke(*args: str):
+def _invoke(*args: str) -> Result:
     return CliRunner().invoke(main, ["jev", *args])
 
 

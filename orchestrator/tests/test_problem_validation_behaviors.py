@@ -14,7 +14,6 @@ import pytest
 import uv
 from click.testing import CliRunner
 from harbor.models.task.task import Task
-from raidar_contract.canonical import digest_json
 
 from raidar.cli import main
 from raidar.contract.paths import VAR_ENV, problems_root
@@ -61,6 +60,7 @@ from raidar.design.problem.validation import (
     Check,
     CheckStatus,
     Grade,
+    ValidationReport,
     ValidationRuns,
     Verdict,
     check_determinism,
@@ -80,6 +80,7 @@ from raidar.design.problem.validator import ValidateOptions, validate_problem
 from raidar.grading.bundle import VerifierStepSpec
 from raidar.grading.sandbox import SandboxResult, SandboxRun
 from raidar.subject.environment.python.pack_definition import load_pack_spec
+from raidar_contract.canonical import digest_json
 from tests.problems_support import (
     CONVERTED_TASK_TOML,
     NEGATIVE_REF,
@@ -121,7 +122,7 @@ def _grade(step: str, outcomes: dict[str, str], infra: str | None = None) -> Gra
 
 async def _validate(
     store: ProblemStore, ref: str, tmp_path: Path, repeats: int = 2
-) -> validator.ValidationReport:
+) -> ValidationReport:
     return await validate_problem(
         store,
         ProblemId.parse(ref),
@@ -404,7 +405,9 @@ def test_lock_metadata_ignores_run_specific_report_bytes(tmp_path: Path) -> None
     one, two = read_validation_record(first), read_validation_record(second)
 
     assert one.lock_metadata() == two.lock_metadata()
-    assert one.lock_metadata()["spec_determinacy"]["status"] == "unmeasured"
+    spec_determinacy = one.lock_metadata()["spec_determinacy"]
+    assert isinstance(spec_determinacy, dict)
+    assert spec_determinacy["status"] == "unmeasured"
 
     second.write_text(
         json.dumps(

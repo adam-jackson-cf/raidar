@@ -10,18 +10,18 @@ from typing import Any
 import pytest
 from click.testing import CliRunner
 from pydantic import ValidationError
-from raidar_contract.canonical import digest_json
 
 from raidar.cli import main
-from raidar.design.experiment.loader import load_experiment
+from raidar.design.experiment.loader import LoadedExperiment, load_experiment
 from raidar.design.experiment.lock import LockError
 from raidar.design.experiment.schema import ProblemEntry
 from raidar.design.problem.store import ROOT_ENV
 from raidar.engine.trial.agent_config import arm_agent_config
-from raidar.engine.trial.plan import PlanError, PlanOptions, build_plan
+from raidar.engine.trial.plan import ExperimentPlan, PlanError, PlanOptions, build_plan
 from raidar.subject.environment.python.harness import HarnessPinError
 from raidar.subject.environment.python.pack_definition import load_pack_spec
 from raidar.subject.workflow.runner import WorkflowRunner
+from raidar_contract.canonical import digest_json
 from tests.execution_support import ImportedFixture, locked_experiment, validated_fixture
 from tests.problems_support import ONESHOT_REF, build_fixture_store, record_validation
 
@@ -43,7 +43,9 @@ def locked(
     )
 
 
-def _plan(locked: tuple[Any, dict[str, Any], Path], fixture: ImportedFixture, **options: Any):
+def _plan(
+    locked: tuple[Any, dict[str, Any], Path], fixture: ImportedFixture, **options: Any
+) -> ExperimentPlan:
     loaded, lock, _ = locked
     return build_plan(
         loaded, lock, store=fixture.store, pack=load_pack_spec(), options=PlanOptions(**options)
@@ -111,7 +113,9 @@ def test_selection_and_truncation_change_what_runs_not_the_condition(
     assert trial.hashes.trial != original.hashes.trial
 
 
-def _bound(tmp_path: Path, fixture: ImportedFixture, name: str, **binding: Any):
+def _bound(
+    tmp_path: Path, fixture: ImportedFixture, name: str, **binding: Any
+) -> tuple[LoadedExperiment, dict[str, Any], Path]:
     return locked_experiment(
         tmp_path / name,
         fixture.ref,

@@ -98,12 +98,18 @@ def test_copy_in_tar_sets_ownership_and_modes(tmp_path: Path) -> None:
     assert not any(name.startswith("oracle/out/") for name in members)
     with tarfile.open(tmp_path / "in.tar") as archive:
         shipped = {
-            member.name.removeprefix("oracle/runtime/"): archive.extractfile(member).read()
+            member.name.removeprefix("oracle/runtime/"): _member_bytes(archive, member)
             for member in archive.getmembers()
             if member.isfile() and member.name.startswith("oracle/runtime/")
         }
     assert shipped == {name: path.read_bytes() for name, path in runtime_files().items()}
     assert not any("__pycache__" in name for name in members)
+
+
+def _member_bytes(archive: tarfile.TarFile, member: tarfile.TarInfo) -> bytes:
+    extracted = archive.extractfile(member)
+    assert extracted is not None
+    return extracted.read()
 
 
 def test_copy_in_tar_keeps_case_sensitive_names_and_symlinks(tmp_path: Path) -> None:

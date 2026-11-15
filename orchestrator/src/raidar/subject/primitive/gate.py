@@ -31,7 +31,7 @@ from collections.abc import Awaitable, Mapping, Sequence
 from dataclasses import dataclass, field
 from enum import StrEnum
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Literal
+from typing import TYPE_CHECKING, Any, Literal, Protocol
 
 from raidar.contract.snapshot import SNAPSHOT_EXCLUDES, tree_digest
 from raidar.subject.primitive import calls, gate_tool
@@ -42,7 +42,7 @@ from raidar_contract.package.manifest import GateCheck, Output
 if TYPE_CHECKING:
     from harbor.environments.base import BaseEnvironment
 
-    from raidar.subject.primitive.install import InstalledPackage
+    from raidar.subject.primitive.install import TreeCheck
 
 PASSED, REFUSED, ERROR = gate_tool.PASSED, gate_tool.REFUSED, gate_tool.ERROR
 RECORD_DIR = "gate"
@@ -125,13 +125,31 @@ class GatePaths:
         return [self.system_python, "-B", self.payload]
 
 
+class GateTool(Protocol):
+    """What the gate reads of an installed tool tree (``InstalledPackage`` provides it)."""
+
+    @property
+    def path(self) -> str: ...
+
+    @property
+    def python(self) -> str: ...
+
+    @property
+    def root(self) -> str: ...
+
+    @property
+    def digest(self) -> str: ...
+
+    async def verify(self) -> TreeCheck: ...
+
+
 @dataclass(frozen=True)
 class GatePackage:
     """One enabled package's gate: its checks, installed tool and the context they read."""
 
     name: str
     """The package's leaf name."""
-    installed: InstalledPackage
+    installed: GateTool
     checks: Sequence[GateCheck]
     context: Mapping[str, Any] = field(default_factory=dict)
     """The JSON the checks read through ``RAIDAR_STAGE_CONTEXT`` (written root-owned)."""

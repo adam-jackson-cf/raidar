@@ -5,18 +5,19 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+from collections.abc import Awaitable, Callable
 from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
 import pytest
-from raidar_contract.package.manifest import StagePackage
 
 from raidar.subject.package.registry import load_stage_package
 from raidar.subject.primitive import outputs
-from raidar.subject.primitive.calls import TransportError
+from raidar.subject.primitive.calls import TransportError, TreeManifest
 from raidar.subject.primitive.outputs import collect_outputs
 from raidar.subject.primitive.site import TrialInvalidError
+from raidar_contract.package.manifest import StagePackage
 from tests.lifecycle_support import NOTE, NOTE_STATE, WATCH, Rig, build_rig
 
 REPORT = f"{WATCH}/report.json"
@@ -69,9 +70,10 @@ async def test_outputs_are_copied_hashed_and_validated_host_side(
     assert note.sha256 == hashlib.sha256(b"hello there world").hexdigest()
     assert Path(note.host_path or "").read_text() == "hello there world"
 
-    snapshot = outputs.snapshot_state
+    # The rig's transport, installed on the module by ``build_rig``, not the real one.
+    snapshot: Callable[..., Awaitable[TreeManifest]] = vars(outputs)["snapshot_state"]
 
-    async def changed(*args: Any, **kwargs: Any) -> Any:
+    async def changed(*args: Any, **kwargs: Any) -> TreeManifest:
         manifest = await snapshot(*args, **kwargs)
         return replace(
             manifest,

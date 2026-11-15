@@ -6,6 +6,7 @@ git state, digests): no run directory, process or network is touched.
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any, cast
@@ -42,22 +43,31 @@ def _target() -> Any:
     )
 
 
+@dataclass(frozen=True)
+class _CheckFailures:
+    """Errors the stubbed credential preflight and problem loading raise, when set."""
+
+    credentials: Exception | None = None
+    problems: Exception | None = None
+
+
 def _prepare(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
     *,
     kind: str,
     allow_unsmoked: bool = False,
-    credentials_error: Exception | None = None,
-    problems_error: Exception | None = None,
+    failures: _CheckFailures | None = None,
 ) -> Any:
+    injected = failures or _CheckFailures()
+
     def preflight(_plan: object) -> None:
-        if credentials_error is not None:
-            raise credentials_error
+        if injected.credentials is not None:
+            raise injected.credentials
 
     def load(_plan: object, _store: object) -> dict[int, Any]:
-        if problems_error is not None:
-            raise problems_error
+        if injected.problems is not None:
+            raise injected.problems
         return {0: "problem"}
 
     monkeypatch.setattr(run_checks, "preflight_credentials", preflight)
@@ -108,7 +118,7 @@ def test_a_missing_credential_refuses_the_run_with_the_preflight_message(
             monkeypatch,
             tmp_path,
             kind="smoke",
-            credentials_error=CredentialPreflightError("no key for agents.0"),
+            failures=_CheckFailures(credentials=CredentialPreflightError("no key for agents.0")),
         )
 
 
@@ -120,7 +130,7 @@ def test_an_unusable_problem_store_refuses_the_run(
             monkeypatch,
             tmp_path,
             kind="smoke",
-            problems_error=ProblemStoreError("manifest mismatch"),
+            failures=_CheckFailures(problems=ProblemStoreError("manifest mismatch")),
         )
 
 

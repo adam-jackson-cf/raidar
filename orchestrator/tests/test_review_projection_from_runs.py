@@ -36,7 +36,7 @@ PASSING = "synthetic-bugfix-gpt-5.5-medium-01"
 
 @pytest.fixture(scope="module")
 def fixture_root(tmp_path_factory: pytest.TempPathFactory) -> Path:
-    root = tmp_path_factory.mktemp("review-fixture")
+    root: Path = tmp_path_factory.mktemp("review-fixture")
     generate_review_fixture(root)
     return root
 

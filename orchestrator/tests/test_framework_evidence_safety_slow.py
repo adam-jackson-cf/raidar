@@ -214,7 +214,8 @@ def test_a_plain_rescore_uses_the_runs_locked_assessment_config(tmp_path: Path) 
         args = ["assess", "--rescore", str(target), "--scorer", scorer, "--store", str(store)]
         result = CliRunner().invoke(main, [*args, *extra])
         assert result.exit_code == 0, result.output
-        return json.loads(result.output)
+        report: dict[str, object] = json.loads(result.output)
+        return report
 
     explicit = rescore(trial, "correctness@10", "--config", str(config))
     for target in (trial, trial.parent):  # a trial dir, and its job dir

@@ -6,8 +6,6 @@ import json
 from pathlib import Path
 
 import pytest
-from raidar_contract.agent import AgentDefinitionError
-from raidar_contract.agent import load_agent as load_portable_agent
 
 from raidar.subject.agent.config import AgentSpec, Harness, ModelTarget
 from raidar.subject.agent.definition import harness_of, load_agent, provider_of
@@ -16,8 +14,8 @@ from raidar.subject.agent.native import (
     credentials,
     resolve_adapter,
 )
-from raidar.subject.agent.schema import AgentDefinition
-from raidar.subject.agent.schema import load_agent as load_lab_agent
+from raidar.subject.agent.schema import AgentDefinition, load_agent as load_lab_agent
+from raidar_contract.agent import AgentDefinitionError, load_agent as load_portable_agent
 from tests.capability_support import CAPABILITIES
 
 KEY = "test-key"

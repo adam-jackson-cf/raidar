@@ -7,6 +7,7 @@ import subprocess
 import sys
 import tomllib
 from pathlib import Path
+from types import ModuleType
 
 import pytest
 
@@ -16,7 +17,7 @@ pytestmark = pytest.mark.quality
 
 
 @pytest.fixture(scope="module")
-def bump_version_module():
+def bump_version_module() -> ModuleType:
     spec = importlib.util.spec_from_file_location("bump_version", SCRIPT_PATH)
     if spec is None or spec.loader is None:
         raise AssertionError(f"Could not load {SCRIPT_PATH}")
@@ -26,7 +27,7 @@ def bump_version_module():
 
 
 def test_release_updates_and_verifies_the_lock_before_publishing_files(
-    bump_version_module,
+    bump_version_module: ModuleType,
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:

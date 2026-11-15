@@ -133,9 +133,7 @@ class _Trial:
             Observation(metric=metric, subject=subject, status=AssessStatus.OK, value=value)
         )
 
-    def item(
-        self, metric: str, subject: str, kind: str, line: int, length: int, message: str
-    ) -> None:
+    def item(self, metric: str, subject: str, kind: str, span: Span, message: str) -> None:
         path = self.rng.choice(_FILES)
         self.evidence.append(
             Evidence(
@@ -144,10 +142,15 @@ class _Trial:
                 path=path,
                 sha256=_digest(self.trial_id, subject, path),
                 kind=kind,
-                spans=(Span(line=line, end_line=line + length - 1),),
+                spans=(span,),
                 message=message,
             )
         )
+
+
+def _lines(line: int, length: int) -> Span:
+    """The span of ``length`` lines starting at ``line``."""
+    return Span(line=line, end_line=line + length - 1)
 
 
 def _architecture(trial: _Trial, checkpoint: str) -> float | None:
@@ -168,8 +171,7 @@ def _architecture(trial: _Trial, checkpoint: str) -> float | None:
             "architecture",
             checkpoint,
             "cyclic_call",
-            5,
-            12,
+            _lines(5, 12),
             "report -> core (weight 2) is in a call cycle",
         )
     return architecture
@@ -182,8 +184,7 @@ def _findings(trial: _Trial, checkpoint: str, lint: int, high_cc: int) -> None:
             "verbosity",
             checkpoint,
             f"ruff:{code}",
-            10 + 17 * number,
-            1,
+            _lines(10 + 17 * number, 1),
             f"Ruff {code} (SCB contract rule set)",
         )
     for number in range(high_cc):
@@ -191,8 +192,7 @@ def _findings(trial: _Trial, checkpoint: str, lint: int, high_cc: int) -> None:
             "erosion",
             checkpoint,
             "high_complexity",
-            20 + 100 * number,
-            trial.rng.randint(25, 80),
+            _lines(20 + 100 * number, trial.rng.randint(25, 80)),
             f"function handle_{number}: cc={11 + number} (synthetic)",
         )
 
@@ -232,8 +232,7 @@ def _transition(trial: _Trial, subject: str) -> dict[str, float]:
             "rework",
             subject,
             "repeated_rework:added",
-            30,
-            6,
+            _lines(30, 6),
             "6 added lines re-modify symbols already changed earlier",
         )
     if regression < 1:
@@ -241,8 +240,7 @@ def _transition(trial: _Trial, subject: str) -> dict[str, float]:
             "regression",
             subject,
             "regression_attribution",
-            44,
-            3,
+            _lines(44, 3),
             "post_entry changed and is executed by failing regression(s)",
         )
     return {"rework": rework, "regression": regression}
@@ -411,10 +409,10 @@ def generate_quality_fixture(dest: Path) -> Path:
     lock_sha256 = write_synthetic_lock(
         experiment_file,
         experiment=EXPERIMENT,
-        baseline_arm=ARMS[0],
         metric=default_metric(len(CHECKPOINTS)),
-        problem=PROBLEM,
-        checkpoints=len(CHECKPOINTS),
+        analysis=synthetic_analysis(
+            baseline_arm=ARMS[0], problem=PROBLEM, checkpoints=len(CHECKPOINTS)
+        ),
     )
     job_dir.joinpath("job.json").write_text(
         json.dumps(

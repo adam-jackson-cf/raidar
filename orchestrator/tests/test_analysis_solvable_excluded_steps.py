@@ -21,8 +21,9 @@ from raidar.scoring.catalog.builtin import default_scorer_registry
 from raidar.scoring.catalog.outcomes import CORRECTNESS_REF
 from raidar.scoring.framework.rescore import rescore_path
 from raidar.scoring.framework.store import AssessmentStore
+from tests.analysis_support import analysis_lock as _lock
 from tests.test_analysis_bound_prefix import ALL_STEPS, PROBLEM, _write_job
-from tests.test_analysis_command import _analyze, _effect, _lock
+from tests.test_analysis_command import _analyze, _effect
 
 pytestmark = pytest.mark.slow
 
@@ -57,7 +58,8 @@ def _report(tmp_path: Path, excluded: set[str]) -> dict[str, Any]:
     output = tmp_path / "out"
     result = _analyze(job_dir, store, lock_path, output)
     assert result.exit_code == 0, result.output
-    return json.loads((output / "analysis.json").read_text())
+    report: dict[str, Any] = json.loads((output / "analysis.json").read_text())
+    return report
 
 
 # The baseline solves every checkpoint; the guided arm fails the second.

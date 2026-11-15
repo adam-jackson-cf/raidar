@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from typing import Any
 
 import pytest
 from click.testing import CliRunner
@@ -37,28 +38,32 @@ from raidar.engine.perf.report import PerfReport, build_report, report_from_samp
 from raidar.grading.records import PRE_AGENT_LEAK_FILE, RECORD_FILE, step_record_dir
 from tests.execution_support import StepOutcome, _record
 
+PhaseReading = tuple[float, float | None, list[PhaseSample]]
+"""What a step's own records give the phase reader: reset seconds, setup seconds, samples."""
+
 
 def _samples(phase: str, values: list[float], condition: str | None = None) -> list[PhaseSample]:
     return [PhaseSample(phase=phase, seconds=v, condition=condition) for v in values]
 
 
-def _timeline(steps: int = 2) -> tuple[dict, dict]:
+def _timeline(steps: int = 2) -> tuple[dict[str, Any], dict[str, PhaseReading]]:
     origin = datetime(2026, 10, 1, tzinfo=UTC)
 
     def at(seconds: float) -> str:
         return (origin + timedelta(seconds=seconds)).isoformat()
 
-    result = {
+    step_results: list[dict[str, Any]] = []
+    result: dict[str, Any] = {
         "environment_setup": {"started_at": at(0), "finished_at": at(10)},
         "agent_setup": {"started_at": at(10), "finished_at": at(11)},
         "finished_at": at(14 + steps * 20),
-        "step_results": [],
+        "step_results": step_results,
     }
-    readings = {}
+    readings: dict[str, PhaseReading] = {}
     for index in range(steps):
         name = f"checkpoint_{index + 1}"
         clock = 11 + index * 20
-        result["step_results"].append(
+        step_results.append(
             {
                 "step_name": name,
                 "agent_execution": {"started_at": at(clock + 2), "finished_at": at(clock + 12)},
@@ -278,7 +283,7 @@ def test_target_budget_selection_judges_samples_not_labels(target: str | None) -
 
 @pytest.mark.parametrize("strict", [False, True])
 def test_cli_budget_breaches_warn_by_default_and_fail_strictly(
-    monkeypatch, tmp_path: Path, strict: bool
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, strict: bool
 ) -> None:
     loaded = _loaded(teardown=6)
     report = report_from_samples(loaded, _contention(), min_samples=3)
@@ -303,9 +308,9 @@ def test_cli_budget_breaches_warn_by_default_and_fail_strictly(
 
 @pytest.mark.parametrize("malformed", [False, True])
 def test_cli_refuses_empty_and_malformed_inputs_even_report_only(
-    monkeypatch, tmp_path: Path, malformed: bool
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, malformed: bool
 ) -> None:
-    def load(_):
+    def load(_job_dirs: list[Path]) -> JobSamples:
         if malformed:
             raise PerfInputError("unreadable trial record")
         return JobSamples([], 0, False)
@@ -317,7 +322,7 @@ def test_cli_refuses_empty_and_malformed_inputs_even_report_only(
 
 
 def test_cli_one_shot_report_preserves_contention_and_record_only_tripwires(
-    monkeypatch, tmp_path: Path
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     loaded = _loaded(steps=1)
     loaded.samples.append(PhaseSample(phase="environment_start", seconds=300, condition="cold"))
@@ -348,7 +353,7 @@ def test_cli_one_shot_report_preserves_contention_and_record_only_tripwires(
 
 
 @pytest.fixture
-def memory_files(monkeypatch):
+def memory_files(monkeypatch: pytest.MonkeyPatch) -> dict[Path, str]:
     """A reader boundary, not generated job directories on disk."""
     files: dict[Path, str] = {}
     monkeypatch.setattr(Path, "is_file", lambda path: path in files)
@@ -421,7 +426,7 @@ def _memory_job(files: dict[Path, str], job: Path, offsets: list[float]) -> None
 
 @pytest.mark.parametrize("sibling_target", ["same", "foreign", "unknown"])
 def test_sibling_contention_counts_only_known_shared_targets(
-    memory_files, sibling_target: str
+    memory_files: dict[Path, str], sibling_target: str
 ) -> None:
     job = Path("/memory/jobs/e/measured")
     sibling = job.with_name("busy")
@@ -446,7 +451,9 @@ def test_sibling_contention_counts_only_known_shared_targets(
     )
 
 
-def test_untimed_trials_and_unrecorded_concurrency_remain_explicit(memory_files) -> None:
+def test_untimed_trials_and_unrecorded_concurrency_remain_explicit(
+    memory_files: dict[Path, str],
+) -> None:
     job = Path("/memory/jobs/e/measured")
     _memory_job(memory_files, job, [0, 100])
     manifest = json.loads(memory_files[job / "job.json"])
@@ -473,7 +480,9 @@ def test_untimed_trials_and_unrecorded_concurrency_remain_explicit(memory_files)
 
 
 @pytest.mark.parametrize("broken", ["record", "manifest", "result", "manifest-shape"])
-def test_malformed_records_are_input_errors_not_budget_warnings(memory_files, broken: str) -> None:
+def test_malformed_records_are_input_errors_not_budget_warnings(
+    memory_files: dict[Path, str], broken: str
+) -> None:
     job = Path("/memory/jobs/e/measured")
     _memory_job(memory_files, job, [0])
     path = {
@@ -487,7 +496,9 @@ def test_malformed_records_are_input_errors_not_budget_warnings(memory_files, br
         build_report([job], load_job_samples([job]), min_samples=1)
 
 
-def test_mixed_target_jobs_are_refused_before_budgets_are_combined(memory_files) -> None:
+def test_mixed_target_jobs_are_refused_before_budgets_are_combined(
+    memory_files: dict[Path, str],
+) -> None:
     job = Path("/memory/jobs/e/measured")
     other = job.with_name("other")
     _memory_job(memory_files, job, [0])
@@ -506,7 +517,7 @@ def test_mixed_target_jobs_are_refused_before_budgets_are_combined(memory_files)
 
 
 def test_phase_reader_uses_recorded_values_and_omits_missing_or_malformed_measurements(
-    memory_files,
+    memory_files: dict[Path, str],
 ) -> None:
     trial = Path("/memory/trial")
     result, _ = _timeline(1)
@@ -514,7 +525,9 @@ def test_phase_reader_uses_recorded_values_and_omits_missing_or_malformed_measur
     record = _record("checkpoint_1", StepOutcome("checkpoint_1"), trial)
     directory = step_record_dir(trial, "checkpoint_1")
     memory_files[directory / RECORD_FILE] = record.model_dump_json()
-    memory_files[directory / PRE_AGENT_LEAK_FILE] = record.pre_agent_leak_check.model_dump_json()
+    leaks = record.pre_agent_leak_check
+    assert leaks is not None
+    memory_files[directory / PRE_AGENT_LEAK_FILE] = leaks.model_dump_json()
     reset = trial / "steps/checkpoint_1/agent/raidar-reset.json"
     memory_files[reset] = json.dumps({"duration_ms": 240})
     samples = trial_phases(trial, arm_apply_s=0.25, environment_cold=False, compose_init=True)

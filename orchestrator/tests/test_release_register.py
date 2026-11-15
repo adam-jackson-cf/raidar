@@ -7,6 +7,7 @@ import shutil
 import subprocess
 from collections.abc import Callable
 from pathlib import Path
+from typing import Any
 
 import pytest
 import yaml
@@ -15,8 +16,9 @@ from click.testing import CliRunner
 from raidar.cli import main
 from raidar.contract.paths import agents_root
 from raidar.contract.releases import ReleaseKind, parse_register
-from raidar.subject import agent_checks, release_check
+from raidar.subject import agent_checks
 from raidar.subject.agent.definition import load_agent
+from raidar.subject.environment import load_runtime_pack
 from raidar.subject.package.registry import load_stage_package
 from raidar.subject.release_check import history_issues, release_base, release_issues
 from raidar.subject.releases import released_agent, released_workflow
@@ -389,7 +391,7 @@ def test_a_registered_name_with_no_definition_is_reported(tree: Path) -> None:
 
 
 def test_an_agent_pin_that_differs_from_the_runtime_pack_is_reported(tree: Path) -> None:
-    def repin(doc: dict) -> None:
+    def repin(doc: dict[str, Any]) -> None:
         doc["tool"].update(version="0.0.1")
         doc["capabilities"].update(version_pin="0.0.1")
 
@@ -408,7 +410,7 @@ def test_a_runtime_without_the_agents_harness_has_no_pin_obligation(
     tree: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    pack = agent_checks.load_runtime_pack("python")
+    pack = load_runtime_pack("python")
     unrelated = pack.model_copy(update={"image": pack.image.model_copy(update={"harnesses": {}})})
     monkeypatch.setattr(agent_checks, "available_runtimes", lambda: ["unrelated"])
     monkeypatch.setattr(agent_checks, "load_runtime_pack", lambda _runtime: unrelated)
@@ -416,7 +418,7 @@ def test_a_runtime_without_the_agents_harness_has_no_pin_obligation(
 
 
 def test_an_invalid_agent_does_not_hide_another_agents_pack_pin_mismatch(tree: Path) -> None:
-    def repin(document: dict) -> None:
+    def repin(document: dict[str, Any]) -> None:
         document["tool"]["version"] = "0.0.1"
         document["capabilities"]["version_pin"] = "0.0.1"
 
@@ -528,7 +530,8 @@ def _history(tmp_path: Path, now: str, git: Callable[..., str | None]) -> list[s
 
 
 def _agents(versions: dict[int, str]) -> str:
-    return yaml.safe_dump({"agents": {f"codex@{n}": d for n, d in versions.items()}})
+    document: str = yaml.safe_dump({"agents": {f"codex@{n}": d for n, d in versions.items()}})
+    return document
 
 
 def test_re_hashing_a_registered_version_in_place_is_allowed(tmp_path: Path) -> None:
@@ -574,18 +577,18 @@ def test_an_unreadable_register_at_the_base_is_reported(tmp_path: Path) -> None:
 def test_git_process_outcomes_distinguish_a_missing_repository(
     monkeypatch: pytest.MonkeyPatch, exit_code: int
 ) -> None:
-    def run(command, **kwargs):
+    def run(command: list[str], **kwargs: Any) -> subprocess.CompletedProcess[str]:
         output = " head \n" if command[-1] == "HEAD" else " fork \n"
         return subprocess.CompletedProcess(command, exit_code, stdout=output)
 
-    monkeypatch.setattr(release_check.subprocess, "run", run)
+    monkeypatch.setattr(subprocess, "run", run)
     assert release_base(Path("repo")) == ("fork" if exit_code == 0 else None)
 
 
 def test_git_timeout_is_not_an_empty_or_clean_history(monkeypatch: pytest.MonkeyPatch) -> None:
-    def timeout(command, **kwargs):
+    def timeout(command: list[str], **kwargs: Any) -> subprocess.CompletedProcess[str]:
         raise subprocess.TimeoutExpired(command, 1)
 
-    monkeypatch.setattr(release_check.subprocess, "run", timeout)
+    monkeypatch.setattr(subprocess, "run", timeout)
     with pytest.raises(subprocess.TimeoutExpired):
         release_base(Path("repo"))

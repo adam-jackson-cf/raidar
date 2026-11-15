@@ -13,6 +13,7 @@ from pathlib import Path
 
 import pytest
 
+from raidar.contract.review import ReviewProjectionArtifact
 from raidar.engine.health.records_manifest import seal_trial
 from raidar.evaluation.analysis.pooling import PoolingError
 from raidar.evaluation.review.projection import merge_review_projections
@@ -26,7 +27,7 @@ pytestmark = pytest.mark.slow
 
 @pytest.fixture(scope="module")
 def review_fixture(tmp_path_factory: pytest.TempPathFactory) -> Path:
-    root = tmp_path_factory.mktemp("review-integrity")
+    root: Path = tmp_path_factory.mktemp("review-integrity")
     generate_review_fixture(root)
     return root
 
@@ -80,7 +81,9 @@ def _quality(
     return build_quality_projection_from([(jobs, store)], synthetic=synthetic, locks=locks)
 
 
-def _project(pipeline: str, jobs: Path, store: Path):
+def _project(
+    pipeline: str, jobs: Path, store: Path
+) -> QualityProjection | ReviewProjectionArtifact:
     if pipeline == "quality":
         return _quality(jobs, store)
     return merge_review_projections(job_roots=[jobs], stores=[store])
@@ -320,7 +323,7 @@ def test_a_lock_named_by_flag_is_read_from_its_file_for_runs_whose_own_lock_move
     quality_fixture: Path, tmp_path: Path
 ) -> None:
     from tests.review_fixtures.quality.generate import ARMS, CHECKPOINTS, EXPERIMENT, PROBLEM
-    from tests.review_fixtures.quality.lock import write_synthetic_lock
+    from tests.review_fixtures.quality.lock import synthetic_analysis, write_synthetic_lock
 
     target = _quality_copy(quality_fixture, tmp_path)
     executed = tmp_path / "executed.lock.json"
@@ -328,10 +331,10 @@ def test_a_lock_named_by_flag_is_read_from_its_file_for_runs_whose_own_lock_move
     write_synthetic_lock(
         target / "experiment.yaml",
         experiment=f"{EXPERIMENT}-redesigned",
-        baseline_arm=ARMS[0],
         metric="scb-canonical-oneshot@1",
-        problem=PROBLEM,
-        checkpoints=len(CHECKPOINTS),
+        analysis=synthetic_analysis(
+            baseline_arm=ARMS[0], problem=PROBLEM, checkpoints=len(CHECKPOINTS)
+        ),
     )
     plain = _quality(target / "jobs", target / "store")
     flagged = _quality(target / "jobs", target / "store", locks=(executed,))

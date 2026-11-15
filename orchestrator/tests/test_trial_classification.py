@@ -36,8 +36,6 @@ from raidar.grading.solvable import SolvableRef
 from raidar.grading.verifier import step_rewards
 from tests.execution_support import (
     CLASSIFIED_STEPS as STEPS,
-)
-from tests.execution_support import (
     StepOutcome,
     classification_context,
     gate_rewards,
@@ -54,19 +52,15 @@ def _classify(
     outcomes: list[StepOutcome],
     rule: ProgressionRule = CONTINUE,
     steps: tuple[str, ...] = STEPS,
-    *,
-    trial_exception: str | None = None,
-    agent_version: str = "0.156.1",
-    result: bool = True,
-    idle_killed: tuple[str, ...] = (),
 ) -> tuple[TrialEvidence, tuple[StepResult, ...]]:
-    gathered = trial_evidence(
-        outcomes,
-        trial_exception=trial_exception,
-        agent_version=agent_version,
-        result=result,
-        idle_killed=idle_killed,
-    )
+    return _classify_gathered(trial_evidence(outcomes), rule, steps)
+
+
+def _classify_gathered(
+    gathered: TrialEvidence,
+    rule: ProgressionRule = CONTINUE,
+    steps: tuple[str, ...] = STEPS,
+) -> tuple[TrialEvidence, tuple[StepResult, ...]]:
     return gathered, classify_evidence(classification_context(steps, rule), gathered)
 
 
@@ -147,13 +141,15 @@ def test_agent_outcomes_are_graded_and_keep_the_trial_valid() -> None:
 def test_an_idle_killed_agent_is_graded_like_an_agent_timeout() -> None:
     """Harbor records the kill as a non-zero agent exit; only the liveness record excuses it."""
     exit_error = "NonZeroAgentExitCodeError"
-    _, step_results = _classify(
-        [
-            StepOutcome("checkpoint_1", passed=False, exception=exit_error),
-            StepOutcome("checkpoint_2", passed=False, exception=exit_error),
-        ],
+    _, step_results = _classify_gathered(
+        trial_evidence(
+            [
+                StepOutcome("checkpoint_1", passed=False, exception=exit_error),
+                StepOutcome("checkpoint_2", passed=False, exception=exit_error),
+            ],
+            idle_killed=("checkpoint_1",),
+        ),
         steps=STEPS[:2],
-        idle_killed=("checkpoint_1",),
     )
     assert _states(step_results)[:2] == ["failed", "infra_error"]
     assert step_results[0].termination == exit_error
@@ -171,15 +167,17 @@ def test_a_step_without_agent_usage_is_still_graded() -> None:
 
 
 def test_trial_level_failures_fail_the_validity_gate() -> None:
-    gathered, step_results = _classify([StepOutcome("checkpoint_1")], trial_exception="X")
+    gathered, step_results = _classify_gathered(
+        trial_evidence([StepOutcome("checkpoint_1")], trial_exception="X")
+    )
     assert step_results[1].infra_reasons == ("not_started:X",)
     assert not _valid(gathered, step_results, CONTINUE)
-    gathered, step_results = _classify(
-        [StepOutcome("checkpoint_1")], steps=STEPS[:1], agent_version="0.1"
+    gathered, step_results = _classify_gathered(
+        trial_evidence([StepOutcome("checkpoint_1")], agent_version="0.1"), steps=STEPS[:1]
     )
     assert _valid(gathered, step_results, CONTINUE, runnable=1)
     for rule in (CONTINUE, HALT):
-        gathered, step_results = _classify([], rule, result=False)
+        gathered, step_results = _classify_gathered(trial_evidence([], result=False), rule)
         # Environment start or step preparation failed: infrastructure, whatever the mode.
         assert _states(step_results) == ["infra_error"] * 8
         assert step_results[0].infra_reasons == ("not_started:no_result",)

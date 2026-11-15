@@ -105,7 +105,9 @@ def test_every_checkpoint_and_transition_carries_the_fork_values_and_traceable_e
         )
         # The in-memory Ruff finds nothing: V can only be at least the fork's.
         assert _observation(result, "lint_findings", step).value == 0
-        assert _observation(result, "verbosity", step).value >= float(quality["verbosity"])
+        verbosity = _observation(result, "verbosity", step).value
+        assert verbosity is not None
+        assert verbosity >= float(quality["verbosity"])
     reworks = [float(item["rework"]) for item in case["lineage"]["transitions"]]
     assert [_observation(result, "rework", key).value for key in (T12, T23)] == reworks
     assert _observation(result, "regression", T12).value == float(

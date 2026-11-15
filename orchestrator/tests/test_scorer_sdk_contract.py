@@ -13,7 +13,7 @@ from raidar.contract.references import RefKind, RegistryRef, RegistryReferenceEr
 from raidar.grading.models import CaseStatus
 from raidar.scoring.catalog.builtin import ScorerResolver
 from raidar.scoring.framework.builtin_manifests import BUILTIN_MANIFESTS, CODE_QUALITY, CORRECTNESS
-from raidar.scoring.framework.context import statused_result
+from raidar.scoring.framework.context import AssessContext, statused_result
 from raidar.scoring.framework.keys import scorer_identity
 from raidar.scoring.framework.manifest import (
     EvidenceInput,
@@ -68,15 +68,18 @@ from tests.scorer_support import (
 
 
 @pytest.fixture
-def ctx(tmp_path: Path):
+def ctx(tmp_path: Path) -> AssessContext:
     return two_step_context(tmp_path)
 
 
 def _with(result: AssessResult, **changes: object) -> AssessResult:
-    return result.model_copy(update=changes)
+    changed: AssessResult = result.model_copy(update=changes)
+    return changed
 
 
-def test_scorer_output_with_undeclared_duplicate_or_missing_metrics_is_rejected(ctx) -> None:
+def test_scorer_output_with_undeclared_duplicate_or_missing_metrics_is_rejected(
+    ctx: AssessContext,
+) -> None:
     manifest = fake_manifest()
     good = FakeScorer(manifest).assess(ctx)
     accepted = validate_result(manifest, ctx, good)
@@ -114,13 +117,13 @@ def test_scorer_output_with_undeclared_duplicate_or_missing_metrics_is_rejected(
         validate_result(manifest, ctx, _with(good, evidence=(stray_evidence,)))
 
 
-def test_a_newer_manifest_rejects_output_missing_its_new_metric(ctx) -> None:
+def test_a_newer_manifest_rejects_output_missing_its_new_metric(ctx: AssessContext) -> None:
     v1_output = FakeScorer(fake_manifest("1")).assess(ctx)
     with pytest.raises(MissingMetricError, match=r"test_files\[checkpoint_1\]"):
         validate_result(fake_scorer_v2().manifest, ctx, v1_output)
 
 
-def test_unavailable_is_never_a_value_and_ok_values_fit_their_type(ctx) -> None:
+def test_unavailable_is_never_a_value_and_ok_values_fit_their_type(ctx: AssessContext) -> None:
     with pytest.raises(ValidationError, match="never zero"):
         Observation(
             metric="solved", subject="c", status=AssessStatus.UNAVAILABLE, value=0.0, reason="x"
@@ -149,7 +152,7 @@ def test_unavailable_is_never_a_value_and_ok_values_fit_their_type(ctx) -> None:
             validate_result(manifest, ctx, _with(good, observations=observations))
 
 
-def test_result_status_and_ratio_parts_must_agree_with_the_values(ctx) -> None:
+def test_result_status_and_ratio_parts_must_agree_with_the_values(ctx: AssessContext) -> None:
     manifest = fake_manifest()
     good = FakeScorer(manifest).assess(ctx)
     with pytest.raises(ValidationError, match="cannot carry ok observations"):
@@ -170,12 +173,14 @@ def test_result_status_and_ratio_parts_must_agree_with_the_values(ctx) -> None:
             Observation(metric="m", subject="c", status=AssessStatus.OK, value=0.9, **parts)
 
 
-def test_evidence_must_point_at_real_lines_of_the_subjects_stored_files(ctx) -> None:
+def test_evidence_must_point_at_real_lines_of_the_subjects_stored_files(ctx: AssessContext) -> None:
     manifest = fake_manifest()
     good = FakeScorer(manifest).assess(ctx)
     real = next(e for e in good.evidence if e.subject == "checkpoint_2")
     assert validate_result(manifest, ctx, _with(good, evidence=(real,))).evidence == (real,)
-    trace_file = ctx.step("checkpoint_1").trace_dir / "trajectory.json"
+    trace_dir = ctx.step("checkpoint_1").trace_dir
+    assert trace_dir is not None
+    trace_file = trace_dir / "trajectory.json"
     trace = Evidence(
         metric="solved",
         subject="checkpoint_1",
@@ -207,7 +212,7 @@ def test_evidence_must_point_at_real_lines_of_the_subjects_stored_files(ctx) -> 
 def test_snapshot_scorers_must_report_steps_with_unreadable_evidence_as_ineligible(
     tmp_path: Path,
 ) -> None:
-    latin1 = {**APP_V2, "app/core.py": "s = 'caf\xe9'\n".encode("latin-1")}
+    latin1: dict[str, str | bytes] = {**APP_V2, "app/core.py": "s = 'caf\xe9'\n".encode("latin-1")}
     ctx = snapshot_context(
         tmp_path,
         [
@@ -293,7 +298,9 @@ def test_implementation_digest_covers_helpers_the_scorer_imports(
     assert registration.implementation_digest() != after_kernel
 
 
-def test_statused_result_explicitly_covers_every_declared_metric_without_values(ctx) -> None:
+def test_statused_result_explicitly_covers_every_declared_metric_without_values(
+    ctx: AssessContext,
+) -> None:
     unsupported = statused_result(
         CODE_QUALITY, ctx, AssessStatus.UNSUPPORTED, "runtime go has no adapter"
     )
@@ -306,7 +313,7 @@ def test_statused_result_explicitly_covers_every_declared_metric_without_values(
         statused_result(CODE_QUALITY, ctx, AssessStatus.OK, "fine")
 
 
-def test_accepted_results_are_canonical_whatever_the_emission_order(ctx) -> None:
+def test_accepted_results_are_canonical_whatever_the_emission_order(ctx: AssessContext) -> None:
     manifest = fake_manifest()
     emitted = FakeScorer(manifest).assess(ctx)
     shuffled = _with(

@@ -71,7 +71,7 @@ def _gated(work_tests: bool) -> dict[str, Any]:
     }
 
 
-def _ctx(tmp_path: Path, *traces: dict, **config: Any) -> AssessContext:
+def _ctx(tmp_path: Path, *traces: dict[str, Any], **config: Any) -> AssessContext:
     steps = [TracedStep(f"checkpoint_{i}", trace=trace) for i, trace in enumerate(traces, 1)]
     return traced_memory_context(
         tmp_path, steps, config={"extra_test_patterns": [GATE_PATTERN], **config}

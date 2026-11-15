@@ -17,11 +17,7 @@ from raidar.subject.environment.python.pack_definition import load_pack_spec
 from tests.execution_support import ImportedFixture, locked_experiment
 from tests.test_problem_errata import (
     EXCLUDED as EXCLUDED,
-)
-from tests.test_problem_errata import (
     fixture_fixture as fixture_fixture,
-)
-from tests.test_problem_errata import (
     write_errata as write_errata,
 )
 from tests.test_verifier_and_regrade import make_verifier, place_step_artifact

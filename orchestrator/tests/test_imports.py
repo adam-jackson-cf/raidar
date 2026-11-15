@@ -8,15 +8,15 @@ from pathlib import Path
 import pytest
 import yaml
 from click.testing import CliRunner
-from raidar_contract.package import StagePackageError
-from raidar_contract.references import ReleaseError
-from raidar_contract.workflow import load_package_workflow, package_workflow_digest
 
 from raidar.cli import main
 from raidar.contract.releases import ReleaseKind
 from raidar.subject.imports import PackageImportError, import_folder, import_issues, load_imports
 from raidar.subject.package.registry import load_stage_package
 from raidar.subject.releases import released_workflow
+from raidar_contract.package import StagePackageError
+from raidar_contract.references import ReleaseError
+from raidar_contract.workflow import load_package_workflow, package_workflow_digest
 from tests.package_support import write_package
 
 
@@ -37,7 +37,9 @@ def _import(tree: tuple[Path, Path, str], source: str = " unknown origin ") -> P
     return target
 
 
-def test_import_records_verbatim_source_without_registering_and_is_idempotent(tree) -> None:
+def test_import_records_verbatim_source_without_registering_and_is_idempotent(
+    tree: tuple[Path, Path, str],
+) -> None:
     root, _, digest = tree
     target = _import(tree)
     assert load_stage_package(target).digest == digest
@@ -53,13 +55,15 @@ def test_import_records_verbatim_source_without_registering_and_is_idempotent(tr
 
 
 @pytest.mark.parametrize("source", ["", "  ", "a\nb", "a\n", "a\rb", "a\u2028b"])
-def test_blank_or_multiline_source_never_installs(tree, source: str) -> None:
+def test_blank_or_multiline_source_never_installs(
+    tree: tuple[Path, Path, str], source: str
+) -> None:
     with pytest.raises(PackageImportError, match="one non-empty line"):
         _import(tree, source)
     assert not (tree[0] / "lab/stages").exists()
 
 
-def test_recorded_digest_cannot_change_source_or_name(tree) -> None:
+def test_recorded_digest_cannot_change_source_or_name(tree: tuple[Path, Path, str]) -> None:
     root, package, digest = tree
     _import(tree)
     with pytest.raises(PackageImportError, match="different name or SOURCE"):
@@ -74,7 +78,7 @@ def test_recorded_digest_cannot_change_source_or_name(tree) -> None:
 
 
 @pytest.mark.parametrize("name", ["raidar/docs", "../docs", "a/b/c", "/fxl/docs"])
-def test_reserved_or_traversing_name_is_refused(tree, name: str) -> None:
+def test_reserved_or_traversing_name_is_refused(tree: tuple[Path, Path, str], name: str) -> None:
     root, package, digest = tree
     with pytest.raises((PackageImportError, ReleaseError)):
         import_folder(
@@ -83,7 +87,7 @@ def test_reserved_or_traversing_name_is_refused(tree, name: str) -> None:
     assert not (root / "lab/stages").exists()
 
 
-def test_single_changed_byte_is_refused_before_writing(tree) -> None:
+def test_single_changed_byte_is_refused_before_writing(tree: tuple[Path, Path, str]) -> None:
     root, package, _ = tree
     original = (package / "prompt.md").read_bytes()
     (package / "prompt.md").write_bytes(original + b"x")
@@ -93,7 +97,9 @@ def test_single_changed_byte_is_refused_before_writing(tree) -> None:
 
 
 @pytest.mark.parametrize("unsafe", ["link", "fifo", "ancestor"])
-def test_unsafe_export_is_refused_including_fixtures(tree, unsafe: str) -> None:
+def test_unsafe_export_is_refused_including_fixtures(
+    tree: tuple[Path, Path, str], unsafe: str
+) -> None:
     root, package, digest = tree
     if unsafe == "ancestor":
         link = package.parent.parent / "linked"
@@ -118,7 +124,9 @@ def test_unsafe_export_is_refused_including_fixtures(tree, unsafe: str) -> None:
     assert not (root / "lab/stages").exists()
 
 
-def test_different_existing_folder_and_frozen_release_are_refused(tree) -> None:
+def test_different_existing_folder_and_frozen_release_are_refused(
+    tree: tuple[Path, Path, str],
+) -> None:
     root, package, digest = tree
     target = _import(tree)
     (target / "prompt.md").write_text("changed target")
@@ -131,7 +139,9 @@ def test_different_existing_folder_and_frozen_release_are_refused(tree) -> None:
     assert not target.exists()
 
 
-def test_workflow_requires_registered_dependencies_and_source_is_not_identity(tree) -> None:
+def test_workflow_requires_registered_dependencies_and_source_is_not_identity(
+    tree: tuple[Path, Path, str],
+) -> None:
     root, _, digest = tree
     _import(tree)
     exported = root.parent / "workflow-export"
@@ -168,7 +178,9 @@ def test_workflow_requires_registered_dependencies_and_source_is_not_identity(tr
     assert released_workflow("fxl/checked@1", repo_root=root, draft=False).digest == expected
 
 
-def test_release_check_requires_folder_and_every_historical_release_digest(tree) -> None:
+def test_release_check_requires_folder_and_every_historical_release_digest(
+    tree: tuple[Path, Path, str],
+) -> None:
     root, _, digest = tree
     _import(tree)
     (root / "lab/releases.yaml").write_text(
@@ -201,13 +213,13 @@ def test_release_check_requires_folder_and_every_historical_release_digest(tree)
         "duplicate",
     ],
 )
-def test_malformed_ledger_is_a_release_issue(tree, document: str) -> None:
+def test_malformed_ledger_is_a_release_issue(tree: tuple[Path, Path, str], document: str) -> None:
     root = tree[0]
     (root / "lab/imports.yaml").write_text(document)
     assert import_issues(root)
 
 
-def test_a_malformed_digest_argument_is_refused(tree) -> None:
+def test_a_malformed_digest_argument_is_refused(tree: tuple[Path, Path, str]) -> None:
     root, package, _ = tree
     with pytest.raises(PackageImportError, match="64 lowercase hexadecimal"):
         import_folder(
@@ -218,7 +230,7 @@ def test_a_malformed_digest_argument_is_refused(tree) -> None:
         )
 
 
-def test_a_symlinked_install_folder_is_refused(tree) -> None:
+def test_a_symlinked_install_folder_is_refused(tree: tuple[Path, Path, str]) -> None:
     root, package, digest = tree
     elsewhere = root.parent / "elsewhere"
     elsewhere.mkdir()
@@ -234,7 +246,7 @@ def test_a_symlinked_install_folder_is_refused(tree) -> None:
 
 
 def test_the_import_command_reports_what_it_installed_and_what_it_refused(
-    tree, monkeypatch: pytest.MonkeyPatch
+    tree: tuple[Path, Path, str], monkeypatch: pytest.MonkeyPatch
 ) -> None:
     root, package, digest = tree
     monkeypatch.setattr("raidar.cli.imports.REPO_ROOT", root)
@@ -252,7 +264,7 @@ def test_the_import_command_reports_what_it_installed_and_what_it_refused(
 
 
 def test_the_workflow_import_command_is_refused_without_its_dependencies(
-    tree, monkeypatch: pytest.MonkeyPatch
+    tree: tuple[Path, Path, str], monkeypatch: pytest.MonkeyPatch
 ) -> None:
     root, _, _ = tree
     monkeypatch.setattr("raidar.cli.imports.REPO_ROOT", root)

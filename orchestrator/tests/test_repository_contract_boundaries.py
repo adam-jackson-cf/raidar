@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import stat
 from importlib.metadata import EntryPoint
 from pathlib import Path
@@ -104,7 +105,7 @@ def test_snapshot_excludes_reserved_names_even_when_they_are_files(
 ) -> None:
     root = Path("/snapshot")
     monkeypatch.setattr(
-        snapshot.os,
+        os,
         "walk",
         lambda *args, **kwargs: [(str(root), [], [".git", "keep.py", ".raidar"])],
     )
@@ -117,7 +118,7 @@ def test_snapshot_refuses_a_file_replaced_by_a_special_entry_after_the_path_chec
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     (tmp_path / "source.py").write_text("print('safe')\n")
-    monkeypatch.setattr(snapshot.os, "fstat", lambda fd: SimpleNamespace(st_mode=stat.S_IFIFO))
+    monkeypatch.setattr(os, "fstat", lambda fd: SimpleNamespace(st_mode=stat.S_IFIFO))
 
     with pytest.raises(OSError, match="not a regular file"):
         snapshot.tree_digest(tmp_path)

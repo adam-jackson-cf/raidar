@@ -111,7 +111,11 @@ def memory_step(name: str, statuses: Sequence[CaseStatus] | None) -> MemoryStep:
 
 
 def memory_record(
-    name: str, grade: VerifierGrade, *, rewards: Mapping[str, float] | None = None, problem="toy"
+    name: str,
+    grade: VerifierGrade,
+    *,
+    rewards: Mapping[str, float] | None = None,
+    problem: str = "toy",
 ) -> StepRecord:
     """An oracle step record built in memory (nothing is stored)."""
     return StepRecord(
@@ -193,7 +197,7 @@ def fixed_identity(registration: ScorerRegistration) -> ScorerIdentity:
 
     Store tests exercise keys and outcomes, not the source closure ``scorer_identity`` hashes.
     """
-    return ScorerIdentity.model_validate(
+    identity: ScorerIdentity = ScorerIdentity.model_validate(
         {
             "ref": registration.manifest.ref,
             "manifest_digest": registration.manifest.digest(),
@@ -202,6 +206,7 @@ def fixed_identity(registration: ScorerRegistration) -> ScorerIdentity:
             ).hexdigest(),
         }
     )
+    return identity
 
 
 def assess_fixed(

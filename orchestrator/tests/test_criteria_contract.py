@@ -6,6 +6,7 @@ import copy
 from typing import Any
 
 import pytest
+
 from raidar_contract.criteria import CriteriaError, validate_criteria
 
 

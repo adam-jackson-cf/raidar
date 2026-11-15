@@ -107,9 +107,13 @@ def _job(
     records: tuple[TrialRecord, ...] = (),
     *,
     seal: Mapping[str, Any] = SEALED,
-    **plan: Any,
+    plan: Mapping[str, Any] | None = None,
 ) -> JobDir:
-    """An in-memory job with one sealed trial; ``manifest`` is its job.json (default: epoch job)."""
+    """An in-memory job with one sealed trial; ``manifest`` is its job.json (default: epoch job).
+
+    ``plan`` overrides the trial's hashes and the arm's capabilities, model, reasoning and varies.
+    """
+    plan = plan or {}
     fields = _manifest(job_id=name) if manifest is None else {**manifest, "job_id": name}
     if "mechanics_epoch" in fields:
         fields["records_manifests"] = {TRIAL: seal}
@@ -211,7 +215,7 @@ def test_pooling_refuses_each_provenance_difference_naming_jobs_and_values(
 def test_pooling_refuses_a_different_subject_but_the_override_lifts_it(
     change: str, one: str, two: str
 ) -> None:
-    jobs = [_job("one"), _job("two", **{change: two})]
+    jobs = [_job("one"), _job("two", plan={change: two})]
     with pytest.raises(PoolingError, match=rf"subject differs.*one=.*{one}.*two=.*{two}"):
         check_pooling(jobs)
     assert check_pooling(jobs, ["subject"]).overrides_used == ("subject",)
@@ -221,7 +225,7 @@ def test_pooling_refuses_a_different_subject_but_the_override_lifts_it(
 def test_pooling_refuses_different_package_or_primitive_identity_and_no_override_lifts_it(
     field: str,
 ) -> None:
-    jobs = [_job("one"), _job("two", **{field: "s2"})]
+    jobs = [_job("one"), _job("two", plan={field: "s2"})]
     with pytest.raises(PoolingError, match=rf"{field} differs.*one=.*s1.*two=.*s2") as refused:
         check_pooling(jobs)
     assert "nothing lifts it" in str(refused.value)
@@ -307,7 +311,7 @@ def test_pooling_reports_the_shared_capabilities_and_parity() -> None:
 def test_arms_must_share_a_complete_capability_declaration_with_no_override(
     two: dict[str, str] | None, message: str
 ) -> None:
-    jobs = [_job("one"), _job("two", capabilities=two)]
+    jobs = [_job("one"), _job("two", plan={"capabilities": two})]
 
     with pytest.raises(PoolingError, match=message):
         check_pooling(jobs)
@@ -318,10 +322,10 @@ def test_arms_must_share_a_complete_capability_declaration_with_no_override(
 def _harness_jobs(**two: Any) -> list[JobDir]:
     """Two jobs whose experiment declares a harness comparison; ``two`` shapes the second."""
     return [
-        _job("one", varies=["harness"], canonical_model="m", reasoning="low"),
+        _job("one", plan={"varies": ["harness"], "canonical_model": "m", "reasoning": "low"}),
         _job(
             "two",
-            **{
+            plan={
                 "capabilities": OTHER_HARNESS,
                 "varies": ["harness"],
                 "canonical_model": "m",
@@ -357,11 +361,11 @@ def test_a_harness_comparison_differing_in_model_or_reasoning_must_declare_it(
     two: dict[str, str], varies: list[str], message: str | None
 ) -> None:
     jobs = [
-        _job("one", varies=varies, canonical_model="m", reasoning="low"),
+        _job("one", plan={"varies": varies, "canonical_model": "m", "reasoning": "low"}),
         _job(
             "two",
-            **{"capabilities": OTHER_HARNESS, "varies": varies, "canonical_model": "m",
-               "reasoning": "low", **two},
+            plan={"capabilities": OTHER_HARNESS, "varies": varies, "canonical_model": "m",
+                  "reasoning": "low", **two},
         ),
     ]  # fmt: skip
 

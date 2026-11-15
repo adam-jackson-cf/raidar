@@ -281,7 +281,7 @@
     },
     "tools": {}
   },
-  "document_sha256": "350f3dc1d5703f6abafc97e4d5916a443ceb81f6bf655e4239365ebf0b1bed93",
+  "document_sha256": "b4dfa84a033c6d5e3b77efbd29e6fb2efa3b026bd18fc8be69d73af1ab61e72f",
   "execution": {
     "arms": {
       "baseline": {
@@ -299,13 +299,13 @@
           "version_pin": "0.156.1",
           "workflow_skills": "placement.skills .agents/skills in the workspace /app"
         },
-        "digest": "377444a858e27f765baa72057d20d18091c06329c5d532b683cf35b3ec44e125",
+        "digest": "00ab0721812f5398c09af1e8de83228ad864ccbfd293ede8b39f600aa781d4e8",
         "model": "gpt-6-luna",
         "packages": {},
         "primitive_code": {
           "frame/1": "7c483c24e1d1bbb7ea51b8ce5ecd59bbc162d9a71096990db8edaa0b1bc5f894",
           "install/1": "b50a2e24aadef912d05136986848a0e14f75715c26665da5c24940c432493419",
-          "runner/1": "dd0206166ef4e7ac40e1503969285a996e1d6e84e0ab861db9fef3c398a18ba5"
+          "runner/1": "c9561faa31eb23f6250408f8daafa74eb602bf1db3491048943826d71d7d35e0"
         },
         "provider": "openai",
         "reasoning": "low",
@@ -501,7 +501,7 @@
     "source_sha256": "0bff2a286fca5ecd28d140558aaa645381aaeb1c4eef5a53196aa3434b8bef42",
     "spec_sha256": "76f0308dd2c40ac3bf2b4c8a31ef3c3b8c4b2cc8f5edc338f7958d470215d27c"
   },
-  "lock_sha256": "2d3b0c5358730afb06d9bc616ad058714cc50b70309f631b39fae6ecd251216d",
+  "lock_sha256": "beee2dddb83b3124d633449e7f81b5a8ae0816569764ba5df0bfdf665459a0f0",
   "lock_version": 5,
   "overrides": {
     "flags": {},
@@ -510,7 +510,7 @@
   "sections": {
     "analysis": "a9e70f16a3d8fde7db8251be753771af765c98ad0c0b01202934c7622c4976f4",
     "assessment": "e62d519442dc429cee08cd6cb00cb73a0a41707df20e8069355ee699d2623671",
-    "execution": "2d3b0c5358730afb06d9bc616ad058714cc50b70309f631b39fae6ecd251216d",
+    "execution": "beee2dddb83b3124d633449e7f81b5a8ae0816569764ba5df0bfdf665459a0f0",
     "toolchain": "57caa99992c5b2bb5d4f0ac51dba5ab949f084361d7d255b3636fa6bbd0a7e8d"
   },
   "spec": {

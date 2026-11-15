@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import argparse
 import base64
+import ctypes
 import hashlib
 import io
 import json
@@ -15,6 +16,7 @@ import os
 import signal
 import subprocess
 import sys
+import time
 import types
 from collections.abc import Callable
 from pathlib import Path
@@ -411,25 +413,26 @@ def pytest_reply(outcomes: dict[str, Any] | str | None, code: int = 0) -> Callab
 
 
 @pytest.mark.parametrize(
-    ("outcomes", "code", "status"),
+    ("run", "status"),
     [
-        ({"collected": ["a"], "outcomes": {"a": "passed"}}, 0, "passed"),
-        ({"collected": [], "outcomes": {}}, 0, "failed"),
-        ({"collected": ["a"], "outcomes": {"a": "failed"}}, 0, "failed"),
-        (None, 0, "failed"),  # no outcomes file: nothing was collected
-        ("not json", 0, "failed"),
-        ("[1]", 0, "failed"),  # an outcomes file that is not an object
-        ({"collected": ["a"], "outcomes": {"a": "passed"}}, 126, "error"),
+        (({"collected": ["a"], "outcomes": {"a": "passed"}}, 0), "passed"),
+        (({"collected": [], "outcomes": {}}, 0), "failed"),
+        (({"collected": ["a"], "outcomes": {"a": "failed"}}, 0), "failed"),
+        ((None, 0), "failed"),  # no outcomes file: nothing was collected
+        (("not json", 0), "failed"),
+        (("[1]", 0), "failed"),  # an outcomes file that is not an object
+        (({"collected": ["a"], "outcomes": {"a": "passed"}}, 126), "error"),
     ],
 )
 def test_the_pytest_kind_judges_the_recorded_outcomes(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
     tools: Path,
-    outcomes: dict[str, Any] | str | None,
-    code: int,
+    run: tuple[dict[str, Any] | str | None, int],
     status: str,
 ) -> None:
+    """``run`` is the (outcomes file content, exit code) the ``pytest-run`` call leaves."""
+    outcomes, code = run
     check = entry(tools, kind="pytest", argv=["one.py"], timeout_s=30)
     done = run_check(monkeypatch, tmp_path, check, Supervisor(pytest_reply(outcomes, code)))
     assert done.status == status
@@ -1212,7 +1215,7 @@ def _git_broken(w: types.SimpleNamespace) -> None:
     w.host.commands = lambda argv, kw: (1, "boom") if argv[0] == "git" else (0, "tool 1.0")
 
 
-SETUP_FAILURES = {
+SETUP_FAILURES: dict[str, tuple[Callable[[types.SimpleNamespace], object], set[str], str]] = {
     "root": (
         lambda w: w.monkeypatch.setattr(os, "getuid", lambda: 0),
         {"agent_user_not_root"},
@@ -1400,8 +1403,9 @@ def test_pytest_run_adds_sites_returns_pytests_status_and_ends_a_slow_test(
     running = stopper.pytest_runtest_call()
     next(running)
     handler = signal.getsignal(signal.SIGALRM)
+    assert callable(handler)
     with pytest.raises(pytest.fail.Exception, match="the test ran longer than 2 s"):
-        handler(signal.SIGALRM, None)  # type: ignore[operator]
+        handler(signal.SIGALRM, None)
     with pytest.raises(StopIteration):
         running.send(None)
     assert signal.getsignal(signal.SIGALRM) == previous
@@ -1414,7 +1418,7 @@ def test_pytest_run_adds_sites_returns_pytests_status_and_ends_a_slow_test(
 def fake_proc(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Path:
     proc = tmp_path / "proc"
     proc.mkdir()
-    real = gate_tool.Path
+    real = Path
 
     def path(value: Any) -> Path:
         text = str(value)
@@ -1441,7 +1445,7 @@ def test_reaping_kills_the_users_other_processes_until_none_remain_or_five_round
         (proc / str(pid)).rmdir()
 
     monkeypatch.setattr(os, "kill", kill)
-    monkeypatch.setattr(gate_tool.time, "sleep", lambda seconds: None)
+    monkeypatch.setattr(time, "sleep", lambda seconds: None)
     record = gate_tool.reap()
     assert record["killed"] == [70001]
     assert record["remaining"] == [70002]
@@ -1565,8 +1569,13 @@ class Libc:
 def libc(monkeypatch: pytest.MonkeyPatch) -> Libc:
     fake = Libc()
     monkeypatch.setattr(sys, "platform", "linux")
-    monkeypatch.setattr(gate_tool.ctypes, "CDLL", lambda *a, **k: fake)
-    monkeypatch.setattr(os, "umask", lambda mask: fake.umasks.append(mask) or 0)
+    monkeypatch.setattr(ctypes, "CDLL", lambda *a, **k: fake)
+
+    def umask(mask: int) -> int:
+        fake.umasks.append(mask)
+        return 0
+
+    monkeypatch.setattr(os, "umask", umask)
     return fake
 
 
@@ -1617,24 +1626,27 @@ def test_a_missing_subcommand_is_a_usage_error(libc: Libc) -> None:
     assert stopped.value.code == 2
 
 
+@pytest.mark.usefixtures("libc")
 @pytest.mark.parametrize(
-    ("argv", "key", "expected"),
+    ("argv", "expected"),
     [
-        (["canary"], "verdict", "passed"),
-        (["seal", "--run", "2", "--after", "turn", "--base", "B0"], "who", "seal"),
-        (["baseline"], "error", "no pytest check to run"),
+        (["canary"], ("verdict", "passed")),
+        (["seal", "--run", "2", "--after", "turn", "--base", "B0"], ("who", "seal")),
+        (["baseline"], ("error", "no pytest check to run")),
     ],
 )
 def test_configured_gate_subcommands_report_their_decision(
-    host: Host, tmp_path: Path, libc: Libc, capsys: pytest.CaptureFixture[str],
-    argv: list[str], key: str, expected: str,
+    host: Host, tmp_path: Path, capsys: pytest.CaptureFixture[str],
+    argv: list[str], expected: tuple[str, str],
 ) -> None:  # fmt: skip
+    """``expected`` is the (field, value) the subcommand's JSON report carries."""
+    key, value = expected
     host.head = "H"
     config = gate_config(host, tmp_path, empty_hooks="/empty/hooks")
     cfg = tmp_path / "gate.json"
     cfg.write_text(json.dumps(config))
     assert gate_tool.main([argv[0], "--config", str(cfg), *argv[1:]]) == 0
-    assert json.loads(capsys.readouterr().out)[key] == expected
+    assert json.loads(capsys.readouterr().out)[key] == value
 
 
 def test_the_hook_and_workspace_setup_run_from_the_command_line(

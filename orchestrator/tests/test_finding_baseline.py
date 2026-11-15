@@ -7,13 +7,14 @@ import json
 import subprocess
 import sys
 from pathlib import Path
+from types import ModuleType
 
 import pytest
 
 ROOT = Path(__file__).resolve().parents[2]
 
 
-def _load_script():
+def _load_script() -> ModuleType:
     spec = importlib.util.spec_from_file_location(
         "finding_baseline_proofs", ROOT / "scripts/checks/check-finding-baseline.py"
     )
@@ -31,7 +32,9 @@ MYPY_BASELINE = "scripts/checks/baselines/mypy.json"
 SOURCE = "def build():\n    unused = 1\n    return 0\n"
 
 
-def _finding(*, path: str = PATH, code: str = "F841", fingerprint: str = "abc", count: int = 1):
+def _finding(
+    *, path: str = PATH, code: str = "F841", fingerprint: str = "abc", count: int = 1
+) -> dict[str, object]:
     return {"path": path, "code": code, "fingerprint": fingerprint, "count": count}
 
 
@@ -39,7 +42,7 @@ def _baseline(*findings: dict[str, object], tool: str = "ruff") -> dict[str, obj
     return {"schemaVersion": 1, "tool": tool, "findings": list(findings)}
 
 
-def _ruff(*, row=2, code="F841", filename=PATH):
+def _ruff(*, row: int = 2, code: str | None = "F841", filename: str = PATH) -> dict[str, object]:
     return {
         "filename": filename,
         "code": code,
@@ -207,7 +210,11 @@ def test_exact_baseline_equality_is_silent_and_successful(tool: str) -> None:
     ids=["new", "count-above", "fixed-or-file-gone", "count-below", "entry-added", "count-raised"],
 )
 def test_baseline_failures_are_finding_specific_and_actionable(
-    record: dict, findings: list[dict], base_record: dict, rule: str, fix: str
+    record: dict[str, object],
+    findings: list[dict[str, object]],
+    base_record: dict[str, object],
+    rule: str,
+    fix: str,
 ) -> None:
     status, lines = baseline.evaluate_baseline(record, findings, base_record)
     assert status == 1
@@ -249,7 +256,7 @@ def test_baseline_may_only_shrink_and_matches_each_finding_not_rule_totals() -> 
         _baseline(_finding(), _finding()),
     ],
 )
-def test_baseline_refuses_invalid_records(invalid: dict) -> None:
+def test_baseline_refuses_invalid_records(invalid: dict[str, object]) -> None:
     with pytest.raises(baseline.ScanInputError):
         baseline.evaluate_baseline(invalid, [], _baseline())
     with pytest.raises(baseline.ScanInputError):
@@ -305,15 +312,12 @@ def test_existing_base_baseline_is_read_instead_of_refreshing_it() -> None:
 def test_generic_reports_keep_finding_identity_and_ratchet_custom_tools() -> None:
     item = {"path": PATH, "code": "PYS250", "symbol": "build", "source_line": "for x in rows:"}
     findings = baseline.parse_findings_json(json.dumps([item, item]), root="/repo")
-    expected = _finding(
-        code="PYS250",
-        fingerprint=baseline.fingerprint("PYS250", "build", "for x in rows:"),
-        count=2,
-    )
+    fingerprint: str = baseline.fingerprint("PYS250", "build", "for x in rows:")
+    expected = _finding(code="PYS250", fingerprint=fingerprint, count=2)
     assert findings == [expected]
     record = _baseline(expected, tool="python-policy")
     assert baseline.evaluate_baseline(record, findings, record) == (0, [])
-    shrunk = _finding(code="PYS250", fingerprint=expected["fingerprint"])
+    shrunk = _finding(code="PYS250", fingerprint=fingerprint)
     assert baseline.evaluate_baseline(
         _baseline(shrunk, tool="python-policy"), [shrunk], record
     ) == (0, [])

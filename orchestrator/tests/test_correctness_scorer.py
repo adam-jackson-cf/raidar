@@ -76,7 +76,9 @@ def test_checkpoint_values_equal_the_oracle_record() -> None:
     for step in grades:
         record = ctx.step(step).record
         assert record is not None
-        assert observed["solved", step].value == float(record.summary["solved"])
+        solved = record.summary["solved"]
+        assert isinstance(solved, int | float)
+        assert observed["solved", step].value == float(solved)
         assert observed["strict_pass_rate", step].value == record.summary["strict_pass_rate"]
         for key in ("strict_pass_rate", "core_pass_rate", "regression_pass_rate"):
             if key in record.rewards:

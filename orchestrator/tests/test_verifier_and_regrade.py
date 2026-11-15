@@ -25,7 +25,7 @@ from raidar.grading.records import (
     load_step_record,
     step_record_dir,
 )
-from raidar.grading.regrade import RegradeError, RegradeOptions, regrade_path
+from raidar.grading.regrade import RegradeError, RegradeOptions, SandboxFactory, regrade_path
 from raidar.grading.sandbox import GradingSandbox
 from raidar.grading.verifier import RaidarVerifier, SnapshotUnavailableError
 from tests.verifier_support import FakeAgentEnvironment, LocalProcessSandbox, make_bundle, write_app
@@ -106,7 +106,7 @@ def place_step_artifact(tmp_path: Path, step: str, *, mul: bool = False) -> Path
     return write_app(tmp_path / "trial" / "steps" / step / "artifacts" / "app", mul=mul)
 
 
-def local_factory(tmp_path: Path):
+def local_factory(tmp_path: Path) -> SandboxFactory:
     async def build(bundle: Any) -> GradingSandbox:
         return LocalProcessSandbox(tmp_path / "regrade-sandbox")
 

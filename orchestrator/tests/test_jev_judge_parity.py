@@ -15,7 +15,6 @@ from types import SimpleNamespace
 from typing import Any, cast
 
 import pytest
-from raidar_contract.workflow import PackageJudge
 
 from raidar.judge.client import TransportResponse
 from raidar.judge.live import LIVE_MODEL, RecordedJev
@@ -34,6 +33,7 @@ from raidar.subject.workflow.package import (
 )
 from raidar.subject.workflow.package_judge import JevJudge
 from raidar.subject.workflow.stage import FIRST_BUILD, GATE_FIX, REWORK, Checkpoint, Resume, Spent
+from raidar_contract.workflow import PackageJudge
 from tests.criteria_support import (
     CRITERIA,
     FILE,

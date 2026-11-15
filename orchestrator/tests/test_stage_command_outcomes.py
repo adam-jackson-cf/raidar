@@ -322,9 +322,10 @@ def rig(stages: Path, monkeypatch: pytest.MonkeyPatch) -> SimpleNamespace:
 
     async def fake_check(package: Any, name: str, rig: Any, **kwargs: Any) -> CheckReport:
         state.calls.append(rig.logs_dir)
-        if isinstance(state.report, Exception):
-            raise state.report
-        return state.report
+        report: CheckReport | Exception = state.report
+        if isinstance(report, Exception):
+            raise report
+        return report
 
     monkeypatch.setattr(stage_fixtures, "lock_problems", lambda root: [])
     monkeypatch.setattr(stage_fixtures, "_pack", lambda target: ("image", "context", "pack"))

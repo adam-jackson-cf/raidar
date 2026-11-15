@@ -23,8 +23,7 @@ from raidar.contract.trial import (
     TrialRecord,
     ValidityCheck,
 )
-from raidar.engine.trial import finish, run
-from raidar.engine.trial import record as record_module
+from raidar.engine.trial import finish, record as record_module, run
 from raidar.engine.trial.context import JobContext
 from raidar.engine.trial.provision import TrialProvision
 from raidar.engine.trial.record import (
@@ -161,7 +160,8 @@ def _no_audit(monkeypatch: pytest.MonkeyPatch, checks: tuple[ValidityCheck, ...]
 
 def _stored(disk: _MemoryFiles, trial_id: str = "t0") -> TrialRecord:
     path = JOB / TRIAL_RECORDS_DIR / f"{trial_id}.json"
-    return TrialRecord.model_validate_json(disk.files[path])
+    record: TrialRecord = TrialRecord.model_validate_json(disk.files[path])
+    return record
 
 
 def test_job_context_names_the_grader_docker_context_and_the_trials_directory() -> None:
@@ -334,9 +334,10 @@ class _Guard:
     ) -> TrialRecord:
         self.reviewed.append((trial_dir, trials_dir))
         lost = ValidityCheck(name="target_reachable", passed=False, detail="gone")
-        return record.model_copy(
+        reviewed: TrialRecord = record.model_copy(
             update={"validity": ExecutionValidity(checks=(*record.validity.checks, lost))}
         )
+        return reviewed
 
 
 async def test_finishing_keeps_the_guards_verdict_then_the_audits_in_the_written_record(

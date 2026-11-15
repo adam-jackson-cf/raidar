@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import time
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
@@ -11,6 +12,7 @@ import pytest
 from harbor.environments.base import ExecResult
 from harbor.models.trial.config import AgentConfig, TrialConfig
 from harbor.trial.hooks import TrialEvent
+from harbor.trial.trial import Trial
 
 from raidar.engine.job import provenance
 from raidar.engine.job.provenance import execution_source_digest
@@ -38,7 +40,7 @@ async def test_hidden_tests_stop_the_agent_before_it_can_read_them(
     )
     monkeypatch.setattr(guard, "load_bundle", lambda _path: bundle)
     monkeypatch.setattr(guard, "write_pre_agent_leak", lambda _path, report: reports.append(report))
-    monkeypatch.setattr(leak.time, "perf_counter", lambda: 0.0)
+    monkeypatch.setattr(time, "perf_counter", lambda: 0.0)
     for installer in (
         "install_agent_reaper",
         "install_trial_provisioning",
@@ -77,7 +79,7 @@ async def test_hidden_tests_stop_the_agent_before_it_can_read_them(
     async def create(_config: TrialConfig) -> ProtectedTrial:
         return trial
 
-    monkeypatch.setattr(driver.Trial, "create", create)
+    monkeypatch.setattr(Trial, "create", create)
     if leaked:
         with pytest.raises(leak.LeakScanError):
             await run_harbor_trial(TrialConfig.model_construct(), Path("/bundle"))

@@ -16,7 +16,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-from click.testing import CliRunner
+from click.testing import CliRunner, Result
 
 from raidar.cli import main
 from raidar.contract.references import ResolverSet
@@ -105,11 +105,10 @@ def _write_run(
     name: str = "run-1",
     max_checkpoints: int | None = None,
     record_truncation: bool = True,
-    outcomes: dict[str, list[tuple[CaseStatus, CaseStatus]]] | None = None,
 ) -> Path:
     job_dir = root / name
     trials = []
-    for arm, solves in (outcomes or SOLVES).items():
+    for arm, solves in SOLVES.items():
         for attempt, (first, second) in enumerate(solves):
             trial_id = f"toy-{arm}-b{attempt}"
             trial_dir = write_trial(
@@ -149,7 +148,9 @@ def pilot(tmp_path: Path) -> tuple[Path, Path, Path]:
     return job_dir, store, lock_path
 
 
-def _analyze(job_dir: Path | list[Path], store: Path, lock_path: Path, output: Path, *extra: str):
+def _analyze(
+    job_dir: Path | list[Path], store: Path, lock_path: Path, output: Path, *extra: str
+) -> Result:
     job_dirs = job_dir if isinstance(job_dir, list) else [job_dir]
     return CliRunner().invoke(
         main,
@@ -449,7 +450,10 @@ def test_setting_the_primary_relocks_the_analysis_section_only(tmp_path: Path) -
         path = write_experiment(tmp_path / name, document)
         loaded = load_experiment(path)
         lock_path = path.with_name("experiment.lock.json")
-        return json.loads(render_lock(build_lock(loaded, lock_path=lock_path, resolvers=resolvers)))
+        lock: dict[str, Any] = json.loads(
+            render_lock(build_lock(loaded, lock_path=lock_path, resolvers=resolvers))
+        )
+        return lock
 
     base = locked(experiment_document(), "base")
     document = experiment_document()

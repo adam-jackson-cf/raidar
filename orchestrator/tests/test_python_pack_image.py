@@ -14,6 +14,7 @@ from typing import Any
 import pytest
 import yaml
 from click.testing import CliRunner
+from harbor.agents.factory import AgentFactory
 from harbor.agents.installed.base import BaseInstalledAgent
 from harbor.agents.installed.claude_code import ClaudeCode
 from harbor.agents.installed.codex import Codex
@@ -30,8 +31,7 @@ from raidar.subject.environment.drift import (
     pack_drift_issues,
     problem_pack_images,
 )
-from raidar.subject.environment.python import harness as harness_module
-from raidar.subject.environment.python import image as image_module
+from raidar.subject.environment.python import harness as harness_module, image as image_module
 from raidar.subject.environment.python.harness import (
     HarnessPinError,
     harbor_agent_kwargs,
@@ -63,7 +63,8 @@ from raidar.subject.environment.python.task import (
 
 def _spec_with_context(spec: PackSpec, context: Path) -> PackSpec:
     image = spec.image.model_copy(update={"context": str(context)})
-    return spec.model_copy(update={"image": image})
+    updated: PackSpec = spec.model_copy(update={"image": image})
+    return updated
 
 
 DEFAULT_PYTHON = "/usr/local/bin/python3"
@@ -405,13 +406,13 @@ def test_harbor_agent_on_the_pack_pin_skips_install(
 
     agent = agent_class(logs_dir=tmp_path, model_name="openai/gpt-6-luna", **kwargs)
     environment = _VersionReportingEnvironment(version_output.format(version=pinned))
-    asyncio.run(agent.install(environment))  # type: ignore[arg-type]
+    asyncio.run(agent.install(environment))
     # Only the version check ran, and it is the command the image audit replays.
     assert environment.commands == [harbor_version_command(spec.image.harnesses[harness])]
 
     failing = _VersionReportingEnvironment(version_output.format(version=pinned), return_code=1)
     with contextlib.suppress(Exception):
-        asyncio.run(agent.install(failing))  # type: ignore[arg-type]
+        asyncio.run(agent.install(failing))
     assert len(failing.commands) > 1, "a non-zero version check reinstalls, as the audit assumes"
 
     with pytest.raises(HarnessPinError, match="reinstall"):
@@ -545,7 +546,7 @@ def test_a_harbor_agent_that_is_not_installed_or_has_no_version_command_is_refus
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     pin = load_pack_spec().image.harnesses["codex-cli"]
-    monkeypatch.setattr(harness_module.AgentFactory, "get_agent_class", lambda _name: dict)
+    monkeypatch.setattr(AgentFactory, "get_agent_class", lambda _name: dict)
     with pytest.raises(HarnessPinError, match="not an installed agent"):
         harbor_version_command(pin)
 

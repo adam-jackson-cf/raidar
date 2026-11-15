@@ -12,6 +12,7 @@ from typing import Any
 import pytest
 from harbor.models.trial.paths import TrialPaths
 
+from raidar.contract.snapshot import tree_digest
 from raidar.grading import closure, offline, records, regrade, verifier
 from raidar.grading.grader_image import GraderIdentityError
 from raidar.grading.leak import LeakReport, LeakScanError
@@ -119,7 +120,7 @@ async def test_download_snapshot_keeps_an_independent_regradable_tree(
     retained = tmp_path / ref.stored_path
     assert (retained / "app.py").read_text() == "print(42)\n"
     assert ref.requested == ref.used == "download"
-    assert ref.digest == verifier.tree_digest(retained)
+    assert ref.digest == tree_digest(retained)
     (snapshot / "app.py").write_text("changed\n")
     assert (retained / "app.py").read_text() == "print(42)\n"
 
@@ -135,7 +136,7 @@ async def test_artifact_snapshot_identity_matches_retained_content(
     monkeypatch.setattr(subject, "_artifact_snapshot", lambda: artifact)
     path, ref = await subject._snapshot(tmp_path / "work", tmp_path / "evidence")
     assert path == artifact
-    assert ref.digest == verifier.tree_digest(artifact)
+    assert ref.digest == tree_digest(artifact)
     assert ref.stored_path == "steps/checkpoint_1/artifacts/app"
     assert ref.requested == ref.used == "artifact"
 
@@ -413,8 +414,10 @@ async def test_job_regrade_fails_when_any_trials_case_verdict_changed(
     monkeypatch.setattr(regrade, "regrade_step", grade)
     report = await regrade.regrade_path(tmp_path, regrade.RegradeOptions("fixture"))
     assert report["match"] is False
-    assert [trial["match"] for trial in report["trials"]] == [True, False]
-    failed = report["trials"][1]["steps"][0]
+    trials = report["trials"]
+    assert isinstance(trials, list)
+    assert [trial["match"] for trial in trials] == [True, False]
+    failed = trials[1]["steps"][0]
     assert failed["original"]["solved"] is True
     assert failed["regraded"]["solved"] is False
     assert failed["differences"] == ["case: passed -> failed"]

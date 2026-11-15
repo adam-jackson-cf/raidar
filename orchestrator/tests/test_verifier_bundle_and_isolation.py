@@ -6,6 +6,7 @@ import hashlib
 import json
 import os
 import textwrap
+from collections.abc import Callable, Iterator
 from dataclasses import replace
 from pathlib import Path
 from types import SimpleNamespace
@@ -291,11 +292,15 @@ def test_snapshot_walk_refuses_missing_and_unreadable_evidence(
     (private / "app.py").write_text("x = 1\n")
     walk = os.walk
 
-    def unreadable_walk(*args: object, **kwargs: object) -> object:
-        onerror = kwargs["onerror"]
-        assert callable(onerror)
+    def unreadable_walk(
+        top: Path,
+        *,
+        followlinks: bool,
+        onerror: Callable[[OSError], object] | None,
+    ) -> Iterator[tuple[str, list[str], list[str]]]:
+        assert onerror is not None
         onerror(PermissionError("snapshot directory is unreadable"))
-        return walk(*args, **kwargs)
+        return walk(top, followlinks=followlinks, onerror=onerror)
 
     monkeypatch.setattr(os, "walk", unreadable_walk)
     with pytest.raises(PermissionError, match="unreadable"):
@@ -405,7 +410,9 @@ def test_leak_scan_command_quotes_names_and_prunes_virtual_filesystems() -> None
         ),
     ],
 )
-def test_scb_import_rejects_malformed_tasks(tmp_path: Path, breakage, message: str) -> None:
+def test_scb_import_rejects_malformed_tasks(
+    tmp_path: Path, breakage: Callable[[Path], object], message: str
+) -> None:
     task = write_scb_task(tmp_path / "task")
     breakage(task)
     with pytest.raises(BundleError, match=message):
@@ -604,7 +611,6 @@ def _verdict(case_id: str, status: CaseStatus) -> CaseResult:
 def _stored(
     cases: tuple[CaseResult, ...] = (),
     *,
-    environment_id: str = "img",
     infra: InfraFailure | None = None,
     parity: object = None,
     canary: CanaryRecord | None = None,
@@ -612,7 +618,7 @@ def _stored(
 ) -> Any:
     return SimpleNamespace(
         grade=SimpleNamespace(cases=cases, infra_failure=infra),
-        grader=SimpleNamespace(environment_id=environment_id),
+        grader=SimpleNamespace(environment_id="img"),
         coverage=SimpleNamespace(parity=parity),
         canary=canary or CanaryRecord(),
         submission_dependencies=dependencies,

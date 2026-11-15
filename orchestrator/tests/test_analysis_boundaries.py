@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from functools import partial
+
 import pytest
 from pydantic import ValidationError
 
@@ -30,7 +32,9 @@ from raidar.evaluation.review.quality.stats import median
     ],
 )
 @pytest.mark.parametrize("model", [Value, Cell])
-def test_statused_observations_refuse_missing_values_and_fabricated_zeroes(model, payload) -> None:
+def test_statused_observations_refuse_missing_values_and_fabricated_zeroes(
+    model: type[Value | Cell], payload: dict[str, object]
+) -> None:
     with pytest.raises(ValidationError):
         model.model_validate(payload)
 
@@ -41,25 +45,27 @@ def test_review_refuses_unknown_assessment_status() -> None:
 
 
 @pytest.mark.parametrize(
-    "overrides",
+    "settings",
     [
-        {"sign_flip_state_limit": 0},
-        {"bootstrap_samples": 99},
-        {"max_exclusion_fraction": -0.01},
-        {"max_exclusion_fraction": 1.01},
-        {"max_exclusion_difference": -0.01},
-        {"max_exclusion_difference": 1.01},
-        {"alpha": 0.0},
-        {"alpha": 1.0},
-        {"min_effects": {"solve_rate": 0.0}},
-        {"min_effects": {"solve_rate": -0.1}},
+        partial(Settings, sign_flip_state_limit=0),
+        partial(Settings, bootstrap_samples=99),
+        partial(Settings, max_exclusion_fraction=-0.01),
+        partial(Settings, max_exclusion_fraction=1.01),
+        partial(Settings, max_exclusion_difference=-0.01),
+        partial(Settings, max_exclusion_difference=1.01),
+        partial(Settings, alpha=0.0),
+        partial(Settings, alpha=1.0),
+        partial(Settings, min_effects={"solve_rate": 0.0}),
+        partial(Settings, min_effects={"solve_rate": -0.1}),
     ],
 )
-def test_verdict_settings_refuse_impossible_counts_fractions_and_effects(overrides) -> None:
-    key = next(iter(overrides))
+def test_verdict_settings_refuse_impossible_counts_fractions_and_effects(
+    settings: partial[Settings],
+) -> None:
+    key = next(iter(settings.keywords))
     reason = "effects of interest" if key == "min_effects" else key
     with pytest.raises(ValueError, match=reason):
-        Settings(**overrides)
+        settings()
 
 
 def test_absent_arm_exclusion_readings_cannot_authorize_a_comparison() -> None:

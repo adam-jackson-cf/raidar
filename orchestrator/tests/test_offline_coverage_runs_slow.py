@@ -22,6 +22,7 @@ import pytest
 from raidar.grading.coverage import offline as coverage_module
 from raidar.grading.coverage.offline import check_coverage_path, produce_coverage_path
 from raidar.grading.coverage.store import read_offline_coverage
+from raidar.grading.grader import run_oracle
 from raidar.grading.records import (
     FORK_EVIDENCE_FILE,
     coverage_identity,
@@ -32,11 +33,15 @@ from raidar.grading.regrade import RegradeOptions
 from raidar.grading.sandbox import GradingSandbox
 from tests.scorer_support import tree_state
 from tests.test_verifier_and_regrade import (
-    FakeAgentEnvironment,
     make_verifier,
     place_step_artifact,
 )
-from tests.verifier_support import LocalProcessSandbox, copy_grading_sources, make_bundle
+from tests.verifier_support import (
+    FakeAgentEnvironment,
+    LocalProcessSandbox,
+    copy_grading_sources,
+    make_bundle,
+)
 
 pytestmark = pytest.mark.slow
 
@@ -119,7 +124,7 @@ async def test_shared_coverage_is_rechecked_against_each_trials_grading_evidence
     record["grade"]["cases"][0]["status"] = "failed"
     record_path.write_text(json.dumps(record))
     calls = 0
-    original = coverage_module.run_oracle
+    original = run_oracle
 
     async def measured(*args: Any, **kwargs: Any) -> Any:
         nonlocal calls
@@ -143,7 +148,7 @@ async def test_host_execution_changes_invalidate_reusable_coverage(
     trial = await _graded(tmp_path, coverage=False)
     copied = copy_grading_sources(tmp_path / "implementation", monkeypatch)
     calls = 0
-    original = coverage_module.run_oracle
+    original = run_oracle
 
     async def measured(*args: Any, **kwargs: Any) -> Any:
         nonlocal calls

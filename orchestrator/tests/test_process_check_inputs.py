@@ -10,6 +10,7 @@ from __future__ import annotations
 import json
 import os
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -95,7 +96,9 @@ def test_a_readable_trajectory_is_measured(tmp_path: Path) -> None:
     assert isinstance(_measure(_inputs(trace_dir=tmp_path)), Trajectory)
 
 
-def _event(kind: EventKind, call_id: str | None, path: str | None, session_id: str = "main"):
+def _event(
+    kind: EventKind, call_id: str | None, path: str | None, session_id: str = "main"
+) -> TraceEvent:
     return TraceEvent(0, kind, session_id, "write", call_id, f"{kind.value} {path}", path)
 
 
@@ -146,7 +149,7 @@ def test_the_work_session_is_every_session_when_none_received_a_prompt() -> None
     assert work_events(events, "s2") == (events[1],)
 
 
-def _ran(call_id: str, *contents: object) -> dict:
+def _ran(call_id: str, *contents: object) -> dict[str, Any]:
     """An agent step calling a tool once, with one recorded result per content."""
     call = {"tool_call_id": call_id, "function_name": "x", "arguments": {}}
     results = [{"source_call_id": call_id, "content": content} for content in contents]

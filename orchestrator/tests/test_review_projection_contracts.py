@@ -12,7 +12,7 @@ import json
 import runpy
 import sys
 from collections.abc import Callable
-from dataclasses import replace
+from dataclasses import dataclass, replace
 from decimal import Decimal
 from pathlib import Path
 from types import SimpleNamespace
@@ -126,7 +126,14 @@ def _detail(projection: ReviewProjectionArtifact, job_id: str) -> ReviewRunDetai
 
 def _span(detail: ReviewRunDetail, name: str) -> dict[str, Any]:
     span = next(span for span in detail.spans if span.name == name)
-    return json.loads(span.output_payload or "{}")
+    output = json.loads(span.output_payload or "{}")
+    assert isinstance(output, dict)
+    return output
+
+
+def _record_with(record: TrialRecord, **changes: object) -> TrialRecord:
+    updated: TrialRecord = record.model_copy(update=changes)
+    return updated
 
 
 def _with_records(
@@ -495,13 +502,14 @@ def test_an_excluded_checkpoint_is_neutral_in_review_and_keeps_its_raw_diagnosti
 ) -> None:
     def exclude_first(record: TrialRecord) -> TrialRecord:
         first, *rest = record.step_results
+        assert first.rewards is not None
         excluded = first.model_copy(
             update={
                 "checkpoint_state": CheckpointState.EXCLUDED,
                 "rewards": {**first.rewards, "halt_gate": 1.0, "solvable_excluded": 1.0},
             }
         )
-        return record.model_copy(update={"step_results": (excluded, *rest)})
+        return _record_with(record, step_results=(excluded, *rest))
 
     source = _with_records(review.source("synthetic-bugfix"), exclude_first, "gpt-5.5-medium-01")
     detail = _detail(_project(review, [source]), PASSING)
@@ -522,9 +530,7 @@ def test_truncated_dev_run_is_withheld_and_never_pooled_with_arm_evidence(
     def truncate(record: TrialRecord) -> TrialRecord:
         *ran, unrun = record.step_results
         skipped = unrun.model_copy(update={"checkpoint_state": CheckpointState.NOT_ATTEMPTED})
-        return record.model_copy(
-            update={"truncated_to": 2, "job_id": "dev", "step_results": (*ran, skipped)}
-        )
+        return _record_with(record, truncated_to=2, job_id="dev", step_results=(*ran, skipped))
 
     full = review.source("synthetic-bugfix")
     dev = replace(
@@ -566,7 +572,7 @@ def test_invalid_execution_withholds_the_headline_even_when_measured(
             else check
             for check in record.validity.checks
         )
-        return record.model_copy(update={"validity": ExecutionValidity(checks=checks)})
+        return _record_with(record, validity=ExecutionValidity(checks=checks))
 
     source = _with_records(review.source("synthetic-skill"), fail_probe, "gpt-5.5-low-01")
     artifact = _project(review, [source])
@@ -589,7 +595,7 @@ def test_a_failed_validity_check_without_a_detail_still_names_the_check(
 ) -> None:
     def fail(record: TrialRecord) -> TrialRecord:
         checks = (*record.validity.checks, ValidityCheck(name="progression", passed=False))
-        return record.model_copy(update={"validity": ExecutionValidity(checks=checks)})
+        return _record_with(record, validity=ExecutionValidity(checks=checks))
 
     source = _with_records(review.source("synthetic-skill"), fail, "gpt-5.5-low-01")
     run = _detail(_project(review, [source]), "synthetic-skill-gpt-5.5-low-01").run
@@ -724,7 +730,7 @@ def _modern_job(name: str, **manifest: Any) -> JobDir:
 
 
 def _changed(change: str) -> JobDir:
-    manifest = copy.deepcopy(_modern_job("two").manifest)
+    manifest: dict[str, Any] = copy.deepcopy(dict(_modern_job("two").manifest))
     if change == "target":
         manifest["execution_target"]["name"] = "target-b"
     elif change in {"toolchain", "execution"}:
@@ -932,9 +938,9 @@ def test_codex_tool_results_are_decoded_and_statused_by_their_header() -> None:
 
 
 def test_message_content_parts_join_their_texts_and_other_messages_have_none() -> None:
+    @dataclass
     class Part:
-        def __init__(self, text: str | None) -> None:
-            self.text = text
+        text: str | None
 
     assert _text([Part("one"), Part(None), Part("two")]) == "one\ntwo"
     assert _text(None) == ""
@@ -994,19 +1000,20 @@ def test_a_failed_checkpoint_without_a_verifier_record_says_there_is_no_record(
 ) -> None:
     def drop_record(record: TrialRecord) -> TrialRecord:
         *earlier, last = record.step_results
-        return record.model_copy(
-            update={"step_results": (*earlier, last.model_copy(update={"verifier_record": None}))}
+        return _record_with(
+            record, step_results=(*earlier, last.model_copy(update={"verifier_record": None}))
         )
 
     source = _with_records(review.source("synthetic-bugfix"), drop_record, "gpt-5.5-low-04")
     detail = _detail(_project(review, [source]), FAILING)
     gate = next(note for note in detail.annotations if note.category == "failed-gate")
+    assert gate.note is not None
     assert "no verifier record" in gate.note
 
 
 def test_a_trial_without_validity_checks_has_no_validity_gates(review: MemoryReview) -> None:
     def no_checks(record: TrialRecord) -> TrialRecord:
-        return record.model_copy(update={"validity": ExecutionValidity(checks=())})
+        return _record_with(record, validity=ExecutionValidity(checks=()))
 
     source = _with_records(review.source("synthetic-bugfix"), no_checks, "gpt-5.5-medium-01")
     detail = _detail(_project(review, [source]), PASSING)
