@@ -1,4 +1,4 @@
-"""Manipulation check: did the guided arm's process actually differ from baseline? (G5)
+"""Manipulation check (G5): whether the guided arm's process differed from baseline.
 
 A process-guidance arm only means something if agents under it behave
 differently. This check takes ``process-compliance`` results per arm
@@ -45,6 +45,7 @@ from __future__ import annotations
 import math
 import random
 from collections.abc import Iterable, Mapping, Sequence
+from dataclasses import dataclass
 from enum import StrEnum
 from itertools import combinations
 from pathlib import Path
@@ -317,11 +318,18 @@ def _arm_results(
     return results
 
 
+@dataclass(frozen=True)
+class CheckSources:
+    """Per trial id, the process and verification-effort results; None when undeclared."""
+
+    process: Mapping[str, AssessResult | None] | None
+    gate: Mapping[str, AssessResult | None] | None
+
+
 def treatment_check_report(
     outcomes: Sequence[TrialOutcome],
+    sources: CheckSources,
     *,
-    process_results: Mapping[str, AssessResult | None] | None,
-    gate_results: Mapping[str, AssessResult | None] | None,
     baseline: str,
     treatment: str,
     alpha: float,
@@ -331,17 +339,17 @@ def treatment_check_report(
     The default checks of each declared scorer run when that scorer's results exist;
     with neither there is no report.
     """
-    sources = {PROCESS_SOURCE: process_results, GATE_SOURCE: gate_results}
+    by_source = {PROCESS_SOURCE: sources.process, GATE_SOURCE: sources.gate}
     checks = [
-        *(DEFAULT_CHECKS if process_results is not None else ()),
-        *((GATE_CLEAN,) if gate_results is not None else ()),
+        *(DEFAULT_CHECKS if sources.process is not None else ()),
+        *((GATE_CLEAN,) if sources.gate is not None else ()),
     ]
     if not checks:
         return None
     per_check = {
         check: _arm_results(
             outcomes,
-            sources.get(CHECK_SCORERS[check][0]),
+            by_source.get(CHECK_SCORERS[check][0]),
             baseline=baseline,
             treatment=treatment,
         )

@@ -59,6 +59,7 @@ from raidar.subject.environment.python.task import (
     bind_task_environment,
     compose_override,
 )
+from tests.workflow_support import HarborEnvironmentDouble
 
 
 def _spec_with_context(spec: PackSpec, context: Path) -> PackSpec:
@@ -376,7 +377,7 @@ def test_harness_matches_only_when_harbor_parses_exactly_the_pin(
     assert (parsed == pin.version) is matches
 
 
-class _VersionReportingEnvironment:
+class _VersionReportingEnvironment(HarborEnvironmentDouble):
     """Answers every exec with one ``--version`` output, like the pack image would."""
 
     def __init__(self, version_output: str, return_code: int = 0) -> None:
@@ -384,7 +385,14 @@ class _VersionReportingEnvironment:
         self.return_code = return_code
         self.commands: list[str] = []
 
-    async def exec(self, command: str, **_: object) -> ExecResult:
+    async def exec(
+        self,
+        command: str,
+        cwd: str | None = None,
+        env: dict[str, str] | None = None,
+        timeout_sec: int | None = None,
+        user: str | int | None = None,
+    ) -> ExecResult:
         self.commands.append(command)
         return ExecResult(stdout=self.version_output, stderr="", return_code=self.return_code)
 
@@ -404,7 +412,9 @@ def test_harbor_agent_on_the_pack_pin_skips_install(
     kwargs = harbor_agent_kwargs(spec, harness)
     assert kwargs == {"version": pinned}
 
-    agent = agent_class(logs_dir=tmp_path, model_name="openai/gpt-6-luna", **kwargs)
+    agent = agent_class(
+        logs_dir=tmp_path, model_name="openai/gpt-6-luna", version=kwargs["version"]
+    )
     environment = _VersionReportingEnvironment(version_output.format(version=pinned))
     asyncio.run(agent.install(environment))
     # Only the version check ran, and it is the command the image audit replays.

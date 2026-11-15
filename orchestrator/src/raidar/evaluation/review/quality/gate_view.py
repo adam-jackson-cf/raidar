@@ -25,6 +25,7 @@ from raidar.evaluation.review.quality.models import (
     CellStatus,
     GateRound,
     GateStep,
+    GateVerdict,
     GateView,
 )
 from raidar.evaluation.review.quality.sources import TrialSource
@@ -93,11 +94,21 @@ class _Cells:
         return any(item.status is AssessStatus.OK for item in self._items.values())
 
 
+def _verdict(value: str) -> GateVerdict | None:
+    match value:
+        case "passed" | "refused" | "error":
+            return value
+    return None
+
+
 def _round(run: GateRunView) -> GateRound:
+    verdict = _verdict(run.verdict)
+    if run.after is None or run.attribution is None or verdict is None:
+        raise GateRecordError(f"gate seal {run.run} has no turn, attribution or verdict")
     return GateRound(
         run=run.run,
         after=run.after,
-        verdict=run.verdict,
+        verdict=verdict,
         attribution=run.attribution,
         seconds=run.seconds,
         error=run.error,

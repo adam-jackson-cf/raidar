@@ -54,6 +54,7 @@ def test_explicit_public_overrides_cannot_widen_stricter_parent_policies(
     tmp_path: Path, restricted_level: str
 ) -> None:
     task = TaskConfig(steps=[StepConfig(name="first")])
+    assert task.steps is not None
     step = task.steps[0]
     task.agent.network_mode = NetworkMode.PUBLIC
     step.agent.network_mode = NetworkMode.PUBLIC
@@ -69,6 +70,7 @@ def test_explicit_public_overrides_cannot_widen_stricter_parent_policies(
     restrict_trial_network(tmp_path, runtime="python", provider="openai")
 
     rendered = TaskConfig.model_validate_toml(path.read_text())
+    assert rendered.steps is not None
     plan = resolve_trial_network_plan(
         rendered,
         AgentConfig(),
@@ -96,6 +98,7 @@ def test_existing_allowlists_intersect_the_contract_and_preserve_narrower_phase_
     ]
     task.agent.network_mode = NetworkMode.ALLOWLIST
     task.agent.allowed_hosts = ["api.openai.com", "unapproved.example.org", "10.1.0.0/16"]
+    assert task.steps is not None
     task.steps[0].agent.network_mode = NetworkMode.PUBLIC
     path = tmp_path / "task.toml"
     path.write_text(task.model_dump_toml())
@@ -103,6 +106,7 @@ def test_existing_allowlists_intersect_the_contract_and_preserve_narrower_phase_
     restrict_trial_network(tmp_path, runtime="python", provider="openai")
 
     rendered = TaskConfig.model_validate_toml(path.read_text())
+    assert rendered.steps is not None
     plan = resolve_trial_network_plan(
         rendered,
         AgentConfig(),

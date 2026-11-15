@@ -37,18 +37,18 @@ def test_interval_method_switches_to_bootstrap_at_ten_pairs() -> None:
     assert below.interval.method is IntervalMethod.PAIRED_T
     assert at.interval is not None
     assert at.interval.method is IntervalMethod.BOOTSTRAP
-    assert at.interval.low <= at.mean <= at.interval.high  # type: ignore[operator]
+    assert at.mean is not None
+    assert at.interval.low <= at.mean <= at.interval.high
 
 
 def test_paired_t_interval_is_mean_plus_minus_t_times_se() -> None:
     summary = summarise([1.0, 2.0, 3.0, 4.0, 5.0], seed=0, bootstrap_samples=500)
-    assert (summary.mean, summary.sd) == (3.0, pytest.approx(1.5811388))
+    assert summary.mean == 3.0
+    assert summary.sd == pytest.approx(1.5811388)
     half = 2.776445 * 1.5811388 / 5**0.5
     assert summary.interval is not None
-    assert (summary.interval.low, summary.interval.high) == (
-        pytest.approx(3.0 - half, abs=1e-5),
-        pytest.approx(3.0 + half, abs=1e-5),
-    )
+    assert summary.interval.low == pytest.approx(3.0 - half, abs=1e-5)
+    assert summary.interval.high == pytest.approx(3.0 + half, abs=1e-5)
 
 
 def test_fewer_than_two_values_have_no_spread_or_interval() -> None:

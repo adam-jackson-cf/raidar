@@ -16,10 +16,10 @@ from collections.abc import Iterable, Mapping
 from pathlib import Path
 
 from pydantic import Field
-from raidar_contract.canonical import digest_json
 
 from raidar.contract.wheels import ARCHES
 from raidar.grading.models import VerifierModel
+from raidar_contract.canonical import digest_json
 
 DEPENDENCY_DIR_SUFFIX = ".deps"
 REFUSAL_REASON = "dependency_unresolvable"

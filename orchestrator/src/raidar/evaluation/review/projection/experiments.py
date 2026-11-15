@@ -15,8 +15,6 @@ from dataclasses import dataclass
 from statistics import fmean, median, pstdev
 from typing import Any
 
-from raidar_contract.canonical import digest_json
-
 from raidar.contract.references import RegistryReferenceError
 from raidar.contract.review import (
     ArmComparableConfig,
@@ -33,6 +31,7 @@ from raidar.evaluation.review.projection.spans import repo_path
 from raidar.evaluation.review.projection.trials import TrialInput
 from raidar.scoring.catalog.outcomes import CODE_QUALITY_REF, CORRECTNESS_REF
 from raidar.scoring.framework.metrics import DEFAULT_METRIC_REGISTRY
+from raidar_contract.canonical import digest_json
 
 MINIMUM_SCORED_RUNS = 3
 PREFERRED_SCORED_RUNS = 5

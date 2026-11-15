@@ -169,8 +169,8 @@ class RunScopedDockerEnvironment(DockerEnvironment):
     _mounts_compose_temp_dir: tempfile.TemporaryDirectory[str] | None
     """Harbor's temporary directory for the mounts compose file (None until it is written)."""
 
-    def __init__(self, *args: Any, session_id: str, run_scope: str, **kwargs: Any) -> None:
-        super().__init__(*args, session_id=f"{session_id}-{run_scope}", **kwargs)
+    def __init__(self, *, session_id: str, run_scope: str, **kwargs: Any) -> None:
+        super().__init__(session_id=f"{session_id}-{run_scope}", **kwargs)
         self.run_scope = run_scope
         self._synced: dict[Path, tuple[int, int]] = {}
         self._main_container: str | None = None

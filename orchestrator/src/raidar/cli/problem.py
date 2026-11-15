@@ -6,13 +6,14 @@ import asyncio
 import json
 from dataclasses import replace
 from pathlib import Path
+from typing import TypedDict, Unpack
 
 import click
 
 from raidar.cli.target_options import docker_selection, target_option
-from raidar.design.problem.catalog import select_problems, source_catalog
+from raidar.design.problem.catalog import ProblemSelection, select_problems, source_catalog
 from raidar.design.problem.errata import Disposition, draft_errata, report_entries
-from raidar.design.problem.importer import import_problem
+from raidar.design.problem.importer import ImportSource, import_problem
 from raidar.design.problem.models import ProblemId, ProblemManifest
 from raidar.design.problem.store import ProblemStore, ProblemStoreError, open_store
 from raidar.design.problem.validation import (
@@ -60,18 +61,12 @@ _PROBLEMS_OPTION = click.option("--problems", help="Comma-separated problem name
 
 
 def _selected(
-    store: ProblemStore,
-    refs: tuple[str, ...],
-    names: str | None,
-    source: str | None,
-    checkout: Path | None,
-    *,
-    importing: bool = False,
+    store: ProblemStore, selection: ProblemSelection, *, importing: bool = False
 ) -> tuple[ProblemId, ...]:
     try:
-        for ref in refs:
+        for ref in selection.refs:
             _problem_id(ref)
-        return select_problems(store, refs, names, source, checkout, importing=importing)
+        return select_problems(store, selection, importing=importing)
     except (ProblemStoreError, RuntimeError, ValueError) as exc:
         raise click.ClickException(str(exc)) from exc
 
@@ -214,6 +209,15 @@ def info_command(
     click.echo(f"  store: {_store_state(store, problem_id)} ({_content_dir(store, problem_id)})")
 
 
+class _ImportOptions(TypedDict):
+    refs: tuple[str, ...]
+    store_root: Path | None
+    source_checkout: Path | None
+    update: bool
+    source: str | None
+    problems: str | None
+
+
 @problem.command("import")
 @click.argument("refs", nargs=-1)
 @_STORE_OPTION
@@ -221,20 +225,17 @@ def info_command(
 @click.option("--update", is_flag=True, help="Accept content that differs from the manifest.")
 @_SOURCE_OPTION
 @_PROBLEMS_OPTION
-def import_command(
-    refs: tuple[str, ...],
-    store_root: Path | None,
-    source_checkout: Path | None,
-    update: bool,
-    source: str | None,
-    problems: str | None,
-) -> None:
+def import_command(**options: Unpack[_ImportOptions]) -> None:
     """Import REFS (<dataset>/<problem>[.<checkpoint>]@<version>) from the pinned dataset."""
-    store = _store(store_root)
-    for problem_id in _selected(store, refs, problems, source, source_checkout, importing=True):
+    source_checkout = options["source_checkout"]
+    store = _store(options["store_root"])
+    selection = ProblemSelection(
+        options["refs"], options["problems"], options["source"], source_checkout
+    )
+    for problem_id in _selected(store, selection, importing=True):
         try:
             result = import_problem(
-                store, problem_id, source_checkout=source_checkout, update=update
+                store, problem_id, source=ImportSource(source_checkout), update=options["update"]
             )
         except (ProblemStoreError, RuntimeError, ValueError) as exc:
             raise click.ClickException(f"{problem_id}: {exc}") from exc
@@ -254,6 +255,22 @@ def import_command(
         if manifest.dependency_refusal is not None:
             reason = manifest.dependency_refusal.reason
             click.echo(f"  excluded: {reason}: {manifest.dependency_refusal.detail}")
+
+
+class _ValidateCommandOptions(TypedDict):
+    refs: tuple[str, ...]
+    source: str | None
+    problems: str | None
+    store_root: Path | None
+    source_checkout: Path | None
+    engine: str
+    repeats: int
+    concurrency: int
+    target_name: str | None
+    native_runner: Path | None
+    audit: bool
+    audit_only: bool
+    report_path: Path | None
 
 
 @problem.command("validate")
@@ -293,21 +310,7 @@ def import_command(
         "failure goes to the store cache instead, never over the committed report)."
     ),
 )
-def validate_command(
-    refs: tuple[str, ...],
-    source: str | None,
-    problems: str | None,
-    store_root: Path | None,
-    source_checkout: Path | None,
-    engine: str,
-    repeats: int,
-    concurrency: int,
-    target_name: str | None,
-    native_runner: Path | None,
-    audit: bool,
-    audit_only: bool,
-    report_path: Path | None,
-) -> None:
+def validate_command(**options: Unpack[_ValidateCommandOptions]) -> None:
     """Validate REF's verifier: ref k passes 1..k, ref k-1 fails k, repeats agree, native parity.
 
     The spec-determinacy audit flags verifier cases that assert what the
@@ -315,29 +318,35 @@ def validate_command(
     Exit 0 when validated (fully or with skipped checks), 1 when a check
     failed (exclude the problem), 2 when infrastructure failed (no verdict).
     """
-    store = _store(store_root)
-    problem_ids = _selected(store, refs, problems, source, source_checkout)
+    source_checkout = options["source_checkout"]
+    report_path = options["report_path"]
+    audit_only = options["audit_only"]
+    store = _store(options["store_root"])
+    problem_ids = _selected(
+        store,
+        ProblemSelection(options["refs"], options["problems"], options["source"], source_checkout),
+    )
     if report_path is not None and len(problem_ids) != 1:
         raise click.BadParameter("--report requires exactly one problem")
     selection = docker_selection(
-        target_name,
+        options["target_name"],
         trial_purpose="problem validation (hidden tests)",
         grader_purpose="problem validation (hidden tests)",
     )
-    options = ValidateOptions(
-        engine=engine,
-        repeats=repeats,
-        concurrency=selection.trial.effective_concurrency(concurrency),
+    validate_options = ValidateOptions(
+        engine=options["engine"],
+        repeats=options["repeats"],
+        concurrency=selection.trial.effective_concurrency(options["concurrency"]),
         docker_context=selection.grader.docker_context,
-        native_runner=native_runner,
+        native_runner=options["native_runner"],
         source_checkout=source_checkout,
-        audit=audit or audit_only,
+        audit=options["audit"] or audit_only,
     )
     if audit_only:
         for problem_id in problem_ids:
-            _audit_only(store, problem_id, options)
+            _audit_only(store, problem_id, validate_options)
         return
-    asyncio.run(_validate_selected(store, problem_ids, options, report_path))
+    asyncio.run(_validate_selected(store, problem_ids, validate_options, report_path))
 
 
 async def _validate_selected(

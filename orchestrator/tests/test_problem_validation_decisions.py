@@ -14,6 +14,7 @@ from types import SimpleNamespace
 from typing import Any
 
 import pytest
+from harbor.models.trial.config import TaskConfig as TrialTaskConfig, TrialConfig
 from harbor.trial.trial import Trial
 
 from raidar.design.problem import direct, harbor_engine, validator, variant_shim
@@ -370,7 +371,9 @@ def test_direct_validation_prepares_a_sandbox_and_runs_the_audit(
     async def prepare(problem: Any, context: str) -> tuple[object, dict[str, object]]:
         return sandbox, {"grader_image": "img"}
 
-    async def grade_references(problem: Any, box: object, **kw: Any) -> dict[str, Any]:
+    async def grade_references(
+        problem: Any, box: object, runs: direct.ReferenceRuns, **kw: Any
+    ) -> dict[str, Any]:
         return _oracle()
 
     async def audit_variants(problem: Any, box: object, **kw: Any) -> Any:
@@ -398,7 +401,9 @@ def test_given_sandbox_is_used_without_preparing_one(
     async def forbidden(*_: Any, **__: Any) -> Any:
         raise AssertionError("no sandbox may be prepared")
 
-    async def grade_references(problem: Any, box: object, **kw: Any) -> dict[str, Any]:
+    async def grade_references(
+        problem: Any, box: object, runs: direct.ReferenceRuns, **kw: Any
+    ) -> dict[str, Any]:
         return _oracle()
 
     monkeypatch.setattr(direct, "prepare_grader_sandbox", forbidden)
@@ -446,9 +451,9 @@ def test_harbor_validation_pins_the_grader_identity_it_prepared(
         }
 
     async def run_variant(
-        problem: Any, variant: str, payloads: Any, work: Path, **kw: Any
-    ) -> list[dict[str, Grade]]:
-        pins.append(kw["grader"])
+        problem: Any, variant: str, payloads: Any, work: Path, runs: harbor_engine.HarborRuns
+    ) -> Any:
+        pins.append(dict(runs.grader))
         if variant == NEGATIVE:
             negative_paths.update(payloads.values())
         return _oracle()[variant]
@@ -493,7 +498,9 @@ def test_native_runner_grades_the_same_snapshots_and_records_its_revision(
     async def prepare(problem: Any, context: str) -> tuple[object, dict[str, object]]:
         return object(), {}
 
-    async def grade_references(problem: Any, box: object, **kw: Any) -> dict[str, Any]:
+    async def grade_references(
+        problem: Any, box: object, runs: direct.ReferenceRuns, **kw: Any
+    ) -> dict[str, Any]:
         return _oracle()
 
     monkeypatch.setattr(direct, "prepare_grader_sandbox", prepare)
@@ -600,7 +607,7 @@ def test_grade_references_groups_grades_by_variant_and_repeat(
     problem = FakeProblem(tmp_path, FakeManifest())
 
     async def grade_step(
-        bundle: Any, step: str, snapshot: Path, sandbox: Any, out: Path, **kw: Any
+        oracle: Any, step: str, snapshot: Path, out: Path, settings: Any
     ) -> SimpleNamespace:
         passed = snapshot == problem.reference(step)
         status = CaseStatus.PASSED if passed else CaseStatus.FAILED
@@ -611,7 +618,7 @@ def test_grade_references_groups_grades_by_variant_and_repeat(
 
     monkeypatch.setattr(direct, "grade_step", grade_step)
     runs = asyncio.run(
-        direct.grade_references(problem, object(), repeats=2, concurrency=2)  # type: ignore[arg-type]
+        direct.grade_references(problem, object(), direct.ReferenceRuns(2, 2))  # type: ignore[arg-type]
     )
     assert all(len(runs[v]) == 2 for v in (POSITIVE, NEGATIVE))
     assert runs[POSITIVE][1]["checkpoint_2"].all_pass
@@ -621,7 +628,7 @@ def test_grade_references_groups_grades_by_variant_and_repeat(
 def test_grade_references_refuses_zero_repeats(tmp_path: Path) -> None:
     problem = FakeProblem(tmp_path, FakeManifest())
     with pytest.raises(ValueError, match="repeats must be >= 1"):
-        asyncio.run(direct.grade_references(problem, object(), repeats=0))  # type: ignore[arg-type]
+        asyncio.run(direct.grade_references(problem, object(), direct.ReferenceRuns(0)))  # type: ignore[arg-type]
 
 
 def test_prepare_grader_sandbox_records_the_image_and_environment(
@@ -711,10 +718,9 @@ def test_run_variant_runs_each_repeat_and_reads_its_grades(
             POSITIVE,
             payloads,
             tmp_path / "work",
-            repeats=2,
-            docker_context="ctx",
-            concurrency=1,
-            grader={"image": "img"},
+            harbor_engine.HarborRuns(
+                repeats=2, concurrency=1, docker_context="ctx", grader={"image": "img"}
+            ),
         )
     )
     assert result[0]["checkpoint_1"].all_pass
@@ -729,10 +735,7 @@ def test_run_variant_refuses_zero_concurrency(tmp_path: Path) -> None:
                 POSITIVE,
                 {},
                 tmp_path,
-                repeats=1,
-                docker_context="ctx",
-                concurrency=0,
-                grader={},
+                harbor_engine.HarborRuns(repeats=1, concurrency=0, docker_context="ctx", grader={}),
             )
         )
 
@@ -749,13 +752,20 @@ def test_trial_outcome_reports_the_trial_dir_and_exception_type(
             info = SimpleNamespace(exception_type=self.error) if self.error else None
             return SimpleNamespace(exception_info=info)
 
-    async def create(config: Any) -> FakeTrial:
-        return FakeTrial(config)
+    error_by_trial_name: dict[str, str | None] = {"clean": None, "boom": "Boom"}
+
+    async def create(config: TrialConfig) -> FakeTrial:
+        return FakeTrial(error_by_trial_name[config.trial_name])
+
+    def trial_config(trial_name: str) -> TrialConfig:
+        return TrialConfig(task=TrialTaskConfig(path=tmp_path), trial_name=trial_name)
 
     monkeypatch.setattr(Trial, "create", create)
     monkeypatch.setattr(harbor_engine, "install_leak_guard", lambda trial, root: None)
-    assert asyncio.run(harbor_engine._run_trial(None, tmp_path)) == (tmp_path / "t", None)
-    assert asyncio.run(harbor_engine._run_trial("Boom", tmp_path)) == (tmp_path / "t", "Boom")
+    clean_outcome = asyncio.run(harbor_engine._run_trial(trial_config("clean"), tmp_path))
+    assert clean_outcome == (tmp_path / "t", None)
+    failed_outcome = asyncio.run(harbor_engine._run_trial(trial_config("boom"), tmp_path))
+    assert failed_outcome == (tmp_path / "t", "Boom")
 
 
 # ---- variant shim --------------------------------------------------------------------------

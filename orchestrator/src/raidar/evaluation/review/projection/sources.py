@@ -96,9 +96,13 @@ def _is_job_dir(path: Path) -> bool:
     if not manifest.is_file():
         return False
     try:
-        return json.loads(manifest.read_text(encoding="utf-8")).get("kind") == JOB_KIND
-    except (OSError, json.JSONDecodeError, AttributeError):
+        document: object = json.loads(manifest.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
         return False
+    if not isinstance(document, dict):
+        return False
+    kind: object = document.get("kind")
+    return kind == JOB_KIND
 
 
 def discover_job_dirs(roots: Iterable[Path]) -> list[Path]:

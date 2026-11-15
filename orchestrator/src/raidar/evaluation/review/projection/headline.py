@@ -28,14 +28,13 @@ from typing import cast
 from raidar.contract.references import RegistryReferenceError
 from raidar.contract.trial import CheckpointState, TrialRecord
 from raidar.evaluation.analysis.assessed import (
-    CODE_QUALITY_REF,
     Observed,
     correctness_component,
     infra_reasons,
 )
 from raidar.evaluation.analysis.policy_inputs import ComponentInput, score_inputs
 from raidar.evaluation.review.projection.assessments import TrialAssessments
-from raidar.scoring.catalog.outcomes import CORRECTNESS_REF
+from raidar.scoring.catalog.outcomes import CODE_QUALITY_REF, CORRECTNESS_REF
 from raidar.scoring.framework.metrics import (
     CORRECTNESS,
     DEFAULT_METRIC_REGISTRY,
@@ -211,9 +210,12 @@ def _policy_reasons(
     assessments: TrialAssessments,
     declared: Collection[str] | None = None,
 ) -> tuple[str, ...]:
-    """Why S is missing. A scorer the experiment never declared is the real cause and is
-    named first (no rescore or rerun can fix it); then unassessed, which takes precedence
-    over ineligible: "not scored yet" is not "not scorable"."""
+    """Why S is missing.
+
+    A scorer the experiment never declared is the real cause and is named first (no rescore
+    or rerun can fix it); then unassessed, which takes precedence over ineligible: "not
+    scored yet" is not "not scorable".
+    """
     undeclared = _undeclared_reasons(policy, declared)
     if undeclared:
         return undeclared

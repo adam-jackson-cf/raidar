@@ -13,11 +13,11 @@ from pathlib import Path
 
 import pytest
 
-from raidar.contract.review import ReviewProjectionArtifact
+from raidar.contract.review import ReviewProjectionArtifact, ReviewRunDetail
 from raidar.engine.health.records_manifest import seal_trial
 from raidar.evaluation.analysis.pooling import PoolingError
 from raidar.evaluation.review.projection import merge_review_projections
-from raidar.evaluation.review.quality.models import QualityProjection
+from raidar.evaluation.review.quality.models import QualityProjection, QualityRunDetail
 from raidar.evaluation.review.quality.projection import build_quality_projection_from
 from tests.capability_support import CAPABILITIES
 from tests.review_fixtures.projection.generate import REVIEW_ONLY_DIR, generate_review_fixture
@@ -123,16 +123,13 @@ def test_review_checks_a_single_jobs_records_and_preserves_unmeasured_historical
 ) -> None:
     job = _copy_job(review_fixture, tmp_path / "one")
     historical = _project(pipeline, job, review_fixture / "store")
-    if pipeline == "quality":
-        assert all(
-            any("provenance unmeasured" in note for note in detail.notes)
-            for detail in historical.run_details.values()
-        )
-    else:
-        assert all(
-            any(note.category == "provenance-unmeasured" for note in detail.annotations)
-            for detail in historical.run_details.values()
-        )
+    for detail in historical.run_details.values():
+        if pipeline == "quality":
+            assert isinstance(detail, QualityRunDetail)
+            assert any("provenance unmeasured" in note for note in detail.notes)
+        else:
+            assert isinstance(detail, ReviewRunDetail)
+            assert any(note.category == "provenance-unmeasured" for note in detail.annotations)
     _modern(job)
     assert _project(pipeline, job, review_fixture / "store").runs
     record = next((job / "trial-records").glob("*.json"))

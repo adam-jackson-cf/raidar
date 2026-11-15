@@ -11,14 +11,12 @@ from collections.abc import Callable, Mapping, Sequence
 from dataclasses import replace
 from pathlib import Path
 
-from raidar_contract.canonical import pretty_canonical_json_bytes
-
 from raidar.evaluation.review.integrity import check_review_jobs
 from raidar.evaluation.review.quality.experiment_view import ReviewedTrial, build_experiments
 from raidar.evaluation.review.quality.gate_view import GateReader, read_gate_from_disk
 from raidar.evaluation.review.quality.labels import JevAudit
 from raidar.evaluation.review.quality.models import QualityProjection
-from raidar.evaluation.review.quality.run_view import build_run_detail
+from raidar.evaluation.review.quality.run_view import RunAssessments, RunJev, build_run_detail
 from raidar.evaluation.review.quality.sources import (
     StoreIndex,
     TrialSource,
@@ -30,6 +28,7 @@ from raidar.scoring.catalog.outcomes import (
     VERIFICATION_EFFORT_REF,
 )
 from raidar.scoring.framework.store import Assessment
+from raidar_contract.canonical import pretty_canonical_json_bytes
 
 
 def review_trials(
@@ -42,15 +41,16 @@ def review_trials(
     attached = audit.attach(list(trials))
     reviewed = []
     for trial in trials:
-        jev = attached[trial.review_id]
+        attachment = attached[trial.review_id]
+        assessments = RunAssessments(
+            quality=find(CODE_QUALITY_REF, trial),
+            correctness=find(CORRECTNESS_REF, trial),
+            gate=find(VERIFICATION_EFFORT_REF, trial),
+        )
         detail = build_run_detail(
             trial,
-            find(CODE_QUALITY_REF, trial),
-            find(CORRECTNESS_REF, trial),
-            decisions=jev.decisions,
-            labels=audit.labels,
-            jev_note=jev.note,
-            gate=find(VERIFICATION_EFFORT_REF, trial),
+            assessments,
+            jev=RunJev(attachment.decisions, audit.labels, attachment.note),
             gate_reader=gate_reader,
         )
         reviewed.append(ReviewedTrial(source=trial, detail=detail))

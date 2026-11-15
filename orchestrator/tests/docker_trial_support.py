@@ -26,6 +26,7 @@ from harbor.agents.base import BaseAgent
 from harbor.agents.options import AgentOptions
 from harbor.environments.base import BaseEnvironment
 from harbor.models.agent.context import AgentContext
+from harbor.models.environment_type import EnvironmentType
 from harbor.models.trial.config import (
     AgentConfig,
     EnvironmentConfig,
@@ -166,7 +167,7 @@ async def run_trial(
         trials_dir=trials_dir,
         agent=agent,
         environment=EnvironmentConfig(
-            type="docker",
+            type=EnvironmentType.DOCKER,
             import_path=RUN_SCOPED_DOCKER_IMPORT_PATH,
             delete=True,
             kwargs={SCOPE_KWARG: run_scope(trials_dir)},

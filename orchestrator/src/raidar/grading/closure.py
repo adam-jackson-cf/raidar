@@ -27,6 +27,7 @@ from raidar.contract.wheels import (
     hashed_requirements,
     pylock_wheels,
 )
+from raidar.grading.dependency_pins import lock_sha256
 from raidar.grading.submission_deps import closure_dir
 
 CLOSURE_REPOSITORY = "raidar-oracle-closure"
@@ -39,6 +40,14 @@ _INSTALL = (
     f"{LOCKED_FLAGS} --python {{python}} {{target}} "
     "-r {mount}/{requirements}"
 )
+
+
+@dataclass(frozen=True)
+class ClosureBase:
+    """The grader image a closure layer is built on, and its submission interpreter."""
+
+    tag: str
+    python: str
 
 
 @dataclass(frozen=True)
@@ -145,17 +154,16 @@ async def build_image(
 
 
 async def ensure_closure_image(
-    base_tag: str,
+    base: ClosureBase,
     lock_text: str,
-    lock_sha: str,
     *,
     docker_context: str,
-    python: str,
     docker_bin: str = "docker",
     cache_root: Path | None = None,
 ) -> ClosureImage:
     """Presence-check the closure image; build it (host fetch, offline build) if absent."""
-    tag = closure_tag(base_tag, lock_sha)
+    lock_sha = lock_sha256(lock_text)
+    tag = closure_tag(base.tag, lock_sha)
     started = time.perf_counter()
     existing = await image_id(docker_bin, docker_context, tag)
     if existing is not None:
@@ -165,7 +173,11 @@ async def ensure_closure_image(
         await asyncio.to_thread(fetch_wheels, lock_text, wheels, cache_root=cache_root)
         await asyncio.to_thread(build_context, lock_text, wheels, context)
         await build_image(
-            docker_bin, docker_context, tag, closure_dockerfile(base_tag, lock_sha, python), context
+            docker_bin,
+            docker_context,
+            tag,
+            closure_dockerfile(base.tag, lock_sha, base.python),
+            context,
         )
     built = await image_id(docker_bin, docker_context, tag)
     if built is None:

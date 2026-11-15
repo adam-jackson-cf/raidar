@@ -22,7 +22,7 @@ from raidar.grading.bundle import (
 )
 from raidar.grading.closure import ClosureImage, closure_dockerfile, closure_tag
 from raidar.grading.dependency_pins import lock_sha256, set_sha256
-from raidar.grading.grader import grade_step
+from raidar.grading.grader import Oracle, OracleSettings, grade_step
 from raidar.grading.grader_image import ensure_grader_image, grader_dockerfile, grader_image_tag
 from raidar.grading.provision import prepare_dependencies
 from raidar.grading.resolver import resolve_pins
@@ -315,13 +315,11 @@ async def test_a_resolver_outage_is_an_infrastructure_failure_never_a_score(
     fake.error = DependencyInfraError("pypi unreachable")
     sandbox = LocalProcessSandbox(tmp_path / "sandbox")
     result = await grade_step(
-        bundle,
+        Oracle(bundle, sandbox),
         "checkpoint_1",
         _declaring(tmp_path / "app", "flask"),
-        sandbox,
         tmp_path / "work",
-        coverage=True,
-        resolver=fake,
+        OracleSettings(coverage=True, resolver=fake),
     )
     failure = result.grade.infra_failure
     assert failure is not None
@@ -515,12 +513,7 @@ async def test_the_closure_image_is_built_once_per_base_and_lock(
     sandbox = DockerCopySandbox(image="grader:base", docker_context="mbp")
     cache_root = tmp_path / "cache"
     first = await closure.ensure_closure_image(
-        "grader:base",
-        lock,
-        lock_sha256(lock),
-        docker_context="mbp",
-        python="/py",
-        cache_root=cache_root,
+        closure.ClosureBase("grader:base", "/py"), lock, docker_context="mbp", cache_root=cache_root
     )
     assert first.built
     assert first.image_id.startswith("sha256:")
@@ -530,12 +523,7 @@ async def test_the_closure_image_is_built_once_per_base_and_lock(
         "wheels/pkg-1.0-py3-none-any.whl",
     ]
     again = await closure.ensure_closure_image(
-        "grader:base",
-        lock,
-        lock_sha256(lock),
-        docker_context="mbp",
-        python="/py",
-        cache_root=cache_root,
+        closure.ClosureBase("grader:base", "/py"), lock, docker_context="mbp", cache_root=cache_root
     )
     assert not again.built
     assert again.tag == first.tag
@@ -558,11 +546,9 @@ async def test_a_closure_build_that_leaves_no_image_is_an_error(
     ).lock_text
     with pytest.raises(RuntimeError, match="missing after its build"):
         await closure.ensure_closure_image(
-            "base",
+            closure.ClosureBase("base", "/py"),
             lock,
-            lock_sha256(lock),
             docker_context="mbp",
-            python="/py",
             cache_root=tmp_path / "cache",
         )
 

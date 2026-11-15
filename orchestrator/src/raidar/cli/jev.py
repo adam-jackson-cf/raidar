@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import re
 from pathlib import Path
+from typing import TypedDict, Unpack
 
 import click
 
@@ -67,6 +68,16 @@ def jev_policies() -> None:
     click.echo(json.dumps([row.model_dump(mode="json") for row in rows], indent=2))
 
 
+class _ShadowRubricOptions(TypedDict):
+    snapshots: Path
+    store: Path
+    specs: Path | None
+    replay_only: bool
+    within: str
+    trial: str | None
+    output: Path | None
+
+
 @jev.command("shadow-rubric")
 @click.option(
     "--snapshots", type=click.Path(exists=True, file_okay=False, path_type=Path), required=True
@@ -83,19 +94,17 @@ def jev_policies() -> None:
 )
 @click.option("--trial", help="Trial id for the audit (default: the snapshots directory name).")
 @click.option("--output", type=click.Path(dir_okay=False, path_type=Path))
-def jev_shadow_rubric(
-    snapshots: Path,
-    store: Path,
-    specs: Path | None,
-    replay_only: bool,
-    within: str,
-    trial: str | None,
-    output: Path | None,
-) -> None:
+def jev_shadow_rubric(**options: Unpack[_ShadowRubricOptions]) -> None:
     """Run the SCB rubric question set in shadow over checkpoint snapshots."""
-    runtime = open_runtime(store, replay_only=replay_only, trial=trial or snapshots.name)
+    snapshots = options["snapshots"]
+    output = options["output"]
+    runtime = open_runtime(
+        options["store"],
+        replay_only=options["replay_only"],
+        trial=options["trial"] or snapshots.name,
+    )
     runner = RubricRunner(runtime, load_rubric_question_set())
-    results = runner.run(checkpoint_sources(snapshots, specs, within))
+    results = runner.run(checkpoint_sources(snapshots, options["specs"], options["within"]))
     report = json.dumps(rubric_shadow_report(results, runtime, policy_id=RUBRIC_POLICY), indent=2)
     if output is not None:
         output.parent.mkdir(parents=True, exist_ok=True)

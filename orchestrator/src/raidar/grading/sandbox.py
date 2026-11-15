@@ -43,8 +43,7 @@ from raidar.grading.bundle import (
     VerifierBundle,
     VerifierStepSpec,
 )
-from raidar.grading.closure import ClosureImage, docker_arch, ensure_closure_image
-from raidar.grading.dependency_pins import lock_sha256
+from raidar.grading.closure import ClosureBase, ClosureImage, docker_arch, ensure_closure_image
 from raidar.grading.payload import runtime_files
 from raidar.judge.secrets import absence_evidence, require_key_absent
 
@@ -285,12 +284,10 @@ class DockerCopySandbox:
     async def closure_image(self, lock_text: str) -> ClosureImage:
         """The grader image plus the lock's closure layer (built once per base and lock)."""
         return await ensure_closure_image(
-            self.image,
+            ClosureBase(self.image, SUBMISSION_PYTHON),
             lock_text,
-            lock_sha256(lock_text),
             docker_context=self.docker_context,
             docker_bin=self.docker_bin,
-            python=SUBMISSION_PYTHON,
         )
 
     async def _exec(
@@ -438,7 +435,7 @@ def sweep_grader_orphans(docker_context: str, docker_bin: str = "docker") -> Non
 def _stamp(
     owner: tuple[int, int], *, writable: bool
 ) -> Callable[[tarfile.TarInfo], tarfile.TarInfo]:
-    """tarfile filter: fixed ownership; owner-writable, or readable with no write bits."""
+    """Tarfile filter: fixed ownership; owner-writable, or readable with no write bits."""
 
     def apply(info: tarfile.TarInfo) -> tarfile.TarInfo:
         info.uid, info.gid, info.uname, info.gname = owner[0], owner[1], "", ""

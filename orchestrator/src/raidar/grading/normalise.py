@@ -121,9 +121,12 @@ def no_graded_cases(cases: Sequence[CaseResult]) -> InfraFailure | None:
 
 
 def timing_sensitive(ledger: Mapping[str, Any], timeout_s: float | None) -> tuple[str, ...]:
-    """Cases within 2x of their per-test timeout (oracle-validation.md §4), plus
-    cases failed because the run's grading budget ran out (their verdict depends
-    on how fast the earlier cases ran)."""
+    """Cases near their timeout or failed by the exhausted grading budget.
+
+    Near means within 2x of the per-test timeout (oracle-validation.md §4). A case failed
+    because the run's grading budget ran out has a verdict that depends on how fast the
+    earlier cases ran.
+    """
     near_timeout = (
         set()
         if timeout_s is None

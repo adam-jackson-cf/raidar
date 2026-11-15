@@ -40,8 +40,6 @@ from raidar.subject.primitive.payload.supervise import STATE_LIMITS, TREE_LIMITS
 from raidar_contract.package.manifest import GateCheck, Output
 
 if TYPE_CHECKING:
-    from harbor.environments.base import BaseEnvironment
-
     from raidar.subject.primitive.install import TreeCheck
 
 PASSED, REFUSED, ERROR = gate_tool.PASSED, gate_tool.REFUSED, gate_tool.ERROR
@@ -419,7 +417,7 @@ class GateRun:
 
     def __init__(
         self,
-        environment: BaseEnvironment,
+        environment: calls.Sandbox,
         logs_dir: Path,
         packages: Sequence[GatePackage],
         settings: GateSettings | None = None,

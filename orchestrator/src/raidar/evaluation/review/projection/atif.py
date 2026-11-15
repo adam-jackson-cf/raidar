@@ -20,7 +20,7 @@ from harbor.models.trajectories import Step, ToolCall, Trajectory
 from pydantic import ValidationError
 
 from raidar.contract.review import ReviewStatus
-from raidar.evaluation.review.projection.spans import SpanBuilder, TextReader, to_ms
+from raidar.evaluation.review.projection.spans import SpanBuilder, SpanSpec, TextReader, to_ms
 
 TRAJECTORY_FILE = "trajectory.json"
 _NAME_LIMIT = 60
@@ -39,8 +39,11 @@ SUBAGENT_PROMPT = "subagent prompt"
 
 
 def _content_parts(text: str) -> str | None:
-    """Harbor's Codex ATIF stores tool output as the Python repr of content parts
-    (``"[{'type': 'input_text', 'text': '...'}, ...]"``); join their texts."""
+    """Join the texts of a Codex ATIF content-parts repr.
+
+    Harbor's Codex ATIF stores tool output as the Python repr of content parts
+    (``"[{'type': 'input_text', 'text': '...'}, ...]"``).
+    """
     if not text.startswith(_PARTS_PREFIXES):
         return None
     try:
@@ -130,31 +133,35 @@ def _agent_step(builder: SpanBuilder, step: Step, parent: str, duration: int | N
     start = to_ms(step.timestamp)
     metrics = step.metrics
     turn = builder.add(
-        name="assistant message",
-        span_type="LLM_GENERATION",
-        status="OK",
-        parent=parent,
-        start=start,
-        duration=duration,
-        model=step.model_name,
-        output_value=_text(step.message) or None,
-        attributes={"step_id": step.step_id, "reasoning": step.reasoning_content},
-        tokens=(
-            metrics.prompt_tokens if metrics else None,
-            metrics.completion_tokens if metrics else None,
-        ),
+        SpanSpec(
+            name="assistant message",
+            span_type="LLM_GENERATION",
+            status="OK",
+            parent=parent,
+            start=start,
+            duration=duration,
+            model=step.model_name,
+            output_value=_text(step.message) or None,
+            attributes={"step_id": step.step_id, "reasoning": step.reasoning_content},
+            tokens=(
+                metrics.prompt_tokens if metrics else None,
+                metrics.completion_tokens if metrics else None,
+            ),
+        )
     )
     for call in step.tool_calls or ():
         output = _observation(step, call)
         builder.add(
-            name=tool_label(call),
-            span_type="TOOL_CALL",
-            status=_tool_status(output),
-            parent=turn,
-            start=start,
-            duration=duration,
-            input_value={"tool": call.function_name, "arguments": call.arguments},
-            output_value=output,
+            SpanSpec(
+                name=tool_label(call),
+                span_type="TOOL_CALL",
+                status=_tool_status(output),
+                parent=turn,
+                start=start,
+                duration=duration,
+                input_value={"tool": call.function_name, "arguments": call.arguments},
+                output_value=output,
+            )
         )
 
 
@@ -179,21 +186,25 @@ def _session(builder: SpanBuilder, document: Trajectory, parent: str, prompt_nam
             _agent_step(builder, step, parent, duration)
             continue
         builder.add(
-            name=_message_name(step, index, prompt, prompt_name),
-            span_type="INTERNAL",
-            status="OK",
-            parent=parent,
-            start=to_ms(step.timestamp),
-            duration=duration,
-            input_value=_text(step.message),
+            SpanSpec(
+                name=_message_name(step, index, prompt, prompt_name),
+                span_type="INTERNAL",
+                status="OK",
+                parent=parent,
+                start=to_ms(step.timestamp),
+                duration=duration,
+                input_value=_text(step.message),
+            )
         )
     for embedded in document.subagent_trajectories or ():
         session = builder.add(
-            name=f"session {embedded.session_id or embedded.trajectory_id or 'subagent'}",
-            span_type="AGENT_ROOT",
-            status="OK",
-            parent=parent,
-            model=embedded.agent.model_name,
+            SpanSpec(
+                name=f"session {embedded.session_id or embedded.trajectory_id or 'subagent'}",
+                span_type="AGENT_ROOT",
+                status="OK",
+                parent=parent,
+                model=embedded.agent.model_name,
+            )
         )
         _session(builder, embedded, session, SUBAGENT_PROMPT)
 
@@ -216,11 +227,13 @@ def project_trajectory(
         document = Trajectory.model_validate_json(read(path))
     except (OSError, ValidationError) as exc:
         builder.add(
-            name="trajectory unreadable",
-            span_type="INTERNAL",
-            status="ERROR",
-            parent=parent,
-            output_value=f"{path}: {exc}",
+            SpanSpec(
+                name="trajectory unreadable",
+                span_type="INTERNAL",
+                status="ERROR",
+                parent=parent,
+                output_value=f"{path}: {exc}",
+            )
         )
         return
     _session(builder, document, parent, TRIAL_PROMPT if first_checkpoint else CHECKPOINT_PROMPT)

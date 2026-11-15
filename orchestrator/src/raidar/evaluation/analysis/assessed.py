@@ -285,6 +285,16 @@ def verification_effort_ref(declared: Collection[str]) -> str | None:
     return VERIFICATION_EFFORT_REF if VERIFICATION_EFFORT_REF in declared else None
 
 
+def process_compliance_ref(declared: Collection[str]) -> str | None:
+    """``process-compliance`` when a lock declares it, else None."""
+    return PROCESS_COMPLIANCE_REF if PROCESS_COMPLIANCE_REF in declared else None
+
+
+def correctness_result(results: Mapping[str, AssessResult | None]) -> AssessResult | None:
+    """The correctness result among one trial's scorer results, if any."""
+    return results.get(CORRECTNESS_REF)
+
+
 def gate_metrics(result: AssessResult | None) -> dict[str, Value]:
     """The ``gate.*`` outcomes from a trial's verification-effort trajectory observations.
 

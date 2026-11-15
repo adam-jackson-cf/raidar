@@ -23,11 +23,12 @@ from types import SimpleNamespace
 from typing import Any
 
 import pytest
+from pydantic import JsonValue
 
 from raidar.subject.primitive import calls, install
 from raidar.subject.primitive.payload import isolate, supervise
 
-CONTEXT = {"task": "write a note", "round": 0}
+CONTEXT: dict[str, JsonValue] = {"task": "write a note", "round": 0}
 CALL_ARGV = ["tool", "go"]
 
 

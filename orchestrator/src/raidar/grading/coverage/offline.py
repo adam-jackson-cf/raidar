@@ -49,7 +49,7 @@ from raidar.grading.coverage.store import (
     coverage_path,
     read_offline_coverage,
 )
-from raidar.grading.grader import parity_verdict, run_oracle
+from raidar.grading.grader import Oracle, OracleSettings, parity_verdict, run_oracle
 from raidar.grading.models import (
     CaseResult,
     InfraFailure,
@@ -169,9 +169,12 @@ async def run_offline_coverage(
         verdict = ineligible(f"grading_infra_failure:{grading.infra_failure.code}")
         return CoverageRun(verdict, (), None, environment, 0.0, None)
     started = time.perf_counter()
-    measured = await _coverage_measurement(
-        target, options, store_root, bundle, snapshot, sandbox, grading
-    )
+    cache = _measurement_cache(record, store_root, grading)
+    measured = cache.load() if cache is not None else None
+    if measured is None:
+        measured = await _measure_coverage(record, options, bundle, snapshot, sandbox)
+        if cache is not None:
+            cache.store(measured)
     verdict, differences = parity_verdict(grading, measured)
     fork = fork_payload(StepGrade(record.grade, grading, measured, verdict, differences))
     # As the trial writes it (json.dumps, sort_keys) and reads it back: plain JSON values.
@@ -202,46 +205,26 @@ def _measurement_identity(record: StepRecord, grading: RunOutcome) -> str:
     ).hexdigest()
 
 
-async def _coverage_measurement(
-    target: CoverageTarget,
-    options: RegradeOptions,
-    store_root: Path | None,
-    bundle: VerifierBundle,
-    snapshot: Path,
-    sandbox: GradingSandbox,
-    grading: RunOutcome,
-) -> RunOutcome:
-    record = target.record
-    identity = _measurement_identity(record, grading)
-    cached = None
-    if store_root is not None:
-        cached = coverage_path(
-            store_root / "coverage-runs",
-            record.bundle.digest,
-            record.step,
-            record.snapshot.digest,
-            identity=identity,
-        )
-        if cached.is_file():
-            payload = json.loads(cached.read_text())
-            if payload.get("identity") == identity:
-                return _outcome(payload)
-    with tempfile.TemporaryDirectory(prefix="raidar-coverage-", dir=options.work_root) as work:
-        measured = await run_oracle(
-            bundle,
-            bundle.step(record.step),
-            snapshot,
-            sandbox,
-            Path(work) / "coverage",
-            coverage=True,
-            timeout_s=record.grader.timeout_s,
-            recorded=record.submission_dependencies,
-        )
-    if cached is not None and measured.infra_failure is None:
+@dataclass(frozen=True)
+class _MeasurementCache:
+    """A reusable coverage measurement's place in the store and the identity it binds."""
+
+    path: Path
+    identity: str
+
+    def load(self) -> RunOutcome | None:
+        if not self.path.is_file():
+            return None
+        payload = json.loads(self.path.read_text())
+        return _outcome(payload) if payload.get("identity") == self.identity else None
+
+    def store(self, measured: RunOutcome) -> None:
+        if measured.infra_failure is not None:
+            return
         write_store_json(
-            cached,
+            self.path,
             {
-                "identity": identity,
+                "identity": self.identity,
                 "role": measured.role,
                 "cases": [case.model_dump(mode="json") for case in measured.cases],
                 "infra_failure": None,
@@ -250,7 +233,43 @@ async def _coverage_measurement(
                 else None,
             },
         )
-    return measured
+
+
+def _measurement_cache(
+    record: StepRecord, store_root: Path | None, grading: RunOutcome
+) -> _MeasurementCache | None:
+    if store_root is None:
+        return None
+    identity = _measurement_identity(record, grading)
+    path = coverage_path(
+        store_root / "coverage-runs",
+        record.bundle.digest,
+        record.step,
+        record.snapshot.digest,
+        identity=identity,
+    )
+    return _MeasurementCache(path, identity)
+
+
+async def _measure_coverage(
+    record: StepRecord,
+    options: RegradeOptions,
+    bundle: VerifierBundle,
+    snapshot: Path,
+    sandbox: GradingSandbox,
+) -> RunOutcome:
+    with tempfile.TemporaryDirectory(prefix="raidar-coverage-", dir=options.work_root) as work:
+        return await run_oracle(
+            Oracle(bundle, sandbox),
+            bundle.step(record.step),
+            snapshot,
+            Path(work) / "coverage",
+            OracleSettings(
+                coverage=True,
+                timeout_s=record.grader.timeout_s,
+                recorded=record.submission_dependencies,
+            ),
+        )
 
 
 def _entry(target: CoverageTarget, status: str, **extra: Any) -> dict[str, Any]:

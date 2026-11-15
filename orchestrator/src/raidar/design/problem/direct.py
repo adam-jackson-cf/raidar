@@ -14,12 +14,13 @@ from __future__ import annotations
 
 import asyncio
 import tempfile
+from dataclasses import dataclass
 from pathlib import Path
 
 from raidar.design.problem.models import ProblemMode
 from raidar.design.problem.store import ImportedProblem
 from raidar.design.problem.validation import NEGATIVE, POSITIVE, Grade, StepGrades
-from raidar.grading.grader import DEFAULT_RUN_TIMEOUT_S, grade_step
+from raidar.grading.grader import DEFAULT_RUN_TIMEOUT_S, Oracle, OracleSettings, grade_step
 from raidar.grading.grader_image import ensure_grader_image
 from raidar.grading.records import grading_execution_digest
 from raidar.grading.sandbox import DockerCopySandbox, GradingSandbox
@@ -69,19 +70,27 @@ def _by_repeat(
     return {variant: list(run) for variant, run in runs.items()}
 
 
+@dataclass(frozen=True)
+class ReferenceRuns:
+    """How often, how concurrently and how long the reference variants are graded."""
+
+    repeats: int
+    concurrency: int = DEFAULT_CONCURRENCY
+    timeout_s: float = DEFAULT_RUN_TIMEOUT_S
+
+
 async def grade_references(
     problem: ImportedProblem,
     sandbox: GradingSandbox,
+    runs: ReferenceRuns,
     *,
-    repeats: int,
-    concurrency: int = DEFAULT_CONCURRENCY,
-    timeout_s: float = DEFAULT_RUN_TIMEOUT_S,
     work_root: Path | None = None,
 ) -> dict[str, list[StepGrades]]:
     """Oracle grades per variant, one ``{step: Grade}`` per repeat."""
+    repeats, timeout_s = runs.repeats, runs.timeout_s
     if repeats < 1:
         raise ValueError("repeats must be >= 1")
-    gate = asyncio.Semaphore(concurrency)
+    gate = asyncio.Semaphore(runs.concurrency)
     with tempfile.TemporaryDirectory(prefix="raidar-problem-validate-", dir=work_root) as tmp:
         work = Path(tmp)
         empty = work / "empty-starter"
@@ -91,13 +100,11 @@ async def grade_references(
         async def one(variant: str, step: str, repeat: int) -> Grade:
             async with gate:
                 result = await grade_step(
-                    problem.bundle,
+                    Oracle(problem.bundle, sandbox),
                     step,
                     snapshots[variant][step],
-                    sandbox,
                     work / variant / str(repeat) / step,
-                    coverage=False,
-                    timeout_s=timeout_s,
+                    OracleSettings(coverage=False, timeout_s=timeout_s),
                 )
             return Grade.from_verifier(result.grade)
 

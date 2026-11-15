@@ -4,11 +4,10 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
-import inspect
 import json
 import tomllib
 from collections.abc import Sequence
-from dataclasses import replace
+from dataclasses import dataclass, fields, replace
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
@@ -17,7 +16,9 @@ import pytest
 import yaml
 from click.testing import CliRunner
 from harbor.models.trial.config import TrialConfig
+from harbor.models.trial.paths import TrialPaths
 from harbor.trial.hooks import TrialEvent
+from harbor.trial.trial import TrialHookCallback
 
 from raidar.cli import main
 from raidar.contract.trial import TrialRecord
@@ -53,7 +54,7 @@ from raidar.engine.trial.provision import TrialProvision
 from raidar.engine.trial.workspace import SEED_SLUG
 from raidar.grading.guard import install_leak_guard
 from raidar.grading.records import load_pre_agent_leak, step_record_dir
-from raidar.grading.verifier import RaidarVerifier
+from raidar.grading.verifier import VerifierSettings
 from raidar.subject.environment.python.pack_definition import load_pack_spec
 from raidar.subject.workflow.runner import WorkflowRunner
 from tests.execution_support import (
@@ -142,16 +143,28 @@ def _recorded_trial(config: TrialConfig, outcomes: Sequence[StepOutcome]) -> Tri
     return TrialRun(trial_dir, None)
 
 
+@dataclass
+class _GuardedTrial:
+    """The parts of a Harbor trial the leak guard uses."""
+
+    paths: TrialPaths
+    agent_environment: FakeAgentEnvironment
+    hooks: dict[TrialEvent, list[Any]]
+
+    def add_hook(self, event: TrialEvent, hook: TrialHookCallback) -> None:
+        self.hooks.setdefault(event, []).append(hook)
+
+
 async def _recorded_guarded_trial(
     config: TrialConfig, outcomes: Sequence[StepOutcome], bundle_root: Path, leaked: bool
 ) -> TrialRun:
     outcome = _recorded_trial(config, outcomes)
     hooks: dict[TrialEvent, list[Any]] = {}
     planted = "TESTS\t/tests/private.py\n" if leaked else ""
-    trial = SimpleNamespace(
-        paths=SimpleNamespace(trial_dir=outcome.trial_dir),
-        agent_environment=FakeAgentEnvironment(leak_stdout=planted + "RAIDAR_LEAK_SCAN_DONE\n"),
-        add_hook=lambda event, hook: hooks.setdefault(event, []).append(hook),
+    trial = _GuardedTrial(
+        TrialPaths(outcome.trial_dir),
+        FakeAgentEnvironment(leak_stdout=planted + "RAIDAR_LEAK_SCAN_DONE\n"),
+        hooks,
     )
     install_leak_guard(trial, bundle_root)
     event = SimpleNamespace(
@@ -207,7 +220,7 @@ def test_a_run_materialises_each_trial_and_writes_step_results(
         {"run_scope": run_scope(ctx.trials_dir)},
     )
     # The verifier kwargs are ones the Raidar verifier accepts.
-    assert set(kwargs) <= set(inspect.signature(RaidarVerifier.__init__).parameters)
+    assert set(kwargs) <= {item.name for item in fields(VerifierSettings)}
     assert config.agent.import_path == WorkflowRunner.import_path()
     assert config.agent.kwargs["inner_agent"]["kwargs"]["version"] == "0.156.1"
     task = Path(config.task.path or "")

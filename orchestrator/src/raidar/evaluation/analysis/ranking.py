@@ -25,6 +25,7 @@ unmeasured value is never read as zero (F6).
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
+from dataclasses import dataclass
 from math import comb
 
 from raidar.evaluation.analysis.effects import IntervalOut, Settings, interval_out
@@ -101,21 +102,36 @@ def _sort_key(row: RankingRow, direction: Direction) -> tuple[bool, float, str]:
     return (False, -row.mean if direction is Direction.HIGHER_BETTER else row.mean, row.arm)
 
 
+@dataclass(frozen=True)
+class RankingSpec:
+    """What the ranking orders by, the arm it names as reference and the attempts per problem."""
+
+    rank_by: str
+    reference_arm: str
+    attempts: int
+
+
+@dataclass(frozen=True)
+class RankedArm:
+    """One arm to rank, with its per-arm cost and verification-effort means."""
+
+    arm: str
+    cost_means: Mapping[str, float | None]
+    gate_means: Mapping[str, float | None] | None = None
+
+
 def ranking(
     outcomes: Sequence[TrialOutcome],
-    arms: Sequence[str],
-    *,
-    rank_by: str,
-    reference_arm: str,
-    attempts: int,
+    arms: Sequence[RankedArm],
+    spec: RankingSpec,
     settings: Settings,
-    cost_means: Mapping[str, Mapping[str, float | None]],
-    gate_means: Mapping[str, Mapping[str, float | None] | None] | None = None,
 ) -> Ranking:
     """The ranking view over every arm (reference included)."""
+    rank_by = spec.rank_by
     metric = outcome_metric(rank_by)
     unranked = []
-    for arm in arms:
+    for ranked in arms:
+        arm = ranked.arm
         valid = [o for o in outcomes if o.arm == arm and not o.infra_error]
         values = [
             value.value
@@ -135,15 +151,15 @@ def ranking(
                 n=summary.n,
                 mean=summary.mean,
                 interval=interval_out(summary.interval),
-                pass_at_k=_pass_rows(valid, attempts),
-                cost_means=dict(cost_means.get(arm, {})),
-                gate_means=_gate_row((gate_means or {}).get(arm)),
+                pass_at_k=_pass_rows(valid, spec.attempts),
+                cost_means=dict(ranked.cost_means),
+                gate_means=_gate_row(ranked.gate_means),
             )
         )
     ordered = sorted(unranked, key=lambda row: _sort_key(row, metric.direction))
     return Ranking(
         rank_by=rank_by,
         direction=metric.direction.value,
-        reference_arm=reference_arm,
+        reference_arm=spec.reference_arm,
         rows=tuple(row.model_copy(update={"rank": index + 1}) for index, row in enumerate(ordered)),
     )

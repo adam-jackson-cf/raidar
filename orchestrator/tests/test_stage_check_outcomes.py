@@ -1077,6 +1077,7 @@ async def test_exec_past_its_timeout_is_killed_and_reported_as_124(docker: _Dock
     result = await _pack().exec("sleep", timeout_sec=0)
 
     assert result.return_code == 124
+    assert result.stderr is not None
     assert "timed out" in result.stderr
     assert docker.processes[0].killed
 

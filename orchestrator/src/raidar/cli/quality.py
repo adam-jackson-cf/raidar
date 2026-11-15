@@ -85,7 +85,7 @@ def run_ruff_quality_gates(*, fix: bool) -> None:
         return
 
     run_or_raise([PYTHON, "-m", "ruff", "format", "--check", *options, *targets], ORCHESTRATOR_ROOT)
-    run_or_raise([PYTHON, str(REPO_ROOT / "scripts/checks/ruff_baseline.py")], REPO_ROOT)
+    run_or_raise([PYTHON, str(REPO_ROOT / "scripts/checks/check-ruff.py")], REPO_ROOT)
     run_or_raise([PYTHON, str(REPO_ROOT / "scripts/checks/check-ruff-suppressions.py")], REPO_ROOT)
 
 
@@ -166,7 +166,7 @@ def run_fast_tier() -> None:
 
 
 def run_mypy_quality_gates() -> None:
-    """Check maintained inventory and strict findings against the shrink-only baseline."""
+    """Check maintained inventory and fail on any strict mypy finding."""
     run_or_raise(
         [PYTHON, str(MYPY_CHECK_SCRIPT), "--root", str(REPO_ROOT), "--config", str(PYPROJECT)],
         ORCHESTRATOR_ROOT,

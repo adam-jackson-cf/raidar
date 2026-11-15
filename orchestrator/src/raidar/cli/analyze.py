@@ -19,9 +19,9 @@ report as a development job.
 from __future__ import annotations
 
 from pathlib import Path
+from typing import TypedDict, Unpack
 
 import click
-from raidar_contract.canonical import pretty_canonical_json_bytes
 
 from raidar.contract.references import RegistryReferenceError
 from raidar.evaluation.analysis.load import LoadRequest, load_inputs
@@ -31,6 +31,7 @@ from raidar.evaluation.analysis.sources import AnalysisInputError
 from raidar.evaluation.analysis.thresholds import settings_from_lock
 from raidar.scoring.catalog.builtin import default_scorer_registry
 from raidar.scoring.catalog.outcomes import outcome_metric
+from raidar_contract.canonical import pretty_canonical_json_bytes
 
 REPORT_JSON = "analysis.json"
 REPORT_MARKDOWN = "analysis.md"
@@ -72,6 +73,23 @@ def _echo_pooling(report: AnalysisReport) -> None:
         )
     for finding in pooling.findings:
         click.echo(f"warning: pooling override {finding.field}: {finding.message}", err=True)
+
+
+class _AnalyzeOptions(TypedDict):
+    jobs: tuple[Path, ...]
+    store: Path
+    output: Path
+    lock_path: Path | None
+    assessment_config: Path | None
+    min_pairs: int | None
+    max_exclusion_fraction: float | None
+    max_exclusion_difference: float | None
+    alpha: float | None
+    bootstrap_samples: int
+    exact_state_limit: int | None
+    min_effects: tuple[str, ...]
+    allow_dev_jobs: bool
+    pool_overrides: tuple[str, ...]
 
 
 @click.command()
@@ -160,47 +178,33 @@ def _echo_pooling(report: AnalysisReport) -> None:
     help="Lift one pooling refusal between jobs (repeatable; recorded in the report). "
     "A records-manifest violation is never overridable.",
 )
-def analyze(
-    jobs: tuple[Path, ...],
-    store: Path,
-    output: Path,
-    lock_path: Path | None,
-    assessment_config: Path | None,
-    min_pairs: int | None,
-    max_exclusion_fraction: float | None,
-    max_exclusion_difference: float | None,
-    alpha: float | None,
-    bootstrap_samples: int,
-    exact_state_limit: int | None,
-    min_effects: tuple[str, ...],
-    allow_dev_jobs: bool,
-    pool_overrides: tuple[str, ...],
-) -> None:
+def analyze(**options: Unpack[_AnalyzeOptions]) -> None:
     """Paired deltas, CIs, curves and verdicts for every arm against the baseline."""
-    _check_output(output, [*jobs, store])
-    effects = _min_effects(min_effects)
+    output = options["output"]
+    _check_output(output, [*options["jobs"], options["store"]])
+    effects = _min_effects(options["min_effects"])
     request = LoadRequest(
-        job_dirs=jobs,
-        store_root=store,
+        job_dirs=options["jobs"],
+        store_root=options["store"],
         registry=default_scorer_registry(),
-        lock_path=lock_path,
-        assessment_config=assessment_config,
-        allow_dev_jobs=allow_dev_jobs,
-        pool_overrides=pool_overrides,
+        lock_path=options["lock_path"],
+        assessment_config=options["assessment_config"],
+        allow_dev_jobs=options["allow_dev_jobs"],
+        pool_overrides=options["pool_overrides"],
     )
     try:
         inputs, lock = load_inputs(request)
         settings = settings_from_lock(
             {**lock["spec"]["analysis"], **lock.get("analysis", {})},
             overrides={
-                "min_pairs": min_pairs,
-                "max_exclusion_fraction": max_exclusion_fraction,
-                "max_exclusion_difference": max_exclusion_difference,
-                "alpha": alpha,
+                "min_pairs": options["min_pairs"],
+                "max_exclusion_fraction": options["max_exclusion_fraction"],
+                "max_exclusion_difference": options["max_exclusion_difference"],
+                "alpha": options["alpha"],
                 "min_effects": effects,
             },
-            bootstrap_samples=bootstrap_samples,
-            exact_state_limit=exact_state_limit,
+            bootstrap_samples=options["bootstrap_samples"],
+            exact_state_limit=options["exact_state_limit"],
         )
         report = analyse(inputs, settings)
     except (AnalysisInputError, RegistryReferenceError, ValueError) as exc:

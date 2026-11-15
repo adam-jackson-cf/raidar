@@ -24,13 +24,12 @@ async def test_copy_sandbox_grades_the_fixture_like_the_local_grader(tmp_path: P
     )
     image = await ensure_grader_image(problem.bundle, docker_context=docker_context())
     local = await direct.grade_references(
-        problem, LocalProcessSandbox(tmp_path / "local"), repeats=1, concurrency=1
+        problem, LocalProcessSandbox(tmp_path / "local"), direct.ReferenceRuns(1, 1)
     )
     copied = await direct.grade_references(
         problem,
         DockerCopySandbox(image=image.tag, docker_context=docker_context()),
-        repeats=1,
-        concurrency=1,
+        direct.ReferenceRuns(1, 1),
     )
 
     assert copied == local

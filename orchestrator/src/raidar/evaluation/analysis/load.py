@@ -17,9 +17,9 @@ from raidar.design.problem.store import ProblemStore, open_store
 from raidar.engine.job.assessment import lock_errata, lock_solvable
 from raidar.evaluation.analysis.assessed import (
     ANALYSED_SCORERS,
-    CORRECTNESS_REF,
-    PROCESS_COMPLIANCE_REF,
     build_outcome,
+    correctness_result,
+    process_compliance_ref,
     verification_effort_ref,
 )
 from raidar.evaluation.analysis.dependencies import dependency_steps
@@ -71,11 +71,6 @@ class LoadRequest:
     pool_overrides: tuple[str, ...] = ()
 
 
-def _process_ref(declared: tuple[str, ...]) -> str | None:
-    """``process-compliance`` when the lock declares it, else None."""
-    return PROCESS_COMPLIANCE_REF if PROCESS_COMPLIANCE_REF in declared else None
-
-
 def _scorer_refs(declared: tuple[str, ...], process_ref: str | None) -> tuple[str, ...]:
     gate_ref = verification_effort_ref(declared)
     wanted = (
@@ -90,17 +85,23 @@ def _scorer_refs(declared: tuple[str, ...], process_ref: str | None) -> tuple[st
 _TrialResults = dict[str, Any]
 
 
+@dataclass(frozen=True)
+class _ReadPlan:
+    """The headline policy and the declared process and verification-effort refs."""
+
+    policy: Metric
+    process_ref: str
+    gate_ref: str
+
+
 def _read_trials(
     chosen: Mapping[str, tuple[Any, Any]],
     lookup: AssessmentLookup,
     request: LoadRequest,
     lock: Mapping[str, Any],
-    *,
-    policy: Metric,
-    refs: tuple[str, str],
+    plan: _ReadPlan,
 ) -> tuple[list[Any], _TrialResults, _TrialResults]:
     """Every chosen trial's outcome, with its process and verification-effort results."""
-    process_ref, gate_ref = refs
     outcomes: list[Any] = []
     process: _TrialResults = {}
     gate: _TrialResults = {}
@@ -114,18 +115,18 @@ def _read_trials(
             problem=record.trial.problem,
         )
         trial_dir = job.trial_dir(record)
-        outcome = build_outcome(record, results, policy=policy)
+        outcome = build_outcome(record, results, policy=plan.policy)
         outcomes.append(
             outcome.model_copy(
                 update={
                     "dependency_steps": dependency_steps(
-                        record.trial.steps, trial_dir, results.get(CORRECTNESS_REF)
+                        record.trial.steps, trial_dir, correctness_result(results)
                     )
                 }
             )
         )
-        process[trial_id] = results.get(process_ref)
-        gate[trial_id] = results.get(gate_ref)
+        process[trial_id] = results.get(plan.process_ref)
+        gate[trial_id] = results.get(plan.gate_ref)
     return outcomes, process, gate
 
 
@@ -166,6 +167,15 @@ def _determinacy_summary(lock: Mapping[str, Any]) -> dict[str, dict[str, object]
     }
 
 
+def _scorer_lookup(
+    request: LoadRequest, declared: tuple[str, ...]
+) -> tuple[AssessmentLookup, str | None, str | None]:
+    """The lookup over the analysed scorers, with the process and verification-effort refs."""
+    process_ref = process_compliance_ref(declared)
+    lookup = _lookup(request, _scorer_refs(declared, process_ref))
+    return lookup, process_ref, verification_effort_ref(declared)
+
+
 def load_inputs(request: LoadRequest) -> tuple[AnalysisInputs, Mapping[str, Any]]:
     """The analysis inputs and the lock they were checked against."""
     if not request.job_dirs:
@@ -176,16 +186,12 @@ def load_inputs(request: LoadRequest) -> tuple[AnalysisInputs, Mapping[str, Any]
     options = job_options(jobs, allow_dev_jobs=request.allow_dev_jobs)
     policy, policy_facts = headline(lock)
     spec = lock["spec"]
-    declared = tuple(spec["assessment"]["scorers"])
-    process_ref = _process_ref(declared)
-    lookup = _lookup(request, _scorer_refs(declared, process_ref))
+    lookup, process_ref, gate_ref = _scorer_lookup(request, tuple(spec["assessment"]["scorers"]))
     chosen, replaced = select_records(jobs)
-    gate_ref = verification_effort_ref(declared)
-    read = _read_trials(
-        chosen, lookup, request, lock, policy=policy, refs=(process_ref or "", gate_ref or "")
+    outcomes, process, gate = _read_trials(
+        chosen, lookup, request, lock, _ReadPlan(policy, process_ref or "", gate_ref or "")
     )
-    outcomes, process, gate = read
-    inputs = AnalysisInputs(
+    return AnalysisInputs(
         experiment=str(lock["experiment"]["id"]),
         lock_sha256=str(lock["lock_sha256"]),
         errata={ref: errata.model_dump(mode="json") for ref, errata in lock_errata(lock).items()},
@@ -208,5 +214,4 @@ def load_inputs(request: LoadRequest) -> tuple[AnalysisInputs, Mapping[str, Any]
         process_scorer=process_ref,
         dev_job=_dev_job(options),
         pooling=pooling,
-    )
-    return inputs, lock
+    ), lock

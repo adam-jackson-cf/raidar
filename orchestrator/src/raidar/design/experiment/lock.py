@@ -46,13 +46,6 @@ from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 from typing import Any
 
-from raidar_contract.canonical import (
-    IGNORED_TREE_NAMES,
-    digest_json,
-    pretty_canonical_json_bytes,
-    sha256_file,
-)
-
 from raidar.contract.references import (
     RefKind,
     RegistryRef,
@@ -82,6 +75,12 @@ from raidar.scoring.framework.metrics import (
 )
 from raidar.subject.draft import draft_resolution
 from raidar.subject.releases import AgentResolver, WorkflowResolver
+from raidar_contract.canonical import (
+    IGNORED_TREE_NAMES,
+    digest_json,
+    pretty_canonical_json_bytes,
+    sha256_file,
+)
 
 LOCK_VERSION = 5
 """5: an arm's identity carries ``packages`` and ``primitive_code`` (no ``stage_code``)."""
@@ -157,9 +156,9 @@ covered too, under ``raidar_contract/<path>`` keys."""
 
 
 def spec_source_digest() -> str:
-    """Digest of this package's code, ``SPEC_EXTERNAL_MODULES`` and the contract distribution,
-    so a change to the spec/metric/lock rules relocks.
+    """Digest of the code behind the spec, metric and lock rules, so a change to them relocks.
 
+    The code is this package, ``SPEC_EXTERNAL_MODULES`` and the contract distribution.
     The installed ``raidar`` version is static between releases; this digest is
     what ties a lock to the exact validation, metric and lock rules used. Each
     module is hashed as its normalised syntax tree, so docstring and comment
@@ -408,7 +407,6 @@ def build_lock(
     *,
     lock_path: Path,
     resolvers: ResolverSet | None = None,
-    metrics: MetricRegistry = DEFAULT_METRIC_REGISTRY,
     pack_loader: PackLoader | None = None,
     draft: bool = False,
 ) -> dict[str, object]:
@@ -423,7 +421,6 @@ def build_lock(
             loaded,
             lock_path=lock_path,
             resolvers=resolvers,
-            metrics=metrics,
             pack_loader=pack_loader,
             draft=draft,
         )
@@ -473,7 +470,6 @@ def _build_lock(
     *,
     lock_path: Path,
     resolvers: ResolverSet | None,
-    metrics: MetricRegistry,
     pack_loader: PackLoader | None,
     draft: bool,
 ) -> dict[str, object]:
@@ -485,8 +481,8 @@ def _build_lock(
     _require_smoke_draft(loaded, draft)
     builder = _LockBuilder(
         loaded=loaded,
-        resolvers=resolvers or default_resolvers(metrics),
-        metrics=metrics,
+        resolvers=resolvers or default_resolvers(DEFAULT_METRIC_REGISTRY),
+        metrics=DEFAULT_METRIC_REGISTRY,
         lock_path=lock_path,
     )
     spec = loaded.spec
@@ -507,12 +503,14 @@ def _build_lock(
         "spec": spec_json,
         "execution": execution_section(
             spec_json,
-            problems=resolved_problems,
-            files=builder.files,
-            references=execution_refs,
-            arms=arms,
-            versions=_versions(arms),
-            tools=execution_tools,
+            ExecutionInputs(
+                problems=resolved_problems,
+                files=builder.files,
+                references=execution_refs,
+                arms=arms,
+                versions=_versions(arms),
+                tools=execution_tools,
+            ),
         ),
         "assessment": {
             "spec": spec_json["assessment"],
@@ -538,16 +536,19 @@ def _bound_checkpoint_counts(
     }
 
 
-def execution_section(
-    spec_json: Mapping[str, Any],
-    *,
-    problems: object,
-    files: object,
-    references: object,
-    arms: object,
-    versions: object,
-    tools: object,
-) -> dict[str, object]:
+@dataclass(frozen=True)
+class ExecutionInputs:
+    """The resolved inputs the ``execution`` section records beside the spec's design."""
+
+    problems: object
+    files: object
+    references: object
+    arms: object
+    versions: object
+    tools: object
+
+
+def execution_section(spec_json: Mapping[str, Any], inputs: ExecutionInputs) -> dict[str, object]:
     """The ``execution`` section: everything a job's identity (``lock_sha256``) covers."""
     analysis = spec_json["analysis"]
     return {
@@ -555,12 +556,12 @@ def execution_section(
             **{name: spec_json[name] for name in EXECUTION_SPEC_FIELDS if name in spec_json},
             **{name: analysis[name] for name in EXECUTION_ANALYSIS_FIELDS},
         },
-        "problems": problems,
-        "files": files,
-        "references": references,
-        "arms": arms,
-        "versions": versions,
-        "tools": tools,
+        "problems": inputs.problems,
+        "files": inputs.files,
+        "references": inputs.references,
+        "arms": inputs.arms,
+        "versions": inputs.versions,
+        "tools": inputs.tools,
     }
 
 

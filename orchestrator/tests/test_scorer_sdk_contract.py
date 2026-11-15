@@ -164,13 +164,21 @@ def test_result_status_and_ratio_parts_must_agree_with_the_values(ctx: AssessCon
     Observation(
         metric="m", subject="c", status=AssessStatus.OK, value=0.5, numerator=1, denominator=2
     )
-    for parts, problem in (
-        ({"numerator": 1, "denominator": 0}, "zero denominator"),
-        ({"numerator": 1, "denominator": 3}, "not numerator/denominator"),
-        ({"numerator": 1}, "reported together"),
-    ):
+    fraction_cases: tuple[tuple[int, int | None, str], ...] = (
+        (1, 0, "zero denominator"),
+        (1, 3, "not numerator/denominator"),
+        (1, None, "reported together"),
+    )
+    for numerator, denominator, problem in fraction_cases:
         with pytest.raises(ValidationError, match=problem):
-            Observation(metric="m", subject="c", status=AssessStatus.OK, value=0.9, **parts)
+            Observation(
+                metric="m",
+                subject="c",
+                status=AssessStatus.OK,
+                value=0.9,
+                numerator=numerator,
+                denominator=denominator,
+            )
 
 
 def test_evidence_must_point_at_real_lines_of_the_subjects_stored_files(ctx: AssessContext) -> None:

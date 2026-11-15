@@ -2,6 +2,8 @@
 
 Everything outside ``raidar.subject.agent`` selects an adapter, a native agent class or a
 harness's host-side facts here, by ``Harness``: nothing imports a codex or claude module.
+``CodexNativeAgent`` names ``native_agent_class(Harness.CODEX_CLI)`` statically, so a class
+can derive from it.
 """
 
 from __future__ import annotations
@@ -13,10 +15,14 @@ from harbor.agents.base import BaseAgent
 
 from raidar.subject.agent.adapters.base import HarnessAdapter
 from raidar.subject.agent.adapters.harbor_cli import HarborCliAdapter
+from raidar.subject.agent.adapters.isolated_codex import IsolatedCodex
 from raidar.subject.agent.adapters.registry import registry
 from raidar.subject.agent.config import AgentSpec, Harness
 from raidar.subject.agent.protocol import NativeAgent
 from raidar.subject.agent.records import Credentials, StatePath
+
+CodexNativeAgent = IsolatedCodex
+"""The class ``native_agent_class(Harness.CODEX_CLI)`` returns, named for deriving from it."""
 
 
 def resolve_adapter(spec: AgentSpec) -> HarnessAdapter:

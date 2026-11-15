@@ -14,10 +14,6 @@ from collections.abc import Mapping
 from dataclasses import dataclass, field
 from functools import cached_property
 
-from raidar_contract.canonical import digest_json
-from raidar_contract.references import ReleaseError
-from raidar_contract.workflow import PackageWorkflowDefinition
-
 from raidar.design.experiment.agent import AgentResolutionError, ResolvedAgent, resolve_agent
 from raidar.design.experiment.schema import ExperimentSpec
 from raidar.subject.draft import drafting
@@ -32,6 +28,9 @@ from raidar.subject.workflow.package_runtime import (
     evidence_issues,
     load_evidence,
 )
+from raidar_contract.canonical import digest_json
+from raidar_contract.references import ReleaseError
+from raidar_contract.workflow import PackageWorkflowDefinition
 
 
 @dataclass(frozen=True)
@@ -47,8 +46,11 @@ class ResolvedArm:
 
     @cached_property
     def packages(self) -> dict[str, dict[str, object]]:
-        """``{package: {release, sha256, installed, check}}``: each package's release, its
-        ``stage-tree/1`` digest and the stage-check proof (installed tree per architecture)."""
+        """Each package's release, ``stage-tree/1`` digest and stage-check proof.
+
+        Shape: ``{package: {release, sha256, installed, check}}``; the proof is the installed
+        tree per architecture.
+        """
         return {
             stage.release.name: {
                 "release": str(stage.release),
@@ -95,8 +97,10 @@ class ArmResolutionError(ValueError):
 
 
 def workflow_evidence(workflow: ReleasedWorkflow) -> dict[str, PackageEvidence]:
-    """The stage-check proof of each package; a normal arm lacking it is refused (a draft's
-    missing proof is recorded as absent)."""
+    """The stage-check proof of each package.
+
+    A normal arm lacking it is refused; a draft's missing proof is recorded as absent.
+    """
     evidence = {stage.release.name: load_evidence(stage) for stage in workflow.stages}
     if not drafting():
         missing = [

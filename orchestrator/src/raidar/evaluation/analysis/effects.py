@@ -44,11 +44,11 @@ from typing import Any
 
 from pydantic import Field
 
-from raidar.design.experiment.schema import DEFAULT_ALPHA as DEFAULT_ALPHA
 from raidar.design.experiment.schema import (
+    DEFAULT_ALPHA as DEFAULT_ALPHA,
     DEFAULT_MAX_EXCLUSION_FRACTION as DEFAULT_MAX_EXCLUSION_FRACTION,
+    DEFAULT_MIN_PAIRS as DEFAULT_MIN_PAIRS,
 )
-from raidar.design.experiment.schema import DEFAULT_MIN_PAIRS as DEFAULT_MIN_PAIRS
 from raidar.evaluation.analysis.outcomes import UNASSESSED, AnalysisModel, TrialOutcome, Value
 from raidar.evaluation.analysis.stats import (
     BOOTSTRAP_SAMPLES,

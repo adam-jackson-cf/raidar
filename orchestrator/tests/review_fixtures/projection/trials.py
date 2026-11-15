@@ -572,16 +572,16 @@ def memory_trial(plan: TrialPlan, script: TrialScript) -> MemoryTrial:
         snapshots[checkpoint.step] = digest_json(checkpoint.source)
         sources[checkpoint.step] = checkpoint.source
         if checkpoint.outcome != "infra":
-            record = step_record(
+            verifier_record = step_record(
                 plan,
                 checkpoint,
                 _prior(script, checkpoint),
                 bundle_digest=digest_json(plan.problem),
                 snapshot_digest=snapshots[checkpoint.step],
             )
-            records[checkpoint.step] = record
+            records[checkpoint.step] = verifier_record
             files[trial_dir / "raidar-oracle" / "steps" / checkpoint.step / "record.json"] = (
-                record.model_dump_json(indent=2) + "\n"
+                verifier_record.model_dump_json(indent=2) + "\n"
             )
         steps.append(_step_timing(checkpoint, at))
         at += timedelta(seconds=4 * (_turns(checkpoint) + 2))

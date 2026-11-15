@@ -19,7 +19,6 @@ from typing import Any
 
 import yaml
 from pydantic import ValidationError
-from raidar_contract.canonical import sha256_hex
 
 from raidar.design.experiment.schema import ExperimentSpec, FieldIssue
 from raidar.design.experiment.validation import (
@@ -28,6 +27,7 @@ from raidar.design.experiment.validation import (
     semantic_issues,
 )
 from raidar.scoring.framework.metrics import DEFAULT_METRIC_REGISTRY, MetricRegistry
+from raidar_contract.canonical import sha256_hex
 
 FLAG_PATHS: Mapping[str, str] = {
     "attempts": "analysis.attempts",
@@ -35,11 +35,7 @@ FLAG_PATHS: Mapping[str, str] = {
 }
 
 
-class _UniqueKeyLoader(yaml.SafeLoader):
-    """SafeLoader that rejects duplicate mapping keys instead of keeping the last."""
-
-
-def _construct_unique_mapping(loader: _UniqueKeyLoader, node: yaml.MappingNode) -> dict[Any, Any]:
+def _construct_unique_mapping(loader: yaml.SafeLoader, node: yaml.MappingNode) -> object:
     keys: set[object] = set()
     for key_node, _ in node.value:
         key = loader.construct_object(key_node)
@@ -63,9 +59,18 @@ def _construct_unique_mapping(loader: _UniqueKeyLoader, node: yaml.MappingNode) 
     return loader.construct_mapping(node)
 
 
-_UniqueKeyLoader.add_constructor(
-    yaml.resolver.BaseResolver.DEFAULT_MAPPING_TAG, _construct_unique_mapping
-)
+def _load_unique_keys(text: str) -> object:
+    """``yaml.safe_load`` that rejects duplicate mapping keys instead of keeping the last."""
+    loader = yaml.SafeLoader(text)
+    # An instance-level table: the class-wide SafeLoader constructors stay untouched.
+    loader.yaml_constructors = {
+        **yaml.SafeLoader.yaml_constructors,
+        yaml.resolver.BaseResolver.DEFAULT_MAPPING_TAG: _construct_unique_mapping,
+    }
+    try:
+        return loader.get_single_data()
+    finally:
+        loader.dispose()
 
 
 @dataclass(frozen=True)
@@ -182,7 +187,7 @@ def _unshared(node: Any, ancestors: frozenset[int] = frozenset()) -> Any:
 def _read_document(path: Path) -> tuple[dict[str, Any], str]:
     raw = path.read_bytes()
     try:
-        document = yaml.load(raw.decode("utf-8"), Loader=_UniqueKeyLoader)
+        document = _load_unique_keys(raw.decode("utf-8"))
         document = _unshared(document)
     except (yaml.YAMLError, UnicodeDecodeError, ValueError) as exc:
         raise SpecValidationError(str(path), [FieldIssue("", f"unreadable YAML: {exc}")]) from exc

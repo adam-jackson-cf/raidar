@@ -1,4 +1,4 @@
-"""Exercise Full Ruff lint and finding-baseline refusal in isolated workspaces."""
+"""Exercise Full Ruff lint and the Ruff gate's refusal in isolated workspaces."""
 
 from __future__ import annotations
 
@@ -19,25 +19,24 @@ SOURCE = "orchestrator/src/raidar/probe.py"
 
 @pytest.fixture
 def lint_tree(tmp_path: Path) -> Path:
-    """Copy only the real Ruff config and baseline checker, never released code."""
+    """Copy only the real Ruff config and gate script, never released code."""
     config = tmp_path / "orchestrator/pyproject.toml"
     config.parent.mkdir()
     shutil.copyfile(ROOT / "orchestrator/pyproject.toml", config)
-    checker = tmp_path / "scripts/checks/check-finding-baseline.py"
+    checker = tmp_path / "scripts/checks/check-ruff.py"
     checker.parent.mkdir(parents=True)
-    shutil.copyfile(ROOT / "scripts/checks/check-finding-baseline.py", checker)
-    baseline = tmp_path / "scripts/checks/baselines/ruff.json"
-    baseline.parent.mkdir(parents=True)
-    baseline.write_text(json.dumps({"schemaVersion": 1, "tool": "ruff", "findings": []}))
+    shutil.copyfile(ROOT / "scripts/checks/check-ruff.py", checker)
+    for root in ("orchestrator/stubs", "orchestrator/tests", "contract/src"):
+        (tmp_path / root).mkdir(parents=True)
     source = tmp_path / SOURCE
     source.parent.mkdir(parents=True)
     return tmp_path
 
 
-def _lint_and_baseline(
+def _lint_and_gate(
     root: Path, source: str, *options: str
 ) -> tuple[CompletedProcess[str], list[dict[str, object]], CompletedProcess[str]]:
-    """Run the gate's check-only lint step and the real baseline CLI."""
+    """Run the check-only lint step and the real Ruff gate script."""
     (root / SOURCE).write_text(source)
     lint = subprocess.run(
         [
@@ -62,30 +61,16 @@ def _lint_and_baseline(
     assert lint.returncode in (0, 1), lint.stderr
     findings: list[dict[str, object]] = json.loads(lint.stdout)
     assert isinstance(findings, list), lint.stdout
-    (root / "ruff-report.json").write_text(lint.stdout)
-    baseline = subprocess.run(
-        [
-            sys.executable,
-            "scripts/checks/check-finding-baseline.py",
-            "--tool",
-            "ruff",
-            "--root",
-            str(root),
-            "--report",
-            "ruff-report.json",
-            "--baseline",
-            "scripts/checks/baselines/ruff.json",
-            "--base-baseline",
-            "scripts/checks/baselines/ruff.json",
-        ],
+    gate = subprocess.run(
+        [sys.executable, "scripts/checks/check-ruff.py"],
         cwd=root,
         capture_output=True,
         text=True,
         check=False,
         timeout=30,
     )
-    assert baseline.returncode in (0, 1), baseline.stderr
-    return lint, findings, baseline
+    assert gate.returncode in (0, 1), gate.stderr
+    return lint, findings, gate
 
 
 @pytest.mark.parametrize(
@@ -108,17 +93,14 @@ def _lint_and_baseline(
     ],
     ids=["missing-nested-class-docstring", "six-arguments"],
 )
-def test_new_full_rule_violation_fails_ruff_and_baseline(
+def test_new_full_rule_violation_fails_ruff_and_the_gate(
     lint_tree: Path, source: str, code: str
 ) -> None:
-    lint, findings, baseline = _lint_and_baseline(lint_tree, source)
+    lint, findings, gate = _lint_and_gate(lint_tree, source)
     assert code in {finding["code"] for finding in findings}, lint.stdout
     assert lint.returncode == 1
-    assert baseline.returncode == 1
-    assert any(
-        "BASELINE.new" in line and SOURCE in line and code in line
-        for line in baseline.stderr.splitlines()
-    ), baseline.stderr
+    assert gate.returncode == 1
+    assert any(SOURCE in line and code in line for line in gate.stdout.splitlines()), gate.stdout
 
 
 def test_d401_only_docstring_is_an_accepted_deviation(lint_tree: Path) -> None:
@@ -126,9 +108,9 @@ def test_d401_only_docstring_is_an_accepted_deviation(lint_tree: Path) -> None:
         '"""Expose a small answer function."""\n\n\n'
         'def answer() -> int:\n    """Returns the answer."""\n    return 42\n'
     )
-    lint, findings, baseline = _lint_and_baseline(lint_tree, source)
+    lint, findings, gate = _lint_and_gate(lint_tree, source)
     assert findings == [], lint.stdout
-    assert lint.returncode == baseline.returncode == 0
+    assert lint.returncode == gate.returncode == 0
 
 
 @pytest.mark.parametrize(("length", "accepted"), [(95, True), (105, False)])
@@ -140,17 +122,14 @@ def test_line_length_deviation_keeps_the_hundred_character_boundary(
     content = ("word " * length)[:content_length]
     line = prefix + content + '"'
     assert len(line) == length
-    lint, findings, baseline = _lint_and_baseline(
-        lint_tree, '"""Expose a message."""\n\n' + line + "\n"
-    )
+    lint, findings, gate = _lint_and_gate(lint_tree, '"""Expose a message."""\n\n' + line + "\n")
     if accepted:
         assert findings == [], lint.stdout
-        assert lint.returncode == baseline.returncode == 0
+        assert lint.returncode == gate.returncode == 0
     else:
         assert "E501" in {finding["code"] for finding in findings}, lint.stdout
-        assert lint.returncode == baseline.returncode == 1
-        assert "BASELINE.new" in baseline.stderr
-        assert "E501" in baseline.stderr
+        assert lint.returncode == gate.returncode == 1
+        assert "E501" in gate.stdout
 
 
 def test_py313_generator_defaults_are_not_required_for_py312(lint_tree: Path) -> None:
@@ -160,11 +139,9 @@ def test_py313_generator_defaults_are_not_required_for_py312(lint_tree: Path) ->
         'def samples() -> Generator[int, None, None]:\n    """Yield a sample."""\n'
         "    yield 1\n"
     )
-    lint, findings, baseline = _lint_and_baseline(lint_tree, source)
+    lint, findings, gate = _lint_and_gate(lint_tree, source)
     assert findings == [], lint.stdout
-    assert lint.returncode == baseline.returncode == 0
-    _, newer_findings, newer_baseline = _lint_and_baseline(
-        lint_tree, source, "--target-version=py313"
-    )
+    assert lint.returncode == gate.returncode == 0
+    newer, newer_findings, _ = _lint_and_gate(lint_tree, source, "--target-version=py313")
     assert "UP043" in {finding["code"] for finding in newer_findings}
-    assert newer_baseline.returncode == 1
+    assert newer.returncode == 1

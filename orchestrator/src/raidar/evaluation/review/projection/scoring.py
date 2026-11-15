@@ -17,12 +17,11 @@ from dataclasses import dataclass
 from decimal import Decimal
 
 from raidar.contract.trial import CheckpointState, StepResult, TrialRecord
-from raidar.evaluation.analysis.assessed import CODE_QUALITY_REF
 from raidar.evaluation.review.projection.assessments import TrialAssessments
 from raidar.evaluation.review.projection.headline import COMPONENT_METRICS, Headline, policy_shares
 from raidar.evaluation.review.projection.notes import EvidenceRef, Finding
-from raidar.evaluation.review.projection.spans import SpanBuilder
-from raidar.scoring.catalog.outcomes import CORRECTNESS_REF
+from raidar.evaluation.review.projection.spans import SpanBuilder, SpanSpec
+from raidar.scoring.catalog.outcomes import CODE_QUALITY_REF, CORRECTNESS_REF
 from raidar.scoring.framework.metrics import DEFAULT_METRIC_REGISTRY
 from raidar.scoring.framework.result import AssessStatus, Observation
 
@@ -39,7 +38,9 @@ class ScoringContext:
     assessments: TrialAssessments
 
 
-def _checkpoint_payload(step_result: StepResult, assessments: TrialAssessments) -> dict:
+def _checkpoint_payload(
+    step_result: StepResult, assessments: TrialAssessments
+) -> dict[str, object]:
     solved = (
         None
         if step_result.checkpoint_state is CheckpointState.EXCLUDED
@@ -75,44 +76,50 @@ def _correctness(ctx: ScoringContext, scoring: str) -> None:
     if ctx.headline.diagnostic is not None:
         base, _ = policy_shares(DEFAULT_METRIC_REGISTRY.get(ctx.headline.policy))
         area = ctx.builder.add(
-            name=f"scorer:{CORRECTNESS_REF}",
-            span_type="INTERNAL",
-            status="OK",
-            parent=scoring,
-            start=ctx.start,
-            output_value={
-                "scorer_id": CORRECTNESS_REF,
-                "version": 1,
-                "weight": base,
-                "score": ctx.headline.diagnostic,
-                "category": "correctness",
-                "component": "C",
-                "metric_contributions": [
-                    {
-                        "metric_id": step_result.checkpoint,
-                        "weight": 1 / len(step_results),
-                        "score": step_result.strict_pass_rate
-                        if step_result.checkpoint_state is CheckpointState.EXCLUDED
-                        else float(step_result.checkpoint_state is CheckpointState.SOLVED),
-                    }
-                    for step_result in step_results
-                ],
-            },
+            SpanSpec(
+                name=f"scorer:{CORRECTNESS_REF}",
+                span_type="INTERNAL",
+                status="OK",
+                parent=scoring,
+                start=ctx.start,
+                output_value={
+                    "scorer_id": CORRECTNESS_REF,
+                    "version": 1,
+                    "weight": base,
+                    "score": ctx.headline.diagnostic,
+                    "category": "correctness",
+                    "component": "C",
+                    "metric_contributions": [
+                        {
+                            "metric_id": step_result.checkpoint,
+                            "weight": 1 / len(step_results),
+                            "score": step_result.strict_pass_rate
+                            if step_result.checkpoint_state is CheckpointState.EXCLUDED
+                            else float(step_result.checkpoint_state is CheckpointState.SOLVED),
+                        }
+                        for step_result in step_results
+                    ],
+                },
+            )
         )
     for step_result in step_results:
         if area is None and step_result.checkpoint_state is CheckpointState.NOT_ATTEMPTED:
             continue
         ctx.builder.add(
-            name=f"metric:{step_result.checkpoint}",
-            span_type="INTERNAL",
-            status=step_result.checkpoint_state.span_status,
-            parent=area or scoring,
-            start=ctx.start,
-            output_value=_checkpoint_payload(step_result, ctx.assessments),
+            SpanSpec(
+                name=f"metric:{step_result.checkpoint}",
+                span_type="INTERNAL",
+                status=step_result.checkpoint_state.span_status,
+                parent=area or scoring,
+                start=ctx.start,
+                output_value=_checkpoint_payload(step_result, ctx.assessments),
+            )
         )
 
 
-def _component_payload(component: str, observation: Observation | None, weight: Decimal) -> dict:
+def _component_payload(
+    component: str, observation: Observation | None, weight: Decimal
+) -> dict[str, object]:
     measured = observation is not None and observation.status is AssessStatus.OK
     return {
         "metric_id": COMPONENT_METRICS[component],
@@ -137,38 +144,42 @@ def _quality(ctx: ScoringContext, scoring: str) -> None:
     if ctx.headline.quality is not None:
         _, inertia = policy_shares(policy)
         area = ctx.builder.add(
-            name=f"scorer:{quality}",
-            span_type="INTERNAL",
-            status="OK",
-            parent=scoring,
-            start=ctx.start,
-            output_value={
-                "scorer_id": quality,
-                "version": int(quality.rsplit("@", 1)[1]),
-                "weight": inertia,
-                "score": ctx.headline.quality,
-                "category": "quality",
-                "component": "I",
-                "metric_contributions": [
-                    {
-                        "metric_id": COMPONENT_METRICS[component],
-                        "weight": float(weight),
-                        "score": ctx.headline.components[component].value,
-                    }
-                    for component, weight in weights.items()
-                ],
-            },
+            SpanSpec(
+                name=f"scorer:{quality}",
+                span_type="INTERNAL",
+                status="OK",
+                parent=scoring,
+                start=ctx.start,
+                output_value={
+                    "scorer_id": quality,
+                    "version": int(quality.rsplit("@", 1)[1]),
+                    "weight": inertia,
+                    "score": ctx.headline.quality,
+                    "category": "quality",
+                    "component": "I",
+                    "metric_contributions": [
+                        {
+                            "metric_id": COMPONENT_METRICS[component],
+                            "weight": float(weight),
+                            "score": ctx.headline.components[component].value,
+                        }
+                        for component, weight in weights.items()
+                    ],
+                },
+            )
         )
     for component, weight in weights.items():
         observation = ctx.headline.components.get(component)
         measured = observation is not None and observation.status is AssessStatus.OK
         ctx.builder.add(
-            name=f"metric:{COMPONENT_METRICS[component]}",
-            span_type="INTERNAL",
-            status="OK" if measured else "ERROR",
-            parent=area or scoring,
-            start=ctx.start,
-            output_value=_component_payload(component, observation, weight),
+            SpanSpec(
+                name=f"metric:{COMPONENT_METRICS[component]}",
+                span_type="INTERNAL",
+                status="OK" if measured else "ERROR",
+                parent=area or scoring,
+                start=ctx.start,
+                output_value=_component_payload(component, observation, weight),
+            )
         )
 
 
@@ -262,12 +273,14 @@ def _unscored_finding(ctx: ScoringContext) -> list[Finding]:
 def project_scoring(ctx: ScoringContext) -> list[Finding]:
     """Add the scoring spans and return the findings they support."""
     scoring = ctx.builder.add(
-        name="scoring",
-        span_type="INTERNAL",
-        status="OK" if ctx.headline.composite is not None else "ERROR",
-        parent=ctx.root,
-        start=ctx.start,
-        output_value=_scoring_summary(ctx),
+        SpanSpec(
+            name="scoring",
+            span_type="INTERNAL",
+            status="OK" if ctx.headline.composite is not None else "ERROR",
+            parent=ctx.root,
+            start=ctx.start,
+            output_value=_scoring_summary(ctx),
+        )
     )
     _correctness(ctx, scoring)
     if ctx.headline.score is not None:

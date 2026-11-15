@@ -126,8 +126,10 @@ _JOB_DEPTH = 2  # a trial dir sits at <job>/trials/<trial>
 
 
 def find_job_manifest(target: Path) -> tuple[Path, dict[str, Any]] | None:
-    """The job directory holding ``target`` (a job or one of its trial directories) and its
-    ``job.json``, or None when ``target`` is outside any job."""
+    """The job directory holding ``target`` and its ``job.json``.
+
+    ``target`` is a job or one of its trial directories; None when it is outside any job.
+    """
     candidate = target.resolve()
     for _ in range(_JOB_DEPTH + 1):
         if (candidate / JOB_MANIFEST).is_file():

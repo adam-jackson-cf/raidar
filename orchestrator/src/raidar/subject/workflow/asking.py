@@ -18,12 +18,11 @@ from collections.abc import Sequence
 from pathlib import Path
 from typing import Any
 
-from harbor.environments.base import BaseEnvironment
-
 from raidar.contract.activity import host_window
 from raidar.judge.client import FailureReason, JevFailure, JevSuccess
 from raidar.judge.live import LIVE_MODEL, RecordedJev
 from raidar.judge.protocol import NoulAnswer
+from raidar.subject.primitive.calls import Sandbox
 from raidar.subject.primitive.judge import RETRIES, TIMEOUT_S, JudgeConfig
 from raidar.subject.workflow.judging import ASPECT_ASSERTED, Request, questions
 
@@ -69,7 +68,7 @@ class Asker:
         self,
         settings: JudgeConfig,
         logs_dir: Path,
-        environment: BaseEnvironment,
+        environment: Sandbox,
         workers: int = WORKERS,
     ) -> None:
         if settings.model != LIVE_MODEL:

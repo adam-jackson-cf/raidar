@@ -1,13 +1,14 @@
-"""Jev calibration commands: labels (direct and blind), supersessions, recorded splits,
-promotion and its verification.
+"""Jev calibration commands.
 
-Attached to the ``raidar jev`` group by ``raidar.cli.jev``.
+They cover labels (direct and blind), supersessions, recorded splits, promotion and its
+verification. Attached to the ``raidar jev`` group by ``raidar.cli.jev``.
 """
 
 from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import TypedDict, Unpack
 
 import click
 
@@ -83,6 +84,15 @@ def jev_import_labels(
     click.echo(json.dumps({"imported": added, **readiness.summary()}, indent=2))
 
 
+class _ExportBlindOptions(TypedDict):
+    store: Path
+    policy: str
+    output: Path
+    trials: tuple[str, ...]
+    limit: int | None
+    request_ids: tuple[str, ...]
+
+
 @click.command("export-blind")
 @_STORE
 @click.option("--policy", required=True)
@@ -95,24 +105,19 @@ def jev_import_labels(
     multiple=True,
     help="Exactly this selected decision (repeatable); refused unless unlabelled and answered.",
 )
-def jev_export_blind(
-    store: Path,
-    policy: str,
-    output: Path,
-    trials: tuple[str, ...],
-    limit: int | None,
-    request_ids: tuple[str, ...],
-) -> None:
+def jev_export_blind(**options: Unpack[_ExportBlindOptions]) -> None:
     """Export unlabelled answered decisions WITHOUT Jev's answers, for a blind labeller."""
-    runtime = open_runtime(store, replay_only=True)
+    policy = options["policy"]
+    output = options["output"]
+    runtime = open_runtime(options["store"], replay_only=True)
     try:
         runtime.policies.get(policy)
         rows = export_blind(
             runtime.audit,
             policy,
-            trials=set(trials) or None,
-            limit=limit,
-            request_ids=set(request_ids) or None,
+            trials=set(options["trials"]) or None,
+            limit=options["limit"],
+            request_ids=set(options["request_ids"]) or None,
         )
     except (PolicyError, LabelImportError) as error:
         raise click.ClickException(str(error)) from error
@@ -178,6 +183,15 @@ def jev_supersede_labels(
     click.echo(json.dumps({"superseded": len(records), **readiness.summary()}, indent=2))
 
 
+class _RecordSplitOptions(TypedDict):
+    store: Path
+    policy: str
+    split_id: str
+    calibration: str
+    evaluation: str
+    reason: str
+
+
 @click.command("record-split")
 @_STORE
 @click.option("--policy", required=True)
@@ -189,19 +203,20 @@ def jev_supersede_labels(
     "--evaluation", required=True, help="Evaluation trial ids (space or comma separated)."
 )
 @click.option("--reason", required=True, help="How and why the split was chosen.")
-def jev_record_split(
-    store: Path, policy: str, split_id: str, calibration: str, evaluation: str, reason: str
-) -> None:
+def jev_record_split(**options: Unpack[_RecordSplitOptions]) -> None:
     """Record a calibration/evaluation split of trials before labelling against it."""
-    runtime = open_runtime(store, replay_only=True)
+    policy = options["policy"]
+    runtime = open_runtime(options["store"], replay_only=True)
     try:
         runtime.policies.get(policy)
         record = record_split(
             runtime.audit,
             policy,
-            split_id=split_id,
-            trials=SplitTrials(_trial_list(calibration), _trial_list(evaluation)),
-            reason=reason,
+            split_id=options["split_id"],
+            trials=SplitTrials(
+                _trial_list(options["calibration"]), _trial_list(options["evaluation"])
+            ),
+            reason=options["reason"],
         )
     except (PolicyError, LabelImportError) as error:
         raise click.ClickException(str(error)) from error
@@ -269,6 +284,16 @@ def _write(path: Path, plan: PromotionPlan) -> str:
     return str(path)
 
 
+class _PromoteOptions(TypedDict):
+    store: Path
+    policy: str
+    calibration: str | None
+    evaluation: str | None
+    dry_run: bool
+    allow_pending_scorer_bump: bool
+    policy_dir: Path
+
+
 @click.command("promote")
 @_STORE
 @click.option("--policy", required=True)
@@ -290,15 +315,7 @@ def _write(path: Path, plan: PromotionPlan) -> str:
     ),
 )
 @_POLICY_DIR
-def jev_promote(
-    store: Path,
-    policy: str,
-    calibration: str | None,
-    evaluation: str | None,
-    dry_run: bool,
-    allow_pending_scorer_bump: bool,
-    policy_dir: Path,
-) -> None:
+def jev_promote(**options: Unpack[_PromoteOptions]) -> None:
     """Fit and freeze the threshold, then write the enforce promotion if it verifies.
 
     A promotion ships with the next minor version of its scorer. While that bump is
@@ -306,20 +323,24 @@ def jev_promote(
     ``jev verify-promotion`` rejects, so the write is refused unless
     ``--allow-pending-scorer-bump`` is given.
     """
-    runtime = open_runtime(store, replay_only=True, policy_dir=policy_dir)
+    policy = options["policy"]
+    policy_dir = options["policy_dir"]
+    runtime = open_runtime(options["store"], replay_only=True, policy_dir=policy_dir)
     try:
         current = runtime.policies.get(policy)
-        split = _split(calibration, evaluation, recorded_split(runtime.audit, policy))
+        split = _split(
+            options["calibration"], options["evaluation"], recorded_split(runtime.audit, policy)
+        )
     except (PolicyError, ValueError) as error:
         raise click.ClickException(str(error)) from error
     version = scorer_versions().get(scorer_id(policy))
     plan = plan_promotion(current, runtime.audit, split=split, scorer_version=version)
-    blocked = plan.ok and plan.scorer_bump is not None and not allow_pending_scorer_bump
-    write = plan.ok and not dry_run and not blocked
+    blocked = plan.ok and plan.scorer_bump is not None and not options["allow_pending_scorer_bump"]
+    write = plan.ok and not options["dry_run"] and not blocked
     written = _write(policy_dir / f"{policy}.yaml", plan) if write else None
     report = {**plan.summary(), "written": written, "blocked_on_scorer_bump": blocked}
     click.echo(json.dumps(report, indent=2))
-    if not plan.ok or (blocked and not dry_run):
+    if not plan.ok or (blocked and not options["dry_run"]):
         raise SystemExit(1)
 
 

@@ -35,7 +35,7 @@ from pathlib import Path
 from typing import Any
 
 from raidar.contract.snapshot import tree_digest
-from raidar.grading.grader import grade_step
+from raidar.grading.grader import Oracle, OracleSettings, grade_step
 from raidar.grading.models import VerifierGrade
 from raidar.grading.per_trial import per_trial
 from raidar.grading.pre_fix.store import (
@@ -141,13 +141,11 @@ async def _grade(snapshot: PreFixSnapshot, options: RegradeOptions) -> tuple[Ver
         raise RegradeError("pre-fix grader environment differs from the trial")
     with tempfile.TemporaryDirectory(prefix="raidar-pre-fix-", dir=options.work_root) as work:
         result = await grade_step(
-            bundle,
+            Oracle(bundle, sandbox),
             snapshot.record.step,
             snapshot.path,
-            sandbox,
             Path(work),
-            coverage=False,
-            timeout_s=snapshot.record.grader.timeout_s,
+            OracleSettings(coverage=False, timeout_s=snapshot.record.grader.timeout_s),
         )
     return result.grade, environment
 

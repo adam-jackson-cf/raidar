@@ -185,9 +185,9 @@ class Oracle:
     calls: list[dict[str, Any]] = field(default_factory=list)
 
     async def __call__(
-        self, bundle: Any, step: Any, snapshot: Path, sandbox: Any, work: Path, **kw: Any
+        self, oracle: Any, step: Any, snapshot: Path, work: Path, settings: Any
     ) -> RunOutcome:
-        self.calls.append({"snapshot": snapshot, **kw})
+        self.calls.append({"snapshot": snapshot, "settings": settings})
         return self.outcome
 
 

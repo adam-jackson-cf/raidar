@@ -14,6 +14,8 @@ from raidar.contract.wheels import DependencyInfraError
 from raidar.grading import grader as grader_module
 from raidar.grading.grader import (
     BUDGET_MARGIN_S,
+    Oracle,
+    OracleSettings,
     _coverage_contexts,
     _environment,
     _sandbox_infra,
@@ -300,9 +302,9 @@ def _outcome(
     *,
     cases: tuple[CaseResult, ...] = (),
     evidence: RunEvidence | None = None,
-    dependencies: object | None = None,
+    dependencies: SubmissionDependencies | None = None,
 ) -> RunOutcome:
-    return RunOutcome("grading", cases, infra, evidence, (), 1.5, cast(Any, dependencies))
+    return RunOutcome("grading", cases, infra, evidence, (), 1.5, dependencies)
 
 
 def test_sandbox_outcomes_classify_success_timeout_nonzero_and_missing_ledger(
@@ -406,7 +408,8 @@ def test_parity_verdict_is_ineligible_when_either_run_has_no_evidence() -> None:
 
 
 def test_attributing_a_crash_to_the_submission_fails_every_starter_case() -> None:
-    crashed = _outcome(InfraFailure(code="sandbox_timeout"), dependencies="deps")
+    crash_dependencies = SubmissionDependencies(declared=("deps",))
+    crashed = _outcome(InfraFailure(code="sandbox_timeout"), dependencies=crash_dependencies)
     starter = _outcome(
         cases=(
             _case("t::a", CaseGroup.CORE, CaseStatus.PASSED),
@@ -418,7 +421,7 @@ def test_attributing_a_crash_to_the_submission_fails_every_starter_case() -> Non
     assert attributed.evidence is None
     assert [c.status for c in attributed.cases] == [CaseStatus.FAILED, CaseStatus.FAILED]
     assert [c.id for c in attributed.cases] == ["t::a", "t::b"]
-    assert (attributed.seconds, attributed.dependencies) == (1.5, "deps")
+    assert (attributed.seconds, attributed.dependencies) == (1.5, crash_dependencies)
 
 
 def test_fork_projection_keeps_graded_nodes_and_hashes_the_environment() -> None:
@@ -585,13 +588,11 @@ async def _grade(
 ) -> StepGrade:
     bundle = make_bundle(tmp_path / "fixture")
     return await grade_step(
-        bundle,
+        Oracle(bundle, cast(Any, sandbox)),
         "checkpoint_1",
         tmp_path / "snapshot",
-        cast(Any, sandbox),
         tmp_path / "work",
-        coverage=coverage,
-        timeout_s=timeout_s,
+        OracleSettings(coverage=coverage, timeout_s=timeout_s),
     )
 
 

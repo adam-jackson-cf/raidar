@@ -9,7 +9,6 @@ import json
 import re
 import shlex
 import subprocess
-import sys
 import tomllib
 from collections.abc import Mapping, Sequence
 from pathlib import Path
@@ -533,42 +532,10 @@ def formatter_findings(paths: Sequence[str]) -> list[str]:
     ]
 
 
-def baseline_findings(mode: str, findings: Sequence[str]) -> int:
-    tool = "dependency-audit" if mode == "audit" else "prettier"
-    report = ROOT / "var/quality/toolchain" / f"{tool}.json"
-    report.parent.mkdir(parents=True, exist_ok=True)
-    records = []
-    for line in findings:
-        path, code, source_line = line.split(": ", 2)
-        records.append(
-            {"path": path, "code": code, "symbol": "", "source_line": source_line}
-        )
-    report.write_text(json.dumps(records) + "\n")
-    result = run_process(
-        [
-            sys.executable,
-            "scripts/checks/check-finding-baseline.py",
-            "--tool",
-            tool,
-            "--format",
-            "findings-json",
-            "--report",
-            str(report),
-            "--baseline",
-            f"scripts/checks/baselines/{tool}.json",
-        ],
-        timeout=60,
-    )
-    sys.stdout.write(result.stdout)
-    sys.stderr.write(result.stderr)
-    return result.returncode
-
-
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("mode", choices=("static", "prettier", "audit"))
     parser.add_argument("--ci", action="store_true")
-    parser.add_argument("--baseline", action="store_true")
     parser.add_argument("paths", nargs="*")
     args = parser.parse_args()
     try:
@@ -582,8 +549,6 @@ def main() -> int:
             findings = audit_findings(changed, ci=args.ci, run=run_process)
         else:
             findings = formatter_findings(paths)
-        if args.baseline and args.mode != "static":
-            return baseline_findings(args.mode, findings)
     except (OSError, ValueError, subprocess.SubprocessError) as error:
         rules = {
             "static": "PARITY.lock-version",

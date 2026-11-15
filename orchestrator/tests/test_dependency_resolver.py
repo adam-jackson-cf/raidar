@@ -27,6 +27,7 @@ from raidar.contract import wheel_cache
 from raidar.contract.wheels import PLATFORMS, PYTHON, DependencyInfraError
 from raidar.design.problem import dependencies as problem_dependencies
 from raidar.design.problem.dependencies import (
+    DeclaredDependencies,
     ProblemDependencies,
     resolve_dependencies,
     write_locks,
@@ -49,7 +50,7 @@ from raidar.grading.dependency_pins import (
     set_sha256,
 )
 from raidar.grading.resolver import (
-    DependencyUnresolvable,
+    DependencyUnresolvableError,
     DirectoryIndex,
     IndexFile,
     SimpleIndex,
@@ -655,14 +656,14 @@ def test_a_problem_without_test_dependencies_has_no_seed() -> None:
 
 def test_diverging_architectures_exclude_the_problem() -> None:
     fake = FakeResolver(arch_versions={"arm64": "2.0"})
-    with pytest.raises(DependencyUnresolvable, match="arch-mismatch") as caught:
+    with pytest.raises(DependencyUnresolvableError, match="arch-mismatch") as caught:
         resolve_pins({"s": ["pkg"]}, [], exclude_newer=CUTOFF, resolver=fake)
     assert {item.reason for item in caught.value.unprovided} == {"arch-mismatch"}
 
 
 def test_any_unprovided_requirement_excludes_the_problem() -> None:
     fake = FakeResolver(unprovided={"solo": "no-wheel"})
-    with pytest.raises(DependencyUnresolvable, match="solo: no-wheel") as caught:
+    with pytest.raises(DependencyUnresolvableError, match="solo: no-wheel") as caught:
         resolve_pins({"s": ["solo"]}, [], exclude_newer=CUTOFF, resolver=fake)
     assert [(u.requirement, u.reason) for u in caught.value.unprovided] == [("solo", "no-wheel")]
 
@@ -850,7 +851,11 @@ def test_a_new_problem_resolves_every_declared_set_under_the_import_time_cutoff(
     references = _references(tmp_path, {"checkpoint_1": ["flask"], "checkpoint_2": []})
     fake = FakeResolver()
     result = resolve_dependencies(
-        ProblemStore(tmp_path / "store"), PROBLEM, None, references, STEPS, ("pyyaml",), fake
+        ProblemStore(tmp_path / "store"),
+        PROBLEM,
+        None,
+        DeclaredDependencies(references, STEPS, ("pyyaml",)),
+        fake,
     )
     assert result.refusal is None
     assert result.pins is not None
@@ -868,13 +873,17 @@ def test_a_recorded_pin_for_the_same_declarations_is_reused_with_its_committed_l
     store = ProblemStore(tmp_path / "store")
     references = _references(tmp_path, {"checkpoint_1": ["flask"], "checkpoint_2": []})
     first = resolve_dependencies(
-        store, PROBLEM, None, references, STEPS, ("pyyaml",), FakeResolver()
+        store, PROBLEM, None, DeclaredDependencies(references, STEPS, ("pyyaml",)), FakeResolver()
     )
     write_locks(store, PROBLEM, first)
     import_clock[0] = "2027-01-01T00:00:00Z"
     again = FakeResolver()
     reused = resolve_dependencies(
-        store, PROBLEM, _manifest(dependencies=first.pins), references, STEPS, ("pyyaml",), again
+        store,
+        PROBLEM,
+        _manifest(dependencies=first.pins),
+        DeclaredDependencies(references, STEPS, ("pyyaml",)),
+        again,
     )
     assert again.calls == []
     assert reused.pins == first.pins
@@ -887,13 +896,21 @@ def test_a_recorded_pin_from_another_resolver_resolves_again_under_its_cutoff(
     store = ProblemStore(tmp_path / "store")
     references = _references(tmp_path, {"checkpoint_1": ["flask"], "checkpoint_2": []})
     first = resolve_dependencies(
-        store, PROBLEM, None, references, STEPS, ("pyyaml",), FakeResolver(identity="uv@0.1")
+        store,
+        PROBLEM,
+        None,
+        DeclaredDependencies(references, STEPS, ("pyyaml",)),
+        FakeResolver(identity="uv@0.1"),
     )
     write_locks(store, PROBLEM, first)
     import_clock[0] = "2027-01-01T00:00:00Z"
     upgraded = FakeResolver(identity="uv@0.2")
     result = resolve_dependencies(
-        store, PROBLEM, _manifest(dependencies=first.pins), references, STEPS, ("pyyaml",), upgraded
+        store,
+        PROBLEM,
+        _manifest(dependencies=first.pins),
+        DeclaredDependencies(references, STEPS, ("pyyaml",)),
+        upgraded,
     )
     assert first.pins is not None
     assert result.pins is not None
@@ -910,7 +927,7 @@ def test_a_changed_declaration_resolves_again_under_the_retained_cutoff(
     store = ProblemStore(tmp_path / "store")
     references = _references(tmp_path, {"checkpoint_1": ["flask"], "checkpoint_2": []})
     first = resolve_dependencies(
-        store, PROBLEM, None, references, STEPS, ("pyyaml",), FakeResolver()
+        store, PROBLEM, None, DeclaredDependencies(references, STEPS, ("pyyaml",)), FakeResolver()
     )
     write_locks(store, PROBLEM, first)
     import_clock[0] = "2027-01-01T00:00:00Z"
@@ -921,7 +938,11 @@ def test_a_changed_declaration_resolves_again_under_the_retained_cutoff(
             '[project]\nname = "app"\ndependencies = ["flask>=3"]\n'
         )
     result = resolve_dependencies(
-        store, PROBLEM, _manifest(dependencies=first.pins), references, STEPS, tests, again
+        store,
+        PROBLEM,
+        _manifest(dependencies=first.pins),
+        DeclaredDependencies(references, STEPS, tests),
+        again,
     )
     assert again.calls
     assert {call[2] for call in again.calls} == {IMPORT_TIME}  # the recorded cutoff, not now
@@ -935,7 +956,11 @@ def test_an_unprovided_requirement_is_a_refusal_that_keeps_its_cutoff_on_reimpor
     store = ProblemStore(tmp_path / "store")
     references = _references(tmp_path, {"checkpoint_1": ["solo"], "checkpoint_2": []})
     refused = resolve_dependencies(
-        store, PROBLEM, None, references, STEPS, (), FakeResolver(unprovided={"solo": "no-wheel"})
+        store,
+        PROBLEM,
+        None,
+        DeclaredDependencies(references, STEPS, ()),
+        FakeResolver(unprovided={"solo": "no-wheel"}),
     )
     assert refused.pins is None
     assert refused.locks is None
@@ -947,7 +972,9 @@ def test_an_unprovided_requirement_is_a_refusal_that_keeps_its_cutoff_on_reimpor
     import_clock[0] = "2027-01-01T00:00:00Z"
     retry = FakeResolver()
     recorded = _manifest(refusal=refusal)
-    resolve_dependencies(store, PROBLEM, recorded, references, STEPS, (), retry)
+    resolve_dependencies(
+        store, PROBLEM, recorded, DeclaredDependencies(references, STEPS, ()), retry
+    )
     assert {call[2] for call in retry.calls} == {IMPORT_TIME}
 
 
@@ -958,7 +985,11 @@ def test_a_resolver_outage_is_infrastructure_never_a_refusal(
     fake = FakeResolver(error=DependencyInfraError("index unreachable"))
     with pytest.raises(DependencyInfraError):
         resolve_dependencies(
-            ProblemStore(tmp_path / "store"), PROBLEM, None, references, ["checkpoint_1"], (), fake
+            ProblemStore(tmp_path / "store"),
+            PROBLEM,
+            None,
+            DeclaredDependencies(references, ["checkpoint_1"], ()),
+            fake,
         )
 
 
@@ -968,7 +999,7 @@ def test_committed_locks_are_replaced_and_a_refused_problem_keeps_none(
     store = ProblemStore(tmp_path / "store")
     references = _references(tmp_path, {"checkpoint_1": ["flask"]})
     resolved = resolve_dependencies(
-        store, PROBLEM, None, references, ["checkpoint_1"], (), FakeResolver()
+        store, PROBLEM, None, DeclaredDependencies(references, ["checkpoint_1"], ()), FakeResolver()
     )
     write_locks(store, PROBLEM, resolved)
     stale = store.deps_dir(PROBLEM) / "stale.toml"

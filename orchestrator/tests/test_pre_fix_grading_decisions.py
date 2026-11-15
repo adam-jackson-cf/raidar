@@ -96,9 +96,11 @@ class Grader:
     calls: list[dict[str, Any]] = field(default_factory=list)
 
     async def __call__(
-        self, bundle: Any, step: str, path: Path, sandbox: Any, work: Path, **kw: Any
+        self, oracle: Any, step: str, path: Path, work: Path, settings: Any
     ) -> SimpleNamespace:
-        self.calls.append({"step": step, "path": path, "work_exists": work.is_dir(), **kw})
+        self.calls.append(
+            {"step": step, "path": path, "work_exists": work.is_dir(), "settings": settings}
+        )
         return SimpleNamespace(grade=self.grade)
 
 

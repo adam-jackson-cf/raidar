@@ -11,10 +11,10 @@ import asyncio
 import json
 from collections.abc import Callable
 from pathlib import Path
-from types import SimpleNamespace
 from typing import Any
 
 import pytest
+from harbor.environments.base import ExecResult
 from harbor.models.agent.context import AgentContext
 
 from raidar.subject.primitive.site import TrialInvalidError
@@ -39,6 +39,7 @@ from raidar_contract.agent_records import ZERO
 from raidar_contract.workflow import load_package_workflow
 from tests.native_support import CodexNative
 from tests.release_support import REAL_LAB
+from tests.workflow_support import HarborEnvironmentDouble
 
 INSTRUCTION = "Add a function `add(a, b)` to main.py."
 ONE_SHOT_PROMPT = f"Work the issue below per the repository's own rules.\n\n{INSTRUCTION}"
@@ -85,17 +86,22 @@ class FakeInner(CodexNative):
         await self.run(instruction, environment, context)
 
 
-class FakeEnvironment:
+class FakeEnvironment(HarborEnvironmentDouble):
     """A mounted-logs environment: the in-container copy of the turn's logs is a no-op here."""
-
-    capabilities = SimpleNamespace(mounted=True)
 
     def __init__(self) -> None:
         self.commands: list[str] = []
 
-    async def exec(self, command: str, **_: Any) -> Any:
+    async def exec(
+        self,
+        command: str,
+        cwd: str | None = None,
+        env: dict[str, str] | None = None,
+        timeout_sec: int | None = None,
+        user: str | int | None = None,
+    ) -> ExecResult:
         self.commands.append(command)
-        return SimpleNamespace(return_code=0, stdout="", stderr="")
+        return ExecResult(return_code=0, stdout="", stderr="")
 
 
 @pytest.fixture(autouse=True)
@@ -233,20 +239,27 @@ def test_a_link_planted_in_the_agents_logs_is_named_and_never_copied(tmp_path: P
 class RemoteEnvironment(FakeEnvironment):
     """A container whose ``/logs/agent`` is not mounted: Harbor downloads it after the run."""
 
-    capabilities = SimpleNamespace(mounted=False)
+    mounted = False
 
     def __init__(self, refuse: str | None = None) -> None:
         super().__init__()
         self.refuse = refuse
         self.downloaded: list[str] = []
 
-    async def exec(self, command: str, **options: Any) -> Any:
+    async def exec(
+        self,
+        command: str,
+        cwd: str | None = None,
+        env: dict[str, str] | None = None,
+        timeout_sec: int | None = None,
+        user: str | int | None = None,
+    ) -> ExecResult:
         if self.refuse is not None and command.removeprefix("umask 022; ").startswith(self.refuse):
             raise ConnectionError("container gone")
-        return await super().exec(command, **options)
+        return await super().exec(command, cwd, env, timeout_sec, user)
 
-    async def download_dir(self, source: str, target: Path) -> None:
-        self.downloaded.append(source)
+    async def download_dir(self, source_dir: str, target_dir: Path | str) -> None:
+        self.downloaded.append(source_dir)
 
 
 def test_a_container_that_cannot_lock_the_logs_does_not_lose_the_record(tmp_path: Path) -> None:
@@ -414,7 +427,7 @@ def test_a_check_that_asks_resumes_the_session_with_its_message(
 
 
 class BrokenDownload(RemoteEnvironment):
-    async def download_dir(self, source: str, target: Path) -> None:
+    async def download_dir(self, source_dir: str, target_dir: Path | str) -> None:
         raise OSError("disk full")
 
 

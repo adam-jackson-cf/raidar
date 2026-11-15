@@ -8,13 +8,12 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from raidar_contract.references import ReleaseError
-
 from raidar.design.experiment.schema import AgentEntry
 from raidar.subject.agent.config import Harness
 from raidar.subject.agent.definition import ReleasedAgent, harness_of, provider_of
 from raidar.subject.agent.schema import AgentName
 from raidar.subject.releases import released_agent
+from raidar_contract.references import ReleaseError
 
 
 class AgentResolutionError(ValueError):

@@ -155,6 +155,15 @@ def test_a_child_never_repeats_its_parent_name(relative: str) -> None:
     _assert_finding(found[0], relative, "NAME.conventions")
 
 
+@pytest.mark.parametrize(
+    "relative",
+    ["orchestrator/stubs/harbor/trial/trial.pyi", "orchestrator/stubs/harbor/utils/env.pyi"],
+)
+def test_a_third_party_stub_keeps_its_package_module_names(relative: str) -> None:
+    assert paths.naming_findings(relative) == []
+    assert paths.naming_findings(relative.replace("orchestrator/stubs/", "orchestrator/src/"))
+
+
 def test_directories_below_a_skill_are_kebab_case() -> None:
     assert paths.naming_findings(".agents/skills/probe-skill/references/guide.md") == []
     relative = ".agents/skills/probe-skill/Reference_Notes/guide.md"

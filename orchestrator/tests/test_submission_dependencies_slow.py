@@ -9,7 +9,7 @@ from pathlib import Path
 import pytest
 
 from raidar.grading import closure
-from raidar.grading.grader import grade_step
+from raidar.grading.grader import Oracle, OracleSettings, grade_step
 from raidar.grading.sandbox import RUNTIME_DIR
 from raidar.grading.submission_deps import (
     closure_dir,
@@ -31,13 +31,11 @@ async def test_the_graded_program_runs_in_the_closure_image_with_the_closure_on_
     bundle = _grading_bundle(tmp_path / "problem", fake)
     sandbox = LocalProcessSandbox(tmp_path / "sandbox")
     result = await grade_step(
-        bundle,
+        Oracle(bundle, sandbox),
         "checkpoint_1",
         _declaring(tmp_path / "app", "flask"),
-        sandbox,
         tmp_path / "work",
-        coverage=False,
-        resolver=fake,
+        OracleSettings(coverage=False, resolver=fake),
     )
     assert result.grade.solved is True
     [run] = sandbox.runs
@@ -57,13 +55,11 @@ async def test_a_coverage_run_reuses_the_grading_runs_lock(tmp_path: Path) -> No
     sandbox = LocalProcessSandbox(tmp_path / "sandbox")
     fake.calls.clear()
     result = await grade_step(
-        bundle,
+        Oracle(bundle, sandbox),
         "checkpoint_1",
         _declaring(tmp_path / "app", "flask"),
-        sandbox,
         tmp_path / "work",
-        coverage=True,
-        resolver=fake,
+        OracleSettings(coverage=True, resolver=fake),
     )
     assert len(fake.calls) == 2  # both architectures, once
     assert result.coverage is not None

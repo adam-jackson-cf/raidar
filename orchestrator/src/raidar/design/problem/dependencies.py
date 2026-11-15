@@ -19,7 +19,7 @@ from raidar.grading.dependency_pins import (
 )
 from raidar.grading.resolver import (
     GRADER_TOOLS,
-    DependencyUnresolvable,
+    DependencyUnresolvableError,
     Resolver,
     UvResolver,
     resolve_pins,
@@ -68,13 +68,20 @@ def _unchanged_pins(
     return pins if same else None
 
 
+@dataclass(frozen=True)
+class DeclaredDependencies:
+    """What a problem declares: each reference step's requirements and the grader's tests."""
+
+    references: Path
+    steps: list[str]
+    test_dependencies: tuple[str, ...]
+
+
 def resolve_dependencies(
     store: ProblemStore,
     problem: ProblemId,
     recorded: ProblemManifest | None,
-    references: Path,
-    steps: list[str],
-    test_dependencies: tuple[str, ...],
+    declared: DeclaredDependencies,
     resolver: Resolver | None,
 ) -> ProblemDependencies:
     """Resolve every reference step's declared set and the grader's sets, both architectures.
@@ -85,7 +92,10 @@ def resolve_dependencies(
     resolves to different versions per architecture, is a refusal (``dependency_unresolvable``).
     A resolver or index outage raises (infrastructure), it never becomes a refusal.
     """
-    reference_sets = {step: declared_requirements(references / step) for step in steps}
+    test_dependencies = declared.test_dependencies
+    reference_sets = {
+        step: declared_requirements(declared.references / step) for step in declared.steps
+    }
     chosen = resolver or UvResolver()
     reused = _unchanged_pins(recorded, reference_sets, test_dependencies)
     if reused is not None and reused.resolver == chosen.identity:
@@ -96,7 +106,7 @@ def resolve_dependencies(
         pins, locks = resolve_pins(
             reference_sets, test_dependencies, exclude_newer=cutoff, resolver=chosen
         )
-    except DependencyUnresolvable as exc:
+    except DependencyUnresolvableError as exc:
         refusal = DependencyRefusal(
             detail=str(exc), exclude_newer=cutoff, unprovided=exc.unprovided
         )

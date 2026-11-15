@@ -44,6 +44,7 @@ from raidar.design.problem.validation import (
     reference_tree_digest,
     run_checks,
 )
+from raidar.grading.grader import DEFAULT_RUN_TIMEOUT_S
 from raidar.grading.sandbox import GradingSandbox
 
 ENGINES = ("direct", "harbor")
@@ -55,7 +56,7 @@ class ValidateOptions:
     engine: str = "direct"
     repeats: int = 5
     concurrency: int = direct.DEFAULT_CONCURRENCY
-    timeout_s: float = direct.DEFAULT_RUN_TIMEOUT_S
+    timeout_s: float = DEFAULT_RUN_TIMEOUT_S
     native_runner: Path | None = None
     source_checkout: Path | None = None
     audit: bool = True
@@ -76,17 +77,16 @@ async def _harbor_runs(
     empty = work / "empty-starter"
     empty.mkdir(parents=True, exist_ok=True)
     snapshots = direct.variant_snapshots(problem, empty)
+    harbor_runs = harbor_engine.HarborRuns(
+        repeats=options.repeats,
+        concurrency=options.concurrency,
+        docker_context=options.docker_context,
+        grader=grader,
+    )
     runs: dict[str, list[StepGrades]] = {}
     for variant in (POSITIVE, NEGATIVE):
         runs[variant] = await harbor_engine.run_variant(
-            problem,
-            variant,
-            snapshots[variant],
-            work,
-            repeats=options.repeats,
-            concurrency=options.concurrency,
-            docker_context=options.docker_context,
-            grader=grader,
+            problem, variant, snapshots[variant], work, harbor_runs
         )
     return runs
 
@@ -177,9 +177,7 @@ async def validate_problem(
             oracle = await direct.grade_references(
                 problem,
                 sandbox,
-                repeats=options.repeats,
-                concurrency=options.concurrency,
-                timeout_s=options.timeout_s,
+                direct.ReferenceRuns(options.repeats, options.concurrency, options.timeout_s),
                 work_root=work,
             )
         references = _reference_digests(problem, work)

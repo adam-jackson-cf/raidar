@@ -28,7 +28,11 @@ from raidar.design.problem.audit import (
     spec_texts,
 )
 from raidar.design.problem.content import content_digest
-from raidar.design.problem.dependencies import ProblemDependencies, resolve_dependencies
+from raidar.design.problem.dependencies import (
+    DeclaredDependencies,
+    ProblemDependencies,
+    resolve_dependencies,
+)
 from raidar.design.problem.determinacy import AssertionKind, AuditedAssertion, Determination
 from raidar.design.problem.errata import (
     ErrataError,
@@ -420,9 +424,7 @@ def test_a_recorded_manifest_without_any_dependency_record_resolves_at_the_impor
         store,
         problem,
         _manifest(dependencies=None),
-        _references(tmp_path),
-        ["checkpoint_1"],
-        (),
+        DeclaredDependencies(_references(tmp_path), ["checkpoint_1"], ()),
         resolver,
     )
     assert result.pins is not None
@@ -442,7 +444,11 @@ def test_a_refused_problem_keeps_its_cutoff_and_records_what_cannot_be_provided(
     )
     resolver = FakeResolver(unprovided)
     result = resolve_dependencies(
-        store, problem, recorded, _references(tmp_path), ["checkpoint_1"], (), resolver
+        store,
+        problem,
+        recorded,
+        DeclaredDependencies(_references(tmp_path), ["checkpoint_1"], ()),
+        resolver,
     )
     assert result.pins is None
     assert result.locks is None
@@ -470,7 +476,7 @@ class _Converted:
             out.mkdir(parents=True)
             return out
 
-        def render(_converted: Path, out: Path, **_kw: object) -> None:
+        def render(_converted: Path, out: Path, *_a: object) -> None:
             (out / "tests").mkdir(parents=True)
             if leak:
                 (out / "tests" / "test_checkpoint_1.py").write_text("assert True\n")
@@ -493,15 +499,15 @@ class _Converted:
 
     def materialise(self, store: ProblemStore, staging: Path) -> importer._Materialised:
         checkout: Any = SimpleNamespace(root=staging, pin=SimpleNamespace(commit=COMMIT))
-        return importer._materialise(
-            store,
-            checkout,
-            ProblemId.parse(POSITIVE_REF),
-            staging,
-            None,  # type: ignore[arg-type]
+        inputs = importer._ImportInputs(
+            store=store,
+            checkout=checkout,
+            problem=ProblemId.parse(POSITIVE_REF),
+            pack=None,  # type: ignore[arg-type]
             recorded=None,
             resolver=None,
         )
+        return importer._materialise(inputs, staging)
 
 
 def test_import_refuses_a_task_that_repeats_hidden_verifier_content(
@@ -815,7 +821,7 @@ def test_the_spec_of_a_step_falls_back_to_the_tasks_single_instruction(
 
 
 def _fake_grader(calls: list[tuple[str, str]]) -> Any:
-    async def grade(_bundle: object, step: str, snapshot: Path, *_rest: object, **_: object) -> Any:
+    async def grade(oracle: Any, step: str, snapshot: Path, run: Path, settings: Any) -> Any:
         variant = REFERENCE if snapshot.parent.name == "references" else snapshot.parent.name
         calls.append((variant, step))
         status = CaseStatus.FAILED if variant == NEUTRAL_ERROR_TEXT else CaseStatus.PASSED

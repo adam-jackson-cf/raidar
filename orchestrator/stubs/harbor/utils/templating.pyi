@@ -1,0 +1,6 @@
+from pathlib import Path
+
+from jinja2.sandbox import SandboxedEnvironment
+
+def create_prompt_environment() -> SandboxedEnvironment: ...
+def render_prompt_template(template_path: Path, instruction: str) -> str: ...

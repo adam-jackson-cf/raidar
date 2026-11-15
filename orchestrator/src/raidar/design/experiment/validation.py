@@ -19,7 +19,6 @@ from collections.abc import Iterable, Mapping, Sequence
 from pathlib import Path
 
 from pydantic import ValidationError
-from raidar_contract.references import ReleaseError
 
 from raidar.contract.references import RegistryReferenceError
 from raidar.design.experiment.agent import entry_issues
@@ -38,6 +37,7 @@ from raidar.scoring.catalog.builtin import (
 from raidar.scoring.catalog.outcomes import ALL_METRICS, OUTCOME_METRICS
 from raidar.scoring.framework.metrics import DEFAULT_METRIC_REGISTRY, MetricRegistry
 from raidar.subject.releases import released_agent, released_workflow
+from raidar_contract.references import ReleaseError
 
 EXPERIMENTS_ROOT = "experiments"
 ID_SEPARATOR = "__"

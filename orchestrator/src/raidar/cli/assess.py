@@ -48,12 +48,13 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, TypedDict, Unpack
 
 import click
 
 from raidar.cli.grading import (
     RegradeOptions,
+    RescoreGrading,
     check_coverage,
     grade_pre_fix,
     grading_options,
@@ -91,20 +92,16 @@ def _emit(report: dict[str, object], out: Path | None) -> None:
 def _regrade(
     target: Path,
     options: RegradeOptions,
-    out: Path | None,
     store: Path | None = None,
     *,
     coverage_check: bool = False,
     concurrency: int = 1,
-) -> None:
-    report = (
+) -> dict[str, Any]:
+    return (
         check_coverage(target, options, store, concurrency)
         if coverage_check
         else regrade(target, options, store)
     )
-    _emit(report, out)
-    if not report["match"]:
-        raise click.exceptions.Exit(1)
 
 
 @dataclass(frozen=True)
@@ -118,6 +115,21 @@ class _RescoreRequest:
     lock: Path | None = None
     target_name: str | None = None
     concurrency: int = 1
+
+
+class _AssessOptions(TypedDict):
+    regrade_target: Path | None
+    rescore_target: Path | None
+    scorer_refs: tuple[str, ...]
+    store: Path | None
+    config_path: Path | None
+    lock_path: Path | None
+    replay: bool
+    bundle_override: Path | None
+    coverage_check: bool
+    concurrency: int
+    target_name: str | None
+    out: Path | None
 
 
 # A trial dir sits at <job>/trials/<trial>; a job dir at <job>/trials.
@@ -246,22 +258,15 @@ def _rescore(request: _RescoreRequest, out: Path | None) -> None:
     graded = covered = None
     if reads_docker_grades(request.scorer_refs, request.replay):
         options = grading_options(request.target_name, request.bundle)
-        graded = grade_pre_fix(
+        grading = RescoreGrading(
             request.target,
             store,
             request.scorer_refs,
-            options,
             replay=request.replay,
             concurrency=request.concurrency,
         )
-        covered = produce_coverage(
-            request.target,
-            store,
-            request.scorer_refs,
-            options,
-            replay=request.replay,
-            concurrency=request.concurrency,
-        )
+        graded = grade_pre_fix(grading, options)
+        covered = produce_coverage(grading, options)
     try:
         settings, config_path = _settings(request)
         records = rescore_path(
@@ -375,46 +380,37 @@ def _rescore(request: _RescoreRequest, out: Path | None) -> None:
 @click.option(
     "--out", type=click.Path(dir_okay=False, path_type=Path), help="Write the report here."
 )
-def assess(
-    regrade_target: Path | None,
-    rescore_target: Path | None,
-    scorer_refs: tuple[str, ...],
-    store: Path | None,
-    config_path: Path | None,
-    lock_path: Path | None,
-    replay: bool,
-    bundle_override: Path | None,
-    coverage_check: bool,
-    concurrency: int,
-    target_name: str | None,
-    out: Path | None,
-) -> None:
+def assess(**options: Unpack[_AssessOptions]) -> None:
     """Re-assess stored jobs without re-running agents."""
-    if coverage_check and regrade_target is None:
+    regrade_target = options["regrade_target"]
+    rescore_target = options["rescore_target"]
+    if options["coverage_check"] and regrade_target is None:
         raise click.UsageError("--coverage-check applies to --regrade only")
     if regrade_target is not None and rescore_target is None:
-        _check_as1(regrade_target, lock_path, (), bundle_override)
-        options = grading_options(target_name, bundle_override)
-        _regrade(
+        _check_as1(regrade_target, options["lock_path"], (), options["bundle_override"])
+        grading = grading_options(options["target_name"], options["bundle_override"])
+        report = _regrade(
             regrade_target,
-            options,
-            out,
-            store,
-            coverage_check=coverage_check,
-            concurrency=concurrency,
+            grading,
+            options["store"],
+            coverage_check=options["coverage_check"],
+            concurrency=options["concurrency"],
         )
+        _emit(report, options["out"])
+        if not report["match"]:
+            raise click.exceptions.Exit(1)
     elif rescore_target is not None and regrade_target is None:
         request = _RescoreRequest(
             rescore_target,
-            scorer_refs,
-            store,
-            config_path,
-            bundle_override,
-            replay,
-            lock_path,
-            target_name,
-            concurrency,
+            options["scorer_refs"],
+            options["store"],
+            options["config_path"],
+            options["bundle_override"],
+            options["replay"],
+            options["lock_path"],
+            options["target_name"],
+            options["concurrency"],
         )
-        _rescore(request, out)
+        _rescore(request, options["out"])
     else:
         raise click.UsageError("choose one assessment mode: --regrade PATH or --rescore PATH")

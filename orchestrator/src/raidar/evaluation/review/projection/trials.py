@@ -30,6 +30,7 @@ from raidar.evaluation.review.projection.notes import Finding, finding_counts, t
 from raidar.evaluation.review.projection.scoring import ScoringContext, project_scoring
 from raidar.evaluation.review.projection.spans import (
     SpanBuilder,
+    SpanSpec,
     TextReader,
     read_disk,
     repo_path,
@@ -115,16 +116,20 @@ def _agent_spans(builder: SpanBuilder, trial: TrialInput, agent: str) -> None:
             continue
         seconds = step_result.agent_execution_s
         checkpoint = builder.add(
-            name=step_result.checkpoint,
-            span_type="INTERNAL",
-            status=step_result.checkpoint_state.span_status,
-            parent=agent,
-            duration=round(seconds * 1000) if seconds is not None else None,
-            input_value={
-                "step": step_result.step,
-                "instruction_sha256": step_result.instruction_sha256,
-            },
-            output_value={"usage": step_result.usage.model_dump() if step_result.usage else None},
+            SpanSpec(
+                name=step_result.checkpoint,
+                span_type="INTERNAL",
+                status=step_result.checkpoint_state.span_status,
+                parent=agent,
+                duration=round(seconds * 1000) if seconds is not None else None,
+                input_value={
+                    "step": step_result.step,
+                    "instruction_sha256": step_result.instruction_sha256,
+                },
+                output_value={
+                    "usage": step_result.usage.model_dump() if step_result.usage else None
+                },
+            )
         )
         if step_result.trace_dir is not None:
             project_trajectory(
@@ -155,69 +160,79 @@ def _observations(trial: TrialInput) -> dict[str, object]:
 def _support_spans(builder: SpanBuilder, trial: TrialInput, root: str, start: int) -> None:
     record = trial.record
     builder.add(
-        name="execution validity",
-        span_type="INTERNAL",
-        status="OK" if record.valid else "ERROR",
-        parent=root,
-        start=start,
-        output_value={
-            "checks": [check.model_dump(mode="json") for check in record.validity.checks],
-            "reached": list(record.reached),
-            "reached_source": record.reached_source,
-            "progression": record.progression.model_dump(mode="json"),
-            "truncated_to": record.truncated_to,
-            "trial_exception": record.trial_exception,
-        },
+        SpanSpec(
+            name="execution validity",
+            span_type="INTERNAL",
+            status="OK" if record.valid else "ERROR",
+            parent=root,
+            start=start,
+            output_value={
+                "checks": [check.model_dump(mode="json") for check in record.validity.checks],
+                "reached": list(record.reached),
+                "reached_source": record.reached_source,
+                "progression": record.progression.model_dump(mode="json"),
+                "truncated_to": record.truncated_to,
+                "trial_exception": record.trial_exception,
+            },
+        )
     )
     builder.add(
-        name="process metrics",
-        span_type="INTERNAL",
-        status="OK",
-        parent=root,
-        start=start,
-        output_value={
-            "phases": [sample.model_dump(mode="json") for sample in record.phases],
-            "observations": _observations(trial),
-        },
+        SpanSpec(
+            name="process metrics",
+            span_type="INTERNAL",
+            status="OK",
+            parent=root,
+            start=start,
+            output_value={
+                "phases": [sample.model_dump(mode="json") for sample in record.phases],
+                "observations": _observations(trial),
+            },
+        )
     )
     builder.add(
-        name="artifacts & evidence",
-        span_type="INTERNAL",
-        status="OK",
-        parent=root,
-        start=start,
-        output_value={
-            "trial_dir": repo_path(trial.trial_dir),
-            "snapshots": {
-                a.step: a.snapshot.model_dump()
-                for a in record.step_results
-                if a.snapshot is not None
+        SpanSpec(
+            name="artifacts & evidence",
+            span_type="INTERNAL",
+            status="OK",
+            parent=root,
+            start=start,
+            output_value={
+                "trial_dir": repo_path(trial.trial_dir),
+                "snapshots": {
+                    a.step: a.snapshot.model_dump()
+                    for a in record.step_results
+                    if a.snapshot is not None
+                },
+                "verifier_records": {
+                    a.step: a.verifier_record for a in record.step_results if a.verifier_record
+                },
+                "trial_hashes": record.trial.hashes.model_dump(),
             },
-            "verifier_records": {
-                a.step: a.verifier_record for a in record.step_results if a.verifier_record
-            },
-            "trial_hashes": record.trial.hashes.model_dump(),
-        },
+        )
     )
 
 
 def _spans(builder: SpanBuilder, trial: TrialInput, start: int, duration: int) -> list[Finding]:
     labels, status = trial.labels, _status(trial)
     root = builder.add(
-        name=f"{labels.problem}@{labels.arm}",
-        span_type="TRACE",
-        status=status,
-        start=start,
-        duration=duration,
+        SpanSpec(
+            name=f"{labels.problem}@{labels.arm}",
+            span_type="TRACE",
+            status=status,
+            start=start,
+            duration=duration,
+        )
     )
     agent = builder.add(
-        name=f"{labels.harness} · {labels.model}",
-        span_type="AGENT_ROOT",
-        status=status,
-        parent=root,
-        start=start,
-        duration=duration,
-        model=labels.model,
+        SpanSpec(
+            name=f"{labels.harness} · {labels.model}",
+            span_type="AGENT_ROOT",
+            status=status,
+            parent=root,
+            start=start,
+            duration=duration,
+            model=labels.model,
+        )
     )
     _agent_spans(builder, trial, agent)
     findings = project_gates(

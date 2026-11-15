@@ -29,6 +29,7 @@ import shutil
 import tempfile
 import time
 from collections.abc import Mapping
+from dataclasses import dataclass, fields
 from pathlib import Path
 from typing import Any, Literal
 
@@ -42,14 +43,16 @@ from raidar.contract.snapshot import (
     tree_digest,
 )
 from raidar.grading.bundle import VerifierBundle, load_bundle
-from raidar.grading.grader import DEFAULT_RUN_TIMEOUT_S, grade_step
+from raidar.grading.grader import DEFAULT_RUN_TIMEOUT_S, Oracle, OracleSettings, grade_step
 from raidar.grading.grader_image import ensure_grader_image, refuse_grader_mismatch
 from raidar.grading.leak import LeakReport, LeakScanError, scan_agent_environment
-from raidar.grading.models import INFRA_REWARD_KEY
+from raidar.grading.models import INFRA_REWARD_KEY, VerifierGrade
 from raidar.grading.records import (
     BundleRef,
     GraderRef,
     SnapshotRef,
+    StepRecord,
+    StepSetting,
     build_step_record,
     grading_execution_digest,
     load_pre_agent_leak,
@@ -111,36 +114,49 @@ def _artifact_status(app_dir: Path) -> str | None:
     return statuses[-1] if statuses else None
 
 
+@dataclass(frozen=True)
+class VerifierSettings:
+    """``RaidarVerifier``'s own ``VerifierConfig.kwargs``; Harbor's are passed through.
+
+    ``pinned`` is the problem-bound lock evidence: ``grader`` (the validated identity, as
+    ``refuse_grader_mismatch`` reads it; required) and, when the lock pins them, ``errata``
+    and ``solvable``.
+    """
+
+    oracle_bundle: str
+    docker_context: str
+    pinned: Mapping[str, Any]
+    snapshot_source: SnapshotSource = "artifact"
+    coverage: bool = True
+    grader_timeout_s: float = DEFAULT_RUN_TIMEOUT_S
+    work_root: str | None = None
+    require_pre_agent_check: bool = True
+
+    @classmethod
+    def take(cls, kwargs: dict[str, Any]) -> VerifierSettings:
+        """Remove this verifier's keys from ``kwargs``, leaving Harbor's."""
+        names = [item.name for item in fields(cls)]
+        return cls(**{name: kwargs.pop(name) for name in names if name in kwargs})
+
+
 class RaidarVerifier(BaseVerifier):
-    def __init__(
-        self,
-        *,
-        oracle_bundle: str,
-        docker_context: str,
-        snapshot_source: SnapshotSource = "artifact",
-        coverage: bool = True,
-        grader_timeout_s: float = DEFAULT_RUN_TIMEOUT_S,
-        work_root: str | None = None,
-        require_pre_agent_check: bool = True,
-        pinned: Mapping[str, Any],
-        **kwargs: Any,
-    ) -> None:
-        """``pinned`` is the problem-bound lock evidence: ``grader`` (the validated identity, as
-        ``refuse_grader_mismatch`` reads it; required) and, when the lock pins them, ``errata``
-        and ``solvable``."""
+    def __init__(self, **kwargs: Any) -> None:
+        """Take ``VerifierSettings`` from ``kwargs``; Harbor's ``BaseVerifier`` takes the rest."""
+        settings = VerifierSettings.take(kwargs)
         super().__init__(**kwargs)
+        snapshot_source = settings.snapshot_source
         if snapshot_source not in ("artifact", "download"):
             raise ValueError(f"snapshot_source must be artifact or download, not {snapshot_source}")
-        self.bundle: VerifierBundle = load_bundle(Path(oracle_bundle))
-        self.docker_context = docker_context
+        self.bundle: VerifierBundle = load_bundle(Path(settings.oracle_bundle))
+        self.docker_context = settings.docker_context
         self.snapshot_source: SnapshotSource = snapshot_source
-        self.coverage = coverage
-        self.grader_timeout_s = grader_timeout_s
-        self.work_root = Path(work_root) if work_root else None
-        self.require_pre_agent_check = require_pre_agent_check
-        self.pinned_grader = dict(pinned["grader"])
-        self.errata = parse_errata(pinned.get("errata"))
-        self.solvable = parse_solvable(pinned.get("solvable"))
+        self.coverage = settings.coverage
+        self.grader_timeout_s = settings.grader_timeout_s
+        self.work_root = Path(settings.work_root) if settings.work_root else None
+        self.require_pre_agent_check = settings.require_pre_agent_check
+        self.pinned_grader = dict(settings.pinned["grader"])
+        self.errata = parse_errata(settings.pinned.get("errata"))
+        self.solvable = parse_solvable(settings.pinned.get("solvable"))
 
     # --------------------------------------------------------------- hooks
     async def prepare_sandbox(self) -> tuple[GradingSandbox, GraderRef]:
@@ -182,7 +198,7 @@ class RaidarVerifier(BaseVerifier):
         only in ``manifest.json``. A directory whose manifest entry is not
         ``ok`` is therefore an empty or truncated tree, never the snapshot.
         """
-        artifacts = (
+        artifacts: Path = (
             self.trial_paths.step_artifacts_dir(self.step_name)
             if self.step_name is not None
             else self.trial_paths.artifacts_dir
@@ -225,6 +241,65 @@ class RaidarVerifier(BaseVerifier):
         )
         return downloaded, ref
 
+    async def _record(
+        self,
+        prepared: tuple[GradingSandbox, GraderRef],
+        step: str,
+        timings: dict[str, float],
+        leaks: tuple[LeakReport, LeakReport | None],
+    ) -> tuple[StepRecord, float]:
+        """Grade the step's snapshot in a scratch dir; (step record, evidence write time)."""
+        sandbox, grader = prepared
+        record_dir = step_record_dir(self.trial_paths.trial_dir, step)
+        work = Path(tempfile.mkdtemp(prefix=f"raidar-oracle-{step}-", dir=self.work_root))
+        try:
+            mark = time.perf_counter()
+            snapshot, snapshot_ref = await self._snapshot(work, record_dir)
+            timings["snapshot_transfer_s"] = time.perf_counter() - mark
+            result = await grade_step(
+                Oracle(self.bundle, sandbox),
+                step,
+                snapshot,
+                work / "runs",
+                OracleSettings(coverage=self.coverage, timeout_s=self.grader_timeout_s),
+            )
+            timings.update(result.timings)
+            mark = time.perf_counter()
+            write_step_evidence(record_dir, result)
+            _keep_logs(work / "runs", record_dir)
+            evidence_write_s = time.perf_counter() - mark
+        finally:
+            shutil.rmtree(work, ignore_errors=True)  # cleanup: counted as plumbing
+        record = build_step_record(
+            result,
+            StepSetting(
+                bundle=BundleRef(
+                    root=str(self.bundle.root),
+                    digest=self.bundle.digest(),
+                    problem=self.bundle.manifest.problem,
+                ),
+                snapshot=snapshot_ref,
+                grader=grader,
+                coverage_enabled=self.coverage,
+                errata=self.errata,
+            ),
+            leaks=leaks,
+            rewards=self._rewards(step, result.grade, leaks),
+            timings=timings,
+        )
+        return record, evidence_write_s
+
+    def _rewards(
+        self, step: str, grade: VerifierGrade, leaks: tuple[LeakReport, LeakReport | None]
+    ) -> dict[str, float]:
+        """The step's rewards (``leaks``: final, then pre-agent scan); a leak voids the verdict."""
+        leak, pre_agent = leaks
+        leaked = not leak.clean or (pre_agent is not None and not pre_agent.clean)
+        gate_rewards = (
+            grade.rewards() if self.solvable is None else self.solvable.gate_rewards(step, grade)
+        )
+        return step_rewards(gate_rewards, leaked=leaked)
+
     # -------------------------------------------------------------- verify
     async def verify(self) -> VerifierResult:
         started = time.perf_counter()
@@ -237,52 +312,10 @@ class RaidarVerifier(BaseVerifier):
         timings["leak_check_s"] = leak.seconds
 
         mark = time.perf_counter()
-        sandbox, grader = await self.prepare_sandbox()
+        prepared = await self.prepare_sandbox()
         timings["grader_image_s"] = time.perf_counter() - mark
 
-        work = Path(tempfile.mkdtemp(prefix=f"raidar-oracle-{step}-", dir=self.work_root))
-        try:
-            mark = time.perf_counter()
-            snapshot, snapshot_ref = await self._snapshot(work, record_dir)
-            timings["snapshot_transfer_s"] = time.perf_counter() - mark
-            result = await grade_step(
-                self.bundle,
-                step,
-                snapshot,
-                sandbox,
-                work / "runs",
-                coverage=self.coverage,
-                timeout_s=self.grader_timeout_s,
-            )
-            timings.update(result.timings)
-            mark = time.perf_counter()
-            write_step_evidence(record_dir, result)
-            _keep_logs(work / "runs", record_dir)
-            evidence_write_s = time.perf_counter() - mark
-        finally:
-            shutil.rmtree(work, ignore_errors=True)  # cleanup: counted as plumbing
-        leaked = not leak.clean or (pre_agent is not None and not pre_agent.clean)
-        gate_rewards = (
-            result.grade.rewards()
-            if self.solvable is None
-            else self.solvable.gate_rewards(step, result.grade)
-        )
-        rewards = step_rewards(gate_rewards, leaked=leaked)
-        record = build_step_record(
-            result,
-            bundle=BundleRef(
-                root=str(self.bundle.root),
-                digest=self.bundle.digest(),
-                problem=self.bundle.manifest.problem,
-            ),
-            snapshot=snapshot_ref,
-            grader=grader,
-            coverage_enabled=self.coverage,
-            leaks=(leak, pre_agent),
-            rewards=rewards,
-            timings=timings,
-            errata=self.errata,
-        )
+        record, evidence_write_s = await self._record(prepared, step, timings, (leak, pre_agent))
         mark = time.perf_counter()
         write_step_record(record_dir, record)
         # result_write_s (evidence, logs, record.json) is a component of plumbing, as in
@@ -292,7 +325,7 @@ class RaidarVerifier(BaseVerifier):
         timings["verifier_total_s"] = time.perf_counter() - started
         timings["verifier_plumbing_s"] = _plumbing(timings)
         write_step_record(record_dir, record.model_copy(update={"timings": dict(timings)}))
-        return VerifierResult(rewards=rewards)
+        return VerifierResult(rewards=record.rewards)
 
 
 def _keep_logs(runs: Path, record_dir: Path) -> None:

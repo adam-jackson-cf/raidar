@@ -32,6 +32,7 @@ def test_experiment_identity_records_only_deferred_coverage(
     )
     serialized = spec.to_json()
     recorded = serialized["protocol"]
+    assert isinstance(recorded, dict)
     if mode == "offline":
         assert recorded["verifier_coverage"] == "offline"
     else:

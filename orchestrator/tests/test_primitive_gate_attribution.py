@@ -14,7 +14,7 @@ import tarfile
 from dataclasses import dataclass
 from pathlib import Path
 from types import SimpleNamespace
-from typing import Any
+from typing import Any, Literal
 
 import pytest
 
@@ -166,7 +166,9 @@ def command(name: str, **extra: Any) -> GateCheck:
     return GateCheck(name=name, run=("tool", name), **extra)
 
 
-def pytest_package(params: dict[str, Any], *, kind: str = "pytest") -> GatePackage:
+def pytest_package(
+    params: dict[str, Any], *, kind: Literal["command", "pytest"] = "pytest"
+) -> GatePackage:
     check = GateCheck(name="specs", kind=kind, run=("x",))
     return package(check, context={"params": params})
 
@@ -469,9 +471,9 @@ async def test_each_seal_is_numbered_recorded_and_attributed(tmp_path: Path) -> 
 async def test_a_seal_that_printed_no_record_is_an_integrity_failure(
     tmp_path: Path, reply: str, fragment: str
 ) -> None:
-    run, _ = gate(tmp_path)
+    run, container = gate(tmp_path)
     await run.prepare()
-    run.environment.replies["seal"] = (4, reply, "out of memory")
+    container.replies["seal"] = (4, reply, "out of memory")
     outcome = await run.seal("turn-1")
     assert outcome.attribution is Attribution.INTEGRITY
     assert fragment in outcome.reason

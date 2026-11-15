@@ -14,7 +14,7 @@ import time
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from harbor.environments.base import BaseEnvironment
+from raidar.subject.primitive.calls import Sandbox
 
 DEADLINE = "deadline"
 TURN_ERROR = "turn_error"
@@ -49,7 +49,7 @@ class Checkpoint:
     ``turns`` every finished turn so far, which the runner appends to.
     """
 
-    environment: BaseEnvironment
+    environment: Sandbox
     logs_dir: Path
     task: str
     deadline: float | None = None

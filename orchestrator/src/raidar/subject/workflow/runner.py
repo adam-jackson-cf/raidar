@@ -240,6 +240,7 @@ class WorkflowRunner(BaseAgent):
     ) -> None:
         state = Run()
         options = self.runner_options
+        self.agent_environment = environment
         self.watch = SessionWatch()
         self.integrity: list[dict[str, str]] = []
         self.invalid = None
@@ -303,18 +304,18 @@ class WorkflowRunner(BaseAgent):
         await self._turn(checkpoint, state, package, None)
         while True:
             resume = await package.check(checkpoint, state.turns[-1].log_dir)
-            await self._rewatch(checkpoint, state.turns[-1])
+            await self._rewatch(state.turns[-1])
             if resume is None:
                 break
             await self._turn(checkpoint, state, package, resume)
 
-    async def _rewatch(self, checkpoint: Checkpoint, turn: Turn) -> None:
+    async def _rewatch(self, turn: Turn) -> None:
         """The checks ran the agent's own code after the turn (its pytest and conftest).
 
         The native session store must still be exactly as the turn left it.
         """
         staged = self.staging / turn.log_dir
-        environment = checkpoint.environment
+        environment = self.agent_environment
         try:
             links = await self._copy_turn_logs(environment, turn, staged)
             self._note_links(turn, links, f"{turn.log_dir} (after the checks)")
@@ -365,7 +366,7 @@ class WorkflowRunner(BaseAgent):
         self, checkpoint: Checkpoint, state: Run, package: PackageStage, resume: Resume | None
     ) -> None:
         """Run one agent turn: the package's first build prompt, or ``resume``'s message."""
-        environment = checkpoint.environment
+        environment = self.agent_environment
         kind = FIRST_BUILD if resume is None else resume.kind
         prompt = package.decorate(kind, package.prompt if resume is None else resume.message)
         turn = Turn(

@@ -18,7 +18,7 @@ from raidar.design.problem.models import ProblemId
 from raidar.design.problem.store import open_store
 from raidar.engine.trial.workspace import seed_locks, workspace_seed
 from raidar.grading.dependency_pins import lock_sha256, set_sha256
-from raidar.grading.grader import grade_step
+from raidar.grading.grader import Oracle, OracleSettings, grade_step
 from raidar.grading.grader_image import ensure_grader_image
 from raidar.grading.provision import prepare_dependencies
 from raidar.grading.resolver import Resolution, pylock_packages
@@ -191,14 +191,15 @@ async def test_regrade_with_empty_wheel_cache_and_blocked_pypi_is_infrastructure
     subprocess.run([*docker, "tag", base.tag, alias], check=True, capture_output=True, timeout=120)
     try:
         outcome = await grade_step(
-            problem.bundle,
+            Oracle(problem.bundle, DockerCopySandbox(image=alias, docker_context=ready_target)),
             problem.manifest.steps[0].name,
             snapshot,
-            DockerCopySandbox(image=alias, docker_context=ready_target),
             tmp_path / "regrade",
-            coverage=False,
-            resolver=_NeverResolve(),
-            recorded=recorded,
+            OracleSettings(
+                coverage=False,
+                resolver=_NeverResolve(),
+                recorded=recorded,
+            ),
         )
         assert outcome.grade.infra_failure is not None
         assert outcome.grade.infra_failure.code == "dependency_resolver_unavailable"

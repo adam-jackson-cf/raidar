@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import os
 import subprocess
+from typing import TypedDict, Unpack
 
 import click
 
@@ -42,6 +43,13 @@ def agent_list() -> None:
         click.echo(f"  {'':12} models: {adapter_class.supported_model_summary()}")
 
 
+class _ValidateOptions(TypedDict):
+    model: str
+    provider: str
+    reasoning_effort: str | None
+    timeout: int
+
+
 @agent.command("validate")
 @click.option("--agent", "-a", "agent_name", type=_AGENT_CHOICES, required=True)
 @click.option("--model", "-m", type=str, required=True)
@@ -51,7 +59,7 @@ def agent_list() -> None:
     type=click.Choice(["low", "medium", "high", "xhigh", "max"]),
 )
 @click.option("--timeout", type=int, default=1800)
-def agent_validate(agent_name: str, **options) -> None:
+def agent_validate(agent_name: str, **options: Unpack[_ValidateOptions]) -> None:
     """Validate an agent's adapter wiring, model support and host credentials."""
     config = AgentSpec(
         harness=agent_cli(agent_name),

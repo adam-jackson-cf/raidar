@@ -945,7 +945,9 @@ async def test_the_sources_the_judge_reads_are_the_sealed_trees_files_and_no_oth
     assert not (logs / "pass-1" / "tests" / "changed.py").exists()
     assert not (logs / "pass-1" / "tests" / "absent.py").exists()
     assert held.acceptance.sources == "workflow/sources/final"
-    assert len(checkpoint.environment.commands) == 3
+    shell = checkpoint.environment
+    assert isinstance(shell, ScriptShell)
+    assert len(shell.commands) == 3
     assert gate["verdict"] == "passed"
 
 
@@ -1008,7 +1010,7 @@ def asker_over(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, provider: Provid
         ),
     )
     config = JudgeConfig(model=LIVE_MODEL, closed_at=0.8, open_at=0.3)
-    return asking.Asker(config, tmp_path, object(), workers=2)
+    return asking.Asker(config, tmp_path, ScriptShell(), workers=2)
 
 
 async def test_an_aspect_failing_for_a_transient_reason_is_asked_again_until_answered(
@@ -1066,7 +1068,7 @@ async def test_without_the_hosts_key_the_aspect_has_no_answer_and_nothing_is_sen
 ) -> None:
     monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
     config = JudgeConfig(model=LIVE_MODEL, closed_at=0.8, open_at=0.3)
-    asker = asking.Asker(config, tmp_path, object(), workers=1)
+    asker = asking.Asker(config, tmp_path, ScriptShell(), workers=1)
 
     answers = await asker.ask(1, [("F1.AC1", ASPECT)])
 
@@ -1079,4 +1081,4 @@ def test_a_judge_model_other_than_the_pinned_one_is_refused(tmp_path: Path) -> N
     config = JudgeConfig(model="some/other-model", closed_at=0.8, open_at=0.3)
 
     with pytest.raises(ValueError, match="not the pinned"):
-        asking.Asker(config, tmp_path, object())
+        asking.Asker(config, tmp_path, ScriptShell())
