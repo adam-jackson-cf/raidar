@@ -23,7 +23,7 @@ from raidar.subject.primitive import calls, gate_tool
 from raidar.subject.primitive.gate import (
     AgentFacts,
     Attribution,
-    GateInvalid,
+    GateInvalidError,
     GateOutcome,
     GatePackage,
     GatePaths,
@@ -119,7 +119,7 @@ def test_a_canary_that_decided_is_a_working_instrument_even_when_it_refused(verd
 def test_a_canary_that_could_not_decide_invalidates_the_instrument(
     record: dict[str, Any], detail: str
 ) -> None:
-    with pytest.raises(GateInvalid) as caught:
+    with pytest.raises(GateInvalidError) as caught:
         check_canary(record)
     assert caught.value.category == "instrument"
     assert str(caught.value) == f"the gate's canary failed on the starting workspace: {detail}"
@@ -314,7 +314,7 @@ async def test_a_workspace_setup_without_a_base_commit_is_an_integrity_failure(
     tmp_path: Path, answer: str
 ) -> None:
     run, _ = gate(tmp_path, **{"workspace-setup": answer})
-    with pytest.raises(GateInvalid) as caught:
+    with pytest.raises(GateInvalidError) as caught:
         await run.prepare()
     assert caught.value.category == "integrity"
     assert run.base is None
@@ -324,7 +324,7 @@ async def test_a_root_or_user_step_that_exits_non_zero_is_an_integrity_failure(
     tmp_path: Path,
 ) -> None:
     run, _ = gate(tmp_path, uid=(1, "", "denied"))
-    with pytest.raises(GateInvalid, match="exit 1.*denied") as caught:
+    with pytest.raises(GateInvalidError, match="exit 1.*denied") as caught:
         await run.prepare()
     assert caught.value.category == "integrity"
 
@@ -353,7 +353,7 @@ async def test_a_failed_or_unreadable_setup_check_invalidates_the_instrument(
 ) -> None:
     reply: Any = answer if answer.startswith("{") else (3, answer, "boom")
     run, _ = gate(tmp_path, **{"setup-check": reply})
-    with pytest.raises(GateInvalid) as caught:
+    with pytest.raises(GateInvalidError) as caught:
         await run.prepare()
     assert caught.value.category == "instrument"
     assert "the gate's setup check failed: " in str(caught.value)
@@ -376,7 +376,7 @@ async def test_a_canary_that_cannot_decide_stops_the_gate_before_the_agent(
     tmp_path: Path, answer: str, detail: str
 ) -> None:
     run, _ = gate(tmp_path, canary=answer)
-    with pytest.raises(GateInvalid, match=re.escape(detail)) as caught:
+    with pytest.raises(GateInvalidError, match=re.escape(detail)) as caught:
         await run.prepare()
     assert caught.value.category == "instrument"
     assert run.record()["canary"] is not None  # the evidence is kept for the report
@@ -392,7 +392,7 @@ async def test_a_changed_tool_tree_before_the_agent_invalidates_the_trial(tmp_pa
     pkg = package(command("lint"))
     pkg.installed.ok = False  # type: ignore[misc]
     run, _ = gate(tmp_path, pkg)
-    with pytest.raises(GateInvalid) as caught:
+    with pytest.raises(GateInvalidError) as caught:
         await run.prepare()
     assert caught.value.category == "integrity"
     assert run.record()["integrity"][0]["name"] == "tool_tree_changed"
@@ -559,7 +559,7 @@ async def test_a_failed_output_copy_during_a_seal_is_an_integrity_failure(
         raise calls.TransportError("the container went away")
 
     monkeypatch.setattr(run.outputs, "keep", unreachable)
-    with pytest.raises(GateInvalid, match="output copy failed") as caught:
+    with pytest.raises(GateInvalidError, match="output copy failed") as caught:
         await run.seal("turn-1")
     assert caught.value.category == "integrity"
 

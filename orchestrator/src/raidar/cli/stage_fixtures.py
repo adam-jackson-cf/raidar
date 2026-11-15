@@ -23,6 +23,7 @@ from raidar.subject.environment.python.image import image_lock_hash, image_tag, 
 from raidar.subject.workflow.identity import package_primitives
 from raidar.subject.workflow.stage_check import (
     CaseResult,
+    Rig,
     captured_states,
     check_package,
     record_json,
@@ -96,9 +97,7 @@ def _replay(name: str, package: StagePackage, trial: Path, image: str, context: 
         raise click.ClickException(f"{trial} holds no captured state for {name}")
     logs = _logs_dir(name, "replay")
     try:
-        runs = asyncio.run(
-            replay_trial(package, name, states, image=image, docker_context=context, logs_dir=logs)
-        )
+        runs = asyncio.run(replay_trial(package, name, states, Rig(image, context, logs)))
     except Exception as error:
         raise click.ClickException(f"stage-check replay could not complete: {error}") from error
     for run in runs:
@@ -134,11 +133,9 @@ def check_command(name: str, replay: Path | None, target_name: str | None) -> No
             check_package(
                 package,
                 name,
-                image=image,
-                docker_context=context,
+                Rig(image, context, logs),
                 pack=pack,
                 primitives=package_primitives([package]),
-                logs_dir=logs,
             )
         )
     except Exception as error:

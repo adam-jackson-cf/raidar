@@ -41,6 +41,8 @@ from raidar.subject.primitive.payload.supervise import (
     MAX_TIMEOUT_S,
     STATE_LIMITS,
     TREE_LIMITS,
+    ChildCommand,
+    Confinement,
     build_spec,
 )
 
@@ -116,15 +118,11 @@ async def trusted_exec(
     *,
     user: str | int | None = None,
     timeout_sec: float | None = None,
-    cwd: str | None = None,
-    env_vars: Mapping[str, str] | None = None,
 ) -> ExecResult:
     """One command through the environment; a transport failure raises ``TransportError``."""
     try:
         return await environment.exec(
             f"umask 022; {command}",
-            cwd=cwd,
-            env=dict(env_vars) if env_vars else None,
             timeout_sec=None if timeout_sec is None else int(timeout_sec),
             user=user,
         )
@@ -202,7 +200,8 @@ async def root_file_exists(environment: Any, path: str) -> bool:
     result = await trusted_exec(environment, f"[ -e {_q(path)} ]", user="root", timeout_sec=30)
     if result.return_code not in (0, 1):
         raise TransportError(f"existence check of {path} exited {result.return_code}")
-    return result.return_code == 0
+    code: int = result.return_code
+    return code == 0
 
 
 def _regular_only(root: Path) -> None:
@@ -391,30 +390,36 @@ def _manifest(document: Mapping[str, Any]) -> TreeManifest:
     )
 
 
-def _limits(bounds: bool, links: bool, owner: int | None) -> dict[str, Any]:
-    if bounds:
+@dataclass(frozen=True)
+class Unbounded:
+    """An unbounded walk of a trusted install: links recorded when ``links``, ``owner`` checked."""
+
+    links: bool = False
+    owner: int | None = None
+
+
+def _limits(unbounded: Unbounded | None) -> dict[str, Any]:
+    if unbounded is None:
         return dict(STATE_LIMITS)
-    return {"links": links, "owner": owner}
+    return {"links": unbounded.links, "owner": unbounded.owner}
 
 
 async def tree_manifest(
     environment: Any,
     path: str,
     *,
-    bounds: bool = True,
-    links: bool = False,
-    owner: int | None = None,
+    unbounded: Unbounded | None = None,
     entries: bool | None = None,
 ) -> TreeManifest:
     """No-follow manifest of ``path``.
 
-    ``bounds`` applies the 64 MiB / 10k files / depth 32 caps and refuses links and special
-    files; otherwise the tree is unbounded (root-owned trusted installs, links recorded).
+    Without ``unbounded`` the walk applies the 64 MiB / 10k files / depth 32 caps and refuses
+    links and special files; with it the tree is unbounded (root-owned trusted installs).
     """
     spec = {
         "path": path,
-        "limits": _limits(bounds, links, owner),
-        "entries": bounds if entries is None else entries,
+        "limits": _limits(unbounded),
+        "entries": unbounded is None if entries is None else entries,
     }
     return _manifest(await run_payload(environment, "manifest", spec))
 
@@ -618,6 +623,38 @@ class CallResult:
         return self.ran and self.exit_code == 0 and not any(flaws)
 
 
+@dataclass(frozen=True)
+class CallOptions:
+    """How one authored call runs.
+
+    ``append_context`` adds the final ``--context <path>`` pair (setup/stop); gate checks pass
+    False and read ``RAIDAR_STAGE_CONTEXT`` instead. ``installed`` trees are verified before and
+    after; ``state`` is bounds-checked before the child may read it. ``path`` replaces the
+    ``PATH`` the installed trees' ``bin`` folders give.
+    """
+
+    timeout_s: float = DEFAULT_TIMEOUT_S
+    path: str | None = None
+    cwd: str = "/app"
+    append_context: bool = True
+    installed: Sequence[ToolTree] = ()
+    state: str | None = None
+
+
+@dataclass(frozen=True)
+class _Launch:
+    """A prepared call: what the record keeps of it besides the child's output."""
+
+    sequence: int
+    package: str
+    primitive: str
+    command: list[str]
+    environ: Mapping[str, str]
+    context_text: str
+    spec: Mapping[str, Any]
+    installed: Sequence[ToolTree]
+
+
 def _safe(name: str) -> str:
     return "".join(c if c.isalnum() or c in "._-" else "--" for c in name)
 
@@ -714,20 +751,12 @@ class CallRunner:
         primitive: str,
         argv: Sequence[str],
         context: Mapping[str, JsonValue],
-        *,
-        timeout_s: float = DEFAULT_TIMEOUT_S,
-        path: str | None = None,
-        cwd: str = "/app",
-        append_context: bool = True,
-        installed: Sequence[ToolTree] = (),
-        state: str | None = None,
+        options: CallOptions | None = None,
     ) -> CallResult:
-        """Run ``argv`` (never a shell) as the confined child and record the call.
-
-        ``append_context`` adds the final ``--context <path>`` pair (setup/stop); gate checks
-        pass False and read ``RAIDAR_STAGE_CONTEXT`` instead. ``installed`` trees are verified
-        before and after; ``state`` is bounds-checked before the child may read it.
-        """
+        """Run ``argv`` (never a shell) as the confined child and record the call."""
+        if options is None:
+            options = CallOptions()
+        timeout_s, installed = options.timeout_s, options.installed
         if not argv or not all(isinstance(item, str) for item in argv):
             raise ValueError("argv must be a nonempty list of strings")
         if not 0 < timeout_s <= MAX_TIMEOUT_S:
@@ -737,47 +766,34 @@ class CallRunner:
         sequence = self._sequence
         call_dir = f"{CALLS_ROOT}/{uuid.uuid4().hex}"
         context_path = f"{call_dir}/context.json"
-        command = [*argv, "--context", context_path] if append_context else list(argv)
+        command = [*argv, "--context", context_path] if options.append_context else list(argv)
         environ = {
-            "PATH": path or ":".join([*(tree.bin for tree in installed), BASE_PATH]),
+            "PATH": options.path or ":".join([*(tree.bin for tree in installed), BASE_PATH]),
             "LANG": "C.UTF-8",
             "HOME": f"{call_dir}/home",
             "TMPDIR": f"{call_dir}/tmp",
             "RAIDAR_STAGE_CONTEXT": context_path,
         }
         context_text = json.dumps(dict(context), sort_keys=True, separators=(",", ":"))
-        spec = self._spec(call_dir, command, environ, cwd, timeout_s, installed, state)
+        child = ChildCommand(call_dir, command, environ, options.cwd, timeout_s)
+        spec = self._spec(child, options)
         output = await self._execute(call_dir, context_text, spec, timeout_s)
-        return self._record(
-            sequence, package, primitive, command, environ, context_text, spec, installed, output
+        launch = _Launch(
+            sequence, package, primitive, command, environ, context_text, spec, installed
         )
+        return self._record(launch, output)
 
-    def _spec(
-        self,
-        call_dir: str,
-        command: list[str],
-        environ: Mapping[str, str],
-        cwd: str,
-        timeout_s: float,
-        installed: Sequence[ToolTree],
-        state: str | None,
-    ) -> dict[str, Any]:
+    def _spec(self, child: ChildCommand, options: CallOptions) -> dict[str, Any]:
         policy = self.policy
         trees = [
             {"root": t.root, "digest": t.digest, "limits": {**TREE_LIMITS, "owner": policy.owner}}
-            for t in installed
+            for t in options.installed
         ]
         return build_spec(
-            call_dir=call_dir,
-            argv=command,
-            env=dict(environ),
-            cwd=cwd,
-            timeout_s=timeout_s,
-            uid=policy.uid,
-            gid=policy.gid,
-            seccomp=policy.seccomp,
+            command=child,
+            confinement=Confinement(policy.uid, policy.gid, policy.seccomp),
             trees=trees,
-            state=state,
+            state=options.state,
             state_limits=STATE_LIMITS,
         )
 
@@ -805,18 +821,9 @@ class CallRunner:
             )
             raise
 
-    def _record(
-        self,
-        sequence: int,
-        package: str,
-        primitive: str,
-        command: list[str],
-        environ: Mapping[str, str],
-        context_text: str,
-        spec: Mapping[str, Any],
-        installed: Sequence[ToolTree],
-        output: ExecResult,
-    ) -> CallResult:
+    def _record(self, launch: _Launch, output: ExecResult) -> CallResult:
+        sequence, package, primitive = launch.sequence, launch.package, launch.primitive
+        environ, spec = launch.environ, launch.spec
         result = _parse_result(output.stdout or "")
         stdout, stderr = _decoded(result, "stdout"), _decoded(result, "stderr")
         problems = _problems(result, stdout, stderr)
@@ -828,14 +835,14 @@ class CallRunner:
             "primitive": primitive,
             "sequence": sequence,
             "recorded_at": datetime.now(UTC).isoformat(),
-            "argv": command,
+            "argv": launch.command,
             "user": f"{spec['uid']}:{spec['gid']}",
             "cwd": spec["cwd"],
             "timeout_s": spec["timeout_s"],
             "env_names": sorted(environ),
             "env_sha256": hashlib.sha256(json.dumps(environ, sort_keys=True).encode()).hexdigest(),
-            "context_sha256": hashlib.sha256(context_text.encode()).hexdigest(),
-            "installed": [{"reference": t.reference, "digest": t.digest} for t in installed],
+            "context_sha256": hashlib.sha256(launch.context_text.encode()).hexdigest(),
+            "installed": [{"reference": t.reference, "digest": t.digest} for t in launch.installed],
             "state": spec["state"],
             "supervisor_exit": output.return_code,
             "ran": bool(facts.get("ran")),

@@ -22,10 +22,15 @@ from raidar_contract.package.fixtures import required_cases, static_problems
 from raidar.subject.package.registry import load_stage_package
 from raidar.subject.primitive.calls import ResourceFloors, TransportError
 from raidar.subject.primitive.canary import StageCheckRecord
-from raidar.subject.primitive.gate import Attribution, GateInvalid, GateOutcome
-from raidar.subject.primitive.site import TrialInvalid
+from raidar.subject.primitive.gate import Attribution, GateInvalidError, GateOutcome
+from raidar.subject.primitive.site import TrialInvalidError
 from raidar.subject.workflow import stage_check
-from raidar.subject.workflow.stage_check import captured_states, record_json, replay_trial
+from raidar.subject.workflow.stage_check import (
+    Rig,
+    captured_states,
+    record_json,
+    replay_trial,
+)
 from raidar.subject.workflow.stage_container import ContainerError, PackContainer
 from tests.lifecycle_support import FakeContainer, ToolOutcome, note_digest, stop_json
 from tests.package_support import write_package
@@ -348,7 +353,7 @@ async def test_a_done_run_that_loses_its_output_at_record_time_invalidates_the_c
 
     rig = install_rig(tmp_path / "rig", monkeypatch, tool=vanishing)
 
-    with pytest.raises(TrialInvalid) as error:
+    with pytest.raises(TrialInvalidError) as error:
         await rig.run_check()
 
     assert error.value.kind == "instrument"
@@ -456,7 +461,7 @@ async def test_an_unreachable_container_invalidates_the_check_as_integrity(
     rig = install_rig(tmp_path / "rig", monkeypatch)
     rig.container.transport_down = True
 
-    with pytest.raises(TrialInvalid) as error:
+    with pytest.raises(TrialInvalidError) as error:
         await rig.run_check()
 
     assert error.value.kind == "integrity"
@@ -470,7 +475,7 @@ async def test_a_call_that_changed_the_installed_tree_invalidates_the_check(
     rig = install_rig(tmp_path / "rig", monkeypatch)
     rig.container.tampered = True
 
-    with pytest.raises(TrialInvalid) as error:
+    with pytest.raises(TrialInvalidError) as error:
         await rig.run_check()
 
     assert error.value.kind == "integrity"
@@ -764,11 +769,11 @@ async def test_an_invalid_gate_run_invalidates_the_check_and_still_closes_the_ga
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, scratch: Path
 ) -> None:
     def tampered(workspace: Path, run: int) -> GateOutcome:
-        raise GateInvalid("integrity", "the gate log was rewritten")
+        raise GateInvalidError("integrity", "the gate log was rewritten")
 
     rig = _gate_rig(tmp_path, monkeypatch, tampered)
 
-    with pytest.raises(TrialInvalid) as error:
+    with pytest.raises(TrialInvalidError) as error:
         await rig.run_check()
 
     assert error.value.kind == "integrity"
@@ -800,9 +805,7 @@ async def _replay(rig: CheckRig, trial: Path, reference: str = "ns/note-state") 
         rig.package,
         reference,
         captured_states(trial, reference),
-        image="image",
-        docker_context="context",
-        logs_dir=rig.root / "logs",
+        Rig("image", "context", rig.root / "logs"),
     )
 
 
@@ -890,7 +893,7 @@ async def test_replay_refuses_a_recorded_context_that_is_not_an_object(
     trial = tmp_path / "trial"
     _snapshot(trial, "note-state", 0, "words", "[1]")
 
-    with pytest.raises(TrialInvalid) as error:
+    with pytest.raises(TrialInvalidError) as error:
         await _replay(rig, trial, "note-state")
 
     assert error.value.kind == "instrument"
@@ -909,9 +912,7 @@ async def test_replay_needs_a_package_with_a_stop(
             package,
             "gate-check",
             [],
-            image="image",
-            docker_context="context",
-            logs_dir=tmp_path / "logs",
+            Rig("image", "context", tmp_path / "logs"),
         )
 
     assert rig.entered == 0

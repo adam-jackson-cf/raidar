@@ -24,6 +24,7 @@ from typing import Any
 from pydantic import JsonValue
 
 from raidar.subject.primitive.calls import (
+    CallOptions,
     ResourceFloors,
     TransportError,
     make_state_dir,
@@ -32,7 +33,7 @@ from raidar.subject.primitive.calls import (
     tree_manifest,
     upload_state,
 )
-from raidar.subject.primitive.site import PackageSite, TrialInvalid
+from raidar.subject.primitive.site import PackageSite, TrialInvalidError
 
 DONE_CASE = "done"
 CANARY_ROOT = "/var/lib/raidar-calls/canary"
@@ -121,7 +122,7 @@ class FixtureRun:
 def _fixture_json(path: Path) -> dict[str, JsonValue]:
     data = json.loads(path.read_text(encoding="utf-8"))
     if not isinstance(data, dict):
-        raise TrialInvalid("instrument", f"{path} is not a JSON object")
+        raise TrialInvalidError("instrument", f"{path} is not a JSON object")
     return data
 
 
@@ -133,7 +134,9 @@ async def run_fixture(site: PackageSite, case: str, label: str) -> FixtureRun:
     """
     stop = site.package.manifest.on_stop
     if stop is None:
-        raise TrialInvalid("instrument", f"{site.reference} declares no stop to run a fixture for")
+        raise TrialInvalidError(
+            "instrument", f"{site.reference} declares no stop to run a fixture for"
+        )
     fixture = site.package.fixture_dir(case)
     context = _fixture_json(fixture / "context.json")
     root = f"{CANARY_ROOT}/{site.scope}-{site.evidence_dir.name}/{label}"
@@ -148,16 +151,18 @@ async def run_fixture(site: PackageSite, case: str, label: str) -> FixtureRun:
             "stop/1",
             stop.run,
             context,
-            timeout_s=stop.timeout_s,
-            path=site.installed.path,
-            installed=[site.installed],
-            state=f"{root}/state",
+            CallOptions(
+                timeout_s=stop.timeout_s,
+                path=site.installed.path,
+                installed=[site.installed],
+                state=f"{root}/state",
+            ),
         )
         digests = {name: await _digest(site, path) for name, path in paths.items()}
     except TransportError as error:
-        raise TrialInvalid("integrity", f"canary transport failed: {error}") from error
+        raise TrialInvalidError("integrity", f"canary transport failed: {error}") from error
     if result.integrity_error is not None:
-        raise TrialInvalid("integrity", result.integrity_error, result.record)
+        raise TrialInvalidError("integrity", result.integrity_error, result.record)
     return FixtureRun(
         record=result.record,
         usable=result.usable,
@@ -226,23 +231,23 @@ class Canary:
         """Before the agent: the record is for these identities and the fixture reproduces it."""
         mismatch = self.expected.identity_error(package, pack, primitives)
         if mismatch is not None:
-            raise TrialInvalid("instrument", mismatch)
+            raise TrialInvalidError("instrument", mismatch)
         if not await self._passes("initial"):
-            raise TrialInvalid(
+            raise TrialInvalidError(
                 "instrument", "canary failed before the agent started", self.runs[-1]
             )
 
     async def attribute_failure(self) -> str:
         """Attribute a failed stop call: ``agent_state`` or ``environment_exhausted``.
 
-        Raises ``TrialInvalid`` for integrity failures regardless of resource floors,
+        Raises ``TrialInvalidError`` for integrity failures regardless of resource floors,
         or when the canary fails with resources above their floors.
         """
         if await self._passes("recheck"):
             return AGENT_STATE
         if await self._exhausted():
             return ENVIRONMENT_EXHAUSTED
-        raise TrialInvalid(
+        raise TrialInvalidError(
             "instrument", "stop call and canary both failed above resource floors", self.runs[-1]
         )
 

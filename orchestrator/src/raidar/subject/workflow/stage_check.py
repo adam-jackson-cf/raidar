@@ -19,15 +19,8 @@ from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Any
 
-from raidar_contract.package.fixtures import (
-    GATE_STATUSES,
-    Expectation,
-    read_expectation,
-    static_problems,
-)
-from raidar_contract.package.manifest import StagePackage
-
 from raidar.subject.primitive.calls import (
+    CallOptions,
     CallResult,
     CallRunner,
     ResourceFloors,
@@ -45,12 +38,19 @@ from raidar.subject.primitive.canary import (
     StageCheckRecord,
     run_fixture,
 )
-from raidar.subject.primitive.gate import GateInvalid, GateOutcome, GatePackage, GateRun
-from raidar.subject.primitive.install import InstalledPackage, install_package
+from raidar.subject.primitive.gate import GateInvalidError, GateOutcome, GatePackage, GateRun
+from raidar.subject.primitive.install import InstalledPackage, ShippedPackage, install_package
 from raidar.subject.primitive.outputs import collect_outputs
-from raidar.subject.primitive.site import PackageSite, TrialInvalid
+from raidar.subject.primitive.site import PackageSite, TrialInvalidError
 from raidar.subject.workflow.stage_cases import result_status, stop_status
 from raidar.subject.workflow.stage_container import PackContainer
+from raidar_contract.package.fixtures import (
+    GATE_STATUSES,
+    Expectation,
+    read_expectation,
+    static_problems,
+)
+from raidar_contract.package.manifest import StagePackage
 
 GATE_WORKSPACE = "/app"
 OVERSIZED_BYTES = 70 * 1024 * 1024
@@ -144,12 +144,15 @@ async def _stop_case(site: PackageSite, case: str, expected: Expectation) -> Cas
 
 @dataclass(frozen=True)
 class Rig:
-    """Where a fresh throwaway container comes from (gate fixtures each need their own)."""
+    """Where a fresh throwaway container comes from (gate fixtures each need their own).
+
+    ``logs_dir`` keeps the check's records; ``cache_root`` is the wheel cache, if any.
+    """
 
     image: str
     docker_context: str
     logs_dir: Path
-    cache_root: Path | None
+    cache_root: Path | None = None
 
 
 def _gate_key(outcome: GateOutcome, canary: Mapping[str, Any] | None) -> dict[str, Any]:
@@ -169,8 +172,11 @@ def _gate_key(outcome: GateOutcome, canary: Mapping[str, Any] | None) -> dict[st
 async def _gate_once(
     package: StagePackage, reference: str, case: str, label: str, rig: Rig
 ) -> dict[str, Any]:
-    """One fresh container: the fixture's state is the workspace; the gate's own starting canary
-    (setup check and a run over the unchanged workspace) must decide, then the seal runs."""
+    """One fresh container.
+
+    The fixture's state is the workspace; the gate's own starting canary (setup check and a run over
+    the unchanged workspace) must decide, then the seal runs.
+    """
     context = json.loads((package.fixture_dir(case) / "context.json").read_text(encoding="utf-8"))
     logs = rig.logs_dir / f"gate-{label}"
     async with PackContainer(rig.image, rig.docker_context) as container:
@@ -198,8 +204,8 @@ async def _gate_once(
             copied = await collect_outputs(
                 _site(container, logs, package, reference, installed), f"gate-{label}"
             )
-        except GateInvalid as error:
-            raise TrialInvalid(error.category, str(error)) from error
+        except GateInvalidError as error:
+            raise TrialInvalidError(error.category, str(error)) from error
         finally:
             await gate.close()
         key = _gate_key(outcome, gate.evidence.canary)
@@ -355,10 +361,12 @@ async def _run_call(site: PackageSite, state: str) -> CallResult:
         "stop/1",
         stop.run,
         context,
-        timeout_s=stop.timeout_s,
-        path=site.installed.path,
-        installed=[site.installed],
-        state=state,
+        CallOptions(
+            timeout_s=stop.timeout_s,
+            path=site.installed.path,
+            installed=[site.installed],
+            state=state,
+        ),
     )
 
 
@@ -390,9 +398,12 @@ async def _bounds_case(site: PackageSite, container: PackContainer, mode: str) -
 
 
 def _floors(before: ResourceFloors, after: ResourceFloors) -> tuple[int, int | None]:
-    """The recorded floors: the least agent-writable disk and available memory seen around the
-    passing ``done`` run (``ResourceFloors`` semantics). The canary demonstrably succeeded with at
-    least this much free, so a failed canary with less is the environment's, not the tool's."""
+    """The recorded floors.
+
+    The least agent-writable disk and available memory seen around the passing ``done`` run
+    (``ResourceFloors`` semantics). The canary demonstrably succeeded with at least this much free,
+    so a failed canary with less is the environment's, not the tool's.
+    """
     disks = [
         free for floors in (before, after) for free in floors.disk_free.values() if free is not None
     ]
@@ -428,13 +439,10 @@ async def _stop_only_cases(site: PackageSite, container: PackContainer) -> list[
 async def check_package(
     package: StagePackage,
     reference: str,
+    rig: Rig,
     *,
-    image: str,
-    docker_context: str,
     pack: str,
     primitives: Mapping[str, str],
-    logs_dir: Path,
-    cache_root: Path | None = None,
 ) -> CheckReport:
     """Check ``package`` (``reference`` is ``<ns>/<name>``) offline in a pack container."""
     report = CheckReport(reference, package.digest, pack, dict(primitives))
@@ -442,11 +450,11 @@ async def check_package(
     if report.static:
         return report
     manifest = package.manifest
-    rig = Rig(image, docker_context, logs_dir, cache_root)
+    logs_dir = rig.logs_dir
     with tempfile.TemporaryDirectory(prefix="raidar-stage-check-") as scratch:
         checked = _with_generated(package, Path(scratch)) if manifest.on_stop else package
-        async with PackContainer(image, docker_context) as container:
-            installed = await _install(container, logs_dir, package, reference, cache_root)
+        async with PackContainer(rig.image, rig.docker_context) as container:
+            installed = await _install(container, logs_dir, package, reference, rig.cache_root)
             report.installed = dict(installed.record)
             site = _site(container, logs_dir, checked, reference, installed)
             report.cases.extend(await _fixture_cases(package, reference, site, rig))
@@ -470,15 +478,13 @@ async def _install(
     cache_root: Path | None,
 ) -> InstalledPackage:
     tool = package.manifest.tool
-    return await install_package(
-        container,
-        logs_dir,
+    shipped = ShippedPackage(
         reference=reference,
         package_digest=package.digest,
         files=package.files,
         commands={} if tool is None else {k: list(v) for k, v in tool.commands.items()},
-        cache_root=cache_root,
     )
+    return await install_package(container, logs_dir, shipped, cache_root=cache_root)
 
 
 async def _record(
@@ -493,7 +499,7 @@ async def _record(
     after = await resource_floors(container, WRITABLE_PATHS)
     missing = [name for name, digest in done.outputs.items() if digest is None]
     if missing:
-        raise TrialInvalid("instrument", f"the done fixture left no output {missing}")
+        raise TrialInvalidError("instrument", f"the done fixture left no output {missing}")
     disk, memory = _floors(before, after)
     return StageCheckRecord(
         package=package.digest,
@@ -525,8 +531,10 @@ class CapturedCall:
 
 
 def captured_states(trial_dir: Path, reference: str) -> list[CapturedCall]:
-    """Stop-call snapshots (``stop-N-before``) a trial kept for ``reference``, each with the
-    ``stop-N-context.json`` the trial recorded beside it."""
+    """Stop-call snapshots (``stop-N-before``) a trial kept for ``reference``.
+
+    Each comes with the ``stop-N-context.json`` the trial recorded beside it.
+    """
     key = _reference_key(reference)
     found = sorted(trial_dir.glob(f"**/stages/{key}/stop-*-before"))
     calls_found = []
@@ -541,11 +549,7 @@ async def replay_trial(
     package: StagePackage,
     reference: str,
     captured: list[CapturedCall],
-    *,
-    image: str,
-    docker_context: str,
-    logs_dir: Path,
-    cache_root: Path | None = None,
+    rig: Rig,
 ) -> list[ReplayRun]:
     """Run each captured call again with its recorded context (params, round, carry, task).
 
@@ -571,9 +575,9 @@ async def replay_trial(
             shutil.copytree(item.snapshot, case / "state", symlinks=True)
             shutil.copyfile(item.context, case / "context.json")
         replayed = replace(package, root=root)
-        async with PackContainer(image, docker_context) as container:
-            installed = await _install(container, logs_dir, package, reference, cache_root)
-            site = _site(container, logs_dir, replayed, reference, installed)
+        async with PackContainer(rig.image, rig.docker_context) as container:
+            installed = await _install(container, rig.logs_dir, package, reference, rig.cache_root)
+            site = _site(container, rig.logs_dir, replayed, reference, installed)
             for index, item in enumerate(usable):
                 run = await run_fixture(site, f"replay-{index}", f"replay-{index}")
                 status, why = stop_status(run, package.manifest.tokens)

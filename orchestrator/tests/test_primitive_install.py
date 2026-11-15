@@ -73,12 +73,14 @@ async def _install(
     return await install.install_package(
         LocalEnvironment(),
         container / "logs",
-        reference="ns/pkg",
-        package_digest="d" * 64,
-        files=files,
+        install.ShippedPackage(
+            reference="ns/pkg",
+            package_digest="d" * 64,
+            files=files,
+            owner=None,
+            **options,  # type: ignore[arg-type]
+        ),
         cache_root=container / "cache",
-        owner=None,
-        **options,  # type: ignore[arg-type]
     )
 
 
@@ -143,10 +145,9 @@ async def _reuse(
     return await install.reuse_installed(
         LocalEnvironment(),
         container / "logs-2",
-        reference="ns/pkg",
-        package_digest="d" * 64,
-        files=files or (),
-        owner=None,
+        install.ShippedPackage(
+            reference="ns/pkg", package_digest="d" * 64, files=files or (), owner=None
+        ),
     )
 
 

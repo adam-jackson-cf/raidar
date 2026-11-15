@@ -25,8 +25,8 @@ from harbor.models.agent.context import AgentContext
 
 from raidar.subject.package.registry import load_stage_package
 from raidar.subject.primitive.canary import StageCheckRecord
-from raidar.subject.primitive.install import install_package
-from raidar.subject.primitive.site import TrialInvalid
+from raidar.subject.primitive.install import ShippedPackage, install_package
+from raidar.subject.primitive.site import TrialInvalidError
 from raidar.subject.workflow.package import CheckpointPlan, PackageCheckpoint
 from raidar.subject.workflow.package_member import PackageSpec
 from raidar.subject.workflow.stage import Checkpoint
@@ -287,10 +287,12 @@ async def load_spec(
     installed = await install_package(
         environment,
         logs_dir,
-        reference=reference,
-        package_digest=package.digest,
-        files=package.files,
-        commands={} if tool is None else dict(tool.commands),
+        ShippedPackage(
+            reference=reference,
+            package_digest=package.digest,
+            files=package.files,
+            commands={} if tool is None else dict(tool.commands),
+        ),
     )
     expected = None
     if manifest.on_stop is not None:
@@ -375,12 +377,12 @@ class AttackAgent(BaseAgent):
                     break
                 outcome["resumes"].append(resume.kind)
             outcome["trusted_after"] = await trusted_digest(environment)
-        except TrialInvalid as error:
+        except TrialInvalidError as error:
             outcome["invalid"] = {"category": error.kind, "message": str(error)}
         finally:
             try:
                 await runtime.close(None)
-            except TrialInvalid as error:
+            except TrialInvalidError as error:
                 outcome["invalid"] = outcome["invalid"] or {
                     "category": error.kind,
                     "message": str(error),

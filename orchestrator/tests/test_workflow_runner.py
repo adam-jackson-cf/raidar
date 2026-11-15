@@ -19,7 +19,7 @@ from harbor.models.agent.context import AgentContext
 from raidar_contract.agent_records import ZERO
 from raidar_contract.workflow import load_package_workflow
 
-from raidar.subject.primitive.site import TrialInvalid
+from raidar.subject.primitive.site import TrialInvalidError
 from raidar.subject.workflow.package_stage import PackageStage
 from raidar.subject.workflow.runner import (
     EVIDENCE_DIRS,
@@ -348,7 +348,7 @@ def test_a_removed_session_file_is_named_and_a_link_in_the_store_is_not_part_of_
 def test_an_instrument_failure_in_a_turn_is_recorded_invalid_and_not_raised_as_the_agents(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    FakeInner.failure = TrialInvalid("integrity", "the lock moved")
+    FakeInner.failure = TrialInvalidError("integrity", "the lock moved")
     original_exec = FakeEnvironment.exec
 
     async def readable_metadata(self: FakeEnvironment, command: str, **options: Any) -> Any:
@@ -456,7 +456,7 @@ def test_an_instrument_failure_when_the_packages_close_is_recorded_invalid(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     async def close(self: PackageStage, checkpoint: Checkpoint, cut: str | None) -> None:
-        raise TrialInvalid("integrity", "the lock moved at close")
+        raise TrialInvalidError("integrity", "the lock moved at close")
 
     monkeypatch.setattr(PackageStage, "close", close)
 

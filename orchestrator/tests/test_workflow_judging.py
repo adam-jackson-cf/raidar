@@ -389,7 +389,9 @@ def outcome_for(
     chosen = subject(item, *tests)
     context = judging.assemble(chosen, record, FILES.get, 32_000)
     given = {aspect: (p, (index,)) for index, (aspect, p) in enumerate(answers.items())}
-    return judging.outcome_of(chosen, context, given, SETTINGS, gate_passed, baseline)
+    return judging.outcome_of(
+        chosen, context, given, SETTINGS, judging.RegressionBasis(gate_passed, baseline)
+    )
 
 
 def test_a_criterion_closes_when_its_tests_passed_and_every_aspect_is_answered_high() -> None:
@@ -562,7 +564,9 @@ def test_a_criterion_without_quotes_is_pushed_back_with_its_own_text() -> None:
     bare = Criterion("F1.AC1", "text of it", aspects=(Aspect("a", "s", "o"),))
     chosen = judging.Subject(bare, "F1", "", (OBJECT,))
     context = judging.assemble(chosen, PASSING, FILES.get, 32_000)
-    found = judging.outcome_of(chosen, context, {"a": (0.1, ())}, SETTINGS, True, None)
+    found = judging.outcome_of(
+        chosen, context, {"a": (0.1, ())}, SETTINGS, judging.RegressionBasis(True, None)
+    )
 
     text = judging.pushback_text(judging.PassResult(1, (found,)))
 

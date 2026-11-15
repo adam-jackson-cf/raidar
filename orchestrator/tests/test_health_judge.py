@@ -427,7 +427,7 @@ ROW_CASES: list[tuple[str, Mutation]] = [
     ("W1", _drop("stop/1")),
     ("W1", _drop("outputs/1")),
     ("W1", _drop(GATE)),
-    ("W1", _set(GATE, "errors", value=["GateInvalid: the tools changed"])),
+    ("W1", _set(GATE, "errors", value=["GateInvalidError: the tools changed"])),
     ("W1", _set(GATE, "gates", value=None)),
     ("W1", _drop(JUDGE)),
     ("W1", _drop(REPLY)),

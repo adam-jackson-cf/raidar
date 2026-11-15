@@ -19,7 +19,7 @@ judge), ``gate_refused`` (the fix rounds ran out; that tree is judged, not rewor
 ``gate_error``. ``no_criteria`` is the one excused terminal state: the criteria producer's stop
 closed for good (a legitimate agent outcome that owes no output), so nothing is judged. A
 producer that answered ``done`` owes a valid ``criteria/1`` copy: a missing, invalid,
-digest-mismatching or later-changed copy is ``TrialInvalid("integrity")``, never an ending. A
+digest-mismatching or later-changed copy is ``TrialInvalidError("integrity")``, never an ending. A
 producer neither done nor closed leaves zero criteria, judged as such (never ``verified``).
 ``gate_ending`` is the last seal's own verdict.
 
@@ -47,17 +47,16 @@ import json
 from pathlib import Path
 from typing import Any, NoReturn, Protocol
 
-from raidar_contract.criteria import validate_criteria
-from raidar_contract.workflow import PackageJudge
-
 from raidar.subject.primitive.gate import GateRun
 from raidar.subject.primitive.judge import PRIMITIVE, config_of
-from raidar.subject.primitive.site import TrialInvalid
+from raidar.subject.primitive.site import TrialInvalidError
 from raidar.subject.workflow import judging
 from raidar.subject.workflow.acceptance import Acceptance
 from raidar.subject.workflow.judgeloop import JudgeLoop
 from raidar.subject.workflow.package import GATE_BUDGET, GATE_ERROR, GATE_PASSED
 from raidar.subject.workflow.stage import DEADLINE, REWORK, Checkpoint, Resume
+from raidar_contract.criteria import validate_criteria
+from raidar_contract.workflow import PackageJudge
 
 BUDGET_EXHAUSTED = "budget_exhausted"
 NO_CRITERIA = "no_criteria"
@@ -116,7 +115,7 @@ class JevJudge:
         try:
             self.loop.start(checkpoint)
         except ValueError as error:
-            raise TrialInvalid("instrument", f"{PRIMITIVE}: {error}") from error
+            raise TrialInvalidError("instrument", f"{PRIMITIVE}: {error}") from error
 
     def take_baseline(self, gate: GateRun | None) -> None:
         """The tests that passed on the base, from the gate's baseline run (none: none passed)."""
@@ -128,7 +127,7 @@ class JevJudge:
     def load_criteria(self, runtime: Sealing) -> bool:
         """Read the criteria the producer's ``done`` stop copied; fixed at the first valid one.
 
-        A producer that reported ``done`` owes a valid copy: anything else is ``TrialInvalid``.
+        A producer that reported ``done`` owes a valid copy: anything else is ``TrialInvalidError``.
         """
         copy = runtime.output_copy(self.package, self.output)
         if copy is None:
@@ -154,15 +153,18 @@ class JevJudge:
     def _broken(self, why: str) -> NoReturn:
         message = f"{self.criteria_ref}: {why}"
         self._error(message)
-        raise TrialInvalid("integrity", f"{PRIMITIVE}: {message}")
+        raise TrialInvalidError("integrity", f"{PRIMITIVE}: {message}")
 
     def _error(self, message: str) -> None:
         if message not in self.errors:
             self.errors.append(message)
 
     async def after(self, checkpoint: Checkpoint, runtime: Sealing) -> Resume | None:
-        """Judge the tree the checkpoint's gate just sealed; end the loop or send the open
-        criteria back (``rework``). ``None`` when no seal stands or the judge has ended."""
+        """Judge the tree the checkpoint's gate just sealed.
+
+        End the loop or send the open criteria back (``rework``). ``None`` when no seal stands or
+        the judge has ended.
+        """
         sealed, stand, gate = runtime.sealed, runtime.gate_stand, runtime.gate
         if sealed is None or stand is None or gate is None or self.ending is not None:
             return None

@@ -18,7 +18,7 @@ import shlex
 import tempfile
 import uuid
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path, PurePosixPath
 from typing import Any, Protocol
 
@@ -32,6 +32,7 @@ from raidar.contract.wheels import (
     uv_lock_wheels,
 )
 from raidar.subject.primitive import calls
+from raidar.subject.primitive.payload.supervise import BASE_PATH
 
 LOCK_PATH = "tool/uv.lock"
 TOOL_PREFIX = "tool/"
@@ -59,6 +60,34 @@ class ShippedFile(Protocol):
 
     @property
     def data(self) -> bytes: ...
+
+
+@dataclass(frozen=True)
+class ShippedPackage:
+    """A package to install or measure in a container.
+
+    ``reference`` is ``<ns>/<name>``; ``files`` are the package's shipped bytes and ``commands``
+    its tool's commands. ``owner`` is the required owner uid of the installed tree (``None``
+    skips the check, tests only).
+    """
+
+    reference: str
+    package_digest: str
+    files: Sequence[ShippedFile] = ()
+    commands: Mapping[str, Sequence[str]] = field(default_factory=dict)
+    owner: int | None = 0
+
+
+@dataclass(frozen=True)
+class _InstallFacts:
+    """What the install record keeps of one package's install in one container."""
+
+    reference: str
+    package_digest: str
+    arch: str
+    payload: str
+    wheels: Sequence[LockedWheel]
+    commands: Mapping[str, Sequence[str]]
 
 
 @dataclass(frozen=True)
@@ -100,7 +129,7 @@ class InstalledPackage:
     @property
     def path(self) -> str:
         """The ``PATH`` value for calls into this package."""
-        return f"{self.bin}:{calls.BASE_PATH}"
+        return f"{self.bin}:{BASE_PATH}"
 
     @property
     def python(self) -> str:
@@ -109,7 +138,10 @@ class InstalledPackage:
     async def verify(self) -> TreeCheck:
         """Re-walk the installed tree (no-follow, root-owned) and compare it with the record."""
         found = await calls.tree_manifest(
-            self.environment, self.root, bounds=False, links=True, owner=self.owner, entries=False
+            self.environment,
+            self.root,
+            unbounded=calls.Unbounded(links=True, owner=self.owner),
+            entries=False,
         )
         ok = found.violation is None and found.digest == self.digest
         return TreeCheck(ok, found.digest, self.digest, found.violation)
@@ -155,17 +187,11 @@ def _stage(
     (host / "requirements.txt").write_text(hashed_requirements(wheels), encoding="utf-8")
 
 
-def _spec(
-    stage: str,
-    root: str,
-    uv: str,
-    tool: Sequence[ShippedFile],
-    wheels: Sequence[LockedWheel],
-    commands: Mapping[str, Sequence[str]],
-) -> dict[str, Any]:
+def _spec(stage: str, uv: str, tool: Sequence[ShippedFile], facts: _InstallFacts) -> dict[str, Any]:
+    wheels, commands = facts.wheels, facts.commands
     return {
         "stage": stage,
-        "root": root,
+        "root": f"{calls.STAGES_ROOT}/{facts.reference}",
         "uv": uv,
         "python": calls.TRUSTED_PYTHON,
         "venv": bool(tool),
@@ -194,28 +220,20 @@ async def _run_install(environment: Any, host: Path, spec: dict[str, Any]) -> No
         raise InstallError(str(outcome.get("error", "the root install failed")))
 
 
-def _record(
-    reference: str,
-    package_digest: str,
-    arch: str,
-    payload: str,
-    wheels: Sequence[LockedWheel],
-    commands: Mapping[str, Sequence[str]],
-    found: calls.TreeManifest,
-) -> dict[str, Any]:
+def _record(facts: _InstallFacts, found: calls.TreeManifest) -> dict[str, Any]:
     return {
         "schema": "install/1",
-        "reference": reference,
-        "package_digest": package_digest,
-        "arch": arch,
-        "payload_digest": payload,
+        "reference": facts.reference,
+        "package_digest": facts.package_digest,
+        "arch": facts.arch,
+        "payload_digest": facts.payload,
         "tree_digest": found.digest,
         "tree_files": found.files,
         "tree_bytes": found.bytes,
-        "commands": {name: list(argv) for name, argv in sorted(commands.items())},
+        "commands": {name: list(argv) for name, argv in sorted(facts.commands.items())},
         "wheels": [
             {"name": w.name, "version": w.version, "filename": w.filename, "sha256": w.sha256}
-            for w in wheels
+            for w in facts.wheels
         ],
     }
 
@@ -223,59 +241,48 @@ def _record(
 async def install_package(
     environment: Any,
     logs_dir: Path,
+    package: ShippedPackage,
     *,
-    reference: str,
-    package_digest: str,
-    files: Sequence[ShippedFile],
-    commands: Mapping[str, Sequence[str]] | None = None,
     cache_root: Path | None = None,
-    owner: int | None = 0,
 ) -> InstalledPackage:
-    """Install ``files`` (the package's shipped bytes) as ``/opt/raidar/stages/<reference>``.
+    """Install ``package``'s shipped bytes as ``/opt/raidar/stages/<reference>``.
 
-    ``reference`` is ``<ns>/<name>``. Refuses (``InstallError``) a tool without a ``uv.lock``, any
-    sdist/source/direct reference or missing wheel for the container's architecture, and a
-    tree that is not root-owned afterwards. A missing index with a cold wheel cache raises
-    ``DependencyInfraError``; container failures raise ``calls.TransportError``.
+    Refuses (``InstallError``) a tool without a ``uv.lock``, any sdist/source/direct reference or
+    missing wheel for the container's architecture, and a tree that is not root-owned
+    afterwards. A missing index with a cold wheel cache raises ``DependencyInfraError``;
+    container failures raise ``calls.TransportError``.
     """
+    reference = package.reference
     if _REFERENCE.fullmatch(reference) is None:
         raise InstallError(f"bad package reference {reference!r}")
     payload = await calls.ensure_trusted(environment)
     arch = _arch(await calls.root_command(environment, "uname -m"))
-    tool = _tool_files(files)
+    tool = _tool_files(package.files)
     wheels = _plan(tool, arch)
     uv = (await calls.root_command(environment, "command -v uv")).strip()
-    root = f"{calls.STAGES_ROOT}/{reference}"
     stage = f"{calls.CALLS_ROOT}/install-{uuid.uuid4().hex}"
-    wanted = dict(commands or {})
+    facts = _InstallFacts(
+        reference, package.package_digest, arch, payload, wheels, dict(package.commands)
+    )
     with tempfile.TemporaryDirectory(prefix="raidar-install-") as scratch:
         host = Path(scratch)
         await asyncio.to_thread(_stage, host, tool, wheels, cache_root)
-        await _run_install(environment, host, _spec(stage, root, uv, tool, wheels, wanted))
-    return await _measured(
-        environment, logs_dir, reference, package_digest, arch, payload, wheels, wanted, owner
-    )
+        await _run_install(environment, host, _spec(stage, uv, tool, facts))
+    return await _measured(environment, logs_dir, facts, package.owner)
 
 
 async def _measured(
-    environment: Any,
-    logs_dir: Path,
-    reference: str,
-    package_digest: str,
-    arch: str,
-    payload: str,
-    wheels: Sequence[LockedWheel],
-    wanted: Mapping[str, Sequence[str]],
-    owner: int | None,
+    environment: Any, logs_dir: Path, facts: _InstallFacts, owner: int | None
 ) -> InstalledPackage:
     """Measure the installed tree (no-follow, owner checked) and record it host-side."""
+    reference, wheels, wanted = facts.reference, facts.wheels, facts.commands
     root = f"{calls.STAGES_ROOT}/{reference}"
     found = await calls.tree_manifest(
-        environment, root, bounds=False, links=True, owner=owner, entries=False
+        environment, root, unbounded=calls.Unbounded(links=True, owner=owner), entries=False
     )
     if found.violation is not None:
         raise InstallError(f"installed tree {root}: {found.violation}")
-    record = _record(reference, package_digest, arch, payload, wheels, wanted, found)
+    record = _record(facts, found)
     target = Path(logs_dir) / "install" / f"{reference.replace('/', '--')}.json"
     target.parent.mkdir(parents=True, exist_ok=True)
     target.write_text(json.dumps(record, indent=2, sort_keys=True) + "\n", encoding="utf-8")
@@ -284,7 +291,7 @@ async def _measured(
         reference,
         root,
         found.digest,
-        package_digest,
+        facts.package_digest,
         {name: tuple(argv) for name, argv in wanted.items()},
         tuple(WheelRecord(w.name, w.version, w.filename, w.sha256) for w in wheels),
         record,
@@ -293,14 +300,7 @@ async def _measured(
 
 
 async def reuse_installed(
-    environment: Any,
-    logs_dir: Path,
-    *,
-    reference: str,
-    package_digest: str,
-    files: Sequence[ShippedFile] = (),
-    commands: Mapping[str, Sequence[str]] | None = None,
-    owner: int | None = 0,
+    environment: Any, logs_dir: Path, package: ShippedPackage
 ) -> InstalledPackage | None:
     """The package an earlier checkpoint installed in this container, measured now; else ``None``.
 
@@ -309,6 +309,7 @@ async def reuse_installed(
     bytes) only supply the wheel list recorded beside it. A tree that is not root-owned or holds
     a special file raises ``InstallError``.
     """
+    reference, files = package.reference, package.files
     if _REFERENCE.fullmatch(reference) is None:
         raise InstallError(f"bad package reference {reference!r}")
     if not await calls.root_file_exists(environment, f"{calls.STAGES_ROOT}/{reference}"):
@@ -316,14 +317,7 @@ async def reuse_installed(
     payload = await calls.ensure_trusted(environment)
     arch = _arch(await calls.root_command(environment, "uname -m"))
     wheels = _plan(_tool_files(files), arch) if files else ()
-    return await _measured(
-        environment,
-        logs_dir,
-        reference,
-        package_digest,
-        arch,
-        payload,
-        wheels,
-        dict(commands or {}),
-        owner,
+    facts = _InstallFacts(
+        reference, package.package_digest, arch, payload, wheels, dict(package.commands)
     )
+    return await _measured(environment, logs_dir, facts, package.owner)

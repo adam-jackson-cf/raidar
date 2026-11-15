@@ -4,12 +4,11 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from raidar_contract.agent import AgentDefinitionError, agent_names
-from raidar_contract.workflow import PackageWorkflowError
-
 from raidar.subject.agent.definition import harness_of, load_agent
 from raidar.subject.agent.schema import AgentDefinition
 from raidar.subject.environment import available_runtimes, load_runtime_pack
+from raidar_contract.agent import AgentDefinitionError, agent_names
+from raidar_contract.workflow import PackageWorkflowError
 
 
 def agent_pin_issues(root: Path) -> list[str]:

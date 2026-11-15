@@ -19,15 +19,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
-from raidar_contract.agent import AgentDefinitionError
-from raidar_contract.references import Release, ReleaseError
-from raidar_contract.workflow import (
-    PackageWorkflowDefinition,
-    PackageWorkflowError,
-    load_package_workflow,
-    package_workflow_digest,
-)
-
 from raidar.contract.paths import REPO_ROOT, agents_root, releases_file, workflows_root
 from raidar.contract.references import (
     RefKind,
@@ -46,6 +37,14 @@ from raidar.subject.agent.definition import ReleasedAgent, harness_of, load_agen
 from raidar.subject.draft import drafting
 from raidar.subject.stages import resolve_stages
 from raidar.subject.workflow.package_checks import ResolvedStage
+from raidar_contract.agent import AgentDefinitionError
+from raidar_contract.references import Release, ReleaseError
+from raidar_contract.workflow import (
+    PackageWorkflowDefinition,
+    PackageWorkflowError,
+    load_package_workflow,
+    package_workflow_digest,
+)
 
 
 @dataclass(frozen=True)
@@ -115,8 +114,11 @@ def released_workflow(
 
 
 def tree_workflow_digest(name: str, repo_root: Path, register: ReleaseRegister) -> str:
-    """A workflow's identity as the tree holds it (packages read from the tree, not the register:
-    an unreleased package is its own register-check entry)."""
+    """A workflow's identity as the tree holds it.
+
+    Packages are read from the tree, not the register: an unreleased package is its own
+    register-check entry.
+    """
     definition, stages = _workflow(name, repo_root, register, draft=True)
     return workflow_digest(definition, stages)
 

@@ -10,15 +10,15 @@ from pathlib import Path
 from typing import TypedDict
 
 import yaml
-from raidar_contract.canonical import IGNORED_TREE_NAMES
-from raidar_contract.package.digest import read_stage_tree
-from raidar_contract.references import Release, ReleaseError
-from raidar_contract.workflow import load_package_workflow, package_workflow_digest
 
 from raidar.contract.paths import releases_file, stages_root, workflows_root
 from raidar.contract.releases import ReleaseKind, load_register
 from raidar.subject.package.registry import load_stage_package
 from raidar.subject.stages import resolve_stages
+from raidar_contract.canonical import IGNORED_TREE_NAMES
+from raidar_contract.package.digest import read_stage_tree
+from raidar_contract.references import Release, ReleaseError
+from raidar_contract.workflow import load_package_workflow, package_workflow_digest
 
 
 class PackageImportError(ValueError):
@@ -98,8 +98,9 @@ def _digest(kind: ReleaseKind, folder: Path, name: str, repo_root: Path) -> str:
 
 
 def _install_verified(
-    kind: ReleaseKind, staged: Path, target: Path, name: str, digest: str, repo_root: Path
+    kind: ReleaseKind, staged: Path, target: Path, entry: ImportEntry, repo_root: Path
 ) -> str:
+    name, digest = entry["name"], entry["sha256"]
     register = load_register(releases_file(repo_root))
     latest = register.latest(kind, name)
     if latest is not None and register.of(kind)[latest] != digest:
@@ -116,15 +117,18 @@ def _install_verified(
 
 
 def import_folder(
-    kind: ReleaseKind, source: Path, name: str, sha256: str, provenance: str, repo_root: Path
+    kind: ReleaseKind, source: Path, entry: ImportEntry, repo_root: Path
 ) -> tuple[Path, str]:
-    """Copy unchanged export bytes; never overwrite different bytes or register a release."""
+    """Copy unchanged export bytes; never overwrite different bytes or register a release.
+
+    ``entry`` is the import's name, expected digest and provenance as the ledger records it.
+    """
+    name, sha256 = entry["name"], entry["sha256"]
     _name(name)
-    _source(provenance)
+    _source(entry["source"])
     if not re.fullmatch(r"[0-9a-f]{64}", sha256):
         raise PackageImportError("SHA256 must be 64 lowercase hexadecimal characters")
     entries = load_imports(repo_root)
-    entry: ImportEntry = {"name": name, "sha256": sha256, "source": provenance}
     recorded = next((row for row in entries if row["sha256"] == sha256), None)
     if recorded is not None and recorded != entry:
         raise PackageImportError("recorded digest has a different name or SOURCE")
@@ -139,7 +143,7 @@ def import_folder(
         digest = _digest(kind, staged, name, repo_root)
         if digest != sha256:
             raise PackageImportError(f"digest mismatch: expected {sha256}, found {digest}")
-        release = _install_verified(kind, staged, target, name, digest, repo_root)
+        release = _install_verified(kind, staged, target, entry, repo_root)
     if recorded is None:
         ledger = repo_root / "lab" / "imports.yaml"
         ledger.write_text(yaml.safe_dump([*entries, entry], sort_keys=False), encoding="utf-8")

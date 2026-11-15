@@ -21,7 +21,7 @@ from raidar.judge.client import TransportResponse
 from raidar.judge.live import LIVE_MODEL, RecordedJev
 from raidar.judge.protocol import JEV_PINNED_MODEL
 from raidar.subject.primitive.gate import Attribution, GateOutcome
-from raidar.subject.primitive.site import TrialInvalid
+from raidar.subject.primitive.site import TrialInvalidError
 from raidar.subject.workflow import asking, judgeloop, stage
 from raidar.subject.workflow.acceptance import Acceptance
 from raidar.subject.workflow.package import (
@@ -424,7 +424,7 @@ async def test_a_producer_that_reported_done_owes_valid_criteria_or_the_trial_is
     fake = jev(lambda call, situation: CLOSED_P)
     rig = Rig(tmp_path, criteria='{"contract": "criteria/1", "features": []}')
 
-    with pytest.raises(TrialInvalid) as invalid:
+    with pytest.raises(TrialInvalidError) as invalid:
         await rig.seal()
 
     assert invalid.value.kind == "integrity"
@@ -441,7 +441,7 @@ async def test_a_producer_that_reported_done_with_no_copy_is_invalid(
     rig = Rig(tmp_path)
     rig.runtime.copy = None
 
-    with pytest.raises(TrialInvalid):
+    with pytest.raises(TrialInvalidError):
         await rig.seal()
 
 
@@ -484,7 +484,7 @@ async def test_a_criteria_copy_that_changes_after_it_was_read_is_invalid(
     await rig.seal()
 
     rig.runtime.copy = {**rig.copy, "sha256": "0" * 64}
-    with pytest.raises(TrialInvalid) as invalid:
+    with pytest.raises(TrialInvalidError) as invalid:
         rig.judge.load_criteria(cast(Any, rig.runtime))
 
     assert invalid.value.kind == "integrity"
@@ -500,7 +500,7 @@ async def test_a_criteria_copy_whose_bytes_differ_from_its_digest_is_invalid(
     rig = Rig(tmp_path)
     rig.runtime.copy = {**rig.copy, "sha256": "1" * 64}
 
-    with pytest.raises(TrialInvalid):
+    with pytest.raises(TrialInvalidError):
         rig.judge.load_criteria(cast(Any, rig.runtime))
 
     assert "differ from its recorded digest" in rig.judge.record()["errors"][0]
@@ -519,7 +519,7 @@ async def test_a_cut_ends_a_checkpoint_the_judge_had_not_ended(tmp_path: Path, j
 def test_a_judge_model_other_than_the_pinned_one_is_the_instruments_failure(
     tmp_path: Path,
 ) -> None:
-    with pytest.raises(TrialInvalid) as invalid:
+    with pytest.raises(TrialInvalidError) as invalid:
         Rig(tmp_path, model="someone/else-1")
 
     assert invalid.value.kind == "instrument"

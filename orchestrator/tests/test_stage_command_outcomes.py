@@ -320,8 +320,8 @@ def rig(stages: Path, monkeypatch: pytest.MonkeyPatch) -> SimpleNamespace:
     package = load_stage_package(stages / "acme" / "my-check")
     state = SimpleNamespace(report=_passing(), calls=[], digest=package.digest)
 
-    async def fake_check(*args: Any, **kwargs: Any) -> CheckReport:
-        state.calls.append(kwargs["logs_dir"])
+    async def fake_check(package: Any, name: str, rig: Any, **kwargs: Any) -> CheckReport:
+        state.calls.append(rig.logs_dir)
         if isinstance(state.report, Exception):
             raise state.report
         return state.report

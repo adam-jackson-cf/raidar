@@ -77,4 +77,5 @@ def harbor_reported_version(pin: HarnessPin, output: str, exit_code: int = 0) ->
     """
     if exit_code != 0:
         return f"exit status {exit_code}"
-    return _harbor_agent(pin).parse_version(output)
+    version: str = _harbor_agent(pin).parse_version(output)
+    return version

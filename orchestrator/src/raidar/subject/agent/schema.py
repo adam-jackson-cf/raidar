@@ -7,9 +7,12 @@ from pathlib import Path
 from typing import Annotated, Literal, Self, cast
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
-from raidar_contract.agent import AgentDefinition as PortableAgentDefinition
-from raidar_contract.agent import Text
-from raidar_contract.agent import load_agent as load_portable_agent
+
+from raidar_contract.agent import (
+    AgentDefinition as PortableAgentDefinition,
+    Text,
+    load_agent as load_portable_agent,
+)
 
 FEATURE_PATTERN = r"^[a-z][a-z0-9_]*$"
 SKILL_PATTERN = r"^[A-Za-z0-9][A-Za-z0-9._-]*$"

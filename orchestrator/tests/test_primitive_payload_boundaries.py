@@ -881,14 +881,10 @@ def _polls(monkeypatch: pytest.MonkeyPatch, *statuses: int | None) -> None:
 
 def _call_spec(tmp_path: Path, **over: Any) -> dict[str, Any]:
     spec = supervise.build_spec(
-        call_dir=str(tmp_path / "call"),
-        argv=["tool"],
-        env={"PATH": supervise.BASE_PATH},
-        cwd=str(tmp_path),
-        timeout_s=1,
-        uid=None,
-        gid=None,
-        seccomp=False,
+        command=supervise.ChildCommand(
+            str(tmp_path / "call"), ["tool"], {"PATH": supervise.BASE_PATH}, str(tmp_path), 1
+        ),
+        confinement=supervise.Confinement(None, None, False),
         trees=[],
     )
     spec.update(over)

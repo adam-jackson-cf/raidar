@@ -299,7 +299,7 @@ class ToolProvisioner:
     def _still_matches(self, spec: ToolSpec, layout: _Layout, marker: Path) -> bool:
         """Re-probe a reused install; any drift from its marker means reinstall."""
         try:
-            recorded = json.loads(marker.read_text(encoding="utf-8")).get("resolved")
+            recorded: object = json.loads(marker.read_text(encoding="utf-8")).get("resolved")
             return self._verify(layout.root.name, spec, layout) == recorded
         except (ToolProvisioningError, ValueError, AttributeError):
             return False

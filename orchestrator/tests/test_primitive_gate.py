@@ -28,7 +28,7 @@ from raidar.subject.primitive import calls, gate_tool
 from raidar.subject.primitive.gate import (
     AgentFacts,
     Attribution,
-    GateInvalid,
+    GateInvalidError,
     GatePackage,
     GatePaths,
     GateRun,
@@ -451,7 +451,7 @@ async def test_a_missing_tool_invalidates_the_instrument(
     tmp_path: Path, gate_env: dict[str, str]
 ) -> None:
     rig = make_rig(tmp_path, PASS)
-    with pytest.raises(GateInvalid) as caught:
+    with pytest.raises(GateInvalidError) as caught:
         await open_gate(rig, gate_env, [command("gone", "no-such-tool")])
     assert caught.value.category == "instrument"
 
@@ -461,7 +461,7 @@ async def test_a_gate_that_crashes_on_the_starting_workspace_invalidates_the_ins
 ) -> None:
     rig = make_rig(tmp_path, PASS)
     (rig.workspace / "conftest.py").write_text("import os\nos._exit(126)\n")
-    with pytest.raises(GateInvalid) as caught:
+    with pytest.raises(GateInvalidError) as caught:
         await open_gate(rig, gate_env, fixture_checks(rig))
     assert caught.value.category == "instrument"
     assert "canary" in str(caught.value)
@@ -472,7 +472,7 @@ async def test_tool_bytes_changed_before_the_agent_invalidate_the_trial(
 ) -> None:
     rig = make_rig(tmp_path, PASS)
     rig.installed.ok = False
-    with pytest.raises(GateInvalid) as caught:
+    with pytest.raises(GateInvalidError) as caught:
         await open_gate(rig, gate_env, fixture_checks(rig))
     assert caught.value.category == "integrity"
 
@@ -587,7 +587,7 @@ async def test_a_failed_output_download_is_an_integrity_failure_not_output_evide
     run = await open_gate(rig, gate_env, checks, outputs=outputs)
     run.outputs.environment = Unreachable(gate_env)
     try:
-        with pytest.raises(GateInvalid) as caught:
+        with pytest.raises(GateInvalidError) as caught:
             await run.seal("turn-1")
     finally:
         await run.close()

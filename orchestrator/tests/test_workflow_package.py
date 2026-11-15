@@ -19,8 +19,8 @@ from raidar_contract.workflow import PackageWorkflowDefinition
 from raidar.judge.live import LIVE_MODEL, RecordedJev
 from raidar.subject.package.registry import stage_folder
 from raidar.subject.primitive.calls import TransportError
-from raidar.subject.primitive.gate import Attribution, GateInvalid, GateOutcome
-from raidar.subject.primitive.site import TrialInvalid
+from raidar.subject.primitive.gate import Attribution, GateInvalidError, GateOutcome
+from raidar.subject.primitive.site import TrialInvalidError
 from raidar.subject.workflow import asking, package_stage
 from raidar.subject.workflow import package as package_module
 from raidar.subject.workflow import stage as stage_module
@@ -218,7 +218,7 @@ async def test_close_copies_outputs_and_the_record_is_keyed_by_primitive(rig: Ri
 async def test_an_invalid_setup_invalidates_the_trial_before_the_agent(rig: Rig) -> None:
     rig.container.tool = lambda *_: ToolOutcome(b"", exit_code=1)
 
-    with pytest.raises(TrialInvalid):
+    with pytest.raises(TrialInvalidError):
         await rig.runtime.prepare()
 
 
@@ -511,7 +511,7 @@ async def test_an_unusable_judge_invalidates_before_any_package_code_runs(lab: L
     )
     checkpoint = Checkpoint(lab.container, lab.tmp_path / "judge-logs", TASK)
 
-    with pytest.raises(TrialInvalid) as invalid:
+    with pytest.raises(TrialInvalidError) as invalid:
         await stage.prepare(checkpoint)
 
     assert invalid.value.kind == "instrument"
@@ -528,7 +528,7 @@ async def test_a_package_the_lock_does_not_list_is_refused_before_anything_insta
 ) -> None:
     stage, checkpoint = lab.stage({})
 
-    with pytest.raises(TrialInvalid, match="not in the lock") as refused_:
+    with pytest.raises(TrialInvalidError, match="not in the lock") as refused_:
         await stage.prepare(checkpoint)
 
     assert refused_.value.kind == "integrity"
@@ -538,7 +538,7 @@ async def test_a_package_the_lock_does_not_list_is_refused_before_anything_insta
 async def test_package_bytes_other_than_the_locked_digest_are_refused(lab: Lab) -> None:
     stage, checkpoint = lab.stage(lab.lock(sha256="0" * 64))
 
-    with pytest.raises(TrialInvalid, match="on disk, the lock holds 000000000000") as refused_:
+    with pytest.raises(TrialInvalidError, match="on disk, the lock holds 000000000000") as refused_:
         await stage.prepare(checkpoint)
 
     assert refused_.value.kind == "integrity"
@@ -551,7 +551,7 @@ async def test_a_package_missing_from_the_tree_is_an_integrity_failure_not_an_os
     shutil.rmtree(stage_folder(RELEASE, lab.repo))
     stage, checkpoint = lab.stage()
 
-    with pytest.raises(TrialInvalid) as refused_:
+    with pytest.raises(TrialInvalidError) as refused_:
         await stage.prepare(checkpoint)
 
     assert refused_.value.kind == "integrity"
@@ -561,9 +561,9 @@ async def test_a_package_missing_from_the_tree_is_an_integrity_failure_not_an_os
 async def test_a_changed_installed_tree_is_refused_and_never_reinstalled_over(lab: Lab) -> None:
     stage, checkpoint = lab.stage(lab.lock(installed={ARCH: "u" * 64}))
 
-    with pytest.raises(TrialInvalid, match="differs from the locked uuuuuuuuuuuu") as first:
+    with pytest.raises(TrialInvalidError, match="differs from the locked uuuuuuuuuuuu") as first:
         await stage.prepare(checkpoint)
-    with pytest.raises(TrialInvalid, match="differs from the locked"):
+    with pytest.raises(TrialInvalidError, match="differs from the locked"):
         await lab.stage(lab.lock(installed={ARCH: "u" * 64}))[0].prepare(checkpoint)
 
     assert first.value.kind == "integrity"
@@ -574,7 +574,7 @@ async def test_a_changed_installed_tree_is_refused_and_never_reinstalled_over(la
 async def test_a_lock_without_this_architecture_is_refused(lab: Lab) -> None:
     stage, checkpoint = lab.stage(lab.lock(installed={"amd64": TREE}))
 
-    with pytest.raises(TrialInvalid, match=r"none for arm64"):
+    with pytest.raises(TrialInvalidError, match=r"none for arm64"):
         await stage.prepare(checkpoint)
 
 
@@ -582,7 +582,7 @@ async def test_an_install_failure_is_an_integrity_failure_naming_the_cause(lab: 
     lab.installs.failure = "wheel hash mismatch"
     stage, checkpoint = lab.stage()
 
-    with pytest.raises(TrialInvalid, match="wheel hash mismatch") as refused_:
+    with pytest.raises(TrialInvalidError, match="wheel hash mismatch") as refused_:
         await stage.prepare(checkpoint)
 
     assert refused_.value.kind == "integrity"
@@ -604,7 +604,7 @@ async def test_a_stop_needs_the_locked_stage_check_record(
     lab.stored_check = stored
     stage, checkpoint = lab.stage(lab.lock(**overrides))
 
-    with pytest.raises(TrialInvalid, match=message) as refused_:
+    with pytest.raises(TrialInvalidError, match=message) as refused_:
         await stage.prepare(checkpoint)
 
     assert refused_.value.kind == "instrument"
@@ -670,7 +670,7 @@ async def test_close_collects_outputs_then_refuses_an_installed_tree_that_change
     lab.container.write_note("a note of enough words here")
     lab.trees["digest"] = "x" * 64  # the agent changed the tool tree during the trial
 
-    with pytest.raises(TrialInvalid, match="changed during the trial") as refused_:
+    with pytest.raises(TrialInvalidError, match="changed during the trial") as refused_:
         await stage.close(checkpoint, None)
 
     assert refused_.value.kind == "integrity"
@@ -773,7 +773,7 @@ async def test_the_canary_compares_the_loaded_packages_own_code_not_the_arms_loc
     keeps its output."""
     lab.primitives = {"stop/1": "p" * 64}
     stale, checkpoint = lab.stage()
-    with pytest.raises(TrialInvalid) as refused_:
+    with pytest.raises(TrialInvalidError) as refused_:
         await stale.prepare(checkpoint)
     assert refused_.value.kind == "instrument"
 
@@ -805,7 +805,7 @@ async def test_an_invalid_gate_is_an_invalid_trial_even_with_fix_budget_left(
     await stage.prepare(checkpoint)
     ScriptedGate.outcomes = [GateOutcome(attribution, {"why": "broker"}, "gate state changed")]
 
-    with pytest.raises(TrialInvalid, match="gate state changed") as refused_:
+    with pytest.raises(TrialInvalidError, match="gate state changed") as refused_:
         await stage.check(checkpoint, "turn-1")
 
     assert refused_.value.kind == kind
@@ -818,11 +818,11 @@ async def test_a_gate_that_cannot_run_or_reach_the_container_is_an_invalid_trial
 ) -> None:
     stage, checkpoint = lab.stage(fix_rounds=1)
     await stage.prepare(checkpoint)
-    ScriptedGate.outcomes = [GateInvalid("instrument", "gate payload missing")]
-    with pytest.raises(TrialInvalid, match="gate payload missing") as invalid:
+    ScriptedGate.outcomes = [GateInvalidError("instrument", "gate payload missing")]
+    with pytest.raises(TrialInvalidError, match="gate payload missing") as invalid:
         await stage.check(checkpoint, "turn-1")
     ScriptedGate.outcomes = [TransportError("exec failed")]
-    with pytest.raises(TrialInvalid, match="container transport failed: exec failed") as moved:
+    with pytest.raises(TrialInvalidError, match="container transport failed: exec failed") as moved:
         await stage.check(checkpoint, "turn-2")
 
     assert invalid.value.kind == "instrument"
@@ -834,7 +834,7 @@ async def test_a_stop_call_over_a_changed_tool_tree_is_an_invalid_trial(lab: Lab
     await stage.prepare(checkpoint)
     lab.container.tampered = True
 
-    with pytest.raises(TrialInvalid, match="installed tree changed") as refused_:
+    with pytest.raises(TrialInvalidError, match="installed tree changed") as refused_:
         await stage.check(checkpoint, "turn-1")
 
     assert refused_.value.kind == "integrity"
@@ -1024,7 +1024,7 @@ async def test_a_done_producer_whose_output_is_not_criteria_is_an_integrity_fail
     fast_lab.container.write_note("a note of enough words here")
 
     for turn in ("turn-1", "turn-2"):
-        with pytest.raises(TrialInvalid) as refused_:
+        with pytest.raises(TrialInvalidError) as refused_:
             await stage.check(checkpoint, turn)
         assert refused_.value.kind == "integrity"
 

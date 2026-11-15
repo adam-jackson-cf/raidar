@@ -58,9 +58,12 @@ def _understood_message(payload: dict[str, Any]) -> bool:
 
 
 def _understood_row(row: dict[str, Any]) -> bool:
-    """A rollout row of a known type. A ``response_item`` must be a known item kind, and a
-    message must be complete (known role, text-only parts): a message variant this audit cannot
-    read could hold instructions, so it is unread, never skipped."""
+    """A rollout row of a known type.
+
+    A ``response_item`` must be a known item kind, and a message must be complete (known role,
+    text-only parts): a message variant this audit cannot read could hold instructions, so it is
+    unread, never skipped.
+    """
     payload = row.get("payload")
     if row.get("type") not in ROW_TYPES or not isinstance(payload, dict):
         return False
@@ -215,7 +218,7 @@ def _agent_message(event: dict[str, Any]) -> str | None:
         event.get("type") == "item.completed"
         and isinstance(item, dict)
         and item.get("type") == "agent_message"
-        and isinstance(item.get("text"), str)
+        and isinstance(text := item.get("text"), str)
     ):
-        return item["text"]
+        return text
     return None

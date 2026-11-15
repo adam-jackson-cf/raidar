@@ -152,7 +152,6 @@ _DEFINITIONS: dict[str, HarnessDefinition] = {
 
 def validate_harness_registry() -> None:
     """Validate cross-harness definition and credential invariants."""
-
     for harness_id, definition in _DEFINITIONS.items():
         if definition.id != harness_id:
             raise HarnessDefinitionError(
@@ -178,7 +177,6 @@ validate_harness_registry()
 
 def harness_definition(harness_id: str) -> HarnessDefinition:
     """Return a registered harness definition."""
-
     try:
         return _DEFINITIONS[harness_id]
     except KeyError as exc:
@@ -190,7 +188,6 @@ def harness_definition(harness_id: str) -> HarnessDefinition:
 
 def harness_rule_filenames() -> tuple[str, ...]:
     """Return unique rule filenames declared by registered harnesses."""
-
     return tuple(
         sorted(
             {
@@ -204,5 +201,4 @@ def harness_rule_filenames() -> tuple[str, ...]:
 
 def registered_harness_definitions() -> tuple[HarnessDefinition, ...]:
     """Return every registered definition in stable identifier order."""
-
     return tuple(_DEFINITIONS[harness_id] for harness_id in sorted(_DEFINITIONS))

@@ -6,14 +6,14 @@ import json
 from pathlib import Path
 
 from pydantic import BaseModel, ConfigDict, Field, TypeAdapter, ValidationError
-from raidar_contract.canonical import digest_json
-from raidar_contract.references import Release, ReleaseError
 
 from raidar.contract.paths import lab_root, stage_checks_root, stages_root
 from raidar.contract.releases import ReleaseKind, ReleaseRegister, Sha256, registration_issues
 from raidar.subject.package.registry import load_stage_package
 from raidar.subject.stages import stage_names
 from raidar.subject.workflow.package_runtime import CHECK_SUFFIX, INSTALLED_SUFFIX
+from raidar_contract.canonical import digest_json
+from raidar_contract.references import Release, ReleaseError
 
 
 class _RecordedWheel(BaseModel):

@@ -26,14 +26,13 @@ from dataclasses import dataclass
 from functools import cache
 from pathlib import Path
 
+from raidar.contract.uv import locked_uv
+from raidar.contract.wheels import uv_lock_refusals
+from raidar.subject.primitive.registry import SUPPORTED_CONTRACTS
 from raidar_contract.package.manifest import StagePackage
 from raidar_contract.package.tokens import PLACEHOLDER, TASK_SLOT, token_name
 from raidar_contract.references import Release
 from raidar_contract.workflow import PackageJudge
-
-from raidar.contract.uv import locked_uv
-from raidar.contract.wheels import uv_lock_refusals
-from raidar.subject.primitive.registry import SUPPORTED_CONTRACTS
 
 LOCK_PATH = "tool/uv.lock"
 LockCheck = Callable[[Path], str | None]

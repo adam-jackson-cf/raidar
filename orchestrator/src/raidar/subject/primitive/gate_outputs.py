@@ -17,10 +17,9 @@ from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
-from raidar_contract.package.manifest import Output
-
 from raidar.subject.primitive import calls
 from raidar.subject.primitive.outputs import CopiedOutput, finish_copy
+from raidar_contract.package.manifest import Output
 
 _UNSAFE = re.compile(r"[^A-Za-z0-9._-]+")
 

@@ -170,7 +170,7 @@ def _add_file(archive: tarfile.TarFile, path: str, entry: Entry) -> None:
     member.size = entry["size"]
     member.mode = entry["mode"]
     with os.fdopen(fd, "rb") as handle:
-        archive.addfile(member, _Exact(handle, entry["size"]))  # type: ignore[arg-type]
+        archive.addfile(member, _Exact(handle, entry["size"]))
 
 
 def snapshot(root: str, tar_path: str, limits: Limits) -> dict[str, Any]:

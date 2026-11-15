@@ -61,7 +61,7 @@ from harbor.environments.base import BaseEnvironment
 from harbor.models.agent.context import AgentContext
 
 from raidar.subject.primitive import calls
-from raidar.subject.primitive.site import TrialInvalid
+from raidar.subject.primitive.site import TrialInvalidError
 from raidar.subject.workflow.inner import WorkflowRunnerOptions, create_inner
 from raidar.subject.workflow.package_stage import PackageStage
 from raidar.subject.workflow.stage import (
@@ -69,6 +69,7 @@ from raidar.subject.workflow.stage import (
     FIRST_BUILD,
     TURN_ERROR,
     Checkpoint,
+    Resume,
     Spent,
 )
 from raidar.subject.workflow.turns import (
@@ -107,7 +108,7 @@ LAST_MESSAGE_FILE = "last-message.txt"
 STEP_RECORD_PREFIX = "raidar-"
 """Step-level lab records in ``/logs/agent`` (reset report, provision records): not a turn's."""
 INVALID = "invalid"
-"""Why a checkpoint was cut when a package's instrument failed (``TrialInvalid``)."""
+"""Why a checkpoint was cut when a package's instrument failed (``TrialInvalidError``)."""
 BUILD = "build"
 """The stage name every turn carries: a package workflow is one build frame."""
 EVIDENCE_DIRS = ("stages", "gate", "calls", "install")
@@ -217,7 +218,7 @@ class WorkflowRunner(BaseAgent):
     package_stage: PackageStage | None = None
     invalid: dict[str, Any] | None = None
 
-    def _invalid(self, invalid: TrialInvalid) -> None:
+    def _invalid(self, invalid: TrialInvalidError) -> None:
         """The instrument failed: recorded as an integrity finding (W11), never an agent outcome."""
         name = f"package_{invalid.kind}"
         self.invalid = {"kind": invalid.kind, "detail": invalid.detail, "record": invalid.record}
@@ -266,7 +267,7 @@ class WorkflowRunner(BaseAgent):
         except asyncio.CancelledError:
             cut = DEADLINE
             raise
-        except TrialInvalid as invalid:
+        except TrialInvalidError as invalid:
             cut = INVALID
             self._invalid(invalid)
         except Exception:
@@ -279,10 +280,12 @@ class WorkflowRunner(BaseAgent):
             self._finish(context, state, package)
 
     async def _lock_logs(self, environment: BaseEnvironment) -> None:
-        """A non-mounted ``/logs/agent`` is downloaded by Harbor after the run, over what the
-        runner published. The agent's processes were reaped, so each published directory in the
-        container is recreated root-owned and empty: nothing the agent left there can overwrite a
-        published record."""
+        """Recreate each published directory in the container root-owned and empty.
+
+        A non-mounted ``/logs/agent`` is downloaded by Harbor after the run, over what the runner
+        published. The agent's processes were reaped, so nothing the agent left there can
+        overwrite a published record.
+        """
         if environment.capabilities.mounted:
             return
         names = (WORKFLOW_DIR, *EVIDENCE_DIRS)
@@ -297,17 +300,19 @@ class WorkflowRunner(BaseAgent):
     async def _work(self, checkpoint: Checkpoint, state: Run, package: PackageStage) -> None:
         """Prepare the package runtime, run the one prompt, then resume while its checks ask."""
         await package.prepare(checkpoint)
-        await self._turn(checkpoint, state, package, FIRST_BUILD, package.prompt, resume=False)
+        await self._turn(checkpoint, state, package, None)
         while True:
             resume = await package.check(checkpoint, state.turns[-1].log_dir)
             await self._rewatch(checkpoint, state.turns[-1])
             if resume is None:
                 break
-            await self._turn(checkpoint, state, package, resume.kind, resume.message, resume=True)
+            await self._turn(checkpoint, state, package, resume)
 
     async def _rewatch(self, checkpoint: Checkpoint, turn: Turn) -> None:
-        """The checks ran the agent's own code after the turn (its pytest and conftest): the
-        native session store must still be exactly as the turn left it."""
+        """The checks ran the agent's own code after the turn (its pytest and conftest).
+
+        The native session store must still be exactly as the turn left it.
+        """
         staged = self.staging / turn.log_dir
         environment = checkpoint.environment
         try:
@@ -324,10 +329,13 @@ class WorkflowRunner(BaseAgent):
     async def _remote_ctimes(
         self, environment: BaseEnvironment, turn: Turn, where: str
     ) -> dict[str, int] | None:
-        """Each session-store file's ``ctime`` in the container, read by the agent's user with the
-        standard library only (the agent's user cannot set a ``ctime`` back). A read that fails is
-        a named ``session_metadata_missing`` violation: without it a write and restore of the
-        session log could not be seen, and that is never silently skipped."""
+        """Each session-store file's ``ctime`` in the container.
+
+        The agent's user reads it with the standard library only (the agent's user cannot set a
+        ``ctime`` back). A read that fails is a named ``session_metadata_missing`` violation:
+        without it a write and restore of the session log could not be seen, and that is never
+        silently skipped.
+        """
         store = turn.session_store
         if not store:
             return {}
@@ -350,26 +358,21 @@ class WorkflowRunner(BaseAgent):
     async def _close(self, checkpoint: Checkpoint, package: PackageStage, cut: str | None) -> None:
         try:
             await package.close(checkpoint, cut)
-        except TrialInvalid as invalid:
+        except TrialInvalidError as invalid:
             self._invalid(invalid)
 
     async def _turn(
-        self,
-        checkpoint: Checkpoint,
-        state: Run,
-        package: PackageStage,
-        kind: str,
-        prompt: str,
-        *,
-        resume: bool,
+        self, checkpoint: Checkpoint, state: Run, package: PackageStage, resume: Resume | None
     ) -> None:
+        """Run one agent turn: the package's first build prompt, or ``resume``'s message."""
         environment = checkpoint.environment
-        prompt = package.decorate(kind, prompt)
+        kind = FIRST_BUILD if resume is None else resume.kind
+        prompt = package.decorate(kind, package.prompt if resume is None else resume.message)
         turn = Turn(
             stage=BUILD,
             kind=kind,
             index=len(state.turns) + 1,
-            resumed=resume,
+            resumed=resume is not None,
             prompt_sha256=hashlib.sha256(prompt.encode()).hexdigest(),
             started_at=now(),
             started=time.monotonic(),
@@ -382,7 +385,7 @@ class WorkflowRunner(BaseAgent):
         (staged / PROMPT_FILE).write_text(prompt, encoding="utf-8")
         inner = self._inner(turn_dir)
         context = AgentContext()
-        send = inner.resume if resume else inner.run
+        send = inner.run if resume is None else inner.resume
         try:
             await send(prompt, environment, context)
         except asyncio.CancelledError:
@@ -474,8 +477,11 @@ class WorkflowRunner(BaseAgent):
         return links
 
     def _record(self, state: Run, package: PackageStage) -> dict[str, Any]:
-        """``workflow.json``: the turns, the phase's tokens, the components and each primitive's
-        host-written evidence (keyed by contract id), with staging paths made portable."""
+        """``workflow.json``.
+
+        The turns, the phase's tokens, the components and each primitive's host-written evidence
+        (keyed by contract id), with staging paths made portable.
+        """
         usage = state.usage()
         record: dict[str, Any] = {
             "kind": RECORD_KIND,
@@ -493,9 +499,11 @@ class WorkflowRunner(BaseAgent):
         return portable
 
     def _portable(self, value: Any) -> Any:
-        """``value`` with each ``host_path`` that names a staging file rewritten to its path below
-        the step's agent logs: staging is deleted at publication, and a recorded path must lead to
-        the published copy, never outside it."""
+        """``value`` with each staging ``host_path`` rewritten below the step's agent logs.
+
+        Staging is deleted at publication, and a recorded path must lead to the published copy,
+        never outside it.
+        """
         if isinstance(value, dict):
             return {
                 key: self._published_path(item)
@@ -531,9 +539,11 @@ class WorkflowRunner(BaseAgent):
         self._publish(workflow_dir, trajectory)
 
     def _publish(self, workflow_dir: Path, trajectory: Path | None) -> None:
-        """Put the host-kept records and evidence in the step's agent logs once the agent's
-        processes were reaped (the runtime's ``close``): what the agent wrote under the published
-        names during the run is replaced."""
+        """Put the host-kept records and evidence in the step's agent logs.
+
+        This runs once the agent's processes were reaped (the runtime's ``close``): what the agent
+        wrote under the published names during the run is replaced.
+        """
         target = self.logs_dir / WORKFLOW_DIR
         shutil.rmtree(target, ignore_errors=True)
         shutil.copytree(workflow_dir, target, symlinks=True)

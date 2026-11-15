@@ -2,9 +2,8 @@
 
 from __future__ import annotations
 
-from raidar_contract.call import parse_stop_result
-
 from raidar.subject.primitive.canary import FixtureRun
+from raidar_contract.call import parse_stop_result
 
 
 def result_status(stdout: bytes, tokens: tuple[str, ...]) -> str:

@@ -12,7 +12,7 @@ import re
 import shutil
 import tempfile
 from collections.abc import Callable, Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
@@ -23,7 +23,7 @@ from raidar_contract.package.manifest import StagePackage
 
 from raidar.subject.package.registry import load_stage_package
 from raidar.subject.primitive import calls
-from raidar.subject.primitive.calls import ResourceFloors, TreeManifest
+from raidar.subject.primitive.calls import CallOptions, ResourceFloors, TreeManifest
 from raidar.subject.primitive.gate import Attribution, GateOutcome
 from raidar.subject.primitive.outputs import OutputsResult
 from raidar.subject.workflow import stage_check
@@ -113,11 +113,16 @@ class _Runner(ScriptedRunner):
         self.rig = rig
 
     async def run(  # type: ignore[override]
-        self, package: str, primitive: str, argv: Sequence[str], context: Any, **options: Any
+        self,
+        package: str,
+        primitive: str,
+        argv: Sequence[str],
+        context: Any,
+        options: CallOptions | None = None,
     ) -> Any:
-        if self.rig.ignore_bounds:
-            options.pop("state", None)
-        result = await super().run(package, primitive, argv, context, **options)
+        if self.rig.ignore_bounds and options is not None:
+            options = replace(options, state=None)
+        result = await super().run(package, primitive, argv, context, options)
         result.record["stdout"] = result.stdout.decode("utf-8", errors="replace")
         result.record["exit_code"] = result.exit_code
         result.record["duration_s"] = self.rig.duration_s
@@ -184,11 +189,9 @@ class CheckRig:
         return await stage_check.check_package(
             self.package,
             reference or self.package.name,
-            image="image",
-            docker_context="context",
+            stage_check.Rig("image", "context", logs or self.root / "logs"),
             pack="pack-recipe-1",
             primitives=self.primitives,
-            logs_dir=logs or self.root / "logs",
         )
 
     @property
