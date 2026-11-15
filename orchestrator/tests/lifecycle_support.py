@@ -22,12 +22,10 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-from raidar_contract.package.manifest import StagePackage
 
 from raidar.subject.package.registry import load_stage_package
 from raidar.subject.primitive import canary, outputs, site, stop
 from raidar.subject.primitive.calls import (
-    STATE_LIMITS,
     CallResult,
     CallRunner,
     ManifestEntry,
@@ -37,7 +35,9 @@ from raidar.subject.primitive.calls import (
 )
 from raidar.subject.primitive.canary import Canary, StageCheckRecord
 from raidar.subject.primitive.install import InstalledPackage
+from raidar.subject.primitive.payload.supervise import STATE_LIMITS
 from raidar.subject.primitive.site import PackageSite
+from raidar_contract.package.manifest import StagePackage
 
 FIXTURES = Path(__file__).parent / "fixtures" / "stages" / "acme"
 NOTE_STATE = FIXTURES / "note-state"
@@ -157,7 +157,7 @@ class ScriptedRunner(CallRunner):
         super().__init__(container, logs_dir)
         self.container = container
 
-    async def run(  # type: ignore[override]
+    async def run(
         self, package: str, primitive: str, argv: Sequence[str], context: Any, **options: Any
     ) -> CallResult:
         container = self.container
@@ -328,6 +328,6 @@ def build_rig(
         reference=package.name,
         installed=installed(package, container),
         task="the task",
-        params=package.effective_params(),  # type: ignore[arg-type]
+        params=package.effective_params(),
     )
     return Rig(container, package, package_site, Canary(package_site, expected), expected)

@@ -11,7 +11,6 @@ from typing import Any
 
 import pytest
 import yaml
-from raidar_contract.canonical import digest_json
 
 from raidar.contract.references import (
     RefKind,
@@ -25,6 +24,7 @@ from raidar.design.experiment.loader import CliOverrides, load_experiment
 from raidar.design.experiment.lock import build_lock, render_lock
 from raidar.scoring.framework.metrics import MetricResolver
 from raidar.subject.releases import AgentResolver, WorkflowResolver
+from raidar_contract.canonical import digest_json
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 EXPERIMENTS = REPO_ROOT / "lab" / "experiments"
@@ -135,4 +135,5 @@ def lock_bytes(path: Path, *, checkpoints: int = 8, overrides: CliOverrides | No
 
 
 def lock_document(path: Path, **kwargs: Any) -> dict[str, Any]:
-    return json.loads(lock_bytes(path, **kwargs))
+    document: dict[str, Any] = json.loads(lock_bytes(path, **kwargs))
+    return document

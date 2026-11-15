@@ -21,7 +21,6 @@ from harbor.agents.base import BaseAgent
 from harbor.agents.options import AgentOptions
 from harbor.environments.base import BaseEnvironment
 from harbor.models.agent.context import AgentContext
-from raidar_contract.package.manifest import ParamScalar
 
 from raidar.subject.package.registry import load_stage_package
 from raidar.subject.primitive.canary import StageCheckRecord
@@ -30,6 +29,7 @@ from raidar.subject.primitive.site import TrialInvalid
 from raidar.subject.workflow.package import CheckpointPlan, PackageCheckpoint
 from raidar.subject.workflow.package_member import PackageSpec
 from raidar.subject.workflow.stage import Checkpoint
+from raidar_contract.package.manifest import ParamScalar
 
 FIXTURES = Path(__file__).parent / "fixtures" / "stages" / "acme"
 PACK = "at3-pack"

@@ -16,9 +16,8 @@ from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
 
-from raidar_contract.criteria import validate_criteria
-
 from raidar.subject.workflow.acceptance import Acceptance
+from raidar_contract.criteria import validate_criteria
 
 TESTS = """\
 from app import parse
@@ -94,7 +93,7 @@ class ScriptShell:
         finally:
             sys.argv, sys.stdout = saved
         out.flush()
-        stdout = out.buffer.getvalue().decode("utf-8")  # type: ignore[attr-defined]
+        stdout = out.buffer.getvalue().decode("utf-8")
         return SimpleNamespace(return_code=code, stdout=stdout, stderr="")
 
 

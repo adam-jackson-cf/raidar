@@ -438,8 +438,12 @@ def load_fork(root: Path) -> Any:
         dependency_graph_traversal,
     )
     from slop_code.metrics.quality_io import save_quality_metrics
-    from slop_code.metrics.scoring import live_evidence, live_regression, production
-    from slop_code.metrics.scoring import models as scoring_models
+    from slop_code.metrics.scoring import (
+        live_evidence,
+        live_regression,
+        models as scoring_models,
+        production,
+    )
     from slop_code.metrics.scoring.inventory import build_inventory
     from slop_code.metrics.scoring.lineage import (
         calculate_problem_rework,

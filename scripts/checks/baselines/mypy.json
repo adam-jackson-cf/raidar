@@ -807,18 +807,6 @@
       "count": 1
     },
     {
-      "path": "orchestrator/tests/code_quality_support.py",
-      "code": "no-any-return",
-      "fingerprint": "b441b344127165247291a2dfc6433b7e500e418da9aa9a0939c4ec33d723e91d",
-      "count": 1
-    },
-    {
-      "path": "orchestrator/tests/criteria_support.py",
-      "code": "unused-ignore",
-      "fingerprint": "8070a201fc3828fcda0feb6e1668b27460e5b16f66e366e6a14f9dc5782fd4f8",
-      "count": 1
-    },
-    {
       "path": "orchestrator/tests/docker_trial_support.py",
       "code": "misc",
       "fingerprint": "edd0db9a26e56da6f0a0053b725dd05b2855debf23cb5e1bd3bb11296f319179",
@@ -828,48 +816,6 @@
       "path": "orchestrator/tests/docker_trial_support.py",
       "code": "misc",
       "fingerprint": "f136304571c126a71d926969d34e995b45441234c576eb340980459b9010436e",
-      "count": 1
-    },
-    {
-      "path": "orchestrator/tests/experiment_spec_support.py",
-      "code": "no-any-return",
-      "fingerprint": "b146937bed4db96582555cdb4680775c9c093dac9432914f5b9db64ca43f7041",
-      "count": 1
-    },
-    {
-      "path": "orchestrator/tests/health_support.py",
-      "code": "call-overload",
-      "fingerprint": "e05ac85d0b1497ba2c90346d4cb1f168f71327568c90a7b6f041dafe4599b7f6",
-      "count": 1
-    },
-    {
-      "path": "orchestrator/tests/health_support.py",
-      "code": "misc",
-      "fingerprint": "58ec20eca80a9c452b8dcd8d8519b06db18919f016a280bf7497a6520111b249",
-      "count": 1
-    },
-    {
-      "path": "orchestrator/tests/health_support.py",
-      "code": "no-any-return",
-      "fingerprint": "0be53bfff5b52c85d774a63ee1cf09711336c7598ee50f993e0f0dd92c4b102e",
-      "count": 1
-    },
-    {
-      "path": "orchestrator/tests/lifecycle_support.py",
-      "code": "attr-defined",
-      "fingerprint": "0817e219f1fca8391f261b4da447ca50f8eb6aea0f56c274703b6dd34612fedc",
-      "count": 1
-    },
-    {
-      "path": "orchestrator/tests/lifecycle_support.py",
-      "code": "unused-ignore",
-      "fingerprint": "2251e6e2b09725851cd1852026e75172b8fea704a1272a989ef02627dda8ea2e",
-      "count": 1
-    },
-    {
-      "path": "orchestrator/tests/lifecycle_support.py",
-      "code": "unused-ignore",
-      "fingerprint": "246a8d887a6390d633344bcd28309ae536fd4cb3733c252924ecdc6c49225b45",
       "count": 1
     },
     {

@@ -27,16 +27,14 @@ from raidar.design.problem.store import ROOT_ENV
 from raidar.engine.health.records_manifest import RECORDS_MANIFEST, seal_trial
 from raidar.engine.job.assessment import lock_rescore_config
 from raidar.evaluation.analysis.pooling import PoolingError, check_pooling
-from raidar.evaluation.analysis.sources import JobDir
+from raidar.evaluation.analysis.sources import DevOptions, JobDir
 from raidar.grading.models import CaseStatus
 from raidar.scoring.catalog.builtin import default_scorer_registry
 from raidar.scoring.catalog.outcomes import SOLVE_RATE_ERRATA
 from raidar.scoring.framework.metrics import MetricResolver
 from raidar.scoring.framework.rescore import rescore_path
 from raidar.scoring.framework.store import AssessmentStore
-from tests.analysis_support import RECORD_STEPS as STEPS
-from tests.analysis_support import analysis_lock as _lock
-from tests.analysis_support import trial_record
+from tests.analysis_support import RECORD_STEPS as STEPS, analysis_lock as _lock, trial_record
 from tests.experiment_spec_support import experiment_document, fixture_resolvers, write_experiment
 from tests.scorer_support import (
     APP_V1,
@@ -80,9 +78,11 @@ def _record(
         for index, step in enumerate(STEPS)
         if truncated_to is not None
     )
-    return trial_record(
-        trial_id, arm, attempt, valid=valid, truncated_to=truncated_to, step_results=results
+    record = trial_record(
+        trial_id, arm, attempt, valid=valid, options=DevOptions(max_checkpoints=truncated_to)
     )
+    stepped: TrialRecord = record.model_copy(update={"step_results": results})
+    return stepped
 
 
 def _add_cost(trial_dir: Path, cost: float) -> None:

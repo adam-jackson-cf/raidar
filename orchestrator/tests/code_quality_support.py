@@ -64,7 +64,8 @@ SHOP_CONFIG = {"entry_file": "app.py"}
 @cache
 def fork_goldens() -> dict[str, Any]:
     with gzip.open(GOLDENS, "rt", encoding="utf-8") as handle:
-        return json.load(handle)
+        goldens: dict[str, Any] = json.load(handle)
+    return goldens
 
 
 def golden_case(name: str) -> dict[str, Any]:
@@ -210,7 +211,6 @@ def case_trial(
     trial_dir: Path,
     case: Mapping[str, Any],
     *,
-    coverage: bool = True,
     parity: ParityVerdict | None = None,
     planned: Sequence[str] = (),
     reached: int | None = None,
@@ -237,7 +237,7 @@ def case_trial(
         verdict = parity if parity is not None else ParityVerdict(eligible=True)
         write_step_record(
             record_dir,
-            record.model_copy(update={"coverage": CoverageRef(enabled=coverage, parity=verdict)}),
+            record.model_copy(update={"coverage": CoverageRef(enabled=True, parity=verdict)}),
         )
         if runs is not None:
             (record_dir / FORK_EVIDENCE_FILE).write_text(
@@ -268,26 +268,34 @@ def memory_step(name: str, snapshot: Path | None, *, reached: bool = True) -> St
     )
 
 
+def with_files(
+    case: Mapping[str, Any], files: Mapping[str, Mapping[str, str | bytes]]
+) -> dict[str, Any]:
+    """A golden case whose snapshot files are replaced by checkpoint name."""
+    checkpoints = [
+        {**checkpoint, "files": files.get(checkpoint["checkpoint"], checkpoint["files"])}
+        for checkpoint in case["checkpoints"]
+    ]
+    return {**case, "checkpoints": checkpoints}
+
+
 def memory_context(
     tmp_path: Path,
     case: Mapping[str, Any],
     *,
     reached: int | None = None,
     planned: bool = False,
-    files: Mapping[str, Mapping[str, str | bytes]] | None = None,
     config: dict[str, Any] | None = None,
 ) -> AssessContext:
     """A golden case's steps as an in-memory context: snapshots on disk, no stored trial.
 
-    ``files`` replaces a step's snapshot files by checkpoint name. Steps from ``reached`` on
-    are left out, or listed as unreached when ``planned``.
+    Steps from ``reached`` on are left out, or listed as unreached when ``planned``.
     """
     steps = []
     for index, checkpoint in enumerate(case["checkpoints"]):
         name = checkpoint["checkpoint"]
         if reached is None or index < reached:
-            files_of = (files or {}).get(name, checkpoint["files"])
-            steps.append(memory_step(name, materialise(tmp_path / name, files_of)))
+            steps.append(memory_step(name, materialise(tmp_path / name, checkpoint["files"])))
         elif planned:
             steps.append(memory_step(name, None, reached=False))
     ctx = AssessContext(case["name"], tuple(steps))

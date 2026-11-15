@@ -27,8 +27,7 @@ from raidar.design.experiment.loader import load_experiment
 from raidar.design.experiment.lock import seal_lock
 from raidar.design.experiment.validation import SpecValidationError
 from raidar.engine.job.assessment import lock_rescore_config
-from raidar.evaluation.analysis import load as load_module
-from raidar.evaluation.analysis import lookup as lookup_module
+from raidar.evaluation.analysis import load as load_module, lookup as lookup_module
 from raidar.evaluation.analysis.assessed import (
     PROCESS_COMPLIANCE_REF,
     VERIFICATION_EFFORT_REF,
@@ -39,8 +38,7 @@ from raidar.evaluation.analysis.load import LoadRequest, load_inputs
 from raidar.evaluation.analysis.lookup import AssessmentLookup, assessment_config
 from raidar.evaluation.analysis.markdown import render_markdown
 from raidar.evaluation.analysis.outcomes import PoolFinding, PoolingReport, Value
-from raidar.evaluation.analysis.report import DevRun, analyse
-from raidar.evaluation.analysis.report import PlannedTrial as PlannedRow
+from raidar.evaluation.analysis.report import DevRun, PlannedTrial as PlannedRow, analyse
 from raidar.evaluation.analysis.sources import (
     AnalysisInputError,
     DevOptions,
@@ -289,9 +287,7 @@ def test_a_valid_rerun_replaces_an_invalid_trial_but_two_valid_ones_conflict() -
 
 def _dev_job(name: str, plan: DevOptions, recorded: DevOptions | None = None) -> JobDir:
     recorded = plan if recorded is None else recorded
-    record = trial_record(
-        "t", "a", 0, truncated_to=recorded.max_checkpoints, agent_override=recorded.agent_override
-    )
+    record = trial_record("t", "a", 0, options=recorded)
     options = {"max_checkpoints": plan.max_checkpoints, "agent_override": plan.agent_override}
     return JobDir(Path(name), {"job_id": name}, {"options": options}, (record,))
 
@@ -628,8 +624,7 @@ def _toy_job(
             arm,
             attempt,
             valid=valid,
-            truncated_to=options.max_checkpoints,
-            agent_override=options.agent_override,
+            options=options,
         )
         for arm in ("baseline", "guided")
         for attempt in range(2)

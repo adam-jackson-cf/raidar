@@ -7,16 +7,16 @@ from typing import Any
 
 from raidar.contract.trial import (
     ExecutionValidity,
+    PlannedTrial as RecordedTrial,
     ProgressionRule,
-    StepResult,
     TrialHashes,
     TrialRecord,
     ValidityCheck,
 )
-from raidar.contract.trial import PlannedTrial as RecordedTrial
 from raidar.design.experiment.lock import LOCK_VERSION, seal_lock
 from raidar.evaluation.analysis.outcomes import TrialOutcome, Value
 from raidar.evaluation.analysis.report import AnalysisInputs, ArmSummary, PlannedTrial
+from raidar.evaluation.analysis.sources import DevOptions
 from raidar.evaluation.analysis.verification_effort import GateDescriptive
 from raidar.scoring.catalog.outcomes import declared_outcome_types
 
@@ -40,18 +40,12 @@ def trial(
     *,
     problem: str = "toy@1",
     infra: bool = False,
-    solved: Sequence[float | None] | None = None,
 ) -> TrialOutcome:
-    """One trial; plain floats become ``ok`` values, ``None`` checkpoints are gaps."""
+    """One trial; plain floats become ``ok`` values."""
     values = {
         name: value if isinstance(value, Value) else Value.ok(value)
         for name, value in metrics.items()
     }
-    series = {}
-    if solved is not None:
-        series["solved"] = tuple(
-            Value.ok(v) if v is not None else gap("not_applicable", "not reached") for v in solved
-        )
     return TrialOutcome(
         trial_id=f"{problem}-{arm}-b{attempt}",
         job_id="run-1",
@@ -62,8 +56,20 @@ def trial(
         infra_error=infra,
         infra_reasons=("validity:steps_started",) if infra else (),
         metrics=values,
-        series=series,
     )
+
+
+def checkpoint_trial(
+    arm: str, attempt: int, solved: Sequence[float | None], *, infra: bool = False
+) -> TrialOutcome:
+    """One trial with no metrics and a ``solved`` series; ``None`` checkpoints are gaps."""
+    points = tuple(
+        Value.ok(v) if v is not None else gap("not_applicable", "not reached") for v in solved
+    )
+    outcome: TrialOutcome = trial(arm, attempt, {}, infra=infra).model_copy(
+        update={"series": {"solved": points}}
+    )
+    return outcome
 
 
 def paired_arms(
@@ -185,13 +191,10 @@ def trial_record(
     attempt: int,
     *,
     valid: bool = True,
-    truncated_to: int | None = None,
-    agent_override: str | None = None,
-    problem: str = "scb/toy@1",
-    steps: tuple[str, ...] = RECORD_STEPS,
-    step_results: tuple[StepResult, ...] = (),
+    options: DevOptions | None = None,
 ) -> TrialRecord:
-    """A trial record built in memory; ``steps`` is the bound prefix it planned."""
+    """A trial record built in memory that planned ``RECORD_STEPS`` and ran under ``options``."""
+    options = options or DevOptions()
     return TrialRecord(
         experiment="pilot",
         job_id="run-1",
@@ -201,17 +204,17 @@ def trial_record(
             order=0,
             sequence=attempt,
             arm=arm,
-            problem=problem,
+            problem="scb/toy@1",
             problem_index=0,
-            steps=steps,
+            steps=RECORD_STEPS,
             hashes=RECORD_HASHES,
         ),
         trial_dir=f"trials/{trial_id}",
         progression=ProgressionRule(mode="continue", reward_key="solved"),
-        truncated_to=truncated_to,
-        agent_override=agent_override,
-        step_results=step_results,
-        reached=tuple(True for _ in steps),
+        truncated_to=options.max_checkpoints,
+        agent_override=options.agent_override,
+        step_results=(),
+        reached=tuple(True for _ in RECORD_STEPS),
         reached_source="derived",
         validity=ExecutionValidity(checks=(ValidityCheck(name="steps_started", passed=valid),)),
     )
