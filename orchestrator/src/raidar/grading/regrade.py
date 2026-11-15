@@ -28,7 +28,7 @@ from pathlib import Path
 
 from raidar.contract.snapshot import tree_digest
 from raidar.grading.bundle import VerifierBundle, load_bundle
-from raidar.grading.grader import grade_step
+from raidar.grading.grader import Oracle, OracleSettings, grade_step
 from raidar.grading.grader_image import ensure_grader_image
 from raidar.grading.outcomes import StepGrade
 from raidar.grading.records import RECORD_FILE, VERIFIER_RECORD_DIR, StepRecord, load_step_record
@@ -78,8 +78,11 @@ def docker_sandbox_factory(docker_context: str) -> SandboxFactory:
 
 
 def write_store_json(path: Path, payload: dict[str, object]) -> None:
-    """Write one Assessment-store file by atomic replace: an interrupted run never leaves a
-    partial file that a later run would take for a stored grade."""
+    """Write one Assessment-store file by atomic replace.
+
+    An interrupted run never leaves a partial file that a later run would take for a stored
+    grade.
+    """
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_name(f".{path.name}.{os.getpid()}.tmp")
     temporary.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n")
@@ -168,14 +171,15 @@ async def regrade_step(trial_dir: Path, record_dir: Path, options: RegradeOption
     sandbox = await factory(bundle)
     with tempfile.TemporaryDirectory(prefix="raidar-regrade-", dir=options.work_root) as work:
         result = await grade_step(
-            bundle,
+            Oracle(bundle, sandbox),
             record.step,
             snapshot,
-            sandbox,
             Path(work),
-            coverage=record.coverage.enabled,
-            timeout_s=record.grader.timeout_s,
-            recorded=record.submission_dependencies,
+            OracleSettings(
+                coverage=record.coverage.enabled,
+                timeout_s=record.grader.timeout_s,
+                recorded=record.submission_dependencies,
+            ),
         )
     differences = compare(record, result, await sandbox.environment_id())
     return StepRegrade(
@@ -192,10 +196,8 @@ async def regrade_trial(trial_dir: Path, options: RegradeOptions) -> TrialRegrad
     record_dirs = sorted(p for p in steps_root.iterdir() if (p / RECORD_FILE).is_file())
     if not record_dirs:
         raise RegradeError(f"no verifier step records under {steps_root}")
-    return TrialRegrade(
-        trial_dir=trial_dir,
-        steps=tuple([await regrade_step(trial_dir, d, options) for d in record_dirs]),
-    )
+    steps = [await regrade_step(trial_dir, d, options) for d in record_dirs]
+    return TrialRegrade(trial_dir=trial_dir, steps=tuple(steps))
 
 
 def report_payload(results: list[TrialRegrade]) -> dict[str, object]:

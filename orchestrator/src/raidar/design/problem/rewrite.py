@@ -24,6 +24,7 @@ from __future__ import annotations
 import re
 import shutil
 import stat
+from dataclasses import dataclass
 from pathlib import Path
 
 import yaml
@@ -153,19 +154,23 @@ def checkpoint_specs(
     }
 
 
+@dataclass(frozen=True)
+class ConversionTarget:
+    """What a converted problem is rewritten for: the problem, its selected steps and pack."""
+
+    problem: ProblemId
+    steps: list[str]
+    pack: PackSpec
+
+
 def render_task(
-    converted: Path,
-    out: Path,
-    *,
-    problem: ProblemId,
-    steps: list[str],
-    pack: PackSpec,
-    specs: dict[str, str],
+    converted: Path, out: Path, target: ConversionTarget, specs: dict[str, str]
 ) -> None:
+    problem, steps = target.problem, target.steps
     config = TaskConfig.model_validate_toml((converted / "task.toml").read_text())
     by_name = {step.name: step for step in config.steps or []}
     out.mkdir(parents=True)
-    env_fields = bind_task_environment(out / "environment", pack)
+    env_fields = bind_task_environment(out / "environment", target.pack)
     artifact = ArtifactConfig.model_validate(app_artifact_config())
     if config.task is not None:
         config.task.name = problem.name
@@ -188,19 +193,17 @@ def render_task(
     stub.write_text(STUB_TEST_SH)
     stub.chmod(stub.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
     for name in steps:
-        target = out / "steps" / name
-        target.mkdir(parents=True)
-        (target / "instruction.md").write_bytes(specs[name].encode("utf-8"))
+        step_dir = out / "steps" / name
+        step_dir.mkdir(parents=True)
+        (step_dir / "instruction.md").write_bytes(specs[name].encode("utf-8"))
     Task(out)  # Harbor must load what it will run.
 
 
 def build_bundle(
     converted: Path,
     out: Path,
+    target: ConversionTarget,
     *,
-    problem: ProblemId,
-    steps: list[str],
-    pack: PackSpec,
     source: dict[str, str],
     entry_file: str | None = None,
 ) -> VerifierBundle:
@@ -211,13 +214,14 @@ def build_bundle(
     try:
         derived = staged.manifest
         manifest = BundleManifest(
-            problem=str(problem),
+            problem=str(target.problem),
             source=derived.source,
             env=derived.env,
             grader=GraderSpec(
-                base_image=image_tag(pack), test_dependencies=derived.grader.test_dependencies
+                base_image=image_tag(target.pack),
+                test_dependencies=derived.grader.test_dependencies,
             ),
-            steps=tuple(staged.step(name) for name in steps),
+            steps=tuple(staged.step(name) for name in target.steps),
             entry_file=entry_file,
         )
         selected = {name for step in manifest.steps for name in step.test_files}

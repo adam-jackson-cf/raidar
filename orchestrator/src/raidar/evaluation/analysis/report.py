@@ -52,11 +52,12 @@ from raidar.evaluation.analysis.effects import (
     problem_effect,
 )
 from raidar.evaluation.analysis.manipulation import (
+    CheckSources,
     ManipulationReport,
     treatment_check_report,
 )
 from raidar.evaluation.analysis.outcomes import AnalysisModel, PoolingReport, TrialOutcome
-from raidar.evaluation.analysis.ranking import Ranking, ranking
+from raidar.evaluation.analysis.ranking import RankedArm, Ranking, RankingSpec, ranking
 from raidar.evaluation.analysis.verification_effort import (
     NO_PROCESS_NOTE,
     GateDescriptive,
@@ -309,8 +310,7 @@ def _manipulation(
 ) -> ManipulationReport | None:
     return treatment_check_report(
         inputs.outcomes,
-        process_results=inputs.process_results,
-        gate_results=inputs.gate_results,
+        CheckSources(process=inputs.process_results, gate=inputs.gate_results),
         baseline=inputs.baseline_arm,
         treatment=treatment,
         alpha=settings.alpha,
@@ -540,13 +540,17 @@ def _ranking(
 ) -> Ranking | None:
     if inputs.kind != "benchmark":
         return None
-    return ranking(
-        inputs.outcomes,
-        [summary.arm for summary in summaries],
+    arms = [
+        RankedArm(
+            arm=summary.arm,
+            cost_means=summary.cost_means,
+            gate_means=gate_means(summary.verification_effort),
+        )
+        for summary in summaries
+    ]
+    spec = RankingSpec(
         rank_by=inputs.rank_by or inputs.primary,
         reference_arm=inputs.baseline_arm,
         attempts=inputs.attempts,
-        settings=settings,
-        cost_means={summary.arm: summary.cost_means for summary in summaries},
-        gate_means={summary.arm: gate_means(summary.verification_effort) for summary in summaries},
     )
+    return ranking(inputs.outcomes, arms, spec, settings)

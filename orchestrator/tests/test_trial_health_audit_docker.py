@@ -7,6 +7,7 @@ from types import SimpleNamespace
 from typing import Any
 
 import pytest
+from harbor.models.environment_type import EnvironmentType
 from harbor.models.trial.config import (
     AgentConfig,
     EnvironmentConfig,
@@ -52,7 +53,7 @@ async def _run(tmp_path: Path, tamper_on_step: int | None) -> Path:
         trials_dir=trials_dir,
         agent=AgentConfig(name="nop"),
         environment=EnvironmentConfig(
-            type="docker",
+            type=EnvironmentType.DOCKER,
             import_path=RUN_SCOPED_DOCKER_IMPORT_PATH,
             delete=True,
             kwargs={SCOPE_KWARG: run_scope(trials_dir)},

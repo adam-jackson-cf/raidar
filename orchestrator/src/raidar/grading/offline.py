@@ -27,6 +27,7 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import Iterable
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -45,6 +46,20 @@ class OfflineGradingError(RuntimeError):
     """A regrade, pre-fix grading, offline coverage run or coverage check that cannot run."""
 
 
+@dataclass(frozen=True)
+class RescoreGrading:
+    """What a rescore grades first: the target job, into which store, for which scorers.
+
+    ``replay`` grades nothing; ``concurrency`` is how many trials are graded at once.
+    """
+
+    target: Path
+    store: Path
+    scorer_refs: Iterable[str]
+    replay: bool
+    concurrency: int = 1
+
+
 def regrade(target: Path, options: RegradeOptions, store: Path | None) -> dict[str, Any]:
     """The regrade report; a regrade that cannot run is an ``OfflineGradingError``."""
     try:
@@ -57,38 +72,26 @@ def regrade(target: Path, options: RegradeOptions, store: Path | None) -> dict[s
     return {**report, "pre_fix": pre_fix, "match": bool(report["match"]) and pre_fix["match"]}
 
 
-def grade_pre_fix(
-    target: Path,
-    store: Path,
-    scorer_refs: Iterable[str],
-    options: RegradeOptions,
-    *,
-    replay: bool,
-    concurrency: int = 1,
-) -> dict[str, Any] | None:
+def grade_pre_fix(request: RescoreGrading, options: RegradeOptions) -> dict[str, Any] | None:
     """Grade the target's ungraded pre-fix snapshots into the store, when a scorer reads them."""
-    if replay or not PRE_FIX_GRADE_SCORERS.intersection(scorer_refs):
+    if request.replay or not PRE_FIX_GRADE_SCORERS.intersection(request.scorer_refs):
         return None
     try:
-        return asyncio.run(grade_pre_fix_path(target, store, options, concurrency))
+        return asyncio.run(
+            grade_pre_fix_path(request.target, request.store, options, request.concurrency)
+        )
     except (RegradeError, BundleError) as exc:
         raise OfflineGradingError(f"pre-fix grading: {exc}") from exc
 
 
-def produce_coverage(
-    target: Path,
-    store: Path,
-    scorer_refs: Iterable[str],
-    options: RegradeOptions,
-    *,
-    replay: bool,
-    concurrency: int = 1,
-) -> dict[str, Any] | None:
+def produce_coverage(request: RescoreGrading, options: RegradeOptions) -> dict[str, Any] | None:
     """Make the target's deferred coverage runs into the store, when a scorer reads them."""
-    if replay or not OFFLINE_COVERAGE_SCORERS.intersection(scorer_refs):
+    if request.replay or not OFFLINE_COVERAGE_SCORERS.intersection(request.scorer_refs):
         return None
     try:
-        return asyncio.run(produce_coverage_path(target, store, options, concurrency))
+        return asyncio.run(
+            produce_coverage_path(request.target, request.store, options, request.concurrency)
+        )
     except (RegradeError, BundleError) as exc:
         raise OfflineGradingError(f"offline coverage: {exc}") from exc
 
@@ -113,6 +116,7 @@ __all__ = [
     "OFFLINE_COVERAGE_SCORERS",
     "PRE_FIX_GRADE_SCORERS",
     "OfflineGradingError",
+    "RescoreGrading",
     "check_coverage",
     "grade_pre_fix",
     "produce_coverage",

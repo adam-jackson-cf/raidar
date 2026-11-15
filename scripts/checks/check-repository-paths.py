@@ -111,6 +111,8 @@ OWNERS = cast(
 )
 STAGE_FIXTURE = re.compile(r"^lab/stages/[^/]+/[^/]+/fixtures/")
 KEBAB_CASE = re.compile(r"[a-z][a-z0-9]*(?:-[a-z0-9]+)*")
+THIRD_PARTY_STUB_ROOT = "orchestrator/stubs/"
+"""Type stubs for packages that ship none: their paths are the package's own module names."""
 # Files the test runners collect; anything else that looks like a test is never run.
 TEST_FILE_PATTERNS = (
     *QUALITY.CANONICAL_TEST_GROUPS["behaviour"],
@@ -211,6 +213,8 @@ def name_matches(path: str, pattern: str) -> bool:
 
 def naming_findings(path: str) -> list[str]:
     """Catch-all words, a child repeating its parent and skill directory casing."""
+    if path.startswith(THIRD_PARTY_STUB_ROOT):
+        return []
     parts = PurePosixPath(path).parts
     names = [*parts[:-1], name_stem(parts[-1])]
     found: list[str] = []

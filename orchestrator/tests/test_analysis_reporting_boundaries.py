@@ -144,7 +144,7 @@ def test_report_retains_rawless_primary_and_omits_unavailable_power_rows() -> No
 def test_verifier_sensitivity_notes_stay_beside_diagnostics_without_changing_outcomes(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    from raidar.design.problem.sensitivities import VerifierSensitivity
+    from raidar.design.problem.sensitivities import SensitivityKind, VerifierSensitivity
     from raidar.evaluation.analysis import report as report_module
 
     outcome_inputs = inputs(paired_arms("solve_rate", [0.0, 0.0], [1.0, 1.0]), 2)
@@ -153,7 +153,7 @@ def test_verifier_sensitivity_notes_stay_beside_diagnostics_without_changing_out
     note = VerifierSensitivity(
         case="test_deadline.py::test_timeout",
         checkpoint="checkpoint_1",
-        kind="timing",
+        kind=SensitivityKind.TIMING,
         spec_determined=True,
         spec="must terminate within the deadline",
         mechanism="wall clock sampling varies across grading runs",

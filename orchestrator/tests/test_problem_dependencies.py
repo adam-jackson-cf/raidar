@@ -10,7 +10,7 @@ from pathlib import Path
 import pytest
 
 from raidar.contract.wheels import DependencyInfraError
-from raidar.design.problem.importer import ProblemDriftError, import_problem
+from raidar.design.problem.importer import ImportSource, ProblemDriftError, import_problem
 from raidar.design.problem.models import ProblemId
 from raidar.design.problem.store import ProblemStore, ProblemStoreError
 from raidar.design.problem.validation import DEPENDENCY_CHECK, Verdict
@@ -40,7 +40,7 @@ def test_import_pins_dependencies_and_writes_locks_beside_the_manifest(
     scb: tuple[ProblemStore, Path, ProblemId],
 ) -> None:
     store, repo, problem = scb
-    result = import_problem(store, problem, source_checkout=repo, resolver=FakeResolver())
+    result = import_problem(store, problem, source=ImportSource(repo), resolver=FakeResolver())
     pins = result.manifest.dependencies
     assert pins is not None
     assert result.manifest.dependency_refusal is None
@@ -57,9 +57,9 @@ def test_reimport_keeps_the_cutoff_and_reuses_the_committed_locks(
     scb: tuple[ProblemStore, Path, ProblemId],
 ) -> None:
     store, repo, problem = scb
-    first = import_problem(store, problem, source_checkout=repo, resolver=FakeResolver())
+    first = import_problem(store, problem, source=ImportSource(repo), resolver=FakeResolver())
     resolver = FakeResolver()
-    again = import_problem(store, problem, source_checkout=repo, resolver=resolver)
+    again = import_problem(store, problem, source=ImportSource(repo), resolver=resolver)
     assert not again.changed
     assert again.manifest == first.manifest
     assert resolver.cutoffs == []
@@ -67,7 +67,7 @@ def test_reimport_keeps_the_cutoff_and_reuses_the_committed_locks(
 
 def test_a_changed_pin_moves_the_manifest_digest(scb: tuple[ProblemStore, Path, ProblemId]) -> None:
     store, repo, problem = scb
-    first = import_problem(store, problem, source_checkout=repo, resolver=FakeResolver())
+    first = import_problem(store, problem, source=ImportSource(repo), resolver=FakeResolver())
     manifest = first.manifest
     assert manifest.dependencies is not None
     other = manifest.model_copy(
@@ -84,12 +84,14 @@ def test_a_changed_pin_moves_the_manifest_digest(scb: tuple[ProblemStore, Path, 
     )
     store.write_manifest(other)
     with pytest.raises(ProblemDriftError):
-        import_problem(store, problem, source_checkout=repo, resolver=FakeResolver())
+        import_problem(store, problem, source=ImportSource(repo), resolver=FakeResolver())
 
 
 def test_tampered_lock_is_refused_on_load(scb: tuple[ProblemStore, Path, ProblemId]) -> None:
     store, repo, problem = scb
-    pins = import_problem(store, problem, source_checkout=repo, resolver=FakeResolver()).manifest
+    pins = import_problem(
+        store, problem, source=ImportSource(repo), resolver=FakeResolver()
+    ).manifest
     path = next(store.deps_dir(problem).glob("*.toml"))
     path.write_text("tampered\n")
     with pytest.raises(ProblemStoreError, match="differs from its pin"):
@@ -100,7 +102,7 @@ def test_tampered_lock_is_refused_on_load(scb: tuple[ProblemStore, Path, Problem
 def test_unresolvable_set_excludes_the_problem(scb: tuple[ProblemStore, Path, ProblemId]) -> None:
     store, repo, problem = scb
     resolver = FakeResolver((Unprovided(requirement="sdist-only", reason="no-wheel"),))
-    result = import_problem(store, problem, source_checkout=repo, resolver=resolver)
+    result = import_problem(store, problem, source=ImportSource(repo), resolver=resolver)
     refusal = result.manifest.dependency_refusal
     assert refusal is not None
     assert refusal.reason == REFUSAL_REASON
@@ -112,7 +114,7 @@ def test_unresolvable_set_excludes_the_problem(scb: tuple[ProblemStore, Path, Pr
     assert "grades" not in report.to_json()
     # A refused re-import keeps its cutoff.
     retry = FakeResolver()
-    import_problem(store, problem, source_checkout=repo, update=True, resolver=retry)
+    import_problem(store, problem, source=ImportSource(repo), update=True, resolver=retry)
     assert retry.cutoffs
     assert set(retry.cutoffs) == {refusal.exclude_newer}
 
@@ -121,14 +123,14 @@ def test_infra_outage_is_not_an_exclusion(scb: tuple[ProblemStore, Path, Problem
     store, repo, problem = scb
 
     with pytest.raises(DependencyInfraError):
-        import_problem(store, problem, source_checkout=repo, resolver=Outage())
+        import_problem(store, problem, source=ImportSource(repo), resolver=Outage())
     assert not store.manifest_path(problem).exists()
 
 
 def test_a_manifest_without_a_pin_is_not_usable(scb: tuple[ProblemStore, Path, ProblemId]) -> None:
     store, repo, problem = scb
     manifest = import_problem(
-        store, problem, source_checkout=repo, resolver=FakeResolver()
+        store, problem, source=ImportSource(repo), resolver=FakeResolver()
     ).manifest
     unpinned = manifest.model_copy(update={"dependencies": None})
     with pytest.raises(ProblemStoreError, match="validation|dependency pin"):

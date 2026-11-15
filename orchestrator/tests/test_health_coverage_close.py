@@ -53,7 +53,7 @@ from raidar.engine.health.records_manifest import (
 )
 from raidar.engine.health.workflow import check_workflow
 from raidar.grading import offline
-from raidar.grading.offline import OfflineGradingError
+from raidar.grading.offline import OfflineGradingError, RescoreGrading
 from raidar.grading.records import step_record_dir, write_step_record
 from raidar.grading.regrade import RegradeOptions
 from tests.health_support import (
@@ -657,8 +657,10 @@ def _report_of(trial_id: str, *checks: HealthCheck) -> HealthReport:
     return HealthReport(trial_id=trial_id, checks=checks)
 
 
-def _check(check_id: str, status: Any, detail: str = "") -> HealthCheck:
-    return HealthCheck(id=check_id, family=check_id[0], status=status, detail=detail)
+def _check(check_id: str, status: str, detail: str = "") -> HealthCheck:
+    return HealthCheck.model_validate(
+        {"id": check_id, "family": check_id[0], "status": status, "detail": detail}
+    )
 
 
 def _health_job(tmp_path: Path, *trial_ids: str, manifest: bool = True) -> Path:
@@ -758,10 +760,10 @@ PATHS = (Path("target"), Path("store"))
 WRAPPERS: dict[str, Callable[[], object]] = {
     "regrade": lambda: grading_cli.regrade(PATHS[0], OPTIONS, None),
     "grade_pre_fix": lambda: grading_cli.grade_pre_fix(
-        *PATHS, ["ref"], OPTIONS, replay=False, concurrency=2
+        RescoreGrading(*PATHS, ["ref"], replay=False, concurrency=2), OPTIONS
     ),
     "produce_coverage": lambda: grading_cli.produce_coverage(
-        *PATHS, ["ref"], OPTIONS, replay=True, concurrency=2
+        RescoreGrading(*PATHS, ["ref"], replay=True, concurrency=2), OPTIONS
     ),
     "check_coverage": lambda: grading_cli.check_coverage(PATHS[0], OPTIONS, None, 2),
 }

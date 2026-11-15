@@ -22,10 +22,10 @@ from enum import StrEnum
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
-from raidar_contract.canonical import digest_json
 
 from raidar.contract.references import RefKind, RegistryRef, RegistryReferenceError
 from raidar.grading.dependency_pins import DependencyPins, DependencyRefusal
+from raidar_contract.canonical import digest_json
 
 VERSION_CHARS = 12
 _COMMIT = re.compile(r"^[0-9a-f]{40}$")

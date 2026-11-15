@@ -12,7 +12,6 @@ import time
 from pathlib import Path
 
 import click
-from raidar_contract.package.manifest import StagePackage
 
 from raidar.cli.stage_lock import lock_problems
 from raidar.cli.stage_package import load_named
@@ -29,6 +28,7 @@ from raidar.subject.workflow.stage_check import (
     record_json,
     replay_trial,
 )
+from raidar_contract.package.manifest import StagePackage
 
 RUNTIME = "python"
 

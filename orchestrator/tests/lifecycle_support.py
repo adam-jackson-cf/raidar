@@ -22,6 +22,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+from harbor.environments.base import ExecResult
 
 from raidar.subject.package.registry import load_stage_package
 from raidar.subject.primitive import canary, outputs, site, stop
@@ -107,6 +108,17 @@ class FakeContainer:
 
     def host(self, path: str) -> Path:
         return self.root / path.lstrip("/")
+
+    async def exec(
+        self,
+        command: str,
+        cwd: str | None = None,
+        env: dict[str, str] | None = None,
+        timeout_sec: int | None = None,
+        user: str | int | None = None,
+    ) -> ExecResult:
+        """Commands reach this fake only through the patched primitive calls."""
+        raise AssertionError(f"an unpatched command reached the fake container: {command}")
 
     def write_note(self, text: str = "a short note of words") -> None:
         note = self.host(NOTE)

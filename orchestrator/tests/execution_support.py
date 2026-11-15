@@ -30,7 +30,7 @@ from raidar.design.experiment.lock import (
     render_lock,
 )
 from raidar.design.experiment.schema import ProtocolSpec
-from raidar.design.problem.importer import import_problem
+from raidar.design.problem.importer import ImportSource, import_problem
 from raidar.design.problem.models import ProblemId
 from raidar.design.problem.store import ProblemStore
 from raidar.design.problem.validator import ValidateOptions, validate_problem, write_report
@@ -97,7 +97,7 @@ def imported_pack_fixture(root: Path, docker_context: str) -> ImportedFixture:
     repo, commit = build_fake_scb_repo(root / "src")
     store = fake_store(root / "problems", commit)
     problem = ProblemId.parse(f"scb/adder@{commit[:12]}")
-    import_problem(store, problem, source_checkout=repo, resolver=UvResolver())
+    import_problem(store, problem, source=ImportSource(repo), resolver=UvResolver())
     report = asyncio.run(
         validate_problem(
             store,

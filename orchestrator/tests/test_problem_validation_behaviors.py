@@ -19,9 +19,9 @@ from raidar.cli import main
 from raidar.contract.paths import VAR_ENV, problems_root
 from raidar.contract.references import RegistryReferenceError
 from raidar.design.problem import direct, harbor_engine, importer, validator
-from raidar.design.problem.catalog import select_problems, source_catalog
+from raidar.design.problem.catalog import ProblemSelection, select_problems, source_catalog
 from raidar.design.problem.content import content_digest, hidden_content_in_task
-from raidar.design.problem.importer import ProblemDriftError
+from raidar.design.problem.importer import ImportSource, ProblemDriftError
 from raidar.design.problem.models import ProblemId, ProblemManifest, ProblemMode, SourcePin
 from raidar.design.problem.native import (
     NativeRunner,
@@ -375,8 +375,9 @@ def test_harbor_engine_variant_adds_solutions_to_a_copy_only(
         tmp_path / "trials",
         "negative-0",
         problem.bundle.root,
-        docker_context="orbstack",
-        grader=GRADER,
+        harbor_engine.HarborRuns(
+            repeats=1, concurrency=1, docker_context="orbstack", grader=GRADER
+        ),
     )
     assert config.verifier.kwargs["pinned"] == {"grader": GRADER}
     assert config.agent.name == "oracle"
@@ -497,8 +498,9 @@ def _cp(code: int = 0, out: str = "", err: str = "") -> subprocess.CompletedProc
 
 
 def _pin(converter: str | None = None) -> SourcePin:
-    extra = {} if converter is None else {"converter": converter}
-    return SourcePin(url="file:///nowhere", commit=COMMIT, **extra)
+    if converter is None:
+        return SourcePin(url="file:///nowhere", commit=COMMIT)
+    return SourcePin(url="file:///nowhere", commit=COMMIT, converter=converter)
 
 
 def _ref(name: str = "scb/adder") -> ProblemId:
@@ -516,7 +518,7 @@ def _import(
 ) -> importer.ImportResult:
     store, repo, run = scripted
     return importer.import_problem(
-        store, ref or _ref(), source_checkout=repo, resolver=FakeResolver(), run=run, **kw
+        store, ref or _ref(), source=ImportSource(repo, run), resolver=FakeResolver(), **kw
     )
 
 
@@ -669,10 +671,16 @@ def test_source_selection_requires_one_pin_and_unambiguous_names(tmp_path: Path)
     _, available = source_catalog(store, source, repo, run=run)
     expected = (_ref(),)
     assert available == expected
-    assert select_problems(store, (), "all", source, repo, importing=True, run=run) == expected
-    assert select_problems(store, (), "adder,adder", source, repo, run=run) == expected
-    assert select_problems(store, (str(expected[0]),), None, None) == expected
-    assert select_problems(store, (str(expected[0]),) * 2, None, None) == expected
+    assert (
+        select_problems(store, ProblemSelection((), "all", source, repo), importing=True, run=run)
+        == expected
+    )
+    assert (
+        select_problems(store, ProblemSelection((), "adder,adder", source, repo), run=run)
+        == expected
+    )
+    assert select_problems(store, ProblemSelection((str(expected[0]),), None, None)) == expected
+    assert select_problems(store, ProblemSelection((str(expected[0]),) * 2, None, None)) == expected
     for refs, names, pin in (
         ((str(expected[0]),), "all", source),
         ((), None, source),
@@ -683,17 +691,19 @@ def test_source_selection_requires_one_pin_and_unambiguous_names(tmp_path: Path)
         ((), "adder", None),
     ):
         with pytest.raises(ProblemStoreError):
-            select_problems(store, refs, names, pin, repo, importing=True, run=run)
+            select_problems(
+                store, ProblemSelection(refs, names, pin, repo), importing=True, run=run
+            )
 
 
 def test_registered_problems_are_selected_by_name_or_all(store: ProblemStore) -> None:
     everything = tuple(store.registered())
     assert len(everything) == 3
-    assert select_problems(store, (), "all", None) == everything
-    names = select_problems(store, (), "adder, fixture/adder_negative", None)
+    assert select_problems(store, ProblemSelection((), "all", None)) == everything
+    names = select_problems(store, ProblemSelection((), "adder, fixture/adder_negative", None))
     assert [str(p) for p in names] == [POSITIVE_REF, NEGATIVE_REF]
     with pytest.raises(ProblemStoreError, match="one pinned problem"):
-        select_problems(store, (), "nothing", None)
+        select_problems(store, ProblemSelection((), "nothing", None))
 
 
 def test_a_checkout_must_sit_at_its_pin(tmp_path: Path) -> None:
@@ -850,11 +860,11 @@ def test_import_refuses_sources_that_are_not_exactly_the_pin(
         _import(scripted, ProblemId.parse("other/adder@000000000000"))
     with pytest.raises(SourceError, match="local changes"):
         importer.import_problem(
-            store, _ref(), source_checkout=repo, run=ScriptedSource(repo, COMMIT, dirty="?? x")
+            store, _ref(), source=ImportSource(repo, ScriptedSource(repo, COMMIT, dirty="?? x"))
         )
     with pytest.raises(SourceError, match="expected pinned commit"):
         importer.import_problem(
-            store, _ref(), source_checkout=repo, run=ScriptedSource(repo, COMMIT, head="c" * 40)
+            store, _ref(), source=ImportSource(repo, ScriptedSource(repo, COMMIT, head="c" * 40))
         )
     with pytest.raises(ProblemStoreError, match="is not an SCB problem"):
         _import(scripted, _ref("scb/ghost"))
@@ -884,7 +894,7 @@ def test_import_surfaces_converter_failure_and_timeout(
     ):
         with pytest.raises(SourceError, match=message):
             importer.import_problem(
-                store, _ref(), source_checkout=repo, resolver=FakeResolver(), run=run
+                store, _ref(), source=ImportSource(repo, run), resolver=FakeResolver()
             )
     assert not store.manifest_path(_ref()).exists()
 
@@ -893,7 +903,9 @@ def test_default_import_clones_the_pinned_commit_into_the_store_cache(
     scripted: tuple[ProblemStore, Path, ScriptedSource],
 ) -> None:
     store, _, run = scripted
-    result = importer.import_problem(store, _ref(), resolver=FakeResolver(), run=run)
+    result = importer.import_problem(
+        store, _ref(), source=ImportSource(run=run), resolver=FakeResolver()
+    )
     assert (store.root / "cache" / "sources" / f"scb-{COMMIT[:12]}" / ".git").exists()
     assert result.manifest.source.url == "file:///nowhere"
 

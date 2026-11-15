@@ -24,6 +24,7 @@ from raidar.subject.primitive.calls import (
     CallResult,
     CallRunner,
     ResourceFloors,
+    Sandbox,
     TransportError,
     make_state_dir,
     resource_floors,
@@ -94,7 +95,7 @@ def _reference_key(reference: str) -> str:
 
 
 def _site(
-    container: PackContainer,
+    container: Sandbox,
     logs_dir: Path,
     package: StagePackage,
     reference: str,
@@ -336,7 +337,7 @@ async def _data_case(site: PackageSite, mode: str) -> CaseResult:
     return CaseResult(case, "adversarial", not problems, status, tuple(problems))
 
 
-async def _special_state(container: PackContainer, mode: str, root: str) -> str:
+async def _special_state(container: Sandbox, mode: str, root: str) -> str:
     state = f"{root}/state"
     await make_state_dir(container, state)
     commands = {
@@ -370,7 +371,7 @@ async def _run_call(site: PackageSite, state: str) -> CallResult:
     )
 
 
-async def _bounds_case(site: PackageSite, container: PackContainer, mode: str) -> CaseResult:
+async def _bounds_case(site: PackageSite, container: Sandbox, mode: str) -> CaseResult:
     root = f"{CANARY_ROOT}/{site.scope}-{site.evidence_dir.name}/raidar-{mode}"
     state = await _special_state(container, mode, root)
     result = await _run_call(site, state)
@@ -428,7 +429,7 @@ async def _fixture_cases(
     return results
 
 
-async def _stop_only_cases(site: PackageSite, container: PackContainer) -> list[CaseResult]:
+async def _stop_only_cases(site: PackageSite, container: Sandbox) -> list[CaseResult]:
     """Raidar's data cases and, for watched state, its bounds cases."""
     results = [await _data_case(site, mode) for mode in DATA_CASES]
     if site.watch is not None:
@@ -471,7 +472,7 @@ async def check_package(
 
 
 async def _install(
-    container: PackContainer,
+    container: Sandbox,
     logs_dir: Path,
     package: StagePackage,
     reference: str,
@@ -489,7 +490,7 @@ async def _install(
 
 async def _record(
     site: PackageSite,
-    container: PackContainer,
+    container: Sandbox,
     package: StagePackage,
     pack: str,
     primitives: Mapping[str, str],

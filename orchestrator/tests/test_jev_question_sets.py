@@ -304,8 +304,10 @@ def test_shadow_rubric_cli_writes_the_report_for_a_trial_layout(
     assert {record.stage for record in parked_audit} == {DecisionStage.SKIPPED}
 
     # The dormant shadow path still works on a shadow copy of the policies.
+    runtime_keyword_defaults = open_runtime.__kwdefaults__
+    assert runtime_keyword_defaults is not None
     monkeypatch.setitem(
-        open_runtime.__kwdefaults__, "policy_dir", shadow_policy_dir(tmp_path / "policies")
+        runtime_keyword_defaults, "policy_dir", shadow_policy_dir(tmp_path / "policies")
     )
     output = tmp_path / "report.json"
     result = _shadow_rubric(tmp_path, tmp_path / "store", output)

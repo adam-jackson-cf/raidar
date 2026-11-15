@@ -8,6 +8,7 @@ read as zero.
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Literal
 
 import pytest
 
@@ -75,7 +76,7 @@ HASHES = TrialHashes(
 
 
 def _record(
-    mode: str = "continue",
+    mode: Literal["continue", "halt_on_failure"] = "continue",
     *,
     steps: tuple[str, ...] = STEPS,
     valid: bool = True,

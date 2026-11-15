@@ -1,8 +1,7 @@
-"""Real mypy canaries using the repository configuration and baseline gate."""
+"""Real mypy canaries using the repository configuration and the mypy gate."""
 
 from __future__ import annotations
 
-import json
 import shutil
 import subprocess
 import sys
@@ -48,7 +47,6 @@ def _mypy(orchestrator: Path) -> subprocess.CompletedProcess[str]:
             "--config-file",
             "pyproject.toml",
             "--no-incremental",
-            "--follow-imports=skip",
             "src/raidar/canary.py",
         ],
         orchestrator,
@@ -77,30 +75,12 @@ def test_repository_mypy_policy_accepts_typed_code_and_refuses_canary(
     assert f"[{code}]" in refused.stdout, refused.stdout + refused.stderr
 
 
-def test_mypy_baseline_gate_refuses_a_new_real_type_error(
+def test_mypy_gate_refuses_a_new_real_type_error(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capfd: pytest.CaptureFixture[str]
 ) -> None:
     orchestrator = _workspace(tmp_path)
-    baseline = tmp_path / "scripts/checks/baselines/mypy.json"
-    baseline.parent.mkdir(parents=True)
-    baseline.write_text(json.dumps({"schemaVersion": 1, "tool": "mypy", "findings": []}))
-    for argv in [
-        ["git", "init", "-q"],
-        ["git", "add", "scripts/checks/baselines/mypy.json"],
-        [
-            "git",
-            "-c",
-            "user.name=Canary",
-            "-c",
-            "user.email=canary@example.invalid",
-            "commit",
-            "-qm",
-            "Empty mypy baseline",
-        ],
-        ["git", "update-ref", "refs/remotes/origin/main", "HEAD"],
-    ]:
-        result = _run(argv, tmp_path)
-        assert result.returncode == 0, result.stdout + result.stderr
+    result = _run(["git", "init", "-q"], tmp_path)
+    assert result.returncode == 0, result.stdout + result.stderr
     monkeypatch.setattr(quality, "REPO_ROOT", tmp_path)
     monkeypatch.setattr(quality, "ORCHESTRATOR_ROOT", orchestrator)
     monkeypatch.setattr(quality, "PYPROJECT", orchestrator / "pyproject.toml")
@@ -111,7 +91,5 @@ def test_mypy_baseline_gate_refuses_a_new_real_type_error(
         quality.run_mypy_quality_gates()
     captured = capfd.readouterr()
     diagnostic = captured.out + captured.err + str(error.value)
-    assert "BASELINE.new" in diagnostic
     assert "orchestrator/src/raidar/canary.py" in diagnostic
     assert "assignment" in diagnostic
-    assert json.loads(baseline.read_text())["findings"] == []

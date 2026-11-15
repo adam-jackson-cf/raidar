@@ -15,8 +15,9 @@ from collections.abc import Iterable, Mapping, Sequence
 from pathlib import Path
 
 from raidar.engine.health.model import HealthReport, load_health
-from raidar.evaluation.analysis.assessed import CORRECTNESS_REF, SOLVABLE_SOLVED, Observed
+from raidar.evaluation.analysis.assessed import SOLVABLE_SOLVED, Observed
 from raidar.evaluation.analysis.outcomes import AnalysisModel, DependencyStep, TrialOutcome
+from raidar.scoring.catalog.outcomes import CORRECTNESS_REF
 from raidar.scoring.framework.result import AssessResult
 
 UNPROVIDED = "unprovided"

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Callable, Sequence
 from pathlib import Path
-from typing import Any
+from typing import Any, TypedDict, Unpack
 
 import click
 
@@ -90,6 +90,17 @@ def validate_command(
         click.echo(f"  {kind} references: {len(refs)} ({state})")
 
 
+class _LockOptions(TypedDict):
+    experiment: Path
+    attempts: int | None
+    seed: int | None
+    assignments: tuple[str, ...]
+    output: Path | None
+    check: bool
+    ignore_host_python: bool
+    draft: bool
+
+
 @click.command("lock")
 @_override_options
 @click.option(
@@ -114,27 +125,23 @@ def validate_command(
     help="Smoke experiments only: resolve unregistered packages and workflows from the working "
     "tree and write the lock under var/tmp/drafts (a dev job; never admits a measured run).",
 )
-def lock_command(
-    experiment: Path,
-    attempts: int | None,
-    seed: int | None,
-    assignments: tuple[str, ...],
-    output: Path | None,
-    check: bool,
-    ignore_host_python: bool,
-    draft: bool,
-) -> None:
+def lock_command(**options: Unpack[_LockOptions]) -> None:
     """Resolve an experiment to content hashes and pinned versions.
 
     ``lock_sha256`` is the digest of the execution section only: relocking
     after a scorer, metric, threshold or toolchain change keeps it, so jobs
     executed under the earlier lock still match.
     """
-    _reject_combinations(check, draft, ignore_host_python, output)
+    check = options["check"]
+    draft = options["draft"]
+    output = options["output"]
+    _reject_combinations(check, draft, options["ignore_host_python"], output)
     with draft_resolution(draft):
-        loaded = load_cli_experiment(experiment, attempts, seed, assignments)
+        loaded = load_cli_experiment(
+            options["experiment"], options["attempts"], options["seed"], options["assignments"]
+        )
     lock_path = output or _default_target(loaded, draft)
-    lock, note = _resolve(loaded, lock_path, draft, check, ignore_host_python)
+    lock, note = _resolve(loaded, lock_path, draft, check, options["ignore_host_python"])
     summary = f"{lock_path} (lock_sha256 {str(lock['lock_sha256'])[:12]})"
     if check:
         if note:

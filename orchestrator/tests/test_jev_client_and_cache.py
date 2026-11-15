@@ -56,7 +56,8 @@ def test_cached_replay_makes_no_provider_call_and_costs_nothing(tmp_path: Path) 
         sufficiency=SUFFICIENT,
     )
     assert first.noul("swallows_errors") == pytest.approx(0.91)
-    assert (first.record.cost_usd, first.record.cache_hit) == (pytest.approx(0.0021), False)
+    assert first.record.cost_usd == pytest.approx(0.0021)
+    assert first.record.cache_hit is False
 
     for replay in (
         make_runtime(tmp_path, transport=transport),
@@ -221,7 +222,7 @@ def test_answers_that_do_not_fit_their_question_are_rejected(
 
 
 def test_matching_choice_and_score_answers_are_accepted() -> None:
-    questions = {
+    questions: JevQuestions = {
         "pick": ChoiceQuestion(instructions="Pick", criteria={"a": "first", "b": None}),
         "level": ScoreQuestion(instructions="Rate", criteria=("low", "mid", "high")),
     }

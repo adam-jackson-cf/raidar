@@ -25,7 +25,7 @@ from raidar.evaluation.analysis.assessed import build_outcome
 from raidar.evaluation.analysis.sources import JobDir
 from raidar.evaluation.review.projection.assessments import TrialAssessments
 from raidar.evaluation.review.quality.experiment_view import ReviewedTrial, _primary
-from raidar.evaluation.review.quality.gate_view import GateReader, build_gate_view
+from raidar.evaluation.review.quality.gate_view import GateReader, _round, build_gate_view
 from raidar.evaluation.review.quality.labels import JevAudit
 from raidar.evaluation.review.quality.models import (
     COMPONENTS,
@@ -62,7 +62,7 @@ from raidar.scoring.framework.result import AssessStatus
 from raidar.scoring.framework.store import Assessment, assessment_key
 from raidar.scoring.judge.audit import AuditLog, LabelRecord
 from raidar.scoring.judge.rubric import RUBRIC_POLICY
-from raidar.scoring.verification_effort.records import GateRecordError, StepGate
+from raidar.scoring.verification_effort.records import GateRecordError, GateRunView, StepGate
 from tests.review_fixtures.quality.generate import (
     CHECKPOINTS,
     EXPERIMENT,
@@ -1226,3 +1226,15 @@ def test_mixed_headline_policies_are_named_in_problem_notes() -> None:
     assert len(notes) == 1
     assert "scb-canonical@1" in notes[0]
     assert "alternate@1" in notes[0]
+
+
+@pytest.mark.parametrize(
+    ("after", "verdict", "attribution"),
+    [(None, "passed", "agent"), ("turn-1", "skipped", "agent"), ("turn-1", "passed", None)],
+)
+def test_a_gate_round_without_its_turn_verdict_or_attribution_is_an_unreadable_record(
+    after: str | None, verdict: str, attribution: str | None
+) -> None:
+    run = GateRunView(1, after, verdict, attribution, None, None, ())
+    with pytest.raises(GateRecordError, match="gate seal 1"):
+        _round(run)

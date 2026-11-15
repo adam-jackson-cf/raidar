@@ -117,7 +117,7 @@ AGENT_SMOKE_EFFECTIVE_REASONING = $(if $(filter command line environment,$(origi
 	toolchain-pin-check structure-check release-archive \
 	test-fast test-slow test-quality test-docker \
 	quality gate-commit gate-ci version-release version-check analyzer-scope-check \
-	ruff-baseline ruff-check ruff-suppressions-check mypy-check mypy-baseline
+	ruff-check ruff-suppressions-check mypy-check
 
 define require_var
 	@if [ -z "$($1)" ]; then \
@@ -154,11 +154,9 @@ help:
 	@echo "  make test-hygiene-check                                Check bounded test processes, skill metadata/support links, and registered stage evidence"
 	@echo "  make feature-map-check                                 Check feature-map documents, their links, and the review-surface journeys"
 	@echo "  make test-integrity-check                              Check tests use real code without skips or unseeded properties, and production has no test hooks"
-	@echo "  make ruff-baseline                                    Explicitly record current Full Ruff findings (gates never refresh)"
-	@echo "  make ruff-check                                       Check Full Ruff against the finding-specific shrink-only baseline"
+	@echo "  make ruff-check                                       Run Full Ruff over every maintained root; any finding fails"
 	@echo "  make ruff-suppressions-check                           Refuse added Ruff suppressions relative to origin/main"
-	@echo "  make mypy-check                                        Check maintained Python inventory and strict finding baseline (check-only)"
-	@echo "  make mypy-baseline                                     Explicitly record current strict findings; adoption only, then shrink entries with fixes"
+	@echo "  make mypy-check                                        Check maintained Python inventory and run strict mypy; any finding fails"
 	@echo "  make release-archive REF=<name>@<N>                    Tag archive/<name>@<N> at HEAD before editing a released definition in place (refuses an existing tag)"
 	@echo "  Generated data lives under var/ (git-ignored; RAIDAR_VAR=<dir> relocates it): jobs, stores, analysis, problems, tmp"
 	@echo "  Secrets: execute/smoke/assess/jev targets inject Infisical (project mac-os-cf, env dev) when the infisical"
@@ -740,11 +738,8 @@ toolchain-pin-check:
 structure-check:
 	@$(REPO_RUNTIME_ENV) uv run --project orchestrator python scripts/checks/check-structure.py --repo-root "$(CURDIR)"
 
-ruff-baseline:
-	@$(REPO_RUNTIME_ENV) uv run --project orchestrator --extra dev python scripts/checks/ruff_baseline.py --record
-
 ruff-check:
-	@$(REPO_RUNTIME_ENV) uv run --project orchestrator --extra dev python scripts/checks/ruff_baseline.py
+	@$(REPO_RUNTIME_ENV) uv run --project orchestrator --extra dev python scripts/checks/check-ruff.py
 
 ruff-suppressions-check:
 	@$(REPO_RUNTIME_ENV) uv run --project orchestrator --extra dev python scripts/checks/check-ruff-suppressions.py
@@ -761,9 +756,6 @@ test-integrity-check:
 
 mypy-check:
 	@$(REPO_RUNTIME_ENV) uv run --project orchestrator --extra dev python scripts/checks/check-mypy-coverage.py
-
-mypy-baseline:
-	@$(REPO_RUNTIME_ENV) uv run --project orchestrator --extra dev python scripts/checks/check-mypy-coverage.py --write-baseline
 
 # Build the portable contract's wheel and sdist into var/ and print their sha256 (nothing is published).
 CONTRACT_DIST_DIR ?= $(RAIDAR_VAR)/contract-dist
@@ -829,7 +821,7 @@ toolchain-parity-check:
 	@$(REPO_RUNTIME_ENV) uv run --project orchestrator --extra dev --locked python scripts/checks/check-toolchain-parity.py static
 
 prettier-check:
-	@$(REPO_RUNTIME_ENV) uv run --project orchestrator --extra dev --locked python scripts/checks/check-toolchain-parity.py prettier --baseline
+	@$(REPO_RUNTIME_ENV) uv run --project orchestrator --extra dev --locked python scripts/checks/check-toolchain-parity.py prettier
 
 dependency-audit-check:
-	@$(REPO_RUNTIME_ENV) uv run --project orchestrator --extra dev --locked python scripts/checks/check-toolchain-parity.py audit --baseline $(AUDIT_ARGS)
+	@$(REPO_RUNTIME_ENV) uv run --project orchestrator --extra dev --locked python scripts/checks/check-toolchain-parity.py audit $(AUDIT_ARGS)

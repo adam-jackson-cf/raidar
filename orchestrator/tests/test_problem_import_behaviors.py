@@ -26,6 +26,7 @@ from raidar.design.experiment.loader import load_experiment
 from raidar.design.experiment.lock import build_lock
 from raidar.design.problem import importer
 from raidar.design.problem.content import hidden_content_in_task
+from raidar.design.problem.importer import ImportSource
 from raidar.design.problem.models import ProblemId
 from raidar.design.problem.resolver import ProblemResolver, resolver_factory
 from raidar.design.problem.rewrite import VERIFIER_IMPORT_PATH
@@ -78,7 +79,7 @@ def test_import_splits_the_converted_task_into_agent_task_bundle_and_references(
     scb: tuple[ProblemStore, Path, str],
 ) -> None:
     store, repo, commit = scb
-    result = import_problem(store, _ref(commit), source_checkout=repo)
+    result = import_problem(store, _ref(commit), source=ImportSource(repo))
     manifest, content = result.manifest, result.content_dir
 
     assert result.changed
@@ -134,10 +135,10 @@ def test_import_refuses_sources_that_are_not_exactly_the_pin(
 ) -> None:
     store, repo, commit = scb
     with pytest.raises(ProblemStoreError, match="does not match"):
-        import_problem(store, ProblemId.parse("scb/adder@000000000000"), source_checkout=repo)
+        import_problem(store, ProblemId.parse("scb/adder@000000000000"), source=ImportSource(repo))
     (repo / "adder" / "config.yaml").write_text("edited: true\n")
     with pytest.raises(SourceError, match="local changes"):
-        import_problem(store, _ref(commit), source_checkout=repo)
+        import_problem(store, _ref(commit), source=ImportSource(repo))
     subprocess.run(["git", "-C", str(repo), "checkout", "-q", "--", "."], check=True, timeout=120)
     subprocess.run(
         [
@@ -158,9 +159,11 @@ def test_import_refuses_sources_that_are_not_exactly_the_pin(
         timeout=120,
     )
     with pytest.raises(SourceError, match="expected pinned commit"):
-        import_problem(store, _ref(commit), source_checkout=repo)
+        import_problem(store, _ref(commit), source=ImportSource(repo))
     with pytest.raises(ProblemStoreError, match="not pinned"):
-        import_problem(store, ProblemId.parse("other/adder@000000000000"), source_checkout=repo)
+        import_problem(
+            store, ProblemId.parse("other/adder@000000000000"), source=ImportSource(repo)
+        )
 
 
 def test_default_import_clones_the_pinned_commit_into_the_store_cache(tmp_path: Path) -> None:
@@ -316,4 +319,4 @@ def test_import_refuses_ignored_files_under_the_problem(
     cache.mkdir(parents=True, exist_ok=True)
     (cache / "conftest.cpython-312.pyc").write_bytes(b"\0")
     with pytest.raises(SourceError, match="local changes"):
-        import_problem(store, _ref(commit), source_checkout=repo)
+        import_problem(store, _ref(commit), source=ImportSource(repo))

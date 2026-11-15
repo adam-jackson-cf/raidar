@@ -41,7 +41,6 @@ CANONICAL_TEST_GROUPS = {
 }
 SCRIPT_NAME_EXCEPTIONS = {
     "scripts/checks/check_toolchain_pins.py",
-    "scripts/checks/ruff_baseline.py",
     "scripts/checks/git_inventory.py",
 }
 GENERIC_NAME_ALLOWLIST: set[str] = set()
@@ -120,10 +119,9 @@ SEAM_SUBPROCESS_WRAPPERS: dict[str, set[str]] = {
     "orchestrator/src/raidar/subject/workflow/package_checks.py": {"uv_lock_stale"},
     "orchestrator/src/raidar/subject/workflow/stage_container.py": {"PackContainer._run"},
     "lab/stages/raidar/verify/tool/src/verify_tool/checks.py": {"run"},
-    "scripts/checks/check-finding-baseline.py": {"main"},
     "scripts/checks/check-mypy-coverage.py": {"main"},
     "scripts/checks/check-ruff-suppressions.py": {"main"},
-    "scripts/checks/ruff_baseline.py": {"main"},
+    "scripts/checks/check-ruff.py": {"main"},
     "scripts/checks/git_inventory.py": {"_git_paths"},
     "scripts/release/bump-version.py": {
         "git_output",
@@ -175,7 +173,7 @@ ALLOWED_TEST_ROOT_FILES = {
 }
 SCRIPT_NAME_ALLOWLIST = {
     "bump-version.py",
-    "check-finding-baseline.py",
+    "check-ruff.py",
     "check-ruff-suppressions.py",
     "check-mypy-coverage.py",
     "check-python-fanout.py",

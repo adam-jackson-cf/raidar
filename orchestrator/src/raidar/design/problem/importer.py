@@ -17,6 +17,7 @@ from pathlib import Path
 
 from raidar.design.problem.content import content_digest, hidden_content_in_task
 from raidar.design.problem.dependencies import (
+    DeclaredDependencies,
     ProblemDependencies,
     resolve_dependencies,
     write_locks,
@@ -29,6 +30,7 @@ from raidar.design.problem.models import (
     ProblemStep,
 )
 from raidar.design.problem.rewrite import (
+    ConversionTarget,
     build_bundle,
     checkpoint_specs,
     converted_steps,
@@ -142,28 +144,29 @@ class _Materialised:
     dependencies: ProblemDependencies
 
 
-def _materialise(
-    store: ProblemStore,
-    checkout: PinnedCheckout,
-    problem: ProblemId,
-    staging: Path,
-    pack: PackSpec,
-    *,
-    recorded: ProblemManifest | None,
-    resolver: Resolver | None,
-) -> _Materialised:
+@dataclass(frozen=True)
+class _ImportInputs:
+    store: ProblemStore
+    checkout: PinnedCheckout
+    problem: ProblemId
+    pack: PackSpec
+    recorded: ProblemManifest | None
+    resolver: Resolver | None
+
+
+def _materialise(inputs: _ImportInputs, staging: Path) -> _Materialised:
+    checkout, problem, pack = inputs.checkout, inputs.problem, inputs.pack
     converted = convert_problem(checkout, problem.problem, staging / "converted")
     (converted / _CONVERTER_README).unlink(missing_ok=True)
     converted_sha256 = content_digest(converted)
     steps = select_steps(converted_steps(converted), problem.checkpoint)
     content = staging / "content"
     entry_file = problem_entry_file(checkout.root / problem.problem, pack)
+    target = ConversionTarget(problem=problem, steps=steps, pack=pack)
     bundle = build_bundle(
         converted,
         content / "oracle",
-        problem=problem,
-        steps=steps,
-        pack=pack,
+        target,
         source={
             "dataset": problem.dataset,
             "commit": checkout.pin.commit,
@@ -175,19 +178,18 @@ def _materialise(
     specs = checkpoint_specs(
         checkout.root / problem.problem, steps, entry_command=entry_command, entry_file=entry_file
     )
-    render_task(converted, content / "task", problem=problem, steps=steps, pack=pack, specs=specs)
+    render_task(converted, content / "task", target, specs)
     copy_references(converted, content / "references", steps)
     leaked = hidden_content_in_task(content / "task", bundle)
     if leaked:
         raise ProblemStoreError(f"hidden verifier content in the agent task: {leaked}")
+    declared = DeclaredDependencies(
+        references=content / "references",
+        steps=list(steps),
+        test_dependencies=bundle.manifest.grader.test_dependencies,
+    )
     dependencies = resolve_dependencies(
-        store,
-        problem,
-        recorded,
-        content / "references",
-        list(steps),
-        bundle.manifest.grader.test_dependencies,
-        resolver,
+        inputs.store, problem, inputs.recorded, declared, inputs.resolver
     )
     if dependencies.pins is not None and dependencies.locks is not None:
         bundle = write_bundle_dependencies(
@@ -239,28 +241,41 @@ def _runtime_pack(runtime: str, given: PackSpec | None = None, dataset: str = ""
     return pack
 
 
+@dataclass(frozen=True)
+class ImportSource:
+    """Where the pinned source comes from: an existing checkout (else the store cache)."""
+
+    checkout: Path | None = None
+    run: Runner = subprocess.run
+
+
 def import_problem(
     store: ProblemStore,
     problem: ProblemId,
     *,
-    source_checkout: Path | None = None,
+    source: ImportSource | None = None,
     update: bool = False,
-    pack: PackSpec | None = None,
     resolver: Resolver | None = None,
-    run: Runner = subprocess.run,
 ) -> ImportResult:
     """Import (or re-materialise) one problem into the store."""
-    checkout = resolve_checkout(store, problem, source_checkout, run=run)
-    pack = _runtime_pack(checkout.pin.runtime, pack, problem.dataset)
+    source = source or ImportSource()
+    checkout = resolve_checkout(store, problem, source.checkout, run=source.run)
+    pack = _runtime_pack(checkout.pin.runtime, dataset=problem.dataset)
     checkout.verify_clean(problem.problem, checkout.converter_dir, _CONVERSION_OVERRIDES)
     if not (checkout.root / problem.problem / _PROBLEM_CONFIG).is_file():
         raise ProblemStoreError(f"{problem.problem} is not an SCB problem at {checkout.pin.commit}")
     recorded = _recorded(store, problem)
     with tempfile.TemporaryDirectory(prefix="raidar-problem-import-") as tmp:
         staging = Path(tmp)
-        materialised = _materialise(
-            store, checkout, problem, staging, pack, recorded=recorded, resolver=resolver
+        inputs = _ImportInputs(
+            store=store,
+            checkout=checkout,
+            problem=problem,
+            pack=pack,
+            recorded=recorded,
+            resolver=resolver,
         )
+        materialised = _materialise(inputs, staging)
         manifest = _manifest(problem, checkout, materialised, pack)
         drift = _drift(recorded, manifest) if recorded is not None else []
         if drift and not update:

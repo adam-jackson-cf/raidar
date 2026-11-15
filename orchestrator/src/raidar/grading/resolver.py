@@ -142,7 +142,7 @@ def _refusal_reason(text: str) -> str:
     return "direct-reference" if direct else "unparseable"
 
 
-class DependencyUnresolvable(ValueError):
+class DependencyUnresolvableError(ValueError):
     """A reference set has unprovided requirements or diverging architectures."""
 
     def __init__(self, detail: str, unprovided: tuple[Unprovided, ...] = ()) -> None:
@@ -630,7 +630,7 @@ def _resolve_sets(
         )
     if problems:
         unique = tuple(dict.fromkeys(problems))
-        raise DependencyUnresolvable(
+        raise DependencyUnresolvableError(
             "; ".join(f"{item.requirement}: {item.reason}" for item in unique), unique
         )
     return sets, locks
@@ -647,7 +647,7 @@ def resolve_pins(
 
     Sets: each reference step's declared set, ``seed`` (the test dependencies alone;
     the agent's) and ``grader`` (``GRADER_TOOLS`` plus the test dependencies). Empty sets
-    need no lock and are omitted. Raises ``DependencyUnresolvable`` when any requirement
+    need no lock and are omitted. Raises ``DependencyUnresolvableError`` when any requirement
     is unprovided or the architectures resolve to different versions.
     """
     chosen = resolver or UvResolver()

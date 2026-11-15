@@ -173,8 +173,10 @@ def summarise(
     bootstrap_samples: int,
     confidence: float = CONFIDENCE,
 ) -> Summary:
-    """Mean, SD and interval at ``confidence`` (the pinned 1 - alpha in analysis):
-    paired t below 10 values, bootstrap from 10 on."""
+    """Mean, SD and interval at ``confidence`` (the pinned 1 - alpha in analysis).
+
+    The interval is paired t below 10 values, bootstrap from 10 on.
+    """
     n = len(values)
     if n == 0:
         return Summary(n=0, mean=None, sd=None, interval=None)

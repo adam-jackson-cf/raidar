@@ -10,12 +10,12 @@ from __future__ import annotations
 import json
 
 import click
-from raidar_contract.package import StagePackageError
 
 from raidar.cli import imports, stage_fixtures, stage_package
 from raidar.cli.stage_lock import StageLockError, generate_lock, lock_problems
 from raidar.contract.paths import stage_checks_root
 from raidar.subject.package.registry import load_stage_package
+from raidar_contract.package import StagePackageError
 
 
 def register(main: click.Group) -> None:

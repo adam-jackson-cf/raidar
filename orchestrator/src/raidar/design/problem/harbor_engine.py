@@ -18,8 +18,10 @@ import asyncio
 import shutil
 import stat
 from collections.abc import Mapping
+from dataclasses import dataclass
 from pathlib import Path
 
+from harbor.models.environment_type import EnvironmentType
 from harbor.models.trial.config import (
     AgentConfig,
     EnvironmentConfig,
@@ -62,31 +64,38 @@ def variant_task(problem: ImportedProblem, payloads: Mapping[str, Path], dest: P
     return dest
 
 
+@dataclass(frozen=True)
+class HarborRuns:
+    """How a variant's validation trials run.
+
+    ``grader`` is the identity under validation (it pins itself).
+    """
+
+    repeats: int
+    concurrency: int
+    docker_context: str
+    grader: Mapping[str, str]
+
+
 def trial_config(
-    task: Path,
-    trials_dir: Path,
-    name: str,
-    bundle_root: Path,
-    *,
-    docker_context: str,
-    grader: Mapping[str, str],
+    task: Path, trials_dir: Path, name: str, bundle_root: Path, runs: HarborRuns
 ) -> TrialConfig:
-    """The validation trial; ``grader`` is the identity under validation (it pins itself)."""
+    """The validation trial, verified by the grader identity ``runs`` pins."""
     return TrialConfig(
         task=TaskConfig(path=task),
         trial_name=name,
         trials_dir=trials_dir,
         agent=AgentConfig(name="oracle"),
-        environment=EnvironmentConfig(type="docker", delete=True),
+        environment=EnvironmentConfig(type=EnvironmentType.DOCKER, delete=True),
         verifier=VerifierConfig(
             import_path=VERIFIER_IMPORT_PATH,
             kwargs={
                 "oracle_bundle": str(bundle_root),
-                "docker_context": docker_context,
+                "docker_context": runs.docker_context,
                 # Validation tasks collect no /app artifact; the snapshot is downloaded.
                 "snapshot_source": "download",
                 "coverage": False,
-                "pinned": {"grader": dict(grader)},
+                "pinned": {"grader": dict(runs.grader)},
             },
         ),
     )
@@ -125,29 +134,18 @@ async def run_variant(
     variant: str,
     payloads: Mapping[str, Path],
     work: Path,
-    *,
-    repeats: int,
-    docker_context: str,
-    concurrency: int,
-    grader: Mapping[str, str],
+    runs: HarborRuns,
 ) -> list[StepGrades]:
     """Run one variant's repeats within the selected target's concurrency limit."""
-    if concurrency < 1:
+    if runs.concurrency < 1:
         raise ValueError("concurrency must be >= 1")
     task = variant_task(problem, payloads, work / "tasks" / variant)
     bundle_root = problem.bundle.root
     configs = [
-        trial_config(
-            task,
-            work / "trials",
-            f"{variant}-{index}",
-            bundle_root,
-            docker_context=docker_context,
-            grader=grader,
-        )
-        for index in range(repeats)
+        trial_config(task, work / "trials", f"{variant}-{index}", bundle_root, runs)
+        for index in range(runs.repeats)
     ]
-    gate = asyncio.Semaphore(concurrency)
+    gate = asyncio.Semaphore(runs.concurrency)
 
     async def run_trial(config: TrialConfig) -> tuple[Path, str | None]:
         async with gate:

@@ -17,6 +17,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from harbor.models.environment_type import EnvironmentType
 from harbor.models.trial.config import EnvironmentConfig, TaskConfig, TrialConfig, VerifierConfig
 
 from raidar.contract.trial import PlannedTrial
@@ -77,7 +78,7 @@ def harbor_trial_config(
         trials_dir=trials_dir,
         agent=with_host_auth(plan.arms[trial.arm].agent_config, harness),
         environment=EnvironmentConfig(
-            type="docker",
+            type=EnvironmentType.DOCKER,
             import_path=RUN_SCOPED_DOCKER_IMPORT_PATH,
             delete=True,
             kwargs={SCOPE_KWARG: run_scope(trials_dir)},

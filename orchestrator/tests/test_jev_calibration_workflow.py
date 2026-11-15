@@ -10,7 +10,7 @@ import pytest
 from click.testing import CliRunner, Result
 
 from raidar.cli import main
-from raidar.judge.protocol import ChoiceQuestion, NoulQuestion, ScoreQuestion
+from raidar.judge.protocol import ChoiceQuestion, JevQuestions, NoulQuestion, ScoreQuestion
 from raidar.scoring.judge.audit import DecisionRecord, LabelRecord, ReviewerKind
 from raidar.scoring.judge.blind import derive_blind_labels, export_blind
 from raidar.scoring.judge.calibration import (
@@ -75,7 +75,13 @@ def _store(
 
 def test_label_records_name_their_reviewer_and_readiness_counts_by_kind(tmp_path: Path) -> None:
     with pytest.raises(ValueError, match="reviewer_model"):
-        LabelRecord(timestamp="t", request_id="r", policy=RUBRIC, label="correct", reviewer="model")
+        LabelRecord(
+            timestamp="t",
+            request_id="r",
+            policy=RUBRIC,
+            label="correct",
+            reviewer=ReviewerKind.MODEL,
+        )
     with pytest.raises(ValueError, match="takes no reviewer_model"):
         LabelRecord(
             timestamp="t", request_id="r", policy=RUBRIC, label="correct", reviewer_model=HAIKU
@@ -322,7 +328,7 @@ def test_promote_refuses_to_write_while_the_scorer_bump_is_pending(tmp_path: Pat
 def test_blind_decisions_without_noul_questions_compare_choices_and_scores(
     tmp_path: Path,
 ) -> None:
-    questions = {
+    questions: JevQuestions = {
         "kind": ChoiceQuestion(instructions="Which kind?", criteria={"a": None, "b": None}),
         "size": ScoreQuestion(instructions="How big?", criteria=("small", "medium", "large")),
     }

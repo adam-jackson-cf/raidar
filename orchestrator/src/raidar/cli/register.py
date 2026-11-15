@@ -18,8 +18,10 @@ from raidar.cli import (
 
 
 def register_commands(main: click.Group) -> None:
-    """Attach the package and workflow authoring commands, the experiment workflow, then the
-    operational commands."""
+    """Attach the authoring commands, the experiment workflow, then the operational commands.
+
+    Authoring covers packages and workflows.
+    """
     stage.register(main)
     workflow.register(main)
     agent.register(main)

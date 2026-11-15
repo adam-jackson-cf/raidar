@@ -18,6 +18,7 @@ import hashlib
 import json
 import time
 from collections import defaultdict
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -26,7 +27,6 @@ from raidar.grading.bundle import VerifierBundle, VerifierStepSpec
 from raidar.grading.models import (
     CanaryRecord,
     CaseStatus,
-    CorpusEvidence,
     CoverageContext,
     EnvironmentEvidence,
     InfraFailure,
@@ -66,6 +66,28 @@ BUDGET_MARGIN_S = 60.0
 _LOG_TAIL = 2000
 
 
+@dataclass(frozen=True)
+class Oracle:
+    """A verifier bundle and the grading sandbox its hidden tests run in."""
+
+    bundle: VerifierBundle
+    sandbox: GradingSandbox
+
+
+@dataclass(frozen=True)
+class OracleSettings:
+    """How one oracle run grades: the coverage pass, its time limit and its dependencies.
+
+    ``resolver`` resolves the submission's dependencies; ``recorded`` reuses a closure an
+    earlier run already recorded.
+    """
+
+    coverage: bool
+    timeout_s: float = DEFAULT_RUN_TIMEOUT_S
+    resolver: Resolver | None = None
+    recorded: SubmissionDependencies | None = None
+
+
 def _sha256_hex(value: str) -> str:
     return hashlib.sha256(value.encode()).hexdigest()
 
@@ -92,20 +114,19 @@ def _coverage_contexts(rows: list[dict[str, Any]]) -> tuple[CoverageContext, ...
     )
 
 
-def _evidence(
+async def _evidence(
+    oracle: Oracle,
+    step: VerifierStepSpec,
     role: str,
-    ledger: dict[str, Any],
-    *,
-    environment_id: str,
-    corpus: CorpusEvidence,
-    invocation: InvocationEvidence,
     prefix: tuple[str, ...],
+    ledger: dict[str, Any],
 ) -> RunEvidence:
+    layout = oracle.sandbox.layout
     return RunEvidence(
         role=role,
-        environment=_environment(ledger, environment_id),
-        corpus=corpus,
-        invocation=invocation,
+        environment=_environment(ledger, await oracle.sandbox.environment_id()),
+        corpus=oracle.bundle.corpus_evidence(step),
+        invocation=InvocationEvidence(argv=render_pytest_args(step, layout), cwd=layout.app),
         measurement_prefix=prefix,
         ledger=tuple(LedgerEntry.model_validate(row) for row in ledger.get("ledger", [])),
         coverage=_coverage_contexts(ledger.get("coverage", [])),
@@ -132,29 +153,31 @@ def grading_budget(step: VerifierStepSpec, timeout_s: float) -> float | None:
 
 
 async def run_oracle(
-    bundle: VerifierBundle,
+    oracle: Oracle,
     step: VerifierStepSpec,
     snapshot: Path,
-    sandbox: GradingSandbox,
     run_dir: Path,
-    *,
-    coverage: bool,
-    timeout_s: float = DEFAULT_RUN_TIMEOUT_S,
-    resolver: Resolver | None = None,
-    recorded: SubmissionDependencies | None = None,
+    settings: OracleSettings,
 ) -> RunOutcome:
-    role = "coverage" if coverage else "grading"
+    bundle, sandbox = oracle.bundle, oracle.sandbox
+    role = "coverage" if settings.coverage else "grading"
     started = time.perf_counter()
     app, out = stage_snapshot(snapshot, run_dir)
     try:
         dependencies = await prepare_dependencies(
-            bundle, app, sandbox, resolver=resolver, recorded=recorded
+            bundle, app, sandbox, resolver=settings.resolver, recorded=settings.recorded
         )
     except DependencyInfraError as error:
         # A resolver or index outage is never a verdict about the submission.
-        unavailable = InfraFailure(code="dependency_resolver_unavailable", detail=str(error))
-        return RunOutcome(role, (), unavailable, None, (), time.perf_counter() - started)
-    argv, prefix = sandbox_argv(step, sandbox.layout, coverage=coverage)
+        return RunOutcome(
+            role,
+            (),
+            InfraFailure(code="dependency_resolver_unavailable", detail=str(error)),
+            None,
+            (),
+            time.perf_counter() - started,
+        )
+    argv, prefix = sandbox_argv(step, sandbox.layout, coverage=settings.coverage)
     result = await sandbox.run(
         SandboxRun(
             app_dir=app,
@@ -164,11 +187,11 @@ async def run_oracle(
             env=sandbox_env(
                 bundle,
                 sandbox.layout,
-                coverage=coverage,
-                budget_s=grading_budget(step, timeout_s),
+                coverage=settings.coverage,
+                budget_s=grading_budget(step, settings.timeout_s),
                 python_path=python_path_entries(dependencies),
             ),
-            timeout_s=timeout_s,
+            timeout_s=settings.timeout_s,
             cpus=bundle.manifest.grader.cpus,
             memory_mb=bundle.manifest.grader.memory_mb,
             image=dependencies.image_id or None,
@@ -181,16 +204,7 @@ async def run_oracle(
     try:
         ledger = json.loads((out / LEDGER_NAME).read_text())
         cases = case_results(ledger, step.checkpoint)
-        evidence = _evidence(
-            role,
-            ledger,
-            environment_id=await sandbox.environment_id(),
-            corpus=bundle.corpus_evidence(step),
-            invocation=InvocationEvidence(
-                argv=render_pytest_args(step, sandbox.layout), cwd=sandbox.layout.app
-            ),
-            prefix=prefix,
-        )
+        evidence = await _evidence(oracle, step, role, prefix, ledger)
         infra = (
             ledger_infra_failure(ledger)
             or ledger_consistency_failure(ledger, result.exit_code, step.test_files)
@@ -199,11 +213,14 @@ async def run_oracle(
         sensitive = timing_sensitive(ledger, step.timeout_s)
     except (ValueError, KeyError, TypeError, AttributeError) as error:
         # The submission shares the ledger's uid, so a malformed ledger is an untrusted run.
-        malformed = InfraFailure(
-            code="ledger_unreadable", detail=f"{type(error).__name__}: {error}"
-        )
         return RunOutcome(
-            role, (), malformed, None, (), time.perf_counter() - started, dependencies
+            role,
+            (),
+            InfraFailure(code="ledger_unreadable", detail=f"{type(error).__name__}: {error}"),
+            None,
+            (),
+            time.perf_counter() - started,
+            dependencies,
         )
     return RunOutcome(
         role=role,
@@ -244,9 +261,8 @@ decided by the starter canary. A resolver outage and corpus or collection faults
 
 
 async def run_canary(
-    bundle: VerifierBundle,
+    oracle: Oracle,
     step: VerifierStepSpec,
-    sandbox: GradingSandbox,
     work: Path,
     *,
     grading: RunOutcome,
@@ -264,14 +280,11 @@ async def run_canary(
     assert grading.infra_failure is not None
     assert grading.dependencies is not None
     outcome = await run_oracle(
-        bundle,
+        oracle,
         step,
         starter,
-        sandbox,
         work / "canary",
-        coverage=False,
-        timeout_s=timeout_s,
-        recorded=grading.dependencies,
+        OracleSettings(coverage=False, timeout_s=timeout_s, recorded=grading.dependencies),
     )
     failure = outcome.infra_failure
     record = CanaryRecord(
@@ -293,28 +306,25 @@ def attribute_to_submission(grading: RunOutcome, starter: RunOutcome) -> RunOutc
 
 
 async def grade_step(
-    bundle: VerifierBundle,
+    oracle: Oracle,
     step_name: str,
     snapshot: Path,
-    sandbox: GradingSandbox,
     work: Path,
-    *,
-    coverage: bool,
-    timeout_s: float = DEFAULT_RUN_TIMEOUT_S,
-    resolver: Resolver | None = None,
-    recorded: SubmissionDependencies | None = None,
+    settings: OracleSettings,
 ) -> StepGrade:
-    step = bundle.step(step_name)
+    step = oracle.bundle.step(step_name)
+    timeout_s = settings.timeout_s
     grading = await run_oracle(
-        bundle,
+        oracle,
         step,
         snapshot,
-        sandbox,
         work / "grading",
-        coverage=False,
-        timeout_s=timeout_s,
-        resolver=resolver,
-        recorded=recorded,
+        OracleSettings(
+            coverage=False,
+            timeout_s=timeout_s,
+            resolver=settings.resolver,
+            recorded=settings.recorded,
+        ),
     )
     canary = CanaryRecord()
     failure = grading.infra_failure
@@ -323,9 +333,7 @@ async def grade_step(
         and failure.code in SUBMISSION_FAILURE_CODES
         and grading.dependencies is not None
     ):
-        canary, starter = await run_canary(
-            bundle, step, sandbox, work, grading=grading, timeout_s=timeout_s
-        )
+        canary, starter = await run_canary(oracle, step, work, grading=grading, timeout_s=timeout_s)
         if canary.status == "passed":
             grading = attribute_to_submission(grading, starter)
     grade = VerifierGrade(
@@ -337,7 +345,7 @@ async def grade_step(
     timings = {"oracle_run_s": grading.seconds}
     if canary.status != "not_run":
         timings["canary_run_s"] = canary.seconds
-    if not coverage:
+    if not settings.coverage:
         return StepGrade(
             grade=grade, grading=grading, coverage=None, parity=None, timings=timings, canary=canary
         )
@@ -348,14 +356,11 @@ async def grade_step(
         verdict = ineligible(f"grading_infra_failure:{grading.infra_failure.code}")
         return StepGrade(grade, grading, None, verdict, timings=timings, canary=canary)
     measured = await run_oracle(
-        bundle,
+        oracle,
         step,
         snapshot,
-        sandbox,
         work / "coverage",
-        coverage=True,
-        timeout_s=timeout_s,
-        recorded=grading.dependencies,
+        OracleSettings(coverage=True, timeout_s=timeout_s, recorded=grading.dependencies),
     )
     timings["coverage_run_s"] = measured.seconds
     verdict, differences = parity_verdict(grading, measured)

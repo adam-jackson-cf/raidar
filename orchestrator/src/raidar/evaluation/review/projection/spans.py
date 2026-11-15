@@ -6,6 +6,7 @@ import json
 import os
 import re
 from collections.abc import Callable
+from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 
@@ -59,6 +60,23 @@ def safe_id(value: str) -> str:
     return _UNSAFE_ID_CHARS.sub("-", value).strip("-") or "run"
 
 
+@dataclass(frozen=True)
+class SpanSpec:
+    """One span to append; ``SpanBuilder.add`` assigns its id and run."""
+
+    name: str
+    span_type: ReviewSpanType
+    status: ReviewStatus
+    parent: str | None = None
+    start: int | None = None
+    duration: int | None = None
+    model: str | None = None
+    input_value: object = None
+    output_value: object = None
+    attributes: object = None
+    tokens: tuple[int | None, int | None] = (None, None)
+
+
 class SpanBuilder:
     """Appends spans with run-scoped sequential ids."""
 
@@ -66,41 +84,28 @@ class SpanBuilder:
         self.run_id = run_id
         self.spans: list[ReviewSpan] = []
 
-    def add(
-        self,
-        *,
-        name: str,
-        span_type: ReviewSpanType,
-        status: ReviewStatus,
-        parent: str | None = None,
-        start: int | None = None,
-        duration: int | None = None,
-        model: str | None = None,
-        input_value: object = None,
-        output_value: object = None,
-        attributes: object = None,
-        tokens: tuple[int | None, int | None] = (None, None),
-    ) -> str:
+    def add(self, spec: SpanSpec) -> str:
         span_id = f"{self.run_id}:s{len(self.spans) + 1}"
+        start, duration = spec.start, spec.duration
         self.spans.append(
             ReviewSpan(
                 id=span_id,
                 run_id=self.run_id,
-                parent_span_id=parent,
-                name=name,
-                span_type=span_type,
-                status=status,
+                parent_span_id=spec.parent,
+                name=spec.name,
+                span_type=spec.span_type,
+                status=spec.status,
                 start_time_ms=start,
                 end_time_ms=(
                     start + duration if start is not None and duration is not None else None
                 ),
                 duration_ms=duration,
-                model=model,
-                input_tokens=tokens[0],
-                output_tokens=tokens[1],
-                input_payload=payload(input_value),
-                output_payload=payload(output_value),
-                attributes=payload(attributes),
+                model=spec.model,
+                input_tokens=spec.tokens[0],
+                output_tokens=spec.tokens[1],
+                input_payload=payload(spec.input_value),
+                output_payload=payload(spec.output_value),
+                attributes=payload(spec.attributes),
             )
         )
         return span_id

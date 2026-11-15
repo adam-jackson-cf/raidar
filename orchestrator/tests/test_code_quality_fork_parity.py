@@ -26,7 +26,7 @@ import pytest
 from raidar.contract import file_io
 from raidar.scoring.code_quality import arithmetic
 from raidar.scoring.code_quality.diffs import production_symbols
-from raidar.scoring.code_quality.lineage import calculate_transition_rework
+from raidar.scoring.code_quality.lineage import Ledger, calculate_transition_rework
 from raidar.scoring.code_quality.lineage_models import (
     PhysicalLineEvidence,
     RegressionBreadthInput,
@@ -119,7 +119,7 @@ def test_rework_lineage_and_regression_equal_the_fork_live_producers(tmp_path: P
 
 def test_lineage_kernel_scenarios_equal_the_fork() -> None:
     for scenario in fork_goldens()["kernels"]["lineage"]:
-        ledger = {
+        ledger: Ledger = {
             SymbolIdentity.model_validate(symbol).stable_identity: True
             for symbol in scenario["ledger"]
         }

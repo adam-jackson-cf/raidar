@@ -112,8 +112,23 @@ def _chown(owner: str, path: str, *, recursive: bool = False) -> str:
     return f'(chown {flag}{owner} {_q(path)} || [ "$(id -u)" != 0 ])'
 
 
+class Sandbox(Protocol):
+    """What a primitive needs of a Harbor environment to run one command in it."""
+
+    async def exec(
+        self,
+        command: str,
+        /,
+        *,
+        cwd: str | None = None,
+        env: dict[str, str] | None = None,
+        timeout_sec: int | None = None,
+        user: str | int | None = None,
+    ) -> ExecResult: ...
+
+
 async def trusted_exec(
-    environment: Any,
+    environment: Sandbox,
     command: str,
     *,
     user: str | int | None = None,

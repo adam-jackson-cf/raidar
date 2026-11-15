@@ -33,11 +33,11 @@ make gate-commit
 | Change                 | Automated evidence                                                                                          | Contributor action                                                                                          |
 | ---------------------- | ----------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
 | Tests and capabilities | Ownership and tier checks block changes that fail their requirements.                                       | Declare each new capability's owner and each test file's tier.                                              |
-| Python and analysis    | Ruff, strict mypy, import contracts, complexity, policy and I/O boundary checks block new or stale debt. | Use owning seams and remove resolved baseline entries; never refresh baselines to make a change pass.       |
+| Python and analysis    | Ruff, strict mypy, import contracts, complexity, policy and I/O boundary checks block every finding.       | Use owning seams and fix each finding; there are no baselines or waivers.                                   |
 | Toolchain              | Exact tool-pin, installer/lock agreement and maintained Markdown/YAML formatting checks block changes that fail their requirements. | Use the locked formatter; dependency changes also run the pinned audit (CI always audits).                  |
 
 > [!IMPORTANT]
-> **Owning policies:** [ownership map](../../scripts/checks/repository-owners.json) defines owners, tiers and seams; [baselines](../../scripts/checks/baselines/) hold the shrink-only Ruff and mypy debt; the analyzer I/O boundary check has no baseline and blocks on every finding. Unknown local ownership runs all T2 seams rather than skipping tests. Docker, performance and security checks are separate gates.
+> **Owning policies:** [ownership map](../../scripts/checks/repository-owners.json) defines owners, tiers and seams; Ruff, strict mypy, Prettier, the dependency audit and the analyzer I/O boundary check have no baselines and block on every finding. Unknown local ownership runs all T2 seams rather than skipping tests. Docker, performance and security checks are separate gates.
 
 Sources: [.pre-commit-config.yaml](../../.pre-commit-config.yaml); [Makefile](../../Makefile) (`gate-commit`, `gate-ci`, `quality`); [scripts/checks/repository-owners.json](../../scripts/checks/repository-owners.json); [scripts/checks/check-python-quality.py](../../scripts/checks/check-python-quality.py); [scripts/checks/check-analyzer-scope.py](../../scripts/checks/check-analyzer-scope.py).
 

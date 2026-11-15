@@ -190,8 +190,11 @@ def _differing_keys(variants: Sequence[Mapping[str, Any]]) -> list[str]:
 
 
 def _declarations(job: JobDir) -> dict[str, dict[str, Any] | None]:
-    """Each arm the job planned or recorded: its capability declaration, canonical model and
-    reasoning (``None``: no declaration recorded)."""
+    """Each arm the job planned or recorded, with its declaration.
+
+    The declaration is the arm's capability declaration, canonical model and reasoning
+    (``None``: no declaration recorded).
+    """
     arms = job.plan.get("arms") or {}
     planned = {str(trial["arm"]) for trial in job.plan.get("trials", ())}
     found: dict[str, dict[str, Any] | None] = {}
@@ -237,8 +240,11 @@ def _capability_findings(
 def _capabilities(
     jobs: Sequence[JobDir],
 ) -> tuple[dict[str, str] | None, tuple[str, ...], list[PoolFinding]]:
-    """The one declaration every arm shares (``None``: it differs, under a declared harness
-    variation, or nothing is measured), the declared variation, and what refuses the pool."""
+    """The shared declaration, the declared variation, and what refuses the pool.
+
+    The shared declaration is the one every arm shares (``None``: it differs, under a
+    declared harness variation, or nothing is measured).
+    """
     measured = _measured(jobs)
     arms = {name: value for job in measured for name, value in _declarations(job).items()}
     missing = [name for name, value in arms.items() if value is None]

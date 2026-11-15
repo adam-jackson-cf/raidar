@@ -56,8 +56,10 @@ __all__ = [
 
 
 class GraderIdentityError(RuntimeError):
-    """The grader at hand is not the one the lock pinned: an infrastructure failure, never a
-    verdict about the submission."""
+    """The grader at hand is not the one the lock pinned.
+
+    This is an infrastructure failure, never a verdict about the submission.
+    """
 
 
 def refuse_grader_mismatch(

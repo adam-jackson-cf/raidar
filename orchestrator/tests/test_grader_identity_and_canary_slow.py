@@ -8,7 +8,7 @@ import pytest
 
 from raidar.contract.wheels import DependencyInfraError
 from raidar.grading.bundle import VerifierBundle
-from raidar.grading.grader import grade_step
+from raidar.grading.grader import Oracle, OracleSettings, grade_step
 from raidar.grading.sandbox import LEDGER_NAME, SandboxResult, SandboxRun
 from tests.dependency_support import FakeResolver
 from tests.test_submission_dependencies import _declaring, _grading_bundle
@@ -53,7 +53,9 @@ async def test_a_sandbox_that_cannot_grade_the_starter_is_infrastructure(
     sandbox.always = True
     app = write_app(tmp_path / "app")
 
-    result = await grade_step(bundle, "checkpoint_1", app, sandbox, tmp_path / "w", coverage=False)
+    result = await grade_step(
+        Oracle(bundle, sandbox), "checkpoint_1", app, tmp_path / "w", OracleSettings(coverage=False)
+    )
 
     assert result.canary.status == "failed"
     assert result.canary.detail.startswith("sandbox_timeout")
@@ -69,13 +71,11 @@ async def test_a_resolver_outage_is_never_attributed_to_the_submission(tmp_path:
     sandbox = HangingSandbox(tmp_path / "sandbox")
 
     result = await grade_step(
-        bundle,
+        Oracle(bundle, sandbox),
         "checkpoint_1",
         _declaring(tmp_path / "app", "flask"),
-        sandbox,
         tmp_path / "work",
-        coverage=False,
-        resolver=fake,
+        OracleSettings(coverage=False, resolver=fake),
     )
 
     assert result.grade.infra_failure is not None
@@ -91,7 +91,11 @@ async def test_a_timeout_the_starter_does_not_reproduce_is_a_failed_agent_outcom
     (app / "hang").write_text("")
 
     result = await grade_step(
-        bundle, "checkpoint_1", app, HangingSandbox(tmp_path / "sb"), tmp_path / "w", coverage=True
+        Oracle(bundle, HangingSandbox(tmp_path / "sb")),
+        "checkpoint_1",
+        app,
+        tmp_path / "w",
+        OracleSettings(coverage=True),
     )
 
     assert result.canary.status == "passed"
@@ -109,7 +113,11 @@ async def test_a_timeout_the_starter_does_not_reproduce_is_a_failed_agent_outcom
 async def test_a_graded_submission_runs_no_canary(tmp_path: Path, bundle: VerifierBundle) -> None:
     sandbox = HangingSandbox(tmp_path / "sb")
     result = await grade_step(
-        bundle, "checkpoint_1", write_app(tmp_path / "app"), sandbox, tmp_path / "w", coverage=False
+        Oracle(bundle, sandbox),
+        "checkpoint_1",
+        write_app(tmp_path / "app"),
+        tmp_path / "w",
+        OracleSettings(coverage=False),
     )
     assert result.canary.status == "not_run"
     assert len(sandbox.runs) == 1
@@ -129,7 +137,11 @@ async def test_a_crash_or_corrupted_ledger_the_starter_does_not_reproduce_is_a_f
     (app / marker).write_text("")
 
     result = await grade_step(
-        bundle, "checkpoint_1", app, HangingSandbox(tmp_path / "sb"), tmp_path / "w", coverage=False
+        Oracle(bundle, HangingSandbox(tmp_path / "sb")),
+        "checkpoint_1",
+        app,
+        tmp_path / "w",
+        OracleSettings(coverage=False),
     )
 
     assert (result.canary.status, result.canary.trigger) == ("passed", trigger)

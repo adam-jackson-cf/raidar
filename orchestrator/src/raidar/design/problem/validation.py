@@ -49,8 +49,6 @@ from decimal import Decimal
 from enum import StrEnum
 from pathlib import Path
 
-from raidar_contract.canonical import digest_json
-
 from raidar.grading.dependency_pins import REFUSAL_REASON, DependencyRefusal
 from raidar.grading.models import CaseGroup, CaseStatus, VerifierGrade
 from raidar.grading.solvable import case_key
@@ -59,6 +57,7 @@ from raidar.scoring.framework.metrics import (
     checkpoint_pass_rate,
     problem_correctness,
 )
+from raidar_contract.canonical import digest_json
 
 POSITIVE = "positive"
 NEGATIVE = "negative"
@@ -406,23 +405,26 @@ def check_positive_repeats(name: str, runs: ValidationRuns) -> Check:
     return Check(name, CheckStatus.INFRA if infra else CheckStatus.PASS, tuple(infra + notes))
 
 
+@dataclass(frozen=True)
+class _RepeatComparison:
+    """One repeat's disagreement with repeat 0: a failure, missing evidence, or neither."""
+
+    failure: str | None = None
+    infra: str | None = None
+
+
 def _compare_repeat_step(
-    index: int,
-    step: str,
-    reference: Grade | None,
-    grade: Grade,
-    quarantined: frozenset[str],
-    failures: list[str],
-    infra: list[str],
-) -> None:
-    """Compare one repeat's step grade with repeat 0, appending to ``failures``/``infra``."""
+    index: int, step: str, reference: Grade | None, grade: Grade, quarantined: frozenset[str]
+) -> _RepeatComparison:
+    """Compare one repeat's step grade with repeat 0."""
     if reference is None or not reference.has_verdict:
-        infra.append(_no_verdict(f"repeat 0 {step}", reference))
-    elif not grade.has_verdict:
-        infra.append(_no_verdict(f"repeat {index} {step}", grade))
-    elif _differs(reference, grade, quarantined):
+        return _RepeatComparison(infra=_no_verdict(f"repeat 0 {step}", reference))
+    if not grade.has_verdict:
+        return _RepeatComparison(infra=_no_verdict(f"repeat {index} {step}", grade))
+    if _differs(reference, grade, quarantined):
         diff = "; ".join(diff_grades(reference, grade)) or "group counts differ"
-        failures.append(f"repeat {index} vs 0 {step}: {diff}")
+        return _RepeatComparison(failure=f"repeat {index} vs 0 {step}: {diff}")
+    return _RepeatComparison()
 
 
 def _differs(reference: Grade, grade: Grade, quarantined: frozenset[str]) -> bool:
@@ -446,7 +448,11 @@ def check_determinism(name: str, runs: ValidationRuns) -> Check:
     for index, grades in enumerate(repeats[1:], start=1):
         for step, grade in grades.items():
             reference = repeats[0].get(step)
-            _compare_repeat_step(index, step, reference, grade, quarantined, failures, infra)
+            compared = _compare_repeat_step(index, step, reference, grade, quarantined)
+            if compared.failure is not None:
+                failures.append(compared.failure)
+            if compared.infra is not None:
+                infra.append(compared.infra)
     return _check(name, failures, sorted(set(infra)))
 
 

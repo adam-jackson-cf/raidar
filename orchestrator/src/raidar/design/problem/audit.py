@@ -43,7 +43,7 @@ from raidar.design.problem.errata import report_entries
 from raidar.design.problem.store import ImportedProblem
 from raidar.design.problem.variant_shim import NEUTRAL_ERROR_TEXT, REFORMATTED_JSON
 from raidar.design.problem.variants import VARIANTS, build_variant
-from raidar.grading.grader import DEFAULT_RUN_TIMEOUT_S, grade_step
+from raidar.grading.grader import DEFAULT_RUN_TIMEOUT_S, Oracle, OracleSettings, grade_step
 from raidar.grading.models import CaseStatus, VerifierGrade
 from raidar.grading.sandbox import GradingSandbox
 
@@ -361,13 +361,11 @@ async def grade_audit_variants(
             )
             async with gate:
                 result = await grade_step(
-                    problem.bundle,
+                    Oracle(problem.bundle, sandbox),
                     step,
                     snapshot,
-                    sandbox,
                     work / "runs" / variant / step,
-                    coverage=False,
-                    timeout_s=timeout_s,
+                    OracleSettings(coverage=False, timeout_s=timeout_s),
                 )
             return StepGradeSummary.from_grade(result.grade)
 

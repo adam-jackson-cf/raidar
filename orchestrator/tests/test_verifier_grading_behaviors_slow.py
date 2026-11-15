@@ -8,7 +8,7 @@ from pathlib import Path
 import pytest
 
 from raidar.grading.bundle import VerifierBundle
-from raidar.grading.grader import BUDGET_MARGIN_S, grade_step
+from raidar.grading.grader import BUDGET_MARGIN_S, Oracle, OracleSettings, grade_step
 from raidar.grading.models import (
     CaseGroup,
     CaseStatus,
@@ -75,7 +75,9 @@ async def test_reference_solution_solves_and_prior_solution_fails_next_checkpoin
     v1 = write_app(tmp_path / "v1")
     v2 = write_app(tmp_path / "v2", mul=True)
 
-    first = await grade_step(bundle, "checkpoint_1", v1, sandbox, tmp_path / "w1", coverage=False)
+    first = await grade_step(
+        Oracle(bundle, sandbox), "checkpoint_1", v1, tmp_path / "w1", OracleSettings(coverage=False)
+    )
     counts = first.grade.group_counts()
     assert first.grade.solved
     assert counts[CaseGroup.CORE].total == 1
@@ -83,11 +85,15 @@ async def test_reference_solution_solves_and_prior_solution_fails_next_checkpoin
     assert counts[CaseGroup.ERROR].total == 1
     assert any(c.status is CaseStatus.SKIPPED for c in first.grade.cases)
 
-    stale = await grade_step(bundle, "checkpoint_2", v1, sandbox, tmp_path / "w2", coverage=False)
+    stale = await grade_step(
+        Oracle(bundle, sandbox), "checkpoint_2", v1, tmp_path / "w2", OracleSettings(coverage=False)
+    )
     assert not stale.grade.solved
     assert stale.grade.group_counts()[CaseGroup.REGRESSION].passed == 3
 
-    solved = await grade_step(bundle, "checkpoint_2", v2, sandbox, tmp_path / "w3", coverage=False)
+    solved = await grade_step(
+        Oracle(bundle, sandbox), "checkpoint_2", v2, tmp_path / "w3", OracleSettings(coverage=False)
+    )
     assert solved.grade.solved
 
 
@@ -98,7 +104,9 @@ async def test_submission_modules_cannot_replace_the_grader_tools(
     for name in ("pytest.py", "coverage.py", "json.py"):
         (app / name).write_text(SHADOW)
 
-    result = await grade_step(bundle, "checkpoint_2", app, sandbox, tmp_path / "w", coverage=True)
+    result = await grade_step(
+        Oracle(bundle, sandbox), "checkpoint_2", app, tmp_path / "w", OracleSettings(coverage=True)
+    )
 
     assert result.grade.infra_failure is None
     assert not result.grade.solved
@@ -114,7 +122,9 @@ async def test_submission_cannot_forge_the_grading_ledger(
     app.mkdir()
     (app / "app.py").write_text(FORGER.lstrip())
 
-    result = await grade_step(bundle, "checkpoint_2", app, sandbox, tmp_path / "w", coverage=False)
+    result = await grade_step(
+        Oracle(bundle, sandbox), "checkpoint_2", app, tmp_path / "w", OracleSettings(coverage=False)
+    )
 
     assert not result.grade.solved
     ledger = json.loads((tmp_path / "w" / "grading" / "out" / "ledger.json").read_text())
@@ -140,7 +150,11 @@ async def test_a_malformed_ledger_is_an_infra_failure_not_a_crash(
 
     app = write_app(tmp_path / "app")
     result = await grade_step(
-        bundle, "checkpoint_2", app, BrokenLedger(sandbox.root), tmp_path / "w", coverage=False
+        Oracle(bundle, BrokenLedger(sandbox.root)),
+        "checkpoint_2",
+        app,
+        tmp_path / "w",
+        OracleSettings(coverage=False),
     )
 
     assert result.grade.infra_failure is not None
@@ -158,7 +172,11 @@ async def test_cases_left_when_the_grading_budget_runs_out_fail_rather_than_infr
     timeout_s = BUDGET_MARGIN_S + 1.0
 
     result = await grade_step(
-        fixture, "checkpoint_1", app, sandbox, tmp_path / "w", coverage=False, timeout_s=timeout_s
+        Oracle(fixture, sandbox),
+        "checkpoint_1",
+        app,
+        tmp_path / "w",
+        OracleSettings(coverage=False, timeout_s=timeout_s),
     )
 
     assert result.grade.infra_failure is None
@@ -173,8 +191,12 @@ async def test_regrading_the_same_snapshot_gives_identical_results(
     tmp_path: Path, bundle: VerifierBundle, sandbox: LocalProcessSandbox
 ) -> None:
     app = write_app(tmp_path / "app")
-    first = await grade_step(bundle, "checkpoint_2", app, sandbox, tmp_path / "a", coverage=True)
-    second = await grade_step(bundle, "checkpoint_2", app, sandbox, tmp_path / "b", coverage=True)
+    first = await grade_step(
+        Oracle(bundle, sandbox), "checkpoint_2", app, tmp_path / "a", OracleSettings(coverage=True)
+    )
+    second = await grade_step(
+        Oracle(bundle, sandbox), "checkpoint_2", app, tmp_path / "b", OracleSettings(coverage=True)
+    )
     assert first.grade == second.grade
     assert first.parity == second.parity
     assert first.grading.evidence == second.grading.evidence
@@ -185,7 +207,9 @@ async def test_grading_never_modifies_the_snapshot(
 ) -> None:
     app = write_app(tmp_path / "app", mul=True)
     before = (app / "app.py").read_bytes()
-    await grade_step(bundle, "checkpoint_2", app, sandbox, tmp_path / "w", coverage=True)
+    await grade_step(
+        Oracle(bundle, sandbox), "checkpoint_2", app, tmp_path / "w", OracleSettings(coverage=True)
+    )
     assert sorted(p.name for p in app.iterdir()) == ["app.py"]
     assert (app / "app.py").read_bytes() == before
 
@@ -194,7 +218,9 @@ async def test_coverage_pass_attributes_lines_per_test_with_parity(
     tmp_path: Path, bundle: VerifierBundle, sandbox: LocalProcessSandbox
 ) -> None:
     app = write_app(tmp_path / "app", mul=True)
-    result = await grade_step(bundle, "checkpoint_2", app, sandbox, tmp_path / "w", coverage=True)
+    result = await grade_step(
+        Oracle(bundle, sandbox), "checkpoint_2", app, tmp_path / "w", OracleSettings(coverage=True)
+    )
 
     assert result.parity is not None
     assert result.parity.eligible, result.parity
@@ -213,7 +239,9 @@ async def test_verdict_flipped_by_instrumentation_makes_coverage_ineligible(
     tmp_path: Path, bundle: VerifierBundle, sandbox: LocalProcessSandbox
 ) -> None:
     app = write_app(tmp_path / "app", mul=True, coverage_sensitive=True)
-    result = await grade_step(bundle, "checkpoint_2", app, sandbox, tmp_path / "w", coverage=True)
+    result = await grade_step(
+        Oracle(bundle, sandbox), "checkpoint_2", app, tmp_path / "w", OracleSettings(coverage=True)
+    )
 
     assert result.grade.solved  # the uninstrumented grading run decides the verdict
     assert result.parity is not None
@@ -227,7 +255,9 @@ async def test_grading_infra_failure_skips_coverage_and_is_ineligible(
 ) -> None:
     (bundle.tests_dir / "conftest.py").write_text("raise RuntimeError('broken corpus')\n")
     app = write_app(tmp_path / "app")
-    result = await grade_step(bundle, "checkpoint_1", app, sandbox, tmp_path / "w", coverage=True)
+    result = await grade_step(
+        Oracle(bundle, sandbox), "checkpoint_1", app, tmp_path / "w", OracleSettings(coverage=True)
+    )
 
     assert result.grade.infra_failure is not None
     assert not result.grade.solved

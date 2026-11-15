@@ -12,11 +12,11 @@ from __future__ import annotations
 import hashlib
 import json
 from collections.abc import Mapping
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Literal
 
 from pydantic import Field
-from raidar_contract.canonical import digest_json
 
 from raidar.grading.errata import ErrataOutcome, ErrataRef, errata_outcome
 from raidar.grading.identity import grading_execution_inventory
@@ -32,6 +32,7 @@ from raidar.grading.outcomes import RunOutcome, StepGrade
 from raidar.grading.parity import fork_regression_run_evidence
 from raidar.grading.solvable import SolvableRef
 from raidar.grading.submission_deps import SubmissionDependencies
+from raidar_contract.canonical import digest_json
 
 VERIFIER_RECORD_DIR = "raidar-oracle"
 RECORD_FILE = "record.json"
@@ -165,36 +166,45 @@ def errata_for(grade: VerifierGrade, errata: ErrataRef | None) -> ErrataOutcome 
     return errata_outcome(grade, errata) if errata is not None else None
 
 
+@dataclass(frozen=True)
+class StepSetting:
+    """What a step was graded from and with: bundle, snapshot, grader, coverage and errata."""
+
+    bundle: BundleRef
+    snapshot: SnapshotRef
+    grader: GraderRef
+    coverage_enabled: bool
+    errata: ErrataRef | None
+
+
 def build_step_record(
     result: StepGrade,
+    setting: StepSetting,
     *,
-    bundle: BundleRef,
-    snapshot: SnapshotRef,
-    grader: GraderRef,
-    coverage_enabled: bool,
     leaks: tuple[LeakReport, LeakReport | None],
     rewards: dict[str, float],
     timings: dict[str, float],
-    errata: ErrataRef | None,
 ) -> StepRecord:
     """The host-only record of one graded step (``leaks``: final, then pre-agent scan)."""
     return StepRecord(
         step=result.grade.step,
         checkpoint=result.grade.checkpoint,
-        bundle=bundle,
-        snapshot=snapshot,
-        grader=grader,
+        bundle=setting.bundle,
+        snapshot=setting.snapshot,
+        grader=setting.grader,
         grade=result.grade,
         summary=result.grade.summary(),
         timing_sensitive_cases=result.grading.timing_sensitive,
         coverage=CoverageRef(
-            enabled=coverage_enabled, parity=result.parity, differences=result.parity_differences
+            enabled=setting.coverage_enabled,
+            parity=result.parity,
+            differences=result.parity_differences,
         ),
         leak_check=leaks[0],
         pre_agent_leak_check=leaks[1],
         rewards=rewards,
         timings=dict(timings),
-        errata=errata_for(result.grade, errata),
+        errata=errata_for(result.grade, setting.errata),
         canary=result.canary,
         submission_dependencies=result.grading.dependencies,
     )

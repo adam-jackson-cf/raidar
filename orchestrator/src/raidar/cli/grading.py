@@ -7,7 +7,6 @@ target (trusted with hidden tests, ensured), which only the CLI does.
 
 from __future__ import annotations
 
-from collections.abc import Iterable
 from pathlib import Path
 from typing import Any
 
@@ -15,7 +14,7 @@ import click
 
 from raidar.cli.target_options import docker_selection
 from raidar.grading import offline
-from raidar.grading.offline import OfflineGradingError, reads_docker_grades
+from raidar.grading.offline import OfflineGradingError, RescoreGrading, reads_docker_grades
 from raidar.grading.regrade import RegradeOptions
 
 
@@ -27,38 +26,18 @@ def regrade(target: Path, options: RegradeOptions, store: Path | None) -> dict[s
         raise click.ClickException(str(exc)) from exc
 
 
-def grade_pre_fix(
-    target: Path,
-    store: Path,
-    scorer_refs: Iterable[str],
-    options: RegradeOptions,
-    *,
-    replay: bool,
-    concurrency: int = 1,
-) -> dict[str, Any] | None:
+def grade_pre_fix(request: RescoreGrading, options: RegradeOptions) -> dict[str, Any] | None:
     """Grade the target's ungraded pre-fix snapshots into the store, when a scorer reads them."""
     try:
-        return offline.grade_pre_fix(
-            target, store, scorer_refs, options, replay=replay, concurrency=concurrency
-        )
+        return offline.grade_pre_fix(request, options)
     except OfflineGradingError as exc:
         raise click.ClickException(str(exc)) from exc
 
 
-def produce_coverage(
-    target: Path,
-    store: Path,
-    scorer_refs: Iterable[str],
-    options: RegradeOptions,
-    *,
-    replay: bool,
-    concurrency: int = 1,
-) -> dict[str, Any] | None:
+def produce_coverage(request: RescoreGrading, options: RegradeOptions) -> dict[str, Any] | None:
     """Make the target's deferred coverage runs into the store, when a scorer reads them."""
     try:
-        return offline.produce_coverage(
-            target, store, scorer_refs, options, replay=replay, concurrency=concurrency
-        )
+        return offline.produce_coverage(request, options)
     except OfflineGradingError as exc:
         raise click.ClickException(str(exc)) from exc
 
@@ -83,6 +62,7 @@ def grading_options(target_name: str | None, bundle_override: Path | None) -> Re
 
 __all__ = [
     "RegradeOptions",
+    "RescoreGrading",
     "check_coverage",
     "grade_pre_fix",
     "grading_options",

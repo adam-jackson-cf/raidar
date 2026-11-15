@@ -39,7 +39,7 @@ import subprocess
 import sys
 import time
 from pathlib import Path
-from typing import Any
+from typing import Any, NamedTuple
 
 import pytest
 
@@ -116,25 +116,33 @@ class RunState:
         self.exit_status: int | None = None
 
 
+# A NamedTuple, not a dataclass: the file is also loaded without a ``sys.modules`` entry.
+class PluginSettings(NamedTuple):
+    """Where one session writes its ledger, what it grades, and how it measures.
+
+    ``budget_s`` is how long the session may start new cases; ``runtime`` is the plugin's own
+    directory, kept off the submission's import path.
+    """
+
+    ledger: Path
+    root: Path
+    scratch: Path
+    coverage: bool
+    budget_s: float | None = None
+    runtime: str = ""
+
+
 class OraclePlugin:
     """Record outcomes, group markers, ledger, process events and coverage."""
 
-    def __init__(
-        self,
-        *,
-        ledger: Path,
-        root: Path,
-        scratch: Path,
-        coverage: bool,
-        budget_s: float | None = None,
-        runtime: str = "",
-    ) -> None:
-        self._ledger_path = ledger
-        self._runtime = runtime
+    def __init__(self, settings: PluginSettings) -> None:
+        self._ledger_path = settings.ledger
+        self._runtime = settings.runtime
+        budget_s = settings.budget_s
         self._deadline = None if budget_s is None else time.monotonic() + budget_s
-        self._root = root
-        self._scratch = scratch
-        self._coverage = coverage
+        self._root = settings.root
+        self._scratch = settings.scratch
+        self._coverage = settings.coverage
         self._config: Any = None
         self._run = RunState()
         self._active: tuple[str, str] | None = None
@@ -408,12 +416,14 @@ def pytest_configure(config: Any) -> None:
     """Register the plugin when loaded with ``-p raidar_oracle_plugin``."""
     environment = _take_oracle_environment()
     plugin = OraclePlugin(
-        ledger=Path(environment[ENV_LEDGER]),
-        root=Path(environment[ENV_ROOT]),
-        scratch=Path(environment[ENV_SCRATCH]),
-        coverage=environment.get(ENV_COVERAGE) == "1",
-        budget_s=float(environment[ENV_BUDGET]) if environment.get(ENV_BUDGET) else None,
-        runtime=environment.get(ENV_RUNTIME, ""),
+        PluginSettings(
+            ledger=Path(environment[ENV_LEDGER]),
+            root=Path(environment[ENV_ROOT]),
+            scratch=Path(environment[ENV_SCRATCH]),
+            coverage=environment.get(ENV_COVERAGE) == "1",
+            budget_s=float(environment[ENV_BUDGET]) if environment.get(ENV_BUDGET) else None,
+            runtime=environment.get(ENV_RUNTIME, ""),
+        )
     )
     # pytest_configure is historic: pluggy replays it for the new plugin.
     config.pluginmanager.register(plugin, "raidar-oracle")

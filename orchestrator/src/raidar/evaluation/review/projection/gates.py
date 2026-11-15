@@ -21,7 +21,7 @@ from raidar.contract.trial import (
     ValidityCheck,
 )
 from raidar.evaluation.review.projection.notes import EvidenceRef, Finding
-from raidar.evaluation.review.projection.spans import SpanBuilder, TextReader
+from raidar.evaluation.review.projection.spans import SpanBuilder, SpanSpec, TextReader
 from raidar.grading.models import CaseStatus
 from raidar.grading.records import RECORD_FILE, StepRecord
 
@@ -85,19 +85,21 @@ def _checkpoint_gate(ctx: GateContext, parent: str, step_result: StepResult) -> 
     excluded = state is CheckpointState.EXCLUDED
     name = f"gate:{step_result.checkpoint}"
     ctx.builder.add(
-        name=name,
-        span_type="TOOL_CALL",
-        status="OK" if solved or excluded else "ERROR",
-        parent=parent,
-        start=ctx.start,
-        input_value=f"oracle strict all-cases verdict for {step_result.step}",
-        output_value={
-            "checkpoint_state": step_result.checkpoint_state.value,
-            "strict_pass_rate": step_result.strict_pass_rate,
-            "rewards": step_result.rewards,
-            "infra_reasons": list(step_result.infra_reasons),
-            **_case_summary(step),
-        },
+        SpanSpec(
+            name=name,
+            span_type="TOOL_CALL",
+            status="OK" if solved or excluded else "ERROR",
+            parent=parent,
+            start=ctx.start,
+            input_value=f"oracle strict all-cases verdict for {step_result.step}",
+            output_value={
+                "checkpoint_state": step_result.checkpoint_state.value,
+                "strict_pass_rate": step_result.strict_pass_rate,
+                "rewards": step_result.rewards,
+                "infra_reasons": list(step_result.infra_reasons),
+                **_case_summary(step),
+            },
+        )
     )
     if solved or excluded or state is CheckpointState.INFRA_ERROR:
         return None  # an infrastructure error is reported once, by the infra gate
@@ -132,16 +134,18 @@ def _validity_gate(ctx: GateContext, parent: str, gate: str, lab: bool) -> Findi
     failed = [check for check in checks if not check.passed]
     name = f"gate:{gate}"
     ctx.builder.add(
-        name=name,
-        span_type="TOOL_CALL",
-        status="ERROR" if failed else "OK",
-        parent=parent,
-        start=ctx.start,
-        input_value=f"execution validity: {', '.join(check.name for check in checks)}",
-        output_value={
-            "checks": [check.model_dump(mode="json") for check in checks],
-            "trial_exception": ctx.record.trial_exception,
-        },
+        SpanSpec(
+            name=name,
+            span_type="TOOL_CALL",
+            status="ERROR" if failed else "OK",
+            parent=parent,
+            start=ctx.start,
+            input_value=f"execution validity: {', '.join(check.name for check in checks)}",
+            output_value={
+                "checks": [check.model_dump(mode="json") for check in checks],
+                "trial_exception": ctx.record.trial_exception,
+            },
+        )
     )
     return _validity_finding(gate, failed) if failed else None
 
@@ -175,11 +179,13 @@ def project_gates(ctx: GateContext) -> list[Finding]:
     scored = (CheckpointState.SOLVED, CheckpointState.EXCLUDED)
     failing = any(a.checkpoint_state not in scored for a in step_results)
     parent = ctx.builder.add(
-        name="verification gates",
-        span_type="INTERNAL",
-        status="ERROR" if failing or not ctx.record.valid else "OK",
-        parent=ctx.root,
-        start=ctx.start,
+        SpanSpec(
+            name="verification gates",
+            span_type="INTERNAL",
+            status="ERROR" if failing or not ctx.record.valid else "OK",
+            parent=ctx.root,
+            start=ctx.start,
+        )
     )
     findings: Sequence[Finding | None] = [
         *(_checkpoint_gate(ctx, parent, step_result) for step_result in step_results),

@@ -18,6 +18,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+from pydantic import JsonValue
 
 from raidar.subject.primitive import calls
 from tests.primitive_support import UNCONFINED, LocalEnvironment, Tree, relocate
@@ -25,7 +26,7 @@ from tests.primitive_support import UNCONFINED, LocalEnvironment, Tree, relocate
 pytestmark = pytest.mark.slow
 
 PY = sys.executable
-CONTEXT = {"task": "write a note", "round": 0}
+CONTEXT: dict[str, JsonValue] = {"task": "write a note", "round": 0}
 
 
 @pytest.fixture

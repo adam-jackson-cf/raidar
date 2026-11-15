@@ -1,11 +1,9 @@
 #!/usr/bin/env python3
-"""Check maintained Python inventory and ratchet the complete strict mypy scan."""
+"""Check maintained Python inventory and fail on any finding of the complete strict mypy scan."""
 
 from __future__ import annotations
 
 import argparse
-import importlib.util
-import json
 import os
 import subprocess
 import sys
@@ -67,7 +65,6 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--root", type=Path, default=ROOT)
     parser.add_argument("--config", type=Path)
-    parser.add_argument("--write-baseline", action="store_true")
     args = parser.parse_args()
     root = args.root.absolute()
     config = args.config or root / "orchestrator/pyproject.toml"
@@ -91,7 +88,6 @@ def main() -> int:
                 "--config-file",
                 str(config),
                 "--no-incremental",
-                "--follow-imports=skip",
                 "--no-pretty",
                 "--no-color-output",
                 *targets,
@@ -105,54 +101,9 @@ def main() -> int:
             print(scan.stderr, file=sys.stderr, end="")
         if scan.returncode not in (0, 1):
             raise ValueError(f"mypy scan failed ({scan.returncode}): {scan.stderr or scan.stdout}")
-        spec = importlib.util.spec_from_file_location(
-            "finding_baseline", Path(__file__).with_name("check-finding-baseline.py")
-        )
-        if spec is None or spec.loader is None:
-            raise ValueError("cannot load finding baseline checker")
-        checker = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(checker)
-
-        class Sources(dict[str, str]):
-            def __missing__(self, path: str) -> str:
-                self[path] = (root / path).read_text()
-                return self[path]
-
-        entries = checker.parse_mypy(scan.stdout, root=str(root), sources=Sources())
-        baseline = root / "scripts/checks/baselines/mypy.json"
-        if args.write_baseline:
-            baseline.parent.mkdir(parents=True, exist_ok=True)
-            baseline.write_text(
-                json.dumps({"schemaVersion": 1, "tool": "mypy", "findings": entries}, indent=2)
-                + "\n"
-            )
-            print(
-                f"Recorded {sum(entry['count'] for entry in entries)} mypy findings "
-                f"in {baseline.relative_to(root)}"
-            )
-            return 0
-        report_dir = Path(os.environ.get("RAIDAR_VAR", root / "var")) / "tmp/quality"
-        report_dir.mkdir(parents=True, exist_ok=True)
-        report = report_dir / "mypy.txt"
-        report.write_text(scan.stdout)
-        return subprocess.run(
-            [
-                sys.executable,
-                str(Path(__file__).with_name("check-finding-baseline.py")),
-                "--tool",
-                "mypy",
-                "--root",
-                str(root),
-                "--baseline",
-                "scripts/checks/baselines/mypy.json",
-                "--report",
-                str(report),
-                "--base-ref",
-                "origin/main",
-            ],
-            cwd=root,
-            check=False,
-        ).returncode
+        if scan.returncode:
+            print(scan.stdout, end="")
+        return scan.returncode
     except (OSError, ValueError, KeyError) as exc:
         print(f"mypy-check: {exc}", file=sys.stderr)
         return 2

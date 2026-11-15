@@ -7,7 +7,6 @@ from collections.abc import Sequence
 from dataclasses import dataclass, field, replace
 from functools import cache
 from pathlib import Path
-from types import SimpleNamespace
 from typing import Any, ClassVar
 
 import pytest
@@ -36,6 +35,7 @@ from tests.lifecycle_support import (
     installed,
     stage_check_record,
 )
+from tests.workflow_support import HarborEnvironmentDouble
 
 NAMESPACE = "acme"
 STAGE_FIXTURES = Path(__file__).parent / "fixtures" / "stages" / NAMESPACE
@@ -93,10 +93,8 @@ def definition_json(params: dict[str, Any] | None = None, fix_rounds: int = 0) -
     }
 
 
-class Env(FakeContainer):
+class Env(FakeContainer, HarborEnvironmentDouble):
     """The lifecycle container as a Harbor environment whose logs are mounted (no host shell)."""
-
-    capabilities = SimpleNamespace(mounted=True)
 
 
 class ScriptedGate:

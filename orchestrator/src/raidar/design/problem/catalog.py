@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import subprocess
+from dataclasses import dataclass
 from pathlib import Path
 
 from raidar.design.problem.models import ProblemId
@@ -34,17 +35,25 @@ def source_catalog(
     return checkout, problems
 
 
+@dataclass(frozen=True)
+class ProblemSelection:
+    """What to select: explicit references, or names from a pinned source or the registry."""
+
+    refs: tuple[str, ...]
+    names: str | None
+    source: str | None
+    checkout_path: Path | None = None
+
+
 def select_problems(
     store: ProblemStore,
-    refs: tuple[str, ...],
-    names: str | None,
-    source: str | None,
-    checkout_path: Path | None = None,
+    selection: ProblemSelection,
     *,
     importing: bool = False,
     run: Runner = subprocess.run,
 ) -> tuple[ProblemId, ...]:
     """Resolve the single-reference and bulk forms without mixing their meanings."""
+    refs, names, source = selection.refs, selection.names, selection.source
     if refs and (names is not None or source is not None):
         raise ProblemStoreError("use references or --problems/--source, not both")
     if refs:
@@ -54,7 +63,7 @@ def select_problems(
     if importing and source is None:
         raise ProblemStoreError("bulk import requires --source <dataset>@<commit>")
     available = (
-        source_catalog(store, source, checkout_path, run=run)[1]
+        source_catalog(store, source, selection.checkout_path, run=run)[1]
         if source is not None
         else tuple(store.registered())
     )

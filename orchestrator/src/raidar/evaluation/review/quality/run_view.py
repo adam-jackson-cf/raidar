@@ -1,5 +1,7 @@
-"""One trial's Quality view: the C·V·E·H·R·G·I·S strip, drill-down evidence, Jev decisions
-and, for a trial that ran behind a commit gate, its gate effort (``gate_view``).
+"""One trial's Quality view.
+
+It holds the C·V·E·H·R·G·I·S strip, drill-down evidence, Jev decisions and, for a trial
+that ran behind a commit gate, its gate effort (``gate_view``).
 
 Checkpoint cells come straight from the stored observations:
 
@@ -24,7 +26,7 @@ unmeasured becomes a zero: every missing value keeps its reason.
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from decimal import Decimal
 from pathlib import Path
 
@@ -385,17 +387,33 @@ def _key(assessment: Assessment | None) -> str | None:
     return assessment.key if assessment is not None else None
 
 
+@dataclass(frozen=True)
+class RunAssessments:
+    """One trial's code-quality, correctness and verification-effort Assessments, if any."""
+
+    quality: Assessment | None
+    correctness: Assessment | None
+    gate: Assessment | None = None
+
+
+@dataclass(frozen=True)
+class RunJev:
+    """The Jev decisions attached to one trial, the labels on them and the attachment note."""
+
+    decisions: Sequence[DecisionRecord] = ()
+    labels: Mapping[str, LabelRecord] = field(default_factory=dict)
+    note: str | None = None
+
+
 def build_run_detail(
     trial: TrialSource,
-    quality: Assessment | None,
-    correctness: Assessment | None,
+    assessments: RunAssessments,
     *,
-    decisions: Sequence[DecisionRecord] = (),
-    labels: Mapping[str, LabelRecord] | None = None,
-    jev_note: str | None = None,
-    gate: Assessment | None = None,
+    jev: RunJev | None = None,
     gate_reader: GateReader = read_gate_from_disk,
 ) -> QualityRunDetail:
+    quality, correctness = assessments.quality, assessments.correctness
+    jev = jev or RunJev()
     record = trial.record
     checkpoints = _checkpoints(trial, quality, correctness)
     policy, info = resolve_policy(trial.experiment.metric, _problem_k(trial, checkpoints))
@@ -429,7 +447,7 @@ def build_run_detail(
         policy_reasons=reasons,
         evidence=evidence,
         exclusions=_exclusions(quality),
-        jev_decisions=_jev_items(decisions, labels or {}),
-        notes=_notes(trial, jev_note),
-        gate=build_gate_view(trial, gate, checkpoints, gate_reader),
+        jev_decisions=_jev_items(jev.decisions, jev.labels),
+        notes=_notes(trial, jev.note),
+        gate=build_gate_view(trial, assessments.gate, checkpoints, gate_reader),
     )

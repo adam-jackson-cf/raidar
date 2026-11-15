@@ -50,8 +50,10 @@ def closure_dir(lock_sha: str) -> str:
 
 
 def unreadable(name: str) -> str:
-    """The declared-set entry standing for a declaration file Raidar cannot read (an unparseable
-    requirement, so health sees it instead of an empty set)."""
+    """The declared-set entry standing for a declaration file Raidar cannot read.
+
+    It is an unparseable requirement, so health sees it instead of an empty set.
+    """
     return f"{name} (unreadable declaration)"
 
 

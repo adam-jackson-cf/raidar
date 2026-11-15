@@ -16,6 +16,7 @@ from pathlib import Path, PurePosixPath
 from typing import Any, ClassVar
 
 import pytest
+from harbor.environments.base import ExecResult
 from harbor.models.agent.context import AgentContext
 
 from raidar.subject.workflow.runner import RECORD_FILE, WorkflowRunner
@@ -45,8 +46,17 @@ class HostEnv(Env):
     """The lifecycle container whose own shell commands (the session-store ctime read) run on the
     host, as the existing workflow environment double does."""
 
-    async def exec(self, command: str, **options: Any) -> Any:
-        return await LocalEnvironment(dict(os.environ)).exec(command, **options)
+    async def exec(
+        self,
+        command: str,
+        cwd: str | None = None,
+        env: dict[str, str] | None = None,
+        timeout_sec: int | None = None,
+        user: str | int | None = None,
+    ) -> ExecResult:
+        shell = LocalEnvironment(dict(os.environ))
+        reply = await shell.exec(command, cwd=cwd, env=env, timeout_sec=timeout_sec, user=user)
+        return ExecResult(return_code=reply.return_code, stdout=reply.stdout, stderr=reply.stderr)
 
 
 @pytest.fixture

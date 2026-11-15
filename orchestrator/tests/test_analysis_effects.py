@@ -344,6 +344,7 @@ def test_several_problems_get_an_equal_weight_aggregate() -> None:
         assert combined.test is not None
         assert combined.test.name is ExactTestName.SIGN_FLIP
         assert combined.mean_delta == pytest.approx(-0.018181818 if reverse else 0.018181818)
+        assert combined.mean_delta is not None
         assert (combined.test.statistic > 0) is (combined.mean_delta > 0)
         assert combined.test.p_value is not None
         assert combined.test.p_value > 0.05
@@ -744,7 +745,7 @@ def test_the_report_shows_dependency_readings_errata_and_material_arm_difference
         return tuple(
             DependencyStep(
                 step=f"checkpoint_{index}",
-                unprovided=[{"requirement": "x", "reason": "no wheel"}] if index < hits else [],
+                unprovided=({"requirement": "x", "reason": "no wheel"},) if index < hits else (),
                 undeclared_imports=None,
                 solvable_solved=False if index < hits else None,
             )

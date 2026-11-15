@@ -199,6 +199,25 @@ def _absence_cause(arm: str, attempt: int, infra: set[tuple[str, int]]) -> str:
     return "infra_error" if (arm, attempt) in infra else "not_run"
 
 
+@dataclass
+class _ExclusionTally:
+    """Running exclusion counts of one component's pairs: overall, by status, per arm."""
+
+    counts: dict[str, int]
+    statuses: dict[str, int]
+    causes: dict[str, dict[str, int]]
+    excluded: dict[str, int]
+
+    @classmethod
+    def empty(cls, arms: tuple[str, str]) -> _ExclusionTally:
+        return cls(
+            counts={"not_run": 0, "infra_error": 0, "ineligible": 0},
+            statuses=defaultdict(int),
+            causes={arm: defaultdict(int) for arm in arms},
+            excluded=dict.fromkeys(arms, 0),
+        )
+
+
 def _pair_component(
     component: str,
     pairs: Sequence[tuple[int, ReviewedTrial | None, ReviewedTrial | None]],
@@ -208,17 +227,14 @@ def _pair_component(
     """Within-attempt differences, tallied the way WS-J tallies exclusions, per arm and cause."""
     differences: list[float] = []
     reasons: list[str] = []
-    tally = {"not_run": 0, "infra_error": 0, "ineligible": 0}
-    statuses: dict[str, int] = defaultdict(int)
-    causes: dict[str, dict[str, int]] = {arm: defaultdict(int) for arm in arms}
-    excluded = dict.fromkeys(arms, 0)
+    tally = _ExclusionTally.empty(arms)
     for attempt, base, other in pairs:
         if base is None or other is None:
             missing = arms[0] if base is None else arms[1]
             cause = _absence_cause(missing, attempt, infra)
-            tally[cause] += 1
-            causes[missing][cause] += 1
-            excluded[missing] += 1
+            tally.counts[cause] += 1
+            tally.causes[missing][cause] += 1
+            tally.excluded[missing] += 1
             reasons.append(f"attempt {attempt}: {missing} {cause.replace('_', ' ')}")
             continue
         base_cell, other_cell = base.detail.problem[component], other.detail.problem[component]
@@ -229,42 +245,34 @@ def _pair_component(
         else:
             differences.append(other_cell.value - base_cell.value)
             continue
-        tally["ineligible"] += 1
-        statuses[gap.status] += 1
+        tally.counts["ineligible"] += 1
+        tally.statuses[gap.status] += 1
         for arm, cell in zip(arms, (base_cell, other_cell), strict=True):
             if cell.value is None:
-                causes[arm][f"ineligible:{cell.status}"] += 1
-                excluded[arm] += 1
+                tally.causes[arm][f"ineligible:{cell.status}"] += 1
+                tally.excluded[arm] += 1
         reasons.append(f"attempt {attempt}: {gap.status}")
-    exclusions = _component_exclusions(
-        len(pairs), len(differences), arms, tally, statuses, causes, excluded
-    )
+    exclusions = _component_exclusions(len(pairs), len(differences), arms, tally)
     return differences, exclusions, reasons
 
 
 def _component_exclusions(
-    planned: int,
-    paired: int,
-    arms: tuple[str, str],
-    tally: dict[str, int],
-    statuses: dict[str, int],
-    causes: dict[str, dict[str, int]],
-    excluded: dict[str, int],
+    planned: int, paired: int, arms: tuple[str, str], tally: _ExclusionTally
 ) -> Exclusions:
     return Exclusions(
         planned=planned,
         paired=paired,
-        ineligible_statuses=dict(statuses),
+        ineligible_statuses=dict(tally.statuses),
         arms=tuple(
             ArmExclusions(
                 arm=arm,
                 planned=planned,
-                excluded=excluded[arm],
-                causes=dict(sorted(causes[arm].items())),
+                excluded=tally.excluded[arm],
+                causes=dict(sorted(tally.causes[arm].items())),
             )
             for arm in arms
         ),
-        **tally,
+        **tally.counts,
     )
 
 
@@ -308,13 +316,20 @@ def _delta(
     )
 
 
+@dataclass(frozen=True)
+class _PairingScope:
+    """The problem a paired Δ belongs to and the settings that decide it."""
+
+    problem: str
+    settings: Settings
+
+
 def _paired(
-    problem: str,
+    scope: _PairingScope,
     trials: Sequence[ReviewedTrial],
     arms: Sequence[str],
     baseline: str | None,
     infra: set[tuple[str, int]],
-    settings: Settings,
 ) -> tuple[PairedDelta, ...]:
     if baseline is None or baseline not in arms:
         return ()
@@ -330,11 +345,11 @@ def _paired(
         ]
         deltas.extend(
             _delta(
-                problem,
+                scope.problem,
                 component,
                 arm,
                 _pair_component(component, pairs, infra, (baseline, arm)),
-                settings,
+                scope.settings,
             )
             for component in COMPONENTS
         )
@@ -583,7 +598,7 @@ def _problem_quality(
         arms=arms,
         run_ids=tuple(sorted(trial.detail.run.id for trial in trials)),
         curves=_curves(counted, arms, checkpoints, settings),
-        paired=_paired(problem, counted, arms, baseline, infra, settings),
+        paired=_paired(_PairingScope(problem, settings), counted, arms, baseline, infra),
         distributions=_distributions(counted, arms),
         head_to_head=_head_to_head(counted, arms, baseline, checkpoints),
         sensitivity=_sensitivity(counted, reference.detail.policy.inertia_weights),

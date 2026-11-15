@@ -6,14 +6,14 @@ from pathlib import Path
 from typing import Any
 
 from raidar.subject.agent.config import Harness
-from raidar.subject.agent.native import native_agent_class
+from raidar.subject.agent.native import CodexNativeAgent, native_agent_class
 
 MODELS = {
     Harness.CODEX_CLI: ("openai/gpt-6-luna", "0.156.1"),
     Harness.CLAUDE_CODE: ("anthropic/claude-sonnet-4-6", "2.1.285"),
 }
 
-CodexNative: Any = native_agent_class(Harness.CODEX_CLI)
+CodexNative = CodexNativeAgent
 """The class that runs Harbor's codex agent (a base for scripted agents)."""
 
 

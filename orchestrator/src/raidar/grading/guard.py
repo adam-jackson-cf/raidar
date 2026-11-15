@@ -19,9 +19,11 @@ Usage (trial runner)::
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Protocol
 
+from harbor.models.trial.paths import TrialPaths
 from harbor.trial.hooks import TrialEvent, TrialHookEvent
-from harbor.trial.trial import Trial
+from harbor.trial.trial import TrialHookCallback
 
 from raidar.grading.bundle import VerifierBundle, load_bundle
 from raidar.grading.leak import LeakScanError, scan_agent_environment
@@ -34,7 +36,19 @@ def current_step(event: TrialHookEvent, bundle: VerifierBundle) -> str:
     return bundle.resolve_step(steps[-1].step_name if steps else None)
 
 
-def install_leak_guard(trial: Trial, oracle_bundle: str | Path) -> None:
+class GuardedTrial(Protocol):
+    """What the leak guard needs of a Harbor ``Trial``."""
+
+    @property
+    def paths(self) -> TrialPaths: ...
+
+    @property
+    def agent_environment(self) -> object: ...
+
+    def add_hook(self, event: TrialEvent, hook: TrialHookCallback) -> None: ...
+
+
+def install_leak_guard(trial: GuardedTrial, oracle_bundle: str | Path) -> None:
     bundle = load_bundle(Path(oracle_bundle))
 
     async def before_agent(event: TrialHookEvent) -> None:

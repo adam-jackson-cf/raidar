@@ -34,11 +34,13 @@ def plugin_fixture() -> ModuleType:
 
 def make_plugin(plugin: ModuleType, tmp_path: Path, *, coverage: bool) -> Any:
     return plugin.OraclePlugin(
-        ledger=tmp_path / "out" / "ledger.json",
-        root=tmp_path / "app",
-        scratch=tmp_path / "scratch",
-        coverage=coverage,
-        runtime="/runtime",
+        plugin.PluginSettings(
+            ledger=tmp_path / "out" / "ledger.json",
+            root=tmp_path / "app",
+            scratch=tmp_path / "scratch",
+            coverage=coverage,
+            runtime="/runtime",
+        )
     )
 
 
@@ -147,12 +149,14 @@ class _Config:
 
 def _configured(plugin: ModuleType, tmp_path: Path, **kwargs: Any) -> Any:
     instance = plugin.OraclePlugin(
-        ledger=tmp_path / "out" / "ledger.json",
-        root=tmp_path / "app",
-        scratch=tmp_path / "scratch",
-        coverage=False,
-        runtime="/runtime",
-        **kwargs,
+        plugin.PluginSettings(
+            ledger=tmp_path / "out" / "ledger.json",
+            root=tmp_path / "app",
+            scratch=tmp_path / "scratch",
+            coverage=False,
+            runtime="/runtime",
+            **kwargs,
+        )
     )
     instance._config = _Config()
     return instance

@@ -18,7 +18,7 @@ from raidar.judge.client import (
     TransportTimeoutError,
 )
 from raidar.judge.live import LIVE_MODEL, RecordedJev
-from raidar.judge.protocol import JEV_MODEL, JEV_PINNED_MODEL, NoulQuestion
+from raidar.judge.protocol import JEV_MODEL, JEV_PINNED_MODEL, NoulAnswer, NoulQuestion
 from raidar.judge.secrets import (
     JUDGE_KEY_ENV,
     SecretIsolationError,
@@ -46,7 +46,9 @@ def test_success_records_raw_request_and_response(tmp_path: Path) -> None:
     live = _live(tmp_path, transport)
     result = live.decide(STATE, QUESTIONS)
     assert isinstance(result, JevSuccess)
-    assert result.answers["q1"].noul == 0.9
+    first_answer = result.answers["q1"]
+    assert isinstance(first_answer, NoulAnswer)
+    assert first_answer.noul == 0.9
     (call,) = live.calls
     root = tmp_path / "judge"
     request = (root / call["request_file"]).read_bytes()

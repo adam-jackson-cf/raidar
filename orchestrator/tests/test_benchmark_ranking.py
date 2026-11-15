@@ -76,6 +76,7 @@ def test_a_benchmark_ranks_agents_with_intervals_pass_at_k_and_cost() -> None:
     codex = ranking.rows[0]
     assert codex.n == 4
     assert codex.mean == pytest.approx(0.8 + 0.01 * 1.5)
+    assert codex.mean is not None
     assert codex.interval is not None
     assert codex.interval.low < codex.mean < codex.interval.high
     assert [entry.k for entry in codex.pass_at_k] == [1, 2, 3, 4]
