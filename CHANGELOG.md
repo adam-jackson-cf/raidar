@@ -4,6 +4,16 @@ All notable changes to this project are documented in this file.
 
 ## Unreleased
 
+- feat(checks)!: audit every lock file, whole repository, every run. The
+  dependency audit discovers manifests and locks from the git inventory (fixture
+  programs excluded), audits each `uv.lock` and `requirements*.txt` with pip-audit
+  and each `package-lock.json` with `npm audit`, and reports a recognised lock
+  format without an auditor or a manifest without a lock. The staged-file trigger
+  and `AUDIT_ARGS=--ci` are gone. Every advisory blocks; each line states lock,
+  ecosystem, package, version, advisory, aliases and fix versions. Owner-approved
+  exceptions for advisories without a fixed release live in
+  `scripts/checks/dependency-audit-exceptions.json`. Relock review-surface on
+  Vite 6.4 to clear its npm advisories.
 - refactor(checks)!: verify only owned code at the third-party boundary. Delete
   the Harbor and payload stubs (mypy reads Harbor's own annotations; the gate tool
   types its container import from the real payload package), add the PyYAML,
