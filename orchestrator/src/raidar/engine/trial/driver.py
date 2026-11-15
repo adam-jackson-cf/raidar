@@ -30,6 +30,7 @@ order and the concurrency bound (``run_in_order``).
 from __future__ import annotations
 
 import asyncio
+import os
 from collections.abc import Awaitable, Callable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
@@ -38,7 +39,7 @@ from typing import Protocol, TypeVar
 from harbor.models.trial.config import TrialConfig
 from harbor.trial.trial import Trial
 
-from raidar.engine.health.liveness import install_liveness_monitor
+from raidar.engine.health.liveness import LivenessConfig, install_liveness_monitor
 from raidar.engine.health.reaper import install_agent_reaper
 from raidar.engine.health.tool_tree import install_tool_tree_watch
 from raidar.engine.trial.provision import TrialProvision, install_trial_provisioning
@@ -68,7 +69,7 @@ async def run_harbor_trial(
     install_agent_reaper(trial, bundle_root)
     install_trial_provisioning(trial, provisions)
     install_tool_tree_watch(trial, bundle_root)
-    install_liveness_monitor(trial)
+    install_liveness_monitor(trial, LivenessConfig.from_env(os.environ))
     result = await trial.run()
     error = result.exception_info.exception_type if result.exception_info else None
     return TrialRun(trial.paths.trial_dir, error)

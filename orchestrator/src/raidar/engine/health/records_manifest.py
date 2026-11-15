@@ -15,7 +15,7 @@ import json
 import os
 from pathlib import Path
 
-from raidar.contract.file_io import load_bytes, store_bytes
+from raidar.contract.file_io import load_bytes, load_sha256, store_bytes
 from raidar.engine.health.model import HEALTH_FILE
 
 RECORDS_MANIFEST = "raidar-records-manifest.json"
@@ -24,11 +24,7 @@ RECORDS_MANIFEST = "raidar-records-manifest.json"
 def _file_digest(path: Path) -> str:
     if path.is_symlink():
         return "symlink:" + hashlib.sha256(os.readlink(path).encode()).hexdigest()
-    digest = hashlib.sha256()
-    with path.open("rb") as handle:
-        for chunk in iter(lambda: handle.read(1 << 20), b""):
-            digest.update(chunk)
-    return digest.hexdigest()
+    return load_sha256(path)
 
 
 def current_files(trial_dir: Path, record_file: Path, job_dir: Path) -> dict[str, str]:

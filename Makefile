@@ -142,7 +142,7 @@ help:
 	@echo "  make dependency-audit-check [AUDIT_ARGS=--ci]            Strict locked audit on dependency changes (always with --ci)"
 	@echo "  make gate-commit                                       Whole-tree policy, static/T1 checks and affected local T2 seams"
 	@echo "  make gate-ci                                           Commit gate, slow tier, then quality tier (every push and pull request)"
-	@echo "  make analyzer-scope-check                              Check analyzer I/O boundaries and CODEOWNERS with finding-level debt ratchets"
+	@echo "  make analyzer-scope-check                              Check analyzer I/O boundaries and CODEOWNERS; any finding blocks"
 	@echo "  make version-release                                   Prepare an on-demand release PR from HEAD at origin/main; refuses no-bump histories"
 	@echo "  make version-check                                     Check CLI, lock and CHANGELOG versions and release-entry history; part of make quality"
 	@echo "  make test-fast                                         Fast test tier (not slow/quality/docker/security/perf) with line and branch coverage floors; part of make quality"
@@ -787,12 +787,7 @@ release-archive:
 
 analyzer-scope-check:
 	@$(REPO_RUNTIME_ENV) uv run --project orchestrator --extra dev \
-		python scripts/checks/check-analyzer-scope.py --format findings-json \
-		> "$(REPO_TMP_DIR)/analyzer-scope-findings.json"
-	@$(REPO_RUNTIME_ENV) uv run --project orchestrator --extra dev \
-		python scripts/checks/check-finding-baseline.py --tool analyzer-scope --format findings-json \
-		--report "$(REPO_TMP_DIR)/analyzer-scope-findings.json" \
-		--baseline scripts/checks/baselines/analyzer-scope.json
+		python scripts/checks/check-analyzer-scope.py
 
 gate-commit:
 	@$(REPO_RUNTIME_ENV) uv run --project orchestrator --extra dev \

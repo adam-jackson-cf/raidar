@@ -404,16 +404,14 @@ def test_checker_inventory_ignores_external_symlinks_and_checks_git_files(tmp_pa
             str(ROOT / "scripts/checks/check-analyzer-scope.py"),
             "--repo-root",
             str(repository),
-            "--format",
-            "findings-json",
         ],
         capture_output=True,
         text=True,
         check=False,
         timeout=30,
     )
-    assert result.returncode == 0, result.stderr
-    assert {finding["path"] for finding in json.loads(result.stdout)} == set(paths)
+    assert result.returncode == 1, result.stderr
+    assert {line.split(":", 1)[0] for line in result.stdout.splitlines()} == set(paths)
     program = (
         "import runpy,sys; from pathlib import Path; "
         f"sys.path.insert(0, {str(ROOT / 'scripts/checks')!r}); "

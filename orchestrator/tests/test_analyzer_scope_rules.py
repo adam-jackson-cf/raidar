@@ -317,3 +317,16 @@ def test_nominally_unrelated_scorer_still_has_behavioral_purity_obligations(
         "    def assess(self, context):\n        return os.environ.items()\n",
     )
     _assert_finding(checker.analyzer_findings(tmp_path, [relative]), relative, "PYS252")
+
+
+@pytest.mark.parametrize(
+    "relative",
+    [
+        "orchestrator/src/raidar/engine/health/liveness.py",
+        "orchestrator/src/raidar/engine/health/records_manifest.py",
+    ],
+)
+def test_health_modules_take_environment_and_files_through_their_seams(
+    checker: AnalyzerChecker, relative: str
+) -> None:
+    assert checker.analyzer_findings(ROOT, [relative]) == []

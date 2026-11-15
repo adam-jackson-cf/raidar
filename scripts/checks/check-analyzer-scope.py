@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """Check behavioral analyzer boundaries (filesystem, process and environment access).
 
+Every finding blocks: the check exits non-zero on any diagnostic, with no waived findings.
+
 The nominal analyzer rules PYQ210/PYQ211 live in check-python-quality.py. Scorers use a
 structural Protocol and are not ``*Analyzer`` classes, so those rules find nothing today.
 See docs/reboot/evidence/decide-analyzer-sol.md for the adopted architecture.
@@ -11,7 +13,6 @@ from __future__ import annotations
 import argparse
 import ast
 import fnmatch
-import json
 from pathlib import Path
 
 from git_inventory import python_paths
@@ -197,9 +198,9 @@ def _parents(tree: ast.AST) -> dict[ast.AST, ast.AST]:
     return {child: parent for parent in ast.walk(tree) for child in ast.iter_child_nodes(parent)}
 
 
-def _scan(root: Path, paths: list[str]) -> tuple[list[str], list[dict[str, str]]]:
+def analyzer_findings(root: Path, paths: list[str]) -> list[str]:
+    """Return every boundary operation and whole-scope ownership diagnostic."""
     diagnostics = ownership_findings(root)
-    findings: list[dict[str, str]] = []
     for path in sorted(set(paths)):
         if not path.endswith(".py") or not path.startswith(SCOPE_ROOTS):
             continue
@@ -214,42 +215,26 @@ def _scan(root: Path, paths: list[str]) -> tuple[list[str], list[dict[str, str]]
         visitor = BoundaryVisitor(path)
         visitor.parents = _parents(tree)
         visitor.visit(tree)
-        for node, code, symbol in visitor.operations:
+        for node, code, _symbol in visitor.operations:
             row = getattr(node, "lineno", 1)
             column = getattr(node, "col_offset", 0) + 1
             operation = ast.unparse(node)
-            findings.append(
-                {"path": path, "code": code, "symbol": symbol, "source_line": operation}
-            )
             fix = (
                 "inject retained inputs through an approved filesystem seam"
                 if code == "PYS251"
                 else "inject environment or process results through run_process"
             )
             diagnostics.append(f"{path}:{row}:{column} {code} direct {operation}; {fix}")
-    return diagnostics, findings
-
-
-def analyzer_findings(root: Path, paths: list[str]) -> list[str]:
-    """Return unsuppressed operations and whole-scope ownership diagnostics."""
-    return _scan(root, paths)[0]
+    return diagnostics
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--repo-root", type=Path, default=ROOT)
-    parser.add_argument("--format", choices=("text", "findings-json"), default="text")
     arguments = parser.parse_args()
     paths = [path for path in python_paths(arguments.repo_root) if path.startswith(SCOPE_ROOTS)]
-    diagnostics, findings = _scan(arguments.repo_root, paths)
-    if arguments.format == "findings-json":
-        # Ownership and parse failures must never disappear behind an I/O baseline.
-        blockers = [line for line in diagnostics if " PYS253 " in line or " PYS000 " in line]
-        if blockers:
-            parser.exit(2, "\n".join(blockers) + "\n")
-        print(json.dumps(findings))
-        return 0
-    else:
+    diagnostics = analyzer_findings(arguments.repo_root, paths)
+    if diagnostics:
         print("\n".join(diagnostics))
     return int(bool(diagnostics))
 

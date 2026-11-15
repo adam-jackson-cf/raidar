@@ -37,7 +37,7 @@ make gate-commit
 | Toolchain              | Exact tool-pin, installer/lock agreement and maintained Markdown/YAML formatting checks block changes that fail their requirements. | Use the locked formatter; dependency changes also run the pinned audit (CI always audits).                  |
 
 > [!IMPORTANT]
-> **Owning policies:** [ownership map](../../scripts/checks/repository-owners.json) defines owners, tiers and seams; [baselines](../../scripts/checks/baselines/) hold the shrink-only Ruff, mypy and analyzer debt. Unknown local ownership runs all T2 seams rather than skipping tests. Docker, performance and security checks are separate gates.
+> **Owning policies:** [ownership map](../../scripts/checks/repository-owners.json) defines owners, tiers and seams; [baselines](../../scripts/checks/baselines/) hold the shrink-only Ruff and mypy debt; the analyzer I/O boundary check has no baseline and blocks on every finding. Unknown local ownership runs all T2 seams rather than skipping tests. Docker, performance and security checks are separate gates.
 
 Sources: [.pre-commit-config.yaml](../../.pre-commit-config.yaml); [Makefile](../../Makefile) (`gate-commit`, `gate-ci`, `quality`); [scripts/checks/repository-owners.json](../../scripts/checks/repository-owners.json); [scripts/checks/check-python-quality.py](../../scripts/checks/check-python-quality.py); [scripts/checks/check-analyzer-scope.py](../../scripts/checks/check-analyzer-scope.py).
 

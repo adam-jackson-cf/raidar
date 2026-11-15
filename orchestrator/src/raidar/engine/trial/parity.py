@@ -16,6 +16,7 @@ each step's ``workflow/workflow.json``, and the trial record keeps each distinct
 from __future__ import annotations
 
 import json
+import os
 import tomllib
 from collections.abc import Iterable, Iterator, Mapping, Sequence
 from pathlib import Path
@@ -122,5 +123,5 @@ def parity_record(
         network=agent_network(task_dir),
         image_id=image_id,
         timeouts=timeouts,
-        liveness=LivenessConfig.from_env().as_json(),
+        liveness=LivenessConfig.from_env(os.environ).as_json(),
     )
